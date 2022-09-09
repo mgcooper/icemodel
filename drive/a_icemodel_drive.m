@@ -1,6 +1,7 @@
 clean
-
-%%   run dependent information
+%--------------------------------------------------------------------------
+%   run dependent information
+%--------------------------------------------------------------------------
 savedata    =  true;
 sitename    =  'region';
 forcingdata =  'mar';
@@ -13,17 +14,6 @@ endyear     =   2018;
 npts        =   1487;
 si          =   671;              % 298, 671, 1046,  1420 
 ei          =   744;             % 372, 744, 1116, 1487
-
-% 223+(372-223)/2
-% 597+(744-597)/2
-% 975+(1116-975)/2
-% 1352+(1487-1352)/2
-
-rmpath(genpath('/Volumes/GoogleDrive/My Drive/MATLAB/GREENLAND/icemodel/model'));
-
-modelpath = '/Users/mattcooper/projects/icemodel/v10';
-addpath(genpath(modelpath));
-cd(modelpath)
 
 % MAKE SURE TO SET THE RIGHT PATH
 drive          =  '/Users/mattcooper/data/';
