@@ -1,5 +1,5 @@
 
-function [ice1,ice2] = icemodel_region_lists(opts)
+function [ice1,ice2] = icemodel_region(opts)
    
 %--------------------------------------------------------------------------
 %   INITIALIZE THE MODEL
