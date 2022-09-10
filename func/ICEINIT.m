@@ -25,7 +25,9 @@ function [  f_ice,                                                      ...
             scoef,                                                      ...
             ro_sno,                                                     ...
             ro_iwe,                                                     ...
-            ro_wie ]   =   ICEINIT(opts,met)
+            ro_wie,                                                     ...
+            enbal,                                                      ...
+            ice2  ]   =   ICEINIT(opts,met)
 %--------------------------------------------------------------------------
 
 % load the physical constants to be used.
@@ -41,8 +43,8 @@ function [  f_ice,                                                      ...
    dz_spect       =  opts.dz_spectral;
    z0_therm       =  opts.z0_thermal;
    ro_i           =  opts.ro_snow_i;
-%    maxiter        =  opts.maxiter;
-%    use_ro_glc     =  opts.ro_glc;
+   maxiter        =  opts.maxiter;
+   use_ro_glc     =  opts.use_ro_glc;
    
 %    % test
 %    A1 = ones(JJ_therm,1);
@@ -55,23 +57,21 @@ function [  f_ice,                                                      ...
    grid_therm ]   =  CVTHERMAL(z0_therm,dz_therm);
    
    % Density for melt/freeze
-%    ro_glc      =  (917+1000)/2;                    % [kg/m3]
-%    if use_ro_glc == true
-%       ro_ice   =  ro_glc;
-%       ro_liq   =  ro_glc;
-%    end
+   ro_glc      =  (917+1000)/2;                    % [kg/m3]
+   if use_ro_glc == true
+      ro_ice   =  ro_glc;
+      ro_liq   =  ro_glc;
+   end
    ro_wie      =  ro_liq./ro_ice;
    ro_iwe      =  ro_ice./ro_liq;
 
-%    % Init ice temperature
-%    if opts.use_init == true
-%       load(opts.f_init);
-%       T        =  init.T+met.tair(1)-init.T(1);
-%    else
-%       T        =  (met.tair(1)-1).*ones(JJ_therm,1);
-%    end
-
-   T           =  (met.tair(1)-1).*ones(JJ_therm,1);
+   % Init ice temperature
+   if opts.use_init == true
+      load(opts.f_init);
+      T        =  init.T+met.tair(1)-init.T(1);
+   else
+      T        =  (met.tair(1)-1).*ones(JJ_therm,1);
+   end
 
    % Init liquid/ice water fraction, bulk densities, and aP coeff
    Tdep        =  Tf-T(:,1);                       % [K]
@@ -107,96 +107,27 @@ function [  f_ice,                                                      ...
    Sp          =  zeros(JJ_therm,1);
    
    % Initialize the output structures
-%    enbal.Tsfc        = nan(maxiter,1);
-%    enbal.Qle         = nan(maxiter,1);
-%    enbal.Qh          = nan(maxiter,1);
-%    enbal.Qe          = nan(maxiter,1);
-%    enbal.Qc          = nan(maxiter,1);
-%    enbal.Qm          = nan(maxiter,1);
-%    enbal.Qf          = nan(maxiter,1);
-%    enbal.chi         = nan(maxiter,1);
-%    enbal.balance     = nan(maxiter,1);
-%    enbal.dt          = nan(maxiter,1);
-%    enbal.zD          = nan(maxiter,1);
-%    
-%    % Save the vertical ice column data   
-%    ice2.Tice         = nan(JJ_therm,maxiter);
-%    ice2.f_ice        = nan(JJ_therm,maxiter);
-%    ice2.f_liq        = nan(JJ_therm,maxiter);
-%    ice2.Sc           = nan(JJ_therm,maxiter);
-%    ice2.errH         = nan(JJ_therm,maxiter);
-%    ice2.errT         = nan(JJ_therm,maxiter);
-%    ice2.df_liq       = nan(JJ_therm,maxiter);
-%    ice2.df_drn       = nan(JJ_therm,maxiter);
+   enbal.Tsfc        = nan(maxiter,1);
+   enbal.Qle         = nan(maxiter,1);
+   enbal.Qh          = nan(maxiter,1);
+   enbal.Qe          = nan(maxiter,1);
+   enbal.Qc          = nan(maxiter,1);
+   enbal.Qm          = nan(maxiter,1);
+   enbal.Qf          = nan(maxiter,1);
+   enbal.chi         = nan(maxiter,1);
+   enbal.balance     = nan(maxiter,1);
+   enbal.dt          = nan(maxiter,1);
+   enbal.zD          = nan(maxiter,1);
+   
+   % Save the vertical ice column data   
+   ice2.Tice         = nan(JJ_therm,maxiter);
+   ice2.f_ice        = nan(JJ_therm,maxiter);
+   ice2.f_liq        = nan(JJ_therm,maxiter);
+   ice2.Sc           = nan(JJ_therm,maxiter);
+   ice2.errH         = nan(JJ_therm,maxiter);
+   ice2.errT         = nan(JJ_therm,maxiter);
+   ice2.df_liq       = nan(JJ_therm,maxiter);
+   ice2.df_drn       = nan(JJ_therm,maxiter);
    
 %    diags.Tflag       = false(maxiter,1);
 %    diags.LCflag      = false(maxiter,1);
-   
-
-%       dz       =  opts.dz_thermal;
-%       Z        =  opts.z0_thermal;
-%       z        =  (dz/2:dz:Z-dz/2)';      
-%       figure; plot([init.T init.T+dT],z); set(gca,'YDir','reverse'); 
-      
-%       cp_sno(:,1) =  init.cp_sno;
-%       k_eff(:,1)  =  init.k_eff;
-%       ro_sno(:,1) =  init.ro_sno;
-%       f_liq(:,1)  =  init.f_liq;
-%       f_ice(:,1)  =  init.f_ice;
-   
-% normally f_liq = f_wat/(1+(fcp*(Tf-Td))^2) 
-% so I use f_liq_min = f_wat/(1+(fcp*(Tf-TL))^2) = flmin
-% and similar for f_liq_max
-% but f_liq_min/max should change as f_wat changes. 
-% so instead I should define flmin/max as 
-%    flmin    = 1/(1+(fcp*(Tf-TL))^2)
-%    flmax    = 1/(1+(fcp*(Tf-TH))^2)
-% where flmin/max are now the same quantities defined in sntherm as
-% flglim(1) and flglim(2) (i.e., f_sub_ell in eq. 67), rather than
-% frac_liq_min/max as I have them above returned from MELTCURVE. I would
-% then update frac_liq_min/max at the top of ICEENBAL as:
-%    fliqmin = f_wat./flmin;
-%    fliqmax = f_wat./flmax;
-% and send these into MZTRANSFORM
-   
-% this is how jordan does it:
-% first compute TL,TH (as above)
-% then compute flmin/flmax as:
-%    flmin    = 1/(1+(fcp*(Tf-TL))^2)
-%    flmax    = 1/(1+(fcp*(Tf-TH))^2)
-% note that f_liq/f_wat = g_liq/g_wat 
-
-
-% % confirm that MELTCURVE recovers the same frac's
-%    f_wat    = f_liq+f_ice.*ro_ice./ro_liq;              % frac_wat_old
-%    f_liq2   = f_wat./(1.0+(fcp.*Tdep).^2.0);            % eq 67, Jordan
-%    f_ice2   = (f_wat - f_liq) .* ro_liq ./ ro_ice;
-%    f_air2   = 1.0-f_liq-f_ice;
-   
-%    % save the ice surface data
-%    surf_mlt    =  0.0;
-%    surf_frz    =  0.0;
-%    surf_rof    =  0.0;
-%    surf_sub    =  0.0;
-%    surf_con    =  0.0;
-
-%    ice1.surf_melt    = zeros(maxiter,1);
-%    ice1.surf_freeze  = zeros(maxiter,1);
-%    ice1.surf_subl    = zeros(maxiter,1);
-%    ice1.surf_cond    = zeros(maxiter,1);
-%    ice1.surf_runoff  = zeros(maxiter,1);
-   
-      
-   % put the data into an output structure (unimplemented)
-   % init.dy_p                       =   dy_p;
-   % init.f_n                        =   f_n;
-   % init.dely_p                     =   dely_p;
-   % init.T_old                      =   T_old;
-   % init.melt_frac                  =   melt_frac;
-   % init.freeze                     =   freeze;
-   % init.gamma                      =   gamma;
-   % init.ro_snow_z                  =   ro_snow_z;
-   % init.xk_snow                    =   xk_snow;
-   % init.freeze_frac                =   freeze_frac;
-   % init.water_depth_old            =   water_depth_old;
-   % init.freeze_depth_old           =   freeze_depth_old;

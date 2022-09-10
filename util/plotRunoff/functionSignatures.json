@@ -1,0 +1,21 @@
+{
+  "_schemaVersion": "1.0.0",
+  "plotRunoff":
+  {
+     "inputs":
+     [
+        {"name":"Runoff",     "kind":"required",  "type":["timetable"]},
+        {"name":"Discharge",  "kind":"required",  "type":["timetable"]},
+        {"name":"Catchment",  "kind":"required",  "type":["struct"]},
+        {"name":"plotpatch",  "kind":"namevalue", "type":["logical"]},
+        {"name":"plotcolumn", "kind":"namevalue", "type":["logical"]},
+        {"name":"plotsurf",   "kind":"namevalue", "type":["logical"]},
+        {"name":"plotmelt",   "kind":"namevalue", "type":["logical"]},
+        {"name":"plotcomp",   "kind":"namevalue", "type":["logical"]},
+        {"name":"plotcomp",   "kind":"namevalue", "type":["logical"]},
+        {"name":"plotmean",   "kind":"namevalue", "type":["logical"]},
+        {"name":"plotensemble","kind":"namevalue", "type":["logical"]},
+        {"name":"legendtext", "kind":"namevalue", "type":["cell"]}
+     ]
+  }
+}

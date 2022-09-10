@@ -1,5 +1,5 @@
 
-function [ice1,ice2] = icemodel_region_lists(opts)
+function [ice1,ice2,times] = icemodel_region_test_save(opts)
    
 %--------------------------------------------------------------------------
 %   INITIALIZE THE MODEL
@@ -12,16 +12,13 @@ function [ice1,ice2] = icemodel_region_lists(opts)
                      'Rv','Tf','TINY');
                   
 % load the first met file
-   load([opts.pathmet 'met_' int2str(opts.ipt) '.mat'],'met');
+   simyear  = int2str(opts.simyears(1));
+   load([opts.pathmet simyear '/met_' int2str(opts.ipt) '.mat'],'met');
 
-   maxiter = 35040;
-
-   bi = find(met.modis<=0 | met.modis>=1);
-   met.modis(bi) = met.albedo(bi);
-
-   if string(opts.userdata) == "modis"
-      met.albedo = met.modis;
+   if isleap(opts.simyears(1))
+      met = rmleapinds(met);
    end
+   maxiter = size(met,1);
    
 %  INITIALIZE THE ICE COLUMN
 [  f_ice,                                                               ...
@@ -77,8 +74,6 @@ function [ice1,ice2] = icemodel_region_lists(opts)
    spect_upper,                                                         ...
    solardwavl  ]     =     EXTCOEFSINIT(opts,radii,scattercoefs,        ...
                            solar,kabs,kice,dz_spect,JJ_spect,ro_ice);
-
-   clear radii scattercoefs solar
 %--------------------------------------------------------------------------
 %   START THE MODEL
 %--------------------------------------------------------------------------
@@ -113,32 +108,28 @@ for MM = 1:opts.numyears
    simyear     = int2str(opts.simyears(MM));
    pathoutput  = [opts.pathsave simyear '/'];
    
-   t1          = datetime(opts.simyears(MM),1,1,0,0,0);
-   t2          = datetime(opts.simyears(MM),12,31,23,45,0);
-   t1.TimeZone = 'UTC';
-   t2.TimeZone = 'UTC';
-   Time        = met.Time(isbetween(met.Time,t1,t2));
-   iter0       = find(met.Time==t1);
-
+   load([opts.pathmet simyear '/met_' int2str(opts.ipt) '.mat'],'met');
+   if isleap(opts.simyears(MM))
+      met = rmleapinds(met);
+   end
+   
 %--------------------------------------------------------------------------
 %--------------------------------------------------------------------------
    
    while iter <= maxiter
    
-   metiter = iter+iter0-1;
-
 % reset the change in liq water content
    d_liq       =  0.0.*f_liq;
    d_drn       =  0.0.*f_liq;
 
 %  load the atmospheric forcing data for this time step.
-   Tair        =  met.tair(metiter);
-   rh          =  met.rh(metiter);
-   wspd        =  met.wspd(metiter);
-   Qsi         =  met.swd(metiter);
-   Qli         =  met.lwd(metiter);
-   Pa          =  met.psfc(metiter);
-   albedo      =  met.albedo(metiter);
+   Tair        =  met.tair(iter);
+   rh          =  met.rh(iter);
+   wspd        =  met.wspd(iter);
+   Qsi         =  met.swd(iter);
+   Qli         =  met.lwd(iter);
+   Pa          =  met.psfc(iter);
+   albedo      =  met.albedo(iter);
    De          =  wspd*wcoef;
    ea          =  VAPPRESS(rh,Tair,liqflag);
    
@@ -266,17 +257,73 @@ for MM = 1:opts.numyears
       iter     =  iter + 1;
 
    end % timesteps (one year)
-   
-   % post process
-   [ice1,ice2] = POSTPROC2(T_sfc,T_ice,frac_ice,frac_liq,df_liq,Time,opts);
 
 %--------------------------------------------------------------------------
-%  save the data
+%%  save the data
 %--------------------------------------------------------------------------
    if opts.savedata == true
       if ~exist(pathoutput,'dir'); mkdir(pathoutput); end
-      save([pathoutput 'ice1_' int2str(opts.ipt)],'ice1','-v7.3');
-      save([pathoutput 'ice2_' int2str(opts.ipt)],'ice2','-v7.3');
+      
+      versions = {'-v4','-v6','-v7','-v7.3'};
+      times    = nan(3,numel(versions)+2);
+      
+      for n = 1:numel(versions)
+         
+         v     = versions{n};
+         fsfx  = strrep(strrep(v,'-',''),'.','');
+
+         % tt
+         [ice1,ice2] = POSTPROC2(T_sfc,T_ice,frac_ice,frac_liq,...
+                                       df_liq,met,opts);
+         ice1 = removevars(ice1,{'surf_runoff','column_runoff'});
+         tic;  save([pathoutput 'tt_' fsfx],'ice1','ice2',v);
+         times(1,n) = toc;
+         
+         if n == numel(versions)
+            tic;  save([pathoutput 'tt_v7_no'],'ice1','ice2','-v7','-nocompression');
+            times(1,n+1) = toc;
+            tic;  save([pathoutput 'tt_v73_no'],'ice1','ice2','-v7.3','-nocompression');
+            times(1,n+2) = toc;
+         end
+         
+         % struct
+         [ice1,ice2] = POSTPROC2_test(T_sfc,T_ice,frac_ice,frac_liq,...
+                                       df_liq,met,opts);
+         tic;  save([pathoutput 'struct_' fsfx],'ice1','ice2',v);
+         times(2,n) = toc;
+         
+         if n == numel(versions)
+            tic;  save([pathoutput 'struct_v7_no'],'ice1','ice2','-v7','-nocompression');
+            times(2,n+1) = toc;
+            tic;  save([pathoutput 'struct_v73_no'],'ice1','ice2','-v7.3','-nocompression');
+            times(2,n+2) = toc;
+         end
+         
+         % arrays
+         [Tsfc,runoff,melt,freeze,                                   ...
+         Tice,f_ice,f_liq,d_liq] = POSTPROC2_test2(T_sfc,T_ice,    ...
+                                 frac_ice,frac_liq,df_liq,met,opts);
+      
+         tic; save([pathoutput 'vec_' fsfx], ...
+         'Tsfc','runoff','melt','freeze', ...
+         'Tice','f_ice','f_liq','d_liq',v);
+         times(3,n) = toc;
+         
+         if n == numel(versions)
+            tic;  save([pathoutput 'vec_v7_no'], ...
+            'Tsfc','runoff','melt','freeze', ...
+            'Tice','f_ice','f_liq','d_liq','-v7','-nocompression');
+            times(3,n+1) = toc;
+            tic;  save([pathoutput 'vec_v73_no'], ...
+            'Tsfc','runoff','melt','freeze', ...
+            'Tice','f_ice','f_liq','d_liq','-v7.3','-nocompression');
+            times(3,n+2) = toc;
+         end
+         
+      end
+      times = array2table(times,'VariableNames',{'v4','v6','v7','v73','v7no','v73no'}, ...
+      'RowNames',{'timetable','struct','arrays'});
+      
    end
    
    % restart the counters

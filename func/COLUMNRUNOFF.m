@@ -3,19 +3,11 @@
 %--------------------------------------------------------------------------
 
 %--------------------------------------------------------------------------
-function runoff = COLUMNRUNOFF(h_melt,h_freeze,opts)
+function runoff = COLUMNRUNOFF(melt,freeze,opts)
 %--------------------------------------------------------------------------
 
 tlag        =  opts.tlagcolumn;
-melt        =  (sum(h_melt,1))';
-freeze      =  (sum(h_freeze,1))';
-
-% this should allow tlag to be set to zero
-if tlag == 0
-    runoff(1,1)         =   0.0;
-else
-    runoff(1:tlag,1)    =   0.0;
-end
+runoff      =  zeros(size(melt));
 
 for n = 1+tlag:length(melt)
     meltsumlag      =   sum(melt(n-tlag:n));
@@ -44,4 +36,3 @@ end
 % carried forward and subjected to the freeze energy at later timesteps,
 % just like it occurs in the real world). 
 % note: need to add rain
-
