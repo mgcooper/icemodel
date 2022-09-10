@@ -26,7 +26,7 @@ function [  f_ice,                                                      ...
             ro_sno,                                                     ...
             ro_iwe,                                                     ...
             ro_wie,                                                     ...
-            enbal,                                                      ...
+            ice1,                                                       ...
             ice2  ]   =   ICEINIT(opts,met)
 %--------------------------------------------------------------------------
 
@@ -45,10 +45,6 @@ function [  f_ice,                                                      ...
    ro_i           =  opts.ro_snow_i;
    maxiter        =  opts.maxiter;
    use_ro_glc     =  opts.use_ro_glc;
-   
-%    % test
-%    A1 = ones(JJ_therm,1);
-%    A = spdiags([A1,A1,A1],-1:1,JJ_therm,JJ_therm);
    
    % Compute c.v. size information.
 [  dz,                                                               ...
@@ -72,6 +68,8 @@ function [  f_ice,                                                      ...
    else
       T        =  (met.tair(1)-1).*ones(JJ_therm,1);
    end
+
+   % T        =  (met.tair(1)-1).*ones(JJ_therm,1);
 
    % Init liquid/ice water fraction, bulk densities, and aP coeff
    Tdep        =  Tf-T(:,1);                       % [K]
@@ -105,19 +103,26 @@ function [  f_ice,                                                      ...
    % source term linearization vectors
    Sc          =  zeros(JJ_therm,1);
    Sp          =  zeros(JJ_therm,1);
-   
-   % Initialize the output structures
-   enbal.Tsfc        = nan(maxiter,1);
-   enbal.Qle         = nan(maxiter,1);
-   enbal.Qh          = nan(maxiter,1);
-   enbal.Qe          = nan(maxiter,1);
-   enbal.Qc          = nan(maxiter,1);
-   enbal.Qm          = nan(maxiter,1);
-   enbal.Qf          = nan(maxiter,1);
-   enbal.chi         = nan(maxiter,1);
-   enbal.balance     = nan(maxiter,1);
-   enbal.dt          = nan(maxiter,1);
-   enbal.zD          = nan(maxiter,1);
+
+% Initialize the output structures
+if opts.sitename == "region"
+   ice1.Tsfc         = nan(maxiter,1);
+   ice2.Tice         = nan(JJ_therm,maxiter);
+   ice2.f_ice        = nan(JJ_therm,maxiter);
+   ice2.f_liq        = nan(JJ_therm,maxiter);
+   ice2.df_liq       = nan(JJ_therm,maxiter);
+else
+   ice1.Tsfc        = nan(maxiter,1);
+   ice1.Qle         = nan(maxiter,1);
+   ice1.Qh          = nan(maxiter,1);
+   ice1.Qe          = nan(maxiter,1);
+   ice1.Qc          = nan(maxiter,1);
+   ice1.Qm          = nan(maxiter,1);
+   ice1.Qf          = nan(maxiter,1);
+   ice1.chi         = nan(maxiter,1);
+   ice1.balance     = nan(maxiter,1);
+   ice1.dt          = nan(maxiter,1);
+   ice1.zD          = nan(maxiter,1);
    
    % Save the vertical ice column data   
    ice2.Tice         = nan(JJ_therm,maxiter);
@@ -131,3 +136,8 @@ function [  f_ice,                                                      ...
    
 %    diags.Tflag       = false(maxiter,1);
 %    diags.LCflag      = false(maxiter,1);
+end
+   
+%    % test
+%    A1 = ones(JJ_therm,1);
+%    A = spdiags([A1,A1,A1],-1:1,JJ_therm,JJ_therm);

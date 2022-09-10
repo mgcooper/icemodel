@@ -79,17 +79,17 @@ for n = 1:ensemble.numcombos
 %--------------------------------------------------------------------------
    
    if opts.skinmodel == true
-      tic; [enbal,ice2,met,opts] = skinmodel(opts); toc
+      tic; [ice1,ice2,met,opts] = skinmodel(opts); toc
    else
-      tic; [enbal,ice2,met,opts] = icemodel(opts); toc
+      tic; [ice1,ice2,met,opts] = icemodel(opts); toc
    end
 
    % post process
-   [enbal,ice1,ice2,met] = POSTPROC(enbal,ice2,met,opts);
+   [ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts);
    
 % % if using diags:   
-%    tic; [enbal,ice2,met,opts,diags] = icemodel(opts,met); toc   
-%    [enbal,ice1,ice2,met,diags] = POSTPROC(enbal,ice2,met,opts,diags);
+%    tic; [ice1,ice2,met,opts,diags] = icemodel(opts); toc   
+%    [ice1,ice2,met,diags] = POSTPROC(ice1,ice2,met,opts,diags);
 
 
 %--------------------------------------------------------------------------
@@ -149,7 +149,7 @@ h2 = plotPromice(AblationHourly,'refstart',t1);
 h2 = plotPromice(AblationDaily,'refstart',t1);
 
 % plot enbal - need option to plot met station data when forcing is rcm 
-plotEnbal(enbal,met);
+plotEnbal(ice1,met);
 
 % plotTice(opts,ice2);
 % 

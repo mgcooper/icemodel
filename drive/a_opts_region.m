@@ -1,6 +1,6 @@
 function opts = a_opts_region(opts,sitename,meltmodel,startyear,endyear)
    
-   opts.siteName        =  sitename;
+   opts.sitename        =  sitename;
    
    % model options
    opts.annual_loops    =  1;
@@ -10,6 +10,8 @@ function opts = a_opts_region(opts,sitename,meltmodel,startyear,endyear)
    opts.z_obs           =  3.0;    % Height of wind and air temp obs   [m]
    opts.kabs_user       =  true;
    opts.tlagcolumn      =  6*3600/opts.dt;
+   opts.use_ro_glc      =  false;
+   opts.use_init        =  false;
    
    % define the thermal and spectral grid
    opts.dz_thermal      =  0.04;       % dz for heat transfer          [m]

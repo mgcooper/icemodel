@@ -1,39 +1,52 @@
-function [ice1,ice2] = POSTPROC2(T_sfc,ice2,met,opts)
+function [ice1,ice2] = POSTPROC2(ice1,ice2,Time,opts)
+
+% load physical constants   
+load('PHYSCONS','Tf','ro_liq','Ls','Lf');
 
 % compute melt,freeze, and runoff
-ice1           = ICERUNOFF(ice2,opts);
-
-% convert temperature to celsius
-ice1.Tsfc      = min(T_sfc-273.15,0);
-ice2.Tice      = min(T_ice-273.15,0);
-
-% Retime to hourly and round
-ice1           = struct2table(ice1);
-ice1           = table2timetable(ice1,'RowTimes',Time);
-ice1           = retime(ice1,'hourly','mean');
-ice1           = rmleapinds(ice1);
-
-% init temp arrays
-tmp.df_liq     = nan(size(ice2.df_liq,1),numel(ice1.Time));
-tmp.f_ice      = nan(size(ice2.f_ice,1),numel(ice1.Time));
-tmp.f_liq      = nan(size(ice2.f_liq,1),numel(ice1.Time));
-tmp.Tice       = nan(size(ice2.Tice,1),numel(ice1.Time));
-
-for n = 1:numel(ice1.Time)
-
-   % this works b/c we know it's fifteen minute data
-   i1    = n*4-3;
-   i2    = n*4;
-   
-   tmp.df_liq(:,n)   =  sum(ice2.df_liq(:,i1:i2),2);
-   tmp.f_liq(:,n)    =  mean(ice2.f_liq(:,i1:i2),2);
-   tmp.f_ice(:,n)    =  mean(ice2.f_ice(:,i1:i2),2);
-   tmp.Tice(:,n)     =  mean(ice2.Tice(:,i1:i2),2);
+if opts.skinmodel == true
+   ice1  =  SRFRUNOFF(ice1,ro_liq,Ls,Lf,opts.dt);
+else
+   ice1  =  ICERUNOFF(ice1,ice2,opts);
 end
 
-ice2 = tmp;
+% convert temperature to celsius
+ice1.Tsfc      = min(ice1.Tsfc-Tf,0);
+ice2.Tice      = min(ice2.Tice-Tf,0);
 
-% this should be faster than the two options below
+% convert to timetable
+ice1           = struct2table(ice1);
+ice1           = table2timetable(ice1,'RowTimes',Time);
+
+% Retime to hourly
+if opts.dt == 900
+   
+   ice1           = retime(ice1,'hourly','mean');
+   ice1           = rmleapinds(ice1);
+   
+   % init tmp arrays to retime ice2
+   tmp.df_liq     = nan(size(ice2.df_liq,1),numel(ice1.Time));
+   tmp.f_ice      = nan(size(ice2.f_ice,1),numel(ice1.Time));
+   tmp.f_liq      = nan(size(ice2.f_liq,1),numel(ice1.Time));
+   tmp.Tice       = nan(size(ice2.Tice,1),numel(ice1.Time));
+
+
+   for n = 1:numel(ice1.Time)
+
+      % this works b/c we know it's fifteen minute data
+      i1    = n*4-3;
+      i2    = n*4;
+
+      tmp.df_liq(:,n)   =  sum(ice2.df_liq(:,i1:i2),2);
+      tmp.f_liq(:,n)    =  mean(ice2.f_liq(:,i1:i2),2);
+      tmp.f_ice(:,n)    =  mean(ice2.f_ice(:,i1:i2),2);
+      tmp.Tice(:,n)     =  mean(ice2.Tice(:,i1:i2),2);
+   end
+
+   ice2 = tmp;
+end
+
+% round. this should be faster than the two options below
 ice1.Tsfc      = round(ice1.Tsfc,5);
 ice1.runoff    = round(ice1.runoff,5);
 ice1.melt      = round(ice1.melt,5);

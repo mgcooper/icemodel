@@ -8,7 +8,12 @@ if opts.sitename == "region"
    % load the first met file
    load(opts.metfname,'met');
 
-   opts.maxiter = height(met);
+   %opts.maxiter = height(met);
+   if opts.dt == 900
+      opts.maxiter = 35040;
+   elseif opts.dt == 3600
+      opts.maxiter = 8760;
+   end
 
    bi = find(met.modis<=0 | met.modis>=1);
    met.modis(bi) = met.albedo(bi);
@@ -144,6 +149,7 @@ end
 % met = retime(met,'hourly','mean');
 %%%% test
 
+% met            = rmleapinds(met);
 opts.maxiter   = size(met,1);
 opts.dt        = seconds(met.Time(2)-met.Time(1));
    

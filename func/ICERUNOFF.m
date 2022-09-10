@@ -1,4 +1,4 @@
-function ice1 = ICERUNOFF(ice2,opts)
+function ice1 = ICERUNOFF(ice1,ice2,opts)
 % ICERUNOFF computes runoff from the ice column
 
 dz       = opts.dz_thermal;

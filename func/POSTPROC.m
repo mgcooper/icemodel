@@ -1,8 +1,8 @@
-function [enbal,ice1,ice2,met] = POSTPROC(enbal,ice2,met,opts)
+function [ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts)
 
 % minimum required inputs:
 
-   % enbal.Tsfc
+   % ice1.Tsfc
    % ice2.Tice
    % ice2.f_liq
    % ice2.f_ice
@@ -36,20 +36,20 @@ function [enbal,ice1,ice2,met] = POSTPROC(enbal,ice2,met,opts)
    ice2.Z         =  (dz/2:dz:Z-dz/2)';
    
 % Compute the radiative heat fluxes
-   enbal.Tsfc     = min(enbal.Tsfc,Tf);            % surface temp,cap at Tf
-   enbal.albedo   = met.albedo;                    % albedo
-   enbal.Qsi      = met.swd;                       % shortwave down
-   enbal.Qsr      = enbal.Qsi.*enbal.albedo;       % shortwave up
-   enbal.Qli      = emiss.*met.lwd;                % longwave down
-   enbal.Qle      = emissSB.*enbal.Tsfc.^4;        % longwave up
-   enbal.Qsn      = (1-enbal.albedo).*enbal.Qsi;   % net shortwave 
-   enbal.Qln      = enbal.Qli-enbal.Qle;           % net longwave
-   enbal.Qn       = enbal.Qsn+enbal.Qln;           % net radiation
-   enbal.Qsip     = (1-enbal.chi).*enbal.Qsi;      % penetrated shortwave
-   enbal.Qabs     = (1-enbal.albedo).*enbal.Qsi;   % absorbed shortwave
-   enbal.Qsrf     = enbal.chi.*enbal.Qabs;         % skin shortwave
-   enbal.Qsub     = (1-enbal.chi).*enbal.Qabs;     % subsurf shortwave
-   enbal.Qbal     = enbal.Qsub+enbal.Qsrf-enbal.Qabs;    % balance
+   ice1.Tsfc      = min(ice1.Tsfc,Tf);             % surface temp,cap at Tf
+   ice1.albedo    = met.albedo;                    % albedo
+   ice1.Qsi       = met.swd;                       % shortwave down
+   ice1.Qsr       = ice1.Qsi.*ice1.albedo;         % shortwave up
+   ice1.Qli       = emiss.*met.lwd;                % longwave down
+   ice1.Qle       = emissSB.*ice1.Tsfc.^4;         % longwave up
+   ice1.Qsn       = (1-ice1.albedo).*ice1.Qsi;     % net shortwave 
+   ice1.Qln       = ice1.Qli-ice1.Qle;             % net longwave
+   ice1.Qn        = ice1.Qsn+ice1.Qln;             % net radiation
+   ice1.Qsip      = (1-ice1.chi).*ice1.Qsi;        % penetrated shortwave
+   ice1.Qabs      = (1-ice1.albedo).*ice1.Qsi;     % absorbed shortwave
+   ice1.Qsrf      = ice1.chi.*ice1.Qabs;           % skin shortwave
+   ice1.Qsub      = (1-ice1.chi).*ice1.Qabs;       % subsurf shortwave
+   ice1.Qbal      = ice1.Qsub+ice1.Qsrf-ice1.Qabs; % balance
 
 % for reference, Qsub can also be computed this way
  % enbal.Qsub     = sum(ice2.Sc.*dz)';             % subsurf shortwave
@@ -67,14 +67,14 @@ function [enbal,ice1,ice2,met] = POSTPROC(enbal,ice2,met,opts)
    met.tair       =  met.tair-Tf;
    
 % Convert temperature from Kelvin to Celsius
-   enbal.Tsfc     =  enbal.Tsfc-Tf;             % surface temp,cap at Tf
+   ice1.Tsfc      =  ice1.Tsfc-Tf;             % surface temp,cap at Tf
    ice2.Tice      =  ice2.Tice-Tf;              % ice temperature
    
 % calculate surface and subsurface runoff
    if opts.skinmodel == true
-      ice1  =  SRFRUNOFF(enbal,ro_liq,Ls,Lf,opts.dt);
+      ice1  =  SRFRUNOFF(ice1,ro_liq,Ls,Lf,opts.dt);
    else
-      ice1  =  ICERUNOFF(ice2,opts);
+      ice1  =  ICERUNOFF(ice1,ice2,opts);
    end
    
 % % temporary - take Tflag out of enbal
@@ -83,19 +83,16 @@ function [enbal,ice1,ice2,met] = POSTPROC(enbal,ice2,met,opts)
 %    diags.Tflag    = Tflag;
    
 % convert enbal and ice1 to timetables
-   dates          = met.Time; dates.TimeZone = 'UTC';
-   enbal          = struct2table(enbal);
-   ice1           = struct2table(ice1);
-   enbal          = table2timetable(enbal,'RowTimes',dates);
-   ice1           = table2timetable(ice1,'RowTimes',dates);
-   ice1           = retime(ice1,'hourly','mean');
-   enbal          = retime(enbal,'hourly','mean');
-   met            = retime(met,'hourly','mean');   
+   dates       = met.Time; dates.TimeZone = 'UTC';
+   ice1        = struct2table(ice1);
+   ice1        = table2timetable(ice1,'RowTimes',dates);
+   ice1        = retime(ice1,'hourly','mean');
+   met         = retime(met,'hourly','mean');   
 
 % Retime ice2 to hourly and round the data
-   fields         = fieldnames(ice2);
-   oldtime        = dates;
-   newtime        = enbal.Time;
+   fields      = fieldnames(ice2);
+   oldtime     = dates;
+   newtime     = ice1.Time;
 
    for mm = 1:numel(fields)
 
@@ -148,7 +145,7 @@ function [enbal,ice1,ice2,met] = POSTPROC(enbal,ice2,met,opts)
 % rename enbal to match the naming conventions i use everywhere else
    oldvars  =  {'Qsi','Qsr','Qsn','Qli','Qle','Qln','Qh','Qe','Qc','Qn','Tsfc'};
    newvars  =  {'swd','swu','swn','lwd','lwu','lwn','shf','lhf','chf','netr','tsfc'};
-   enbal    =  renamevars(enbal,oldvars,newvars);      
+   ice1    =  renamevars(ice1,oldvars,newvars);      
    
    
 % The surface energy balance: Qm = chi*Qsi*(1-albedo) + Qln + Qh + Qe + Qc
