@@ -5,6 +5,12 @@ clean
 % the raw mar nc files and geus albedo files rather than the processed
 % files
 
+% NOTE: when I ran this on my personal mac I should have used xmask/ymask
+% not xmodel/ymodel to get the runs on the same numbering as the original
+% runs which was xmask/ymask. the mistake was in using list=dir() in THIS
+% script to save the data, now that mistake is propagated into the new runs
+% so i'll just have to keep using xmodel/ymodel
+
 savedata    =  true;
 modis       =  true;
 sitename    =  'region';
@@ -15,13 +21,17 @@ tinterp     =  true;
 newdt       =  '15m';
 
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-%% set paths
+% set paths
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 % starting with hills data, I am only saving in the icemodel input folder
-pathdata =  '/Users/coop558/mydata/mar3.11/RUH2/';
-pathsave =  '/Users/coop558/mydata/mar3.11/matfiles/region/level2/test/';
-pathsupp =  '/Users/coop558/mydata/geus/albedo/raw/';
+% pathdata =  '/Users/coop558/mydata/mar3.11/RUH2/';
+% pathsave =  '/Users/coop558/mydata/mar3.11/matfiles/region/level2/test/';
+% pathsupp =  '/Users/coop558/mydata/geus/albedo/raw/';
+
+pathdata =  '/Volumes/Samsung_T5b/mar3.11/RUH2/';
+pathsave =  '/Users/mattcooper/data/mar3.11/matfiles/region/level2/grids/';
+pathsupp =  '/Volumes/Samsung_T5b/geus/albedo/';
 list     =  getlist(pathdata,'*.nc');
 
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -32,8 +42,10 @@ load('projsipsn.mat')
 % for the gridded region runs, we want the x,y coordinates to be the bare
 % ice mask
 load('modis_ice_mask.mat');
+
 Xmet     = icemask.xmodel;
 Ymet     = icemask.ymodel;
+
 
 % some variables need only be extracted once, do them first
 fmar     = [pathdata 'MARv3.11-ERA5-15km-' num2str(yri) '.nc'];
@@ -45,7 +57,7 @@ VAR      = ncread(fmar,'RUH');
    Ymar] = projfwd(projsipsn,LAT,LON);
 
 
-figure; scatter(Xmar(:),Ymar(:)); hold on; scatter(Xmet,Ymet);
+% figure; scatter(Xmar(:),Ymar(:)); hold on; scatter(Xmet,Ymet);
 
 % similarly, do the modis conversion from lat/lon to x/y first
 fmodis   = [pathsupp 'Greenland_Reflectivity_' num2str(yri) '_5km_C6.nc'];
@@ -61,20 +73,27 @@ for n = 1:nyears
    fmodis  = [pathsupp 'Greenland_Reflectivity_' num2str(yyyy) '_5km_C6.nc'];
    
    % for the region gridded runs, use the simple naming convention
-   savepath = [pathsave int2str(yyyy) '/'];
+   fsavemet    = [pathsave 'met_' int2str(yyyy) '.mat'];
    if ~exist(savepath,'dir'); mkdir(savepath); end;
       
    % the filename gets appended with the point number in the function
-   fsave   = [savepath 'met_'];
+   fsavedata   = [pathsave 'data_' int2str(yyyy) '.mat'];
 
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
-   met   =  makeMarMetfileGrid(fmar,Xmar,Ymar,Xmet,Ymet,yyyy, ...
-            'modis',modis,'fmodis',fmodis,'Xmodis',Xmod,'Ymodis',Ymod,...
-            'newdt',newdt);
+   [met,data]  = makeMarMetfileGrid(fmar,Xmar,Ymar,Xmet,Ymet,yyyy,      ...
+                     'modis',modis,'fmodis',fmodis,'Xmodis',Xmod,       ...
+                     'Ymodis',Ymod,'newdt',newdt);
         
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
+   if savedata == true
+      save(fsavemet,'met','-v7.3')
+      save(fsavedata,'data','-v7.3')
+   end
+
+   clear met data
+   
 end
 
 
