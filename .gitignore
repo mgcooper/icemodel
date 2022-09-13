@@ -1,0 +1,59 @@
+*~
+
+# Mac stuff
+.DS_Store
+Desktop.ini
+
+# Thumbnail cache files
+._*
+Thumbs.db
+
+# External disks
+.Spotlight-*
+.Trashes
+
+# Backup
+*.tmp
+*.bk
+*.archive
+*.keep
+*.old
+
+# data
+data/
+
+# private folder
+private/
+todo.md
+readmemgc.txt
+
+# microsoft
+*.xlsx
+*.xlsb
+*.xls
+
+# # I added these then commented them out b/c it's impossible to know if this is always desirable. Will need to manage on a case by case basis by adding to local ignore files
+# # Large datasets unlikely to come from remote
+# *.nc
+# *.nc4
+# *.h5
+# *.hd5
+
+# Archives
+*.7z
+*.jar
+*.rar
+*.zip
+*.tgz
+*.gz
+*.bzip
+*.xz
+*.lzma
+*.iso
+*.tar
+*.dmg
+*.xpi
+*.gem
+*.egg
+*.deb
+*.rpm
