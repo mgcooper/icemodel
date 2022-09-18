@@ -58,6 +58,7 @@ for ipt = si:ei % 1045 = rio behar
 end
 
 % save the opts
-if ~exist([opts.pathsave 'opts/'],'dir'); mkdir([opts.pathsave 'opts/']); end
-save([opts.pathsave 'opts/opts_' meltmodel '_' userdata '.mat'],'opts');
-
+if ~exist([opts.path.output 'opts/'],'dir')
+   mkdir([opts.path.output 'opts/']); 
+end
+save([opts.path.output 'opts/opts_' meltmodel '_' userdata '.mat'],'opts');
