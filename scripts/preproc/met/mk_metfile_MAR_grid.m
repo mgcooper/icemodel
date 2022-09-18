@@ -74,7 +74,7 @@ for n = 1:nyears
    
    % for the region gridded runs, use the simple naming convention
    fsavemet    = [pathsave 'met_' int2str(yyyy) '.mat'];
-   if ~exist(savepath,'dir'); mkdir(savepath); end;
+   if ~exist(savepath,'dir'); mkdir(savepath); end
       
    % the filename gets appended with the point number in the function
    fsavedata   = [pathsave 'data_' int2str(yyyy) '.mat'];

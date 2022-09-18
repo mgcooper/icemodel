@@ -1,104 +1,102 @@
 clean
 
-% given a point, this builds a mar metfile. this limits the current
-% function to regions that are well-approximated by a single grid cell.
+% v2 adds the grid cells that were not included in the original bare ice
+% mask 1487 points
 
-% jul 2022 update, removed the saving in two places, reconcicled the naming
-% with the filenames in icemodel/input/met, added modis albedo by default
-% i.e. no more making two separate files just for the modis albedo
+% NOTE: when I ran this on my personal mac I should have used xmask/ymask
+% not xmodel/ymodel to get the runs on the same numbering as the original
+% runs which was xmask/ymask. the mistake was in using list=dir() in THIS
+% script to save the data, now that mistake is propagated into the new runs
+% so i'll just have to keep using xmodel/ymodel
 
 savedata    =  true;
 modis       =  true;
-sitename    =  'hills';
-yri         =  2014;
-yrf         =  2016;
+sitename    =  'region';
+yri         =  2008;
+yrf         =  2018;
 nyears      =  yrf-yri+1;
 tinterp     =  true;
 newdt       =  '15m';
 
-%--------------------------------------------------------------------------
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 % set paths
-%--------------------------------------------------------------------------
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 % starting with hills data, I am only saving in the icemodel input folder
-pathdata    =  '/Users/coop558/mydata/mar3.11/RUH2/';
-pathsave    =  setpath('GREENLAND/icemodel/input/met/');
-pathsupp    =  '/Users/coop558/mydata/geus/albedo/raw/';
-list        =  getlist(pathdata,'*.nc');
+% pathdata =  '/Users/coop558/mydata/mar3.11/RUH2/';
+% pathsave =  '/Users/coop558/mydata/mar3.11/matfiles/region/level2/test/';
+% pathsupp =  '/Users/coop558/mydata/geus/albedo/raw/';
 
-%--------------------------------------------------------------------------
+pathdata =  '/Volumes/Samsung_T5b/mar3.11/RUH2/';
+pathsave =  '/Volumes/Samsung_T5b/mar3.11/matfiles/region/level2/grids3/';
+pathsupp =  '/Volumes/Samsung_T5b/geus/albedo/';
+list     =  getlist(pathdata,'*.nc');
+
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 % read in the catchment to get the x,y coordinate 
-%--------------------------------------------------------------------------
+%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 load('projsipsn.mat')
 
-if strcmp(sitename,'hills')
-   load('hills_Tice.mat');
-   Xmet     = temperature.T_14.x;
-   Ymet     = temperature.T_14.y;
-else
-   load(['Q_' sitename '.mat'])
-   if isfield(sf,'med')
-       Xmet    = nanmedian(sf.med.spsn.x);
-       Ymet    = nanmedian(sf.med.spsn.y);
-   elseif isfield(sf,'max')
-       Xmet    = nanmedian(sf.max.spsn.x);
-       Ymet    = nanmedian(sf.max.spsn.y);
-   end
-end
+% for the gridded region runs, we want the x,y coordinates to be the bare
+% ice mask
+load('modis_ice_mask.mat','icemask'); oldmask = icemask; clear icemask;
+load('IceMask.mat','IceMask'); newmask = IceMask; clear IceMask;
 
+Xmet     = newmask.X(newmask.IceMaskSLA);
+Ymet     = newmask.Y(newmask.IceMaskSLA);
+
+% macfig; scatter(Xmet,Ymet,200,'filled','s'); hold on; 
+
+% plot to be certain
+% macfig; scatter(Xall,Yall,200,'filled','s'); hold on; 
+% scatter(Xold,Yold,50,'filled','s'); scatter(Xmet,Ymet,30,'filled','s');
 
 % some variables need only be extracted once, do them first
-fmar        = [pathdata 'MARv3.11-ERA5-15km-' num2str(yri) '.nc'];
-info        = ncparse(fmar);
-LON         = ncread(fmar,'LON');
-LAT         = ncread(fmar,'LAT');
-VAR         = ncread(fmar,'RUH');
-[Xmar,Ymar] = projfwd(projsipsn,LAT,LON);
+fmar     = [pathdata 'MARv3.11-ERA5-15km-' num2str(yri) '.nc'];
+info     = ncparse(fmar);
+LON      = ncread(fmar,'LON');
+LAT      = ncread(fmar,'LAT');
+VAR      = ncread(fmar,'RUH');
+[Xmar,...
+   Ymar] = projfwd(projsipsn,LAT,LON);
 
+
+% figure; scatter(Xmar(:),Ymar(:)); hold on; scatter(Xmet,Ymet);
+
+% similarly, do the modis conversion from lat/lon to x/y first
+fmodis   = [pathsupp 'Greenland_Reflectivity_' num2str(yri) '_5km_C6.nc'];
+LON      = double(ncread(fmodis,'lon'));
+LAT      = double(ncread(fmodis,'lat'));
+[Xmod, ...
+   Ymod] = projfwd(projsipsn,LAT,LON);
 
 for n = 1:nyears
     
    yyyy    = yri+n-1;
    fmar    = [pathdata 'MARv3.11-ERA5-15km-' num2str(yyyy) '.nc'];
    fmodis  = [pathsupp 'Greenland_Reflectivity_' num2str(yyyy) '_5km_C6.nc'];
-   fsave   = ['met_' sitename '_MAR_' num2str(yyyy)];
-
-% % we use 2014 for each year but keep this in case we use the 15/16 or 11
-% data (2014 is the install date, the data is useable for 2015/16)
-%    if strcmp(sitename,'hills')
-%       if yyyy == 2014
-%          Xmet  = temperature.T_14.x;
-%          Ymet  = temperature.T_14.y;
-%       elseif yyyy == 2015
-%          Xmet  = (temperature.T_15a.x + temperature.T_15b.x + ...
-%                      temperature.T_15c.x)/3;
-%          Ymet  = (temperature.T_15a.y + temperature.T_15b.y + ...
-%                      temperature.T_15c.y)/3;
-%       elseif yyyy == 2016
-%          Xmet  = temperature.T_16.x;
-%          Ymet  = temperature.T_16.y;
-%       end
-%    end
+   
+   % for the region gridded runs, use the simple naming convention
+   fsavemet    = [pathsave 'met_' int2str(yyyy) '.mat'];
+      
+   % the filename gets appended with the point number in the function
+   fsavedata   = [pathsave 'data_' int2str(yyyy) '.mat'];
 
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         
-   met = makeMarMetfile(fmar,Xmar,Ymar,Xmet,Ymet,yyyy, ...
-                           'modis',modis,'fmodis',fmodis);
+   [met,data]  = makeMarMetfileGrid(fmar,Xmar,Ymar,Xmet,Ymet,yyyy,      ...
+                     'modis',modis,'fmodis',fmodis,'Xmodis',Xmod,       ...
+                     'Ymodis',Ymod,'newdt',newdt);
         
 %~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
    if savedata == true
-      save([pathsave fsave '_1hr.mat'],'met');
-
-      % interpolate, re-check out-of-bound values, and save
-      if tinterp == true
-         met      = interpMet(met,newdt);
-         met.date = datenum(met.Time);
-         met      = metchecks(met,false); % false = don't plot
-
-         save([pathsave fsave '_' newdt '.mat'],'met');
-      end
+      save(fsavemet,'met','-v7.3')
+      save(fsavedata,'data','-v7.3')
    end
+
+   clear met data
+   
 end
 
 
