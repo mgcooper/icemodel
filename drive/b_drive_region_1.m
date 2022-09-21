@@ -14,14 +14,15 @@ meltmodel   =  'icemodel';
 
 startyear   =   2008;
 endyear     =   2018;
-npts        =   1487;
-si          =   1;              % 298, 671, 1046,  1420 
-ei          =   743;             % 372, 744, 1116, 1487
 
-% load('private/idxnew.mat','idxnew')
-% npts        =   numel(idxnew);
+% npts        =   1487;
 % si          =   1;              % 298, 671, 1046,  1420 
-% ei          =   496;             % 372, 744, 1116, 1487
+% ei          =   743;             % 372, 744, 1116, 1487
+
+load('private/idxnew.mat','idxnew')
+npts        =   numel(idxnew);
+si          =   1;              % 298, 671, 1046,  1420 
+ei          =   496;             % 372, 744, 1116, 1487
 
 % npts        =  2479;
 % si          =  1;
@@ -46,11 +47,11 @@ disp([meltmodel ' ' userdata ' ' int2str(startyear) ':'   ...
 opts = a_opts_region(opts,sitename,meltmodel,startyear,endyear);
 
 % run the model for each point
-for ipt = si:ei % 1045 = rio behar
-% for n = si:ei
+% for ipt = si:ei % 1045 = rio behar
+for n = si:ei
 
-%    ipt            = idxnew(n);
-opts.ipt       = ipt;
+   ipt            = idxnew(n);
+   opts.ipt       = ipt;
    opts.metfname  = [opts.path.met 'met_' int2str(opts.ipt) '.mat'];
     
    % run the model

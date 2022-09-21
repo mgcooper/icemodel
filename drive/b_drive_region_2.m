@@ -2,6 +2,9 @@ clean
 %--------------------------------------------------------------------------
 %   run dependent information
 %--------------------------------------------------------------------------
+workoff skinmodel
+workon icemodel
+
 savedata    =  true;
 sitename    =  'region';
 forcingdata =  'mar';
@@ -11,32 +14,29 @@ meltmodel   =  'icemodel';
 
 startyear   =   2008;
 endyear     =   2018;
-npts        =   1487;
-si          =   744;              % 298, 671, 1046,  1420 
-ei          =   1487;             % 372, 744, 1116, 1487
 
-% warning off
-% rmpath(genpath('/Volumes/GoogleDrive/My Drive/MATLAB/GREENLAND/icemodel/model'));
-% modelpath = '/Users/mattcooper/myprojects/icemodel/skinmodel';
-% addpath(genpath(modelpath));
-% cd(modelpath)
-% warning on
+% npts        =   1487;
+% si          =   1;              % 298, 671, 1046,  1420 
+% ei          =   743;             % 372, 744, 1116, 1487
+
+load('private/idxnew.mat','idxnew')
+npts        =   numel(idxnew);
+si          =   497;              % 298, 671, 1046,  1420 
+ei          =   npts;             % 372, 744, 1116, 1487
+
+% npts        =  2479;
+% si          =  1;
+% ei          =  1239;
 
 % MAKE SURE TO SET THE RIGHT PATH
-drive             =  '/Users/mattcooper/mydata/';
-opts.path.met     =  [drive 'mar3.11/matfiles/region/level2/lists/'];
-opts.path.input   =  '/Users/mattcooper/myprojects/icemodel/input/';
-opts.path.output  =  '/Volumes/Samsung_T5b/icemodel/output/region/v10/';
+drive             =  '/Volumes/Samsung_T5b/';
+opts.path.met     =  setpath('mar3.11/matfiles/region/level2/lists3/',drive);
+opts.path.input   =  setpath('runoff/data/icemodel/input/','project');
+opts.path.output  =  setpath('icemodel/output/region/v10_b/',drive);
 opts.path.output  =  [opts.path.output meltmodel '/' userdata '/'];
 
-% drive             =  '/Users/coop558/mydata/';
-% opts.path.met     =  [drive 'mar3.11/matfiles/region/level2/'];
-% opts.path.input   =  setpath('GREENLAND/icemodel/input/');
-
-opts.savedata  =  savedata;
-
-% this is to use the new met files that have both mar and modis albedo
-opts.userdata  =  userdata;
+opts.savedata     =  savedata;
+opts.userdata     =  userdata; % to set mar/modis albedo
 
 %% run the model
 
@@ -47,8 +47,10 @@ disp([meltmodel ' ' userdata ' ' int2str(startyear) ':'   ...
 opts = a_opts_region(opts,sitename,meltmodel,startyear,endyear);
 
 % run the model for each point
-for ipt = si:ei % 1045 = rio behar
-    
+% for ipt = si:ei % 1045 = rio behar
+for n = si:ei
+
+   ipt            = idxnew(n);
    opts.ipt       = ipt;
    opts.metfname  = [opts.path.met 'met_' int2str(opts.ipt) '.mat'];
     
