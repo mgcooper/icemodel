@@ -9,15 +9,16 @@ forcingdata =  {'kanm'};   % {'mar','kanl'}
 userdata    =  {'none'};   % {'none','merra','racmo','mar','modis'};
 uservars    =  {'albedo'};
 meltmodels  =  {'icemodel'};
-startyear   =  2015;
-endyear     =  2015;
+startyear   =  2016;
+endyear     =  2016;
 simyears    =  startyear:endyear;
 
 ensemble    =  ensembleList(  forcingdata,userdata,uservars,meltmodels, ...
                               simyears,sitenames);
 
 % activate the right version
-% activateicemodel('icemodel')
+workoff skinmodel
+workon icemodel
 
 % note: ak4 userData merra and racmo is available from 2012:2016, whereas
 % mar, kanl, and modis are available from 2009:2016

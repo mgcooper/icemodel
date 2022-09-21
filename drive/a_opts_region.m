@@ -31,8 +31,10 @@ function opts = a_opts_region(opts,sitename,meltmodel,startyear,endyear)
    
    % model structure
    if strcmp(meltmodel,'icemodel')
+      opts.icemodel  = true;
       opts.skinmodel = false;
    elseif strcmp(meltmodel,'skinmodel')
+      opts.icemodel  = false;
       opts.skinmodel = true;
    end
    
