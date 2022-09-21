@@ -4,6 +4,7 @@ function opts = a_opts_region(opts,sitename,meltmodel,startyear,endyear)
    
    % model options
    opts.annual_loops    =  1;
+   opts.calendar_type   =  'noleap';
    opts.dt              =  900.0;  % timestep                          [s]
    opts.kthermal        =  12;     % thermal conductivity
    opts.z_0             =  0.001;  % Surface aero. roughness length    [m]

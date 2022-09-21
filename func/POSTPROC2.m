@@ -56,6 +56,10 @@ ice2.f_ice     = round(ice2.f_ice,5);
 ice2.f_liq     = round(ice2.f_liq,5);
 ice2.Tice      = round(ice2.Tice,3);
 
+if isfield(ice1,'drain')
+   ice1.drain  = round(ice1.drain,5);
+end
+
 
 % Retime ice2 to hourly and round the data
 % fields         = fieldnames(ice2);

@@ -61,15 +61,15 @@ function [  f_ice,                                                      ...
    ro_wie      =  ro_liq./ro_ice;
    ro_iwe      =  ro_ice./ro_liq;
 
-   % Init ice temperature
-   if opts.use_init == true
-      load(opts.f_init);
-      T        =  init.T+met.tair(1)-init.T(1);
-   else
-      T        =  (met.tair(1)-1).*ones(JJ_therm,1);
-   end
+%    % Init ice temperature
+%    if opts.use_init == true
+%       load(opts.f_init);
+%       T        =  init.T+met.tair(1)-init.T(1);
+%    else
+%       T        =  (met.tair(1)-1).*ones(JJ_therm,1);
+%    end
 
-   % T        =  (met.tair(1)-1).*ones(JJ_therm,1);
+   T        =  (met.tair(1)-1).*ones(JJ_therm,1);
 
    % Init liquid/ice water fraction, bulk densities, and aP coeff
    Tdep        =  Tf-T(:,1);                       % [K]

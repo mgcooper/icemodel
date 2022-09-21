@@ -11,18 +11,10 @@ function [ice1,ice2] = icemodel_region(opts)
                      'ro_air','ro_ice','ro_liq','roLf','roLs','roLv',   ...
                      'Rv','Tf','TINY');
                   
-% load the first met file
-   load([opts.pathmet 'met_' int2str(opts.ipt) '.mat'],'met');
 
-   maxiter = 35040;
-
-   bi = find(met.modis<=0 | met.modis>=1);
-   met.modis(bi) = met.albedo(bi);
-
-   if string(opts.userdata) == "modis"
-      met.albedo = met.modis;
-   end
-   
+%  LOAD THE FORCING DATA
+   [met,opts] = METINIT(opts);
+                  
 %  INITIALIZE THE ICE COLUMN
 [  f_ice,                                                               ...
    f_liq,                                                               ...
@@ -47,11 +39,12 @@ function [ice1,ice2] = icemodel_region(opts)
    scoef,                                                               ...
    ro_sno,                                                              ...
    ro_iwe,                                                              ...
-   ro_wie ]    =  ICEINIT(opts,met);
-      
+   ro_wie,                                                              ...
+   ice1,                                                                ...
+   ice2  ]    =  ICEINIT(opts,met);
 
-% % these are optional instead of enbal, ice2
-% % init output arrays
+
+% % init output arrays - for region
 %    df_liq      =  nan(JJ_therm,maxiter);
 %    frac_ice    =  nan(JJ_therm,maxiter);
 %    frac_liq    =  nan(JJ_therm,maxiter);
@@ -88,10 +81,13 @@ function [ice1,ice2] = icemodel_region(opts)
    dt          =  opts.dt;
    fopts       =  opts.fzero;
    f_min       =  opts.f_ice_min;
+   nloops      =  opts.annual_loops;
+   simyears    =  opts.simyears;
    
 %--------------------------------------------------------------------------
 % substepping settings
 %--------------------------------------------------------------------------
+   maxiter     =  opts.maxiter;
    maxsubiter  =  200;
    minsubiter  =  1;
    dt_min      =  dt/maxsubiter;  % or: dt_min = 5; maxsubiter  = dt/dt_min;
@@ -108,14 +104,21 @@ function [ice1,ice2] = icemodel_region(opts)
    liqflag     =  false;
    Qc          =  CONDUCT(k_eff,T,dz,xTsfc);
 
-for MM = 1:opts.numyears
+   
+if nloops > 1
+   simyears    =  [repmat(simyears(1),nloops,1) simyears(2:end)];
+end
+
+   numyears    =  numel(simyears);
+   
+for MM = 1:numyears
    
    % set the output folder and load the met data
-   simyear     = int2str(opts.simyears(MM));
-   pathoutput  = [opts.pathsave simyear '/'];
+   simyear     = int2str(simyears(MM));
+   pathoutput  = [opts.path.output simyear '/'];
    
-   t1          = datetime(opts.simyears(MM),1,1,0,0,0);
-   t2          = datetime(opts.simyears(MM),12,31,23,45,0);
+   t1          = datetime(simyears(MM),1,1,0,0,0);
+   t2          = datetime(simyears(MM),12,31,23,45,0);
    t1.TimeZone = 'UTC';
    t2.TimeZone = 'UTC';
    Time        = met.Time(isbetween(met.Time,t1,t2));
@@ -126,7 +129,7 @@ for MM = 1:opts.numyears
    
    while iter <= maxiter
    
-   metiter = iter+iter0-1;
+   metiter     =  iter+iter0-1;
 
 % reset the change in liq water content
    d_liq       =  0.0.*f_liq;
@@ -142,7 +145,6 @@ for MM = 1:opts.numyears
    albedo      =  met.albedo(metiter);
    De          =  wspd*wcoef;
    ea          =  VAPPRESS(rh,Tair,liqflag);
-   
    
 %  Update the subsurface absorption profile and solar radiation source-term
    if Qsi>0
@@ -255,19 +257,25 @@ for MM = 1:opts.numyears
 %--------------------------------------------------------------------------
 %   Save the output
 %--------------------------------------------------------------------------
-      
-      % save the surface energy balance
-      enbal.Tsfc(iter,1)      =  Tsfc;       % surface temp
-    % enbal.Qh(iter,1)        =  Qh;         % sensible
-    % enbal.Qe(iter,1)        =  Qe;         % latent
-    % enbal.Qc(iter,1)        =  Qc;         % conductive into surface
-    % enbal.Qm(iter,1)        =  Qm;         % melt energy
-    % enbal.Qf(iter,1)        =  Qf;         % freeze deficit
-    % enbal.chi(iter,1)       =  chi;        % skin parameter
-    % enbal.balance(iter,1)   =  balance;    % SEB residual
-    % enbal.dt(iter,1)        =  dt_sum;     % check
-    % %enbal.zD(iter,1)       =  zD;
-      
+
+   % NEED TO GO BACK TO ARRAYS SO THEY CAN BE WRITTEN OVER EACH YEAR or USE
+   % THE KEEP VERSIONS BELOW ... BUT ALSO NEED TO REVISIT SURFRUNOFF TO SEE
+   % HOW I DEALT WITH FREEZE, IT CAN ONLY EXIST IF WATER IS AVAILABLE SO AS
+   % IT IS IT IS WRONG
+
+   if MM-nloops == 0
+
+       % save the surface energy balance
+      ice1.Tsfc(iter,1)    =  Tsfc;       % surface temp
+    % ice1.Qe(iter,1)      =  Qe;         % latent
+    % ice1.Qm(iter,1)      =  Qm;         % melt energy
+    % ice1.Qf(iter,1)      =  Qf;         % freeze deficit
+    % ice1.Qh(iter,1)      =  Qh;         % sensible
+    % ice1.Qc(iter,1)      =  Qc;         % conductive into surface
+    % ice1.chi(iter,1)     =  chi;        % skin parameter
+    % ice1.balance(iter,1) =  balance;    % SEB residual
+    % ice1.dt(iter,1)      =  dt_sum;     % check
+    % ice1.zD(iter,1)      =  zD;
 
       ice2.Tice(:,iter)    =  T;             % ice temperature
       ice2.f_ice(:,iter)   =  f_ice;         % fraction ice
@@ -284,14 +292,30 @@ for MM = 1:opts.numyears
 %       frac_ice (:,iter)    =  f_ice;
 %       frac_liq (:,iter)    =  f_liq;
 %       df_liq   (:,iter)    =  d_liq;
-      
-      % move to next timestep
-      iter     =  iter + 1;
+   
+   end
 
+   % move to next timestep
+   iter     =  iter + 1;
+   
    end % timesteps (one year)
    
+   % option to spin up year 1 by looping over it 
+   if MM-nloops<0
+      % restart the counters
+      iter     =  1;
+      subiter  =  1;
+      continue
+   end
+   
+   ice1keep = ice1;
+   ice2keep = ice2;
+   
    % post process
-   [ice1,ice2] = POSTPROC3(enbal,ice2,Time,opts);
+   % [ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts);
+   
+   [ice1,ice2] = POSTPROC2(ice1,ice2,Time,opts);
+  %[ice1,ice2] = POSTPROC3(enbal,ice2,Time,opts);
   %[ice1,ice2] = POSTPROC2(T_sfc,T_ice,frac_ice,frac_liq,df_liq,Time,opts);
 
 %--------------------------------------------------------------------------
@@ -307,4 +331,6 @@ for MM = 1:opts.numyears
    iter     =  1;
    subiter  =  1;
    
+   ice1     =  ice1keep;
+   ice2     =  ice2keep;
 end % numyears
