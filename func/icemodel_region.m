@@ -263,7 +263,7 @@ for MM = 1:numyears
    % HOW I DEALT WITH FREEZE, IT CAN ONLY EXIST IF WATER IS AVAILABLE SO AS
    % IT IS IT IS WRONG
 
-   if MM-nloops == 0
+   if MM-nloops >= 0
 
        % save the surface energy balance
       ice1.Tsfc(iter,1)    =  Tsfc;       % surface temp
