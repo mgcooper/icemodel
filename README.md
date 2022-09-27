@@ -24,6 +24,7 @@ In summary:
 
 ## Model input
 
+### 1. met files
 The met files are named using the following protocol:
 `met_SITENAME_FORCINGDATA_YYYY_TIMESTEP`
 
@@ -35,6 +36,7 @@ For example:
 
 `met_KANM_MAR_2009_15m.mat` = met data for site KAN-M from MAR forcings for year 2009 at a 15 minute timestep.
 
+### 2. user data
 The "userdata" files are named using the following protocol:
 `FORCINGDATA_SITENAME_YYYY`
 
@@ -52,7 +54,9 @@ Say you want to run a simulation at the KAN-M weather station for year 2018 at a
 
 The function `METINIT.m` will then swap out the KAN-M albedo data in the met forcing data with the modis albedo.
 
-In practice, however, these options are set programmatically by passing the `sitename`, `forcingdata`, `userdata`, `uservars`, `meltmodel`, `startyear`, and `endyear` variables to the `a_opts.m` function, which builds the `opts.metfname` string. The function `b_drive.m` is used to set these variables, pass them to `a_opts.m`, and then pass `opts` to the main program `icemodel.m`. A stripped-down example:
+In practice, however, these options are set programmatically by passing the `sitename`, `forcingdata`, `userdata`, `uservars`, `meltmodel`, `startyear`, and `endyear` variables to the `a_opts.m` function, which builds the `opts.metfname` string. The function `b_drive.m` is used to set these variables, pass them to `a_opts.m`, and then pass `opts` to the main program `icemodel.m`.
+
+### Example model configuration:
 
     % set the main configuration options
     sitename    = 'KANM';
