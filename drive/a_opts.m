@@ -3,17 +3,18 @@ function opts = a_opts(opts,sitename,simyear,meltmodel,forcingdata,  ...
    
    opts.sitename        =  sitename;
    opts.yyyy            =  simyear;
-      
-   opts.use_init        =  false;
-   opts.use_ro_glc      =  false;
    
    % model options
    opts.annual_loops    =  1;
+   opts.use_init        =  false;
+   opts.calendar_type   =  'noleap';
    opts.dt              =  900.0;  % timestep                          [s]
    opts.kthermal        =  12;     % thermal conductivity
    opts.z_0             =  0.001;  % Surface aero. roughness length    [m]
    opts.z_obs           =  3.0;    % Height of wind and air temp obs   [m]
    opts.kabs_user       =  true;
+   opts.tlagcolumn      =  6*3600/opts.dt;
+   opts.use_ro_glc      =  false;
    
    % define the thermal and spectral grid
    opts.dz_thermal      =  0.04;       % dz for heat transfer          [m]
@@ -32,8 +33,10 @@ function opts = a_opts(opts,sitename,simyear,meltmodel,forcingdata,  ...
    
    % model structure
    if strcmp(meltmodel,'icemodel')
+      opts.icemodel  = true;
       opts.skinmodel = false;
    elseif strcmp(meltmodel,'skinmodel')
+      opts.icemodel  = false;
       opts.skinmodel = true;
    end
    
