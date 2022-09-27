@@ -22,6 +22,64 @@ In summary:
 | `b_drive.m` | Script to run the model | place this repo on your matlab path, edit and run the script |
 | `c_eval.m` | Script to evaluate model output | place this repo on your matlab path, edit and run the script |
 
+## Model input
+
+The met files are named using the following protocol:
+`met_SITENAME_FORCINGDATA_YYYY_TIMESTEP`
+
+For example:
+
+`met_ak4_MAR_2009_1hr.mat` = met data for site ak4 from MAR forcings for year 2009 at a 1 hour timestep.
+
+`met_KANM_KANM_2009_15m.mat` = met data for site KAN-M from KAN-M forcings for year 2009 at a 15 minute timestep.
+
+`met_KANM_MAR_2009_15m.mat` = met data for site KAN-M from MAR forcings for year 2009 at a 15 minute timestep.
+
+The "userdata" files are named using the following protocol:
+`FORCINGDATA_SITENAME_YYYY`
+
+For example:
+
+`KANM_behar_2015.mat` = forcing data from the KAN-M weather station for site 'behar' for year 2015.
+
+`modis_behar_2015.mat` = modis albedo data for site 'behar' for year 2015.
+
+Say you want to run a simulation at the KAN-M weather station for year 2018 at a 15-m timesep (15 m is required for icemodel, 1 hr is suitable for skinmodel), but you want to use MODIS albedo instead of KAN-M albedo. You would use the following settings:
+
+    opts.metfname = 'met_KANM_KANM_2018_15m.mat';
+    opts.userdata = 'modis';
+    opts.uservars = 'albedo';
+
+The function `METINIT.m` will then swap out the KAN-M albedo data in the met forcing data with the modis albedo.
+
+In practice, however, these options are set programmatically by passing the `sitename`, `forcingdata`, `userdata`, `uservars`, `meltmodel`, `startyear`, and `endyear` variables to the `a_opts.m` function, which builds the `opts.metfname` string. The function `b_drive.m` is used to set these variables, pass them to `a_opts.m`, and then pass `opts` to the main program `icemodel.m`. A stripped-down example:
+
+    % set the main configuration options
+    sitename    = 'KANM';
+    startyear   = 2018;
+    endyear     = 2018;
+    meltmodel   = 'icemodel';
+    forcingdata = 'KANM';
+    userdata    = 'modis';
+    uservars    = 'albedo';
+
+    % initialize the opts struct with the input and output paths (note: this will be removed)
+    opts.path.input    = '/full/path/to/icemodel/input/';
+    opts.path.output   = '/full/path/to/icemodel/output/';
+    opts.path.metdata  = '/full/path/to/icemodel/input/met/';
+    opts.path.userdata = '/full/path/to/icemodel/input/userdata/';
+
+    % set the opts configuration struct
+    opts = a_opts(  opts,sitename,simyear,meltmodels,   ...
+                    forcingdata,userdata,uservars,      ...
+                    startyear,endyear);
+
+    % run the model
+    [ice1,ice2,met,opts] = icemodel(opts);
+
+    % evaluate the output
+    
+
 ## Code reference
 forthcoming
 
