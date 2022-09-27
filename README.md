@@ -5,9 +5,6 @@
 ## Background
 `icemodel` is loosely based on models described in Liston et al. (1999) and Jordan (1991) (*SNTHERM*). `icemodel` follows Liston et al. (1999) in adopting the two-stream radiative transfer model described in Schlatter (1972), the water vapor diffusion parameterization described in Anderson (1976), and a turbulent flux parameterization based on Monin-Obukhov similarity theory (Monin & Obukhov, 1954). `icemodel` loosely adopts *SNTHERM* thermodynamics, including the melt-zone preconditioner, but implements a numerical enthalpy conservation scheme described in Clark et al. (2021). State variables are ice temperature and liquid water content, from which various hydrologic and thermodynamic quantities are computed, namely meltwater runoff.
 
-## Journal reference
-Cooper, M G, et al. *Greenland Ice Sheet runoff reduced by meltwater refreezing in bare ice*, in revision (preprint: https://assets.researchsquare.com/files/rs-842710/v1_covered.pdf?c=1631877020)
-
 ## Usage
 
 The main program is `icemodel.m`, which calls functions saved in `functions/`. To run the model, first set the model configuration options in `drive/a_opts.m`. Configuration options include which input forcing dataset you want to use, and whether you want to run `icemodel` or `skinmodel`. Then run the model by calling `drive/b_drive.m`. The output will be saved in `output/`. Optionally, run `drive/c_eval.m` to evaluate the results and compare with observations.
@@ -50,6 +47,9 @@ Cooper, M G (2022). icemodel output [Data set]. DataHub. https://doi.org/some-do
 | Model | Version | Repository Link | DOI |
 |-------|---------|-----------------|-----|
 | ATRAN | version | link to code repository | link to DOI dataset |
+
+## Journal reference
+Cooper, M G, et al. *Greenland Ice Sheet runoff reduced by meltwater refreezing in bare ice*, in revision (preprint: https://assets.researchsquare.com/files/rs-842710/v1_covered.pdf?c=1631877020)
 
 # References
 
