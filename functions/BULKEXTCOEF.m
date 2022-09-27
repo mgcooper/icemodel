@@ -1,8 +1,7 @@
-%--------------------------------------------------------------------------
+%------------------------------------------------------------------------------
 %   Compute the spectrally integrated extinction coefficient. 
-%--------------------------------------------------------------------------
+%------------------------------------------------------------------------------
 function bulkcoefs = BULKEXTCOEF(dz_spect,ro_sno,spect_lower,spect_upper,solardwavl)
-%--------------------------------------------------------------------------
 
 % Compute the downward bulk extinction coefficient, scaled by the total ice
 %   equivalent thickness of each layer
