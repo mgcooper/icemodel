@@ -12,10 +12,8 @@ function [  T,                                                          ...
 
 % xf_liq is from the prior met-step, so each sub-step d_liq is overridden,
 % and the total d_liq is relative to each met-step, as it should be,
-% whereas the other values in here are updated at each substep. However,
-% what happens when a layr is removed within a sub-stepping?
+% whereas the other values in here are updated at each substep.
 
-% need to test putting this after subl 
 % d_drn gets updated if layers are combined      
    d_liq       =  d_liq + f_liq - xf_liq; % test
    xf_liq      =  f_liq;

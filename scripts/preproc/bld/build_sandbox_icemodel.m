@@ -1,10 +1,67 @@
 clean
 
-% send mk_snowMask to my other computer
-funcname = 'mk_snowMask';
-pathsave = '/Volumes/GoogleDrive/My Drive/TEMP/';
+%------------------------------------------------------------------------------
+% send the latest icemodel dependencies to maxim
+%------------------------------------------------------------------------------
+funcname = '/Users/coop558/myprojects/matlab/icemodel/drive/b_drive.m';
+pathsave = '/Users/coop558/myprojects/matlab/sandbox/icemodel/';
+
+workoff skinmodel
+workon icemodel
+workon runoff
 
 info     = buildsandbox(funcname,'pathsave',pathsave,'dryrun',false);
+
+%------------------------------------------------------------------------------
+% repeat for skinmdoel
+%------------------------------------------------------------------------------
+funcname = '/Users/coop558/myprojects/matlab/skinmodel/drive/b_drive.m';
+pathsave = '/Users/coop558/myprojects/matlab/sandbox/skinmodel/';
+
+workon skinmodel
+workon runoff
+workoff icemodel
+info     = buildsandbox(funcname,'pathsave',pathsave,'dryrun',false,'strexclude','Cupid');
+
+
+%------------------------------------------------------------------------------
+% use this to move unneccesary files out of functions/ and into private/
+%------------------------------------------------------------------------------
+srcdir1  = '/Users/coop558/myprojects/matlab/sandbox/icemodel/functions/';
+srcdir2  = '/Users/coop558/myprojects/matlab/sandbox/skinmodel/functions/';
+cpydir   = '/Users/coop558/myprojects/matlab/icemodel/functions/';
+dstdir   = '/Users/coop558/myprojects/matlab/icemodel/private/functions/';
+
+% these are lists of functions in the sandboxes
+srclist1 = getlist(srcdir1,'.m');
+srclist2 = getlist(srcdir2,'.m');
+srclist1 = {srclist1.name}';
+srclist2 = {srclist2.name}';
+
+% this is the combined list of functions in the sandboxes
+srclist  = unique([srclist1;srclist2]);
+
+% this is the list of functions in the main icemodel/functions dir
+cpylist  = getlist(cpydir,'.m');
+cpylist  = {cpylist.name}';
+
+for n = 1:numel(cpylist)
+   
+   % if the file in the main icemodel function dir isn't in the sandbox, it
+   % means we don't need it to run either icemodel or skinmodel, so move it to
+   % the private/functions dir
+   if ~ismember(cpylist(n),srclist)
+      %fprintf(['moving ' [cpydir cpylist{n}] ' to ' [dstdir cpylist{n}] '\n\n']);
+      system(['git mv ' [cpydir cpylist{n}] ' ' [dstdir cpylist{n}]])
+      %movefile([cpydir cpylist{n}],[dstdir cpylist{n}]);
+   end
+end
+
+% % send mk_snowMask to my other computer
+% funcname = 'mk_snowMask';
+% pathsave = '/Volumes/GoogleDrive/My Drive/TEMP/';
+% 
+% info     = buildsandbox(funcname,'pathsave',pathsave,'dryrun',false);
 
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
 % % this is the oriignal setup which was then copied to personal mac:

@@ -83,11 +83,7 @@ end
 %    tic; T = (diag(-aN(2:end),-1)+diag(-aS(1:end-1),1)+diag(aP,0))\b;toc;
 %    
 % %    T           =  spdiags([-aS,aP,-aN],-1:1,JJ,JJ) \ b;
-   
-% NOTE: still need to figrue out why i had the version w/o H_vap just in
-% case but must have just been a test
-% not sure why Hvap isn't in here ... actuallly i think it may be because
-% my porosity doesn't change so there's always .1 air which is unrealistic  
+
 % % total enthalpy
 %     H0          =   ((ro_ice.*cp_ice.*f_ice + ro_liq.*cp_liq.*f_liq).*  ...
 %                     (T_old-Tf) +  ro_ice.*Lf.*f_liq).*dz./dt;
@@ -106,84 +102,7 @@ end
 %     Sc_new      =   Sc_old + alpha.*Sc;
 %     φnew,used = φold +λ(φnew,predicted −φold)
 
-% key notes: flmin/max must be at least 0.95/1.05, tol must be >=5e-2 (not
-% 1e-2), maxiter might need to be capped at 5, or some combination of the
-% aforementioned, otherwise Qc blows up. Might need to figure out if some
-% combination, such as 1d-2 and maxiter>10, works such that Qc doesn't need
-% to be included in Tsfc calculation
 
-% these are the min/max controls in case i want to go back
-% % f_liq(iM)   =   max(0.0,min(1.0,T(iM)./ro_liq + f_liq(iM)));
-%   f_liq(iM)   =   min(1.0,T(iM)./ro_liq + f_liq(iM));
-%   f_ice(iM)   =   max(0.0,(f_wat(iM)-f_liq(iM).*ro_liq./ro_ice));
-  
-% this is how she says she updates it (eq. 133a)
-%   T(iM)       =   Tf - 1/fcp.*sqrt(ro_sno(iM)./(f_liq(iM).*ro_liq)-1);
-
-% but this is the direct translation of eq 122a
-%   T(iM)       =   T(iM)./ro_sno(iM)./dFdT(iM) + gkP(iM);
-%   T(iM)       =   T(iM).*gvP(iM) + gkP(iM);
-
-% and this is how it's coded in ftemp.f (line 79 and 117)
-%   g_liq(iM)   =   T(iM)+g_liq_old(iM)*dz(iM);
-%   T(iM)       =   Tf-sqrt(ratio-1.0)/a1;
-% which is identical to what i have
-    
-% check if the phase boundary is overshot by more than 5%    
-   %if any( f_liq(iM) < 0.950*flmin) || any(f_liq(iM) > 1.050*flmax)
-%     if  ( T(iM)<T_old(iM) & any( f_liq(iM) < 1e-3) )  |      ...
-%         ( T(iM)>T_old(iM) & any( f_liq(iM) > 1.001) ) 
-%         asflag = true;
-%         return;
-%     end
-% the reason this doesn't work is b/c if the prior step was f_liq==1e-3 or
-% whatever is used, then the next step gets stuck trying to get f_liq
-% smaller but that's impossible unless dt=0.0, so i'm not sure how she got
-% around that, I think by just setting f_liq to the small value and
-% continuing
-
-
-
-
-% THIS IS HOW I HAVE IT IN v9e/HEATSOLVE_MZ
-% x=Pmelt in the melt zone, so those layers need to be transformed to T 
-% this method first updates f_liq, then uses f_liq to update x(iM), but
-% note that f_ice must also be updated, but i can probably get around it
-% with some algebra involving f_wat
-%     f_wat       =   f_liq(iM)+f_ice(iM).*ro_ice./ro_liq;
-%     f_liq(iM)   =   min(1.0,x(iM)./ro_liq + f_liq(iM));
-%     f_ice(iM)   =   max(0.0,(f_wat-f_liq(iM)).*ro_liq./ro_ice);
-%     x(iM)        =  Tf-sqrt(f_ice(iM).*ro_ice./f_liq(iM)./ro_liq)./fcp;
-    
-% note: i think the method above is correct but not right b/c it masks the
-% situation where a phase boundary is overshot, instead, i think i need to
-% use eq. 122a, which will return T>Tf so i can check overshoot correctly
-% T(iM) = T(iM).*gvP(iM) + gkP(iM);
-
-% this is how she says she updates it (eq. 133a)
-%   x(iM)       =   Tf - 1/fcp.*sqrt(ro_sno(iM)./(f_liq(iM).*ro_liq)-1);
-
-% but this is the direct translation of 
-%   x(iM)       =   x(iM)./ro_sno(iM)./dFdT(iM) + gkP(iM);
-
-
-% after tridiag is finished, this is what she does:
-%     flmin     =   fliquid(f_wat(iM),tdl(m,1),tdl13(m,1),flglim(m,1))
-%     flmax     =   fliquid(f_wat(iM),tdl(m,2),tdl13(m,2),flglim(m,2))
-%     [f_liq,T] =   ftemp(T(iM),dt,f_liq(iM),f_wat(iM),dz(iM),TL(iM),TH(iM),...
-%                   f_liq_old(i),bmelt(i),flgo(i),flmin,flmax,dtmin,dFdT);
-            
-% since her model has water fluxes, flimin/max need to be updated b/c they
-% are functions of total water content, so i can use the precomputed
-% values. ftemp returns liquid water content and temperature BUT ALSO the
-% overshoot condition, so 
-     
-% flglim are the unfrozen water fraction values 'flg' at phase boundaries
-% MELTZONE determines temperature limits th and tl for the meltzone,
-% and computes the corresponding fractional water content limits
-% flgliml and flglimh for the capillary portion of the freezing curv
-
-% This was in HEATSOLVE_CAPP, which I deleted
 % % for water infiltration, would be:
 %     Cp          =   ro_sno.*Cp_sno;
 %     Cv          =   xLs.*d_ro_vap_dT.*frac_air;

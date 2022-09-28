@@ -6,9 +6,6 @@ function [Tsfc,OK] = SFCTEMP(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,...
                      emiss,SB,Tf,Qc,xTsfc,chi,roL,scoef,fopts,liqflag)
 %------------------------------------------------------------------------------
 
-% % this version is correct (the B3 error is fixed, S is confirmed correct
-% for both cases)
-
 %    debug =  false;
 %    dflag =  true;
 
@@ -172,47 +169,5 @@ elseif tryflag == 2     % next try Tair in case of bad past Tsfc
 elseif tryflag == 3     % next try Tair in case of bad past Tsfc
    [Tsfc,~,~]  = fzero(fSEB,Tair,fopts); 
 end 
-
-%   SEB     =   fSEB(250:1:300);
-%   SEB     =   derivative(fSEB(250:1:300));
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-% the problem might be that when we have melting conditions, we can't find
-% a root b/c of the missing melt energy
-
-% if debug == true
-%    
-%    fopts2 = fopts;
-%    fopts2.Display = 'notify';
-%    fopts2.FunValCheck = 'on';
-%    fopts2.PlotFcns = @optimplotfval;
-%    [Tsfc,~,~,output]  = fzero(fSEB,Tair,fopts2); 
-% 
-% % derivative of fSEB:
-%    ftmp  =  @(fSEB,Tsfc,epsilon)imag(fSEB(Tsfc(:)+1i*epsilon))/epsilon;
-%    dfSEB =  @(Tsfc)ftmp(fSEB,Tsfc,10^-20);
-%    
-%   %Ttest    = min(Tair-4,268):1:max(Tair,Tf+1);
-%    Ttest = Tair-10:1:Tair+10;
-%    F     = nan(size(Ttest));
-%    dF    = nan(size(Ttest));
-%    for n = 1:numel(Ttest)
-%       F(n)  = fSEB(Ttest(n));
-%       dF(n) = dfSEB(Ttest(n));
-%      %dF(n) = (fSEB(Ttest(n)+1e-10)-F(n))/1e-10;
-%    end
-%    
-%    figure; plot(Ttest,F); hold on; plot(Tair,fSEB(Tair),'o');
-%    plot(xTsfc,fSEB(xTsfc),'o')
-%    xylabel('Tsfc','SEB(Tsfc)');
-%    
-%    figure; plot(Ttest,dF); hold on; plot(Tair,dF(Ttest==Tair),'o');
-%    plot(xTsfc,dF(find(Ttest-xTsfc>0,1,'first')),'o');
-%    xylabel('Tsfc','dSEB/dTsfc');
-%    
-% end
-   
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 end

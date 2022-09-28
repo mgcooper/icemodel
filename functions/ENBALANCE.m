@@ -1,20 +1,20 @@
-%--------------------------------------------------------------------------
+%------------------------------------------------------------------------------
 %   COMPUTE THE SURFACE ENERGY-BALANCE AND SOLVE FOR Tsfc
-%--------------------------------------------------------------------------
-function [  Qle,                                                        ...
+%------------------------------------------------------------------------------
+function [  Qm,                                                         ...
+            Qf,                                                         ...
             Qh,                                                         ...
             Qe,                                                         ...
             Qc,                                                         ...
-            Qm,                                                         ...
-            Qf,                                                         ...
+            Qle,                                                        ...
             balance,                                                    ...
             Tsfc  ]  =  ENBALANCE(Tair,wspd,rh,Qsi,Qli,albedo,k_eff,Pa, ...
                         T,Tf,dz,chi,xTsfc,cv_air,emiss,SB,roL,De,scoef, ...
-                        epsilon,fopts,liqflag)
-%--------------------------------------------------------------------------
+                        epsilon,fopts,liqflag,opts)
+%------------------------------------------------------------------------------
    
 % Atmospheric vapor pressure from relative humidity data.
-   ea       =  VAPPRESS(rh,Tair,xTsfc,Tf,liqflag);
+   ea       =  VAPPRESS(rh,Tair,liqflag);
    
 % incoming longwave if not provided
 %  Qli      =  LONGIN(ea,Tair,stefBoltz);
@@ -34,22 +34,22 @@ function [  Qle,                                                        ...
    
 % Make the Tsfc_0 <= 0 C for surface flux calculations.
 %   Let Tsfc remain > Tf for the upper boundary condition on ICE_ENERGY
-%    Tsfc0    =  MELTTEMP(Tsfc,Tf);
+   Tsfc0    =  MELTTEMP(Tsfc,Tf);
    
 % Compute the stability function.
-   S        =  STABLEFN(Tair,MELTTEMP(Tsfc,Tf),wspd,scoef);
+   S        =  STABLEFN(Tair,Tsfc0,wspd,scoef);
    
 % Compute the water vapor pressure at the surface.
-   es0      =  VAPOR(MELTTEMP(Tsfc,Tf),Tf,liqflag);
+   es0      =  VAPOR(Tsfc0,Tf,liqflag);
    
 % Compute the latent heat flux.
    Qe       =  LATENT(De,S,ea,es0,roL,epsilon,Pa);
 
 % Compute the sensible heat flux.
-   Qh       =  SENSIBLE(De,S,Tair,MELTTEMP(Tsfc,Tf),cv_air);
+   Qh       =  SENSIBLE(De,S,Tair,Tsfc0,cv_air);
 
 % Compute the longwave flux emitted by the surface.
-   Qle      =  LONGOUT(MELTTEMP(Tsfc,Tf),emiss,SB);
+   Qle      =  LONGOUT(Tsfc0,emiss,SB);
    
 % Compute the energy flux available for melting or freezing.
    Qm       =  0.0; 
@@ -68,11 +68,9 @@ function [  Qle,                                                        ...
    end
 
 % Perform an energy balance check.
-   balance = chi*Qsi*(1.0-albedo) + emiss*Qli + Qle + Qh + Qe + Qc - Qm;
+   balance  =  chi*Qsi*(1.0-albedo) + emiss*Qli + Qle + Qh + Qe + Qc - Qm;
    
-%    % For a 'skin' surface energy balance model, reset Tsfc
-%    if ~isempty(opts)
-%       if opts.skinmodel == true || opts.skinmelt == true
-%          Tsfc     =   Tsfc0;
-%       end
-%    end
+% For a 'skin' surface energy balance model, reset Tsfc
+   if opts.skinmodel == true
+      Tsfc  =  Tsfc0;
+   end

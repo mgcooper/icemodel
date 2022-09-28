@@ -11,21 +11,6 @@ function [Sc,Sp]  =  SFCFLIN(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,  ...
 
 % the linearization is of the form: SEB=SEB'+dSEB/dTsfc(Tsfc-Tsfc')
 
-% note on solar radiation source term. the penetrating solar radiation
-% absorbed in each cv (dQp) that comes out of updateextcoefs is scaled to
-% match the total subsurface absorbed solar radiation at each timestep in
-% SOLAR_HEAT (dQp_new = -(1-chi)*Qsi/total_solar).*dQp_old). Although not
-% intuitive, just trust that this provides the amount of solar radiation
-% absorbed in each cv AFTER removing chi*Qsi*1-albedo from Qsi. TLDR: as
-% long as the SEB term gets chi*(1.0-albedo) * Qsi, and the Qsip that comes
-% out of SOLARPEN and goes into SOLAR_HEAT uses the same chi, then energy
-% is not double counted. The 'chi' part goes into the skin, and the rest
-% goes into each cv. So, in the SEB linearization, we don't need any
-% special procedures to deal with the part absorbed in the top layer. The
-% equation below puts the skin part into the SEB linearization, and the
-% heat solver puts in the cv part, and they are combined in the equation
-% for for the top layer/node. 
-
 if liqflag == true
    % Over water.
    A  =  611.210;

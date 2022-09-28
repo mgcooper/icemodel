@@ -71,22 +71,6 @@ z_crds      =   roundn(z_crds,-3);
 z_wall      =   roundn(z_wall,-3);
 gridz       =   roundn(gridz,-3);
 
-% most likely delete this. this is if i want to return the cv info with the
-% upper boundary values. I think I want to deal with those in the solution
-% JJ          =   5;                          % number of control volumes
-% deltaz      =   0.3;                        % width of each control volume
-% deltab      =   0.0;                        % width of c.v. at the boundaries
-% dy_p        =   deltaz.*ones(1,JJ);         % array of c.v. widths
-% dy_pbc      =   [deltab dy_p deltab];       % array of c.v. widths including boundaries
-% dely_neg    =   [0.0 0.5.*dy_pbc(1:JJ+1)];  % interface-to-previous point
-% dely_pos    =   [0.0 0.5.*dy_pbc(2:JJ+2)];  % interface-to-next point
-% dely_p      =   dely_neg + dely_pos;        % distance between grid points
-% y_crds      =   cumsum(dely_p);             % grid point coordinates       
-% y_wall      =   [0 cumsum(dy_p)];           % interface coordinates
-% f_n         =   dely_pos./dely_p;           % interface conductivity weighting factor
-% f_n(1)      =   0.0;
-% f_n(end)    =   []; 
-
 % See notes at the end for further clarification.
 
 % This is the c.v. geometry, labeled as in Patankar, Fig. 4.3. Note that
@@ -114,12 +98,6 @@ gridz       =   roundn(gridz,-3);
 %|0|.15-|.15|   |.15|   |.15|   |.15|   |-|     dely_pos /
 %|0|.15-|--.3---|--.3---|--.3---|--.3---|-.15|  dely_p 
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% further notes on why the arrangement works. main idea is that ki gets
-% correctly defined, and the delta z term near the boundary does as well,
-% so the flux is properly defined in the top most c.v.
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
 % with this arrangement, lets look at the boundary flux:
 % we need the boundary conductivity, which we get from the interface
 % conductivity equation 4.9:
@@ -134,14 +112,6 @@ gridz       =   roundn(gridz,-3);
 % also note that kw = 2*kI*kW/(kI+kW) which is also what we want - the
 % interface conductivity is the harmonic mean of the two adjacent
 % conductivity values, which are defined at each c.v. center 
-
-% Further notes for reference:
-% Patankar uses the x-direction and uses P for the point and E/W for
-%   either side (right/left). Glen uses N/S, presumably for north south? In
-%   glen's original code, he had S for the surface (Patankar's W) and N for
-%   the lower boundary (Patankar's E). I switched them because N should be
-%   the surface. This is also how glen has it in SnowModel. Maybe it was a
-%   typo in the original model that he later fixed.
 	  
 % P = grid point
 % E = east side grid point, in the positive x-direction from P

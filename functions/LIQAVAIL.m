@@ -30,8 +30,6 @@ function [  h_resid,                                                    ...
 
 % NOTE: it's essential that liqflag be sent back as false if we're not in
 % the first layer, otherwise all water except liqresid is drained in MELT
-
-% also, i need to confirm i retained the method i came up with to 
        
 % with porosity defined as h_tot-h_ice, colbeck's water saturation is:
 % Sw = liqsat = h_liq_j/porosity,
@@ -42,7 +40,7 @@ function [  h_resid,                                                    ...
 % literature as volume water / volume ice. this is why liqresid =
 % theta_resid * h_ice
 
-% % these are confirmed correct
+% % these are correct:
 % theta_resid = 0.02;                 % residual water [m3 water/ m3 ice] [-]
 % liqresid    = theta_resid.*h_ice;   % residual water volume             [m]
 % liqavail    = h_liq - liqresid;     % water available to drain/freeze   [m]
@@ -50,15 +48,14 @@ function [  h_resid,                                                    ...
 % availCap    = porosity - liqresid;  % available capacity                [m]
 % relsat      = liqavail./availCap    % relative saturation               [-]
 
-% ALSO see LIQ_FLUX
+% ALSO see LIQFLUX
 
-% from earlier updatestate notes:    
 % %   the following relationship holds and could be useful (eq. 6)
 % %   liquid saturation, liquid volume per void volume % [m3/m3]
 %    liqsat       =   0.1;
 %    liqfrac      =   liqsat*porosity_snow; 
 %   
-% %   mgc liqsat and liqfrac expressions above are from Jordan. The liqresid
+% %   liqsat and liqfrac expressions above are from Jordan. The liqresid
 % %   etc. below are from Colbeck (but Jordan might have them too)
 % %   this would be needed to implement liquid fluxes
 %     liqresid    =   0.02;

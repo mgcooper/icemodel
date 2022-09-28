@@ -1,29 +1,23 @@
 function [met,opts] = METINIT(opts)
-    
-% re-activate this when/if i put all the metfiles in the input directory
-%load([opts.path.input 'met/' opts.metfname],'met')
 
 if opts.sitename == "region"
 
    % load the first met file
    load(opts.metfname,'met');
 
+   % re-activate this when/if i put all the metfiles in the input directory
+   %load([opts.path.input 'met/' opts.metfname],'met')
+
    if opts.calendar_type == "noleap"
       met = rmleapinds(met);
    end
-   %opts.maxiter = height(met);
+   
    opts.maxiter = height(met)/opts.numyears;
    opts.dt  = seconds(met.Time(2)-met.Time(1));
-% % should be able to remove this 
-%    if opts.dt == 900
-%       opts.maxiter = 35040;
-%    elseif opts.dt == 3600
-%       opts.maxiter = 8760;
-%    end
 
    bi = find(met.modis<=0 | met.modis>=1);
    if ~isempty(bi)
-   met.modis(bi) = met.albedo(bi);
+      met.modis(bi) = met.albedo(bi);
       warning('bad albedo')
    end
 

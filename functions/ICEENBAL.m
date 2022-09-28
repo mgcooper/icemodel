@@ -47,12 +47,6 @@ while any(errT > 1e-2) && iter < 50
    iM  ]    =  GECOEFS(T,ro_sno,cp_sno,f_liq,f_ice,Ls,Lf,dz,dt,         ...
                dFdT,drovdT,TL,H,H_old,Sc,k_eff,fn,delz,Tsfc,JJ);
 
-% underrelaxation (doesn't work with melt-zone transformation)
-% if iter>1
-%     aP          =   aP./alpha;
-%     b           =   b + beta.*aP.*T;
-% end
-
 % solve the equation
    T        =  TRISOLVE(-aN,aP,-aS,b);
 

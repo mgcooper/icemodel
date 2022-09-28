@@ -7,7 +7,7 @@ function [Fsfc,Fdot] =  SFCFLUX(Tair,Qli,Qc,ea,De,Pa,wspd,cv_air,emiss, ...
 %--------------------------------------------------------------------------
 
 % The surface flux includes Qc so it can be used in general, but for a
-% coupled surface/column with neumann bc at the top, Qc=0 when this is
+% neumann upper bc at the top, Qc=0 when this is
 % called from within the solver. Tsfc is then updated using the top node
 % temperature and the conductive flux from the top node into the surface.
 % In contrast, for a dirichlet upper bc, this function could be called with
