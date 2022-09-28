@@ -10,7 +10,7 @@ workoff skinmodel
 workon icemodel
 workon runoff
 
-info     = buildsandbox(funcname,'pathsave',pathsave,'dryrun',false);
+info     = buildsandbox(funcname,'pathsave',pathsave,'dryrun',true);
 
 %------------------------------------------------------------------------------
 % repeat for skinmdoel

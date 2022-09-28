@@ -16,8 +16,8 @@ ensemble    =  ensembleList(  forcingdata,userdata,uservars,meltmodels, ...
                               simyears,sitenames);
 
 % activate the right version (need to add these functions to the repo)
-% workoff skinmodel
-% workon icemodel
+workoff skinmodel
+workon icemodel
 
 %------------------------------------------------------------------------------
 % set paths
@@ -56,13 +56,12 @@ for n = 1:ensemble.numcombos
       continue;
    end
    
-   % set the model options (including the fsave prefix)
+   % set the model options
    opts        = a_opts(   opts,sitename,simyear,meltmodels,forcingdata,...
                            userdata,uservars,str2double(simyear),...
                            str2double(simyear));
 
-   % run the model 
-
+   % display the model configuration
    disp([meltmodels ', ' sitename ', '  forcingdata ', ' userdata ', ' simyear])
    
    
