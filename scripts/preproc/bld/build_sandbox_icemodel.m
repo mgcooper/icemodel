@@ -45,6 +45,10 @@ srclist  = unique([srclist1;srclist2]);
 cpylist  = getlist(cpydir,'.m');
 cpylist  = {cpylist.name}';
 
+% this is the list of functions that are already in icemodel/private/functions 
+dstlist  = getlist(dstdir,'.m');
+dstlist  = {dstlist.name}';
+
 for n = 1:numel(cpylist)
    
    % if the file in the main icemodel function dir isn't in the sandbox, it
@@ -52,8 +56,12 @@ for n = 1:numel(cpylist)
    % the private/functions dir
    if ~ismember(cpylist(n),srclist)
       %fprintf(['moving ' [cpydir cpylist{n}] ' to ' [dstdir cpylist{n}] '\n\n']);
-      system(['git mv ' [cpydir cpylist{n}] ' ' [dstdir cpylist{n}]])
-      %movefile([cpydir cpylist{n}],[dstdir cpylist{n}]);
+      if ~ismember(cpylist(n),dstlist)
+         %system(['git mv ' [cpydir cpylist{n}] ' ' [dstdir cpylist{n}]])
+         movefile([cpydir cpylist{n}],[dstdir cpylist{n}]);
+      else
+         fprintf(['file ' [cpydir cpylist{n}] ' already present in private/']);
+      end
    end
 end
 
