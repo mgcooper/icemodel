@@ -15,6 +15,9 @@ Thumbs.db
 # Backup
 *.tmp
 *.bk
+*.bak
+*.orig
+*.tmp
 *.archive
 *.keep
 *.old
