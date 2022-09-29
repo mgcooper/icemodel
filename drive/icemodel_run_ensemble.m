@@ -3,7 +3,7 @@ clean
 % this demonstrates how to set up an ensemble of runs at one site
 
 %------------------------------------------------------------------------------
-%   run dependent information
+%  set the run-specific model configuration
 %------------------------------------------------------------------------------
 savedata    =   false;
 sitenames   =  {'behar'};  
@@ -69,15 +69,12 @@ for n = 1:ensemble.numcombos
       tic; [ice1,ice2,met,opts] = icemodel(opts); toc
    end
 
-   % post process
-   [ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts);
-
 %------------------------------------------------------------------------------
 %     save the data
 %------------------------------------------------------------------------------
    if savedata == true
-      if ~exist(opts.path.output,'dir'); mkdir(opts.path.output); end 
-      save([opts.path.output opts.fsave],'ice1','ice2','opts');
+      if ~exist(opts.pathoutput,'dir'); mkdir(opts.pathoutput); end 
+      save([opts.pathoutput opts.fsave],'ice1','ice2','opts');
    end
 
 end

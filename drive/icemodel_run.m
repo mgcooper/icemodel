@@ -3,7 +3,7 @@ clean
 % this demonstrates how to set up a one-year run at one site
 
 %------------------------------------------------------------------------------
-%  set the model configuraton
+%  set the run-specific model configuration
 %------------------------------------------------------------------------------
 savedata    = false;
 sitename    = 'behar';         % options: 'kanm', 'behar'
@@ -11,23 +11,24 @@ startyear   = 2016;           % options: 2016
 endyear     = 2016;           % options: 2016
 meltmodel   = 'icemodel';     % options: 'icemodel','skinmodel'
 forcingdata = 'kanm';         % options: 'mar','kanm'
-userdata    = 'racmo';         % options: 'modis','racmo','merra','mar','kanm','none'
+userdata    = 'none';         % options: 'modis','racmo','merra','mar','kanm','none'
 uservars    = 'albedo';       % options: 'albedo', or any var in met
 
 %------------------------------------------------------------------------------
 %  set the input and output paths (do this here or in icemodel_config.m)
 %------------------------------------------------------------------------------
+
 % setenv('ICEMODELIINPUTPATH','/full/path/to/icemodel/input/');
 % setenv('ICEMODELOUTPUTPATH','/full/path/to/icemodel/output/');
 
 %------------------------------------------------------------------------------
-%  set the model options 
+%  build the 'opts' model configuration structure
 %------------------------------------------------------------------------------
 opts = icemodel_opts(   sitename,meltmodel,forcingdata,userdata,uservars,  ...
                         startyear,endyear);
 
 %------------------------------------------------------------------------------
-%   run the model
+%  run the model
 %------------------------------------------------------------------------------
 [ice1,ice2,met,opts] = icemodel(opts);
 
@@ -56,7 +57,7 @@ else
 end
 
 % plot ablation
-t1 = datetime(startyear,6,1,0,0,0,'TimeZone','UTC');
+t1 = datetime(startyear,7,1,0,0,0,'TimeZone','UTC');
 plotPromice(AblationDaily,'refstart',t1);
 plotPromice(AblationHourly,'refstart',t1);
 
