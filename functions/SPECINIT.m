@@ -10,16 +10,16 @@ function [radii,scattercoefs,solar,kabs,kice] = SPECINIT(opts)
               4.000, 4.500, 5.000, 5.500, 6.000 ];
 
 % load the pre-defined Mie scattering values.
-    load([opts.path.input 'spectral/mie.mat'],'mie'); 
+    load([opts.pathinput 'spectral/mie.mat'],'mie'); 
     scattercoefs = mie; clear mie;
 
 % load the proto-typical spectral irradiance profile
-    load([opts.path.input 'spectral/solar.mat'],'solar'); 
+    load([opts.pathinput 'spectral/solar.mat'],'solar'); 
     
 % load the user-defined kabs/kice if provided
     if opts.kabs_user == true
-        load([opts.path.input 'spectral/kabs'],'kabs');
-        load([opts.path.input 'spectral/kice'],'kice');
+        load([opts.pathinput 'spectral/kabs'],'kabs');
+        load([opts.pathinput 'spectral/kice'],'kice');
     else
         kabs = []; kice = [];
     end
