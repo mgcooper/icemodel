@@ -61,7 +61,7 @@ t1 = datetime(startyear,6,1,0,0,0,'TimeZone','UTC');
 plotPromice(AblationDaily,'refstart',t1);
 plotPromice(AblationHourly,'refstart',t1);
 
-% plot enbal - need option to plot met station data when forcing is rcm 
-plotEnbal(ice1,met);
+% plot the energy balance 
+% plotEnbal(ice1,met);
 
 
