@@ -57,7 +57,7 @@ else
 end
 
 % plot ablation
-t1 = datetime(startyear,7,1,0,0,0,'TimeZone','UTC');
+t1 = datetime(startyear,6,1,0,0,0,'TimeZone','UTC');
 plotPromice(AblationDaily,'refstart',t1);
 plotPromice(AblationHourly,'refstart',t1);
 
