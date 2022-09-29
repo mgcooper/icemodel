@@ -7,7 +7,7 @@
 
 ## Usage
 
-The main program is `icemodel.m`, which calls functions saved in `functions/`. To run the model, first set the model configuration options in `drive/a_opts.m`. Configuration options include which input forcing dataset you want to use, and whether you want to run `icemodel` or `skinmodel`. Then run the model by calling `drive/b_drive.m`. The output will be saved in `output/`. Optionally, run `drive/c_eval.m` to evaluate the results and compare with observations.
+The main program is `icemodel.m`, which calls functions saved in `functions/`. To get started, open the file `drive/icemodel_config.m` and set the global configuration options (environment variables). Then open `drive/icemodel_opts.m` which is a function that sets run-specific model options and parameters, such as which input forcing dataset you want to use, and whether you want to run `icemodel` or `skinmodel`. Then run the model by calling `drive/icemodel_run.m`. There are options in that script to save the model output and evaluate the results against observations.
 
 The required inputs are in `inputs/`. These include the meteorological forcing data in `inputs/met/`, user data in `inputs/userdata/`, and the inputs to the two-stream model in `inputs/spectral/`. The spectral data inputs include values for the absorption coefficient of pure ice from Warren et al. 2008, in-situ absorption coefficients for glacier ice from Cooper et al. 2021, a proto-typical downwelling solar spectrum for the Arctic atmosphere generated with `ATRAN` (Lord, 1991), and a library of mie-scattering coefficients as described in Cooper et al. 2021. The "user data" directory contains alternative model forcing data that is "swapped out" with the standard model forcing to test hypotheses about processes and determine model sensitivity to forcings. For example, the user can select input forcing data generated from climate model output by setting the `opts.metfname` configuration parameter. This parameter points to the input meteorological forcing file in `inputs/met/`. The user can then override one or more of the forcing variables in this input file by setting `opts.userdata` and `opts.uservars` to point to an alternative forcing dataset. For example, `opts.userdata=modis` and `opts.uservars=albedo` would replace the albedo values in the input meteorological forcing file with modis albedo for the same time and location.
 
@@ -18,9 +18,10 @@ In summary:
 
 | Script Name | Description | How to Run |
 | --- | --- | --- |
-| `a_opts.m` | Script to set the model configuration | place this repo on your matlab path, edit and run the script |
-| `b_drive.m` | Script to run the model | place this repo on your matlab path, edit and run the script |
-| `c_eval.m` | Script to evaluate model output | place this repo on your matlab path, edit and run the script |
+| `icemodel_config.m` | global configuration settings | place this repo on your matlab path, edit and run the script |
+| `icemodel_opts.m` | run-specific model configuration | place this repo on your matlab path, edit and run the script |
+| `icemodel_run.m` | Script to run the model | place this repo on your matlab path, edit and run the script |
+| `icemodel_eval.m` | Script to evaluate model output | place this repo on your matlab path, edit and run the script |
 
 ## Model input
 
@@ -54,7 +55,7 @@ Say you want to run a simulation at the KAN-M weather station for year 2018 at a
 
 The function `METINIT.m` will then swap out the KAN-M albedo data in the met forcing data with the modis albedo.
 
-In practice, however, these options are set programmatically by passing the `sitename`, `forcingdata`, `userdata`, `uservars`, `meltmodel`, `startyear`, and `endyear` variables to the `a_opts.m` function, which builds the `opts.metfname` string. The function `b_drive.m` is used to set these variables, pass them to `a_opts.m`, and then pass `opts` to the main program `icemodel.m`.
+In practice, however, these options are set programmatically by passing the `sitename`, `forcingdata`, `userdata`, `uservars`, `meltmodel`, `startyear`, and `endyear` variables to the `icemodel_opts.m` function, which builds the `opts.metfname` string. The function `icemodel_run.m` is used to set these variables, pass them to `icemodel_opts.m`, and then pass `opts` to the main program `icemodel.m`.
 
 ### Example model configuration:
 
@@ -67,21 +68,12 @@ In practice, however, these options are set programmatically by passing the `sit
     userdata    = 'modis';
     uservars    = 'albedo';
 
-    % initialize the opts struct with the input and output paths (note: this will be removed)
-    opts.path.input    = '/full/path/to/icemodel/input/';
-    opts.path.output   = '/full/path/to/icemodel/output/';
-    opts.path.metdata  = '/full/path/to/icemodel/input/met/';
-    opts.path.userdata = '/full/path/to/icemodel/input/userdata/';
-
-    % set the opts configuration struct
-    opts = a_opts(  opts,sitename,simyear,meltmodels,   ...
-                    forcingdata,userdata,uservars,      ...
-                    startyear,endyear);
+    % build the 'opts' model configuration structure
+    opts = icemodel_opts(   sitename,meltmodel,forcingdata,userdata,uservars,  ...
+                            startyear,endyear);
 
     % run the model
     [ice1,ice2,met,opts] = icemodel(opts);
-
-    % evaluate the output
     
 
 ## Code reference

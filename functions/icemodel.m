@@ -67,7 +67,7 @@ function [ice1,ice2,met,opts] = icemodel(opts)
    clear radii scattercoefs solar
    
 %------------------------------------------------------------------------------
-%  initialize timestepping, parameters, and initial state values
+%  initialize timestepping and initial state values
 %------------------------------------------------------------------------------
    
 % timestepping settings
