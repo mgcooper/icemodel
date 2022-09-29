@@ -1,25 +1,74 @@
+clean
 
-% this demonstrates how to set up a single-year run at one site
+% this demonstrates how to set up a one-year run at one site
 
-% set the main configuration options
-sitename    = 'KANM';                  % KAN-M weather station
-startyear   = 2018;
-endyear     = 2018;
-meltmodel   = 'icemodel';
-forcingdata = 'KANM';
-userdata    = 'modis';                 % use modis albedo instead of kan-m
-uservars    = 'albedo';
+%------------------------------------------------------------------------------
+%  set the model configuraton
+%------------------------------------------------------------------------------
+savedata    = false;
+sitename    = 'behar';         % options: 'kanm', 'behar'
+startyear   = 2016;           % options: 2016
+endyear     = 2016;           % options: 2016
+meltmodel   = 'icemodel';     % options: 'icemodel','skinmodel'
+forcingdata = 'kanm';         % options: 'mar','kanm'
+userdata    = 'racmo';         % options: 'modis','racmo','merra','mar','kanm','none'
+uservars    = 'albedo';       % options: 'albedo', or any var in met
 
-% set the input and output paths (see icemodel_config.m)
-setenv('ICEMODELIINPUTPATH','/full/path/to/icemodel/input/');
-setenv('ICEMODELOUTPUTPATH','/full/path/to/icemodel/output/');
+%------------------------------------------------------------------------------
+%  set the input and output paths (see icemodel_config.m)
+%------------------------------------------------------------------------------
+% setenv('ICEMODELIINPUTPATH','/full/path/to/icemodel/input/');
+% setenv('ICEMODELOUTPUTPATH','/full/path/to/icemodel/output/');
 
-% set the model options 
-opts = icemodel_opts(sitename,meltmodel,forcingdata,userdata,uservars,startyear,endyear);
+HOMEPATH = [getenv('HOME') '/'];
 
-% run the model
+% setenv('ICEMODELDATAPATH', [HOMEPATH 'myprojects/matlab/runoff/data/icemodel/eval/']);
+% setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/runoff/data/icemodel/input/']);
+
+setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel/input/']);
+setenv('ICEMODELDATAPATH', [HOMEPATH 'myprojects/matlab/icemodel/input/userdata/']);
+
+%------------------------------------------------------------------------------
+%  set the model options 
+%------------------------------------------------------------------------------
+opts = icemodel_opts(   sitename,meltmodel,forcingdata,userdata,uservars,  ...
+                        startyear,endyear);
+
+%------------------------------------------------------------------------------
+%   run the model
+%------------------------------------------------------------------------------
 [ice1,ice2,met,opts] = icemodel(opts);
 
-% save the data
+%------------------------------------------------------------------------------
+%  save the data
+%------------------------------------------------------------------------------
+if savedata == true
+   if ~exist(opts.pathoutput,'dir'); mkdir(opts.pathoutput); end 
+   save([opts.pathoutput opts.fsave],'ice1','ice2','opts');
+end
 
-% plot the data
+%------------------------------------------------------------------------------
+%  prep the output for plotting
+%------------------------------------------------------------------------------
+[Runoff,Discharge,Catchment]  = prepRunoff(opts,ice1);
+AblationHourly                = prepAblation(opts,ice1,'hourly');
+AblationDaily                 = prepAblation(opts,ice1,'daily');
+
+% plot the runoff
+if opts.meltmodel == "skinmodel"
+	h1 = plotRunoff(Runoff,Discharge,Catchment,'plotsurf',true,'sitename',  ...
+                     sitename,'userdata',userdata,'forcingdata',forcingdata);
+else
+   h1 = plotRunoff(Runoff,Discharge,Catchment,'sitename',sitename,         ...
+                     'userdata',userdata,'forcingdata',forcingdata);
+end
+
+% plot ablation
+t1 = datetime(startyear,6,1,0,0,0,'TimeZone','UTC');
+plotPromice(AblationDaily,'refstart',t1);
+plotPromice(AblationHourly,'refstart',t1);
+
+% plot enbal - need option to plot met station data when forcing is rcm 
+plotEnbal(ice1,met);
+
+

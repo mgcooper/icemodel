@@ -1,4 +1,7 @@
 clean
+
+% this demonstrates how to set up an ensemble of runs at one site
+
 %------------------------------------------------------------------------------
 %   run dependent information
 %------------------------------------------------------------------------------
@@ -12,30 +15,22 @@ startyear   =  2016;
 endyear     =  2016;
 simyears    =  startyear:endyear;
 
+% this builds an array of all combinations of the above settings.
 ensemble    =  ensembleList(  forcingdata,userdata,uservars,meltmodels, ...
                               simyears,sitenames);
 
-% activate the right version (need to add these functions to the repo)
-workoff skinmodel
-workon icemodel
-
 %------------------------------------------------------------------------------
-% set paths
+% notes on ensemble options
 %------------------------------------------------------------------------------
-opts.path.input    = [pwd '/input/'];
-opts.path.output   = [pwd '/output/'];
-opts.path.metdata  = [opts.path.input 'met/'];
-opts.path.initdata = [opts.path.input 'init/'];
-opts.path.userdata = [opts.path.input 'userdata/'];
 
 % valid userdata:
 % {'racmo','mar','merra','kanm','kanl','modis','none'}
 
 % valid sitenames:
-% {'upperBasin','behar','slv1','slv2','ak4'}
+% {'upperbasin','behar','slv1','slv2','ak4'}
 
 % valid forcingdata:
-% {'MAR','KANM','KANL'}
+% {'mar','kanm','kanl'}
 
 %------------------------------------------------------------------------------
 % run all combos
@@ -44,12 +39,12 @@ for n = 1:ensemble.numcombos
    
    sitename    = char(ensemble.allcombos.sitenames(n));
    simyear     = char(ensemble.allcombos.simyears(n));
-   meltmodels  = char(ensemble.allcombos.meltmodels(n));
+   meltmodel   = char(ensemble.allcombos.meltmodels(n));
    forcingdata = char(ensemble.allcombos.forcingdata(n));
    userdata    = char(ensemble.allcombos.userdata(n));
    uservars    = cellstr(ensemble.allcombos.uservars(n));
    
-   % this skips cases like 'icemodel_upperbasin_2016_kanl_swap_KANL_albedo'
+   % this skips cases like 'icemodel_upperbasin_2016_kanl_swap_kanl_albedo'
    % this does not skip the cases where the sitename and forcing are the
    % same, which are the cases where kanm/kanl are used to force basin runs
    if strcmpi(userdata,forcingdata)
@@ -57,19 +52,18 @@ for n = 1:ensemble.numcombos
    end
    
    % set the model options
-   opts        = a_opts(   opts,sitename,simyear,meltmodels,forcingdata,...
-                           userdata,uservars,str2double(simyear),...
-                           str2double(simyear));
-
+   opts = icemodel_opts(sitename,meltmodel,forcingdata,userdata,uservars,   ...
+                        str2double(simyear),str2double(simyear));
+                        
    % display the model configuration
-   disp([meltmodels ', ' sitename ', '  forcingdata ', ' userdata ', ' simyear])
+   disp([meltmodel ', ' sitename ', '  forcingdata ', ' userdata ', ' simyear])
    
    
 %------------------------------------------------------------------------------
 %     RUN THE MODEL
 %------------------------------------------------------------------------------
    
-   if opts.skinmodel == true
+   if opts.meltmodel == "skinmodel"
       tic; [ice1,ice2,met,opts] = skinmodel(opts); toc
    else
       tic; [ice1,ice2,met,opts] = icemodel(opts); toc
@@ -96,22 +90,13 @@ end
 AblationHourly                = prepAblation(opts,ice1,'hourly');
 AblationDaily                 = prepAblation(opts,ice1,'daily');
 
-if strcmpi(userdata,'none')
-   ltext = {'ADCP','RACMO','MAR','MERRA',['ICE (' upper(forcingdata) ')']};
+% plot the runoff
+if opts.meltmodel == "skinmodel"
+	h1 = plotRunoff(Runoff,Discharge,Catchment,'plotsurf',true,'sitename',  ...
+                     sitename,'userdata',userdata,'forcingdata',forcingdata);
 else
-   ltext = {'ADCP','RACMO','MAR','MERRA',['ICE (' upper(userdata) ')']};
-end
-
-% FIGURE 1 = RUNOFF (options: 'raw','mean','members','sensitivity','surf')
-if opts.skinmodel == true
-	h1 = plotRunoff(Runoff,Discharge,Catchment,  'plotsurf',true,          ...
-                                                'legendtext',ltext,     ...
-                                                'sitename',sitename,    ...
-                                                'refstart',true);
-else
-   h1 = plotRunoff(Runoff,Discharge,Catchment,'plotensemble',false,  ...
-                                            'legendtext',ltext,      ...
-                                            'sitename',sitename);
+   h1 = plotRunoff(Runoff,Discharge,Catchment,'sitename',sitename,         ...
+                     'userdata',userdata,'forcingdata',forcingdata);
 end
 
 % PLOT ABLATION
