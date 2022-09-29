@@ -8,17 +8,18 @@ HOMEPATH = [getenv('HOME') '/'];
 
 % set the icemodel code, input data, and output data paths:
 setenv('ICEMODELPATH',[HOMEPATH 'myprojects/matlab/icemodel/']);
-setenv('ICEMODELDATAPATH', [HOMEPATH 'myprojects/matlab/runoff/data/icemodel/eval/']);
-setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/runoff/data/icemodel/input/']);
-setenv('ICEMODELOUTPUTPATH',[HOMEPATH 'myprojects/matlab/runoff/data/icemodel/output/']);
+setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel/input/']);
+setenv('ICEMODELDATAPATH', [HOMEPATH 'myprojects/matlab/icemodel/input/userdata/']);
+setenv('ICEMODELOUTPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel//output/']);
 
 % ICEMODELPATH is the top-level model path (see 'more information' below)
-% ICEMODELDATAPATH is the path to the evaluation data (see prepRunoff.m)
+% ICEMODELDATAPATH is the path to the evaluation data
 % ICEMODELINPUTPATH is the path to the input met data
 % ICEMODELOUTPUTPATH is the path where model output is saved
 
-% (note: ICEMODELPATH is not currently used)
-% (note: ICEMODELOUTPUTPATH is only used in the drive script)
+% (note: ICEMODELPATH is not currently used, and ICEMODELOUTPUTPATH is only
+% used in the icemodel_run script. ICEMODELINPUTPATH should point to input/
+% and ICEMODELDATAPATH should point to input/userdata/ )  
 
 % ----------------
 % MORE INFORMATION
@@ -66,6 +67,7 @@ setenv('ICEMODELOUTPUTPATH',[HOMEPATH 'myprojects/matlab/runoff/data/icemodel/ou
 % than where the model code is saved (as i have it setup above). 
 
 
-
-
+ 
+% setenv('ICEMODELDATAPATH', [HOMEPATH 'myprojects/matlab/runoff/data/icemodel/eval/']);
+% setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/runoff/data/icemodel/input/']);
 

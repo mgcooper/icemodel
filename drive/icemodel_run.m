@@ -15,18 +15,10 @@ userdata    = 'racmo';         % options: 'modis','racmo','merra','mar','kanm','
 uservars    = 'albedo';       % options: 'albedo', or any var in met
 
 %------------------------------------------------------------------------------
-%  set the input and output paths (see icemodel_config.m)
+%  set the input and output paths (do this here or in icemodel_config.m)
 %------------------------------------------------------------------------------
 % setenv('ICEMODELIINPUTPATH','/full/path/to/icemodel/input/');
 % setenv('ICEMODELOUTPUTPATH','/full/path/to/icemodel/output/');
-
-HOMEPATH = [getenv('HOME') '/'];
-
-% setenv('ICEMODELDATAPATH', [HOMEPATH 'myprojects/matlab/runoff/data/icemodel/eval/']);
-% setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/runoff/data/icemodel/input/']);
-
-setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel/input/']);
-setenv('ICEMODELDATAPATH', [HOMEPATH 'myprojects/matlab/icemodel/input/userdata/']);
 
 %------------------------------------------------------------------------------
 %  set the model options 
