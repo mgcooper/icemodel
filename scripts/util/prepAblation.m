@@ -3,76 +3,39 @@ function Ablation = prepAblation(opts,ice1,timescale)
 %    addParameter(  p, 'timescale',      '',         @(x)ischar(x)        );
 
    site    = opts.sitename;
-   yyyy    = opts.yyyy;
+   yyyy    = num2str(opts.simyears(1));
    
-%    % this will work if we have Data files for the site/year, but those are
-%    % only for years with runoff. This means I need to make Data files for
-%    % the met stations, which is needed anyway for a comprehensive ablation
-%    % analysis
-%    if strcmpi(site,'kanm'); site = 'behar'; end
-%    if strcmpi(site,'kanl'); site = 'ak4'; end
-%    %    if strcmpi(site,'kanl'); site = 'upperBasin'; end
-   
-   if strcmpi(site,'hills'); 
-      site = 'behar'; 
-      disp('site=hills, using behar runoff')
-   end
-
-   p.data  = '/Users/coop558/mydata/';
-   p.mar   = [p.data 'mar3.11/matfiles/' site '/data/'];
-   p.rac   = [p.data 'racmo2.3/matfiles/' site '/data/'];
-   p.mer   = [p.data 'merra2/1hrly/matfiles/' site '/data/'];
-   p.obs   = setpath(['GREENLAND/runoff/data/icemodel/eval/' site '/']);
-   p.aws1  = setpath('runoff/data/ablation/mat/','project');
-   p.aws2  = setpath('runoff/data/icemodel/eval/','project');
-   
-
-   if strcmp(site,'behar')
-      p.obs = [p.obs opts.yyyy '/'];
-   end
+   patheval = getenv('ICEMODELDATAPATH');
+   pathdata = [getenv('ICEMODELINPUTPATH') 'userdata/'];
    
    % load the promice ablation data
-   load([p.aws1 'promice_ablation_annual.mat'],'data');
-   iyear  = find(data.Year == str2double(yyyy));
-   switch site
-      case {'behar','slv1','slv2','kanm','KANM'}
-         if strcmp(timescale,'daily')
-            load([p.aws2 'kanm/kanm_ablation_daily'],'ablation');
-         elseif strcmp(timescale,'hourly')
-            load([p.aws2 'kanm/kanm_ablation_hourly'],'ablation');
-         end
-         
-         %AnnualAblation  = data.KAN_M(iYear);
-         
-      case {'upperBasin','ak4','kanl','KANL'}
-         if strcmp(timescale,'daily')
-            load([p.aws2 'kanl/kanl_ablation_daily'],'ablation');
-         elseif strcmp(timescale,'hourly')
-            load([p.aws2 'kanl/kanl_ablation_hourly'],'ablation');
-         end
-         %AnnualAblation  = data.KAN_L(iYear);
+   if contains(site,{'behar','slv1','slv2','kanm','KANM'})
+      aws = 'kanm';
+   elseif contains(site,{'upperbasin','ak4','kanl','KANL'})
+      aws = 'kanl';
    end
+   load([patheval aws '_ablation_' timescale '.mat'],'ablation');
    
    % pull out the ablation for the simulation time
    iplot       = isbetween(ablation.Time,ice1.Time(1),ice1.Time(end));
    Ablation    = ablation(iplot,:);
    
    % read in the RCM model data
-   if exist([p.mar 'mar_' site '_' yyyy '.mat'],'file')
-      MAR               = load([p.mar 'mar_' site '_' yyyy '.mat'],'Data');
+   if exist([pathdata 'mar_' site '_' yyyy '.mat'],'file') == 2
+      MAR               = load([pathdata 'mar_' site '_' yyyy '.mat'],'Data');
    else
       MAR.Data.runoff   = nan(size(Ablation.ablation));
       MAR.Data.melt     = nan(size(Ablation.ablation));
    end
-   if exist([p.rac 'racmo_' site '_' yyyy '.mat'],'file')
-      RAC               = load([p.rac 'racmo_' site '_' yyyy '.mat'],'Data');
+   if exist([pathdata 'racmo_' site '_' yyyy '.mat'],'file') == 2
+      RAC               = load([pathdata 'racmo_' site '_' yyyy '.mat'],'Data');
    else % create a dummy timetable for compatibility but set nan 
       RAC.Data          = MAR.Data;
       RAC.Data.runoff   = nan.*RAC.Data.runoff;
       RAC.Data.melt     = nan.*RAC.Data.melt;
    end
-   if exist([p.mer 'merra_' site '_' yyyy '.mat'],'file')
-      MER   = load([p.mer 'merra_' site '_' yyyy '.mat'],'Data');
+   if exist([pathdata 'merra_' site '_' yyyy '.mat'],'file') == 2
+      MER               = load([pathdata 'merra_' site '_' yyyy '.mat'],'Data');
    else
       MER.Data          = MAR.Data;
       MER.Data.runoff   = nan.*MER.Data.runoff;
@@ -125,5 +88,14 @@ function Ablation = prepAblation(opts,ice1,timescale)
    Ablation    = renamevars(Ablation,'ablation','promice');
    
    % merra.melt      = MER.ppt-MER.smb-MER.evap-MER.rain;
+
+   
+      
+   % this data is no longer used
+   % pathaws = setpath('runoff/data/ablation/mat/','project');
+   % load([pathaws 'promice_ablation_annual.mat'],'data');
+   % iyear  = find(data.Year == str2double(yyyy));
+   % AnnualAblation  = data.KAN_M(iyear);
+   % AnnualAblation  = data.KAN_L(iYear);
    
 end

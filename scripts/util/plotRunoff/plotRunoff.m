@@ -23,47 +23,38 @@ function h = plotRunoff(Runoff,Discharge,Catchment,varargin)
    addParameter(  p, 'refstart',       false,      @(x)islogical(x)     );
    addParameter(  p, 'legendtext',     {''},       @(x)iscell(x)        );
    addParameter(  p, 'sitename',       '',         @(x)ischar(x)        );
+   addParameter(  p, 'userdata',       'none',     @(x)ischar(x)        );
+   addParameter(  p, 'forcingdata',    'MAR',      @(x)ischar(x)        );
    addParameter(  p, 't1',             NaT,        @(x)isdatetime(x)    );
    addParameter(  p, 't2',             NaT,        @(x)isdatetime(x)    );
    
    
    parse(p,Runoff,Discharge,Catchment,varargin{:});
    
-   opts.plot_patch      =  p.Results.plotpatch;
-   opts.plot_column     =  p.Results.plotcolumn;
-   opts.plot_surf       =  p.Results.plotsurf;
-   opts.plot_melt       =  p.Results.plotmelt;
-   opts.plot_comp       =  p.Results.plotcomp;
-   opts.plot_mean       =  p.Results.plotmean;
-   opts.plot_members    =  p.Results.plotmembers;
-   opts.plot_ensemble   =  p.Results.plotensemble;
-   opts.refstart        =  p.Results.refstart;
-   opts.ltext           =  p.Results.legendtext;
-   opts.sitename        =  p.Results.sitename;
-   opts.t1              =  p.Results.t1;
-   opts.t2              =  p.Results.t2;
+   opts = p.Results;
    
+   % plotcomp means compare two version of icemodel 
    
-   % plot_comp means compare two version of icemodel 
-   % plot_
+   % set default legend text
+   if opts.userdata == "none"
+      ltext = {'ADCP','RACMO','MAR','MERRA',['ICEMODEL (' upper(opts.forcingdata) ')']};
+   else
+      ltext = {'ADCP','RACMO','MAR','MERRA',['ICEMODEL (' upper(opts.userdata) ')']};
+   end
+   opts.legendtext = ltext;
    
 %--------------------------------------------------------------------------
    warning off
-%    narginchk(3,6)
-% 
-%    numargin    = nargin;
-%    argsin      = varargin;
-%    opts        = set_opts(numargin,argsin);
-
-   if opts.plot_surf == true
-      opts.plot_column = false;
+   
+   if opts.plotsurf == true
+      opts.plotcolumn = false;
    end
 
-   if opts.plot_surf == true
+   if opts.plotsurf == true
        Runoff.icemodel =   Runoff.skinmodelRunoff;
-   elseif opts.plot_melt == true
+   elseif opts.plotmelt == true
        Runoff.icemodel =   Runoff.icemodelMelt;
-   elseif opts.plot_column == true
+   elseif opts.plotcolumn == true
        Runoff.icemodel =   Runoff.icemodelRunoff;
    end
 
@@ -131,12 +122,14 @@ function [Q,R,txt] = prep_runoff(Runoff,Discharge,Catchment,opts)
    end
    
    % the lakes require unique processing
-   if any(strcmp(sitename,{'slv1','slv2'}))
+   if contains(sitename,{'slv1','slv2'})
+      
       if opts.refstart == true
          t1    =  Discharge.Time(find(~isnan(Discharge.lake_area_km2),1,'first'));
       else
          t1    =  datetime(2015,6,25,'TimeZone','UTC');
       end
+      
       t2       =  datetime(2015,8,5,'TimeZone','UTC');
       [si,ei]  =  dateInds(t1,t2,Runoff.Time);
       Y        =  [racmo(si:ei) mar(si:ei) merra(si:ei) icemod(si:ei,:)];
@@ -160,54 +153,30 @@ function [Q,R,txt] = prep_runoff(Runoff,Discharge,Catchment,opts)
    else
       
       % get the dates to extract the rcm data during the observation period
-      if strcmp(sitename,'ak4')
-         
-         yyyy     =  year(Runoff.Time(1));
-         
-         if isnat(opts.t1)
-            t1    =  datetime(yyyy,6,1,'TimeZone','UTC');
-         else
-            t1    =  opts.t1;
-         end
-         
-         if isnat(opts.t2)
-            t2    =  datetime(yyyy,9,1,'TimeZone','UTC');
-         else
-            t2    =  opts.t2;
-         end
-         
-         si       =  find(Discharge.Time == t1);
-         ei       =  find(Discharge.Time == t2);
-         
-         % convert the observed discharge to cumulative runoff in m3
-         Q.obs    =   cumsum(Discharge.Qm3(si:ei)); Q.obs = Q.obs-Q.obs(1);
-         Q.err    =   cumsum((Discharge.Qm3H(si:ei)-Discharge.Qm3L(si:ei))./2);
-         Q.t      =   datenum(Discharge.Time(si:ei));
-         
-         % reset si,ei to get the rcm data
-         si       =  find(Runoff.Time == t1);
-         ei       =  find(Runoff.Time == t2);
-      else
-         
-         % convert the observed discharge to cumulative runoff in m3
-         Q.obs    =   cumsum(Discharge.Qm3); Q.obs = Q.obs-Q.obs(1);
-         Q.err    =   cumsum((Discharge.Qm3H-Discharge.Qm3L)./2);
-         Q.t      =   datenum(Discharge.Time);
-         
-         si       =  find(Runoff.Time == Discharge.Time(1));
-         ei       =  find(Runoff.Time == Discharge.Time(end));
-         
-      end
+      yyyy     =  year(Runoff.Time(1));
+      t1       =  opts.t1;
+      t2       =  opts.t2;
       
-      Y        =  [racmo(si:ei) mar(si:ei) merra(si:ei) icemod(si:ei,:)];
+      % if t1 and t2 were not provided, use 6/1 to 9/1
+      if isnat(opts.t1); t1 = datetime(yyyy,6,1,'TimeZone','UTC'); end
+      if isnat(opts.t2); t2 = datetime(yyyy,9,1,'TimeZone','UTC'); end
+
+      % convert the observed discharge to cumulative runoff in m3
+      idx      =  isbetween(Discharge.Time,t1,t2);
+      Q.obs    =  cumsum(Discharge.Qm3(idx));
+      Q.obs    =  Q.obs-Q.obs(1);
+      Q.err    =  cumsum((Discharge.Qm3H(idx)-Discharge.Qm3L(idx))./2);
+      Q.t      =  datenum(Discharge.Time(idx));
+
+      % repeat for the rcm data
+      idx      =  isbetween(Runoff.Time,Discharge.Time(1),Discharge.Time(end));
+      Y        =  [racmo(idx) mar(idx) merra(idx) icemod(idx,:)];
       subQ0    =  true;
       ltxt     = 'ADCP';
       
-
    end
 
 % convert runoff to km3 using the catchment areas (km2)
-% put the data in rows so patch is easier to deal with
    for n = 1:size(Y,2)
       if subQ0 == true
          R.min(n,:) = Catchment.min.ease.area.*(cumsum(Y(:,n))-Y(1,n));
@@ -221,30 +190,30 @@ function [Q,R,txt] = prep_runoff(Runoff,Discharge,Catchment,opts)
    end
       
 % next makes legend text
-   if ~isempty(opts.ltext)
+   if ~isempty(opts.legendtext)
 
-      txt   = opts.ltext;
+      txt   = opts.legendtext;
 
    else
 
-      if opts.plot_ensemble == true
+      if opts.plotensemble == true
       %Y   =   [racmo.runoff(si:ei) mar.runoff(si:ei) icemod];
          txt  =   {ltxt,'RCMs','IceModel'};  % set the legend text
 
-         if opts.plot_surf == true
+         if opts.plotsurf == true
             txt   =   {ltxt,'RCMs','SkinModel'};
          end 
 
       else
 
-         if opts.plot_comp == true
-            if opts.plot_surf == true
+         if opts.plotcomp == true
+            if opts.plotsurf == true
                txt   =   {ltxt,'RACMO','MAR','MERRA','SkinModel v2','SkinModel'};
             else
                txt   =   {ltxt,'RACMO','MAR','MERRA','IceModel v2','IceModel'};
             end
          else
-            if opts.plot_surf == true
+            if opts.plotsurf == true
 
                txt   =   {ltxt,'RACMO','MAR','MERRA','SkinModel'};
 
@@ -282,20 +251,20 @@ herr     =   myerrorbar(c1,Q.t(1:pf:end),Q.obs(1:pf:end),Q.err(1:pf:end),    ...
                'LineWidth',lw,'MarkerSize',ms); hold on; 
 h.ax     =  gca;
 
-% plot_mean    =  patch each RCM min/max, lines on top
-% plot_members =  patch average of all RCM's, lines on top, + separate 
+% plotmean    =  patch each RCM min/max, lines on top
+% plotmembers =  patch average of all RCM's, lines on top, + separate 
 %                 patch for icemodel
-% plot_
+% plot
 
 % should have an option to plot as patches or lines
 
 
-% plot_patch means the data passed in must have 
+% plotpatch means the data passed in must have 
 
-if opts.plot_patch == true
+if opts.plotpatch == true
 
    % patch each rcm, with the average
-   if opts.plot_mean == true
+   if opts.plotmean == true
 
        for n = 1:N
            ypatch  =   [R.max(n,:) fliplr(R.min(n,:))];
@@ -306,7 +275,7 @@ if opts.plot_patch == true
        lh          =   [herr p];
 
    % plot one patch for mean min/max then the members on top    
-   elseif opts.plot_members == true
+   elseif opts.plotmembers == true
 
        ypatch      =   [max(R.max(1:N-1,:)) fliplr(min(R.min(1:N-1,:)))];
        p1          =   patch('XData',tpatch,'YData',ypatch,'FaceColor',    ...
@@ -322,7 +291,7 @@ if opts.plot_patch == true
        l(N)    =   plot(Q.t,R.med(N,:),'Color',c(N,:));
        lh      =   [herr l];
 
-   elseif opts.plot_ensemble == true
+   elseif opts.plotensemble == true
 
       % patch icemodel
       yL       =   mean(R.min(N-1:N,:));
@@ -347,7 +316,7 @@ if opts.plot_patch == true
 % plot lines, no patches   
 else
 
-   if opts.plot_ensemble == true
+   if opts.plotensemble == true
       
       % note: these assume the last two entries are AWS and MODIS
       
@@ -402,7 +371,7 @@ datetick;
 end
 
 % % this clips SEB to the obsevation time limits
-% if plot_comp == false
+% if plotcomp == false
 %     seb         =   seb.adcp;
 %     [si,ei]     =   dateInds(Q.Time(1),Q.Time(end),seb.time);
 %     seb_runoff  =   seb.runoff(si:ei);
@@ -413,38 +382,38 @@ end
 
 % function opts = set_opts(numargin,argsin)
 %     
-%     opts.plot_alpha         =   0.25;
-%     opts.plot_mean          =   true;
-%     opts.plot_members       =   false;
-%     opts.plot_raw           =   false;
-%     opts.plot_sensitivity   =   false;
-%     opts.plot_surf          =   false;
-%     opts.plot_column        =   false;
-%     opts.plot_comp          =   false;
-%     opts.plot_melt          =   false;
+%     opts.plotalpha         =   0.25;
+%     opts.plotmean          =   true;
+%     opts.plotmembers       =   false;
+%     opts.plotraw           =   false;
+%     opts.plotsensitivity   =   false;
+%     opts.plotsurf          =   false;
+%     opts.plotcolumn        =   false;
+%     opts.plotcomp          =   false;
+%     opts.plotmelt          =   false;
 %     
 %     if numargin >= 4 && strcmp(argsin{1},'members')
-%         opts.plot_mean      =   false;
-%         opts.plot_members   =   true;
+%         opts.plotmean      =   false;
+%         opts.plotmembers   =   true;
 %     elseif numargin >= 4 && strcmp(argsin{1},'raw')
-%         opts.plot_mean      =   false;
-%         opts.plot_raw       =   true;
+%         opts.plotmean      =   false;
+%         opts.plotraw       =   true;
 %     elseif numargin >= 4 && strcmp(argsin{1},'comp')
-%         opts.plot_mean      =   false;
-%         opts.plot_raw       =   true;
-%         opts.plot_comp      =   true;
+%         opts.plotmean      =   false;
+%         opts.plotraw       =   true;
+%         opts.plotcomp      =   true;
 %     elseif numargin >= 4 && strcmp(argsin{1},'sensitivity')
-%         opts.plot_mean      =   false;
-%         opts.plot_raw       =   true;    
-%         opts.plot_sensitivity =  true;
+%         opts.plotmean      =   false;
+%         opts.plotraw       =   true;    
+%         opts.plotsensitivity =  true;
 %     end
 % 
 %     if numargin == 5 && strcmp(argsin{2},'surf')
-%         opts.plot_surf      =   true;
+%         opts.plotsurf      =   true;
 %     elseif numargin == 5 && strcmp(argsin{2},'melt')
-%         opts.plot_melt      =   true;
+%         opts.plotmelt      =   true;
 %     elseif numargin == 5 && strcmp(argsin{2},'column')
-%         opts.plot_column    =   true;
+%         opts.plotcolumn    =   true;
 %     end
 %     
 % end
