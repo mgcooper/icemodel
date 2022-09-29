@@ -71,7 +71,7 @@ function [ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts)
    ice2.Tice      =  ice2.Tice-Tf;              % ice temperature
    
 % calculate surface and subsurface runoff
-   if opts.skinmodel == true
+   if opts.meltmodel == "skinmodel"
       ice1  =  SRFRUNOFF(ice1,ro_liq,Ls,Lf,opts.dt);
    else
       ice1  =  ICERUNOFF(ice1,ice2,opts);
