@@ -1,24 +1,20 @@
 
-function [enbal,ice2,met,opts] = icemodel(opts)
+function [ice1,ice2,met,opts] = icemodel(opts)
    
 %------------------------------------------------------------------------------
 %   INITIALIZE THE MODEL
 %------------------------------------------------------------------------------
    
 % load the physical constants to be used.
-   load( 'PHYSCONS', 'cp_ice','cv_air','cv_liq','cv_ice','emiss',       ...
-                     'SB','epsilon','fcp','k_liq','Lf','Ls','Lv',       ...
-                     'ro_air','ro_ice','ro_liq','roLf','roLs','roLv',   ...
+   load( 'PHYSCONS', 'cp_ice','cv_air','cv_liq','cv_ice','emiss',          ...
+                     'SB','epsilon','fcp','k_liq','Lf','Ls','Lv',          ...
+                     'ro_air','ro_ice','ro_liq','roLf','roLs','roLv',      ...
                      'Rv','Tf','TINY');
                   
-% open the input meteorological data file
-   [met,opts]  = METINIT(opts);
-   
-   if strcmp(opts.error,'metfile does not exist')
-      error(opts.error);
-   end
 
-
+%  LOAD THE FORCING DATA
+   [met,opts] = METINIT(opts);
+                  
 %  INITIALIZE THE ICE COLUMN
 [  f_ice,                                                               ...
    f_liq,                                                               ...
@@ -44,7 +40,7 @@ function [enbal,ice2,met,opts] = icemodel(opts)
    ro_sno,                                                              ...
    ro_iwe,                                                              ...
    ro_wie,                                                              ...
-   enbal,                                                               ...
+   ice1,                                                                ...
    ice2  ]     =   ICEINIT(opts,met);
 
 %------------------------------------------------------------------------------
@@ -67,23 +63,15 @@ function [enbal,ice2,met,opts] = icemodel(opts)
    spect_upper,                                                         ...
    solardwavl  ]     =     EXTCOEFSINIT(opts,radii,scattercoefs,        ...
                            solar,kabs,kice,dz_spect,JJ_spect,ro_ice);
+
+   clear radii scattercoefs solar
+   
 %------------------------------------------------------------------------------
-%   START THE MODEL
+%  initialize timestepping, parameters, and initial state values
 %------------------------------------------------------------------------------
    
-   % extract struct values that are used frequently
-   Tsfc        =  T(1);
-   itime       =  met.Time(1);             % initialize model time
-   
-   nloops      =  opts.annual_loops;
+% timestepping settings
    dt          =  opts.dt;
-   fopts       =  opts.fzero;
-   f_min       =  opts.f_ice_min;
-%  qsfactor    =  opts.qsfactor;
-   
-%------------------------------------------------------------------------------
-% substepping settings
-%------------------------------------------------------------------------------
    maxiter     =  opts.maxiter;
    maxsubiter  =  200;
    minsubiter  =  1;
@@ -92,14 +80,19 @@ function [enbal,ice2,met,opts] = icemodel(opts)
    dt_new      =  dt_max;
    iter        =  1;
    subiter     =  1;
+   itime       =  met.Time(1);      % model time
 
-% we need these on the first iteration, they are updated after each substep
+% extract parameter values that are used frequently
+   nloops      =  opts.annual_loops;
+   fopts       =  opts.fzero;
+   f_min       =  opts.f_ice_min;
+   
+% initial values needed on the first iteration
+   xTsfc       =  T(1);
    xf_liq      =  f_liq;
-   xTsfc       =  Tsfc;
    roL         =  roLs;
    liqflag     =  false;
    Qc          =  CONDUCT(k_eff,T,dz,xTsfc);
-   
 %  zD          =  sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
 
 for MM = 1:nloops
@@ -120,16 +113,10 @@ while iter <= maxiter
    Qli         =  met.lwd(iter);
    Pa          =  met.psfc(iter);
    albedo      =  met.albedo(iter);
-%    snowd       =  met.snowd(iter);
+ % snowd       =  met.snowd(iter);
    De          =  wspd*wcoef;
    ea          =  VAPPRESS(rh,Tair,liqflag);
-   
-% update the upper layer diffusion length scale
-%  zD          =  sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
-%    if zD > dz(1)
-%       pause;
-%    end   
-   
+
 %  Update the subsurface absorption profile and solar radiation source-term
 if Qsi>0
 [  Sc,                                                                  ...
@@ -142,33 +129,16 @@ else
    chi         =  0.0;
 end
 
-% [Qsi*(1-albedo) sum(Sc.*dz)]                        % total
-% [chi*Qsi*(1-albedo) Sc(1).*dz(1)]                   % top node
-% [(1-chi)*Qsi*(1-albedo) sum(Sc(2:end).*dz(2:end))] 	% interior nodes
-
-% if the Sc(1)=0 method is used, then this should hold:
-% Qsi*(1-albedo) - ( chi*Qsi*(1-albedo) + sum(Sc.*dz) ) = 0
-% (1-chi)*Qsi*(1.0-albedo) - Sc(1)*dz(1) = 0
-
-% if using the Qseb method, the total absorbed radiation should equal the
-% portion allocated to the surface plus the sum of the subsurface absorption
-% [Qsi*(1-albedo) sum(Sc.*dz)+Qseb]                   % total
-% [chi*Qsi*(1.0-albedo) Qseb]                         % SEB 
-% [(1-chi)*Qsi*(1.0-albedo) sum(Sc.*dz)]              % interior
-
-% so we can either pass Qseb or chi out of extcoefs 
-
 %------------------------------------------------------------------------------
 %   Initialize dynamic timestepping
 %------------------------------------------------------------------------------
    dt_sum      =  0.0;
    subfail     =  0;                      % keep track of failed substeps
    dt_flag     =  false;                  %
-%    LCflag      =  false(size(f_ice));     % layer combination flag
    OK          =  false;                  % assume sub-stepping is needed
 
    % could use this to get a better estimate of Tsfc if convergence fails
-%    xTsfc       =  T(1) + SEB/(k_eff(1)/(dz/2)); % T1 + SEB/a1
+   % xTsfc       =  T(1) + SEB/(k_eff(1)/(dz/2)); % T1 + SEB/a1
    
    while OK == false || dt_sum < dt
 
@@ -208,7 +178,7 @@ end
          continue;
       else
          
-      % need to update this for Qc
+      % update the effective thermal k to get a better estimate of Qc
          k_eff       =  GETGAMMA(T,f_liq,f_ice,ro_ice,k_liq,Ls,Rv,Tf);
          
       % Substep was successful, recompute top flux and linearization error
@@ -247,7 +217,7 @@ end
 %          if zD > dz(1)
 %          end
          
-      % allocate this step to the running total
+      % allocate this substep to the running total
          dt_sum   =  dt_sum + dt_new;
          itime    =  itime + seconds(dt_new);
 
@@ -265,7 +235,8 @@ end
             roL      = roLs;  % ro_air*Ls
             liqflag  = false;
          end
-         % first is true if step incomplete, second if overage will occur
+         
+      % first is true if step incomplete, second if overage will occur
          if dt-dt_sum > TINY && (dt_sum+dt_new)-dt > TINY
             dt_new   =  max(dt-dt_sum,dt_min);
             dt_flag  =  true;
@@ -293,44 +264,40 @@ end
 %   Save the output
 %------------------------------------------------------------------------------
 
-% although i could compute the enbal after the model is finished, we need
-% all components to compute the balance if used for error control, so we
-% might as well save the components here rather than compute in POSTPROC.
-% but should test to see if memory overhead exceeds compute.
-
    if MM==nloops
       
-%       for a stripped-down run this is all that's needed:
-%       df_liq(:,iter)    =  d_liq;
-%       frac_ice(:,iter)  =  f_ice;         % fraction ice
-%       T_ice(:,iter)     =  T;
-%       T_srf(iter,1)     =  Tsfc;
-      
       % save the surface energy balance
-      enbal.Tsfc(iter,1)      =  Tsfc;           % surface temp
-      enbal.Qh(iter,1)        =  Qh;             % sensible
-      enbal.Qe(iter,1)        =  Qe;             % latent
-      enbal.Qc(iter,1)        =  Qc;             % conductive into surface
-      enbal.Qm(iter,1)        =  Qm;             % melt energy
-      enbal.Qf(iter,1)        =  Qf;             % freeze deficit
-      enbal.chi(iter,1)       =  chi;            % skin parameter
-      enbal.balance(iter,1)   =  balance;        % SEB residual
-      enbal.dt(iter,1)        =  dt_sum;        % check
-      %enbal.zD(iter,1)        =  zD;
+      ice1.Tsfc(iter,1)       =  Tsfc;          % surface temp
+      ice1.Qm(iter,1)         =  Qm;            % melt energy
+      ice1.Qf(iter,1)         =  Qf;            % freeze deficit
+      ice1.Qe(iter,1)         =  Qe;            % latent
+      ice1.Qh(iter,1)         =  Qh;            % sensible
+      ice1.Qc(iter,1)         =  Qc;            % conductive into surface
+      ice1.chi(iter,1)        =  chi;           % skin parameter
+      ice1.balance(iter,1)    =  balance;       % SEB residual
+      ice1.dt(iter,1)         =  dt_sum;        % check
+      %ice1.zD(iter,1)        =  zD;
       
       % Save the ice column data
       ice2.Tice(:,iter)       =  T;             % ice temperature
       ice2.f_ice(:,iter)      =  f_ice;         % fraction ice
       ice2.f_liq(:,iter)      =  f_liq;         % fraction liq
+      ice2.df_liq(:,iter)     =  d_liq;
+      ice2.df_drn(:,iter)     =  d_drn;
       ice2.Sc(:,iter)         =  Sc;            % source term
       ice2.errH(:,iter)       =  errH;          % enthalpy error
       ice2.errT(:,iter)       =  errT;          % temperature error
-      ice2.df_liq(:,iter)     =  d_liq;
-      ice2.df_drn(:,iter)     =  d_drn;
-
+    
       % save the diagnostic data
       % diags.Tflag(iter,1)     =  Tflag; 
       % diags.LCflag(iter,1)    =  LCflag(1);
+      
+      % for a stripped-down run this is all that's needed:
+      % T_sfc    (iter,1)    =  Tsfc;
+      % T_ice    (:,iter)    =  T;
+      % frac_ice (:,iter)    =  f_ice;
+      % frac_liq (:,iter)    =  f_liq;
+      % df_liq   (:,iter)    =  d_liq;
 
    end
    
@@ -338,8 +305,17 @@ end
    iter     =  iter + 1;
 
 end
+   
    % restart the model
    iter     =  1;
    subiter  =  1;
    itime    =  met.Time(1);             % initialize model time
 end
+
+% post process
+[ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts);
+   
+   
+   
+   
+   
