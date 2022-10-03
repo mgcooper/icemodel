@@ -1,27 +1,27 @@
 function [met,opts] = METINIT(opts)
-   
+
 %------------------------------------------------------------------------------
 % this section is for gridded (sector-scale) simulations
 %------------------------------------------------------------------------------
-if opts.sitename == "sector"
+if strcmp(opts.sitename,"sector")
 
    % load the met file
    load(opts.metfname,'met')
 
    % remove leap inds if the met data is on a leap-year calendar
-   if opts.calendar_type == "noleap"
+   if strcmp(opts.calendar_type,"noleap")
       met = rmleapinds(met);
    end
-   
+
    % compute the total number of model timesteps
    opts.maxiter = height(met)/opts.numyears;
    opts.dt  = seconds(met.Time(2)-met.Time(1));
 
    % swap out chosen forcing data albedo for modis albedo
-   if string(opts.userdata) == "modis"
+   if strcmp(opts.userdata,"modis")
       met.albedo = met.modis;
    end
-   
+
    return;
    % for a sector-scale run, we are finished
 end
@@ -35,7 +35,7 @@ end
 
 % next swaps out a variable from userdata in place of the default met data
 if opts.userdata ~= "none"
-    
+
    % for point/catchment-scale runs, multi-year simulations are not presently
    % supported, so the simyear should equal the start/endyear
    simyear     =   num2str(opts.simyears(1));
@@ -43,21 +43,21 @@ if opts.userdata ~= "none"
    userdata    =   opts.userdata;
    uservars    =   opts.uservars;
    userpath    =   opts.userpath;
-   
+
    % convert uservars to a cellstr for compatibility with multiple uservars
    if ischar(uservars)
       uservars = cellstr(uservars);
    end
-   
+
    numuservars =   numel(uservars);
-    
+
 % load the forcingUserData file and retime to match the metfile
    userfile    =   [userpath userdata '_' sitename '_' simyear '.mat'];
-   
+
    if ~exist(userfile,'file')
       error('userdata file does not exist');
    end
-   
+
    % the userdata is hourly, retime to 15 m if the met data is 15 m
    load(userfile,'Data');
    if Data.Time(2)-Data.Time(1) ~= met.Time(2)-met.Time(1)

@@ -1,4 +1,4 @@
-clean
+%clean
 
 % this demonstrates how to set up a one-year run at one site
 
@@ -36,7 +36,7 @@ opts = icemodel_opts(   sitename,meltmodel,forcingdata,userdata,uservars,  ...
 %  save the data
 %------------------------------------------------------------------------------
 if savedata == true
-   if ~exist(opts.pathoutput,'dir'); mkdir(opts.pathoutput); end 
+   if ~exist(opts.pathoutput,'dir'); mkdir(opts.pathoutput); end
    save([opts.pathoutput opts.fsave],'ice1','ice2','opts');
 end
 
@@ -61,7 +61,7 @@ t1 = datetime(startyear,6,1,0,0,0,'TimeZone','UTC');
 plotPromice(AblationDaily,'refstart',t1);
 plotPromice(AblationHourly,'refstart',t1);
 
-% plot the energy balance 
+% plot the energy balance
 % plotEnbal(ice1,met);
 
 
