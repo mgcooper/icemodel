@@ -63,13 +63,13 @@ f_n         =   delz_pos./delz;         % interface conductivity weighting facto
 gridz       =   z_crds(2:end-1);        % just the grid points
 
 % round the outputs to the nearest milimeter (except f_n)       
-dz          =   roundn(dz,-3);
-dz_pbc      =   roundn(dz_pbc,-3);
-delz        =   roundn(delz,-3);
-f_n         =   roundn(f_n,-1);
-z_crds      =   roundn(z_crds,-3);
-z_wall      =   roundn(z_wall,-3);
-gridz       =   roundn(gridz,-3);
+dz          =   round(dz,3);
+dz_pbc      =   round(dz_pbc,3);
+delz        =   round(delz,3);
+f_n         =   round(f_n,1);
+z_crds      =   round(z_crds,3);
+z_wall      =   round(z_wall,3);
+gridz       =   round(gridz,3);
 
 % See notes at the end for further clarification.
 

@@ -32,12 +32,12 @@ for n = 1+tlag:length(melt)
     end 
 end
 ice1.runoff    = runoff;                           % cumulative runoff
-ice1.melt      = tocolumn(cumsum(melt));           % cumulative melt
-ice1.freeze    = tocolumn(cumsum(freeze));         % cumulative freeze
+ice1.melt      = cumsum(melt);           % cumulative melt
+ice1.freeze    = cumsum(freeze);         % cumulative freeze
 
 % compute cumulative drainage if it's included in the output
 if isfield(ice2,'df_drn')
-   ice1.drain  = tocolumn(cumsum(sum(dz.*ice2.df_drn)));
+   ice1.drain  = transpose(cumsum(sum(dz.*ice2.df_drn)));
 end
 
 % compute runoff and drain directly from df_liq (note: df_liq is the change

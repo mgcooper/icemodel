@@ -19,8 +19,8 @@ function ice1 = SRFRUNOFF(ice1,ro_liq,Ls,Lf,dt)
 
    rof         =  mlt + con;
    
-   ice1.melt   = tocolumn(cumsum(mlt));
-   ice1.freeze = tocolumn(cumsum(frz));
-   ice1.subl   = tocolumn(cumsum(sub));
-   ice1.cond   = tocolumn(cumsum(con));
-   ice1.runoff = tocolumn(cumsum(rof));
+   ice1.melt   = cumsum(mlt);
+   ice1.freeze = cumsum(frz);
+   ice1.subl   = cumsum(sub);
+   ice1.cond   = cumsum(con);
+   ice1.runoff = cumsum(rof);

@@ -10,7 +10,8 @@ if strcmp(opts.sitename,"sector")
 
    % remove leap inds if the met data is on a leap-year calendar
    if strcmp(opts.calendar_type,"noleap")
-      met = rmleapinds(met);
+      feb29 = month(met.Time) == 2 & day(met.Time) == 29;
+      met = met(~feb29,:);
    end
 
    % compute the total number of model timesteps
@@ -87,6 +88,12 @@ end
 %%%% test
 % met = retime(met,'hourly','mean');
 %%%% test
+
+% remove leap inds if the met data is on a leap-year calendar
+if strcmp(opts.calendar_type,"noleap")
+   feb29 = month(met.Time) == 2 & day(met.Time) == 29;
+   met = met(~feb29,:);
+end
 
 % reset the timestep using the built-in time functions to ensure precision
 opts.maxiter   = size(met,1);

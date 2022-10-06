@@ -24,11 +24,11 @@ function [  dz_p,                                                       ...
     grid_spectral   =   z_crds(2:end-1);
     
   % round the outputs to the nearest milimeter (except f_n)       
-    dz_p            =   roundn(dz_p,-3);
-    dz_pbc          =   roundn(dz_pbc,-3);
-    delz_p          =   roundn(delz_p,-3);
-    f_n             =   roundn(f_n,-1);
-    z_crds          =   roundn(z_crds,-3);
-    z_walls         =   roundn(z_walls,-3);
-    grid_spectral   =   roundn(grid_spectral,-3);
+    dz_p            =   round(dz_p,3);
+    dz_pbc          =   round(dz_pbc,3);
+    delz_p          =   round(delz_p,3);
+    f_n             =   round(f_n,1);
+    z_crds          =   round(z_crds,3);
+    z_walls         =   round(z_walls,3);
+    grid_spectral   =   round(grid_spectral,3);
       
