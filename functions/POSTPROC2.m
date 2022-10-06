@@ -5,27 +5,28 @@ load('PHYSCONS','Tf','ro_liq','Ls','Lf');
 
 % compute melt,freeze, and runoff
 if opts.skinmodel == true
-   ice1  =  SRFRUNOFF(ice1,ro_liq,Ls,Lf,opts.dt);
+   ice1 = SRFRUNOFF(ice1,ro_liq,Ls,Lf,opts.dt);
 else
-   ice1  =  ICERUNOFF(ice1,ice2,opts);
+   ice1 = ICERUNOFF(ice1,ice2,opts);
 end
 
 % convert temperature to celsius
-ice1.Tsfc      = min(ice1.Tsfc-Tf,0);
-ice2.Tice      = min(ice2.Tice-Tf,0);
+ice1.Tsfc = min(ice1.Tsfc-Tf,0);
+ice2.Tice = min(ice2.Tice-Tf,0);
 
 % convert to timetable
-ice1           = struct2table(ice1);
-ice1           = table2timetable(ice1,'RowTimes',Time);
+ice1 = struct2table(ice1);
+ice1 = table2timetable(ice1,'RowTimes',Time);
 
 % Retime to hourly
 if opts.dt == 900
    
-   ice1           = retime(ice1,'hourly','mean');
-   ice1           = rmleapinds(ice1);
+   ice1  = retime(ice1,'hourly','mean');
+   feb29 = month(met.Time) == 2 & day(met.Time) == 29;
+   ice1  = ice1(~feb29,:);
    
    % init tmp arrays to retime ice2
-   tmp.Tice       = nan(size(ice2.Tice,1),numel(ice1.Time));
+   tmp.Tice = nan(size(ice2.Tice,1),numel(ice1.Time));
 
    if opts.icemodel == true
       tmp.df_liq     = nan(size(ice2.df_liq,1),numel(ice1.Time));
@@ -37,10 +38,10 @@ if opts.dt == 900
    for n = 1:numel(ice1.Time)
 
       % this works b/c we know it's fifteen minute data
-      i1    = n*4-3;
-      i2    = n*4;
+      i1 = n*4-3;
+      i2 = n*4;
 
-      tmp.Tice(:,n)     =  mean(ice2.Tice(:,i1:i2),2);
+      tmp.Tice(:,n) = mean(ice2.Tice(:,i1:i2),2);
 
       if opts.icemodel == true
          tmp.df_liq(:,n)   =  sum(ice2.df_liq(:,i1:i2),2);
@@ -54,12 +55,12 @@ if opts.dt == 900
 end
 
 % round. this should be faster than the two options below
-ice1.Tsfc      = round(ice1.Tsfc,5);
-ice1.runoff    = round(ice1.runoff,5);
-ice1.melt      = round(ice1.melt,5);
-ice1.freeze    = round(ice1.freeze,5);
+ice1.Tsfc   = round(ice1.Tsfc,5);
+ice1.runoff = round(ice1.runoff,5);
+ice1.melt   = round(ice1.melt,5);
+ice1.freeze = round(ice1.freeze,5);
 
-ice2.Tice      = round(ice2.Tice,3);
+ice2.Tice   = round(ice2.Tice,3);
 
 if opts.icemodel == true
    ice2.df_liq    = round(ice2.df_liq,8);
@@ -68,7 +69,7 @@ if opts.icemodel == true
 end
 
 if isfield(ice1,'drain')
-   ice1.drain  = round(ice1.drain,5);
+   ice1.drain = round(ice1.drain,5);
 end
 
 
