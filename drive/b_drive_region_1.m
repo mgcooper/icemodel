@@ -8,7 +8,7 @@ workon icemodel
 savedata    =  true;
 sitename    =  'region';
 forcingdata =  'mar';
-userdata    =  'mar';
+userdata    =  'modis';
 uservars    =  'albedo';
 meltmodel   =  'icemodel';
 
@@ -21,7 +21,8 @@ endyear     =   2018;
 
 load('private/idxnew.mat','idxnew')
 npts        =   numel(idxnew);
-si          =   1;              % 298, 671, 1046,  1420 
+% si          =   1;              % 298, 671, 1046,  1420 
+si          =   301;              % 298, 671, 1046,  1420 
 ei          =   496;             % 372, 744, 1116, 1487
 
 % npts        =  2479;

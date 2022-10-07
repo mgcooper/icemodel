@@ -2,13 +2,13 @@ clean
 %--------------------------------------------------------------------------
 %   run dependent information
 %--------------------------------------------------------------------------
-workoff skinmodel
-workon icemodel
+% workoff skinmodel
+% workon icemodel
 
 savedata    =  true;
 sitename    =  'region';
 forcingdata =  'mar';
-userdata    =  'mar';
+userdata    =  'modis';
 uservars    =  'albedo';
 meltmodel   =  'icemodel';
 
@@ -21,7 +21,8 @@ endyear     =   2018;
 
 load('private/idxnew.mat','idxnew')
 npts        =   numel(idxnew);
-si          =   497;              % 298, 671, 1046,  1420 
+% si          =   497;              % 298, 671, 1046,  1420 
+si          =   798;              % 298, 671, 1046,  1420 
 ei          =   npts;             % 372, 744, 1116, 1487
 
 % npts        =  2479;
