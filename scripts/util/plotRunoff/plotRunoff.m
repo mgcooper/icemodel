@@ -166,10 +166,11 @@ function [Q,R,txt] = prep_runoff(Runoff,Discharge,Catchment,opts)
       Q.obs    =  cumsum(Discharge.Qm3(idx));
       Q.obs    =  Q.obs-Q.obs(1);
       Q.err    =  cumsum((Discharge.Qm3H(idx)-Discharge.Qm3L(idx))./2);
-      Q.t      =  datenum(Discharge.Time(idx));
+      t        =  Discharge.Time(idx);
+      Q.t      =  datenum(t);
 
       % repeat for the rcm data
-      idx      =  isbetween(Runoff.Time,Discharge.Time(1),Discharge.Time(end));
+      idx      =  isbetween(Runoff.Time,t(1),t(end));
       Y        =  [racmo(idx) mar(idx) merra(idx) icemod(idx,:)];
       subQ0    =  true;
       ltxt     = 'ADCP';
