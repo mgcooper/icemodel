@@ -4,8 +4,8 @@ pathdata    =  '/Users/coop558/mydata/icemodel/output/v11/run2/';
 pathsave    =  '/Users/coop558/mydata/icemodel/figs/v11/run2/';
 patheval    =  '/Users/coop558/mydata/icemodel/eval/v11/run2/';
 
-savefigs    =   true;
-savedata    =   true;
+savefigs    =   false;
+savedata    =   false;
 siteNames   =  {'ak4'};
 forcingData =  {'kanl'};
 userVars    =  {'albedo'};
