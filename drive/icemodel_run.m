@@ -6,20 +6,21 @@
 %  set the run-specific model configuration
 %------------------------------------------------------------------------------
 savedata    = false;
-sitename    = 'behar';         % options: 'kanm', 'behar'
+
+% these settings are for the rio behar catchment:
+
+sitename    = 'behar';        % options: 'kanm', 'behar'
 startyear   = 2016;           % options: 2016
 endyear     = 2016;           % options: 2016
 meltmodel   = 'icemodel';     % options: 'icemodel','skinmodel'
 forcingdata = 'kanm';         % options: 'mar','kanm'
-userdata    = 'none';         % options: 'modis','racmo','merra','mar','kanm','none'
+userdata    = 'modis';        % options: 'modis','racmo','merra','mar','kanm','none'
 uservars    = 'albedo';       % options: 'albedo', or any var in met
 
 %------------------------------------------------------------------------------
-%  set the input and output paths (do this here or in icemodel_config.m)
+%  set the input and output paths (see icemodel_config.m)
 %------------------------------------------------------------------------------
-
-% setenv('ICEMODELIINPUTPATH','/full/path/to/icemodel/input/');
-% setenv('ICEMODELOUTPUTPATH','/full/path/to/icemodel/output/');
+icemodel_config
 
 %------------------------------------------------------------------------------
 %  build the 'opts' model configuration structure
@@ -47,13 +48,16 @@ end
 AblationHourly                = prepAblation(opts,ice1,'hourly');
 AblationDaily                 = prepAblation(opts,ice1,'daily');
 
+t1 = datetime(startyear,7,1,0,0,0,'TimeZone','UTC');
+t2 = datetime(startyear,9,1,0,0,0,'TimeZone','UTC');
+
 % plot the runoff
 if opts.meltmodel == "skinmodel"
 	h1 = plotRunoff(Runoff,Discharge,Catchment,'plotsurf',true,'sitename',  ...
                      sitename,'userdata',userdata,'forcingdata',forcingdata);
 else
    h1 = plotRunoff(Runoff,Discharge,Catchment,'sitename',sitename,         ...
-                     'userdata',userdata,'forcingdata',forcingdata);
+         'userdata',userdata,'forcingdata',forcingdata,'t1',t1,'t2',t2);
 end
 
 % plot ablation

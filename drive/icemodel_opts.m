@@ -98,7 +98,9 @@ function opts = icemodel_opts(   sitename,meltmodel,forcingdata,userdata,  ...
       opts.pathinput = strrep(fileparts(which(metfname)),'met','');
    else
       % the metfile does not exist on the path
-      error('met file not found');
+      % rather than error, use isfield(opts,'metfname') to halt in run script
+      warning('met file not found');
+      return;
    end
 
    % set the path to the met file and the user data
@@ -129,7 +131,6 @@ function opts = icemodel_opts(   sitename,meltmodel,forcingdata,userdata,  ...
                   '_swap_' upper(userdata) '_' uservars];
 
    opts.fsave = [opts.pathoutput fsave];
-
 
 
 

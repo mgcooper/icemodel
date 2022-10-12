@@ -10,7 +10,7 @@ HOMEPATH = [getenv('HOME') '/'];
 setenv('ICEMODELPATH',[HOMEPATH 'myprojects/matlab/icemodel/']);
 setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel/input/']);
 setenv('ICEMODELDATAPATH', [HOMEPATH 'myprojects/matlab/icemodel/input/userdata/']);
-setenv('ICEMODELOUTPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel//output/']);
+setenv('ICEMODELOUTPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel/output/']);
 
 % ICEMODELPATH is the top-level model path (see 'more information' below)
 % ICEMODELDATAPATH is the path to the evaluation data
