@@ -8,15 +8,15 @@ function [Runoff,Discharge,Catchment] = prepRunoff(opts,ice1)
    
    % for the purpose of prepRunoff, it might make sense to just swap the
    % siteName
-   if strcmpi(site,'hills'); 
+   if strcmpi(site,'hills')
       site = 'behar'; 
       disp('site=hills, using behar runoff')
    end
-   if strcmpi(site,'kanm'); 
+   if strcmpi(site,'kanm')
       site = 'behar'; 
       disp('site=kanm, using behar runoff')
    end
-   if strcmpi(site,'kanl'); 
+   if strcmpi(site,'kanl')
       site = 'ak4'; 
       disp('site=kanl, using ak4 runoff')
    end
@@ -29,7 +29,7 @@ function [Runoff,Discharge,Catchment] = prepRunoff(opts,ice1)
       load([patheval '/Q_' site],'Q','sf');
    end
    
-   Discharge   = Q;
+   Discharge = Q;
 
 % UpperBasin has no min/max, but the uncertainty was estimated to be +/- 5% 
     if ~isfield(sf,'min')
@@ -38,28 +38,28 @@ function [Runoff,Discharge,Catchment] = prepRunoff(opts,ice1)
     if ~isfield(sf,'max')
         sf.max.ease.area = 1.05*sf.med.ease.area;
     end
-    Catchment   = sf;
+    Catchment = sf;
     Catchment.sitename = site;
 
 % read in the RCM model data. for years with missing data, use MAR 
-   MAR     = load([pathdata 'mar_' site '_' yyyy '.mat'],'Data');
+   MAR = load([pathdata 'mar_' site '_' yyyy '.mat'],'Data');
    if strcmp(site,'ak4')
       if str2double(yyyy)>=2012 && str2double(yyyy)<=2016
-         RAC   = load([pathdata 'racmo_' site '_' yyyy '.mat'],'Data');
-         MER   = load([pathdata 'merra_' site '_' yyyy '.mat'],'Data');
+         RAC = load([pathdata 'racmo_' site '_' yyyy '.mat'],'Data');
+         MER = load([pathdata 'merra_' site '_' yyyy '.mat'],'Data');
       else
-         RAC               = MAR;
+         RAC = MAR;
          RAC.Data.runoff   = nan.*RAC.Data.runoff;
          RAC.Data.melt     = nan.*RAC.Data.melt;
       
-         MER               = MAR;
+         MER = MAR;
          MER.Data.runoff   = nan.*MER.Data.runoff;
          MER.Data.melt     = nan.*MER.Data.runoff;
          MER.Data.rain     = nan.*MER.Data.runoff;
       end
    else
-      RAC   = load([pathdata 'racmo_' site '_' yyyy '.mat'],'Data');
-      MER   = load([pathdata 'merra_' site '_' yyyy '.mat'],'Data');
+      RAC = load([pathdata 'racmo_' site '_' yyyy '.mat'],'Data');
+      MER = load([pathdata 'merra_' site '_' yyyy '.mat'],'Data');
    end
     
 % for the case where an ensemble of icemodel/skinmodel runs are passed in:

@@ -36,12 +36,14 @@ function h = plotRunoff(Runoff,Discharge,Catchment,varargin)
    % plotcomp means compare two version of icemodel 
    
    % set default legend text
-   if opts.userdata == "none"
-      ltext = {'ADCP','RACMO','MAR','MERRA',['ICEMODEL (' upper(opts.forcingdata) ')']};
-   else
-      ltext = {'ADCP','RACMO','MAR','MERRA',['ICEMODEL (' upper(opts.userdata) ')']};
+   if isempty(opts.legendtext)
+      if opts.userdata == "none"
+         ltext = {'ADCP','RACMO','MAR','MERRA',['ICEMODEL (' upper(opts.forcingdata) ')']};
+      else
+         ltext = {'ADCP','RACMO','MAR','MERRA',['ICEMODEL (' upper(opts.userdata) ')']};
+      end
+      opts.legendtext = ltext;
    end
-   opts.legendtext = ltext;
    
 %--------------------------------------------------------------------------
    warning off
@@ -60,14 +62,14 @@ function h = plotRunoff(Runoff,Discharge,Catchment,varargin)
 
 %--------------------------------------------------------------------------
 
-sitename    =  Catchment.sitename;
+sitename = Catchment.sitename;
 
 % % % % %  prep the runoff for plotting
-[Q,R,txt]   =  prep_runoff(Runoff,Discharge,Catchment,opts);
+[Q,R,txt] = prep_runoff(Runoff,Discharge,Catchment,opts);
                                                         % % % % % %
 
 % % % % %  make the plot
-h       =   make_plot(Q,R,txt,opts);
+h = make_plot(Q,R,txt,opts);
                                                         % % % % % % 
 
 % this sends back the adcp data and the model data in the same format
@@ -108,7 +110,7 @@ function [Q,R,txt] = prep_runoff(Runoff,Discharge,Catchment,opts)
       end
    end
    
-   sitename =  Catchment.sitename;
+   sitename = Catchment.sitename;
    
    % put the runoff into an array
    racmo    =  Runoff.racmoRunoff;
@@ -125,9 +127,9 @@ function [Q,R,txt] = prep_runoff(Runoff,Discharge,Catchment,opts)
    if contains(sitename,{'slv1','slv2'})
       
       if opts.refstart == true
-         t1    =  Discharge.Time(find(~isnan(Discharge.lake_area_km2),1,'first'));
+         t1 = Discharge.Time(find(~isnan(Discharge.lake_area_km2),1,'first'));
       else
-         t1    =  datetime(2015,6,25,'TimeZone','UTC');
+         t1 = datetime(2015,6,25,'TimeZone','UTC');
       end
       
       t2       =  datetime(2015,8,5,'TimeZone','UTC');
@@ -153,9 +155,9 @@ function [Q,R,txt] = prep_runoff(Runoff,Discharge,Catchment,opts)
    else
       
       % get the dates to extract the rcm data during the observation period
-      yyyy     =  year(Runoff.Time(1));
-      t1       =  opts.t1;
-      t2       =  opts.t2;
+      yyyy  = year(Runoff.Time(1));
+      t1    = opts.t1;
+      t2    = opts.t2;
       
       % if t1 and t2 were not provided, use 6/1 to 9/1
       if isnat(opts.t1); t1 = datetime(yyyy,6,1,'TimeZone','UTC'); end
@@ -193,33 +195,33 @@ function [Q,R,txt] = prep_runoff(Runoff,Discharge,Catchment,opts)
 % next makes legend text
    if ~isempty(opts.legendtext)
 
-      txt   = opts.legendtext;
+      txt = opts.legendtext;
 
    else
 
       if opts.plotensemble == true
       %Y   =   [racmo.runoff(si:ei) mar.runoff(si:ei) icemod];
-         txt  =   {ltxt,'RCMs','IceModel'};  % set the legend text
+         txt = {ltxt,'RCMs','IceModel'};  % set the legend text
 
          if opts.plotsurf == true
-            txt   =   {ltxt,'RCMs','SkinModel'};
+            txt = {ltxt,'RCMs','SkinModel'};
          end 
 
       else
 
          if opts.plotcomp == true
             if opts.plotsurf == true
-               txt   =   {ltxt,'RACMO','MAR','MERRA','SkinModel v2','SkinModel'};
+               txt = {ltxt,'RACMO','MAR','MERRA','SkinModel v2','SkinModel'};
             else
-               txt   =   {ltxt,'RACMO','MAR','MERRA','IceModel v2','IceModel'};
+               txt = {ltxt,'RACMO','MAR','MERRA','IceModel v2','IceModel'};
             end
          else
             if opts.plotsurf == true
 
-               txt   =   {ltxt,'RACMO','MAR','MERRA','SkinModel'};
+               txt = {ltxt,'RACMO','MAR','MERRA','SkinModel'};
 
             else
-               txt   =   {ltxt,'RACMO','MAR','MERRA','IceModel'};
+               txt = {ltxt,'RACMO','MAR','MERRA','IceModel'};
             end
          end   
       end

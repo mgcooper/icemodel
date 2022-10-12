@@ -1,13 +1,18 @@
 clean
 
-pathdata    =  '/Users/coop558/mydata/icemodel/output/v11/run2/';
-pathsave    =  '/Users/coop558/mydata/icemodel/figs/v11/run2/';
-patheval    =  '/Users/coop558/mydata/icemodel/eval/v11/run2/';
+% note: the ak4+kanl figures show that icemodel brings each model closer to the
+% obs e.g. icemodel+racmo is closer than racmo, icemodel+mar is closer than
+% mar, even though they all overpredict in most years. alos need to figure out
+% if something about ak4 changed in 2016 b/c icemodel tracks the obs closely
+
+pathdata = Path(getenv('ICEMODELOUTPUTPATH'));
+pathsave = Path(pathdata.parent).parent / 'figs' / pathdata.stem;
+patheval = pathdata; % to save the processed data
 
 savefigs    =   false;
 savedata    =   false;
 siteNames   =  {'ak4'};
-forcingData =  {'kanl'};
+forcingData =  {'mar'};
 userVars    =  {'albedo'};
 meltModel   =  {'icemodel'};
 simYears    =  2009:2016;
@@ -74,50 +79,50 @@ for m = 1:numel(simYears)
       userVars    = char(mGroup.userVars(n));
       
       % prep the file name prefix used to save 
-      fprfx       = [meltModel '_' siteName '_' simYear '_' forcingData];
-      fdata       = [fprfx '_swap_' upper(userData) '_' userVars '.mat'];
-      
+      fprfx = [meltModel '_' siteName '_' simYear '_' forcingData];
+      fdata = [fprfx '_swap_' upper(userData) '_' userVars '.mat'];
+      fdata = pathdata / fdata;
       % load the data
-      if exist([pathdata fdata],'file') == 2
-         load([pathdata fdata]);
+      if exist(fdata.char,'file') == 2
+         load(fdata.char);
       else
          continue
       end
       
       if n == 1 || ~exist('Rcol','var') 
          Rcol  =  nan(height(ice1),numSims);
-         Rsrf  =  nan(height(ice1),numSims);
+         % Rsrf  =  nan(height(ice1),numSims);
          M     =  nan(height(ice1),numSims);
       end
       
-      Rcol(:,n)   = ice1.column_runoff;
-      Rsrf(:,n)   = ice1.surf_runoff;
-      M(:,n)      = ice1.depth_melt;
+      Rcol(:,n)   = ice1.runoff;
+      % Rsrf(:,n)   = ice1.surf_runoff;
+      M(:,n)      = ice1.melt;
       
    end
    
-%    % for the case where we don't have racmo/merra
-%    if size(Rcol,2) == 3
-%       Rcol(:,4:5) = nan.*Rcol(:,1:2);
-%       Rsrf(:,4:5) = nan.*Rsrf(:,1:2);
-%       M(:,4:5)    = nan.*M(:,1:2);
-%    end
+   % for the case where we don't have racmo/merra
+   if all(all(isnan(Rcol(:,[2 5]))))
+      Rcol(:,[2 5]) = nan.*Rcol(:,[1 3]);
+      %Rsrf(:,[2 5]) = nan.*Rsrf(:,[1 3]);
+      M(:,[2 5])    = nan.*M(:,[1 3]);
+   end
    
    Rcol  = Rcol(:,order);
-   Rsrf  = Rsrf(:,order);
+   % Rsrf  = Rsrf(:,order);
    M     = M(:,order);
    
    
    % put R and M into 'ice1' for compatibility with prepRunoff
-   ice1.column_runoff   = Rcol;
-   ice1.surf_runoff     = Rsrf;
-   ice1.depth_melt      = M;
+   ice1.runoff   = Rcol;
+   % ice1.surf_runoff     = Rsrf;
+   ice1.melt      = M;
    
    % load mar, merra, racmo
-   [Runoff,Discharge,Catchment]  = prepRunoff(opts,ice1);
-   % Ablation                      = prepAblation(opts,ice1);
+   [Runoff,Discharge,Catchment] = prepRunoff(opts,ice1);
+   % Ablation = prepAblation(opts,ice1);
    
-   ltext    = {'ADCP','RACMO','MAR','MERRA','ICE (RACMO)','ICE (MAR)',  ...
+   ltext = {'ADCP','RACMO','MAR','MERRA','ICE (RACMO)','ICE (MAR)',  ...
                'ICE (MERRA)','ICE (AWS)','ICE (MODIS)'};
    
    h = plotRunoff( Runoff,Discharge,Catchment,  ...
@@ -149,8 +154,8 @@ for m = 1:numel(simYears)
    end
    
    
-%    pause;
-   clear Rcol Rsrf M;
+   pause;
+   clear Rcol Rsrf M
    
    if m<numel(simYears) && n<numel(numSims); close all; end
    

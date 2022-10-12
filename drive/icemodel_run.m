@@ -48,6 +48,7 @@ end
 AblationHourly                = prepAblation(opts,ice1,'hourly');
 AblationDaily                 = prepAblation(opts,ice1,'daily');
 
+% this controls the time period over which ablation and runoff are plotted
 t1 = datetime(startyear,7,1,0,0,0,'TimeZone','UTC');
 t2 = datetime(startyear,9,1,0,0,0,'TimeZone','UTC');
 
@@ -61,7 +62,6 @@ else
 end
 
 % plot ablation
-t1 = datetime(startyear,6,1,0,0,0,'TimeZone','UTC');
 plotPromice(AblationDaily,'refstart',t1);
 plotPromice(AblationHourly,'refstart',t1);
 

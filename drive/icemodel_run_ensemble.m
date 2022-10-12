@@ -19,7 +19,7 @@ simyears    =  startyear:endyear;
 ensemble    =  ensembleList(  forcingdata,userdata,uservars,meltmodels, ...
                               simyears,sitenames);
 
-setenv('ICEMODELOUTPUTPATH',[getenv('HOME') '/mydata/icemodel/v10b/']);
+setenv('ICEMODELOUTPUTPATH',[getenv('HOME') '/work/data/icemodel/output/v10b/']);
 
 %------------------------------------------------------------------------------
 % notes on ensemble options
