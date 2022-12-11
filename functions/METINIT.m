@@ -50,10 +50,10 @@ if opts.userdata ~= "none"
       uservars = cellstr(uservars);
    end
 
-   numuservars =   numel(uservars);
+   numuservars = numel(uservars);
 
-% load the forcingUserData file and retime to match the metfile
-   userfile    =   [userpath userdata '_' sitename '_' simyear '.mat'];
+   % load the forcingUserData file and retime to match the metfile
+   userfile = [userpath userdata '_' sitename '_' simyear '.mat'];
 
    if ~exist(userfile,'file')
       error('userdata file does not exist');
@@ -62,7 +62,7 @@ if opts.userdata ~= "none"
    % the userdata is hourly, retime to 15 m if the met data is 15 m
    load(userfile,'Data');
    if Data.Time(2)-Data.Time(1) ~= met.Time(2)-met.Time(1)
-      Data  = retime(Data,met.Time,'linear');
+      Data = retime(Data,met.Time,'linear');
    end
 
    % swap out the data in the metfile for the user data

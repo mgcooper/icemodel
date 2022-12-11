@@ -5,6 +5,7 @@
 - [icemodel](#icemodel)
   - [Background](#background)
   - [Usage](#usage)
+  - [Make it stop](#make-it-stop)
   - [Model input](#model-input)
     - [1. met files](#1-met-files)
     - [2. user data](#2-user-data)
@@ -35,7 +36,7 @@ The main program is `icemodel.m`, which calls functions saved in `functions/`. T
 
 The required inputs are in `inputs/`. These include the meteorological forcing data in `inputs/met/`, user data in `inputs/userdata/`, and the inputs to the two-stream model in `inputs/spectral/`. The spectral data inputs include values for the absorption coefficient of pure ice from Warren et al. 2008, in-situ absorption coefficients for glacier ice from Cooper et al. 2021, a proto-typical downwelling solar spectrum for the Arctic atmosphere generated with `ATRAN` (Lord, 1991), and a library of mie-scattering coefficients as described in Cooper et al. 2021. The "user data" directory contains alternative model forcing data that is "swapped out" with the standard model forcing to test hypotheses about processes and determine model sensitivity to forcings. For example, the user can select input forcing data generated from climate model output by setting the `opts.metfname` configuration parameter. This parameter points to the input meteorological forcing file in `inputs/met/`. The user can then override one or more of the forcing variables in this input file by setting `opts.userdata` and `opts.uservars` to point to an alternative forcing dataset. For example, `opts.userdata=modis` and `opts.uservars=albedo` would replace the albedo values in the input meteorological forcing file with modis albedo for the same time and location.
 
-In summary:
+## Make it stop
 
 1. Install this repo and place it on your Matlab path
 2. Download the input data (model forcing) from [Input data](#input-data)
