@@ -12,6 +12,8 @@ setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel/input/']);
 setenv('ICEMODELDATAPATH', [HOMEPATH 'myprojects/matlab/icemodel/input/userdata/']);
 setenv('ICEMODELOUTPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel/output/']);
 
+% setpref is like .ini or Java .properties files
+
 % ICEMODELPATH is the top-level model path (see 'more information' below)
 % ICEMODELDATAPATH is the path to the evaluation data
 % ICEMODELINPUTPATH is the path to the input met data
