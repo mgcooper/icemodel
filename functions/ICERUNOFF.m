@@ -31,13 +31,13 @@ for n = 1+tlag:length(melt)
         runoff(n,1) =   runoff(n-1) + potrunoff;
     end 
 end
-ice1.runoff    = runoff;                           % cumulative runoff
+ice1.runoff    = runoff;                 % cumulative runoff
 ice1.melt      = cumsum(melt);           % cumulative melt
 ice1.freeze    = cumsum(freeze);         % cumulative freeze
 
 % compute cumulative drainage if it's included in the output
 if isfield(ice2,'df_drn')
-   ice1.drain  = transpose(cumsum(sum(dz.*ice2.df_drn)));
+   ice1.drain  = transpose(volFracToThickness(ice2.df_drn,dz));
 end
 
 % compute runoff and drain directly from df_liq (note: df_liq is the change
