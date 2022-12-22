@@ -18,9 +18,11 @@ userdata    = 'modis';        % options: 'modis','racmo','merra','mar','kanm','n
 uservars    = 'albedo';       % options: 'albedo', or any var in met
 
 %------------------------------------------------------------------------------
-%  set the input and output paths (see icemodel_config.m)
+%  set the input and output paths (do this here or in icemodel_config.m)
 %------------------------------------------------------------------------------
 icemodel_config
+% setenv('ICEMODELIINPUTPATH','/full/path/to/icemodel/input/');
+% setenv('ICEMODELOUTPUTPATH','/full/path/to/icemodel/output/');
 
 %------------------------------------------------------------------------------
 %  build the 'opts' model configuration structure
@@ -62,6 +64,7 @@ else
 end
 
 % plot ablation
+t1 = datetime(startyear,6,1,0,0,0,'TimeZone','UTC');
 plotPromice(AblationDaily,'refstart',t1);
 plotPromice(AblationHourly,'refstart',t1);
 
