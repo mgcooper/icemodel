@@ -51,7 +51,7 @@ function h = myerrorbar(varargin)
 %      e = std(y)*ones(size(x));
 %      errorbar(x,y,e)
 
-% p = MipInputParser;
+% p = magicParser;
 % p.FunctionName='myerrorbar';
 % p.addParameter('color',rgb('blue'),@(x)isnumeric(x)||ischar(x));
 % p.parseMagically('caller');

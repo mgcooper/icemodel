@@ -8,8 +8,10 @@ HOMEPATH = [getenv('HOME') '/'];
 
 % set the icemodel code, input data, and output data paths:
 setenv('ICEMODELPATH',[HOMEPATH 'myprojects/matlab/icemodel/']);
-setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel/input/']);
-setenv('ICEMODELDATAPATH', [HOMEPATH 'myprojects/matlab/icemodel/input/userdata/']);
+% setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel/input/']);
+% setenv('ICEMODELDATAPATH', [HOMEPATH 'myprojects/matlab/icemodel/input/userdata/']);
+setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/runoff/data/icemodel/input/']);
+setenv('ICEMODELDATAPATH',[HOMEPATH 'myprojects/matlab/runoff/data/icemodel/eval/']);
 setenv('ICEMODELOUTPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel/output/']);
 
 % setpref is like .ini or Java .properties files

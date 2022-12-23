@@ -10,11 +10,11 @@ savedata    = false;
 % these settings are for the rio behar catchment:
 
 sitename    = 'behar';        % options: 'kanm', 'behar'
-startyear   = 2016;           % options: 2016
-endyear     = 2016;           % options: 2016
+startyear   = 2015;           % options: 2016
+endyear     = 2015;           % options: 2016
 meltmodel   = 'skinmodel';     % options: 'icemodel','skinmodel'
-forcingdata = 'mar';         % options: 'mar','kanm'
-userdata    = 'mar';        % options: 'modis','racmo','merra','mar','kanm','none'
+forcingdata = 'kanm';         % options: 'mar','kanm'
+userdata    = 'racmo';        % options: 'modis','racmo','merra','mar','kanm','none'
 uservars    = 'albedo';       % options: 'albedo', or any var in met
 
 %------------------------------------------------------------------------------
