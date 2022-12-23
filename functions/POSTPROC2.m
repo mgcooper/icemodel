@@ -3,11 +3,11 @@ function [ice1,ice2] = POSTPROC2(ice1,ice2,Time,opts)
 % load physical constants   
 load('PHYSCONS','Tf','ro_liq','Ls','Lf');
 
-% compute melt,freeze, and runoff
-if opts.skinmodel == true
-   ice1 = SRFRUNOFF(ice1,ro_liq,Ls,Lf,opts.dt);
+% calculate surface and subsurface runoff
+if opts.meltmodel == "skinmodel"
+   ice1  =  SRFRUNOFF(ice1,ro_liq,Ls,Lf,opts.dt);
 else
-   ice1 = ICERUNOFF(ice1,ice2,opts);
+   ice1  =  ICERUNOFF(ice1,ice2,opts);
 end
 
 % convert temperature to celsius
@@ -22,13 +22,13 @@ ice1 = table2timetable(ice1,'RowTimes',Time);
 if opts.dt == 900
    
    ice1  = retime(ice1,'hourly','mean');
-   feb29 = month(met.Time) == 2 & day(met.Time) == 29;
+   feb29 = month(ice1.Time) == 2 & day(ice1.Time) == 29;
    ice1  = ice1(~feb29,:);
    
    % init tmp arrays to retime ice2
    tmp.Tice = nan(size(ice2.Tice,1),numel(ice1.Time));
 
-   if opts.icemodel == true
+   if opts.meltmodel == "icemodel"
       tmp.df_liq     = nan(size(ice2.df_liq,1),numel(ice1.Time));
       tmp.f_ice      = nan(size(ice2.f_ice,1),numel(ice1.Time));
       tmp.f_liq      = nan(size(ice2.f_liq,1),numel(ice1.Time));
@@ -43,7 +43,7 @@ if opts.dt == 900
 
       tmp.Tice(:,n) = mean(ice2.Tice(:,i1:i2),2);
 
-      if opts.icemodel == true
+      if opts.meltmodel == "icemodel"
          tmp.df_liq(:,n)   =  sum(ice2.df_liq(:,i1:i2),2);
          tmp.f_liq(:,n)    =  mean(ice2.f_liq(:,i1:i2),2);
          tmp.f_ice(:,n)    =  mean(ice2.f_ice(:,i1:i2),2);
@@ -62,7 +62,7 @@ ice1.freeze = round(ice1.freeze,5);
 
 ice2.Tice   = round(ice2.Tice,3);
 
-if opts.icemodel == true
+if opts.meltmodel == "icemodel"
    ice2.df_liq    = round(ice2.df_liq,8);
    ice2.f_ice     = round(ice2.f_ice,5);
    ice2.f_liq     = round(ice2.f_liq,5);

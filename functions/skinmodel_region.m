@@ -1,15 +1,15 @@
 
-function [ice1,ice2,met,opts] = icemodel(opts)
+function [ice1,ice2,met,opts] = skinmodel_region(opts)
    
 %-------------------------------------------------------------------------------
 %   INITIALIZE THE MODEL
 %-------------------------------------------------------------------------------
    
 % load the physical constants to be used.
-load( 'PHYSCONS', 'cp_ice','cv_air','cv_liq','cv_ice','emiss',          ...
-                  'SB','epsilon','fcp','k_liq','Lf','Ls','Lv',          ...
-                  'ro_air','ro_ice','ro_liq','roLf','roLs','roLv',      ...
-                  'Rv','Tf','TINY');
+load( 'PHYSCONS', 'cp_ice','cv_air','cv_liq','cv_ice','emiss',       ...
+                  'SB','epsilon','fcp','k_liq','Lf','Ls','Lv',       ...
+                  'ro_air','ro_ice','ro_liq','roLf','roLs','roLv',   ...
+                  'Rv','Tf','TINY','cp_liq');
                   
 
 %  LOAD THE FORCING DATA
@@ -41,8 +41,29 @@ load( 'PHYSCONS', 'cp_ice','cv_air','cv_liq','cv_ice','emiss',          ...
    ro_iwe,                                                              ...
    ro_wie,                                                              ...
    ice1,                                                                ...
-   ice2  ]     =  ICEINIT(opts,met);
+   ice2  ]    =  ICEINIT(opts,met);
 
+
+% % init output arrays - for region
+%    df_liq      =  nan(JJ_therm,maxiter);
+%    frac_ice    =  nan(JJ_therm,maxiter);
+%    frac_liq    =  nan(JJ_therm,maxiter);
+%    T_ice       =  nan(JJ_therm,maxiter);
+%    T_sfc       =  nan(maxiter,1);
+   
+
+%    surf_melt      = 0.0;
+%    surf_freeze    = 0.0;
+%    surf_subl      = 0.0;
+%    surf_cond      = 0.0;
+%    surf_runoff    = 0.0;
+%                         
+%    ice1.surf_melt    = zeros(opts.maxiter,1);
+%    ice1.surf_freeze  = zeros(opts.maxiter,1);
+%    ice1.surf_subl    = zeros(opts.maxiter,1);
+%    ice1.surf_cond    = zeros(opts.maxiter,1);
+%    ice1.surf_runoff  = zeros(opts.maxiter,1);
+      
 %-------------------------------------------------------------------------------
 %   INITIALIZE THE EXTINCTION COEFFICIENTS
 %-------------------------------------------------------------------------------
@@ -79,91 +100,104 @@ load( 'PHYSCONS', 'cp_ice','cv_air','cv_liq','cv_ice','emiss',          ...
    dt_new      =  dt_max;
    iter        =  1;
    subiter     =  1;
-   itime       =  met.Time(1);      % model time
 
 % extract parameter values that are used frequently
    nloops      =  opts.annual_loops;
    fopts       =  opts.fzero;
    f_min       =  opts.f_ice_min;
-   
-% initial values needed on the first iteration
-   xTsfc       =  T(1);
+
+   simyears    =  opts.simyears;
+
+% we need these on the first iteration, they are updated after each substep
+   Tsfc        =  T(1);
    xf_liq      =  f_liq;
+   xTsfc       =  Tsfc;
    roL         =  roLs;
    liqflag     =  false;
    Qc          =  CONDUCT(k_eff,T,dz,xTsfc);
-%  zD          =  sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
 
-for MM = 1:nloops
+   
+if nloops > 1
+   simyears    =  [repmat(simyears(1),nloops,1) simyears(2:end)];
+end
+
+   numyears    =  numel(simyears);
+   
+for MM = 1:numyears
+   
+   % set the output folder and load the met data
+   simyear     = int2str(simyears(MM));
+   pathoutput  = [opts.pathoutput simyear '/'];
+   
+   t1          = datetime(simyears(MM),1,1,0,0,0);
+   t2          = datetime(simyears(MM),12,31,23,45,0);
+   t1.TimeZone = 'UTC';
+   t2.TimeZone = 'UTC';
+   Time        = met.Time(isbetween(met.Time,t1,t2));
+   iter0       = find(met.Time==t1);
+
 %-------------------------------------------------------------------------------
 %-------------------------------------------------------------------------------
    
-while iter <= maxiter
+   while iter <= maxiter
    
+   metiter     =  iter+iter0-1;
+
 % reset the change in liq water content
    d_liq       =  0.0.*f_liq;
    d_drn       =  0.0.*f_liq;
 
 %  load the atmospheric forcing data for this time step.
-   Tair        =  met.tair(iter);
-   rh          =  met.rh(iter);
-   wspd        =  met.wspd(iter);
-   Qsi         =  met.swd(iter);
-   Qli         =  met.lwd(iter);
-   Pa          =  met.psfc(iter);
-   albedo      =  met.albedo(iter);
- % snowd       =  met.snowd(iter);
+   Tair        =  met.tair(metiter);
+   rh          =  met.rh(metiter);
+   wspd        =  met.wspd(metiter);
+   Qsi         =  met.swd(metiter);
+   Qli         =  met.lwd(metiter);
+   Pa          =  met.psfc(metiter);
+   albedo      =  met.albedo(metiter);
    De          =  wspd*wcoef;
-   ea          =  VAPPRESS(rh,Tair,liqflag);
-
+   
 %  Update the subsurface absorption profile and solar radiation source-term
-   if Qsi>0
-   [  Sc,                                                                  ...
-      chi   ]  =  UPDATEEXTCOEFS(grid_spect,JJ_spect,dz_spect,             ...
-                  grid_therm,JJ_therm,dz_therm,z_walls,dz,ro_sno,          ...
-                  Qsi,total_solar,spect_lower,spect_upper,albedo,          ...
+   if opts.meltmodel == "skinmodel"
+      chi      =  1.0;
+   elseif Qsi>0
+   [  Sc,                                                               ...
+      chi   ]  =  UPDATEEXTCOEFS(grid_spect,JJ_spect,dz_spect,          ...
+                  grid_therm,JJ_therm,dz_therm,z_walls,dz,ro_sno,       ...
+                  Qsi,total_solar,spect_lower,spect_upper,albedo,       ...
                   solardwavl);
    else
       Sc       =  0.0.*Sc;
       chi      =  0.0;
    end
-
+   
 %-------------------------------------------------------------------------------
 %   Initialize dynamic timestepping
 %-------------------------------------------------------------------------------
    dt_sum      =  0.0;
    subfail     =  0;                      % keep track of failed substeps
    dt_flag     =  false;                  %
-   OK          =  false;                  % assume sub-stepping is needed
-
-   % could use this to get a better estimate of Tsfc if convergence fails
-   % xTsfc       =  T(1) + SEB/(k_eff(1)/(dz/2)); % T1 + SEB/a1
+   %OK         =  false;                  % assume sub-stepping is needed
+   OK          =  true;                   % assume sub-stepping is needed
    
-   while OK == false || dt_sum < dt
+   % while OK == false || dt_sum < dt
+   while dt_sum < dt
 
-% SURFACE TEMPERATURE
-   [  Tsfc  ]  =  SFCTEMP(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,     ...
-                  emiss,SB,Tf,Qc,xTsfc,chi,roL,scoef,fopts,liqflag);
-
-%       if Tflag == false
-%          fprintf('iter = %d (%.2f%%), dt = %.0f, Tsfc not converged\n',            ...
-%             iter,100*iter/maxiter,dt_new)
-%       end
+% SURFACE ENERGY BALANCE
+   [  Qm,                                                               ...
+      Qf,                                                               ...
+      Qh,                                                               ...
+      Qe,                                                               ...
+      Qc,                                                               ...
+      ~,                                                                ...
+      balance,                                                          ...
+      Tsfc  ]  =  ENBALANCE(Tair,wspd,rh,Qsi,Qli,albedo,k_eff,Pa,       ...
+                  T,Tf,dz,chi,xTsfc,cv_air,emiss,SB,roL,De,scoef,       ...
+                  epsilon,fopts,liqflag,opts);
 
 % SUBSURFACE ENERGY BALANCE
-   [  T,                                                                ...
-      errH,                                                             ...
-      errT,                                                             ...
-      f_ice,                                                            ...
-      f_liq,                                                            ...
-      OK    ]  =  ICEENBAL(T,f_ice,f_liq,k_liq,cv_ice,cv_liq,           ...
-                  ro_ice,ro_liq,ro_sno,cp_sno,Ls,Lf,roLf,Rv,Tf,         ...
-                  dz,delz,fn,dt_new,JJ_therm,Tsfc,Sc,fcp,TL,TH,         ...
-                  flmin,flmax,ro_iwe,ro_wie);
-
-% this will slow down the code a lot but is useful for debugging               
-%     fprintf('iter = %d (%.2f%%), dt = %.0f, success = %s\n',            ...
-%             iter,100*iter/maxiter,dt_new,mat2str(OK))
+      T        =  SKINSOLVE(Tsfc,T,k_eff,ro_sno,cp_sno,dz,dt_new,       ...
+                  JJ_therm,fn,delz);
 
 % if a phase boundary was overshot, decrease the time step and start over
       if OK == false && subfail < maxsubiter
@@ -176,49 +210,48 @@ while iter <= maxiter
          f_liq       =  xf_liq;
          continue;
       else
-         
-      % update the effective thermal k to get a better estimate of Qc
-         k_eff       =  GETGAMMA(T,f_liq,f_ice,ro_ice,k_liq,Ls,Rv,Tf);
-         
-      % Substep was successful, recompute top flux and linearization error
-      [  Qe,                                                            ...
-         Qh,                                                            ...
-         Qc,                                                            ...
-         Qm,                                                            ...
-         Qf,                                                            ...
-         ea,                                                            ...
-         balance ]   =  SEBFLUX(T,Tair,MELTTEMP(Tsfc,Tf),Qsi,Qli,albedo,...
-                        wspd,rh,Pa,Tf,k_eff,cv_air,roL,emiss,SB,epsilon,...
-                        scoef,De,dz,liqflag,chi);
 
-% %    % faster option to send an updated Qe to ICEMF to compute subl:
-%          ea       =  VAPPRESS(rh,Tair,Tsfc,Tf,liqflag);
+%          [ surf_melt,                                                   ...
+%            surf_freeze,                                                 ...
+%            surf_subl,                                                   ...
+%            surf_cond,                                                   ...
+%            surf_runoff]  =  ICEABLATIONtmp(Qm,Qe,Qf,surf_melt,          ...
+%                             surf_freeze,surf_runoff,surf_subl,          ...
+%                             surf_cond,ro_ice,ro_liq,Lf,Ls,dt,opts);
+                         
+      % recompute top fluxes
+%          k_eff    =  GETGAMMA(T,f_liq,f_ice,ro_ice,k_liq,Ls,Rv,Tf);
+%          Qc       =  CONDUCT(k_eff,T,dz,Tsfc);
+%          ea       =  VAPPRESS(rh,Tair,liqflag);
 %          S        =  STABLEFN(Tair,Tsfc,wspd,scoef);
 %          es0      =  VAPOR(Tsfc,Tf,liqflag);
 %          Qe       =  LATENT(De,S,ea,es0,roL,epsilon,Pa);
+%          Qh       =  SENSIBLE(De,S,Tair,Tsfc,cv_air);
+%          Qle      =  LONGOUT(Tsfc,emiss,SB);
+% 
+%       % Compute the energy flux available for melting or freezing.
+%          [Qm,Qf]  =  MFENERGY(albedo,Qsi,Qli,Qle,Qh,Qe,Qc,Tsfc,Tf,      ...
+%                      Tair,wspd,De,ea,roL,Pa,cv_air,emiss,SB,k_eff,      ...
+%                      T,dz,epsilon,scoef,chi);
+%          balance  =  ENBAL(albedo,Qsi,Qli,Qle,Qh,Qe,Qc,Qm,emiss,chi);
 
-      % Substep was successful, compute fluxes and update state
-      [  T,                                                             ...
-         f_ice,                                                         ...
-         f_liq,                                                         ...
-         d_liq,                                                         ...
-         d_drn ]  =  ICEMF(T,f_ice,f_liq,ro_ice,ro_liq,cp_ice,Lf,Ls,    ...
-                     Lv,Tf,TL,fcp,xf_liq,Sc,Sp,JJ_therm,f_min,fopts,    ...
-                     dz_therm,dt_new,Qe,liqflag,ro_iwe,d_liq,d_drn);
+%       % Substep was successful, compute fluxes and update state
+%       [  T,                                                             ...
+%          f_ice,                                                         ...
+%          f_liq,                                                         ...
+%          d_liq,                                                         ...
+%          d_drn ]  =  ICEMF(T,f_ice,f_liq,ro_ice,ro_liq,cp_ice,Lf,Ls,    ...
+%                      Lv,Tf,TL,fcp,xf_liq,Sc,Sp,JJ_therm,f_min,fopts,    ...
+%                      dz_therm,dt_new,Qe,liqflag,ro_iwe,d_liq,d_drn);
                         
       % update density (kg/m3), heat capacity (J/kg/K), thermal K (W/m/K)
-       % k_eff    =  GETGAMMA(T,f_liq,f_ice,ro_ice,k_liq,Ls,Rv,Tf);
-         ro_sno   =  f_ice.*ro_ice+f_liq.*ro_liq+(1.0-f_liq-f_ice).*ro_air;
-         cp_sno   =  (cv_ice.*f_ice+cv_liq.*f_liq)./ro_sno;
+      [  k_eff,                                                         ...
+         ro_sno,                                                        ...
+         cp_sno ] =  UPDATESTATE(T,f_ice,f_liq,ro_ice,ro_liq,ro_air,    ...
+                     cp_ice,cp_liq,k_liq,Ls,Rv,Tf);
          
-%       % update the upper layer diffusion length scale
-%          zD       =  sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
-%          if zD > dz(1)
-%          end
-         
-      % allocate this substep to the running total
+      % allocate this step to the running total
          dt_sum   =  dt_sum + dt_new;
-         itime    =  itime + seconds(dt_new);
 
       % this gets the last successful substep AND the last full-step
          xT       =  T;
@@ -234,17 +267,13 @@ while iter <= maxiter
             roL      = roLs;  % ro_air*Ls
             liqflag  = false;
          end
-         
-      % first is true if step incomplete, second if overage will occur
+         % first is true if step incomplete, second if overage will occur
          if dt-dt_sum > TINY && (dt_sum+dt_new)-dt > TINY
             dt_new   =  max(dt-dt_sum,dt_min);
             dt_flag  =  true;
          end
 
       end
-      
-% NOTE: this can go outside of substepping unless we want it during subs
-%       LCflag  =   logical(LCflag+lcflag);    % track layer combinations
 
    end % substepping
    
@@ -263,8 +292,13 @@ while iter <= maxiter
 %   Save the output
 %-------------------------------------------------------------------------------
 
-   if MM==nloops
-      
+   % NEED TO GO BACK TO ARRAYS SO THEY CAN BE WRITTEN OVER EACH YEAR or USE
+   % THE KEEP VERSIONS BELOW ... BUT ALSO NEED TO REVISIT SURFRUNOFF TO SEE
+   % HOW I DEALT WITH FREEZE, IT CAN ONLY EXIST IF WATER IS AVAILABLE SO AS
+   % IT IS IT IS WRONG
+
+   if MM-nloops >= 0
+
       % save the surface energy balance
       ice1.Tsfc(iter,1)       =  Tsfc;          % surface temp
       ice1.Qm(iter,1)         =  Qm;            % melt energy
@@ -279,42 +313,57 @@ while iter <= maxiter
       
       % Save the ice column data
       ice2.Tice(:,iter)       =  T;             % ice temperature
-      ice2.f_ice(:,iter)      =  f_ice;         % fraction ice
-      ice2.f_liq(:,iter)      =  f_liq;         % fraction liq
-      ice2.df_liq(:,iter)     =  d_liq;
-      ice2.df_drn(:,iter)     =  d_drn;
-      ice2.Sc(:,iter)         =  Sc;            % source term
-      ice2.errH(:,iter)       =  errH;          % enthalpy error
-      ice2.errT(:,iter)       =  errT;          % temperature error
-    
-      % save the diagnostic data
-      % diags.Tflag(iter,1)     =  Tflag; 
-      % diags.LCflag(iter,1)    =  LCflag(1);
+    % ice2.f_ice(:,iter)   =  f_ice;         % fraction ice
+    % ice2.f_liq(:,iter)   =  f_liq;         % fraction liq
+    % ice2.df_liq(:,iter)  =  d_liq;
+    % ice2.df_drn(:,iter)  =  d_drn; 
+    % ice2.Sc(:,iter)      =  Sc;            % source term
+    % ice2.errH(:,iter)    =  errH;          % enthalpy error
+    % ice2.errT(:,iter)    =  errT;          % temperature error
       
-      % for a stripped-down run this is all that's needed:
-      % T_sfc    (iter,1)    =  Tsfc;
-      % T_ice    (:,iter)    =  T;
-      % frac_ice (:,iter)    =  f_ice;
-      % frac_liq (:,iter)    =  f_liq;
-      % df_liq   (:,iter)    =  d_liq;
-
-   end
+      % save the surf data
+%       ice1.surf_melt(iter,1)     =  surf_melt;
+%       ice1.surf_freeze(iter,1)   =  surf_freeze;    % skin freeze
+%       ice1.surf_subl(iter,1)     =  surf_subl;      % sublimation
+%       ice1.surf_cond(iter,1)     =  surf_cond;      % condensation
+%       ice1.surf_runoff(iter,1)   =  surf_runoff;    % skin runoff
    
+   end
+
    % move to next timestep
    iter     =  iter + 1;
-
-end
    
-   % restart the model
+   end % timesteps (one year)
+   
+   % option to spin up year 1 by looping over it 
+   if MM-nloops<0
+      % restart the counters
+      iter     =  1;
+      subiter  =  1;
+      continue
+   end
+   
+   ice1keep = ice1;
+   ice2keep = ice2;
+   
+   % post process
+   % [ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts);
+   
+   [ice1,ice2] = POSTPROC2(ice1,ice2,Time,opts);
+   
+%-------------------------------------------------------------------------------
+%  save the data
+%-------------------------------------------------------------------------------
+   if opts.savedata == true
+      if ~exist(pathoutput,'dir'); mkdir(pathoutput); end
+      save([pathoutput 'ice1_' int2str(opts.ipt)],'ice1','-v7.3');
+      save([pathoutput 'ice2_' int2str(opts.ipt)],'ice2','-v7.3');
+   end
+   
+   % restart the counters
    iter     =  1;
    subiter  =  1;
-   itime    =  met.Time(1);             % initialize model time
-end
-
-% post process
-[ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts);
    
-   
-   
-   
-   
+   ice1     =  ice1keep;
+   ice2     =  ice2keep;
+end % numyears

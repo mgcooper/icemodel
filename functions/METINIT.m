@@ -32,7 +32,7 @@ end
 %------------------------------------------------------------------------------
 
 % point- or catchment-scale forcing file
-   load(opts.metfname,'met')
+load(opts.metfname,'met')
 
 % next swaps out a variable from userdata in place of the default met data
 if opts.userdata ~= "none"

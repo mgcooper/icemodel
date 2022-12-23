@@ -12,9 +12,9 @@ savedata    = false;
 sitename    = 'behar';        % options: 'kanm', 'behar'
 startyear   = 2016;           % options: 2016
 endyear     = 2016;           % options: 2016
-meltmodel   = 'icemodel';     % options: 'icemodel','skinmodel'
-forcingdata = 'kanm';         % options: 'mar','kanm'
-userdata    = 'modis';        % options: 'modis','racmo','merra','mar','kanm','none'
+meltmodel   = 'skinmodel';     % options: 'icemodel','skinmodel'
+forcingdata = 'mar';         % options: 'mar','kanm'
+userdata    = 'mar';        % options: 'modis','racmo','merra','mar','kanm','none'
 uservars    = 'albedo';       % options: 'albedo', or any var in met
 
 %------------------------------------------------------------------------------
@@ -33,7 +33,13 @@ opts = icemodel_opts(   sitename,meltmodel,forcingdata,userdata,uservars,  ...
 %------------------------------------------------------------------------------
 %  run the model
 %------------------------------------------------------------------------------
-[ice1,ice2,met,opts] = icemodel(opts);
+switch meltmodel
+   case 'icemodel'
+      [ice1,ice2,met,opts] = icemodel(opts);
+   case 'skinmodel'
+      [ice1,ice2,met,opts] = skinmodel(opts);
+end
+
 
 %------------------------------------------------------------------------------
 %  save the data

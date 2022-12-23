@@ -71,6 +71,6 @@ function [  Qm,                                                         ...
    balance  =  chi*Qsi*(1.0-albedo) + emiss*Qli + Qle + Qh + Qe + Qc - Qm;
    
 % For a 'skin' surface energy balance model, reset Tsfc
-   if opts.skinmodel == true
+   if opts.meltmodel == "skinmodel"
       Tsfc  =  Tsfc0;
    end

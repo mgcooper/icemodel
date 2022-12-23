@@ -36,7 +36,7 @@ opts = p.Results;
 % plotcomp means compare two version of icemodel 
 
 % set default legend text
-if isempty(opts.legendtext)
+if isempty(opts.legendtext{1})
    if opts.userdata == "none"
       ltext = {'ADCP','RACMO','MAR','MERRA',['ICEMODEL (' upper(opts.forcingdata) ')']};
    else
@@ -192,7 +192,7 @@ for n = 1:size(Y,2)
 end
    
 % next makes legend text
-if ~isempty(opts.legendtext)
+if ~isempty(opts.legendtext{1})
 
    txt = opts.legendtext;
 
