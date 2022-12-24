@@ -16,14 +16,14 @@ if strcmp(opts.sitename,"sector")
 
    % compute the total number of model timesteps
    opts.maxiter = height(met)/opts.numyears;
-   opts.dt  = seconds(met.Time(2)-met.Time(1));
+   opts.dt = seconds(met.Time(2)-met.Time(1));
 
    % swap out chosen forcing data albedo for modis albedo
    if strcmp(opts.userdata,"modis")
       met.albedo = met.modis;
    end
 
-   return;
+   return
    % for a sector-scale run, we are finished
 end
 
@@ -39,11 +39,11 @@ if opts.userdata ~= "none"
 
    % for point/catchment-scale runs, multi-year simulations are not presently
    % supported, so the simyear should equal the start/endyear
-   simyear     =   num2str(opts.simyears(1));
-   sitename    =   opts.sitename;
-   userdata    =   opts.userdata;
-   uservars    =   opts.uservars;
-   userpath    =   opts.userpath;
+   simyear  = num2str(opts.simyears(1));
+   sitename = opts.sitename;
+   userdata = opts.userdata;
+   uservars = opts.uservars;
+   userpath = opts.userpath;
 
    % convert uservars to a cellstr for compatibility with multiple uservars
    if ischar(uservars)
@@ -53,7 +53,7 @@ if opts.userdata ~= "none"
    numuservars = numel(uservars);
 
    % load the forcingUserData file and retime to match the metfile
-   userfile = [userpath userdata '_' sitename '_' simyear '.mat'];
+   userfile = fullfile(userpath,[userdata '_' sitename '_' simyear '.mat']);
 
    if ~exist(userfile,'file')
       error('userdata file does not exist');

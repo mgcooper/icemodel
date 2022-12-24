@@ -3,19 +3,19 @@ function opts = icemodel_opts(sitename,meltmodel,forcingdata,userdata, ...
 
 %---------------------------- set the standard options that were passed in
 %------------------------------------------------------------------------------
-opts.sitename        =  sitename;
-opts.meltmodel       =  meltmodel;
-opts.forcingData     =  forcingdata;
-opts.userdata        =  userdata;
-opts.uservars        =  uservars;
-opts.simyears        =  startyear:1:endyear;
-opts.numyears        =  endyear-startyear+1;
+opts.sitename     =  sitename;
+opts.meltmodel    =  meltmodel;
+opts.forcingdata  =  forcingdata;
+opts.userdata     =  userdata;
+opts.uservars     =  uservars;
+opts.simyears     =  startyear:1:endyear;
+opts.numyears     =  endyear-startyear+1;
 
 %---------------------------- optional settings / parameters
 %------------------------------------------------------------------------------
 
 % general model settings
-opts.annual_loops    =  1;       % number of spin-up loops to initialize
+opts.annual_loops    =  3;       % number of spin-up loops to initialize
 opts.use_init        =  false;   % use pre-initialized data?
 opts.kabs_user       =  true;    % use user-defined ice absorptivity?
 opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
@@ -30,8 +30,8 @@ opts.ro_snow_i       =  900.0;   % initial ice density               [kg/m3]
 opts.dt              =  3600.0;   % timestep                             [s]
 opts.dz_thermal      =  0.04;    % dz for heat transfer                 [m]
 opts.dz_spectral     =  0.002;   % dz for radiative transfer            [m]
-opts.z0_thermal      =  12;      % domain thickness for heat transfer   [m]
-opts.z0_spectral     =  4;       % domain thickness for rad transfer    [m]
+opts.z0_thermal      =  20;      % domain thickness for heat transfer   [m]
+opts.z0_spectral     =  12;       % domain thickness for rad transfer    [m]
 opts.f_ice_min       =  0.01;
 
 % solver options
@@ -82,15 +82,15 @@ end
 
 % give precedence to ICEMODELINPUTPATH before searching elsewhere
 if (  ~isempty(getenv('ICEMODELINPUTPATH'))                             ...
-      && exist([getenv('ICEMODELINPUTPATH') 'met/' metfname],'file') == 2 )
+      && exist(fullfile(getenv('ICEMODELINPUTPATH'),'met',metfname),'file') == 2 )
 
    % the ICEMODELIINPUTPATH environment variable is defined
    opts.pathinput = getenv('ICEMODELINPUTPATH');
 
-elseif exist([pwd '/input/met/' metfname],'file') == 2
+elseif exist(fullfile(pwd,'input','met',metfname),'file') == 2
 
    % the metfile exists in the 'input/met/' directory
-   opts.pathinput = [pwd '/input/'];
+   opts.pathinput = fullfile(pwd,'input');
 
 elseif exist(metfname,'file') == 2
 
@@ -99,13 +99,14 @@ elseif exist(metfname,'file') == 2
 else
    % the metfile does not exist on the path
    % rather than error, use isfield(opts,'metfname') to halt in run script
-   warning('met file not found');
-   return;
+   opts.msg = 'met file not found';
+%    warning(opts.msg);
+   return
 end
 
 % set the path to the met file and the user data
-opts.metfname = [opts.pathinput 'met/' metfname];
-opts.userpath = [opts.pathinput 'userdata/'];
+opts.metfname = fullfile(opts.pathinput,'met',metfname);
+opts.userpath = fullfile(opts.pathinput,'userdata');
 
 % set the output data path
 % ------------------------
@@ -118,11 +119,11 @@ if ~isempty(getenv('ICEMODELOUTPUTPATH'))
 elseif exist([pwd '/output/'],'dir') == 7
 
    % an 'output/' directory is present, save the data there
-   opts.pathoutput = [pwd '/output/'];
+   opts.pathoutput = fullfile(pwd,'output');
 
 else
    % make a temporary output path
-   opts.pathoutput = [pwd '/icemodel_output_tmp/'];
+   opts.pathoutput = fullfile(pwd,'icemodel_output_tmp');
    warning(['ICEMODELOUTPUTPATH not found, output path set to ' opts.pathoutput]);
 end
 
@@ -130,8 +131,8 @@ end
 fsave = [ meltmodel '_' sitename '_' simyear '_' upper(forcingdata) ...
    '_swap_' upper(userdata) '_' uservars];
 
-opts.fsave = [opts.pathoutput fsave];
-
+opts.fsave = fullfile(opts.pathoutput,fsave);
+opts.msg = '';
 
 
 
