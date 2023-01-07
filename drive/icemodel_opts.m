@@ -15,7 +15,7 @@ opts.numyears     =  endyear-startyear+1;
 %------------------------------------------------------------------------------
 
 % general model settings
-opts.annual_loops    =  3;       % number of spin-up loops to initialize
+opts.annual_loops    =  1;       % number of spin-up loops to initialize
 opts.use_init        =  false;   % use pre-initialized data?
 opts.kabs_user       =  true;    % use user-defined ice absorptivity?
 opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
@@ -27,7 +27,7 @@ opts.z_obs           =  3.0;     % Height of wind and air temp obs   [m]
 opts.ro_snow_i       =  900.0;   % initial ice density               [kg/m3]
 
 % timestepping / grid thickness
-opts.dt              =  3600.0;   % timestep                             [s]
+opts.dt              =  900.0;   % timestep                             [s]
 opts.dz_thermal      =  0.04;    % dz for heat transfer                 [m]
 opts.dz_spectral     =  0.002;   % dz for radiative transfer            [m]
 opts.z0_thermal      =  20;      % domain thickness for heat transfer   [m]

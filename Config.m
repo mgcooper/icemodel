@@ -1,7 +1,19 @@
+function Config
+%CONFIG configure project preferences including paths to data files and the
+%location of model output files.
 
-% this is an example configuration script. the model needs to know where the
+% this is an example configuration function. the model needs to know where the
 % input data is located, and (optionally) where to save the output data. this
 % script shows one way to accomplish that. more information is provided below.
+
+% ICEMODELPATH is the top-level model path (see 'more information' below)
+% ICEMODELDATAPATH is the path to the evaluation data
+% ICEMODELINPUTPATH is the path to the input met data
+% ICEMODELOUTPUTPATH is the path where model output is saved
+% ICEMODELUSERPATH is an additional path that is used for accessing large
+% datasets stored on external hard drives, or anything else the user wishes to
+% use it for. It is not used in the model, but may be used in some plotting
+% scripts or pre-processing scripts.
 
 % get the system $HOME path:
 HOMEPATH = [getenv('HOME') '/']; 
@@ -14,12 +26,12 @@ setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/runoff/data/icemodel/inp
 setenv('ICEMODELDATAPATH',[HOMEPATH 'myprojects/matlab/runoff/data/icemodel/eval/']);
 setenv('ICEMODELOUTPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel/output/']);
 
+% ICEMODELUSERPATH is an additional path that can be set to access data, for
+% example large datasets saved on an external hard drive.
+setenv('ICEMODELUSERPATH','/Volumes/Samsung_T5b/');
+
 % setpref is like .ini or Java .properties files
 
-% ICEMODELPATH is the top-level model path (see 'more information' below)
-% ICEMODELDATAPATH is the path to the evaluation data
-% ICEMODELINPUTPATH is the path to the input met data
-% ICEMODELOUTPUTPATH is the path where model output is saved
 
 % (note: ICEMODELPATH is not currently used, and ICEMODELOUTPUTPATH is only
 % used in the icemodel_run script. ICEMODELINPUTPATH should point to input/
