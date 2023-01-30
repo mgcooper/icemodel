@@ -16,15 +16,15 @@ function Config
 % scripts or pre-processing scripts.
 
 % get the system $HOME path:
-HOMEPATH = [getenv('HOME') '/']; 
+HOMEPATH = getenv('HOME'); 
 
 % set the icemodel code, input data, and output data paths:
-setenv('ICEMODELPATH',[HOMEPATH 'myprojects/matlab/icemodel/']);
-% setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel/input/']);
-% setenv('ICEMODELDATAPATH', [HOMEPATH 'myprojects/matlab/icemodel/input/userdata/']);
-setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/runoff/data/icemodel/input/']);
-setenv('ICEMODELDATAPATH',[HOMEPATH 'myprojects/matlab/runoff/data/icemodel/eval/']);
-setenv('ICEMODELOUTPUTPATH',[HOMEPATH 'myprojects/matlab/icemodel/output/']);
+setenv('ICEMODELPATH',fullfile(HOMEPATH,'myprojects/matlab/icemodel/'));
+% setenv('ICEMODELINPUTPATH',fullfile(HOMEPATH,'myprojects/matlab/icemodel/input/'));
+% setenv('ICEMODELDATAPATH', fullfile(HOMEPATH,'myprojects/matlab/icemodel/input/userdata/'));
+setenv('ICEMODELINPUTPATH',fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/input/'));
+setenv('ICEMODELDATAPATH',fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/eval/'));
+setenv('ICEMODELOUTPUTPATH',fullfile(HOMEPATH,'myprojects/matlab/icemodel/output/'));
 
 % ICEMODELUSERPATH is an additional path that can be set to access data, for
 % example large datasets saved on an external hard drive.
@@ -84,6 +84,6 @@ setenv('ICEMODELUSERPATH','/Volumes/Samsung_T5b/');
 
 
  
-% setenv('ICEMODELDATAPATH', [HOMEPATH 'myprojects/matlab/runoff/data/icemodel/eval/']);
-% setenv('ICEMODELINPUTPATH',[HOMEPATH 'myprojects/matlab/runoff/data/icemodel/input/']);
+% setenv('ICEMODELDATAPATH', fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/eval/'));
+% setenv('ICEMODELINPUTPATH',fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/input/'));
 

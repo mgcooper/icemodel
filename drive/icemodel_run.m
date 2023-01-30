@@ -20,7 +20,7 @@ uservars    = 'albedo';       % options: 'albedo', or any var in met
 %------------------------------------------------------------------------------
 %  set the input and output paths (do this here or in icemodel_config.m)
 %------------------------------------------------------------------------------
-icemodel_config
+% Config
 % setenv('ICEMODELIINPUTPATH','/full/path/to/icemodel/input/');
 % setenv('ICEMODELOUTPUTPATH','/full/path/to/icemodel/output/');
 
