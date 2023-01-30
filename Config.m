@@ -24,7 +24,9 @@ setenv('ICEMODELPATH',fullfile(HOMEPATH,'myprojects/matlab/icemodel/'));
 % setenv('ICEMODELDATAPATH', fullfile(HOMEPATH,'myprojects/matlab/icemodel/input/userdata/'));
 setenv('ICEMODELINPUTPATH',fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/input/'));
 setenv('ICEMODELDATAPATH',fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/eval/'));
-setenv('ICEMODELOUTPUTPATH',fullfile(HOMEPATH,'myprojects/matlab/icemodel/output/'));
+setenv('ICEMODELOUTPUTPATH','/Volumes/Samsung_T5b/icemodel/output/v10b');
+
+% setenv('ICEMODELOUTPUTPATH',fullfile(HOMEPATH,'myprojects/matlab/icemodel/output/'));
 
 % ICEMODELUSERPATH is an additional path that can be set to access data, for
 % example large datasets saved on an external hard drive.
