@@ -3,7 +3,7 @@ function [met,opts] = METINIT(opts)
 % re-activate this when/if i put all the metfiles in the input directory
 %load([opts.path.input 'met/' opts.metfname],'met')
 
-if opts.sitename == "region"
+if opts.sitename == "sector"
 
    % load the first met file
    load(opts.metfname,'met');
@@ -23,7 +23,7 @@ if opts.sitename == "region"
 
    bi = find(met.modis<=0 | met.modis>=1);
    if ~isempty(bi)
-   met.modis(bi) = met.albedo(bi);
+      met.modis(bi) = met.albedo(bi);
       warning('bad albedo')
    end
 
@@ -31,7 +31,7 @@ if opts.sitename == "region"
       met.albedo = met.modis;
    end
    
-   return;
+   return
    
 end
    
