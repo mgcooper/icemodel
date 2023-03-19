@@ -15,25 +15,42 @@ function [  T,                                                          ...
 % whereas the other values in here are updated at each substep. However,
 % what happens when a layr is removed within a sub-stepping?
 
-% need to test putting this after subl 
-% d_drn gets updated if layers are combined      
-   d_liq       =  d_liq + f_liq - xf_liq; % test
-   xf_liq      =  f_liq;
-   
-% these have dimensions of f_liq and f_ice i.e. h_liq/h and h_ice/h
+% d_drn gets updated if layers are combined
+   d_liq = d_liq + f_liq - xf_liq;
+   xf_liq = f_liq;
+
+% evaporation
    if liqflag == true
-      f_liq(1) =  min(max(f_liq(1)+Qe/(Lv*ro_liq)*dt_new/dz_therm,0),1);
+      xevap = min(0,f_liq(1)+Qe/(Lv*ro_liq)*dt_new/dz_therm-0.001);
+      f_liq(1) = min(max(f_liq(1)+Qe/(Lv*ro_liq)*dt_new/dz_therm,0.001),1);
+      f_ice(1) = min(max(f_ice(1)+xevap*Lv*ro_liq/(Ls*ro_ice),f_min),1);
    else
-      f_ice(1) =  min(max(f_ice(1)+Qe/(Ls*ro_ice)*dt_new/dz_therm,f_min),1);
+      f_ice(1) = min(max(f_ice(1)+Qe/(Ls*ro_ice)*dt_new/dz_therm,f_min),1);
    end
 
+% % this is wrong but use it to complete the test runs, then run test2 with above
+% % and compare saved, test, test2 for all points all years to see if it merits
+% % rerunning everyhting with above
+% if liqflag == true
+%    evap = Qe/(Lv*ro_liq)*dt_new/dz_therm;
+%    if f_liq(1)+evap < 0.001
+%       subl = Lv*ro_liq/(Ls*ro_ice)*(0.001-f_liq(1));
+%       f_liq(1) = 0.001;
+%       f_ice(1) = min(max(f_ice(1)+subl,f_min),1);
+%    else
+%       f_liq(1) = min(f_liq(1)+evap,1);
+%    end
+% else
+%    f_ice(1) = min(max(f_ice(1)+Qe/(Ls*ro_ice)*dt_new/dz_therm,f_min),1);
+% end
+
 % update the top layer temperature
-   T(1)        =  Tf-sqrt(((f_liq(1)+f_ice(1).*ro_iwe)./f_liq(1)-1))./fcp;
+   T(1) = Tf-sqrt(((f_liq(1)+f_ice(1).*ro_iwe)./f_liq(1)-1))./fcp;
    
 % combine layers if any layer is <f_min, or if this step's sublimation
 % would reduce any layer to <f_min (predict the need to combine next step)
-   lyrmrg      =  (f_ice+Qe/(Ls*ro_ice)*dt_new/dz_therm)<=f_min;
-   lcflag      =  false(size(f_ice));
+   lyrmrg = (f_ice+Qe/(Ls*ro_ice)*dt_new/dz_therm)<=f_min;
+   lcflag = false(size(f_ice));
     
 % if lyrmerge is all false and no layers are < h_min, return (no combine)
 if any(lyrmrg) % && ~any(h_ice<=h_min)
@@ -49,10 +66,10 @@ if any(lyrmrg) % && ~any(h_ice<=h_min)
 % Combine layers
         if (f_ice(ji)+Qe/(Ls*ro_ice)*dt_new/dz_therm)<=f_min || lyrmrg(ji)==true
             
-            [j1,j2]     =  LAYERINDS(ji,f_ice);
+            [j1,j2] = LAYERINDS(ji,f_ice);
 
 % prep for layer combination
-            lcflag(j1)  =  true;
+            lcflag(j1) = true;
     
         [   f_liq(j2),                                                  ...
             f_ice(j2),                                                  ...

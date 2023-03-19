@@ -79,13 +79,14 @@ switch opts.dt
 end
 
 % these are experimental options that should be left as-is
-opts.tlagcolumn    =   6*3600/opts.dt;
-opts.tlagsurf      =   12;
+opts.tlagcolumn = 6*3600/opts.dt;
+opts.tlagsurf   = 12;
 
 % build a filename string to save the output data
-fsave    =  [  meltmodel '_' sitename '_' simyear '_' forcingdata    ...
-   '_swap_' upper(userdata) '_' uservars{1}];
-opts.fsave  = fsave;
+fsave = [meltmodel '_' sitename '_' simyear '_' forcingdata '_swap_' 
+   upper(userdata) '_' uservars{1}];
+
+opts.fsave = fsave;
 
 opts.error = '';
 

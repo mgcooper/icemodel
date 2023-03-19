@@ -45,7 +45,7 @@ function [  f_liq_j,                                                    ...
       B     =  fcp^2*(Lf*g_liq12-cp_ice*(g_wat1*Td1+g_wat2*Td2));
       C     =  A/fcp^2;
       D     =  B/fcp^2 - Lf*(g_wat1+g_wat2);
-   %  TdC   =  roots([A B C D]);       % should be second root
+     %TdC   =  roots([A B C D]);       % should be second root
       fTdC  =  @(TdC) A*TdC^3 + B*TdC^2 + C*TdC + D;
       
 %       % to make A=1:
@@ -54,19 +54,22 @@ function [  f_liq_j,                                                    ...
 %       C     =  1/fcp^2;
 %       D     =  (Lf*(g_liq12-(g_wat1+g_wat2))-cp_ice*(g_wat1*Td1+g_wat2*Td2))/...
 %                (fcp^2*cp_ice*(g_wat1+g_wat2));
+
       % try an endpoint constrained range
       try
+         %[a,b] = fzero_guess_to_bounds(fTdC,min(Td1,Td2),max(Td1,Td2)); 
+         % TdC = fzero_brent(fTdC,a,b,fopts.TolX);
          TdC = fzero(fTdC,[min(Td1,Td2) max(Td1,Td2)],fopts);
 
       catch ME
 
-         if strcmp(ME.identifier,'MATLAB:fzero:ValuesAtEndPtsSameSign')
+         if strcmp(ME.identifier,'MATLAB:fzero:ValuesAtEndPtsSameSign') || strcmp(ME.identifier,'MATLAB:fzero:Arg2NotFinite')
             msg      =  'Layer combination failed using endpoints, using midpoint instead';
             causeE   =  MException('icemodel:COMBINEHEAT:rootfinding',msg);
             ME       =  addCause(ME,causeE); % let it go
          end
 
-         % try a midpoint
+         % try a midpoint. this should rarely if ever happen.
          try
             TdC   =  fzero(fTdC,(Td1+Td2)/2,fopts);
          catch ME
@@ -80,7 +83,7 @@ function [  f_liq_j,                                                    ...
             
             % an alternative would be to use the average temperature or to
             % invoke the cv-balance subroutine to expel liquid water and
-            % combine the dry ice masses
+            % combine the dry ice masses, but in testing this ~never happens.
             T_j   =  (T(j1)*g_wat1 + T(j2)*g_wat2)/(g_wat1+g_wat2);
             TdC   =  Tf-T_j;
             
