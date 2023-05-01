@@ -67,7 +67,8 @@ end
 
 % send these into updateextcoefs to improve speed of exponentiation
    solardwavl     =  solar.*dwavl; 
-   spect_walls    =  -z_walls.*repmat(spect_coefs./ro_ice,JJ_spect+1,1);
+   spect_walls    =  -z_walls*spect_coefs/ro_ice;
+   % spect_walls    =  -z_walls.*repmat(spect_coefs./ro_ice,JJ_spect+1,1);
    spect_lower    =  spect_walls(2:end,:);
    spect_upper    =  spect_walls(1:end-1,:);
    
