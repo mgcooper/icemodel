@@ -46,6 +46,11 @@ end
 % the change in stored heat due to water vapor diffusion (Eq. 74, term 2)
 %   H_vap       =   Ls.*f_air.*f_rh.*d_ro_vap_dT;           % [J/K/m3]
     
+% vapor thermal diffusion coefficient % [W m-1 K-1]
+%   k_vap = ro_vap_sat.*Ls.*De.*22.452*272.55./(272.55+Td).^2; 
+
+% equivalently:
+% k_vap = Ls.*De.*(d_ro_vap_dT + ro_vap_sat./T);
 
 % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
 
