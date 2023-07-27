@@ -71,9 +71,9 @@ ice1.Tsfc      =  ice1.Tsfc-Tf;             % surface temp,cap at Tf
 ice2.Tice      =  ice2.Tice-Tf;              % ice temperature
 
 % calculate surface and subsurface runoff
-if opts.meltmodel == "skinmodel"
+if strcmp('skinmodel', opts.simmodel)
    ice1  =  SRFRUNOFF(ice1,ro_liq,Ls,Lf,opts.dt);
-else
+elseif strcmp('icemodel', opts.simmodel)
    ice1  =  ICERUNOFF(ice1,ice2,opts);
 end
 

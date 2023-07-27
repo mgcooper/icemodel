@@ -18,8 +18,8 @@ function [radii,scattercoefs,solar,kabs,kice] = SPECINIT(opts)
     
 % load the user-defined kabs/kice if provided
     if opts.kabs_user == true
-        load(fullfile(opts.pathinput,'spectral','kabs'),'kabs');
-        load(fullfile(opts.pathinput,'spectral','kice'),'kice');
+        load(fullfile(opts.pathinput,'spectral','kabs.mat'),'kabs');
+        load(fullfile(opts.pathinput,'spectral','kice.mat'),'kice');
     else
         kabs = []; kice = [];
     end

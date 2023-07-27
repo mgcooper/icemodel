@@ -34,22 +34,22 @@ function [  Qm,                                                         ...
    
 % Make the Tsfc_0 <= 0 C for surface flux calculations.
 %   Let Tsfc remain > Tf for the upper boundary condition on ICE_ENERGY
-   Tsfc0    =  MELTTEMP(Tsfc,Tf);
+%    Tsfc0    =  MELTTEMP(Tsfc,Tf);
    
 % Compute the stability function.
-   S        =  STABLEFN(Tair,Tsfc0,wspd,scoef);
+   S        =  STABLEFN(Tair,MELTTEMP(Tsfc,Tf),wspd,scoef);
    
 % Compute the water vapor pressure at the surface.
-   es0      =  VAPOR(Tsfc0,Tf,liqflag);
+   es0      =  VAPOR(MELTTEMP(Tsfc,Tf),Tf,liqflag);
    
 % Compute the latent heat flux.
    Qe       =  LATENT(De,S,ea,es0,roL,epsilon,Pa);
 
 % Compute the sensible heat flux.
-   Qh       =  SENSIBLE(De,S,Tair,Tsfc0,cv_air);
+   Qh       =  SENSIBLE(De,S,Tair,MELTTEMP(Tsfc,Tf),cv_air);
 
 % Compute the longwave flux emitted by the surface.
-   Qle      =  LONGOUT(Tsfc0,emiss,SB);
+   Qle      =  LONGOUT(MELTTEMP(Tsfc,Tf),emiss,SB);
    
 % Compute the energy flux available for melting or freezing.
    Qm       =  0.0; 
@@ -71,6 +71,6 @@ function [  Qm,                                                         ...
    balance  =  chi*Qsi*(1.0-albedo) + emiss*Qli + Qle + Qh + Qe + Qc - Qm;
    
 % For a 'skin' surface energy balance model, reset Tsfc
-   if opts.meltmodel == "skinmodel"
+   if strcmp('skinmodel', opts.simmodel)
       Tsfc  =  Tsfc0;
    end

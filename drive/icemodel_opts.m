@@ -1,15 +1,22 @@
-function opts = icemodel_opts(sitename,meltmodel,forcingdata,userdata, ...
-   uservars,startyear,endyear)
+function opts = icemodel_opts(sitename, simmodel, simyears, forcings, ...
+   userdata, uservars, savedata, testname, testpoint)
+%ICEMODEL_OPTS set model options
+
+if nargin < 8 || isempty(testname); testname = 'none'; end
+if nargin < 9 || isempty(testpoint); testpoint = 'none'; end
 
 %---------------------------- set the standard options that were passed in
 %------------------------------------------------------------------------------
-opts.sitename     =  sitename;
-opts.meltmodel    =  meltmodel;
-opts.forcingdata  =  forcingdata;
-opts.userdata     =  userdata;
-opts.uservars     =  uservars;
-opts.simyears     =  startyear:1:endyear;
-opts.numyears     =  endyear-startyear+1;
+opts.savedata = savedata;
+opts.simmodel = simmodel;
+opts.sitename = sitename;
+opts.forcings = forcings;
+opts.userdata = userdata;
+opts.uservars = uservars;
+opts.simyears = simyears;
+opts.numyears = numel(simyears);
+opts.testname = testname;
+opts.testpoint = testpoint;
 
 %---------------------------- optional settings / parameters
 %------------------------------------------------------------------------------
@@ -35,7 +42,7 @@ opts.z0_spectral     =  12;       % domain thickness for rad transfer    [m]
 opts.f_ice_min       =  0.01;
 
 % solver options
-opts.fzero           =  optimset('Display','off','TolX',1e-6);
+opts.fzero = optimset('Display','off','TolX',1e-6);
 
 % the mie scattering coefficients are defined for 35 grain sizes and 118
 % spectral bands. define those dimensions here, they are used to read in
@@ -51,28 +58,37 @@ opts.tlagsurf        =  6*3600/opts.dt;
 %---------------------------- set the met forcing file name
 %------------------------------------------------------------------------------
 
-% deal with the case where met-station forcing data is requested for a
-% nearby catchment, as opposed to climate model forcing data that was
-% created for the catchment. for example, if sitename=="behar" and
-% forcingdata=="kanm", this loads the met_kanm_kanm_YYYY met file, to negate
-% the need to create a second (identical) met_behar_kanm_YYYY file.
+% Deal with the case where met-station forcing data (as opposed to gridded
+% climate model forcing data) is requested for a nearby catchment by replacing
+% the catchment name in the metfile with the met station name. For example, if
+% sitename=="behar" and forcingdata=="kanm", this sets the metfile name to
+% met_kanm_kanm_YYYY rather than met_behar_kanm_YYYY, to negate the need to
+% create a second (identical) met_behar_kanm_YYYY file.
 
-if forcingdata == "kanl" && any(ismember(sitename,{'ak4','upperbasin'}))
+if strcmpi('kanl', forcings) && any(ismember(sitename,{'ak4','upperbasin'}))
    metname = 'kanl';
-elseif forcingdata == "kanm" && any(ismember(sitename,{'slv1','slv2','behar'}))
+elseif strcmpi('kanm', forcings) && any(ismember(sitename,{'slv1','slv2','behar'}))
    metname = 'kanm';
 else
    metname = sitename;
 end
 
-% multi-year runs are not currently supported, so simyear equals startyear
-simyear = num2str(startyear);
+% Sets the met filenames and output filenames. Note: for kanm/kanl, all values
+% are from the weather station. otherwise, the values are from MAR.
 switch opts.dt
    case 900
-      metfname = ['met_' metname '_' forcingdata '_' simyear '_15m.mat'];
+      dtstr = '15m.mat';
    case 3600
-      metfname = ['met_' metname '_' forcingdata '_' simyear '_1hr.mat'];
+      dtstr = '1hr.mat';
 end
+for n = 1:numel(simyears)
+   simyear = num2str(simyears(n));
+   opts.metfname{n} = ['met_' metname '_' forcings '_' simyear '_' dtstr];
+   opts.outfname{n} = [simmodel '_' sitename '_' simyear '_' forcings ...
+      '_swap_' upper(userdata) '_' uservars];
+end
+% programming note: if swapping multiple vars is supported, will need to extend
+% the loop above and add a method to METINIT and/or icemodel
 
 %---------------------------- configure the input and output data paths
 %------------------------------------------------------------------------------
@@ -81,32 +97,27 @@ end
 % -----------------------
 
 % give precedence to ICEMODELINPUTPATH before searching elsewhere
-if (  ~isempty(getenv('ICEMODELINPUTPATH'))                             ...
-      && exist(fullfile(getenv('ICEMODELINPUTPATH'),'met',metfname),'file') == 2 )
+if ~isempty(getenv('ICEMODELINPUTPATH'))
 
    % the ICEMODELIINPUTPATH environment variable is defined
    opts.pathinput = getenv('ICEMODELINPUTPATH');
 
-elseif exist(fullfile(pwd,'input','met',metfname),'file') == 2
-
-   % the metfile exists in the 'input/met/' directory
-   opts.pathinput = fullfile(pwd,'input');
-
-elseif exist(metfname,'file') == 2
+elseif isfile(opts.metfname{1},'file')
 
    % the metfile exists somewhere else on the path
-   opts.pathinput = strrep(fileparts(which(metfname)),'met','');
+   opts.pathinput = strrep(fileparts(which(opts.metfname{1})),'met','');
+
+elseif isfolder(fullfile(pwd, 'input', 'met'))
+
+   % assume the metfile exists in the 'input/met/' directory
+   opts.pathinput = fullfile(pwd,'input');
+
 else
    % the metfile does not exist on the path
    % rather than error, use isfield(opts,'metfname') to halt in run script
    opts.msg = 'met file not found';
-%    warning(opts.msg);
    return
 end
-
-% set the path to the met file and the user data
-opts.metfname = fullfile(opts.pathinput,'met',metfname);
-opts.userpath = fullfile(opts.pathinput,'userdata');
 
 % set the output data path
 % ------------------------
@@ -116,10 +127,10 @@ if ~isempty(getenv('ICEMODELOUTPUTPATH'))
    % the ICEMODELOUTPUTPATH environment variable is defined, use it
    opts.pathoutput = getenv('ICEMODELOUTPUTPATH');
 
-elseif exist([pwd '/output/'],'dir') == 7
+elseif isfolder(fullfile(pwd, 'output'))
 
    % an 'output/' directory is present, save the data there
-   opts.pathoutput = fullfile(pwd,'output');
+   opts.pathoutput = fullfile(pwd, 'output');
 
 else
    % make a temporary output path
@@ -127,12 +138,15 @@ else
    warning(['ICEMODELOUTPUTPATH not found, output path set to ' opts.pathoutput]);
 end
 
-% build a filename string to save the output data
-fsave = [ meltmodel '_' sitename '_' simyear '_' upper(forcingdata) ...
-   '_swap_' upper(userdata) '_' uservars];
+% append the path to the met file names and set the userdata path
+opts.metfname = fullfile(opts.pathinput, 'met', opts.metfname);
+opts.outfname = fullfile(opts.pathoutput, opts.outfname);
+opts.userpath = fullfile(opts.pathinput, 'userdata');
 
-opts.fsave = fullfile(opts.pathoutput,fsave);
-opts.msg = '';
+% these are experimental options that should be left as-is
+opts.tlagcolumn = 6*3600/opts.dt;
+opts.tlagsurf = 12;
+opts.error = '';
 
 
 

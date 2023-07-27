@@ -60,17 +60,19 @@ function [  f_liq_j,                                                    ...
 
       catch ME
 
-         if strcmp(ME.identifier,'MATLAB:fzero:ValuesAtEndPtsSameSign')
+         if strcmp(ME.identifier,'MATLAB:fzero:ValuesAtEndPtsSameSign') || ...
+               strcmp(ME.identifier,'MATLAB:fzero:Arg2NotFinite')
             msg      =  'Layer combination failed using endpoints, using midpoint instead';
             causeE   =  MException('icemodel:COMBINEHEAT:rootfinding',msg);
             ME       =  addCause(ME,causeE); % let it go
          end
 
-         % try a midpoint
+         % try a midpoint. this should rarely if ever happen.
          try
             TdC   =  fzero(fTdC,(Td1+Td2)/2,fopts);
          catch ME
-            if strcmp(ME.identifier,'MATLAB:fzero:ValuesAtEndPtsSameSign')
+            if strcmp(ME.identifier,'MATLAB:fzero:ValuesAtEndPtsSameSign') || ...
+               strcmp(ME.identifier,'MATLAB:fzero:Arg2NotFinite')
                msg      =  'Layer combination failed using midpoint';
                causeE   =  MException('icemodel:COMBINEHEAT:rootfinding',msg);
                ME       =  addCause(ME,causeE);
@@ -80,7 +82,7 @@ function [  f_liq_j,                                                    ...
             
             % an alternative would be to use the average temperature or to
             % invoke the cv-balance subroutine to expel liquid water and
-            % combine the dry ice masses
+            % combine the dry ice masses, but in testing this ~never happens.
             T_j   =  (T(j1)*g_wat1 + T(j2)*g_wat2)/(g_wat1+g_wat2);
             TdC   =  Tf-T_j;
             

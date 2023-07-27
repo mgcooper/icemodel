@@ -1,25 +1,41 @@
-function [met,opts] = METINIT(opts)
+function [met,opts] = METINIT(opts, fileiter)
 
-%------------------------------------------------------------------------------
+% The second input is the index into the metfile name list generated in setopts
+if nargin < 2
+   fileiter = 1;
+end
+
+%--------------------------------------------------------
 % this section is for gridded (sector-scale) simulations
-%------------------------------------------------------------------------------
-if strcmp(opts.sitename,"sector")
+%--------------------------------------------------------
+
+if strcmp('sector', opts.sitename)
 
    % load the met file
-   load(opts.metfname,'met')
+   load(opts.metfname{fileiter},'met')
 
    % remove leap inds if the met data is on a leap-year calendar
-   if strcmp(opts.calendar_type,"noleap")
+   if strcmp('noleap', opts.calendar_type)
       feb29 = month(met.Time) == 2 & day(met.Time) == 29;
       met = met(~feb29,:);
    end
 
-   % compute the total number of model timesteps
+   % subset the met file to the requested simyears
+   met = met(ismember(year(met.Time),opts.simyears),:);
+
+   % compute the total number of model timesteps and the timestep
    opts.maxiter = height(met)/opts.numyears;
    opts.dt = seconds(met.Time(2)-met.Time(1));
 
+   % check for bad albedo data
+   bi = find(met.modis<=0 | met.modis>=1);
+   if ~isempty(bi)
+      met.modis(bi) = met.albedo(bi);
+      warning('bad albedo')
+   end
+
    % swap out chosen forcing data albedo for modis albedo
-   if strcmp(opts.userdata,"modis")
+   if strcmp('modis', opts.userdata)
       met.albedo = met.modis;
    end
 
@@ -27,12 +43,12 @@ if strcmp(opts.sitename,"sector")
    % for a sector-scale run, we are finished
 end
 
-%------------------------------------------------------------------------------
+%----------------------------------------------------------------
 % this section is for point-scale or catchment-scale simulations
-%------------------------------------------------------------------------------
+%----------------------------------------------------------------
 
 % point- or catchment-scale forcing file
-load(opts.metfname,'met')
+load(opts.metfname{fileiter},'met')
 
 % next swaps out a variable from userdata in place of the default met data
 if opts.userdata ~= "none"

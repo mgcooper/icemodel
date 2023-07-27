@@ -11,9 +11,12 @@ load( 'PHYSCONS', 'cp_ice','cv_air','cv_liq','cv_ice','emiss',          ...
                   'ro_air','ro_ice','ro_liq','roLf','roLs','roLv',      ...
                   'Rv','Tf','TINY');
                   
+% open the first input meteorological data file
+   [met, opts]  = METINIT(opts, 1);
 
-%  LOAD THE FORCING DATA
-[  met,opts ] = METINIT(opts);
+   if strcmp(opts.error,'metfile does not exist')
+      error(opts.error);
+   end
                   
 %  INITIALIZE THE ICE COLUMN
 [  f_ice,                                                               ...
@@ -63,8 +66,8 @@ load( 'PHYSCONS', 'cp_ice','cv_air','cv_liq','cv_ice','emiss',          ...
    spect_upper,                                                         ...
    solardwavl  ]     =     EXTCOEFSINIT(opts,radii,scattercoefs,        ...
                            solar,kabs,kice,dz_spect,JJ_spect,ro_ice);
+%  clear radii scattercoefs solar
 
-%    clear radii scattercoefs solar
 %-------------------------------------------------------------------------------
 %  initialize timestepping and initial state values
 %-------------------------------------------------------------------------------
@@ -79,7 +82,7 @@ load( 'PHYSCONS', 'cp_ice','cv_air','cv_liq','cv_ice','emiss',          ...
    dt_new      =  dt_max;
    iter        =  1;
    subiter     =  1;
-   itime       =  met.Time(1);      % model time
+   itime       =  met.Time(1);   % initialize model time
 
 % extract parameter values that are used frequently
    nloops      =  opts.annual_loops;
@@ -142,6 +145,9 @@ while iter <= maxiter
    while OK == false || dt_sum < dt
 
 % SURFACE TEMPERATURE
+      % Tsfc     =  SEBSOLVE(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,...
+      %             emiss,SB,Tf,Qc,xTsfc,chi,roL,scoef,fopts,liqflag);
+   
    [  Tsfc  ]  =  SFCTEMP(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,     ...
                   emiss,SB,Tf,Qc,xTsfc,chi,roL,scoef,fopts,liqflag);
 
@@ -204,7 +210,8 @@ while iter <= maxiter
          d_liq,                                                         ...
          d_drn ]  =  ICEMF(T,f_ice,f_liq,ro_ice,ro_liq,cp_ice,Lf,Ls,    ...
                      Lv,Tf,TL,fcp,xf_liq,Sc,Sp,JJ_therm,f_min,fopts,    ...
-                     dz_therm,dt_new,Qe,liqflag,ro_iwe,d_liq,d_drn);
+                     dz_therm,dt_new,Qe,liqflag,ro_iwe,d_liq,d_drn,     ...
+                     flmin,iter);
                         
       % update density (kg/m3), heat capacity (J/kg/K), thermal K (W/m/K)
        % k_eff    =  GETGAMMA(T,f_liq,f_ice,ro_ice,k_liq,Ls,Rv,Tf);
@@ -313,8 +320,8 @@ end
 
 % post process
 [ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts);
-   
-   
-   
-   
-   
+
+
+
+
+

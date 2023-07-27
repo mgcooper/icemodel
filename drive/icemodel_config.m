@@ -1,11 +1,17 @@
-function Config
-%CONFIG configure project preferences including paths to data files and the
-%location of model output files.
-
-% this is an example configuration function. the model needs to know where the
+function icemodel_config()
+%ICEMODEL_CONFIG configure project preferences
+%
+% Syntax:
+% 
+% icemodel_config() configures project preferences including paths to data files
+% and the location of model output files.
+%
+% Description:
+%
+% This is an example configuration function. The model needs to know where the
 % input data is located, and (optionally) where to save the output data. this
 % script shows one way to accomplish that. more information is provided below.
-
+%
 % ICEMODELPATH is the top-level model path (see 'more information' below)
 % ICEMODELDATAPATH is the path to the evaluation data
 % ICEMODELINPUTPATH is the path to the input met data
@@ -14,30 +20,27 @@ function Config
 % datasets stored on external hard drives, or anything else the user wishes to
 % use it for. It is not used in the model, but may be used in some plotting
 % scripts or pre-processing scripts.
-
-% get the system $HOME path:
-HOMEPATH = getenv('HOME'); 
+% 
+% (note: ICEMODELPATH is not currently used, and ICEMODELOUTPUTPATH is only
+% used in the icemodel_run script. ICEMODELINPUTPATH should point to input/
+% and ICEMODELDATAPATH should point to input/userdata )  
+% 
+% See also: icemodel
 
 % set the icemodel code, input data, and output data paths:
-setenv('ICEMODELPATH',fullfile(HOMEPATH,'myprojects/matlab/icemodel/'));
-% setenv('ICEMODELINPUTPATH',fullfile(HOMEPATH,'myprojects/matlab/icemodel/input/'));
-% setenv('ICEMODELDATAPATH', fullfile(HOMEPATH,'myprojects/matlab/icemodel/input/userdata/'));
-setenv('ICEMODELINPUTPATH',fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/input/'));
-setenv('ICEMODELDATAPATH',fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/eval/'));
-setenv('ICEMODELOUTPUTPATH','/Volumes/Samsung_T5b/icemodel/output/v10b');
+HOMEPATH = getenv('HOME');
+setenv('ICEMODELPATH', fullfile(HOMEPATH,'myprojects/matlab/icemodel'));
+setenv('ICEMODELINPUTPATH', fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/input'));
+setenv('ICEMODELDATAPATH', fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/eval'));
+setenv('ICEMODELOUTPUTPATH', '/Volumes/Samsung_T5b/icemodel/output/v10b');
 
-% setenv('ICEMODELOUTPUTPATH',fullfile(HOMEPATH,'myprojects/matlab/icemodel/output/'));
+% setenv('ICEMODELDATAPATH', fullfile(HOMEPATH,'myprojects/matlab/icemodel/input/userdata'));
+% setenv('ICEMODELINPUTPATH', fullfile(HOMEPATH,'myprojects/matlab/icemodel/input'));
+% setenv('ICEMODELOUTPUTPATH', fullfile(HOMEPATH,'myprojects/matlab/icemodel/output'));
 
 % ICEMODELUSERPATH is an additional path that can be set to access data, for
 % example large datasets saved on an external hard drive.
-setenv('ICEMODELUSERPATH','/Volumes/Samsung_T5b/');
-
-% setpref is like .ini or Java .properties files
-
-
-% (note: ICEMODELPATH is not currently used, and ICEMODELOUTPUTPATH is only
-% used in the icemodel_run script. ICEMODELINPUTPATH should point to input/
-% and ICEMODELDATAPATH should point to input/userdata/ )  
+setenv('ICEMODELUSERPATH','/Volumes/Samsung_T5b');
 
 % ----------------
 % MORE INFORMATION
@@ -86,6 +89,6 @@ setenv('ICEMODELUSERPATH','/Volumes/Samsung_T5b/');
 
 
  
-% setenv('ICEMODELDATAPATH', fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/eval/'));
-% setenv('ICEMODELINPUTPATH',fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/input/'));
+% setenv('ICEMODELDATAPATH',fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/eval'));
+% setenv('ICEMODELINPUTPATH',fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/input'));
 
