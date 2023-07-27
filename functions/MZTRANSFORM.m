@@ -1,6 +1,7 @@
 function [T,f_liq,f_ice,OK] = MZTRANSFORM(T,T_old,f_liq,f_wat,ro_liq,   ...
                               ro_wie,Tf,TL,TH,fcp,flmin,flmax,iM,OK)
-               
+%MZTRANSFORM melt zone transformation
+% 
 % this implements two numerical checks: 
 % 1) if a node within the melt zone exited the meltzone by more than 5% in
 % either direction, and 2) if any nodes skipped the melt zone, meaning a

@@ -1,20 +1,13 @@
-%--------------------------------------------------------------------------
-%   build control volume used for heat transfer
-%--------------------------------------------------------------------------
-
-function [  dz,                                                         ...
-            delz,                                                       ...
-            f_n,                                                        ...
-            gridz ]     =   CVTHERMAL(Z,dz)
-
-%--------------------------------------------------------------------------
+function [dz, delz, f_n, gridz] = CVTHERMAL(Z,dz)
+%CVTHERMAL build control volume used for heat transfer
+% 
 % JJ = internal temperature nodes / c.v.'s (5 in example below
 % JJ+1 = interfaces (6 in example below)
-
+% 
 % conductivity (gamma) is a function of T and is defined at T1, T2, ..., TN
 % k is the interface conductivity and is calculated from the values at T1,
 % T2, ..., TN using eq. 4.9. This puts k on the c.v. interfaces: 
-
+% 
 %  /////////
 %  ----o---- Tsfc ---       (upper boundary T = Tsfc, dy_pbc = 0, dely = 0) 
 % k1 .....         |        interface 1: k1 = k(T1) 
@@ -40,7 +33,7 @@ function [  dz,                                                         ...
 % k6 .....        dy_6 (JJ+1)
 %  ----o---- T6 (JJ+1)      lower boundary dT/dz = 0, dy_pbc = 0, dely = 0
 %  /////////
- 
+% 
 % Note that dy for the c.v.'s is constant but dy for the heat flux terms
 % includes a 1/2 c.v. at the top and bottom (dy_1 and dy_JJ+1)
 % with the upper and lower boundaries included the actual arrays will have

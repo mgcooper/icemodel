@@ -1,4 +1,5 @@
 function ice1 = SRFRUNOFF(ice1,ro_liq,Ls,Lf,dt)
+%SRFRUNOFF compute surface runoff
 
 % init arrays
    mlt      =  zeros(size(ice1.Qe));

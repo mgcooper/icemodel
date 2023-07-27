@@ -1,13 +1,9 @@
-%------------------------------------------------------------------------------
-%   SOLVE THE ENERGY BALANCE FOR SURFACE TEMPERATURE
-%------------------------------------------------------------------------------
-
 function [Tsfc,OK] = SFCTEMP(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,...
                      emiss,SB,Tf,Qc,xTsfc,chi,roL,scoef,fopts,liqflag)
-%------------------------------------------------------------------------------
+%SFCTEMP solve the energy balance for surface temperature
 
-%    debug =  false;
-%    dflag =  true;
+% debug =  false;
+% dflag =  true;
 
 % gather terms in the SEB equation. Note that if icond_flag == 0, Qc = 0
    AAA   =  cv_air * De;                           % [W m-2 K-1]
@@ -28,9 +24,8 @@ function [Tsfc,OK] = SFCTEMP(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,...
    B1    =  scoef(2)/(Tair*wspd^2);
    B2    =  scoef(3)/(sqrt(Tair)*wspd);
 
-%------------------------------------------------------------------------------
-% SOLVE
-%------------------------------------------------------------------------------
+
+   % SOLVE
    if liqflag == true
       % Over water.
       A     =  611.21;
@@ -146,9 +141,8 @@ function [Tsfc,OK] = SFCTEMP(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,...
    
 end
    
-%------------------------------------------------------------------------------
+
 % fzero
-%------------------------------------------------------------------------------
 function Tsfc = SFCTMPFSOLVE(EEE,AAA,FFF,CCC,Tair,ea,wspd,emiss,SB,Tf,  ...
                   xTsfc,scoef,fopts,liqflag,tryflag)
                   

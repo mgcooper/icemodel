@@ -1,4 +1,5 @@
 function [met,opts] = METINIT(opts, fileiter)
+%METINIT initialize the met file
 
 % The second input is the index into the metfile name list generated in setopts
 if nargin < 2

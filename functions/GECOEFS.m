@@ -1,10 +1,7 @@
-%------------------------------------------------------------------------------
-% get the general equation coefficients
-%------------------------------------------------------------------------------
 function [aN,aP,aS,b,iM] = GECOEFS(T,ro_sno,cp_sno,f_liq,f_ice,Ls,Lf,   ...
                            dz,dt,dFdT,drovdT,TL,H,H_old,Sc,k_eff,fn,    ...
                            delz,Tsfc,JJ)
-% was H1d_GETCOEFS_MZ
+%GECOEFS get the general equation coefficients
 
 % melt zone indices
    iM       = TL <= T;

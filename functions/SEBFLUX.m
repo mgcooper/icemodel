@@ -7,9 +7,8 @@ function [  Qe,                                                         ...
             balance] = SEBFLUX(T,Tair,Tsfc,Qsi,Qli,albedo,wspd,rh,Pa,   ...
                        Tf,k_eff,cv_air,roL,emiss,SB,epsilon,scoef,De,   ...
                        dz,liqflag,chi)
-
-% using the new top node temperature, compute a new surface flux
-                        
+%SEBFLUX using the new top node temperature, compute a new surface flux
+% 
 % Atmospheric vapor pressure from relative humidity data.
 % Compute the stability function.   
 % Compute the water vapor pressure at the surface.

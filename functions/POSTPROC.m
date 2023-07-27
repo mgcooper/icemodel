@@ -1,7 +1,8 @@
 function [ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts)
-
+%POSTPROC postprocess the simulation results
+% 
 % minimum required inputs:
-
+% 
 % ice1.Tsfc
 % ice2.Tice
 % ice2.f_liq

@@ -1,4 +1,5 @@
 function [radii,scattercoefs,solar,kabs,kice] = SPECINIT(opts)
+%SPECINIT initialize the spectral coefficients
 
 % The grain radii that can be used for the two-stream spectral model
     radii = [ 0.040, 0.050, 0.065, 0.080, 0.100, ...
