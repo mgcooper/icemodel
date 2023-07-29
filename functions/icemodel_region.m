@@ -1,19 +1,17 @@
-
 function [ice1,ice2] = icemodel_region(opts)
-   
-%--------------------------------------------------------------------------
-%   INITIALIZE THE MODEL
-%--------------------------------------------------------------------------
-   
-% load the physical constants to be used.
+%ICEMODEL 
+
+
+%% INITIALIZE THE MODEL
+
+%  LOAD THE PHYSICAL CONSTANTS
    load( 'PHYSCONS', 'cp_ice','cv_air','cv_liq','cv_ice','emiss',       ...
                      'SB','epsilon','fcp','k_liq','Lf','Ls','Lv',       ...
                      'ro_air','ro_ice','ro_liq','roLf','roLs','roLv',   ...
                      'Rv','Tf','TINY');
-                  
 
 %  LOAD THE FORCING DATA
-   [met,opts] = METINIT(opts);
+   [met, opts]  = METINIT(opts, 1);
                   
 %  INITIALIZE THE ICE COLUMN
 [  f_ice,                                                               ...
@@ -41,52 +39,44 @@ function [ice1,ice2] = icemodel_region(opts)
    ro_iwe,                                                              ...
    ro_wie,                                                              ...
    ice1,                                                                ...
-   ice2  ]    =  ICEINIT(opts,met);
+   ice2  ]        =  ICEINIT(opts,met);
 
+   % % init output arrays - for region
+   % df_liq      =  nan(JJ_therm,maxiter);
+   % frac_ice    =  nan(JJ_therm,maxiter);
+   % frac_liq    =  nan(JJ_therm,maxiter);
+   % T_ice       =  nan(JJ_therm,maxiter);
+   % T_sfc       =  nan(maxiter,1);
 
-% % init output arrays - for region
-%    df_liq      =  nan(JJ_therm,maxiter);
-%    frac_ice    =  nan(JJ_therm,maxiter);
-%    frac_liq    =  nan(JJ_therm,maxiter);
-%    T_ice       =  nan(JJ_therm,maxiter);
-%    T_sfc       =  nan(maxiter,1);
-   
-%--------------------------------------------------------------------------
-%   INITIALIZE THE EXTINCTION COEFFICIENTS
-%--------------------------------------------------------------------------
+%  INITIALIZE THE EXTINCTION COEFFICIENTS
+[  radii,                                                               ...
+   scattercoefs,                                                        ...
+   solar,                                                               ...
+   kabs,                                                                ...
+   kice  ]        =  SPECINIT(opts);
 
-% load the spectral mie values, solar spectrum, and abs. coefficients
-[  radii,                                                            ...
-   scattercoefs,                                                     ...
-   solar,                                                            ...
-   kabs,                                                             ...
-   kice    ]         =     SPECINIT(opts);
-   
-% Initialize the extinction coefficients that control the solar radiation
-%   source term within the snow/ice matrix.
 [  total_solar,                                                         ...
    grid_spect,                                                          ...
    z_walls,                                                             ...
    spect_lower,                                                         ...
    spect_upper,                                                         ...
-   solardwavl  ]     =     EXTCOEFSINIT(opts,radii,scattercoefs,        ...
-                           solar,kabs,kice,dz_spect,JJ_spect,ro_ice);
+   solardwavl  ]  =  EXTCOEFSINIT(opts,radii,scattercoefs,              ...
+                     solar,kabs,kice,dz_spect,JJ_spect,ro_ice);
 
    clear radii scattercoefs solar
-%--------------------------------------------------------------------------
-%   START THE MODEL
-%--------------------------------------------------------------------------
-   
-   % extract struct values that are used frequently
+
+%  INITIALIZE TIMESTEPPING
    dt          =  opts.dt;
    fopts       =  opts.fzero;
-   f_min       =  opts.f_ice_min;
    nloops      =  opts.annual_loops;
    simyears    =  opts.simyears;
    
-%--------------------------------------------------------------------------
-% substepping settings
-%--------------------------------------------------------------------------
+   if nloops > 1
+      simyears = [repmat(simyears(1),nloops,1) simyears(2:end)];
+   end
+   numyears    =  numel(simyears);
+   
+%  INITIALIZE SUBSTEPPING
    maxiter     =  opts.maxiter;
    maxsubiter  =  200;
    minsubiter  =  1;
@@ -96,26 +86,19 @@ function [ice1,ice2] = icemodel_region(opts)
    iter        =  1;
    subiter     =  1;
 
-% we need these on the first iteration, they are updated after each substep
-   Tsfc        =  T(1);
+%  INITIALIZE STATE VARIABLES AND PARAMETERS NEEDED ON FIRST ITERATION
+   xTsfc       =  T(1);
    xf_liq      =  f_liq;
-   xTsfc       =  Tsfc;
    roL         =  roLs;
    liqflag     =  false;
+   f_min       =  opts.f_ice_min;
    Qc          =  CONDUCT(k_eff,T,dz,xTsfc);
 
-   
-if nloops > 1
-   simyears = [repmat(simyears(1),nloops,1) simyears(2:end)];
-end
-
-numyears = numel(simyears);
-
-% for testing
+%% START ITERATIONS OVER YEARS
 for MM = 1:numyears
    
    % set the output folder and load the met data
-   pathout = fullfile(opts.path.output,int2str(simyears(MM)));
+   pathout = fullfile(opts.pathoutput,int2str(simyears(MM)));
    
    t1    = datetime(simyears(MM),1,1,0,0,0,'TimeZone','UTC');
    t2    = datetime(simyears(MM),12,31,23,45,0,'TimeZone','UTC');
@@ -124,6 +107,8 @@ for MM = 1:numyears
 
 %--------------------------------------------------------------------------
 %--------------------------------------------------------------------------
+   
+   d_err = 0.0;
    
    while iter <= maxiter
    
@@ -165,8 +150,13 @@ for MM = 1:numyears
    while OK == false || dt_sum < dt
 
 % SURFACE TEMPERATURE
-   [  Tsfc  ]  =  SFCTEMP(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,     ...
+   [  Tsfc  ]  =  SEBSOLVE(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,     ...
                   emiss,SB,Tf,Qc,xTsfc,chi,roL,scoef,fopts,liqflag,metiter);
+   
+%    if Tflag == false
+%       fprintf('iter = %d (%.2f%%), dt = %.0f, Tsfc not converged\n',            ...
+%          iter,100*iter/maxiter,dt_new)
+%    end
 
 % SUBSURFACE ENERGY BALANCE
    [  T,                                                                ...
@@ -204,10 +194,12 @@ for MM = 1:numyears
          f_ice,                                                         ...
          f_liq,                                                         ...
          d_liq,                                                         ...
-         d_drn ]  =  ICEMF(T,f_ice,f_liq,ro_ice,ro_liq,cp_ice,Lf,Ls,    ...
+         d_drn,                                                         ...
+         x_err ]  =  ICEMF(T,f_ice,f_liq,ro_ice,ro_liq,cp_ice,Lf,Ls,    ...
                      Lv,Tf,TL,fcp,xf_liq,Sc,Sp,JJ_therm,f_min,fopts,    ...
-                     dz_therm,dt_new,Qe,liqflag,ro_iwe,d_liq,d_drn);
-                        
+                     dz_therm,dt_new,Qe,liqflag,ro_iwe,d_liq,d_drn,     ...
+                     flmin,metiter);
+
       % update density (kg/m3), heat capacity (J/kg/K), thermal K (W/m/K)
          ro_sno = f_ice.*ro_ice+f_liq.*ro_liq+(1.0-f_liq-f_ice).*ro_air;
          cp_sno = (cv_ice.*f_ice+cv_liq.*f_liq)./ro_sno;
@@ -250,6 +242,8 @@ for MM = 1:numyears
       dt_new = dt_max/subiter;
    end
 
+   d_err = d_err + x_err;
+   
    %% Save the output
 
    % NEED TO GO BACK TO ARRAYS SO THEY CAN BE WRITTEN OVER EACH YEAR or USE
@@ -312,10 +306,12 @@ for MM = 1:numyears
   %[ice1,ice2] = POSTPROC3(enbal,ice2,Time,opts);
   %[ice1,ice2] = POSTPROC2(T_sfc,T_ice,frac_ice,frac_liq,df_liq,Time,opts);
 
+   fprintf('err, %d, %.10f\n', simyears(MM), d_err)
+   
    % save the data
    if opts.savedata == true
-      save(fullfile(pathout,['ice1_' int2str(opts.ipt)]),'ice1','-v7.3');
-      save(fullfile(pathout,['ice2_' int2str(opts.ipt)]),'ice2','-v7.3');
+      save(fullfile(pathout, ['ice1_' int2str(opts.ipt)]), 'ice1', '-v7.3');
+      save(fullfile(pathout, ['ice2_' int2str(opts.ipt)]), 'ice2', '-v7.3');
    end
    
    % restart the counters
