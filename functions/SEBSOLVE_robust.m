@@ -15,6 +15,7 @@ fSEB = @(Tsfc) EEE - emiss*SB.*Tsfc.^4 + ...
 
 if isnan(a)
    try
+      % this might return NaN during spinup (doesn't catch), see check at end
       Tsfc = fzero(fSEB,xTsfc,fopts);
    catch
       Tsfc = min(Tair,Tf);

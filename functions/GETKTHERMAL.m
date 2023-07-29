@@ -37,7 +37,7 @@ switch opts.kthermal
       b        =   1.23e-4;
       c        =   0.024;
       ksnow    =   a.*gam_ice.^2 - b.*gam_ice + c;
-      ksnow    =   roundn(ksnow,-3);
+      ksnow    =   round(ksnow, 3);
       % kcal   =   0.024 - 1.23*10^(-4).*ro_s + 2.5*10^-6 .* ro_s.^2
 
       % van Dusen, 1929 (lower limit)

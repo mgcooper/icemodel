@@ -32,9 +32,71 @@ B1    =  scoef(2)/(Tair*wspd^2);
 B2    =  scoef(3)/(sqrt(Tair)*wspd);
 
 % % TEST    
-Tsfc = SEBSOLVE(EEE,AAA,FFF,CCC,Tair,ea,wspd,emiss,SB,Tf,...
+Tsfc = SEBSOLVE_SUB(EEE,AAA,FFF,CCC,Tair,ea,wspd,emiss,SB,Tf,...
                xTsfc,scoef,fopts,liqflag,metiter);
+
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+% moved SEBSOLVE here to preserve the first cut test of fzero-brent, then moved
+% everything needed for one function call to SEBSOLVE and replaced call to
+% SFCTEMP in main to SEBSOLVE. UPDATE - although everything above is accurate,
+% I thought this function preserved the old call to SOLVE follwed by the
+% try-catch if SOLVE failed without any fzero_brent, but the try-catch has
+% brent, so that must hvae been the first cut, either way, I can still use this
+% to compare the call to SOLVe first to without it, and could revert the
+% try-catch to not sue brent pretty easily. BUT AFTER TESTING this appears to be
+% broken, 
+% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+
+function Tsfc = SEBSOLVE_SUB(EEE,AAA,FFF,CCC,Tair,ea,wspd,emiss,SB,Tf,...
+                  xTsfc,scoef,fopts,liqflag,metiter)
+
+Sfnc = @STABLEFN;
+Vfnc = @VAPOR;
+fSEB = @(Tsfc) EEE - emiss*SB.*Tsfc.^4 + ...
+   AAA.*Sfnc(Tair,Tsfc,wspd,scoef).*(Tair-Tsfc) + ...
+   FFF.*CCC.*Sfnc(Tair,Tsfc,wspd,scoef) .* ...
+   (ea-Vfnc(Tsfc,Tf,liqflag));
+
+% find the region with zero crossing
+[a,b] = fzero_guess_to_bounds(fSEB, xTsfc, xTsfc-50, xTsfc+50);
+
+if isnan(a)
+   Tsfc = min(Tair,Tf); % 1 May 2023 added min
+else
+   Tsfc = fzero_brent(fSEB, a, b, fopts.TolX);
+   % Tsfc = fzero(fSEB,[a b],fopts);
+end
+
+%% more robust 
+
+% % find the region with zero crossing
+% a = nan;
+% iter = 0;
+% while isnan(a) && iter<15 % stop at +/- 120K
+%    iter = iter+1;
+%    [a,b] = fzero_guess_to_bounds(fSEB,xTsfc,[xTsfc-(45+5*iter) xTsfc+(45+5*iter)]);
+% end
 % 
+% if isnan(a)
+% %    try
+% %       Tsfc = fzero(fSEB,xTsfc); % try unconstrained (not during spinup though)
+% %    catch ME
+%       Tsfc = Tair;
+% %    end
+% else
+%    Tsfc = fzero_brent(fSEB,[a b],fopts.TolX);
+%    % Tsfc = fzero(fSEB,[a b],fopts);
+% end
+
+% % this should only occur during spinup, and only if built-in fzero is used
+% if isnan(Tsfc)
+%    Tsfc = Tair;
+% end
+
+% % % % % % % % % % % % % % % % % % % % % % 
+% BELOW HERE ORIGINAL SOLVE METHOD
+% % % % % % % % % % % % % % % % % % % % % % 
+
 % %------------------------------------------------------------------------------
 % % SOLVE
 % %------------------------------------------------------------------------------

@@ -133,7 +133,7 @@ function [  Sc,                                                         ...
 %   Transform the pentrating radiation back to the thermal grid as dQ
    % extrapolate xynet to the bottom of the thermal grid
    M3             =  JJ_therm*dz_therm/dz_spect;
-   M4             =  roundn(M3-M,0);
+   M4             =  round(M3-M,0);
    dxy            =  xynet(M)-xynet(M-1);
    xyextrap       =  zeros(M4,1);
    xyextrap(1)    =  xynet(M) + dxy;

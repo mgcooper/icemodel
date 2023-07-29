@@ -6,7 +6,7 @@ function dQp   =  GRIDINVERSE(xynet,dz_spect,dz_therm,JJ_spect,JJ_therm)
 
 % extrapolate xynet to the bottom of the thermal grid
    JJnew             =  JJ_therm*dz_therm/dz_spect;
-   JJext             =  roundn(JJnew-JJ_spect,0);
+   JJext             =  round(JJnew-JJ_spect, 0);
    dxy               =  xynet(JJ_spect)-xynet(JJ_spect-1);
    xyextrap          =  zeros(JJext,1);
    xyextrap(1)       =  xynet(JJ_spect) + dxy;
