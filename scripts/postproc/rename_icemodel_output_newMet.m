@@ -102,8 +102,10 @@ for m = 3:nyrs
       end
 
       % create old and new file names
-      fold = [pathold 'icemodel/' albedo '/' num2str(years(m)) '/ice1_' num2str(idxold) '.mat'];
-      fnew = [pathnew 'icemodel/' albedo '/' num2str(years(m)) '/ice1_' num2str(idxnew) '.mat'];
+      fold = ['ice1_' num2str(idxold) '.mat'];
+      fnew = ['ice1_' num2str(idxnew) '.mat'];
+      fold = fullfile(pathold, 'icemodel', albedo, num2str(years(m)), fold);
+      fnew = fullfile(pathnew, 'icemodel', albedo, num2str(years(m)), fnew);
 
       % check if the new file already exists - should be 10 of them
       if exist(fnew,'file')
@@ -118,8 +120,10 @@ for m = 3:nyrs
       end
 
       % repeat for ice2
-      fold = [pathold 'icemodel/' albedo '/' num2str(years(m)) '/ice2_' num2str(idxold) '.mat'];
-      fnew = [pathnew 'icemodel/' albedo '/' num2str(years(m)) '/ice2_' num2str(idxnew) '.mat'];
+      fold = ['ice2_' num2str(idxold) '.mat'];
+      fnew = ['ice2_' num2str(idxnew) '.mat'];
+      fold = fullfile(pathold, 'icemodel', albedo, num2str(years(m)), fold);
+      fnew = fullfile(pathnew, 'icemodel', albedo, num2str(years(m)), fnew);
 
       if movedata == true
          cmd = ['rsync -a --remove-source-files ' fold ' ' fnew];

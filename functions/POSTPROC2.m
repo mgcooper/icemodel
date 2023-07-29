@@ -3,10 +3,10 @@ function [ice1,ice2] = POSTPROC2(ice1,ice2,Time,opts)
 % load physical constants   
 load('PHYSCONS','Tf','ro_liq','Ls','Lf');
 
-% compute melt,freeze, and runoff
-if opts.skinmodel == true
+% calculate surface and subsurface runoff
+if strcmp('skinmodel', opts.simmodel)
    ice1 = SRFRUNOFF(ice1,ro_liq,Ls,Lf,opts.dt);
-else
+elseif strcmp('icemodel', opts.simmodel)
    ice1 = ICERUNOFF(ice1,ice2,opts);
 end
 
@@ -21,18 +21,18 @@ ice1 = table2timetable(ice1,'RowTimes',Time);
 % Retime to hourly
 if opts.dt == 900
    
-   ice1 = retime(ice1,'hourly','mean');
-   ice1 = rmleapinds(ice1);
-   
+   ice1  = retime(ice1,'hourly','mean');
+   feb29 = month(ice1.Time) == 2 & day(ice1.Time) == 29;
+   ice1  = ice1(~feb29,:);
+
    % init tmp arrays to retime ice2
    tmp.Tice = nan(size(ice2.Tice,1),numel(ice1.Time));
 
-   if opts.icemodel == true
+   if strcmp('icemodel', opts.simmodel)
       tmp.df_liq = nan(size(ice2.df_liq,1),numel(ice1.Time));
       tmp.f_ice = nan(size(ice2.f_ice,1),numel(ice1.Time));
       tmp.f_liq = nan(size(ice2.f_liq,1),numel(ice1.Time));
    end
-
 
    for n = 1:numel(ice1.Time)
 
@@ -42,7 +42,7 @@ if opts.dt == 900
 
       tmp.Tice(:,n) = mean(ice2.Tice(:,i1:i2),2);
 
-      if opts.icemodel == true
+      if strcmp('icemodel', opts.simmodel)
          tmp.df_liq(:,n) = sum(ice2.df_liq(:,i1:i2),2);
          tmp.f_liq(:,n) = mean(ice2.f_liq(:,i1:i2),2);
          tmp.f_ice(:,n) = mean(ice2.f_ice(:,i1:i2),2);
@@ -54,16 +54,17 @@ if opts.dt == 900
 end
 
 % round. this should be faster than the two options below
-ice2.Tice = round(ice2.Tice,3);
 ice1.Tsfc = round(ice1.Tsfc,5);
 ice1.melt = round(ice1.melt,5);
-ice1.runoff = round(ice1.runoff,5);
 ice1.freeze = round(ice1.freeze,5);
+ice1.runoff = round(ice1.runoff,5);
 
-if opts.icemodel == true
-   ice2.df_liq = round(ice2.df_liq,8);
+ice2.Tice = round(ice2.Tice,3);
+
+if strcmp('icemodel', opts.simmodel)
    ice2.f_ice = round(ice2.f_ice,5);
    ice2.f_liq = round(ice2.f_liq,5);
+   ice2.df_liq = round(ice2.df_liq,8);
 end
 
 if isfield(ice1,'drain')
@@ -72,9 +73,9 @@ end
 
 
 % Retime ice2 to hourly and round the data
-% fields         = fieldnames(ice2);
-% oldtime        = dates;
-% newtime        = ice1.Time;
+% fields = fieldnames(ice2);
+% oldtime = dates;
+% newtime = ice1.Time;
 
 % for mm = 1:numel(fields)
 % 
