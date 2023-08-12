@@ -1,0 +1,36 @@
+{
+   "_schemaVersion": "1.0.0",
+   "icemodel.completions":
+   {
+      "inputs": 
+      [
+         {"name":"funcname", "type":["choices=icemodel.completions('completions')"]}
+      ],
+      "outputs":
+      [
+         {"name":"proplist", "type":["cell"]}
+      ]
+   },   
+   "icemodel.cvconvert":
+   {
+      "inputs":
+      [
+         {"name":"convertFrom", "kind":"required", "type":["choices=icemodel.completions('cvconvert')"]},
+         {"name":"convertTo", "kind":"required", "type":["choices=icemodel.completions('cvconvert')"]},
+         {"name":"CV", "kind":"required", "type":[["numeric", "scalar"],["numeric", "2d"]]},
+         {"name":"constants", "kind":"required", "type":[["numeric", "scalar"],["numeric", "2d"]]},
+         {"name":"varargin", "kind":"required", "repeating":true, "type":["numeric", "vector"]}
+      ]
+   },
+   "icemodel.physicalConstant":
+   {
+      "inputs":
+      [
+         {"name":"name", "kind":"required", "repeating":true, "type":["choices=icemodel.completions('physicalConstant')"]}
+      ],
+      "outputs":
+      [
+         {"name":"value", "repeating":true, "type":["double", "scalar"]}
+      ]
+   }
+}
