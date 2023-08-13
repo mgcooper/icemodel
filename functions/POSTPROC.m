@@ -1,4 +1,4 @@
-function [ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts)
+function [ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts) %#codegen
 
 % minimum required inputs:
 
@@ -9,8 +9,9 @@ function [ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts)
 % ice2.Sc
 
 % load physical constants
-load('PHYSCONS','Tf','emissSB','cv_ice','cv_liq','ro_ice','ro_liq',  ...
-   'ro_air','k_liq','Ls','Lf','Rv','emiss');
+[Tf,emissSB,cv_ice,cv_liq,ro_ice,ro_liq,ro_air,k_liq,Ls,Lf,Rv,emiss] = ...
+   icemodel.physicalConstant('Tf','emissSB','cv_ice','cv_liq','ro_ice', ...
+   'ro_liq','ro_air','k_liq','Ls','Lf','Rv','emiss');
 
 % anything we want at the 15 min timestep can be added to diags
 %diags.Time = met.Time;
@@ -88,6 +89,13 @@ ice1 = struct2table(ice1);
 ice1 = table2timetable(ice1,'RowTimes',time);
 ice1 = retime(ice1,'hourly','mean');
 met  = retime(met,'hourly','mean');
+
+% TODO: put the retiming in an if-else, but to do that, need to separate the
+% retiming from the rounding, see POSTPROC2
+% if opts.dt == 900
+%    ice1 = retime(ice1,'hourly','mean');
+%    met  = retime(met,'hourly','mean');
+% end
 
 % Retime ice2 to hourly and round the data
 sfields = fieldnames(ice2);

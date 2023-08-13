@@ -1,4 +1,4 @@
-function [dFdT,f_wat] = FREEZECURVE(T,f_liq,f_ice,ro_iwe,Tf,fcp)
+function [dFdT,f_wat] = FREEZECURVE(T,f_liq,f_ice,ro_iwe,Tf,fcp) %#codegen
 
     Tdep    = Tf-min(T,Tf);
 %   dFdT    = 2.0.*Tdep.*fcp.^2.0./(1.0+(fcp.*Tdep).^2.0).^2.0;

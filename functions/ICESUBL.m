@@ -1,5 +1,5 @@
 function [f_ice, f_liq, d_drn, xsubl] = ICESUBL(f_ice, f_liq, d_drn, ro_ice, ...
-   ro_liq, Ls, Lv, f_ice_min, f_liq_min, dz_therm, dt_new, Qe, liqflag, metiter)
+   ro_liq, Ls, Lv, f_ice_min, f_liq_min, dz_therm, dt_new, Qe, liqflag)
 %SUBL compute ice sublimation from top layer control volume
 % 
 % f_ice = fraction of ice by volume in each control volume
@@ -11,6 +11,8 @@ function [f_ice, f_liq, d_drn, xsubl] = ICESUBL(f_ice, f_liq, d_drn, ro_ice, ...
 % not sure about liqflag and f_liq_min because liqflag means f_liq>0.02, so once
 % f_liq gets below that, no evaporation will occur, also, condensation should be
 % able to occur when liqflag is false
+% 
+%#codegen
 
 % potential evaporation
 pevap = Qe/(Lv*ro_liq)*dt_new/dz_therm;
@@ -38,7 +40,9 @@ if liqflag == true || pevap > 0
       if f_liq_top < f_liq_min % f_liq_top - f_liq_min < 0
          % only residual water exists, send pevap to SUBL
          xevap = pevap;
-         fprintf('metiter = %d, f_liq(1) < f_liq_min\n',metiter)
+         
+         % add metiter as an input to use this but it never triggered in tests
+         %fprintf('metiter = %d, f_liq(1) < f_liq_min\n',metiter)
          
       elseif abs(pevap) <= (f_liq_top - f_liq_min)
          % some water evaporates
