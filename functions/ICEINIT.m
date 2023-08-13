@@ -21,18 +21,25 @@ function [  f_ice,                                                      ...
             JJ_spect,                                                   ...
             Sc,                                                         ...
             Sp,                                                         ...
-            wcoef,                                                      ...
             scoef,                                                      ...
             ro_sno,                                                     ...
             ro_iwe,                                                     ...
             ro_wie,                                                     ...
+            xTsfc,                                                      ...
+            xf_liq,                                                     ...
+            roL,                                                        ...
+            Qc,                                                         ...
+            f_min,                                                      ...
+            fopts,                                                      ...
+            liqflag,                                                    ... 
             ice1,                                                       ...
-            ice2  ]   =   ICEINIT(opts,met)
+            ice2  ]   =   ICEINIT(opts, tair) %#codegen
 %--------------------------------------------------------------------------
 
-% load the physical constants to be used.
-   load('PHYSCONS','cp_ice','cp_liq','fcp','kappa','Lf','ro_ice',       ...
-      'ro_air','ro_liq','k_liq','Tf','Ls','Rv');
+   % load the physical constants.
+   [cp_ice,cp_liq,fcp,kappa,Lf,ro_ice,ro_air,ro_liq,k_liq,Tf,Ls,Rv,roLs] = ...
+      icemodel.physicalConstant('cp_ice','cp_liq','fcp','kappa','Lf', ...
+      'ro_ice','ro_air','ro_liq','k_liq','Tf','Ls','Rv','roLs');
 
    % pull out anything in opts used below
 
@@ -69,7 +76,7 @@ function [  f_ice,                                                      ...
 %       T        =  (met.tair(1)-1).*ones(JJ_therm,1);
 %    end
 
-   T        =  (met.tair(1)-1).*ones(JJ_therm,1);
+   T        =  (tair(1)-1).*ones(JJ_therm,1);
 
    % Init liquid/ice water fraction, bulk densities, and aP coeff
    Tdep        =  Tf-T(:,1);                       % [K]
@@ -95,6 +102,7 @@ function [  f_ice,                                                      ...
    z_obs       =  opts.z_obs;
    z_0         =  opts.z_0;
    wcoef       =  (kappa/log(z_obs/z_0))^2;        % wind transfer coef
+   scoef       =  nan(1, 3);
    scoef(1)    =  5.3*9.4*wcoef*sqrt(z_obs/z_0);   % gamma Eq. A15
    scoef(2)    =  9.4*9.81*z_obs;                  % 9.81=gravity
    scoef(3)    =  scoef(1)*sqrt(9.81*z_obs);
@@ -104,8 +112,18 @@ function [  f_ice,                                                      ...
    Sc          =  zeros(JJ_therm,1);
    Sp          =  zeros(JJ_therm,1);
 
+   % initialize state variables and parameters needed on the first iteration
+   xTsfc       =  T(1);
+   xf_liq      =  f_liq;
+   roL         =  roLs;
+   liqflag     =  false;
+   Qc          =  CONDUCT(k_eff,T,dz,xTsfc);
+   % zD        =  sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
+   fopts       =  opts.fzero;
+   f_min       =  opts.f_ice_min;
+
 % Initialize the output structures
-if opts.sitename == "region"
+if opts.sitename == "sector"
    ice1.Tsfc         = nan(maxiter,1);
    ice2.Tice         = nan(JJ_therm,maxiter);
    ice2.f_ice        = nan(JJ_therm,maxiter);
@@ -113,17 +131,16 @@ if opts.sitename == "region"
    ice2.df_liq       = nan(JJ_therm,maxiter);
 else
    ice1.Tsfc        = nan(maxiter,1);
-   ice1.Qle         = nan(maxiter,1);
-   ice1.Qh          = nan(maxiter,1);
-   ice1.Qe          = nan(maxiter,1);
-   ice1.Qc          = nan(maxiter,1);
    ice1.Qm          = nan(maxiter,1);
    ice1.Qf          = nan(maxiter,1);
+   ice1.Qe          = nan(maxiter,1);
+   ice1.Qh          = nan(maxiter,1);
+   ice1.Qc          = nan(maxiter,1);
    ice1.chi         = nan(maxiter,1);
    ice1.balance     = nan(maxiter,1);
    ice1.dt          = nan(maxiter,1);
    ice1.zD          = nan(maxiter,1);
-   
+
    % Save the vertical ice column data   
    ice2.Tice         = nan(JJ_therm,maxiter);
    ice2.f_ice        = nan(JJ_therm,maxiter);
@@ -133,9 +150,9 @@ else
    ice2.errT         = nan(JJ_therm,maxiter);
    ice2.df_liq       = nan(JJ_therm,maxiter);
    ice2.df_drn       = nan(JJ_therm,maxiter);
-   
-%    diags.Tflag       = false(maxiter,1);
-%    diags.LCflag      = false(maxiter,1);
+   ice2.df_evp       = nan(JJ_therm,maxiter);
+   % diags.Tflag       = false(maxiter,1);
+   % diags.LCflag      = false(maxiter,1);
 end
    
 %    % test

@@ -1,13 +1,15 @@
 function [ice1,ice2] = POSTPROC2(ice1,ice2,Time,opts)
 
-% load physical constants   
-load('PHYSCONS','Tf','ro_liq','Ls','Lf');
+% This is for the sector runs
+
+% load physical constants
+[Tf,ro_liq,Ls,Lf] = icemodel.physicalConstant('Tf','ro_liq','Ls','Lf');
 
 % calculate surface and subsurface runoff
 if strcmp('skinmodel', opts.simmodel)
-   ice1 = SRFRUNOFF(ice1,ro_liq,Ls,Lf,opts.dt);
+   ice1 = SRFRUNOFF(ice1, ro_liq, Ls, Lf, opts.dt);
 elseif strcmp('icemodel', opts.simmodel)
-   ice1 = ICERUNOFF(ice1,ice2,opts);
+   ice1 = ICERUNOFF(ice1, ice2, opts);
 end
 
 % convert temperature to celsius

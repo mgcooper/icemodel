@@ -29,7 +29,7 @@ ice2.df_evp(:,iter)     =  d_evp;
 ice2.Sc(:,iter)         =  Sc;            % source term
 ice2.errH(:,iter)       =  errH;          % enthalpy error
 ice2.errT(:,iter)       =  errT;          % temperature error
-
+         
 % save the diagnostic data
 % diags.Tflag(iter,1)     =  Tflag;
 % diags.LCflag(iter,1)    =  LCflag(1);

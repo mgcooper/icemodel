@@ -1,4 +1,4 @@
-function [met,opts] = METINIT(opts, fileiter)
+function [met,opts] = METINIT(opts, fileiter) %#codegen
 
 % The second input is the index into the metfile name list generated in setopts
 if nargin < 2
@@ -6,7 +6,8 @@ if nargin < 2
 end
 
 % load the met file
-load(opts.metfname{fileiter}, 'met')
+met = load(opts.metfname{fileiter}, 'met');
+met = met.met;
 
 if strcmp('sector', opts.sitename)
    
@@ -20,6 +21,9 @@ else
    
    [met, opts] = processMetData(met, opts);
 end
+
+% compute the wind speed transfer coefficient 
+met.De = WINDCOEF(met.wspd, opts.z_0, opts.z_obs);
 
 %% 
 function [met, opts] = processMetData(met, opts)
@@ -37,16 +41,22 @@ met = met(ismember(year(met.Time), opts.simyears), :);
 opts.maxiter = size(met, 1)/opts.numyears;
 opts.dt = seconds(met.Time(2)-met.Time(1));
 
-% check for bad albedo data
-bi = met.modis <= 0 | met.modis >= 1;
-if sum(bi) > 0
-   met.modis(bi) = met.albedo(bi);
-   warning('bad albedo')
-end
+% check for bad modis data before swapping out default albedo for modis
+varmodis = {'modis', 'MODIS'};
+hasmodis = ismember(varmodis, met.Properties.VariableNames);
+if any(hasmodis)
+   bi = met.(varmodis{hasmodis}) <= 0 | met.(varmodis{hasmodis}) >= 1;
+   if sum(bi) > 0
+      met.(varmodis{hasmodis})(bi) = met.albedo(bi);
+      warning('bad albedo')
+   end
 
-% swap out chosen forcing data albedo for modis albedo
-if strcmp('modis', opts.userdata)
-   met.albedo = met.modis;
+   % % THIS IS WHERE THE SECTOR-RUNS WERE SWAPPED, REACTIVATE IF RECONCILING
+   % DOESN'T WORK
+   % % swap out chosen forcing data albedo for modis albedo
+   % if strcmp('modis', opts.userdata)
+   %    met.albedo = met.modis;
+   % end
 end
 
 met.Time.TimeZone = 'UTC';
@@ -64,7 +74,8 @@ simyears = num2str(opts.simyears(1));
 userfile = [opts.userdata '_' opts.sitename '_' simyears '.mat'];
 
 if isfile(fullfile(opts.userpath, userfile))
-   load(fullfile(opts.userpath, userfile), 'Data');
+   Data = load(fullfile(opts.userpath, userfile), 'Data');
+   Data = Data.Data;
 else
    error('userdata file does not exist');
 end

@@ -1,53 +1,28 @@
-function Tsfc = SEBSOLVE(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,...
-   emiss,SB,Tf,Qc,xTsfc,chi,roL,scoef,fopts,liqflag,metiter)
+function Tsfc = SEBSOLVE(Tair,Qsi,Qli,albedo,wspd,Pa,De,ea,cv_air,...
+   emiss,SB,Tf,Qc,xTsfc,chi,roL,scoef,fopts,liqflag)
 %SEBSOLVE solve the surface energy balance for the skin temperature
 
-debug = false;
-dflag = true;
+% Gather terms in the SEB equation.
+fSEB = @(Tsfc) chi*(1.0-albedo)*Qsi + emiss*Qli + Qc - emiss*SB.*Tsfc.^4 + ...
+   cv_air*De.*STABLEFN(Tair,Tsfc,wspd,scoef).*(Tair-Tsfc) + ...
+   roL*De.*0.622/Pa.*STABLEFN(Tair,Tsfc,wspd,scoef) .* ...
+   (ea-VAPOR(Tsfc,Tf,liqflag));
 
-% gather terms in the SEB equation. Note that if icond_flag == 0, Qc = 0
-AAA = cv_air * De;                           % [W m-2 K-1]
-CCC = 0.622 / Pa;                            % [Pa-1] = [m3 J-1]
-EEE = chi*(1.0-albedo)*Qsi + emiss*Qli + Qc; % [W m-2]
-FFF = roL * De;                              % [W m-2]
-
-% these replace the block above
-B1 = scoef(2)/(Tair*wspd^2);
-B2 = scoef(3)/(sqrt(Tair)*wspd);
-
-Sfnc = @STABLEFN;
-Vfnc = @VAPOR;
-fSEB = @(Tsfc) EEE - emiss*SB.*Tsfc.^4 + ...
-   AAA.*Sfnc(Tair,Tsfc,wspd,scoef).*(Tair-Tsfc) + ...
-   FFF.*CCC.*Sfnc(Tair,Tsfc,wspd,scoef) .* ...
-   (ea-Vfnc(Tsfc,Tf,liqflag));
-
-% find the region with zero crossing
+% Find the region with zero crossing
 [a,b] = fzero_guess_to_bounds(fSEB, xTsfc, xTsfc-50, xTsfc+50);
 
 if isnan(a)
-   %try
-      % this might return NaN during spinup (doesn't catch), see check at end,
-      % but don't use for now, need method to deal with spinup when xTsfc-Tsfc
-      % is very large and leads to bad solution
-   %   Tsfc = fzero(fSEB,xTsfc,fopts);
-   %catch
-      % Tsfc = Tair;
-      Tsfc = min(Tair,Tf);
-   %end
+   Tsfc = min(Tair,Tf);
 else
    try
       Tsfc = fzero_brent(fSEB, a, b, fopts.TolX);
    catch
-      % fallback to fsolve
       try
          Tsfc = fzero(fSEB,[a b],fopts);
       catch
-         % fallback to secant method (or fsolve? )
          try
             Tsfc = fzero_secant(fSEB, a, b, fopts.TolX);
          catch
-            % Tsfc = Tair; % set to air temperature if all methods fail
             Tsfc = min(Tair,Tf);
          end
       end
@@ -56,11 +31,10 @@ end
 
 % This should only occur during spinup, and only if built-in fzero is used
 if isnan(Tsfc)
-   Tsfc = min(Tair,Tf);
-   % Tsfc = Tair;
+   Tsfc = Tair;
 end
 
-
+%% Secant method
 function [root, iter] = fzero_secant(f, a, b, tol,varargin)
 iter = 0;
 max_iter = 2000;
@@ -77,6 +51,7 @@ while iter < max_iter
 end
 root = c;
 
+%% Brent's method
 function b = fzero_brent(f, a, b, tol, varargin)
 %FZERO_BRENT  Find a root of a univariate function within a given interval
 %             using Brent's method
@@ -251,6 +226,7 @@ while ( true )
 
 end
 
+%% Bound search
 function [a, b] = fzero_guess_to_bounds(f, x, A, B, varargin)
 %FZERO_GUESS_TO_BOUNDS  Search for a sign change bounding a zero of a
 %                       univariate function, expanding geometrically
@@ -318,28 +294,28 @@ function [a, b] = fzero_guess_to_bounds(f, x, A, B, varargin)
 sqrttwo = 1.414213562373095;
 
 
-if nargin >= 4 && isscalar(A) && isscalar(B)
+if nargin >= 4 % && isscalar(A) && isscalar(B)
 
-   % Handle bad inputs
-   if isnan(A) || isnan(B) || isnan(x)
-      a = nan;
-      b = nan;
-      return
-   end
-
-   fa = f(A, varargin{:});
-   if fa == 0
-      a = A;
-      b = A;
-      return
-   end
-
-   fb = f(B, varargin{:});
-   if fb == 0
-      a = B;
-      b = B;
-      return
-   end
+   % % Handle bad inputs
+   % if isnan(A) || isnan(B) || isnan(x)
+   %    a = nan;
+   %    b = nan;
+   %    return
+   % end
+   % 
+   % fa = f(A, varargin{:});
+   % if fa == 0
+   %    a = A;
+   %    b = A;
+   %    return
+   % end
+   % 
+   % fb = f(B, varargin{:});
+   % if fb == 0
+   %    a = B;
+   %    b = B;
+   %    return
+   % end
 
    x = min(max(x, A), B);
 

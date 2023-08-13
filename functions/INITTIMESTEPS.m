@@ -1,5 +1,5 @@
 function [iter, subiter, itime, maxiter, maxsubiter, dt, dt_min, ...
-   dt_max, dt_new] = INITTIMESTEPS(opts, met)
+   dt_max, dt_new] = INITTIMESTEPS(opts, Time)
 %INITTIMESTEP initialize timestepping
 
 dt          =  opts.dt;
@@ -11,4 +11,4 @@ dt_max      =  dt/minsubiter;  % or: dt_min = 5; maxsubiter  = dt/dt_min;
 dt_new      =  dt_max;
 iter        =  1;
 subiter     =  1;
-itime       =  met.Time(1);   % initialize model time
+itime       =  Time(1);   % initialize model time
