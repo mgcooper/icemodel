@@ -1,4 +1,5 @@
-function [met,opts] = METINIT(opts, fileiter) %#codegen
+function [opts, tair, swdn, lwdn, refl, wspd, relh, psfc, De, Time] = METINIT( ...
+   opts, fileiter) %#codegen
 
 % The second input is the index into the metfile name list generated in setopts
 if nargin < 2
@@ -10,24 +11,33 @@ met = load(opts.metfname{fileiter}, 'met');
 met = met.met;
 
 if strcmp('sector', opts.sitename)
-   
+
    [met, opts] = processMetData(met, opts);
 else
    % for point/catchment-scale simulations, option to swap out a variable from
-   % userdata in place of the default met data 
+   % userdata in place of the default met data
    if ~strcmp('none', opts.userdata)
       met = swapMetData(met , opts);
    end
-   
    [met, opts] = processMetData(met, opts);
 end
 
-% compute the wind speed transfer coefficient 
-met.De = WINDCOEF(met.wspd, opts.z_0, opts.z_obs);
+% Transfer the met data to vectors
+swdn = met.swd;
+lwdn = met.lwd;
+tair = met.tair;
+relh = met.rh;
+wspd = met.wspd;
+psfc = met.psfc;
+refl = met.albedo;
+Time = met.Time;
 
-%% 
+% compute the wind speed transfer coefficient
+De = WINDCOEF(wspd, opts.z_0, opts.z_obs);
+
+%%
 function [met, opts] = processMetData(met, opts)
-   
+
 % remove leap inds if the met data is on a leap-year calendar
 if strcmp('noleap', opts.calendar_type)
    feb29 = month(met.Time) == 2 & day(met.Time) == 29;
@@ -61,7 +71,7 @@ end
 
 met.Time.TimeZone = 'UTC';
 
-%% 
+%%
 function met = swapMetData(met , opts)
 
 % convert uservars to a cellstr for compatibility with multiple uservars

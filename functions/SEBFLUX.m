@@ -28,6 +28,3 @@ Qc       =  CONDUCT(k_eff,T,dz,Tsfc);
             Tair,wspd,De,ea,roL,Pa,cv_air,emiss,SB,k_eff,      ...
             T,dz,epsilon,scoef,chi);
 balance  =  ENBAL(albedo,Qsi,Qli,Qle,Qh,Qe,Qc,Qm,emiss,chi);
-   
-   
-   

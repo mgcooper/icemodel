@@ -1,118 +1,102 @@
-function [ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts) %#codegen
+function [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time)
+%POSTPROC post process the simulation data
 
-% minimum required inputs:
-
-% ice1.Tsfc
-% ice2.Tice
-% ice2.f_liq
-% ice2.f_ice
-% ice2.Sc
-
-% load physical constants
+% Load physical constants
 [Tf,emissSB,cv_ice,cv_liq,ro_ice,ro_liq,ro_air,k_liq,Ls,Lf,Rv,emiss] = ...
    icemodel.physicalConstant('Tf','emissSB','cv_ice','cv_liq','ro_ice', ...
    'ro_liq','ro_air','k_liq','Ls','Lf','Rv','emiss');
 
-% anything we want at the 15 min timestep can be added to diags
-%diags.Time = met.Time;
-%diags.Qc   = enbal.Qc;
-
 % Compute a mesh for plotting
-dz    = opts.dz_thermal;
-Z     = opts.z0_thermal;
+Z = opts.z0_thermal;
+dz = opts.dz_thermal;
 
-% compute bulk density (kg/m3), heat capacity (J/kg/K), thermal K (W/m/K)
-T              =  ice2.Tice;
-f_liq          =  ice2.f_liq;
-f_ice          =  ice2.f_ice;
-[k_eff,k_vap]  =  GETGAMMA(T,f_liq,f_ice,ro_ice,k_liq,Ls,Rv,Tf);
-ro_sno         =  f_ice.*ro_ice+f_liq.*ro_liq+(1.0-f_liq-f_ice).*ro_air;
-cp_sno         =  (cv_ice.*f_ice+cv_liq.*f_liq)./ro_sno;
+% Compute bulk density (kg/m3), heat capacity (J/kg/K), thermal K (W/m/K)
+T_ice = ice2.Tice;
+f_liq = ice2.f_liq;
+f_ice = ice2.f_ice;
 
-ice2.k_eff     =  k_eff;                  % eff. thermal k
-ice2.k_vap     =  k_vap;                  % water vapor diffusivity
-ice2.cp_sno    =  cp_sno;                 % sp. heat cap.
-ice2.ro_sno    =  ro_sno;                 % ice density
-ice2.Qsub      =  ice2.Sc.*dz;            % subsurf absorbed shortwave
-ice2.Z         =  (dz/2:dz:Z-dz/2)';
+[k_eff, k_vap] = GETGAMMA(T_ice, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
+ro_sno = f_ice.*ro_ice + f_liq.*ro_liq + (1.0-f_liq-f_ice).*ro_air;
+cp_sno = (cv_ice.*f_ice+cv_liq.*f_liq) ./ ro_sno;
+
+% Assign values to ice2
+ice2.Z      = (dz/2:dz:Z-dz/2)';
+ice2.k_eff  = k_eff;                  % eff. thermal k
+ice2.k_vap  = k_vap;                  % water vapor diffusivity
+ice2.cp_sno = cp_sno;                 % sp. heat cap.
+ice2.ro_sno = ro_sno;                 % ice density
 
 % Compute the radiative heat fluxes
-ice1.Tsfc      = min(ice1.Tsfc,Tf);             % surface temp,cap at Tf
-ice1.albedo    = met.albedo;                    % albedo
-ice1.Qsi       = met.swd;                       % shortwave down
-ice1.Qsr       = ice1.Qsi.*ice1.albedo;         % shortwave up
-ice1.Qli       = emiss.*met.lwd;                % longwave down
-ice1.Qle       = emissSB.*ice1.Tsfc.^4;         % longwave up
-ice1.Qsn       = (1-ice1.albedo).*ice1.Qsi;     % net shortwave
-ice1.Qln       = ice1.Qli-ice1.Qle;             % net longwave
-ice1.Qn        = ice1.Qsn+ice1.Qln;             % net radiation
-ice1.Qsip      = (1-ice1.chi).*ice1.Qsi;        % penetrated shortwave
-ice1.Qabs      = (1-ice1.albedo).*ice1.Qsi;     % absorbed shortwave
-ice1.Qsrf      = ice1.chi.*ice1.Qabs;           % skin shortwave
-ice1.Qsub      = (1-ice1.chi).*ice1.Qabs;       % subsurf shortwave
-ice1.Qbal      = ice1.Qsub+ice1.Qsrf-ice1.Qabs; % balance
+ice1.Tsfc   = min(ice1.Tsfc, Tf);            % surface temp,cap at Tf
+ice1.albedo = albedo;                        % albedo
+ice1.swd    = swd;                           % shortwave down
+ice1.swu    = swd.*albedo;                   % shortwave up
+ice1.lwd    = emiss.*lwd;                    % longwave down
+ice1.lwu    = emissSB.*ice1.Tsfc.^4;         % longwave up
+ice1.swn    = (1-albedo).*swd;               % net shortwave
+ice1.lwn    = ice1.lwd-ice1.lwu;             % net longwave
+ice1.netr   = ice1.swn+ice1.lwn;             % net radiation
+ice1.Qsip   = (1-ice1.chi).*ice1.swd;        % penetrated shortwave
+ice1.Qabs   = (1-albedo).*swd;               % absorbed shortwave
+ice1.Qsrf   = ice1.chi.*ice1.Qabs;           % skin shortwave
+ice1.Qsub   = (1-ice1.chi).*ice1.Qabs;       % subsurf shortwave
+ice1.Qbal   = ice1.Qsub+ice1.Qsrf-ice1.Qabs; % balance
 
 % for reference, Qsub can also be computed this way
-% enbal.Qsub     = sum(ice2.Sc.*dz)';             % subsurf shortwave
-
-% repeat for met
-met.swu        =  met.swd.*met.albedo;
-met.swn        =  met.swd.*(1-met.albedo);
-met.lwu        =  emissSB.*met.tsfc.^4;
-met.lwd        =  emiss.*met.lwd;
-met.lwn        =  met.lwd - met.lwu;
-met.netr       =  met.swn + met.lwn;
-
-% do this after computing lwu etc
-met.tsfc       =  met.tsfc-Tf;
-met.tair       =  met.tair-Tf;
+% ice1.Qsub = sum(ice2.Sc.*dz)';             % subsurf shortwave
 
 % Convert temperature from Kelvin to Celsius
-ice1.Tsfc      =  ice1.Tsfc-Tf;             % surface temp,cap at Tf
-ice2.Tice      =  ice2.Tice-Tf;              % ice temperature
+ice1.Tsfc   = ice1.Tsfc-Tf;                  % surface temp,cap at Tf
+ice2.Tice   = ice2.Tice-Tf;                  % ice temperature
 
-% calculate surface and subsurface runoff
+% Calculate runoff
 if strcmp('skinmodel', opts.simmodel)
    ice1 = SRFRUNOFF(ice1, ro_liq, Ls, Lf, opts.dt);
 elseif strcmp('icemodel', opts.simmodel)
    ice1 = ICERUNOFF(ice1, ice2, opts);
 end
 
-% % temporary - take Tflag out of enbal
-% Tflag = enbal.Tflag;
-% enbal = rmfield(enbal,'Tflag');
-% diags.Tflag = Tflag;
-
-% convert enbal and ice1 to timetables
-time = met.Time; time.TimeZone = 'UTC';
+% Convert ice1 to timetable
+time.TimeZone = 'UTC';
 ice1 = struct2table(ice1);
-ice1 = table2timetable(ice1,'RowTimes',time);
-ice1 = retime(ice1,'hourly','mean');
-met  = retime(met,'hourly','mean');
+ice1 = table2timetable(ice1, 'RowTimes', time);
 
-% TODO: put the retiming in an if-else, but to do that, need to separate the
-% retiming from the rounding, see POSTPROC2
-% if opts.dt == 900
-%    ice1 = retime(ice1,'hourly','mean');
-%    met  = retime(met,'hourly','mean');
-% end
+% Retime from 15 m to hourly
+if opts.dt == 900
+   ice1 = retime(ice1, 'hourly', 'mean');
+   newtime = ice1.Time; % retimed to hourly
 
-% Retime ice2 to hourly and round the data
-sfields = fieldnames(ice2);
-oldtime = time;
-newtime = ice1.Time;
-
-for mm = 1:numel(sfields)
-
-   thisfield = sfields{mm};
-
-   if strcmp(thisfield,'Z') || strcmp(thisfield,'LCflag')
-      continue
+   % Retime ice2 to hourly
+   sfields = fieldnames(ice2);
+   oldtime = time; % met time
+   for mm = 1:numel(sfields)
+      thisfield = sfields{mm};
+      if strcmp(thisfield,'Z') || strcmp(thisfield,'LCflag')
+         continue
+      end
+      olddat = transpose(ice2.(thisfield));
+      newdat = interp1(oldtime,olddat,newtime);
+      ice2.(thisfield) = transpose(newdat);
    end
-   olddat = transpose(ice2.(thisfield));
-   newdat = interp1(oldtime,olddat,newtime);
-   ice2.(thisfield) = transpose(newdat);
 
+   % Retime logical flags
+   if isfield(ice2,'LCflag')
+      LCflag = false(size(ice2.f_ice));
+      idx = 0;
+      for mm = 1:4:size(ice2.LCflag,2)-3
+         idx = idx+1;
+         LCflag(:,idx) = sum(ice2.LCflag(:,mm:mm+3),2)>0;
+      end
+      ice1.LCflag = transpose(LCflag(1,:));
+      ice2 = rmfield(ice2,'LCflag');
+   end
+end
+ice2.Time = ice1.Time;
+
+% Round the ice2 data
+sfields = fieldnames(ice2);
+for mm = 1:numel(sfields)
+   thisfield = sfields{mm};
    if ismember(thisfield,{'f_ice','f_liq','k_vap','k_eff'})
       ice2.(thisfield) = round(ice2.(thisfield),5);
    elseif ismember(thisfield,{'h_melt','h_freeze','Tice'})
@@ -124,9 +108,7 @@ for mm = 1:numel(sfields)
    end
 end
 
-% repeat rounding for ice1. in this case, we round all fields to 5
-% digits, so i use 'fields' in the logical checks below, but if i had
-% vars i wanted rounded to different precision, would need to replace
+% Round ice1 data to 5 digits (all fields, so there are no if-else checks).
 sfields = ice1.Properties.VariableNames;
 for mm = 1:numel(sfields)
    thisfield = sfields{mm};
@@ -135,25 +117,12 @@ for mm = 1:numel(sfields)
    end
 end
 
-% deal with retiming LCFlag to hourly
-if isfield(ice2,'LCflag')
-   LCflag = false(size(ice2.f_ice));
-   idx = 0;
-   for mm = 1:4:size(ice2.LCflag,2)-3
-      idx = idx+1;
-      LCflag(:,idx) = sum(ice2.LCflag(:,mm:mm+3),2)>0;
-   end
-
-   ice1.LCflag = transpose(LCflag(1,:));
-   ice2 = rmfield(ice2,'LCflag');
-end
-
-ice2.Time = ice1.Time;
-
-% rename enbal to match the naming conventions i use everywhere else
+% Rename ice1 vars to match the naming conventions i use everywhere else
 oldvars = {'Qsi','Qsr','Qsn','Qli','Qle','Qln','Qh','Qe','Qc','Qn','Tsfc'};
 newvars = {'swd','swu','swn','lwd','lwu','lwn','shf','lhf','chf','netr','tsfc'};
-ice1 = renamevars(ice1,oldvars,newvars);
+repvars = oldvars(ismember(oldvars, ice1.Properties.VariableNames));
+newvars = newvars(ismember(oldvars, ice1.Properties.VariableNames));
+ice1 = renamevars(ice1, repvars, newvars);
 
 
 % The surface energy balance: Qm = chi*Qsi*(1-albedo) + Qln + Qh + Qe + Qc
@@ -179,3 +148,29 @@ ice1 = renamevars(ice1,oldvars,newvars);
 % in short, if we call the net solar downflux in the ice Q, then:
 % Qsub = dQ is the absorbed solar downflux in the ice in each layer
 % Sc = dQ/dz is the source term (divergence of the net solar downflux)
+
+
+% To process the met data, use this signature:
+% function [ice1,ice2,met] = POSTPROC1(ice1, ice2, opts, ...
+%    tair, swd, lwd, albedo, wspd, rh, psfc, De, tsfc, time)
+
+% % repeat for met
+% met.tair    = tair;
+% met.swd     = swd;
+% met.lwd     = lwd;
+% met.albedo  = albedo;
+% met.wspd    = wspd;
+% met.rh      = rh;
+% met.psfc    = psfc;
+% met.De      = De;
+% met.tsfc    = tsfc;
+% met.swu  =  swd.*albedo;
+% met.swn  =  swd.*(1-albedo);
+% met.lwu  =  emissSB.*tsfc.^4;
+% met.lwd  =  emiss.*lwd;
+% met.lwn  =  met.lwd - met.lwu;
+% met.netr =  met.swn + met.lwn;
+% met.tsfc =  tsfc-Tf; % do this after computing lwu etc
+% met.tair =  tair-Tf; % do this after computing lwu etc
+% met = struct2timetable(met, 'RowTimes', time);
+% met  = retime(met,'hourly','mean');

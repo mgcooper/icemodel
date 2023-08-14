@@ -51,10 +51,6 @@ opts.nwavl           =  118;
 opts.nradii          =  35;
 opts.i_grainradius   =  25;      % index 25 = 2.0 mm                 [#]
 
-% define the timescale beyond which stored meltwater is assumed to runoff
-opts.tlagcolumn      =  6*3600/opts.dt;   % convert hours to timesteps
-opts.tlagsurf        =  6*3600/opts.dt;
-
 %---------------------------- set the met forcing file name
 %------------------------------------------------------------------------------
 
@@ -144,7 +140,8 @@ opts.outfname = fullfile(opts.pathoutput, opts.outfname);
 opts.userpath = fullfile(opts.pathinput, 'userdata');
 
 % these are experimental options that should be left as-is
-opts.tlagcolumn = 6*3600/opts.dt;
-opts.tlagsurf = 12;
+% define the timescale beyond which stored meltwater is assumed to runoff
+opts.tlagcolumn = 6*3600/opts.dt; % convert hours to timesteps
+opts.tlagsurf = 6*3600/opts.dt;
 opts.error = '';
 
