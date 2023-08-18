@@ -1,4 +1,4 @@
-function [ice1, ice2, opts] = icemodel(opts) %#codegen
+function [ice1, ice2] = icemodel(opts) %#codegen
 % ICEMODEL Simulate the phase change process in melting glacier ice.
 %
 % This function models the phase change process in melting glacier ice. It uses
@@ -44,25 +44,26 @@ function [ice1, ice2, opts] = icemodel(opts) %#codegen
 TINY = 1e-8;
 
 % Load the forcing data
-[opts, tair, swd, lwd, albedo, wspd, rh, psfc, De, Time] = METINIT(opts, 1);
+[tair, swd, lwd, albedo, wspd, rh, psfc, De, time] = METINIT(opts, 1);
 
 % Initialize the ice column
 [f_ice, f_liq, T, TL, TH, flmin, flmax, cp_sno, ~, dz, fn, delz, grid_therm, ...
    dz_therm, dz_spect, JJ_therm, JJ_spect, ~, Sp, scoef, ro_sno, ro_iwe, ...
    ro_wie, xTsfc, xf_liq, roL, Qc, f_min, fopts, liqflag, ice1, ice2] = ...
-   ICEINIT(opts, tair(1));
+   ICEINIT(opts, tair);
 
-% Initialize the extinction coefficients
+% INITIALIZE THE EXTINCTION COEFFICIENTS
 [total_solar, grid_spect, z_walls, spect_lower, spect_upper, solardwavl] = ...
    EXTCOEFSINIT(opts, dz_spect, JJ_spect, ro_ice);
 
-% Initialize timestepping
-[iter, subiter, itime, maxiter, maxsubiter, dt, dt_min, dt_max, dt_new] = ...
-   INITTIMESTEPS(opts, Time);
+% INITIALIZE TIMESTEPPING
+[metiter, subiter, maxiter, maxsubiter, dt, dt_min, dt_max, dt_new, ...
+   numyears, ~, numspinup] = INITTIMESTEPS(opts, time);
 
 %% START ITERATIONS OVER YEARS
+for thisyear = 1:numyears
 
-for MM = 1:opts.annual_loops
+   iter = 1;
 
    while iter <= maxiter
 
@@ -76,8 +77,8 @@ for MM = 1:opts.annual_loops
       % end
 
       % SUBSURFACE SOLAR RADIATION SOURCE-TERM
-      if swd(iter) > 0
-         [Sc, chi] = UPDATEEXTCOEFS(swd(iter), albedo(iter), grid_spect, ...
+      if swd(metiter) > 0
+         [Sc, chi] = UPDATEEXTCOEFS(swd(metiter), albedo(metiter), grid_spect, ...
             JJ_spect, dz_spect, grid_therm, JJ_therm, dz_therm, dz, z_walls, ...
             ro_sno, total_solar, spect_lower, spect_upper, solardwavl);
       else
@@ -102,15 +103,15 @@ for MM = 1:opts.annual_loops
       % so we can either pass Qseb or chi out of extcoefs
 
       % SURFACE TEMPERATURE
-      ea = VAPPRESS(rh(iter), tair(iter), liqflag);
+      ea = VAPPRESS(rh(metiter), tair(metiter), liqflag);
       Tsfc = fsearchzero(@(Tsfc) ...
-         chi * (1.0-albedo(iter)) * swd(iter) + emiss * lwd(iter) + Qc - ...
-         emiss * SB * Tsfc^4 + cv_air * De(iter) * ...
-         STABLEFN(tair(iter), Tsfc, wspd(iter), scoef) * ...
-         (tair(iter)-Tsfc) + roL * De(iter) * 0.622 / psfc(iter) * ...
-         STABLEFN(tair(iter), Tsfc, wspd(iter), scoef) * ...
+         chi * (1.0-albedo(metiter)) * swd(metiter) + emiss * lwd(metiter) + Qc - ...
+         emiss * SB * Tsfc^4 + cv_air * De(metiter) * ...
+         STABLEFN(tair(metiter), Tsfc, wspd(metiter), scoef) * ...
+         (tair(metiter)-Tsfc) + roL * De(metiter) * 0.622 / psfc(metiter) * ...
+         STABLEFN(tair(metiter), Tsfc, wspd(metiter), scoef) * ...
          (ea - VAPOR(Tsfc, Tf, liqflag)), ...
-         xTsfc, xTsfc-50, xTsfc+50, tair(iter), fopts.TolX);
+         xTsfc, xTsfc-50, xTsfc+50, tair(metiter), fopts.TolX);
 
       while OK == false || dt_sum < dt
 
@@ -126,18 +127,27 @@ for MM = 1:opts.annual_loops
 
          % PHASE BOUNDARY OVERSHOOT, DECREASE THE TIME STEP AND START OVER
          if not(OK) && subfail < maxsubiter
+
             [subfail, subiter, dt_new, T, Tsfc, f_ice, f_liq] = ...
                RESETSUBSTEP( xT, xTsfc, xf_ice, xf_liq, dt_max, subiter, ...
                maxsubiter, subfail);
+
             continue
          else
 
             % UPDATE SURFACE FLUXES
             k_eff = GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
-            [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, Tsfc, tair(iter), ...
-               swd(iter), lwd(iter), albedo(iter), wspd(iter), psfc(iter), ...
-               De(iter), ea, Tf, k_eff, cv_air, roL, emiss, SB, epsilon, ...
-               scoef, dz, liqflag, chi);
+            [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, Tsfc, tair(metiter), ...
+               swd(metiter), lwd(metiter), albedo(metiter), wspd(metiter), ...
+               psfc(metiter), De(metiter), ea, Tf, k_eff, cv_air, roL, ...
+               emiss, SB, epsilon, scoef, dz, liqflag, chi);
+
+            % % UPDATE SURFACE FLUXES
+            % k_eff =  GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
+            % Qc    =  CONDUCT(k_eff, T, dz, MELTTEMP(Tsfc,Tf));
+            % S     =  STABLEFN(tair(metiter), MELTTEMP(Tsfc,Tf), wspd(metiter), scoef);
+            % es0   =  VAPOR(MELTTEMP(Tsfc,Tf), Tf, liqflag);
+            % Qe    =  LATENT(De(metiter), S, ea, es0, roL, epsilon, psfc(metiter));
 
             % COMPUTE MELT FREEZE
             [T, f_ice, f_liq, d_liq, d_evp, d_drn] = ICEMF(T, f_ice, ...
@@ -148,32 +158,35 @@ for MM = 1:opts.annual_loops
 
             % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
             [ro_sno, cp_sno, liqflag, roL, xT, xTsfc, xf_liq, xf_ice, ...
-               dt_sum, itime, dt_new, dt_flag] = ...
+               dt_sum, dt_new, dt_flag] = ...
                UPDATESUBSTEP(f_ice, f_liq, ro_ice, ro_liq, ro_air, cv_ice, ...
-               cv_liq, T, Tsfc, dt, dt_sum, itime, dt_new, roLv, roLs, ...
-               dt_min, TINY);
-            
+               cv_liq, T, Tsfc, dt, dt_sum, dt_new, roLv, roLs, dt_min, TINY);
+
             % zD = sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
             % if zD > dz(1)
-            %
             % end
          end
       end
-      
-      % Save output
-      if MM==opts.annual_loops
-         [ice1, ice2] = SAVEOUTPUT(ice1, ice2, Tsfc, Qm, Qf, Qe, Qh, Qc, ...
-            chi, balance, dt_sum, T, f_ice, f_liq, d_liq, d_drn, d_evp, ...
-            Sc, errH, errT, iter);
-      end
-      
-      % Move to the next timestep
-      [iter, subiter, dt_new] = NEXTSTEP(iter, subiter, dt_flag, dt_max, OK);
-   end
-   
-   % Restart the model (spinup)
-   [iter, subiter, itime] = INITTIMESTEPS(opts, Time);
-end
 
-% Post process
-[ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, Time);
+      % SAVE OUTPUT IF SPINUP IS FINISHED
+      if thisyear >= numspinup
+         [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, opts.vars1, opts.vars2, ...
+            {Tsfc, Qm, Qf, Qe, Qh, Qc, chi, balance, dt_sum},  ...
+            {T, f_ice, f_liq, d_liq, d_drn, d_evp, Sc, errH, errT});
+      end
+
+      % MOVE TO THE NEXT TIMESTEP
+      [iter, metiter, subiter, dt_new] = NEXTSTEP(iter, metiter, subiter, ...
+         dt_flag, dt_max, OK);
+   end
+
+   % RESTART THE MET DATA ITERATOR DURING SPIN UP
+   if thisyear < numspinup
+      metiter = 1;
+      continue
+   end
+
+   % WRITE TO DISK
+   WRITEOUTPUT(ice1, ice2, opts, thisyear, ...
+      time((thisyear-1)*maxiter+1:thisyear*maxiter), swd, lwd, albedo)
+end
