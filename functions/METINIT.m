@@ -1,118 +1,98 @@
-function [met,opts] = METINIT(opts, fileiter)
+function [tair, swd, lwd, albedo, wspd, rh, psfc, De, time] = METINIT(opts, ii) 
 %METINIT initialize the met file
+%
+%#codegen
 
 % The second input is the index into the metfile name list generated in setopts
 if nargin < 2
-   fileiter = 1;
+   ii = 1;
 end
 
-%--------------------------------------------------------
-% this section is for gridded (sector-scale) simulations
-%--------------------------------------------------------
+% Load the met file
+met = load(opts.metfname{ii}, 'met');
+met = met.met;
 
-if strcmp('sector', opts.sitename)
-
-   % load the met file
-   load(opts.metfname{fileiter},'met')
-
-   % remove leap inds if the met data is on a leap-year calendar
-   if strcmp('noleap', opts.calendar_type)
-      feb29 = month(met.Time) == 2 & day(met.Time) == 29;
-      met = met(~feb29,:);
-   end
-
-   % subset the met file to the requested simyears
-   met = met(ismember(year(met.Time),opts.simyears),:);
-
-   % compute the total number of model timesteps and the timestep
-   opts.maxiter = height(met)/opts.numyears;
-   opts.dt = seconds(met.Time(2)-met.Time(1));
-
-   % check for bad albedo data
-   bi = find(met.modis<=0 | met.modis>=1);
-   if ~isempty(bi)
-      met.modis(bi) = met.albedo(bi);
-      warning('bad albedo')
-   end
-
-   % swap out chosen forcing data albedo for modis albedo
-   if strcmp('modis', opts.userdata)
-      met.albedo = met.modis;
-   end
-
-   return
-   % for a sector-scale run, we are finished
+if ~strcmp('none', opts.userdata)
+   met = swapMetData(met , opts);
 end
+met = prepareMetData(met, opts);
 
-%----------------------------------------------------------------
-% this section is for point-scale or catchment-scale simulations
-%----------------------------------------------------------------
+% Transfer the met data to vectors
+rh = met.rh;
+swd = met.swd;
+lwd = met.lwd;
+tair = met.tair;
+wspd = met.wspd;
+psfc = met.psfc;
+time = met.Time;
+albedo = met.albedo;
 
-% point- or catchment-scale forcing file
-load(opts.metfname{fileiter},'met')
+% compute the wind speed transfer coefficient
+De = WINDCOEF(wspd, opts.z_0, opts.z_obs);
 
-% next swaps out a variable from userdata in place of the default met data
-if opts.userdata ~= "none"
-
-   % for point/catchment-scale runs, multi-year simulations are not presently
-   % supported, so the simyear should equal the start/endyear
-   simyear  = num2str(opts.simyears(1));
-   sitename = opts.sitename;
-   userdata = opts.userdata;
-   uservars = opts.uservars;
-   userpath = opts.userpath;
-
-   % convert uservars to a cellstr for compatibility with multiple uservars
-   if ischar(uservars)
-      uservars = cellstr(uservars);
-   end
-
-   numuservars = numel(uservars);
-
-   % load the forcingUserData file and retime to match the metfile
-   userfile = fullfile(userpath,[userdata '_' sitename '_' simyear '.mat']);
-
-   if ~exist(userfile,'file')
-      error('userdata file does not exist');
-   end
-
-   % the userdata is hourly, retime to 15 m if the met data is 15 m
-   load(userfile,'Data');
-   if Data.Time(2)-Data.Time(1) ~= met.Time(2)-met.Time(1)
-      Data = retime(Data,met.Time,'linear');
-   end
-
-   % swap out the data in the metfile for the user data
-   for n = 1:numuservars
-
-      thisvar  = uservars{n};
-      swapvar  = thisvar;
-
-      % MODIS requires changing the variable name to albedo
-      if lower(userdata) == "modis" && lower(thisvar) == "albedo"
-         thisvar = 'albedo';
-         swapvar = 'modis';
-      end
-
-      met.(thisvar) = Data.(swapvar);
-   end
-end
-
-if isempty(met.Time.TimeZone)
-   met.Time.TimeZone = 'UTC';
-end
-
-%%%% test
-% met = retime(met,'hourly','mean');
-%%%% test
+%%
+function met = prepareMetData(met, opts)
+%PREPAREMETDATA remove leap inds, trim to simyears, check for bad data
 
 % remove leap inds if the met data is on a leap-year calendar
-if strcmp(opts.calendar_type,"noleap")
+if strcmp('noleap', opts.calendar_type)
    feb29 = month(met.Time) == 2 & day(met.Time) == 29;
    met = met(~feb29,:);
 end
 
-% reset the timestep using the built-in time functions to ensure precision
-opts.maxiter   = size(met,1);
-opts.dt        = seconds(met.Time(2)-met.Time(1));
+% subset the met file to the requested simyears
+met = met(ismember(year(met.Time), opts.simyears), :);
 
+% check for bad modis data before swapping out default albedo for modis
+varmodis = {'modis', 'MODIS'};
+hasmodis = ismember(varmodis, met.Properties.VariableNames);
+if any(hasmodis)
+   bi = met.(varmodis{hasmodis}) <= 0 | met.(varmodis{hasmodis}) >= 1;
+   if sum(bi) > 0
+      met.(varmodis{hasmodis})(bi) = met.albedo(bi);
+      warning('bad albedo')
+   end
+end
+met.Time.TimeZone = 'UTC';
+
+%%
+function met = swapMetData(met, opts)
+
+% convert uservars to a cellstr for compatibility with multiple uservars
+if ischar(opts.uservars)
+   opts.uservars = cellstr(opts.uservars);
+end
+
+if strcmp(opts.sitename, 'sector')
+   % Swap out the forcing data albedo for modis albedo
+   if strcmp('modis', opts.userdata)
+      Data.modis = met.modis;
+   end
+else
+   % Load the userdata and retime from hourly to 15 m if the met data is 15 m
+   simyears = num2str(opts.simyears(1));
+   userfile = [opts.userdata '_' opts.sitename '_' simyears '.mat'];
+   
+   if isfile(fullfile(opts.pathinput, 'userdata', userfile))
+      Data = load(fullfile(opts.pathinput, 'userdata', userfile), 'Data');
+      Data = Data.Data;
+      if Data.Time(2)-Data.Time(1) ~= met.Time(2)-met.Time(1)
+         Data = retime(Data, met.Time, 'linear');
+      end
+   else
+      error('userdata file does not exist');
+   end
+end
+
+% Swap out the data in the metfile for the user data
+for n = 1:numel(opts.uservars)
+   thisvar  = opts.uservars{n};
+   swapvar  = thisvar;
+
+   % MODIS requires changing the variable name to albedo
+   if strcmpi('modis', opts.userdata) && strcmpi('albedo', thisvar)
+      thisvar = 'albedo';
+      swapvar = 'modis';
+   end
+   met.(thisvar) = Data.(swapvar);
+end

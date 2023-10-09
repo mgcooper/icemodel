@@ -2,7 +2,7 @@ function [  f_liq,                                                      ...
             f_ice,                                                      ...
             f_wat,                                                      ...
             T,                                                          ...
-            dFdT ]  = MELTCURVE(T,f_liq,f_ice,ro_wie,ro_iwe,Tf,fcp)
+            dFdT ]  = MELTCURVE(T,f_liq,f_ice,ro_wie,ro_iwe,Tf,fcp) %#codegen
 %MELTCURVE melt fraction curve
 
 % The change in frac_liq is the new frac_liq minus the old frac_liq.
@@ -10,7 +10,7 @@ function [  f_liq,                                                      ...
 %   the old frac_ice minus dfrac_liq scaled by volume expansion.
 
 % DEFINITIONS: 
-%   fcp     = freezing-curve parameter
+%  fcp   = freezing-curve parameter
 %  Tdep  = temperature depression (-)
 %  fliq  = fraction of unfrozen water (-) (redefined as liquid water fraction)
 

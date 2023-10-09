@@ -1,4 +1,4 @@
-function icemodel_config()
+function out = icemodel_config()
 %ICEMODEL_CONFIG configure project preferences
 %
 % Syntax:
@@ -28,19 +28,57 @@ function icemodel_config()
 % See also: icemodel
 
 % set the icemodel code, input data, and output data paths:
-HOMEPATH = getenv('HOME');
-setenv('ICEMODELPATH', fullfile(HOMEPATH,'myprojects/matlab/icemodel'));
-setenv('ICEMODELINPUTPATH', fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/input'));
-setenv('ICEMODELDATAPATH', fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/eval'));
-setenv('ICEMODELOUTPUTPATH', '/Volumes/Samsung_T5b/icemodel/output/v10b');
+persistent cfg
+if isempty(cfg)
+   
+   HOMEPATH = getenv('HOME');
+   
+   cfg.ICEMODELPATH = fullfile(HOMEPATH,'myprojects/matlab/icemodel');
+   cfg.ICEMODELINPUTPATH = fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/input');
+   cfg.ICEMODELDATAPATH = fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/eval');
+   cfg.ICEMODELOUTPUTPATH = '/Volumes/Samsung_T5b/icemodel/output/v10b';
+   cfg.ICEMODELUSERPATH = '/Volumes/Samsung_T5b';
+   
+   for field = fieldnames(cfg)'
+      setenv(field{:}, cfg.(field{:}))
+   end
+   
+   % setenv('ICEMODELPATH', cfg.ICEMODELPATH);
+   % setenv('ICEMODELINPUTPATH', cfg.ICEMODELINPUTPATH);
+   % setenv('ICEMODELDATAPATH', cfg.ICEMODELDATAPATH);
+   % setenv('ICEMODELOUTPUTPATH', cfg.ICEMODELOUTPUTPATH);
+   % setenv('ICEMODELUSERPATH', cfg.ICEMODELUSERPATH);
+end
 
+if nargout > 0
+   out = cfg;
+end
 % setenv('ICEMODELDATAPATH', fullfile(HOMEPATH,'myprojects/matlab/icemodel/input/userdata'));
 % setenv('ICEMODELINPUTPATH', fullfile(HOMEPATH,'myprojects/matlab/icemodel/input'));
 % setenv('ICEMODELOUTPUTPATH', fullfile(HOMEPATH,'myprojects/matlab/icemodel/output'));
 
 % ICEMODELUSERPATH is an additional path that can be set to access data, for
 % example large datasets saved on an external hard drive.
-setenv('ICEMODELUSERPATH','/Volumes/Samsung_T5b');
+
+
+% %---------------------------- set the model configuration
+% %------------------------------------------------------------------------------
+% persistent isconfigured
+% if isempty(isconfigured)
+%    isconfigured = true;
+%    HOMEPATH = getenv('HOME');
+%    cfg.ICEMODELPATH = fullfile(HOMEPATH,'myprojects/matlab/icemodel');
+%    cfg.ICEMODELINPUTPATH = fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/input');
+%    cfg.ICEMODELDATAPATH = fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/eval');
+%    cfg.ICEMODELOUTPUTPATH = '/Volumes/Samsung_T5b/icemodel/output/v10b';
+%    cfg.ICEMODELUSERPATH = '/Volumes/Samsung_T5b';
+%    for field = fieldnames(cfg)'
+%       setenv(field{:}, cfg.(field{:}))
+%    end
+% end
+
+
+
 
 % ----------------
 % MORE INFORMATION

@@ -20,7 +20,6 @@ for n = 1+tlag:length(melt)
     potrunoff = melt(n);
     potfreeze = min(frze(n),meltsumlag);
     potfreeze = max(potfreeze,0.0);
-    
     if meltsumlag > 0.0
         netrunoff = potrunoff-potfreeze;
         runoff(n,1) = max(runoff(n-1)+netrunoff, 0.0);

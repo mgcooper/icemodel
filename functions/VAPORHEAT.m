@@ -1,51 +1,59 @@
-function [H_vap, d_ro_vap_dT, ro_vap_sat, gamma_vap] = VAPORHEAT(T, f_liq, ...
-   f_ice, Tf, Rv, Ls)
-%VAPORHEAT compute the saturation vapor density within the ice
-%
-% [H_vap,d_ro_vap_dT,ro_vap_sat,gamma_vap] = VAPORHEAT(T,f_liq,f_ice,Tf,Rv,Ls)
-% computes the saturation vapor density within the ice and the release of latent
-% heat due to water vapor diffusion within the ice  .
-%
-% k=i wrt ice, and l wrt liq, that's what the i_liq / i_ice do
+function [H_vap, dro_vapdT, ro_vap, bd_vap] = VAPORHEAT(T,f_liq,f_ice,Tf,Rv,Ls)
+   %VAPORHEAT compute the saturation vapor density within the ice
+   %
+   % [H_vap,d_ro_vap_dT,ro_vap_sat,gamma_vap] =
+   % VAPORHEAT(T,f_liq,f_ice,Tf,Rv,Ls) computes the saturation vapor density
+   % within the ice and the release of latent heat due to water vapor diffusion
+   % within the ice.
+   %
+   % k=i wrt ice, and l wrt liq, that's what the i_liq / i_ice do
+   %
+   % See also:
 
-% Locate the indices with and without water
-iM    =  f_liq > 0.02;
+   % Locate the indices with and without water
+   iM = f_liq > 0.02;
 
-% Saturation vapor pressure over ice (Pvk_sat in Jordan, but not used) [Pa]
-esi   =  611.15.*exp((22.452.*(T-Tf))./(272.55+(T-Tf)));
+   % Saturation vapor pressure over ice (Pvk_sat in Jordan, but not used) [Pa]
+   esi = 611.15.*exp((22.452.*(T-Tf))./(272.55+(T-Tf)));
 
-% Saturation vapor pressure over water (Pvk_sat in Jordan)           [Pa]
-if sum(iM) > 0
-   esi(iM) =  611.21.*exp(17.502.*(T(iM)-Tf)./(240.97+(T(iM)-Tf)));
+   % Saturation vapor pressure over water (Pvk_sat in Jordan) [Pa]
+   if sum(iM) > 0
+      esi(iM) = 611.21.*exp(17.502.*(T(iM)-Tf)./(240.97+(T(iM)-Tf)));
+   end
+   % note: es0 is the surface value computed in VAPOR
+
+   % equilibrium water vapor density wrt phase k: [kg m-3] (ro_vk_sat)
+   ro_vap = esi ./ (Rv .* T);
+
+   % bulk vapor density (Eq. 18) (assume f_rh = 1.0) % [kg m-3]
+   bd_vap = (1.0-f_liq-f_ice).*ro_vap;
+
+   % Compute the diffusion of water vapor [kg/m^2/s]
+   %De = 9.0e-5.*(T./Tf).^14; % [m2 s-1]
+
+   % Derivative of vapor density wrt to temperature over ice (Eq. 20)
+   dro_vapdT = ro_vap.*(22.452*272.55./((272.55+(T-Tf)).^2)-1./T);
+
+   % dbd_vapdT = dro_vapdT*(1.0-f_liq-f_ice);
+
+   % Derivative of vapor density wrt to temperature over water
+   if sum(iM) > 0
+      dro_vapdT(iM) = ro_vap(iM).*(17.502*240.97./ ...
+         ((240.97+(T(iM)-Tf)).^2)-1./T(iM));
+   end
+
+   % cast in terms of the actual heat (enthalpy) per unit volume:
+   H_vap = Ls.*bd_vap;
+
+   % the change in stored heat due to water vapor diffusion (Eq. 74, term 2)
+   % H_vap = Ls.*f_air.*f_rh.*d_ro_vap_dT;           % [J/K/m3]
+
+   % vapor thermal diffusion coefficient % [W m-1 K-1]
+   % k_vap = ro_vap_sat.*Ls.*De.*22.452*272.55./(272.55+Td).^2;
+
+   % equivalently:
+   % k_vap = Ls.*De.*(d_ro_vap_dT + ro_vap_sat./T);
 end
-% note: es0 is the surface value computed in VAPOR
-
-% equilibrium water vapor density wrt phase k: [kg m-3] (ro_vk_sat)
-ro_vap_sat  =  esi ./ (Rv .* T);
-
-% bulk vapor density (Eq. 18) (assume f_rh = 1.0)
-gamma_vap   =  (1.0-f_liq-f_ice).*ro_vap_sat;         % [kg m-3]
-
-% Compute the diffusion of water vapor [kg/m^2/s]
-%De         =  9.0e-5.*(T./Tf).^14;                    % [m2 s-1]
-
-% Derivative of vapor density wrt to temperature over ice (Eq. 20)
-d_ro_vap_dT = ro_vap_sat.*(22.452*272.55./((272.55+(T-Tf)).^2)-1./T);
-
-% Derivative of vapor density wrt to temperature over water
-if sum(iM) > 0
-   d_ro_vap_dT(iM) = ro_vap_sat(iM).*(17.502*240.97./ ...
-      ((240.97+(T(iM)-Tf)).^2)-1./T(iM));
-end
-
-% cast in terms of the actual heat (enthalpy) per unit volume:
-H_vap       =   Ls.*gamma_vap;
-
-% the change in stored heat due to water vapor diffusion (Eq. 74, term 2)
-%   H_vap       =   Ls.*f_air.*f_rh.*d_ro_vap_dT;           % [J/K/m3]
-
-
-% % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
 % NOTE: might change to dbvdT, for consistency with snthrm, i.e., convert
 % ro_vap to bulk density, so the thermal coefficient aP0 is ro_sno*c_sno +
@@ -144,4 +152,3 @@ H_vap       =   Ls.*gamma_vap;
 % gamma_v = theta_v * ro_v = theta_v * frh * ro_vk_sat
 % ro_vk_sat = equilibrium water vapor density wrt phase k (kg/m3)
 % theta_v = fractional volume (m3/m3) (my frac_ice/frac_air/frac_liq)
-

@@ -6,17 +6,19 @@ clc
 
 %% set the run-specific model configuration
 
-savedata = false;
+savedata = true;
 sitename = 'behar';        % options: 'kanm', 'behar'
 forcings = 'mar';          % options: 'mar','kanm'
-userdata = 'modis';          % options: 'modis','racmo','merra','mar','kanm','none'
+userdata = 'modis';        % options: 'modis','racmo','merra','mar','kanm','none'
 uservars = 'albedo';       % options: 'albedo', or any var in met
-simmodel = 'icemodel';    % options: 'icemodel','skinmodel'
+simmodel = 'icemodel';     % options: 'icemodel','skinmodel'
 simyears = 2016;
 
-%% source the input and output paths set in icemodel_config.m
+%% set the input and output paths in icemodel_config.m
 
-icemodel_config()
+pathadd(getprojectfolder('runoff'))
+
+cfg = icemodel_config();
 
 %% build the 'opts' model configuration structure
 
@@ -24,28 +26,21 @@ opts = icemodel_opts(sitename,simmodel,simyears,forcings,userdata,uservars,  ...
    savedata);
 
 %% run the model
-
-tic
 switch simmodel
    case 'icemodel'
-      [ice1,ice2,met,opts] = icemodel(opts);
+      tic; icemodel(opts); toc
    case 'skinmodel'
-      [ice1,ice2,met,opts] = skinmodel(opts);
+      tic; skinmodel(opts); toc
 end
-toc
 
-%% save the data
-
-if savedata == true
-   if ~isfolder(opts.pathoutput); mkdir(opts.pathoutput); end
-   save([opts.pathoutput opts.fsave],'ice1','ice2','opts');
-end
+% load the met data and run the post processing 
+[ice1, ice2, met] = icemodel.loadresults(opts);
 
 %% prep the output for plotting
 
-[Runoff,Discharge,Catchment]  = prepRunoff(opts, ice1);
-AblationHourly                = prepAblation(opts, ice1, 'hourly');
-AblationDaily                 = prepAblation(opts, ice1, 'daily');
+[Runoff,Discharge,Catchment] = prepRunoff(opts, ice1);
+AblationHourly = prepAblation(opts, ice1, 'hourly');
+AblationDaily = prepAblation(opts, ice1, 'daily');
 
 % this controls the time period over which ablation and runoff are plotted
 t1 = datetime(simyears(1),7,1,0,0,0,'TimeZone','UTC');
@@ -68,4 +63,13 @@ plotPromice(AblationHourly,'refstart',t1);
 % plot the energy balance
 % plotEnbal(ice1,met);
 
+%%
 
+% [Lv, ro_liq] = icemodel.physicalConstant('Lv', 'ro_liq');
+% evap = ice1.lhf ./ (Lv * ro_liq) .* opts.dt ./ opts.dz_thermal;
+%
+% figure;
+% plot(ice1.Time, ice1.evap); hold on;
+% plot(ice1.Time, cumsum(evap, 'omitnan'));
+
+% postive lhf means energy into the surface
