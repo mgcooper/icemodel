@@ -190,3 +190,11 @@ for thisyear = 1:numyears
    WRITEOUTPUT(ice1, ice2, opts, thisyear, ...
       time((thisyear-1)*maxiter+1:thisyear*maxiter), swd, lwd, albedo)
 end
+
+% post process
+[ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts);
+
+
+
+
+

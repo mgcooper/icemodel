@@ -1,11 +1,8 @@
-%--------------------------------------------------------------------------
-%   COMPUTE THE ENERGY FOR MELTING/FREEZING
-%--------------------------------------------------------------------------
-
 function [Qm,Qf] =   MFENERGY(albedo,Qsi,Qli,Qle,Qh,Qe,Qc,Tsfc,Tf,      ...
                      Tair,wspd,De,ea,roL,Pa,cv_air,emiss,SB,k_eff,      ...
                      T,dz,epsilon,scoef,chi)
-%--------------------------------------------------------------------------
+%MFENERGY compute the energy for melting/freezing
+% 
 % If Qm is > 0, this is the energy available for melting.
 %   If Qm is < 0, this is the energy available for freezing
 %   For the case of melting conditions, the fluxes that are passed into
