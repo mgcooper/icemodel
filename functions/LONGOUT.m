@@ -1,8 +1,3 @@
-%--------------------------------------------------------------------------
-%   COMPUTE LONGWAVE FLUX EMITTED BY THE SURFACE
-%--------------------------------------------------------------------------
-
 function Qle = LONGOUT(Tsfc,emiss,SB)
-%--------------------------------------------------------------------------
-
-      Qle = - emiss*SB*Tsfc^4;                  % [W m-2]   
+%LONGOUT compute outgoing longwave emitted by the surface
+Qle = - emiss*SB*Tsfc^4; % [W m-2]

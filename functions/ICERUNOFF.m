@@ -1,19 +1,15 @@
 function ice1 = ICERUNOFF(ice1,ice2,opts)
-% ICERUNOFF computes runoff from the ice column
+%ICERUNOFF compute runoff from the ice column
 
 dz = opts.dz_thermal;
 df_liq = ice2.df_liq;
 
 % partition runoff into melt/freeze
-nsteps = size(df_liq,2);
-melt = zeros(nsteps,1);
-frze = zeros(nsteps,1);
-
-for n = 1:nsteps
-    imlt = df_liq(:,n)>0;
-    ifrz = df_liq(:,n)<0;
-    melt(n) = sum(dz(1).*df_liq(imlt,n));
-    frze(n) = sum(-dz(1).*df_liq(ifrz,n));
+melt = zeros(size(df_liq,2), 1);
+frze = zeros(size(df_liq,2), 1);
+for n = 1:size(df_liq,2)
+    melt(n) = sum(dz(1).*df_liq(df_liq(:,n)>0, n));
+    frze(n) = sum(-dz(1).*df_liq(df_liq(:,n)<0, n));
 end
 
 tlag = opts.tlagcolumn;
@@ -26,7 +22,7 @@ for n = 1+tlag:length(melt)
     potfreeze = max(potfreeze,0.0);
     if meltsumlag > 0.0
         netrunoff = potrunoff-potfreeze;
-        runoff(n,1) = max(runoff(n-1)+netrunoff,0.0);
+        runoff(n,1) = max(runoff(n-1)+netrunoff, 0.0);
     else
         runoff(n,1) = runoff(n-1) + potrunoff;
     end 
@@ -37,7 +33,7 @@ ice1.freeze = cumsum(frze);         % cumulative freeze
 
 % compute cumulative drainage if it's included in the output
 if isfield(ice2,'df_drn')
-   ice1.drain  = transpose(volFracToThickness(ice2.df_drn,dz));
+   ice1.drain = transpose(volFracToThickness(ice2.df_drn,dz));
 end
 
 % compute runoff and drain directly from df_liq (note: df_liq is the change

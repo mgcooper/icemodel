@@ -66,7 +66,7 @@ VAR         = reshape(VAR,n,m,h*d);
 VAR         = flipud(permute(VAR,[2 1 3]));
 
 % mar has no-data values that are either 999 or 1e36
-VAR         = setnan(VAR,VAR>998);
+VAR         = setnan(VAR,[],VAR>998);
 is          = find(T==datetime(yri,5,1,0,0,0));
 ie          = find(T==datetime(yri,9,30,0,0,0));
 Z           = VAR(:,:,is:ie);

@@ -1,4 +1,6 @@
 function [tair, swd, lwd, albedo, wspd, rh, psfc, De, time] = METINIT(opts, ii) 
+%METINIT initialize the met file
+%
 %#codegen
 
 % The second input is the index into the metfile name list generated in setopts

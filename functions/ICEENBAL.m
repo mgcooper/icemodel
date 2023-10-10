@@ -7,6 +7,7 @@ function [  T,                                                          ...
                         ro_ice,ro_liq,ro_sno,cp_sno,Ls,Lf,roLf,Rv,      ...
                         Tf,dz,delz,fn,dt,JJ,Tsfc,Sc,fcp,TL,TH,flmin,    ...
                         flmax,ro_iwe,ro_wie) %#codegen
+%ICEENBAL ice energy balance
 
 % % liquid water fraction and the derivative of f_liq wrt to temperature
    f_wat    =  f_liq+f_ice.*ro_iwe;           % frac_wat_old
@@ -46,12 +47,6 @@ while any(errT > 1e-2) && iter < 50
    iM  ]    =  GECOEFS(T,ro_sno,cp_sno,f_liq,f_ice,Ls,Lf,dz,dt,         ...
                dFdT,drovdT,TL,H,H_old,Sc,k_eff,fn,delz,Tsfc,JJ);
 
-% underrelaxation (doesn't work with melt-zone transformation)
-% if iter>1
-%     aP          =   aP./alpha;
-%     b           =   b + beta.*aP.*T;
-% end
-
 % solve the equation
    T        =  TRISOLVE(-aN,aP,-aS,b);
 
@@ -88,8 +83,3 @@ end
 % % check Tsfc
 %    Tsfc  =  TSURF(T,ro_sno,cp_sno,f_liq,f_ice,Ls,Lf,dz,dt,dFdT,   ...
 %             drovdT,H,H_old,Sc,k_eff,fn,delz,JJ);
-   
-   
-   
-   
-   

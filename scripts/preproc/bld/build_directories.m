@@ -1,5 +1,7 @@
 clean
 
+% this is outdated but could be used as a template for setting up directories
+
 % see /Users/coop558/mydata/icemodel/model/experiment/v8c/region/skinmodel
 % need to create similar dir's for v10 icemodel for region runs
 
@@ -21,18 +23,18 @@ frc_sol =   false; % solar data
 % the elements that need to be copied into each folder are 1) spectral
 % profiles, 2) met files, 3) functions. The 
 
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-%% set paths to the folder where everything exists and the one you want to build
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+%------------------------------------------------------------------------------
+% set paths to the folder where everything exists and the one you want to build
+%------------------------------------------------------------------------------
 p.src   = setpath('GREENLAND/icemodel/model/experiment/v8/behar/');
 p.bld   = setpath(['GREENLAND/icemodel/model/experiment/v8/' basin '/']);
 p.met   = setpath(['GREENLAND/icemodel/preproc/data/met/' basin '/']);
 p.rad   = setpath('GREENLAND/icemodel/preproc/data/spectral/');
 
 % NOTE: to separate the model from the location where the output is saved,             
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-%% make the directories
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+%------------------------------------------------------------------------------
+% make the directories
+%------------------------------------------------------------------------------
 
 if ~exist([p.bld],'dir')
     mkdir([p.bld]);
@@ -50,9 +52,9 @@ if ~exist([p.bld 'functions'],'dir')
     copyfile([p.src 'functions'],[p.bld 'functions']);
 end
 
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-%% copy the static files
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+%------------------------------------------------------------------------------
+% copy the static files
+%------------------------------------------------------------------------------
 flist   =   {   'a_icemodel_driver.m',          ...
                 'b_icemodel_input.m',           ...
                 'c_icemodel_initialize.m',      ...
@@ -69,9 +71,9 @@ for n = 1:length(flist)
     end
 end
 
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-%% copy the forcings
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+%------------------------------------------------------------------------------
+% copy the forcings
+%------------------------------------------------------------------------------
 
 for n = 1:nyears
     
@@ -117,9 +119,10 @@ for n = 1:nyears
     end
     
 end
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-%% make an output folder for each year
-%~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+%------------------------------------------------------------------------------
+% make an output folder for each year
+%------------------------------------------------------------------------------
 for n = 1:nyears
     
     yy = int2str(yri+n-1);

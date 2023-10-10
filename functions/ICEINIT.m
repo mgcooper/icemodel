@@ -2,7 +2,7 @@ function [f_ice, f_liq, T, TL, TH, flmin, flmax, cp_sno, k_eff, dz, fn, delz, ..
    grid_therm, dz_therm, dz_spect, JJ_therm, JJ_spect, Sc, Sp, scoef, ro_sno, ...
    ro_iwe, ro_wie, xTsfc, xf_liq, roL, Qc, f_min, fopts, liqflag, ice1, ice2] = ...
    ICEINIT(opts, tair)
-%ICEINIT initialize the ice columns
+%ICEINIT initialize the 1-d ice column
 %
 %#codegen
 
