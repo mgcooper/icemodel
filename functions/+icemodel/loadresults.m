@@ -1,5 +1,5 @@
 function [ice1, ice2, met] = loadresults(opts, varargin)
-   
+
    % If the simulation year is not specified, load the last one
    if nargin < 2
       thisyear = int2str(opts.simyears(end));
@@ -9,17 +9,17 @@ function [ice1, ice2, met] = loadresults(opts, varargin)
          thisyear = int2str(thisyear);
       end
    end
-   
+
    % load the met data
    met = icemodel.loadmet(opts, 1);
-   
+
    met = icemodel.processmet(met);
-   
+
    % load the simulation results
    try
       load(fullfile(opts.pathoutput, thisyear, ...
          ['ice1_' opts.casename]), 'ice1');
-   
+
       load(fullfile(opts.pathoutput, thisyear, ...
          ['ice2_' opts.casename]), 'ice2');
    catch e
@@ -28,7 +28,3 @@ function [ice1, ice2, met] = loadresults(opts, varargin)
       end
    end
 end
-
-
-
-

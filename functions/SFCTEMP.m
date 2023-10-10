@@ -108,7 +108,6 @@ function [Tsfc,OK] = SFCTEMP(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,...
    if errT<1e-3 && abs(xTsfc-Tsfc) < 10
       OK = true;  return
    else
-
       % cycle through various solver opts until we get a good solution
       dif = 20;
       tryflag = 0;
@@ -127,7 +126,6 @@ function [Tsfc,OK] = SFCTEMP(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,...
          %       causeE = MException('icemodel:SFCTEMP:rootfinding',msg);
          %       ME = addCause(ME,causeE); % let it go
          %    end
-
          end
          dif = abs(xTsfc-Tsfc);
       end
@@ -162,4 +160,3 @@ function Tsfc = SFCTMPFSOLVE(EEE,AAA,FFF,CCC,Tair,ea,wspd,emiss,SB,Tf,  ...
       [Tsfc,~,~] = fzero(fSEB,Tair,fopts);
    end
 end
-
