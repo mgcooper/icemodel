@@ -142,7 +142,7 @@ for thisyear = 1:numyears
                psfc(metiter), De(metiter), ea, Tf, k_eff, cv_air, roL, ...
                emiss, SB, epsilon, scoef, dz, liqflag, chi);
 
-            % % UPDATE SURFACE FLUXES
+            % % UPDATE SURFACE FLUXES (this active in icemodel_region)
             % k_eff =  GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
             % Qc    =  CONDUCT(k_eff, T, dz, MELTTEMP(Tsfc,Tf));
             % S     =  STABLEFN(tair(metiter), MELTTEMP(Tsfc,Tf), wspd(metiter), scoef);
@@ -173,12 +173,17 @@ for thisyear = 1:numyears
          [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, opts.vars1, opts.vars2, ...
             {Tsfc, Qm, Qf, Qe, Qh, Qc, chi, balance, dt_sum},  ...
             {T, f_ice, f_liq, d_liq, d_drn, d_evp, Sc, errH, errT});
+         
+         % For a regional run:
+         % {Tsfc},  ...
+         %    {T, f_ice, f_liq, d_liq, d_drn, d_evp});
       end
 
       % MOVE TO THE NEXT TIMESTEP
       [iter, metiter, subiter, dt_new] = NEXTSTEP(iter, metiter, subiter, ...
          dt_flag, dt_max, OK);
-   end
+
+   end % timesteps (one year)
 
    % RESTART THE MET DATA ITERATOR DURING SPIN UP
    if thisyear < numspinup
@@ -190,11 +195,3 @@ for thisyear = 1:numyears
    WRITEOUTPUT(ice1, ice2, opts, thisyear, ...
       time((thisyear-1)*maxiter+1:thisyear*maxiter), swd, lwd, albedo)
 end
-
-% post process
-[ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts);
-
-
-
-
-

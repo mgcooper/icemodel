@@ -50,7 +50,7 @@ TINY = 1e-8;
 [f_ice, f_liq, T, TL, TH, flmin, flmax, cp_sno, ~, dz, fn, delz, grid_therm, ...
    dz_therm, dz_spect, JJ_therm, JJ_spect, ~, Sp, scoef, ro_sno, ro_iwe, ...
    ro_wie, xTsfc, xf_liq, roL, Qc, f_min, fopts, liqflag, ice1, ice2] = ...
-   ICEINIT(opts, tair(1));
+   ICEINIT(opts, tair);
 
 % INITIALIZE THE EXTINCTION COEFFICIENTS
 [total_solar, grid_spect, z_walls, spect_lower, spect_upper, solardwavl] = ...
@@ -135,7 +135,7 @@ for thisyear = 1:numyears
             continue
          else
 
-            % % UPDATE SURFACE FLUXES
+            % UPDATE SURFACE FLUXES
             % k_eff = GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
             % [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, Tsfc, tair(metiter), ...
             %    swd(metiter), lwd(metiter), albedo(metiter), wspd(metiter), ...
@@ -181,7 +181,7 @@ for thisyear = 1:numyears
 
    end % timesteps (one year)
 
-   % RESTART THE COUNTER FOR SPIN UP
+   % RESTART THE MET DATA ITERATOR DURING SPIN UP
    if thisyear < numspinup
       metiter = 1;
       continue

@@ -1,6 +1,8 @@
 function Tsfc = SEBSOLVE(Tair,Qsi,Qli,albedo,wspd,Pa,De,ea,cv_air,...
       emiss,SB,Tf,Qc,xTsfc,chi,roL,scoef,fopts,liqflag)
    %SEBSOLVE solve the surface energy balance for the skin temperature
+   %
+   % TODO: add a call to SOLVE
 
    % Gather terms in the SEB equation.
    fSEB = @(Tsfc) chi*(1.0-albedo)*Qsi + emiss*Qli + Qc - emiss*SB.*Tsfc.^4 + ...
@@ -12,6 +14,8 @@ function Tsfc = SEBSOLVE(Tair,Qsi,Qli,albedo,wspd,Pa,De,ea,cv_air,...
    [a,b] = fzero_guess_to_bounds(fSEB, xTsfc, xTsfc-50, xTsfc+50);
 
    if isnan(a)
+      % an earlier version tried an unconstrained call to fzero but see notes in
+      % the "more robust" version about spinup - better to fall back to tair
       Tsfc = min(Tair,Tf);
    else
       try
@@ -34,6 +38,37 @@ function Tsfc = SEBSOLVE(Tair,Qsi,Qli,albedo,wspd,Pa,De,ea,cv_air,...
       Tsfc = Tair;
    end
 end
+
+%% more robust
+
+% This attempts to widen the search window, but I think I determined that a
+% wide window to begin with doesn't hurt performance and if the solution is
+% outside the window it's almost surely during spinup and falling back to Tair
+% is better than accepting the solution.
+
+% % find the region with zero crossing
+% a = nan;
+% iter = 0;
+% while isnan(a) && iter<15 % stop at +/- 120K
+%    iter = iter+1;
+%    [a,b] = fzero_guess_to_bounds(fSEB,xTsfc,[xTsfc-(45+5*iter) xTsfc+(45+5*iter)]);
+% end
+%
+% if isnan(a)
+% %    try
+% %       Tsfc = fzero(fSEB,xTsfc); % try unconstrained (not during spinup though)
+% %    catch ME
+%       Tsfc = Tair;
+% %    end
+% else
+%    Tsfc = fzero_brent(fSEB,[a b],fopts.TolX);
+%    % Tsfc = fzero(fSEB,[a b],fopts);
+% end
+
+% % this should only occur during spinup, and only if built-in fzero is used
+% if isnan(Tsfc)
+%    Tsfc = Tair;
+% end
 
 %% Secant method
 function [root, iter] = fzero_secant(f, a, b, tol,varargin)
@@ -285,7 +320,7 @@ function [a, b] = fzero_guess_to_bounds(f, x, A, B, varargin)
    % Version   : 1.0
    % History   : 01/07/2020 - initial release
    %           : 22/07/2020 - fix infinite loop in bounded case, arising from
-   %                          machine precision rounding 
+   %                          machine precision rounding
 
 
    % Matt Cooper, for compatibility with fzero syntax NEED TO REVISIT WHEN I

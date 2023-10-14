@@ -1,5 +1,4 @@
-function Qsi = SOLAR_RAD(J_day,xlat,cloud_frac,xhour,slope_az, ...
-      terrain_slope,transmiss)
+function Qsi = SOLARRAD(Jday,xlat,cloudfrac,xhour,slopeaz,sfcslope,transmiss)
    %SOLAR_RAD Compute the incoming solar radiation at the model timestep
 
    % Required constants.
@@ -13,7 +12,7 @@ function Qsi = SOLAR_RAD(J_day,xlat,cloud_frac,xhour,slope_az, ...
    % COMPUTE THE BASIC SOLAR RADIATION PARAMETERS.
 
    % Compute the solar declination angle (radians).
-   sol_dec = Trop_Can * cos(2.*pi * (real(J_day) - solstice)/days_yr);
+   sol_dec = Trop_Can * cos(2.*pi * (real(Jday) - solstice)/days_yr);
 
    % Compute the sun's hour angle (radians).
    hr_angl = (xhour * 15.0 - 180.0) * deg2rad;
@@ -25,8 +24,8 @@ function Qsi = SOLAR_RAD(J_day,xlat,cloud_frac,xhour,slope_az, ...
    cos_Z = max(0.0,cos_Z);
 
    % Account for clouds, water vapor, pollution, etc.
-   trans_direct = transmiss * (0.6 + 0.2 * cos_Z) * (1.0-cloud_frac);
-   trans_diffuse = transmiss * (0.3 + 0.1 * cos_Z) * cloud_frac;
+   trans_direct = transmiss * (0.6 + 0.2 * cos_Z) * (1.0-cloudfrac);
+   trans_diffuse = transmiss * (0.3 + 0.1 * cos_Z) * cloudfrac;
 
    % Compute the solar radiation transmitted through the atmosphere.
    Qsi_trans_dir = solar_const * trans_direct;
@@ -54,16 +53,16 @@ function Qsi = SOLAR_RAD(J_day,xlat,cloud_frac,xhour,slope_az, ...
 
    % Build, from the variable with north having zero azimuth, a
    %   slope_azimuth value with south having zero azimuth.
-   if (slope_az>=180.0)
-      slope_az_S0 = slope_az - 180.0;
+   if (slopeaz>=180.0)
+      slope_az_S0 = slopeaz - 180.0;
    else
-      slope_az_S0 = slope_az + 180.0;
+      slope_az_S0 = slopeaz + 180.0;
    end
    % Compute the angle between the normal to the slope and the angle
    %   at which the direct solar radiation impinges on the sloping
    %   terrain (radians).
-   cos_i = cos(terrain_slope * deg2rad) * cos_Z + ...
-      sin(terrain_slope * deg2rad) * sin_Z * ...
+   cos_i = cos(sfcslope * deg2rad) * cos_Z + ...
+      sin(sfcslope * deg2rad) * sin_Z * ...
       cos(sun_azimuth - slope_az_S0 * deg2rad);
    % Adjust the topographic correction due to local slope so that
    %   the correction is zero if the sun is below the local horizon
