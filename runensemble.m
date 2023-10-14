@@ -6,9 +6,6 @@ clean
 % python-feature e.g. the calling syntax to a_opts (now icemdoel-opts) here is
 % different than icemodel_opts in that branch
 
-%------------------------------------------------------------------------------
-%   run dependent information
-%------------------------------------------------------------------------------
 ID          =  'run1'; % run1 = w/chi, run2 = w/o chi (chi=0)
 savedata    =   false;
 sitenames   =  {'behar'};
@@ -25,9 +22,6 @@ ensemble = ensembleList(forcingdata,userdata,uservars,meltmodels,simyears,sitena
 % note: ak4 userData merra and racmo is available from 2012:2016, whereas
 % mar, kanl, and modis are available from 2009:2016
 
-%------------------------------------------------------------------------------
-% set paths
-%------------------------------------------------------------------------------
 opts.path.input    = setpath('GREENLAND/icemodel/input/');
 opts.path.output   = ['/Users/coop558/mydata/icemodel/output/v10/' ID '/'];
 opts.path.metdata  = [opts.path.input 'met/'];
@@ -48,9 +42,7 @@ opts.path.userdata = [opts.path.input 'userdata/'];
 % RACMO forcing + MAR, MERRA, RACMO, AWS, MODIS albedo
 % AWS forcing + MAR, MERRA, RACMO, AWS, MODIS albedo
 
-%------------------------------------------------------------------------------
 % run all combos
-%------------------------------------------------------------------------------
 for n = 1:ensemble.numcombos
 
    sitename    = char(ensemble.allcombos.sitenames(n));
@@ -88,10 +80,7 @@ for n = 1:ensemble.numcombos
    %    tic; [ice1,ice2,met,opts,diags] = icemodel(opts); toc
    %    [ice1,ice2,met,diags] = POSTPROC(ice1,ice2,met,opts,diags);
 
-
-   %------------------------------------------------------------------------------
-   %     save the data
-   %------------------------------------------------------------------------------
+   % save the data
    if savedata == true
       if ~exist(opts.path.output,'dir'); mkdir(opts.path.output); end
       save([opts.path.output opts.fsave],'enbal','ice1','ice2','opts');
@@ -99,10 +88,7 @@ for n = 1:ensemble.numcombos
 
 end
 
-%------------------------------------------------------------------------------
 % quick eval
-%------------------------------------------------------------------------------
-
 [Runoff,Discharge,Catchment] = prepRunoff(opts,ice1);
 AblationHourly = prepAblation(opts,ice1,'hourly');
 AblationDaily = prepAblation(opts,ice1,'daily');

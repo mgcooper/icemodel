@@ -2,10 +2,7 @@ clearvars
 close
 clc
 
-% this demonstrates how to set up a one-year run at one site
-
 %% set the run-specific model configuration
-
 savedata = true;
 sitename = 'behar';        % options: 'kanm', 'behar'
 forcings = 'mar';          % options: 'mar','kanm'
@@ -14,16 +11,12 @@ uservars = 'albedo';       % options: 'albedo', or any var in met
 simmodel = 'icemodel';     % options: 'icemodel','skinmodel'
 simyears = 2016;
 
-%% set the input and output paths in icemodel_config.m
-
 pathadd(getprojectfolder('runoff'))
 
-cfg = icemodel_config();
-
-%% build the 'opts' model configuration structure
-
-opts = icemodel_opts(sitename,simmodel,simyears,forcings,userdata,uservars,  ...
-   savedata);
+%% Set the project configuration and model options
+cnfg = icemodel.config();
+opts = icemodel.setopts(simmodel, sitename, simyears, forcings, ...
+   userdata, uservars, savedata);
 
 %% run the model
 switch simmodel

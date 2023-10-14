@@ -1,6 +1,9 @@
-function opts = icemodel_opts(sitename, simmodel, simyears, forcings, ...
+function opts = setopts(simmodel, sitename, simyears, forcings, ...
       userdata, uservars, savedata, casename, testname)
-   %ICEMODEL_OPTS set model options
+   %SETOPTS Set model options
+   %
+   %
+   % See also: icemodel.config
 
    if nargin < 8 || isempty(casename); casename = sitename; end
    if nargin < 9 || isempty(testname); testname = 'none'; end

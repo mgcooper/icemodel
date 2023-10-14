@@ -1,10 +1,10 @@
-function out = icemodel_config()
-   %ICEMODEL_CONFIG Configure project preferences
+function out = config()
+   %CONFIG Configure project preferences
    %
    % Syntax:
    %
-   % icemodel_config() configures project preferences including paths to data
-   % files and the location of model output files.
+   % cfg = icemodel.config() configures project preferences including paths to
+   % data files and the location of model output files.
    %
    % Description:
    %
@@ -26,7 +26,7 @@ function out = icemodel_config()
    % used in the icemodel_run script. ICEMODELINPUTPATH should point to input/
    % and ICEMODELDATAPATH should point to input/userdata )
    %
-   % See also: icemodel
+   % See also: icemodel icemodel.setopts icemodel.run
 
    % set the icemodel code, input data, and output data paths:
    persistent cfg
@@ -35,7 +35,7 @@ function out = icemodel_config()
       HOMEPATH = getenv('HOME');
 
       cfg.ICEMODELPATH = fullfile(HOMEPATH, 'myprojects/matlab/icemodel');
-      cfg.ICEMODELINPUTPATH = fullfile(HOMEPATH,' myprojects/matlab/runoff/data/icemodel/input');
+      cfg.ICEMODELINPUTPATH = fullfile(HOMEPATH,'myprojects/matlab/runoff/data/icemodel/input');
       cfg.ICEMODELDATAPATH = fullfile(HOMEPATH, 'myprojects/matlab/runoff/data/icemodel/eval');
       cfg.ICEMODELOUTPUTPATH = '/Volumes/Samsung_T5b/icemodel/output/v10b';
       cfg.ICEMODELUSERPATH = '/Volumes/Samsung_T5b';
