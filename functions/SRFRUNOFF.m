@@ -40,7 +40,6 @@ function rof = LAGRUNOFF(ice1,opts)
    con = ice1.cond;
    rof = zeros(size(mlt));
 
-
    for n = 1+lag:length(mlt)
       mltsumlag = sum(mlt(n-lag:n) + con(n-lag:n));
       potrunoff = con(n) + mlt(n);
@@ -59,4 +58,3 @@ function rof = LAGRUNOFF(ice1,opts)
       end
    end
 end
-

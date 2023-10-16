@@ -1,4 +1,5 @@
-function [T] = SKINSOLVE(Tsfc,T,k_eff,ro_sno,cp_sno,dz,dt,N,fn,delz)
+function [T, OK] = SKINSOLVE(Tsfc,T,k_eff,ro_sno,cp_sno,dz,dt,N,fn,delz, ...
+      f_liq,f_ice,Tf,Rv,Ls)
    %SKINSOLVE Solve the 1-dimensional heat conduction equation
    %--------------------------------------------------------------------------
    % 
@@ -26,11 +27,11 @@ function [T] = SKINSOLVE(Tsfc,T,k_eff,ro_sno,cp_sno,dz,dt,N,fn,delz)
    xT = Tsfc;
    
    % Set Sc/Sp to zero for pure 'skin' melt model
-   Sc = 0.0.*dz;
-   Sp = 0.0.*dz;
+   % Sc = 0.0.*dz;
+   % Sp = 0.0.*dz;
    
    % Solve the nonlinear heat equation by iteration (p. 47)
-   tol = 1e-1; dif = 2*tol; iter = 0; maxiter = 100;
+   tol = 1e-1; dif = 2*tol; iter = 0; maxiter = 100; OK = true;
    
    while any(dif > tol) && iter < maxiter
    
@@ -39,11 +40,11 @@ function [T] = SKINSOLVE(Tsfc,T,k_eff,ro_sno,cp_sno,dz,dt,N,fn,delz)
       gb_ns = 1.0./( (1.0-fn)./g_ns(1:N+1)+fn./g_ns(2:N+2));
    
       % Compute the enthalpy coefficient for each c.v. for the current timestep
-      aP0 = ro_sno .* cp_sno .* dz ./ dt;
+      % aP0 = ro_sno .* cp_sno .* dz ./ dt;
    
       % If including vapor heat:
-      % [~, drovdT] = VAPORHEAT(T,f_liq,f_ice,Tf,Rv,Ls);
-      % aP0 = (ro_sno.*cp_sno+Ls.*(1-f_liq-f_ice).*drovdT).*dz./dt;
+      [~, drovdT] = VAPORHEAT(T,f_liq,f_ice,Tf,Rv,Ls);
+      aP0 = (ro_sno.*cp_sno+Ls.*(1-f_liq-f_ice).*drovdT).*dz./dt;
    
       % Compute the aN and aS coefficients
       aN = gb_ns(1:N)   ./ delz(1:N);
@@ -56,8 +57,8 @@ function [T] = SKINSOLVE(Tsfc,T,k_eff,ro_sno,cp_sno,dz,dt,N,fn,delz)
       aS(N) = 0.0;
    
       % Compute the aP coefficient and solution vector b
-      aP = aN(1:N) + aS(1:N) + aP0(1:N) - Sp(1:N) .* dz(1:N);
-      b = Sc(1:N) .* dz(1:N) + aP0(1:N) .* T(1:N);
+      aP = aN(1:N) + aS(1:N) + aP0(1:N); % - Sp(1:N) .* dz(1:N);
+      b = aP0(1:N) .* T(1:N); % + Sc(1:N) .* dz(1:N);
    
       % modify b to account for Dirichlet boundary conditions
       b(1) = b(1) + bc_N;
@@ -70,5 +71,8 @@ function [T] = SKINSOLVE(Tsfc,T,k_eff,ro_sno,cp_sno,dz,dt,N,fn,delz)
       dif = abs(T-x);
       T = x;
       iter = iter+1;
+   end
+   if any(dif > tol)
+      OK = false;
    end
 end

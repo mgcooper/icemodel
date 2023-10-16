@@ -125,6 +125,10 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
          {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_drn', 'df_evp', 'Sc', ...
          'errH', 'errT'};
 
+      if strcmp(simmodel, 'skinmodel')
+         opts.vars2 = {'Tice', 'f_ice', 'f_liq'};
+      end
+      
       % Deal with the case where met-station forcing data (as opposed to gridded
       % climate model forcing data) is requested for a nearby catchment by
       % replacing the catchment name in the metfile with the met station name.

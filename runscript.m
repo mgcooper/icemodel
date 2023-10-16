@@ -3,10 +3,10 @@ close
 clc
 
 %% set the run-specific model configuration
-savedata = true;
+savedata = false;
 sitename = 'behar';        % options: 'kanm', 'behar'
-forcings = 'mar';          % options: 'mar','kanm'
-userdata = 'modis';        % options: 'modis','racmo','merra','mar','kanm','none'
+forcings = 'kanm';          % options: 'mar','kanm'
+userdata = 'mar';        % options: 'modis','racmo','merra','mar','kanm','none'
 uservars = 'albedo';       % options: 'albedo', or any var in met
 simmodel = 'icemodel';     % options: 'icemodel','skinmodel'
 simyears = 2016;
