@@ -1,6 +1,7 @@
-function [ro_sno, cp_sno, liqflag, roL, xT, xTsfc, xf_liq, xf_ice, dt_sum, ...
+function [ro_sno, cp_sno, liqflag, roL, T, Tsfc, f_liq, f_ice, dt_sum, ...
       dt_new, dt_flag] = UPDATESUBSTEP(f_ice, f_liq, ro_ice, ro_liq, ro_air, ...
       cv_ice, cv_liq, T, Tsfc, dt, dt_sum, dt_new, roLv, roLs, dt_min, TINY)
+   %UPDATESUBSTEP Update state, return past values, and allocate substep time
 
    % UPDATE DENSITY, HEAT CAPACITY, DIFFUSION LENGTH SCALE
    ro_sno = f_ice.*ro_ice + f_liq.*ro_liq + (1.0 - f_liq - f_ice).*ro_air;
@@ -13,12 +14,6 @@ function [ro_sno, cp_sno, liqflag, roL, xT, xTsfc, xf_liq, xf_ice, dt_sum, ...
    else
       roL = roLs;  % ro_air*Ls
    end
-
-   % STORE PAST VALUES
-   xT = T;
-   xTsfc = Tsfc;
-   xf_liq = f_liq;
-   xf_ice = f_ice;
 
    % ALLOCATE THIS SUBSTEP TO THE TIMESTEP
    dt_sum = dt_sum + dt_new;

@@ -29,7 +29,7 @@ function [T,f_ice,f_liq,d_liq,d_evp,d_drn,x_err,lcflag] = ICEMF( ...
 
    % evaporation/condensation/sublimation
    [f_ice, f_liq, d_drn, x_err] = ICESUBL(f_ice, f_liq, d_drn, ro_ice, ...
-      ro_liq, Ls, Lv, f_min, f_liq_min, dz_therm, dt_new, Qe, liqflag, metiter);
+      ro_liq, Ls, Lv, f_min, f_liq_min, dz_therm, dt_new, Qe, liqflag);
 
    % % budget evap / subl
    d_evp = d_evp + f_liq - xf_liq;
