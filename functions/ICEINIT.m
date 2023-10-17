@@ -1,5 +1,5 @@
 function [f_ice, f_liq, T, TL, TH, flmin, flmax, cp_sno, k_eff, dz, fn, ...
-      delz, grid_therm, dz_therm, dz_spect, JJ_therm, JJ_spect, Sc, Sp, ...
+      delz, z_therm, dz_therm, dz_spect, JJ_therm, JJ_spect, Sc, Sp, ...
       scoef, ro_sno, ro_iwe, ro_wie, xTsfc, xf_liq, roL, Qc, f_min, fopts, ...
       liqflag, ice1, ice2] = ICEINIT(opts, tair)
    %ICEINIT initialize the 1-d ice column
@@ -22,7 +22,7 @@ function [f_ice, f_liq, T, TL, TH, flmin, flmax, cp_sno, k_eff, dz, fn, ...
    maxiter = numel(tair)/opts.numyears;
 
    % GENERATE A THERMAL MESH
-   [dz, delz, fn, grid_therm] = CVTHERMAL(z0_therm, dz_therm);
+   [dz, delz, z_therm, ~, fn] = CVMESH(z0_therm, dz_therm);
 
    % INITIALIZE DENSITIES
    ro_glc = (917+1000)/2; % [kg/m3]
@@ -62,8 +62,7 @@ function [f_ice, f_liq, T, TL, TH, flmin, flmax, cp_sno, k_eff, dz, fn, ...
    scoef(1) = 5.3*9.4*wcoef*sqrt(z_obs/z_0);    % gamma Eq. A15
    scoef(2) = 9.4*9.81*z_obs;                   % 9.81=gravity
    scoef(3) = scoef(1)*sqrt(9.81*z_obs);
-   clear kappa z_obs z_0
-
+   
    % SOURCE TERM LINEARIZATION VECTORS
    Sc = zeros(JJ_therm,1);
    Sp = zeros(JJ_therm,1);
