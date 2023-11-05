@@ -21,13 +21,19 @@ opts = icemodel.setopts(simmodel, sitename, simyears, forcings, ...
 %% run the model
 switch simmodel
    case 'icemodel'
-      tic; icemodel(opts); toc
+      tic; [ice1, ice2] = icemodel(opts); toc
    case 'skinmodel'
       tic; skinmodel(opts); toc
 end
 
-% load the met data and run the post processing 
-[ice1, ice2, met] = icemodel.loadresults(opts);
+% load the met data and run the post processing
+if opts.savedata
+   [ice1, ice2, met] = icemodel.loadresults(opts);
+else
+   met = icemodel.loadmet(opts, numel(simyears));
+   [~, swd, lwd, albedo, ~, ~, ~, ~, time] = METINIT(opts, numel(simyears));
+   [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time);
+end
 
 %% prep the output for plotting
 

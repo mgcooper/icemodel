@@ -50,7 +50,7 @@ function varargout = physicalConstant(varargin)
       'cv_air', 1280.1, ...      % volumetric heat cap dry air     [J/m3/K]
       'cv_ice', 1927534.0, ...   % volumetric heat cap ice         [J/m3/K]
       'cv_liq', 4180000.0, ...   % volumetric heat cap liquid h20  [J/m3/K]
-      'fcp', 100.0, ...          % freezing curve parameter        [-]
+      'fcp', 100.0, ...          % freezing curve parameter        [K-1]
       'scale_ht', 8500.0, ...    % scale height                    [m]
       'hrsperday', 24, ...       % hours per day                   [hr]
       'roLv', 3187500.0, ...     % air density x latent heat vapor [J/m3]

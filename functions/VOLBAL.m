@@ -2,8 +2,8 @@ function [h_ice_j,h_liq_j,h_air_j,xice,xliq] = VOLBAL(h_ice_j,h_liq_j, ...
       h_air_j,h_res,h_tot)
 
    % Check if ice+liq exceeds available pore space
-   xice = max(0.0,h_ice_j+h_res-h_tot);
-   xliq = max(0.0,h_ice_j+h_liq_j-h_tot);
+   xice = max(0.0, h_ice_j + h_res - h_tot);
+   xliq = max(0.0, h_ice_j + h_liq_j - h_tot);
 
    if xice > 0 % ice + residual water exceeds pore space.
 
@@ -21,13 +21,13 @@ function [h_ice_j,h_liq_j,h_air_j,xice,xliq] = VOLBAL(h_ice_j,h_liq_j, ...
          h_res = 0.0;                        % reduce h_resid entirely
       end
 
-      h_ice_j = h_tot-h_res;                 % h_resid can be zero or +ive
+      h_ice_j = h_tot - h_res;               % h_resid can be zero or +ive
       h_liq_j = h_res;                       % h_liq can be zero or +ive
       h_air_j = 0.0;
 
    elseif xliq > 0 % the cv can acommodate the ice + some but not all free water
 
-      h_liq_j = h_liq_j-xliq;                % drain free water as needed
+      h_liq_j = h_liq_j - xliq;              % drain free water as needed
       h_air_j = 0.0;
 
    else % the cv can acommodate all the ice + free water
