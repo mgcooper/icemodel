@@ -70,6 +70,7 @@ function [dz_cv, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz)
    [dz_cv, delz, z_node, z_edge, z_node_bc] = deal( ...
       round(dz_cv,3), round(delz,3), round(z_node,3), round(z_edge,3), ...
       round(z_node_bc,3));
+   f = round(f, 1);
    
    % % These quantities are not computed, but may be useful. 
    % dz_bc = [delz_b; dz; delz_b]; % array of c.v. widths including boundaries

@@ -23,7 +23,7 @@ function [k_eff, k_vap] = GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf)
 
    % Compute snow thermal k
    g_ice = ro_ice * f_ice;
-   theta = 1 / (1 + exp(-0.04 * (g_ice - 450.0)));
+   theta = 1 ./ (1 + exp(-0.04 * (g_ice - 450.0)));
    kfirn = 2.107 + 0.003618 * (g_ice - 917.0);
    ksnow = 0.024 - 1.23e-4 * g_ice + 2.5e-6 * g_ice .^ 2;
    kiceT = 9.828 * exp(-5.7e-3 * T);
