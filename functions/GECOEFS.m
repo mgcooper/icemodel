@@ -1,58 +1,86 @@
-function [aN,aP,aS,b,iM] = GECOEFS(T,ro_sno,cp_sno,f_liq,f_ice,Ls,Lf,   ...
-      dz,dt,dFdT,drovdT,TL,H,H_old,Sc,k_eff,fn,delz,Tsfc,JJ)
+function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
+      Lf, ro_liq, dz, dt, dFdT, drovdT, TL, H, H_old, Sc, k_eff, fn, delz, Tsfc, JJ)
    %GECOEFS Compute the general equation coefficients
    %
-   %
-   %
+   % 
+   % 
+   %  Note: ro_sno * cp_sno = (cv_ice * f_ice + cv_liq * f_liq)
+   %  See UPDATESTATE (or UPDATESUBSTEP) for how ro_sno and cp_sno are computed
+   % 
+   %  Subtle point: Pmelt here is identical to SNTHRM:
+   %     P = g_liq - g_liq_o
+   %       = ro_liq * (f_liq - f_liq_o)
+   %       = g_wat * (f_ell - f_ell_o)
+   % 
+   %  Jordan uses P = g_wat * (f_ell - f_ell_o) 
+   %  I use P = ro_liq * (f_liq - f_liq_o)
+   %  This leads to different gv/gk switches, since my model is defined in terms
+   %  of volumetric fraction f_liq and Jordan's is bulk density g_liq:
+   %  T = dT + To
+   %  T = gv * P + gk
+   %    = 1 / (ro_liq * df_liq_dT) * (ro_liq * (f_liq - f_liq_o)) + To
+   %    = 1 / (f_liq - f_liq_o) / dT * (f_liq - f_liq_o) + To
+   %  T = dT + To
+   % 
+   % The same result is found using Jordan's definition of Pmelt and gv/gk.
+   % 
    % See also: 
 
-   % melt zone indices
+   % Commented statements are kept for reference. In some cases they are needed
+   % but are set when initialized e.g. the gv/gk/dFdT BCs, in other cases they
+   % are not used but would be for a frozen soil model.
+   
+   % Melt zone indices
    iM = TL <= T;
 
-   % for a soil model, would need indices above the melt zone
+   % For a soil model, would need indices above the melt zone
    % iM = TL <= T & T <= TH;
-   % iL = T>TH;
+   % iL = T > TH;
 
-   % coefficients for nodes below the melt zone: (W/m2/K)
-   f_air = (1.0-f_ice-f_liq);
-   aP0 = (ro_sno.*cp_sno+Lf.*ro_sno.*dFdT+Ls.*f_air.*drovdT).*dz./dt;
-   gv = ones(JJ,1);     % Eq 123
-   gk = zeros(JJ,1);
-   LfMZ = zeros(JJ,1);  % for melt-zone latent heat switch
+   % Coefficients for nodes below the melt zone: (W/m2/K)
+   f_air = (1.0 - f_ice - f_liq);
+   aP0 = (ro_sno .* cp_sno + Lf * ro_liq * dFdT + Ls * f_air .* drovdT) .* dz/dt;
+   gv = ones(JJ, 1);     % Eq 123
+   gk = zeros(JJ, 1);
+   LfMZ = zeros(JJ, 1);  % for melt-zone latent heat switch
 
-   % commented statements are for reference, they are set when initialized
+   % % If using g_liq instead of f_liq in the definition of dFdT as in SNTHRM:
+   % aP0 = (ro_sno .* cp_sno + Lf * ro_sno .* dFdT + Ls*f_air.*drovdT) .* dz/dt;
 
-   if sum(iM)>0   % nodes inside the melt zone:
-      aP0(iM) = (ro_sno(iM).*cp_sno(iM)+Ls.*f_air(iM).*drovdT(iM)).*dz(iM)./dt;
-      gv(iM) = 1./dFdT(iM)./ro_sno(iM);                     % Eq 122b
-      % gv(iM) = 1./dFdT(iM)./f_wat(iM)./ro_liq;            % Eq 122b
+   if sum(iM) > 0 % nodes inside the melt zone:
+      aP0(iM) = (ro_sno(iM) .* cp_sno(iM) + Ls * f_air(iM) .* drovdT(iM)) .* dz(iM) / dt;
+      gv(iM) = 1 ./ (ro_liq * dFdT(iM)); % Eq 122b
       gk(iM) = T(iM);
-      LfMZ(iM) = Lf.*dz(iM)./dt;
+      LfMZ(iM) = Lf * dz(iM) / dt;
+
+      % % If using g_liq instead of f_liq as in SNTHRM:
+      % gv(iM) = 1 ./ (ro_sno(iM) .* dFdT(iM)); % Eq 122b
+      % gv(iM) = 1 ./ (ro_liq * f_wat(iM) .* dFdT(iM)); % Eq 122b
    end
 
-   % % for a soil model, would need indices above the melt zone
+   % % For a soil model, would need indices above the melt zone
    % if sum(iL)>0   % nodes above the melt zone:
-   %    aP0(iL) = ro_sno(iL).*cp_liq.*dz(iL)./dt;
+   %    aP0(iL) = cv_liq * dz(iL) / dt;
    %  % gv(iM) = 1.0;
    %  % gk(iM) = 0.0;
    %  % dFdT(iL) = 0.0;
    % end
 
-   % adjust gv/gk in terms of N/P/S
-   gvN = vertcat(1,gv(1:JJ-1));
-   gvS = vertcat(gv(2:JJ),0);
-   gkN = vertcat(0,gk(1:JJ-1));
-   gkS = vertcat(gk(2:JJ),0);
+   % Adjust gv/gk in terms of N/P/S
+   gvN = vertcat(1, gv(1:JJ-1));
+   gvS = vertcat(gv(2:JJ), 0);
+   gkN = vertcat(0, gk(1:JJ-1));
+   gkS = vertcat(gk(2:JJ), 0);
    % gkP = gk;
    % gvP = gv;
 
-   % compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
-   g_b_ns = 1./((1-fn)./[k_eff(1);k_eff]+fn./[k_eff;k_eff(JJ)]);
+   % Compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
+   g_b_ns = 1 ./ ((1 - fn) ./ [k_eff(1); k_eff] + fn ./ [k_eff; k_eff(JJ)]);
 
-   % compute the aN and aS coefficients
+   % Compute the aN and aS coefficients
    aN = g_b_ns(1:JJ)   ./ delz(1:JJ);
    aS = g_b_ns(2:JJ+1) ./ delz(2:JJ+1);
-   % note that dely_p(1) and dely_p(end) are 1/2 CVs, which is correct
+   % note that delz(1) and delz(end) are 1/2 CVs, which is correct
 
    % Account for the boundary conditions.
    % bc_N = aN(1) * TN;       % Dirichlet: TN = known
@@ -60,18 +88,18 @@ function [aN,aP,aS,b,iM] = GECOEFS(T,ro_sno,cp_sno,f_liq,f_ice,Ls,Lf,   ...
    aS(JJ) = 0.0;              % Neumann: dT/dz = 0.0
    % aN(1) = 0.0;             % Neumann: qB = known
 
-   % compute the aP coefficient and solution vector b
+   % Compute the aP coefficient and solution vector b
    aP = aN + aS + aP0; % -Sp.*dz;
-   b = aP0.*T + Sc.*dz - (H - H_old);
+   b = aP0 .* T + Sc .* dz - (H - H_old);
 
-   % modify b to account for Dirichlet boundary conditions
-   b(1) = b(1) + aN(1)*Tsfc;
+   % Modify b to account for Dirichlet boundary conditions
+   b(1) = b(1) + aN(1) * Tsfc;
 
-   % adjust coefficients for melt zone switches
-   b = b - aP0.*gk+aS.*gkS-aS.*gk+aN.*gkN-aN.*gk;
-   aN = aN.*gvN;
-   aS = aS.*gvS;
-   aP = aP.*gv + LfMZ;
+   % Adjust coefficients for melt zone switches
+   b = b + aN.*gkN - aP.*gk + aS.*gkS ;
+   aN = aN .* gvN;
+   aS = aS .* gvS;
+   aP = aP .* gv + LfMZ;
 end
 
 % NOTES:
@@ -96,10 +124,10 @@ end
 % b = aP0*T_old + aS*gkS - aP0*gkP - aN*gkP - aS*gkP + aN*gkN + Sc*dx;
 %                                       (inside and out)
 
-% aP0 = (ro_sno*cp_sno + Lf*ro_sno*Fbar + Lv*f_air*CkT)*dz/dt (outside)
+% aP0 = (ro_sno*cp_sno + Lf*ro_liq*Fbar + Lv*f_air*CkT)*dz/dt (outside)
 % aP0 = (ro_sno*cp_sno +      0         + Lv*f_air*CkT)*dz/dt (inside)
 
-% gv = 1./ro_sno./Fbar;  (inside)
+% gv = 1./ro_liq./Fbar;  (inside)
 % gk = T_old             (inside)
 % gv = 1;                (outside)
 % gv = 0;                (outside)
