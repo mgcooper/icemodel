@@ -35,8 +35,10 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
    %% INITIALIZE THE MODEL
 
+   assertF off
+
    % Define a logical flag that sets the simulation model
-   isicemodel = strcmp(opts.simmodel, 'icemodel');
+   % isicemodel = strcmp(opts.simmodel, 'icemodel');
 
    % Load the physical constants
    [  cv_air, cv_liq, cv_ice, emiss, SB, epsilon, fcp, k_liq, Lf, ...
@@ -80,12 +82,12 @@ function [ice1, ice2] = icemodel(opts) %#codegen
          % end
 
          % SUBSURFACE SOLAR RADIATION SOURCE-TERM
-         if swd(metiter) > 0 && isicemodel
+         if swd(metiter) > 0 % && isicemodel
             [Sc, chi] = UPDATEEXTCOEFS(swd(metiter), albedo(metiter), ...
                z_spect, dz_spect, z_therm, dz_therm, JJ, dz, ro_sno, ...
                total_solar, spect_lower, spect_upper, solardwavl);
          else
-            Sc = 0.0.*dz;
+            Sc = 0.0 * dz;
             chi = 1.0;
          end
 
@@ -117,17 +119,42 @@ function [ice1, ice2] = icemodel(opts) %#codegen
             * (ea - VAPOR(Tsfc, Tf, liqflag)), ...
             xTsfc, xTsfc-50, xTsfc+50, tair(metiter), fopts.TolX);
 
+         % TEST
+         % [f_liq, f_ice, T, OK2] = INFILTRATION(f_liq, f_ice, T, Tf, ...
+         %    TL, fcp, dz, dt);
+         % ro_sno = f_ice .* ro_ice + f_liq .* ro_liq + (1.0 - f_liq - f_ice) .* ro_air;
+         % cp_sno = (cv_ice .* f_ice + cv_liq .* f_liq) ./ ro_sno;
+         % assertF(@() all(f_ice + f_liq - 1.0 <= 0))
+
          while dt_sum < dt
 
+            assertF(@() all(f_ice + f_liq - 1.0 <= 0))
+
             % SUBSURFACE ENERGY BALANCE
-            [T, errH, errT, f_ice, f_liq, OK] = ICEENBAL(T, f_ice, f_liq, ...
+            [T, errH, errT, f_ice, f_liq, OK1] = ICEENBAL(T, f_ice, f_liq, ...
                k_liq, cv_ice, cv_liq, ro_ice, ro_liq, ro_sno, cp_sno, Ls, ...
                Lf, roLf, Rv, Tf, dz, delz, fn, dt_new, JJ, Tsfc, Sc, ...
                fcp, TL, TH, flmin, flmax, ro_iwe, ro_wie);
 
+            assertF(@() all(f_ice + f_liq - 1.0 <= 0))
+
+            % TEST
+            OK2 = true;
+            % if OK1
+            %    [f_liq, f_ice, T, OK2] = INFILTRATION(f_liq, f_ice, T, Tf, ...
+            %       TL, fcp, dz, dt_new);
+            %
+            %    ro_sno = f_ice .* ro_ice + f_liq .* ro_liq + (1.0 - f_liq - f_ice) .* ro_air;
+            %    cp_sno = (cv_ice .* f_ice + cv_liq .* f_liq) ./ ro_sno;
+            %
+            %    assertF(@() all(f_ice + f_liq - 1.0 <= 0))
+            % end
+
+            OK = OK1 && OK2;
+
             % ERROR MESSAGE (SLOWS DOWN THE CODE A LOT)
             % fprintf('iter = %d (%.2f%%), dt = %.0f, success = %s\n', ...
-            %    iter,100*iter/maxiter,dt_new,mat2str(OK))
+            %    iter,100*iter/maxiter,dt_new,mat2str(all(OK)))
 
             % PHASE BOUNDARY OVERSHOOT, DECREASE THE TIME STEP AND START OVER
             if not(OK) && subiter < maxsubiter
@@ -138,6 +165,12 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
                continue
             else
+
+               % NOTE: if subiter == maxsubiter and OK is false, we have a
+               % problem b/c T is likely complex and xT etc get set in
+               % UPDATESUBSTEP, so either need to reduce the timestep further,
+               % or add a check that only sets xT etc if OK is true, and
+               % otherwise keeps state constant essentially skipping the step
 
                % UPDATE SURFACE FLUXES
                k_eff = GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
@@ -153,12 +186,16 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                % es0   =  VAPOR(MELTTEMP(Tsfc,Tf), Tf, liqflag);
                % Qe    =  LATENT(De(metiter), S, ea, es0, roL, epsilon, psfc(metiter));
 
+               assertF(@() all(f_ice + f_liq - 1.0 <= 0))
+
                % COMPUTE MELT FREEZE
                [T, f_ice, f_liq, d_liq, d_evp, d_drn] = ICEMF(T, f_ice, ...
                   f_liq, ro_ice, ro_liq, cv_ice, cv_liq, Lf, Ls, Lv, ...
                   Tf, TL, fcp, xf_liq, Sc, Sp, JJ, f_min, fopts, ...
                   dz_therm, dt_new, Qe, liqflag, ro_iwe, d_liq, d_drn, ...
                   d_evp, flmin);
+
+               assertF(@() all(f_ice + f_liq - 1.0 <= 0))
 
                % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
                [ro_sno, cp_sno, liqflag, roL, xT, xTsfc, xf_liq, xf_ice, ...
@@ -187,6 +224,8 @@ function [ice1, ice2] = icemodel(opts) %#codegen
          % MOVE TO THE NEXT TIMESTEP
          [iter, metiter, subiter, dt_new] = NEXTSTEP(iter, metiter, subiter, ...
             dt_flag, dt_max, OK, dt_new);
+
+         assertF(@() all(f_ice + f_liq - 1.0 <= 0))
 
       end % timesteps (one year)
 
