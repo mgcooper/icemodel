@@ -96,22 +96,22 @@ function [f_liq_C, f_ice_C, T_C, Sc_C, Sp_C, d_drn, d_liq] = COMBINEHEAT( ...
 
       % Set T=Tf for a fully-melted node and ICEMF will remove it
       if Td_C < 0
-         T_C  = ( T(j1)*m_wat_1 + T(j2)*m_wat_2 ) / m_wat_C;
-         Td_C = Tf-T_C;
+         T_C  = (T(j1) * m_wat_1 + T(j2) * m_wat_2) / m_wat_C;
+         Td_C = Tf - T_C;
       end
    end
 
    % Invert T_dC to obtain f_liq from the f_liq = f(f_wat, Tdc) relationship.
    f_wat_C = m_wat_C / (ro_liq * 2 * dz);
-   f_liq_C = f_wat_C ./ (1.0 + (fcp .* Td_C).^2.0); % eq 67, Jordan
+   f_liq_C = f_wat_C / (1.0 + (fcp * Td_C) ^ 2.0); % eq 67, Jordan
    f_ice_C = (f_wat_C - f_liq_C) * ro_liq / ro_ice;
 
    % f_wat_C = m_wat_C / (ro_liq * dz);
 
    % positive d_liq means ice melted, negative means liquid refroze.
-   d_liq(j1) = d_liq(j1) + 2*f_liq_C - (f_liq(j1)+f_liq(j2));
+   d_liq(j1) = d_liq(j1) + 2 * f_liq_C - (f_liq(j1) + f_liq(j2));
 
    % if there is less water in the combined layer then water drained
    % d_drn(j1) = d_drn(j1) + max((f_liq(j1)+f_liq(j2))-f_liq_C-d_liq(j1), 0);
-   d_drn(j1) = d_drn(j1) + max(f_liq_C/2, 0);
+   d_drn(j1) = d_drn(j1) + max(f_liq_C / 2, 0);
 end

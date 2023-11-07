@@ -55,8 +55,8 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    opts.i_grainradius   =  25;      % index 25 = 2.0 mm                 [#]
 
    % define the timescale beyond which stored meltwater is assumed to runoff
-   opts.tlagcolumn = 6*3600/opts.dt; % convert hours to timesteps
-   opts.tlagsurf = 6*3600/opts.dt;
+   opts.tlagcolumn = 6 * 3600 / opts.dt; % convert hours to timesteps
+   opts.tlagsurf = 6 * 3600 / opts.dt;
    opts.error = '';
 
    %---------------------------- set the input and output paths

@@ -12,28 +12,26 @@ function [T,f_liq,f_ice,OK] = MZTRANSFORM(T,T_old,f_liq,f_wat,ro_liq,   ...
    % fraction at the start of the step
    % note: flmin/max are f_wat at T=TL/TH, NOT min/max possible f_wat
 
-   % Transform melt-zone layers from T to liq density (f_liq = f_liq_o + P/ro)
+   % Update liquid fraction of melting layers (f_liq = f_liq_o + P/ro)
    f_liq(iM) = f_liq(iM) + T(iM) / ro_liq; % line 79 of ftemp.f
 
    % Update frac ice
    f_ice = (f_wat - f_liq) * ro_wie;
    
-   % Transform melt-zone layers frac liq to T (NOTE g_wat/g_liq=f_wat/f_liq)
+   % Transform melt-zone frac liq to T (NOTE g_wat/g_liq=f_wat/f_liq)
    T(iM) = Tf - sqrt(f_wat(iM) ./ f_liq(iM) - 1.0) / fcp;
    
    % Note: above uses the new f_liq, which is correct. Don't use this update:
    % T(iM) = T_old(iM) + T(iM) ./ (ro_liq * dFdT(iM));
    
-   % Check if phase boundary is overshot. This is essential because melt-zone
-   % switches will not give a valid solution outside the melt zone. Also,
-   % since this is only called on nodes that were within the melt zone, it's
-   % sufficient to check if the boundary is overshot in either direction.
+   % Check for nodes that were within the melt zone but now have a liquid
+   % fraction below the lower limit (phase boundary overshoot).
    if any(f_liq(iM) < 0.95 * flmin(iM)) || any(f_liq(iM) > 1.05 * flmax(iM))
       OK = false;
    end
 
-   % Check if any frozen nodes totally skipped the melt-zone or visa-versa
-   if any(T_old(~iM) < TL & T(~iM) > TH) || any(T_old(~iM) > TH & T(~iM) < TL)
+   % Check for nodes that were outside the melt zone and fully overshot it.
+   if any(T_old(~iM) < TL & T(~iM) >= TH) || any(T_old(~iM) > TH & T(~iM) < TL)
       OK  = false;
    end
 end

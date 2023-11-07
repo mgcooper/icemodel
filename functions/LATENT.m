@@ -1,4 +1,4 @@
-function Qe = LATENT(De,S,ea,es0,roL,epsilon,Pa)
+function Qe = LATENT(De, S, ea, es0, roL, epsilon, Pa)
    %LATENT compute latent heat flux
    %
    %  Qe = ro_air * L * De_h * stability * (0.622/Pa * (ea - es0));
@@ -10,7 +10,4 @@ function Qe = LATENT(De,S,ea,es0,roL,epsilon,Pa)
    %
    % See also: SENSIBLE
    Qe = roL * De * S * (epsilon/Pa * (ea - es0));
-
-   % to implement scalar coeffs, use D_e instead of De_h
-   % Qe = ro_air * L * D_e * stability * (0.622/Pa * (ea - es0))
 end

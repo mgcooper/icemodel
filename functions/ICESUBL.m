@@ -14,7 +14,7 @@ function [f_ice, f_liq, d_drn, xsubl] = ICESUBL(f_ice, f_liq, d_drn, ro_ice, ...
    % should be able to occur when liqflag is false
 
    % potential evaporation
-   pevap = Qe/(Lv*ro_liq)*dt_new/dz_therm;
+   pevap = Qe / (Lv * ro_liq) * dt_new / dz_therm;
 
    % top-layer liquid water and ice fraction
    f_liq_top = f_liq(1);
@@ -86,7 +86,7 @@ function [f_ice, xsubl] = SUBL(pevap, f_ice, f_ice_min, ro_ice, ro_liq, Lv, Ls)
    end
 
    % convert evap to ice frac-equivalent
-   psubl = pevap * (ro_liq*Lv) / (ro_ice*Ls);
+   psubl = pevap * (ro_liq * Lv) / (ro_ice * Ls);
    f_ice_top = f_ice(1);
 
    % Note: since layer combination is based on f_ice, I don't think we need to

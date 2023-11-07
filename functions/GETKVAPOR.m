@@ -9,7 +9,7 @@ function k_vap = GETKVAPOR(T, Ls, Rv, Tf)
    % where:
    %  De = 9e-5 * (T / Tf) ^ nd;
    %
-   % with nd the 'temperature exponent', Anderson (1976) eq. 3.13
+   % with nd the 'temperature exponent', Anderson (1976) Eq. 3.13 (& Fig. 4.3)
    %
    % See also:
 

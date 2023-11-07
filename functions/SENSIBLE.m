@@ -1,4 +1,4 @@
-function Qh = SENSIBLE(De,S,Tair,Tsfc,cv_air)
+function Qh = SENSIBLE(De, S, Tair, Tsfc, cv_air)
    %SENSIBLE compute the sensible heat flux
    %
    % Qh = ro_air * Cp_air * De_h * stability * (Tair - Tsfc);
@@ -6,7 +6,4 @@ function Qh = SENSIBLE(De,S,Tair,Tsfc,cv_air)
    %
    % see also: LATENT
    Qh = cv_air * De * S * (Tair - Tsfc);
-
-   % to implement scalar coeffs use D_h
-   % Qh = ro_air * Cp * D_h * stability * (Tair - Tsfc)
 end
