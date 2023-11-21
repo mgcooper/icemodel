@@ -31,9 +31,9 @@ function [k_eff, k_vap] = GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf)
       + theta .* kiceT / 2.107 .* kfirn;
 
    % Compute snow vapor k
-   esi = 611.15 * exp((22.452 * (T - Tf)) ./ (272.55 + T - Tf)); % [Pa]
+   es = 611.15 * exp((22.452 * (T - Tf)) ./ (272.55 + T - Tf)); % [Pa]
    k_vap = Ls * 9e-5 * (T / Tf) .^ 14 ./ (Rv * T) ...
-     * 22.452 * 272.55 .* esi ./ ((272.55 + T - Tf) .^ 2); % desi/dT [Pa K-1]
+     * 22.452 * 272.55 .* es ./ ((272.55 + T - Tf) .^ 2); % des/dT [Pa K-1]
    
    % Combine them into a bulk value
    k_sno = f_liq .* k_liq + f_ice .* k_sno;

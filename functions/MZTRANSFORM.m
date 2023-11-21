@@ -10,6 +10,7 @@ function [T,f_liq,f_ice,OK] = MZTRANSFORM(T,T_old,f_liq,f_wat,ro_liq,   ...
    % note: Told is needed for the second check
    % iM is the melt zone nodes at the start of the step, f_wat is the water
    % fraction at the start of the step
+   %
    % note: flmin/max are f_wat at T=TL/TH, NOT min/max possible f_wat
 
    % Update liquid fraction of melting layers (f_liq = f_liq_o + P/ro)
