@@ -16,10 +16,20 @@ function varargout = physicalConstant(varargin)
    %
    %#codegen
 
+   % see: IAPWS release on the Properties of Ice and Supercooled Water.
+   
    narginchk(0,Inf);
 
    % name = validatestring(name,icemodel.physconlist,'physicalConstant','name', 1);
-
+   
+   % From Romps:
+   % Rv = 461;                      % specific gas constant for water vapor [J kg-1 K-1]
+   % cp_liq = 4119;                 % specific heat capacity of liquid water
+   % cp_ice = 1861;
+   % cv_vap = 1418;                 % specific heat capacity of water vapor at constant volume [J kg-1 K-1]
+   % cp_vap = cv_vap + Rv;          % specific heat capacity of water vapor at constant pressure [J kg-1 K-1]
+   % Ptrip = 611.65;                % triple point vapor pressure
+   
    % Define physical constants and accepted values
    constants = struct( ...
       'Tf', 273.16, ...             % Freezing point (Triple point), [K]
@@ -67,6 +77,10 @@ function varargout = physicalConstant(varargin)
    constants.roLf = constants.ro_liq * constants.Lf;        % [J m-3] for liquid
 %    constants.roLf = constants.ro_ice * constants.Lf;      % [J m-3] for ice
    
+   % Need to add for VAPORHEAT:
+   % Ls / Rv
+   % Lv / Rv
+
    % Ratios of intrinsic ice and water density
    constants.ro_iwe = constants.ro_ice / constants.ro_liq;  % [dimensionless]
    constants.ro_wie = constants.ro_liq / constants.ro_ice;  % [dimensionless]

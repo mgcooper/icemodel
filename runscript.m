@@ -50,7 +50,7 @@ if opts.simmodel == "skinmodel"
    h1 = plotRunoff(Runoff,Discharge,Catchment,'plotsurf',true,'sitename',  ...
       sitename,'userdata',userdata,'forcingdata',forcings);
 else
-   h1 = plotRunoff(Runoff,Discharge,Catchment,'sitename',sitename,         ...
+   [h1, data] = plotRunoff(Runoff,Discharge,Catchment,'sitename',sitename,         ...
       'userdata',userdata,'forcingdata',forcings,'t1',t1,'t2',t2);
 end
 
@@ -62,6 +62,8 @@ plotPromice(AblationHourly,'refstart',t1);
 % plot the energy balance
 % plotEnbal(ice1,met);
 
+diffs = (data{end, 2:end} - data.ADCP(end)) ./ data.ADCP(end);
+diffs = array2table(diffs, 'VariableNames', {'Racmo', 'Mar', 'Merra', 'IceModel'})
 %%
 
 % [Lv, ro_liq] = icemodel.physicalConstant('Lv', 'ro_liq');
