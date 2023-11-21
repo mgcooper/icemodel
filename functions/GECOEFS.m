@@ -36,36 +36,42 @@ function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
    % For a soil model, would need indices above the melt zone
    % iM = TL <= T & T <= TH;
    % iL = T > TH;
-
+   
    % Coefficients for nodes below the melt zone: (W/m2/K)
    f_air = (1.0 - f_ice - f_liq);
-   aP0 = (ro_sno .* cp_sno + Lf * ro_liq * dFdT + Ls * f_air .* drovdT) .* dz/dt;
+   aP0 = ro_sno .* cp_sno + Lf * ro_liq * dFdT + Ls * f_air .* drovdT;
    gv = ones(JJ, 1);     % Eq 123
-   gk = zeros(JJ, 1);
-   LfMZ = zeros(JJ, 1);  % for melt-zone latent heat switch
+   gk = zeros(JJ, 1);    % Eq 123
+   LfMZ = zeros(JJ, 1);  % Eq 123, melt-zone latent heat switch
 
    % % If using g_liq instead of f_liq in the definition of dFdT as in SNTHRM:
-   % aP0 = (ro_sno .* cp_sno + Lf * ro_sno .* dFdT + Ls*f_air.*drovdT) .* dz/dt;
+   % aP0 = (ro_sno .* cp_sno + Lf * ro_sno .* dFdT + Ls * f_air .* drovdT)
 
    if sum(iM) > 0 % nodes inside the melt zone:
-      aP0(iM) = (ro_sno(iM) .* cp_sno(iM) + Ls * f_air(iM) .* drovdT(iM)) .* dz(iM) / dt;
-      gv(iM) = 1 ./ (ro_liq * dFdT(iM)); % Eq 122b
+      aP0(iM) = ro_sno(iM) .* cp_sno(iM) + Ls * f_air(iM) .* drovdT(iM);
+      gv(iM) = 1 ./ (ro_sno(iM) .* dFdT(iM)); % Eq 122b
       gk(iM) = T(iM);
       LfMZ(iM) = Lf * dz(iM) / dt;
 
       % % If using g_liq instead of f_liq as in SNTHRM:
       % gv(iM) = 1 ./ (ro_sno(iM) .* dFdT(iM)); % Eq 122b
       % gv(iM) = 1 ./ (ro_liq * f_wat(iM) .* dFdT(iM)); % Eq 122b
+      
+      % If using ro_liq:
+      % gv(iM) = 1 ./ (ro_liq * dFdT(iM));
    end
 
    % % For a soil model, would need indices above the melt zone
    % if sum(iL)>0   % nodes above the melt zone:
-   %    aP0(iL) = cv_liq * dz(iL) / dt;
+   %    aP0(iL) = cv_liq;
    %  % gv(iM) = 1.0;
    %  % gk(iM) = 0.0;
    %  % dFdT(iL) = 0.0;
    % end
 
+   % Convert from J/m3/K to W/m2/K
+   aP0 = aP0 .* dz / dt;
+   
    % Adjust gv/gk in terms of N/P/S
    gvN = vertcat(1, gv(1:JJ-1));
    gvS = vertcat(gv(2:JJ), 0);
@@ -77,7 +83,7 @@ function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
    % Compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
    g_b_ns = 1 ./ ((1 - fn) ./ [k_eff(1); k_eff] + fn ./ [k_eff; k_eff(JJ)]);
 
-   % Compute the aN and aS coefficients
+   % Compute the aN and aS coefficients (W / m2 / K)
    aN = g_b_ns(1:JJ)   ./ delz(1:JJ);
    aS = g_b_ns(2:JJ+1) ./ delz(2:JJ+1);
    % note that delz(1) and delz(end) are 1/2 CVs, which is correct
@@ -90,7 +96,7 @@ function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
 
    % Compute the aP coefficient and solution vector b
    aP = aN + aS + aP0; % -Sp.*dz;
-   b = aP0 .* T + Sc .* dz - (H - H_old);
+   b = aP0 .* T + Sc .* dz - (H - H_old) .* dz / dt; % W / m2
 
    % Modify b to account for Dirichlet boundary conditions
    b(1) = b(1) + aN(1) * Tsfc;

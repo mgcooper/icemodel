@@ -16,10 +16,10 @@ function [H,T,errH,errT,OK] = HEATSOLVE(T_old,H_old,f_wat,f_ice,f_liq, ...
       k_eff = GETGAMMA(T_old,f_liq,f_ice,ro_ice,k_liq,Ls,Rv,Tf);
 
       % update vapor heat
-      [H_vap, drovdT] = VAPORHEAT(T_old,f_liq,f_ice,Tf,Rv,Ls);
+      [ro_vap, drovdT] = VAPORHEAT(T_old,f_liq,f_ice,Tf,Rv,Ls);
 
       % update total enthalpy
-      H = TOTALHEAT(T_old,f_liq,f_ice,cv_liq,cv_ice,roLf,Tf,H_vap,dzdt);
+      H = TOTALHEAT(T_old,f_liq,f_ice,cv_liq,cv_ice,roLf,Ls*ro_vap,Tf);
 
       % update the general model coefficients
       [aN,aP,aS,b,iM] = GECOEFS(T_old,ro_sno,cp_sno,f_liq,f_ice,cp_liq,Ls, ...
@@ -72,8 +72,7 @@ end
 
 % NOTE: still need to figrue out why i had the version w/o H_vap just in
 % case but must have just been a test
-% not sure why Hvap isn't in here ... actuallly i think it may be because
-% my porosity doesn't change so there's always .1 air which is unrealistic
+% not sure why Hvap isn't in here:
 % % total enthalpy
 %     H0 = ((ro_ice.*cp_ice.*f_ice + ro_liq.*cp_liq.*f_liq).*  ...
 %                     (T_old-Tf) +  ro_ice.*Lf.*f_liq).*dz./dt;

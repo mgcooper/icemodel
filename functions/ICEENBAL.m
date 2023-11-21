@@ -1,6 +1,7 @@
-function [T,errH,errT,f_ice,f_liq,OK] = ICEENBAL(T,f_ice,f_liq,k_liq,cv_ice, ...
-      cv_liq,ro_ice,ro_liq,ro_sno,cp_sno,Ls,Lf,roLf,Rv,Tf,dz,delz,fn,dt,JJ, ...
-      Tsfc,Sc,fcp,TL,TH,flmin,flmax,ro_iwe,ro_wie) %#codegen
+function [T, errH, errT, f_ice, f_liq, OK] = ICEENBAL(T, f_ice, f_liq, ...
+      k_liq, cv_ice, cv_liq, ro_ice, ro_liq, ro_sno, cp_sno, Ls, Lf, roLf, ...
+      Rv, Tf, dz, delz, fn, dt, JJ, Tsfc, Sc, fcp, TL, TH, flmin, flmax, ...
+      ro_iwe, ro_wie) %#codegen
    %ICEENBAL Solve the ice energy balance.
    
    % Compute water fraction and the derivative of f_liq wrt to temperature
@@ -12,11 +13,11 @@ function [T,errH,errT,f_ice,f_liq,OK] = ICEENBAL(T,f_ice,f_liq,k_liq,cv_ice, ...
    fliqmin = f_wat .* flmin;
    fliqmax = f_wat .* flmax;
 
-   % Compute latent heat due to water vapor diffusion
-   H_vap = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
+   % Compute vapor diffusion
+   ro_vap = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
 
-   % Compute total enthalpy in W/m2
-   H_old = ((cv_ice*f_ice + cv_liq*f_liq).*(T-Tf) + roLf*f_liq + H_vap) .* dz/dt;
+   % Compute total enthalpy in J/m3
+   H_old = TOTALHEAT(T, f_liq, f_ice, cv_liq, cv_ice, roLf, Ls * ro_vap, Tf);
 
    % Iterate to solve the nonlinear heat equation
    errT = 2e-2; iter = 0; errH = 0; OK = true; alpha = 0.8;
@@ -30,12 +31,12 @@ function [T,errH,errT,f_ice,f_liq,OK] = ICEENBAL(T,f_ice,f_liq,k_liq,cv_ice, ...
       k_eff = GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
 
       % Update vapor heat
-      [H_vap, drovdT] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
+      [ro_vap, drovdT] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
 
       % Update total enthalpy
-      H = ((cv_ice*f_ice + cv_liq*f_liq).*(T-Tf) + roLf*f_liq + H_vap) .* dz/dt;
-
-      % Update the general model coefficients
+      H = TOTALHEAT(T, f_liq, f_ice, cv_liq, cv_ice, roLf, Ls * ro_vap, Tf);
+      
+      % Update the general equation coefficients
       [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
          Lf, ro_liq, dz, dt, dFdT, drovdT, TL, H, H_old, Sc, k_eff, fn, ...
          delz, Tsfc, JJ);
