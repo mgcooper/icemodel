@@ -33,7 +33,7 @@ function ice1 = ICERUNOFF(ice1,ice2,opts)
 
    % compute cumulative drainage if it's included in the output
    if isfield(ice2,'df_drn')
-      ice1.drain = transpose(volFracToThickness(ice2.df_drn,dz));
+      ice1.drain = transpose(cumsum(sum(dz(:) .* ice2.df_drn)));
    end
 
    % compute runoff and drain directly from df_liq (note: df_liq is the change
