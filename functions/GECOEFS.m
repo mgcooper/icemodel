@@ -1,8 +1,9 @@
-function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
-      Lf, ro_liq, dz, dt, dFdT, drovdT, TL, H, H_old, Sc, k_eff, fn, delz, Tsfc, JJ)
+function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, Lf, ...
+      ro_liq, dz, dt, dFdT, drovdT, TL, H, H_old, Sc, k_eff, fn, delz, Tsfc, JJ)
    %GECOEFS Compute the general equation coefficients
    %
-   % 
+   %  This function constructs the lower, middle, and upper diagonals of the 
+   %  A matrix in a form compatible with TRISOLVE.
    % 
    %  Note: ro_sno * cp_sno = (cv_ice * f_ice + cv_liq * f_liq)
    %  See UPDATESTATE (or UPDATESUBSTEP) for how ro_sno and cp_sno are computed
@@ -24,7 +25,7 @@ function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
    % 
    % The same result is found using Jordan's definition of Pmelt and gv/gk.
    % 
-   % See also: 
+   % See also: ICEENBAL, TRISOLVE
 
    % Commented statements are kept for reference. In some cases they are needed
    % but are set when initialized e.g. the gv/gk/dFdT BCs, in other cases they
@@ -75,10 +76,11 @@ function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
    % Adjust gv/gk in terms of N/P/S
    gvN = vertcat(1, gv(1:JJ-1));
    gvS = vertcat(gv(2:JJ), 0);
-   gkN = vertcat(0, gk(1:JJ-1));
+   gkN = vertcat(0, gk(1:JJ-1)); % zero accounts for upper dirichlet BC
    gkS = vertcat(gk(2:JJ), 0);
    % gkP = gk;
    % gvP = gv;
+   % Todo: Confirm if gkN(1) is zero if a Neumann condition is used up top.
 
    % Compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
    g_b_ns = 1 ./ ((1 - fn) ./ [k_eff(1); k_eff] + fn ./ [k_eff; k_eff(JJ)]);
@@ -86,9 +88,9 @@ function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
    % Compute the aN and aS coefficients (W / m2 / K)
    aN = g_b_ns(1:JJ)   ./ delz(1:JJ);
    aS = g_b_ns(2:JJ+1) ./ delz(2:JJ+1);
-   % note that delz(1) and delz(end) are 1/2 CVs, which is correct
+   % note that delz(1) and delz(end) are 1/2 CVs
 
-   % Account for the boundary conditions.
+   % Account for Neumann boundary conditions before constructing A
    % bc_N = aN(1) * TN;       % Dirichlet: TN = known
    % bc_S = 0.0;              % Neumann: dT/dz = 0.0
    aS(JJ) = 0.0;              % Neumann: dT/dz = 0.0
@@ -101,11 +103,17 @@ function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
    % Modify b to account for Dirichlet boundary conditions
    b(1) = b(1) + aN(1) * Tsfc;
 
-   % Adjust coefficients for melt zone switches
+   % Apply the melt zone (enthalpy) transformation
    b = b + aN .* gkN - aP .* gk + aS .* gkS ;
    aN = aN .* gvN;
    aS = aS .* gvS;
    aP = aP .* gv + LfMZ;
+   
+   % Account for the upper boundary condition. Not strictly necessary b/c aN(1)
+   % is not involved in the TRISOLVE solution, but technically correct. Must be
+   % done here, after all other terms involving aN are computed, unlike aS(JJ),
+   % which must be done prior to constructing A.
+   aN(1) = 0.0;
 end
 
 % NOTES:

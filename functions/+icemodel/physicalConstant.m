@@ -44,13 +44,15 @@ function varargout = physicalConstant(varargin)
       'cp_ice', 2093.0, ...         % Specific heat capacity of ice at 0°C [J kg-1 K-1]
       'k_liq', 0.561, ...           % Thermal conductivity of water at 0°C [W m-1 K-1]
       'k_ice', 2.22, ...            % Thermal conductivity of ice at 0°C [W m-1 K-1]
+      'Rd', 287.0, ...              % gas constant for dry air [J kg-1 K-1]
       'Rv', 461.5, ...              % Gas constant for water vapor [J kg-1 K-1]
-      'emiss', 0.98, ...            % Surface emissivity for ice [dimensionless]
       'SB', 5.670374419e-8, ...     % Stefan-Boltzmann constant [W m-2 K-4]
+      'emiss', 0.98, ...            % Surface emissivity for ice [1]
       'gravity', 9.80665, ...       % Gravitational acceleration [m s-2]
-      'kappa', 0.4, ...             % von Karman constant [dimensionless]
-      'one_atmos', 101325.0, ...    % One atmosphere [Pa]
-      'epsilon', 0.622, ...         % Ratio of molar mass of dry air to that of water vapor [dimensionless]
+      'kappa', 0.4, ...             % von Karman constant [1]
+      'kappa_p', 0.2854, ...        % Poisson constant for dry air [1] (Rd/cp_air)
+      'epsilon', 0.622, ...         % Ratio of molar mass of dry air to that of water vapor [1]
+      'P0', 101325.0, ...           % One atmosphere [Pa]
       'es0', 611.2, ...             % Reference saturation vapor pressure at 0°C [Pa]
       'S0', 1361.0, ...             % Solar constant [W m-2]
       'N0', 0.08, ...               % Marshall-Palmer parameter [cm-4]
@@ -75,15 +77,14 @@ function varargout = physicalConstant(varargin)
    constants.roLv = constants.ro_air * constants.Lv;        % [J m-3]
    constants.roLs = constants.ro_air * constants.Ls;        % [J m-3]
    constants.roLf = constants.ro_liq * constants.Lf;        % [J m-3] for liquid
-%    constants.roLf = constants.ro_ice * constants.Lf;      % [J m-3] for ice
    
    % Need to add for VAPORHEAT:
    % Ls / Rv
    % Lv / Rv
 
    % Ratios of intrinsic ice and water density
-   constants.ro_iwe = constants.ro_ice / constants.ro_liq;  % [dimensionless]
-   constants.ro_wie = constants.ro_liq / constants.ro_ice;  % [dimensionless]
+   constants.ro_iwe = constants.ro_ice / constants.ro_liq;  % [1]
+   constants.ro_wie = constants.ro_liq / constants.ro_ice;  % [1]
    
    % Freezing point depression parameter ^2
    constants.fcpsq = constants.fcp^2;                       % [K-2]
