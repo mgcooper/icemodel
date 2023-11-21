@@ -102,7 +102,7 @@ function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
    b(1) = b(1) + aN(1) * Tsfc;
 
    % Adjust coefficients for melt zone switches
-   b = b + aN.*gkN - aP.*gk + aS.*gkS ;
+   b = b + aN .* gkN - aP .* gk + aS .* gkS ;
    aN = aN .* gvN;
    aS = aS .* gvS;
    aP = aP .* gv + LfMZ;
