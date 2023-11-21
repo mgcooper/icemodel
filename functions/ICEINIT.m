@@ -1,15 +1,15 @@
 function [f_ice, f_liq, T, TL, TH, flmin, flmax, cp_sno, k_eff, dz, fn, ...
-      delz, z_therm, dz_therm, dz_spect, JJ_therm, JJ_spect, Sc, Sp, ...
-      scoef, ro_sno, ro_iwe, ro_wie, xTsfc, xf_liq, roL, Qc, f_min, fopts, ...
-      liqflag, ice1, ice2] = ICEINIT(opts, tair)
+      delz, z_therm, dz_therm, dz_spect, JJ_therm, JJ_spect, Sc, Sp, scoef, ...
+      ro_sno, ro_iwe, ro_wie, xTsfc, xf_liq, roL, Qc, f_min, fopts, ...
+      liqresid, liqflag, ice1, ice2] = ICEINIT(opts, tair)
    %ICEINIT initialize the 1-d ice column
    %
    %#codegen
 
    % load the physical constants.
    [cp_ice, cp_liq, fcp, kappa, Lf, ro_ice, ro_air, ro_liq, k_liq, Tf, Ls, ...
-      Rv, roLs, gravity] = ...
-      icemodel.physicalConstant('cp_ice','cp_liq','fcp','kappa','Lf', ...
+      Rv, roLs, gravity] ...
+      = icemodel.physicalConstant('cp_ice','cp_liq','fcp','kappa','Lf', ...
       'ro_ice','ro_air','ro_liq','k_liq','Tf','Ls','Rv','roLs','gravity');
 
    % COMPUTE THE # OF NODES IN THE THERMAL AND SPECTRAL GRIDS
@@ -63,19 +63,21 @@ function [f_ice, f_liq, T, TL, TH, flmin, flmax, cp_sno, k_eff, dz, fn, ...
    scoef(1) = 5.3 * 9.4 * wcoef * sqrt(z_obs / z_0); % gamma Eq. A15
    scoef(2) = 9.4 * gravity * z_obs;
    scoef(3) = scoef(1) * sqrt(gravity * z_obs);
-   
+
    % SOURCE TERM LINEARIZATION VECTORS
    Sc = zeros(JJ_therm, 1);
    Sp = zeros(JJ_therm, 1);
 
    % STATE VARIABLES AND PARAMETERS NEEDED ON THE FIRST ITERATION
-   xTsfc = T(1);
-   Qc =  CONDUCT(k_eff, T, dz, xTsfc);
-   roL = roLs;
    fopts = opts.fzero;
-   xf_liq = f_liq;
    f_min = opts.f_ice_min;
+   liqresid = opts.liqresid;
+
+   roL = roLs;
+   xTsfc = T(1);
+   xf_liq = f_liq;
    liqflag = false;
+   Qc =  CONDUCT(k_eff, T, dz, xTsfc);
    % zD = sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
 
    % INITIALIZE THE OUTPUT STRUCTURES
@@ -91,4 +93,3 @@ function [f_ice, f_liq, T, TL, TH, flmin, flmax, cp_sno, k_eff, dz, fn, ...
    % A1 = ones(JJ_therm,1);
    % A = spdiags([A1,A1,A1],-1:1,JJ_therm,JJ_therm);
 end
-

@@ -35,6 +35,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    opts.z_0             =  0.001;   % Surface aero. roughness length    [m]
    opts.z_obs           =  3.0;     % Height of wind and air temp obs   [m]
    opts.ro_snow_i       =  900.0;   % initial ice density               [kg/m3]
+   opts.liqresid        =  0.07;    % residual pore water fraction      [-]
 
    % timestepping / grid thickness
    opts.dt              =  900.0;   % timestep                             [s]

@@ -1,7 +1,7 @@
-function [T,f_ice,f_liq,d_liq,d_evp,d_drn,x_err,lcflag] = ICEMF( ...
-      T,f_ice,f_liq,ro_ice,ro_liq,cv_ice,cv_liq,Lf,Ls,Lv,Tf,TL,fcp,xf_liq, ...
-      Sc,Sp,JJ_therm,f_min,fopts,dz_therm,dt_new,Qe,liqflag,ro_iwe,d_liq, ...
-      d_drn,d_evp,flmin)
+function [T, f_ice, f_liq, d_liq, d_evp, d_drn, x_err, lcflag] = ICEMF( ...
+      T, f_ice, f_liq, ro_ice, ro_liq, cv_ice, cv_liq, Lf, Ls, Lv, Tf, ...
+      TL, fcp, xf_liq, Sc, Sp, JJ_therm, f_min, fopts, dz_therm, dt_new, ...
+      Qe, ro_iwe, d_liq, d_drn, d_evp, flmin, liqresid)
    %ICEMF compute ice melt-freeze and combine layers if necessary
    %
    %#codegen
@@ -24,12 +24,29 @@ function [T,f_ice,f_liq,d_liq,d_evp,d_drn,x_err,lcflag] = ICEMF( ...
    % d_evp > 0 = cond (should be correct below)
    % d_drn > 0 = runoff due to extra condensation (should be correct below)
 
-   % update the lower melt-zone boundary
-   f_liq_min = (f_liq(1)+f_ice(1).*ro_iwe).*flmin; % 0.001;
+   % Update the lower melt-zone boundary
+   if T(1) > TL
+      
+      % Ensure f_liq is never reduced below residual water for melting nodes
+      f_liq_min = (f_liq(1) + f_ice(1) * ro_iwe) * flmin;
+      liqresid = max(liqresid, f_liq_min / (1 - f_ice(1)));
+
+      % If f_res is larger than f_liq_min, ICESUBL will never reduce f_liq(1)
+      % below f_liq_min. Thus, below checks if f_res is ever smaller than
+      % f_liq_min. If it is, then there's a problem 
+      
+      % Check if f_res is ever smaller than f_liq_min. If it can be proven it
+      % will never trigger, delete this entire if block and use liq_resid
+      % without any max() statement.
+      % 
+      % if liq_resid * (1 - f_ice(1)) < f_liq_min
+      %    liq_resid = max(0.07, f_liq_min / (1 - f_ice(1)));
+      % end
+   end
 
    % evaporation/condensation/sublimation
-   [f_ice, f_liq, d_drn, x_err] = ICESUBL(f_ice, f_liq, d_drn, ro_ice, ...
-      ro_liq, Ls, Lv, f_min, f_liq_min, dz_therm, dt_new, Qe, liqflag);
+   [f_ice, f_liq, d_drn, x_err] = ICESUBL(f_ice, f_liq, d_drn, ...
+      ro_ice, ro_liq, Ls, Lv, dz_therm, dt_new, Qe, f_min, liqresid);
 
    % % budget evap / subl
    d_evp = d_evp + f_liq - xf_liq;
@@ -38,16 +55,18 @@ function [T,f_ice,f_liq,d_liq,d_evp,d_drn,x_err,lcflag] = ICEMF( ...
    % if cond, d_evp > 0
    % if subl, d_sub < 0
 
-   % Below here
+   % Below here:
    % d_XXX = f_liq - xf_liq - d_evp
    % where f_liq on the rhs is f_liq_new
 
-   % update the top layer temperature
-   T(1) = Tf-sqrt(((f_liq(1)+f_ice(1).*ro_iwe)./f_liq(1)-1))./fcp;
+   % Update the top layer temperature, if the node is in the melt zone
+   if T(1) > TL % f_liq(1) > f_liq_min
+      T(1) = Tf - sqrt( (f_liq(1) + f_ice(1) * ro_iwe) / f_liq(1) - 1.0) / fcp;
+   end
 
    % combine layers if any layer is <f_min, or if this step's sublimation
    % would reduce any layer to <f_min (predict the need to combine next step)
-   lyrmrg = f_ice <= f_min | (f_ice+Qe/(Ls*ro_ice)*dt_new/dz_therm) <= f_min;
+   lyrmrg = f_ice <= f_min | (f_ice + Qe/(Ls*ro_ice)*dt_new/dz_therm) <= f_min;
 
    % lyrmrg is updated in the loop, keep lcflag to know which layer was combined
    lcflag = lyrmrg;
