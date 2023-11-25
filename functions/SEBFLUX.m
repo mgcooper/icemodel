@@ -21,8 +21,8 @@ function [  Qe,                                                         ...
    % Perform an energy balance check.
    Tsfc     =  MELTTEMP(Tsfc, Tf);
    S        =  STABLEFN(Tair,Tsfc,wspd,scoef);
-   es0      =  VAPOR(Tsfc,Tf,liqflag);
-   Qe       =  LATENT(De,S,ea,es0,roL,epsilon,Pa);
+   es       =  VAPPRESS(Tsfc,Tf,liqflag);
+   Qe       =  LATENT(De,S,ea,es,roL,epsilon,Pa);
    Qh       =  SENSIBLE(De,S,Tair,Tsfc,cv_air);
    Qle      =  LONGOUT(Tsfc,emiss,SB);
    Qc       =  CONDUCT(k_eff,T,dz,Tsfc);

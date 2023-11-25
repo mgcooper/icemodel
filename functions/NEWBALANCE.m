@@ -28,10 +28,10 @@ function [Qle,Qh,Qe,Qc,Qm,Qf,balance,Tsfc,Tflag] = NEWBALANCE(Tair,wspd,rh, ...
    stability = STABLEFN(Tair,Tsfc0,wspd,gravity,xkappa,opts);
 
    % Compute the water vapor pressure at the surface.
-   es0 = VAPOR(Tsfc0,Tfp);
+   es = VAPPRESS(Tsfc0,Tfp);
 
    % Compute the latent heat flux.
-   Qe = LATENT(De_h,stability,ea,es0,ro_air,xLs,Pa);
+   Qe = LATENT(De_h,stability,ea,es,ro_air,xLs,Pa);
 
    % Compute the sensible heat flux.
    Qh = SENSIBLE(De_h,stability,Tair,Tsfc0,ro_air,Cp_air);
