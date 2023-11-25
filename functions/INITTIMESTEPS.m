@@ -23,9 +23,9 @@ function [iter, subiter, maxiter, maxsubiter, dt, dt_min, dt_max, dt_new, ...
 
    % this is
    numspinup = opts.spinup_loops;
-   simyears = opts.simyears;
+   simyears = opts.simyears(:);
    if numspinup > 1
-      simyears = [repmat(simyears(1),numspinup,1) simyears(2:end)];
+      simyears = [repmat(simyears(1),numspinup,1); simyears(2:end)];
    end
    numyears = numel(simyears);
 end

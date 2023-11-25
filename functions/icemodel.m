@@ -62,8 +62,9 @@ function [ice1, ice2] = icemodel(opts) %#codegen
       = EXTCOEFSINIT(opts, ro_ice);
 
    % INITIALIZE TIMESTEPPING
-   [metiter, subiter, maxiter, maxsubiter, dt, dt_min, dt_max, dt_new, ...
-      numyears, ~, numspinup] = INITTIMESTEPS(opts, time);
+   [metiter, subiter, maxiter, maxsubiter, dt, dt_min, dt_max, ...
+      dt_new, numyears, ~, numspinup] ...
+      = INITTIMESTEPS(opts, time);
 
    %% START ITERATIONS OVER YEARS
    for thisyear = 1:numyears
@@ -73,8 +74,8 @@ function [ice1, ice2] = icemodel(opts) %#codegen
       while iter <= maxiter
 
          % INITIALIZE NEW SUBSTEP
-         [dt_sum, subfail, dt_flag, OK, d_liq, d_drn, d_evp] = ...
-            INITSUBSTEP(f_liq);
+         [dt_sum, subfail, dt_flag, OK, d_liq, d_drn, d_evp] ...
+            = INITSUBSTEP(f_liq);
 
          % update the upper layer diffusion length scale
          % if sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1))) > dz(1)
@@ -90,35 +91,20 @@ function [ice1, ice2] = icemodel(opts) %#codegen
             Sc = 0.0 * dz;
             chi = 1.0;
          end
-
-         % [Qsi*(1-albedo) sum(Sc.*dz)]                        % total
-         % [chi*Qsi*(1-albedo) Sc(1).*dz(1)]                   % top node
-         % [(1-chi)*Qsi*(1-albedo) sum(Sc(2:end).*dz(2:end))] 	% interior nodes
-
-         % if the Sc(1)=0 method is used, then this should hold:
-         % Qsi*(1-albedo) - ( chi*Qsi*(1-albedo) + sum(Sc.*dz) ) = 0
-         % (1-chi)*Qsi*(1.0-albedo) - Sc(1)*dz(1) = 0
-
-         % if using the Qseb method, the total absorbed radiation should equal
-         % the portion allocated to the surface plus the sum of the subsurface
-         % absorption
-         % [Qsi*(1-albedo) sum(Sc.*dz)+Qseb]                   % total
-         % [chi*Qsi*(1.0-albedo) Qseb]                         % SEB
-         % [(1-chi)*Qsi*(1.0-albedo) sum(Sc.*dz)]              % interior
-
-         % so we can either pass Qseb or chi out of extcoefs
+         
+         % icemodel.verifyShortwaveBalance(Qsi, Sc, albedo, chi, dz, 1);
 
          % SURFACE TEMPERATURE
          ea = VAPPRESS(tair(metiter), Tf, liqflag) * rh(metiter) / 100;
          Tsfc = fsearchzero(@(Tsfc) Qc ...
             + chi * (1.0 - albedo(metiter)) * swd(metiter) ...
-            + emiss * (lwd(metiter) - SB * Tsfc^4) ...
-            + cv_air * De(metiter) * (tair(metiter)-Tsfc) ...
+            + emiss * (lwd(metiter) - SB * Tsfc ^ 4) ...
+            + cv_air * De(metiter) * (tair(metiter) - Tsfc) ...
             * STABLEFN(tair(metiter), Tsfc, wspd(metiter), scoef) ...
             + roL * De(metiter) * (ea - VAPPRESS(Tsfc, Tf, liqflag)) ...
             * 0.622 / psfc(metiter) ...
             * STABLEFN(tair(metiter), Tsfc, wspd(metiter), scoef), ...
-            xTsfc, xTsfc-50, xTsfc+50, tair(metiter), fopts.TolX);
+            xTsfc, xTsfc - 50, xTsfc + 50, tair(metiter), fopts.TolX);
 
          % TEST
          % [f_liq, f_ice, T, OK2] = INFILTRATION(f_liq, f_ice, T, Tf, ...
@@ -161,8 +147,8 @@ function [ice1, ice2] = icemodel(opts) %#codegen
             if not(OK) && subiter < maxsubiter
 
                [subfail, subiter, dt_new, T, Tsfc, f_ice, f_liq] ...
-                  = RESETSUBSTEP( xT, xTsfc, xf_ice, xf_liq, dt_max, subiter, ...
-                  maxsubiter, subfail);
+                  = RESETSUBSTEP( xT, xTsfc, xf_ice, xf_liq, dt_max, ...
+                  subiter, maxsubiter, subfail);
 
                continue
             else
@@ -175,10 +161,11 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
                % UPDATE SURFACE FLUXES
                k_eff = GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
-               [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, Tsfc, tair(metiter), ...
-                  swd(metiter), lwd(metiter), albedo(metiter), wspd(metiter), ...
-                  psfc(metiter), De(metiter), ea, Tf, k_eff, cv_air, roL, ...
-                  emiss, SB, epsilon, scoef, dz, liqflag, chi);
+               
+               [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, Tsfc, ...
+                  tair(metiter), swd(metiter), lwd(metiter), albedo(metiter), ...
+                  wspd(metiter), psfc(metiter), De(metiter), ea, Tf, k_eff, ...
+                  cv_air, roL, emiss, SB, epsilon, scoef, dz, liqflag, chi);
 
                % % UPDATE SURFACE FLUXES (this active in icemodel_region)
                % k_eff =  GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
@@ -198,10 +185,11 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                assertF(@() all(f_ice + f_liq - 1.0 <= 0))
 
                % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
-               [ro_sno, cp_sno, liqflag, roL, xT, xTsfc, xf_liq, xf_ice, ...
-                  dt_sum, dt_new, dt_flag] = UPDATESUBSTEP(f_ice, f_liq, ...
-                  ro_ice, ro_liq, ro_air, cv_ice, cv_liq, T, Tsfc, dt, ...
-                  dt_sum, dt_new, roLv, roLs, dt_min, TINY);
+               [ro_sno, cp_sno, liqflag, roL, xT, xTsfc, xf_liq, ...
+                  xf_ice, dt_sum, dt_new, dt_flag] ...
+                  = UPDATESUBSTEP(f_ice, f_liq, ro_ice, ro_liq, ro_air, ...
+                  cv_ice, cv_liq, T, Tsfc, dt, dt_sum, dt_new, roLv, ...
+                  roLs, dt_min, TINY);
 
                % zD = sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
                % if zD > dz(1)
@@ -222,8 +210,8 @@ function [ice1, ice2] = icemodel(opts) %#codegen
          end
 
          % MOVE TO THE NEXT TIMESTEP
-         [iter, metiter, subiter, dt_new] = NEXTSTEP(iter, metiter, subiter, ...
-            dt_flag, dt_max, OK, dt_new);
+         [iter, metiter, subiter, dt_new] = NEXTSTEP(iter, metiter, ...
+            subiter, dt_flag, dt_max, OK, dt_new);
 
          assertF(@() all(f_ice + f_liq - 1.0 <= 0))
 

@@ -1,32 +1,29 @@
 clean
 
-% NOTE: this was b_drive, I renamed it icemodel_run_ensemble, checked out
-% icemodel_config and icemodel_run from python-feature, and renamed a_opts to
-% icemodel_opts, but did not edit this function or merge anything else from
-% python-feature e.g. the calling syntax to a_opts (now icemdoel-opts) here is
-% different than icemodel_opts in that branch
+testname = 'run1'; % run1 = w/chi, run2 = w/o chi (chi=0)
+savedata = true;
 
-ID          =  'run1'; % run1 = w/chi, run2 = w/o chi (chi=0)
-savedata    =   false;
-sitenames   =  {'behar'};
-forcingdata =  {'kanm'};   % {'mar','kanl'}
-userdata    =  {'none'};   % {'none','merra','racmo','mar','modis'};
-uservars    =  {'albedo'};
-meltmodels  =  {'icemodel'};
-startyear   =  2016;
-endyear     =  2016;
-simyears    =  startyear:endyear;
+sitename = {'behar', 'slv1', 'slv2'}; % {'behar'};
+forcings = {'mar', 'kanm'};
+userdata = {'none','merra','racmo','mar','modis', 'kanm'}; % {'none'};
+uservars = {'albedo'};
+simmodel = {'icemodel', 'skinmodel'};
+simyears = 2015:2015;
 
-ensemble = ensembleList(forcingdata,userdata,uservars,meltmodels,simyears,sitenames);
+% sitename = {'upperbasin'}; % {'behar'};
+% forcings = {'mar', 'kanl'};
+% userdata = {'none','merra','racmo','mar','modis'}; % {'none'};
+% uservars = {'albedo'};
+% simmodel = {'icemodel', 'skinmodel'};
+% simyears = 2016:2016;
 
-% note: ak4 userData merra and racmo is available from 2012:2016, whereas
+% userdata = {'none','mar','modis', 'kanl'}; % {'none'};
+
+ensemble = ensembleList( ...
+   forcings, userdata, uservars, simmodel, simyears, sitename);
+
+% note: ak4 userdata merra and racmo is available from 2012:2016, whereas
 % mar, kanl, and modis are available from 2009:2016
-
-opts.path.input    = setpath('GREENLAND/icemodel/input/');
-opts.path.output   = ['/Users/coop558/mydata/icemodel/output/v10/' ID '/'];
-opts.path.metdata  = [opts.path.input 'met/'];
-opts.path.initdata = [opts.path.input 'init/'];
-opts.path.userdata = [opts.path.input 'userdata/'];
 
 % valid userdata:
 % {'racmo','mar','merra','kanm','kanl','modis','none'}
@@ -45,62 +42,57 @@ opts.path.userdata = [opts.path.input 'userdata/'];
 % run all combos
 for n = 1:ensemble.numcombos
 
-   sitename    = char(ensemble.allcombos.sitenames(n));
-   simyear     = char(ensemble.allcombos.simyears(n));
-   meltmodels  = char(ensemble.allcombos.meltmodels(n));
-   forcingdata = char(ensemble.allcombos.forcingdata(n));
-   userdata    = char(ensemble.allcombos.userdata(n));
-   uservars    = cellstr(ensemble.allcombos.uservars(n));
+   sitename = char(ensemble.allcombos.sitename(n));
+   simyears = char(ensemble.allcombos.simyears(n));
+   simmodel = char(ensemble.allcombos.simmodel(n));
+   forcings = char(ensemble.allcombos.forcings(n));
+   userdata = char(ensemble.allcombos.userdata(n));
+   uservars = char(ensemble.allcombos.uservars(n));
 
    % this skips cases like 'icemodel_upperBasin_2016_kanl_swap_KANL_albedo'
    % this does not skip the cases where the sitename and forcing are the
    % same, which are the cases where kanm/kanl are used to force basin runs
-   if strcmpi(userdata,forcingdata)
+   if strcmpi(userdata, forcings)
       continue;
    end
 
-   % set the model options (including the fsave prefix)
-   opts = a_opts(opts,sitename,simyear,meltmodels,forcingdata,userdata, ...
-      uservars,str2double(simyear),str2double(simyear));
+   % set the model options
+   opts = icemodel.setopts(simmodel, sitename, str2double(simyears), ...
+      forcings, userdata, uservars, savedata);
 
    % display the run info
-   disp([meltmodels ', ' sitename ', '  forcingdata ', ' userdata ', ' simyear])
+   disp([simmodel ', ' sitename ', '  forcings ', ' userdata ', ' simyears])
 
    % RUN THE MODEL
-   if opts.skinmodel == true
-      tic; [ice1,ice2,met,opts] = skinmodel(opts); toc
-   else
-      tic; [ice1,ice2,met,opts] = icemodel(opts); toc
+   switch simmodel
+      case 'icemodel'
+         tic; [ice1, ice2] = icemodel(opts); toc
+      case 'skinmodel'
+         tic; [ice1, ice2] = skinmodel(opts); toc
    end
-
-   % post process
-   [ice1,ice2,met] = POSTPROC(ice1,ice2,met,opts);
-
-   % % if using diags:
-   %    tic; [ice1,ice2,met,opts,diags] = icemodel(opts); toc
-   %    [ice1,ice2,met,diags] = POSTPROC(ice1,ice2,met,opts,diags);
-
-   % save the data
-   if savedata == true
-      if ~exist(opts.path.output,'dir'); mkdir(opts.path.output); end
-      save([opts.path.output opts.fsave],'enbal','ice1','ice2','opts');
-   end
-
 end
 
-% quick eval
-[Runoff,Discharge,Catchment] = prepRunoff(opts,ice1);
-AblationHourly = prepAblation(opts,ice1,'hourly');
-AblationDaily = prepAblation(opts,ice1,'daily');
+% post process
+met = icemodel.loadmet(opts, numel(str2double(simyears)));
+[ice1, ice2] = POSTPROC(ice1, ice2, opts, ...
+   met.swd, met.lwd, met.albedo, met.Time);
+met = icemodel.processmet(met);
+plotice2(ice2, 'Tice')
 
-if strcmpi(userdata,'none')
-   ltext = {'ADCP','RACMO','MAR','MERRA',['ICE (' upper(forcingdata) ')']};
+
+% quick eval
+[Runoff, Discharge, Catchment] = prepRunoff(opts, ice1);
+AblationHourly = prepAblation(opts, ice1, 'hourly');
+AblationDaily = prepAblation(opts, ice1, 'daily');
+
+if strcmpi(userdata, 'none')
+   ltext = {'ADCP','RACMO','MAR','MERRA',['ICE (' upper(forcings) ')']};
 else
    ltext = {'ADCP','RACMO','MAR','MERRA',['ICE (' upper(userdata) ')']};
 end
 
 % FIGURE 1 = RUNOFF (options: 'raw','mean','members','sensitivity','surf')
-if opts.skinmodel == true
+if opts.simmodel == "skinmodel"
    h1 = plotRunoff( ...
       Runoff,Discharge,Catchment, ...
       'plotsurf',true, ...
@@ -109,7 +101,7 @@ if opts.skinmodel == true
       'refstart',true ...
       );
 else
-   if ismember(sitename,{'slv1','slv2'})
+   if ismember(sitename, {'slv1','slv2'})
       
       h1 = plotRunoff( ...
          Runoff,Discharge,Catchment, ...
@@ -137,11 +129,11 @@ else
 end
 
 % PLOT ABLATION
-t1 = datetime(str2double(simyear),6,1,0,0,0,'TimeZone','UTC');
+t1 = datetime(str2double(simyears),6,1,0,0,0,'TimeZone','UTC');
 h2 = plotPromice(AblationHourly,'refstart',t1);
 h2 = plotPromice(AblationDaily,'refstart',t1);
 
-t1 = datetime(str2double(simyear),7,1,0,0,0,'TimeZone','UTC');
+t1 = datetime(str2double(simyears),7,1,0,0,0,'TimeZone','UTC');
 h2 = plotPromice(AblationHourly,'refstart',t1);
 h2 = plotPromice(AblationDaily,'refstart',t1);
 

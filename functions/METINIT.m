@@ -78,11 +78,13 @@ function met = swapMetData(met, opts)
       if isfile(fullfile(opts.pathinput, 'userdata', userfile))
          Data = load(fullfile(opts.pathinput, 'userdata', userfile), 'Data');
          Data = Data.Data;
+         Data.Time.TimeZone = met.Time.TimeZone;
          if Data.Time(2)-Data.Time(1) ~= met.Time(2)-met.Time(1)
             Data = retime(Data, met.Time, 'linear');
          end
       else
-         error('userdata file does not exist');
+         error('\n userdata file does not exist: \n\n %s \n', ...
+            fullfile(opts.pathinput, 'userdata', userfile));
       end
    end
 

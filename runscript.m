@@ -23,7 +23,7 @@ switch simmodel
    case 'icemodel'
       tic; [ice1, ice2] = icemodel(opts); toc
    case 'skinmodel'
-      tic; skinmodel(opts); toc
+      tic; [ice1, ice2] = skinmodel(opts); toc
 end
 
 % load the met data and run the post processing

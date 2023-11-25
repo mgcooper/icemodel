@@ -5,9 +5,12 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    %
    % See also: icemodel.config
 
-   if nargin < 8 || isempty(casename); casename = sitename; end
-   if nargin < 9 || isempty(testname); testname = 'none'; end
+   if nargin < 8 || isempty(casename); casename = ''; end
+   if nargin < 9 || isempty(testname); testname = ''; end
 
+   % Set the project-level configuration
+   icemodel.config();
+   
    %---------------------------- save the standard options that were passed in
    %----------------------------------------------------------------------------
    opts.savedata = savedata;
@@ -25,7 +28,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    %----------------------------------------------------------------------------
 
    % general model settings
-   opts.spinup_loops    =  1;       % number of spin-up loops to initialize
+   opts.spinup_loops    =  2;       % number of spin-up loops to initialize
    opts.use_init        =  false;   % use pre-initialized data?
    opts.kabs_user       =  true;    % use user-defined ice absorptivity?
    opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
@@ -62,9 +65,16 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
 
    %---------------------------- set the input and output paths
    %----------------------------------------------------------------------------
+
+   % WRITEOUTPUT appends ['ice1_' opts.casename '.mat'] and saves the file in
+   % a subfolder of opts.pathoutput for each year e.g. opts.pathoutput/2016. 
+   % 
+   % For sector runs, opts.casename is set to the grid point ID outside this
+   % function in a loop, to get ice1_1.mat, ice1_2.mat, and so forth. Same for
+   % metfname. When writing to netcdf is implemented, that issue will go away.
+
    opts.pathinput = getenv('ICEMODELINPUTPATH');
-   opts.pathoutput = fullfile(getenv('ICEMODELOUTPUTPATH'), ...
-      sitename, simmodel, userdata);
+   opts.pathoutput = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, simmodel);
 
    assert(isfolder(opts.pathinput), ...
       'ICEMODELINPUTPATH does not exist, set it using icemodel.config');
@@ -74,43 +84,26 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
       opts.pathoutput = fullfile(opts.pathoutput, testname);
    end
 
-   % build the output folders if they don't already exist. This creates one
-   % folder for each simulation year in pathoutput/
+   % Create the casename. WRITEOUTPUT appends this to the base filenames.
+   opts.casename = icemodel.setcase(forcings, userdata, uservars);
+      
+   % Create folders for each simulation year in pathoutput/ if they don't exist
    if opts.savedata
-      if ~isfolder(opts.pathoutput)
-         warning( ...
-            'output folders do not exist, creating them in %s', opts.pathoutput)
-         icemodel.mkfolders(opts);
-      end
-
-      % Between here was in region not point
-      % make a folder to save the model options
-      if ~isfolder(fullfile(opts.pathoutput, 'opts'))
-         mkdir(fullfile(opts.pathoutput, 'opts'));
-      end
+      
+      icemodel.mkfolders(opts);
 
       % save the model opts
-      optsfile = ['opts_' simmodel '_' userdata '.mat'];
+      optsfile = ['opts_' opts.casename '.mat'];
       save(fullfile(opts.pathoutput, 'opts', optsfile), 'opts');
-      % Between here was in region not point
    end
 
    %---------------------------- set the met forcing file name
    %----------------------------------------------------------------------------
 
-   % to reconcile sector and site-scale runs, could try to put the common logic
-   % for met file and output file names in the first part of the file name and
-   % use empty chars for the non-common or an if-else. For now, set the metfname
-   % and outfname in the run script for sector scale runs otherwise
-
-   % opts.metfname = fullfile( ...
-   %    opts.pathinput, 'met', ['met_' metname '_<other parts>.mat']);
-   % opts.outfname = fullfile( ...
-   %    opts.pathoutput, [simmodel '_' sitename '_<other parts>']);
-
    if strcmp(sitename, 'sector')
 
-      % Could add logic here to deal with sector file names
+      % Could add logic here to deal with sector file names. For now, the
+      % metfname must be set outside this function in a loop.
       % for n = 1:numel(runpoints)
       %    opts.metfname = 'met_sector.mat';
       % end
@@ -129,39 +122,53 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
       if strcmp(simmodel, 'skinmodel')
          opts.vars2 = {'Tice', 'f_ice', 'f_liq'};
       end
-      
-      % Deal with the case where met-station forcing data (as opposed to gridded
-      % climate model forcing data) is requested for a nearby catchment by
-      % replacing the catchment name in the metfile with the met station name.
-      % For example, if sitename=="behar" and forcingdata=="kanm", this sets the
-      % metfile name to met_kanm_kanm_YYYY rather than met_behar_kanm_YYYY, to
-      % negate the need to create a second (identical) met_behar_kanm_YYYY file.
 
-      if strcmpi(forcings, 'kanl') && ...
-            ismember(sitename, {'ak4','upperbasin'})
-         metname = 'kanl';
-      elseif strcmpi(forcings, 'kanm') && ...
-            ismember(sitename, {'slv1','slv2','behar'})
-         metname = 'kanm';
-      else
-         metname = sitename;
-      end
+      % Create met file names
+      opts = createMetFileNames(opts, sitename, forcings, simyears);
 
-      switch opts.dt
-         case 900
-            dtstr = '15m.mat';
-         case 3600
-            dtstr = '1hr.mat';
-      end
-
-      for n = 1:numel(simyears)
-         simyear = num2str(simyears(n));
-         opts.metfname{n} = ['met_' metname '_' forcings '_' simyear '_' dtstr];
-         opts.outfname{n} = [simmodel '_' sitename '_' simyear '_' forcings ...
-            '_swap_' upper(userdata) '_' uservars];
-      end
       % append the path to the met file and out file names
       opts.metfname = fullfile(opts.pathinput, 'met', opts.metfname);
-      opts.outfname = fullfile(opts.pathoutput, opts.outfname);
+
+      % % This is the previous method.
+      % for n = 1:numel(simyears)
+      %    simyear = num2str(simyears(n));
+      %    opts.metfname{n} = ['met_' metname '_' forcings '_' simyear '_' dtstr];
+      %    opts.outfname{n} = [simmodel '_' sitename '_' simyear '_' forcings ...
+      %       '_swap_' upper(userdata) '_' uservars];
+      % end
+   end
+end
+
+%% Create met file names
+function opts = createMetFileNames(opts, sitename, forcings, simyears)
+
+   % Deal with the case where met-station forcing data (as opposed to gridded
+   % climate model forcing data) is requested for a nearby catchment by
+   % replacing the catchment name in the metfile with the met station name.
+   % For example, if sitename=="behar" and forcingdata=="kanm", this sets the
+   % metfile name to met_kanm_kanm_YYYY rather than met_behar_kanm_YYYY, to
+   % negate the need to create a second (identical) met_behar_kanm_YYYY file.
+   if strcmpi(forcings, 'kanl') ...
+         && ismember(sitename, {'ak4','upperbasin'})
+      metname = 'kanl';
+   elseif strcmpi(forcings, 'kanm') ...
+         && ismember(sitename, {'slv1','slv2','behar'})
+      metname = 'kanm';
+   else
+      metname = sitename;
+   end
+
+   % Deal with the option to use 15 min vs 1 hrly forcings.
+   switch opts.dt
+      case 900
+         dtstr = '15m.mat';
+      case 3600
+         dtstr = '1hr.mat';
+   end
+
+   % Build full file names.
+   for n = 1:numel(simyears)
+      simyear = num2str(simyears(n));
+      opts.metfname{n} = ['met_' metname '_' forcings '_' simyear '_' dtstr];
    end
 end

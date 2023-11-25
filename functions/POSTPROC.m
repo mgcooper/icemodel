@@ -59,6 +59,10 @@ function ice2 = retimeIce2(ice2, Time)
    for n = 1:numel(fields)
       tmp.(fields{n}) = nan(size(ice2.Tice, 1), numel(Time));
    end
+   % Replace Z, if this is not a sector run
+   if isfield(ice2, 'Z')
+      tmp.Z = ice2.Z;
+   end
 
    % Loop over each hour
    for n = 1:numel(Time)
