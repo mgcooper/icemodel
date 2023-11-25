@@ -1,5 +1,5 @@
-function [T,f_liq,f_ice,OK] = MZTRANSFORM(T,T_old,f_liq,f_wat,ro_liq,   ...
-      ro_wie,Tf,TL,TH,fcp,flmin,flmax,iM,OK)
+function [T, f_liq, f_ice, OK] = MZTRANSFORM(T, T_old, f_liq, f_wat, ro_liq, ...
+      ro_wie, Tf, TL, TH, fcp, flmin, flmax, iM, OK)
    %MZTRANSFORM melt zone transformation
    %
    % This implements two numerical checks:

@@ -76,7 +76,7 @@ function varargout = physicalConstant(varargin)
    % Volumetric enthalpy of vaporization, sublimation, and fusion 
    constants.roLv = constants.ro_air * constants.Lv;        % [J m-3]
    constants.roLs = constants.ro_air * constants.Ls;        % [J m-3]
-   constants.roLf = constants.ro_liq * constants.Lf;        % [J m-3] for liquid
+   constants.roLf = constants.ro_liq * constants.Lf;        % [J m-3]
    
    % Need to add for VAPORHEAT:
    % Ls / Rv

@@ -34,8 +34,8 @@ function varargout = cvconvert(varargin)
    % Example: 
    % [m_liq, m_ice] = icemodel.cvconvert( ...
    %    'volumefraction', 'mass', dz, [ro_liq, ro_ice], f_liq, f_ice); 
-   % This converts the volume fractions of liquid
-   % and ice into their corresponding masses.
+   % This converts the volume fractions of liquid and ice into their
+   % corresponding masses. 
    %
    % See also: icemodel, cvpropertylist
 
@@ -63,6 +63,17 @@ function varargout = cvconvert(varargin)
                for i = 1:numel(values)
                   % Volumetric fraction to mass conversion
                   varargout{i} = values{i} .* constants(i) .* CV;
+               end
+            case 'massfraction' % fmk = gk * sum(gk) = mk / mt
+               varargout = cell(size(values));
+               for i = 1:numel(values)
+                  % Volumetric fraction to mass conversion
+                  varargout{i} = values{i} .* constants(i) .* CV;
+               end
+               % Mass to mass fraction conversion
+               totalmass = sum([varargout{:}]);
+               for i = 1:numel(values)
+                  varargout{i} = varargout{i} / totalmass;
                end
             case 'bulkdensity' % gk = fk * rok
                varargout = cell(size(values));

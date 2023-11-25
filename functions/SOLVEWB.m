@@ -1,4 +1,4 @@
-function [Twb, flag] = SOLVEWB(Tair, rh, Ls, cp_air, P)
+function [Twb, flag] = SOLVEWB(Tair, rh, Ls, cp_air, P, liqflag)
    %SOLVEWB Compute wet bulb from air temperature and relative humidity
    %
    % This function computes the wet bulb temperature based on air temperature,

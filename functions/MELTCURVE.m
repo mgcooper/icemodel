@@ -30,7 +30,7 @@ function [f_liq, f_ice, f_wat, T, dFdT] = MELTCURVE(T, f_liq, f_ice, ...
    end
    
    if nargout > 4
-      % Differentiate the freezing curve w.r.t temperature
+      % Differentiate the freezing curve w.r.t temperature, eq 68, Jordan
       dFdT = 2.0 * fcp ^ 2.0 * T_dep .* f_wat ...
          ./ (1.0 + fcp ^ 2.0 * T_dep .^ 2.0) .^ 2.0;
    end
