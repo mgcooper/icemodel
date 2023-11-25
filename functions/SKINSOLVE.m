@@ -1,5 +1,5 @@
-function [T, OK] = SKINSOLVE(Tsfc,T,k_eff,ro_sno,cp_sno,dz,dt,N,fn,delz, ...
-      f_liq,f_ice,Tf,Rv,Ls)
+function [T, OK] = SKINSOLVE(Tsfc, T, k_eff, ro_sno, cp_sno, dz, dt, N, ...
+      fn, delz, f_liq, f_ice, Tf, Rv, Ls)
    %SKINSOLVE Solve the 1-dimensional heat conduction equation
    %--------------------------------------------------------------------------
    %

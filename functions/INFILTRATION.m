@@ -37,7 +37,7 @@ function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, Tf, TL, fcp, dz, 
          df_liq(n) = -min(abs(df_liq(n)), max_drainage);
       else
          % Don't allow more water to infiltrate than can be stored
-         max_infill = 0.917*(1.0 - f_ice(n)) - f_liq(n);
+         max_infill = 0.917 * (1.0 - f_ice(n)) - f_liq(n);
          df_liq(n) = min(df_liq(n), max_infill);
       end
    end
@@ -49,7 +49,7 @@ function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, Tf, TL, fcp, dz, 
       elseif df_liq(n) < 0
          % Ensure drainage does not exceed available capacity in layer below
          % max_infill = 1.0 - f_ice(n+1) - f_liq(n+1);
-         max_infill = 0.917*(1.0 - f_ice(n+1)) - f_liq(n+1);
+         max_infill = 0.917 * (1.0 - f_ice(n+1)) - f_liq(n+1);
          if abs(df_liq(n)) > max_infill
             df_liq(n) = -max_infill; % extra_liq = abs(df_liq(n)) - max_infill;
          end
@@ -68,11 +68,11 @@ function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, Tf, TL, fcp, dz, 
       xT = T; xf_liq = f_liq; xf_ice = f_ice;
 
       % Update the water fraction and temperature
-      f_wat = f_liq + f_ice .* 917/1000; % ro_iwe
+      f_wat = f_liq + f_ice * 917/1000; % ro_iwe
       T = Tf - sqrt((f_wat ./ f_liq - 1.0)) ./ fcp;
 
       % f_liq = f_wat ./ (1.0 + (fcp * (Tf - min(T, Tf))) .^ 2.0); % f_liq_new
-      f_ice = (f_wat - f_liq) .* 1000/917; % f_ice_new
+      f_ice = (f_wat - f_liq) * 1000/917; % f_ice_new
    end
 
    if any(f_ice <= 1e-8)
