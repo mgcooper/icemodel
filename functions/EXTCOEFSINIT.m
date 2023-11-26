@@ -1,25 +1,26 @@
-function [total_solar,z_spect,spect_lower,spect_upper,solardwavl] = ...
-      EXTCOEFSINIT(opts, ro_ice)
+function [I0, z_spect, spect_N, spect_S, solardwavl] = EXTCOEFSINIT(opts, ro_ice)
    %EXTCOEFSINIT initialize the extinction coefficients
    %
-   % The outputs correspond to the center of each level, and the top surface of
-   % the top grid cell, and the bottom surface of the bottom grid cell (thus the
-   % 502 values, for the current setup).
+   % The outputs correspond to the center of each level, and the top 
+   % surface  of the top grid cell, and the bottom surface of the 
+   % bottom grid cell  (thus the 502 values, for the current setup).
    %
-   % There should be no limit to how coarse (like 10 cm) or how fine (like 1 mm)
-   % you want to define your levels to be.  There is an upper limit of 500
-   % levels hard coded in the program that could be changed if you want/need to.
+   % There should be no limit to how coarse (like 10 cm) or how fine 
+   % (like 1 mm) you want to define your levels to be. There is an upper 
+   % limit of 500 levels hard coded in the program that could be changed 
+   % if you want/need to.
    %
-   % The simulation domain is defined by using a combination of deltaz (the
-   % thickness of each level) and nz (the number of levels).
+   % The simulation domain is defined by using a combination of deltaz 
+   % (the thickness of each level) and nz (the number of levels).
    %
-   % Note that: down = solar down, up = solar up, up/down = albedo,
-   %   and up-down = net solar (or - solar_absorbed).
+   % Note that: down = solar down, up = solar up, up/down = albedo, 
+   % and up-down = net solar (or - solar_absorbed).
    %
    % See also: 
 
    % The grain radii that can be used for the two-stream spectral model
-   radii = [ 0.040, 0.050, 0.065, 0.080, 0.100, ...
+   radii = [ ...
+      0.040, 0.050, 0.065, 0.080, 0.100, ...
       0.120, 0.140, 0.170, 0.200, 0.240, ...
       0.290, 0.350, 0.420, 0.500, 0.570, ...
       0.660, 0.760, 0.870, 1.000, 1.100, ...
@@ -28,16 +29,15 @@ function [total_solar,z_spect,spect_lower,spect_upper,solardwavl] = ...
       4.000, 4.500, 5.000, 5.500, 6.000 ];
 
    % load the pre-defined Mie scattering values.
-   load(fullfile(opts.pathinput,'spectral','mie.mat'),'mie');
-   scattercoefs = mie; clear mie;
+   load(fullfile(opts.pathinput, 'spectral', 'mie.mat'), 'mie');
 
    % load the proto-typical spectral irradiance profile
-   load(fullfile(opts.pathinput,'spectral','solar.mat'),'solar');
+   load(fullfile(opts.pathinput, 'spectral', 'solar.mat'), 'solar');
 
    % load the user-defined kabs/kice if provided
    if opts.kabs_user == true
-      load(fullfile(opts.pathinput,'spectral','kabs.mat'),'kabs');
-      load(fullfile(opts.pathinput,'spectral','kice.mat'),'kice');
+      load(fullfile(opts.pathinput, 'spectral', 'kabs.mat'), 'kabs');
+      load(fullfile(opts.pathinput, 'spectral', 'kice.mat'), 'kice');
    else
       kabs = []; kice = [];
    end
@@ -51,14 +51,14 @@ function [total_solar,z_spect,spect_lower,spect_upper,solardwavl] = ...
    r_snow = radii(opts.i_grainradius) / 1000.0;
 
    % Read in the wavelength-dependent scattering coefficient arrays.
-   [g, qext, ss_coalb, wavelength] = GETSCATTERCOEFS(opts, scattercoefs);
+   [g, qext, ss_coalb, wavelength] = GETSCATTERCOEFS(opts, mie);
 
    % Generate a delta_wavelength array.
    dwavl = GETDWAVL(wavelength, nwavl);
 
    % Produce a downward (spectral) solar spectrum and integrated value. Note
    % that the input 'solar' is interpolated here to the 118 bands
-   [solar, total_solar] = GETSOLAR(solar, nwavl, wavelength, dwavl);
+   [solar, I0] = GETSOLAR(solar, nwavl, wavelength, dwavl);
 
    % Compute the spectral extinction coefficients as a function of wavelength.
    spect_coefs = SPECTEXTCOEF(opts, qext, g, ss_coalb, r_snow);
@@ -69,17 +69,16 @@ function [total_solar,z_spect,spect_lower,spect_upper,solardwavl] = ...
       spect_coefs = SCALESPECTEXTCOEF(spect_coefs, wavelength, kice, kabs);
    end
 
-   % send these into updateextcoefs to improve speed of exponentiation
+   % Send these into updateextcoefs to improve speed of exponentiation
    solardwavl = solar .* dwavl;
    spect_walls = -z_walls * spect_coefs / ro_ice;
-   spect_lower = spect_walls(2:end, :);
-   spect_upper = spect_walls(1:end-1, :);
+   spect_N = spect_walls(1:end-1, :);
+   spect_S = spect_walls(2:end, :);
 end
 
 % % tried using exp here but it's slower
 % spect_walls = exp(-z_walls.*repmat(spect_coefs./ro_ice,1,2001));
 % spect_lower = spect_walls(:,2:end); spect_upper = spect_walls(:,1:end-1);
-
 
 %--------------------------------------------------------------------------
 % This is here for clarification. The xynet above is the column-integrated value

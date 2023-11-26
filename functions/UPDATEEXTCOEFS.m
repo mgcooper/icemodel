@@ -1,11 +1,13 @@
-function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, z_spect, dz_spect, ...
-      z_therm, dz_therm, JJ_therm, dz, ro_sno, total_solar, spect_lower, ...
-      spect_upper, solardwavl)
+function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, I0, dz, z_spect, dz_spect, ...
+      z_therm, dz_therm, spect_N, spect_S, solardwavl, ro_sno)
    %UPDATEEXTCOEFS Update the bulk extinction coefficients
    
-   persistent z_walls
+   persistent z_walls JJ_therm
    if isempty(z_walls)
       z_walls = round([0; z_spect + dz_spect/2; z_spect(end) + 3*dz_spect/2], 3);
+   end
+   if isempty(JJ_therm)
+      JJ_therm = length(dz);
    end
 
    % Transform the mass density to the spectral grid resolution
@@ -13,9 +15,9 @@ function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, z_spect, dz_spect, ...
    ro_sno = max(ro_sno, 300);
 
    % Compute the downward bulk extinction coefficient.
-   bulkcoefs = -log((sum(solardwavl .* exp(spect_lower .* ro_sno), 2))./ ...
-      (sum(solardwavl .* exp(spect_upper .* ro_sno), 2))) ./ dz_spect;
-   %  NOTE: solardwavl comes multiplied by dwavl, and sum/trapz are identical
+   bulkcoefs = -log((sum(solardwavl .* exp(spect_S .* ro_sno), 2)) ...
+      ./ (sum(solardwavl .* exp(spect_N .* ro_sno), 2))) ./ dz_spect;
+   % NOTE: solardwavl comes multiplied by dwavl
 
    % Cast in a form that can be used in the two-stream computation (add the
    % boundaries).  Here I have assumed that it is okay to call the boundaries
@@ -26,7 +28,7 @@ function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, z_spect, dz_spect, ...
    % Compute the a and r coefficients from the surface albedo and the 
    % extinction coefficients.
    a = (1.0 - albedo) ./ (1.0 + albedo) .* bulkcoefs;
-   r = 2.0 .* albedo .* bulkcoefs ./ (1.0 - albedo^2);
+   r = 2.0 .* albedo .* bulkcoefs ./ (1.0 - albedo ^ 2);
 
    % Solve the system of equations for the two-stream model
    M = numel(z_spect); % notation here roughly follows Schlatter
@@ -44,7 +46,7 @@ function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, z_spect, dz_spect, ...
    e(1) = 0.0;
    f(1) = 1.0;
    g(1) = -alfa / (dz_spect + alfa);
-   b(1) = r(1) * total_solar * dz_spect * alfa / (dz_spect + alfa);
+   b(1) = r(1) * I0 * dz_spect * alfa / (dz_spect + alfa);
 
    % Fill the vectors between the boundaries
    deltaz = z_walls(3:M2) - z_walls(2:M1);
@@ -75,9 +77,9 @@ function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, z_spect, dz_spect, ...
    % Reconstruct y.
    dn = (a(2:M1) + r(2:M1)) ./ r(2:M1) .* up(2:M1) - (up(3:M2) - up(1:M2-2)) ...
       ./ (2.0 .* deltaz .*r (2:M1));
-   dn = vertcat(total_solar, dn);
-   dn = vertcat(dn, (a(M2) + r(M2)) / r(M2) * up(M2) - (up(M2) - up(M1)) / ...
-      (deltaz(1) * r(M2)));
+   dn = vertcat(I0, dn);
+   dn = vertcat(dn, (a(M2) + r(M2)) / r(M2) * up(M2) - (up(M2) - up(M1)) ...
+      / (deltaz(1) * r(M2)));
 
    % Smooth any small bumps in the up and down curve.  This will assist
    % in any delta up, delta down computations. Do the interior.
@@ -115,7 +117,7 @@ function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, z_spect, dz_spect, ...
    % Ensure xynet(1) is equal to the total absorbed radiation. This corrects
    % for any (very) small errors in the two-stream model, typically due to a
    % spectral grid that is too shallow to absorb all the radiation
-   xynet(1) = min(-total_solar * (1 - albedo), xynet(1));
+   xynet(1) = min(-I0 * (1 - albedo), xynet(1));
 
    % xynet is the net solar radiation at each level. In Schlatter it is
    % just Q. The source term (absorbed flux per unit volume) is dQ/dz.
@@ -154,5 +156,5 @@ function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, z_spect, dz_spect, ...
    else
       chi = dQ(1) / sum(dQ);
    end
-   Sc = -(1.0 - chi) * Qsi / total_solar * dQ ./ dz; % [W/m3]
+   Sc = -(1.0 - chi) * Qsi / I0 * dQ ./ dz; % [W/m3]
 end

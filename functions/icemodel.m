@@ -58,13 +58,11 @@ function [ice1, ice2] = icemodel(opts) %#codegen
       = ICEINIT(opts, tair);
 
    % INITIALIZE THE EXTINCTION COEFFICIENTS
-   [total_solar, z_spect, spect_lower, spect_upper, solardwavl] ...
-      = EXTCOEFSINIT(opts, ro_ice);
+   [I0, z_spect, spect_N, spect_S, solardwavl] = EXTCOEFSINIT(opts, ro_ice);
 
    % INITIALIZE TIMESTEPPING
    [metiter, subiter, maxiter, maxsubiter, dt, dt_min, dt_max, ...
-      dt_new, numyears, ~, numspinup] ...
-      = INITTIMESTEPS(opts, time);
+      dt_new, numyears, ~, numspinup] = INITTIMESTEPS(opts, time);
 
    %% START ITERATIONS OVER YEARS
    for thisyear = 1:numyears
@@ -84,9 +82,9 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
          % SUBSURFACE SOLAR RADIATION SOURCE-TERM
          if swd(metiter) > 0 % && isicemodel
-            [Sc, chi] = UPDATEEXTCOEFS(swd(metiter), albedo(metiter), ...
-               z_spect, dz_spect, z_therm, dz_therm, JJ, dz, ro_sno, ...
-               total_solar, spect_lower, spect_upper, solardwavl);
+            [Sc, chi] = UPDATEEXTCOEFS(swd(metiter), albedo(metiter), I0, ...
+               dz, z_spect, dz_spect, z_therm, dz_therm, spect_N, spect_S, ...
+               solardwavl, ro_liq * f_liq + ro_ice * f_ice);
          else
             Sc = 0.0 * dz;
             chi = 1.0;
