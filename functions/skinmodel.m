@@ -40,7 +40,7 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
                epsilon, fopts, liqflag, false);
 
             % HEAT CONDUCTION
-            k_eff = GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
+            k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
             [T, OK] = SKINSOLVE(Tsfc, T, k_eff, ro_sno, cp_sno, dz, dt_new, ...
                JJ_therm, fn, delz, f_liq, f_ice, Tf, Rv, Ls);
 
@@ -52,11 +52,11 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
                continue
             else
                % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
-               k_eff = GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
-               [ro_sno, cp_sno, liqflag, roL, xT, xTsfc, xf_liq, xf_ice, ...
-                  dt_sum, dt_new, dt_flag] = UPDATESUBSTEP(f_ice, f_liq, ...
-                  ro_ice, ro_liq, ro_air, cv_ice, cv_liq, T, Tsfc, dt, ...
-                  dt_sum, dt_new, roLv, roLs, dt_min, TINY);
+               k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
+               [xT, xTsfc, xf_ice, xf_liq, dt_sum, dt_new, dt_flag, ...
+                  liqflag, roL, ro_sno, cp_sno] = UPDATESUBSTEP(T, Tsfc, ...
+                  f_ice, f_liq, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, ...
+                  dt, dt_sum, dt_new, roLv, roLs, dt_min, TINY);
             end
          end
 

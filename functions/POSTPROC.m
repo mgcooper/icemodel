@@ -163,9 +163,9 @@ function [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo)
    f_liq = ice2.f_liq;
    f_ice = ice2.f_ice;
 
-   [k_eff, k_vap] = GETGAMMA(T_ice, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
-   ro_sno = f_ice.*ro_ice + f_liq.*ro_liq + (1.0-f_liq-f_ice).*ro_air;
-   cp_sno = (cv_ice.*f_ice+cv_liq.*f_liq) ./ ro_sno;
+   [k_eff, k_vap] = GETGAMMA(T_ice, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
+   ro_sno = ro_ice * f_ice + ro_liq * f_liq + ro_air * (1.0 - f_liq - f_ice);
+   cp_sno = (cv_ice * f_ice + cv_liq * f_liq) ./ ro_sno;
 
    % Compute a mesh for plotting
    Z = opts.z0_thermal;

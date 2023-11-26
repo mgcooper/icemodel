@@ -13,13 +13,13 @@ function [H,T,errH,errT,OK] = HEATSOLVE(T_old,H_old,f_wat,f_ice,f_liq, ...
    while any(errT > tol) && iter < maxiter
 
       % update thermal conductivity
-      k_eff = GETGAMMA(T_old,f_liq,f_ice,ro_ice,k_liq,Ls,Rv,Tf);
+      k_eff = GETGAMMA(T_old,f_ice,f_liq,ro_ice,k_liq,Ls,Rv,Tf);
 
       % update vapor heat
       [ro_vap, drovdT] = VAPORHEAT(T_old,f_liq,f_ice,Tf,Rv,Ls);
 
       % update total enthalpy
-      H = TOTALHEAT(T_old,f_liq,f_ice,cv_liq,cv_ice,roLf,Ls*ro_vap,Tf);
+      H = TOTALHEAT(T_old,f_ice,f_liq,cv_ice,cv_liq,roLf,Ls*ro_vap,Tf);
 
       % update the general model coefficients
       [aN,aP,aS,b,iM] = GECOEFS(T_old,ro_sno,cp_sno,f_liq,f_ice,cp_liq,Ls, ...

@@ -1,4 +1,4 @@
-function [k_eff, k_vap] = GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf)
+function [k_eff, k_vap] = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf)
    %GETGAMMA Compute thermal conductivity (gamma)
    %
    % gamma = ki + kv, where ki is thermal conductivity of ice and kv is vapor

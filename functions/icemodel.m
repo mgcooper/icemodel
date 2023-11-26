@@ -52,9 +52,9 @@ function [ice1, ice2] = icemodel(opts) %#codegen
    [tair, swd, lwd, albedo, wspd, rh, psfc, De, time] = METINIT(opts, 1);
 
    % Initialize the ice column
-   [f_ice, f_liq, T, TL, TH, flmin, flmax, cp_sno, ~, dz, fn, delz, z_therm, ...
-      dz_therm, dz_spect, JJ, ~, ~, Sp, scoef, ro_sno, ro_iwe, ro_wie, ...
-      xTsfc, xf_liq, roL, Qc, f_min, fopts, liqresid, liqflag, ice1, ice2] ...
+   [f_ice, f_liq, T, TL, TH, flmin, flmax, ~, ~, dz, fn, delz, z_therm, ...
+      dz_therm, dz_spect, JJ, ~, ~, Sp, scoef, ~, ro_iwe, ro_wie, xTsfc, ...
+      xf_liq, roL, Qc, f_min, fopts, liqresid, liqflag, ice1, ice2] ...
       = ICEINIT(opts, tair);
 
    % INITIALIZE THE EXTINCTION COEFFICIENTS
@@ -117,9 +117,9 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
             % SUBSURFACE ENERGY BALANCE
             [T, errH, errT, f_ice, f_liq, OK1] = ICEENBAL(T, f_ice, f_liq, ...
-               k_liq, cv_ice, cv_liq, ro_ice, ro_liq, ro_sno, cp_sno, Ls, ...
-               Lf, roLf, Rv, Tf, dz, delz, fn, dt_new, JJ, Tsfc, Sc, ...
-               fcp, TL, TH, flmin, flmax, ro_iwe, ro_wie);
+               k_liq, cv_ice, cv_liq, ro_ice, ro_liq, ro_air, Ls, Lf, roLf, ...
+               Rv, Tf, dz, delz, fn, dt_new, JJ, Tsfc, Sc, fcp, TL, TH, ...
+               flmin, flmax, ro_iwe, ro_wie);
 
             assertF(@() all(f_ice + f_liq - 1.0 <= 0))
 
@@ -158,7 +158,7 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                % otherwise keeps state constant essentially skipping the step
 
                % UPDATE SURFACE FLUXES
-               k_eff = GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
+               k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
                
                [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, Tsfc, ...
                   tair(metiter), swd(metiter), lwd(metiter), albedo(metiter), ...
@@ -166,10 +166,10 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                   cv_air, roL, emiss, SB, epsilon, scoef, dz, liqflag, chi);
 
                % % UPDATE SURFACE FLUXES (this active in icemodel_region)
-               % k_eff =  GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
-               % Qc    =  CONDUCT(k_eff, T, dz, MELTTEMP(Tsfc,Tf));
-               % S     =  STABLEFN(tair(metiter), MELTTEMP(Tsfc,Tf), wspd(metiter), scoef);
-               % es    =  VAPPRESS(MELTTEMP(Tsfc,Tf), Tf, liqflag);
+               % k_eff =  GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
+               % Qc    =  CONDUCT(k_eff, T, dz, MELTTEMP(Tsfc, Tf));
+               % S     =  STABLEFN(tair(metiter), MELTTEMP(Tsfc, Tf), wspd(metiter), scoef);
+               % es    =  VAPPRESS(MELTTEMP(Tsfc, Tf), Tf, liqflag);
                % Qe    =  LATENT(De(metiter), S, ea, es, roL, epsilon, psfc(metiter));
 
                assertF(@() all(f_ice + f_liq - 1.0 <= 0))
@@ -183,12 +183,11 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                assertF(@() all(f_ice + f_liq - 1.0 <= 0))
 
                % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
-               [ro_sno, cp_sno, liqflag, roL, xT, xTsfc, xf_liq, ...
-                  xf_ice, dt_sum, dt_new, dt_flag] ...
-                  = UPDATESUBSTEP(f_ice, f_liq, ro_ice, ro_liq, ro_air, ...
-                  cv_ice, cv_liq, T, Tsfc, dt, dt_sum, dt_new, roLv, ...
-                  roLs, dt_min, TINY);
-
+               [xT, xTsfc, xf_ice, xf_liq, dt_sum, dt_new, dt_flag, ...
+                  liqflag, roL] = UPDATESUBSTEP(T, Tsfc, f_ice, f_liq, ...
+                  ro_ice, ro_liq, ro_air, cv_ice, cv_liq, dt, dt_sum, ...
+                  dt_new, roLv, roLs, dt_min, TINY);
+                  
                % zD = sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
                % if zD > dz(1)
                % end

@@ -1,23 +1,22 @@
-function [T, errH, errT, f_ice, f_liq, OK] = ICEENBAL(T, f_ice, f_liq, ...
-      k_liq, cv_ice, cv_liq, ro_ice, ro_liq, ro_sno, cp_sno, Ls, Lf, roLf, ...
-      Rv, Tf, dz, delz, fn, dt, JJ, Tsfc, Sc, fcp, TL, TH, flmin, flmax, ...
-      ro_iwe, ro_wie) %#codegen
+function [T, errH, errT, f_ice, f_liq, OK] = ICEENBAL(T, f_ice, f_liq, k_liq, ...
+      cv_ice, cv_liq, ro_ice, ro_liq, ro_air, Ls, Lf, roLf, Rv, Tf, dz, delz, ...
+      fn, dt, JJ, Tsfc, Sc, fcp, TL, TH, flmin, flmax, ro_iwe, ro_wie)
    %ICEENBAL Solve the ice energy balance.
-   
-   % Compute water fraction and the derivative of f_liq wrt to temperature
+   %
+   %#codegen
+
+   % Update the water fraction
    f_wat = f_liq + f_ice * ro_iwe;
-   dFdT = 2.0 * fcp ^ 2.0 * (Tf - min(T, Tf)) .* f_wat ...
-      ./ (1.0 + fcp ^ 2.0 * (Tf - min(T, Tf)) .^ 2.0) .^ 2.0;
-   
+
    % Update the melt-zone boundaries
    fliqmin = f_wat .* flmin;
    fliqmax = f_wat .* flmax;
 
-   % Compute vapor diffusion
+   % Compute vapor density
    ro_vap = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
 
    % Compute total enthalpy in J/m3
-   H_old = TOTALHEAT(T, f_liq, f_ice, cv_liq, cv_ice, roLf, Ls * ro_vap, Tf);
+   H_old = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
 
    % Iterate to solve the nonlinear heat equation
    errT = 2e-2; iter = 0; errH = 0; OK = true; alpha = 0.8;
@@ -28,14 +27,20 @@ function [T, errH, errT, f_ice, f_liq, OK] = ICEENBAL(T, f_ice, f_liq, ...
       iter = iter + 1;
 
       % Update thermal conductivity
-      k_eff = GETGAMMA(T, f_liq, f_ice, ro_ice, k_liq, Ls, Rv, Tf);
+      k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
 
       % Update vapor heat
       [ro_vap, drovdT] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
 
       % Update total enthalpy
-      H = TOTALHEAT(T, f_liq, f_ice, cv_liq, cv_ice, roLf, Ls * ro_vap, Tf);
-      
+      H = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
+
+      % Update density, heat capacity, and d(f_liq)/dT
+      ro_sno = ro_ice * f_ice + ro_liq * f_liq + ro_air * (1.0 - f_liq - f_ice);
+      cp_sno = (cv_ice * f_ice + cv_liq * f_liq) ./ ro_sno;
+      dFdT = 2.0 * fcp ^ 2.0 * (Tf - min(T, Tf)) .* f_wat ...
+         ./ (1.0 + fcp ^ 2.0 * (Tf - min(T, Tf)) .^ 2.0) .^ 2.0;
+
       % Update the general equation coefficients
       [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
          Lf, ro_liq, dz, dt, dFdT, drovdT, TL, H, H_old, Sc, k_eff, fn, ...
