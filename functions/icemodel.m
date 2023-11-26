@@ -159,11 +159,11 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
                % UPDATE SURFACE FLUXES
                k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
-               
+
                [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, Tsfc, ...
                   tair(metiter), swd(metiter), lwd(metiter), albedo(metiter), ...
                   wspd(metiter), psfc(metiter), De(metiter), ea, Tf, k_eff, ...
-                  cv_air, roL, emiss, SB, epsilon, scoef, dz, liqflag, chi);
+                  dz, cv_air, roL, emiss, SB, chi, epsilon, scoef, liqflag);
 
                % % UPDATE SURFACE FLUXES (this active in icemodel_region)
                % k_eff =  GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
@@ -187,7 +187,7 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                   liqflag, roL] = UPDATESUBSTEP(T, Tsfc, f_ice, f_liq, ...
                   ro_ice, ro_liq, ro_air, cv_ice, cv_liq, dt, dt_sum, ...
                   dt_new, roLv, roLs, dt_min, TINY);
-                  
+
                % zD = sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
                % if zD > dz(1)
                % end

@@ -92,4 +92,30 @@ function [f_ice, f_liq, T, TL, TH, flmin, flmax, cp_sno, k_eff, dz, fn, ...
    % diags.LCflag = false(maxiter,1);
    % A1 = ones(JJ_therm,1);
    % A = spdiags([A1,A1,A1],-1:1,JJ_therm,JJ_therm);
+
+   %% CV balance notes
+
+   % Note the volumetric water fraction is ~0.9:
+   %
+   % f_wat_1 = f_liq(1) + f_ice(1) * ro_ice / ro_liq
+   % printf(f_wat_1, 10)
+   %
+   % And the maximum mass fraction (flmax) is ~1 but <1:
+   % printf(flmax, 10)
+   %
+   % Thus the max volumetric water fraction (the water fraction at T = TH):
+   % fliqmax = f_wat_1 * flmax
+   % printf(fliqmax, 10)
+   %
+   % Cannot exceed the initial fraction (f_wat_1):
+   % printf(f_wat_1 - fliqmax , 10)
+   % assert(fliqmax < f_wat_1)
+   %
+   % These are not needed but demonstrate cvconvert:
+   %
+   % [fm_ice, fm_liq] = icemodel.cvconvert("volumefraction", "massfraction", ...
+   %    dz(1), [ro_ice, ro_liq], f_ice(1), f_liq(1));
+   % printf(fm_ice, 10)
+   % printf(fm_liq, 10)
+   % printf(fm_ice + fm_liq, 10)
 end

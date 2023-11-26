@@ -1,25 +1,19 @@
-function [  Qe,                                                         ...
-            Qh,                                                         ...
-            Qc,                                                         ...
-            Qm,                                                         ...
-            Qf,                                                         ...
-            balance] =  SEBFLUX(T,Tsfc,Tair,Qsi,Qli,albedo,wspd,Pa,De,  ...
-            ea,Tf,k_eff,cv_air,roL,emiss,SB,epsilon,scoef,  ...
-            dz,liqflag,chi)
+function [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, Tsfc, Tair, Qsi, Qli, ...
+      albedo, wspd, Pa, De, ea, Tf, k_eff, dz, cv_air, roL, emiss, SB, chi, ...
+      epsilon, scoef, liqflag) %#codegen
    %SEBFLUX using the new top node temperature, compute a new surface flux
    %
-   %#codegen
-
-   % Atmospheric vapor pressure from relative humidity data.
-   % Compute the stability function.
-   % Compute the water vapor pressure at the surface.
-   % Compute the latent heat flux.
-   % Compute the sensible heat flux.
-   % Compute the longwave flux emitted by the surface.
-   % Compute the flux contribution due to conduction.
-   % Compute the energy flux available for melting or freezing.
-   % Perform an energy balance check.
-   Tsfc     =  MELTTEMP(Tsfc, Tf);
+   % 
+   % ea  - atmospheric vapor pressure from relative humidity data.
+   % S   - stability function.
+   % es  - surface saturation water vapor pressure.
+   % Qe  - turbulent latent heat flux.
+   % Qh  - turbulent sensible heat flux.
+   % Qle - surface emitted longwave heat flux.
+   % Qc  - conductive heat flux into the surface.
+   % Qm  - the energy flux available for melting or freezing.
+   % bal - an energy balance check.
+   Tsfc     =  MELTTEMP(Tsfc,Tf);
    S        =  STABLEFN(Tair,Tsfc,wspd,scoef);
    es       =  VAPPRESS(Tsfc,Tf,liqflag);
    Qe       =  LATENT(De,S,ea,es,roL,epsilon,Pa);
