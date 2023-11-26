@@ -28,7 +28,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    %----------------------------------------------------------------------------
 
    % general model settings
-   opts.spinup_loops    =  2;       % number of spin-up loops to initialize
+   opts.spinup_loops    =  1;       % number of spin-up loops to initialize
    opts.use_init        =  false;   % use pre-initialized data?
    opts.kabs_user       =  true;    % use user-defined ice absorptivity?
    opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
