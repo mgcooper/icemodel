@@ -1,5 +1,6 @@
-function [h_resid,h_avail,h_drain,h_ice_j,h_liq_j,h_air_j] = LIQAVAIL( ...
-      h_ice_j,h_liq_j,h_air_j,T_old_j,Tfp,theta_resid,h_drain,liqflag,h_total)
+function [h_resid, h_avail, h_drain, h_ice_j, h_liq_j, h_air_j] ...
+      = LIQAVAIL(h_ice_j, h_liq_j, h_air_j, T_old_j, Tfp, theta_resid, ...
+      h_drain, liqflag, h_total)
    %LIQAVAIL Compute available liquid water.
 
    % Update theta_resid
@@ -7,18 +8,18 @@ function [h_resid,h_avail,h_drain,h_ice_j,h_liq_j,h_air_j] = LIQAVAIL( ...
 
    % Compute liqresid and liqavail in units of liquid water. liqavail is
    % liquid water available to drain or freeze. liqresid is unavailable.
-   h_resid = theta_resid*h_ice_j;
-   h_avail = max(h_liq_j-h_resid,0.0);
+   h_resid = theta_resid * h_ice_j;
+   h_avail = max(h_liq_j - h_resid, 0.0);
 
    % % these would be in an 'else' statement below but here is faster
-   % availCap = porosity-h_resid;  % available capacity      [m]
-   % relsat = h_avail./availCap  % relative saturation     [-]
+   % availCap = porosity - h_resid;  % available capacity      [m]
+   % relsat = h_avail ./ availCap  % relative saturation     [-]
 
    % Set the liquid drainage decision flag, with layer 1 always unsaturated.
    if liqflag
       h_drain = h_drain + h_avail;
-      h_liq_j = max(h_liq_j-h_avail,h_resid);
-      h_air_j = h_total-h_liq_j-h_ice_j;
+      h_liq_j = max(h_liq_j - h_avail, h_resid);
+      h_air_j = h_total - h_liq_j - h_ice_j;
       %h_avail = 0.0;
       % availCap = h_resid;         % available capacity      [m]
       % relsat = h_avail./availCap  % relative saturation     [-]

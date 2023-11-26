@@ -7,6 +7,6 @@ function Pa = PRESSURE(topo)
    %
    % See also:
 
-   Pa = 101300.0 * exp(- topo / 8000.0);
+   Pa = 101300.0 * exp(-topo / 8000.0);
    % [Pa = J m-3 = N m-2 = kg m-1 s-2]
 end
