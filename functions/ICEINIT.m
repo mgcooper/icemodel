@@ -77,7 +77,7 @@ function [f_ice, f_liq, T, TL, TH, flmin, flmax, cp_sno, k_eff, dz, fn, ...
    xTsfc = T(1);
    xf_liq = f_liq;
    liqflag = false;
-   Qc =  CONDUCT(k_eff, T, dz, xTsfc);
+   Qc = CONDUCT(k_eff, T, dz, xTsfc);
    % zD = sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
 
    % INITIALIZE THE OUTPUT STRUCTURES

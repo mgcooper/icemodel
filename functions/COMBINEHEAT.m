@@ -46,17 +46,18 @@ function [f_liq_C, f_ice_C, T_C, Sc_C, Sp_C, d_drn, d_liq] = COMBINEHEAT( ...
    Sp_C = Sp(j1) + Sp(j2);
 
    % Depression temperature of each cv
-   Td_1 = Tf-T(j1);
-   Td_2 = Tf-T(j2);
+   Td_1 = Tf - T(j1);
+   Td_2 = Tf - T(j2);
 
    % Compute water mass (ice + liquid water)
-   m_wat_1 = (ro_ice*f_ice(j1) + ro_liq*f_liq(j1)) * dz;
-   m_wat_2 = (ro_ice*f_ice(j2) + ro_liq*f_liq(j2)) * dz;
-   m_wat_C = (ro_ice*(f_ice(j1)+f_ice(j2)) + ro_liq*(f_liq(j1)+f_liq(j2))) * dz;
+   m_wat_1 = (ro_ice * f_ice(j1) + ro_liq * f_liq(j1)) * dz;
+   m_wat_2 = (ro_ice * f_ice(j2) + ro_liq * f_liq(j2)) * dz;
+   m_wat_C = (ro_ice * (f_ice(j1) + f_ice(j2)) ...
+      + ro_liq * (f_liq(j1) + f_liq(j2))) * dz;
 
    % Compute combined temperature assuming T1 != T2 but neither CV is melting.
    % This temperature also applies to the case where T1 == T2, melting or not.
-   T_C = (T(j1)*m_wat_1 + T(j2)*m_wat_2) / m_wat_C;
+   T_C = (T(j1) * m_wat_1 + T(j2) * m_wat_2) / m_wat_C;
    Td_C = Tf - T_C;
 
    % If either CV is melting, compute combined temperature of dry and wet ice.
@@ -66,22 +67,23 @@ function [f_liq_C, f_ice_C, T_C, Sc_C, Sp_C, d_drn, d_liq] = COMBINEHEAT( ...
       % combined cv. Use m_liq_C to express the equation as a third-order
       % polynomial of the combined Td. Define the coefficients:
 
-      f = -cv_ice * ( f_ice(j1) * Td_1 + f_ice(j2) * Td_2 ) + ...
-         -cv_liq * ( f_liq(j1) * Td_1 + f_liq(j2) * Td_2 ) + ...
-         Lf * ro_liq * ( f_liq(j1) + f_liq(j2) );
+      f = -cv_ice * ( f_ice(j1) * Td_1 + f_ice(j2) * Td_2 ) ...
+          -cv_liq * ( f_liq(j1) * Td_1 + f_liq(j2) * Td_2 ) ...
+          + ro_liq * Lf * ( f_liq(j1) + f_liq(j2) );
       g = cv_ice * (f_ice(j1) + f_ice(j2)) + cv_liq * (f_liq(j1) + f_liq(j2));
 
       a = 1;
       b = f / g;
-      c = 1 / fcp^2;
+      c = 1 / fcp ^ 2;
       d = c * (b - Lf * m_wat_C / g / dz);
 
-      F = @(Td_C) a*Td_C^3 + b*Td_C^2 + c*Td_C + d;
+      F = @(Td_C) a * Td_C ^ 3 + b * Td_C ^ 2 + c * Td_C + d;
 
       % solve using an endpoint constrained range
-      [Td_C, ok] = fsearchzero(F, Td_C, min(Td_1,Td_2), max(Td_1,Td_2), Td_C, 1e-4);
+      [Td_C, ok] = fsearchzero( ...
+         F, Td_C, min(Td_1, Td_2), max(Td_1, Td_2), Td_C, 1e-4);
 
-      %[Td_C, ~, ok] = fzero(F, [min(Td_1,Td_2) max(Td_1,Td_2)], fopts);
+      %[Td_C, ~, ok] = fzero(F, [min(Td_1, Td_2) max(Td_1, Td_2)], fopts);
 
       % Check if the function successfully found a zero
       if ok == 1

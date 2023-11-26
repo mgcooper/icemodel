@@ -3,13 +3,13 @@ function [iter, metiter, subiter, dt_new] = NEXTSTEP(iter, metiter, subiter, ...
 
    % i think this check can be deleted b/c next check gets it
    if dt_flag == true
-      dt_new = dt_max/subiter;
+      dt_new = dt_max / subiter;
    end
 
-   % IF CONVERGENCE IS SUCCESSFUL, INCREASE THE TIMESTEP
+   % If convergence is successful, increase the timestep
    if OK == true
-      subiter = max(1, subiter-1); % reverse the subiter decrement
-      dt_new = dt_max/subiter;
+      subiter = max(1, subiter - 1); % reverse the subiter decrement
+      dt_new = dt_max / subiter;
    end
 
    iter = iter + 1;

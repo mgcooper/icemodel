@@ -17,8 +17,8 @@ function [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time)
    end
 
    % Convert surface and subsurface ice temperature from Kelvin to Celsius
-   ice1.Tsfc = min(ice1.Tsfc-Tf, 0);
-   ice2.Tice = min(ice2.Tice-Tf, 0);
+   ice1.Tsfc = min(ice1.Tsfc - Tf, 0);
+   ice2.Tice = min(ice2.Tice - Tf, 0);
 
    % Convert ice1 to timetable
    time.TimeZone = 'UTC';
@@ -119,13 +119,13 @@ function [ice1, ice2] = roundData(ice1, ice2)
       thisfield = fields{mm};
       switch thisfield
          case {'f_ice','f_liq','k_vap','k_eff'}
-            ice2.(thisfield) = round(ice2.(thisfield),5);
+            ice2.(thisfield) = round(ice2.(thisfield), 5);
          case {'Tice', 'h_melt','h_freeze'}
-            ice2.(thisfield) = round(ice2.(thisfield),3);
+            ice2.(thisfield) = round(ice2.(thisfield), 3);
          case {'cp_sno','ro_sno'}
-            ice2.(thisfield) = round(ice2.(thisfield),1);
+            ice2.(thisfield) = round(ice2.(thisfield), 1);
          case {'df_liq','df_drn','Qsub','Sc','errT','errH'}
-            ice2.(thisfield) = round(ice2.(thisfield),8);
+            ice2.(thisfield) = round(ice2.(thisfield), 8);
       end
    end
 

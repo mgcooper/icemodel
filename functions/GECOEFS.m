@@ -45,21 +45,18 @@ function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, Lf, 
    gk = zeros(JJ, 1);    % Eq 123
    LfMZ = zeros(JJ, 1);  % Eq 123, melt-zone latent heat switch
 
-   % % If using g_liq instead of f_liq in the definition of dFdT as in SNTHRM:
+   % % If using g_liq instead of f_liq in the definition of dFdT as in SNTHERM:
    % aP0 = (ro_sno .* cp_sno + Lf * ro_sno .* dFdT + Ls * f_air .* drovdT)
 
    if sum(iM) > 0 % nodes inside the melt zone:
       aP0(iM) = ro_sno(iM) .* cp_sno(iM) + Ls * f_air(iM) .* drovdT(iM);
-      gv(iM) = 1 ./ (ro_sno(iM) .* dFdT(iM)); % Eq 122b
+      gv(iM) = 1 ./ (ro_liq * dFdT(iM)); % Eq 122b
       gk(iM) = T(iM);
       LfMZ(iM) = Lf * dz(iM) / dt;
 
-      % % If using g_liq instead of f_liq as in SNTHRM:
+      % % If using g_liq instead of f_liq as in SNTHERM:
       % gv(iM) = 1 ./ (ro_sno(iM) .* dFdT(iM)); % Eq 122b
       % gv(iM) = 1 ./ (ro_liq * f_wat(iM) .* dFdT(iM)); % Eq 122b
-      
-      % If using ro_liq:
-      % gv(iM) = 1 ./ (ro_liq * dFdT(iM));
    end
 
    % % For a soil model, would need indices above the melt zone
