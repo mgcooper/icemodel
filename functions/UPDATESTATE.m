@@ -18,11 +18,11 @@ function [k_eff, ro_sno, cp_sno, drovdT] = UPDATESTATE(T, f_ice, f_liq, ...
    % Combined bulk mass-specific heat capacity (ct) J/kg/K
    cp_sno = (cv_ice + cv_liq) ./ ro_sno; % (eq 55)
 
-   % Effective thermal conductivity
-   k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
-
    % Change in saturation vapor density with temperature kg/m3
-   % [~, drovdT] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
+   [~, drovdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
+   
+   % Effective thermal conductivity
+   k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
 
    % Energy coefficient W/m2/K
    % aP0 = bd_sno .* cp_sno .* dz ./ dt;

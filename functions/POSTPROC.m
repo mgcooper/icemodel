@@ -76,10 +76,12 @@ function ice2 = retimeIce2(ice2, Time)
          switch thisfield
             case {'Z'} % might need {'Z', 'LCflag'} and other logicals/etc
                continue
-            case {'Tice', 'f_ice', 'f_liq'}
+            case {'Tice', 'f_ice', 'f_liq', 'k_eff', 'k_vap', 'ro_sno', 'cp_sno'}
                tmp.(thisfield)(:, n) = mean(ice2.(thisfield)(:, i1:i2), 2);
-            case 'df_liq'
+            case {'df_liq', 'df_evp', 'df_drn', 'errH'}
                tmp.(thisfield)(:, n) = sum(ice2.(thisfield)(:, i1:i2), 2);
+            otherwise % assume averaging is correct
+               tmp.(thisfield)(:, n) = mean(ice2.(thisfield)(:, i1:i2), 2);
          end
       end
    end
@@ -124,7 +126,7 @@ function [ice1, ice2] = roundData(ice1, ice2)
             ice2.(thisfield) = round(ice2.(thisfield), 3);
          case {'cp_sno','ro_sno'}
             ice2.(thisfield) = round(ice2.(thisfield), 1);
-         case {'df_liq','df_drn','Qsub','Sc','errT','errH'}
+         case {'df_liq','df_drn','df_evp','Qsub','Sc','errT','errH'}
             ice2.(thisfield) = round(ice2.(thisfield), 8);
       end
    end

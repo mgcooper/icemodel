@@ -81,6 +81,10 @@ function varargout = physicalConstant(varargin)
    % Need to add for VAPORHEAT:
    % Ls / Rv
    % Lv / Rv
+   
+   % Water vapor coefficients [kg m-3 K]
+   ci = 611.15 * exp(constants.Ls / (constants.Rv * constants.Tf)) / constants.Rv;
+   cl = 611.21 * exp(constants.Lv / (constants.Rv * constants.Tf)) / constants.Rv;
 
    % Ratios of intrinsic ice and water density
    constants.ro_iwe = constants.ro_ice / constants.ro_liq;  % [1]

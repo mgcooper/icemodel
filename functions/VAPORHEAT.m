@@ -1,4 +1,4 @@
-function [ro_vap, dro_vapdT] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls)
+function [ro_vap, dro_vapdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls)
    %VAPORHEAT Compute saturation vapor density within porous ice
    %
    % [H_vap, dro_vapdT, ro_vap, bd_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls)
@@ -14,42 +14,57 @@ function [ro_vap, dro_vapdT] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls)
    % ro_vap is analogous to an intrinsic density. The calculations assume the
    % air voids are saturated with respect to water vapor.
    % 
+   % De0s = 9.2e-5 [m2 s-1] is the reference effective diffusion coefficient for
+   % water vapor in snow at 1000 mb and 0oC. (See Jordan pg v. Nomenclature).
+   %
+   % De0g = 1.61e-5 * porosity is the reference effective diffusion coefficient
+   % for water vapor in soil at 1000 mb and 0oC.
+   % 
    % See also:
+
+   % Define coefficients over water and ice
+   persistent aw bw cw ai bi ci
+   if isempty(aw)
+      aw = 611.21;
+      bw = 17.502;
+      cw = 240.97;
+      ai = 611.15;
+      bi = 22.452;
+      ci = 272.55;
+   end
 
    % Locate the indices with and without water
    iM = f_liq > 0.02;
 
    % Saturation vapor pressure over ice (Pvk_sat in Jordan, but not used) [Pa]
-   es = 611.15 * exp((22.452 * (T - Tf)) ./ (272.55 + T - Tf));
+   es = ai * exp(bi * (T - Tf) ./ (ci + T - Tf));
 
    % Saturation vapor pressure over water (Pvk_sat in Jordan) [Pa]
    if sum(iM) > 0
-      es(iM) = 611.21 * exp(17.502 * (T(iM) - Tf) ./ (240.97 + T(iM) - Tf));
+      es(iM) = aw * exp(bw * (T(iM) - Tf) ./ (cw + T(iM) - Tf));
    end
 
    % Equilibrium water vapor density wrt phase k: [kg m-3] (ro_vk_sat)
    ro_vap = es ./ (Rv * T);
    
    % Derivative of vapor density wrt to temperature over ice (Eq. 20)
-   dro_vapdT = ro_vap .* (22.452 * 272.55 ./ ((272.55 + T - Tf) .^ 2) - 1 ./ T);
+   dro_vapdT = ro_vap .* (bi * ci ./ (ci + T - Tf) .^ 2 - 1 ./ T);
 
    % Derivative of vapor density wrt to temperature over water
    if sum(iM) > 0
-      dro_vapdT(iM) = ro_vap(iM) .* (17.502 * 240.97 ./ ...
-         ((240.97 + T(iM) - Tf) .^ 2) - 1 ./ T(iM));
+      dro_vapdT(iM) = ro_vap(iM) .* (bw * cw ./ ...
+         (cw + T(iM) - Tf) .^ 2 - 1 ./ T(iM));
    end
 
-   % Diffusion of water vapor [kg/m^2/s]
-   
    % Vapor diffusivity [m2 s-1]
-   % De = 9.0e-5 * (T / Tf) .^ 14; 
+   % De = 9.0e-5 * (T / Tf) .^ 6;
    
-   % Vapor thermal diffusion coefficient [W m-1 K-1]
-   % k_vap = Ls * De  ...
-   %    * 22.452 * 272.55 * ro_vap ./ (272.55 + T - Tf) .^ 2; % des/dT [Pa K-1]
+   % Vapor thermal diffusion coefficient [W m-1 K-1]: Ls * De * dro_vapdT
+   k_vap = Ls * 9.0e-5 * (T / Tf) .^ 6 .* dro_vapdT;
    
-   % equivalently:
-   % k_vap = Ls * De * (d_ro_vap_dT + ro_vap ./ T);
+   % k_vap = Ls * 2.1664062e-19 * T .^ 6 .* dro_vapdT;
+   
+   % Below here not currently implemented, but would be used for grain growth 
    
    % Bulk vapor density (Eq. 18) (assume f_rh = 1.0) [kg m-3]
    % bd_vap = ro_vap .* (1.0 - f_liq - f_ice);
@@ -62,4 +77,29 @@ function [ro_vap, dro_vapdT] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls)
    
    % The change in stored heat due to water vapor diffusion (Eq. 74, term 2)
    % dH_vap_dT = Ls * f_air .* f_rh .* d_ro_vap_dT; % [J/K/m3]
+   
+   % Diffusion of water vapor [kg/m^2/s]
+   % From here ... need dT/dz
+   % U_vap = -De .* dro_vapdT .* dTdz;
+   % U_vap = -k_vap ./ Ls .* dTdz; % equivalent to above
+   % U_vap = -De .* dro_vapdz; % if dro_vapdz = dro_vapdT * dTdz is valid
+   
+   % Time derivative of grain growth, but only for dry snow:
+   % dgdt = g1 ./ d .* De .* dro_vapdT .* dTdz;
+   % dgdt = g1 ./ d(n) .* Uv(n);
+   % for n = 1:numel(f_liq)
+   % 
+   %    % For wet snow:
+   %    if 0.02 <= f_liq(n) && f_liq(n) < 0.09
+   % 
+   %       dgdt(n) = g2 / d(n) * (f_liq(n) + 0.05);
+   % 
+   %    elseif 0.09 <= f_liq(n)
+   % 
+   %       dgdt(n) = g2 / d(n) * 0.14;
+   %    else
+   %       % For dry snow:
+   %       dgdt(n) = g1 ./ d(n) .* Uv(n);
+   %    end
+   % end
 end

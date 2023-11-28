@@ -1,4 +1,4 @@
-function [k_eff, k_vap] = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf)
+function [k_eff, k_vap] = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, varargin)
    %GETGAMMA Compute thermal conductivity (gamma)
    %
    % gamma = ki + kv, where ki is thermal conductivity of ice and kv is vapor
@@ -30,10 +30,24 @@ function [k_eff, k_vap] = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf)
    k_sno = 0.47461 * (1 - theta) .* kiceT .* ksnow ...
       + theta .* kiceT / 2.107 .* kfirn;
 
-   % Compute snow vapor k
-   es = 611.15 * exp((22.452 * (T - Tf)) ./ (272.55 + T - Tf)); % [Pa]
-   k_vap = Ls * 9e-5 * (T / Tf) .^ 14 ./ (Rv * T) ...
-     * 22.452 * 272.55 .* es ./ ((272.55 + T - Tf) .^ 2); % des/dT [Pa K-1]
+   switch nargin 
+      case 6
+         % k_vap provided by an external model.
+         k_vap = varargin{1};
+         
+      case 8
+         % Compute dry snow vapor k: (Ls·De)/(Rv·T)(∂es/∂T-es/T)
+         Ls = varargin{1};
+         Rv = varargin{2};
+         Tf = varargin{3};
+         es = 611.15 * exp((22.452 * (T - Tf)) ./ (272.55 + T - Tf)); % [Pa]
+         k_vap = Ls * 9e-5 * (T / Tf) .^ 6 ./ (Rv * T) ...
+           .* (22.452 * 272.55 .* es ./ ((272.55 + T - Tf) .^ 2) ... % ∂es/∂T
+           - es ./ T); % es/T
+      otherwise
+         % do not compute k_vap
+         k_vap = 0;
+   end
    
    % Combine them into a bulk value
    k_sno = f_liq .* k_liq + f_ice .* k_sno;

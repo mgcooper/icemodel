@@ -16,6 +16,30 @@ function [T, f_liq, f_ice, OK] = MZTRANSFORM(T, T_old, f_liq, f_wat, ro_liq, ...
    %    water fraction at the start of the step
    %
    % See also:
+   
+   
+   % These must be true:
+   % 
+   % f_ice + f_liq * ro_liq / ro_ice <= 1
+   % f_ice * ro_ice / ro_liq + f_liq <= ro_ice / ro_liq
+   % f_wat <= ro_ice / ro_liq
+   % 
+   % If all ice melts:
+   % 
+   % f_wat = f_liq(new) 
+   %       = f_liq(old) + df_liq
+   % 
+   % Thus the requirement is:
+   % 
+   % f_liq(old) + df_liq <= ro_ice / ro_liq
+   % df_liq <= ro_ice / ro_liq - f_liq(old)
+   %
+   % But the implementation should probably use a small f_ice threshold to
+   % disallow complete melting, and/or call combine layers.
+   
+   if any( (T(iM) / ro_liq) >= (1 / ro_wie - f_liq(iM)) ) 
+      OK = false;
+   end
 
    % Update liquid fraction of melting layers (f_liq = f_liq_o + P/ro)
    f_liq(iM) = f_liq(iM) + T(iM) / ro_liq; % line 79 of ftemp.f
@@ -32,10 +56,17 @@ function [T, f_liq, f_ice, OK] = MZTRANSFORM(T, T_old, f_liq, f_wat, ro_liq, ...
       OK = false;
    else
       f_liq(iM) = min(f_liq(iM), f_wat(iM) - eps);
+      % This might need to be:
+      % f_liq(iM) = min(f_liq(iM), f_wat(iM) - f_ice(iM) / ro_wie);
    end
 
    % Update frac ice
    f_ice = (f_wat - f_liq) * ro_wie;
+   
+   % Test
+   if any(f_liq + f_ice > 1)
+      OK = false;
+   end
    
    % Transform melt-zone frac liq to T (NOTE g_wat / g_liq = f_wat / f_liq)
    T(iM) = Tf - sqrt(f_wat(iM) ./ f_liq(iM) - 1.0) / fcp; % Eq. 133a

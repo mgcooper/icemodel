@@ -1,4 +1,4 @@
-function [T, errH, errT, f_ice, f_liq, OK] = ICEENBAL(T, f_ice, f_liq, k_liq, ...
+function [T, errH, errT, f_ice, f_liq, OK, iter] = ICEENBAL(T, f_ice, f_liq, k_liq, ...
       cv_ice, cv_liq, ro_ice, ro_liq, ro_air, Ls, Lf, roLf, Rv, Tf, dz, delz, ...
       fn, dt, JJ, Tsfc, Sc, fcp, TL, TH, flmin, flmax, ro_iwe, ro_wie)
    %ICEENBAL Solve the ice energy balance.
@@ -19,21 +19,21 @@ function [T, errH, errT, f_ice, f_liq, OK] = ICEENBAL(T, f_ice, f_liq, k_liq, ..
    H_old = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
 
    % Iterate to solve the nonlinear heat equation
-   errT = 2e-2; iter = 0; errH = 0; OK = true; alpha = 0.8;
+   tol = 1e-3; errT = 2 * tol; iter = 0; errH = 0; OK = true; % alpha = 0.8;
 
-   while any(errT > 1e-2) && iter < 50
+   while any(errT > tol) && iter < 100
 
       T_old = T;
       iter = iter + 1;
 
-      % Update thermal conductivity
-      k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
-
       % Update vapor heat
-      [ro_vap, drovdT] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
+      [ro_vap, drovdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
 
       % Update total enthalpy
       H = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
+      
+      % Update thermal conductivity
+      k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
 
       % Update density, heat capacity, and d(f_liq)/dT
       ro_sno = ro_ice * f_ice + ro_liq * f_liq + ro_air * (1.0 - f_liq - f_ice);
@@ -70,8 +70,8 @@ function [T, errH, errT, f_ice, f_liq, OK] = ICEENBAL(T, f_ice, f_liq, k_liq, ..
 
       % assertF(@() all(f_ice + f_liq - 1.0 <= 0))
 
-      % Apply relaxation
-      T = alpha * T + (1 - alpha) * T_old;
+      % Relaxation does not tend to improve the solution but keep for reference.
+      % T = alpha * T + (1 - alpha) * T_old;
 
       % prep for next iteration
       errT = abs(T - T_old);

@@ -1,7 +1,5 @@
 function Qe = LATENT(De, S, ea, es, roL, epsilon, Pa)
    %LATENT Compute latent heat flux
-function Qe = LATENT(De, S, ea, es, roL, epsilon, Pa)
-   %LATENT Compute latent heat flux
    %
    %  Qe = ro_air * L * De_h * stability * (0.622/Pa * (ea - es));
    %  [W m-2] = [kg m-3] * [J kg-1] * [m s-1] * [-] * [Pa-1 * Pa]

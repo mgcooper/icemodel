@@ -3,29 +3,34 @@ function S = STABLEFN(Tair,Tsfc,wspd,scoef)
    %
    % Following Appendix 1 of Liston et al. 1999:
    %    S = 1.0;
-   %    Ri = 9.81*z_obs/(Tair*wspd^2)*(Tair-Tsfc);
-   %    De = wcoef*wspd;
-   %    gamma = 5.3*9.4*De/wspd*sqrt((z_obs/z_0));
+   %    Ri = 9.81 * z_obs / (Tair * wspd ^ 2) * (Tair - Tsfc);
+   %    De = wcoef * wspd;
+   %    gamma = 5.3 * 9.4 * De / wspd * sqrt((z_obs / z_0));
    %    if Ri<0
-   %       S = 1 - 9.4*Ri/(1+gamma*sqrt(abs(Ri)));
-   %    elseif Ri>0
-   %       S = 1 / (1+4.7*Ri)^2;
+   %       S = 1 - 9.4 * Ri / (1 + gamma * sqrt(abs(Ri)));
+   %    elseif Ri > 0
+   %       S = 1 / (1 + 4.7 * Ri) ^2;
    %    end
    %
-   % for unstable, the absolute value of the Richardson number is implicit
+   % For unstable, the absolute value of the Richardson number is implicit
    % because Tsfc>Tair implies Tsfc-Tair>0, see Appendix of Liston et al 1999
+   %
+   % Units: [1]
+   % 
+   % See also:
 
    S = 1.0; % Neutrally stable case.
 
-   if (Tsfc>Tair) % Unstable case.
+   if (Tsfc > Tair) % Unstable case.
 
-      S = 1+scoef(2)/(Tair*wspd^2)*(Tsfc-Tair)/...
-         (1+scoef(3)/(sqrt(Tair)*wspd)*sqrt(Tsfc-Tair));   % [-]
+      S = 1 + scoef(2) / (Tair * wspd ^ 2) * (Tsfc - Tair) ...
+         / (1 + scoef(3) / (sqrt(Tair) * wspd) * sqrt(Tsfc - Tair));
 
-   elseif (Tsfc<Tair) % Stable case.
+   elseif (Tsfc < Tair) % Stable case.
 
-      S = 1/((1+scoef(2)/(2*wspd^2)*(Tair-Tsfc)/Tair)^2);   % [-]
-      % S = 1/((1+scoef(2)/(Tair*wspd^2)/2*(Tair-Tsfc))^2);   % [-]
+      S = 1 / ((1 + scoef(2) / (2 * wspd ^ 2) * (Tair - Tsfc) / Tair) ^ 2);
+      
+      % S = 1 / ((1 + scoef(2) / (Tair * wspd ^ 2) / 2 * (Tair - Tsfc)) ^ 2);
    end
 
 end

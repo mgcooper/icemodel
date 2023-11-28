@@ -55,15 +55,15 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_drn, x_err, lcflag] = ICEMF( ...
    % if cond, d_evp > 0
    % if subl, d_sub < 0
 
-   % Below here:
-   % d_XXX = f_liq - xf_liq - d_evp
-   % where f_liq on the rhs is f_liq_new
-
    % Update the top layer temperature, if the node is in the melt zone
    if T(1) > TL % f_liq(1) > f_liq_min
       T(1) = Tf - sqrt( (f_liq(1) + f_ice(1) * ro_iwe) / f_liq(1) - 1.0) / fcp;
    end
 
+   % Below here:
+   % d_XXX = f_liq - xf_liq - d_evp
+   % where f_liq on the rhs is f_liq_new
+   
    % combine layers if any layer is <f_min, or if this step's sublimation
    % would reduce any layer to <f_min (predict the need to combine next step)
    lyrmrg = f_ice <= f_min | (f_ice + Qe/(Ls*ro_ice)*dt_new/dz_therm) <= f_min;

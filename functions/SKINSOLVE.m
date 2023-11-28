@@ -24,7 +24,7 @@ function [T, OK] = SKINSOLVE(Tsfc, T, k_eff, ro_sno, cp_sno, dz, dt, N, ...
 
    % Solver options
    persistent tol maxiter alpha
-   if isempty(tol); tol = 1e-2; end
+   if isempty(tol); tol = 1e-3; end
    if isempty(maxiter); maxiter = 1000; end
    if isempty(alpha); alpha = 1.8; end
   

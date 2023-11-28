@@ -16,10 +16,10 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
    [f_ice, f_liq, T, ~, ~, ~, ~, cp_sno, k_eff, dz, fn, delz, ~, ~, ~, ...
       JJ_therm, ~, ~, ~, scoef, ro_sno, ~, ~, xTsfc, xf_liq, roL, Qc, ~, ...
       fopts, ~, liqflag, ice1, ice2] = ICEINIT(opts, tair);
-
+   
    % INITIALIZE TIMESTEPPING
-   [metiter, subiter, maxiter, maxsubiter, dt, dt_min, dt_max, dt_new, ...
-      numyears, ~, numspinup] = INITTIMESTEPS(opts, time);
+   [metiter, subiter, maxiter, maxsubiter, dt_FULL_STEP, dt_min, dt_max, ...
+      dt_new, numyears, ~, numspinup] = INITTIMESTEPS(opts, time);
 
    %% START ITERATIONS OVER YEARS
    for thisyear = 1:numyears
@@ -30,7 +30,7 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
          % INITIALIZE NEW TIMESTEP
          [dt_sum, subfail, dt_flag, OK] = INITSUBSTEP(f_liq);
 
-         while dt_sum < dt
+         while dt_sum < dt_FULL_STEP
 
             % SURFACE ENERGY BALANCE
             [Qm, Qf, Qh, Qe, Qc, ~, balance, Tsfc] = ENBALANCE( ...
@@ -43,7 +43,7 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
             k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
             [T, OK] = SKINSOLVE(Tsfc, T, k_eff, ro_sno, cp_sno, dz, dt_new, ...
                JJ_therm, fn, delz, f_liq, f_ice, Tf, Rv, Ls);
-
+            
             % ADAPTIVE TIME STEP
             if not(OK) && subiter < maxsubiter
                [subfail, subiter, dt_new, T, Tsfc, f_ice, f_liq] ...
@@ -56,7 +56,7 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
                [xT, xTsfc, xf_ice, xf_liq, dt_sum, dt_new, dt_flag, ...
                   liqflag, roL, ro_sno, cp_sno] = UPDATESUBSTEP(T, Tsfc, ...
                   f_ice, f_liq, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, ...
-                  dt, dt_sum, dt_new, roLv, roLs, dt_min, TINY);
+                  dt_FULL_STEP, dt_sum, dt_new, roLv, roLs, dt_min, TINY);
             end
          end
 
