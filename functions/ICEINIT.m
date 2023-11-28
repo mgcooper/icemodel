@@ -85,7 +85,11 @@ function [f_ice, f_liq, T, TL, TH, flmin, flmax, cp_sno, k_eff, dz, fn, ...
       ice1.(opts.vars1{n}) = nan(maxiter, 1);
    end
    for n = 1:numel(opts.vars2) % ice2 = 2-d data
-      ice2.(opts.vars2{n}) = nan(JJ_therm, maxiter);
+      if strcmp(opts.vars2{n}, 'lcflag')
+         ice2.(opts.vars2{n}) = false(JJ_therm, maxiter);
+      else
+         ice2.(opts.vars2{n}) = nan(JJ_therm, maxiter);
+      end
    end
 
    % diags.Tflag = false(maxiter,1);
