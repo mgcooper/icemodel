@@ -1,19 +1,19 @@
-function [T, Tsfc, f_ice, f_liq, dt_sum, dt_new, dt_flag, liqflag, roL, ...
-      ro_sno, cp_sno] = UPDATESUBSTEP(T, Tsfc, f_ice, f_liq, ro_ice, ro_liq, ...
-      ro_air, cv_ice, cv_liq, dt, dt_sum, dt_new, roLv, roLs, dt_min, TINY)
+function [T, Tsfc, f_ice, f_liq, dt_sum, dt_new, liqflag, roL, ro_sno, cp_sno] ...
+      = UPDATESUBSTEP(T, Tsfc, f_ice, f_liq, dt_FULL_STEP, dt_sum, dt_new, TINY, ...
+      ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs)
    %UPDATESUBSTEP Return past values, allocate timestep, and update state
 
    % Allocate this substep to the timestep
    dt_sum = dt_sum + dt_new;
 
-   % First is true if step incomplete, second if overage will occur
-   dt_flag = (dt - dt_sum) > TINY && (dt_sum + dt_new - dt) > TINY;
-
-   if dt_flag
-      dt_new = max(dt - dt_sum, dt_min);
+   % Adjust dt to exactly complete the full step without going over. 
+   % The first condition is true if the full step is incomplete, the second 
+   % is true if the next substep will exceed the full step.
+   if (dt_FULL_STEP - dt_sum) > TINY && (dt_sum + dt_new - dt_FULL_STEP) > TINY
+      dt_new = dt_FULL_STEP - dt_sum; % dt_new = max(dt - dt_sum, dt_min);
    end
 
-   if nargout > 7
+   if nargout > 6
       
       % Top node contains >2% liquid water
       liqflag = f_liq(1) > 0.02;

@@ -76,8 +76,7 @@ function [ice1, ice2] = icemodel(opts) %#codegen
       while iter <= maxiter
 
          % INITIALIZE NEW SUBSTEP
-         [dt_sum, subfail, dt_flag, OK, d_liq, d_drn, d_evp] ...
-            = INITSUBSTEP(f_liq);
+         [dt_sum, subfail, OK, d_liq, d_drn, d_evp] = INITSUBSTEP(f_liq);
 
          % update the upper layer diffusion length scale
          % if sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1))) > dz(1)
@@ -131,7 +130,7 @@ function [ice1, ice2] = icemodel(opts) %#codegen
          % cp_sno = (cv_ice .* f_ice + cv_liq .* f_liq) ./ ro_sno;
          % assertF(@() all(f_ice + f_liq - 1.0 <= 0))
 
-         while dt_sum < dt_FULL_STEP
+         while dt_sum + TINY < dt_FULL_STEP 
 
             assertF(@() all(f_ice + f_liq * ro_wie <= 1))
 
@@ -198,16 +197,18 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                assertF(@() all(f_ice + f_liq * ro_wie <= 1))
 
                % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
-               [xT, xTsfc, xf_ice, xf_liq, dt_sum, dt_new, dt_flag, ...
-                  liqflag, roL] = UPDATESUBSTEP(T, Tsfc, f_ice, f_liq, ...
-                  ro_ice, ro_liq, ro_air, cv_ice, cv_liq, dt_FULL_STEP, ...
-                  dt_sum, dt_new, roLv, roLs, dt_min, TINY);
-
+               [xT, xTsfc, xf_ice, xf_liq, dt_sum, dt_new, liqflag, roL] ...
+                  = UPDATESUBSTEP(T, Tsfc, f_ice, f_liq, dt_FULL_STEP, ...
+                  dt_sum, dt_new, TINY, ro_ice, ro_liq, ro_air, cv_ice, ...
+                  cv_liq, roLv, roLs);
+               
                % zD = sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
                % if zD > dz(1)
                % end
             end
          end
+
+         assertF(@() dt_sum < dt_FULL_STEP + 2 * TINY)
 
          % SAVE OUTPUT IF SPINUP IS FINISHED
          if thisyear >= numspinup
@@ -223,7 +224,7 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
          % MOVE TO THE NEXT TIMESTEP
          [iter, metiter, subiter, dt_new] = NEXTSTEP(iter, metiter, ...
-            subiter, dt_flag, dt_max, OK, dt_new);
+            subiter, dt_new, dt_max, dt_min, OK);
 
          assertF(@() all(f_ice + f_liq * ro_wie <= 1))
 
