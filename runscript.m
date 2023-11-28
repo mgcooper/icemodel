@@ -2,11 +2,16 @@ clearvars
 close
 clc
 
+% I need this to run a single point if requested. Ideally it would run all
+% points inside a catchment and conservatively remap but for now, it at least
+% needs to run a given point.
+runpoint = true;
+
 %% set the run-specific model configuration
 savedata = false;
 sitename = 'behar';        % options: 'kanm', 'behar'
-forcings = 'mar';          % options: 'mar','kanm'
-userdata = 'modis';        % options: 'modis','racmo','merra','mar','kanm','none'
+forcings = 'mar';         % options: 'mar','kanm'
+userdata = 'none';        % options: 'modis','racmo','merra','mar','kanm','none'
 uservars = 'albedo';       % options: 'albedo', or any var in met
 simmodel = 'icemodel';     % options: 'icemodel','skinmodel'
 simyears = 2016;
@@ -34,6 +39,10 @@ else
    [ice1, ice2] = POSTPROC(ice1, ice2, opts, ...
       met.swd, met.lwd, met.albedo, met.Time);
 end
+
+% [mean(itercount) std(itercount) min(itercount) max(itercount) numel(itercount)]
+% 
+% figure; histogram(itercount)
 
 %% prep the output for plotting
 
@@ -64,6 +73,8 @@ plotPromice(AblationHourly,'refstart',t1);
 
 diffs = (data{end, 2:end} - data.ADCP(end)) ./ data.ADCP(end);
 diffs = array2table(diffs, 'VariableNames', {'Racmo', 'Mar', 'Merra', 'IceModel'})
+[ice1.runoff(end) ice1.melt(end)]
+
 %%
 
 % [Lv, ro_liq] = icemodel.physicalConstant('Lv', 'ro_liq');

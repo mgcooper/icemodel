@@ -35,7 +35,7 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
    %% INITIALIZE THE MODEL
 
-   assertF off
+   assertF on
 
    % Define a logical flag that sets the simulation model
    % isicemodel = strcmp(opts.simmodel, 'icemodel');
@@ -104,6 +104,8 @@ function [ice1, ice2] = icemodel(opts) %#codegen
             * STABLEFN(tair(metiter), Tsfc, wspd(metiter), scoef), ...
             xTsfc, xTsfc - 50, xTsfc + 50, tair(metiter), fopts.TolX);
 
+         % assertF(@() OK)
+         
          % TEST
          % [f_liq, f_ice, T, OK2] = INFILTRATION(f_liq, f_ice, T, Tf, ...
          %    TL, fcp, dz, dt);
