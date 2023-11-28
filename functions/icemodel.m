@@ -133,7 +133,7 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
          while dt_sum < dt_FULL_STEP
 
-            assertF(@() all(f_ice + f_liq - 1.0 <= 0))
+            assertF(@() all(f_ice + f_liq * ro_wie <= 1))
 
             % SUBSURFACE ENERGY BALANCE
             [T, errH, errT, f_ice, f_liq, OK1] = ICEENBAL(T, f_ice, f_liq, ...
@@ -141,9 +141,8 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                Rv, Tf, dz, delz, fn, dt_new, JJ, Tsfc, Sc, fcp, TL, TH, ...
                flmin, flmax, ro_iwe, ro_wie);
 
-            assertF(@() all(f_ice + f_liq - 1.0 <= 0))
             assertF(@() all(f_ice + f_liq * ro_wie <= 1))
-            
+
             % TEST
             OK2 = true;
             % if OK1
@@ -163,7 +162,7 @@ function [ice1, ice2] = icemodel(opts) %#codegen
             %    iter,100*iter/maxiter,dt_new,mat2str(all(OK)))
 
             % PHASE BOUNDARY OVERSHOOT, DECREASE THE TIME STEP AND START OVER
-            if not(OK) && subiter < maxsubiter
+            if not(OK) && subfail < maxsubiter
 
                [subfail, subiter, dt_new, T, Tsfc, f_ice, f_liq] ...
                   = RESETSUBSTEP( xT, xTsfc, xf_ice, xf_liq, dt_max, ...
@@ -188,15 +187,15 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                   wspd(metiter), psfc(metiter), De(metiter), ea, Tf, k_eff, ...
                   dz, cv_air, roL, emiss, SB, chi, epsilon, scoef, liqflag);
 
-               assertF(@() all(f_ice + f_liq - 1.0 <= 0))
+               assertF(@() all(f_ice + f_liq * ro_wie <= 1))
 
                % COMPUTE MASS BALANCE
-               [T, f_ice, f_liq, d_liq, d_evp, d_drn,~,lcflag] = ICEMF(T, f_ice, ...
+               [T, f_ice, f_liq, d_liq, d_evp, d_drn, ~, lcflag] = ICEMF(T, f_ice, ...
                   f_liq, ro_ice, ro_liq, cv_ice, cv_liq, Lf, Ls, Lv, Tf, ...
                   TL, fcp, xf_liq, Sc, Sp, JJ, f_min, fopts, dz_therm, ...
                   dt_new, Qe, ro_iwe, d_liq, d_drn, d_evp, flmin, liqresid);
 
-               assertF(@() all(f_ice + f_liq - 1.0 <= 0))
+               assertF(@() all(f_ice + f_liq * ro_wie <= 1))
 
                % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
                [xT, xTsfc, xf_ice, xf_liq, dt_sum, dt_new, dt_flag, ...
@@ -226,7 +225,7 @@ function [ice1, ice2] = icemodel(opts) %#codegen
          [iter, metiter, subiter, dt_new] = NEXTSTEP(iter, metiter, ...
             subiter, dt_flag, dt_max, OK, dt_new);
 
-         assertF(@() all(f_ice + f_liq - 1.0 <= 0))
+         assertF(@() all(f_ice + f_liq * ro_wie <= 1))
 
       end % timesteps (one year)
 
