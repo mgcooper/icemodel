@@ -36,12 +36,13 @@ function [ice1, ice2] = icemodel(opts) %#codegen
    %% INITIALIZE THE MODEL
 
    assertF on
+   % assertF(@() all(f_ice + f_liq * ro_wie <= 1))
 
    % Define a logical flag that sets the simulation model
    % isicemodel = strcmp(opts.simmodel, 'icemodel');
 
    % Load the physical constants and parameters
-   [  cv_air, cv_liq, cv_ice, emiss, SB, epsilon, fcp, k_liq, Lf, ...
+   [cv_air, cv_liq, cv_ice, emiss, SB, epsilon, fcp, k_liq, Lf, ...
       Ls, Lv, ro_air, ro_ice, ro_liq, roLf, roLs, roLv, Rv, Tf] ...
       = icemodel.physicalConstant( ...
       'cv_air','cv_liq','cv_ice','emiss', 'SB','epsilon','fcp','k_liq','Lf', ...
@@ -97,40 +98,10 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
          % SURFACE TEMPERATURE
          ea = VAPPRESS(tair(metiter), Tf, liqflag) * rh(metiter) / 100;
-         
-         dif = 1; ii = 0; % OK = false;
-         while dif > 1e-3 && ii < 100 % && OK == false
-            ii = ii+1;
-            xTsfc = Tsfc;
-
-            [Tsfc, exitflag, OK] = fsearchzero(@(Tsfc) Qc ...
-               + chi * (1.0 - albedo(metiter)) * swd(metiter) ...
-               + emiss * (lwd(metiter) - SB * Tsfc ^ 4) ...
-               + cv_air * De(metiter) * (tair(metiter) - Tsfc) ...
-               * STABLEFN(tair(metiter), Tsfc, wspd(metiter), scoef) ...
-               + roL * De(metiter) * (ea - VAPPRESS(Tsfc, Tf, liqflag)) ...
-               * epsilon / psfc(metiter) ...
-               * STABLEFN(tair(metiter), Tsfc, wspd(metiter), scoef), ...
-               xTsfc, xTsfc - 50, xTsfc + 50, tair(metiter), fopts.TolX);
-            Qc = CONDUCT(k_eff, T, dz, Tsfc);
-            dif = abs(xTsfc - Tsfc);
-            if exitflag == -6
-               flag(iter) = true;
-               break
-            end
-         end
-         numiter(iter) = ii;
-         
-         % assertF(@() OK)
-         
-         % TEST
-         % [f_liq, f_ice, T, OK2] = INFILTRATION(f_liq, f_ice, T, Tf, ...
-         %    TL, fcp, dz, dt);
-         % ro_sno = f_ice .* ro_ice + f_liq .* ro_liq + (1.0 - f_liq - f_ice) .* ro_air;
-         % cp_sno = (cv_ice .* f_ice + cv_liq .* f_liq) ./ ro_sno;
-         % assertF(@() all(f_ice + f_liq - 1.0 <= 0))
-
-         while dt_sum + TINY < dt_FULL_STEP 
+         Ts = SEBSOLVE(tair(metiter), swd(metiter), lwd(metiter), ...
+            albedo(metiter), wspd(metiter), psfc(metiter), De(metiter), ...
+            ea, cv_air, emiss, SB, Tf, chi, roL, scoef, liqflag, ...
+            Ts, T, k_eff, dz, opts.sebsolver);
 
             assertF(@() all(f_ice + f_liq * ro_wie <= 1))
 
@@ -141,20 +112,6 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                flmin, flmax, ro_iwe, ro_wie);
 
             assertF(@() all(f_ice + f_liq * ro_wie <= 1))
-
-            % TEST
-            OK2 = true;
-            % if OK1
-            %    [f_liq, f_ice, T, OK2] = INFILTRATION(f_liq, f_ice, T, Tf, ...
-            %       TL, fcp, dz, dt_new);
-            %
-            %    ro_sno = f_ice .* ro_ice + f_liq .* ro_liq + (1.0 - f_liq - f_ice) .* ro_air;
-            %    cp_sno = (cv_ice .* f_ice + cv_liq .* f_liq) ./ ro_sno;
-            %
-            %    assertF(@() all(f_ice + f_liq - 1.0 <= 0))
-            % end
-
-            OK = OK1 && OK2;
 
             % ERROR MESSAGE (SLOWS DOWN THE CODE A LOT)
             % fprintf('iter = %d (%.2f%%), dt = %.0f, success = %s\n', ...
@@ -181,12 +138,10 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
                % UPDATE SURFACE FLUXES
                k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
-               [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, Tsfc, ...
-                  tair(metiter), swd(metiter), lwd(metiter), albedo(metiter), ...
-                  wspd(metiter), psfc(metiter), De(metiter), ea, Tf, k_eff, ...
-                  dz, cv_air, roL, emiss, SB, chi, epsilon, scoef, liqflag);
-
-               assertF(@() all(f_ice + f_liq * ro_wie <= 1))
+               [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, Ts, tair(metiter), ...
+                  swd(metiter), lwd(metiter), albedo(metiter), wspd(metiter), ...
+                  psfc(metiter), De(metiter), ea, Tf, k_eff, dz, cv_air, roL, ...
+                  emiss, SB, chi, epsilon, scoef, liqflag);
 
                % COMPUTE MASS BALANCE
                [T, f_ice, f_liq, d_liq, d_evp, d_drn, ~, lcflag] = ICEMF(T, f_ice, ...
@@ -201,7 +156,7 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                   = UPDATESUBSTEP(T, Tsfc, f_ice, f_liq, dt_FULL_STEP, ...
                   dt_sum, dt_new, TINY, ro_ice, ro_liq, ro_air, cv_ice, ...
                   cv_liq, roLv, roLs);
-               
+
                % zD = sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
                % if zD > dz(1)
                % end

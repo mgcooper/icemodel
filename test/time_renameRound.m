@@ -24,7 +24,7 @@ ice2lookup = {
 
 %% For initial testing, use tic toc
 
-Rename Method 1: Using ismember
+% Rename Method 1: Using ismember
 tmp = ice1;
 tic
 for m = 1:1000

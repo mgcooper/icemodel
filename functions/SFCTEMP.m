@@ -1,31 +1,24 @@
-function [Tsfc,OK] = SFCTEMP(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,...
-      emiss,SB,Tf,Qc,xTsfc,chi,roL,scoef,fopts,liqflag)
-   %SFCTEMP solve the energy balance for surface temperature
+function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
+      ea, cv_air, emiss, SB, Tf, chi, roL, scoef, Qc, liqflag)
+   %SFCTEMP Solve the energy balance for surface temperature
 
-   % debug = false;
-   % dflag = true;
+   persistent tol maxiter
+   if isempty(tol)
+      tol = 1e-3;
+      maxiter = 100;
+   end
 
-   % gather terms in the SEB equation. Note that if icond_flag == 0, Qc = 0
-   AAA = cv_air * De;                           % [W m-2 K-1]
-   CCC = 0.622 / Pa;                            % [Pa-1] = [m3 J-1]
-   EEE = chi*(1.0-albedo)*Qsi + emiss*Qli + Qc; % [W m-2]
-   FFF = roL * De;                              % [W m-2]
+   % Gather terms in the SEB equation.
+   AAA = cv_air * De;                                    % [W m-2 K-1]
+   CCC = 0.622 / Pa;                                     % [Pa-1] = [m3 J-1]
+   EEE = chi * (1.0 - albedo) * Qsi + emiss * Qli + Qc;  % [W m-2]
+   FFF = roL * De;                                       % [W m-2]
 
-   % % Compute the constants used in the stability coefficient computations
-   % % (following are needed for SOLVE but not for fzero)
-   % a1 = 5.3*9.4;                               % [-]
-   % z1 = z_obs/z_0;                             % [-]
-   % C1 = a1 * (kapp/(log(z1)))^2 * sqrt(z1);    % [-]
-   % C2 = grav * z_obs/(Tair*wspd^2);            % [K-1]
-   % B1 = 9.4 * C2;                              % [K-1]
-   % B2 = C1 * sqrt(C2);                         % [K-1]
-
-   % these replace the block above
-   B1 = scoef(2)/(Tair*wspd^2);
-   B2 = scoef(3)/(sqrt(Tair)*wspd);
-
-
-   % SOLVE
+   % Compute the constants used in the stability coefficient computations.
+   B1 = scoef(2) / (Ta * wspd ^ 2);
+   B2 = scoef(3) / (sqrt(Ta) * wspd);
+         
+   % Define the vapor pressure coefficients.
    if liqflag == true
       % Over water.
       A = 611.21;
@@ -38,125 +31,75 @@ function [Tsfc,OK] = SFCTEMP(Tair,Qsi,Qli,ea,albedo,De,Pa,wspd,cv_air,...
       C = 272.55;
    end
 
-   old = Tair; errT = 2e-3; iter = 0; OK = false;
+   old = Ta;
+   
+   for iter = 1:maxiter
 
-   while errT>1e-3 && iter<200
-
-      % commented vars can be activated for clarity / debugging
-      % This accounts for an increase in turbulent fluxes under unstable conditions.
-      % other1 = AAA * (Tair-old);
-      es0 = A * exp((B*(old-Tf))/(C+(old-Tf)));
-      % other2 = FFF*CCC*(ea-es0);
-      % dother1 = -AAA;
-      % dother2 = -FFF*CCC*es0*B*C/((C+old-Tf)^2);
-
-      if (old>Tair)                          % Unstable case.
-         B3 = 1.0+B2*sqrt(old-Tair);
-         S = 1.0+B1*(old-Tair)/B3;
-         dS = B1/B3-(B1*B2*(old-Tair))/(2.0*B3*B3*sqrt(old-Tair));
-         df1 = -4.0*emiss*SB*old^3;
-         df2 = S*-AAA+AAA*(Tair-old)*dS;
-         df3 = S*-FFF*CCC*es0*B*C/((C+old-Tf)^2)+FFF*CCC*(ea-es0)*dS;
-         df4 = -0.0;
-      elseif (old<Tair)                      % Stable case.
-         B8 = B1/2.0;
-         S = 1.0/((1.0+B8*(Tair-old))^2);
-         dS = 2.0*B8/((1.0+B8*(Tair-old))^3);
-         df1 = -4.0*emiss*SB*old^3;
-         df2 = S*-AAA+AAA*(Tair-old)*dS;
-         df3 = S*-FFF*CCC*es0*B*C/((C+old-Tf)^2)+FFF*CCC*(ea-es0)*dS;
-         df4 = -0.0;
-      else                                   % Neutrally stable case.
-         S = 1.0;
-         df1 = -4.0*emiss*SB*old^3;
-         df2 = -AAA;
-         df3 = -FFF*CCC*es0*B*C/((C+old-Tf)^2);
-         df4 = -0.0;
-      end
-
-      % f1-5 can be activated for clarity / debugging
-      % f1 = EEE - emiss*SB*old^4;    % net radiation + conduction (Qc is in EEE)
-      % f2 = AAA*(Tair-old)*S;   % sensible flux
-      % f3 = FFF*CCC*(ea-es0)*S; % latent flux
-      % f4 = 0.0;                % for the case where Qc is taken out from EEE
-
-      f = EEE-emiss*SB*old^4+AAA*(Tair-old)*S+FFF*CCC*(ea-es0)*S; % + f4
-      Tsfc = old-f/(df1 + df2 + df3 + df4);
-
-      % if debug == true
-      %    if dflag == true
-      %       figure;
-      %       s1 = subplot(1,2,1); plot(old,f,'ko'); hold on;
-      %       xylabel('T','F(T)');
-      %       legend('f(Tair)','AutoUpdate','off');
-      %       s2 = subplot(1,2,2); plot(old,(df1 + df2 + df3 + df4),'ko');
-      %       xylabel('T','dF/dT');
-      %       hold on; dflag = false;
-      %    else
-      %       plot(s1,old,f,'o'); plot(s2,old,(df1 + df2 + df3 + df4),'o');
-      %       pause;
-      %    end
-      % end
-
-      % prep for next iteration
-      errT = abs(Tsfc-old);
-      old = Tsfc;
-      iter = iter+1;
-   end
-
-   % if converges pass it to SFCTEMP
-   if errT<1e-3 && abs(xTsfc-Tsfc) < 10
-      OK = true;  return
-   else
-      % cycle through various solver opts until we get a good solution
-      dif = 20;
-      tryflag = 0;
-
-      while dif > 10 && tryflag < 3
-
-         tryflag = tryflag + 1;
-
-         % try fsolve
-         try %#ok<TRYNC>
-            Tsfc = SFCTMPFSOLVE(EEE,AAA,FFF,CCC,Tair,ea,wspd,emiss,SB,Tf, ...
-               xTsfc,scoef,fopts,liqflag,tryflag);
-         % catch ME
-         %    if strcmp(ME.identifier,'MATLAB:fzero:ValuesAtEndPtsSameSign')
-         %       msg = 'Tsfc failed using endpoints, using midpoint instead';
-         %       causeE = MException('icemodel:SFCTEMP:rootfinding',msg);
-         %       ME = addCause(ME,causeE); % let it go
-         %    end
-         end
-         dif = abs(xTsfc-Tsfc);
-      end
-
-      if isnan(Tsfc) || dif>10
-         Tsfc = Tair; % if it doesn't converge use tair
+      % Account for an increase in turbulent fluxes under unstable conditions.
+      es = A * exp(B * (old - Tf) / (C + old - Tf));
+      
+      if old > Ta 
+         % Unstable case.
+         S = 1.0 + B1 * (old - Ta) / (1.0 + B2 * sqrt(old - Ta));
+         dS = B1 / (1.0 + B2 * sqrt(old - Ta)) - (B1 * B2 * (old - Ta)) ...
+            / (2.0 * (1.0 + B2 * sqrt(old - Ta)) ^ 2 * sqrt(old - Ta));
+         
+      elseif old < Ta
+         % Stable case.
+         S = 1.0 / (1.0 + B1 / 2.0 * (Ta - old)) ^ 2;
+         dS = 2.0 * B1 / 2.0 / (1.0 + B1 / 2.0 * (Ta - old)) ^ 3;
       else
-         OK = true;
+         % Neutrally stable case.
+         S = 1.0;
+         dS = 0;
       end
+
+      dfdT = -4.0 * emiss * SB * old ^ 3 ...
+         + S * -AAA + AAA * (Ta - old) * dS ...
+         + S * -FFF * CCC * es * B * C / (C + old - Tf) ^ 2 ...
+         + FFF * CCC * (ea - es) * dS;
+
+      f = EEE - emiss * SB * old ^ 4 + AAA * (Ta - old) * S ...
+         + FFF * CCC * (ea - es) * S;
+      
+      Ts = old - f / dfdT;
+
+      if abs(Ts - old) < tol
+         ok = true;
+         return
+      elseif isnan(Ts) || iter == maxiter
+         ok = false;
+         Ts = Ta;
+         return
+      end
+      old = Ts;
    end
-end
-
-% fzero
-function Tsfc = SFCTMPFSOLVE(EEE,AAA,FFF,CCC,Tair,ea,wspd,emiss,SB,Tf,  ...
-      xTsfc,scoef,fopts,liqflag,tryflag)
-
-   Sfnc = @STABLEFN;
-   Vfnc = @VAPPRESS;
-   fSEB = @(Tsfc) EEE - emiss*SB.*Tsfc.^4 + ...
-      AAA.*Sfnc(Tair,Tsfc,wspd,scoef).*(Tair-Tsfc) + ...
-      FFF.*CCC.*Sfnc(Tair,Tsfc,wspd,scoef) .* ...
-      (ea-Vfnc(Tsfc,Tf,liqflag));
-   % + cp_liq*ppt*Tppt; % ppt in kg/m2/s
-
-   % solve the equation, using Tair as an intial guess for Tsfc
-
-   if tryflag == 1         % first try bounding by +/- 5 deg past Tsfc
-      [Tsfc,~,~] = fzero(fSEB,[xTsfc-5 xTsfc+5],fopts);
-   elseif tryflag == 2     % next try Tair in case of bad past Tsfc
-      [Tsfc,~,~] = fzero(fSEB,[Tair-5 Tair+5],fopts);
-   elseif tryflag == 3     % next try Tair in case of bad past Tsfc
-      [Tsfc,~,~] = fzero(fSEB,Tair,fopts);
-   end
+   
+   %    % Check convergence
+   %    if err < tol && abs(xTs - Ts) < 10
+   %       OK = true;
+   %       return
+   %    else
+   %
+   %       % Try brent's method
+   %       fSEB = @(Ts) EEE - emiss * SB * Ts ^ 4 + ...
+   %       AAA * STABLEFN(Ta, Ts, wspd, scoef) * (Ta - Ts) + ...
+   %       FFF * CCC * STABLEFN(Ta, Ts, wspd, scoef) * ...
+   %       (ea - VAPPRESS(Ts, Tf, liqflag));
+   %       % + cp_liq*ppt*Tppt; % ppt in kg/m2/s
+   %
+   %       [Ts, ~, ok] = fsearchzero(fSEB, ...
+   %          xTs, xTs-50, xTs+50, Ta, fopts.TolX);
+   %
+   %       if not(ok) || abs(xTs - Ts) > 10
+   %          Ts = Ta;
+   %       else
+   %          OK = true;
+   %       end
+   %
+   %       % If newton and brent fail, could try fzero bounded and unconstrained:
+   %       % [Ts, ~, ~] = fzero(fSEB, [Ta-50 Ta+50], fopts);
+   %       % [Ts, ~, ~] = fzero(fSEB, Ta, fopts);
+   %
+   %    end
 end
