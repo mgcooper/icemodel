@@ -1,6 +1,6 @@
 function [f_liq_C, f_ice_C, T_C, Sc_C, Sp_C, d_drn, d_liq] = COMBINEHEAT( ...
       f_liq, f_ice, T, Sc, Sp, Tf, TL, cv_ice, cv_liq, Lf, ro_ice, ro_liq, ...
-      fcp, j1, j2, d_drn, d_liq, dz, fopts)
+      fcp, j1, j2, d_drn, d_liq, dz)
    %COMBINEHEAT Combine layers conserving mass, enthalpy, and absorbed radiation
    %
    % j1 is the thin layer that is removed, the combined values are put into j2.

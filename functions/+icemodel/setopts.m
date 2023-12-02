@@ -49,6 +49,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    opts.f_ice_min       =  0.01;
 
    % solver options
+   opts.sebsolver = 1;
    opts.fzero = optimset('Display', 'off', 'TolX', 1e-6);
 
    % the mie scattering coefficients are defined for 35 grain sizes and 118

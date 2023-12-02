@@ -5,12 +5,12 @@ function [dFdT, f_wat] = FREEZECURVE(T, f_liq, f_ice, ro_iwe, Tf, fcp) %#codegen
    %
    % See also: MELTCURVE
 
-   Tdep = Tf - min(T, Tf);
+   T_dep = Tf - min(T, Tf);
 
    % In terms of volumetric liquid fraction:
    f_wat = f_liq + ro_iwe * f_ice;
-   dFdT = 2.0 * fcp ^ 2 * Tdep .* f_wat...
-      ./ (1.0 + fcp ^ 2 * Tdep .^ 2) .^ 2;
+   dFdT = 2.0 * fcp ^ 2 * T_dep .* f_wat ...
+      ./ (1.0 + fcp ^ 2 * T_dep .^ 2) .^ 2;
    
    % In terms of the volumetric liquid mass fraction f_ell = f_liq / f_wat:
    % dFdT = 2.0 * fcp ^ 2.0 * Tdep ./ (1.0 + (fcp * Tdep) .^ 2.0) .^ 2.0;

@@ -1,5 +1,5 @@
-function [Tair,rh,wspd,Qsi,Qli,Pa,albedo,imonth,snowd] = SUBMET( ...
-      met,itime,iter,dt_new,dt,maxiter)
+function [Ta, rh, wspd, Qsi, Qli, Pa, albedo, imonth, snowd] = SUBMET( ...
+      met, itime, iter, dt_new, dt, maxiter)
 
    % I THINK THIS IS ONLY NEEDED IF WE WANT TO PASS IN MET DATA WITH AN HOURLY
    % OR LONGER TIMESTEP AND THEN INTERPOLATE TO SUB-HOURLY. IF WE USE 15
@@ -18,17 +18,17 @@ function [Tair,rh,wspd,Qsi,Qli,Pa,albedo,imonth,snowd] = SUBMET( ...
 
    %  where t1 and t2 are met forcing timestamps and itime is model time
 
-   %  dTair = Tair(t2) - Tair(t1);
+   %  dTair = Ta(t2) - Ta(t1);
    %  dt_iter = itime - t1;
    %  dt_met = t2-t1;
-   %  Tair = Tair(t1) + dTair*dt_iter/dt;
+   %  Ta = Ta(t1) + dTair*dt_iter/dt;
 
    %  The met time step is one hour. The model time (itime) is usually at a
    %  timestep within the met step. dt_iter is that time minus the start. the
    %  function interpolates between the start of the met step and the start of
    %  the next met step
 
-   Tair = met.tair(iter);
+   Ta = met.tair(iter);
    rh = met.rh(iter);
    wspd = met.wspd(iter);
    Qsi = met.swd(iter);
@@ -48,7 +48,7 @@ function [Tair,rh,wspd,Qsi,Qli,Pa,albedo,imonth,snowd] = SUBMET( ...
       % interpolate the met data to the model time
 
       % met values at i and i+1
-      imet = [ Tair rh wspd Qsi Qli albedo snowd Pa;                 ...
+      imet = [ Ta rh wspd Qsi Qli albedo snowd Pa;                 ...
          met.tair(iter+1) met.rh(iter+1) met.wspd(iter+1)      ...
          met.swd(iter+1) met.lwd(iter+1) met.albedo(iter+1)    ...
          met.snowd(iter+1) met.psfc(iter+1)                    ];
@@ -58,7 +58,7 @@ function [Tair,rh,wspd,Qsi,Qli,Pa,albedo,imonth,snowd] = SUBMET( ...
       imonth = month(met.Time(iter));
 
       % pull out the forcings
-      Tair = imet(1);
+      Ta = imet(1);
       rh = max(imet(2),0.0);
       wspd = max(imet(3),0.0);
       Qsi = max(imet(4),0.0);    % wdir is 4 and precip is 5
@@ -98,7 +98,7 @@ end
 %     itime = itime + dt_sub/86400.00;           % running model time in days
 %
 %     % pull out the forcings
-%     Tair = imet(1);
+%     Ta = imet(1);
 %     rh = max(imet(2),0.0);
 %     wspd = max(imet(3),0.0);
 %     Qsi = max(imet(6),0.0);    % wdir is 4 and precip is 5

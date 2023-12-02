@@ -1,7 +1,7 @@
 function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, I0, dz, z_spect, dz_spect, ...
       z_therm, dz_therm, spect_N, spect_S, solardwavl, ro_sno)
    %UPDATEEXTCOEFS Update the bulk extinction coefficients
-   
+      
    persistent z_walls JJ_therm
    if isempty(z_walls)
       z_walls = round([0; z_spect + dz_spect/2; z_spect(end) + 3*dz_spect/2], 3);

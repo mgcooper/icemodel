@@ -1,8 +1,8 @@
-function Tsfc = MELTTEMP(Tsfc, Tf)
+function Ts = MELTTEMP(Ts, Tf)
    %MELTTEMP Set surface temperature to melt temp
 
-   %if (depth_swe>0.0 && Tsfc>Tf)
-   if Tsfc > Tf
-      Tsfc = Tf;
+   % if (depth_swe > 0.0 && Ts > Tf)
+   if Ts > Tf
+      Ts = Tf;
    end
 end

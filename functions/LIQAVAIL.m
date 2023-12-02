@@ -1,5 +1,5 @@
 function [h_resid, h_avail, h_drain, h_ice, h_liq, h_air] = LIQAVAIL( ...
-      h_ice, h_liq, h_air, T_old, Tfp, theta_resid, h_drain, liqflag, h_total)
+      h_ice, h_liq, h_air, T_old, Tf, theta_resid, h_drain, liqflag, h_total)
    %LIQAVAIL Compute available liquid water.
    %
    % Note: This function should be called with scalar values, nominally in a
@@ -8,7 +8,7 @@ function [h_resid, h_avail, h_drain, h_ice, h_liq, h_air] = LIQAVAIL( ...
    % likely called this from MELT or REFREEZE.
 
    % Update theta_resid
-   if T_old < Tfp; theta_resid = 0.0; end
+   if T_old < Tf; theta_resid = 0.0; end
 
    % Compute liqresid and liqavail in units of liquid water. liqavail is
    % liquid water available to drain or freeze. liqresid is unavailable.

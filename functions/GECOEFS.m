@@ -1,5 +1,5 @@
 function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, Lf, ...
-      ro_liq, dz, dt, dFdT, drovdT, TL, H, H_old, Sc, k_eff, fn, delz, Tsfc, JJ)
+      ro_liq, dz, dt, dFdT, drovdT, TL, H, H_old, Sc, k_eff, fn, delz, Ts, JJ)
    %GECOEFS Compute the general equation coefficients
    %
    %  This function constructs the lower, middle, and upper diagonals of the 
