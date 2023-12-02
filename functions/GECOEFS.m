@@ -38,7 +38,10 @@ function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, Lf, 
    % iM = TL <= T & T <= TH;
    % iL = T > TH;
    
-   % Coefficients for nodes below the melt zone: (W/m2/K)
+   % Compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
+   g_b_ns = 1 ./ ((1 - fn) ./ [k_eff(1); k_eff] + fn ./ [k_eff; k_eff(JJ)]);
+   
+   % Coefficients for nodes below the melt zone [W m-2 K-1]
    f_air = (1.0 - f_ice - f_liq);
    aP0 = ro_sno .* cp_sno + Lf * ro_liq * dFdT + Ls * f_air .* drovdT;
    gv = ones(JJ, 1);     % Eq 123
@@ -67,7 +70,7 @@ function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, Lf, 
    %  % dFdT(iL) = 0.0;
    % end
 
-   % Convert from J/m3/K to W/m2/K
+   % Convert from [J m-3 K-1] to [W m-2 K-1]
    aP0 = aP0 .* dz / dt;
    
    % Adjust gv/gk in terms of N/P/S
@@ -79,28 +82,27 @@ function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, Lf, 
    % gvP = gv;
    % Todo: Confirm if gkN(1) is zero if a Neumann condition is used up top.
 
-   % Compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
-   g_b_ns = 1 ./ ((1 - fn) ./ [k_eff(1); k_eff] + fn ./ [k_eff; k_eff(JJ)]);
-
-   % Compute the aN and aS coefficients (W / m2 / K)
+   % Compute the aN and aS coefficients [W m-2 K-1]
    aN = g_b_ns(1:JJ)   ./ delz(1:JJ);
    aS = g_b_ns(2:JJ+1) ./ delz(2:JJ+1);
    % note that delz(1) and delz(end) are 1/2 CVs
 
    % Account for Neumann boundary conditions before constructing A
-   % bc_N = aN(1) * TN;       % Dirichlet: TN = known
-   % bc_S = 0.0;              % Neumann: dT/dz = 0.0
+   bc_N = Ts;               % Dirichlet: TN = known
+   bc_S = 0.0;                % Neumann: dT/dz = 0.0
    aS(JJ) = 0.0;              % Neumann: dT/dz = 0.0
    % aN(1) = 0.0;             % Neumann: qB = known
 
    % Compute the aP coefficient and solution vector b
    aP = aN + aS + aP0; % -Sp.*dz;
-   b = aP0 .* T + Sc .* dz - (H - H_old) .* dz / dt; % W / m2
+   b = aP0 .* T + Sc .* dz - (H - H_old) .* dz / dt; % [W m-2]
 
-   % Modify b to account for Dirichlet boundary conditions
-   b(1) = b(1) + aN(1) * Tsfc;
+   % Modify b to account for boundary conditions
+   b(1) = b(1) + aN(1) * bc_N;
+   b(JJ) = b(JJ) + aS(JJ) * bc_S;
 
-   % Apply the melt zone (enthalpy) transformation
+   % Apply the melt zone (enthalpy) transformation (Eq. 128/29)
+   % b = b + aN .* gkN - (aN + aS + aP0) .* gk + aS .* gkS ;
    b = b + aN .* gkN - aP .* gk + aS .* gkS ;
    aN = aN .* gvN;
    aS = aS .* gvS;
@@ -110,7 +112,8 @@ function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, Lf, 
    % is not involved in the TRISOLVE solution, but technically correct. Must be
    % done here, after all other terms involving aN are computed, unlike aS(JJ),
    % which must be done prior to constructing A.
-   aN(1) = 0.0;
+   % Update: Unless the original value is needed e.g., to update the wall temp
+   % aN(1) = 0.0;
 end
 
 % NOTES:

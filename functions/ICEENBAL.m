@@ -1,10 +1,18 @@
-function [T, errH, errT, f_ice, f_liq, OK, iter] = ICEENBAL(T, f_ice, f_liq, k_liq, ...
-      cv_ice, cv_liq, ro_ice, ro_liq, ro_air, Ls, Lf, roLf, Rv, Tf, dz, delz, ...
-      fn, dt, JJ, Tsfc, Sc, fcp, TL, TH, flmin, flmax, ro_iwe, ro_wie)
+function [T, f_ice, f_liq, OK, errT, errH, iter] = ICEENBAL(T, f_ice, f_liq, ...
+      dz, delz, fn, Sc, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, ro_liq, ...
+      ro_air, Ls, Lf, roLf, Rv, Tf, fcp, TL, TH, flmin, flmax, ro_iwe, ro_wie)
    %ICEENBAL Solve the ice energy balance.
    %
    %#codegen
 
+   % Solver options
+   persistent tol maxiter % alpha
+   if isempty(tol)
+      tol = 1e-3;
+      maxiter = 100;
+      % alpha = 0.8; 
+   end
+   
    % Update the water fraction
    f_wat = f_liq + f_ice * ro_iwe;
 
@@ -12,19 +20,18 @@ function [T, errH, errT, f_ice, f_liq, OK, iter] = ICEENBAL(T, f_ice, f_liq, k_l
    fliqmin = f_wat .* flmin;
    fliqmax = f_wat .* flmax;
 
-   % Compute vapor density
+   % Compute vapor density [kg m-3]
    ro_vap = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
 
-   % Compute total enthalpy in J/m3
+   % Compute enthalpy [J m-3]
    H_old = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
 
    % Iterate to solve the nonlinear heat equation
-   tol = 1e-3; errT = 2 * tol; iter = 0; errH = 0; OK = true; % alpha = 0.8;
+   errT = NaN; errH = NaN; OK = true;
 
-   while any(errT > tol) && iter < 100
+   for iter = 1:maxiter
 
-      T_old = T;
-      iter = iter + 1;
+      T_iter = T;
 
       % Update vapor heat
       [ro_vap, drovdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
@@ -44,22 +51,19 @@ function [T, errH, errT, f_ice, f_liq, OK, iter] = ICEENBAL(T, f_ice, f_liq, k_l
       % Update the general equation coefficients
       [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
          Lf, ro_liq, dz, dt, dFdT, drovdT, TL, H, H_old, Sc, k_eff, fn, ...
-         delz, Tsfc, JJ);
+         delz, Ts, JJ);
 
       % % Check diagonal dominance and condition number
-      % if ~checkdiags(aP, aN, aS)
-      %    warning(['The system matrix is not diagonally dominant. ' ...
-      %       'Convergence might be slow or not guaranteed.']);
-      % end
+      % icemodel.checkdiags(aP, aN, aS)
 
       % Solve the equation
       T = TRISOLVE(-aN, aP, -aS, b);
 
       % Back-transform the meltzone transformation
-      [T, f_liq, f_ice, OK] = MZTRANSFORM(T, T_old, f_liq, f_wat, ro_liq, ...
+      [T, f_liq, f_ice, OK] = MZTRANSFORM(T, T_iter, f_liq, f_wat, ro_liq, ...
          ro_wie, Tf, TL, TH, fcp, fliqmin, fliqmax, iM, OK);
 
-      % assertF(@() all(f_ice + f_liq - 1.0 <= 0))
+      assertF(@() all(f_ice + f_liq * ro_wie <= 1))
 
       % If failure, return to the main program and adjust the timestep
       if OK == false; return; end
@@ -68,64 +72,20 @@ function [T, errH, errT, f_ice, f_liq, OK, iter] = ICEENBAL(T, f_ice, f_liq, k_l
       % the start of this loop, so this checks for that and updates f_ice/liq/T
       [f_liq, f_ice, ~, T] = MELTCURVE(T, f_liq, f_ice, ro_wie, ro_iwe, Tf, fcp);
 
-      % assertF(@() all(f_ice + f_liq - 1.0 <= 0))
+      assertF(@() all(f_ice + f_liq * ro_wie <= 1))
 
       % Relaxation does not tend to improve the solution but keep for reference.
-      % T = alpha * T + (1 - alpha) * T_old;
+      % T = alpha * T + (1 - alpha) * T_iter;
 
-      % prep for next iteration
-      errT = abs(T - T_old);
-
-      % compute residual (need to add Sp)
-      % resN = aN .* ([TN T(1:end-1)] - T);
-      % resS = aS .* ([T(2:end) 0] - T);
-      % res = (resN + resS + Sc .* dz) ./ aP0;
+      % Prep for next iteration
+      errT = T - T_iter;
+      if all(abs(errT) < tol)
+         break
+      end
    end
-
-   % assertF(@() all(f_ice + f_liq - 1.0 <= 0))
-
-   % keep track of the residual. To accurately compute this, it is necessary to
-   % update all terms (need to add that):
-   errH = H - H_old;
-
-   % % check Tsfc
-   % Tsfc = TSURF(T, ro_sno, cp_sno, f_liq, f_ice, Ls, Lf, dz, dt, dFdT, ...
-   %    drovdT, H, H_old, Sc, k_eff, fn, delz, JJ);
-end
-
-% Various debugging snippets
-% find(iM)
-% find(f_ice + f_liq - 1.0 > 0)
-% find( f_wat - (f_liq + f_ice * ro_iwe))
-%
-% max(f_ice + f_liq - 1.0)
-%
-%
-
-function isDominant = checkdiags(aP, aN, aS)
-   % % Check diagonal dominance for internal nodes
-
-   % Need to confirm if aN and aS need a neg sign in the isDominant checks
-   % isDominant = all(aP(2:end-1) >= abs(aN(2:end-1)) + abs(aS(2:end-1)));
-   %
-   % % Check diagonal dominance for boundary nodes
-   % isDominant = isDominant && (aP(1) >= abs(aN(1)));
-   % isDominant = isDominant && (aP(end) >= abs(aS(end)));
-   %
-   % % Construct the tridiagonal matrix A and compute the condition number
-   % A = diag(aP) + diag(-aN(2:end), 1) + diag(-aS(1:end-1), -1);
-
-   % C = 1 / rcond(A);
-   % % C = cond(A);
-   %
-   % % Compare with alternative solvers
-   % A = diag(aP) + diag(-aN(2:end), 1) + diag(-aS(1:end-1), -1);
-   % T1 = A \ b;
-   % T2 = bicgstab(A, b);
-   % T3 = gmres(A, b);
-   %
-   % % Solve the preconditioned system
-   % M = diag(diag(A));
-   % Minv = diag(1 ./ diag(M));
-   % T4 = (Minv * A) \ (Minv * b);
+   OK = iter < maxiter;
+   
+   % Compute the enthalpy residual
+   errH = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, ...
+      Ls * VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls), Tf) - H;
 end

@@ -10,13 +10,12 @@ function [T, f_liq, f_ice, OK] = MZTRANSFORM(T, T_old, f_liq, f_wat, ...
    %     temperature TH (i.e., completely melted in one step) 
    % 
    % Notes: 
-   %  - Told is needed for the second check
-   %  - flmin/max are f_wat at T=TL/TH, NOT min/max possible f_wat
+   %  - Told is needed for the second check.
+   %  - flmin/max are f_wat at T=TL/TH, not min/max possible f_wat.
    %  - iM is the melt zone nodes at the start of the step, f_wat is the 
-   %    water fraction at the start of the step
+   %    water fraction at the start of the step.
    %
    % See also:
-   
    
    % These must be true:
    % 
@@ -63,9 +62,11 @@ function [T, f_liq, f_ice, OK] = MZTRANSFORM(T, T_old, f_liq, f_wat, ...
    % Update frac ice
    f_ice = (f_wat - f_liq) * ro_wie;
    
-   % Test
-   if any(f_liq + f_ice > 1)
+   % Check for nodes that were within the melt zone but now have a liquid
+   % fraction below the lower limit (phase boundary overshoot).
+   if any(f_liq(iM) < 0.95 * flmin(iM)) || any(f_liq(iM) > 1.05 * flmax(iM))
       OK = false;
+      return
    end
    
    % Transform melt-zone frac liq to T (NOTE g_wat / g_liq = f_wat / f_liq)
@@ -73,12 +74,6 @@ function [T, f_liq, f_ice, OK] = MZTRANSFORM(T, T_old, f_liq, f_wat, ...
    
    % Note: above uses the new f_liq, which is correct. Don't use this update:
    % T(iM) = T_old(iM) + T(iM) ./ (ro_liq * dFdT(iM));
-   
-   % Check for nodes that were within the melt zone but now have a liquid
-   % fraction below the lower limit (phase boundary overshoot).
-   if any(f_liq(iM) < 0.95 * flmin(iM)) || any(f_liq(iM) > 1.05 * flmax(iM))
-      OK = false;
-   end
 
    % Check for nodes that were outside the melt zone and fully overshot it.
    if any(T_old(~iM) < TL & T(~iM) >= TH) ...
