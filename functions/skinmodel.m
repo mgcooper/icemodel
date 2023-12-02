@@ -41,9 +41,9 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
 
             % HEAT CONDUCTION
             k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
-            [T, OK] = SKINSOLVE(Tsfc, T, k_eff, ro_sno, cp_sno, dz, dt_new, ...
-               JJ_therm, fn, delz, f_liq, f_ice, Tf, Rv, Ls);
-            
+            [T, OK] = SKINSOLVE(T, f_ice, f_liq, ro_sno, cp_sno, k_eff, fn, ...
+               delz, dz, dt_new, JJ, Ts, Tf, Rv, Ls);
+
             % ADAPTIVE TIME STEP
             if not(OK) && subiter < maxsubiter
                [subfail, subiter, dt_new, T, Tsfc, f_ice, f_liq] ...
