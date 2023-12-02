@@ -1,7 +1,7 @@
 function [T, f_ice, f_liq, d_liq, d_evp, d_drn, x_err, lcflag] = ICEMF( ...
       T, f_ice, f_liq, ro_ice, ro_liq, cv_ice, cv_liq, Lf, Ls, Lv, Tf, ...
-      TL, fcp, xf_liq, Sc, Sp, JJ_therm, f_min, fopts, dz_therm, dt_new, ...
-      Qe, ro_iwe, d_liq, d_drn, d_evp, flmin, liqresid)
+      TL, fcp, xf_liq, Sc, Sp, JJ, f_min, dz_therm, dt_new, Qe, ro_iwe, ...
+      d_liq, d_drn, d_evp, flmin, liqresid)
    %ICEMF compute ice melt-freeze and combine layers if necessary
    %
    %#codegen
@@ -77,7 +77,7 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_drn, x_err, lcflag] = ICEMF( ...
       % 1:JJ column, since layers are removed within the loop
       ii = 0;
 
-      for j = 1:JJ_therm
+      for j = 1:JJ
          ji = j + ii;
 
          if lyrmrg(ji)
