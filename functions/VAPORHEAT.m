@@ -23,7 +23,7 @@ function [ro_vap, dro_vapdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls)
    % See also:
 
    % Define coefficients over water and ice
-   persistent aw bw cw ai bi ci
+   persistent aw bw cw ai bi ci nd
    if isempty(aw)
       aw = 611.21;
       bw = 17.502;
@@ -31,23 +31,24 @@ function [ro_vap, dro_vapdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls)
       ai = 611.15;
       bi = 22.452;
       ci = 272.55;
+      nd = 14;
    end
 
    % Locate the indices with and without water
    iM = f_liq > 0.02;
 
-   % Saturation vapor pressure over ice (Pvk_sat in Jordan, but not used) [Pa]
+   % Saturation vapor pressure over ice [Pa]
    es = ai * exp(bi * (T - Tf) ./ (ci + T - Tf));
 
-   % Saturation vapor pressure over water (Pvk_sat in Jordan) [Pa]
+   % Saturation vapor pressure over water [Pa]
    if sum(iM) > 0
       es(iM) = aw * exp(bw * (T(iM) - Tf) ./ (cw + T(iM) - Tf));
    end
 
-   % Equilibrium water vapor density wrt phase k: [kg m-3] (ro_vk_sat)
+   % Equilibrium water vapor density wrt phase k: [kg m-3]
    ro_vap = es ./ (Rv * T);
    
-   % Derivative of vapor density wrt to temperature over ice (Eq. 20)
+   % Derivative of vapor density wrt to temperature over ice [kg m-3 K-1]
    dro_vapdT = ro_vap .* (bi * ci ./ (ci + T - Tf) .^ 2 - 1 ./ T);
 
    % Derivative of vapor density wrt to temperature over water
@@ -60,9 +61,9 @@ function [ro_vap, dro_vapdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls)
    % De = 9.0e-5 * (T / Tf) .^ 6;
    
    % Vapor thermal diffusion coefficient [W m-1 K-1]: Ls * De * dro_vapdT
-   k_vap = Ls * 9.0e-5 * (T / Tf) .^ 6 .* dro_vapdT;
+   k_vap = Ls * 9.0e-5 * (T / Tf) .^ nd .* dro_vapdT;
    
-   % k_vap = Ls * 2.1664062e-19 * T .^ 6 .* dro_vapdT;
+   % k_vap = Ls * 2.1664062e-19 * T .^ 14 .* dro_vapdT;
    
    % Below here not currently implemented, but would be used for grain growth 
    
