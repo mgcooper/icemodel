@@ -1,5 +1,5 @@
 clearvars
-close
+close all
 clc
 
 % I need this to run a single point if requested. Ideally it would run all

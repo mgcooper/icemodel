@@ -1,5 +1,5 @@
-function [dt_sum, subfail, OK, d_liq, d_drn, d_evp] = INITSUBSTEP(f_liq)
-   %INITSUBSTEP initialize new substep
+function [dt_sum, subfail, OK, d_liq, d_drn, d_evp] = NEWTIMESTEP(f_liq)
+   %NEWTIMESTEP initialize new timestep
 
    OK = false;             % assume sub-step failed
    d_liq = 0.0 * f_liq;    % reset the change in liq water content

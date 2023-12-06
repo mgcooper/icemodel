@@ -1,10 +1,16 @@
 function [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, vars1, vars2, data1, data2)
 
-   for n = 1:numel(vars1)
+   % Note: the order of vars1 and vars2 (set in icemodel.setopts) must match the
+   % order of data1, data2 (passed in from icemodel main). It's fine if more
+   % variables exist in vars1, vars2 than there are data in data1, data2, but
+   % the vars1, vars2 lists must be in the same order as the data in data1,
+   % data2. Thus vars1, vars2 can be set to some base set of variables in
+   % setopts, and the actual variables can be adjusted in icemodel main. 
+   for n = 1:numel(data1)
       ice1.(vars1{n})(iter, 1) = data1{n};
    end
 
-   for n = 1:numel(vars2)
+   for n = 1:numel(data2)
       ice2.(vars2{n})(:, iter) = data2{n};
    end
 end
