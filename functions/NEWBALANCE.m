@@ -46,7 +46,7 @@ function [Qle,Qh,Qe,Qc,Qm,Qf,balance,Tsfc,Tflag] = NEWBALANCE(Tair,wspd,rh, ...
       chi,opts);
 
    % Perform an energy balance check.
-   bal = ENBAL(albedo,Qsi,Qli,Qle,Qh,Qe,Qc,Qm,chi);
+   bal = ENBAL(albedo,emiss,chi,Qsi,Qli,Qle,Qh,Qe,Qc,Qm);
 
    % Compute the effective temperature error
    Terr = TEMP_ERROR(ro_sno,cp_sno,xLs,frac_air,drovdT,bal);

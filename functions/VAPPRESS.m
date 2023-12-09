@@ -40,33 +40,33 @@ function [es, des_dT, T_dew] = VAPPRESS(T, Tf, liqflag, rh)
       bi = 22.452;
       ci = 272.55;
    end
-   
+
    if nargin < 2
       Tf = 273.16;
    end
    if nargin < 3
       liqflag = false;
    end
-   
-   if liqflag == true || T >= Tf
+
+   if liqflag == true % || T >= Tf
       es = saturationVaporPressure(T, Tf, aw, bw, cw);
-      
+
       % If requested, compute the derivative of es wrt temperature
       if nargout > 1
          des_dT = saturationVaporPressureDerivative(T, Tf, es, bw, cw);
       end
    else
       es = saturationVaporPressure(T, Tf, ai, bi, ci);
-      
+
       % If requested, compute the derivative of es wrt temperature
       if nargout > 1
          des_dT = saturationVaporPressureDerivative(T, Tf, es, bi, ci);
       end
    end
-   
+
    % If requested, compute dew point from relative humidity
    if nargout == 3
-      if liqflag == true || T >= Tf
+      if liqflag == true % || T >= Tf
          T_dew = dewPointTemperature(es * rh / 100, Tf, aw, bw, cw);
       else
          T_dew = dewPointTemperature(es * rh / 100, Tf, ai, bi, ci);
@@ -97,19 +97,19 @@ end
 function dro_vapdT = saturationVaporDensityDerivative(ro_vap, T, Tf, b, c)
    %SATURATIONVAPORDENSITYDERIVATIVE Derivative of saturation vapor density
    dro_vapdT = ro_vap .* (b * c ./ (c + T - Tf) .^ 2 - 1 ./ T); % [kg m-3 K-1]
-   
+
    % % Equivalently:
-   % dro_vapdT = es ./ (Rv * T) .* (b * c ./ (c + T - Tf) .^ 2 - 1 ./ T); 
+   % dro_vapdT = es ./ (Rv * T) .* (b * c ./ (c + T - Tf) .^ 2 - 1 ./ T);
    % dro_vapdT = (des_dT - es ./ T) ./ (Rv * T);
 end
 %% Notes
-% 
+%
 % To convert from e_sat to T:
-% 
+%
 % T = Tf + c * log(e_sat / a) / (b - log(e_sat / a));
-% 
+%
 % Thus to compute Tdew, substitute e_air for e_sat:
-% 
+%
 % T = Tf + c * log(e_air / a) / (b - log(e_air / a));
 %
 % Buck suggests ew1, ei2, fw3, fi3. Below are expressions for f, not used

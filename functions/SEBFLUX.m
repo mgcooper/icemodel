@@ -22,6 +22,6 @@ function [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, xTs, Ta, Qsi, Qli, ...
    Qc       =  CONDUCT(k_eff,T,dz,Ts);
    [Qm,Qf]  =  MFENERGY(albedo,Qsi,Qli,Qle,Qh,Qe,Qc,xTs,Tf, ... % Note: xTs
                Ta,wspd,De,ea,roL,Pa,cv_air,emiss,SB,k_eff, ...
-               T,dz,epsilon,scoef,chi);
-   balance  =  ENBAL(albedo,Qsi,Qli,Qle,Qh,Qe,Qc,Qm,emiss,chi);
+               T,dz,epsilon,scoef,chi,ctype);
+   balance  =  ENBAL(albedo,emiss,chi,Qsi,Qli,Qle,Qh,Qe,Qc,Qm);
 end

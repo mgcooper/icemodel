@@ -17,8 +17,7 @@ function [Qm, Qf] = MFENERGY(albedo, Qsi, Qli, Qle, Qh, Qe, Qc, Ts, ...
    
    if Ts >= Tf
       % Compute melt energy
-      Qm = chi * Qsi * (1.0 - albedo) + emiss * Qli + Qle + Qh + Qe + Qc;
-      
+      Qm = ENBAL(albedo, emiss, chi, Qsi, Qli, Qle, Qh, Qe, Qc, 0.0);
    else
       % Compute energy needed to reach melt temp (freeze energy)
       Qf = -(chi * (1.0 - albedo) * Qsi ...
@@ -26,15 +25,7 @@ function [Qm, Qf] = MFENERGY(albedo, Qsi, Qli, Qle, Qh, Qe, Qc, Ts, ...
          + LATENT(De, STABLEFN(Ta, Tf, wspd, scoef), ea, ...
          VAPPRESS(Tf, Tf, true), roL, epsilon, Pa) ...
          + SENSIBLE(De, STABLEFN(Ta, Tf, wspd, scoef), Ta, Tf, cv_air) ...
-         + CONDUCT(k_eff, T, dz, Tf));
-
-      % xS = STABLEFN(Ta,Tf,wspd,scoef);
-      % xes = VAPPRESS(Tf,Tf,true); % assume melting
-      % xQe = LATENT(De,xS,ea,xes,roL,epsilon,Pa);
-      % xQh = SENSIBLE(De,xS,Ta,Tf,cv_air);
-      % xQle = LONGOUT(Tf,emiss,SB);
-      % xQc = CONDUCT(k_eff,T,dz,Tf);
-      % xQn = chi*Qsi*(1.0-albedo) + emiss*Qli;
-      % Qf = -(xQn + xQle + xQh + xQe + xQc);
+         + CONDUCT(k_eff, T, dz, Tf, ctype) ...
+         );
    end
 end

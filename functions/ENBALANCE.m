@@ -42,28 +42,15 @@ function [Qm, Qf, Qh, Qe, Qc, Qle, balance, Ts, ea] = ENBALANCE( ...
    Qle = LONGOUT(Ts0, emiss, SB);
 
    % Compute the energy flux available for melting or freezing.
-   Qm = 0.0;
-   Qf = 0.0;
+   [Qm, Qf] = MFENERGY(albedo, Qsi, Qli, Qle, Qh, Qe, Qc, Ts, ...
+      Tf, Ta, wspd, De, ea, roL, Pa, cv_air, emiss, SB, k_eff, T, dz, ...
+      epsilon, scoef, chi, ctype);
 
-   % if melting, compute melt energy
-   if Ts >= Tf
-      Qm = chi * Qsi * (1.0 - albedo) + emiss * Qli + Qle + Qh + Qe + Qc;
-   else
-      % else compute energy needed to reach melt temp
-      Qf = -(chi * (1.0 - albedo) * Qsi ...
-         + emiss * Qli ...
-         + LONGOUT(Tf, emiss, SB) ...
-         + LATENT(De, STABLEFN(Ta, Tf, wspd, scoef), ea, ...
-            VAPPRESS(Tf, Tf, true), roL, epsilon, Pa) ...
-         + SENSIBLE(De, STABLEFN(Ta, Tf, wspd, scoef), Ta, Tf, cv_air) ...
-         + CONDUCT(k_eff, T, dz, Tf));
-   end
+   % Perform an energy balance check. When Ts == Tf, balance = 0.0.
+   balance = ENBAL(albedo, emiss, chi, Qsi, Qli, Qle, Qh, Qe, Qc, Qm);
 
-   % Perform an energy balance check.
-   balance = chi * Qsi * (1.0 - albedo) + emiss * Qli + Qle + Qh + Qe + Qc - Qm;
-   
    % For a 'skin' surface energy balance model, reset Ts
-   if ~isicemodel
+   if Tflag
       Ts = Ts0;
    end
 end
