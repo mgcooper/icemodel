@@ -102,14 +102,14 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                % ERROR MESSAGE (SLOWS DOWN THE CODE A LOT)
                fprintf('iter = %d (%.2f%%), dt = %.0f, success = %s\n', ...
                   iter,100*iter/maxiter,dt,mat2str(all(OK)))
-               assertF(@() all(f_ice + f_liq * ro_wie <= 1))
+               assertF(@() all(f_ice + f_liq * ro_wie <= 1 + eps))
             end
 
             % PHASE BOUNDARY OVERSHOOT, DECREASE THE TIME STEP AND START OVER
             if not(OK)
                [T, Ts, f_ice, f_liq, subfail, subiter, dt] ...
                   = RESETSUBSTEP(xT, xTs, xf_ice, xf_liq, dt_FULL_STEP, ...
-                  subiter, maxsubiter, subfail);
+                  subiter, maxsubiter, subfail, dt_sum);
                if subfail < maxsubiter
                   continue
                end
