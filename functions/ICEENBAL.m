@@ -10,13 +10,14 @@ function [T, f_ice, f_liq, OK, errT, errH, iter] = ICEENBAL(T, f_ice, f_liq, ...
    if isempty(tol)
       tol = 1e-3;
       maxiter = 100;
-      % alpha = 0.8; 
+      % alpha = 0.8;
    end
-   
+
    % Update the water fraction
    f_wat = f_liq + f_ice * ro_iwe;
 
-   % Update the melt-zone boundaries
+   % Update the melt-zone boundaries. These are the liquid fractions at T=TL
+   % and T=TH, given the current total water fraction.
    fliqmin = f_wat .* flmin;
    fliqmax = f_wat .* flmax;
 
@@ -84,7 +85,7 @@ function [T, f_ice, f_liq, OK, errT, errH, iter] = ICEENBAL(T, f_ice, f_liq, ...
       end
    end
    OK = iter < maxiter;
-   
+
    % Compute the enthalpy residual
    errH = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, ...
       Ls * VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls), Tf) - H;

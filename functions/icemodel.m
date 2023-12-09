@@ -78,15 +78,9 @@ function [ice1, ice2] = icemodel(opts) %#codegen
          % end
 
          % SUBSURFACE SOLAR RADIATION SOURCE-TERM
-         if swd(metiter) > 0 % && isicemodel
-            [Sc, chi] = UPDATEEXTCOEFS(swd(metiter), albedo(metiter), I0, ...
-               dz, z_spect, dz_spect, z_therm, dz_therm, spect_N, spect_S, ...
-               solardwavl, ro_liq * f_liq + ro_ice * f_ice);
-         else
-            Sc = 0.0 * dz;
-            chi = 1.0;
-         end
-
+         [Sc, chi] = UPDATEEXTCOEFS(swd(metiter), albedo(metiter), I0, ...
+            dz, z_spect, dz_spect, z_therm, dz_therm, spect_N, spect_S, ...
+            solardwavl, ro_liq * f_liq + ro_ice * f_ice);
          % icemodel.verifyShortwaveBalance(Qsi, Sc, albedo, chi, dz, 1);
 
          % SURFACE TEMPERATURE

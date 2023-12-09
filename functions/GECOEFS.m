@@ -72,7 +72,7 @@ function [aN, aP, aS, b, iM] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, Lf, 
 
    % Convert from [J m-3 K-1] to [W m-2 K-1]
    aP0 = aP0 .* dz / dt;
-   
+
    % Adjust gv/gk in terms of N/P/S
    gvN = vertcat(1, gv(1:JJ-1));
    gvS = vertcat(gv(2:JJ), 0);

@@ -10,6 +10,12 @@ function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, I0, dz, z_spect, dz_spect, ...
       JJ_therm = length(dz);
    end
 
+   if Qsi < 1e-3
+      Sc = 0.0 * dz;
+      chi = 1.0;
+      return
+   end
+   
    % Transform the mass density to the spectral grid resolution
    ro_sno = interp1(z_therm, ro_sno, z_spect, 'nearest', 'extrap');
    ro_sno = max(ro_sno, 300);
