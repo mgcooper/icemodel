@@ -35,10 +35,10 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
    %% INITIALIZE THE MODEL
 
+   debug = false;
    assertF on
-   % assertF(@() all(f_ice + f_liq * ro_wie <= 1))
 
-   % Load the physical constants and parameters
+   % LOAD PHYSICAL CONSTANTS AND PARAMETERS
    [cv_air, cv_liq, cv_ice, emiss, SB, epsilon, fcp, k_liq, Lf, ...
       Ls, Lv, ro_air, ro_ice, ro_liq, roLf, roLs, roLv, Rv, Tf] ...
       = icemodel.physicalConstant( ...
@@ -47,13 +47,12 @@ function [ice1, ice2] = icemodel(opts) %#codegen
    TINY = 1e-8;
 
    % LOAD THE FORCING DATA
-   [tair, swd, lwd, albedo, wspd, rh, psfc, De, time] = METINIT(opts, 1);
+   [tair, swd, lwd, albedo, wspd, rh, psfc, De, scoef, time] = METINIT(opts, 1);
 
-   % Initialize the ice column
-   [f_ice, f_liq, T, TL, TH, flmin, flmax, ~, k_eff, dz, fn, delz, z_therm, ...
-      dz_therm, dz_spect, JJ, ~, ~, Sp, scoef, ~, ro_iwe, ro_wie, xTsfc, ...
-      xf_liq, roL, Qc, f_min, fopts, liqresid, liqflag, ice1, ice2] ...
-      = ICEINIT(opts, tair);
+   % INITIALIZE THE ICE COLUMN
+   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, ...
+      JJ, ~, z_therm, dz_therm, dz_spect, ~, Sp, Fc, Fp, TL, TH, flmin, ...
+      flmax, f_min, liqresid, ro_iwe, ro_wie] = ICEINIT(opts, tair);
 
    % INITIALIZE THE SPECTRAL EXTINCTION COEFFICIENTS
    [I0, z_spect, spect_N, spect_S, solardwavl] = EXTCOEFSINIT(opts, ro_ice);

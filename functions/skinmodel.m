@@ -1,12 +1,12 @@
 function [ice1, ice2] = skinmodel(opts) %#codegen
 
-   %% INITIALIZE THE MODEL
+   % INITIALIZE THE MODEL
 
    debug = false;
-   assertF on
+   assertF off
 
    % LOAD PHYSICAL CONSTANTS AND PARAMETERS
-   [  cv_air, cv_liq, cv_ice, emiss, SB, epsilon, k_liq, Ls, ro_air, ...
+   [cv_air, cv_liq, cv_ice, emiss, SB, epsilon, k_liq, Ls, ro_air, ...
       ro_ice, ro_liq, roLs, roLv, Rv, Tf] = icemodel.physicalConstant( ...
       'cv_air', 'cv_liq', 'cv_ice', 'emiss', 'SB', 'epsilon', 'k_liq', ...
       'Ls', 'ro_air', 'ro_ice', 'ro_liq', 'roLs', 'roLv', 'Rv', 'Tf');
@@ -14,13 +14,12 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
    chi = 1.0;
 
    % LOAD THE FORCING DATA
-   [tair, swd, lwd, albedo, wspd, rh, psfc, De, time] = METINIT(opts, 1);
+   [tair, swd, lwd, albedo, wspd, rh, psfc, De, scoef, time] = METINIT(opts, 1);
 
-   % Initialize the ice column
-   [f_ice, f_liq, T, ~, ~, ~, ~, cp_sno, k_eff, dz, fn, delz, ~, ~, ~, ...
-      JJ_therm, ~, ~, ~, scoef, ro_sno, ~, ~, xTsfc, xf_liq, roL, Qc, ~, ...
-      fopts, ~, liqflag, ice1, ice2] = ICEINIT(opts, tair);
-   
+   % INITIALIZE THE ICE COLUMN
+   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, JJ] ...
+      = ICEINIT(opts, tair);
+
    % INITIALIZE TIMESTEPPING
    [metiter, subiter, maxiter, maxsubiter, dt, dt_FULL_STEP, ...
       numyears, numspinup] = INITTIMESTEPS(opts, time);
