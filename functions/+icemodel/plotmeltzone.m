@@ -1,7 +1,12 @@
-function plotmeltzone(ice2, iter, numsteps, zdepth, z_therm, TL, TH)
+function plotmeltzone(ice2, iter, z_therm, TL, TH, zdepth, numsteps)
 
-   numsteps = 8;
-   zdepth = 2;
+   if nargin < 6
+      zdepth = 2;
+   end
+   if nargin < 7
+      numsteps = 8;
+   end
+   
    var = 'Tice';
    
    zi = find(zdepth - z_therm < 0, 1, 'first');
