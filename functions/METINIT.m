@@ -1,4 +1,4 @@
-function [tair, swd, lwd, albedo, wspd, rh, psfc, De, time] = METINIT(opts, ii)
+function [tair, swd, lwd, albedo, wspd, rh, psfc, De, S, time] = METINIT(opts, ii)
    %METINIT initialize the met file
    %
    %#codegen
@@ -13,7 +13,7 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, De, time] = METINIT(opts, ii)
    met = met.met;
 
    if ~strcmp('none', opts.userdata)
-      met = swapMetData(met , opts);
+      met = swapMetData(met, opts);
    end
    met = prepareMetData(met, opts);
 
@@ -27,8 +27,8 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, De, time] = METINIT(opts, ii)
    time = met.Time;
    albedo = met.albedo;
 
-   % compute the wind speed transfer coefficient
-   De = WINDCOEF(wspd, opts.z_0, opts.z_obs);
+   % Compute the wind transfer and stability coefficients
+   [De, S] = WINDCOEF(wspd, opts.z_0, opts.z_obs, opts.z_wind);
 end
 
 %%

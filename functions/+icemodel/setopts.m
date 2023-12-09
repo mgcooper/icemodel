@@ -36,7 +36,8 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
 
    % model parameters
    opts.z_0             =  0.001;   % Surface aero. roughness length    [m]
-   opts.z_obs           =  3.0;     % Height of wind and air temp obs   [m]
+   opts.z_obs           =  3.0;     % Height of air temp obs            [m]
+   opts.z_wind          =  3.0;     % Height of wind obs                [m]
    opts.ro_snow_i       =  900.0;   % initial ice density               [kg/m3]
    opts.liqresid        =  0.07;    % residual pore water fraction      [-]
 
@@ -68,8 +69,8 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    %----------------------------------------------------------------------------
 
    % WRITEOUTPUT appends ['ice1_' opts.casename '.mat'] and saves the file in
-   % a subfolder of opts.pathoutput for each year e.g. opts.pathoutput/2016. 
-   % 
+   % a subfolder of opts.pathoutput for each year e.g. opts.pathoutput/2016.
+   %
    % For sector runs, opts.casename is set to the grid point ID outside this
    % function in a loop, to get ice1_1.mat, ice1_2.mat, and so forth. Same for
    % metfname. When writing to netcdf is implemented, that issue will go away.
@@ -87,10 +88,10 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
 
    % Create the casename. WRITEOUTPUT appends this to the base filenames.
    opts.casename = icemodel.setcase(forcings, userdata, uservars);
-      
+
    % Create folders for each simulation year in pathoutput/ if they don't exist
    if opts.savedata
-      
+
       icemodel.mkfolders(opts);
 
       % save the model opts
