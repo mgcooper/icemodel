@@ -1,4 +1,5 @@
-function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, Tf, TL, fcp, dz, dt)
+function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, ro_ice, ro_liq, ...
+      Tf, TL, fcp, dz, dt)
 
    OK = true;
    if all(T(2:end) < TL)
@@ -37,7 +38,7 @@ function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, Tf, TL, fcp, dz, 
          df_liq(n) = -min(abs(df_liq(n)), max_drainage);
       else
          % Don't allow more water to infiltrate than can be stored
-         max_infill = 0.917 * (1.0 - f_ice(n)) - f_liq(n);
+         max_infill = ro_ice / ro_liq * (1.0 - f_ice(n)) - f_liq(n);
          df_liq(n) = min(df_liq(n), max_infill);
       end
    end

@@ -64,14 +64,14 @@ function [f_ice, f_liq, d_drn, xsubl] = ICESUBL(f_ice, f_liq, d_drn, ...
 
       elseif pevap > 0 % condensation
 
-         if pevap <= (1 - f_liq_top - f_ice_top) % f_air_top >= cond
+         aevap = ro_ice / ro_liq * (1.0 - f_ice_top) - f_liq_top;
+         if pevap <= aevap
             % all condensation stored
             f_liq(1) = f_liq(1) + pevap;  % aevap = pevap, xevap = 0
 
-         elseif pevap > (1 - f_liq_top - f_ice_top)
+         else
             % some condensation stored, some converts to runoff
-            aevap = 1 - f_liq_top - f_ice_top;
-            f_liq(1) = 1 - f_ice_top;
+            f_liq(1) = f_liq(1) + aevap;
             d_drn(1) = d_drn(1) + (pevap - aevap); % xevap = pevap - aevap
          end
       end

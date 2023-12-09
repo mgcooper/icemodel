@@ -15,26 +15,28 @@ function [f_liq, f_ice, f_wat, T, dFdT] = MELTCURVE(T, f_liq, f_ice, ...
    %  fliquid = 1.0 ./ (1.0 + (fcp * T_dep) .^ 2.0);
    %  f_liq = f_wat ./ (1.0 + (fcp * T_dep) .^ 2.0);
    %  f_ice = (1.0 - fliquid) .* f_wat * (ro_liq / ro_ice);
-   % 
+   %
    % See also:
 
-   % Volumetric fraction of liquid water eq 67, Jordan
+   % Compute volumetric fraction of liquid water eq 67, Jordan
    T_dep = Tf - min(T, Tf);
-   f_wat = f_liq + ro_iwe * f_ice;                % f_wat_old
+
+   % Ensure f_wat does not exceed maximum capacity by more than eps
+   f_wat = min(f_liq + ro_iwe * f_ice, ro_iwe);    % f_wat_old
    f_liq = f_wat ./ (1.0 + (fcp * T_dep) .^ 2.0);  % f_liq_new (eq 67, Jordan)
-   f_ice = (f_wat - f_liq) * ro_wie;              % f_ice_new
+   f_ice = (f_wat - f_liq) * ro_wie;               % f_ice_new
 
    if nargout > 3
       % Compute temperature by inverting the fraction of liquid water function
       T = Tf - sqrt(f_wat ./ f_liq - 1.0) / fcp;
    end
-   
+
    if nargout > 4
       % Differentiate the freezing curve w.r.t temperature, eq 68, Jordan
       dFdT = 2.0 * fcp ^ 2.0 * T_dep .* f_wat ...
          ./ (1.0 + fcp ^ 2.0 * T_dep .^ 2.0) .^ 2.0;
    end
-   
+
    % Calculate liquid retention (need to pass prior value into the function)
    % retent = min(0.02, max(retent, 0.75 * f_liq));
 end
@@ -44,11 +46,11 @@ end
 %     f_wat = f_liq + f_ice .* ro_ice ./ ro_liq;
 %     f_liq = f_wat ./ (1.0 + (fcp * T_dep) .^ 2.0);
 %     f_ice = (f_wat - f_liq) .* ro_liq ./ ro_ice;
-% 
+%
 % ... rest is identical
 %
 % In terms of fliq = g_liq / g_wat = 1 / (1 + (fcp*T_dep) ^ 2 ):
-% 
+%
 %     df_liq_dT = 2 .* T_dep .* fcp .^ 2 ./ (1 + (fcp .* T_dep) .^ 2) .^ 2;
 %     T_liq = Tf - ((1.0 ./ fliq - 1.0) ./ fcp .^ 2.0) .^ (0.50);
 %     T_liq = Tf - sqrt((1 ./ fliq - 1)) ./ fcp
