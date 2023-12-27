@@ -1,5 +1,5 @@
-function [T, Ts, f_ice, f_liq, dt_sum, dt_new, liqflag, roL, ro_sno, cp_sno] ...
-      = UPDATESUBSTEP(T, Ts, f_ice, f_liq, dt_FULL_STEP, dt_sum, dt_new, TINY, ...
+function [T, f_ice, f_liq, dt_sum, dt_new, liqflag, roL, ro_sno, cp_sno] ...
+      = UPDATESUBSTEP(T, f_ice, f_liq, dt_FULL_STEP, dt_sum, dt_new, TINY, ...
       ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs)
    %UPDATESUBSTEP Return past values, allocate timestep, and update state
 
@@ -13,7 +13,7 @@ function [T, Ts, f_ice, f_liq, dt_sum, dt_new, liqflag, roL, ro_sno, cp_sno] ...
       dt_new = dt_FULL_STEP - dt_sum; % dt_new = max(dt - dt_sum, dt_min);
    end
 
-   if nargout > 6
+   if nargout > 5
       
       % Top node contains >2% liquid water
       liqflag = f_liq(1) > 0.02;
@@ -24,7 +24,7 @@ function [T, Ts, f_ice, f_liq, dt_sum, dt_new, liqflag, roL, ro_sno, cp_sno] ...
       end
    end
       
-   if nargout > 9
+   if nargout > 7
 
       % UPDATE DENSITY, HEAT CAPACITY, DIFFUSION LENGTH SCALE
       ro_sno = f_ice * ro_ice + f_liq * ro_liq + (1.0 - f_liq - f_ice) * ro_air;

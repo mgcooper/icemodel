@@ -24,6 +24,9 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
    [metiter, subiter, maxiter, maxsubiter, dt, dt_FULL_STEP, ...
       numyears, numspinup] = INITTIMESTEPS(opts, time);
 
+   % INITIALIZE PAST VALUES
+   [xT, xf_ice, xf_liq] = RESETSUBSTEP(T, f_ice, f_liq);
+
    %% START ITERATIONS OVER YEARS
    for thisyear = 1:numyears
 
@@ -48,8 +51,8 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
 
             % ADAPTIVE TIME STEP
             if not(OK)
-               [T, Ts, f_ice, f_liq, subfail, subiter, dt] ...
-                  = RESETSUBSTEP(xT, xTs, xf_ice, xf_liq, dt_FULL_STEP, ...
+               [T, f_ice, f_liq, subfail, subiter, dt] ...
+                  = RESETSUBSTEP(xT, xf_ice, xf_liq, dt_FULL_STEP, ...
                   subiter, maxsubiter, subfail, dt_sum);
                if subfail < maxsubiter
                   continue
@@ -57,8 +60,8 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
             end
 
             % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
-            [xT, xTs, xf_ice, xf_liq, dt_sum, dt, liqflag, roL] ...
-               = UPDATESUBSTEP(T, Ts, f_ice, f_liq, dt_FULL_STEP, dt_sum, ...
+            [xT, xf_ice, xf_liq, dt_sum, dt, liqflag, roL] ...
+               = UPDATESUBSTEP(T, f_ice, f_liq, dt_FULL_STEP, dt_sum, ...
                dt, TINY, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs);
          end
 

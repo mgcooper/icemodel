@@ -62,8 +62,14 @@ function [ice1, ice2] = icemodel(opts) %#codegen
       numyears, numspinup] = INITTIMESTEPS(opts, time);
 
    % INITIALIZE PAST VALUES
-   [xT, xTs, xf_ice, xf_liq] = RESETSUBSTEP(T, Ts, f_ice, f_liq);
-   
+   [xT, xf_ice, xf_liq] = RESETSUBSTEP(T, f_ice, f_liq);
+
+   bc = opts.bc_type;
+   ok = true;
+
+   ppt = 0 * ppt;
+   zD = dz(1);
+
    %% START ITERATIONS OVER YEARS
    for thisyear = 1:numyears
 
@@ -129,8 +135,8 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                d_liq, d_drn, d_evp, flmin, liqresid);
 
             % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
-            [xT, xTs, xf_ice, xf_liq, dt_sum, dt, liqflag, roL] ...
-               = UPDATESUBSTEP(T, Ts, f_ice, f_liq, dt_FULL_STEP, dt_sum, ...
+            [xT, xf_ice, xf_liq, dt_sum, dt, liqflag, roL] ...
+               = UPDATESUBSTEP(T, f_ice, f_liq, dt_FULL_STEP, dt_sum, ...
                dt, TINY, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs);
 
             % zD = sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
