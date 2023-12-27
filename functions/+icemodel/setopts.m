@@ -48,8 +48,14 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    opts.f_ice_min       =  0.01;
 
    % solver options
-   opts.sebsolver = 1;
-   opts.fzero = optimset('Display', 'off', 'TolX', 1e-6);
+   opts.seb_solver      = 1;        % recommended: 1
+   opts.bc_type         = 1;        % recommended: 2
+   opts.conduct_type    = 1;        % recommended: 1 (Practice "B")
+
+   %
+   if strcmp(simmodel, 'skinmodel')
+      opts.seb_solver = -abs(opts.seb_solver);
+   end
 
    % the mie scattering coefficients are defined for 35 grain sizes and 118
    % spectral bands. define those dimensions here, they are used to read in
@@ -77,9 +83,8 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
 
 
    % define the timescale beyond which stored meltwater is assumed to runoff
-   opts.tlagcolumn = 6 * 3600 / opts.dt; % convert hours to timesteps
-   opts.tlagsurf = 6 * 3600 / opts.dt;
-   opts.error = '';
+   opts.tlagcolumn   = 6 * 3600 / opts.dt; % convert hours to timesteps
+   opts.tlagsurf     = 6 * 3600 / opts.dt;
 
    %---------------------------- set the input and output paths
    %----------------------------------------------------------------------------

@@ -2,25 +2,34 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
       ea, cv_air, emiss, SB, roL, scoef, chi, Tf, Ts, liqflag)
    %SFCFLIN Linearize the surface energy balance equation
    %
-   % The linearization is of the form: S = Sc + Sp * T 
-   % 
+   % The linearization is of the form: F = Fc + Fp * T
+   %
    % To construct the linearization, the SEB is separated into terms that are
-   % independent of Ts (call them S_0) and terms that depend on Ts. The
-   % latter are linearized using truncated Taylor expansions and resulting 
-   % terms which are independent of the current Ts (i.e., those that depend on
-   % past values of Ts) are grouped with the S_0 terms to form S'.
-   % 
-   % SEB = SEB' + dSEB/dTs (Ts-Ts')
+   % independent of T (call them F0) and terms that depend on T. The latter
+   % are linearized using truncated Taylor expansions. Terms which are
+   % independent of the current T (i.e., those that depend on past values of
+   % T or the derivative dF/dT) are grouped with the F0 terms to form Fc:
+   %
+   %  SEB = F0 + F(T)
+   %      = F0 + F' + (dF/dT)' * (T - T')
+   %      = F0 + F' + (dF/dT)' * T - (dF/dT)' * T'
+   %      = F0 + F' - (dF/dT)' * T' + (dF/dT)' * T
+   %      = Fc + Fp * T
+   %
+   % where
+   %
+   %  Fc = F0 + F' - (dF/dT)' * T'
+   %  Fp = (dF/dT)'
    %
    % Note that the outgoing longwave and the saturation vapor pressure are
    % linearized around T_old but the stability function is not linearized,
    % thus T_old should be used to compute the stability function.
    %
    % All terms passed here are 'old', meaning the linearizations are computed
-   % once at the start of the timestep, and on iterations updated as 
-   % S = Sc + Sp * T_new 
+   % once at the start of the timestep, and on iterations updated as
+   % F = Fc + Fp * T_new
    %
-   % See also: 
+   % See also: SFCFLUX, SEBFLUX, SEBSOLVE
 
    if liqflag == true
       % Over water.
@@ -53,7 +62,7 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
 
    % linearizations
 
-   % outgoing longwave (note: -Qle = -emiss*SB*Ts^4):
+   % outgoing longwave (note: -Qle = -emiss * SB * Ts ^ 4):
    Sc_Qle = 3 * emiss * SB * Ts ^ 4;
    Sp_Qle = -4 / 3 * Sc_Qle / Ts;
 

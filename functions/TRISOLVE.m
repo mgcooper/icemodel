@@ -1,19 +1,19 @@
-function x = TRISOLVE(lower, middle, upper, rhs)
-   %TRISOLVE Solve tridiagonal matrix
+function x = TRISOLVE(low, mid, upp, rhs)
+   %TRISOLVE Solve tridiagonal matrix equation Ax = b for x.
 
    % Initialize
    x = zeros(size(rhs));
-   n = numel(middle);
+   n = numel(mid);
 
    % Forward elimination
    for k = 2:n
-      middle(k)   =  middle(k) - lower(k) / middle(k-1) * upper(k-1);
-      rhs(k)      =  rhs(k)    - lower(k) / middle(k-1) * rhs(k-1);
+      mid(k) = mid(k) - low(k) / mid(k-1) * upp(k-1);
+      rhs(k) = rhs(k) - low(k) / mid(k-1) * rhs(k-1);
    end
 
    % Back substitution
-   x(n) = rhs(n) / middle(n);
+   x(n) = rhs(n) / mid(n);
    for k = n-1:-1:1
-      x(k) = (rhs(k) - upper(k) * x(k+1)) / middle(k);
+      x(k) = (rhs(k) - upp(k) * x(k+1)) / mid(k);
    end
 end
