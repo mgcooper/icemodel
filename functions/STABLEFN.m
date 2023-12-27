@@ -13,7 +13,7 @@ function S = STABLEFN(Ta, Ts, wspd, scoef)
    %    if Ri<0
    %       S = 1 - 9.4 * Ri / (1 + gamma * sqrt(abs(Ri)));
    %    elseif Ri > 0
-   %       S = 1 / (1 + 4.7 * Ri) ^2;
+   %       S = 1 / (1 + 4.7 * Ri) ^ 2;
    %    end
    %
    % For unstable, the absolute value of the Richardson number is implicit
@@ -23,18 +23,16 @@ function S = STABLEFN(Ta, Ts, wspd, scoef)
    %
    % See also: WINDCOEF
 
-   if abs(Ts - Ta) < 1e-1 % Neutrally stable case.
+   if (Ts < Ta) % Stable case (Ri > 0).
 
-      S = 1.0;
+      S = 1 / (1 + scoef(2) / (2 * wspd ^ 2) * (Ta - Ts) / Ta) ^ 2;
 
-   elseif (Ts > Ta) % Unstable case.
+   elseif (Ts > Ta) % Unstable case (Ri < 0).
 
       S = 1 + scoef(2) / wspd ^ 2 * (Ts - Ta) / Ta ...
          / (1 + scoef(3) / wspd * sqrt((Ts - Ta) / Ta));
 
-   elseif (Ts < Ta) % Stable case.
-
-      S = 1 / (1 + scoef(2) / (2 * wspd ^ 2) * (Ta - Ts) / Ta) ^ 2;
-
+   else % Neutrally stable case. (Ts == Ta)
+      S = 1.0;
    end
 end

@@ -36,8 +36,6 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
 
    % model parameters
    opts.z_0             =  0.001;   % Surface aero. roughness length    [m]
-   opts.z_obs           =  3.0;     % Height of air temp obs            [m]
-   opts.z_wind          =  3.0;     % Height of wind obs                [m]
    opts.ro_snow_i       =  900.0;   % initial ice density               [kg/m3]
    opts.liqresid        =  0.07;    % residual pore water fraction      [-]
 
@@ -59,6 +57,24 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    opts.nwavl           =  118;
    opts.nradii          =  35;
    opts.i_grainradius   =  25;      % index 25 = 2.0 mm                 [#]
+
+   % Define the height of the air temperature and wind observations     [m]
+   if strcmp(forcings, 'mar')
+
+      opts.z_obs        =  2.0;
+      opts.z_wind       =  10.0;
+
+   elseif any(strcmp(forcings, {'kanl', 'kanm'}))
+
+      opts.z_obs        =  2.0; % 2.5
+      opts.z_wind       =  2.0; % 3.0
+
+   else
+      % USER DEFINED
+      opts.z_obs        =  2.0;
+      opts.z_wind       =  3.0;
+   end
+
 
    % define the timescale beyond which stored meltwater is assumed to runoff
    opts.tlagcolumn = 6 * 3600 / opts.dt; % convert hours to timesteps

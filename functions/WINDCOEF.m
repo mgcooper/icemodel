@@ -29,7 +29,7 @@ function [De, S123, W1] = WINDCOEF(wspd, z_0, z_obs, z_wind)
    %     S = 1 + S2 / u ^ 2 * T_star / (1 + S3 / u * T_star ^ 0.5)
    %
    %  If Ri > 0 (stable):
-   %     S = 1 / (1 + eta/2 * Ri) ^ 2
+   %     S = 1 / (1 + S2 / (2 * u ^ 2) * -T_star) ^ 2
    %
    % Where:
    %  S1 = psi * eta * c_w * (z_obs / z_0) ^ 0.5
@@ -42,6 +42,10 @@ function [De, S123, W1] = WINDCOEF(wspd, z_0, z_obs, z_wind)
    %  psi = c_star                                 (see eq 20)
    %  S1 = c = c_star * a^2 * b * (z / z_0)^0.5    (eq 20)
    %  S1 = gamma in Liston et al. 1999, eq. A15
+   %
+   % Note also that eta_star = eta / 2 = 9.4 / 2 = 4.7 is customarily referred
+   % to as "beta" for the stable condition, whereas gamma is comparable to the
+   % "gamma" normally used f or the unstable. 
 
    [kappa, gravity] = icemodel.physicalConstant('kappa', 'gravity');
 
