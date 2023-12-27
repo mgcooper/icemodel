@@ -1,22 +1,22 @@
-function [I0, z_spect, spect_N, spect_S, solardwavl] = EXTCOEFSINIT(opts, ro_ice)
+function [I0, z_spect, spect_N, spect_S, solardwavl, dz_spect] = EXTCOEFSINIT(opts, ro_ice)
    %EXTCOEFSINIT initialize the extinction coefficients
    %
-   % The outputs correspond to the center of each level, and the top 
-   % surface  of the top grid cell, and the bottom surface of the 
+   % The outputs correspond to the center of each level, and the top
+   % surface  of the top grid cell, and the bottom surface of the
    % bottom grid cell  (thus the 502 values, for the current setup).
    %
-   % There should be no limit to how coarse (like 10 cm) or how fine 
-   % (like 1 mm) you want to define your levels to be. There is an upper 
-   % limit of 500 levels hard coded in the program that could be changed 
+   % There should be no limit to how coarse (like 10 cm) or how fine
+   % (like 1 mm) you want to define your levels to be. There is an upper
+   % limit of 500 levels hard coded in the program that could be changed
    % if you want/need to.
    %
-   % The simulation domain is defined by using a combination of deltaz 
+   % The simulation domain is defined by using a combination of deltaz
    % (the thickness of each level) and nz (the number of levels).
    %
-   % Note that: down = solar down, up = solar up, up/down = albedo, 
+   % Note that: down = solar down, up = solar up, up/down = albedo,
    % and up-down = net solar (or - solar_absorbed).
    %
-   % See also: 
+   % See also:
 
    % The grain radii that can be used for the two-stream spectral model
    radii = [ ...
@@ -45,7 +45,7 @@ function [I0, z_spect, spect_N, spect_S, solardwavl] = EXTCOEFSINIT(opts, ro_ice
    nwavl = opts.nwavl;
 
    % Build a control volume for the spectral model.
-   [~, ~, z_spect, z_walls] = CVMESH(opts.z0_spectral, opts.dz_spectral);
+   [dz_spect, ~, z_spect, z_walls] = CVMESH(opts.z0_spectral, opts.dz_spectral);
 
    % Retrieve the ice/snow grain radii
    r_snow = radii(opts.i_grainradius) / 1000.0;

@@ -50,16 +50,17 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
    % INITIALIZE THE ICE COLUMN
    [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, ...
-      JJ, ~, z_therm, dz_therm, dz_spect, ~, Sp, Fc, Fp, TL, TH, flmin, ...
-      flmax, f_min, liqresid, ro_iwe, ro_wie] = ICEINIT(opts, tair);
+      JJ, z_therm, dz_therm, ~, Sp, Fc, Fp, TL, TH, flmin, flmax, f_min, ...
+      liqresid, ro_iwe, ro_wie] = ICEINIT(opts, tair);
 
    % INITIALIZE THE SPECTRAL EXTINCTION COEFFICIENTS
-   [I0, z_spect, spect_N, spect_S, solardwavl] = EXTCOEFSINIT(opts, ro_ice);
+   [I0, z_spect, spect_N, spect_S, solardwavl, dz_spect] ...
+      = EXTCOEFSINIT(opts, ro_ice);
 
    % INITIALIZE TIMESTEPPING
    [metiter, subiter, maxiter, maxsubiter, dt, dt_FULL_STEP, ...
       numyears, numspinup] = INITTIMESTEPS(opts, time);
-   
+
    % INITIALIZE PAST VALUES
    [xT, xTs, xf_ice, xf_liq] = RESETSUBSTEP(T, Ts, f_ice, f_liq);
    

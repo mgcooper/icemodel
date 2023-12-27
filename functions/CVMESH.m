@@ -1,16 +1,22 @@
-function [dz_cv, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz)
-   %CVMESH Compute cell edges and nodes for control volume meshes
-   % 
-   % [dz_cv, delz, z_node, z_edge, f] = CVMESH(Z, dz) Returns CV thickness
-   % (dz_cv), node-to-node distance (delz), node positions (z_node), and edge
-   % positions (z_edge) for a domain with upper boundary coordinate z=0, lower
-   % boundary coordinate z=Z, and constant CV thickness dz. An interpolation
-   % factor f for each CV interface (edge) is also returned using the harmonic
-   % mean.
+function [dz, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz, g)
+   %CVMESH Compute cell edges and nodes for control volume mesh
+   %
+   % [dz, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz) Returns CV
+   % thickness (dz), node-to-node distance (delz), node positions (z_node),
+   % and edge positions (z_edge) for a domain with upper boundary coordinate
+   % z=0, lower boundary coordinate z=Z, and constant CV thickness dz. An
+   % interpolation factor f for each CV interface (edge) is also returned using
+   % the harmonic mean. Control volume nodes are placed midway between faces,
+   % following Patankar's "Practice B".
+   %
+   % [dz, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz, g) Uses growth
+   % factor 'g' to construct a mesh with exponentially increasing thickness. If
+   % g is not provided, a uniform thickness mesh is returned.
    %
    % Inputs:
-   %   Z  : Depth of the ice column [m]
+   %   Z  : Domain thickness [m]
    %   dz : Desired CV thickness [m]
+   %   g  : Growth factor by which CV thickness increases each layer [1]
    %
    % Outputs:
    %   dz        : Thickness of CVs [m]
@@ -32,52 +38,96 @@ function [dz_cv, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz)
    %
    % See also
 
-   % Initialize the number of CVs and arrays
-   N = round(Z / dz);
-   f = zeros(N + 1, 1);
-   dz_cv = zeros(N, 1);
-   delz = zeros(N + 1, 1);
-   z_node = zeros(N, 1);
-   z_edge = zeros(N + 1, 1);
+   % Compute mesh edge positions
+   if nargin < 3 || g == 1
 
-   % Compute edge positions and distances between edges (delz)
-   z_edge(1) = 0;
-   z_edge(end) = Z;
-   delz(1) = dz / 2;
-   delz(end) = dz / 2;
-   for n = 2:N
-      z_edge(n) = z_edge(n-1) + dz;
-      delz(n) = dz;
+      % Linear mesh
+      z_edge = (0:dz:Z)';
+
+   else
+      % Exponential mesh
+      assert(isscalar(g) && isnumeric(g))
+      z_edge = EXPMESH(Z, dz, g);
+
+      % z_edge = cumsum([0, dz * g .^ (0:floor(log(Z / dz) / log(g)))])';
+      % z_edge = [z_edge(z_edge < Z - eps(z_edge(end))); Z];
    end
+   N = numel(z_edge) - 1;
 
    % Compute node positions and cell thicknesses (dz)
-   for n = 1:N
-      z_node(n) = (z_edge(n) + z_edge(n+1)) / 2;
-      dz_cv(n) = z_edge(n+1) - z_edge(n);
-   end
-   
-   % Include fictitious boundary nodes
-   z_node_bc = [0; z_node; z_node(end) + dz/2];
+   z_node = z_edge(1:N) + diff(z_edge) / 2;
 
-   % Compute interpolation factor f for each CV edge (cell face)
-   f(1) = 2 / ((1/delz(1)) + (1/delz(2)));
-   f(end) = 2 / ((1/delz(end-1)) + (1/delz(end)));
-   for n = 2:N
-      f(n) = 2 / ((1/delz(n)) + (1/delz(n+1)));
+   % Append fictitious boundary nodes
+   z_node_bc = [0; z_node; Z];
+
+   % Compute distance between nodes
+   delz = diff(z_node_bc);
+
+   % Compute distance between edges
+   dz = diff(z_edge);
+
+   % Compute interpolation factor f for cell edges
+   f = zeros(N + 1, 1);
+   for n = 1:N+1
+      f(n) = (z_node_bc(n+1) - z_edge(n)) / (z_node_bc(n+1) - z_node_bc(n));
    end
-   
-   % Round all quantities to the nearest milimeter (except f)
-   [dz_cv, delz, z_node, z_edge, z_node_bc] = deal( ...
-      round(dz_cv,3), round(delz,3), round(z_node,3), round(z_edge,3), ...
-      round(z_node_bc,3));
-   f = round(f, 1);
-   
-   % % These quantities are not computed, but may be useful. 
+
+   % Plot the mesh
+   % icemodel.plotmesh(Z, dz, g)
+
+   % % Round all quantities to the nearest milimeter (except f)
+   % [dz, delz, z_node, z_edge, z_node_bc, f] = deal( ...
+   %    round(dz, 3), round(delz, 3), round(z_node, 3), round(z_edge, 3), ...
+   %    round(z_node_bc, 3), round(f, 3));
+
+   % % These quantities are not computed, but may be useful.
    % dz_bc = [delz_b; dz; delz_b]; % array of c.v. widths including boundaries
-   % delz_s = 0.5.*dz_bc(1:N+1); % interface-to-previous point
-   % delz_n = 0.5.*dz_bc(2:N+2); % interface-to-next point
+   % delz_s = 0.5 * dz_bc(1:N+1); % interface-to-previous point
+   % delz_n = 0.5 * dz_bc(2:N+2); % interface-to-next point
+
+   % For reference
+   % z_walls = [0; cumsum(dz_spect); sum(dz_spect) + dz_spect(end)];
+   % z_walls = round([0; z_spect + dz_spect/2; z_spect(end) + 3*dz_spect/2], 3);
+   % z_walls = [z_walls; z_walls(end) + (z_walls(end) - z_walls(end-1))];
+   % z_spect = z_walls(1:end-2) + diff(z_walls(1:end-1)) / 2;
 end
 
+%% Exponential mesh
+function z_edge = EXPMESH(Z, dz, g)
+   %EXPMESH Compute mesh cell edges and nodes with exponential thickness.
+   %
+   % Inputs:
+   %   Z    : Domain thickness [m]
+   %   dz   : Top CV thickness [m]
+   %   g    : Growth factor by which CV thickness increases each layer [1]
+   %
+   % Outputs:
+   %   (Outputs are the same as in the main function but adapted to the
+   %    exponential mesh.)
+   %
+   % See also: CVMESH
+
+   % Preallocate arrays (with an arbitrary large size, will trim later)
+   z_edge = zeros(10000, 1);
+   z_edge(1) = 0; % Top edge
+   n = 0;         % Layer counter
+
+   % Compute edge positions until one exceeds Z
+   while true
+      n = n + 1;
+      if z_edge(n) + dz * g^(n-1) + n * eps(Z) < Z - dz
+         z_edge(n + 1) = z_edge(n) + dz * g^(n-1);
+      else
+         z_edge(n + 1) = Z - dz;
+         break
+      end
+   end
+   % Trim to actual number of layers and insert a bottom layer with dz thickness
+   z_edge = [z_edge(1:n+1); z_edge(n+1) + dz];
+end
+
+%% Notes
+%
 % N = Number of internal nodes / c.v.'s (5 in example below)
 % N+1 = Number of CV interfaces (6 in example below)
 % q = heat flux
@@ -85,7 +135,7 @@ end
 % gamma = conductivity, a function of T defined at T1, T2, ..., TN
 % k = the interface conductivity and is calculated from the values at T1,
 % T2, ..., TN using eq. 4.9 and the interpolation factor f.
-% 
+%
 %  /////////
 %  ----o---- Tsfc ---       (upper boundary T = Tsfc, dz_pbc = 0, delz = 0)
 % k1 .....         |        interface 1: k1 = k(T1)

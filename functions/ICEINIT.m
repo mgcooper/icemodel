@@ -1,6 +1,6 @@
 function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
-      Ts, JJ_therm, JJ_spect, z_therm, dz_therm, dz_spect, Sc, Sp, Fc, Fp, ...
-      TL, TH, flmin, flmax, f_min, liqresid, ro_iwe, ro_wie] = ICEINIT(opts, tair)
+      Ts, JJ, z_therm, dz_therm, Sc, Sp, Fc, Fp, TL, TH, flmin, flmax, ...
+      f_min, liqresid, ro_iwe, ro_wie] = ICEINIT(opts, tair)
    %ICEINIT initialize the 1-d ice column
    %
    %#codegen
@@ -10,19 +10,17 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
       = icemodel.physicalConstant( ...
       'cp_ice','cp_liq', 'fcp','Lf', 'ro_ice','ro_liq', 'k_liq','Tf', ...
       'Ls','Rv','roLs');
-
-   % COMPUTE THE # OF NODES IN THE THERMAL AND SPECTRAL MESHES
-   JJ_therm = opts.z0_thermal / opts.dz_thermal;
-   JJ_spect = opts.z0_spectral / opts.dz_spectral;
+   
+   % GENERATE A THERMAL MESH
    dz_therm = opts.dz_thermal;
-   dz_spect = opts.dz_spectral;
    z0_therm = opts.z0_thermal;
+   [dz, delz, z_therm, ~, fn] = CVMESH(z0_therm, dz_therm);
 
    % NUMBER OF TIMESTEPS TO INITIALIZE OUTPUTS
    maxiter = numel(tair) / opts.numyears;
 
-   % GENERATE A THERMAL MESH
-   [dz, delz, z_therm, ~, fn] = CVMESH(z0_therm, dz_therm);
+   % NUMBER OF NODES IN THE THERMAL MESH
+   JJ = numel(dz);
 
    % INITIALIZE DENSITIES
    ro_glc = (ro_ice + ro_liq) / 2; % [kg/m3]
@@ -40,7 +38,7 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
    flmax = 1 / (1 + (fcp * (Tf - TH)) ^ 2.0);
 
    % INITIALIZE ICE TEMPERATURE TO AIR TEMPERATURE
-   T = min(TL - 1, (tair(1) + 1) * ones(JJ_therm, 1));
+   T = min(TL - 1, (tair(1) - 1) * ones(JJ, 1));
 
    % INITIALIZE LIQUID/ICE WATER FRACTION AND BULK DENSITIES
    T_dep = Tf - T;                           % [K]
@@ -48,14 +46,14 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
    g_ice = opts.ro_snow_i;
    g_liq = g_ice .* (fmliq ./ (1 - fmliq));
    f_liq = g_liq ./ ro_liq;
-   f_ice = g_ice ./ ro_ice .* ones(JJ_therm, 1);
+   f_ice = g_ice ./ ro_ice .* ones(JJ, 1);
 
    % INITIAL THERMAL CONDUCTIVITY
    k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
 
    % SOURCE TERM LINEARIZATION VECTORS
-   Sc = zeros(JJ_therm, 1);
-   Sp = zeros(JJ_therm, 1);
+   Sc = zeros(JJ, 1);
+   Sp = zeros(JJ, 1);
 
    % BOUNDARY FLUX LINEARIZATION SCALARS
    Fc = 1;
@@ -76,9 +74,9 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
    end
    for n = 1:numel(opts.vars2) % ice2 = 2-d data
       if strcmp(opts.vars2{n}, 'lcflag')
-         ice2.(opts.vars2{n}) = false(JJ_therm, maxiter);
+         ice2.(opts.vars2{n}) = false(JJ, maxiter);
       else
-         ice2.(opts.vars2{n}) = nan(JJ_therm, maxiter);
+         ice2.(opts.vars2{n}) = nan(JJ, maxiter);
       end
    end
 
