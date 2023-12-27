@@ -1,5 +1,5 @@
-function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
-      ea, cv_air, emiss, SB, Tf, chi, roL, scoef, Qc, liqflag)
+function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
+      emiss, SB, Tf, chi, roL, scoef, liqflag, varargin)
    %SFCTEMP Solve the energy balance for surface temperature
 
    persistent tol maxiter
@@ -8,16 +8,38 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
       maxiter = 100;
    end
 
+   switch numel(varargin)
+      case 1
+         Qc = varargin{1};
+         a1 = 0.0;
+      case 3
+         % Qc = a1 * T(1) - a1 * Ts;
+         [k_eff, T, dz] = deal(varargin{:});
+         a1 = k_eff(1) / dz(1) / 2;
+         Qc = 0.0;
+      case 5
+         % use this to test w/wo the Qc derivative
+         [Qc, k_eff, T, dz, flag] = deal(varargin{:});
+         if flag
+            a1 = k_eff(1) / dz(1) / 2;
+            Qc = 0.0;
+         else
+            a1 = 0.0;
+         end
+      otherwise
+         error('unrecognized number of inputs')
+   end
+
    % Gather terms in the SEB equation.
-   AAA = cv_air * De;                                    % [W m-2 K-1]
-   CCC = 0.622 / Pa;                                     % [Pa-1] = [m3 J-1]
-   EEE = chi * (1.0 - albedo) * Qsi + emiss * Qli + Qc;  % [W m-2]
-   FFF = roL * De;                                       % [W m-2]
+   AAA = cv_air * De;   % [W m-2 K-1]
+   CCC = 0.622 / Pa;    % [Pa-1] = [m3 J-1]
+   EEE = chi * (1.0 - albedo) * Qsi + emiss * Qli + Qc + a1 * T(1); % [W m-2]
+   FFF = roL * De;      % [W m-2]
 
    % Compute the constants used in the stability coefficient computations.
    B1 = scoef(2) / (Ta * wspd ^ 2);
    B2 = scoef(3) / (sqrt(Ta) * wspd);
-         
+
    % Define the vapor pressure coefficients.
    if liqflag == true
       % Over water.
@@ -32,36 +54,38 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
    end
 
    old = Ta;
-   
+
    for iter = 1:maxiter
 
-      % Account for an increase in turbulent fluxes under unstable conditions.
+      % Update surface saturation vapor pressure
       es = A * exp(B * (old - Tf) / (C + old - Tf));
-      
-      if old > Ta 
+
+      % Account for an increase in turbulent fluxes under unstable conditions.
+      if old < Ta
+         % Stable case.
+         S = 1.0 / (1.0 + B1 / 2.0 * (Ta - old)) ^ 2;
+         dS = 2.0 * B1 / 2.0 / (1.0 + B1 / 2.0 * (Ta - old)) ^ 3;
+
+      elseif old > Ta
          % Unstable case.
          S = 1.0 + B1 * (old - Ta) / (1.0 + B2 * sqrt(old - Ta));
          dS = B1 / (1.0 + B2 * sqrt(old - Ta)) - (B1 * B2 * (old - Ta)) ...
             / (2.0 * (1.0 + B2 * sqrt(old - Ta)) ^ 2 * sqrt(old - Ta));
-         
-      elseif old < Ta
-         % Stable case.
-         S = 1.0 / (1.0 + B1 / 2.0 * (Ta - old)) ^ 2;
-         dS = 2.0 * B1 / 2.0 / (1.0 + B1 / 2.0 * (Ta - old)) ^ 3;
       else
          % Neutrally stable case.
          S = 1.0;
          dS = 0;
       end
 
+      f = EEE - emiss * SB * old ^ 4 + AAA * (Ta - old) * S ...
+         + FFF * CCC * (ea - es) * S - a1 * old;
+
       dfdT = -4.0 * emiss * SB * old ^ 3 ...
          + S * -AAA + AAA * (Ta - old) * dS ...
          + S * -FFF * CCC * es * B * C / (C + old - Tf) ^ 2 ...
-         + FFF * CCC * (ea - es) * dS;
+         + FFF * CCC * (ea - es) * dS ...
+         - a1;
 
-      f = EEE - emiss * SB * old ^ 4 + AAA * (Ta - old) * S ...
-         + FFF * CCC * (ea - es) * S;
-      
       Ts = old - f / dfdT;
 
       if abs(Ts - old) < tol
@@ -74,32 +98,4 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
       end
       old = Ts;
    end
-   
-   %    % Check convergence
-   %    if err < tol && abs(xTs - Ts) < 10
-   %       OK = true;
-   %       return
-   %    else
-   %
-   %       % Try brent's method
-   %       fSEB = @(Ts) EEE - emiss * SB * Ts ^ 4 + ...
-   %       AAA * STABLEFN(Ta, Ts, wspd, scoef) * (Ta - Ts) + ...
-   %       FFF * CCC * STABLEFN(Ta, Ts, wspd, scoef) * ...
-   %       (ea - VAPPRESS(Ts, Tf, liqflag));
-   %       % + cp_liq*ppt*Tppt; % ppt in kg/m2/s
-   %
-   %       [Ts, ~, ok] = fsearchzero(fSEB, ...
-   %          xTs, xTs-50, xTs+50, Ta, fopts.TolX);
-   %
-   %       if not(ok) || abs(xTs - Ts) > 10
-   %          Ts = Ta;
-   %       else
-   %          OK = true;
-   %       end
-   %
-   %       % If newton and brent fail, could try fzero bounded and unconstrained:
-   %       % [Ts, ~, ~] = fzero(fSEB, [Ta-50 Ta+50], fopts);
-   %       % [Ts, ~, ~] = fzero(fSEB, Ta, fopts);
-   %
-   %    end
 end

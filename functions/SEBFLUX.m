@@ -1,9 +1,9 @@
 function [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, xTs, Ta, Qsi, Qli, ...
-      albedo, wspd, Pa, De, ea, Tf, k_eff, dz, cv_air, roL, emiss, SB, chi, ...
-      epsilon, scoef, liqflag) %#codegen
+      albedo, wspd, ppt, tppt, Pa, De, ea, Tf, k_eff, dz, cv_air, cv_liq, ...
+      roL, emiss, SB, chi, epsilon, scoef, liqflag) %#codegen
    %SEBFLUX using the new top node temperature, compute a new surface flux
    %
-   % 
+   %
    % ea  - atmospheric vapor pressure from relative humidity data.
    % S   - stability function.
    % es  - surface saturation water vapor pressure.
@@ -20,8 +20,9 @@ function [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, xTs, Ta, Qsi, Qli, ...
    Qh       =  SENSIBLE(De,S,Ta,Ts,cv_air);
    Qle      =  LONGOUT(Ts,emiss,SB);
    Qc       =  CONDUCT(k_eff,T,dz,Ts);
-   [Qm,Qf]  =  MFENERGY(albedo,Qsi,Qli,Qle,Qh,Qe,Qc,xTs,Tf, ... % Note: xTs
-               Ta,wspd,De,ea,roL,Pa,cv_air,emiss,SB,k_eff, ...
-               T,dz,epsilon,scoef,chi,ctype);
-   balance  =  ENBAL(albedo,emiss,chi,Qsi,Qli,Qle,Qh,Qe,Qc,Qm);
+   Qa       =  QADVECT(ppt,tppt,cv_liq);
+   [Qm,Qf]  =  MFENERGY(albedo,Qsi,Qli,Qle,Qh,Qe,Qc,Qa,xTs,Tf, ... % Note: xTs
+               Ta,wspd,ppt,tppt,De,ea,roL,Pa,cv_air,cv_liq,emiss,SB,k_eff, ...
+               T,dz,epsilon,scoef,chi);
+   balance  =  ENBAL(albedo,emiss,chi,Qsi,Qli,Qle,Qh,Qe,Qc,Qa,Qm);
 end

@@ -46,7 +46,8 @@ function [ice1, ice2] = icemodel(opts) %#codegen
    TINY = 1e-8;
 
    % LOAD THE FORCING DATA
-   [tair, swd, lwd, albedo, wspd, rh, psfc, De, scoef, time] = METINIT(opts, 1);
+   [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
+      = METINIT(opts, 1);
 
    % INITIALIZE THE ICE COLUMN
    [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, ...
@@ -78,16 +79,10 @@ function [ice1, ice2] = icemodel(opts) %#codegen
          % INITIALIZE NEW TIMESTEP
          [dt_sum, subfail, OK, d_liq, d_drn, d_evp] = NEWTIMESTEP(f_liq);
 
-         % update the upper layer diffusion length scale
-         % if sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1))) > dz(1)
-         %    pause;
-         % end
-
          % SUBSURFACE SOLAR RADIATION SOURCE-TERM
          [Sc, chi] = UPDATEEXTCOEFS(swd(metiter), albedo(metiter), I0, ...
             dz, z_spect, dz_spect, z_therm, dz_therm, spect_N, spect_S, ...
             solardwavl, ro_liq * f_liq + ro_ice * f_ice);
-         % icemodel.verifyShortwaveBalance(Qsi, Sc, albedo, chi, dz, 1);
 
          % SURFACE TEMPERATURE
          ea = VAPPRESS(tair(metiter), Tf, liqflag) * rh(metiter) / 100;
@@ -136,8 +131,9 @@ function [ice1, ice2] = icemodel(opts) %#codegen
             end
             [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, Ts, tair(metiter), ...
                swd(metiter), lwd(metiter), albedo(metiter), wspd(metiter), ...
-               psfc(metiter), De(metiter), ea, Tf, k_eff, dz, cv_air, roL, ...
-               emiss, SB, chi, epsilon, scoef, liqflag);
+               ppt(metiter), tppt(metiter), psfc(metiter), De(metiter), ea, ...
+               Tf, k_eff, dz, cv_air, cv_liq, roL, emiss, SB, chi, epsilon, ...
+               scoef, liqflag);
 
             % COMPUTE MASS BALANCE
             [T, f_ice, f_liq, d_liq, d_evp, d_drn] = ICEMF(T, f_ice, f_liq, ...
@@ -149,10 +145,13 @@ function [ice1, ice2] = icemodel(opts) %#codegen
             [xT, xf_ice, xf_liq, dt_sum, dt, liqflag, roL] ...
                = UPDATESUBSTEP(T, f_ice, f_liq, dt_FULL_STEP, dt_sum, ...
                dt, TINY, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs);
+         end
 
-            % zD = sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
-            % if zD > dz(1) 
-            % end
+         % Update the top layer interaction length
+         if swd(metiter) > 1 && (T(1) - T1_old) > TINY && (T(1) - min(Ts, Tf)) > TINY
+            zD = sqrt((k_eff(1) * dt * (T(1) - min(Ts, Tf))) ...
+               / (cv_ice * f_ice(1) + cv_liq * f_liq(1) * (T(1) - T1_old)));
+            % zD = sqrt(k_eff(1) * dt / (cv_ice * f_ice(1) + cv_liq * f_liq(1)));
          end
 
          assertF(@() dt_sum < dt_FULL_STEP + 2 * TINY)

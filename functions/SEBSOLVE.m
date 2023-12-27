@@ -1,75 +1,93 @@
-function Ts = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
-      emiss, SB, Tf, chi, roL, scoef, liqflag, Ts, T, k_eff, dz, solver)
+function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
+      ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, liqflag, Ts, T, ...
+      k_eff, dz, solver)
    %SEBSOLVE solve the surface energy balance for the skin temperature
    %#codegen
+   
+   % The solver logic:
+   % 0 = derivative-free, slower but more robust, thus used as a fall back.
+   % 1 = newton-rhapson, fast, requires analytic derivative, used as a default.
+   % 2 = complex-step, fast and does not require an analytical derivative.
+   % -1 = no outer iterations, use this if phase change is not represented
+   % explicitly in the model.
+   % >2 = experimental.
+   %
+   % Important programming notes:
+   %  - old is initialized to Ts in the outer iterations, which control the
+   %  convergence of the Ts calculation wrt the conduction term.
+   %  - within SFCTEMP, old is always initialized to Ta, but the conduction
+   %  passed into SFCTEMP is computed with old = Ts. For a skinmodel, Ts never
+   %  exceeds Tf when passed into functions, but within the iterations of
+   %  SFCTEMP and when it comes out of SFCTEMP it can exceed Tf.
 
-   persistent tol maxiter
-   if isempty(tol)
-      tol = 1e-3;
-      maxiter = 100;
+   tol = 1e-3;
+   maxiter = 100;
+   iterflag = true;
+   if solver < 0
+      maxiter = 1;
+      solver = -solver;
+      iterflag = false;
    end
 
+   Ts_old = Ts;
    switch solver
 
-      case 1 % Call SFCTEMP directly
+      case 1 % Newton-Rhapson - analytical derivative
 
          for iter = 1:maxiter
-
             old = Ts;
             [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
-               ea, cv_air, emiss, SB, Tf, chi, roL, scoef, ...
-               CONDUCT(k_eff, T, dz, old), liqflag);
+               ea, cv_air, emiss, SB, Tf, chi, roL, scoef, liqflag, ...
+               CONDUCT(k_eff, T, dz, old), k_eff, T, dz, iterflag);
 
             if not(ok) || abs(old - Ts) < tol
                break
             end
          end
 
-      case 2 % Use nested function to create the function handle
+      case 2 % Complex-step - numerical derivative
 
          for iter = 1:maxiter
-
             old = Ts;
-            Qc = CONDUCT(k_eff, T, dz, old);
-            % [Ts, ok] = newtrhap(@fSEB, Ta);
-            [Ts, ~, ok] = fsearchzero(@fSEB, old, Ta-50, Ta+50, Ta, tol);
-
+            [Ts, ok] = complexstep(@fSEB, Ta);
             if not(ok) || abs(old - Ts) < tol
                break
             end
          end
 
-      case 3 % Pass the function handle directly to root finder
-         for iter = 1:maxiter
-            old = Ts;
-            [Ts, ~, ok] = fsearchzero(@(Ts) CONDUCT(k_eff, T, dz, old) ...
-               + chi * (1.0 - albedo) * Qsi + emiss * (Qli - SB * Ts ^ 4) ...
-               + cv_air * De * (Ta - Ts) * STABLEFN(Ta, Ts, wspd, scoef) ...
-               + roL * De * 0.622 / Pa * (ea - VAPPRESS(Ts, Tf, liqflag)) ...
-               * STABLEFN(Ta, Ts, wspd, scoef), ...
-               old, Ta-50, Ta+50, Ta, tol);
-
-            if not(ok) || abs(old - Ts) < tol
-               break
-            end
-         end
+      otherwise % Derivative-free
+         solver = 0;
    end
 
-   % Note: must use nested function to capture updated Qc on each iteration.
+   % Derivative-free solver
+   if solver == 0 || not(ok) || abs(Ts - Ta) > 20
+
+      Ts = Ts_old;
+
+      for iter = 1:maxiter
+         old = Ts;
+         [Ts, ~, ok] = fsearchzero(@fSEB, old, Ta-50, Ta+50, Ta, tol);
+         if not(ok) || abs(old - Ts) < tol
+            break
+         end
+      end
+   end
+
+   % Note: nested function captures updated Qc on each iteration.
    function f = fSEB(Ts)
       f = chi * (1.0 - albedo) * Qsi + emiss * (Qli - SB * Ts ^ 4) ...
-         + Qc + cv_air * De * (Ta - Ts) * STABLEFN(Ta, Ts, wspd, scoef) ...
+         + CONDUCT(k_eff, T, dz, Ts) ...
+         + cv_air * De * (Ta - Ts) * STABLEFN(Ta, Ts, wspd, scoef) ...
          + roL * De * 0.622 / Pa * (ea - VAPPRESS(Ts, Tf, liqflag)) ...
-         * STABLEFN(Ta, Ts, wspd, scoef);
-      % + cp_liq * ppt * Tppt; % ppt in kg/m2/s
+         * STABLEFN(Ta, Ts, wspd, scoef) ...
+         + QADVECT(ppt, tppt, cv_liq);
    end
 end
 
-%% Newton-rhapson
-function [x, ok, iter] = newtrhap(f, x0) %#ok<*DEFNU>
-   %NEWTRHAP Find root of nonlinear function using the Newton Rhapson method.
+function [x, ok, iter] = complexstep(f, x0)
+   %COMPLEXSTEP Find root of nonlinear function using the Newton Rhapson method.
    %
-   % Note: this uses the complex step method.
+   % Note: this uses the complex step numerical derivative.
 
    persistent h dh tol maxiter
    if isempty(tol)

@@ -1,4 +1,5 @@
-function [tair, swd, lwd, albedo, wspd, rh, psfc, De, S, time] = METINIT(opts, ii)
+function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
+      De, S, time] = METINIT(opts, ii)
    %METINIT initialize the met file
    %
    %#codegen
@@ -21,14 +22,24 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, De, S, time] = METINIT(opts, i
    rh = met.rh;
    swd = met.swd;
    lwd = met.lwd;
+   rain = met.rain / 3600; % opts.dt - the mar rain/snow is mWE / hr not / dt
    tair = met.tair;
    wspd = met.wspd;
    psfc = met.psfc;
    time = met.Time;
    albedo = met.albedo;
 
+   rain(isnan(rain)) = 0.0;
+
    % Compute the wind transfer and stability coefficients
    [De, S] = WINDCOEF(wspd, opts.z_0, opts.z_obs, opts.z_wind);
+
+   % Solve for wet bulb
+   [Ls, cp_air] = icemodel.physicalConstant('Ls', 'cp_air');
+   tppt = nan(size(rh));
+   for n = 1:numel(rh)
+      tppt(n) = SOLVEWB(tair(n), rh(n), Ls, cp_air, psfc(n));
+   end
 end
 
 %%

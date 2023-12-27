@@ -14,7 +14,10 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
    chi = 1.0;
 
    % LOAD THE FORCING DATA
-   [tair, swd, lwd, albedo, wspd, rh, psfc, De, scoef, time] = METINIT(opts, 1);
+   [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
+      = METINIT(opts, 1);
+
+   ppt = 0 * ppt;
 
    % INITIALIZE THE ICE COLUMN
    [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, JJ] ...
@@ -35,14 +38,19 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
          % INITIALIZE NEW TIMESTEP
          [dt_sum, subfail, OK] = NEWTIMESTEP(f_liq);
 
-         while dt_sum + TINY < dt_FULL_STEP
+         if ppt(metiter) > 0
+            % dt = dt_FULL_STEP / maxsubiter;
+         end
 
-            % SURFACE ENERGY BALANCE
-            [Qm, Qf, Qh, Qe, Qc, ~, balance, Ts] = ENBALANCE( ...
-               tair(metiter), swd(metiter), lwd(metiter), albedo(metiter), ...
-               wspd(metiter), rh(metiter), psfc(metiter), De(metiter), ...
-               T, k_eff, Tf, dz, chi, xTs, cv_air, emiss, SB, roL, scoef, ...
-               epsilon, liqflag, false);
+         % SURFACE TEMPERATURE
+         ea = VAPPRESS(tair(metiter), Tf, liqflag) * rh(metiter) / 100;
+         [Ts, ok] = SEBSOLVE(tair(metiter), swd(metiter), lwd(metiter), ...
+            albedo(metiter), wspd(metiter), ppt(metiter), tppt(metiter), ...
+            psfc(metiter), De(metiter), ea, cv_air, cv_liq, emiss, SB, Tf, ...
+            chi, roL, scoef, liqflag, Ts, T, k_eff, dz, opts.seb_solver);
+         Ts = MELTTEMP(Ts, Tf);
+
+         while dt_sum + TINY < dt_FULL_STEP
 
             % HEAT CONDUCTION
             [T, OK, N] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, ...
@@ -65,6 +73,14 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
          end
 
          assertF(@() dt_sum < dt_FULL_STEP + 2 * TINY)
+
+         % UPDATE SURFACE FLUXES
+         k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
+         [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, Ts, tair(metiter), ...
+            swd(metiter), lwd(metiter), albedo(metiter), wspd(metiter), ...
+            ppt(metiter), tppt(metiter), psfc(metiter), De(metiter), ea, ...
+            Tf, k_eff, dz, cv_air, cv_liq, roL, emiss, SB, chi, epsilon, ...
+            scoef, liqflag);
 
          % SAVE OUTPUT IF SPINUP IS FINISHED
          if thisyear >= numspinup
