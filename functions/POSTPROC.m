@@ -20,6 +20,14 @@ function [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time)
    ice1.Tsfc = min(ice1.Tsfc - Tf, 0);
    ice2.Tice = min(ice2.Tice - Tf, 0);
 
+   % Convert logical flags to single
+   if isfield(ice1, 'Tice_converged')
+      ice1.Tice_converged = single(ice1.Tice_converged);
+   end
+   if isfield(ice1, 'Tsfc_converged')
+      ice1.Tsfc_converged = single(ice1.Tsfc_converged);
+   end
+
    % Convert ice1 to timetable
    time.TimeZone = 'UTC';
    ice1 = struct2table(ice1);
@@ -92,10 +100,11 @@ end
 function [ice1, ice2] = retimeLogical(ice1, ice2)
    % Retime logical flags
 
+   % 2-d logical
    fields = fieldnames(ice2);
    for n = 1:numel(fields)
       thisfield = fields{n};
-      if strcmp(thisfield, {'LCflag'})
+      if islogical(ice2.(thisfield)(1, 1))
          flag = false(size(ice2.f_ice));
          idx = 0;
          for mm = 1:4:size(ice2.(thisfield), 2) - 3
@@ -106,6 +115,9 @@ function [ice1, ice2] = retimeLogical(ice1, ice2)
          ice2 = rmfield(ice2, thisfield);
       end
    end
+
+   % 1-d logical
+
 end
 
 %%

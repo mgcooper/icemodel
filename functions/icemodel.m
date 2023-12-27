@@ -1,5 +1,5 @@
 function [ice1, ice2] = icemodel(opts) %#codegen
-   % ICEMODEL Simulate the phase change process in melting glacier ice.
+   % ICEMODEL Simulate the phase change process in glacier ice.
    %
    % This function models the phase change process in melting glacier ice. It
    % uses iterative processes to update the temperature, liquid and ice fraction
@@ -7,11 +7,11 @@ function [ice1, ice2] = icemodel(opts) %#codegen
    % energy balance to simulate the phase change.
    %
    % Syntax:
-   % [ice1, ice2, met, opts] = ICEMODEL(opts)
+   % [ice1, ice2] = ICEMODEL(opts)
    %
    % Inputs:
    % opts - A structure containing model options and parameters. Defined by the
-   %        icemodel_opts function. The fields include:
+   %        icemodel.setopts function. The fields include:
    %        * sitename         - Site name for the model simulation
    %        * simmodel         - Simulation model identifier
    %        * simyears         - Years for which the simulation is done
@@ -29,9 +29,8 @@ function [ice1, ice2] = icemodel(opts) %#codegen
    % ice2  - 2-dimensional data storing variables defined on the subsurface ice
    %         column control volume mesh. Contains one column per timestep.
    % met   - Struct containing the meteorological data used for the simulation.
-   % opts  - Updated struct containing model options and parameters.
    %
-   % See also: ICEMODEL_OPTS
+   % See also: ICEMODEL.SETOPTS
 
    %% INITIALIZE THE MODEL
 
@@ -144,8 +143,8 @@ function [ice1, ice2] = icemodel(opts) %#codegen
          if thisyear >= numspinup
             [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, ...
                opts.vars1, opts.vars2, ...
-               {Ts, Qm, Qf, Qe, Qh, Qc, chi, balance, dt_sum},  ...
-               {T, f_ice, f_liq, d_liq, d_drn, d_evp, Sc, errH, errT});
+               {Ts, Qm, Qf, Qe, Qh, Qc, chi, balance, dt_sum, ok, OK, N}, ...
+               {T, f_ice, f_liq, d_liq, d_drn, d_evp, Sc});
 
             % For a regional run:
             % {Ts},  ...

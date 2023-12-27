@@ -5,7 +5,7 @@ function [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, vars1, vars2, data1, data2)
    % variables exist in vars1, vars2 than there are data in data1, data2, but
    % the vars1, vars2 lists must be in the same order as the data in data1,
    % data2. Thus vars1, vars2 can be set to some base set of variables in
-   % setopts, and the actual variables can be adjusted in icemodel main. 
+   % setopts, and the actual variables can be adjusted in icemodel main.
    for n = 1:numel(data1)
       ice1.(vars1{n})(iter, 1) = data1{n};
    end
@@ -14,6 +14,19 @@ function [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, vars1, vars2, data1, data2)
       ice2.(vars2{n})(:, iter) = data2{n};
    end
 end
+
+% function [ice1, ice2, diags] = SAVEOUTPUT(iter, ice1, ice2, vars1, vars2, ...
+%       data1, data2, diags1, diags2, diagvars1, diagvars2, diagdata1, diagdata2)
+%
+%    if nargin > 7
+%       for n = 1:numel(diagdata1)
+%          diags1.(diagvars1{n})(iter, 1) = diagdata1{n};
+%       end
+%       for n = 1:numel(diagdata2)
+%          diags2.(diagvars2{n})(:, iter) = diagdata2{n};
+%       end
+%    end
+% end
 
 % % or:
 % function [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, vars1, vars2, varargin)

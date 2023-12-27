@@ -39,5 +39,5 @@ function spect_extcoefs = SCALESPECTEXTCOEF(spect_extcoefs,wavelength,kice,kabs)
    % figure;
    % plot(wavel,spect_extcoefs); hold on; set(gca,'YScale','log');
    % plot(wavel,spect_extcoefs_scaled);
-   % legend('theory','user defined');
+   % legend('reference','user defined');
 end

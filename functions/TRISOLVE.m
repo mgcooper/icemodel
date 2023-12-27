@@ -7,9 +7,8 @@ function x = TRISOLVE(lower, middle, upper, rhs)
 
    % Forward elimination
    for k = 2:n
-      xfactor     =  lower(k)  / middle(k-1);
-      middle(k)   =  middle(k) - xfactor * upper(k-1);
-      rhs(k)      =  rhs(k)    - xfactor * rhs(k-1);
+      middle(k)   =  middle(k) - lower(k) / middle(k-1) * upper(k-1);
+      rhs(k)      =  rhs(k)    - lower(k) / middle(k-1) * rhs(k-1);
    end
 
    % Back substitution

@@ -7,12 +7,16 @@ function plotmeltzone(ice2, iter, z_therm, TL, TH, zdepth, numsteps)
       numsteps = 8;
    end
    
-   var = 'Tice';
-   
    zi = find(zdepth - z_therm < 0, 1, 'first');
 
    % Prepare data vertices
-   X = ice2.(var)(1:zi, iter-1);
+   if isstruct(ice2) || istimetable(ice2)
+      Tice = ice2.Tice;
+   elseif ismatrix(ice2)
+      Tice = ice2;
+   end
+   
+   X = Tice(1:zi, max(1, iter-1));
    Y = z_therm(1:zi);
 
    % Prepare melt zone vertices
@@ -35,7 +39,7 @@ function plotmeltzone(ice2, iter, z_therm, TL, TH, zdepth, numsteps)
    ylabel('Depth [m]');
    
    for n = 1:numsteps
-      plot(ice2.(var)(1:zi, iter-n+1), Y, '-o');
+      plot(Tice(1:zi, max(1, iter-n+1)), Y, '-o');
    end
    formatPlotMarkers('markersize', 6)
    ylim([0 zdepth])

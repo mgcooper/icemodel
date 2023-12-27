@@ -10,7 +10,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
 
    % Set the project-level configuration
    icemodel.config();
-   
+
    %---------------------------- save the standard options that were passed in
    %----------------------------------------------------------------------------
    opts.savedata = savedata;
@@ -109,22 +109,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
       % for n = 1:numel(runpoints)
       %    opts.metfname = 'met_sector.mat';
       % end
-
-      opts.vars1 = {'Tsfc'};
-      opts.vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_drn', 'df_evp'};
-
    else
-
-      opts.vars1 = ...
-         {'Tsfc', 'Qm', 'Qf', 'Qe', 'Qh', 'Qc', 'chi', 'balance', 'dt_sum'};
-      opts.vars2 = ...
-         {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_drn', 'df_evp', 'Sc', ...
-         'errH', 'errT', 'lcflag'};
-
-      if strcmp(simmodel, 'skinmodel')
-         opts.vars2 = {'Tice', 'f_ice', 'f_liq'};
-      end
-
       % Create met file names
       opts = createMetFileNames(opts, sitename, forcings, simyears);
 
@@ -138,6 +123,43 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
       %    opts.outfname{n} = [simmodel '_' sitename '_' simyear '_' forcings ...
       %       '_swap_' upper(userdata) '_' uservars];
       % end
+   end
+
+   %---------------------------- set the output file variables
+   %----------------------------------------------------------------------------
+
+   % ice1.vars1 = Surface (1-d) data
+   % ice2.vars2 = Subsurface (2-d) data
+
+   % Two important programming notes:
+   % 1) The order in which the opts.vars1 and opts.vars2 variables are set must
+   % match the order in which the data is stored in the cell arrays that are
+   % passed to SAVEOUTPUT from icemodel main.
+   % 2) If new variables are added, POSTPROC must be reviewed to ensure correct
+   % processing is applied, including rounding precision to save storage.
+
+   if strcmp(sitename, 'sector')
+
+      opts.vars1 = {'Tsfc'};
+      opts.vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_drn', 'df_evp'};
+
+   else
+
+      opts.vars1 = ...
+         {'Tsfc', 'Qm', 'Qf', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
+         'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter'};
+
+      opts.vars2 = ...
+         {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_drn', 'df_evp', 'Sc'};
+
+      if strcmp(simmodel, 'skinmodel')
+         opts.vars2 = {'Tice', 'f_ice', 'f_liq'};
+      end
+
+      % % model diagnostics
+      % opts.vars3 = ...
+      %    {'Tsfc_converged', 'Tsfc_numiter', 'Tice_converged', 'Tice_numiter', ...
+      %    'dt_sum', 'Enthalpy_residual', 'Tice_residual', 'Layer_combo'};
    end
 end
 
