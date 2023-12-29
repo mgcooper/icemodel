@@ -1,5 +1,34 @@
-function [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time)
+function varargout = POSTPROC(ice1, ice2, opts, varargin)
    %POSTPROC post process the simulation data
+   %
+   % Syntax:
+   %
+   % [ice1, ice2] = POSTPROC(ice1, ice2, opts, simyear)
+   % [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time)
+   %
+   % Description:
+   %
+   % [ice1, ice2] = POSTPROC(ice1, ice2, opts, simyear) Loads the met file
+   % based on the information in opts and the simulation year. The year is
+   % needed because the opts struct can be setup for multi-year simulations.
+   %
+   % [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time)
+   %
+
+
+   % Process inputs
+   if nargin == 7
+      [swd, lwd, albedo, time] = deal(varargin{:});
+   elseif nargin == 4
+      simyear = varargin{1};
+      met = icemodel.loadmet(opts, find(opts.simyears == simyear));
+      swd = met.swd;
+      lwd = met.lwd;
+      albedo = met.albedo;
+      time = met.Time;
+   else
+      error('unrecognized number of inputs')
+   end
 
    % Load physical constants
    [Tf, ro_liq, Ls, Lf] = icemodel.physicalConstant('Tf', 'ro_liq', 'Ls', 'Lf');
@@ -53,6 +82,20 @@ function [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time)
       ice1 = renamevars(ice1, ...
          oldvars(ismember(oldvars, ice1.Properties.VariableNames)), ...
          newvars(ismember(oldvars, ice1.Properties.VariableNames)));
+   end
+
+   switch nargout
+      case 2
+         varargout{1} = ice1;
+         varargout{2} = ice2;
+      case 3
+         varargout{1} = ice1;
+         varargout{2} = ice2;
+
+         if nargin == 7
+            met = icemodel.loadmet(opts, find(opts.simyears == year(time(1))));
+         end
+         varargout{3} = icemodel.processmet(met);
    end
 end
 

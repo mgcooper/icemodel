@@ -13,7 +13,7 @@ sitename = 'behar';        % options: 'kanm', 'behar'
 forcings = 'kanm';         % options: 'mar','kanm'
 userdata = 'none';          % options: 'modis','racmo','merra','mar','kanm','none'
 uservars = 'albedo';       % options: 'albedo', or any var in met
-simmodel = 'icemodel';    % options: 'icemodel','skinmodel'
+simmodel = 'skinmodel';    % options: 'icemodel','skinmodel'
 simyears = 2016;
 
 %% Set the model options
@@ -32,17 +32,8 @@ end
 if opts.savedata
    [ice1, ice2, met] = icemodel.loadresults(opts);
 else
-   met = icemodel.loadmet(opts, numel(simyears));
-   [ice1, ice2] = POSTPROC(ice1, ice2, opts, ...
-      met.swd, met.lwd, met.albedo, met.Time);
-   met = icemodel.processmet(met);
+   [ice1, ice2, met] = POSTPROC(ice1, ice2, opts, simyears);
 end
-
-% mar none 2016 behar shows how surf melt rates were very low during the field
-% experiment and much of the surf melt occurs early in the year when subsurf
-% refreezing doesn't seem to happen as much or at all (meaning in the top layer
-% where surf melt is added to df_liq), which is why the full year melt/runoff is
-% much higher with surf melt turned on but the field experiment isn't
 
 %% prep the output for plotting
 
@@ -65,8 +56,8 @@ end
 
 % plot ablation
 t1 = datetime(simyears(1),7,1,0,0,0,'TimeZone','UTC');
-plotPromice(AblationDaily,'refstart',t1);
-plotPromice(AblationHourly,'refstart',t1);
+h2 = plotPromice(AblationDaily,'refstart',t1);
+h3 = plotPromice(AblationHourly,'refstart',t1);
 
 % plot the energy balance
 plotEnbal(ice1, met);
