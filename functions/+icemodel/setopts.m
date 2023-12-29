@@ -51,11 +51,12 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    opts.seb_solver      = 1;        % recommended: 1
    opts.bc_type         = 1;        % recommended: 2
    opts.conduct_type    = 1;        % recommended: 1 (Practice "B")
+   opts.maxiter         = 100;
 
    %
-   if strcmp(simmodel, 'skinmodel')
-      opts.seb_solver = -abs(opts.seb_solver);
-   end
+%    if strcmp(simmodel, 'skinmodel')
+%       opts.seb_solver = -abs(opts.seb_solver);
+%    end
 
    % the mie scattering coefficients are defined for 35 grain sizes and 118
    % spectral bands. define those dimensions here, they are used to read in

@@ -51,10 +51,16 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
          Ts = MELTTEMP(Ts, Tf);
 
          while dt_sum + TINY < dt_FULL_STEP
+            
+%             [Ts, ok] = SEBSOLVE(tair(metiter), swd(metiter), lwd(metiter), ...
+%                albedo(metiter), wspd(metiter), ppt(metiter), tppt(metiter), ...
+%                psfc(metiter), De(metiter), ea, cv_air, cv_liq, emiss, SB, Tf, ...
+%                chi, roL, scoef, liqflag, Ts, T, k_eff, dz, opts.seb_solver);
+%             Ts = MELTTEMP(Ts, Tf);
 
             % HEAT CONDUCTION
             [T, OK, N] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, ...
-               Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf);
+               Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf, 1e-2, opts.maxiter);
 
             % ADAPTIVE TIME STEP
             if not(OK)

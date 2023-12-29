@@ -1,12 +1,33 @@
 function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ...
-      k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf)
+      k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf, varargin)
    %SKINSOLVE Solve the 1-dimensional heat conduction equation
 
    % Solver options
-   persistent tol maxiter alpha
-   if isempty(tol); tol = 1e-2; end
-   if isempty(maxiter); maxiter = 100; end
-   if isempty(alpha); alpha = 1.8; end
+%    persistent tol maxiter alpha
+%    if isempty(tol); tol = 1e-2; end
+%    if isempty(maxiter); maxiter = 100; end
+%    if isempty(alpha); alpha = 1.8; end
+
+   tol = 1e-2;
+   maxiter = 100;
+   alpha = 1.8;
+   if ~isempty(varargin)
+      switch numel(varargin)
+         case 1
+            tol = varargin{1};
+         case 2
+            tol = varargin{1};
+            maxiter = varargin{2};
+         case 3
+            tol = varargin{1};
+            maxiter = varargin{2};
+            alpha = varargin{3};
+         otherwise
+      end
+   end
+   if maxiter == 1
+      alpha = 1;
+   end
 
    % Solve the nonlinear heat equation by iteration (p. 47)
    for iter = 1:maxiter
