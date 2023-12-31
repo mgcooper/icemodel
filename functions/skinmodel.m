@@ -16,9 +16,7 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
    % LOAD THE FORCING DATA
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
       = METINIT(opts, 1);
-
-   ppt = 0 * ppt;
-
+   
    % INITIALIZE THE ICE COLUMN
    [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, JJ] ...
       = ICEINIT(opts, tair);
@@ -51,12 +49,6 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
          Ts = MELTTEMP(Ts, Tf);
 
          while dt_sum + TINY < dt_FULL_STEP
-            
-%             [Ts, ok] = SEBSOLVE(tair(metiter), swd(metiter), lwd(metiter), ...
-%                albedo(metiter), wspd(metiter), ppt(metiter), tppt(metiter), ...
-%                psfc(metiter), De(metiter), ea, cv_air, cv_liq, emiss, SB, Tf, ...
-%                chi, roL, scoef, liqflag, Ts, T, k_eff, dz, opts.seb_solver);
-%             Ts = MELTTEMP(Ts, Tf);
 
             % HEAT CONDUCTION
             [T, OK, N] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, ...

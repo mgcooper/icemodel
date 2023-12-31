@@ -3,11 +3,6 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
    %SKINSOLVE Solve the 1-dimensional heat conduction equation
 
    % Solver options
-%    persistent tol maxiter alpha
-%    if isempty(tol); tol = 1e-2; end
-%    if isempty(maxiter); maxiter = 100; end
-%    if isempty(alpha); alpha = 1.8; end
-
    tol = 1e-2;
    maxiter = 100;
    alpha = 1.8;
@@ -28,6 +23,9 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
    if maxiter == 1
       alpha = 1;
    end
+   
+   drovdT = 0 * T;
+   k_vap = 0 * T;
 
    % Solve the nonlinear heat equation by iteration (p. 47)
    for iter = 1:maxiter
@@ -35,7 +33,7 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
       T_iter = T;
 
       % Update vapor heat
-      [~, drovdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
+      % [~, drovdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
 
       % Update thermal conductivity
       k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, k_vap);

@@ -15,13 +15,13 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
       case 3
          % Qc = a1 * T(1) - a1 * Ts;
          [k_eff, T, dz] = deal(varargin{:});
-         a1 = k_eff(1) / dz(1) / 2;
+         a1 = k_eff(1) / (dz(1) / 2);
          Qc = 0.0;
       case 5
          % use this to test w/wo the Qc derivative
          [Qc, k_eff, T, dz, flag] = deal(varargin{:});
          if flag
-            a1 = k_eff(1) / dz(1) / 2;
+            a1 = k_eff(1) / (dz(1) / 2);
             Qc = 0.0;
          else
             a1 = 0.0;
