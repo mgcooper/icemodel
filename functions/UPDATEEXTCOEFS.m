@@ -1,14 +1,6 @@
 function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, I0, dz, z_spect, dz_spect, ...
       z_therm, dz_therm, spect_N, spect_S, solardwavl, ro_sno)
    %UPDATEEXTCOEFS Update the bulk extinction coefficients
-      
-   persistent z_walls JJ_therm
-   if isempty(z_walls)
-      z_walls = round([0; z_spect + dz_spect/2; z_spect(end) + 3*dz_spect/2], 3);
-   end
-   if isempty(JJ_therm)
-      JJ_therm = length(dz);
-   end
 
    if Qsi < 1e-3
       Sc = 0.0 * dz;
@@ -16,13 +8,18 @@ function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, I0, dz, z_spect, dz_spect, ...
       return
    end
    
-   % Transform the mass density to the spectral grid resolution
+   debug = true;
+   debugplot = false;
+
+   z_walls = [0; cumsum(dz_spect); sum(dz_spect) + dz_spect(end)];
+
+   % Transform the mass density to the spectral grid
    ro_sno = interp1(z_therm, ro_sno, z_spect, 'nearest', 'extrap');
    ro_sno = max(ro_sno, 300);
 
    % Compute the downward bulk extinction coefficient.
    bulkcoefs = -log((sum(solardwavl .* exp(spect_S .* ro_sno), 2)) ...
-      ./ (sum(solardwavl .* exp(spect_N .* ro_sno), 2))) ./ dz_spect;
+      ./ (sum(solardwavl .* exp(spect_N .* ro_sno), 2))) ./ dz_spect(1);
    % NOTE: solardwavl comes multiplied by dwavl
 
    % Cast in a form that can be used in the two-stream computation (add the
@@ -31,136 +28,216 @@ function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, I0, dz, z_spect, dz_spect, ...
    % thoughout the cell).
    bulkcoefs = vertcat(bulkcoefs, bulkcoefs(end), bulkcoefs(end));
 
-   % Compute the a and r coefficients from the surface albedo and the 
+   % Compute the a and r coefficients from the surface albedo and the
    % extinction coefficients.
-   a = (1.0 - albedo) ./ (1.0 + albedo) .* bulkcoefs;
-   r = 2.0 .* albedo .* bulkcoefs ./ (1.0 - albedo ^ 2);
+   a = (1.0 - albedo) / (1.0 + albedo) * bulkcoefs;
+   r = 2.0 * albedo * bulkcoefs ./ (1.0 - albedo ^ 2);
 
    % Solve the system of equations for the two-stream model
-   M = numel(z_spect); % notation here roughly follows Schlatter
-   M1 = M+1;
-   M2 = M+2;
+   M = numel(z_spect) + 2; % notation here roughly follows Schlatter
 
    % initialize the matrix
-   e = zeros(M1, 1);
-   f = zeros(M1, 1);
-   g = zeros(M1, 1);
-   b = zeros(M1, 1);
+   e = zeros(M-1, 1);
+   f = zeros(M-1, 1);
+   g = zeros(M-1, 1);
+   b = zeros(M-1, 1);
 
    % Account for the upper boundary condition
    alfa = 1.0 / (a(1) + r(1));
    e(1) = 0.0;
    f(1) = 1.0;
-   g(1) = -alfa / (dz_spect + alfa);
-   b(1) = r(1) * I0 * dz_spect * alfa / (dz_spect + alfa);
+   g(1) = -alfa / (dz_spect(1) + alfa);
+   b(1) = r(1) * I0 * dz_spect(1) * alfa / (dz_spect(1) + alfa);
 
    % Fill the vectors between the boundaries
-   deltaz = z_walls(3:M2) - z_walls(2:M1);
-   e(2:M1) = 1.0 + (r(3:M2) - r(1:M)) ./ (4.0 .* r(2:M1));
-   f(2:M1) = deltaz ./ (2.0 .* r(2:M1)) .* (a(2:M1) .* (r(3:M2) - r(1:M)) ...
-      - r(2:M1) .* (a(3:M2) - a(1:M))) - (2.0 + deltaz.^2 .* bulkcoefs(2:M1).^2);
-   g(2:M1) = 1.0 - (r(3:M2) - r(1:M)) ./ (4.0 * r(2:M1));
-   b(2:M1) = 0.0;
+   deltaz = z_walls(3:M) - z_walls(2:M-1);
+   e(2:M-1) = 1.0 + (r(3:M) - r(1:M-2)) ./ (4.0 * r(2:M-1));
+   f(2:M-1) = deltaz ./ (2.0 * r(2:M-1)) ...
+      .* (a(2:M-1) .* (r(3:M) - r(1:M-2)) - r(2:M-1) .* (a(3:M) - a(1:M-2))) ...
+      - (2.0 + deltaz .^ 2 .* bulkcoefs(2:M-1) .^ 2);
+   g(2:M-1) = 1.0 - (r(3:M) - r(1:M-2)) ./ (4.0 * r(2:M-1));
+   b(2:M-1) = 0.0;
 
    % Account for the lower boundary condition
-   g(M1) = 0.0;
-   b(M1) = 0.0;
+   g(M-1) = 0.0;
+   b(M-1) = 0.0;
+   
+   %% TEST BEGIN
+   
+   % % e(M-1) = 0.0;
+   % % f(M-1) = 1.0;
+   % 
+   % % keep the og ones
+   % e1 = e;
+   % f1 = f;
+   % g1 = g;
+   % b1 = b;
+   % deltaz1 = deltaz;
+   % 
+   % % It should be possible to just compute the interior equations then append the
+   % % upper and lower
+   % deltaz = [dz_spect; dz_spect(end)];
+   % e = 1.0 + (r(3:M) - r(1:M-2)) ./ (4.0 * r(2:M-1));
+   % f = deltaz(2:M-1) ./ (2.0 * r(2:M-1)) ...
+   %    .* (a(2:M-1) .* (r(3:M) - r(1:M-2)) - r(2:M-1) .* (a(3:M) - a(1:M-2))) ...
+   %    - (2.0 + deltaz(2:M-1) .^ 2 .* bulkcoefs(2:M-1) .^ 2);
+   % g = 1.0 - (r(3:M) - r(1:M-2)) ./ (4.0 * r(2:M-1));
+   % b = 0 * g;
+   % 
+   % % Append the upper boundary condition
+   % e = vertcat(0, e);
+   % f = vertcat(1, f);
+   % g = vertcat(-alfa / (dz_spect(1) + alfa), g);
+   % b = vertcat(r(1) * I0 * dz_spect(1) * alfa / (dz_spect(1) + alfa), b);
+   % 
+   % % Account for the lower boundary condition
+   % e(end) = 0.0;
+   % f(end) = 1.0;
+   % g(end) = 0.0;
+   % 
+   % %
+   % isequal(e, e1) % no
+   % isequal(f, f1) % no
+   % isequal(g, g1) % yes
+   % isequal(b, b1) % yes
+   % 
+   % isequal(e(1:end-1), e1(1:end-1)) % yes
+   % isequal(f(1:end-1), f1(1:end-1)) % yes
+   % 
+   % e(end)
+   % e1(end)
+   % 
+   % f(end)
+   % f1(end)
+
+   %% TEST END
 
    % Solve the equation
-   x = zeros(M1, 1);
-   for k = 2:numel(f) % forward elimination
+   up = zeros(M-1, 1);
+   for k = 2:numel(f)
       f(k) = f(k) - e(k) / f(k-1) * g(k-1);
       b(k) = b(k) - e(k) / f(k-1) * b(k-1);
    end
-   x(M1) = b(M1) / f(M1); % back substitution
-   for k = M:-1:1
-      x(k) = (b(k) - g(k) * x(k+1)) / f(k);
+   up(M-1) = b(M-1) / f(M-1);
+   for k = numel(f)-1:-1:1
+      up(k) = (b(k) - g(k) * up(k+1)) / f(k);
    end
 
    % Add the boundary conditions to up and reconstruct down. X = up, Y = down.
-   up = vertcat(x(1:M1), 0); % Add the boundary conditions to rad.
+   up = vertcat(up(1:M-1), 0);
 
-   % Reconstruct y.
-   dn = (a(2:M1) + r(2:M1)) ./ r(2:M1) .* up(2:M1) - (up(3:M2) - up(1:M2-2)) ...
-      ./ (2.0 .* deltaz .*r (2:M1));
-   dn = vertcat(I0, dn);
-   dn = vertcat(dn, (a(M2) + r(M2)) / r(M2) * up(M2) - (up(M2) - up(M1)) ...
-      / (deltaz(1) * r(M2)));
+   % Reconstruct down.
+   dn = vertcat(I0, ...
+      (a(2:M-1) + r(2:M-1)) ./ r(2:M-1) .* up(2:M-1) - (up(3:M) - up(1:M-2)) ...
+      ./ (2.0 * deltaz .* r(2:M-1)), ...
+      (a(M) + r(M)) / r(M) * up(M) - (up(M) - up(M-1)) ...
+      / (deltaz(1) * r(M))); % note: dz(M-1) for the bottom
 
-   % Smooth any small bumps in the up and down curve.  This will assist
-   % in any delta up, delta down computations. Do the interior.
-   dntmp = (dn(2:M1) + 0.5 .* (dn(1:M2-2) + dn(3:M2))) ./ 2.0;
-   uptmp = (up(2:M1) + 0.5 .* (up(1:M2-2) + up(3:M2))) ./ 2.0;
+   if debug == true; UP(:, 1) = up; DN(:, 1) = dn; end
+   
+   % Do the interior.
+   dntmp = (dn(2:M-1) + 0.5 * (dn(1:M-2) + dn(3:M))) / 2.0;
+   uptmp = (up(2:M-1) + 0.5 * (up(1:M-2) + up(3:M))) / 2.0;
 
    % Do the ends.
    dntmp = vertcat((dn(2) + 0.5 * dn(1)) / 1.5, dntmp);
    uptmp = vertcat((up(2) + 0.5 * up(1)) / 1.5, uptmp);
-   dntmp = vertcat(dntmp, (dn(M1) + 0.5 * dn(M2)) / 1.5);
-   uptmp = vertcat(uptmp, (up(M1) + 0.5 * up(M2)) / 1.5);
+   dntmp = vertcat(dntmp, (dn(M-1) + 0.5 * dn(M)) / 1.5);
+   uptmp = vertcat(uptmp, (up(M-1) + 0.5 * up(M)) / 1.5);
 
-   % Rewrite the arrays. Adjust to get back the Qsi at the surface.
-   dn = vertcat(dn(1), dntmp(2:M1), dn(end));
-   up = vertcat(up(1),   uptmp(2:M1),   up(end));
+   % Rewrite the arrays, ensuring Qsi at the surface is conserved.
+   dn = vertcat(dn(1), dntmp(2:M-1), dn(end));
+   up = vertcat(up(1), uptmp(2:M-1), up(end));
 
-   % Repeat the smoothing (deal with edge effects)
-   dntmp = (dn(2:M1) + 0.5 * (dn(1:M) + dn(3:M2))) / 2.0;
-   uptmp = (up(2:M1) + 0.5 * (up(1:M) + up(3:M2))) / 2.0;
+   if debug == true; UP(:, 2) = up; DN(:, 2) = dn; end
+   
+   % Repeat the interior.
+   dntmp = (dn(2:M-1) + 0.5 * (dn(1:M-2) + dn(3:M))) / 2.0;
+   uptmp = (up(2:M-1) + 0.5 * (up(1:M-2) + up(3:M))) / 2.0;
 
    % Do the ends.
    dntmp = vertcat(dn(2) + 0.5 * dn(1) / 1.5, dntmp);
    uptmp = vertcat(up(2) + 0.5 * up(1) / 1.5, uptmp);
-   dntmp = vertcat(dntmp, dn(M1) + 0.5 * dn(M2) / 1.5);
-   uptmp = vertcat(uptmp, up(M1) + 0.5 * up(M2) / 1.5);
+   dntmp = vertcat(dntmp, dn(M-1) + 0.5 * dn(M) / 1.5);
+   uptmp = vertcat(uptmp, up(M-1) + 0.5 * up(M) / 1.5);
 
    % Rewrite the arrays.
-   dn = vertcat(dn(1), dntmp(2:M1), dn(end));
-   up = vertcat(up(1), uptmp(2:M1), up(end));
+   dn = vertcat(dn(1), dntmp(2:M-1), dn(end));
+   up = vertcat(up(1), uptmp(2:M-1), up(end));
 
-   % Build an array of source-term values on the c.v. boundaries.
-   xynet = (up(2:M) + up(3:M1)) ./ 2.0 - (dn(2:M) + dn(3:M1)) ./ 2.0;
-   xynet = vertcat(up(1) - dn(1), xynet);
-
-   % Ensure xynet(1) is equal to the total absorbed radiation. This corrects
-   % for any (very) small errors in the two-stream model, typically due to a
-   % spectral grid that is too shallow to absorb all the radiation
-   xynet(1) = min(-I0 * (1 - albedo), xynet(1));
-
-   % xynet is the net solar radiation at each level. In Schlatter it is
-   % just Q. The source term (absorbed flux per unit volume) is dQ/dz.
-   % Below, I call the absorbed flux dQ, so Sc = dQ/dz = d(xynet)/dz. In
-   % Glen's original model, the quantity dQ was not defined, xynet was
-   % converted directly to dQ/dz in ICE_HEAT by scaling d(xynet) by Qsip and
-   % then to Sc.
-
-   % Transform the pentrating radiation back to the thermal grid as dQ
-   % extrapolate xynet to the bottom of the thermal grid
+   if debug == true; UP(:, 3) = up; DN(:, 3) = dn; end
    
-   JJnew = JJ_therm * dz_therm / dz_spect;
-   JJext = round(JJnew-M, 0);
-   delxy = xynet(M) - xynet(M-1);
-   xyext = [xynet(M) + delxy; xynet(M) + 2*delxy; zeros(JJext-2, 1) + delxy];
-   xynew = [xynet; xyext];
+   % Compute the net flux at each level, ensuring Q(1) recovers the total flux.
+   Q = vertcat(min(-I0 * (1 - albedo), up(1) - dn(1)), ...
+      (up(2:M-1) + up(3:M)) ./ 2.0 - (dn(2:M-1) + dn(3:M)) ./ 2.0);
    
-   % Upscale to the thermal grid
-   dQ = xynew(1:JJnew-1) - xynew(2:JJnew);
-   dQ(JJnew) = dQ(JJnew - 1);
+   % Compute the absorbed flux at each level
+   dQ = Q(1:end-1) - Q(2:end);
    
-   % Get the number of grid cells in the first 3 m segment on each grid
-   rz = JJnew / JJ_therm;
+   if debug == true; dQspect = dQ; end
    
-   % Reshape the radiation into equal chunks along the thermal grid
-   dQ = reshape(dQ, rz, JJ_therm);
+   % Upscale to the thermal grid.
+   dQ = transpose(sum(reshape(dQ, dz_therm(1) / dz_spect(1), []), 1));
    
-   % Sum up those equal chunks to get the absorbed radiation in each thermal c.v.
-   dQ = transpose(sum(dQ, 1));
-
-   % Compute the amount of solar radiation absorbed in the top grid cell, to
-   % be allocated to the SEB. Optionally enhance it by qsfactor to account
-   % for impurities on the ice surface or other factors.
+   % Compute the flux absorbed in the top layer, to be allocated to the SEB.
+   % Optionally enhance it by a parameter to account for impurities on the ice
+   % surface or other factors that enhance the surface absorption. 
    if albedo > 0.65 % && snowd > 0.05
       chi = 0.9;
    else
       chi = dQ(1) / sum(dQ);
    end
-   Sc = -(1.0 - chi) * Qsi / I0 * dQ ./ dz; % [W/m3]
+   
+   % NEED TO ADD A 
+   dQ = vertcat(dQ, zeros((sum(dz) - sum(dz_spect)) / dz_therm, 1));
+   
+   % Compute the source term (absorbed flux per unit volume), Sc = dQ/dz.
+   Sc = -(1.0 - chi) * Qsi / I0 * dQ ./ dz; % [W m-3]
+   
+   if debug == true
+      
+      % sum(dQspect(1:40)) / sum(dQspect)
+      % dQ(1) / sum(dQ)
+      
+      % This compares the different up/dn fluxes
+      if debugplot == true
+         icemodel.plot.twostream(UP, DN, Q, dQspect, z_walls, z_spect, false);
+      
+         % This compares the absorbed flux on the spectral grid to the thermal grid
+         X1 = -dQspect ./ dz_spect;
+         X2 = -dQ ./ dz;
+         Y1 = z_spect;
+         Y2 = z_therm;
+         
+         figure
+         semilogx(X1, Y1, '-o'); hold on;
+         semilogx(X2, Y2, '-o');
+         formatPlotMarkers("markersize", 6)
+         xlabel('dQ/dz')
+         ylabel('depth')
+         legend('spectral grid', 'thermal grid')
+         set(gca, 'YDir', 'reverse', 'XDir', 'reverse')
+         
+         ratio = dz_therm(1)/dz_spect(1);
+         itherm = 20;
+         ispect = ratio * itherm;
+         xlims = [min([X1(1:ispect); X2(1:itherm)]) max([X1(1:ispect); X2(1:itherm)])];
+         ylims = [min(Y1(1), Y2(1)) max(Y2(itherm), Y1(ispect))];
+         axis([0.98*xlims(1) 1.02*xlims(2) ylims(1) ylims(2)])
+         
+         
+         figure
+         semilogx(Sc, Y2, '-o'); hold on;
+         semilogx(X2, Y2, '-o');
+         formatPlotMarkers("markersize", 6)
+         xlabel('dQ/dz')
+         ylabel('depth')
+         legend('S_c', 'dQ/dz')
+         set(gca, 'YDir', 'reverse', 'XDir', 'reverse')
+         
+         close all
+      end
+   end
+   
 end
+ 

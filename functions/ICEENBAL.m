@@ -1,4 +1,4 @@
-function [T, f_ice, f_liq, k_eff, OK, iter, a1, errT, errH] = ICEENBAL( ...
+function [T, f_ice, f_liq, k_eff, OK, iter, a1, errT, err1] = ICEENBAL( ...
       T, f_ice, f_liq, dz, delz, fn, Sc, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ...
       ro_ice, ro_liq, Ls, Lf, roLf, Rv, Tf, fcp, TL, TH, flmin, flmax, ...
       ro_iwe, ro_wie, Fc, Fp, bc)
@@ -9,7 +9,7 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, errT, errH] = ICEENBAL( ...
    % Solver options
    tol = 1e-3;
    maxiter = 100;
-   alpha = 0.8;
+   % alpha = 0.8;
 
    % Update the water fraction
    f_wat = f_liq + f_ice * ro_iwe;
@@ -92,7 +92,7 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, errT, errH] = ICEENBAL( ...
    OK = iter < maxiter;
 
    % Surface energy balance linearization error [K]
-   err0 = -(Fc + Fp * Ts) / a1 - (T(1) - Ts);
+   % err0 = -(Fc + Fp * Ts) / a1 - (T(1) - Ts);
 
    % Top layer energy balance linearization error [K]
    err1 = (dt/dz(1) ...

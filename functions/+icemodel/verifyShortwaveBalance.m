@@ -43,6 +43,11 @@ function verifyShortwaveBalance(Qsi, Sc, albedo, chi, dz, method, Qseb)
 
          % so we can either pass Qseb or chi out of extcoefs   
          
+         % For clarity, the total absorbed:
+         Qsi * (1 - albedo) * chi + sum(Sc .* dz)
+         % Compare that with the known total absorbed:
+         Qsi * (1 - albedo)
+         
       otherwise
          
    end
