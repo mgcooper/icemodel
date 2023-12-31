@@ -100,6 +100,10 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    opts.pathinput = getenv('ICEMODELINPUTPATH');
    opts.pathoutput = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, simmodel);
 
+   if strcmp(sitename, 'sector')
+      opts.pathoutput = fullfile(opts.pathoutput, userdata);
+   end
+   
    assert(isfolder(opts.pathinput), ...
       'ICEMODELINPUTPATH does not exist, set it using icemodel.config');
 
@@ -162,22 +166,30 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
 
    if strcmp(sitename, 'sector')
 
-      opts.vars1 = {'Tsfc'};
-      opts.vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_drn', 'df_evp'};
+      if strcmp(simmodel, 'skinmodel')
+         opts.vars1 = {'Tsfc', 'Qm', 'Qe'};
+         opts.vars2 = {'Tice'};
+      else
+
+         opts.vars1 = {'Tsfc'};
+         opts.vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_drn', 'df_evp'};
+      end
 
    else
 
-      opts.vars1 = ...
-         {'Tsfc', 'Qm', 'Qf', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
-         'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter'};
-
-      opts.vars2 = ...
-         {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_drn', 'df_evp', 'Sc'};
-
       if strcmp(simmodel, 'skinmodel')
-         opts.vars2 = {'Tice', 'f_ice', 'f_liq'};
-      end
+         opts.vars1 = {'Tsfc', 'Qm', 'Qe'};
+         opts.vars2 = {'Tice'};
+         % opts.vars2 = {'Tice', 'f_ice', 'f_liq'};
+      else
+         
+         opts.vars1 = ...
+            {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
+            'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter'};
 
+         opts.vars2 = ...
+            {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_drn', 'df_evp', 'Sc'};
+      end
       % % model diagnostics
       % opts.vars3 = ...
       %    {'Tsfc_converged', 'Tsfc_numiter', 'Tice_converged', 'Tice_numiter', ...

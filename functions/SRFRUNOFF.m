@@ -11,12 +11,12 @@ function ice1 = SRFRUNOFF(ice1,ro_liq,Ls,Lf,dt)
    isub = ice1.Qe < 0;
    icon = ice1.Qe > 0;
    imlt = ice1.Qm > 0;
-   ifrz = ice1.Qf > 0;
+   ifrz = ice1.Qm < 0;
 
    sub(isub) = ice1.Qe(isub) ./ (Ls .* ro_liq) .* dt .* -1.0;
    con(icon) = ice1.Qe(icon) ./ (Ls .* ro_liq) .* dt;
    mlt(imlt) = ice1.Qm(imlt) ./ (Lf .* ro_liq) .* dt;
-   frz(ifrz) = ice1.Qf(ifrz) ./ (Lf .* ro_liq) .* dt;
+   frz(ifrz) = ice1.Qm(ifrz) ./ (Lf .* ro_liq) .* dt .* -1.0;
 
    rof = mlt + con;
 

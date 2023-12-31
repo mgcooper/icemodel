@@ -188,10 +188,8 @@ function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, I0, dz, z_spect, dz_spect, ...
       chi = dQ(1) / sum(dQ);
    end
    
-   % NEED TO ADD A 
-   dQ = vertcat(dQ, zeros((sum(dz) - sum(dz_spect)) / dz_therm, 1));
-   
    % Compute the source term (absorbed flux per unit volume), Sc = dQ/dz.
+   dQ = vertcat(dQ, zeros((sum(dz) - sum(dz_spect)) / dz_therm, 1));
    Sc = -(1.0 - chi) * Qsi / I0 * dQ ./ dz; % [W m-3]
    
    if debug == true

@@ -22,17 +22,18 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    rh = met.rh;
    swd = met.swd;
    lwd = met.lwd;
-   rain = met.rain / 3600; % opts.dt - the mar rain/snow is mWE / hr not / dt
    tair = met.tair;
    wspd = met.wspd;
    psfc = met.psfc;
    time = met.Time;
    albedo = met.albedo;
 
-   rain(isnan(rain)) = 0.0;
-
-   % Compute the wind transfer and stability coefficients
-   [De, S] = WINDCOEF(wspd, opts.z_0, opts.z_obs, opts.z_wind);
+   if isvariable('rain', met)
+      rain = met.rain / 3600; % opts.dt - the mar rain/snow is mWE / hr not / dt
+      rain(isnan(rain)) = 0.0;
+   else
+      rain = 0 * tair;
+   end
 
    % Solve for wet bulb
    [Ls, cp_air] = icemodel.physicalConstant('Ls', 'cp_air');
@@ -40,6 +41,9 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    for n = 1:numel(rh)
       tppt(n) = SOLVEWB(tair(n), rh(n), Ls, cp_air, psfc(n));
    end
+   
+   % Compute the wind transfer and stability coefficients
+   [De, S] = WINDCOEF(wspd, opts.z_0, opts.z_obs, opts.z_wind);
 end
 
 %%
@@ -77,10 +81,20 @@ function met = swapMetData(met, opts)
    end
 
    if strcmp(opts.sitename, 'sector')
+
       % Swap out the forcing data albedo for modis albedo
+      
+      % Activate this and move the swap loop below outside the else to swap
+      % generic variables for gridded (sector) runs.
+      % Data = met;
+      % if strcmp('modis', opts.userdata)
+      %    Data.modis = met.modis;
+      % end
+      
       if strcmp('modis', opts.userdata)
-         Data.modis = met.modis;
+         met.albedo = met.modis;
       end
+      
    else
       % Load the userdata and retime from hourly to 15 m if the met data is 15 m
       simyears = num2str(opts.simyears(1));
@@ -97,18 +111,18 @@ function met = swapMetData(met, opts)
          error('\n userdata file does not exist: \n\n %s \n', ...
             fullfile(opts.pathinput, 'userdata', userfile));
       end
-   end
 
-   % Swap out the data in the metfile for the user data
-   for n = 1:numel(opts.uservars)
-      thisvar  = opts.uservars{n};
-      swapvar  = thisvar;
+      % Swap out the data in the metfile for the user data
+      for n = 1:numel(opts.uservars)
+         thisvar  = opts.uservars{n};
+         swapvar  = thisvar;
 
-      % MODIS requires changing the variable name to albedo
-      if strcmpi('modis', opts.userdata) && strcmpi('albedo', thisvar)
-         thisvar = 'albedo';
-         swapvar = 'modis';
+         % MODIS requires changing the variable name to albedo
+         if strcmpi('modis', opts.userdata) && strcmpi('albedo', thisvar)
+            thisvar = 'albedo';
+            swapvar = 'modis';
+         end
+         met.(thisvar) = Data.(swapvar);
       end
-      met.(thisvar) = Data.(swapvar);
    end
 end
