@@ -3,7 +3,7 @@ clean
 savedata = true;
 sitename = 'sector';
 forcings = 'mar';
-userdata = 'mar';
+userdata = 'modis';
 uservars = 'albedo';
 simmodel = 'skinmodel';
 simyears = 2008:2018;

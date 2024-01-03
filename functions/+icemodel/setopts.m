@@ -43,15 +43,15 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    opts.dt              =  900.0;   % timestep                             [s]
    opts.dz_thermal      =  0.04;    % dz for heat transfer                 [m]
    opts.dz_spectral     =  0.002;   % dz for radiative transfer            [m]
-   opts.z0_thermal      =  20;      % domain thickness for heat transfer   [m]
-   opts.z0_spectral     =  4;       % domain thickness for rad transfer    [m]
-   opts.f_ice_min       =  0.01;
+   opts.z0_thermal      =  12;      % domain thickness for heat transfer   [m]
+   opts.z0_spectral     =  12;       % domain thickness for rad transfer    [m]
+   opts.f_ice_min       =  0.1;
 
    % solver options
    opts.seb_solver      = 1;        % recommended: 1
    opts.bc_type         = 1;        % recommended: 2
    opts.conduct_type    = 1;        % recommended: 1 (Practice "B")
-   opts.maxiter         = 100;
+   opts.maxiter         = 50;
 
    %
 %    if strcmp(simmodel, 'skinmodel')
@@ -178,9 +178,17 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    else
 
       if strcmp(simmodel, 'skinmodel')
-         opts.vars1 = {'Tsfc', 'Qm', 'Qe'};
-         opts.vars2 = {'Tice'};
-         % opts.vars2 = {'Tice', 'f_ice', 'f_liq'};
+         % opts.vars1 = {'Tsfc', 'Qm', 'Qe'};
+         % opts.vars2 = {'Tice'};
+         % % opts.vars2 = {'Tice', 'f_ice', 'f_liq'};
+
+         opts.vars1 = ...
+            {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
+            'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter'};
+
+         opts.vars2 = ...
+            {'Tice', 'f_ice', 'f_liq'};
+         
       else
          
          opts.vars1 = ...

@@ -9,16 +9,20 @@ runpoint = true;
 
 %% set the run-specific model configuration
 savedata = false;
-sitename = 'behar';        % options: 'kanm', 'behar'
-forcings = 'kanm';         % options: 'mar','kanm'
+sitename = 'ak4';        % options: 'kanm', 'behar'
+forcings = 'mar';         % options: 'mar','kanm'
 userdata = 'none';          % options: 'modis','racmo','merra','mar','kanm','none'
 uservars = 'albedo';       % options: 'albedo', or any var in met
 simmodel = 'skinmodel';    % options: 'icemodel','skinmodel'
-simyears = 2016;
+simyears = 2011;
 
 %% Set the model options
 opts = icemodel.setopts(simmodel, sitename, simyears, forcings, ...
    userdata, uservars, savedata);
+
+
+opts.metfname = {fullfile(opts.pathinput, 'met', 'sector', ...
+      ['met_' int2str(433) '.mat'])};
 
 % run the model
 switch simmodel

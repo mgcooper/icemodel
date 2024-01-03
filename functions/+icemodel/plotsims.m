@@ -1,11 +1,14 @@
-function plotdiags(ice1a, ice1b, fields)
+function plotsims(ice1a, ice1b, fields)
 
    % Compare ice1 data from two simulations.
    %
    % just a starter i copied out of the bottom of icemodel_region ... probably
    % better already in runoff//functions
-
+   isskinmodel = false(2, 1);
    if isfile(ice1a)
+      if contains(ice1a, 'skinmodel')
+         isskinmodel(1) = true;
+      end
       try
          load(ice1a, 'ice1')
          ice1a = ice1; clear ice1;
@@ -15,6 +18,9 @@ function plotdiags(ice1a, ice1b, fields)
    end
 
    if isfile(ice1b)
+      if contains(ice1b, 'skinmodel')
+         isskinmodel(2) = true;
+      end
       try
          load(ice1b, 'ice1')
          ice1b = ice1; clear ice1;
@@ -39,16 +45,21 @@ function plotdiags(ice1a, ice1b, fields)
    % Skip the first 1000 values when plotting timeseries 
    idx = 1000:height(ice1a);
 
-   figure('Position', [100   100   900   450])
+   %figure('Position', [100   100   900   450])
+   figontop
    for n = 0:numel(fields)
       
       % 1:1 plots
       subtight(1, 3, 1, "gap", [0.08 0.08], "marw", [0.06 0.02], "marh", [0.08 0.04])
       try
          % Custom melt-freeze
-         if n == 0
-            plot(ice1a.melt-ice1a.freeze, ice1b.melt-ice1b.freeze, 'o');
-            title('melt - freeze')
+         if n == 0 
+            if ~all(isskinmodel)
+               plot(ice1a.melt-ice1a.freeze, ice1b.melt-ice1b.freeze, 'o');
+               title('melt - freeze')
+            else
+               continue
+            end
          else
             plot(ice1a.(fields{n}), ice1b.(fields{n}), 'o');
             title((fields{n}))
