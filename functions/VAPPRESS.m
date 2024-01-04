@@ -2,7 +2,7 @@ function [es, des_dT, T_dew] = VAPPRESS(T, Tf, liqflag, rh)
    %VAPPRESS Compute saturation vapor pressure over water or ice.
    %
    %  E_SAT = VAPPRESS(T, TF, LIQFLAG) Computes saturation vapor pressure
-   %  using the Magnus formula:
+   %  using the Rankine–Kirchhoff formula:
    %
    %     E_SAT = ES0 * exp(B * (T - Tf) / (C + T - Tf))
    %
@@ -34,7 +34,7 @@ function [es, des_dT, T_dew] = VAPPRESS(T, Tf, liqflag, rh)
    persistent aw bw cw ai bi ci
    if isempty(aw)
       aw = 611.21;
-      bw = 17.502;
+      bw = 17.502; % 18.678
       cw = 240.97;
       ai = 611.15;
       bi = 22.452;

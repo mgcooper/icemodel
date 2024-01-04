@@ -17,19 +17,42 @@ function varargout = physicalConstant(varargin)
    %#codegen
 
    % see: IAPWS release on the Properties of Ice and Supercooled Water.
-   
+
    narginchk(0,Inf);
 
    % name = validatestring(name,icemodel.physconlist,'physicalConstant','name', 1);
-   
+
    % From Romps:
    % Rv = 461;                      % specific gas constant for water vapor [J kg-1 K-1]
    % cp_liq = 4119;                 % specific heat capacity of liquid water
    % cp_ice = 1861;
    % cv_vap = 1418;                 % specific heat capacity of water vapor at constant volume [J kg-1 K-1]
+   % cv_liq = cp_liq;               % specific heat capacity of water at constant volume [J kg-1 K-1]
+   % cv_ice = cp_ice;               % specific heat capacity of ice at constant volume [J kg-1 K-1]
    % cp_vap = cv_vap + Rv;          % specific heat capacity of water vapor at constant pressure [J kg-1 K-1]
    % Ptrip = 611.65;                % triple point vapor pressure
-   
+
+   % Romps' expression for saturation vapor pressure:
+   % pv_ice = pv0 * (T / T0) .^ (cp_vap - cv_ice)
+
+   % Note, the specific heat capacity of water vapor at constant pressure is
+   % computed as:
+   % cp_vap = cv_vap + Rv
+   % where
+   % cv_vap = 1384.5
+   %
+   % % Constants
+   % R = 8.314; % J/mol.K, Universal gas constant
+   % molar_mass_water_vapor = 18.015;  % g/mol, Molar mass of water vapor
+   %
+   % % Molar heat capacity at constant volume for water vapor (non-linear
+   % triatomic molecule):
+   % cv_molar = 6 / 2 * R;
+   %
+   % % Convert to specific heat capacity (J/kg.K)
+   % cv_vap = cv_molar / (molar_mass_water_vapor / 1000); % molar mass to kg/mol
+
+
    % Define physical constants and accepted values
    constants = struct( ...
       'Tf', 273.16, ...             % Freezing point (Triple point), [K]
@@ -42,9 +65,10 @@ function varargout = physicalConstant(varargin)
       'cp_air', 1005.0, ...         % Specific heat capacity of air at constant pressure at 0°C [J kg-1 K-1]
       'cp_liq', 4218.0, ...         % Specific heat capacity of water at 0°C [J kg-1 K-1]
       'cp_ice', 2093.0, ...         % Specific heat capacity of ice at 0°C [J kg-1 K-1]
+      'cp_vap', 1846.0, ...         % specific heat capacity of water vapor at constant pressure [J kg-1 K-1]
       'k_liq', 0.561, ...           % Thermal conductivity of water at 0°C [W m-1 K-1]
       'k_ice', 2.22, ...            % Thermal conductivity of ice at 0°C [W m-1 K-1]
-      'Rd', 287.0, ...              % gas constant for dry air [J kg-1 K-1]
+      'Rd', 287.0, ...              % Gas constant for dry air [J kg-1 K-1]
       'Rv', 461.5, ...              % Gas constant for water vapor [J kg-1 K-1]
       'SB', 5.670374419e-8, ...     % Stefan-Boltzmann constant [W m-2 K-4]
       'emiss', 0.98, ...            % Surface emissivity for ice [1]
@@ -66,22 +90,22 @@ function varargout = physicalConstant(varargin)
       );
 
    % Assign derived values based on physical constants
-   
+
    % Volumetric heat capacities of dry air, ice, and liquid water at constant
-   % pressure and 0°C [J m-3 K-1] 
+   % pressure and 0°C [J m-3 K-1]
    constants.cv_air = constants.ro_air * constants.cp_air;  % [J m-3 K-1]
    constants.cv_ice = constants.ro_ice * constants.cp_ice;  % [J m-3 K-1]
    constants.cv_liq = constants.ro_liq * constants.cp_liq;  % [J m-3 K-1]
-   
-   % Volumetric enthalpy of vaporization, sublimation, and fusion 
+
+   % Volumetric enthalpy of vaporization, sublimation, and fusion
    constants.roLv = constants.ro_air * constants.Lv;        % [J m-3]
    constants.roLs = constants.ro_air * constants.Ls;        % [J m-3]
    constants.roLf = constants.ro_liq * constants.Lf;        % [J m-3]
-   
+
    % Need to add for VAPORHEAT:
    % Ls / Rv
    % Lv / Rv
-   
+
    % Water vapor coefficients [kg m-3 K]
    ci = 611.15 * exp(constants.Ls / (constants.Rv * constants.Tf)) / constants.Rv;
    cl = 611.21 * exp(constants.Lv / (constants.Rv * constants.Tf)) / constants.Rv;
@@ -89,13 +113,13 @@ function varargout = physicalConstant(varargin)
    % Ratios of intrinsic ice and water density
    constants.ro_iwe = constants.ro_ice / constants.ro_liq;  % [1]
    constants.ro_wie = constants.ro_liq / constants.ro_ice;  % [1]
-   
+
    % Freezing point depression parameter ^2
    constants.fcpsq = constants.fcp^2;                       % [K-2]
-   
+
    % Emissivity x Stefan-Boltzmann constant [W m-2 K-4]
    constants.emissSB = constants.emiss * constants.SB;      % [W m-2 K-4]
-   
+
    % Time conversions
    constants.secperday = constants.hrsperday * constants.secperhr;
 
