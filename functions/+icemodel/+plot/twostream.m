@@ -3,7 +3,7 @@ function twostream(up, dn, Q, dQ, z_walls, z_spect, zoom)
    if nargin < 7
       zoom = true;
    end
-   zidx = 4; % this controls which index is used as the maximum zoom in plot depth
+   zidx = 8; % this controls which index is used as the maximum zoom in plot depth
 
    %% Compute Q and dQ directly from up/dn for comparison with Q/dQ passed in
 
@@ -28,6 +28,10 @@ function twostream(up, dn, Q, dQ, z_walls, z_spect, zoom)
    % This would be the simplest method if not correcting for Q(1)
    % Q0 = up(1:end-1, :) - dn(1:end-1, :);
 
+   % Compute the source term
+   dQdz = dQ ./ diff(z_walls(1:end-1));
+   dQ0dz = dQ0 ./ diff(z_walls(1:end-1));
+
    %% Plot
 
    % If up/dn have multiple series, need to decide which one to plot. This uses
@@ -36,7 +40,7 @@ function twostream(up, dn, Q, dQ, z_walls, z_spect, zoom)
 
    % up / down
    figure
-   subplot(1, 3, 1)
+   subplot(2, 2, 1)
    semilogx(up(:, idx), z_walls, '-o'); hold on;
    semilogx(dn(:, idx), z_walls, '-o');
    formatPlotMarkers("markersize", 6)
@@ -53,7 +57,7 @@ function twostream(up, dn, Q, dQ, z_walls, z_spect, zoom)
    end
 
    % Q
-   subplot(1, 3, 2)
+   subplot(2, 2, 2)
    semilogx(-Q0(:, idx), z_walls(1:end-1), '-o'); hold on;
    semilogx(-Q, z_walls(1:end-1), '-o');
    formatPlotMarkers("markersize", 6)
@@ -69,7 +73,7 @@ function twostream(up, dn, Q, dQ, z_walls, z_spect, zoom)
    end
 
    % dQ
-   subplot(1, 3, 3)
+   subplot(2, 2, 3)
    semilogx(-dQ0(:, idx), z_spect, '-o'); hold on;
    semilogx(-dQ, z_spect, '-o');
    formatPlotMarkers("markersize", 6)
@@ -83,4 +87,58 @@ function twostream(up, dn, Q, dQ, z_walls, z_spect, zoom)
    else
       axis tight
    end
+
+   % dQ/dz
+   subplot(2, 2, 4)
+   semilogx(-dQ0dz(:, idx), z_spect, '-o'); hold on;
+   semilogx(-dQdz, z_spect, '-o');
+   formatPlotMarkers("markersize", 6)
+   xlabel('dQ/dz')
+   ylabel('depth')
+   legend('uncorrected', 'corrected')
+   set(gca, 'YDir', 'reverse', 'XDir', 'reverse')
+
+   if zoom == true
+      axis([0.98*min(-dQdz(1:zidx)) 1.02*max(-dQdz(1:zidx)) z_spect(1) z_spect(zidx)])
+   else
+      axis tight
+   end
+
+   %% below here is for testing the interpolation of Q onto z_therm
+
+   %    To use this, need to change Q to Q2 in the ~isuniform portion
+
+   %    dQ1 = diff(Q);
+   %    dQ2 = diff(Q2);
+   %
+   %    figure;
+   %    semilogx(-Q, z_walls(1:M-1)); hold on
+   %    semilogx(-Q2, [0; cumsum(dz)], ':');
+   %    set(gca,'YDir', 'reverse', 'XDir', 'reverse');
+   %    xlabel('Q(z)')
+   %    ylabel('z')
+   %
+   %    figure;
+   %    semilogx(dQ1, z_spect); hold on
+   %    semilogx(dQ2, z_therm, ':');
+   %    set(gca,'YDir', 'reverse', 'XDir', 'reverse');
+   %    xlabel('dQ(z)')
+   %    ylabel('z')
+   %
+   %    figure;
+   %    semilogx(dQ1 ./ dz_spect, z_spect); hold on
+   %    semilogx(dQ2 ./ dz, z_therm, ':');
+   %    set(gca,'YDir', 'reverse', 'XDir', 'reverse');
+   %    xlabel('dQ/dz)')
+   %    ylabel('z')
+   %
+   %
+   %    % The most important thing is that the total absorbed solar matches this:
+   %    [I0 * (1-albedo) * (1 - chi) sum(diff(Q))]
+   %    sum(dQ2)
+   %
+   %    % These are not supposed to be equal b/c these have units W/m3
+   %    sum(diff(Q) ./ dz_spect)
+   %    sum(diff(Q2) ./ dz)
+   %
 end

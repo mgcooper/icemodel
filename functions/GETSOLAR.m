@@ -1,9 +1,9 @@
-function [solar, I0] = GETSOLAR(solar, nvalues, wavelength, dwavelen)
+function [solar, Q0] = GETSOLAR(solar, nvalues, wavelength, dwavelen)
    %GETSOLAR Interpolate the spectral solar radiation
    %
-   % [solar, total_solar] = GETSOLAR(solar, nvalues, wavelength, dwavelen)
+   % [solar, Q0] = GETSOLAR(solar, nvalues, wavelength, dwavelen)
    % Interpolate the spectral solar radiation to the 118 bands of mie.dat, and
-   % then integrate it to compute total_solar.
+   % then integrate it to compute Q0.
    %
    % See also:
 
@@ -33,8 +33,8 @@ function [solar, I0] = GETSOLAR(solar, nvalues, wavelength, dwavelen)
    solar = temp';
 
    % Integrate the solar radiation.
-   I0 = 0.0;
+   Q0 = 0.0;
    for k = 1:nvalues
-      I0 = I0 + solar(k) * dwavelen(k);
+      Q0 = Q0 + solar(k) * dwavelen(k);
    end
 end

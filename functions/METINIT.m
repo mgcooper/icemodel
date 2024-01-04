@@ -31,6 +31,7 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    if isvariable('rain', met)
       rain = met.rain / 3600; % opts.dt - the mar rain/snow is mWE / hr not / dt
       rain(isnan(rain)) = 0.0;
+      rain = 0 * tair;
    else
       rain = 0 * tair;
    end

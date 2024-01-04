@@ -1,4 +1,4 @@
-function [I0, z_spect, spect_N, spect_S, solardwavl, dz_spect] = EXTCOEFSINIT(opts, ro_ice)
+function [Q0, dz_spect, spect_N, spect_S, solardwavl] = EXTCOEFSINIT(opts, ro_ice)
    %EXTCOEFSINIT initialize the extinction coefficients
    %
    % The outputs correspond to the center of each level, and the top
@@ -45,7 +45,7 @@ function [I0, z_spect, spect_N, spect_S, solardwavl, dz_spect] = EXTCOEFSINIT(op
    nwavl = opts.nwavl;
 
    % Build a control volume for the spectral model.
-   [dz_spect, ~, z_spect, z_walls] = CVMESH(opts.z0_spectral, opts.dz_spectral);
+   [dz_spect, ~, ~, z_walls] = CVMESH(opts.z0_spectral, opts.dz_spectral);
 
    % Retrieve the ice/snow grain radii
    r_snow = radii(opts.i_grainradius) / 1000.0;
@@ -58,7 +58,7 @@ function [I0, z_spect, spect_N, spect_S, solardwavl, dz_spect] = EXTCOEFSINIT(op
 
    % Produce a downward (spectral) solar spectrum and integrated value. Note
    % that the input 'solar' is interpolated here to the 118 bands
-   [solar, I0] = GETSOLAR(solar, nwavl, wavelength, dwavl);
+   [solar, Q0] = GETSOLAR(solar, nwavl, wavelength, dwavl);
 
    % Compute the spectral extinction coefficients as a function of wavelength.
    spect_coefs = SPECTEXTCOEF(opts, qext, g, ss_coalb, r_snow);
@@ -88,10 +88,11 @@ end
 % amount that was absorbed within each layer:
 
 % Calculate the net down, up, and absorbed flux WITHIN each c.v.
-%     netdown = down(1:nz_spectral+1) - down(2:nz_spectral+2); netup =
-%     up(1:nz_spectral+1) - up(2:nz_spectral+2); netflux = netdown - netup;
-%
+%     netdown = down(1:nz_spectral+1) - down(2:nz_spectral+2);
+%     netup = up(1:nz_spectral+1) - up(2:nz_spectral+2);
+%     netflux = netdown - netup;
 %     sum(netflux)
+%
 % netdown and netup are what go in and out of each c.v. what goes in minus what
 % comes out is what got absorbed the sum of what got absorbed should equal
 % (1-albedo)*total_solar
@@ -108,19 +109,20 @@ end
 % in HEATSOLVE, this amount, sum(netflux), is scaled by Qsip/total_solar so that
 % sum(netflux) equals Qsip:
 
-% consider: (1) sum(netflux) = (1-albedo)*total_solar
+% consider:
+% (1) sum(netflux) = (1-albedo)*total_solar
 
-% but we want sum(netflux) that goes into the numerical calculation to be: (2)
-% sum(netflux) = (1-albedo)*Qsi
+% but we want sum(netflux) that goes into the numerical calculation to be:
+% (2) sum(netflux) = (1-albedo)*Qsi
 
-% so we multiply (1) by Qsi/total_solar: (3) (1-albedo)*total_solar *
-% Qsi/total_solar = (1-albedo)*Qsi
+% so we multiply (1) by Qsi/total_solar:
+% (3) (1-albedo)*total_solar * Qsi/total_solar = (1-albedo)*Qsi
 
-% or as its expressed in the numerical setup: (4) Sc = (Qsi/total_solar .*
-% netflux) ./dy_p;
+% or as its expressed in the numerical setup:
+% (4) Sc = (Qsi/total_solar .* netflux) ./dy_p;
 
-% if total_solar was the actual incoming solar at each timestep, it would be
-% simple: Sc = dq/dz = netflux./dy_p;
+% if total_solar was the actual incoming solar at each timestep, it would be:
+% Sc = dq/dz = netflux./dy_p;
 
 % Now let's say I wanted to let a portion, qsfactor, of the incoming radiation
 % be assigned to surface heating, and the rest penetrate. I would need to

@@ -1,6 +1,6 @@
 function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
-      Ts, JJ, z_therm, dz_therm, Sc, Sp, Fc, Fp, TL, TH, flmin, flmax, ...
-      f_min, liqresid, ro_iwe, ro_wie] = ICEINIT(opts, tair)
+      Ts, JJ, Sc, Sp, Fc, Fp, TL, TH, flmin, flmax, f_min, liqresid, ...
+      ro_iwe, ro_wie] = ICEINIT(opts, tair)
    %ICEINIT initialize the 1-d ice column
    %
    %#codegen
@@ -14,7 +14,7 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
    % GENERATE A THERMAL MESH
    dz_therm = opts.dz_thermal;
    z0_therm = opts.z0_thermal;
-   [dz, delz, z_therm, ~, fn] = CVMESH(z0_therm, dz_therm);
+   [dz, delz, ~, ~, fn] = CVMESH(z0_therm, dz_therm);
 
    % NUMBER OF TIMESTEPS TO INITIALIZE OUTPUTS
    maxiter = numel(tair) / opts.numyears;

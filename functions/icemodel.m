@@ -49,14 +49,13 @@ function [ice1, ice2] = icemodel(opts) %#codegen
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
       = METINIT(opts, 1);
 
-   % INITIALIZE THE ICE COLUMN
-   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, ...
-      JJ, z_therm, dz_therm, ~, Sp, Fc, Fp, TL, TH, flmin, flmax, f_min, ...
-      liqresid, ro_iwe, ro_wie] = ICEINIT(opts, tair);
+   % INITIALIZE THE THERMAL MODEL
+   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, JJ, ...
+      Sc, Sp, Fc, Fp, TL, TH, flmin, flmax, f_min, liqresid, ro_iwe, ro_wie] ...
+      = ICEINIT(opts, tair);
 
-   % INITIALIZE THE SPECTRAL EXTINCTION COEFFICIENTS
-   [I0, z_spect, spect_N, spect_S, solardwavl, dz_spect] ...
-      = EXTCOEFSINIT(opts, ro_ice);
+   % INITIALIZE THE SPECTRAL MODEL
+   [Q0, dz_spect, spect_N, spect_S, solardwavl] = EXTCOEFSINIT(opts, ro_ice);
 
    % INITIALIZE TIMESTEPPING
    [metiter, subiter, maxiter, maxsubiter, dt, dt_FULL_STEP, ...
@@ -67,8 +66,6 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
    bc = opts.bc_type;
    ok = true;
-
-   ppt = 0 * ppt;
    zD = dz(1);
 
    %% START ITERATIONS OVER YEARS
@@ -80,9 +77,9 @@ function [ice1, ice2] = icemodel(opts) %#codegen
          [dt_sum, subfail, OK, d_liq, d_drn, d_evp] = NEWTIMESTEP(f_liq);
 
          % SUBSURFACE SOLAR RADIATION SOURCE-TERM
-         [Sc, chi] = UPDATEEXTCOEFS(swd(metiter), albedo(metiter), I0, ...
-            dz, z_spect, dz_spect, z_therm, dz_therm, spect_N, spect_S, ...
-            solardwavl, ro_liq * f_liq + ro_ice * f_ice);
+         [Sc, chi] = UPDATEEXTCOEFS(swd(metiter), albedo(metiter), ...
+            Q0, dz_spect, spect_N, spect_S, solardwavl, Sc, dz, ...
+            ro_liq * f_liq + ro_ice * f_ice);
 
          % SURFACE TEMPERATURE
          ea = VAPPRESS(tair(metiter), Tf, liqflag) * rh(metiter) / 100;
@@ -98,7 +95,8 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                ea, cv_air, emiss, SB, roL, scoef, chi, Tf, T(1), liqflag);
          end
 
-         T1_old = T(1);
+         % Use this if computing the top layer interaction length scale
+         % xT1 = T(1);
 
          while dt_sum + TINY < dt_FULL_STEP
 
@@ -138,7 +136,7 @@ function [ice1, ice2] = icemodel(opts) %#codegen
             % COMPUTE MASS BALANCE
             [T, f_ice, f_liq, d_liq, d_evp, d_drn] = ICEMF(T, f_ice, f_liq, ...
                ro_ice, ro_liq, cv_ice, cv_liq, Lf, Ls, Lv, Tf, TL, fcp, ...
-               xf_liq, Sc, Sp, JJ, f_min, dz_therm, dt, Qe, ro_iwe, ...
+               xf_liq, Sc, Sp, JJ, f_min, dz(1), dt, Qe, ro_iwe, ...
                d_liq, d_drn, d_evp, flmin, liqresid);
 
             % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
@@ -147,12 +145,12 @@ function [ice1, ice2] = icemodel(opts) %#codegen
                dt, TINY, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs);
          end
 
-         % Update the top layer interaction length
-         if swd(metiter) > 1 && (T(1) - T1_old) > TINY && (T(1) - min(Ts, Tf)) > TINY
-            zD = sqrt((k_eff(1) * dt * (T(1) - min(Ts, Tf))) ...
-               / (cv_ice * f_ice(1) + cv_liq * f_liq(1) * (T(1) - T1_old)));
-            % zD = sqrt(k_eff(1) * dt / (cv_ice * f_ice(1) + cv_liq * f_liq(1)));
-         end
+         % % Update the top layer interaction length
+         % if swd(metiter) > 1 && (T(1) - xT1) > TINY && (T(1) - min(Ts, Tf)) > TINY
+         %    zD = sqrt((k_eff(1) * dt * (T(1) - min(Ts, Tf))) ...
+         %       / (cv_ice * f_ice(1) + cv_liq * f_liq(1) * (T(1) - xT1)));
+         %    % zD = sqrt(k_eff(1) * dt / (cv_ice * f_ice(1) + cv_liq * f_liq(1)));
+         % end
 
          assertF(@() dt_sum < dt_FULL_STEP + 2 * TINY)
 
@@ -160,7 +158,7 @@ function [ice1, ice2] = icemodel(opts) %#codegen
          if thisyear >= numspinup
             [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, ...
                opts.vars1, opts.vars2, ...
-               {Ts, Qm, Qf, Qe, Qh, Qc, chi, balance, dt_sum, ok, OK, N}, ...
+               {Ts, Qm, Qe, Qh, Qc, chi, balance, dt_sum, ok, OK, N}, ...
                {T, f_ice, f_liq, d_liq, d_drn, d_evp, Sc});
 
             % For a regional run:

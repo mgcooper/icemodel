@@ -2,8 +2,12 @@ function verifyShortwaveBalance(Qsi, Sc, albedo, chi, dz, method, Qseb)
 
    if nargin < 7 && method == 3
       error('Qseb must be supplied with method 3')
+
+      % Note: Qseb should be the same as topNodeNetShortwave, not sure why I
+      % error if Qseb not supplied, maybe there's an alternative calculation I
+      % wanted to verify.
    end
-   
+
    % Compute absorbed radiation from forcing data
    totalNetShortwave = Qsi * (1 - albedo);
    topNodeNetShortwave = chi * Qsi * (1 - albedo);
@@ -13,13 +17,13 @@ function verifyShortwaveBalance(Qsi, Sc, albedo, chi, dz, method, Qseb)
    totalSourceTerm = sum(Sc .* dz);
    topNodeSourceTerm = Sc(1) * dz(1);
    interiorSourceTerm = sum(Sc(2:end) .* dz(2:end));
-   
+
    % Confirm the total, top node, and interior nodes
 
    switch method
-      
-      case 1 % the standard method 
-         
+
+      case 1 % the standard method
+
          assertWithRelTol(totalNetShortwave, totalSourceTerm)
          assertWithRelTol(topNodeNetShortwave, topNodeSourceTerm)
          assertWithRelTol(interiorNetShortwave, interiorSourceTerm)
@@ -28,27 +32,27 @@ function verifyShortwaveBalance(Qsi, Sc, albedo, chi, dz, method, Qseb)
 
          assertWithRelTol( totalNetShortwave ...
             - ( topNodeNetShortwave + totalSourceTerm ), 0)
-         
+
          assertWithRelTol(interiorNetShortwave - topNodeSourceTerm, 0)
-      
+
       case 3 % the Qseb method
-         
+
          % The total absorbed radiation should equal the portion allocated to
-         % the surface plus the sum of the subsurface absorption
-         
+         % the surface (topNodeNetShortwave) plus the sum of the subsurface
+         % absorption (totalSourceTerm)
+
          % Verify the total, surface (SEB), and interior
          assertWithRelTol(totalNetShortwave, totalSourceTerm + Qseb)
          assertWithRelTol(topNodeNetShortwave, Qseb)
          assertWithRelTol(interiorNetShortwave, totalSourceTerm)
 
-         % so we can either pass Qseb or chi out of extcoefs   
-         
+         % so we can either pass Qseb or chi out of extcoefs
+
          % For clarity, the total absorbed:
          Qsi * (1 - albedo) * chi + sum(Sc .* dz)
          % Compare that with the known total absorbed:
          Qsi * (1 - albedo)
-         
+
       otherwise
-         
+
    end
-   

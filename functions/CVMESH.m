@@ -107,6 +107,11 @@ function z_edge = EXPMESH(Z, dz, g)
    %
    % See also: CVMESH
 
+   % The "insert a bottom layer with dz thickness" idea was to simplify
+   % remeshing to enable an exponential thermal grid, but the easier approach
+   % is to use an exponential spectral grid which does not require that, so
+   % I commented it out but kept for reference.
+
    % Preallocate arrays (with an arbitrary large size, will trim later)
    z_edge = zeros(10000, 1);
    z_edge(1) = 0; % Top edge
@@ -115,15 +120,16 @@ function z_edge = EXPMESH(Z, dz, g)
    % Compute edge positions until one exceeds Z
    while true
       n = n + 1;
-      if z_edge(n) + dz * g^(n-1) + n * eps(Z) < Z - dz
+      if z_edge(n) + dz * g^(n-1) + n * eps(Z) < Z % - dz
          z_edge(n + 1) = z_edge(n) + dz * g^(n-1);
       else
-         z_edge(n + 1) = Z - dz;
+         z_edge(n + 1) = Z; % - dz;
          break
       end
    end
    % Trim to actual number of layers and insert a bottom layer with dz thickness
-   z_edge = [z_edge(1:n+1); z_edge(n+1) + dz];
+   % z_edge = [z_edge(1:n+1); z_edge(n+1) + dz];
+   z_edge = z_edge(1:n+1);
 end
 
 %% Notes
