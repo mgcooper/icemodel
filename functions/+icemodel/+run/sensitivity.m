@@ -2,6 +2,33 @@ clean
 
 savedata = true;
 
+% NOTE that for these tests, I turned off the -(opts.sebsolver) thing in
+% setopts, which forces skinmodel simulations to use the -solver, to force
+% SEBSOLVE to use 1 outer iter. This was intentional so I can actually test
+% skinmodel with outer seb iters and w/o. But the actual tests I ran all used
+% +solvers, and the maxiter 1,10,100 applied to SKINSOLVE. Note that -solvers
+% also force iterflag == false. THIS EXPLAINS WHY I WAS SURPRISED THAT ALL THE
+% TESTS RAN WITHOUT ERROR - because it's the SEBSOLVE maxiter that causes
+% problems w/SFCTEMP. BUT ACTUALLY MAYBE IT DOESN'T EXPLAIN IT - b/c the problem
+% is when outer iterations ARE used w/SFCTEMP, I thought it would fail, but by
+% turning off the auto-reset to -solver in setopts, I allowed SFCTEMP to run
+% with outer iterations and got no errors. So maybe the errors were related to
+% the xTs reset I removed? 
+
+% what should be tested?
+% - fmin
+% - fcp
+% - nspins
+% - grain size
+% - z0
+% - dz_thermal/spectral
+% - z_thermal/spectral
+% - sebsolver
+% - bctype
+% - maxiter
+% - tol
+% - 
+
 %-----------------------------------------------------
 % upperbasin, 2016, mar, kanl, icemodel
 %-----------------------------------------------------
@@ -13,27 +40,37 @@ savedata = true;
 % simyears = 2016:2016;
 
 %-----------------------------------------------------
+% DONE behar, 2015, mar, kanm
 % DONE behar, 2016, mar, kanm
-sitename = {'behar'};
-forcings = {'kanm', 'mar'};
-userdata = {'none'};
-uservars = {'none'};
-simmodel = {'skinmodel'};
-simyears = 2015:2016;
+% DONE upper, 2016, mar, kanm
+sitename = {'upperbasin', 'ak4'};
+forcings = {'kanl', 'mar'};
+userdata = {'merra', 'racmo', 'mar', 'modis', 'kanl', 'none'};
+uservars = {'albedo'};
+simmodel = {'icemodel'};
+simyears = 2016:2016;
 
 %% Set the parameters
 
-seb_solver = [1, 2, 3];
-maxiter = [1, 10, 100];
+% names = {'seb_solver', 'maxiter'};
+% values = {[1, 2, 3], [1, 10, 100]};
 
-params.seb_solver = seb_solver;
-params.maxiter = maxiter;
-parameters = fieldnames(params);
+names = {'z_wind', 'bc_type'};
+values = {[2, 10], [1, 2]};
+
+for n = 1:numel(names)
+   params.(names{n}) = values{n};
+end
 
 %% Create the ensemble
+
 ensemble = ensembleList( ...
-   forcings, userdata, uservars, simmodel, simyears, sitename, ...
-   seb_solver, maxiter);
+   forcings, userdata, uservars, simmodel, simyears, sitename, params);
+
+% Remove cases where forcings == userdata
+ensemble.allcombos = ensemble.allcombos( ...
+   ensemble.allcombos.forcings ~= ensemble.allcombos.userdata, :);
+ensemble.numcombos = height(ensemble.allcombos);
 
 % Initialize the results
 results = ensemble.allcombos;
@@ -51,11 +88,8 @@ for n = 1:ensemble.numcombos
    userdata = char(ensemble.allcombos.userdata(n));
    uservars = char(ensemble.allcombos.uservars(n));
 
-   % this skips cases like 'icemodel_upperBasin_2016_kanl_swap_KANL_albedo'
-   % this does not skip the cases where the sitename and forcing are the
-   % same, which are the cases where kanm/kanl are used to force basin runs
    if strcmpi(userdata, forcings)
-      continue;
+      continue
    end
 
    % display the run info
@@ -68,16 +102,16 @@ for n = 1:ensemble.numcombos
       userdata, uservars, savedata);
 
    % Override the options with the parameters
-   for m = 1:numel(parameters)
-      value = ensemble.allcombos.(parameters{m})(n);
-      if isnumeric(params.(parameters{m}))
-         opts.(parameters{m}) = str2double(value);
+   for m = 1:numel(names)
+      value = ensemble.allcombos.(names{m})(n);
+      if isnumeric(params.(names{m}))
+         opts.(names{m}) = str2double(value);
       else
-         opts.(parameters{m}) = value;
+         opts.(names{m}) = value;
       end
 
       % display the run info
-      disp([parameters{m} ' = ' char(value)])
+      disp([names{m} ' = ' char(value)])
    end
 
    % RUN THE MODEL
@@ -136,4 +170,7 @@ if savedata == true
    filename = fullfile(pathname, [simmodel '_' mkfiledate]);
    save(filename, 'results', 'opts')
    writetable(results, filename, "FileType", "spreadsheet");
+   
+   % Update the experiment registry?
+   
 end

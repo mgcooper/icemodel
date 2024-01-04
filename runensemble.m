@@ -3,19 +3,66 @@ clean
 testname = 'run1'; % run1 = w/chi, run2 = w/o chi (chi=0)
 savedata = true;
 
-sitename = {'behar', 'slv1', 'slv2'}; % {'behar'};
-forcings = {'mar', 'kanm'};
-userdata = {'none','merra','racmo','mar','modis', 'kanm'}; % {'none'};
+%-----------------------------------------------------
+% upperbasin, 2016, mar, kanl, icemodel
+%-----------------------------------------------------
+sitename = {'upperbasin'};
+forcings = {'mar', 'kanl'};
+userdata = {'none','merra','racmo','mar','modis', 'kanl'};
 uservars = {'albedo'};
 simmodel = {'icemodel', 'skinmodel'};
-simyears = 2015:2015;
+simyears = 2016:2016;
 
-% sitename = {'upperbasin'}; % {'behar'};
-% forcings = {'mar', 'kanl'};
-% userdata = {'none','merra','racmo','mar','modis'}; % {'none'};
+%-----------------------------------------------------
+% DONE behar, 2016, mar, kanm
+%-----------------------------------------------------
+% sitename = {'behar'};
+% forcings = {'mar', 'kanm'};
+% userdata = {'none','merra','racmo','mar','modis', 'kanm'};
+% uservars = {'albedo'};
+% simmodel = {'icemodel'};
+% simyears = 2016:2016;
+
+%-----------------------------------------------------
+% DONE slv1, 2015, mar, kanm, icemodel
+% DONE slv2, 2015, mar, kanm, icemodel
+% DONE behar, 2015, mar, kanm, icemodel
+%-----------------------------------------------------
+% sitename = {'behar', 'slv1', 'slv2'};
+% forcings = {'mar', 'kanm'};
+% userdata = {'none','merra','racmo','mar','modis', 'kanm'};
 % uservars = {'albedo'};
 % simmodel = {'icemodel', 'skinmodel'};
-% simyears = 2016:2016;
+% simyears = 2015:2015;
+
+% Need to do these:
+% sitename = {'behar', 'slv1', 'slv2'};
+% forcings = {'mar', 'kanm'};
+% userdata = {'none','merra','racmo','mar','modis', 'kanm'};
+% uservars = {'albedo'};
+% simmodel = {'icemodel', 'skinmodel'};
+% simyears = 2015:2015;
+
+%-----------------------------------------------------
+% DONE ak4, 2009-2011, mar, kanl, icemodel
+%-----------------------------------------------------
+% sitename = {'ak4'};
+% forcings = {'mar', 'kanl'};
+% userdata = {'none','mar','modis','kanl'};
+% uservars = {'albedo'};
+% simmodel = {'icemodel'};
+% simyears = 2009:2011;
+
+%-----------------------------------------------------
+% DONE ak4, 2012-2016, mar, kanl, icemodel
+%-----------------------------------------------------
+% sitename = {'ak4'};
+% forcings = {'mar', 'kanl'};
+% userdata = {'none','merra','racmo','mar','modis','kanl'};
+% uservars = {'albedo'};
+% simmodel = {'icemodel'};
+% simyears = 2012:2016;
+
 
 % userdata = {'none','mar','modis', 'kanl'}; % {'none'};
 
