@@ -19,6 +19,8 @@ function [k_eff, k_vap] = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, varargin)
    %  k_sno = (1-th).*(k_iceT.*k_airT)./(ki_ref*ka_ref).*k_snow ...
    %     + th.*(k_iceT./ki_ref).*k_firn;
    %
+   %  ksnow / (ki_ref * ka_ref)
+   %
    % See also: GETKTHERMAL, VAPORHEAT
 
    % Compute snow thermal k
@@ -30,11 +32,11 @@ function [k_eff, k_vap] = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, varargin)
    k_sno = 0.47461 * (1 - theta) .* kiceT .* ksnow ...
       + theta .* kiceT / 2.107 .* kfirn;
 
-   switch nargin 
+   switch nargin
       case 6
          % k_vap provided by an external model.
          k_vap = varargin{1};
-         
+
       case 8
          % Compute dry snow vapor k: (Ls·De)/(Rv·T)(∂es/∂T-es/T)
          Ls = varargin{1};
@@ -42,14 +44,19 @@ function [k_eff, k_vap] = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, varargin)
          Tf = varargin{3};
          es = 611.15 * exp((22.452 * (T - Tf)) ./ (272.55 + T - Tf)); % [Pa]
          k_vap = Ls * 9e-5 * (T / Tf) .^ 6 ./ (Rv * T) ...
-           .* (22.452 * 272.55 .* es ./ ((272.55 + T - Tf) .^ 2) ... % ∂es/∂T
-           - es ./ T); % es/T
+            .* (22.452 * 272.55 .* es ./ ((272.55 + T - Tf) .^ 2) ... % ∂es/∂T
+            - es ./ T); % es/T
       otherwise
          % do not compute k_vap
          k_vap = 0;
    end
-   
-   % Combine them into a bulk value
+
+   % Combine the dry snow and liquid water values into a bulk wet-snow value:
    k_sno = f_liq .* k_liq + f_ice .* k_sno;
+
+   % Combine the wet snow and vapor values:
    k_eff = (f_liq + f_ice) .* k_sno + (1.0 - f_liq - f_ice) .* k_vap;
+
+   % Combine the dry snow, liquid water, and vapor values into a bulk value:
+   % k_eff = f_liq .* k_liq + f_ice .* k_sno + (1.0 - f_liq - f_ice) .* k_vap;
 end

@@ -1,5 +1,7 @@
 function WRITEOUTPUT(ice1, ice2, opts, thisyear, time, swd, lwd, albedo)
    %WRITEOUTPUT Save output to disk.
+   %
+   %#codegen
 
    % Save the data
    if opts.savedata
