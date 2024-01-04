@@ -41,10 +41,10 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
 
    % timestepping / grid thickness
    opts.dt              =  900.0;   % timestep                             [s]
-   opts.dz_thermal      =  0.04;    % dz for heat transfer                 [m]
-   opts.dz_spectral     =  0.002;   % dz for radiative transfer            [m]
-   opts.z0_thermal      =  12;      % domain thickness for heat transfer   [m]
-   opts.z0_spectral     =  12;       % domain thickness for rad transfer    [m]
+   opts.dz_thermal      =  0.04;    % dz for thermal heat transfer         [m]
+   opts.dz_spectral     =  0.002;   % dz for radiative heat transfer       [m]
+   opts.z0_thermal      =  16;      % domain thickness for heat transfer   [m]
+   opts.z0_spectral     =  4;       % domain thickness for rad transfer    [m]
    opts.f_ice_min       =  0.1;
 
    % solver options
@@ -53,10 +53,10 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    opts.conduct_type    = 1;        % recommended: 1 (Practice "B")
    opts.maxiter         = 50;
 
-   %
-%    if strcmp(simmodel, 'skinmodel')
-%       opts.seb_solver = -abs(opts.seb_solver);
-%    end
+   % I don't think this is necessary anymore
+   % if strcmp(simmodel, 'skinmodel')
+   %    opts.seb_solver = -abs(opts.seb_solver);
+   % end
 
    % the mie scattering coefficients are defined for 35 grain sizes and 118
    % spectral bands. define those dimensions here, they are used to read in
