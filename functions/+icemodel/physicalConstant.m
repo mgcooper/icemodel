@@ -21,38 +21,8 @@ function varargout = physicalConstant(varargin)
    narginchk(0,Inf);
 
    % name = validatestring(name,icemodel.physconlist,'physicalConstant','name', 1);
-
-   % From Romps:
-   % Rv = 461;                      % specific gas constant for water vapor [J kg-1 K-1]
-   % cp_liq = 4119;                 % specific heat capacity of liquid water
-   % cp_ice = 1861;
-   % cv_vap = 1418;                 % specific heat capacity of water vapor at constant volume [J kg-1 K-1]
-   % cv_liq = cp_liq;               % specific heat capacity of water at constant volume [J kg-1 K-1]
-   % cv_ice = cp_ice;               % specific heat capacity of ice at constant volume [J kg-1 K-1]
-   % cp_vap = cv_vap + Rv;          % specific heat capacity of water vapor at constant pressure [J kg-1 K-1]
-   % Ptrip = 611.65;                % triple point vapor pressure
-
-   % Romps' expression for saturation vapor pressure:
-   % pv_ice = pv0 * (T / T0) .^ (cp_vap - cv_ice)
-
-   % Note, the specific heat capacity of water vapor at constant pressure is
-   % computed as:
-   % cp_vap = cv_vap + Rv
-   % where
-   % cv_vap = 1384.5
-   %
-   % % Constants
-   % R = 8.314; % J/mol.K, Universal gas constant
-   % molar_mass_water_vapor = 18.015;  % g/mol, Molar mass of water vapor
-   %
-   % % Molar heat capacity at constant volume for water vapor (non-linear
-   % triatomic molecule):
-   % cv_molar = 6 / 2 * R;
-   %
-   % % Convert to specific heat capacity (J/kg.K)
-   % cv_vap = cv_molar / (molar_mass_water_vapor / 1000); % molar mass to kg/mol
-
-
+   
+   
    % Define physical constants and accepted values
    constants = struct( ...
       'Tf', 273.16, ...             % Freezing point (Triple point), [K]
