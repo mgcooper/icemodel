@@ -84,6 +84,7 @@ function met = swapMetData(met , opts)
 
    % the userdata is hourly, retime to 15 m if the met data is 15 m
    if Data.Time(2)-Data.Time(1) ~= met.Time(2)-met.Time(1)
+      Data.Time.TimeZone = met.Time.TimeZone;
       Data = retime(Data, met.Time, 'linear');
    end
 
