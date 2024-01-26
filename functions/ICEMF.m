@@ -89,12 +89,12 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_drn, x_err, lcflag] = ICEMF( ...
                Lf, ro_ice, ro_liq, fcp, j1, j2, d_drn, d_liq, dz_therm);
 
             % Remove the combined layers and add new layers to the bottom.
-            T = vertcat(T(~lyrmrg),T(end));
-            Sc = vertcat(Sc(~lyrmrg),Sc(end));
-            Sp = vertcat(Sp(~lyrmrg),Sp(end));
-            f_ice = vertcat(f_ice(~lyrmrg),f_ice(end));
-            f_liq = vertcat(f_liq(~lyrmrg),f_liq(end));
-            lyrmrg = vertcat(lyrmrg(~lyrmrg),lyrmrg(end));
+            T = vertcat(T, T(end)); T(j1) = [];
+            Sc = vertcat(Sc, Sc(end)); Sc(j1) = [];
+            Sp = vertcat(Sp, Sp(end)); Sp(j1) = [];
+            f_ice = vertcat(f_ice, f_ice(end)); f_ice(j1) = [];
+            f_liq = vertcat(f_liq, f_liq(end)); f_liq(j1) = [];
+            lyrmrg = vertcat(lyrmrg, lyrmrg(end)); lyrmrg(j1) = [];
             
             ii = ii - 1;
          end

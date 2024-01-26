@@ -66,7 +66,7 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
    bc = opts.bc_type;
    ok = true;
-   zD = dz(1);
+   % zD = dz(1);
 
    %% START ITERATIONS OVER YEARS
    for thisyear = 1:numyears
@@ -156,14 +156,20 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
          % SAVE OUTPUT IF SPINUP IS FINISHED
          if thisyear >= numspinup
-            [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, ...
-               opts.vars1, opts.vars2, ...
-               {Ts, Qm, Qe, Qh, Qc, chi, balance, dt_sum, ok, OK, N}, ...
-               {T, f_ice, f_liq, d_liq, d_drn, d_evp, Sc});
 
-            % For a regional run:
-            % {Ts},  ...
-            % {T, f_ice, f_liq, d_liq, d_drn, d_evp});
+            if strcmp('sector', opts.sitename)
+
+               [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, ...
+                  opts.vars1, opts.vars2, ...
+                  {Ts},  ...
+                  {T, f_ice, f_liq, d_liq, d_drn, d_evp});
+            else
+
+               [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, ...
+                  opts.vars1, opts.vars2, ...
+                  {Ts, Qm, Qe, Qh, Qc, chi, balance, dt_sum, ok, OK, N}, ...
+                  {T, f_ice, f_liq, d_liq, d_drn, d_evp, Sc});
+            end
          end
 
          % MOVE TO THE NEXT TIMESTEP

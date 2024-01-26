@@ -29,10 +29,10 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL( ...
    T_old = T;
    f_liq_old = f_liq(1);
 
-   T_iter = T_old + tol;
+   T_iter = T_old + 2 * tol;
 
    % Iterate to solve the nonlinear heat equation
-   errT = NaN; errH = NaN; OK = true;
+   OK = true;
 
    for iter = 1:maxiter
 
@@ -47,11 +47,11 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL( ...
 
       % Update heat capacity, and d(f_liq)/dT
       dHdT = cv_ice * f_ice + cv_liq * f_liq;
-      dFdT = 2.0 * fcp ^ 2.0 * (Tf - min(T, Tf)) .* f_wat ...
+      dLdT = 2.0 * fcp ^ 2.0 * (Tf - min(T, Tf)) .* f_wat ...
          ./ (1.0 + fcp ^ 2.0 * (Tf - min(T, Tf)) .^ 2.0) .^ 2.0;
 
       % Update the general equation coefficients
-      [aN, aP, aS, b, iM, a1, a2] = GECOEFS(T, f_liq, f_ice, dHdT, dFdT, ...
+      [aN, aP, aS, b, iM, a1, a2] = GECOEFS(T, f_liq, f_ice, dHdT, dLdT, ...
          drovdT, H-H_old, Sc, k_eff, delz, fn, dz, dt, Ts, Ls, Lf, ro_liq, ...
          TL, JJ, Fc, Fp, bc);
 
