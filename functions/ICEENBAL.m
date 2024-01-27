@@ -34,7 +34,7 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL( ...
    % Iterate to solve the nonlinear heat equation
    OK = true;
 
-   for iter = 1:maxiter
+   for iter = 0:maxiter-1
 
       % Update vapor heat
       [ro_vap, drovdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
@@ -59,8 +59,7 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL( ...
       % icemodel.checkdiags(aP, aN, aS)
 
       % Exit here so the state variables are updated on the final iteration
-      errT = T - T_iter;
-      if all(abs(errT) < tol)
+      if all(abs(T - T_iter) < tol)
          break
       end
 
