@@ -13,7 +13,7 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    met = load(opts.metfname{ii}, 'met');
    met = met.met;
 
-   if ~strcmp('none', opts.userdata)
+   if strcmp('none', opts.userdata) == false
       met = swapMetData(met, opts);
    end
    met = prepareMetData(met, opts);
@@ -42,7 +42,7 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    for n = 1:numel(rh)
       tppt(n) = SOLVEWB(tair(n), rh(n), Ls, cp_air, psfc(n));
    end
-   
+
    % Compute the wind transfer and stability coefficients
    [De, S] = WINDCOEF(wspd, opts.z_0, opts.z_obs, opts.z_wind);
 end
@@ -84,18 +84,18 @@ function met = swapMetData(met, opts)
    if strcmp(opts.sitename, 'sector')
 
       % Swap out the forcing data albedo for modis albedo
-      
+
       % Activate this and move the swap loop below outside the else to swap
       % generic variables for gridded (sector) runs.
       % Data = met;
       % if strcmp('modis', opts.userdata)
       %    Data.modis = met.modis;
       % end
-      
+
       if strcmp('modis', opts.userdata)
          met.albedo = met.modis;
       end
-      
+
    else
       % Load the userdata and retime from hourly to 15 m if the met data is 15 m
       simyears = num2str(opts.simyears(1));

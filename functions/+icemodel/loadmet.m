@@ -5,29 +5,26 @@ function [met, opts] = loadmet(opts, fileiter) %#codegen
    if nargin < 2
       fileiter = 1;
    end
+   if nargin < 1
+      opts = icemodel.setopts('icemodel', 'behar', 2016, 'kanm');
+   end
 
    % load the met file
    met = load(opts.metfname{fileiter}, 'met');
    met = met.met;
 
-   if strcmp('sector', opts.sitename)
-
-      [met, opts] = processMetData(met, opts);
-   else
-      % for point/catchment-scale simulations, option to swap out a variable
-      % from userdata in place of the default met data
-      if ~strcmp('none', opts.userdata)
-         met = swapMetData(met , opts);
-      end
-      [met, opts] = processMetData(met, opts);
+   if strcmp('none', opts.userdata) == false
+      met = swapMetData(met, opts);
    end
+   met = prepareMetData(met, opts);
 
-   % compute the wind speed transfer coefficient
-   met.De = WINDCOEF(met.wspd, opts.z_0, opts.z_obs);
+   % Compute the wind transfer and stability coefficients
+   met.De = WINDCOEF(met.wspd, opts.z_0, opts.z_obs, opts.z_wind);
 end
 
 %%
-function [met, opts] = processMetData(met, opts)
+function met = prepareMetData(met, opts)
+   %PREPAREMETDATA remove leap inds, trim to simyears, check for bad data
 
    % remove leap inds if the met data is on a leap-year calendar
    if strcmp('noleap', opts.calendar_type)
@@ -38,10 +35,6 @@ function [met, opts] = processMetData(met, opts)
    % subset the met file to the requested simyears
    met = met(ismember(year(met.Time), opts.simyears), :);
 
-   % compute the total number of model timesteps and the timestep
-   opts.maxiter = size(met, 1)/opts.numyears;
-   opts.dt = seconds(met.Time(2)-met.Time(1));
-
    % check for bad modis data before swapping out default albedo for modis
    varmodis = {'modis', 'MODIS'};
    hasmodis = ismember(varmodis, met.Properties.VariableNames);
@@ -51,53 +44,61 @@ function [met, opts] = processMetData(met, opts)
          met.(varmodis{hasmodis})(bi) = met.albedo(bi);
          warning('bad albedo')
       end
-
-      % % THIS IS WHERE THE SECTOR-RUNS WERE SWAPPED, REACTIVATE IF RECONCILING
-      % DOESN'T WORK
-      % % swap out chosen forcing data albedo for modis albedo
-      % if strcmp('modis', opts.userdata)
-      %    met.albedo = met.modis;
-      % end
    end
-
    met.Time.TimeZone = 'UTC';
 end
 
 %%
-function met = swapMetData(met , opts)
+function met = swapMetData(met, opts)
 
    % convert uservars to a cellstr for compatibility with multiple uservars
    if ischar(opts.uservars)
       opts.uservars = cellstr(opts.uservars);
    end
 
-   % load the forcingUserData file and retime to match the metfile
-   simyears = num2str(opts.simyears(1));
-   userfile = [opts.userdata '_' opts.sitename '_' simyears '.mat'];
+   if strcmp(opts.sitename, 'sector')
 
-   if isfile(fullfile(opts.pathinput, 'userdata', userfile))
-      Data = load(fullfile(opts.pathinput, 'userdata', userfile), 'Data');
-      Data = Data.Data;
-   else
-      error('userdata file does not exist');
-   end
+      % Swap out the forcing data albedo for modis albedo
 
-   % the userdata is hourly, retime to 15 m if the met data is 15 m
-   if Data.Time(2)-Data.Time(1) ~= met.Time(2)-met.Time(1)
-      Data.Time.TimeZone = met.Time.TimeZone;
-      Data = retime(Data, met.Time, 'linear');
-   end
+      % Activate this and move the swap loop below outside the else to swap
+      % generic variables for gridded (sector) runs.
+      % Data = met;
+      % if strcmp('modis', opts.userdata)
+      %    Data.modis = met.modis;
+      % end
 
-   % swap out the data in the metfile for the user data
-   for n = 1:numel(opts.uservars)
-      thisvar  = opts.uservars{n};
-      swapvar  = thisvar;
-
-      % MODIS requires changing the variable name to albedo
-      if strcmpi('modis', opts.userdata) && strcmpi('albedo', thisvar)
-         thisvar = 'albedo';
-         swapvar = 'modis';
+      if strcmp('modis', opts.userdata)
+         met.albedo = met.modis;
       end
-      met.(thisvar) = Data.(swapvar);
+
+   else
+      % Load the userdata and retime from hourly to 15 m if the met data is 15 m
+      simyears = num2str(opts.simyears(1));
+      userfile = [opts.userdata '_' opts.sitename '_' simyears '.mat'];
+
+      if isfile(fullfile(opts.pathinput, 'userdata', userfile))
+         Data = load(fullfile(opts.pathinput, 'userdata', userfile), 'Data');
+         Data = Data.Data;
+         Data.Time.TimeZone = met.Time.TimeZone;
+         if Data.Time(2)-Data.Time(1) ~= met.Time(2)-met.Time(1)
+            Data = retime(Data, met.Time, 'linear');
+         end
+      else
+         error('\n userdata file does not exist: \n\n %s \n', ...
+            fullfile(opts.pathinput, 'userdata', userfile));
+      end
+
+      % Swap out the data in the metfile for the user data
+      for n = 1:numel(opts.uservars)
+         thisvar  = opts.uservars{n};
+         swapvar  = thisvar;
+
+         % MODIS requires changing the variable name to albedo
+         if strcmpi('modis', opts.userdata) && strcmpi('albedo', thisvar)
+            thisvar = 'albedo';
+            swapvar = 'modis';
+         end
+         met.(thisvar) = Data.(swapvar);
+      end
    end
 end

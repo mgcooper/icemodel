@@ -4,6 +4,10 @@ function plotsims(ice1a, ice1b, fields)
    %
    % just a starter i copied out of the bottom of icemodel_region ... probably
    % better already in runoff//functions
+
+   skip_a = false;
+   skip_b = false;
+
    isskinmodel = false(2, 1);
    if isfile(ice1a)
       if contains(ice1a, 'skinmodel')
@@ -15,6 +19,9 @@ function plotsims(ice1a, ice1b, fields)
       catch e
          rethrow(e)
       end
+   elseif ispathlike(ice1a)
+      warning('file not found: %s', ice1a)
+      skip_a = true;
    end
 
    if isfile(ice1b)
@@ -27,6 +34,9 @@ function plotsims(ice1a, ice1b, fields)
       catch e
          rethrow(e)
       end
+   elseif ispathlike(ice1b)
+      warning('file not found: %s', ice1b)
+      skip_b = true;
    end
 
 
@@ -38,22 +48,22 @@ function plotsims(ice1a, ice1b, fields)
 
    name1 = inputname(1);
    name2 = inputname(2);
-   
+
    ice1a = rmleapinds(ice1a);
    ice1b = rmleapinds(ice1b);
 
-   % Skip the first 1000 values when plotting timeseries 
+   % Skip the first 1000 values when plotting timeseries
    idx = 1000:height(ice1a);
 
    %figure('Position', [100   100   900   450])
    figontop
    for n = 0:numel(fields)
-      
+
       % 1:1 plots
       subtight(1, 3, 1, "gap", [0.08 0.08], "marw", [0.06 0.02], "marh", [0.08 0.04])
       try
          % Custom melt-freeze
-         if n == 0 
+         if n == 0
             if ~all(isskinmodel)
                plot(ice1a.melt-ice1a.freeze, ice1b.melt-ice1b.freeze, 'o');
                title('melt - freeze')
@@ -64,12 +74,12 @@ function plotsims(ice1a, ice1b, fields)
             plot(ice1a.(fields{n}), ice1b.(fields{n}), 'o');
             title((fields{n}))
          end
-          addOnetoOne
+         addOnetoOne
       catch
       end
       xlabel(name1)
       ylabel(name2)
-   
+
       % Timeseries plots
       subplot(1, 3, [2 3])
       hold on
