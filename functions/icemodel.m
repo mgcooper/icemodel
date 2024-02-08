@@ -1,4 +1,4 @@
-function [ice1, ice2] = icemodel(opts) %#codegen
+function [ice1, ice2, numfail] = icemodel(opts) %#codegen
    % ICEMODEL Simulate the phase change process in glacier ice.
    %
    % This function models the phase change process in melting glacier ice. It
@@ -68,6 +68,8 @@ function [ice1, ice2] = icemodel(opts) %#codegen
    ok = true;
    % zD = dz(1);
 
+   numfail = zeros(maxiter, 1);
+   
    %% START ITERATIONS OVER YEARS
    for thisyear = 1:numyears
 
@@ -100,6 +102,9 @@ function [ice1, ice2] = icemodel(opts) %#codegen
 
          while dt_sum + TINY < dt_FULL_STEP
 
+            % subfail goes above maxsubiter when T(1) is on the TL limit I think
+            % and cannot ge
+            
             % SUBSURFACE ENERGY BALANCE
             [T, f_ice, f_liq, k_eff, OK, N, a1] = ICEENBAL(T, f_ice, f_liq, ...
                dz, delz, fn, Sc, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, ...
@@ -176,6 +181,8 @@ function [ice1, ice2] = icemodel(opts) %#codegen
          [metiter, subiter, dt] = NEXTSTEP(metiter, subiter, ...
             dt, dt_FULL_STEP, maxsubiter, OK);
 
+         numfail(iter) = subfail;
+         
       end % timesteps (one year)
 
       % RESTART THE MET DATA ITERATOR DURING SPIN UP

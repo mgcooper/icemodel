@@ -9,25 +9,24 @@ runpoint = true;
 
 %% set the run-specific model configuration
 savedata = false;
-sitename = 'ak4';        % options: 'kanm', 'behar'
+sitename = 'upperbasin';        % options: 'kanm', 'behar'
 forcings = 'mar';         % options: 'mar','kanm'
-userdata = 'none';          % options: 'modis','racmo','merra','mar','kanm','none'
+userdata = 'modis';          % options: 'modis','racmo','merra','mar','kanm','none'
 uservars = 'albedo';       % options: 'albedo', or any var in met
-simmodel = 'skinmodel';    % options: 'icemodel','skinmodel'
-simyears = 2011;
+simmodel = 'icemodel';    % options: 'icemodel','skinmodel'
+simyears = 2016;
 
 %% Set the model options
 opts = icemodel.setopts(simmodel, sitename, simyears, forcings, ...
    userdata, uservars, savedata);
 
-
-opts.metfname = {fullfile(opts.pathinput, 'met', 'sector', ...
-      ['met_' int2str(433) '.mat'])};
+% opts.metfname = {fullfile(opts.pathinput, 'met', 'sector', ...
+%       ['met_' int2str(333) '.mat'])};
 
 % run the model
 switch simmodel
    case 'icemodel'
-      tic; [ice1, ice2] = icemodel(opts); toc
+      tic; [ice1, ice2, numfail] = icemodel(opts); toc
    case 'skinmodel'
       tic; [ice1, ice2] = skinmodel(opts); toc
 end
@@ -49,7 +48,30 @@ AblationDaily = prepAblation(opts, ice1, 'daily');
 t1 = datetime(simyears(1),6,1,0,0,0,'TimeZone','UTC');
 t2 = datetime(simyears(1),9,1,0,0,0,'TimeZone','UTC');
 
-% plot the runoff
+%% TEST
+melt = Runoff.icemodelMelt;
+roff = Runoff.icemodelRunoff;
+roff(roff<0) = 0;
+
+melt0 = cumsum(melt, 'omitnan');
+roff1 = cumsum(Runoff.icemodelRunoff, 'omitnan');
+roff2 = cumsum(roff, 'omitnan');
+
+% Plot before reassigning
+figure;
+plot(roff1); hold on
+plot(roff2, ':')
+plot(melt0); 
+legend('roff', 'roff2', 'melt')
+
+% compute the percent diff cumulative
+(roff2(end) - melt0(end)) / melt0(end)
+(roff1(end) - melt0(end)) / melt0(end)
+
+% Reassign runoff
+Runoff.icemodelRunoff = roff;
+
+%% Plot runoff
 if opts.simmodel == "skinmodel"
    [h1, data] = plotRunoff(Runoff, Discharge, Catchment, 'plotsurf', true, ...
       'sitename', sitename, 'userdata', userdata, 'forcingdata', forcings);
@@ -58,12 +80,12 @@ else
       'userdata', userdata, 'forcingdata', forcings, 't1', t1, 't2', t2);
 end
 
-% plot ablation
+%% Plot ablation
 t1 = datetime(simyears(1),7,1,0,0,0,'TimeZone','UTC');
 h2 = plotPromice(AblationDaily,'refstart',t1);
 h3 = plotPromice(AblationHourly,'refstart',t1);
 
-% plot the energy balance
+%% Plot the energy balance
 plotEnbal(ice1, met);
 
 diffs = (data{end, 2:end} - data.ADCP(end)) ./ data.ADCP(end);
@@ -95,7 +117,7 @@ fprintf('percent icenbal < 5 iterations: %.2f\n', ...
 
 % zD = ice1.zD;
 % [min(zD(zD > 0)) mean(zD(zD > 0)) max(zD(zD > 0))]
-% 
+%
 % figure; plot(ice1.Time, zD); hold on
 % horzline(opts.dz_thermal)
 
