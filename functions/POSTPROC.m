@@ -39,7 +39,8 @@ function varargout = POSTPROC(ice1, ice2, opts, varargin)
    elseif strcmp('icemodel', opts.simmodel)
       ice1 = ICERUNOFF(ice1, ice2, opts);
    end
-
+   % ice1.runoff2 = ice1.melt - ice1.freeze;
+   
    % Compute a full state and energy balance
    if ~strcmp(opts.sitename, 'sector')
       [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo);

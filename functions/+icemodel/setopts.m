@@ -5,6 +5,9 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    %
    % See also: icemodel.config
 
+   if nargin < 5 || isempty(userdata); userdata = 'none'; end
+   if nargin < 6 || isempty(uservars); uservars = 'none'; end
+   if nargin < 7 || isempty(savedata); savedata = false; end
    if nargin < 8 || isempty(casename); casename = ''; end
    if nargin < 9 || isempty(testname); testname = ''; end
 
@@ -28,7 +31,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    %----------------------------------------------------------------------------
 
    % general model settings
-   opts.spinup_loops    =  1;       % number of spin-up loops to initialize
+   opts.spinup_loops    =  2;       % number of spin-up loops to initialize
    opts.use_init        =  false;   % use pre-initialized data?
    opts.kabs_user       =  true;    % use user-defined ice absorptivity?
    opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
@@ -43,9 +46,9 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    opts.dt              =  900.0;   % timestep                             [s]
    opts.dz_thermal      =  0.04;    % dz for thermal heat transfer         [m]
    opts.dz_spectral     =  0.002;   % dz for radiative heat transfer       [m]
-   opts.z0_thermal      =  16;      % domain thickness for heat transfer   [m]
+   opts.z0_thermal      =  20;      % domain thickness for heat transfer   [m]
    opts.z0_spectral     =  4;       % domain thickness for rad transfer    [m]
-   opts.f_ice_min       =  0.1;
+   opts.f_ice_min       =  0.01;
 
    % solver options
    opts.seb_solver      = 1;        % recommended: 1
@@ -103,7 +106,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    if strcmp(sitename, 'sector')
       opts.pathoutput = fullfile(opts.pathoutput, userdata);
    end
-   
+
    assert(isfolder(opts.pathinput), ...
       'ICEMODELINPUTPATH does not exist, set it using icemodel.config');
 
@@ -188,9 +191,9 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
 
          opts.vars2 = ...
             {'Tice', 'f_ice', 'f_liq'};
-         
+
       else
-         
+
          opts.vars1 = ...
             {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
             'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter'};

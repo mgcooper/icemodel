@@ -3,71 +3,7 @@ clean
 testname = 'run1'; % run1 = w/chi, run2 = w/o chi (chi=0)
 savedata = true;
 
-%-----------------------------------------------------
-% upperbasin, 2016, mar, kanl, icemodel
-%-----------------------------------------------------
-sitename = {'upperbasin'};
-forcings = {'mar', 'kanl'};
-userdata = {'none','merra','racmo','mar','modis', 'kanl'};
-uservars = {'albedo'};
-simmodel = {'icemodel', 'skinmodel'};
-simyears = 2016:2016;
-
-%-----------------------------------------------------
-% DONE behar, 2016, mar, kanm
-%-----------------------------------------------------
-% sitename = {'behar'};
-% forcings = {'mar', 'kanm'};
-% userdata = {'none','merra','racmo','mar','modis', 'kanm'};
-% uservars = {'albedo'};
-% simmodel = {'icemodel'};
-% simyears = 2016:2016;
-
-%-----------------------------------------------------
-% DONE slv1, 2015, mar, kanm, icemodel
-% DONE slv2, 2015, mar, kanm, icemodel
-% DONE behar, 2015, mar, kanm, icemodel
-%-----------------------------------------------------
-% sitename = {'behar', 'slv1', 'slv2'};
-% forcings = {'mar', 'kanm'};
-% userdata = {'none','merra','racmo','mar','modis', 'kanm'};
-% uservars = {'albedo'};
-% simmodel = {'icemodel', 'skinmodel'};
-% simyears = 2015:2015;
-
-% Need to do these:
-% sitename = {'behar', 'slv1', 'slv2'};
-% forcings = {'mar', 'kanm'};
-% userdata = {'none','merra','racmo','mar','modis', 'kanm'};
-% uservars = {'albedo'};
-% simmodel = {'icemodel', 'skinmodel'};
-% simyears = 2015:2015;
-
-%-----------------------------------------------------
-% DONE ak4, 2009-2011, mar, kanl, icemodel
-%-----------------------------------------------------
-% sitename = {'ak4'};
-% forcings = {'mar', 'kanl'};
-% userdata = {'none','mar','modis','kanl'};
-% uservars = {'albedo'};
-% simmodel = {'icemodel'};
-% simyears = 2009:2011;
-
-%-----------------------------------------------------
-% DONE ak4, 2012-2016, mar, kanl, icemodel
-%-----------------------------------------------------
-% sitename = {'ak4'};
-% forcings = {'mar', 'kanl'};
-% userdata = {'none','merra','racmo','mar','modis','kanl'};
-% uservars = {'albedo'};
-% simmodel = {'icemodel'};
-% simyears = 2012:2016;
-
-
-% userdata = {'none','mar','modis', 'kanl'}; % {'none'};
-
-ensemble = ensembleList( ...
-   forcings, userdata, uservars, simmodel, simyears, sitename);
+runcombo = 1;
 
 % note: ak4 userdata merra and racmo is available from 2012:2016, whereas
 % mar, kanl, and modis are available from 2009:2016
@@ -86,7 +22,69 @@ ensemble = ensembleList( ...
 % RACMO forcing + MAR, MERRA, RACMO, AWS, MODIS albedo
 % AWS forcing + MAR, MERRA, RACMO, AWS, MODIS albedo
 
-% run all combos
+%% Set which predefined
+switch runcombo
+   case 1
+      % DONE upperbasin, 2016, mar, kanl, icemodel
+      sitename = {'upperbasin'};
+      forcings = {'mar', 'kanl'};
+      userdata = {'none','merra','racmo','mar','modis', 'kanl'};
+      uservars = {'albedo'};
+      simmodel = {'icemodel', 'skinmodel'};
+      simyears = 2016:2016;
+
+   case 2
+      % DONE behar, 2016, mar, kanm
+      sitename = {'behar'};
+      forcings = {'mar', 'kanm'};
+      userdata = {'none','merra','racmo','mar','modis', 'kanm'};
+      uservars = {'albedo'};
+      simmodel = {'icemodel', 'skinmodel'};
+      simyears = 2016:2016;
+
+   case 3
+      % DONE behar, slv1, slv2, 2015, mar, kanm, icemodel
+      sitename = {'behar', 'slv1', 'slv2'};
+      forcings = {'mar', 'kanm'};
+      userdata = {'none','merra','racmo','mar','modis', 'kanm'};
+      uservars = {'albedo'};
+      simmodel = {'icemodel', 'skinmodel'};
+      simyears = 2015:2015;
+
+   case 4
+      % DONE ak4, 2009-2011, mar, kanl, icemodel
+      sitename = {'ak4'};
+      forcings = {'mar', 'kanl'};
+      userdata = {'none','mar','modis','kanl'};
+      uservars = {'albedo'};
+      simmodel = {'icemodel', 'skinmodel'};
+      simyears = 2009:2011;
+
+   case 5
+      % DONE ak4, 2012-2016, mar, kanl, icemodel, merra, racmo
+      sitename = {'ak4'};
+      forcings = {'mar', 'kanl'};
+      userdata = {'none','merra','racmo','mar','modis','kanl'};
+      uservars = {'albedo'};
+      simmodel = {'icemodel', 'skinmodel'};
+      simyears = 2012:2016;
+
+   otherwise
+      % Custom configuration
+      sitename = {'ak4'};
+      forcings = {'mar', 'kanl'};
+      userdata = {'none','merra','racmo','mar','modis','kanl'};
+      uservars = {'albedo'};
+      simmodel = {'icemodel', 'skinmodel'};
+      simyears = 2012:2016;
+
+end
+
+%% Build the ensemble list
+ensemble = ensembleList( ...
+   forcings, userdata, uservars, simmodel, simyears, sitename);
+
+%% Run all combos
 for n = 1:ensemble.numcombos
 
    sitename = char(ensemble.allcombos.sitename(n));
@@ -149,7 +147,7 @@ if opts.simmodel == "skinmodel"
       );
 else
    if ismember(sitename, {'slv1','slv2'})
-      
+
       h1 = plotRunoff( ...
          Runoff,Discharge,Catchment, ...
          'plotensemble',false, ...
@@ -157,7 +155,7 @@ else
          'sitename',sitename, ...
          'refstart',true ...
          );
-      
+
       h1 = plotRunoff( ...
          Runoff,Discharge,Catchment, ...
          'plotensemble',false, ...
@@ -176,61 +174,18 @@ else
 end
 
 % PLOT ABLATION
-t1 = datetime(str2double(simyears),6,1,0,0,0,'TimeZone','UTC');
-h2 = plotPromice(AblationHourly,'refstart',t1);
-h2 = plotPromice(AblationDaily,'refstart',t1);
+plotPromice(AblationHourly, 'refstart', ...
+   datetime(str2double(simyears), 6, 1, 0, 0, 0, 'TimeZone', 'UTC'));
+plotPromice(AblationDaily, 'refstart', ...
+   datetime(str2double(simyears), 6, 1, 0, 0, 0, 'TimeZone', 'UTC'));
 
-t1 = datetime(str2double(simyears),7,1,0,0,0,'TimeZone','UTC');
-h2 = plotPromice(AblationHourly,'refstart',t1);
-h2 = plotPromice(AblationDaily,'refstart',t1);
+plotPromice(AblationHourly, 'refstart', ...
+   datetime(str2double(simyears), 7, 1, 0, 0, 0, 'TimeZone', 'UTC'));
+plotPromice(AblationDaily, 'refstart', ...
+   datetime(str2double(simyears), 7, 1, 0, 0, 0, 'TimeZone', 'UTC'));
 
 % plot enbal - need option to plot met station data when forcing is rcm
-plotEnbal(ice1,met);
-
-% plotTice(opts,ice2);
-%
-% % if mar forcing, then met.tsfc will be daily
-%
-% t1 =  datetime(year(ice1.Time(1)),1,1,0,0,0,'TimeZone','UTC');
-% t2 =  datetime(year(ice1.Time(1)),12,31,23,0,0,'TimeZone','UTC');
-%
-% plotice2(ice2,'Tice','t1',t1,'t2',t2);
-
-
-% this is the percent of timesteps that Tsfc did not converge
-% 100*(1-(sum(diags.Tflag)/opts.maxiter))
-%
-% figure; plot(enbal.tsfc,enbal.TN,'o'); addOnetoOne; xylabel('Tsfc','TN');
-% set(gca,'XLim',[-10 1],'YLim',[-10 1]);
-%
-% % want to know Qc for timesteps when Tsfc does not converge
-% figure; plot(diags.Time,diags.Tflag)
-%
-% mean(diags.Qc(diags.Tflag==true))
-% mean(diags.Qc(diags.Tflag==false))
-%
-% max(diags.Qc(diags.Tflag==true))
-% max(diags.Qc(diags.Tflag==false))
-%
-% min(diags.Qc(diags.Tflag==true))
-% min(diags.Qc(diags.Tflag==false))
-%
-% histogram(diags.Qc)
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% pause; close all;
-
-% end
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-
-%
-% % not 100% sure but I think this converts the W/m2 enbalance error to m.w.e
-% load( 'PHYSCONS', 'cp_ice','cp_liq','Lf');
-% cp_sno   = interp1(met.Time,ice2.cp_sno(1,:),ice1.Time);
-% werr     = cp_sno.*enbal.balance.*opts.dz_thermal./Lf;
-% % figure; plot(enbal.Time,cumsum(werr)); ylabel('cumulative error (m w.e.)')
-
+plotEnbal(ice1, met);
 
 ice1.runoff(end)
 try
@@ -259,29 +214,3 @@ end
 % % kanM 2015 = 0 (Me)
 % % kanM 2016 = 2.3 (Fausto)
 % % kanM 2016 = 2.1 (Me, m.w.e) 2.3 (Me, m.i.e)
-
-
-% % figure;
-% % plot(ice1.Time,ice1.MFerr); hold on;
-% % plot(ice1.Time,ice1.LCerr);
-% % legend('MF error','LC error');
-% % ylabel('error (^oC)');
-
-
-
-% % this doesn't work quite as hoped b/c of the situation where kanl/kanm
-% % are swapped for mar in the forcing data step of metiinit
-% %    % if the met file does not exist, continue
-%    fmet  = [opts.path.metData opts.metfname];
-%    if exist(fmet,'file') ~= 2 ; continue; end
-% %
-% %    % activating this option prevents re-running a site so use with care
-% %    % or the data file already exists
-% %    fsave = [opts.path.output opts.fsave '.mat'];
-% %    if exist(fsave,'file') == 2 ; continue; end
-%
-% % check if the forcingUserData file exists
-%    userData    =   opts.forcingUserData;
-%    userPath    =   opts.path.userData;
-%    userFile    =   [userPath userData '_' siteName '_' simYear '.mat'];
-%    if exist(userFile,'file') ~= 2 ; continue; end

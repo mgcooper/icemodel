@@ -29,11 +29,11 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL( ...
    T_old = T;
    f_liq_old = f_liq(1);
 
+   % Initialize current values
    T_iter = T_old + 2 * tol;
 
    % Iterate to solve the nonlinear heat equation
    OK = true;
-
    for iter = 0:maxiter-1
 
       % Update vapor heat
@@ -45,7 +45,7 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL( ...
       % Update thermal conductivity
       k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
 
-      % Update heat capacity, and d(f_liq)/dT
+      % Update the derivative of enthalpy wrt temperature
       dHdT = cv_ice * f_ice + cv_liq * f_liq;
       dLdT = 2.0 * fcp ^ 2.0 * (Tf - min(T, Tf)) .* f_wat ...
          ./ (1.0 + fcp ^ 2.0 * (Tf - min(T, Tf)) .^ 2.0) .^ 2.0;
@@ -90,10 +90,10 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL( ...
 
    OK = iter < maxiter;
 
-   % Surface energy balance linearization error [K]
+   % Compute surface energy balance linearization error [K]
    % err0 = -(Fc + Fp * Ts) / a1 - (T(1) - Ts);
 
-   % Top layer energy balance linearization error [K]
+   % Compute subsurface energy balance linearization error [K]
    err = (dt/dz(1) ...
       * (a2 * (T(2) - T(1)) ...
       + Fc + Fp * (Fc + a1 * T(1)) / (a1 - Fp) ...

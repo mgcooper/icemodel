@@ -3,7 +3,7 @@ clean
 savedata = true;
 sitename = 'sector';
 forcings = 'mar';
-userdata = 'modis'; % don't use "none" - set equal to forcings
+userdata = 'none';
 uservars = 'albedo';
 simmodel = 'icemodel';
 simyears = 2008:2018;
@@ -12,26 +12,22 @@ simyears = 2008:2018;
 % 298, 671, 1046,  1420
 % 372, 744, 1116, 1487
 
-% gridnums = [368, 2337]; % bad mar pixels
-% gridnums = [2320]; % bad modis pixel
-
 pathdata = icemodel.setpath('output',sitename,simmodel,userdata);
 
-%% Temporary for the zobs test
+%%
 
-[~, X, Y, E] = loadIceMask("icemask", "xmask", "ymask", "elevation");
-
+load('IceMask.mat')
+M = IceMask.IceMaskSLA;
+E = IceMask.Elev(M);
+X = IceMask.X(M);
+Y = IceMask.Y(M);
 filename = fullfile(getenv('ICEMODELPATH'), 'testbed','data','zobs_vars');
 load(filename, 'wspd', 'tair', 'relh')
 idx = wspd > 6.5 | tair > 274 | relh < 70;
 gridnums = find(idx);
 
-% TEMP - run the ones I didn't run
-gridnums = find(~idx & E < 1200);
-
-figure
-scatter(X, Y, 40); hold on
-scatter(X(gridnums), Y(gridnums), 40, E(gridnums), 'filled')
+% figure
+% scatter(X(gridnums), Y(gridnums), 40, E(gridnums), 'filled')
 
 %% config
 
@@ -39,12 +35,19 @@ scatter(X(gridnums), Y(gridnums), 40, E(gridnums), 'filled')
 opts = icemodel.setopts(simmodel, sitename, simyears, forcings, ...
    userdata, uservars, savedata, [], 'zobs');
 
+% 
+N = 1;
+si = 1;
+ni = 154;
+
+S = si+ni*(N-1);
+E = si+ni*N-1;
+
 % display the run information
 disp([simmodel ' ' userdata ' ' int2str(simyears(1)) ':'   ...
-   int2str(simyears(end)) ' ' int2str(gridnums(1)) ':' int2str(gridnums(end))])
+   int2str(simyears(end)) ' ' int2str(S) ':' int2str(E)])
 
-% run the model for each point (thispoint = 1415, thispoint = 1503 rio behar) 
-for n = 1:numel(gridnums)
+for n = S:E
    
    thispoint = gridnums(n);
    
