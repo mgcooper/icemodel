@@ -31,7 +31,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    %----------------------------------------------------------------------------
 
    % general model settings
-   opts.spinup_loops    =  2;       % number of spin-up loops to initialize
+   opts.spinup_loops    =  1;       % number of spin-up loops to initialize
    opts.use_init        =  false;   % use pre-initialized data?
    opts.kabs_user       =  true;    % use user-defined ice absorptivity?
    opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
@@ -46,9 +46,9 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    opts.dt              =  900.0;   % timestep                             [s]
    opts.dz_thermal      =  0.04;    % dz for thermal heat transfer         [m]
    opts.dz_spectral     =  0.002;   % dz for radiative heat transfer       [m]
-   opts.z0_thermal      =  20;      % domain thickness for heat transfer   [m]
-   opts.z0_spectral     =  4;       % domain thickness for rad transfer    [m]
-   opts.f_ice_min       =  0.01;
+   opts.z0_thermal      =  12;      % domain thickness for heat transfer   [m]
+   opts.z0_spectral     =  12;      % domain thickness for rad transfer    [m]
+   opts.f_ice_min       =  0.1;
 
    % solver options
    opts.seb_solver      = 1;        % recommended: 1

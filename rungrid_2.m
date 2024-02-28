@@ -3,9 +3,9 @@ clean
 savedata = true;
 sitename = 'sector';
 forcings = 'mar';
-userdata = 'none';
+userdata = 'modis';
 uservars = 'albedo';
-simmodel = 'icemodel';
+simmodel = 'skinmodel';
 simyears = 2008:2018;
 % gridnums = 671:744;
 
@@ -26,6 +26,9 @@ load(filename, 'wspd', 'tair', 'relh')
 idx = wspd > 6.5 | tair > 274 | relh < 70;
 gridnums = find(idx);
 
+% To run all the ones that weren't rerun
+gridnums = find(~idx);
+
 % figure
 % scatter(X(gridnums), Y(gridnums), 40, E(gridnums), 'filled')
 
@@ -36,12 +39,15 @@ opts = icemodel.setopts(simmodel, sitename, simyears, forcings, ...
    userdata, uservars, savedata, [], 'zobs');
 
 % 
-N = 2;
-si = 1;
-ni = 154;
+% N = 2;
+% si = 1;
+% ni = 154;
+% 
+% S = si+ni*(N-1);
+% E = si+ni*N-1;
 
-S = si+ni*(N-1);
-E = si+ni*N-1;
+S = 1;
+E = numel(gridnums);
 
 % display the run information
 disp([simmodel ' ' userdata ' ' int2str(simyears(1)) ':'   ...

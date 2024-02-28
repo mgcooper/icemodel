@@ -6,8 +6,7 @@ clc
 savedata = false;
 sitename = 'slv2';        % options: 'kanm', 'behar'
 forcings = 'mar';         % options: 'mar','kanm'
-userdata = 'modis';          % options: 'modis','racmo','merra','mar','kanm','none'
-userdata = 'modis';          % options: 'modis','racmo','merra','mar','kanm','none'
+userdata = 'modis';       % options: 'modis','racmo','merra','mar','kanm','none'
 uservars = 'albedo';       % options: 'albedo', or any var in met
 simmodel = 'icemodel';    % options: 'icemodel','skinmodel'
 simyears = 2015:2015;
@@ -47,8 +46,8 @@ else
 end
 
 %% prep the output for plotting
-setzero = true;
-[Runoff,Discharge,Catchment] = prepRunoff(opts, ice1, 'setzero', setzero);
+setzero = false;
+[Runoff, Discharge, Catchment, Melt] = prepRunoff(opts, ice1, 'setzero', setzero);
 AblationHourly = prepAblation(opts, ice1, 'hourly', setzero);
 AblationDaily = prepAblation(opts, ice1, 'daily', setzero);
 
@@ -57,12 +56,12 @@ t1 = datetime(simyears(1),6,1,0,0,0,'TimeZone','UTC');
 t2 = datetime(simyears(1),9,1,0,0,0,'TimeZone','UTC');
 
 %% TEST
-melt = Runoff.icemodelMelt;
-roff = Runoff.icemodelRunoff;
+melt = Melt.icemodel;
+roff = Runoff.icemodel;
 roff(roff<0) = 0;
 
 melt0 = cumsum(melt, 'omitnan');
-roff1 = cumsum(Runoff.icemodelRunoff, 'omitnan');
+roff1 = cumsum(Runoff.icemodel, 'omitnan');
 roff2 = cumsum(roff, 'omitnan');
 
 % Plot before reassigning
@@ -77,16 +76,17 @@ legend('roff', 'roff2', 'melt')
 (roff1(end) - melt0(end)) / melt0(end)
 
 % Reassign runoff
-Runoff.icemodelRunoff = roff;
+Runoff.icemodel = roff;
 
 %% Plot runoff
 if opts.simmodel == "skinmodel"
-   [h1, data] = plotRunoff(Runoff, Discharge, Catchment, 'plotsurf', true, ...
-      'sitename', sitename, 'userdata', userdata, 'forcingdata', forcings);
+   [h1, data] = plotRunoff(Runoff, Discharge, Catchment, ...
+      'plotsurf', true, 'sitename', sitename, 'userdata', userdata, ...
+      'forcingdata', forcings);
 else
-   [h1, data] = plotRunoff(Runoff, Discharge, Catchment, 'sitename', sitename, ...
-      'userdata', userdata, 'forcingdata', forcings, 't1', t1, 't2', t2, ...
-      'refstart', false);
+   [h1, data] = plotRunoff(Runoff, Discharge, Catchment, ...
+      'sitename', sitename, 'userdata', userdata, 'forcingdata', forcings, ...
+      't1', t1, 't2', t2, 'refstart', false);
 end
 
 % plot ablation
@@ -117,14 +117,14 @@ LString = [L.String, {'Surf', 'Subsurf'}];
 % end
 
 
-[~, RacmoSrf] = load_icemodel(sitename, {'mar', 'racmo'}, data.Time, ...
+[~, RacmoSrf] = loadRunoff(sitename, {'mar', 'racmo'}, data.Time, ...
    'racmo', 'surface');
-[~, RacmoSub] = load_icemodel(sitename, {'mar', 'racmo'}, data.Time, ...
+[~, RacmoSub] = loadRunoff(sitename, {'mar', 'racmo'}, data.Time, ...
    'racmo', 'subsurface');
-RsrfL = catchment_runoff(RacmoSrf.min, Catchment.min.ease.area, 'kg/m2/s', false, true);
-RsrfH = catchment_runoff(RacmoSrf.max, Catchment.max.ease.area, 'kg/m2/s', false, true);
-RsubL = catchment_runoff(RacmoSub.min, Catchment.min.ease.area, 'kg/m2/s', false, true);
-RsubH = catchment_runoff(RacmoSub.max, Catchment.max.ease.area, 'kg/m2/s', false, true);
+RsrfL = catchmentRunoff(RacmoSrf.min, Catchment.min.ease.area, 'kg/m2/s', false, true);
+RsrfH = catchmentRunoff(RacmoSrf.max, Catchment.max.ease.area, 'kg/m2/s', false, true);
+RsubL = catchmentRunoff(RacmoSub.min, Catchment.min.ease.area, 'kg/m2/s', false, true);
+RsubH = catchmentRunoff(RacmoSub.max, Catchment.max.ease.area, 'kg/m2/s', false, true);
 
 
 hold on
