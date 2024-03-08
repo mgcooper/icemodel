@@ -42,26 +42,43 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    opts.ro_snow_i       =  900.0;   % initial ice density               [kg/m3]
    opts.liqresid        =  0.07;    % residual pore water fraction      [-]
 
-   % timestepping / grid thickness
-   opts.dt              =  900.0;   % timestep                             [s]
-   opts.dz_thermal      =  0.04;    % dz for thermal heat transfer         [m]
-   opts.dz_spectral     =  0.002;   % dz for radiative heat transfer       [m]
-   opts.z0_thermal      =  12;      % domain thickness for heat transfer   [m]
-   opts.z0_spectral     =  12;      % domain thickness for rad transfer    [m]
-   opts.f_ice_min       =  0.1;
+   % solver options and timestepping / grid thickness
+   if strcmp(simmodel, 'icemodel')
 
-   % solver options
-   opts.seb_solver      = 1;        % recommended: 1
-   opts.bc_type         = 1;        % recommended: 2
-   opts.conduct_type    = 1;        % recommended: 1 (Practice "B")
-   opts.maxiter         = 50;
+      opts.seb_solver      = 1;        % recommended: 1
+      opts.bc_type         = 1;        % recommended: 2
+      opts.conduct_type    = 1;        % recommended: 1 (Practice "B")
+      opts.maxiter         = 50;       % 1d heat transfer max iterations
 
-   % I don't think this is necessary anymore
-   % if strcmp(simmodel, 'skinmodel')
-   %    opts.seb_solver = -abs(opts.seb_solver);
-   % end
+      opts.dt              =  900.0;   % timestep                             [s]
+      opts.dz_thermal      =  0.04;    % dz for thermal heat transfer         [m]
+      opts.dz_spectral     =  0.002;   % dz for radiative heat transfer       [m]
+      opts.z0_thermal      =  20;      % domain thickness for heat transfer   [m]
+      opts.z0_spectral     =  4;       % domain thickness for rad transfer    [m]
+      opts.f_ice_min       =  0.01;
 
-   % the mie scattering coefficients are defined for 35 grain sizes and 118
+   elseif strcmp(simmodel, 'skinmodel')
+
+      opts.seb_solver      = 1;        % recommended: 1
+      opts.bc_type         = 1;        % recommended: 1
+      opts.conduct_type    = 1;        % recommended: 1 (Practice "B")
+      opts.maxiter         = 50;       % 1d heat transfer max iterations
+
+      opts.dt              =  900.0;   % timestep                             [s]
+      opts.dz_thermal      =  0.04;    % dz for thermal heat transfer         [m]
+      opts.dz_spectral     =  0.002;   % dz for radiative heat transfer       [m]
+      opts.z0_thermal      =  12;      % domain thickness for heat transfer   [m]
+      opts.z0_spectral     =  4;       % domain thickness for rad transfer    [m]
+      opts.f_ice_min       =  0.01;
+
+      % I don't think this is necessary anymore
+      % opts.seb_solver = -abs(opts.seb_solver);
+
+   else
+      error('unrecognized simulation model SIMMODEL')
+   end
+
+   % The mie scattering coefficients are defined for 35 grain sizes and 118
    % spectral bands. define those dimensions here, they are used to read in
    % the data array in GETSCATTERCOEFS. also set the grain size index.
    opts.nwavl           =  118;
@@ -104,7 +121,14 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    opts.pathoutput = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, simmodel);
 
    if strcmp(sitename, 'sector')
-      opts.pathoutput = fullfile(opts.pathoutput, userdata);
+      if strcmp(userdata, 'none')
+         % If userdata is none, prevent creation of a "none" folder, use the
+         % forcings instead e.g. sector/icemodel/mar.
+         opts.pathoutput = fullfile(opts.pathoutput, forcings);
+      else
+         % e.g. sector/icemodel/modis.
+         opts.pathoutput = fullfile(opts.pathoutput, userdata);
+      end
    end
 
    assert(isfolder(opts.pathinput), ...
@@ -124,8 +148,11 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
       icemodel.mkfolders(opts);
 
       % save the model opts
-      optsfile = ['opts_' opts.casename '.mat'];
-      save(fullfile(opts.pathoutput, 'opts', optsfile), 'opts');
+      optsfile = fullfile(opts.pathoutput, 'opts', ['opts_' opts.casename '.mat']);
+      if isfile(optsfile)
+         backupfile(optsfile, true);
+      end
+      save(optsfile, 'opts');
    end
 
    %---------------------------- set the met forcing file name
