@@ -26,7 +26,7 @@ pathdata    = [pathroot 'icemodel/model/experiment/' vers '/' userdata '/'];
 pathmeta    = [pathroot 'mar3.11/matfiles/region/level2/' userdata '/'];
 pathsave    = [pathdata 'nc/'];
 
-if ~exist(pathsave,'dir'); mkdir(pathsave); end;
+if ~exist(pathsave,'dir'); mkdir(pathsave); end
 
 % set the dimesions
 ncells      = 3; % 1487    % store the data as a list
