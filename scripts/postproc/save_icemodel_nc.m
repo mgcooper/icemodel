@@ -138,26 +138,26 @@ for m = 1:1 %nyrs
    else
 
       for p = 1:nvars
-   
+
          thisvar = varnames{p};
          varid(p) = netcdf.defVar(ncid,thisvar,'NC_DOUBLE',dimids{p});
-   
+
          netcdf.defVarDeflate(ncid,varid(p),true,true,comprsz);
          netcdf.putAtt(ncid,varid(p),'long_name',longnames{p});
          netcdf.putAtt(ncid,varid(p),'units',units{p});
       end
-   
-   
+
+
       for p = 1:nvars2d + nvars1d
-   
+
          thisvar = varnames{p};
          thisid = varid(p);
-   
+
          for n = 1:ncells
-   
+
             load(fullfile(pathdata, thisyear, ['ice1_' num2str(n) '.mat']), 'ice1');
             load(fullfile(pathdata, thisyear, ['ice2_' num2str(n) '.mat']), 'ice2');
-   
+
             % for 2d vars, need to transpose and set nlyrs start,count
             if p <= nvars2d
                data = transpose(rmleapinds(ice2.(thisvar),ice1.Time));

@@ -42,14 +42,14 @@ function msg = mkncfile(filename, X, Y, ID, varnames, varargin)
          varid_lon = netcdf.defVar(ncid, 'lon', 'double', dimid_gridcell);
          varid_x = netcdf.defVar(ncid, 'x', 'double', dimid_gridcell);
          varid_y = netcdf.defVar(ncid, 'y', 'double', dimid_gridcell);
-         
+
          % Define variable attributes
          netcdf.putAtt(ncid, varid_lat, 'long_name', 'latitude');
          netcdf.putAtt(ncid, varid_lat, 'units', 'degrees_north');
          netcdf.putAtt(ncid, varid_lat, '_FillValue', -9999);
          netcdf.putAtt(ncid, varid_lat, 'standard_name', 'latitude');
          netcdf.putAtt(ncid, varid_lat, 'axis', 'Y');
-         
+
          netcdf.putAtt(ncid, varid_lon, 'long_name', 'longitude');
          netcdf.putAtt(ncid, varid_lon, 'units', 'degrees_east');
          netcdf.putAtt(ncid, varid_lon, '_FillValue', -9999);
@@ -69,7 +69,7 @@ function msg = mkncfile(filename, X, Y, ID, varnames, varargin)
          netcdf.putAtt(ncid, varid_y, '_FillValue', -9999);
          netcdf.putAtt(ncid, varid_y, 'standard_name', 'projection_y_coordinate');
          netcdf.putAtt(ncid, varid_y, 'axis', 'Y');
-         
+
          % Attributes for melt
          varid_melt = netcdf.defVar(ncid, 'melt', 'double', dimid_gridcell);
          netcdf.putAtt(ncid, varid_melt, 'units', 'm/hr');
