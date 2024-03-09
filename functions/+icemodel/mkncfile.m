@@ -23,7 +23,7 @@ function msg = mkncfile(filename, X, Y, ID, varnames, varargin)
    end
 
    % Ensure the number of filenames matches the number of columns of TWD
-   assert(numel(filename) == size(TWD,2),'Number of filenames must equal the number of columns of TWD')
+   assert(numel(filename) == size(TWD, 2),'Number of filenames must equal the number of columns of TWD')
 
    % Determine the number of grid cells
    gridcell = numel(X);
@@ -69,18 +69,12 @@ function msg = mkncfile(filename, X, Y, ID, varnames, varargin)
          netcdf.putAtt(ncid, varid_y, '_FillValue', -9999);
          netcdf.putAtt(ncid, varid_y, 'standard_name', 'projection_y_coordinate');
          netcdf.putAtt(ncid, varid_y, 'axis', 'Y');
-
          
-         
-         varid_twd = netcdf.defVar(ncid, 'totalDemand', 'double', dimid_gridcell);
-
-         
-
-         
-
-         netcdf.putAtt(ncid, varid_twd, 'units', 'm3/s');
-         netcdf.putAtt(ncid, varid_twd, 'long_name', 'total water demand');
-         netcdf.putAtt(ncid, varid_twd, '_FillValue', -9999.0);
+         % Attributes for melt
+         varid_melt = netcdf.defVar(ncid, 'melt', 'double', dimid_gridcell);
+         netcdf.putAtt(ncid, varid_melt, 'units', 'm/hr');
+         netcdf.putAtt(ncid, varid_melt, 'long_name', 'melt water production');
+         netcdf.putAtt(ncid, varid_melt, '_FillValue', -9999.0);
 
          % Add user metadata
          varid = netcdf.getConstant('GLOBAL');
@@ -93,7 +87,7 @@ function msg = mkncfile(filename, X, Y, ID, varnames, varargin)
          % Write data to variables
          netcdf.putVar(ncid, varid_lat, Y);
          netcdf.putVar(ncid, varid_lon, X);
-         netcdf.putVar(ncid, varid_twd, TWD(:,n));
+         netcdf.putVar(ncid, varid_melt, TWD(:,n));
          netcdf.putVar(ncid, varid_ID, ID);
 
          % Close the NetCDF file
