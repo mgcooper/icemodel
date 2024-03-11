@@ -1,272 +1,343 @@
-function makencfile(pathdata, pathsave, siteopts, opts)
-   
-   % Not sure opts is the right choice, if it is already set by setBasinOpts,
-   % could just use that directly and simplify input parsing
+function [info, data] = makencfile(pathdata, pathsave, simyears, ncopts)
+
    arguments
       pathdata (1, :) char
       pathsave (1, :) char
-      siteopts struct
-      opts.compression_size (1, 1) double = 1
-      opts.make_backups (1, 1) logical = true
-      opts.test_compression (1, 1) logical = false
+      simyears (:, :)
+      ncopts.test_write (1, 1) logical = true
+      ncopts.make_backups (1, 1) logical = true
+      ncopts.time_units (1, :) char {mustBeMember(ncopts.time_units, ...
+         {'hours', 'seconds'})} = 'seconds'
+      ncopts.xtype (1, :) char {mustBeMember(ncopts.xtype, ...
+         {'NC_FLOAT', 'NC_DOUBLE', 'NC_INT64', 'NC_UINT64', 'NC_INT', ...
+         'NC_UINT', 'NC_SHORT', 'NC_USHORT', 'NC_BYTE', 'NC_UBYTE', ...
+         'NC_CHAR', 'NC_STRING'})} = 'NC_FLOAT'
+      ncopts.shuffle (1, 1) logical = true
+      ncopts.deflate (1, 1) logical = true
+      ncopts.deflateLevel (1, 1) double = 1
+      ncopts.dochunking = false
    end
-   
-   % Pull out the function options
-   [comprsz, make_backups, test_compression] = deal( ...
-      opts.compression_size, opts.make_backups, opts.test_compression);
 
-   % Pull out the site options
-   [simyears, simmodel, userdata] = deal( ...
-      siteopts.simyears, siteopts.simmodel, siteopts.userdata);
-   
-   numyears = numel(simyears);
+   % Note:
+   % NC_FLOAT = single
+   % NC_INT64, NC_UINT64, NC_UINT, NC_USHORT, NC_UBYTE, NC_STRING only for nc4
 
+   % Set the file format
+   netcdf.setDefaultFormat('NC_FORMAT_NETCDF4');
+
+   % Create the output folder if it does not exist
    if ~isfolder(pathsave)
       mkdir(pathsave);
    end
-   
-   % set default format
-   netcdf.setDefaultFormat('NC_FORMAT_NETCDF4');
 
-   % For testing:
-   load(fullfile(pathdata, simmodel, userdata, '2008', 'ice1_1.mat'), 'ice1')
-   load(fullfile(pathdata, simmodel, userdata, '2008', 'ice2_1.mat'), 'ice2')
+   % Pull out the function options
+   [xtype, shuffle, deflate, deflateLevel, dochunking] = deal(ncopts.xtype, ...
+      ncopts.shuffle, ncopts.deflate, ncopts.deflateLevel, ncopts.dochunking);
 
-   ice1.Properties.VariableNames
-   fieldnames(ice2);
-
-   %% Define variables, dimensions, put the data, close the file
-
-   if test_compression == true
-
-      [varnames, longnames, units] = icemodel.netcdf.getdefaults('ice2', ...
-         {'varnames', 'longnames', 'units'});
-
+   if ncopts.test_write
+      numyears = 1;
    else
-
-      varnames = {'f_ice','f_liq','df_liq','Tice', ... % ice2
-         'Tsfc', 'runoff', 'depth_melt', 'depth_freeze', ... ice1
-         'latitude','longitude', 'x_easting','y_northing','elevation','time'};
-      longnames = {
-         'fraction of frozen water in control volume',            ...
-         'fraction of unfrozen water in control volume',          ...
-         'change in fraction of unfrozen water in control volume',...
-         'thermodynamic temperature of control volume',           ...
-         'thermodynamic temperature of ice surface',              ...
-         'cumulative melt',                                       ...
-         'cumulative refreeze',                                   ...
-         'cumulative runoff',                                     ...
-         'latitude of grid cell center',                          ...
-         'longitude of grid cell center',                         ...
-         'x-coordinate of grid cell center in EPSG:3413 WGS 84 / NSIDC Sea Ice Polar Stereographic North', ...
-         'y-coordinate of grid cell center in EPSG:3413 WGS 84 / NSIDC Sea Ice Polar Stereographic North', ...
-         'elevation above mean sea level',                        ...
-         'seconds since 1 January, 00:00'};
-      units = {'1','1','1','K','K','m w.e.','m w.e.','m w.e.',         ...
-         'degree_north','degree_east','m','m','m','s'};
+      numyears = numel(simyears);
    end
 
-   %%
-   
-   % set the dimesions
-   ncells = 3; % 1487    % store the data as a list
-   nlyrs = 500;         % number of vertical layers
-   nhrs = 8760;        % number of hours per year
+   % Define variables and attributes.
+   for v = ["dims", "ice1", "ice2"]
+      [vars.(v), longnames.(v), units.(v), axes.(v), standardnames.(v)] ...
+         = icemodel.netcdf.getdefaults(v, ...
+         {'varnames', 'longnames', 'units', 'axes', 'standardnames'});
+   end
 
-   % it's best to set these here rather than programatically
-   nvars0d = 6;  % lat, lon, x, y, elev, time
-   nvars1d = 4;  % Tsfc, melt, freeze, runoff
-   nvars2d = 4;  % Tice, f_liq, f_ice, df_liq
-   
-   
-   %%
-   % should be: volume fraction of frozen water, volume fraction of unfrozen water
-   % standardnames = {'volume fraction of frozen water','','','land_ice_temperature'};
+   % Load the grid coordinates and elevation.
+   [dims.x_easting, dims.y_northing, dims.elevation, ...
+      dims.latitude, dims.longitude] = loadIceMask("oldmask", ...
+      varnames=["X", "Y", "Elev", "Lat", "Lon"]);
 
-   nvars = numel(varnames);
+   % Set the timestep
+   switch ncopts.time_units
+      case 'seconds'
+         dt = 3600;
+      case 'hours'
+         dt = 1;
+   end
 
-   % CREATE THE FILES
+   % FOR TESTING
+   if ncopts.test_write
+      ncells = 3;
+      [dims.x_easting, dims.y_northing, dims.elevation, ...
+         dims.latitude, dims.longitude] = deal( ...
+         dims.x_easting(1:ncells), dims.y_northing(1:ncells), ...
+         dims.elevation(1:ncells), dims.latitude(1:ncells), ...
+         dims.longitude(1:ncells));
+   end
 
-   for m = 1:1 %nyrs
+   % Create the files year by year.
+   for m = 1:numyears
 
       thisyear = num2str(simyears(m));
 
-      outfilename = fullfile(pathsave, ['icemodel_' thisyear '.nc4']);
+      % Get the input data dimensions
+      [ncells, nlyrs, nhrs, chunksizes] = getDataDims(pathdata, thisyear, dims);
 
-      if isfile(outfilename)
-         backupfile(outfilename, make_backups);
-         fprintf('Moving to recycle bin: %s \n', outfilename)
-         status = recycle;
-         recycle("on");
-         delete(outfilename)
-         recycle(status);
-      end
+      % Read in the ice1 and ice2 data
+      data = allocateDataArrays(pathdata, thisyear, ncells, nhrs, ...
+         nlyrs, xtype, vars);
 
-      % Load one ice1 file to get the calendar
-      load(fullfile(pathdata, simmodel, userdata, thisyear, 'ice1_1.mat'), 'ice1')
+      % Update the time dimension
+      dims.time = 0:dt:dt*(nhrs-1);
+      units.dims = strrep(units.dims, 'time', ...
+         sprintf('%s since %s-01-01 00:00:00 -2:00', ...
+         ncopts.time_units, thisyear));
 
-      % Create the file and set 'NOFILL' to improve performance
-      ncid = netcdf.create(outfilename, 'NETCDF4');
-      netcdf.setFill(ncid, 'NC_NOFILL');
+      % Create the file
+      ncid = createNcFile(pathsave, thisyear, ncopts.make_backups);
 
-      % Define the dimensions. the unlimited dimension doesn't seem to be
-      % necessary, i got a few errors that appeared to be fixed by using it,
-      % but then once the script was finished, it works both ways. the unidata
-      % blog says compression may be degraded if unlimited is used, but the
-      % file sizes in my tests were identical
+      % Define dimensions and variables
+      defineNcDimsAndVars(ncid, ncells, nlyrs, nhrs, vars, units, axes, ...
+         longnames, standardnames, chunksizes, xtype, shuffle, deflate, ...
+         deflateLevel, dochunking)
 
-      % dimidcells = netcdf.defDim(ncid, 'cells', netcdf.getConstant('NC_UNLIMITED'));
-      dimidcells = netcdf.defDim(ncid, 'cells', ncells);
-      dimidlayers = netcdf.defDim(ncid, 'layers', nlyrs);
-      dimidtime = netcdf.defDim(ncid, 'time', nhrs);
+      % Close definition mode
+      netcdf.endDef(ncid)
 
-      dimid0d = dimidcells;
-      dimid1d = [dimidcells dimidtime];
-      dimid2d = [dimidcells dimidlayers dimidtime];
+      % Write the data
+      writeNcData(ncid, data, dims, vars)
 
-      if test_compression == true
-
-         dimids = {dimid2d, dimid2d, dimid2d, dimid2d};
-      else
-         dimids = {dimid2d, dimid2d, dimid2d, dimid2d, dimid1d, dimid1d, ...
-            dimid1d, dimid1d, dimid0d, dimid0d, dimid0d, dimid0d, ...
-            dimid0d, dimidtime};
-      end
-
-      % ALL VARS - set the varid's and attributes
-      varid = nan(nvars, 1);
-
-      if test_compression == true
-         writevars_test(pathdata, thisyear, ...
-            varid, nvars, varnames, ncid, dimids, comprsz, ...
-            longnames, units)
-      else
-
-         for p = 1:nvars
-
-            thisvar = varnames{p};
-            varid(p) = netcdf.defVar(ncid,thisvar,'NC_DOUBLE',dimids{p});
-
-            netcdf.defVarDeflate(ncid,varid(p),true,true,comprsz);
-            netcdf.putAtt(ncid,varid(p),'long_name',longnames{p});
-            netcdf.putAtt(ncid,varid(p),'units',units{p});
-         end
-
-
-         for p = 1:nvars2d + nvars1d
-
-            thisvar = varnames{p};
-            thisid = varid(p);
-
-            for n = 1:ncells
-
-               load(fullfile(pathdata, thisyear, ['ice1_' num2str(n) '.mat']), 'ice1');
-               load(fullfile(pathdata, thisyear, ['ice2_' num2str(n) '.mat']), 'ice2');
-
-               % for 2d vars, need to transpose and set nlyrs start,count
-               if p <= nvars2d
-                  data = transpose(rmleapinds(ice2.(thisvar),ice1.Time));
-                  netcdf.putVar(ncid,thisid,[n-1 0 0],[1 nlyrs nhrs],data);
-               else
-                  data = rmleapinds(ice1.(thisvar),ice1.Time);
-                  netcdf.putVar(ncid,thisid,[n-1 0],[1 nhrs],data);
-               end
-            end % ncells
-         end % nvars
-      end
-   end % nyears
-
-   %% 0-d variables
-
-   if test_compression == true
-      % do nothing, only write 2-d vars.
-   else
-
-      % init the 0-d arrays
-      vars0d.latitude = nan(ncells,1);
-      vars0d.longitude = nan(ncells,1);
-      vars0d.x_easting = nan(ncells,1);
-      vars0d.y_northing = nan(ncells,1);
-      vars0d.elevation = nan(ncells,1);
-      vars0d.time = 0:3600:3600*nhrs-1;
-
-      % read in the metfiles to get the lat/lon/x/y/elev
-      for n = 1:ncells
-
-
-         metfile = ['met_' num2str(n) '.mat'];
-         load(fullfile(pathmet, metfile), 'met');
-
-         vars0d.latitude(n) = met.Properties.CustomProperties.Lat;
-         vars0d.longitude(n) = met.Properties.CustomProperties.Lon;
-         vars0d.x_easting(n) = met.Properties.CustomProperties.X;
-         vars0d.y_northing(n) = met.Properties.CustomProperties.Y;
-         vars0d.elev(n) = met.Properties.CustomProperties.Elev;
-      end
-
-      % write the lat, lon, time vars
-      for n = 1:nvars0d-1
-         thisid = nvars1d+nvars2d+n;
-         thisvar = varnames{thisid};
-         netcdf.putVar(ncid,varid(thisid),vars0d.(thisvar));
-      end
+      % Close the file
+      netcdf.close(ncid);
    end
 
-   netcdf.close(ncid);
-
-   %% Check the result
-
-   info = ncinfo(outfilename);
-   test = ncread(outfilename,'f_liq');
-   test1 = squeeze(test(1,:,:));
-   test2 = squeeze(test(2,:,:));
-   test3 = squeeze(test(3,:,:));
-
-   figure; plot(test1(1,:)); hold on; plot(test1(2,:)); plot(test1(3,:));
-
-
-   % % % % % % % % % % % % % % % % % % % % % % % % % %
-   % % % this shows that runoff cannot be computed from f_liq after the fact,
-   % % whereas it can be computed from df_liq, so I need to save df_liq. I
-   % % should be able to compute ro_sno, cp_sno, etc from f_liq and f_ice, so I
-   % % still need to save them along with Tice
-   %
-   %
-   % vzero = zeros(size(ice2.f_liq(:,1)));
-   % df_test = [vzero diff(ice2.f_liq,1,2)];
-   %
-   % dz = 0.04;
-   % runoff_test = tocolumn(cumsum( sum( 4*dz.*df_test ) ));
-   % % runoff_test = tocolumn(cumsum( sum( dz.*ice2.df_liq ) ));
-   %
-   % figure;
-   % plot(ice1.Time,ice1.runoff); hold on;
-   % plot(ice1.Time,4.*runoff_test,':');
-
+   % Parse outputs
+   % varargout = cell(nargout, 1);
+   % switch nargout
+   %    case 1
+   %       varargout{1} = ncinfo(outfilename);
+   %    case 2
+   %       varargout{1} = ncinfo(outfilename);
+   %       varargout{2} = ncreaddata(outfilename);
+   % end
 end
 
 %%
-function writevars_test(pathdata, thisyear, varid, nvars, varnames, ...
-      ncid, dimids, comprsz, longnames, units)
+function [ncells, nlyrs, nhrs, chunksizes] = getDataDims(pathdata, thisyear, dims)
 
-   for p = 1:nvars
+   % Load one ice2 file to get the dimensions
+   load(fullfile(pathdata, thisyear, 'ice2_1.mat'), 'ice2')
 
-      thisvar = varnames{p};
-      varid(p) = netcdf.defVar(ncid,thisvar,'NC_DOUBLE',dimids{p});
+   % Set the dimensions
+   ncells = numel(dims.x_easting);        % number of grid cells
+   [nlyrs, ...                            % number of vertical layers
+      nhrs] = size(ice2.f_liq);           % number of hours per year
 
-      netcdf.defVarDeflate(ncid,varid(p),true,true,comprsz);
-      netcdf.putAtt(ncid,varid(p),'long_name',longnames{p});
-      netcdf.putAtt(ncid,varid(p),'units',units{p});
+   % Define chunkSize based on data access patterns. Larger chunk sizes
+   % increase memory usage during read/write.
+   chunksizes.ice1 = ceil([ncells/2, nhrs/2]);  % all cells, annual chunks
+   chunksizes.ice2 = ceil([1, nlyrs, nhrs/12]); % one cell, all layers, annual chunks
 
-      for n = 1:ncells
+   % chunksizes.ice1 = [ncells, nhrs];      % all cells, annual chunks
+   % chunksizes.ice2 = [1, nlyrs, nhrs];    % one cell, all layers, annual chunks
+   % chunksizes.ice1 = [ncells, 24];      % all cells, daily chunks
+   % chunksizes.ice2 = [1, nlyrs, 24];    % one cell, all layers, daily chunks
 
-         load(fullfile(pathdata, thisyear, ['ice1_' num2str(n) '.mat']), 'ice1');
-         load(fullfile(pathdata, thisyear, ['ice2_' num2str(n) '.mat']), 'ice2');
+   % default chunking was set to:
+   % [744,4392] for [1487,8784] data (ncells x nhrs)
+   % [124,42,732] for [1487,500,8784] data (ncells x nlayers x ndays)
 
-         % for 2d vars, need to transpose and set nlyrs start,count
-         data = transpose(rmleapinds(ice2.(thisvar),ice1.Time));
-         netcdf.putVar(ncid,varid(p),[n-1 0 0],[1 nlyrs nhrs],data);
-      end % ncells
-   end % nvars
+   % For the 3D data consider [X, 500, Y] where X represents a typical subset
+   % size of grid cells (could be a smaller number if you access grid cells
+   % individually or in small groups), and Y is a large fraction of nhrs that
+   % represents typical time period access patterns (e.g., several months).
+
+   % Filling the arrays must be done column-major, but what about writing them?
+   % When writing, the primary concern isn't the order of operations but
+   % ensuring the data layout in the file matches how it will be accessed later,
+   % by other programs which assume row-major.
+   %
+   % When the entire array is written at once, as it is here, the efficiency
+   % concern shifts from the order of writes to ensuring that the chunking in
+   % the NetCDF file matches your typical access patterns. If data is
+   % predominantly accessed in large contiguous blocks, having the data and
+   % chunks aligned to those access patterns is ideal.
 end
 
+%%
+function data = allocateDataArrays(pathdata, thisyear, ncells, nhrs, ...
+      nlyrs, xtype, vars)
+
+   % Note: allocate the data using matlab column-major format. Transpose the
+   % data to row-major when writing to netcdf.
+
+   % Preallocate data arrays based on specified dimensions and data type
+   data = preallocateDataArrays(vars, ncells, nhrs, nlyrs, xtype);
+
+   % Read in the ice1 and ice2 data and fill the arrays
+   filepath = fullfile(pathdata, thisyear);
+   for n = 1:ncells
+      ice1 = load(fullfile(filepath, ['ice1_' num2str(n) '.mat'])).('ice1');
+      ice2 = load(fullfile(filepath, ['ice2_' num2str(n) '.mat'])).('ice2');
+
+      for v = 1:numel(vars.ice1)
+         thisvar = vars.ice1{v};
+         data.ice1.(thisvar)(:, n) = ice1.(thisvar); % nhrs x ncells
+      end
+
+      for v = 1:numel(vars.ice2)
+         thisvar = vars.ice2{v};
+         data.ice2.(thisvar)(:, :, n) = ice2.(thisvar); % nlyrs x nhrs x ncells
+      end
+   end
+end
+function data = preallocateDataArrays(vars, ncells, nhrs, nlyrs, xtype)
+
+   matlabType = nctype2mat(xtype);
+
+   % Preallocate based on the data type
+   switch matlabType
+      case {'char', 'string', 'cell'}
+         error( ...
+            'Preallocation for %s is not supported in this function.', xtype);
+      otherwise
+
+         for v = 1:numel(vars.ice1)
+            thisvar = vars.ice1{v};
+            data.ice1.(thisvar) = zeros(nhrs, ncells, matlabType);
+         end
+
+         for v = 1:numel(vars.ice2)
+            thisvar = vars.ice2{v};
+            data.ice2.(thisvar) = zeros(nlyrs, nhrs, ncells, matlabType);
+         end
+   end
+end
+%%
+function ncid = createNcFile(pathsave, thisyear, make_backups)
+
+   % Set the output netcdf file name
+   filename = fullfile(pathsave, ['icemodel_' thisyear '.nc4']);
+
+   % Back up the file if it exists
+   if isfile(filename)
+      backupfile(filename, make_backups);
+      fprintf('Moving to recycle bin: %s \n', filename)
+      status = recycle;
+      recycle("on");
+      delete(filename)
+      recycle(status);
+   end
+
+   % Create the netcdf file.
+   ncid = netcdf.create(filename, 'NETCDF4');
+
+   % Set NOFILL to avoid writing fill values that are later replaced by data.
+   netcdf.setFill(ncid, 'NC_NOFILL');
+end
+
+%% Define netcdf file dimensions
+function dimid = defineNcDimensions(ncid, ncells, nlyrs, nhrs)
+
+   % Define the dimensions of the data arrays, in order
+   dimid.cell = netcdf.defDim(ncid, 'gridcell', ncells);
+   dimid_layer = netcdf.defDim(ncid, 'layer', nlyrs);
+   dimid.time = netcdf.defDim(ncid, 'time', nhrs);
+
+   dimid.ice1 = [dimid.cell dimid.time];
+   dimid.ice2 = [dimid.cell dimid_layer dimid.time];
+end
+
+%% Define netcdf file variables and attributes
+function defineNcDimsAndVars(ncid, ncells, nlyrs, nhrs, vars, units, axes, ...
+      longnames, standardnames, chunksize, xtype, shuffle, deflate, ...
+      deflateLevel, dochunking)
+
+   % Define the dimensions IDs.
+   dimid = defineNcDimensions(ncid, ncells, nlyrs, nhrs);
+
+   % Define the grid and time dimensions and attributes.
+   for v = 1:numel(vars.dims)
+      thisvar = vars.dims{v};
+      if thisvar == "time"
+         % Use double for time.
+         thisvid = netcdf.defVar(ncid, thisvar, 'NC_DOUBLE', dimid.time);
+      else
+         thisvid = netcdf.defVar(ncid, thisvar, 'NC_FLOAT', dimid.cell);
+      end
+      netcdf.defVarDeflate(ncid, thisvid, shuffle, deflate, deflateLevel);
+      netcdf.putAtt(ncid, thisvid, 'standard_name', standardnames.dims{v});
+      netcdf.putAtt(ncid, thisvid, 'long_name', longnames.dims{v});
+      netcdf.putAtt(ncid, thisvid, 'units', units.dims{v});
+      netcdf.putAtt(ncid, thisvid, 'axis', axes.dims{v});
+      % netcdf.putAtt(ncid, thisvid, '_FillValue', -9999);
+
+      if thisvar == "elevation"
+         netcdf.putAtt(ncid, thisvid, 'positive', 'up');
+      end
+   end
+
+   % Define the 1d variables
+   for v = 1:numel(vars.ice1)
+      thisvar = vars.ice1{v};
+      thisvid = netcdf.defVar(ncid, thisvar, xtype, dimid.ice1);
+
+      if dochunking
+         netcdf.defVarChunking(ncid, thisvid, 'CHUNKED', chunksize.ice1);
+      end
+      netcdf.defVarDeflate(ncid, thisvid, shuffle, deflate, deflateLevel);
+      netcdf.putAtt(ncid, thisvid, 'standard_name', standardnames.ice1{v});
+      netcdf.putAtt(ncid, thisvid, 'long_name', longnames.ice1{v});
+      netcdf.putAtt(ncid, thisvid, 'units', units.ice1{v});
+
+      % Can also use the 'comments' field to clarify the standard / long name
+      % netcdf.putAtt(ncid, thisvid, 'comments', '...');
+   end
+
+   % Define the 2d variables
+   for v = 1:numel(vars.ice2)
+      thisvar = vars.ice2{v};
+      thisvid = netcdf.defVar(ncid, thisvar, xtype, dimid.ice2);
+
+      if dochunking
+         netcdf.defVarChunking(ncid, thisvid, 'CHUNKED', chunksize.ice2);
+      end
+      netcdf.defVarDeflate(ncid, thisvid, shuffle, deflate, deflateLevel);
+      netcdf.putAtt(ncid, thisvid, 'standard_name', standardnames.ice1{v});
+      netcdf.putAtt(ncid, thisvid, 'long_name', longnames.ice2{v});
+      netcdf.putAtt(ncid, thisvid, 'units', units.ice2{v});
+   end
+end
+%%
+function writeNcData(ncid, data, dims, vars)
+
+   % Write the grid and time dimensions
+   for v = 1:numel(vars.dims)
+      thisvar = vars.dims{v};
+      thisvid = netcdf.inqVarID(ncid, thisvar);
+      netcdf.putVar(ncid, thisvid, dims.(thisvar));
+   end
+
+   % Write the 1d variables
+   for v = 1:numel(vars.ice1)
+      thisvar = vars.ice1{v};
+      thisvid = netcdf.inqVarID(ncid, thisvar);
+      netcdf.putVar(ncid, thisvid, data.ice1.(thisvar).');
+
+      % This writes one cell at a time. Keep this as a reminder of the access
+      % pattern: [n-1 0], [1 nhrs]
+      % for n = 1:ncells
+      %    load(fullfile(infilepath, ['ice1_' num2str(n) '.mat']), 'ice1');
+      %    netcdf.putVar(ncid, thisvid, [n-1 0], [1 nhrs], ice1.(thisvar));
+      % end
+   end
+
+   % Write the 2d variables
+   for v = 1:numel(vars.ice2)
+      thisvar = vars.ice2{v};
+      thisvid = netcdf.inqVarID(ncid, thisvar);
+      netcdf.putVar(ncid, thisvid, permute(data.ice2.(thisvar), [3 1 2]));
+
+      % This writes one cell at a time. Keep this as a reminder of the access
+      % pattern: [n-1 0 0], [1 nlyrs nhrs]
+      % for n = 1:ncells
+      %    load(fullfile(infilepath, ['ice2_' num2str(n) '.mat']), 'ice2');
+      %    netcdf.putVar(ncid, thisvid, [n-1 0 0], [1 nlyrs nhrs], ice2.(thisvar)');
+      % end
+   end
+end

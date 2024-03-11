@@ -87,7 +87,7 @@ function msg = mkncfile(filename, X, Y, ID, varnames, varargin)
          % Write data to variables
          netcdf.putVar(ncid, varid_lat, Y);
          netcdf.putVar(ncid, varid_lon, X);
-         netcdf.putVar(ncid, varid_melt, TWD(:,n));
+         netcdf.putVar(ncid, varid_melt, TWD(:, n));
          netcdf.putVar(ncid, varid_ID, ID);
 
          % Close the NetCDF file

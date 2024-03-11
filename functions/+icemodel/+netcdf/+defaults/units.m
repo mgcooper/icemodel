@@ -1,16 +1,48 @@
 function out = units(whichdata)
 
+   % Define the grid and time dimension units
+   dimunits = {
+      'degrees_north', ...
+      'degrees_east', ...
+      'm', ...
+      'm', ...
+      'm', ...
+      'time', ... replaced with 'seconds since YYYY-01-01 00:00:00' in code
+      };
+
+   % Define the variable units
    switch whichdata
 
       case 'ice1'
 
+         out = {
+            'K', ...
+            'm w.e.', ...
+            'm w.e.', ...
+            'm w.e.', ...
+            'm w.e.', ...
+            'm w.e.', ...
+            };
+
       case 'ice2'
 
-         out = {'1','1','1','K'};
+         out = {
+            'K', ...
+            '1', ...
+            '1', ...
+            '1', ...
+            };
 
       case 'met'
+
+      case {'dimensions', 'dims'}
+
+         out = dimunits;
 
       otherwise
          error('unrecognized icemodel data file name')
    end
+
+   % Return as a column
+   out = out(:);
 end
