@@ -1,13 +1,20 @@
-function [info, data] = makencfile(pathdata, pathsave, simyears, ncopts)
+function [info, data] = makencfile(pathdata, pathsave, simyears, opts, ncopts)
 
    arguments
       pathdata (1, :) char
       pathsave (1, :) char
       simyears (:, :)
-      ncopts.test_write (1, 1) logical = true
-      ncopts.make_backups (1, 1) logical = true
-      ncopts.time_units (1, :) char {mustBeMember(ncopts.time_units, ...
+
+      % Custom options
+      opts.dz (1, 1) = 0.04
+      opts.Z (1, 1) = 20;
+      opts.test_write (1, 1) logical = true
+      opts.make_backups (1, 1) logical = true
+      opts.time_units (1, :) char {mustBeMember(opts.time_units, ...
          {'hours', 'seconds'})} = 'seconds'
+      opts.dochunking = false
+
+      % netcdf api options
       ncopts.xtype (1, :) char {mustBeMember(ncopts.xtype, ...
          {'NC_FLOAT', 'NC_DOUBLE', 'NC_INT64', 'NC_UINT64', 'NC_INT', ...
          'NC_UINT', 'NC_SHORT', 'NC_USHORT', 'NC_BYTE', 'NC_UBYTE', ...
@@ -15,7 +22,6 @@ function [info, data] = makencfile(pathdata, pathsave, simyears, ncopts)
       ncopts.shuffle (1, 1) logical = true
       ncopts.deflate (1, 1) logical = true
       ncopts.deflateLevel (1, 1) double = 1
-      ncopts.dochunking = false
    end
 
    % Note:
@@ -30,11 +36,15 @@ function [info, data] = makencfile(pathdata, pathsave, simyears, ncopts)
       mkdir(pathsave);
    end
 
-   % Pull out the function options
-   [xtype, shuffle, deflate, deflateLevel, dochunking] = deal(ncopts.xtype, ...
-      ncopts.shuffle, ncopts.deflate, ncopts.deflateLevel, ncopts.dochunking);
+   % Pull out the netcdf api options
+   [xtype, shuffle, deflate, deflateLevel] = deal( ...
+      ncopts.xtype, ncopts.shuffle, ncopts.deflate, ncopts.deflateLevel);
 
-   if ncopts.test_write
+   % Pull out the function options
+   [Z, dz, time_units, make_backups, dochunking] = deal( ...
+      opts.Z, opts.dz, opts.time_units, opts.make_backups, opts.dochunking);
+
+   if opts.test_write
       numyears = 1;
    else
       numyears = numel(simyears);
@@ -53,7 +63,7 @@ function [info, data] = makencfile(pathdata, pathsave, simyears, ncopts)
       varnames=["X", "Y", "Elev", "Lat", "Lon"]);
 
    % Set the timestep
-   switch ncopts.time_units
+   switch time_units
       case 'seconds'
          dt = 3600;
       case 'hours'
@@ -61,7 +71,7 @@ function [info, data] = makencfile(pathdata, pathsave, simyears, ncopts)
    end
 
    % FOR TESTING
-   if ncopts.test_write
+   if opts.test_write
       ncells = 3;
       [dims.x_easting, dims.y_northing, dims.elevation, ...
          dims.latitude, dims.longitude] = deal( ...
@@ -76,20 +86,29 @@ function [info, data] = makencfile(pathdata, pathsave, simyears, ncopts)
       thisyear = num2str(simyears(m));
 
       % Get the input data dimensions
-      [ncells, nlyrs, nhrs, chunksizes] = getDataDims(pathdata, thisyear, dims);
+      [ncells, nlyrs, nhrs, chunksizes, ...
+         vars, units, longnames, standardnames] = getDataDims( ...
+         pathdata, thisyear, dims, ...
+         vars, units, longnames, standardnames);
+
+      % Update the depth
+      % dims.depth = dz/2:dz:(nlyrs*opts.dz);
+      dims.depth = dz/2:dz:Z;
+
+      % Overrule nlyrs
+      nlyrs = numel(dims.depth);
 
       % Read in the ice1 and ice2 data
-      data = allocateDataArrays(pathdata, thisyear, ncells, nhrs, ...
-         nlyrs, xtype, vars);
+      data = allocateDataArrays(pathdata, thisyear, ncells, nhrs, nlyrs, xtype, vars);
 
       % Update the time dimension
       dims.time = 0:dt:dt*(nhrs-1);
       units.dims = strrep(units.dims, 'time', ...
-         sprintf('%s since %s-01-01 00:00:00 -2:00', ...
-         ncopts.time_units, thisyear));
+         sprintf('%s since %s-01-01 00:00:00', ...
+         time_units, thisyear));
 
       % Create the file
-      ncid = createNcFile(pathsave, thisyear, ncopts.make_backups);
+      ncid = createNcFile(pathsave, thisyear, make_backups);
 
       % Define dimensions and variables
       defineNcDimsAndVars(ncid, ncells, nlyrs, nhrs, vars, units, axes, ...
@@ -118,15 +137,33 @@ function [info, data] = makencfile(pathdata, pathsave, simyears, ncopts)
 end
 
 %%
-function [ncells, nlyrs, nhrs, chunksizes] = getDataDims(pathdata, thisyear, dims)
+% function [ncells, nlyrs, nhrs, chunksizes] = getDataDims(pathdata, thisyear, dims)
+function [ncells, nlyrs, nhrs, chunksizes, ...
+      vars, units, longnames, standardnames] = getDataDims( ...
+      pathdata, thisyear, dims, ...
+      vars, units, longnames, standardnames)
 
    % Load one ice2 file to get the dimensions
-   load(fullfile(pathdata, thisyear, 'ice2_1.mat'), 'ice2')
+   ice1 = load(fullfile(pathdata, thisyear, 'ice1_1.mat')).('ice1');
+   ice2 = load(fullfile(pathdata, thisyear, 'ice2_1.mat')).('ice2');
+
+   % Remove variables from the dictionaries that are not present in ice1/2
+   ivars1 = ismember(vars.ice1, ice1.Properties.VariableNames);
+   ivars2 = ismember(vars.ice2, fieldnames(ice2));
+
+   vars.ice1 = vars.ice1(ivars1);
+   vars.ice2 = vars.ice2(ivars2);
+   units.ice1 = units.ice1(ivars1);
+   units.ice2 = units.ice2(ivars2);
+   longnames.ice1 = longnames.ice1(ivars1);
+   longnames.ice2 = longnames.ice2(ivars2);
+   standardnames.ice1 = standardnames.ice1(ivars1);
+   standardnames.ice2 = standardnames.ice2(ivars2);
 
    % Set the dimensions
    ncells = numel(dims.x_easting);        % number of grid cells
    [nlyrs, ...                            % number of vertical layers
-      nhrs] = size(ice2.f_liq);           % number of hours per year
+      nhrs] = size(ice2.Tice);            % number of hours per year
 
    % Define chunkSize based on data access patterns. Larger chunk sizes
    % increase memory usage during read/write.
@@ -182,7 +219,7 @@ function data = allocateDataArrays(pathdata, thisyear, ncells, nhrs, ...
 
       for v = 1:numel(vars.ice2)
          thisvar = vars.ice2{v};
-         data.ice2.(thisvar)(:, :, n) = ice2.(thisvar); % nlyrs x nhrs x ncells
+         data.ice2.(thisvar)(1:size(ice2.(thisvar), 1), :, n) = ice2.(thisvar); % nlyrs x nhrs x ncells
       end
    end
 end
@@ -199,12 +236,12 @@ function data = preallocateDataArrays(vars, ncells, nhrs, nlyrs, xtype)
 
          for v = 1:numel(vars.ice1)
             thisvar = vars.ice1{v};
-            data.ice1.(thisvar) = zeros(nhrs, ncells, matlabType);
+            data.ice1.(thisvar) = nan(nhrs, ncells, matlabType);
          end
 
          for v = 1:numel(vars.ice2)
             thisvar = vars.ice2{v};
-            data.ice2.(thisvar) = zeros(nlyrs, nhrs, ncells, matlabType);
+            data.ice2.(thisvar) = nan(nlyrs, nhrs, ncells, matlabType);
          end
    end
 end
@@ -229,18 +266,29 @@ function ncid = createNcFile(pathsave, thisyear, make_backups)
 
    % Set NOFILL to avoid writing fill values that are later replaced by data.
    netcdf.setFill(ncid, 'NC_NOFILL');
+
+   % Add user metadata
+   varid = netcdf.getConstant('GLOBAL');
+   netcdf.putAtt(ncid, varid, 'model', ['IceModel ' getenv('ICEMODEL_VERSION')]);
+   netcdf.putAtt(ncid, varid, 'created_by', getenv('USER'));
+   netcdf.putAtt(ncid, varid, 'date_created', ...
+      char(datetime("now", "Format", "dd-MMM-uuuu hh:mm:ss", "TimeZone", "UTC")));
+   netcdf.putAtt(ncid, varid, 'contact', getenv('ICEMODEL_CONTACT'));
 end
 
 %% Define netcdf file dimensions
 function dimid = defineNcDimensions(ncid, ncells, nlyrs, nhrs)
 
-   % Define the dimensions of the data arrays, in order
-   dimid.cell = netcdf.defDim(ncid, 'gridcell', ncells);
-   dimid_layer = netcdf.defDim(ncid, 'layer', nlyrs);
+   % Define the dimensions of the data arrays, in order. UPDATE: a "coordinate
+   % variable" is a "1-d variable with the same name as its dimension [e.g.,
+   % time(time) ], and it is defined as a numeric data type with values that are
+   % ordered monotonically". Thus, each dimension needs a dimid.
+   dimid.gridcell = netcdf.defDim(ncid, 'gridcell', ncells);
+   dimid.depth = netcdf.defDim(ncid, 'depth', nlyrs);
    dimid.time = netcdf.defDim(ncid, 'time', nhrs);
 
-   dimid.ice1 = [dimid.cell dimid.time];
-   dimid.ice2 = [dimid.cell dimid_layer dimid.time];
+   dimid.ice1 = [dimid.gridcell dimid.time];
+   dimid.ice2 = [dimid.gridcell dimid.depth dimid.time];
 end
 
 %% Define netcdf file variables and attributes
@@ -254,25 +302,43 @@ function defineNcDimsAndVars(ncid, ncells, nlyrs, nhrs, vars, units, axes, ...
    % Define the grid and time dimensions and attributes.
    for v = 1:numel(vars.dims)
       thisvar = vars.dims{v};
-      if thisvar == "time"
-         % Use double for time.
-         thisvid = netcdf.defVar(ncid, thisvar, 'NC_DOUBLE', dimid.time);
-      else
-         thisvid = netcdf.defVar(ncid, thisvar, 'NC_FLOAT', dimid.cell);
+
+      % Explicitly assign the fundamental dimensions. Their
+      switch thisvar
+         case "time"
+            thisvid = netcdf.defVar(ncid, thisvar, 'NC_DOUBLE', dimid.time);
+
+         case "depth"
+            thisvid = netcdf.defVar(ncid, thisvar, 'NC_FLOAT', dimid.depth);
+
+         otherwise % lat, lon, x, y, elev
+            thisvid = netcdf.defVar(ncid, thisvar, 'NC_FLOAT', dimid.gridcell);
       end
+
       netcdf.defVarDeflate(ncid, thisvid, shuffle, deflate, deflateLevel);
       netcdf.putAtt(ncid, thisvid, 'standard_name', standardnames.dims{v});
       netcdf.putAtt(ncid, thisvid, 'long_name', longnames.dims{v});
       netcdf.putAtt(ncid, thisvid, 'units', units.dims{v});
-      netcdf.putAtt(ncid, thisvid, 'axis', axes.dims{v});
       % netcdf.putAtt(ncid, thisvid, '_FillValue', -9999);
 
-      if thisvar == "elevation"
-         netcdf.putAtt(ncid, thisvid, 'positive', 'up');
+      if ~isempty(axes.dims{v})
+         netcdf.putAtt(ncid, thisvid, 'axis', axes.dims{v});
+      end
+
+      % Additional attributes
+      switch thisvar
+         case "elevation"
+            netcdf.putAtt(ncid, thisvid, 'positive', 'up');
+
+         case "depth"
+            netcdf.putAtt(ncid, thisvid, 'positive', 'down');
+
+         case "time"
+            netcdf.putAtt(ncid, thisvid, 'calendar', 'noleap');
       end
    end
 
-   % Define the 1d variables
+   % Define the 1d x time variables
    for v = 1:numel(vars.ice1)
       thisvar = vars.ice1{v};
       thisvid = netcdf.defVar(ncid, thisvar, xtype, dimid.ice1);
@@ -298,7 +364,7 @@ function defineNcDimsAndVars(ncid, ncells, nlyrs, nhrs, vars, units, axes, ...
          netcdf.defVarChunking(ncid, thisvid, 'CHUNKED', chunksize.ice2);
       end
       netcdf.defVarDeflate(ncid, thisvid, shuffle, deflate, deflateLevel);
-      netcdf.putAtt(ncid, thisvid, 'standard_name', standardnames.ice1{v});
+      netcdf.putAtt(ncid, thisvid, 'standard_name', standardnames.ice2{v});
       netcdf.putAtt(ncid, thisvid, 'long_name', longnames.ice2{v});
       netcdf.putAtt(ncid, thisvid, 'units', units.ice2{v});
    end

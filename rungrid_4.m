@@ -15,22 +15,11 @@ simyears = 2008:2018;
 pathdata = icemodel.setpath('output',sitename,simmodel,userdata);
 
 %%
+gridnums = loadZobsGridNums("round2");
 
-load('IceMask.mat')
-M = IceMask.IceMaskSLA;
-E = IceMask.Elev(M);
-X = IceMask.X(M);
-Y = IceMask.Y(M);
-filename = fullfile(getenv('ICEMODELPATH'), 'testbed','data','zobs_vars');
-load(filename, 'wspd', 'tair', 'relh')
-idx = wspd > 6.5 | tair > 274 | relh < 70;
-gridnums = find(idx);
-
-% To run all the ones that weren't rerun
-gridnums = find(~idx);
-
+% [X, Y, Elev] = loadIceMask(varnames=["X","Y","Elev"]);
 % figure
-% scatter(X(gridnums), Y(gridnums), 40, E(gridnums), 'filled')
+% scatter(X(gridnums), Y(gridnums), 40, Elev(gridnums), 'filled')
 
 %% config
 
@@ -47,7 +36,7 @@ opts = icemodel.setopts(simmodel, sitename, simyears, forcings, ...
 % E = si+ni*N-1;
 
 % S = ceil(numel(gridnums) / 2);
-S = 1033;
+S = 1047;
 E = numel(gridnums);
 
 % display the run information

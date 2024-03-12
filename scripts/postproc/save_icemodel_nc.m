@@ -1,20 +1,21 @@
 clean
 
-% There was a version of this script called _test that tested only writing the
-% 2d vars (and maybe only the 0-d vars based on the note below but the note may
-% be a mistake, it seems it tested only writing 2-d vars). In the test version,
-% comprsz was set to 9, so I added that to the if test_compression == true
-% section, but I think that was just a one-off setting, separate from the actual
-% test of including 0-d, 1-d, or 2-d vars.
+% to finish the makencfile
+% - add grid_mapping
+% - add a gridcell variable
+
+% For the new runs, test on skinmodel, mar, 2008. The raw data is 17.36 GB.
 
 savedata = true;
 sitename = 'sector';
 simyears = 2008:2018;
-simmodel = 'icemodel'; % {'icemodel', 'skinmodel'};
+simmodel = 'skinmodel'; % {'icemodel', 'skinmodel'};
 userdata = 'mar'; % {'mar', 'modis'};
 siteopts = setBasinOpts('sitename', sitename, 'simmodel', simmodel, 'userdata', userdata);
 
 make_backups = false;
+
+simyears = 2008;
 
 % % I also tested if compression is better w/o the 1-d and 2-d vars - it isn't
 % test_compression = true;
@@ -39,10 +40,7 @@ pathsave = pathdata;
 % icemodel.netcdf.makencfile(pathdata, pathsave, simyears(2:end), ...
 %    deflateLevel=9, test_write=false);
 
-icemodel.netcdf.makencfile(pathdata, pathsave, 2012, ...
-   deflateLevel=9, test_write=true);
-
-
+icemodel.netcdf.makencfile(pathdata, pathsave, simyears, deflateLevel=9, test_write=true);
 
 %%
 info = ncinfo(fullfile(pathdata, 'icemodel_2008.nc4'));
@@ -72,7 +70,50 @@ data.R = transpose(ncread(fullfile(pathdata, 'icemodel_2008.nc4'), 'runoff'));
 data.Tsfc = transpose(ncread(fullfile(pathdata, 'icemodel_2008.nc4'), 'Tsfc'));
 toc
 
+%%
 
+
+% skinmodel is not sensitive to the domain thickness, 12 versus 20, but the
+% shape of
+
+ice1_12 = ice1;
+ice2_12 = ice2;
+
+% ice1_20 = ice1;
+% ice2_20 = ice2;
+
+Z_12 = 0.02:0.04:12;
+Z_20 = 0.02:0.04:20;
+
+tidx = month(ice1.Time) == 3; % & hour(ice1.Time) == 15;
+
+figure; hold on
+plot(mean(ice2_12.Tice(:, tidx), 2), Z_12);
+plot(mean(ice2_20.Tice(:, tidx), 2), Z_20);
+legend('12', '20')
+set(gca, 'YDir', 'reverse')
+
+figure
+scatterfit(ice1_12.chf, ice1_20.chf)
+
+% the ones from december are 500 (20 m depth)
+% the ones from february are 300 (12 m depth)
+% they both have the same grid resolution, so just keep the top 300 cells
+
+
+
+ice2_1 = load('/Volumes/Samsung_T5b/icemodel/output/v10b/sector/skinmodel/mar/zobs/2009/ice2_1.mat').('ice2');
+ice2_2 = load('/Volumes/Samsung_T5b/icemodel/output/v10b/sector/skinmodel/mar/zobs/2009/ice2_2.mat').('ice2');
+
+size(ice2_1.Tice)
+size(ice2_2.Tice)
+
+12/300
+20/500
+
+
+
+%%
 %    test = ncread(outfilename,'f_liq');
 %    test1 = squeeze(test(1,:,:));
 %    test2 = squeeze(test(2,:,:));

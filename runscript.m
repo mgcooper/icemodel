@@ -4,11 +4,11 @@ clc
 
 %% set the run-specific model configuration
 savedata = false;
-sitename = 'slv2';        % options: 'kanm', 'behar'
+sitename = 'behar';        % options: 'kanm', 'behar'
 forcings = 'mar';         % options: 'mar','kanm'
 userdata = 'modis';       % options: 'modis','racmo','merra','mar','kanm','none'
 uservars = 'albedo';       % options: 'albedo', or any var in met
-simmodel = 'icemodel';    % options: 'icemodel','skinmodel'
+simmodel = 'skinmodel';    % options: 'icemodel','skinmodel'
 simyears = 2015:2015;
 
 % If sitename is 'sector', specify which grid point to run
@@ -47,7 +47,7 @@ end
 
 %% prep the output for plotting
 setzero = false;
-[Runoff, Discharge, Catchment, Melt] = prepRunoff(opts, ice1, 'setzero', setzero);
+[Runoff, Discharge, Catchment, Melt] = prepRunoff(opts, ice1, 'set_negative_runoff_zero', setzero);
 AblationHourly = prepAblation(opts, ice1, 'hourly', setzero);
 AblationDaily = prepAblation(opts, ice1, 'daily', setzero);
 
