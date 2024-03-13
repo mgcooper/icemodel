@@ -287,8 +287,37 @@ function dimid = defineNcDimensions(ncid, ncells, nlyrs, nhrs)
    dimid.depth = netcdf.defDim(ncid, 'depth', nlyrs);
    dimid.time = netcdf.defDim(ncid, 'time', nhrs);
 
+   % The first dimension in matlab is the last in netcdf. Thus ice1 will be:
+   % time x gridcell, and ice2 will be time x depth x gridcell.
    dimid.ice1 = [dimid.gridcell dimid.time];
    dimid.ice2 = [dimid.gridcell dimid.depth dimid.time];
+
+   % Note: for a lat lon or x y, it would be:
+   % dimid.ice1 = [dimid.lon dimid.lat dimid.time];
+   % dimid.ice2 = [dimid.lon dimid.lat dimid.depth dimid.time];
+   %
+   % As explained here:
+   %
+   % If any or all of the dimensions of a variable have the interpretations of
+   % "date or time" (T), "height or depth" (Z), "latitude" (Y), or "longitude"
+   % (X) then we recommend, but do not require (see Section 1.5, "Relationship
+   % to the COARDS Conventions"), those dimensions to appear in the relative
+   % order T, then Z, then Y, then X in the CDL definition corresponding to the
+   % file. All other dimensions should, whenever possible, be placed to the left
+   % of the spatiotemporal dimensions.
+
+   % NOTE: This suggests I should reverse the ordering above. However, the
+   % actual data is reversed, see ncdump -h, ordering is (time, gridcell) and
+   % (time, depth, gridcell)
+   %
+   % Also note:
+   %
+   % "we allow but do not require the units attribute of dimensionless vertical
+   % coordinates to take the values "level", "layer", or "sigma_level.""
+   %
+   % But I was unable to find a similar "units" (or "standard_name") for grid
+   % cell index
+
 end
 
 %% Define netcdf file variables and attributes
@@ -305,11 +334,15 @@ function defineNcDimsAndVars(ncid, ncells, nlyrs, nhrs, vars, units, axes, ...
 
       % Explicitly assign the fundamental dimensions. Their
       switch thisvar
-         case "time"
-            thisvid = netcdf.defVar(ncid, thisvar, 'NC_DOUBLE', dimid.time);
+
+         case "gridcell"
+            thisvid = netcdf.defVar(ncid, thisvar, 'NC_INT', dimid.gridcell);
 
          case "depth"
             thisvid = netcdf.defVar(ncid, thisvar, 'NC_FLOAT', dimid.depth);
+
+         case "time"
+            thisvid = netcdf.defVar(ncid, thisvar, 'NC_DOUBLE', dimid.time);
 
          otherwise % lat, lon, x, y, elev
             thisvid = netcdf.defVar(ncid, thisvar, 'NC_FLOAT', dimid.gridcell);
@@ -321,13 +354,25 @@ function defineNcDimsAndVars(ncid, ncells, nlyrs, nhrs, vars, units, axes, ...
       netcdf.putAtt(ncid, thisvid, 'units', units.dims{v});
       % netcdf.putAtt(ncid, thisvid, '_FillValue', -9999);
 
+      % Axis
       if ~isempty(axes.dims{v})
          netcdf.putAtt(ncid, thisvid, 'axis', axes.dims{v});
       end
 
-      % Additional attributes
+      % Additional attributes e.g. coordinates (linked to auxiliary coordinate
+      % variables), positive direction for vertical coordinates, calendar, etc.
       switch thisvar
+
+         case "gridcell"
+            netcdf.putAtt(ncid, thisvid, 'coordinates', 'longitude latitude');
+            netcdf.putAtt(ncid, thisvid, 'comment', 'A unique identifier for each grid cell');
+
+         case ["x_easting", "y_northing"]
+
+            netcdf.putAtt(ncid, thisvid, 'coordinates', 'longitude latitude');
+
          case "elevation"
+            netcdf.putAtt(ncid, thisvid, 'coordinates', 'longitude latitude');
             netcdf.putAtt(ncid, thisvid, 'positive', 'up');
 
          case "depth"
@@ -335,6 +380,9 @@ function defineNcDimsAndVars(ncid, ncells, nlyrs, nhrs, vars, units, axes, ...
 
          case "time"
             netcdf.putAtt(ncid, thisvid, 'calendar', 'noleap');
+
+         otherwise
+            % lat, lon - do not add the coordinates
       end
    end
 
@@ -350,6 +398,8 @@ function defineNcDimsAndVars(ncid, ncells, nlyrs, nhrs, vars, units, axes, ...
       netcdf.putAtt(ncid, thisvid, 'standard_name', standardnames.ice1{v});
       netcdf.putAtt(ncid, thisvid, 'long_name', longnames.ice1{v});
       netcdf.putAtt(ncid, thisvid, 'units', units.ice1{v});
+
+      netcdf.putAtt(ncid, thisvid, 'coordinates', 'longitude latitude');
 
       % Can also use the 'comments' field to clarify the standard / long name
       % netcdf.putAtt(ncid, thisvid, 'comments', '...');
@@ -367,6 +417,8 @@ function defineNcDimsAndVars(ncid, ncells, nlyrs, nhrs, vars, units, axes, ...
       netcdf.putAtt(ncid, thisvid, 'standard_name', standardnames.ice2{v});
       netcdf.putAtt(ncid, thisvid, 'long_name', longnames.ice2{v});
       netcdf.putAtt(ncid, thisvid, 'units', units.ice2{v});
+
+      netcdf.putAtt(ncid, thisvid, 'coordinates', 'longitude latitude');
    end
 end
 %%

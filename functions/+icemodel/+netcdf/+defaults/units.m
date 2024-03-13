@@ -2,12 +2,13 @@ function out = units(whichdata)
 
    % Define the grid and time dimension units
    dimunits = {
+      '1', ...              gridcell - I think units can be omitted
       'degrees_north', ... lat
       'degrees_east', ...  lon
-      'm', ...             x
-      'm', ...             y
-      'm', ...             elev
-      'm', ...             depth
+      'meters', ...        x
+      'meters', ...        y
+      'meters', ...        elev
+      'meters', ...        depth
       'time', ...          placeholder, replaced with 'seconds since YYYY-01-01 00:00:00' in code
       };
 
