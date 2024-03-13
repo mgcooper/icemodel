@@ -35,6 +35,9 @@ function info = makencfile(pathdata, pathsave, simyears, opts, ncprops)
    % NC_FLOAT = single
    % NC_INT64, NC_UINT64, NC_UINT, NC_USHORT, NC_UBYTE, NC_STRING only for nc4
 
+   % Update the API configuration
+   icemodel.netcdf.config();
+
    % Set the file format
    oldformat = netcdf.setDefaultFormat(ncprops.format);
 
@@ -64,10 +67,8 @@ function info = makencfile(pathdata, pathsave, simyears, opts, ncprops)
          {'varnames', 'longnames', 'units', 'axes', 'standardnames'});
    end
 
-   % Load the grid coordinates and elevation.
-   [dims.x_easting, dims.y_northing, dims.elevation, ...
-      dims.latitude, dims.longitude] = loadIceMask("oldmask", ...
-      varnames=["X", "Y", "Elev", "Lat", "Lon"]);
+   % Get the spatial dimension data
+   dims = icemodel.netcdf.getdimensions(Z, dz);
 
    % Set the timestep
    switch time_units
@@ -79,12 +80,13 @@ function info = makencfile(pathdata, pathsave, simyears, opts, ncprops)
 
    % FOR TESTING
    if opts.test_write
-      ncells = 3;
-      [dims.x_easting, dims.y_northing, dims.elevation, ...
-         dims.latitude, dims.longitude] = deal( ...
-         dims.x_easting(1:ncells), dims.y_northing(1:ncells), ...
-         dims.elevation(1:ncells), dims.latitude(1:ncells), ...
-         dims.longitude(1:ncells));
+      ncells = opts.test_numcells;
+      fields = fieldnames(dims);
+      for n = 1:numel(fields)
+         if ~strcmp(fields{n}, {'depth', 'time'})
+            dims.(fields{n}) = dims.(fields{n})(1:ncells);
+         end
+      end
    end
 
    % Create the files year by year.
@@ -115,7 +117,9 @@ function info = makencfile(pathdata, pathsave, simyears, opts, ncprops)
          time_units, thisyear));
 
       % Create the file
-      ncid = createNcFile(pathsave, thisyear, make_backups);
+      ncid = icemodel.netcdf.create( ...
+         fullfile(pathsave, ['icemodel_' thisyear '.nc4']), ...
+         'make_backups', make_backups);
 
       % Define dimensions and variables
       defineNcDimsAndVars(ncid, ncells, nlyrs, nhrs, vars, units, axes, ...
@@ -249,36 +253,31 @@ function data = preallocateDataArrays(vars, ncells, nhrs, nlyrs, xtype)
             data.ice2.(thisvar) = nan(nlyrs, nhrs, ncells, matlabType);
          end
    end
-end
-%%
-function ncid = createNcFile(pathsave, thisyear, make_backups)
 
-   % Set the output netcdf file name
-   filename = fullfile(pathsave, ['icemodel_' thisyear '.nc4']);
-
-   % Back up the file if it exists
-   if isfile(filename)
-      backupfile(filename, make_backups);
-      fprintf('Moving to recycle bin: %s \n', filename)
-      status = recycle;
-      recycle("on");
-      delete(filename)
-      recycle(status);
-   end
-
-   % Create the netcdf file.
-   ncid = netcdf.create(filename, 'NETCDF4');
-
-   % Set NOFILL to avoid writing fill values that are later replaced by data.
-   netcdf.setFill(ncid, 'NC_NOFILL');
-
-   % Add user metadata
-   varid = netcdf.getConstant('GLOBAL');
-   netcdf.putAtt(ncid, varid, 'model', ['IceModel ' getenv('ICEMODEL_VERSION')]);
-   netcdf.putAtt(ncid, varid, 'created_by', getenv('USER'));
-   netcdf.putAtt(ncid, varid, 'date_created', ...
-      char(datetime("now", "Format", "dd-MMM-uuuu hh:mm:ss", "TimeZone", "UTC")));
-   netcdf.putAtt(ncid, varid, 'contact', getenv('ICEMODEL_CONTACT'));
+   % The purpose of this is to return both data structs in one to later access
+   % it as data.('ice1').(thisvar) and data.('ice2').(thisvar) while also being
+   % able to just get ice1/ice2 out of this function. To use this, remove the
+   % data. prefix on ice1 and ice2 above. However, this might lead to confusion,
+   % so I reverted to the original output where it's data.ice1, or data.ice2, or
+   % data.ice1 and data.ice2.
+   % switch nargout
+   %    case 1
+   %       if all(ismember({'ice1', 'ice2'}, whichdata))
+   %          data.ice1 = ice1;
+   %          data.ice2 = ice2;
+   %          varargout{1} = data;
+   %
+   %       elseif ismember('ice1', whichdata)
+   %          varargout{1} = ice1;
+   %
+   %       elseif ismember('ice2', whichdata)
+   %          varargout{1} = ice2;
+   %       end
+   %
+   %    case 2
+   %       varargout{1} = ice1;
+   %       varargout{2} = ice2;
+   % end
 end
 
 %% Define netcdf file dimensions
