@@ -102,13 +102,13 @@ function info = makencfile(pathdata, pathsave, simyears, opts, ncprops)
 
       % Update the depth
       % dims.depth = dz/2:dz:(nlyrs*opts.dz);
-      dims.depth = dz/2:dz:Z;
 
       % Overrule nlyrs
       nlyrs = numel(dims.depth);
 
       % Read in the ice1 and ice2 data
-      data = allocateDataArrays(pathdata, thisyear, ncells, nhrs, nlyrs, xtype, vars);
+      filepath = fullfile(pathdata, thisyear);
+      data = allocateDataArrays(filepath, ncells, nhrs, nlyrs, xtype, vars, {'ice1'});
 
       % Update the time dimension
       dims.time = 0:dt:dt*(nhrs-1);
@@ -130,7 +130,7 @@ function info = makencfile(pathdata, pathsave, simyears, opts, ncprops)
       netcdf.endDef(ncid)
 
       % Write the data
-      writeNcData(ncid, data, dims, vars)
+      writeNcData(ncid, data, dims, vars, {'ice1', 'ice2'}, filepath)
 
       % Close the file
       netcdf.close(ncid);
@@ -176,11 +176,11 @@ function [ncells, nlyrs, nhrs, chunksizes, ...
 
    % Define chunkSize based on data access patterns. Larger chunk sizes
    % increase memory usage during read/write.
-   chunksizes.ice1 = ceil([ncells/2, nhrs/2]);  % all cells, annual chunks
-   chunksizes.ice2 = ceil([1, nlyrs, nhrs/12]); % one cell, all layers, annual chunks
+   % chunksizes.ice1 = ceil([ncells/2, nhrs/2]);  % all cells, annual chunks
+   % chunksizes.ice2 = ceil([1, nlyrs, nhrs/12]); % one cell, all layers, monthly chunks
 
-   % chunksizes.ice1 = [ncells, nhrs];      % all cells, annual chunks
-   % chunksizes.ice2 = [1, nlyrs, nhrs];    % one cell, all layers, annual chunks
+   chunksizes.ice1 = [ncells, nhrs];      % all cells, annual chunks
+   chunksizes.ice2 = [1, nlyrs, nhrs];    % one cell, all layers, annual chunks
    % chunksizes.ice1 = [ncells, 24];      % all cells, daily chunks
    % chunksizes.ice2 = [1, nlyrs, 24];    % one cell, all layers, daily chunks
 
@@ -206,33 +206,38 @@ function [ncells, nlyrs, nhrs, chunksizes, ...
 end
 
 %%
-function data = allocateDataArrays(pathdata, thisyear, ncells, nhrs, ...
-      nlyrs, xtype, vars)
+function data = allocateDataArrays(filepath, ncells, nhrs, ...
+      nlyrs, xtype, vars, whichdata)
 
    % Note: allocate the data using matlab column-major format. Transpose the
    % data to row-major when writing to netcdf.
 
-   % Preallocate data arrays based on specified dimensions and data type
-   data = preallocateDataArrays(vars, ncells, nhrs, nlyrs, xtype);
+   data = preallocateDataArrays(vars, ncells, nhrs, nlyrs, xtype, 'ice1');
 
-   % Read in the ice1 and ice2 data and fill the arrays
-   filepath = fullfile(pathdata, thisyear);
-   for n = 1:ncells
-      ice1 = load(fullfile(filepath, ['ice1_' num2str(n) '.mat'])).('ice1');
-      ice2 = load(fullfile(filepath, ['ice2_' num2str(n) '.mat'])).('ice2');
-
-      for v = 1:numel(vars.ice1)
-         thisvar = vars.ice1{v};
-         data.ice1.(thisvar)(:, n) = ice1.(thisvar); % nhrs x ncells
+   % Read in the ice1 data and fill the arrays
+   if ismember('ice1', whichdata)
+      for n = 1:ncells
+         ice1 = load(fullfile(filepath, ['ice1_' num2str(n) '.mat'])).('ice1');
+         for v = 1:numel(vars.ice1)
+            thisvar = vars.ice1{v};
+            data.ice1.(thisvar)(:, n) = ice1.(thisvar); % nhrs x ncells
+         end
       end
+   end
 
-      for v = 1:numel(vars.ice2)
-         thisvar = vars.ice2{v};
-         data.ice2.(thisvar)(1:size(ice2.(thisvar), 1), :, n) = ice2.(thisvar); % nlyrs x nhrs x ncells
+   % Read in the ice2 data and fill the arrays
+   if ismember('ice2', whichdata)
+      for n = 1:ncells
+         ice2 = load(fullfile(filepath, ['ice2_' num2str(n) '.mat'])).('ice2');
+         for v = 1:numel(vars.ice2)
+            thisvar = vars.ice2{v};
+            data.ice2.(thisvar)(1:size(ice2.(thisvar), 1), :, n) = ice2.(thisvar); % nlyrs x nhrs x ncells
+         end
       end
    end
 end
-function data = preallocateDataArrays(vars, ncells, nhrs, nlyrs, xtype)
+
+function data = preallocateDataArrays(vars, ncells, nhrs, nlyrs, xtype, whichdata)
 
    matlabType = nctype2mat(xtype);
 
@@ -242,15 +247,20 @@ function data = preallocateDataArrays(vars, ncells, nhrs, nlyrs, xtype)
          error( ...
             'Preallocation for %s is not supported in this function.', xtype);
       otherwise
+         % Preallocate data arrays based on specified dimensions and data type
 
-         for v = 1:numel(vars.ice1)
-            thisvar = vars.ice1{v};
-            data.ice1.(thisvar) = nan(nhrs, ncells, matlabType);
+         if ismember('ice1', whichdata)
+            for v = 1:numel(vars.ice1)
+               thisvar = vars.ice1{v};
+               data.ice1.(thisvar) = nan(nhrs, ncells, matlabType);
+            end
          end
 
-         for v = 1:numel(vars.ice2)
-            thisvar = vars.ice2{v};
-            data.ice2.(thisvar) = nan(nlyrs, nhrs, ncells, matlabType);
+         if ismember('ice2', whichdata)
+            for v = 1:numel(vars.ice2)
+               thisvar = vars.ice2{v};
+               data.ice2.(thisvar) = nan(nlyrs, nhrs, ncells, matlabType);
+            end
          end
    end
 
@@ -426,7 +436,7 @@ function defineNcDimsAndVars(ncid, ncells, nlyrs, nhrs, vars, units, axes, ...
    end
 end
 %%
-function writeNcData(ncid, data, dims, vars)
+function writeNcData(ncid, data, dims, vars, whichdata, filepath)
 
    % Write the grid and time dimensions
    for v = 1:numel(vars.dims)
@@ -436,30 +446,75 @@ function writeNcData(ncid, data, dims, vars)
    end
 
    % Write the 1d variables
-   for v = 1:numel(vars.ice1)
-      thisvar = vars.ice1{v};
-      thisvid = netcdf.inqVarID(ncid, thisvar);
-      netcdf.putVar(ncid, thisvid, data.ice1.(thisvar).');
+   if ismember('ice1', whichdata)
+      for v = 1:numel(vars.ice1)
+         thisvar = vars.ice1{v};
+         thisvid = netcdf.inqVarID(ncid, thisvar);
+         netcdf.putVar(ncid, thisvid, data.ice1.(thisvar).');
 
-      % This writes one cell at a time. Keep this as a reminder of the access
-      % pattern: [n-1 0], [1 nhrs]
-      % for n = 1:ncells
-      %    load(fullfile(infilepath, ['ice1_' num2str(n) '.mat']), 'ice1');
-      %    netcdf.putVar(ncid, thisvid, [n-1 0], [1 nhrs], ice1.(thisvar));
-      % end
+         % This writes one cell at a time. Keep this as a reminder of the access
+         % pattern: [n-1 0], [1 nhrs]
+         % for n = 1:ncells
+         %    load(fullfile(infilepath, ['ice1_' num2str(n) '.mat']), 'ice1');
+         %    netcdf.putVar(ncid, thisvid, [n-1 0], [1 nhrs], ice1.(thisvar));
+         % end
+      end
    end
 
    % Write the 2d variables
-   for v = 1:numel(vars.ice2)
-      thisvar = vars.ice2{v};
-      thisvid = netcdf.inqVarID(ncid, thisvar);
-      netcdf.putVar(ncid, thisvid, permute(data.ice2.(thisvar), [3 1 2]));
+   if ismember('ice2', whichdata)
+      for v = 1:numel(vars.ice2)
+         thisvar = vars.ice2{v};
+         thisvid = netcdf.inqVarID(ncid, thisvar);
 
-      % This writes one cell at a time. Keep this as a reminder of the access
-      % pattern: [n-1 0 0], [1 nlyrs nhrs]
-      % for n = 1:ncells
-      %    load(fullfile(infilepath, ['ice2_' num2str(n) '.mat']), 'ice2');
-      %    netcdf.putVar(ncid, thisvid, [n-1 0 0], [1 nlyrs nhrs], ice2.(thisvar)');
-      % end
+         % This writes all data at once, which does not work with 16 GB ram
+         % netcdf.putVar(ncid, thisvid, permute(data.ice2.(thisvar), [3 1 2]));
+
+         % To preallocate in chunks:
+         % chunksize = 10;
+         % for n = 1:chunksize:numel(dims.gridcell)
+         %    [s, e] = chunkLoopInds(n, 1, chunksize);
+         %    tmp = preallocateDataArrays(vars, chunksize, 8760, 500, 'NC_FLOAT', 'ice2');
+         %    for m = s:e
+         %       tmp.ice2.(thisvar)(:, :, m) = ...
+         %          load(fullfile(filepath, ['ice2_' num2str(m) '.mat'])).('ice2').(thisvar);
+         %    end
+         %    % The permute rearranges [depth time gridcell] to [gridcell depth time]
+         %    netcdf.putVar(ncid, thisvid, [s-1 0 0], size(permute(tmp.ice2.(thisvar), [3 1 2])), ...
+         %       permute(tmp.ice2.(thisvar), [3 1 2]));
+         % end
+
+         % This writes one cell at a time. Keep this as a reminder of the access
+         % pattern: [n-1 0 0], [1 nlyrs nhrs]. Make sure the [start], [count]
+         % matches the dimid and the data orientation. Here [n-1 0 0], [1 nz nt]
+         % where nz is number of depth layers and nt number of time slices. The
+         % netcdf4 data model might allow the shape of the data sent in to
+         % differ, e.g., the putVar step works when ice2.(thisvar) is
+         % transposed, but the data is scrambled.
+         for n = 1:numel(dims.gridcell)
+            load(fullfile(filepath, ['ice2_' num2str(n) '.mat']), 'ice2');
+            netcdf.putVar(ncid, thisvid, [n-1 0 0], [1 size(ice2.(thisvar))], ice2.(thisvar));
+         end
+      end
    end
+
+   % This is wrong. I thought it explained why the transpose was necessary, but
+   % in fact the transpose was wrong.
+   % recall: [gridcell x depth x time] becomes [time x depth x gridcell]
+   % so [n-1 0 0], [1 500 8760] becomes [0 0 n-1], [8760 500 1], thus the data,
+   % which is [500 x 8760], must be transposed to become [8760 x 500], which,
+   % when appended to the n-1, 0 start count, yields [0 0 n-1], [8760 500 1],
+   % which is an ideal access pattern in a column-major layout, but worst
+   % pattern in row-major, but it depends on whether the right way to think of
+   % it is in terms of how the dims are defined: [gridcell x depth x time] =
+   % [1 500 8760] (ideal for row major) or how it goes in when the data is
+   % transposed / written to disk: [8760 500 1] (ideal for column major).
+   %
+   % But this seems to contradict the full array case:
+   % the data is [500 8760 2479], which is permuted to become [2479 500 8760]
+   % the data is [nlyrs nhrs ncell] which is permuted to become [ncell nlyrs nhrs]
+   % thus permuation makes the data match the dimid: [gridcell depth time]
+   %
+   % if it's written directly to the dimensions defined in dimid:
+
 end
