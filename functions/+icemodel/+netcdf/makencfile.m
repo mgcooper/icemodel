@@ -1,4 +1,4 @@
-function [info, data] = makencfile(pathdata, pathsave, simyears, opts, ncopts)
+function info = makencfile(pathdata, pathsave, simyears, opts, ncprops)
 
    arguments
       pathdata (1, :) char
@@ -9,19 +9,26 @@ function [info, data] = makencfile(pathdata, pathsave, simyears, opts, ncopts)
       opts.dz (1, 1) = 0.04
       opts.Z (1, 1) = 20;
       opts.test_write (1, 1) logical = true
+      opts.test_numcells (1, 1) = 10
       opts.make_backups (1, 1) logical = true
       opts.time_units (1, :) char {mustBeMember(opts.time_units, ...
          {'hours', 'seconds'})} = 'seconds'
       opts.dochunking = false
 
-      % netcdf api options
-      ncopts.xtype (1, :) char {mustBeMember(ncopts.xtype, ...
+      % Netcdf api options
+      ncprops.format (1, :) char {mustBeMember(ncprops.format, ...
+         {'NC_FORMAT_CLASSIC', 'NC_FORMAT_64BIT', ...
+         'NC_FORMAT_NETCDF4', 'NC_FORMAT_NETCDF4_CLASSIC'})} ...
+         = getenv('ICEMODEL_NC_DEFAULT_FORMAT')
+
+      ncprops.xtype (1, :) char {mustBeMember(ncprops.xtype, ...
          {'NC_FLOAT', 'NC_DOUBLE', 'NC_INT64', 'NC_UINT64', 'NC_INT', ...
          'NC_UINT', 'NC_SHORT', 'NC_USHORT', 'NC_BYTE', 'NC_UBYTE', ...
-         'NC_CHAR', 'NC_STRING'})} = 'NC_FLOAT'
-      ncopts.shuffle (1, 1) logical = true
-      ncopts.deflate (1, 1) logical = true
-      ncopts.deflateLevel (1, 1) double = 1
+         'NC_CHAR', 'NC_STRING'})} ...
+         = 'NC_DOUBLE'
+      ncprops.shuffle (1, 1) logical = true
+      ncprops.deflate (1, 1) logical = true
+      ncprops.deflateLevel (1, 1) double = 1
    end
 
    % Note:
@@ -29,7 +36,7 @@ function [info, data] = makencfile(pathdata, pathsave, simyears, opts, ncopts)
    % NC_INT64, NC_UINT64, NC_UINT, NC_USHORT, NC_UBYTE, NC_STRING only for nc4
 
    % Set the file format
-   netcdf.setDefaultFormat('NC_FORMAT_NETCDF4');
+   oldformat = netcdf.setDefaultFormat(ncprops.format);
 
    % Create the output folder if it does not exist
    if ~isfolder(pathsave)
@@ -38,7 +45,7 @@ function [info, data] = makencfile(pathdata, pathsave, simyears, opts, ncopts)
 
    % Pull out the netcdf api options
    [xtype, shuffle, deflate, deflateLevel] = deal( ...
-      ncopts.xtype, ncopts.shuffle, ncopts.deflate, ncopts.deflateLevel);
+      ncprops.xtype, ncprops.shuffle, ncprops.deflate, ncprops.deflateLevel);
 
    % Pull out the function options
    [Z, dz, time_units, make_backups, dochunking] = deal( ...
@@ -125,15 +132,13 @@ function [info, data] = makencfile(pathdata, pathsave, simyears, opts, ncopts)
       netcdf.close(ncid);
    end
 
+   % Reset the file format
+   netcdf.setDefaultFormat(oldformat);
+
    % Parse outputs
-   % varargout = cell(nargout, 1);
-   % switch nargout
-   %    case 1
-   %       varargout{1} = ncinfo(outfilename);
-   %    case 2
-   %       varargout{1} = ncinfo(outfilename);
-   %       varargout{2} = ncreaddata(outfilename);
-   % end
+   if nargout > 1
+      info = ncinfo(outfilename);
+   end
 end
 
 %%
