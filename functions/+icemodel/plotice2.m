@@ -1,4 +1,4 @@
-function H = plotice2(ice2, varname, iter, zdepth, dz, dt)
+function varargout = plotice2(ice2, varname, iter, zdepth, dz, dt)
    %PLOTICE2 Plot 2-d icemodel data
 
    if isnumeric(varname)
@@ -49,4 +49,7 @@ function H = plotice2(ice2, varname, iter, zdepth, dz, dt)
    % setcolorbar(c, 'Title', varunits)
    % title(varname);
 
+   if nargout == 1
+      varargout{1} = H;
+   end
 end
