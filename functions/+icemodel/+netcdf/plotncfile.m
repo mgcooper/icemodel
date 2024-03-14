@@ -14,28 +14,28 @@ function plotncfile(f)
 end
 
 function plotice2(data, info)
-   
+
    depth = data.depth;
    tice = data.Tice;
-   
+
    % Unless/until ncreaddata orientation of data changes, the data will be:
    % [gridcell x time x depth], thus below we take the first dimension to get
    % one grid cell and average down the time dimension to get a depth profile.
-   
+
    % Extract one grid cell then take the temporal average
    tice = mean(squeeze(tice(1, :, :)), 1);
-   
-   % Plot 
+
+   % Plot
    figure
    plot(tice, depth)
    set(gca, 'YDir', 'Reverse')
    xlabel("T [oC]")
    ylabel('depth [m]')
-   
-   
+
+
    % might be able to levereage this
    % icemodel.plotice2(ice2_38, 'Tice', 8760, 20, 0.04)
-   
+
 end
 
 

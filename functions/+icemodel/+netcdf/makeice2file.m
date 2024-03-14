@@ -1,4 +1,4 @@
-function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
+function info = makeice2file(pathdata, pathsave, simmodel, forcings, ...
       userdata, simyears, opts, ncprops)
 
    arguments
@@ -73,7 +73,7 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
    end
 
    % Define variables and attributes.
-   for v = ["dims", "ice1"]
+   for v = ["dims", "ice2"]
       [vars.(v), longnames.(v), units.(v), axes.(v), standardnames.(v)] ...
          = icemodel.netcdf.getdefaults(v, ...
          {'varnames', 'longnames', 'units', 'axes', 'standardnames'});
@@ -117,13 +117,22 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
 
       % Define the output filename
       % <model>.<forcings>.<albedo>.<sitename>.<yyyy>.nc4
-      filename = [simmodel '.ice1.' forcings '.' userdata '.sw.' thisyear '.nc4'];
+      filename = [simmodel '.ice2.' forcings '.' userdata '.sw.' thisyear '.nc4'];
 
       % Get the input data dimensions
       [ncells, nlyrs, nhrs, chunksize, ...
          vars, units, longnames, standardnames] = getDataDims( ...
          pathdata, thisyear, dims, ...
          vars, units, longnames, standardnames, whichdata);
+
+      % Update the depth
+      % dims.depth = dz/2:dz:(nlyrs*opts.dz);
+
+      % Overrule nlyrs
+      nlyrs = numel(dims.depth);
+
+      % Read in the ice1 and ice2 data
+      % data = allocateDataArrays(filepath, ncells, nhrs, nlyrs, xtype, vars);
 
       % Update the time dimension
       dims.time = 0:dt:dt*(nhrs-1);
@@ -148,9 +157,9 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
          standardnames.dims, longnames.dims, units.dims, axes.dims, ...
          "shuffle", shuffle, "deflate", deflate, "deflateLevel", deflateLevel)
 
-      % Define the ice1 variables.
-      icemodel.netcdf.defdatavars(ncid, dimid.ice1, vars.ice1, ...
-         standardnames.ice1, longnames.ice1, units.ice1, chunksize, ...
+      % Define the ice2 variables.
+      icemodel.netcdf.defdatavars(ncid, dimid.ice2, vars.ice2, ...
+         standardnames.ice2, longnames.ice2, units.ice2, chunksize, ...
          xtype, dochunking, "shuffle", shuffle, "deflate", deflate, ...
          "deflateLevel", deflateLevel)
 
@@ -244,13 +253,15 @@ function [ncells, nlyrs, nhrs, chunksize, ...
 end
 
 %%
-function data = allocateDataArrays(filepath, ncells, nhrs, xtype, vars, simmodel)
+function data = allocateDataArrays(filepath, ncells, nhrs, nlyrs, xtype, vars)
    % Read in the ice1 data and fill the arrays
    %
    % Allocate data in column-major format. Transpose the
    % data to row-major when writing to netcdf.
    %
    % See also:
+
+   % Note: with [] nlyrs, this might work for both ice1 and ice2.
 
    mtype = nctype2mat(xtype);
    if ismember(mtype, {'char', 'string', 'cell'})
@@ -261,20 +272,15 @@ function data = allocateDataArrays(filepath, ncells, nhrs, xtype, vars, simmodel
    % Preallocate data arrays
    for v = 1:numel(vars)
       thisvar = vars{v};
-      data.(thisvar) = nan(nhrs, ncells, mtype);
+      data.(thisvar) = nan(nlyrs, nhrs, ncells, mtype);
    end
 
+   % Fill the arrays
    for n = 1:ncells
-      tmp = load(fullfile(filepath, ['ice1_' num2str(n) '.mat'])).('ice1');
-
-      % Set freeze zero for skinmodel (freeze is Qf, not refreeze)
-      if strcmp('skinmodel', simmodel) && isvariable('freeze', tmp)
-         tmp.freeze = 0 * tmp.freeze;
-      end
-
+      tmp = load(fullfile(filepath, ['ice2_' num2str(n) '.mat'])).('ice2');
       for v = 1:numel(vars)
          thisvar = vars{v};
-         data.(thisvar)(:, n) = tmp.(thisvar); % nhrs x ncells
+         data.(thisvar)(1:size(tmp.(thisvar), 1), :, n) = tmp.(thisvar); % nlyrs x nhrs x ncells
       end
    end
 end

@@ -20,7 +20,7 @@ function dimid = defdimid(ncid, ncells, nhrs, nlyrs)
    % with values that are ordered monotonically".
    %
    % See also:
-   
+
    % Change dimid.ice1/2 to dimid.data for standard syntax in makencfile
 
    % Define the dimensions of the data arrays, in strict order.

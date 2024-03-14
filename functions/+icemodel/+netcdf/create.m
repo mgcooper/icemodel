@@ -13,7 +13,7 @@ function varargout = create(filename, createMode, opts, ncprops, ncatts)
    %
    %  filename - Name of the NetCDF file to create.
    %  opts     - Structure with options affecting file creation behavior:
-   %     opts.make_backups - Logical flag to backup the file if it exists.
+   %     opts.makebackups - Logical flag to backup the file if it exists.
    %
    %  ncprops  - Structure with properties and global attributes for the NetCDF file:
    %     createMode      - Format of the NetCDF file.
@@ -28,7 +28,7 @@ function varargout = create(filename, createMode, opts, ncprops, ncatts)
    % Examples
    %
    %  ncid = icemodel.netcdf.create('example.nc', ...
-   %     'make_backups', true, ...
+   %     'makebackups', true, ...
    %     'format', 'NETCDF4', ...
    %     'fillMode', 'NC_NOFILL', ...
    %     'comment', 'This is a test file');
@@ -60,7 +60,7 @@ function varargout = create(filename, createMode, opts, ncprops, ncatts)
          'NETCDF4', 'CLASSIC_MODEL'})} = 'NETCDF4'
 
       % Local function options
-      opts.make_backups (1, 1) logical = true
+      opts.makebackups (1, 1) logical = true
 
       % Netcdf property values
       ncprops.fillMode (1, :) char {mustBeMember(ncprops.fillMode, ...
@@ -88,7 +88,7 @@ function varargout = create(filename, createMode, opts, ncprops, ncatts)
    end
 
    % Back up the file if it exists.
-   makebackup(filename, opts.make_backups);
+   makeBackupFile(filename, opts.makebackups);
 
    % Create the netcdf file with specified format.
    ncid = netcdf.create(filename, createMode);
@@ -118,9 +118,9 @@ function varargout = create(filename, createMode, opts, ncprops, ncatts)
    end
 end
 
-function makebackup(filename, make_backups)
+function makeBackupFile(filename, makebackups)
    if isfile(filename)
-      backupfile(filename, make_backups);
+      backupfile(filename, makebackups);
       fprintf('Moving to recycle bin: %s \n', filename)
       fprintf('Creating new file: %s \n', filename)
       status = recycle;
