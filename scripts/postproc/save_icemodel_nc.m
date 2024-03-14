@@ -7,32 +7,29 @@ clean
 % - DONE add a gridcell variable
 % - DONE figure out the auxiliary coordinate variable thing
 
-% For the new runs, test on skinmodel, mar, 2008. The raw data is 17.36 GB.
+% To deal with zobs, pick N random points from icemask X, Y, then run them with
+% runscript runpoint functionality using no rounding, compare with the saved
+% data in zobs ... if they're equivalent then there's no getting around it, I
+% should just delete the old data and use the new data. BUT, might check
+% sensitivity to numiter, bc, etc. 
+
+% file size in mb/cell for deflateLevel = 1,5,9 w/wo 1d or 0d vars
+% 1: 10.9 (10.8 w/o 1-d or 0-d vars)
+% 5: 9.4
+% 9: 9.2 (9.1 w/o 1-d or 0-d vars)
+% % I also tested if compression is better w/o the 1-d and 2-d vars - it isn't
 
 savedata = true;
 sitename = 'sector';
 simyears = 2009:2018;
 simmodel = 'skinmodel'; % {'icemodel', 'skinmodel'};
 forcings = 'mar';
-userdata = 'modis'; % {'mar', 'modis'};
+userdata = 'mar'; % {'mar', 'modis'};
 siteopts = setBasinOpts('sitename', sitename, 'simmodel', simmodel, 'userdata', userdata);
 
 make_backups = false;
 
 simyears = 2009;
-
-% % I also tested if compression is better w/o the 1-d and 2-d vars - it isn't
-% test_compression = true;
-% if test_compression == true
-%    deflateLevel = 9;           % compression size
-% else
-%    deflateLevel = 1;           % compression size
-% end
-% file size in mb/cell for min/med/max compression
-% 1: 10.9 (10.8 w/o 1-d or 0-d vars)
-% 5: 9.4
-% 9: 9.2 (9.1 w/o 1-d or 0-d vars)
-
 
 % Set path to data
 pathdata = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, simmodel, userdata);

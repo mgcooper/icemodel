@@ -74,7 +74,7 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
    end
 
    % Get the spatial dimension data
-   dims = icemodel.netcdf.getdimensions(Z, dz);
+   dims = icemodel.netcdf.getdims();
 
    % Set the timestep
    switch time_units

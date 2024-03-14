@@ -1,4 +1,14 @@
-function dims = getdimensions(Z, dz)
+function dims = getdims(Z, dz)
+   %GETDIMS Get dimensions
+   %
+   %  DIMS = GETDIMS(Z, DZ)
+   %
+   % See also:
+
+   arguments
+      Z = []
+      dz = []
+   end
 
    % Load the grid coordinates and elevation.
    [dims.x_easting, dims.y_northing, dims.elevation, ...
