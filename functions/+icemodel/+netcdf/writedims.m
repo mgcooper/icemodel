@@ -1,7 +1,8 @@
 function writedims(ncid, dims, vars)
    %WRITEDIMS Write dimensions to icemodel nc file
    %
-   % WRITEDIMS(NCID, DIMS, VARS)
+   % WRITEDIMS(NCID, DIMS, VARS) Writes the data in DIMS.(var)
+   % for each var in VARS to the file with id NCID.
    %
    % See also: icemodel.netcdf.defdimid, icemodel.netcdf.defdimvars
 

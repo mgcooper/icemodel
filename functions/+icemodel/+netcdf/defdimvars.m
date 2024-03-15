@@ -6,16 +6,16 @@ function defdimvars(ncid, dimid, vars, standardnames, longnames, units, axes, nc
    % See also:
 
    arguments
-      ncid (1, 1)
+      ncid (1, 1) {mustBeNumeric}
       dimid
       vars
       standardnames
       longnames
       units
       axes
-      ncprops.shuffle (1, 1) logical = true
-      ncprops.deflate (1, 1) logical = true
-      ncprops.deflateLevel (1, 1) double = 1
+      ncprops.shuffle (1, 1) logical {mustBeNumericOrLogical} = false
+      ncprops.deflate (1, 1) logical {mustBeNumericOrLogical} = false
+      ncprops.deflateLevel (1, 1) double {mustBeNumeric} = 1
    end
 
    for v = 1:numel(vars)

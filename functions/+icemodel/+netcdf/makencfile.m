@@ -1,31 +1,29 @@
 function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
-      userdata, simyears, opts, ncprops)
+      userdata, sitename, simyears, opts, ncprops)
 
    arguments
-      pathdata (1, :) char
-      pathsave (1, :) char
-      simmodel (1, :) char
-      forcings (1, :) char
-      userdata (1, :) char
-      simyears (:, :)
+      % required arguments
+      pathdata (1, :) char {mustBeFolder}
+      pathsave (1, :) char {mustBeFolder}
+      simmodel (1, :) char {mustBeTextScalar}
+      forcings (1, :) char {mustBeTextScalar}
+      userdata (1, :) char {mustBeTextScalar}
+      sitename (1, :) char {mustBeTextScalar}
+      simyears (:, :) double {mustBeNumeric}
 
-      % Custom options
-      opts.dz (1, 1) = 0.04
-      opts.Z (1, 1) = 20;
+      % optional arguments
+      opts.dz  (1, 1) double {mustBeNumeric} = 0
+      opts.Z   (1, 1) double {mustBeNumeric} = 0
       opts.whichdata (1, :) char {mustBeMember(opts.whichdata, ...
-         {'ice1', 'ice2', 'met'})} ...
-         = 'ice1'
-
+         {'ice1', 'ice2', 'met'})} = 'ice1'
       opts.timeunits (1, :) char {mustBeMember(opts.timeunits, ...
-         {'hours', 'seconds'})} ...
-         = 'seconds'
+         {'hours', 'seconds'})} = 'seconds'
+      opts.testwrite (1, 1) logical {mustBeNumericOrLogical} = true
+      opts.numcells (1, 1) {mustBeNumeric} = 10
+      opts.makebackups (1, 1) logical {mustBeNumericOrLogical} = true
+      opts.setchunks (1, 1) logical {mustBeNumericOrLogical} = false
 
-      opts.testwrite (1, 1) logical = true
-      opts.numcells (1, 1) = 10
-      opts.makebackups (1, 1) logical = true
-      opts.dochunking = false
-
-      % Netcdf api options
+      % netcdf api options
       ncprops.format (1, :) char {mustBeMember(ncprops.format, ...
          {'NC_FORMAT_CLASSIC', 'NC_FORMAT_64BIT', ...
          'NC_FORMAT_NETCDF4', 'NC_FORMAT_NETCDF4_CLASSIC'})} ...
@@ -34,16 +32,12 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
       ncprops.xtype (1, :) char {mustBeMember(ncprops.xtype, ...
          {'NC_FLOAT', 'NC_DOUBLE', 'NC_INT64', 'NC_UINT64', 'NC_INT', ...
          'NC_UINT', 'NC_SHORT', 'NC_USHORT', 'NC_BYTE', 'NC_UBYTE', ...
-         'NC_CHAR', 'NC_STRING'})} ...
-         = 'NC_DOUBLE'
-
-      ncprops.shuffle (1, 1) logical = true
-      ncprops.deflate (1, 1) logical = true
-      ncprops.deflateLevel (1, 1) double = 1
+         'NC_CHAR', 'NC_STRING'})} = 'NC_DOUBLE'
+      ncprops.shuffle (1, 1) logical {mustBeNumericOrLogical} = true
+      ncprops.deflate (1, 1) logical {mustBeNumericOrLogical} = true
+      ncprops.deflateLevel (1, 1) double {mustBeNumeric} = 1
    end
 
-   % Note:
-   % NC_FLOAT = single
    % NC_INT64, NC_UINT64, NC_UINT, NC_USHORT, NC_UBYTE, NC_STRING only for nc4
 
    % Update the API configuration
@@ -52,19 +46,14 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
    % Set the file format
    oldformat = netcdf.setDefaultFormat(ncprops.format);
 
-   % Create the output folder if it does not exist
-   if ~isfolder(pathsave)
-      mkdir(pathsave);
-   end
-
    % Pull out the netcdf api options
    [xtype, shuffle, deflate, deflateLevel] = deal( ...
       ncprops.xtype, ncprops.shuffle, ncprops.deflate, ncprops.deflateLevel);
 
    % Pull out the function options
-   [whichdata, Z, dz, timeunits, makebackups, dochunking] = deal( ...
+   [whichdata, Z, dz, timeunits, makebackups, setchunks] = deal( ...
       opts.whichdata, opts.Z, opts.dz, opts.timeunits, opts.makebackups, ...
-      opts.dochunking);
+      opts.setchunks);
 
    if opts.testwrite
       numyears = 1;
@@ -73,7 +62,7 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
    end
 
    % Define variables and attributes.
-   for v = ["dims", "ice1"]
+   for v = ["dims", whichdata]
       [vars.(v), longnames.(v), units.(v), axes.(v), standardnames.(v)] ...
          = icemodel.netcdf.getdefaults(v, ...
          {'varnames', 'longnames', 'units', 'axes', 'standardnames'});
@@ -89,8 +78,8 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
       standardnames.dims(drop) = [];
    end
 
-   % Get the spatial dimension data
-   dims = icemodel.netcdf.getdims(Z, dz);
+   % Get the spatial dimension data. Note: this is the only place Z,dz are used.
+   dims = icemodel.netcdf.getdimdata(Z, dz);
 
    % Set the timestep
    switch timeunits
@@ -116,8 +105,8 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
       filepath = fullfile(pathdata, thisyear);
 
       % Define the output filename
-      % <model>.<forcings>.<albedo>.<sitename>.<yyyy>.nc4
-      filename = [simmodel '.ice1.' forcings '.' userdata '.sw.' thisyear '.nc4'];
+      filename = strjoin( ...
+         {simmodel, whichdata, forcings, userdata, sitename, thisyear, 'nc4'}, '.');
 
       % Get the input data dimensions
       [ncells, nlyrs, nhrs, chunksize, ...
@@ -127,14 +116,11 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
 
       % Update the time dimension
       dims.time = 0:dt:dt*(nhrs-1);
-      units.dims = strrep(units.dims, 'time', ...
-         sprintf('%s since %s-01-01 00:00:00', ...
-         timeunits, thisyear));
+      units.dims{end} = sprintf('%s since %s-01-01 00:00:00', timeunits, thisyear);
 
       % Create the file
       ncid = icemodel.netcdf.create(fullfile(pathsave, filename), ...
          'makebackups', makebackups);
-      % job = onCleanup(@() netcdf.close(ncid));
 
       % Define the dimensions IDs.
       dimid = icemodel.netcdf.defdimid(ncid, ncells, nhrs, nlyrs);
@@ -148,10 +134,10 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
          standardnames.dims, longnames.dims, units.dims, axes.dims, ...
          "shuffle", shuffle, "deflate", deflate, "deflateLevel", deflateLevel)
 
-      % Define the ice1 variables.
-      icemodel.netcdf.defdatavars(ncid, dimid.ice1, vars.ice1, ...
-         standardnames.ice1, longnames.ice1, units.ice1, chunksize, ...
-         xtype, dochunking, "shuffle", shuffle, "deflate", deflate, ...
+      % Define the data variables.
+      icemodel.netcdf.defdatavars(ncid, dimid.(whichdata), vars.(whichdata), ...
+         standardnames.(whichdata), longnames.(whichdata), units.(whichdata), ...
+         chunksize, xtype, setchunks, "shuffle", shuffle, "deflate", deflate, ...
          "deflateLevel", deflateLevel)
 
       % Close definition mode
@@ -160,10 +146,12 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
       % Write the grid and time dimensions
       icemodel.netcdf.writedims(ncid, dims, vars.dims);
 
+      % Get the
+      data = icemodel.netcdf.getvardata(filepath, ...
+         ncells, nhrs, nlyrs, xtype, vars.(whichdata), simmodel);
+
       % Write the data
       if strcmp(whichdata, 'ice1')
-
-         data = allocateDataArrays(filepath, ncells, nhrs, xtype, vars.ice1, simmodel);
 
          icemodel.netcdf.writeice1(ncid, vars.ice1, data);
 

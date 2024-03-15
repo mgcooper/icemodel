@@ -6,8 +6,8 @@ function dims = getdimdata(Z, dz)
    % See also:
 
    arguments
-      Z = []
-      dz = []
+      Z  (1, 1) double {mustBeNumeric} = 0
+      dz (1, 1) double {mustBeNumeric} = 0
    end
 
    % Load the grid coordinates and elevation.

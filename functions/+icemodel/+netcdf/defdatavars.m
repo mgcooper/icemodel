@@ -7,18 +7,21 @@ function defdatavars(ncid, dimid, vars, standardnames, longnames, ...
    % See also:
 
    arguments
-      ncid (1, 1)
+      ncid (1, 1) {mustBeNumeric}
       dimid
       vars
       standardnames
       longnames
       units
       chunksize
-      xtype
-      dochunking = false
-      ncprops.shuffle (1, 1) logical = true
-      ncprops.deflate (1, 1) logical = true
-      ncprops.deflateLevel (1, 1) double = 1
+      xtype (1, :) char {mustBeMember(xtype, ...
+         {'NC_FLOAT', 'NC_DOUBLE', 'NC_INT64', 'NC_UINT64', 'NC_INT', ...
+         'NC_UINT', 'NC_SHORT', 'NC_USHORT', 'NC_BYTE', 'NC_UBYTE', ...
+         'NC_CHAR', 'NC_STRING'})} = 'NC_DOUBLE'
+      dochunking (1, 1) logical {mustBeNumericOrLogical} = false
+      ncprops.shuffle (1, 1) logical {mustBeNumericOrLogical} = true
+      ncprops.deflate (1, 1) logical {mustBeNumericOrLogical} = true
+      ncprops.deflateLevel (1, 1) double {mustBeNumeric} = 1
    end
 
    % Define the data variables. NOTE: each variable must have the same dimid
