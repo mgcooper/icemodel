@@ -1,7 +1,7 @@
-function dims = getdims(Z, dz)
-   %GETDIMS Get dimensions
+function dims = getdimdata(Z, dz)
+   %GETDIMDATA Get dimension data
    %
-   %  DIMS = GETDIMS(Z, DZ)
+   %  DIMS = GETDIMDATA(Z, DZ)
    %
    % See also:
 
