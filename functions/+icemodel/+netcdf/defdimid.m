@@ -24,7 +24,7 @@ function dimid = defdimid(ncid, ncells, nhrs, nlyrs)
    % Change dimid.ice1/2 to dimid.data for standard syntax in makencfile
 
    % Define the dimensions of the data arrays, in strict order.
-   if nargin < 4 || isempty(nlyrs)
+   if nargin < 4 || nlyrs == 1
 
       dimid.gridcell = netcdf.defDim(ncid, 'gridcell', ncells);
       dimid.time = netcdf.defDim(ncid, 'time', nhrs);

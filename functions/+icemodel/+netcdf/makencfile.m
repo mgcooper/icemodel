@@ -179,44 +179,49 @@ function [ncells, nlyrs, nhrs, chunksize, ...
       pathdata, thisyear, dims, ...
       vars, units, longnames, standardnames, whichdata)
 
-   % Load one file to get the dimensions
+   % Load one file to get a sample of the data
+   tmp = load(fullfile(pathdata, thisyear, [whichdata '_1.mat'])).(whichdata);
+
    switch whichdata
       case 'ice1'
+         data = tmp.Tsfc.'; % transpose so it is nlyrs x nhrs
+         allvars = tmp.Properties.VariableNames;
 
-         ice1 = load(fullfile(pathdata, thisyear, 'ice1_1.mat')).('ice1');
+      case 'ice2'
+         data = tmp.Tice;
+         allvars = fieldnames(tmp);
+   end
 
-         % Set the dimensions
-         ncells = numel(dims.x_easting);        % number of grid cells
-         nhrs = height(ice1);                   % number of hours per year
-         nlyrs = [];                            % set empty for ice1
+   % Remove variables from the dictionaries that are not present in the data
+   [vars, units, longnames, standardnames] = trimvars( ...
+      vars, units, longnames, standardnames, allvars, whichdata);
 
-         allvars = ice1.Properties.VariableNames;
+   % Get the dimensions of the data
+   ncells = numel(dims.x_easting);  % number of grid cells
+   [nlyrs, ...                      % number of hours per year
+      nhrs] = size(data);           % number of vertical layers
 
-         chunksize = [ncells, nhrs];            % all cells, annual chunks
-         % chunksize = [ncells, 24];            % all cells, daily chunks
+   % Set the chunksizes
+   switch whichdata
+      case 'ice1'
+         chunksize = [ncells, nhrs];   % all cells, annual chunks
 
       case 'ice2'
 
-         ice2 = load(fullfile(pathdata, thisyear, 'ice2_1.mat')).('ice2');
+         % This updates the depth dimension values for the case where ice2 files
+         % have different Z. However, this uses the test file loaded above, thus
+         % if each individual ice2 file is written to an nc file, this would
+         % need to be updated in writeice2. If multiple ice2 files are written
+         % to one nc file, then the supplied opts.dz/Z should be used and
+         % possibly NOFILL removed to account for different sized arrays.
 
-         % Set the dimensions
-         ncells = numel(dims.x_easting);        % number of grid cells
-         [nlyrs, ...                            % number of vertical layers
-            nhrs] = size(ice2.Tice);            % number of hours per year
+         % dims.depth = dz/2:dz:(nlyrs*opts.dz);
 
-         allvars = fieldnames(ice2);
+         % Overrule nlyrs with the value set by opts.Z/dz
+         nlyrs = numel(dims.depth);
 
-         chunksize = [1, nlyrs, nhrs];             % one cell, all layers, annual
-         % chunksize = ceil([1, nlyrs, nhrs/12]);  % one cell, all layers, monthly
-         % chunksize = [1, nlyrs, 24];             % one cell, all layers, daily
+         chunksize = [1, nlyrs, nhrs]; % one cell, all layers, annual
    end
-
-   % Remove variables from the dictionaries that are not present in ice1/2
-   ivars = ismember(vars.(whichdata), allvars);
-   vars.(whichdata) = vars.(whichdata)(ivars);
-   units.(whichdata) = units.(whichdata)(ivars);
-   longnames.(whichdata) = longnames.(whichdata)(ivars);
-   standardnames.(whichdata) = standardnames.(whichdata)(ivars);
 
    % Define chunkSize based on data access patterns. Larger chunk sizes
    % increase memory usage during read/write.
@@ -229,40 +234,15 @@ function [ncells, nlyrs, nhrs, chunksize, ...
    % efficiency by ensuring the data layout in the file matches how it is
    % accessed later. If data is predominantly accessed in large contiguous
    % blocks, having the data and chunks aligned to those patterns is ideal.
+
 end
 
-%%
-function data = allocateDataArrays(filepath, ncells, nhrs, xtype, vars, simmodel)
-   % Read in the ice1 data and fill the arrays
-   %
-   % Allocate data in column-major format. Transpose the
-   % data to row-major when writing to netcdf.
-   %
-   % See also:
+function [vars, units, longnames, standardnames] = trimvars( ...
+      vars, units, longnames, standardnames, allvars, whichdata)
 
-   mtype = nctype2mat(xtype);
-   if ismember(mtype, {'char', 'string', 'cell'})
-      error( ...
-         'Preallocation for %s is not supported in this function.', xtype);
-   end
-
-   % Preallocate data arrays
-   for v = 1:numel(vars)
-      thisvar = vars{v};
-      data.(thisvar) = nan(nhrs, ncells, mtype);
-   end
-
-   for n = 1:ncells
-      tmp = load(fullfile(filepath, ['ice1_' num2str(n) '.mat'])).('ice1');
-
-      % Set freeze zero for skinmodel (freeze is Qf, not refreeze)
-      if strcmp('skinmodel', simmodel) && isvariable('freeze', tmp)
-         tmp.freeze = 0 * tmp.freeze;
-      end
-
-      for v = 1:numel(vars)
-         thisvar = vars{v};
-         data.(thisvar)(:, n) = tmp.(thisvar); % nhrs x ncells
-      end
-   end
+   ivars = ismember(vars.(whichdata), allvars);
+   vars.(whichdata) = vars.(whichdata)(ivars);
+   units.(whichdata) = units.(whichdata)(ivars);
+   longnames.(whichdata) = longnames.(whichdata)(ivars);
+   standardnames.(whichdata) = standardnames.(whichdata)(ivars);
 end
