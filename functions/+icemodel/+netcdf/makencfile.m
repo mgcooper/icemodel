@@ -23,6 +23,9 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
       opts.makebackups (1, 1) logical {mustBeNumericOrLogical} = true
       opts.setchunks (1, 1) logical {mustBeNumericOrLogical} = false
 
+      opts.GetSizeFromData (1, :) logical {mustBeNumericOrLogical} = true
+      opts.GetSizeFromDims (1, :) logical {mustBeNumericOrLogical} = false
+
       % netcdf api options
       ncprops.format (1, :) char {mustBeMember(ncprops.format, ...
          {'NC_FORMAT_CLASSIC', 'NC_FORMAT_64BIT', ...
@@ -40,6 +43,9 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
 
    % NC_INT64, NC_UINT64, NC_UINT, NC_USHORT, NC_UBYTE, NC_STRING only for nc4
 
+   % ---------------------------------------------------------------------
+   % ----------------------------  Parse inputs and set parameters
+
    % Update the API configuration
    icemodel.netcdf.config();
 
@@ -55,109 +61,129 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
       opts.whichdata, opts.Z, opts.dz, opts.timeunits, opts.makebackups, ...
       opts.setchunks);
 
-   if opts.testwrite
-      numyears = 1;
-   else
-      numyears = numel(simyears);
-   end
-
-   % Define variables and attributes.
-   for v = ["dims", whichdata]
-      [vars.(v), longnames.(v), units.(v), axes.(v), standardnames.(v)] ...
-         = icemodel.netcdf.getdefaults(v, ...
-         {'varnames', 'longnames', 'units', 'axes', 'standardnames'});
-   end
-
-   % Remove 'depth'
-   if strcmp(whichdata, 'ice1')
-      drop = ismember(vars.dims, 'depth');
-      vars.dims(drop) = [];
-      axes.dims(drop) = [];
-      units.dims(drop) = [];
-      longnames.dims(drop) = [];
-      standardnames.dims(drop) = [];
-   end
-
-   % Get the spatial dimension data. Note: this is the only place Z,dz are used.
-   dims = icemodel.netcdf.getdimdata(Z, dz);
-
    % Set the timestep
+   T = 8760; % update inside the loop to support leap years
    switch timeunits
       case 'seconds'
          dt = 3600;
       case 'hours'
          dt = 1;
    end
+   numyears = numel(simyears);
 
-   % FOR TESTING
-   if opts.testwrite
-      for f = fieldnames(dims)'
-         if ~strcmp(f{:}, {'depth', 'time'})
-            dims.(f{:}) = dims.(f{:})(1:opts.numcells);
-         end
-      end
+   % ---------------------------------------------------------------------
+   % ----------------------------  Define variables and attributes.
+
+   for v = ["dims", whichdata]
+      [varnames.(v), longnames.(v), units.(v), axes.(v), standardnames.(v)] ...
+         = icemodel.netcdf.getdefaults(v, ...
+         {'varnames', 'longnames', 'units', 'axes', 'standardnames'});
    end
 
-   % Create the files year by year.
+   % I commented this out to test if I could get ice1 to work w/o it and it
+   % does, the reason it works is because of the try-catch in writedims and the
+   % if-else in defdimvars. Once getdefaults is refactored to use explcit
+   % fieldnames, those should be able to be removed.
+   %
+   % % Remove 'depth' dim from ice1 - this is done for defdimvars
+   % [varnames, axes, units, longnames, standardnames] = dropdims(whichdata, ...
+   %    varnames, axes, units, longnames, standardnames);
+
+   % ---------------------------------------------------------------------
+   % ----------------------------  Create the files year by year
    for m = 1:numyears
 
       thisyear = num2str(simyears(m));
       filepath = fullfile(pathdata, thisyear);
 
       % Define the output filename
-      filename = strjoin( ...
-         {simmodel, whichdata, forcings, userdata, sitename, thisyear, 'nc4'}, '.');
+      filename = fullfile(pathsave, strjoin( ...
+         {simmodel, whichdata, forcings, userdata, sitename, thisyear, 'nc4'}, '.'));
 
-      % Get the input data dimensions
-      [ncells, nlyrs, nhrs, chunksize, ...
-         vars, units, longnames, standardnames] = getDataDims( ...
-         pathdata, thisyear, dims, ...
-         vars, units, longnames, standardnames, whichdata);
+      % Get the spatial and time dimension data. This is the only place Z,dz,T,dt are used.
+      dimdata = icemodel.netcdf.getdimdata(Z, dz, T, dt);
 
-      % Update the time dimension
-      dims.time = 0:dt:dt*(nhrs-1);
-      units.dims{end} = sprintf('%s since %s-01-01 00:00:00', timeunits, thisyear);
+      % Need to update dimdata directly from data here before passing dimdata to
+      % other functions which use getdimsize.
+      [datavars, datasize] = icemodel.netcdf.getvarinfo(filepath, whichdata, 1);
+
+      % NOTE: I think I need to actually reset dimdata with the datasize
+      if opts.GetSizeFromData
+
+         % The problem is when Z, dz are default 0, then dimdata.depth is an
+         % empty double, so it needs to be getdimsfromdata ... so this is just a
+         % test here to reset dimdata.depth but either need to enforce explicit
+         % Z, dz or refactor
+
+         % dimdata.depth = ... yeah so this is the problem, we don't know Z, dz
+         % so just enforce it
+
+      elseif opts.GetSizeFromDims
+      end
+
+
+
+      % ------------------------------------------------------------------
+      % Content in this section is to be removed or only for testing
+
+      % For testing on fewer grid cells
+      dimdata = resetDimData(dimdata, opts);
+
+      % Remove variables from the dictionaries that are not present in the data
+
+      % Note: The problem here is if the datavars change, then varnames, units,
+      % longnames, and standardnames are trimmed and cannot be reset
+
+      [varnames, units, longnames, standardnames] = trimvars(whichdata, ...
+         varnames, units, longnames, standardnames, datavars);
+
+      % If setting the dimensions directly from the data, then getchunksize and
+      % defdimid need to get the same values.
+
+      % ------------------------------------------------------------------
+
+      chunksizes = icemodel.netcdf.getchunksize(whichdata, dimdata, datasize, ...
+         "GetSizeFromData", true, "GetSizeFromDims", false);
+
+      % Update the time units for this year
+      units = settimeunits(units, timeunits, thisyear);
 
       % Create the file
-      ncid = icemodel.netcdf.create(fullfile(pathsave, filename), ...
-         'makebackups', makebackups);
+      ncid = icemodel.netcdf.create(filename, 'makebackups', makebackups);
 
       % Define the dimensions IDs.
-      dimid = icemodel.netcdf.defdimid(ncid, ncells, nhrs, nlyrs);
-
-      % Note: dimid is passed to defdimvars b/c each dim has a named dimid i.e.
-      % dimid.gridcell, dimid.time, but defdatavars only needs the data dimid so
-      % can pass dimid.ice1/2 (or dimid.data if it is redefined in defdimid).
+      dimid = icemodel.netcdf.defdimid(ncid, dimdata, datasize, ...
+         "GetSizeFromData", true, "GetSizeFromDims", false);
 
       % Define the grid and time dimensions and attributes.
-      icemodel.netcdf.defdimvars(ncid, dimid, vars.dims, ...
+      icemodel.netcdf.defdimvars(ncid, dimid, varnames.dims, ...
          standardnames.dims, longnames.dims, units.dims, axes.dims, ...
          "shuffle", shuffle, "deflate", deflate, "deflateLevel", deflateLevel)
 
       % Define the data variables.
-      icemodel.netcdf.defdatavars(ncid, dimid.(whichdata), vars.(whichdata), ...
+      icemodel.netcdf.defdatavars(ncid, dimid.(whichdata), varnames.(whichdata), ...
          standardnames.(whichdata), longnames.(whichdata), units.(whichdata), ...
-         chunksize, xtype, setchunks, "shuffle", shuffle, "deflate", deflate, ...
+         chunksizes, xtype, setchunks, "shuffle", shuffle, "deflate", deflate, ...
          "deflateLevel", deflateLevel)
 
       % Close definition mode
       netcdf.endDef(ncid)
 
       % Write the grid and time dimensions
-      icemodel.netcdf.writedims(ncid, dims, vars.dims);
+      icemodel.netcdf.writedims(ncid, dimdata, varnames.dims);
 
       % Get the
-      data = icemodel.netcdf.getvardata(filepath, ...
-         ncells, nhrs, nlyrs, xtype, vars.(whichdata), simmodel);
+      data = icemodel.netcdf.getvardata(filepath, varnames.(whichdata), ...
+         dimdata, xtype, simmodel);
 
       % Write the data
       if strcmp(whichdata, 'ice1')
 
-         icemodel.netcdf.writeice1(ncid, vars.ice1, data);
+         icemodel.netcdf.writeice1(ncid, varnames.ice1, data);
 
       elseif strcmp(whichdata, 'ice2')
 
-         icemodel.netcdf.writeice2(ncid, vars.ice2, dims, filepath);
+         icemodel.netcdf.writeice2(ncid, varnames.ice2, dimdata, filepath);
       end
 
       % Close the file
@@ -173,68 +199,29 @@ function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
    end
 end
 
-%%
-function [ncells, nlyrs, nhrs, chunksize, ...
-      vars, units, longnames, standardnames] = getDataDims( ...
-      pathdata, thisyear, dims, ...
-      vars, units, longnames, standardnames, whichdata)
+%% trim varnames
+function [varnames, units, longnames, standardnames] = trimvars(whichdata, ...
+      varnames, units, longnames, standardnames, datavars)
 
-   % Load one file to get a sample of the data
-   tmp = load(fullfile(pathdata, thisyear, [whichdata '_1.mat'])).(whichdata);
+   ivars = ismember(varnames.(whichdata), datavars);
+   varnames.(whichdata) = varnames.(whichdata)(ivars);
+   units.(whichdata) = units.(whichdata)(ivars);
+   longnames.(whichdata) = longnames.(whichdata)(ivars);
+   standardnames.(whichdata) = standardnames.(whichdata)(ivars);
+end
 
-   switch whichdata
-      case 'ice1'
-         data = tmp.Tsfc.'; % transpose so it is nlyrs x nhrs
-         allvars = tmp.Properties.VariableNames;
+%% drop dims
+function [varnames, axes, units, longnames, standardnames] = dropdims( ...
+      whichdata, varnames, axes, units, longnames, standardnames)
 
-      case 'ice2'
-         data = tmp.Tice;
-         allvars = fieldnames(tmp);
+   if strcmp(whichdata, 'ice1')
+      drop = ismember(varnames.dims, 'depth');
+      varnames.dims(drop) = [];
+      axes.dims(drop) = [];
+      units.dims(drop) = [];
+      longnames.dims(drop) = [];
+      standardnames.dims(drop) = [];
    end
-
-   % Remove variables from the dictionaries that are not present in the data
-   [vars, units, longnames, standardnames] = trimvars( ...
-      vars, units, longnames, standardnames, allvars, whichdata);
-
-   % Get the dimensions of the data
-   ncells = numel(dims.x_easting);  % number of grid cells
-   [nlyrs, ...                      % number of hours per year
-      nhrs] = size(data);           % number of vertical layers
-
-   % Set the chunksizes
-   switch whichdata
-      case 'ice1'
-         chunksize = [ncells, nhrs];   % all cells, annual chunks
-
-      case 'ice2'
-
-         % This updates the depth dimension values for the case where ice2 files
-         % have different Z. However, this uses the test file loaded above, thus
-         % if each individual ice2 file is written to an nc file, this would
-         % need to be updated in writeice2. If multiple ice2 files are written
-         % to one nc file, then the supplied opts.dz/Z should be used and
-         % possibly NOFILL removed to account for different sized arrays.
-
-         % dims.depth = dz/2:dz:(nlyrs*opts.dz);
-
-         % Overrule nlyrs with the value set by opts.Z/dz
-         nlyrs = numel(dims.depth);
-
-         chunksize = [1, nlyrs, nhrs]; % one cell, all layers, annual
-   end
-
-   % Define chunkSize based on data access patterns. Larger chunk sizes
-   % increase memory usage during read/write.
-   %
-   % When writing, the primary concern is reducing the number of writes.
-   % Thus writing the entire array at once is typically ideal, and the
-   % netcdf software will determine the chunk size.
-   %
-   % However, if typical access patterns are known, chunking can improve
-   % efficiency by ensuring the data layout in the file matches how it is
-   % accessed later. If data is predominantly accessed in large contiguous
-   % blocks, having the data and chunks aligned to those patterns is ideal.
-
 end
 
 %% set time units
@@ -243,9 +230,14 @@ function units = settimeunits(units, timeunits, thisyear)
    units.dims{itime} = sprintf('%s since %s-01-01 00:00:00', timeunits, thisyear);
 end
 
-   ivars = ismember(vars.(whichdata), allvars);
-   vars.(whichdata) = vars.(whichdata)(ivars);
-   units.(whichdata) = units.(whichdata)(ivars);
-   longnames.(whichdata) = longnames.(whichdata)(ivars);
-   standardnames.(whichdata) = standardnames.(whichdata)(ivars);
+%% reset testdims
+function dims = resetDimData(dims, opts)
+   % FOR TESTING
+   if opts.testwrite
+      for f = fieldnames(dims)'
+         if ~strcmp(f{:}, {'depth', 'time'})
+            dims.(f{:}) = dims.(f{:})(1:opts.numcells);
+         end
+      end
+   end
 end

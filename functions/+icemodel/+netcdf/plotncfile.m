@@ -1,19 +1,19 @@
-function plotncfile(f)
+function plotncfile(f, gridcells)
 
    info = ncparse(f);
    data = ncreaddata(f);
 
    if ismember("Tice", info.Name)
 
-      plotice2(data, info);
+      plotice2(data, info, gridcells);
 
    elseif ismember("Tsfc", info.Name)
 
-      plotice1(data, info);
+      plotice1(data, info, gridcells);
    end
 end
 
-function plotice2(data, info)
+function plotice2(data, info, gridcells)
 
    depth = data.depth;
    tice = data.Tice;
@@ -22,15 +22,24 @@ function plotice2(data, info)
    % [gridcell x time x depth], thus below we take the first dimension to get
    % one grid cell and average down the time dimension to get a depth profile.
 
-   % Extract one grid cell then take the temporal average
-   tice = mean(squeeze(tice(1, :, :)), 1);
+   % Extract the grid cells then take the temporal average
+   tice = tice(gridcells, :, :);
+
+   tice_avg = squeeze(mean(tice, 1));
 
    % Plot
    figure
-   plot(tice, depth)
+   plot(tice_avg, depth)
    set(gca, 'YDir', 'Reverse')
    xlabel("T [oC]")
    ylabel('depth [m]')
+   % title('annual average')
+
+   % Plot each grid cell if fewer than 15
+   if numel(gridcell) < 15
+      % or mabye call this from a loop
+
+   end
 
 
    % might be able to levereage this

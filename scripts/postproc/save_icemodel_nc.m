@@ -1,5 +1,19 @@
 clean
 
+% BEFORE DELETING OR RUNNING MORE, WALK THROIUGH THE TRIMVARS THING, IT SEEMS
+% REALLY PROBLEMATIC E.G. IF THE VARS CHANGE DURING A LOOP 
+
+% WHERE TO PICK UP: I got hung up on the damn set dims from data or not thing,
+% I think the trimvars thing actually would be problemetaic if the dta did
+% change during the years because the fields are not reset, but that doesn't
+% affect the data curently saved, it affected the dat on pnnl compter where i
+% had older data mixed with newer and the fields were different
+% so when picking up, need to finish the notes on teh text doc about brace
+% indexing vs explicit fieldname indexing. Currently it all works for both ice1
+% and ice2 but that needs to be fixed
+
+% also add runoff to the verify script
+
 % to finish the makencfile
 % - add grid_mapping
 % - decide how to deal with zobs
@@ -50,7 +64,7 @@ siteopts = setBasinOpts('sitename', sitename, 'simmodel', simmodel, 'userdata', 
 
 make_backups = false;
 
-% simyears = 2009;
+simyears = 2009:2010;
 
 % Set path to data
 pathdata = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, simmodel, userdata);
@@ -65,20 +79,22 @@ pathsave = pathdata;
 % ice 1
 icemodel.netcdf.makencfile(pathdata, pathsave, simmodel, forcings, ...
    userdata, 'sw', simyears, whichdata='ice1', xtype='NC_DOUBLE', ...
-   deflateLevel=9, testwrite=false);
+   deflateLevel=9, testwrite=true);
 
 % ice 2
-% icemodel.netcdf.makencfile(pathdata, pathsave, simmodel, forcings, ...
-%    userdata, 'sw', simyears, whichdata='ice2', xtype='NC_FLOAT', ...
-%    deflateLevel=9, testwrite=true);
+icemodel.netcdf.makencfile(pathdata, pathsave, simmodel, forcings, ...
+   userdata, 'sw', simyears, whichdata='ice2', xtype='NC_FLOAT', ...
+   deflateLevel=9, testwrite=true, Z=20, dz=0.04);
 
 
 %% Check x, y, lat, lon, grid cell, time
 
-filelist = listfiles(pathdata, pattern="nc4", aslist=true, fullpath=true);
+filelist = listfiles(pathdata, pattern="ice2", aslist=true, fullpath=true);
 f = filelist{1};
 data = ncreaddata(f);
 % icemodel.netcdf.plotncfile(f)
+
+verify_ncfile(pathdata, 'ice2')
 
 %%
 

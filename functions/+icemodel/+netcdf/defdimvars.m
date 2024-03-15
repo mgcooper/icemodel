@@ -13,8 +13,8 @@ function defdimvars(ncid, dimid, vars, standardnames, longnames, units, axes, nc
       longnames
       units
       axes
-      ncprops.shuffle (1, 1) logical {mustBeNumericOrLogical} = false
-      ncprops.deflate (1, 1) logical {mustBeNumericOrLogical} = false
+      ncprops.shuffle (1, 1) logical {mustBeNumericOrLogical} = true
+      ncprops.deflate (1, 1) logical {mustBeNumericOrLogical} = true
       ncprops.deflateLevel (1, 1) double {mustBeNumeric} = 1
    end
 

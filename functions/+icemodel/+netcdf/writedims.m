@@ -9,7 +9,16 @@ function writedims(ncid, dims, vars)
    % Write the grid and time dimensions
    for v = 1:numel(vars)
       thisvar = vars{v};
-      thisvid = netcdf.inqVarID(ncid, thisvar);
+      try
+         thisvid = netcdf.inqVarID(ncid, thisvar);
+      catch e
+         if contains(e.message, 'Variable not found (NC_ENOTVAR)')
+            % This catches the case where dims contains "depth"
+            continue
+         else
+            rethrow(e)
+         end
+      end
       netcdf.putVar(ncid, thisvid, dims.(thisvar));
    end
 end

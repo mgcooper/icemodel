@@ -1,7 +1,7 @@
-function dimid = defdimid(ncid, ncells, nhrs, nlyrs)
+function dimid = defdimid(ncid, dimdata, datasize, opts)
    %DEFDIMID Define icemodel netcdf file dimensions
    %
-   %  DIMID = DEFDIMID(NCID, NCELLS, NHRS, NLYRS)
+   %  DIMID = DEFDIMID(NCID, DIMDATA)
    %
    % CF conventions suggest but do not require the dimensions appear in the
    % order: T, Z, Y, X. However, the first dimension in matlab is the last in
@@ -21,19 +21,40 @@ function dimid = defdimid(ncid, ncells, nhrs, nlyrs)
    %
    % See also:
 
+   arguments
+      ncid
+      dimdata
+      datasize
+      opts.GetSizeFromData (1, :) logical {mustBeNumericOrLogical} = true
+      opts.GetSizeFromDims (1, :) logical {mustBeNumericOrLogical} = false
+   end
+
    % Change dimid.ice1/2 to dimid.data for standard syntax in makencfile
 
-   % Define the dimensions of the data arrays, in strict order.
-   if nargin < 4 || nlyrs == 1
+   % Need to either use dimdata or get the sizes directly from the data.
+   dimsize = icemodel.netcdf.getdimsize(dimdata);
+   numcells = dimsize.gridcell;
 
-      dimid.gridcell = netcdf.defDim(ncid, 'gridcell', ncells);
-      dimid.time = netcdf.defDim(ncid, 'time', nhrs);
+   if opts.GetSizeFromDims
+      numlayers = dimsize.depth;
+      numtimesteps = dimsize.time;
+
+   elseif opts.GetSizeFromData
+      numlayers = datasize(1);
+      numtimesteps = datasize(2);
+   end
+
+   % Define the dimensions of the data arrays, in strict order.
+   if numlayers == 1
+
+      dimid.gridcell = netcdf.defDim(ncid, 'gridcell', numcells);
+      dimid.time = netcdf.defDim(ncid, 'time', numtimesteps);
       dimid.ice1 = [dimid.gridcell dimid.time];
    else
 
-      dimid.gridcell = netcdf.defDim(ncid, 'gridcell', ncells);
-      dimid.depth = netcdf.defDim(ncid, 'depth', nlyrs);
-      dimid.time = netcdf.defDim(ncid, 'time', nhrs);
+      dimid.gridcell = netcdf.defDim(ncid, 'gridcell', numcells);
+      dimid.depth = netcdf.defDim(ncid, 'depth', numlayers);
+      dimid.time = netcdf.defDim(ncid, 'time', numtimesteps);
       dimid.ice2 = [dimid.gridcell dimid.depth dimid.time];
    end
 
