@@ -1,5 +1,5 @@
-function info = makeice2file(pathdata, pathsave, simmodel, forcings, ...
-      userdata, simyears, opts, ncprops)
+function info = makencfile(pathdata, pathsave, simmodel, forcings, ...
+      userdata, sitename, simyears, opts, ncprops)
 
    arguments
       pathdata (1, :) char
@@ -7,6 +7,7 @@ function info = makeice2file(pathdata, pathsave, simmodel, forcings, ...
       simmodel (1, :) char
       forcings (1, :) char
       userdata (1, :) char
+      sitename (1, :) char
       simyears (:, :)
 
       % Custom options
@@ -73,7 +74,7 @@ function info = makeice2file(pathdata, pathsave, simmodel, forcings, ...
    end
 
    % Define variables and attributes.
-   for v = ["dims", "ice2"]
+   for v = ["dims", whichdata]
       [vars.(v), longnames.(v), units.(v), axes.(v), standardnames.(v)] ...
          = icemodel.netcdf.getdefaults(v, ...
          {'varnames', 'longnames', 'units', 'axes', 'standardnames'});
@@ -90,7 +91,7 @@ function info = makeice2file(pathdata, pathsave, simmodel, forcings, ...
    end
 
    % Get the spatial dimension data
-   dims = icemodel.netcdf.getdims(Z, dz);
+   dims = icemodel.netcdf.getdimdata(Z, dz);
 
    % Set the timestep
    switch timeunits
@@ -116,23 +117,14 @@ function info = makeice2file(pathdata, pathsave, simmodel, forcings, ...
       filepath = fullfile(pathdata, thisyear);
 
       % Define the output filename
-      % <model>.<forcings>.<albedo>.<sitename>.<yyyy>.nc4
-      filename = [simmodel '.ice2.' forcings '.' userdata '.sw.' thisyear '.nc4'];
+      filename = strjoin( ...
+         {simmodel, whichdata, forcings, userdata, sitename, thisyear, 'nc4'}, '.');
 
       % Get the input data dimensions
       [ncells, nlyrs, nhrs, chunksize, ...
          vars, units, longnames, standardnames] = getDataDims( ...
          pathdata, thisyear, dims, ...
          vars, units, longnames, standardnames, whichdata);
-
-      % Update the depth
-      % dims.depth = dz/2:dz:(nlyrs*opts.dz);
-
-      % Overrule nlyrs
-      nlyrs = numel(dims.depth);
-
-      % Read in the ice1 and ice2 data
-      % data = allocateDataArrays(filepath, ncells, nhrs, nlyrs, xtype, vars);
 
       % Update the time dimension
       dims.time = 0:dt:dt*(nhrs-1);
@@ -157,10 +149,10 @@ function info = makeice2file(pathdata, pathsave, simmodel, forcings, ...
          standardnames.dims, longnames.dims, units.dims, axes.dims, ...
          "shuffle", shuffle, "deflate", deflate, "deflateLevel", deflateLevel)
 
-      % Define the ice2 variables.
-      icemodel.netcdf.defdatavars(ncid, dimid.ice2, vars.ice2, ...
-         standardnames.ice2, longnames.ice2, units.ice2, chunksize, ...
-         xtype, dochunking, "shuffle", shuffle, "deflate", deflate, ...
+      % Define the data variables.
+      icemodel.netcdf.defdatavars(ncid, dimid.(whichdata), vars.(whichdata), ...
+         standardnames.(whichdata), longnames.(whichdata), units.(whichdata), ...
+         chunksize, xtype, dochunking, "shuffle", shuffle, "deflate", deflate, ...
          "deflateLevel", deflateLevel)
 
       % Close definition mode
@@ -172,7 +164,8 @@ function info = makeice2file(pathdata, pathsave, simmodel, forcings, ...
       % Write the data
       if strcmp(whichdata, 'ice1')
 
-         data = allocateDataArrays(filepath, ncells, nhrs, xtype, vars.ice1, simmodel);
+         data = icemodel.netcdf.getvardata(filepath, ...
+            ncells, nhrs, xtype, vars.ice1, simmodel);
 
          icemodel.netcdf.writeice1(ncid, vars.ice1, data);
 
@@ -230,6 +223,18 @@ function [ncells, nlyrs, nhrs, chunksize, ...
          chunksize = [1, nlyrs, nhrs];             % one cell, all layers, annual
          % chunksize = ceil([1, nlyrs, nhrs/12]);  % one cell, all layers, monthly
          % chunksize = [1, nlyrs, 24];             % one cell, all layers, daily
+
+         % This update the depth dimension values for the case where ice2 files
+         % have different Z, but uses the test file loaded above and thus won't
+         % catch when it changes. If ice2 files are written to individual nc
+         % files then this would need to be placed in writeice2. If multiple
+         % ice2 files are written to one nc file, then the supplied opts.dz/Z
+         % should be used and possibly NOFILL removed to account for different
+         % sized arrays.
+         % dims.depth = dz/2:dz:(nlyrs*opts.dz);
+
+         % Overrule nlyrs
+         nlyrs = numel(dims.depth);
    end
 
    % Remove variables from the dictionaries that are not present in ice1/2
@@ -250,37 +255,4 @@ function [ncells, nlyrs, nhrs, chunksize, ...
    % efficiency by ensuring the data layout in the file matches how it is
    % accessed later. If data is predominantly accessed in large contiguous
    % blocks, having the data and chunks aligned to those patterns is ideal.
-end
-
-%%
-function data = allocateDataArrays(filepath, ncells, nhrs, nlyrs, xtype, vars)
-   % Read in the ice1 data and fill the arrays
-   %
-   % Allocate data in column-major format. Transpose the
-   % data to row-major when writing to netcdf.
-   %
-   % See also:
-
-   % Note: with [] nlyrs, this might work for both ice1 and ice2.
-
-   mtype = nctype2mat(xtype);
-   if ismember(mtype, {'char', 'string', 'cell'})
-      error( ...
-         'Preallocation for %s is not supported in this function.', xtype);
-   end
-
-   % Preallocate data arrays
-   for v = 1:numel(vars)
-      thisvar = vars{v};
-      data.(thisvar) = nan(nlyrs, nhrs, ncells, mtype);
-   end
-
-   % Fill the arrays
-   for n = 1:ncells
-      tmp = load(fullfile(filepath, ['ice2_' num2str(n) '.mat'])).('ice2');
-      for v = 1:numel(vars)
-         thisvar = vars{v};
-         data.(thisvar)(1:size(tmp.(thisvar), 1), :, n) = tmp.(thisvar); % nlyrs x nhrs x ncells
-      end
-   end
 end
