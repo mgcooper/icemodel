@@ -1,5 +1,5 @@
-function data = getvararray(filepath, vars, dims, xtype, simmodel)
-   %GETVARARRAY Read icemodel data and fill the arrays.
+function data = getvardata(filepath, vars, dims, xtype, simmodel)
+   %GETVARDATA Read icemodel data and fill the arrays.
    %
    % Allocate arrays in column-major format for efficiency.
    % Permute them to match the defined dimensions when writing to netcdf.
@@ -20,7 +20,7 @@ function data = getvararray(filepath, vars, dims, xtype, simmodel)
    numlyrs = dimsize.depth;
 
    % Check if this is ice1 or ice2
-   if dimsize.depth == 0
+   if dimsize.depth == 1
       sdata = 'ice1';
    else
       sdata = 'ice2';
