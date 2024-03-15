@@ -1,13 +1,26 @@
-function data = getvardata(filepath, ncells, nhrs, nlyrs, xtype, vars, simmodel)
-   %GETVARDATA Read in the icemodel data and fill the arrays.
+function data = getvararray(filepath, vars, dims, xtype, simmodel)
+   %GETVARARRAY Read icemodel data and fill the arrays.
    %
    % Allocate arrays in column-major format for efficiency.
    % Permute them to match the defined dimensions when writing to netcdf.
    %
    % See also:
 
+   arguments
+      filepath (1, :) char {mustBeFolder}
+      vars
+      dims
+      xtype
+      simmodel
+   end
+
+   dimsize = icemodel.netcdf.getdimsize(dims);
+   numcell = dimsize.gridcell;
+   numtime = dimsize.time;
+   numlyrs = dimsize.depth;
+
    % Check if this is ice1 or ice2
-   if nlyrs == 1
+   if dimsize.depth == 0
       sdata = 'ice1';
    else
       sdata = 'ice2';
@@ -30,11 +43,11 @@ function data = getvardata(filepath, ncells, nhrs, nlyrs, xtype, vars, simmodel)
    % Preallocate the data arrays using NaNs. Squeeze to remove singleton dimensions.
    for v = 1:numel(vars)
       thisvar = vars{v};
-      data.(thisvar) = squeeze(nan(nlyrs, nhrs, ncells, mtype));
+      data.(thisvar) = squeeze(nan(numlyrs, numtime, numcell, mtype));
    end
 
    % Fill the data arrays
-   for n = 1:ncells
+   for n = 1:numcell
       tmp = load(fullfile(filepath, [sdata '_' num2str(n) '.mat'])).(sdata);
 
       % Set freeze zero for skinmodel (freeze is Qf, not refreeze)
