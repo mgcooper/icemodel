@@ -237,8 +237,11 @@ function [ncells, nlyrs, nhrs, chunksize, ...
 
 end
 
-function [vars, units, longnames, standardnames] = trimvars( ...
-      vars, units, longnames, standardnames, allvars, whichdata)
+%% set time units
+function units = settimeunits(units, timeunits, thisyear)
+   itime = contains(units.dims, '00:00:00');
+   units.dims{itime} = sprintf('%s since %s-01-01 00:00:00', timeunits, thisyear);
+end
 
    ivars = ismember(vars.(whichdata), allvars);
    vars.(whichdata) = vars.(whichdata)(ivars);

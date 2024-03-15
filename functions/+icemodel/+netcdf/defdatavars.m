@@ -24,8 +24,7 @@ function defdatavars(ncid, dimid, vars, standardnames, longnames, ...
       ncprops.deflateLevel (1, 1) double {mustBeNumeric} = 1
    end
 
-   % Define the data variables. NOTE: each variable must have the same dimid
-   % i.e., the same dimensions. See defdimid.
+   % Define the data variables. NOTE: each variable must have the same dimid.
    for v = 1:numel(vars)
       thisvar = vars{v};
       thisvid = netcdf.defVar(ncid, thisvar, xtype, dimid);

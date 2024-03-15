@@ -9,8 +9,12 @@ function out = units(whichdata)
       'meters', ...        y
       'meters', ...        elev
       'meters', ...        depth
-      'time', ...          placeholder, replaced with 'seconds since YYYY-01-01 00:00:00' in code
+      '00:00:00', ...      placeholder, replaced with 'seconds since YYYY-01-01 00:00:00' in code
       };
+
+   % Note: the placeholder 00:00:00 must remain the time units string. If
+   % getdefaults is refactored to access fieldnames then it won't matter. But as
+   % of now, a strcmp is used to replace that unit with the formatted YYYY string
 
    % Define the variable units
    switch whichdata
