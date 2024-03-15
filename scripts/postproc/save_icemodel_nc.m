@@ -3,9 +3,30 @@ clean
 % to finish the makencfile
 % - add grid_mapping
 % - decide how to deal with zobs
-% - separate into ice1 and ice2 files, latter on monthly timestep?
+% - DONE separate into ice1 and ice2 files, latter on monthly timestep?
 % - DONE add a gridcell variable
 % - DONE figure out the auxiliary coordinate variable thing
+
+% would be nice to commit things as is, then try to move ncells, nhrs, nlayrs
+% into getdimdata, since they should match. I think I had it in th eloop to
+% begin with only because of the changing ice2 sizes.
+
+% If I used dz, Z = 0 for ice1, then dims.depth would be an empty 1x0 vector,
+% and nlyrs = numel(dims.depth) would equal 0. Currently, I transpoe ice1.Tsfc
+% to get nlyrs = 1, nhrs = 8760. If I changed and just used numel(dims.<>) for
+% each dim, which would be sensible, then I would need to change if nlyrs == 1
+% criteria to if nlyrs == 0. BUT, 
+
+% FINAL DECISION ON PRECISION
+% - Save all nc files to double precision, it will still save a lot of disk
+% space plus eliminate unneccesary variables e.g. skinmodel freeze
+% - Then I can decide how to handle zobs, and swap out data as needed
+% - For the final archive, if needed I can save as single but by then, I won't
+% need to 
+% - The tricky decision is whether to save Qm and Qe, but since I can regenerate
+% skinmodel data quickly, just save the core data. RECALL that all variables can
+% be generated for individual sites, this is just the runoff for the sector
+% grids
 
 % To deal with zobs, pick N random points from icemask X, Y, then run them with
 % runscript runpoint functionality using no rounding, compare with the saved
@@ -24,12 +45,12 @@ sitename = 'sector';
 simyears = 2009:2018;
 simmodel = 'skinmodel'; % {'icemodel', 'skinmodel'};
 forcings = 'mar';
-userdata = 'mar'; % {'mar', 'modis'};
+userdata = 'modis'; % {'mar', 'modis'};
 siteopts = setBasinOpts('sitename', sitename, 'simmodel', simmodel, 'userdata', userdata);
 
 make_backups = false;
 
-simyears = 2009;
+% simyears = 2009;
 
 % Set path to data
 pathdata = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, simmodel, userdata);
@@ -41,20 +62,23 @@ pathsave = pathdata;
 % icemodel.netcdf.makencfile(pathdata, pathsave, simyears(2:end), ...
 %    deflateLevel=9, test_write=false);
 
-icemodel.netcdf.makencfile(pathdata, pathsave, simmodel, ...
-   forcings, userdata, simyears, deflateLevel=9, testwrite=false);
+% ice 1
+icemodel.netcdf.makencfile(pathdata, pathsave, simmodel, forcings, ...
+   userdata, 'sw', simyears, whichdata='ice1', xtype='NC_DOUBLE', ...
+   deflateLevel=9, testwrite=false);
 
-
-icemodel.netcdf.makeice2file(pathdata, pathsave, simmodel, ...
-   forcings, userdata, simyears, whichdata='ice2', deflateLevel=9, testwrite=true);
+% ice 2
+% icemodel.netcdf.makencfile(pathdata, pathsave, simmodel, forcings, ...
+%    userdata, 'sw', simyears, whichdata='ice2', xtype='NC_FLOAT', ...
+%    deflateLevel=9, testwrite=true);
 
 
 %% Check x, y, lat, lon, grid cell, time
 
 filelist = listfiles(pathdata, pattern="nc4", aslist=true, fullpath=true);
-f = filelist{2};
-
-icemodel.netcdf.plotncfile(f)
+f = filelist{1};
+data = ncreaddata(f);
+% icemodel.netcdf.plotncfile(f)
 
 %%
 
