@@ -4,15 +4,13 @@ clean
 % REALLY PROBLEMATIC E.G. IF THE VARS CHANGE DURING A LOOP 
 
 % WHERE TO PICK UP: I got hung up on the damn set dims from data or not thing,
-% I think the trimvars thing actually would be problemetaic if the dta did
+% I think the trimvars thing actually would be problematic if the data did
 % change during the years because the fields are not reset, but that doesn't
-% affect the data curently saved, it affected the dat on pnnl compter where i
+% affect the data curently saved, it affected the data on pnnl compter where i
 % had older data mixed with newer and the fields were different
-% so when picking up, need to finish the notes on teh text doc about brace
+% so when picking up, need to finish the notes on the text doc about brace
 % indexing vs explicit fieldname indexing. Currently it all works for both ice1
 % and ice2 but that needs to be fixed
-
-% also add runoff to the verify script
 
 % to finish the makencfile
 % - add grid_mapping
@@ -20,10 +18,11 @@ clean
 % - DONE separate into ice1 and ice2 files, latter on monthly timestep?
 % - DONE add a gridcell variable
 % - DONE figure out the auxiliary coordinate variable thing
+% - DONE add runoff to the verify script
+% - DONE move ncells, nhrs, nlayrs into getdimdata
 
-% would be nice to commit things as is, then try to move ncells, nhrs, nlayrs
-% into getdimdata, since they should match. I think I had it in th eloop to
-% begin with only because of the changing ice2 sizes.
+% I think I had only ncells,nhrs,nlyrs in the loop to begin with because of
+% the changing ice2 sizes. 
 
 % If I used dz, Z = 0 for ice1, then dims.depth would be an empty 1x0 vector,
 % and nlyrs = numel(dims.depth) would equal 0. Currently, I transpoe ice1.Tsfc
@@ -64,7 +63,7 @@ siteopts = setBasinOpts('sitename', sitename, 'simmodel', simmodel, 'userdata', 
 
 make_backups = false;
 
-simyears = 2009:2010;
+simyears = 2009;
 
 % Set path to data
 pathdata = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, simmodel, userdata);
@@ -77,13 +76,13 @@ pathsave = pathdata;
 %    deflateLevel=9, test_write=false);
 
 % ice 1
-icemodel.netcdf.makencfile(pathdata, pathsave, simmodel, forcings, ...
-   userdata, 'sw', simyears, whichdata='ice1', xtype='NC_DOUBLE', ...
+icemodel.netcdf.makencfile('ice1', pathdata, pathsave, simmodel, ...
+   forcings, userdata, 'sw', simyears, xtype='NC_DOUBLE', ...
    deflateLevel=9, testwrite=true);
 
 % ice 2
 icemodel.netcdf.makencfile(pathdata, pathsave, simmodel, forcings, ...
-   userdata, 'sw', simyears, whichdata='ice2', xtype='NC_FLOAT', ...
+   userdata, 'sw', simyears, 'ice2', xtype='NC_FLOAT', ...
    deflateLevel=9, testwrite=true, Z=20, dz=0.04);
 
 
