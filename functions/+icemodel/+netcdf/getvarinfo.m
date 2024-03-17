@@ -23,20 +23,20 @@ function [varnames, varsize] = getvarinfo(filepath, datafile, gridcell)
    % to one nc file, then the supplied opts.dz/Z should be used and
    % possibly NOFILL removed to account for different sized arrays.
 
-   tmp = load(fullfile(filepath, [datafile '_' num2str(gridcell) '.mat'])).(datafile);
+   tmp = load(fullfile( ...
+      filepath, [datafile '_' num2str(gridcell) '.mat'])).(datafile);
 
    switch datafile
       case 'ice1'
 
          data = tmp.Tsfc.'; % transpose to numlayers x numtimes
-         varnames = tmp.Properties.VariableNames;
+         varnames = tmp.Properties.VariableNames';
 
       case 'ice2'
          data = tmp.Tice;
-         varnames = fieldnames(tmp);
+         varnames = fieldnames(tmp)';
    end
 
    % Get the dimensions of the data
    varsize = size(data); % numlayers x numtimes
-
 end

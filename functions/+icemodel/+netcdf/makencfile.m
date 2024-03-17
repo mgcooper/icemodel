@@ -231,12 +231,12 @@ function units = settimeunits(units, timeunits, thisyear)
 end
 
 %% reset testdims
-function dims = resetDimData(dims, opts)
+function dims = trimGridCells(dims, testwrite, numcells)
    % FOR TESTING
-   if opts.testwrite
+   if testwrite
       for f = fieldnames(dims)'
          if ~strcmp(f{:}, {'depth', 'time'})
-            dims.(f{:}) = dims.(f{:})(1:opts.numcells);
+            dims.(f{:}) = dims.(f{:})(1:numcells);
          end
       end
    end
