@@ -1,7 +1,7 @@
-function varargout = getdefaults(whichfile, whichprops, output_type)
+function varargout = getdefaults(whichfiles, whichprops, output_type)
 
    arguments
-      whichfile (1, :) char {mustBeMember(whichfile, ...
+      whichfiles (1, :) string {mustBeMember(whichfiles, ...
          {'ice1', 'ice2', 'met', 'dims', 'dimensions'})} ...
          = 'ice1'
       whichprops (1, :) string {mustBeMember(whichprops, ...
@@ -17,16 +17,44 @@ function varargout = getdefaults(whichfile, whichprops, output_type)
       output_type = 'aslist';
    end
 
-   for thisprop = whichprops(:)'
-      propvals.(thisprop) = icemodel.netcdf.defaults.(thisprop)(whichfile);
+   for thisfile = whichfiles(:)'
+
+      for thisprop = whichprops(:)'
+         props.(thisprop).(thisfile) = ...
+            icemodel.netcdf.defaults.(thisprop)(thisfile);
+      end
+
+      % Remove 'depth' dim from ice1 - this is done for defdimvars
+      props = dropdims(props, whichprops, thisfile);
    end
 
-   if output_type == "aslist"
-      nargoutchk(numel(whichprops), numel(whichprops));
-      varargout = struct2cell(propvals);
+   varargout = struct2cell(props);
 
-   else
-      nargoutchk(1, 1);
-      varargout{1} = propvals;
+   % if output_type == "aslist"
+   %    nargoutchk(numel(whichprops), numel(whichprops));
+   %    varargout = struct2cell(props);
+   % end
+end
+
+%% drop dims
+function props = dropdims(props, propnames, datafile)
+
+   if strcmp(datafile, 'ice1')
+      drop = ismember(props.varnames.dims, 'depth');
+      for thisprop = propnames(:)'
+         props.(thisprop).dims(drop) = [];
+      end
    end
 end
+% function [varnames, axes, units, longnames, standardnames] = dropdims( ...
+%       datafile, varnames, axes, units, longnames, standardnames)
+%
+%    if strcmp(datafile, 'ice1')
+%       drop = ismember(varnames.dims, 'depth');
+%       varnames.dims(drop) = [];
+%       axes.dims(drop) = [];
+%       units.dims(drop) = [];
+%       longnames.dims(drop) = [];
+%       standardnames.dims(drop) = [];
+%    end
+% end

@@ -4,8 +4,8 @@ function out = axes(whichdata)
    % which are not technically "dimensions".
    dimaxes = {
       '', ...     gridcell
-      '', ...    latitude  - I removed Y based on Example 5.2
-      '', ...    longitude - I removed X based on Example 5.2
+      '', ...     latitude  - I removed Y based on Example 5.2
+      '', ...     longitude - I removed X based on Example 5.2
       'X', ...    x_easting
       'Y', ...    y_northing
       '', ...     elevation (not a dimension)
