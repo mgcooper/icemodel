@@ -1,7 +1,7 @@
 clean
 
 % BEFORE DELETING OR RUNNING MORE, WALK THROIUGH THE TRIMVARS THING, IT SEEMS
-% REALLY PROBLEMATIC E.G. IF THE VARS CHANGE DURING A LOOP 
+% REALLY PROBLEMATIC E.G. IF THE VARS CHANGE DURING A LOOP
 
 % WHERE TO PICK UP: I got hung up on the damn set dims from data or not thing,
 % I think the trimvars thing actually would be problematic if the data did
@@ -11,6 +11,13 @@ clean
 % so when picking up, need to finish the notes on the text doc about brace
 % indexing vs explicit fieldname indexing. Currently it all works for both ice1
 % and ice2 but that needs to be fixed
+
+% REMBEMBER: it owuld be nice to reset the GetDimsFromData stuff I added esp to
+% getdimid, it was compact and clear. It was added first to getchunksize but
+% what should happen is a check prior to both that establishes the datasize and
+% its used in all subsequent steps
+
+
 
 % to finish the makencfile
 % - add grid_mapping
@@ -28,14 +35,14 @@ clean
 % and nlyrs = numel(dims.depth) would equal 0. Currently, I transpoe ice1.Tsfc
 % to get nlyrs = 1, nhrs = 8760. If I changed and just used numel(dims.<>) for
 % each dim, which would be sensible, then I would need to change if nlyrs == 1
-% criteria to if nlyrs == 0. BUT, 
+% criteria to if nlyrs == 0. BUT,
 
 % FINAL DECISION ON PRECISION
 % - Save all nc files to double precision, it will still save a lot of disk
 % space plus eliminate unneccesary variables e.g. skinmodel freeze
 % - Then I can decide how to handle zobs, and swap out data as needed
 % - For the final archive, if needed I can save as single but by then, I won't
-% need to 
+% need to
 % - The tricky decision is whether to save Qm and Qe, but since I can regenerate
 % skinmodel data quickly, just save the core data. RECALL that all variables can
 % be generated for individual sites, this is just the runoff for the sector
@@ -63,7 +70,7 @@ siteopts = setBasinOpts('sitename', sitename, 'simmodel', simmodel, 'userdata', 
 
 make_backups = false;
 
-simyears = 2009:2010;
+simyears = 2009;
 
 % Set path to data
 pathdata = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, simmodel, userdata);
@@ -75,15 +82,18 @@ pathsave = pathdata;
 % icemodel.netcdf.makencfile(pathdata, pathsave, simyears(2:end), ...
 %    deflateLevel=9, test_write=false);
 
+pathdata = fullfile(pathdata, 'zobs');
+pathsave = fullfile(pathsave, 'zobs');
+
 % ice 1
 icemodel.netcdf.makencfile('ice1', pathdata, pathsave, simmodel, ...
    forcings, userdata, 'sw', simyears, xtype='NC_DOUBLE', ...
-   deflateLevel=9, testwrite=true);
+   deflateLevel=9, testwrite=false);
 
 % ice 2
 icemodel.netcdf.makencfile('ice2', pathdata, pathsave, simmodel, ...
-   forcings, userdata, 'sw', simyears, xtype='NC_FLOAT', ...
-   deflateLevel=9, testwrite=false, Z=12, dz=0.04, numcells=100);
+   forcings, userdata, 'sw', simyears, xtype='NC_DOUBLE', ...
+   deflateLevel=9, testwrite=false, Z=12, dz=0.04);
 
 
 %% Check x, y, lat, lon, grid cell, time

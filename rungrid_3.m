@@ -36,7 +36,7 @@ opts = icemodel.setopts(simmodel, sitename, simyears, forcings, ...
 % E = si+ni*N-1;
 
 % S = 1;
-S = 121;
+S = 353;
 E = floor(numel(gridnums) / 2);
 
 % display the run information

@@ -140,7 +140,7 @@ function processOneYear(datapath, datafile, filename, ncprops, opts, simmodel)
       {'varnames', 'longnames', 'units', 'axes', 'standardnames'});
 
    % Get the spatial and time dimension data.
-   dimdata = icemodel.netcdf.getdimdata(Z, dz, T, dt, whichmask="oldmask");
+   dimdata = icemodel.netcdf.getdimdata(Z, dz, T, dt, whichmask="icemask");
 
    % Reduce the number of grid cells if testwrite == true
    dimdata = trimGridCells(dimdata, opts.testwrite, opts.numcells);

@@ -39,6 +39,7 @@ function writeice2(ncid, datapath, varnames, dimdata, xtype, simmodel, maxGB)
 
       countcell = min(numcells, numel(dimdata.gridcell) - startcell + 1);
 
+      fprintf('working on cells %d:%d ... \n', startcell, startcell + countcell - 1)
       % [startcell startcell+countcell-1] % use to confirm start/count
 
       data = icemodel.netcdf.getvardata(datapath, varnames, dimdata, xtype, ...
