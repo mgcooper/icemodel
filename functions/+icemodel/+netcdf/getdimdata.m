@@ -1,4 +1,4 @@
-function dims = getdimdata(Z, dz, T, dt)
+function dims = getdimdata(Z, dz, T, dt, opts)
    %GETDIMDATA Get dimensions of icemodel simulation data
    %
    %  DIMS = GETDIMDATA(Z, DZ, T, DT) Returns the spatial and temporal
@@ -12,13 +12,14 @@ function dims = getdimdata(Z, dz, T, dt)
       dz (1, 1) double {mustBeNumeric} = 0
       T  (1, 1) double {mustBeNumeric} = 8760
       dt (1, 1) double {mustBeNumeric} = 3600
+      opts.whichmask = "icemask"
    end
 
    % -----------------------------  Below here sets the actual dimension values
 
    % Load the grid coordinates and elevation.
    [dims.x_easting, dims.y_northing, dims.elevation, ...
-      dims.latitude, dims.longitude] = loadIceMask("icemask", ...
+      dims.latitude, dims.longitude] = loadIceMask(opts.whichmask, ...
       varnames=["X", "Y", "Elev", "Lat", "Lon"]);
 
    % Define the grid cell index
