@@ -49,9 +49,14 @@ function info = makencfile(datafile, datapath, savepath, simmodel, forcings, ...
    % ----------------------------  Parse inputs and set parameters
 
    % Update the API configuration
-   % icemodel.netcdf.config();
+   icemodel.netcdf.config();
 
-   % Validate the timestep
+   % Validate the grid spacing.
+   if datafile == "ice2" && opts.Z == 0
+      error('Set Z and dz if saving ice2 data')
+   end
+
+   % Validate the timestep.
    timeunits = opts.timeunits;
    switch timeunits
       case 'seconds'
@@ -60,7 +65,7 @@ function info = makencfile(datafile, datapath, savepath, simmodel, forcings, ...
          assert(opts.dt == 1)
    end
 
-   % Set the file format
+   % Set the file format.
    oldformat = netcdf.setDefaultFormat(ncprops.format);
    cleanupfn = onCleanup(@() netcdf.setDefaultFormat(oldformat));
 
@@ -69,7 +74,7 @@ function info = makencfile(datafile, datapath, savepath, simmodel, forcings, ...
 
    for thisyear = string(simyears)
 
-      % Define the output filename
+      % Define the output filename.
       filename = fullfile(savepath, strjoin( ...
          {simmodel, datafile, forcings, userdata, sitename, char(thisyear), ...
          'nc4'}, '.'));
@@ -77,12 +82,12 @@ function info = makencfile(datafile, datapath, savepath, simmodel, forcings, ...
       % Update the time units using thisyear as the datum.
       opts.timeunits = gettimeunits(timeunits, thisyear);
 
-      % Create the file
+      % Create the file.
       processOneYear(fullfile(datapath, thisyear), ...
          datafile, filename, ncprops, opts, simmodel);
    end
 
-   % Parse outputs
+   % Parse outputs.
    if nargout > 1
       info = ncinfo(filename);
    end
@@ -106,18 +111,20 @@ end
 % For dims, specifically depth, the important thing is setting the dimsizes in
 % the files to the maximum depth so if some files have 300 layers and other 500,
 % the nc files are defined to have 500 layers and when a file with 300 layers is
-% encountered the data is written to the firs 300 layers. Thus Z and dz are used
-% to set the file-wise dims, which means using GetSizeFromDims == true, and
+% encountered the data is written to the first 300 layers. Thus Z and dz are
+% used to set the file-wise dims, which means using GetSizeFromDims == true, and
 % GetSizeFromData could be removed altogether. In general they should be
 % interchangeable and the Z,dz inputs could be removed to simplify the
 % interface.
 %
-% There may be a good use case for the two separate paths though - Z, dz could
+% There may be a use case for the two separate "GetSize" paths - Z, dz could
 % be used to set the file-wise dims, where getdimsize returns the size of the
 % depth grid defined by Z, dz. But GetSizeFromData is used in getchunksize so
 % the chunks match the actual data ... but actually that's not right either, the
 % chunksize is file-wise. So there may not be any use case for GetSizeFromData
 % unless we want to eliminated Z, dz and rely entirely on the data.
+
+% The use case could just be for validating consistent datasize and dimsize
 
 function processOneYear(datapath, datafile, filename, ncprops, opts, simmodel)
 
@@ -165,8 +172,7 @@ function processOneYear(datapath, datafile, filename, ncprops, opts, simmodel)
    job = onCleanup(@() netcdf.close(ncid));
 
    % Define the dimensions IDs.
-   dimid = icemodel.netcdf.defdimid(ncid, dimdata, datasize, ...
-      "GetSizeFromData", false, "GetSizeFromDims", true);
+   dimid = icemodel.netcdf.defdimid(ncid, dimdata, datasize);
 
    % Define the grid and time dimensions and attributes.
    icemodel.netcdf.defdimvars(ncid, dimid, varnames.dims, ...

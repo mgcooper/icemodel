@@ -21,6 +21,10 @@ function dimid = defdimid(ncid, dimdata, datasize, opts)
    %
    % See also:
 
+   % NOTE: With the current setup, GetSizeFromData should be identical to
+   % GetSizeFromDims, because getdimsize sets the max(1, ...) check on depth.
+   % The case where they would differ is if the datasize changes within years.
+
    arguments
       ncid  (1, 1) double {mustBeNumeric}
       dimdata (1, :) struct {mustBeStruct}

@@ -5,6 +5,10 @@ function dims = getdimdata(Z, dz, T, dt, opts)
    %  dimensions given icemodel vertical domain depth Z, grid spacing DZ,
    %  number of timesteps per year T, and timestep DT.
    %
+   %  Note: If Z = 0, dz = 0, then dims.depth is an empty 1x0 vector and
+   %  numel(dims.depth) = 0. See icemodel.netcdf.getdimsize where a max(1, ...)
+   %  statement is used to set dimsize.depth = 1 in this case.
+   %
    % See also:
 
    arguments
