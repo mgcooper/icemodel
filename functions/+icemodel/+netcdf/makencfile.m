@@ -185,18 +185,16 @@ function processOneYear(datapath, datafile, filename, ncprops, opts, simmodel)
    % Write the grid and time dimensions
    icemodel.netcdf.writedims(ncid, dimdata, varnames.dims);
 
-   % Get the data arrays
-   data = icemodel.netcdf.getvardata(datapath, varnames.(datafile), ...
-      dimdata, xtype, simmodel);
-
    % Write the data
    if strcmp(datafile, 'ice1')
 
-      icemodel.netcdf.writeice1(ncid, varnames.ice1, data);
+      icemodel.netcdf.writeice1(ncid, datapath, varnames.(datafile), ...
+         dimdata, xtype, simmodel);
 
    elseif strcmp(datafile, 'ice2')
 
-      icemodel.netcdf.writeice2(ncid, varnames.ice2, dimdata, datapath);
+      icemodel.netcdf.writeice2(ncid, datapath, varnames.(datafile), ...
+         dimdata, xtype, simmodel);
    end
 end
 

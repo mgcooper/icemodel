@@ -63,7 +63,7 @@ siteopts = setBasinOpts('sitename', sitename, 'simmodel', simmodel, 'userdata', 
 
 make_backups = false;
 
-simyears = 2009;
+simyears = 2009:2010;
 
 % Set path to data
 pathdata = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, simmodel, userdata);
@@ -81,15 +81,15 @@ icemodel.netcdf.makencfile('ice1', pathdata, pathsave, simmodel, ...
    deflateLevel=9, testwrite=true);
 
 % ice 2
-icemodel.netcdf.makencfile(pathdata, pathsave, simmodel, forcings, ...
-   userdata, 'sw', simyears, 'ice2', xtype='NC_FLOAT', ...
-   deflateLevel=9, testwrite=true, Z=20, dz=0.04);
+icemodel.netcdf.makencfile('ice2', pathdata, pathsave, simmodel, ...
+   forcings, userdata, 'sw', simyears, xtype='NC_FLOAT', ...
+   deflateLevel=9, testwrite=false, Z=12, dz=0.04, numcells=100);
 
 
 %% Check x, y, lat, lon, grid cell, time
 
 filelist = listfiles(pathdata, pattern="ice2", aslist=true, fullpath=true);
-f = filelist{1};
+f = filelist{2};
 data = ncreaddata(f);
 % icemodel.netcdf.plotncfile(f)
 
