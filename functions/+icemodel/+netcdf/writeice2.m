@@ -52,11 +52,11 @@ function writeice2(ncid, datapath, varnames, dimdata, xtype, simmodel, maxGB)
          thisvar = varnames{v};
          thisvid = netcdf.inqVarID(ncid, thisvar);
 
-         thisdata = permute(data.(thisvar), [3 1 2]); % cells x layers x time
-         count = size(thisdata);
+         count = size(data.(thisvar)); % cells x time x layers
 
          % The permute rearranges [depth time gridcell] to [gridcell depth time]
-         netcdf.putVar(ncid, thisvid, start, count, thisdata);
+         netcdf.putVar(ncid, thisvid, start, count([3 1 2]), ...
+            permute(data.(thisvar), [3 1 2]));
       end
    end
 
