@@ -1,4 +1,5 @@
-function defdimvars(ncid, dimid, vars, standardnames, longnames, units, axes, ncprops)
+function defdimvars(ncid, dimidStruct, varnames, standardnames, longnames, ...
+      units, axes, ncprops)
    %DEFDIMVARS Define icemodel netcdf grid and time dims and attributes
    %
    %  DEFDIMVARS(NCID, DIMID, VARS, STANDARDNAMES, LONGNAMES, UNITS, AXES, NCPROPS)
@@ -6,25 +7,25 @@ function defdimvars(ncid, dimid, vars, standardnames, longnames, units, axes, nc
    % See also:
 
    arguments
-      ncid (1, 1) {mustBeNumeric}
-      dimid
-      vars
-      standardnames
-      longnames
-      units
-      axes
+      ncid (1, 1) double {mustBeNumeric}
+      dimidStruct (1, :) struct {mustBeStruct}
+      varnames (1, :) cell {mustBeText}
+      standardnames (1, :) cell {mustBeText}
+      longnames (1, :) cell {mustBeText}
+      units (1, :) cell {mustBeText}
+      axes (1, :) cell {mustBeText}
       ncprops.shuffle (1, 1) logical {mustBeNumericOrLogical} = true
       ncprops.deflate (1, 1) logical {mustBeNumericOrLogical} = true
       ncprops.deflateLevel (1, 1) double {mustBeNumeric} = 1
    end
 
-   for v = 1:numel(vars)
-      thisvar = vars{v};
+   for v = 1:numel(varnames)
+      thisvar = varnames{v};
 
       % This check is only made on depth b/c it's the only dimension that
       % differs between ice1/ice2. If dimid had 1:1 mapping with vars, like the
       % other attrs, then this check could apply to all vars.
-      if strcmp(thisvar, 'depth') && ~isfield(dimid, 'depth')
+      if strcmp(thisvar, 'depth') && ~isfield(dimidStruct, 'depth')
          continue
       end
 
@@ -33,17 +34,17 @@ function defdimvars(ncid, dimid, vars, standardnames, longnames, units, axes, nc
 
          case "gridcell"
 
-            thisvid = netcdf.defVar(ncid, thisvar, 'NC_INT', dimid.gridcell);
+            thisvid = netcdf.defVar(ncid, thisvar, 'NC_INT', dimidStruct.gridcell);
 
          case "depth"
 
-            thisvid = netcdf.defVar(ncid, thisvar, 'NC_FLOAT', dimid.depth);
+            thisvid = netcdf.defVar(ncid, thisvar, 'NC_FLOAT', dimidStruct.depth);
 
          case "time"
-            thisvid = netcdf.defVar(ncid, thisvar, 'NC_DOUBLE', dimid.time);
+            thisvid = netcdf.defVar(ncid, thisvar, 'NC_DOUBLE', dimidStruct.time);
 
          otherwise % lat, lon, x, y, elev
-            thisvid = netcdf.defVar(ncid, thisvar, 'NC_FLOAT', dimid.gridcell);
+            thisvid = netcdf.defVar(ncid, thisvar, 'NC_FLOAT', dimidStruct.gridcell);
       end
 
       netcdf.defVarDeflate(ncid, thisvid, ...

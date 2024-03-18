@@ -22,9 +22,9 @@ function dimid = defdimid(ncid, dimdata, datasize, opts)
    % See also:
 
    arguments
-      ncid
-      dimdata
-      datasize
+      ncid  (1, 1) double {mustBeNumeric}
+      dimdata (1, :) struct {mustBeStruct}
+      datasize (1, :) double {mustBeNumeric}
       opts.GetSizeFromData (1, :) logical {mustBeNumericOrLogical} = true
       opts.GetSizeFromDims (1, :) logical {mustBeNumericOrLogical} = false
    end

@@ -2,8 +2,8 @@ function chunksize = getchunksize(whichdata, dimdata, datasize, opts)
 
    arguments
       whichdata
-      dimdata
-      datasize
+      dimdata (1, :) struct {mustBeStruct}
+      datasize (1, :) double {mustBeNumeric}
       opts.GetSizeFromData (1, :) logical {mustBeNumericOrLogical} = true
       opts.GetSizeFromDims (1, :) logical {mustBeNumericOrLogical} = false
    end

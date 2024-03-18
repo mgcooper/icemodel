@@ -13,7 +13,7 @@ function dimsize = getdimsize(dimdata, dimnames)
    % See also:
 
    arguments
-      dimdata
+      dimdata (1, :) struct {mustBeStruct}
       dimnames (1, :) string {mustBeText} = string(fieldnames(dimdata))
    end
 

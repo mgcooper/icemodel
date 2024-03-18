@@ -1,4 +1,4 @@
-function defdatavars(ncid, dimid, vars, standardnames, longnames, ...
+function defdatavars(ncid, dimid, varnames, standardnames, longnames, ...
       units, chunksize, xtype, dochunking, ncprops)
    %DEFDATAVARS Define the icemodel data variables and attributes.
    %
@@ -7,13 +7,13 @@ function defdatavars(ncid, dimid, vars, standardnames, longnames, ...
    % See also:
 
    arguments
-      ncid (1, 1) {mustBeNumeric}
-      dimid
-      vars
-      standardnames
-      longnames
-      units
-      chunksize
+      ncid  (1, 1) double {mustBeNumeric}
+      dimid (1, :) double {mustBeNumeric}
+      varnames (1, :) cell {mustBeText}
+      standardnames (1, :) cell {mustBeText}
+      longnames (1, :) cell {mustBeText}
+      units (1, :) cell {mustBeText}
+      chunksize (1, :) double {mustBeNumeric}
       xtype (1, :) char {mustBeMember(xtype, ...
          {'NC_FLOAT', 'NC_DOUBLE', 'NC_INT64', 'NC_UINT64', 'NC_INT', ...
          'NC_UINT', 'NC_SHORT', 'NC_USHORT', 'NC_BYTE', 'NC_UBYTE', ...
@@ -25,8 +25,8 @@ function defdatavars(ncid, dimid, vars, standardnames, longnames, ...
    end
 
    % Define the data variables. NOTE: each variable must have the same dimid.
-   for v = 1:numel(vars)
-      thisvar = vars{v};
+   for v = 1:numel(varnames)
+      thisvar = varnames{v};
       thisvid = netcdf.defVar(ncid, thisvar, xtype, dimid);
 
       if dochunking

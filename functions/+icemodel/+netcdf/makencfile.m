@@ -18,7 +18,6 @@ function info = makencfile(datafile, datapath, savepath, simmodel, forcings, ...
       opts.dz  (1, 1) double {mustBeNumeric} = 0
       opts.T   (1, 1) double {mustBeNumeric} = 8760
       opts.dt  (1, 1) double {mustBeNumeric} = 3600
-      opts.datafile
       opts.timeunits (1, :) char {mustBeMember(opts.timeunits, ...
          {'hours', 'seconds'})} = 'seconds'
       opts.testwrite (1, 1) logical {mustBeNumericOrLogical} = true
