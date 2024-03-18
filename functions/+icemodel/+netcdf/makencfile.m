@@ -53,7 +53,8 @@ function info = makencfile(datafile, datapath, savepath, simmodel, forcings, ...
    % icemodel.netcdf.config();
 
    % Validate the timestep
-   switch opts.timeunits
+   timeunits = opts.timeunits;
+   switch timeunits
       case 'seconds'
          assert(opts.dt == 3600)
       case 'hours'
@@ -74,9 +75,12 @@ function info = makencfile(datafile, datapath, savepath, simmodel, forcings, ...
          {simmodel, datafile, forcings, userdata, sitename, char(thisyear), ...
          'nc4'}, '.'));
 
+      % Update the time units using thisyear as the datum.
+      opts.timeunits = gettimeunits(timeunits, thisyear);
+
       % Create the file
-      processOneYear( ...
-         fullfile(datapath, thisyear), datafile, filename, ncprops, opts)
+      processOneYear(fullfile(datapath, thisyear), ...
+         datafile, filename, ncprops, opts, simmodel);
    end
 
    % Parse outputs
@@ -116,7 +120,10 @@ end
 % chunksize is file-wise. So there may not be any use case for GetSizeFromData
 % unless we want to eliminated Z, dz and rely entirely on the data.
 
-function processOneYear(datapath, datafile, filename, ncprops, opts)
+function processOneYear(datapath, datafile, filename, ncprops, opts, simmodel)
+
+   % Note: simmodel is only added as an input to patch the skinmodel
+   % ice1.freeze data. Once those files are written, remove simmodel.
 
    % Pull out the netcdf api options
    [xtype, shuffle, deflate, deflateLevel] = deal( ...
@@ -152,7 +159,7 @@ function processOneYear(datapath, datafile, filename, ncprops, opts)
       "GetSizeFromData", true, "GetSizeFromDims", false);
 
    % Update the time units for this year
-   units = settimeunits(units, timeunits, thisyear);
+   units = settimeunits(units, timeunits);
 
    % Create the file
    ncid = icemodel.netcdf.create(filename, 'makebackups', makebackups);
@@ -206,9 +213,12 @@ function [varnames, units, longnames, standardnames] = trimvars(datafile, ...
 end
 
 %% set time units
-function units = settimeunits(units, timeunits, thisyear)
+function timeunits = gettimeunits(baseunits, thisyear)
+   timeunits = sprintf('%s since %s-01-01 00:00:00', baseunits, thisyear);
+end
+function units = settimeunits(units, timeunits)
    itime = contains(units.dims, '00:00:00');
-   units.dims{itime} = sprintf('%s since %s-01-01 00:00:00', timeunits, thisyear);
+   units.dims{itime} = timeunits;
 end
 
 %% reset testdims
