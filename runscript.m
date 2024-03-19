@@ -45,6 +45,7 @@ else
    [ice1, ice2, met] = POSTPROC(ice1, ice2, opts, simyears);
 end
 
+
 %% prep the output for plotting
 setzero = false;
 [Runoff, Discharge, Catchment, Melt] = prepRunoff(opts, ice1, 'set_negative_runoff_zero', setzero);

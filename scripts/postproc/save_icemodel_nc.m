@@ -4,11 +4,14 @@ clean
 % icemodel, mar, zobs
 % icemodel, modis, zobs
 % icemodel, mar
-% icemodel, modis
-% skinmodel, mar, zobs
-% skinmodel, modis, zobs
+% DONE icemodel, modis
+% DONE skinmodel, mar, zobs
+% DONE skinmodel, modis, zobs (ice1.mat were ~600 MB, nc files ~275 MB, saves ~3 GB)
 % DONE skinmodel, mar
 % DONE skinmodel, modis
+
+% For the og icemodel runs (not zobs), it appears I might only have:
+% Tsfc, runoff, melt, freeze, ... and drain ... need to figure that out
 
 % to finish the makencfile
 % - add grid_mapping
@@ -47,14 +50,15 @@ clean
 savedata = true;
 sitename = 'sector';
 simyears = 2009:2018;
-simmodel = 'skinmodel'; % {'icemodel', 'skinmodel'};
+simmodel = 'icemodel'; % {'icemodel', 'skinmodel'};
 forcings = 'mar';
-userdata = 'modis'; % {'mar', 'modis'};
+userdata = 'mar'; % {'mar', 'modis'};
 siteopts = setBasinOpts('sitename', sitename, 'simmodel', simmodel, 'userdata', userdata);
 
-testname = 'zobs';
+% testname = 'zobs';
+testname = '';
 
-% simyears = 2009;
+% simyears = 2018;
 
 % Set path to data
 pathdata = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, simmodel, userdata, testname);
@@ -76,15 +80,16 @@ icemodel.netcdf.makencfile('ice1', pathdata, pathsave, simmodel, ...
 %    forcings, userdata, 'sw', simyears, xtype='NC_DOUBLE', ...
 %    deflateLevel=9, testwrite=false, Z=12, dz=0.04);
 
-
 %% Check x, y, lat, lon, grid cell, time
 
-filelist = listfiles(pathdata, pattern="ice2", aslist=true, fullpath=true);
-f = filelist{2};
+filelist = listfiles(pathdata, pattern="ice1", aslist=true, fullpath=true);
+f = filelist{1};
 data = ncreaddata(f);
 % icemodel.netcdf.plotncfile(f)
 
 verify_ncfile(pathdata, 'ice1')
+
+% Also run qualityControlRunoff
 
 %%
 
