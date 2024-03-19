@@ -1,11 +1,13 @@
 clean
 
+% Run grid points. See second section to run grid points for each catchment.
+
 savedata = true;
 sitename = 'sector';
 forcings = 'mar';
-userdata = 'modis'; % don't use "none" - set equal to forcings
+userdata = 'mar'; % don't use "none" - set equal to forcings
 uservars = 'albedo';
-simmodel = 'icemodel';
+simmodel = 'skinmodel';
 simyears = 2008:2018;
 % gridnums = 671:744;
 
@@ -15,11 +17,8 @@ simyears = 2008:2018;
 % gridnums = [368, 2337]; % bad mar pixels
 % gridnums = [2320]; % bad modis pixel
 
-pathdata = icemodel.setpath('output',sitename,simmodel,userdata);
-
-%% Temporary for the zobs test
-
-[~, X, Y, E] = loadIceMask("icemask", "xmask", "ymask", "elevation");
+% Set the path where the output will be saved.
+pathdata = icemodel.setpath('output', sitename, simmodel, userdata, [], testname);
 
 filename = fullfile(getenv('ICEMODELPATH'), 'testbed','data','zobs_vars');
 load(filename, 'wspd', 'tair', 'relh')

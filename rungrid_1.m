@@ -12,7 +12,8 @@ simyears = 2008:2018;
 % 298, 671, 1046,  1420
 % 372, 744, 1116, 1487
 
-pathdata = icemodel.setpath('output',sitename,simmodel,userdata);
+% Set the path where the output will be saved.
+pathdata = icemodel.setpath('output', sitename, simmodel, userdata);
 
 %%
 gridnums = loadZobsGridNums("round2");
