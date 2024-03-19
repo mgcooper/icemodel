@@ -17,7 +17,7 @@ pathdata = icemodel.setpath('output', sitename, simmodel, userdata);
 [~, E] = icemodel.chunkgridcell(1, numel(gridnums), 2, 1);
 
 % Overrule S if restarting.
-S = 238;
+S = 257;
 
 %% config
 

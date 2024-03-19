@@ -3,7 +3,7 @@ clean
 % TODO: Save to nc and delete ice1 files:
 % icemodel, mar, zobs
 % icemodel, modis, zobs
-% icemodel, mar
+% DONE icemodel, mar
 % DONE icemodel, modis
 % DONE skinmodel, mar, zobs
 % DONE skinmodel, modis, zobs (ice1.mat were ~600 MB, nc files ~275 MB, saves ~3 GB)

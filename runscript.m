@@ -4,15 +4,15 @@ clc
 
 %% set the run-specific model configuration
 savedata = false;
-sitename = 'behar';        % options: 'kanm', 'behar'
+sitename = 'sector';        % options: 'kanm', 'behar'
 forcings = 'mar';         % options: 'mar','kanm'
-userdata = 'modis';       % options: 'modis','racmo','merra','mar','kanm','none'
+userdata = 'mar';       % options: 'modis','racmo','merra','mar','kanm','none'
 uservars = 'albedo';       % options: 'albedo', or any var in met
-simmodel = 'skinmodel';    % options: 'icemodel','skinmodel'
-simyears = 2015:2015;
+simmodel = 'icemodel';    % options: 'icemodel','skinmodel'
+simyears = 2018:2018;
 
 % If sitename is 'sector', specify which grid point to run
-runpoint = [];
+runpoint = 2195;
 
 % % These were the settings I had to rerun 
 % sitename = 'sector';        % options: 'kanm', 'behar'
