@@ -23,10 +23,10 @@ clean
 % - DONE add runoff to the verify script
 % - DONE move ncells, nhrs, nlayrs into getdimdata
 
-
 % FINAL DECISION ON PRECISION
-% - Save all nc files to double precision, it will still save a lot of disk
+% - Save all ice1 nc files to double precision, it will still save a lot of disk
 % space plus eliminate unneccesary variables e.g. skinmodel freeze
+% - (Re)-save ice2 .mat files to single precision.
 % - Then I can decide how to handle zobs, and swap out data as needed
 % - For the final archive, if needed I can save as single but by then, I won't
 % need to
@@ -34,6 +34,7 @@ clean
 % skinmodel data quickly, just save the core data. RECALL that all variables can
 % be generated for individual sites, this is just the runoff for the sector
 % grids
+
 
 % To deal with zobs, pick N random points from icemask X, Y, then run them with
 % runscript runpoint functionality using no rounding, compare with the saved
