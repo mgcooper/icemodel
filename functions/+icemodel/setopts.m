@@ -6,7 +6,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    % See also: icemodel.config
 
    if nargin < 5 || isempty(userdata); userdata = 'none'; end
-   if nargin < 6 || isempty(uservars); uservars = 'none'; end
+   if nargin < 6 || isempty(uservars); uservars = 'albedo'; end
    if nargin < 7 || isempty(savedata); savedata = false; end
    if nargin < 8 || isempty(casename); casename = ''; end
    if nargin < 9 || isempty(testname); testname = ''; end
@@ -31,7 +31,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    %----------------------------------------------------------------------------
 
    % general model settings
-   opts.spinup_loops    =  1;       % number of spin-up loops to initialize
+   opts.spinup_loops    =  2;       % number of spin-up loops to initialize
    opts.use_init        =  false;   % use pre-initialized data?
    opts.kabs_user       =  true;    % use user-defined ice absorptivity?
    opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
@@ -48,13 +48,13 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
       opts.seb_solver      = 1;        % recommended: 1
       opts.bc_type         = 1;        % recommended: 2
       opts.conduct_type    = 1;        % recommended: 1 (Practice "B")
-      opts.maxiter         = 50;       % 1d heat transfer max iterations
+      opts.maxiter         = 100;      % 1d heat transfer max iterations
 
       opts.dt              =  900.0;   % timestep                             [s]
       opts.dz_thermal      =  0.04;    % dz for thermal heat transfer         [m]
       opts.dz_spectral     =  0.002;   % dz for radiative heat transfer       [m]
       opts.z0_thermal      =  20;      % domain thickness for heat transfer   [m]
-      opts.z0_spectral     =  4;       % domain thickness for rad transfer    [m]
+      opts.z0_spectral     =  12;      % domain thickness for rad transfer    [m]
       opts.f_ice_min       =  0.01;
 
    elseif strcmp(simmodel, 'skinmodel')
@@ -62,13 +62,13 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
       opts.seb_solver      = 1;        % recommended: 1
       opts.bc_type         = 1;        % recommended: 1
       opts.conduct_type    = 1;        % recommended: 1 (Practice "B")
-      opts.maxiter         = 50;       % 1d heat transfer max iterations
+      opts.maxiter         = 100;       % 1d heat transfer max iterations
 
       opts.dt              =  900.0;   % timestep                             [s]
       opts.dz_thermal      =  0.04;    % dz for thermal heat transfer         [m]
       opts.dz_spectral     =  0.002;   % dz for radiative heat transfer       [m]
-      opts.z0_thermal      =  12;      % domain thickness for heat transfer   [m]
-      opts.z0_spectral     =  4;       % domain thickness for rad transfer    [m]
+      opts.z0_thermal      =  20;      % domain thickness for heat transfer   [m]
+      opts.z0_spectral     =  12;      % domain thickness for rad transfer    [m]
       opts.f_ice_min       =  0.01;
 
       % I don't think this is necessary anymore
@@ -149,9 +149,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
 
       % save the model opts
       optsfile = fullfile(opts.pathoutput, 'opts', ['opts_' opts.casename '.mat']);
-      if isfile(optsfile)
-         backupfile(optsfile, true);
-      end
+      backupfile(optsfile, true);
       save(optsfile, 'opts');
    end
 

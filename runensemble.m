@@ -1,9 +1,8 @@
 clean
 
-testname = 'run1'; % run1 = w/chi, run2 = w/o chi (chi=0)
 savedata = true;
 
-runcombo = 1;
+runcombo = 5;
 
 % note: ak4 userdata merra and racmo is available from 2012:2016, whereas
 % mar, kanl, and modis are available from 2009:2016

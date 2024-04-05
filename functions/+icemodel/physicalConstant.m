@@ -21,8 +21,8 @@ function varargout = physicalConstant(varargin)
    narginchk(0,Inf);
 
    % name = validatestring(name,icemodel.physconlist,'physicalConstant','name', 1);
-   
-   
+
+
    % Define physical constants and accepted values
    constants = struct( ...
       'Tf', 273.16, ...             % Freezing point (Triple point), [K]

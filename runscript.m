@@ -61,7 +61,8 @@ end
 
 %% prep the output for plotting
 setzero = false;
-[Runoff, Discharge, Catchment, Melt] = prepRunoff(opts, ice1, 'set_negative_runoff_zero', setzero);
+[Runoff, Discharge, Catchment, Melt] = prepRunoff(opts, ice1, ...
+   'set_negative_runoff_zero', setzero);
 AblationHourly = prepAblation(opts, ice1, 'hourly', setzero);
 AblationDaily = prepAblation(opts, ice1, 'daily', setzero);
 
@@ -111,6 +112,14 @@ h3 = plotPromice(AblationHourly,'refstart',t1);
 t1 = datetime(simyears(1),7,1,0,0,0,'TimeZone','UTC');
 h2 = plotPromice(AblationDaily,'refstart',t1);
 h3 = plotPromice(AblationHourly,'refstart',t1);
+
+%%
+
+dz_therm = opts.dz_thermal;
+z0_therm = opts.z0_thermal;
+[dz, delz] = CVMESH(z0_therm, dz_therm);
+
+
 
 %%
 
