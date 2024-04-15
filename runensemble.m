@@ -2,32 +2,46 @@ clean
 
 savedata = true;
 
-runcombo = 5;
+runcombo = 0; % use 0 for the "otherwise" case
 
-% note: ak4 userdata merra and racmo is available from 2012:2016, whereas
-% mar, kanl, and modis are available from 2009:2016
+% Each icemodel/output/<version>/<sitename>/<yearname> folder should have:
+% AWS + MAR, MERRA, MODIS, NONE, RACMO
+% MAR + AWS, MERRA, MODIS, NONE, RACMO
+% Except pre-2012 (Leverett and AK4), which won't have RACMO
+% Thus to quickly confirm all sim's are done, just count as above.
+% As of Apr 2024, all sim's are done.
 
 % valid userdata:
 % {'racmo','mar','merra','kanm','kanl','modis','none'}
 
 % valid sitenames:
-% {'upperBasin','behar','slv1','slv2','ak4'}
+% {'upperbasin','behar','slv1','slv2','ak4'}
 
-% valid forcingdata:
+% valid forcings:
 % {'MAR','KANM','KANL'}
-
-% MAR forcing + MAR, MERRA, RACMO, AWS, MODIS albedo
-% MERRA forcing + MAR, MERRA, RACMO, AWS, MODIS albedo
-% RACMO forcing + MAR, MERRA, RACMO, AWS, MODIS albedo
-% AWS forcing + MAR, MERRA, RACMO, AWS, MODIS albedo
 
 %% Set which predefined
 switch runcombo
+
+   case 0
+      % Custom configuration
+
+      % Apr 2024 - need to use this to run any merra ones that weren't possible
+      % until I made the 2009-2011 files:
+      % DONE skinmodel, ak4
+      % icemodel, ak4
+      sitename = {'ak4'};
+      forcings = {'mar', 'kanl'};
+      userdata = {'merra'};
+      uservars = {'albedo'};
+      simmodel = {'icemodel'};
+      simyears = 2009:2011;
+
    case 1
       % DONE upperbasin, 2016, mar, kanl, icemodel
       sitename = {'upperbasin'};
       forcings = {'mar', 'kanl'};
-      userdata = {'none','merra','racmo','mar','modis', 'kanl'};
+      userdata = {'none', 'mar', 'merra', 'modis', 'kanl', 'racmo'};
       uservars = {'albedo'};
       simmodel = {'icemodel', 'skinmodel'};
       simyears = 2016:2016;
@@ -36,7 +50,7 @@ switch runcombo
       % DONE behar, 2016, mar, kanm
       sitename = {'behar'};
       forcings = {'mar', 'kanm'};
-      userdata = {'none','merra','racmo','mar','modis', 'kanm'};
+      userdata = {'none', 'mar', 'merra', 'modis', 'kanm', 'racmo'};
       uservars = {'albedo'};
       simmodel = {'icemodel', 'skinmodel'};
       simyears = 2016:2016;
@@ -45,7 +59,7 @@ switch runcombo
       % DONE behar, slv1, slv2, 2015, mar, kanm, icemodel
       sitename = {'behar', 'slv1', 'slv2'};
       forcings = {'mar', 'kanm'};
-      userdata = {'none','merra','racmo','mar','modis', 'kanm'};
+      userdata = {'none', 'mar', 'merra', 'modis', 'kanm', 'racmo'};
       uservars = {'albedo'};
       simmodel = {'icemodel', 'skinmodel'};
       simyears = 2015:2015;
@@ -54,28 +68,23 @@ switch runcombo
       % DONE ak4, 2009-2011, mar, kanl, icemodel
       sitename = {'ak4'};
       forcings = {'mar', 'kanl'};
-      userdata = {'none','mar','modis','kanl'};
+      userdata = {'none', 'mar', 'merra', 'modis', 'kanl'};
       uservars = {'albedo'};
-      simmodel = {'icemodel', 'skinmodel'};
+      simmodel = {'skinmodel'}; % 'icemodel',
       simyears = 2009:2011;
 
    case 5
       % DONE ak4, 2012-2016, mar, kanl, icemodel, merra, racmo
       sitename = {'ak4'};
       forcings = {'mar', 'kanl'};
-      userdata = {'none','merra','racmo','mar','modis','kanl'};
+      userdata = {'none', 'mar', 'merra', 'modis', 'kanl', 'racmo'};
       uservars = {'albedo'};
-      simmodel = {'icemodel', 'skinmodel'};
+      simmodel = {'skinmodel'}; % 'icemodel',
       simyears = 2012:2016;
 
    otherwise
-      % Custom configuration
-      sitename = {'ak4'};
-      forcings = {'mar', 'kanl'};
-      userdata = {'none','merra','racmo','mar','modis','kanl'};
-      uservars = {'albedo'};
-      simmodel = {'icemodel', 'skinmodel'};
-      simyears = 2012:2016;
+
+      error('unrecognized run combo')
 
 end
 

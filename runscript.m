@@ -119,50 +119,6 @@ dz_therm = opts.dz_thermal;
 z0_therm = opts.z0_thermal;
 [dz, delz] = CVMESH(z0_therm, dz_therm);
 
-
-
-%%
-
-% The standard method above uses prepRunoff which uses prepice1 which loads the
-% Data files in getenv('ICEMODELINPUTPATH'). Those don't exsit for racmo
-% surface, so they are subsurface. NO CATCHMENT scaling is done there, that's
-% done in plotRunoff -> prep_runoff, but there, catchment min/med/max is used
-%
-% Below, load_icemodel loads the runoff_ files in getenv('ICEMODELDATAPATH')
-%
-L = getlegend;
-LString = [L.String, {'Surf', 'Subsurf'}];
-
-% if sitename == "slv1"
-%    load('/Users/mattcooper/myprojects/matlab/runoff/data/icemodel/eval/racmo_runoff_slv1_2015.mat')
-% elseif sitename == "slv2"
-%    load('/Users/mattcooper/myprojects/matlab/runoff/data/icemodel/eval/racmo_runoff_slv2_2015.mat')
-% end
-
-
-[~, RacmoSrf] = loadRunoff(sitename, {'mar', 'racmo'}, data.Time, ...
-   'racmo', 'surface');
-[~, RacmoSub] = loadRunoff(sitename, {'mar', 'racmo'}, data.Time, ...
-   'racmo', 'subsurface');
-RsrfL = catchmentRunoff(RacmoSrf.min, Catchment.min.ease.area, 'kg/m2/s', false, true);
-RsrfH = catchmentRunoff(RacmoSrf.max, Catchment.max.ease.area, 'kg/m2/s', false, true);
-RsubL = catchmentRunoff(RacmoSub.min, Catchment.min.ease.area, 'kg/m2/s', false, true);
-RsubH = catchmentRunoff(RacmoSub.max, Catchment.max.ease.area, 'kg/m2/s', false, true);
-
-
-hold on
-plot(datenum(data.Time), 1e9 * (RsrfL + RsrfH) / 2, 'b:')
-plot(datenum(data.Time), 1e9 * (RsubL + RsubH) / 2, 'b--')
-legend(LString, 'location', 'nw')
-
-
-% RracM = catchment_runoff(Racmo.med, Catchment.med.ease.area,'kg/m2/s',inan,setzero);
-
-
-% A = (Catchment.min.ease.area + Catchment.max.ease.area) / 2;
-% RracL = catchment_runoff(RacmoSrf.min, A, 'kg/m2/s', false, true);
-% RracH = catchment_runoff(RacmoSrf.max, A, 'kg/m2/s', false, true);
-
 %%
 % % plot the energy balance
 % plotEnbal(ice1, met);

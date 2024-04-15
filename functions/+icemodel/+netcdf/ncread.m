@@ -28,6 +28,7 @@ function data = ncread(source, varnames, start, count, stride)
    Time = ncread(source, 'time', start(2), count(2), stride(2));
    unit = ncreadatt(source, 'time', 'units');
    Time = datetime(strrep(unit, 'seconds since ', '')) + seconds(Time);
+   Time.TimeZone = 'UTC';
 
    % Read the x, y
    data.x = ncread(source, 'x_easting');
