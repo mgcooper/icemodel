@@ -5,14 +5,18 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    %
    % See also: icemodel.config
 
+   % Set the project-level configuration
+   icemodel.config();
+
    if nargin < 5 || isempty(userdata); userdata = 'none'; end
    if nargin < 6 || isempty(uservars); uservars = 'albedo'; end
    if nargin < 7 || isempty(savedata); savedata = false; end
    if nargin < 8 || isempty(casename); casename = ''; end
    if nargin < 9 || isempty(testname); testname = ''; end
 
-   % Set the project-level configuration
-   icemodel.config();
+   [simmodel, sitename, forcings, ...
+      userdata, uservars, casename, testname] = convertStringsToChars(...
+      simmodel, sitename, forcings, userdata, uservars, casename, testname);
 
    %---------------------------- save the standard options that were passed in
    %----------------------------------------------------------------------------
