@@ -3,7 +3,7 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
       k_eff, dz, solver)
    %SEBSOLVE solve the surface energy balance for the skin temperature
    %#codegen
-   
+
    % The solver logic:
    % 0 = derivative-free, slower but more robust, thus used as a fall back.
    % 1 = newton-rhapson, fast, requires analytic derivative, used as a default.

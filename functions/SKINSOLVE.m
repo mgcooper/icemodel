@@ -23,7 +23,7 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
    if maxiter == 1
       alpha = 1;
    end
-   
+
    drovdT = 0 * T;
    k_vap = 0 * T;
 
@@ -32,11 +32,12 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
 
       T_iter = T;
 
-      % Update vapor heat
+      % Update thermal conductivity
       % [~, drovdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
+      % k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
 
       % Update thermal conductivity
-      k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
+      k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
 
       % Compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
       g_ns = [k_eff(1); k_eff(1:JJ); k_eff(JJ)];
