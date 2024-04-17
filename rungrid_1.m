@@ -14,10 +14,10 @@ gridnums = loadZobsGridNums("round2", makeplot=false);
 pathdata = icemodel.setpath('output', sitename, simmodel, userdata);
 
 % Divide the gridpoints into jobs for running in chunks.
-[~, E] = icemodel.chunkgridcell(1, numel(gridnums), 2, 1);
+[S, E] = icemodel.chunkgridcell(1, numel(gridnums), 2, 1);
 
 % Overrule S if restarting.
-S = 257;
+% S = 257;
 
 %% config
 

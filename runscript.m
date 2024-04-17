@@ -6,15 +6,15 @@ clc
 savedata = false;
 sitename = 'sector';        % options: 'kanm', 'behar'
 forcings = 'mar';         % options: 'mar','kanm'
-userdata = 'mar';       % options: 'modis','racmo','merra','mar','kanm','none'
+userdata = 'modis';       % options: 'modis','racmo','merra','mar','kanm','none'
 uservars = 'albedo';       % options: 'albedo', or any var in met
-simmodel = 'icemodel';    % options: 'icemodel','skinmodel'
-simyears = 2018:2018;
+simmodel = 'skinmodel';    % options: 'icemodel','skinmodel'
+simyears = 2016:2016;
 
 % If sitename is 'sector', specify which grid point to run
-runpoint = 2195;
+runpoint = 239; % 2195;
 
-% % These were the settings I had to rerun 
+% % These were the settings I had to rerun
 % sitename = 'sector';        % options: 'kanm', 'behar'
 % forcings = 'mar';         % options: 'mar','kanm'
 % userdata = 'modis';          % options: 'modis','racmo','merra','mar','kanm','none'

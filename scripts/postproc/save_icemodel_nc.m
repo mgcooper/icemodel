@@ -2,7 +2,7 @@ clean
 
 % TODO: Save to nc and delete ice1 files:
 % icemodel, mar, zobs
-% icemodel, modis, zobs
+% DONE icemodel, modis, zobs
 % DONE icemodel, mar
 % DONE icemodel, modis
 % DONE skinmodel, mar, zobs
@@ -12,6 +12,12 @@ clean
 
 % For the og icemodel runs (not zobs), it appears I might only have:
 % Tsfc, runoff, melt, freeze, ... and drain ... need to figure that out
+% ... now that icemodel/modis/zobs are done, it appears drain was never added to
+% makencfile, and for non-zobs, the ice1 files are deleted, and df_drn is not in
+% the ice2 files, whereas for the zobs runs, ice2 has df_drn and ice1 has drain,
+% so i added drain to makencfile, even though drain can always be reconstructed
+% from ice2.df_drn and it might be confusing ot have it in the nc files but i can
+% always remove it and resave them later
 
 % to finish the makencfile
 % - add grid_mapping
@@ -56,8 +62,8 @@ forcings = 'mar';
 userdata = 'mar'; % {'mar', 'modis'};
 siteopts = setBasinOpts('sitename', sitename, 'simmodel', simmodel, 'userdata', userdata);
 
-% testname = 'zobs';
-testname = '';
+testname = 'zobs';
+% testname = '';
 
 % simyears = 2018;
 

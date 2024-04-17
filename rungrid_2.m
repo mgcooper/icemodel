@@ -36,8 +36,11 @@ opts = icemodel.setopts(simmodel, sitename, simyears, forcings, ...
 % E = si+ni*N-1;
 
 % S = ceil(numel(gridnums) / 2);
-S = 1287;
-E = numel(gridnums);
+% S = 1287;
+% E = numel(gridnums);
+
+S = 773 + 39 + 1;
+E = S + 39;
 
 % display the run information
 disp([simmodel ' ' userdata ' ' int2str(simyears(1)) ':'   ...

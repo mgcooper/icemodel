@@ -3,7 +3,7 @@ clean
 savedata = true;
 sitename = 'sector';
 forcings = 'mar';
-userdata = 'modis';
+userdata = 'mar';
 uservars = 'albedo';
 simmodel = 'icemodel';
 simyears = 2008:2018;
@@ -36,8 +36,11 @@ opts = icemodel.setopts(simmodel, sitename, simyears, forcings, ...
 % E = si+ni*N-1;
 
 % S = ceil(numel(gridnums) / 2);
-S = 1285;
-E = numel(gridnums);
+% S = 1713;
+% E = numel(gridnums);
+
+S = 773 + 39 + 1 + 39 + 1 + 39 + 1;
+E = S + 39;
 
 % display the run information
 disp([simmodel ' ' userdata ' ' int2str(simyears(1)) ':'   ...

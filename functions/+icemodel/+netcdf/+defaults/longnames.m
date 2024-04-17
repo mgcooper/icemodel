@@ -24,6 +24,7 @@ function out = longnames(whichdata)
             'cumulative sublimation amount in meters liquid water equivalent', ...        subl
             'cumulative condensation amount in meters liquid water equivalent', ...       cond
             'cumulative runoff amount in meters liquid water equivalent', ...             runoff
+            'cumulative runoff drained in meters liquid water equivalent', ...            drain
             'cumulative melt amount in meters liquid water equivalent', ...               depth_melt
             'cumulative refreeze amount in meters liquid water equivalent', ...           depth_freeze
             'cumulative surface runoff amount in meters liquid water equivalent', ...     surf_runoff
