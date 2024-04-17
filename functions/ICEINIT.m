@@ -1,143 +1,113 @@
-%--------------------------------------------------------------------------
-%   ICEINIT - initialize the model
-%--------------------------------------------------------------------------
+function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
+      Ts, JJ, Sc, Sp, Fc, Fp, TL, TH, flmin, flmax, f_min, liqresid, ...
+      ro_iwe, ro_wie] = ICEINIT(opts, tair)
+   %ICEINIT initialize the 1-d ice column
+   %
+   %#codegen
 
-function [  f_ice,                                                      ...
-            f_liq,                                                      ...
-            T,                                                          ...
-            TL,                                                         ...
-            TH,                                                         ...
-            flmin,                                                      ...
-            flmax,                                                      ...
-            cp_sno,                                                     ...
-            k_eff,                                                      ...
-            dz,                                                         ...
-            fn,                                                         ...
-            delz,                                                       ...
-            grid_therm,                                                 ...
-            dz_therm,                                                   ...
-            dz_spect,                                                   ...
-            JJ_therm,                                                   ...
-            JJ_spect,                                                   ...
-            Sc,                                                         ...
-            Sp,                                                         ...
-            wcoef,                                                      ...
-            scoef,                                                      ...
-            ro_sno,                                                     ...
-            ro_iwe,                                                     ...
-            ro_wie,                                                     ...
-            ice1,                                                       ...
-            ice2  ]   =   ICEINIT(opts,met)
-%--------------------------------------------------------------------------
-
-% load the physical constants to be used.
-   load('PHYSCONS','cp_ice','cp_liq','fcp','kappa','Lf','ro_ice',       ...
-      'ro_air','ro_liq','k_liq','Tf','Ls','Rv');
-
-   % pull out anything in opts used below
-
-   % # of nodes in the thermal and spectral grid
-   JJ_therm       =  opts.z0_thermal/opts.dz_thermal;
-   JJ_spect       =  opts.z0_spectral/opts.dz_spectral;
-   dz_therm       =  opts.dz_thermal;
-   dz_spect       =  opts.dz_spectral;
-   z0_therm       =  opts.z0_thermal;
-   ro_i           =  opts.ro_snow_i;
-   maxiter        =  opts.maxiter;
-   use_ro_glc     =  opts.use_ro_glc;
+   % LOAD PHYSICAL CONSTANTS AND PARAMETERS
+   [cp_ice, cp_liq, fcp, Lf, ro_ice, ro_liq, k_liq, Tf, Ls, Rv, roLs] ...
+      = icemodel.physicalConstant( ...
+      'cp_ice','cp_liq', 'fcp','Lf', 'ro_ice','ro_liq', 'k_liq','Tf', ...
+      'Ls','Rv','roLs');
    
-   % Compute c.v. size information.
-[  dz,                                                               ...
-   delz,                                                             ...
-   fn,                                                               ...
-   grid_therm ]   =  CVTHERMAL(z0_therm,dz_therm);
-   
-   % Density for melt/freeze
-   ro_glc      =  (917+1000)/2;                    % [kg/m3]
-   if use_ro_glc == true
-      ro_ice   =  ro_glc;
-      ro_liq   =  ro_glc;
+   % GENERATE A THERMAL MESH
+   dz_therm = opts.dz_thermal;
+   z0_therm = opts.z0_thermal;
+   [dz, delz, ~, ~, fn] = CVMESH(z0_therm, dz_therm);
+
+   % NUMBER OF TIMESTEPS TO INITIALIZE OUTPUTS
+   maxiter = numel(tair) / opts.numyears;
+
+   % NUMBER OF NODES IN THE THERMAL MESH
+   JJ = numel(dz);
+
+   % INITIALIZE DENSITIES
+   ro_glc = (ro_ice + ro_liq) / 2; % [kg/m3]
+   if opts.use_ro_glc == true
+      ro_ice = ro_glc;
+      ro_liq = ro_glc;
    end
-   ro_wie      =  ro_liq./ro_ice;
-   ro_iwe      =  ro_ice./ro_liq;
+   ro_wie = ro_liq / ro_ice;
+   ro_iwe = ro_ice / ro_liq;
 
-%    % Init ice temperature
-%    if opts.use_init == true
-%       load(opts.f_init);
-%       T        =  init.T+met.tair(1)-init.T(1);
-%    else
-%       T        =  (met.tair(1)-1).*ones(JJ_therm,1);
-%    end
+   % LOWER AND UPPER MELT ZONE TEMPERATURE AND WATER FRACTIONS
+   TL = Tf - (2.0 * Lf / (fcp ^ 2.0 * cp_ice)) ^ (1.0 / 3.0); % Eq 120
+   TH = Tf - cp_liq / (Lf * 2.0 * fcp ^ 2.0);
+   flmin = 1 / (1 + (fcp * (Tf - TL)) ^ 2.0);
+   flmax = 1 / (1 + (fcp * (Tf - TH)) ^ 2.0);
 
-   T        =  (met.tair(1)-1).*ones(JJ_therm,1);
+   % INITIALIZE ICE TEMPERATURE TO AIR TEMPERATURE
+   T = min(TL - 1, (tair(1) - 1) * ones(JJ, 1));
 
-   % Init liquid/ice water fraction, bulk densities, and aP coeff
-   Tdep        =  Tf-T(:,1);                       % [K]
-   fliq        =  1./(1+(fcp.*Tdep).^2);           % [-]
-   bd_ice      =  ro_i;                            % at t1, bd_ice=ro_sno
-   bd_liq      =  bd_ice.*(fliq./(1-fliq));
-   f_liq       =  bd_liq./ro_liq;
-   f_ice       =  bd_ice./ro_ice.*ones(JJ_therm,1);
+   % INITIALIZE LIQUID/ICE WATER FRACTION AND BULK DENSITIES
+   T_dep = Tf - T;                           % [K]
+   fmliq = 1 ./ (1 + (fcp * T_dep) .^ 2);    % [-]
+   g_ice = opts.ro_snow_i;
+   g_liq = g_ice .* (fmliq ./ (1 - fmliq));
+   f_liq = g_liq ./ ro_liq;
+   f_ice = g_ice ./ ro_ice .* ones(JJ, 1);
 
+   % INITIAL THERMAL CONDUCTIVITY
+   k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
 
-[  k_eff,                                                            ...
-   ro_sno,                                                           ...
-   cp_sno   ]  =  UPDATESTATE(T,f_ice,f_liq,ro_ice,ro_liq,ro_air,    ...
-                  cp_ice,cp_liq,k_liq,Ls,Rv,Tf);
+   % SOURCE TERM LINEARIZATION VECTORS
+   Sc = zeros(JJ, 1);
+   Sp = zeros(JJ, 1);
 
-   % lower and upper melt zone temperature and water fractions
-   TL          =  Tf-(2.0*Lf/(fcp*fcp*cp_ice))^(1.0/3.0);   % Eq 120
-   TH          =  Tf-cp_liq/(Lf*2.0*fcp*fcp);
-   flmin       =  1/(1+(fcp*(Tf-TL))^2);
-   flmax       =  1/(1+(fcp*(Tf-TH))^2);
-   
-   % precomputed stability coefficients to speed up the code
-   z_obs       =  opts.z_obs;
-   z_0         =  opts.z_0;
-   wcoef       =  (kappa/log(z_obs/z_0))^2;        % wind transfer coef
-   scoef(1)    =  5.3*9.4*wcoef*sqrt(z_obs/z_0);   % gamma Eq. A15
-   scoef(2)    =  9.4*9.81*z_obs;                  % 9.81=gravity
-   scoef(3)    =  scoef(1)*sqrt(9.81*z_obs);
-   clear kappa z_obs z_0
-   
-   % source term linearization vectors
-   Sc          =  zeros(JJ_therm,1);
-   Sp          =  zeros(JJ_therm,1);
+   % BOUNDARY FLUX LINEARIZATION SCALARS
+   Fc = 1;
+   Fp = 1;
 
-% Initialize the output structures
-if opts.sitename == "region"
-   ice1.Tsfc         = nan(maxiter,1);
-   ice2.Tice         = nan(JJ_therm,maxiter);
-   ice2.f_ice        = nan(JJ_therm,maxiter);
-   ice2.f_liq        = nan(JJ_therm,maxiter);
-   ice2.df_liq       = nan(JJ_therm,maxiter);
-else
-   ice1.Tsfc        = nan(maxiter,1);
-   ice1.Qle         = nan(maxiter,1);
-   ice1.Qh          = nan(maxiter,1);
-   ice1.Qe          = nan(maxiter,1);
-   ice1.Qc          = nan(maxiter,1);
-   ice1.Qm          = nan(maxiter,1);
-   ice1.Qf          = nan(maxiter,1);
-   ice1.chi         = nan(maxiter,1);
-   ice1.balance     = nan(maxiter,1);
-   ice1.dt          = nan(maxiter,1);
-   ice1.zD          = nan(maxiter,1);
-   
-   % Save the vertical ice column data   
-   ice2.Tice         = nan(JJ_therm,maxiter);
-   ice2.f_ice        = nan(JJ_therm,maxiter);
-   ice2.f_liq        = nan(JJ_therm,maxiter);
-   ice2.Sc           = nan(JJ_therm,maxiter);
-   ice2.errH         = nan(JJ_therm,maxiter);
-   ice2.errT         = nan(JJ_therm,maxiter);
-   ice2.df_liq       = nan(JJ_therm,maxiter);
-   ice2.df_drn       = nan(JJ_therm,maxiter);
-   
-%    diags.Tflag       = false(maxiter,1);
-%    diags.LCflag      = false(maxiter,1);
+   % STATE VARIABLES AND PARAMETERS NEEDED ON THE FIRST ITERATION
+   f_min = opts.f_ice_min;
+   liqresid = opts.liqresid;
+
+   Ts = T(1);
+   roL = roLs;
+   liqflag = false;
+   % zD = sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
+
+   % INITIALIZE THE OUTPUT STRUCTURES
+   for n = 1:numel(opts.vars1) % ice1 = 1-d data
+      ice1.(opts.vars1{n}) = nan(maxiter, 1);
+   end
+   for n = 1:numel(opts.vars2) % ice2 = 2-d data
+      if strcmp(opts.vars2{n}, 'lcflag')
+         ice2.(opts.vars2{n}) = false(JJ, maxiter);
+      else
+         ice2.(opts.vars2{n}) = nan(JJ, maxiter);
+      end
+   end
+
+   % diags.Tflag = false(maxiter,1);
+   % diags.LCflag = false(maxiter,1);
+   % A1 = ones(JJ_therm,1);
+   % A = spdiags([A1,A1,A1],-1:1,JJ_therm,JJ_therm);
+
+   %% CV balance notes
+
+   % Note the volumetric water fraction is ~0.9:
+   %
+   % f_wat_1 = f_liq(1) + f_ice(1) * ro_ice / ro_liq
+   % printf(f_wat_1, 10)
+   %
+   % And the maximum mass fraction (flmax) is ~1 but <1:
+   % printf(flmax, 10)
+   %
+   % Thus the max volumetric water fraction (the water fraction at T = TH):
+   % fliqmax = f_wat_1 * flmax
+   % printf(fliqmax, 10)
+   %
+   % Cannot exceed the initial fraction (f_wat_1):
+   % printf(f_wat_1 - fliqmax , 10)
+   % assert(fliqmax < f_wat_1)
+   %
+   % These are not needed but demonstrate cvconvert:
+   %
+   % [fm_ice, fm_liq] = icemodel.cvconvert("volumefraction", "massfraction", ...
+   %    dz(1), [ro_ice, ro_liq], f_ice(1), f_liq(1));
+   % printf(fm_ice, 10)
+   % printf(fm_liq, 10)
+   % printf(fm_ice + fm_liq, 10)
 end
-   
-%    % test
-%    A1 = ones(JJ_therm,1);
-%    A = spdiags([A1,A1,A1],-1:1,JJ_therm,JJ_therm);

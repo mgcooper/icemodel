@@ -1,96 +1,104 @@
-function [  T,                                                          ...
-            errH,                                                       ...
-            errT,                                                       ...
-            f_ice,                                                      ...
-            f_liq,                                                      ...
-            OK    ]  =  ICEENBAL(T,f_ice,f_liq,k_liq,cv_ice,cv_liq,     ...
-                        ro_ice,ro_liq,ro_sno,cp_sno,Ls,Lf,roLf,Rv,      ...
-                        Tf,dz,delz,fn,dt,JJ,Tsfc,Sc,fcp,TL,TH,flmin,    ...
-                        flmax,ro_iwe,ro_wie)
-%------------------------------------------------------------------------------
+function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL( ...
+      T, f_ice, f_liq, dz, delz, fn, Sc, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ...
+      ro_ice, ro_liq, Ls, Lf, roLf, Rv, Tf, fcp, TL, TH, flmin, flmax, ...
+      ro_iwe, ro_wie, Fc, Fp, bc)
+   %ICEENBAL Solve the ice energy balance.
+   %
+   %#codegen
 
-% % liquid water fraction and the derivative of f_liq wrt to temperature
-   f_wat    =  f_liq+f_ice.*ro_iwe;           % frac_wat_old
-   dFdT     =  2*fcp^2.*f_wat.*(Tf-min(T,Tf))./(1+fcp^2.*(Tf-min(T,Tf)).^2).^2;
-    
-% update the melt-zone boundaries
-   fliqmin  =  f_wat.*flmin;
-   fliqmax  =  f_wat.*flmax;
-   
-% vapor diffusion heat
-   H_vap    =  VAPORHEAT(T,f_liq,f_ice,Tf,Rv,Ls);
+   % Solver options
+   tol = 1e-3;
+   maxiter = 100;
+   % alpha = 0.8;
 
-% total enthalpy (in W/m2 for comparison with fluxes)
-   H_old    = ((cv_ice.*f_ice+cv_liq.*f_liq).*(T-Tf)+roLf.*f_liq+H_vap).*dz./dt;
-                     
-% iterate to solve the nonlinear heat equation (p. 47)
-   errT = 2e-2; iter = 0; errH = 0; OK = true;
+   % Update the water fraction
+   f_wat = f_liq + f_ice * ro_iwe;
 
-while any(errT > 1e-2) && iter < 50
-   
-   T_old    =  T;
-   iter     =  iter+1;
-    
-% update thermal conductivity
-   k_eff    =  GETGAMMA(T,f_liq,f_ice,ro_ice,k_liq,Ls,Rv,Tf);
-   
-% update vapor heat   
-[  H_vap,                                                                ...
-   drovdT ] =  VAPORHEAT(T,f_liq,f_ice,Tf,Rv,Ls);
+   % Update the melt-zone boundaries. These are the liquid fractions at T=TL
+   % and T=TH, given the current total water fraction.
+   fliqmin = f_wat .* flmin;
+   fliqmax = f_wat .* flmax;
 
-% update total enthalpy
-   H        =  ((cv_ice.*f_ice+cv_liq.*f_liq).*(T-Tf)+roLf.*f_liq+H_vap).*dz./dt;
-                 
-% update the general model coefficients
-[  aN,aP,                                                               ...
-   aS,b,                                                                ...
-   iM  ]    =  GECOEFS(T,ro_sno,cp_sno,f_liq,f_ice,Ls,Lf,dz,dt,         ...
-               dFdT,drovdT,TL,H,H_old,Sc,k_eff,fn,delz,Tsfc,JJ);
+   % Compute vapor density [kg m-3]
+   ro_vap = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
 
-% underrelaxation (doesn't work with melt-zone transformation)
-% if iter>1
-%     aP          =   aP./alpha;
-%     b           =   b + beta.*aP.*T;
-% end
+   % Compute enthalpy [J m-3]
+   H_old = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
 
-% solve the equation
-   T        =  TRISOLVE(-aN,aP,-aS,b);
+   % Store past values
+   T_old = T;
+   f_liq_old = f_liq(1);
 
-% back-transform the meltzone preconditioner
-[  T,                                                                   ...
-   f_liq,                                                               ...
-   f_ice,                                                               ...
-   OK ]     =  MZTRANSFORM(T,T_old,f_liq,f_wat,ro_liq,ro_wie,Tf,TL,TH,  ...
-               fcp,fliqmin,fliqmax,iM,OK);
+   % Initialize current values
+   T_iter = T_old + 2 * tol;
 
-% if failure, return to the main program and adjust the timestep
-   if OK == false; return; end
-               
-% when a node first enters the melt zone, it will not be tagged by iM at
-% the start of this loop, so this checks for that and updates f_ice/liq/T
-[  f_liq,                                                               ...
-   f_ice,                                                               ...
-   ~,                                                                   ...
-   T  ]     =  MELTCURVE(T,f_liq,f_ice,ro_wie,ro_iwe,Tf,fcp);
- 
-% prep for next iteration
-   errT     =  abs(T_old-T);
+   % Iterate to solve the nonlinear heat equation
+   OK = true;
+   for iter = 0:maxiter-1
 
-% compute residual (need to add Sp)
-%    resN   =  aN.*([TN T(1:end-1)]-T);
-%    resS   =  aS.*([T(2:end) 0]-T);
-%    res    =  (resN+resS+Sc.*dz)./aP0;
+      % Update vapor heat
+      [ro_vap, drovdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
 
+      % Update total enthalpy
+      H = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
+
+      % Update thermal conductivity
+      k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
+
+      % Update the derivative of enthalpy wrt temperature
+      dHdT = cv_ice * f_ice + cv_liq * f_liq;
+      dLdT = 2.0 * fcp ^ 2.0 * (Tf - min(T, Tf)) .* f_wat ...
+         ./ (1.0 + fcp ^ 2.0 * (Tf - min(T, Tf)) .^ 2.0) .^ 2.0;
+
+      % Update the general equation coefficients
+      [aN, aP, aS, b, iM, a1, a2] = GECOEFS(T, f_liq, f_ice, dHdT, dLdT, ...
+         drovdT, H-H_old, Sc, k_eff, delz, fn, dz, dt, Ts, Ls, Lf, ro_liq, ...
+         TL, JJ, Fc, Fp, bc);
+
+      % % Check diagonal dominance and condition number
+      % icemodel.checkdiags(aP, aN, aS)
+
+      % Exit here so the state variables are updated on the final iteration
+      if all(abs(T - T_iter) < tol)
+         break
+      end
+
+      % Capture the past values
+      T_iter = T;
+
+      % Solve the equation
+      T = TRISOLVE(-aN, aP, -aS, b);
+
+      % Back-transform the meltzone transformation
+      [T, f_liq, f_ice, OK] = MZTRANSFORM(T, T_iter, f_ice, f_liq, f_wat, ...
+         ro_liq, ro_wie, Tf, TL, TH, fcp, fliqmin, fliqmax, iM, OK);
+
+      % If failure, return to the main program and adjust the timestep
+      if OK == false; return; end
+
+      assertF(@() all(f_ice + f_liq * ro_wie <= 1 + eps))
+
+      % When a node first enters the melt zone, it will not be tagged by iM at
+      % the start of this loop, so this checks for that and updates f_ice/liq/T
+      [f_liq, f_ice, ~, T] = MELTCURVE(T, f_liq, f_ice, ro_wie, ro_iwe, Tf, fcp);
+
+      assertF(@() all(f_ice + f_liq * ro_wie <= 1 + eps))
+
+      % Relaxation - doesn't tend to improve convergence but keep for reference.
+      % T = alpha * T + (1 - alpha) * T_iter;
+   end
+
+   OK = iter < maxiter;
+
+   % Compute surface energy balance linearization error [K]
+   % err0 = -(Fc + Fp * Ts) / a1 - (T(1) - Ts);
+
+   % Compute subsurface energy balance linearization error [K]
+   err = (dt/dz(1) ...
+      * (a2 * (T(2) - T(1)) ...
+      + Fc + Fp * (Fc + a1 * T(1)) / (a1 - Fp) ...
+      + Sc(1) * dz(1)) ...
+      - ro_liq * Lf * (f_liq(1) - f_liq_old(1)) ) ...
+      / (dHdT(1) + Ls * drovdT(1) * (1 - f_ice(1) - f_liq(1)))...
+      - (T(1) - T_old(1));
 end
-
-% keep track of the residual
-   errH  =  H-H_old;
-   
-% % check Tsfc
-%    Tsfc  =  TSURF(T,ro_sno,cp_sno,f_liq,f_ice,Ls,Lf,dz,dt,dFdT,   ...
-%             drovdT,H,H_old,Sc,k_eff,fn,delz,JJ);
-   
-   
-   
-   
-   

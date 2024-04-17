@@ -1,13 +1,12 @@
-%--------------------------------------------------------------------------
-%   SET SURFACE TEMPERATURE TO MELT TEMP 
-%--------------------------------------------------------------------------
+function Ts = MELTTEMP(Ts, Tf)
+   %MELTTEMP Set surface temperature to melt temperature
+   %
+   %  Ts = MELTTEMP(Ts, Tf)
+   %
+   % See also: MFENERGY, ENBALANCE
 
-function Tsfc0 = MELTTEMP(Tsfc,Tf)
-%--------------------------------------------------------------------------
-
-%     if (depth_swe>0.0 && Tsfc>Tf) 
-    if Tsfc>Tf
-        Tsfc0 = Tf;
-    else
-        Tsfc0 = Tsfc;
-    end
+   % if (depth_swe > 0.0 && Ts > Tf)
+   if Ts > Tf
+      Ts = Tf;
+   end
+end

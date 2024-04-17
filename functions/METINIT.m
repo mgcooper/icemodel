@@ -1,239 +1,129 @@
-function [met,opts] = METINIT(opts)
-    
-% re-activate this when/if i put all the metfiles in the input directory
-%load([opts.path.input 'met/' opts.metfname],'met')
+function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
+      De, S, time] = METINIT(opts, ii)
+   %METINIT initialize the met file
+   %
+   %#codegen
 
-if opts.sitename == "region"
-
-   % load the first met file
-   load(opts.metfname,'met');
-
-   if opts.calendar_type == "noleap"
-      met = rmleapinds(met);
-   end
-   %opts.maxiter = height(met);
-   opts.maxiter = height(met)/opts.numyears;
-   opts.dt  = seconds(met.Time(2)-met.Time(1));
-% % should be able to remove this 
-%    if opts.dt == 900
-%       opts.maxiter = 35040;
-%    elseif opts.dt == 3600
-%       opts.maxiter = 8760;
-%    end
-
-   bi = find(met.modis<=0 | met.modis>=1);
-   if ~isempty(bi)
-   met.modis(bi) = met.albedo(bi);
-      warning('bad albedo')
+   % The 2nd input is the index into the metfile name list generated in setopts
+   if nargin < 2
+      ii = 1;
    end
 
-   if string(opts.userdata) == "modis"
-      met.albedo = met.modis;
+   % Load the met file
+   met = load(opts.metfname{ii}, 'met');
+   met = met.met;
+
+   if strcmp('none', opts.userdata) == false
+      met = swapMetData(met, opts);
    end
-   
-   return;
-   
-end
-   
-   
-% these load met-station forcing data for nearby catchments
+   met = prepareMetData(met, opts);
 
-% slv1
-if strcmp(opts.metfname,      'met_slv1_kanm_2015_15m.mat')
-   load([opts.path.metdata    'met_KANM_KANM_2015_15m.mat'],'met')
-elseif strcmp(opts.metfname,  'met_slv1_kanm_2015_1hr.mat')
-   load([opts.path.metdata    'met_KANM_KANM_2015_1hr.mat'],'met')
+   % Transfer the met data to vectors
+   rh = met.rh;
+   swd = met.swd;
+   lwd = met.lwd;
+   tair = met.tair;
+   wspd = met.wspd;
+   psfc = met.psfc;
+   time = met.Time;
+   albedo = met.albedo;
 
-% slv2
-elseif strcmp(opts.metfname,  'met_slv2_kanm_2015_15m.mat')
-   load([opts.path.metdata    'met_KANM_KANM_2015_15m.mat'],'met')
-elseif strcmp(opts.metfname,  'met_slv2_kanm_2015_1hr.mat')
-   load([opts.path.metdata    'met_KANM_KANM_2015_1hr.mat'],'met')
+   if isvariable('rain', met)
+      rain = met.rain / 3600; % opts.dt - the mar rain/snow is mWE / hr not / dt
+      rain(isnan(rain)) = 0.0;
+      rain = 0 * tair;
+   else
+      rain = 0 * tair;
+   end
 
-% behar   
-elseif strcmp(opts.metfname,  'met_behar_kanm_2015_1hr.mat')
-   load([opts.path.metdata    'met_KANM_KANM_2015_1hr.mat'],'met')
-elseif strcmp(opts.metfname,  'met_behar_kanm_2016_1hr.mat')
-   load([opts.path.metdata    'met_KANM_KANM_2016_1hr.mat'],'met')   
-elseif strcmp(opts.metfname,  'met_behar_kanm_2015_15m.mat')
-   load([opts.path.metdata    'met_KANM_KANM_2015_15m.mat'],'met')
-elseif strcmp(opts.metfname,  'met_behar_kanm_2016_15m.mat')
-   load([opts.path.metdata    'met_KANM_KANM_2016_15m.mat'],'met')
+   % Solve for wet bulb
+   [Ls, cp_air] = icemodel.physicalConstant('Ls', 'cp_air');
+   tppt = nan(size(rh));
+   for n = 1:numel(rh)
+      tppt(n) = SOLVEWB(tair(n), rh(n), Ls, cp_air, psfc(n));
+   end
 
-% ak4
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2009_15m.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2009_15m.mat'],'met')
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2010_15m.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2010_15m.mat'],'met')
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2011_15m.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2011_15m.mat'],'met')
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2012_15m.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2012_15m.mat'],'met')
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2013_15m.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2013_15m.mat'],'met')   
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2014_15m.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2014_15m.mat'],'met')
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2015_15m.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2015_15m.mat'],'met')
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2016_15m.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2016_15m.mat'],'met')   
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2009_1hr.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2009_1hr.mat'],'met')
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2010_1hr.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2010_1hr.mat'],'met')
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2011_1hr.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2011_1hr.mat'],'met')
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2012_1hr.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2012_1hr.mat'],'met')
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2013_1hr.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2013_1hr.mat'],'met')
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2014_1hr.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2014_1hr.mat'],'met')
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2015_1hr.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2015_1hr.mat'],'met')
-elseif strcmp(opts.metfname,  'met_ak4_kanl_2016_1hr.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2016_1hr.mat'],'met')
-
-% upperBasin
-elseif strcmp(opts.metfname,  'met_upperBasin_kanl_2016_1hr.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2016_1hr.mat'],'met')
-elseif strcmp(opts.metfname,  'met_upperBasin_kanl_2016_15m.mat')
-   load([opts.path.metdata    'met_KANL_KANL_2016_15m.mat'],'met')
-
-% final check - if the metfile does not exist, return w/ error   
-elseif exist(opts.metfname,'file') ~= 2
-   met         =  [];
-   opts.error  =  'metfile does not exist';
-   return;
-
-% catchment-scale RCM forcing file
-else
-   load([opts.path.metdata opts.metfname],'met')
+   % Compute the wind transfer and stability coefficients
+   [De, S] = WINDCOEF(wspd, opts.z_0, opts.z_obs, opts.z_wind);
 end
 
-% next swaps out a variable from userData in place of the default met data
-if opts.useUserData == true
-    
-   simYear     =   opts.yyyy;
-   sitename    =   opts.sitename;
-   userData    =   opts.forcingUserData;
-   userVars    =   opts.forcingUserVars;
-   userPath    =   opts.path.userdata;
-   numUserVars =   numel(userVars);
-    
-% load the forcingUserData file and retime to match the metfile
-   userFile    =   [userPath userData '_' sitename '_' simYear '.mat'];
-   
-   if exist(userFile,'file') ~= 2
-      opts.error  =  'metfile does not exist';
-      return;
-   end
-   
-   load(userFile,'Data');
-   if Data.Time(2)-Data.Time(1) ~= met.Time(2)-met.Time(1)
-      Data  = retime(Data,met.Time,'linear');
+%%
+function met = prepareMetData(met, opts)
+   %PREPAREMETDATA remove leap inds, trim to simyears, check for bad data
+
+   % remove leap inds if the met data is on a leap-year calendar
+   if strcmp('noleap', opts.calendar_type)
+      feb29 = month(met.Time) == 2 & day(met.Time) == 29;
+      met = met(~feb29,:);
    end
 
-   % swap out the data in the metfile for the user data
-   for n = 1:numUserVars
+   % subset the met file to the requested simyears
+   met = met(ismember(year(met.Time), opts.simyears), :);
 
-      thisVar  = userVars{n};
-      swapVar  = thisVar;
-
-      % MODIS requires changing the variable name to albedo
-      if lower(userData) == "modis" && lower(thisVar) == "albedo"
-         thisVar = 'albedo';
-         swapVar = 'modis';
+   % check for bad modis data before swapping out default albedo for modis
+   varmodis = {'modis', 'MODIS'};
+   hasmodis = ismember(varmodis, met.Properties.VariableNames);
+   if any(hasmodis)
+      bi = met.(varmodis{hasmodis}) <= 0 | met.(varmodis{hasmodis}) >= 1;
+      if sum(bi) > 0
+         met.(varmodis{hasmodis})(bi) = met.albedo(bi);
+         warning('bad albedo')
       end
-
-      met.(thisVar) = Data.(swapVar);
    end
-end
-
-if isempty(met.Time.TimeZone)
    met.Time.TimeZone = 'UTC';
 end
 
-%%%% test
-% met = retime(met,'hourly','mean');
-%%%% test
+%%
+function met = swapMetData(met, opts)
 
-% met            = rmleapinds(met);
-opts.maxiter   = size(met,1);
-opts.dt        = seconds(met.Time(2)-met.Time(1));
-   
-% % check:
-%    figure; plot(Data.Time,Data.albedo); hold on; 
-%    plot(Data.Time,Data.modis); legend('MAR','MODIS');
-%    oldalbedo  = met.albedo;
-%    figure; plot(met.Time,oldalbedo); hold on;
-%    plot(met.Time,met.albedo); legend('old albedo','new albedo');
+   % convert uservars to a cellstr for compatibility with multiple uservars
+   if ischar(opts.uservars)
+      opts.uservars = cellstr(opts.uservars);
+   end
 
-% turned this off b/c it makes the model slower, better to use 15 m metfiles
-% interpolate the forcings to the chosen timestep
-%    if opts.dt ~= 3600
-%       switch opts.dt
-%          case 900
-%             met = interpMet(met,'15m');
-%       end
-%       met.date =  datenum(met.Time);
-%    end
+   if strcmp(opts.sitename, 'sector')
 
+      % Swap out the forcing data albedo for modis albedo
 
-% older checks:
-% % convert air temperature from celsius to kelvin
-%     met(:,5) = met(:,5) + Tfp;
-%     
-% % convert srf temperature from celsius to kelvin
-%     met(:,14) = met(:,14) + Tfp;
-    
-% % TEMP - needed for new timetable format
-%     if istimetable(met)
-%         met     = timetable2table(met);
-%         vars    = met.Properties.VariableNames;
-%         met     = table2array(met(:,2:end));
-%         met     = met(:,[1:14 19]); % 
-%     end
-    
-    
-% % this means the timestep is < 1hr
-%     if nhrs<1
-%         t0      =   datenum([met(1,1:4) 0 0]);
-%         tF      =   datenum([met(end,1:4) 0 0]);
-%         dt      =   opts.dt/3600/24;
-%         told    =   t0:1/24:tF;
-%         tnew    =   t0:dt:tF;
-%         metold  =   met(:,5:end);
-%         metnew  =   interp1(told,metold,tnew);
-%         tnew    =   datevec(tnew);
-%         met     =   [tnew(:,1:4) metnew];
-%     end
-    
+      % Activate this and move the swap loop below outside the else to swap
+      % generic variables for gridded (sector) runs.
+      % Data = met;
+      % if strcmp('modis', opts.userdata)
+      %    Data.modis = met.modis;
+      % end
 
-% % this is no longer needed if met_15m or met_1hr is used    
-%     one_hr  =   1/24;
-%     t1      =   datenum([met(1  , 1:4) 0 0]);
-%     t2      =   datenum([met(end, 1:4) 0 0]);
-%     tmet    =   t1:one_hr:t2; tmet = tmet(:);
-%     met     =   [met tmet];
-    
-% % was gonna use this to deal with precision of the running model time
-% calendar, but that problem is fixed by the met interpolation method
-% one_hr  =   round(1/24,10);
-   
-   
-% % the original albedo emulator swap   
-%     switch opts.albedoData
-%         case 'merra'
-%             load([opts.path.input 'external/merra_' opts.yyyy],'merra');
-%             met.albedo =   merra.albedo;
-%         case 'mar'
-%             load([opts.path.input 'external/mar_' opts.yyyy],'mar');
-%             met.albedo =   mar.albedo;
-%         case 'racmo'
-%             load([opts.path.input 'external/racmo_' opts.yyyy],'racmo');
-%             met.albedo =   racmo.albedo;
-%         otherwise
-%     end 
-       
-    
+      if strcmp('modis', opts.userdata)
+         met.albedo = met.modis;
+      end
+
+   else
+      % Load the userdata and retime from hourly to 15 m if the met data is 15 m
+      simyears = num2str(opts.simyears(1));
+      userfile = [opts.userdata '_' opts.sitename '_' simyears '.mat'];
+
+      if isfile(fullfile(opts.pathinput, 'userdata', userfile))
+         Data = load(fullfile(opts.pathinput, 'userdata', userfile), 'Data');
+         Data = Data.Data;
+         Data.Time.TimeZone = met.Time.TimeZone;
+         if Data.Time(2)-Data.Time(1) ~= met.Time(2)-met.Time(1)
+            Data = retime(Data, met.Time, 'linear');
+         end
+      else
+         error('\n userdata file does not exist: \n\n %s \n', ...
+            fullfile(opts.pathinput, 'userdata', userfile));
+      end
+
+      % Swap out the data in the metfile for the user data
+      for n = 1:numel(opts.uservars)
+         thisvar  = opts.uservars{n};
+         swapvar  = thisvar;
+
+         % MODIS requires changing the variable name to albedo
+         if strcmpi('modis', opts.userdata) && strcmpi('albedo', thisvar)
+            thisvar = 'albedo';
+            swapvar = 'modis';
+         end
+         met.(thisvar) = Data.(swapvar);
+      end
+   end
+end

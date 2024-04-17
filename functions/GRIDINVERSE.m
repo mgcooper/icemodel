@@ -1,37 +1,38 @@
-%--------------------------------------------------------------------------
-%   Transform absorbed solar from the spectral grid to the thermal grid
-%--------------------------------------------------------------------------
+function dQp = GRIDINVERSE(xynet,dz_spect,dz_therm,JJ_spect,JJ_therm)
+   %GRIDINVERSE Transform absorbed solar from spectral grid to thermal grid
 
-function dQp   =  GRIDINVERSE(xynet,dz_spect,dz_therm,JJ_spect,JJ_therm)
-
-% extrapolate xynet to the bottom of the thermal grid
-   JJnew             =  JJ_therm*dz_therm/dz_spect;
-   JJext             =  roundn(JJnew-JJ_spect,0);
-   dxy               =  xynet(JJ_spect)-xynet(JJ_spect-1);
-   xyextrap          =  zeros(JJext,1);
-   xyextrap(1)       =  xynet(JJ_spect) + dxy;
-   xyextrap(2:JJext) =  xyextrap(1:JJext-1) + dxy;
-   xynew             =  [xynet;xyextrap];
-% aggregate it to the scale of the thermal grid
-   dq                =  xynew(1:JJnew-1)-xynew(2:JJnew);
-   dq(JJnew)         =  dq(JJnew-1);
-% get the number of grid cells in the first 3 m segment on each grid
-   rz                =  JJnew/JJ_therm;
-% reshape the radiation into equal chunks along the thermal grid
-   dq                =  reshape(dq,rz,JJ_therm);    
-% sum up those equal chunks to get the absorbed radiation in each thermal c.v.
-   dQp               =  transpose(sum(dq,1)); % == sumdQdz
-
+   % extrapolate xynet to the bottom of the thermal grid
+   JJnew = JJ_therm*dz_therm/dz_spect;
+   JJext = round(JJnew-JJ_spect, 0);
+   delxy = xynet(JJ_spect)-xynet(JJ_spect-1);
+   xyext = zeros(JJext,1);
+   xyext(1) = xynet(JJ_spect) + delxy;
+   xyext(2:JJext) = xyext(1:JJext-1) + delxy;
+   xynew = [xynet;xyext];
+   
+   % aggregate it to the scale of the thermal grid
+   dq = xynew(1:JJnew-1)-xynew(2:JJnew);
+   dq(JJnew) = dq(JJnew-1);
+   
+   % get the number of grid cells in the first 3 m segment on each grid
+   rz = JJnew/JJ_therm;
+   
+   % reshape the radiation into equal chunks along the thermal grid
+   dq = reshape(dq,rz,JJ_therm);
+   
+   % sum up those equal chunks to get the absorbed radiation in each thermal c.v.
+   dQp = transpose(sum(dq,1)); % == sumdQdz
+end
 %--------------------------------------------------------------------------
 %   A note on what's happening here. The two-stream solution gives the
 %   total upflux (X) and downflux (Y) from the respective boundary to each
 %   layer interface. xynet is energy conservation applied to each c.v., in
-%   the following manner: 
+%   the following manner:
 %
 %   Y↓(1)  X↑(1)    Xnet = X↑(2)-X↑(1), Ynet = Y↓(1)-Y↓(2)
 %   ____________
 %   ____________    XYnet = Xnet - Ynet = (X↑(2)-X↑(1))-(Y↓(1)-Y↓(2))
-%   Y↓(2)  X↑(2)  
+%   Y↓(2)  X↑(2)
 
 %   So XYnet is the net flux and dq = d/dz(XYnet) is the absorbed flux. In
 %   this function I first extrapolate xynet onto the thermal grid in case
@@ -46,4 +47,3 @@ function dQp   =  GRIDINVERSE(xynet,dz_spect,dz_therm,JJ_spect,JJ_therm)
 %   amount of absorbed solar radiation in each layer using the conversion
 %   formula dQ = (-Qsip/total_solar).*dQ
 %--------------------------------------------------------------------------
-      

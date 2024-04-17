@@ -1,3 +1,9 @@
-function H = TOTALHEAT(T,f_liq,f_ice,cv_liq,cv_ice,roLf,Tf,H_vap,dz,dt)
-% this is enthalpy (J/m3/K) converted to W/m2
-   H  = ((cv_ice.*f_ice+cv_liq.*f_liq).*(T-Tf)+roLf.*f_liq+H_vap).*dz./dt;
+function H = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, roLs, Tf)
+   %TOTALHEAT Compute total enthalpy (J/m3)   
+   
+   H = ( ...
+      (cv_ice * f_ice + cv_liq * f_liq) .* (T - Tf) ...  % specific heat
+      + roLf .* f_liq ...                                % latent heat
+      + roLs .* (1.0 - f_liq - f_ice) ...                % vapor heat
+      );
+end

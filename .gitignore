@@ -1,3 +1,9 @@
+# icemodel stuff
+# input/
+# output/
+# data/
+*config.m
+
 *~
 
 # Mac stuff
@@ -15,6 +21,9 @@ Thumbs.db
 # Backup
 *.tmp
 *.bk
+*.bak
+*.orig
+*.tmp
 *.archive
 *.keep
 *.old
@@ -25,10 +34,10 @@ data/
 *.xlsb
 *.xls
 
-# private folder
-private/
+# todo lists
 todo.md
-readmemgc.txt
+TODO.md
+
 
 
 # # I added these then commented them out b/c it's impossible to know if this is always desirable. Will need to manage on a case by case basis by adding to local ignore files

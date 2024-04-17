@@ -1,269 +1,241 @@
-%--------------------------------------------------------------------------
-%   Update the bulk extinction coefficient based on albedo and ice density
-%--------------------------------------------------------------------------
-function [  Sc,                                                         ...
-            chi  ]   =  UPDATEEXTCOEFS(grid_spect,JJ_spect,dz_spect,    ...
-                        grid_therm,JJ_therm,dz_therm,z_walls,dz,ro_sno, ...
-                        Qsi,total_solar,spect_lower,spect_upper,albedo, ...
-                        solardwavl)
-%--------------------------------------------------------------------------
+function [Sc, chi] = UPDATEEXTCOEFS(Qsi, albedo, Q0, dz_spect, spect_N, ...
+      spect_S, solardwavl, Sc, dz_therm, ro_sno)
+   %UPDATEEXTCOEFS Update the bulk extinction coefficients
 
-% Transform the mass density to the spectral grid resolution
-   ro_sno   = interp1(grid_therm,ro_sno,grid_spect,'nearest','extrap');
-   ro_sno   = max(ro_sno,300);
-   
-% Compute the downward bulk extinction coefficient.
-   bulkcoefs = -log((sum(solardwavl.*exp(spect_lower.*ro_sno),2))./     ...
-               (sum(solardwavl.*exp(spect_upper.*ro_sno),2)))./dz_spect;
-%  NOTE: solardwavl comes multiplied by dwavl, and sum/trapz are identical 
-
-% Cast in a form that can be used in the two-stream computation (add the
-%   boundaries).  Here I have assumed that it is okay to call the
-%   boundaries equal to the value at the center of that grid cell (the
-%   value prevails thoughout the cell).
-   bulkcoefs = vertcat(bulkcoefs,bulkcoefs(end),bulkcoefs(end));
-   
-% Compute the a and r coefficients from knowledge of the
-%   surface albedo and the extinction coefficient.
-   a  =  (1.0 - albedo) ./ (1.0 + albedo) .* bulkcoefs;
-   r  =  2.0 .* albedo .* bulkcoefs ./ (1.0 - albedo^2);
-
-% Solve the system of equations for the two-stream model
-   M  =  JJ_spect;   % notation here roughly follows Schlatter
-   M1 =  M+1;
-   M2 =  M+2;
-   
-% extend y_wall downward by one c.v.
-   z_walls(M2) =  z_walls(M1) + z_walls(M1) - z_walls(M);
-   
-% since bulk_extcoefs were computed with y_wall, do the same here
-   deltaz   =  z_walls(2) - z_walls(1);
-   
-% initialize the matrix
-   e  =  zeros(M1,1);
-   f  =  zeros(M1,1);
-   g  =  zeros(M1,1);
-   b  =  zeros(M1,1);
-   
-% Account for the upper boundary condition
-   alfa  =  1.0/(a(1)+r(1));
-   e(1)  =  0.0;
-   f(1)  =  1.0;
-   g(1)  =  -alfa/(deltaz+alfa);
-   b(1)  =  r(1)*total_solar*deltaz * alfa/(deltaz+alfa);
-   
-% Fill the vectors between the boundaries
-   deltaz   =  z_walls(3:M2)-z_walls(2:M1);
-   e(2:M1)  =  1.0 + (r(3:M2) - r(1:M)) ./ (4.0.*r(2:M1));
-   f(2:M1)  =  deltaz./(2.0.*r(2:M1)).*(a(2:M1).*(r(3:M2)-r(1:M))-   ...
-               r(2:M1).*(a(3:M2)-a(1:M)))-(2.0+deltaz.^2.*bulkcoefs(2:M1).^2);
-   g(2:M1)  =  1.0 - (r(3:M2) - r(1:M)) ./ (4.0*r(2:M1));
-   b(2:M1)  =  0.0;
-   
-% Account for the lower boundary condition
-   g(M1)    =  0.0;
-   b(M1)    =  0.0;
-   
-% Solve the equation
-   x = nan(M1,1);
-   for k = 2:numel(f)                        % forward elimination
-      f(k)  =  f(k)-e(k)/f(k-1)*g(k-1);
-      b(k)  =  b(k)-e(k)/f(k-1)*b(k-1);
+   if Qsi < 1e-3
+      Sc = 0.0 * Sc;
+      chi = 1.0;
+      return
    end
-   x(M1) = b(M1)/f(M1);                      % back substitution
-   for k = M:-1:1
-      x(k)  =  (b(k)-g(k)*x(k+1))/f(k);
-   end 
-   
-% Add the boundary conditions to up and reconstruct down. X = up, Y = down.
-   up       =  vertcat(x(1:M1),0); % Add the boundary conditions to rad.
 
-% Reconstruct y.
-   down     =  (a(2:M1)+r(2:M1))./r(2:M1).*up(2:M1)-(up(3:M2)-up(1:M2-2))...
-               ./(2.0.*deltaz.*r(2:M1));
-   down     =  vertcat(total_solar,down);
-   down     =  vertcat(down,(a(M2)+r(M2))/r(M2)*up(M2)-(up(M2)-up(M1))/...
-               (deltaz(1)*r(M2)));
+   debug = true;
+   debugplot = false;
 
-% Smooth any small bumps in the up and down curve.  This will assist
-%   in any delta up, delta down computations. Do the interior.
-   downtmp  =  (down(2:M1) + 0.5 .* (down(1:M2-2) + down(3:M2)))./ 2.0;
-   uptmp    =  (up(2:M1)   + 0.5 .* (up(1:M2-2)   + up(3:M2)))  ./ 2.0;
+   % Transform the mass density to the spectral grid
+   ro_sno = max(interp1(cumsum(dz_therm)-dz_therm/2, ro_sno, ...
+      cumsum(dz_spect) - dz_spect/2, 'nearest', 'extrap'), 300);
 
-% Do the ends.
-   downtmp  =  vertcat((down(2) + 0.5 * down(1)) / 1.5, downtmp);
-   uptmp    =  vertcat((up(2)   + 0.5 * up(1))   / 1.5, uptmp);
-   downtmp  =  vertcat(downtmp, (down(M1) +  0.5 * down(M2)) / 1.5);
-   uptmp    =  vertcat(uptmp,   (up(M1)   +  0.5 * up(M2))   / 1.5);
+   % Compute the downward bulk extinction coefficient.
+   bulkcoefs = -log((sum(solardwavl .* exp(spect_S .* ro_sno), 2)) ...
+      ./ (sum(solardwavl .* exp(spect_N .* ro_sno), 2))) ./ dz_spect(1);
+   % NOTE: solardwavl comes multiplied by dwavl
 
-% Rewrite the arrays. Adjust to get back the Qsi at the surface.
-   down     =  vertcat(down(1), downtmp(2:M1), down(end));
-   up       =  vertcat(up(1),   uptmp(2:M1),   up(end));
+   % Add the boundaries for the two-stream computation.
+   bulkcoefs = vertcat(bulkcoefs, bulkcoefs(end), bulkcoefs(end));
 
-% Repeat the smoothing (deal with edge effects)
-   downtmp  =  (down(2:M1) + 0.5 * (down(1:M) + down(3:M2))) / 2.0;
-   uptmp    =  (up(2:M1) + 0.5 * (up(1:M) + up(3:M2))) / 2.0;
+   % Compute a and r from the surface albedo and the extinction coefficients.
+   a = (1.0 - albedo) / (1.0 + albedo) * bulkcoefs;
+   r = 2.0 * albedo * bulkcoefs ./ (1.0 - albedo ^ 2);
 
-% Do the ends.
-   downtmp  =  vertcat(down(2)   +  0.5 * down(1) / 1.5, downtmp);
-   uptmp    =  vertcat(up(2)     +  0.5 * up(1)   / 1.5, uptmp);
-   downtmp  =  vertcat(downtmp, down(M1) +  0.5 * down(M2) / 1.5);
-   uptmp    =  vertcat(uptmp,   up(M1)   +  0.5 * up(M2)   / 1.5);
+   % Solve the two-stream system of equations for the up flux
+   M = numel(dz_spect) + 2;
 
-% Rewrite the arrays.
-   down     =  vertcat(down(1), downtmp(2:M1), down(end));
-   up       =  vertcat(up(1),   uptmp(2:M1),   up(end));
-   
-% Build an array of source-term values on the c.v. boundaries.
-   xynet    =  (up(2:M)+up(3:M1))./2.0-(down(2:M)+down(3:M1))./2.0;
-   xynet    =  vertcat(up(1)-down(1), xynet);
+   % Initialize the matrix
+   e = zeros(M-1, 1);
+   f = zeros(M-1, 1);
+   g = zeros(M-1, 1);
+   b = zeros(M-1, 1);
 
-% Ensure xynet(1) is equal to the total absorbed radiation. This corrects
-%   for any (very) small errors in the two-stream model, typically due to a
-%   spectral grid that is too shallow to absorb all the radiation
-   xynet(1) =  min(-total_solar*(1-albedo),xynet(1));
+   % Account for the upper boundary condition
+   alfa = 1.0 / (a(1) + r(1));
+   e(1) = 0.0;
+   f(1) = 1.0;
+   g(1) = -alfa / (dz_spect(1) + alfa);
+   b(1) = r(1) * Q0 * dz_spect(1) * alfa / (dz_spect(1) + alfa);
 
-% xynet is the net solar radiation at each level. In Schlatter it is
-%   just Q. The source term (absorbed flux per unit volume) is dQ/dz.
-%   Below, I call the absorbed flux dQ, so Sc = dQ/dz = d(xynet)/dz. In
-%   Glen's original model, the quantity dQ was not defined, xynet was
-%   converted directly to dQ/dz in ICE_HEAT by scaling d(xynet) by Qsip and
-%   then to Sc.
+   % Fill the vectors between the boundaries
+   deltaz = [dz_spect(2:end); dz_spect(end)];
+   e(2:M-1) = 1.0 + (r(3:M) - r(1:M-2)) ./ (4.0 * r(2:M-1));
+   f(2:M-1) = deltaz ./ (2.0 * r(2:M-1)) ...
+      .* (a(2:M-1) .* (r(3:M) - r(1:M-2)) - r(2:M-1) .* (a(3:M) - a(1:M-2))) ...
+      - (2.0 + deltaz .^ 2 .* bulkcoefs(2:M-1) .^ 2);
+   g(2:M-1) = 1.0 - (r(3:M) - r(1:M-2)) ./ (4.0 * r(2:M-1));
+   b(2:M-1) = 0.0;
 
-%   Transform the pentrating radiation back to the thermal grid as dQ
-   % extrapolate xynet to the bottom of the thermal grid
-   M3             =  JJ_therm*dz_therm/dz_spect;
-   M4             =  roundn(M3-M,0);
-   dxy            =  xynet(M)-xynet(M-1);
-   xyextrap       =  zeros(M4,1);
-   xyextrap(1)    =  xynet(M) + dxy;
-   xyextrap(2:M4) =  xyextrap(1:M4-1) + dxy;
-   xynew          =  [xynet;xyextrap];
-% upscale it to the thermal grid
-   dQ             =  xynew(1:M3-1)-xynew(2:M3);
-   dQ(M3)         =  dQ(M3-1);
-% get the number of grid cells in the first 3 m segment on each grid
-   rz             =  M3/JJ_therm;
-% reshape the radiation into equal chunks along the thermal grid
-   dQ             =  reshape(dQ,rz,JJ_therm);    
-% sum up those equal chunks to get the absorbed radiation in each thermal c.v.
-   dQ             =  transpose(sum(dQ,1));
+   % Account for the lower boundary condition
+   g(M-1) = 0.0;
+   b(M-1) = 0.0;
 
-% Compute the amount of solar radiation absorbed in the top grid cell, to
-%   be allocated to the SEB. Optionally enhance it by qsfactor to account
-%   for impurities on the ice surface or other factors. 
-   if albedo>0.65 % && snowd>0.05
-      chi   =  0.9;
+   % Solve the equation
+   up = zeros(M-1, 1);
+   for k = 2:numel(f)
+      f(k) = f(k) - e(k) / f(k-1) * g(k-1);
+      b(k) = b(k) - e(k) / f(k-1) * b(k-1);
+   end
+   up(M-1) = b(M-1) / f(M-1);
+   for k = numel(f)-1:-1:1
+      up(k) = (b(k) - g(k) * up(k+1)) / f(k);
+   end
+
+   % Add the boundary conditions to up and reconstruct down. X = up, Y = down.
+   up = vertcat(up(1:M-1), 0);
+
+   % Reconstruct down.
+   dn = vertcat(Q0, ...
+      (a(2:M-1) + r(2:M-1)) ./ r(2:M-1) .* up(2:M-1) - (up(3:M) - up(1:M-2)) ...
+      ./ (2.0 * deltaz .* r(2:M-1)), ...
+      (a(M) + r(M)) / r(M) * up(M) - (up(M) - up(M-1)) ...
+      / (deltaz(M-2) * r(M))); % note: dz(M-1) for the bottom
+
+   if debug == true; UP(:, 1) = up; DN(:, 1) = dn; end
+
+   % Do the interior.
+   dntmp = (dn(2:M-1) + 0.5 * (dn(1:M-2) + dn(3:M))) / 2.0;
+   uptmp = (up(2:M-1) + 0.5 * (up(1:M-2) + up(3:M))) / 2.0;
+
+   % Do the ends.
+   dntmp = vertcat((dn(2) + 0.5 * dn(1)) / 1.5, dntmp);
+   uptmp = vertcat((up(2) + 0.5 * up(1)) / 1.5, uptmp);
+   dntmp = vertcat(dntmp, (dn(M-1) + 0.5 * dn(M)) / 1.5);
+   uptmp = vertcat(uptmp, (up(M-1) + 0.5 * up(M)) / 1.5);
+
+   % Rewrite the arrays, ensuring Qsi at the surface is conserved.
+   dn = vertcat(dn(1), dntmp(2:M-1), dn(end));
+   up = vertcat(up(1), uptmp(2:M-1), up(end));
+
+   if debug == true; UP(:, 2) = up; DN(:, 2) = dn; end
+
+   % Repeat the interior.
+   dntmp = (dn(2:M-1) + 0.5 * (dn(1:M-2) + dn(3:M))) / 2.0;
+   uptmp = (up(2:M-1) + 0.5 * (up(1:M-2) + up(3:M))) / 2.0;
+
+   % Do the ends.
+   dntmp = vertcat(dn(2) + 0.5 * dn(1) / 1.5, dntmp);
+   uptmp = vertcat(up(2) + 0.5 * up(1) / 1.5, uptmp);
+   dntmp = vertcat(dntmp, dn(M-1) + 0.5 * dn(M) / 1.5);
+   uptmp = vertcat(uptmp, up(M-1) + 0.5 * up(M) / 1.5);
+
+   % Rewrite the arrays.
+   dn = vertcat(dn(1), dntmp(2:M-1), dn(end));
+   up = vertcat(up(1), uptmp(2:M-1), up(end));
+
+   if debug == true; UP(:, 3) = up; DN(:, 3) = dn; end
+
+   % Compute the net flux at each level, ensuring Q(1) recovers the total flux.
+   Q = vertcat(min(-Q0 * (1 - albedo), up(1) - dn(1)), ...
+      (up(2:M-1) + up(3:M)) ./ 2.0 - (dn(2:M-1) + dn(3:M)) ./ 2.0);
+
+   % Save these before upscaling to thermal grid
+   if debug == true
+      Qspect = Q;
+      dQspect = Q(1:end-1) - Q(2:end);
+   end
+
+   % Compute the absorbed flux at each level
+   dQ = Q(1:end-1) - Q(2:end);
+   dQ = transpose(sum(reshape(dQ, dz_therm(1) / dz_spect(1), []), 1));
+   dQ = vertcat(dQ, zeros((sum(dz_therm) - sum(dz_spect)) / dz_therm(1), 1));
+
+   % Compute the flux absorbed in the top layer, to be allocated to the SEB.
+   % Optionally enhance it by a parameter to account for impurities on the ice
+   % surface or other factors that enhance the surface absorption.
+   if albedo > 0.65 % && snowd > 0.05
+      chi = 0.9;
    else
-      chi   =  dQ(1)/sum(dQ);
-%       chi   =  min(1.0,max(chi+qsfactor,0.0));
+      chi = dQ(1) / sum(dQ);
    end
-%    chi      =  0;
-   Sc       =  -(1.0-chi)*Qsi/total_solar.*dQ./dz;    % [W/m3]
 
-%    if albedo>0.65 % && snowd>0.05
-%       chi   =  0.9;
-%    else
-%       if zD<=dz(1)
-%         %Qseb  =  (dQ(1)*Qsi/total_solar).*exp(-zD.*a(1)); 
-%          Qseb  =  dQ(1).*exp(-zD.*a(1));
-%       else
-%          Qseb  =  dQ(1);
-%       end
-%       chi   =  Qseb/sum(dQ);
-%       dQ(1) =  dQ(1)-Qseb;
-%    end
-%    % compute the solar radiation source-term values in each c.v.
-%    Sc       =  -Qsi/total_solar.*dQ./dz;    % [W/m3]
+   % Compute the source term (absorbed flux per unit volume), Sc = dQ/dz.
+   Sc = -(1.0 - chi) * Qsi / Q0 * dQ ./ dz_therm; % [W m-3]
 
-% at this point, sum(dQ) - Qseb = -total_solar*(1-albedo)
-   %Qseb    =  -Qsi/total_solar*Qseb;
-% these should be equal: [chi,  Qseb/(sum(Sc.*dz)+Qseb)]
-   
+   if debug == true
 
-   
-%    % this was me trying to adjust Sc after the fact
-%    Qseb     =  dQ(1).*exp(-zD.*a(1));
-%    Sc(1)    =  Sc(1) + Qseb/dz(1);
-   
-% %    % van dalum does it this way, here at the radiation timestep, get tau:
-% %    Ftop     =  xynet(1);
-% %    tau      =  dz./(log(xynet(1)./xynet));
-% %    
-% %    % then in the substepping, use tau to determine how much of xynet
-% %    % diffuses back to the SEB:
-% %    Fseb     =  xynet.*exp(dz./tau);
-% 
-%    % but I don't need to do it this way, b/c I already know the total
-%    % absorbed radiation in each level for the 1-hr timestep, so I just need
-%    % to know how much of that radiation diffuses to the surface, which is
-%    % just the exponential decay equation evaluated at the diffusion length
-%    % scale. The absorbed flux that contributes to the SEB is then:
-%    zD       =  sqrt(k_eff.*dt_new./(ro_sno.*cp_sno));
-%    Fseb     =  dQ.*exp(-zD.*a);
-%    Sc(1)    =  Sc(1) - Fseb/dz(1);
-%    % and Fseb get's sent into SFCTEMP (or SFCFLIN)
-%    
-%    % to implement, first check if zD exceeds the top layer thickness:
-%    if sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1))) <= dz(1)
-%       Fseb  =  dQ(1)*exp(-sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)))*a(1));
-%    else % assign all of the top layer source term to the SEB
-%       Fseb  =  dQ(1);
-%    end
+      % sum(dQspect(1:40)) / sum(dQspect)
+      % dQ(1) / sum(dQ)
 
-% note: using Dalum's method, my first thought was that tau is determined
-% using dQ: 
-%     tau   =  dz./(log(dQ./(Qsi*(1-albedo))));
-% then send this into the substepping to get Fseb at each sub-step:
-%     Fseb  =  Qsi*(1-albedo)
-% but this is wrong, 
+      % This compares the different up/dn fluxes
+      if debugplot == true
 
-%    % xynet 
-%    tau      =  deltaz./(log(xynet./xynet(1)));
-%    
-%    % it should be the absorbed flux
-%    dxy      =  diff(xynet);
-%    tau      =  deltaz(1:end-1)./(log(dxy./dxy(1)));
-%    
-%    figure; plot(grid_spect(1:end-1),-tau); set(gca,'YDir','reverse')
-%    
-%    tau      =  (z_walls(2:end)-z_walls(1:end-1))./(log(down(2:end)./down(1)));
-%    
-%    
-%    figure; loglog(z_walls(2:end),-tau); set(gca,'YDir','reverse')
-%    
-%    tau      =  grid_spect./(log(xynet./xynet(1)));
-%    
-%    figure; plot(grid_spect,tau); set(gca,'YDir','reverse')
-%    
-%    tau      =  grid_spect./(log(down./down(1)));
-%    
-%    figure; plot(grid_spect,xynet); set(gca,'YDir','reverse')
-%    
-%    figure; plot(grid_spect,tau); set(gca,'YDir','reverse')
-   
-% % these are some tests i was doing to compare sum to trapz    
-% wavl = wavl(1,:);
-% 
-% f1 = solardwavl.*exp(spect_lower.*ro_sno);
-% f2 = solardwavl.*exp(spect_upper.*ro_sno);
-% 
-% f3 = solar.*exp(spect_lower.*ro_sno);
-% f4 = solar.*exp(spect_upper.*ro_sno);
-% 
-% 
-% figure; plot(wavl,f1(1,:))
-% figure; plot(wavl,f3(1,:))
-% 
-% test1 = trapz(wavl,f3,2);
-% test2 = sum(f3.*dwavl,2);
-% figure; myscatter(test1,test2); addOnetoOne;
-% 
-% test  = -log((trapz(wavl,f3,2))./(trapz(wavl,f4,2)))./dz_spect;
-% 
-% bulkcoefs = -log((trapz(solardwavl.*exp(spect_lower.*ro_sno),2))./   ...
-%       (trapz(solardwavl.*exp(spect_upper.*fix(max(ro_sno,300))),2)))./dz_spect;
-% 
-% tic; test1 = trapz(solardwavl.*exp(spect_lower.*ro_sno),2); toc;
-% tic; test2 = sum(solardwavl.*exp(spect_lower.*ro_sno),2); toc;
-% tic; test3 = trapz(wavl,solar.*exp(spect_lower.*ro_sno),2); toc;
+         z_walls = [0; cumsum(dz_spect); sum(dz_spect) + dz_spect(end)];
+         z_therm = cumsum(dz_therm) - dz_therm/2;
+         z_spect = cumsum(dz_spect) - dz_spect/2;
+
+         icemodel.plot.twostream(UP, DN, Qspect, dQspect, z_walls, z_spect, true);
+
+         % This compares the absorbed flux on the spectral grid to the thermal grid
+         X1 = -dQspect ./ dz_spect;
+         X2 = -dQ ./ dz_therm;
+         Y1 = z_spect;
+         Y2 = z_therm;
+
+         figure
+         semilogx(X1, Y1, '-o'); hold on;
+         semilogx(X2, Y2, '-o');
+         formatPlotMarkers("markersize", 6)
+         xlabel('dQ/dz')
+         ylabel('depth')
+         legend('spectral grid', 'thermal grid')
+         set(gca, 'YDir', 'reverse', 'XDir', 'reverse')
+
+         % This might only work with uniform grid
+         ratio = dz_therm(1)/dz_spect(1);
+         itherm = 20;
+         ispect = ratio * itherm;
+         xlims = [min([X1(1:ispect); X2(1:itherm)]) max([X1(1:ispect); X2(1:itherm)])];
+         ylims = [min(Y1(1), Y2(1)) max(Y2(itherm), Y1(ispect))];
+         axis([0.98*xlims(1) 1.02*xlims(2) ylims(1) ylims(2)])
+
+
+         figure
+         semilogx(Sc, Y2, '-o'); hold on;
+         semilogx(X2, Y2, '-o');
+         formatPlotMarkers("markersize", 6)
+         xlabel('dQ/dz')
+         ylabel('depth')
+         legend('S_c', 'dQ/dz')
+         set(gca, 'YDir', 'reverse', 'XDir', 'reverse')
+
+         close all
+      end
+   end
+
+   %% TEST BEGIN
+
+   % This would go between b(M-1) = 0.0; and the "solve the equation".
+
+   % % e(M-1) = 0.0;
+   % % f(M-1) = 1.0;
+   %
+   % % keep the og ones
+   % e1 = e;
+   % f1 = f;
+   % g1 = g;
+   % b1 = b;
+   % deltaz1 = deltaz;
+   %
+   % % It should be possible to just compute the interior equations then append the
+   % % upper and lower
+   % deltaz = [dz_spect; dz_spect(end)];
+   % e = 1.0 + (r(3:M) - r(1:M-2)) ./ (4.0 * r(2:M-1));
+   % f = deltaz(2:M-1) ./ (2.0 * r(2:M-1)) ...
+   %    .* (a(2:M-1) .* (r(3:M) - r(1:M-2)) - r(2:M-1) .* (a(3:M) - a(1:M-2))) ...
+   %    - (2.0 + deltaz(2:M-1) .^ 2 .* bulkcoefs(2:M-1) .^ 2);
+   % g = 1.0 - (r(3:M) - r(1:M-2)) ./ (4.0 * r(2:M-1));
+   % b = 0 * g;
+   %
+   % % Append the upper boundary condition
+   % e = vertcat(0, e);
+   % f = vertcat(1, f);
+   % g = vertcat(-alfa / (dz_spect(1) + alfa), g);
+   % b = vertcat(r(1) * I0 * dz_spect(1) * alfa / (dz_spect(1) + alfa), b);
+   %
+   % % Account for the lower boundary condition
+   % e(end) = 0.0;
+   % f(end) = 1.0;
+   % g(end) = 0.0;
+   %
+   % %
+   % isequal(e, e1) % no
+   % isequal(f, f1) % no
+   % isequal(g, g1) % yes
+   % isequal(b, b1) % yes
+   %
+   % isequal(e(1:end-1), e1(1:end-1)) % yes
+   % isequal(f(1:end-1), f1(1:end-1)) % yes
+   %
+   % e(end)
+   % e1(end)
+   %
+   % f(end)
+   % f1(end)
+end

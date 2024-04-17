@@ -1,197 +1,131 @@
 clean
 
+% TODO: Save to nc and delete ice1 files:
+% icemodel, mar, zobs
+% DONE icemodel, modis, zobs
+% DONE icemodel, mar
+% DONE icemodel, modis
+% DONE skinmodel, mar, zobs
+% DONE skinmodel, modis, zobs (ice1.mat were ~600 MB, nc files ~275 MB, saves ~3 GB)
+% DONE skinmodel, mar
+% DONE skinmodel, modis
 
-savedata    = true;
-sitename    = 'region';
-forcingdata = 'mar';
-userdata    = 'mar';
-uservars    = 'albedo';
-meltmodel   = 'icemodel';
-vers        = 'v10';
+% For the og icemodel runs (not zobs), it appears I might only have:
+% Tsfc, runoff, melt, freeze, ... and drain ... need to figure that out
+% ... now that icemodel/modis/zobs are done, it appears drain was never added to
+% makencfile, and for non-zobs, the ice1 files are deleted, and df_drn is not in
+% the ice2 files, whereas for the zobs runs, ice2 has df_drn and ice1 has drain,
+% so i added drain to makencfile, even though drain can always be reconstructed
+% from ice2.df_drn and it might be confusing ot have it in the nc files but i can
+% always remove it and resave them later
 
-startyear   = 2008;
-endyear     = 2018;
-nyrs        = endyear-startyear+1;
+% to finish the makencfile
+% - add grid_mapping
+% - decide how to deal with zobs
+% - remove GetDimsFromData stuff esp getdimid it was compact and clear
+% - DONE separate into ice1 and ice2 files, latter on monthly timestep?
+% - DONE add a gridcell variable
+% - DONE figure out the auxiliary coordinate variable thing
+% - DONE add runoff to the verify script
+% - DONE move ncells, nhrs, nlayrs into getdimdata
 
-% it's best to set these here rather than programatically
-nvars0d     = 6;  % lat, lon, x, y, elev, time
-nvars1d     = 4;  % Tsfc, melt, freeze, runoff
-nvars2d     = 4;  % Tice, f_liq, f_ice, df_liq
+% FINAL DECISION ON PRECISION
+% - Save all ice1 nc files to double precision, it will still save a lot of disk
+% space plus eliminate unneccesary variables e.g. skinmodel freeze
+% - (Re)-save ice2 .mat files to single precision.
+% - Then I can decide how to handle zobs, and swap out data as needed
+% - For the final archive, if needed I can save as single but by then, I won't
+% need to
+% - The tricky decision is whether to save Qm and Qe, but since I can regenerate
+% skinmodel data quickly, just save the core data. RECALL that all variables can
+% be generated for individual sites, this is just the runoff for the sector
+% grids
 
-% MAKE SURE TO SET THE RIGHT PATH
-pathroot    = '/Users/coop558/mydata/';
-pathdata    = [pathroot 'icemodel/model/experiment/' vers '/' userdata '/'];
-pathmeta    = [pathroot 'mar3.11/matfiles/region/level2/' userdata '/'];
-pathsave    = [pathdata 'nc/'];
 
-if ~exist(pathsave,'dir'); mkdir(pathsave); end;
+% To deal with zobs, pick N random points from icemask X, Y, then run them with
+% runscript runpoint functionality using no rounding, compare with the saved
+% data in zobs ... if they're equivalent then there's no getting around it, I
+% should just delete the old data and use the new data. BUT, might check
+% sensitivity to numiter, bc, etc.
 
-% set the dimesions
-ncells      = 3; % 1487    % store the data as a list
-nlyrs       = 500;         % number of vertical layers
-nhrs        = 8760;        % number of hours per year
-comprsz     = 1;           % compression size
-
-% file size in mb/cell for min/med/max compression
+% file size in mb/cell for deflateLevel = 1,5,9 w/wo 1d or 0d vars
 % 1: 10.9 (10.8 w/o 1-d or 0-d vars)
 % 5: 9.4
 % 9: 9.2 (9.1 w/o 1-d or 0-d vars)
+% % I also tested if compression is better w/o the 1-d and 2-d vars - it isn't
 
-% set default format
-netcdf.setDefaultFormat('NC_FORMAT_NETCDF4');
+savedata = true;
+sitename = 'sector';
+simyears = 2009:2018;
+simmodel = 'icemodel'; % {'icemodel', 'skinmodel'};
+forcings = 'mar';
+userdata = 'mar'; % {'mar', 'modis'};
+siteopts = setBasinOpts('sitename', sitename, 'simmodel', simmodel, 'userdata', userdata);
 
-% Define variables, dimensions, put the data, close the file
-varnames    = {'f_ice','f_liq','df_liq','Tice','Tsfc','depth_melt',     ...
-               'depth_freeze','column_runoff','latitude','longitude',   ...
-               'x_easting','y_northing','elevation','time'};
-longnames   = {'fraction of frozen water in control volume',            ...
-               'fraction of unfrozen water in control volume',          ...
-               'change in fraction of unfrozen water in control volume',...
-               'thermodynamic temperature of control volume',           ...
-               'thermodynamic temperature of ice surface',              ...
-               'cumulative melt',                                       ...
-               'cumulative refreeze',                                   ...
-               'cumulative runoff',                                     ...
-               'latitude of grid cell center',                          ...
-               'longitude of grid cell center',                         ...
-               'x-coordinate of grid cell center in EPSG:3413 WGS 84 / NSIDC Sea Ice Polar Stereographic North', ...
-               'y-coordinate of grid cell center in EPSG:3413 WGS 84 / NSIDC Sea Ice Polar Stereographic North', ...
-               'elevation above mean sea level',                        ...
-               'seconds since 1 January, 00:00'};
-units       =  {'1','1','1','K','K','m w.e.','m w.e.','m w.e.',         ...
-               'degree_north','degree_east','m','m','m','s'};
+testname = 'zobs';
+% testname = '';
 
-% should be: volume fraction of frozen water, volume fraction of unfrozen water
-% standardnames  = {'volume fraction of frozen water','','','land_ice_temperature'};
+% simyears = 2018;
 
-nvars       = numel(varnames);
+% Set path to data
+pathdata = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, simmodel, userdata, testname);
+pathsave = pathdata;
 
-% CREATE THE FILES
+%%
 
-for m = 1:1 %nyrs
-   
-   thisyear = num2str(startyear + m - 1);
-         
-   filename = [pathsave 'icemodel_' thisyear '.nc4'];
-   
-   % load one ice1 file to get the calendar
-   load([pathdata thisyear '/ice1_1.mat'],'ice1');
-   
-   % create the file and set 'NOFILL' to improve performance
-   ncid     = netcdf.create(filename,'NETCDF4');
-   netcdf.setFill(ncid,'NC_NOFILL');
+% [info, data] = icemodel.netcdf.makencfile(pathdata, pathsave, simyears);
+% icemodel.netcdf.makencfile(pathdata, pathsave, simyears(2:end), ...
+%    deflateLevel=9, test_write=false);
 
-   % define the dimensions. the unlimited dimension doesn't seem to be
-   % necessary, i got a few errors that appeared to be fixed by using it,
-   % but then once the script was finished, it works both ways. the unidata
-   % blog says compression may be degraded if unlimited is used, but the
-   % file sizes in my tests were identical
-   
-%    dimidcells  = netcdf.defDim(ncid,'cells', netcdf.getConstant('NC_UNLIMITED'));
-   dimidcells = netcdf.defDim(ncid,'cells', ncells);
-   dimidlayers = netcdf.defDim(ncid,'layers',nlyrs);
-   dimidtime   = netcdf.defDim(ncid,'time',nhrs);
+% ice 1
+icemodel.netcdf.makencfile('ice1', pathdata, pathsave, simmodel, ...
+   forcings, userdata, 'sw', simyears, xtype='NC_DOUBLE', ...
+   deflateLevel=9, testwrite=false);
 
-   dimid0d     = dimidcells;
-   dimid1d     = [dimidcells dimidtime];
-   dimid2d     = [dimidcells dimidlayers dimidtime];
-   
-   dimids      = {dimid2d, dimid2d, dimid2d, dimid2d, dimid1d, dimid1d, ...
-                  dimid1d, dimid1d, dimid0d, dimid0d, dimid0d, dimid0d, ...
-                  dimid0d, dimidtime};
-            
+% ice 2
+% icemodel.netcdf.makencfile('ice2', pathdata, pathsave, simmodel, ...
+%    forcings, userdata, 'sw', simyears, xtype='NC_DOUBLE', ...
+%    deflateLevel=9, testwrite=false, Z=12, dz=0.04);
 
-   % ALL VARS - set the varid's and attributes
-   varid = nan(nvars,1);
+%% Check x, y, lat, lon, grid cell, time
 
-   for p = 1:nvars
+filelist = listfiles(pathdata, pattern="ice1", aslist=true, fullpath=true);
+f = filelist{1};
+data = ncreaddata(f);
+% icemodel.netcdf.plotncfile(f)
 
-      thisvar  = varnames{p};
-      varid(p) = netcdf.defVar(ncid,thisvar,'NC_DOUBLE',dimids{p});
+verify_ncfile(pathdata, 'ice1')
 
-      netcdf.defVarDeflate(ncid,varid(p),true,true,comprsz);
-      netcdf.putAtt(ncid,varid(p),'long_name',longnames{p});
-      netcdf.putAtt(ncid,varid(p),'units',units{p});
-   end
-   
-   
-   for p = 1:nvars2d + nvars1d
-      
-      thisvar  = varnames{p};
-      thisid   = varid(p);
-      
-      for n = 1:ncells
-         
-         load([pathdata thisyear '/ice1_' num2str(n) '.mat'],'ice1');
-         load([pathdata thisyear '/ice2_' num2str(n) '.mat'],'ice2');
-         
-         % for 2d vars, need to transpose and set nlyrs start,count
-         if p <= nvars2d
-            data = transpose(rmleapinds(ice2.(thisvar),ice1.Time));
-            netcdf.putVar(ncid,thisid,[n-1 0 0],[1 nlyrs nhrs],data);
-         else
-            data = rmleapinds(ice1.(thisvar),ice1.Time);
-            netcdf.putVar(ncid,thisid,[n-1 0],[1 nhrs],data);
-         end
-      end % ncells
-   end % nvars
-   
-end % nyears
+% Also run qualityControlRunoff
 
-% init the 0-d arrays
-vars0d.latitude   = nan(ncells,1);
-vars0d.longitude  = nan(ncells,1);
-vars0d.x_easting  = nan(ncells,1);
-vars0d.y_northing = nan(ncells,1);
-vars0d.elevation  = nan(ncells,1);
-vars0d.time       = 0:3600:3600*nhrs-1;
+%%
 
-% read in the metfiles to get the lat/lon/x/y/elev
-for n = 1:ncells
-         
-   load([pathmeta '2009/met_' num2str(n) '.mat'],'met');
-
-   vars0d.latitude(n)   = met.Properties.CustomProperties.Lat;
-   vars0d.longitude(n)  = met.Properties.CustomProperties.Lon;
-   vars0d.x_easting(n)  = met.Properties.CustomProperties.X;
-   vars0d.y_northing(n) = met.Properties.CustomProperties.Y;
-   vars0d.elev(n)       = met.Properties.CustomProperties.Elev;
-end
-
-% write the lat, lon, time vars
-for n = 1:nvars0d-1
-   thisid   = nvars1d+nvars2d+n;
-   thisvar  = varnames{thisid};
-   netcdf.putVar(ncid,varid(thisid),vars0d.(thisvar));
-end
-
-netcdf.close(ncid);
-
-info = ncinfo(filename);
-      
-      
-test = ncread(filename,'f_liq');
-test1 = squeeze(test(1,:,:));
-test2 = squeeze(test(2,:,:));
-test3 = squeeze(test(3,:,:));
-
-figure; plot(test1(1,:)); hold on; plot(test1(2,:)); plot(test1(3,:));
+% <model>.<forcings>.<albedo>.<sitename>.<yyyy>.nc4
+% skinmodel.mar3p11.mar3p11.sw.2009.nc4
+% skinmodel.mar3p11.modis.sw.2009.nc4
+%
+% skinmodel.2009.sw.mar3p11.mar3p11.nc4
+% skinmodel.2009.sw.mar3p11.modis.nc4
+%
+% skinmodel.mar_forcings.modis_albedo.sw.2009.nc4
 
 
-% % % % % % % % % % % % % % % % % % % % % % % % % % 
+%%
+
+% % % % % % % % % % % % % % % % % % % % % % % % % %
 % % % this shows that runoff cannot be computed from f_liq after the fact,
 % % whereas it can be computed from df_liq, so I need to save df_liq. I
 % % should be able to compute ro_sno, cp_sno, etc from f_liq and f_ice, so I
 % % still need to save them along with Tice
-% 
-% 
-% vzero       = zeros(size(ice2.f_liq(:,1)));
-% df_test     = [vzero diff(ice2.f_liq,1,2)];
-% 
-% dz          = 0.04;
+%
+%
+% vzero = zeros(size(ice2.f_liq(:,1)));
+% df_test = [vzero diff(ice2.f_liq,1,2)];
+%
+% dz = 0.04;
 % runoff_test = tocolumn(cumsum( sum( 4*dz.*df_test ) ));
 % % runoff_test = tocolumn(cumsum( sum( dz.*ice2.df_liq ) ));
-% 
-% figure; 
+%
+% figure;
 % plot(ice1.Time,ice1.runoff); hold on;
 % plot(ice1.Time,4.*runoff_test,':');
