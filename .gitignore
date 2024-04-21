@@ -2,7 +2,8 @@
 # input/
 # output/
 # data/
-*config.m
+# *config.m - this was a bad idea, config files got deleted when I renamed functions/ to icemodel/
+# fortunately they were preserved when I pulled on personal so I recommitted them
 
 *~
 
