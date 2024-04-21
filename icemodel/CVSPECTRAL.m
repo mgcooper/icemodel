@@ -6,13 +6,13 @@ function [dz_cv, delz_p, z_node, z_edge, f, z_node_bc, dz_bc] = CVSPECTRAL(Z, dz
    % See also: CVMESH
 
    % Note: this is replaced by CVMESH, but retained for reference.
-   
+
    N = Z / dz;                         % number of nodes [#]
-   dz_cv = dz .* ones(N, 1);
+   dz_cv = dz * ones(N, 1);
    delz_b = 0.0;                       % cv width at the boundaries
    dz_bc = [delz_b; dz_cv; delz_b];    % array of c.v. widths including boundaries
-   delz_s = 0.5 .* dz_bc(1:N+1);       % interface-to-previous point
-   delz_n = 0.5 .* dz_bc(2:N+2);       % interface-to-next point
+   delz_s = 0.5 * dz_bc(1:N+1);        % interface-to-previous point
+   delz_n = 0.5 * dz_bc(2:N+2);        % interface-to-next point
    delz_p = delz_s + delz_n;           % distance between grid points
    z_node_bc = [0; cumsum(delz_p)];    % grid point coordinates including boundariess
    z_edge = [0; cumsum(dz_cv)];        % interface coordinates

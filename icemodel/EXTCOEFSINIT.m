@@ -80,42 +80,13 @@ end
 % spect_walls = exp(-z_walls.*repmat(spect_coefs./ro_ice,1,2001));
 % spect_lower = spect_walls(:,2:end); spect_upper = spect_walls(:,1:end-1);
 
-%--------------------------------------------------------------------------
-% This is here for clarification. The xynet above is the column-integrated value
-% at each c.v. interface, e.g. xynet(1) is the the column-integrated absorbed
-% flux from z(\inf) to z(0), and xynet(2) would be from z(\inf) to z(1), where
-% z(1) is the bottom of the top c.v. For me, it is more intuitive to see the
-% amount that was absorbed within each layer:
-
-% Calculate the net down, up, and absorbed flux WITHIN each c.v.
-%     netdown = down(1:nz_spectral+1) - down(2:nz_spectral+2);
-%     netup = up(1:nz_spectral+1) - up(2:nz_spectral+2);
-%     netflux = netdown - netup;
-%     sum(netflux)
-%
-% netdown and netup are what go in and out of each c.v. what goes in minus what
-% comes out is what got absorbed the sum of what got absorbed should equal
-% (1-albedo)*total_solar
-%     sum(netflux) (1-albedo)*total_solar
-%
-% % note that netflux can also be expressed as:
-%     netflux = xynet(1:JJ)-xynet(2:JJ+1);
-%
-% % try with the higher resolution spectral grid
-%     JJ2 = length(xynet_old)
-%
-%     netflux = xynet_old(1:JJ2-1)-xynet_old(2:JJ2);
-%
-% in HEATSOLVE, this amount, sum(netflux), is scaled by Qsip/total_solar so that
-% sum(netflux) equals Qsip:
-
-% consider:
+% Notes
 % (1) sum(netflux) = (1-albedo)*total_solar
 
-% but we want sum(netflux) that goes into the numerical calculation to be:
+% but sum(netflux) for the numerical calculation should be:
 % (2) sum(netflux) = (1-albedo)*Qsi
 
-% so we multiply (1) by Qsi/total_solar:
+% so multiply (1) by Qsi/total_solar:
 % (3) (1-albedo)*total_solar * Qsi/total_solar = (1-albedo)*Qsi
 
 % or as its expressed in the numerical setup:
@@ -124,6 +95,6 @@ end
 % if total_solar was the actual incoming solar at each timestep, it would be:
 % Sc = dq/dz = netflux./dy_p;
 
-% Now let's say I wanted to let a portion, qsfactor, of the incoming radiation
-% be assigned to surface heating, and the rest penetrate. I would need to
-% account for that within xynet as well as Sc.
+% To assign a portion of the incoming radiation, qsfactor, to surface heating,
+% and the rest to subsurface layers, both xynet and Sc need to be adjusted for
+% the surface portion.

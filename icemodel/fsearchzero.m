@@ -1,6 +1,6 @@
 function [z, exitflag, ok] = fsearchzero(f, z0, A, B, z, tol)
    %FSEARCHZERO search for root of nonlinear function %#codegen
-   
+
    [a, b] = fzero_guess_to_bounds(f, z0, A, B); exitflag = -6; ok = false;
    if ~isnan(a)
       [z, exitflag, ok] = fzero_brent(f, a, b, tol);
@@ -88,12 +88,12 @@ function [b, exitflag, ok] = fzero_brent(f, a, b, tol, varargin)
 
    % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
    % mgc edits
-   % 
+   %
    % Add exitflag that mimics fzero. Since this is only called if the bound
    % search succeeds, the exitflag should always be 1 (success).
    exitflag = 1;
    %
-   % Add an extra OK logical flag  
+   % Add an extra OK logical flag
    ok = true;
    %
    % For compatibility with fzero calling syntax, change input arguments to ab:
@@ -101,7 +101,7 @@ function [b, exitflag, ok] = fzero_brent(f, a, b, tol, varargin)
    % b = ab(2);
    %
    % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
-   
+
    fa = f(a, varargin{:});
    fb = f(b, varargin{:});
 
@@ -238,7 +238,7 @@ function [a, b] = fzero_guess_to_bounds(f, x, A, B, varargin)
    % Version   : 1.0
    % History   : 01/07/2020 - initial release
    %           : 22/07/2020 - fix infinite loop in bounded case, arising from
-   %           machine precision rounding 
+   %           machine precision rounding
 
    % Geometrically expand from the guess x, until a sign change is found
    sqrttwo = 1.414213562373095;
@@ -273,8 +273,8 @@ function [a, b] = fzero_guess_to_bounds(f, x, A, B, varargin)
       dxm = (x - A) / 50;
 
       % Set a = x, except when x is so close to A that machine roundoff makes
-      % dxm identically 0, which would lead to an infinite loop below.  
-      % In this case, set a = A. 
+      % dxm identically 0, which would lead to an infinite loop below.
+      % In this case, set a = A.
       if dxm == 0
          a = A;
       else

@@ -12,16 +12,17 @@ function [upwd, dnwd] = GETUPDOWN(a, r, x, I0, z_walls, M)
    upwd = vertcat(x(1:N-1), 0);
 
    % Reconstruct y.
-   dz = z_walls(3:N)-z_walls(2:N-1);
-   dnwd = (a(2:N-1)+r(2:N-1))./r(2:N-1).*upwd(2:N-1) - ...
-      (upwd(3:N)-upwd(1:N-2)) ./ (2.0.*dz.*r(2:N-1));
-   dnwd = vertcat(I0,dnwd);
-   dnwd = vertcat(dnwd,(a(N)+r(N))/r(N)*upwd(N)-(upwd(N)-upwd(N-1))/(dz(1)*r(N)));
+   dz = z_walls(3:N) - z_walls(2:N-1);
+   dnwd = (a(2:N-1) + r(2:N-1)) ./ r(2:N-1) .* upwd(2:N-1) - ...
+      (upwd(3:N) - upwd(1:N-2)) ./ (2.0 * dz .* r(2:N-1));
+   dnwd = vertcat(I0, dnwd);
+   dnwd = vertcat(dnwd, (a(N) + r(N)) / r(N) * upwd(N) ...
+      - (upwd(N) - upwd(N-1)) / (dz(1) * r(N)));
 
    % Smooth any small bumps in the up and down curve.  This will assist
    % in any delta up, delta down computations. Do the interior.
-   dntmp = (dnwd(2:N-1) + 0.5 .* (dnwd(1:N-2) + dnwd(3:N))) ./ 2.0;
-   uptmp = (upwd(2:N-1) + 0.5 .* (upwd(1:N-2) + upwd(3:N))) ./ 2.0;
+   dntmp = (dnwd(2:N-1) + 0.5 * (dnwd(1:N-2) + dnwd(3:N))) / 2.0;
+   uptmp = (upwd(2:N-1) + 0.5 * (upwd(1:N-2) + upwd(3:N))) / 2.0;
 
    % Do the ends.
    dntmp = vertcat((dnwd(2) + 0.5 * dnwd(1)) / 1.5, dntmp);

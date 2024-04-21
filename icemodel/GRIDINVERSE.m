@@ -9,25 +9,24 @@ function dQp = GRIDINVERSE(xynet,dz_spect,dz_therm,JJ_spect,JJ_therm)
    xyext(1) = xynet(JJ_spect) + delxy;
    xyext(2:JJext) = xyext(1:JJext-1) + delxy;
    xynew = [xynet;xyext];
-   
+
    % aggregate it to the scale of the thermal grid
    dq = xynew(1:JJnew-1)-xynew(2:JJnew);
    dq(JJnew) = dq(JJnew-1);
-   
+
    % get the number of grid cells in the first 3 m segment on each grid
    rz = JJnew/JJ_therm;
-   
+
    % reshape the radiation into equal chunks along the thermal grid
    dq = reshape(dq,rz,JJ_therm);
-   
+
    % sum up those equal chunks to get the absorbed radiation in each thermal c.v.
    dQp = transpose(sum(dq,1)); % == sumdQdz
 end
 %--------------------------------------------------------------------------
-%   A note on what's happening here. The two-stream solution gives the
-%   total upflux (X) and downflux (Y) from the respective boundary to each
-%   layer interface. xynet is energy conservation applied to each c.v., in
-%   the following manner:
+%   Notes. The two-stream solution gives the total upflux (X) and downflux (Y)
+%   from the respective boundary to each layer interface. xynet is energy
+%   conservation applied to each c.v., in the following manner:
 %
 %   Y↓(1)  X↑(1)    Xnet = X↑(2)-X↑(1), Ynet = Y↓(1)-Y↓(2)
 %   ____________
@@ -41,7 +40,7 @@ end
 %   somewhat different than the diagram above, since xynet is computed in
 %   SOLVETWOSTREAM2 by converting the interface fluxes to layer averaged
 %   values (note the /2.0 averaging) and then the differencing is applied
-%   in here to get the interface absorption, Qz. Also note that dq is scaled by
+%   in here to get the divergence, Qz. Also note that dq is scaled by
 %   total_solar, and should be thought of as a percent absorption in each
 %   layer. In the thermal model, SOLAR_HEAT converts dq to the actual
 %   amount of absorbed solar radiation in each layer using the conversion

@@ -68,8 +68,8 @@ function diam = GRAINSIZE(JJ, dt, ro_sno, ...
    D_vap = nan(JJ, 1);
    F_vap = nan(JJ, 1); % vapor flux at nodes
    F_lay = nan(JJ, 1); % vapor flux at upper layer interfaces
-   
-   
+
+
    % Define the snow porosity.
    for k = 1:JJ
       phi(k) = 1.0 - (ro_sno(k) / ro_ice);
@@ -185,9 +185,9 @@ function diam = GRAINSIZE(JJ, dt, ro_sno, ...
    % do the same thing here.
    F_lay(F_lay < -1.0e-6) = -1.0e-6;
    F_lay(F_lay > 1.0e-6) = 1.0e-6;
-   
+
    % Convert these to fluxes per dt (instead of per sec). Without this the
-   % values are something like 10^-11. 
+   % values are something like 10^-11.
    F_lay = dt * F_lay;
 
    % Update the snow grain diameter.
