@@ -3,34 +3,47 @@ function [f_liq_C, f_ice_C, T_C, Sc_C, Sp_C, d_drn, d_liq] = COMBINEHEAT( ...
       fcp, j1, j2, d_drn, d_liq, dz)
    %COMBINEHEAT Combine layers conserving mass, enthalpy, and absorbed radiation
    %
-   % j1 is the thin layer that is removed, the combined values are put into j2.
+   % Combine two control volumes by equating the enthalpy of the two control
+   % volumes to the enthalpy of their combined mass and solving for the
+   % combined temperature.
    %
-   % T = control volume temperature.
-   % Tf = freezing point temperature.
-   % Td = depression temperature, Td = Tf - T.
+   % Inputs
+   %  T - control volume temperature.
+   %  Tf - freezing point temperature.
+   %  j1 - the layer that is removed
+   %  j2 - the combined layer (with conserved values from j1 and j2)
+   %  f_liq - liquid fraction, volume of liquid water per cv volume
+   %  f_ice - frozen fraction, volume of frozen water per cv volume
+   %  ro_liq - liquid water intrinsic density, 1000 kg m-3
+   %  ro_ice - frozen water intrinsic density, 917 kg m-3
    %
-   % f_liq = liquid fraction, volume of liquid water per cv volume
-   % f_ice = frozen fraction, volume of frozen water per cv volume
+   % Outputs
    %
-   % f_wat = water fraction, volume of melted ice + liquid water per cv volume:
-   % f_wat = f_liq + f_ice * ro_ice / ro_liq
+   % Description
    %
-   % ro_liq = liquid water intrinsic density, 1000 kg m-3
-   % ro_ice = frozen water intrinsic density, 917 kg m-3
-   %
-   % The temperature is a function of the liquid fraction:
+   % The control volume temperature is a function of the liquid fraction:
    %
    % T = Tf - sqrt((f_wat / f_liq - 1)) / fcp;
    %
-   % where fcp is the "freezing curve parameter" that controls the slope of
-   % the f_liq = f(T) relationship in the mushy zone.
+   % where the depression temperature, Td, is:
    %
-   % Rearrange that for depression temp as a function of f_liq:
+   % Td = Tf - T.
+   %
+   % and the water fraction, f_wat, is the volume of melted ice + liquid water
+   % per cv volume:
+   %
+   % f_wat = f_liq + f_ice * ro_ice / ro_liq
+   %
+   % fcp is the "freezing curve parameter" that controls the slope of the
+   % f_liq = f(T) relationship in the mushy zone.
+   %
+   % Rearrange for depression temperature as a function of f_liq:
    %
    % Td = sqrt((f_wat / f_liq - 1)) / fcp;
    %
    % This function solves for Td by equating the sum of the enthalpies of two
-   % cv's given their respective Td's to their combined enthalpy given a common Td.
+   % cv's given their respective Td's to their combined enthalpy given a common
+   % Td.
    %
    % The Td solution is then used to compute the combined layer f_liq:
    %
@@ -68,8 +81,8 @@ function [f_liq_C, f_ice_C, T_C, Sc_C, Sp_C, d_drn, d_liq] = COMBINEHEAT( ...
       % polynomial of the combined Td. Define the coefficients:
 
       f = -cv_ice * ( f_ice(j1) * Td_1 + f_ice(j2) * Td_2 ) ...
-          -cv_liq * ( f_liq(j1) * Td_1 + f_liq(j2) * Td_2 ) ...
-          + ro_liq * Lf * ( f_liq(j1) + f_liq(j2) );
+         -cv_liq * ( f_liq(j1) * Td_1 + f_liq(j2) * Td_2 ) ...
+         + ro_liq * Lf * ( f_liq(j1) + f_liq(j2) );
       g = cv_ice * (f_ice(j1) + f_ice(j2)) + cv_liq * (f_liq(j1) + f_liq(j2));
 
       a = 1;
@@ -96,7 +109,7 @@ function [f_liq_C, f_ice_C, T_C, Sc_C, Sp_C, d_drn, d_liq] = COMBINEHEAT( ...
          % [errStatus, errMsg] = errorcheck(ok);
       end
 
-      % Set T=Tf for a fully-melted node and ICEMF will remove it
+      % Fully-melted node
       if Td_C < 0
          T_C  = (T(j1) * m_wat_1 + T(j2) * m_wat_2) / m_wat_C;
          Td_C = Tf - T_C;
@@ -107,11 +120,8 @@ function [f_liq_C, f_ice_C, T_C, Sc_C, Sp_C, d_drn, d_liq] = COMBINEHEAT( ...
    f_wat_C = m_wat_C / (ro_liq * 2 * dz);
    f_liq_C = f_wat_C / (1.0 + (fcp * Td_C) ^ 2.0); % eq 67, Jordan
    f_ice_C = (f_wat_C - f_liq_C) * ro_liq / ro_ice;
-   
-   % positive d_liq means ice melted, negative means liquid refroze.
-   d_liq(j1) = d_liq(j1) + 2 * f_liq_C - (f_liq(j1) + f_liq(j2));
 
-   % if there is less water in the combined layer then water drained
-   % d_drn(j1) = d_drn(j1) + max((f_liq(j1)+f_liq(j2))-f_liq_C-d_liq(j1), 0);
+   % Positive d_liq means ice melted, negative means liquid refroze.
+   d_liq(j1) = d_liq(j1) + 2 * f_liq_C - (f_liq(j1) + f_liq(j2));
    d_drn(j1) = d_drn(j1) + max(f_liq_C / 2, 0);
 end

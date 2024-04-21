@@ -5,7 +5,7 @@ function bulkcoefs = BULKEXTCOEF(dz_spect, ro_sno, spect_N, spect_S, solardwavl)
    %
    % See also:
 
-   % Compute the downward bulk extinction coefficient, scaled by the total 
+   % Compute the downward bulk extinction coefficient, scaled by the total
    % ice equivalent thickness of each layer
    bulkcoefs = -log((sum(exp(spect_S .* ro_sno) .* solardwavl, 2)) ...
       ./ (sum(exp(spect_N .* fix(max(ro_sno, 300))) .* solardwavl, 2))) ...
