@@ -5,8 +5,6 @@ function temperature(T, dz)
 
    figure;
    plot(T, znodes(dz)); set(gca, 'YDir', 'Reverse')
-<<<<<<< HEAD:functions/+icemodel/+plot/temperature.m
-=======
 
 
    % This was in a random file. It is the plot of subsurface T profile with
@@ -23,5 +21,4 @@ function temperature(T, dz)
    % figure; plot(ice1.chf)
    % figure; plot(ice1.balance)
 
->>>>>>> dev:icemodel/+icemodel/+plot/temperature.m
 end
