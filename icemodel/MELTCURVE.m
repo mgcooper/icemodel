@@ -38,7 +38,7 @@ function [f_liq, f_ice, f_wat, T, dFdT] = MELTCURVE(T, f_liq, f_ice, ...
    end
 
    % Calculate liquid retention (need to pass prior value into the function)
-   % retent = min(0.02, max(retent, 0.75 * f_liq));
+   % retention = min(0.02, max(retention, 0.75 * f_liq));
 end
 
 % Using ro_ice and ro_liq instead of ro_iwe:

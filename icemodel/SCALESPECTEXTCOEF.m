@@ -1,7 +1,7 @@
 function spect_extcoefs = SCALESPECTEXTCOEF(spect_extcoefs,wavelength,kice,kabs)
    %SCALESPECTEXTCOEF Scale extinction coefficients by absorption profile
    %
-   % spect_extcoefs = SCALESPECTEXTCOEF(spect_extcoefs,wavelength,kice,kabs)
+   % SPECT_EXTCOEFS = SCALESPECTEXTCOEF(SPECT_EXTCOEFS, WAVELENGTH, KICE, KABS)
    % Scales the theoretical spectral extinction coefficients by a
    % user-provided absorption coefficient profile from 0.3-0.9 um
    %

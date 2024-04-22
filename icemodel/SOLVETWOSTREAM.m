@@ -33,12 +33,12 @@ function xynet = SOLVETWOSTREAM(a,r,bulkcoefs,total_solar,albedo,z_walls)
 
    % Fill the vectors between the boundaries
    deltaz = z_walls(3:M+2)-z_walls(2:M+1);
-   %    tmp1 = deltaz ./ (2.0 .* r(2:M+1));
-   %    tmp2 = a(2:M+1) .* (r(3:M+2) - r(1:M));
-   %    tmp3 = r(2:M+1) .* (a(3:M+2) - a(1:M));
-   %    tmp4 = (2.0 + deltaz.^2 .* xmu(2:M+1).^2);
+   % tmp1 = deltaz ./ (2.0 .* r(2:M+1));
+   % tmp2 = a(2:M+1) .* (r(3:M+2) - r(1:M));
+   % tmp3 = r(2:M+1) .* (a(3:M+2) - a(1:M));
+   % tmp4 = (2.0 + deltaz.^2 .* xmu(2:M+1).^2);
    e(2:M+1) = 1.0 + (r(3:M+2) - r(1:M)) ./ (4.0.*r(2:M+1));
-   %    f(2:M+1) = tmp1 .* (tmp2 - tmp3) - tmp4;
+   % f(2:M+1) = tmp1 .* (tmp2 - tmp3) - tmp4;
    g(2:M+1) = 1.0 - (r(3:M+2) - r(1:M)) ./ (4.0*r(2:M+1));
    b(2:M+1) = 0.0;
 

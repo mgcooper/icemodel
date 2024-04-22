@@ -14,7 +14,7 @@ function varargout = POSTPROC(ice1, ice2, opts, varargin)
    %
    % [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time)
    %
-
+   % See also:
 
    % Process inputs
    if nargin == 7

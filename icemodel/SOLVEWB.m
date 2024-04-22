@@ -27,19 +27,19 @@ function [Tw, flag] = SOLVEWB(Ta, rh, Ls, cp, Pa, liqflag)
    %   Tw = SOLVEWB(293, 50, 2.83e6, 1005, 101325)
    %
    % See also VAPPRESS
-   
+
    if nargin < 6
       liqflag = false;
    end
-   
+
    % Compute atmospheric vapor pressure from relative humidity data.
    ea = VAPPRESS(Ta, 273.16, liqflag) * rh / 100.0;
-   
+
    % Compute dew point as a fall back if the solution does not converge
    % Tdew = 273.16 + C * log(ea / A) / (B - log(ea / A));
-   
+
    % Use this as a fall-back on Tw, but I kept it here to clarify the correct
-   % Tdw formula for the A, B, C 
+   % Tdw formula for the A, B, C
    % Tdw = Tf + C * log(ea / A) / (B - log(ea / A));
    % Tw = tair(metiter) - (tair(metiter) - Tdew) / 3
 
@@ -47,7 +47,7 @@ function [Tw, flag] = SOLVEWB(Ta, rh, Ls, cp, Pa, liqflag)
    maxiter = 1000;
    tol = 1.0e-3;
    old = Ta;
-   
+
    % Default return value if solution fails to converge
    Tw = Ta;
 

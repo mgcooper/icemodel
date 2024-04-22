@@ -27,13 +27,13 @@ function ice1 = SRFRUNOFF(ice1,ro_liq,Ls,Lf,dt)
    ice1.runoff = cumsum(rof);
 end
 
-%% 
+%%
 function rof = LAGRUNOFF(ice1,opts)
 
    % 14 Oct 2023, copied this here out of SURFRUNOFF.m then deleted that file.
    % This is the old version SURFRUNOFF (not SRFRUNOFF) when melt/freeze/cond
    % were computed in (I think) ICEABLATION and added to ice1 on each timestep
-   
+
    lag = opts.tlagsurf;
    mlt = ice1.melt;
    frz = ice1.freeze;

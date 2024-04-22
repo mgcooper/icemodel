@@ -10,51 +10,51 @@ function [f_ice, f_liq, x_ice, x_liq] = MAXWATER(f_ice, f_liq, ro_ice, ...
    % ro_ice / ro_liq condition, and the checks are all designed to ensure we
    % don't exceeed that. BUT, for numerical error e.g. in MZTRANSFORM, it's
    % necessary to ensure the solution does not skip the melt zone in terms of
-   % fliqmin/max rather than ro_ice / ro_liq etc. 
-   
+   % fliqmin/max rather than ro_ice / ro_liq etc.
+
    % These must be true:
-   % 
+   %
    % f_ice + f_liq * ro_liq / ro_ice <= 1
-   % 
+   %
    % f_ice * ro_ice / ro_liq + f_liq <= ro_ice / ro_liq
-   % 
+   %
    % f_wat <= ro_ice / ro_liq
-   % 
+   %
    % Thus, if adding new water:
-   % 
+   %
    % f_ice + (f_liq + d_liq) * ro_liq / ro_ice <= 1
-   % 
+   %
    % f_ice * ro_ice / ro_liq + f_liq + d_liq <= ro_ice / ro_liq
-   % 
+   %
    % d_liq <= ro_ice / ro_liq * (1 - f_ice(old)) - f_liq(old)
    %
    % Or:
-   % 
+   %
    % d_liq_max = ro_ice / ro_liq * (1 - f_ice(old)) - f_liq(old)
-   % 
+   %
    % f_ice + f_liq + d_liq <= f_wat
-   % 
+   %
    % If all ice melts:
-   % 
-   % f_wat = f_liq(new) 
+   %
+   % f_wat = f_liq(new)
    %       = f_liq(old) + df_liq
-   % 
+   %
    % Thus the requirement is:
-   % 
+   %
    % f_liq(old) + df_liq <= ro_ice / ro_liq
    % df_liq <= ro_ice / ro_liq - f_liq(old)
    %
-   
-   % 
+
+   %
    % But the implementation should probably use a small f_ice threshold to
    % disallow complete melting, and/or call combine layers.
-   
-   
+
+
    maxfill = ro_ice / ro_liq * (1 - f_ice) - f_liq;
-   
+
    % therefore:
    f_liq = max()
-   
-   
+
+
    assertF(@() all(f_ice + f_liq * ro_wie <= 1 + eps))
 end

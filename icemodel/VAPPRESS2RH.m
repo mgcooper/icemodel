@@ -13,9 +13,9 @@ function rh = VAPPRESS2RH(ea, Ta, liqflag)
 
    if liqflag == true
       % Over water.
-      rh = 100.0.*ea./(611.21.*exp((17.502.*(Ta-273.16))./(Ta-32.19)));
+      rh = 100 * ea ./ (611.21 * exp((17.502 * (Ta-273.16)) ./ (Ta-32.19)));
    else
       % Over ice.
-      rh = 100.0.*ea./(611.15.*exp((22.452.*(Ta-273.16))./(Ta-0.61)));
+      rh = 100 * ea ./ (611.15 * exp((22.452 * (Ta-273.16)) ./ (Ta-0.61)));
    end
 end

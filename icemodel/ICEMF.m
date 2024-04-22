@@ -24,22 +24,22 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_drn, x_err, lcflag] = ICEMF( ...
    % d_evp > 0 = cond (should be correct below)
    % d_drn > 0 = runoff due to extra condensation (should be correct below)
 
-   % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+   % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
    % Update the lower melt-zone boundary
    if T(1) > TL
-      
+
       % Ensure f_liq is never reduced below residual water for melting nodes
       f_liq_min = (f_liq(1) + f_ice(1) * ro_iwe) * flmin;
       liqresid = max(liqresid, f_liq_min / (1 - f_ice(1)));
 
       % If f_res is larger than f_liq_min, ICESUBL will never reduce f_liq(1)
       % below f_liq_min. Thus, below checks if f_res is ever smaller than
-      % f_liq_min. If it is, then there's a problem 
-      
+      % f_liq_min. If it is, then there's a problem
+
       % Check if f_res is ever smaller than f_liq_min. If it can be proven it
       % will never trigger, delete this entire if block and use liq_resid
       % without any max() statement.
-      % 
+      %
       % if liq_resid * (1 - f_ice(1)) < f_liq_min
       %    liq_resid = max(0.07, f_liq_min / (1 - f_ice(1)));
       % end
@@ -60,12 +60,12 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_drn, x_err, lcflag] = ICEMF( ...
    if T(1) > TL % f_liq(1) > f_liq_min
       T(1) = Tf - sqrt( (f_liq(1) + f_ice(1) * ro_iwe) / f_liq(1) - 1.0) / fcp;
    end
-   % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % 
+   % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % % %
 
    % Below here:
    % d_XXX = f_liq - xf_liq - d_evp
    % where f_liq on the rhs is f_liq_new
-   
+
    % combine layers if any layer is <f_min, or if this step's sublimation
    % would reduce any layer to <f_min (predict the need to combine next step)
    lyrmrg = f_ice <= f_min | (f_ice + Qe/(Ls*ro_ice)*dt_new/dz_therm) <= f_min;
@@ -97,7 +97,7 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_drn, x_err, lcflag] = ICEMF( ...
             f_ice = vertcat(f_ice, f_ice(end)); f_ice(j1) = [];
             f_liq = vertcat(f_liq, f_liq(end)); f_liq(j1) = [];
             lyrmrg = vertcat(lyrmrg, lyrmrg(end)); lyrmrg(j1) = [];
-            
+
             ii = ii - 1;
          end
       end

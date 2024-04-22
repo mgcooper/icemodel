@@ -1,5 +1,5 @@
-function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, ro_ice, ro_liq, ...
-      Tf, TL, fcp, dz, dt)
+function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, ro_ice, ...
+      ro_liq, Tf, TL, fcp, dz, dt)
 
    OK = true;
    if all(T(2:end) < TL)
@@ -79,7 +79,7 @@ function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, ro_ice, ro_liq, .
    if any(f_ice <= 1e-8)
       OK = false;
    end
-   
+
    if any(T > Tf) || any(f_liq + f_ice - 1.0 > 1e-12)
       OK = false;
    end

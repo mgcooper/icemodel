@@ -25,32 +25,32 @@ function Tdew = TDEW(T, rh, liqflag)
    %   Tdew = TDEW(20, 50);
    %
    % See also:
-   
+
    if nargin < 3
       liqflag = true;
    end
-   
+
    persistent Tf
    if isempty(Tf)
       Tf = 273.16;
    end
 
    % Direct calculation, adjusted to Celsius for ease, then back to Kelvins.
-   % 
+   %
    % T = T - Tf;
    % alpha = b * T / (c + T) + log(rh / 100)
    % Tdew = Tf + c * alpha / (b - alpha)
-   % 
+   %
    % Tdew = Tf + c * (b * T / (c + T) + log(rh / 100)) ...
    %    / (b - (b * T / (c + T) + log(rh / 100)));
-   
+
    % Compute dew point temperature over water or ice.
    if liqflag == true || T >= Tf
       % Over water
       % b = 17.502
       % c = 240.97 (c - Tf = -32.19)
       Tdew = Tf + 240.97 * (17.502 * (T - Tf) / (T - 32.19) + log(rh / 100)) ...
-      / (17.502 - (17.502 * (T - Tf) / (T - 32.19) + log(rh / 100)));
+         / (17.502 - (17.502 * (T - Tf) / (T - 32.19) + log(rh / 100)));
    else
       % Over ice
       % b = 22.452
@@ -58,10 +58,10 @@ function Tdew = TDEW(T, rh, liqflag)
       Tdew = Tf + 272.55 * (22.452 * (T - Tf) / (T - 0.61) + log(rh / 100)) ...
          / (22.452 - (22.452 * (T - Tf) / (T - 0.61) + log(rh / 100)));
    end
-   
+
    % % For reference, using the vapor pressure:
    % ea = VAPPRESS(T, Tf, liqflag) * rh / 100;
-   % 
+   %
    % % Tdew = Tf + c * log(ea / es0) / (b - log(ea / es0));
    % if liqflag == true % || T >= Tf
    %    % Over water

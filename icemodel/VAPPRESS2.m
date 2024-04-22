@@ -36,7 +36,7 @@ function [es, des_dT, d2es_dT2, ro_vap, dro_vapdT, d2ro_vapdT2] = VAPPRESS2(T, l
       b = -6273.12;
       c = -0.45986;
    end
-   
+
    % Compute saturation vapor pressure
    es = saturationVaporPressure(T, a, b, c);
 
@@ -46,7 +46,7 @@ function [es, des_dT, d2es_dT2, ro_vap, dro_vapdT, d2ro_vapdT2] = VAPPRESS2(T, l
    elseif nargout > 1
       des_dT = saturationVaporPressureDerivative(T, es, b, c);
    end
-   
+
    % Compute vapor density and derivatives
    if nargout > 3
       Rv = 461;
@@ -59,7 +59,7 @@ function [es, des_dT, d2es_dT2, ro_vap, dro_vapdT, d2ro_vapdT2] = VAPPRESS2(T, l
             T, es, Rv, des_dT, b, c, ro_vap);
       end
    end
-   
+
    % Actual expressions for latent enthalpies:
    % Lv = Lv0 + (cpv_l - cpl) * (T - T0);
    % Ls = Ls0 + (cpv_s - cps) * (T - T0);
@@ -72,15 +72,15 @@ function es = saturationVaporPressure(T, a, b, c)
 end
 
 function [des_dT, d2es_dT2] = saturationVaporPressureDerivative(T, es, b, c)
-   %SATURATIONVAPORPRESSUREDERIVATIVE Temperature derivative of vapor pressure 
-   
+   %SATURATIONVAPORPRESSUREDERIVATIVE Temperature derivative of vapor pressure
+
    % First derivative [Pa K-1]
    des_dT = es ./ T .* (c - b ./ T);
 
    if nargout == 2
       % Second derivative [Pa K-2]
       d2es_dT2 = c ./ T .* (des_dT + es ./ T) - des_dT ./ T .* (2 + b ./ T);
-      
+
       % This form follows the form of des_dT somewhat but involves more powers
       % d2es_dT2 = es ./ T.^2 .* ((c-1) * (c - 2*b./T) + b^2 ./ T.^2);
    end
@@ -95,16 +95,16 @@ function [dro_vapdT, d2ro_vapdT2] = saturationVaporDensityDerivative(T, es, ...
       Rv, des_dT, b, c, ro_vap)
    %SATURATIONVAPORDENSITYDERIVATIVE Derivative of saturation vapor density
    dro_vapdT = (des_dT - es ./ T) ./ (Rv * T); % [kg m-3 K-1]
-   
+
    % In terms of ro_vap (notice analogous form to des_dT):
    % dro_vapdT = ro_vap ./ T .* (c - b ./ T - 1);
-   
+
    if nargout == 2
       % Second derivative % [kg m-3 K-2]
-      
+
       % something is wrong with this one
       % d2ro_vapdT2 = (des_dT - es ./ T.^2 .* (2 * (c - b ./ T) - 1)) ./ (Rv * T);
-      
+
       % In terms of ro_vap (notice analogous form to d2es_dT2):
       d2ro_vapdT2 = ro_vap ./ T.^2 .* ((c-2) * (c-1 - 2*b./T) + b^2 ./ T.^2);
    end

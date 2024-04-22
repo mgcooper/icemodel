@@ -45,7 +45,7 @@ function [De, S123, W1] = WINDCOEF(wspd, z_0, z_obs, z_wind)
    %
    % Note also that eta_star = eta / 2 = 9.4 / 2 = 4.7 is customarily referred
    % to as "beta" for the stable condition, whereas gamma is comparable to the
-   % "gamma" normally used f or the unstable. 
+   % "gamma" normally used f or the unstable.
 
    [kappa, gravity] = icemodel.physicalConstant('kappa', 'gravity');
 

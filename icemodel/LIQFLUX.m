@@ -50,8 +50,8 @@ function [q, dq_dtheta] = LIQFLUX(f_liq, f_ice, liqresid, grainsz) %#codegen
    % See also:
 
    % Note, in general, 2-7% of the pore space must be filled with water before
-   % any can infiltrate, so when debugging, check that 
-   
+   % any can infiltrate, so when debugging, check that
+
    % Parse inputs
    if nargin < 3
       liqresid = 0.07;
@@ -92,7 +92,7 @@ function [q, dq_dtheta] = LIQFLUX(f_liq, f_ice, liqresid, grainsz) %#codegen
    availCap = max(0.0, f_por - f_res);
    relSat = (f_liq - f_res) ./ availCap;
    relSat(availCap <= 0) = 1;
-         
+
    % Note: if relSat is used elsewhere, set negative values to 0 or NaN:
    % relSat(relSat < 0) = NaN;
 
@@ -102,7 +102,7 @@ function [q, dq_dtheta] = LIQFLUX(f_liq, f_ice, liqresid, grainsz) %#codegen
    % Compute the liquid water flux [m/s]
    if method == 1
       m = 2.0;
-      q(iflux) = k_snow(iflux) .* relSat(iflux) .^ m; % * dt 
+      q(iflux) = k_snow(iflux) .* relSat(iflux) .^ m; % * dt
    else
       % if grain size is known, use the van Genuchten equation
       % grainsz = 1e-2;
@@ -120,7 +120,7 @@ function [q, dq_dtheta] = LIQFLUX(f_liq, f_ice, liqresid, grainsz) %#codegen
    else
       % Here, add dq_dtheta for Shimizu 1970 if needed
    end
-   
+
    % Calculate the min/max retention (field capacity?)
    % retention = min(0.02, max(retent, 0.75 * f_liq));
 end

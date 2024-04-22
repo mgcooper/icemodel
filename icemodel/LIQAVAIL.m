@@ -2,10 +2,10 @@ function [h_resid, h_avail, h_drain, h_ice, h_liq, h_air] = LIQAVAIL( ...
       h_ice, h_liq, h_air, T_old, Tf, theta_resid, h_drain, liqflag, h_total)
    %LIQAVAIL Compute available liquid water.
    %
-   % Note: This function should be called with scalar values, nominally in a
-   % loop or for the top layer, but it might work fine with vectors. Noting 
-   % this because all terms had _j appended which I removed, suggesting I 
-   % likely called this from MELT or REFREEZE.
+   % Note: This function is not used in the model. If used, it should be called
+   % with scalar values, nominally in a loop or for the top layer, but it might
+   % work fine with vectors. Noting this because this was once upon a time
+   % called from MELT or REFREEZE, where a single layer was passed in at a time.
 
    % Update theta_resid
    if T_old < Tf; theta_resid = 0.0; end
@@ -44,7 +44,7 @@ end
 % liqresid = theta_resid * h_ice
 
 % Confirmed correct:
-% 
+%
 % theta_resid = 0.02;               % residual water [m3 water/ m3 ice] [-]
 % liqresid = theta_resid * h_ice;   % residual water volume             [m]
 % liqavail = h_liq - liqresid;      % water available to drain/freeze   [m]

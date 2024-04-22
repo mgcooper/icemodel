@@ -1,4 +1,8 @@
 function [ice1, ice2] = skinmodel(opts) %#codegen
+   %SKINMODEL Surface energy balance model for glacier ice.
+   %
+   %
+   % See also: icemodel
 
    % INITIALIZE THE MODEL
 
@@ -16,7 +20,7 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
    % LOAD THE FORCING DATA
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
       = METINIT(opts, 1);
-   
+
    % INITIALIZE THE ICE COLUMN
    [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, JJ] ...
       = ICEINIT(opts, tair);
@@ -82,7 +86,7 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
 
          % SAVE OUTPUT IF SPINUP IS FINISHED
          if thisyear >= numspinup
-            
+
             if strcmp('sector', opts.sitename)
                [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, ...
                   opts.vars1, opts.vars2, ...

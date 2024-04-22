@@ -69,7 +69,7 @@ function [ice1, ice2, numfail] = icemodel(opts) %#codegen
    % zD = dz(1);
 
    numfail = zeros(maxiter, 1);
-   
+
    %% START ITERATIONS OVER YEARS
    for thisyear = 1:numyears
 
@@ -104,7 +104,7 @@ function [ice1, ice2, numfail] = icemodel(opts) %#codegen
 
             % subfail goes above maxsubiter when T(1) is on the TL limit I think
             % and cannot ge
-            
+
             % SUBSURFACE ENERGY BALANCE
             [T, f_ice, f_liq, k_eff, OK, N, a1] = ICEENBAL(T, f_ice, f_liq, ...
                dz, delz, fn, Sc, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, ...
@@ -182,7 +182,7 @@ function [ice1, ice2, numfail] = icemodel(opts) %#codegen
             dt, dt_FULL_STEP, maxsubiter, OK);
 
          numfail(iter) = subfail;
-         
+
       end % timesteps (one year)
 
       % RESTART THE MET DATA ITERATOR DURING SPIN UP
