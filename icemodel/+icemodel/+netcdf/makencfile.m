@@ -1,4 +1,4 @@
-function info = makencfile(datafile, datapath, savepath, simmodel, forcings, ...
+function info = makencfile(datafile, datapath, savepath, smbmodel, forcings, ...
       userdata, sitename, simyears, opts, ncprops)
 
    arguments
@@ -7,7 +7,7 @@ function info = makencfile(datafile, datapath, savepath, simmodel, forcings, ...
          {'ice1', 'ice2', 'met'})}
       datapath (1, :) char {mustBeFolder}
       savepath (1, :) char {mustBeFolder}
-      simmodel (1, :) char {mustBeTextScalar}
+      smbmodel (1, :) char {mustBeTextScalar}
       forcings (1, :) char {mustBeTextScalar}
       userdata (1, :) char {mustBeTextScalar}
       sitename (1, :) char {mustBeTextScalar}
@@ -75,7 +75,7 @@ function info = makencfile(datafile, datapath, savepath, simmodel, forcings, ...
    for thisyear = string(simyears)
 
       % Define the output filename.
-      filename = icemodel.netcdf.setfilename(datafile, simmodel, forcings, userdata, ...
+      filename = icemodel.netcdf.setfilename(datafile, smbmodel, forcings, userdata, ...
          sitename, thisyear, savepath);
 
       % Update the time units using thisyear as the datum.
@@ -83,7 +83,7 @@ function info = makencfile(datafile, datapath, savepath, simmodel, forcings, ...
 
       % Create the file.
       processOneYear(fullfile(datapath, thisyear), ...
-         datafile, filename, ncprops, opts, simmodel);
+         datafile, filename, ncprops, opts, smbmodel);
    end
 
    % Parse outputs.
@@ -125,10 +125,10 @@ end
 
 % The use case could just be for validating consistent datasize and dimsize
 
-function processOneYear(datapath, datafile, filename, ncprops, opts, simmodel)
+function processOneYear(datapath, datafile, filename, ncprops, opts, smbmodel)
 
-   % Note: simmodel is only added as an input to patch the skinmodel
-   % ice1.freeze data. Once those files are written, remove simmodel.
+   % Note: smbmodel is only added as an input to patch the skinmodel
+   % ice1.freeze data. Once those files are written, remove smbmodel.
 
    % Pull out the netcdf api options
    [xtype, shuffle, deflate, deflateLevel] = deal( ...
@@ -194,12 +194,12 @@ function processOneYear(datapath, datafile, filename, ncprops, opts, simmodel)
    if strcmp(datafile, 'ice1')
 
       icemodel.netcdf.writeice1(ncid, datapath, varnames.(datafile), ...
-         dimdata, xtype, simmodel);
+         dimdata, xtype, smbmodel);
 
    elseif strcmp(datafile, 'ice2')
 
       icemodel.netcdf.writeice2(ncid, datapath, varnames.(datafile), ...
-         dimdata, xtype, simmodel);
+         dimdata, xtype, smbmodel);
    end
 end
 

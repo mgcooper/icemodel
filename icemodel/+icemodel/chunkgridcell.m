@@ -35,7 +35,7 @@ function [S, E] = chunkgridcell(firstcell, finalcell, numjob, whichjob)
    % S = si + ni * (N-1);
    % E = si + ni * (N) - 1;
 
-   % % Divide into two equal chunks for simmodel/mar
+   % % Divide into two equal chunks for smbmodel/mar
    % S = 1;
    % E = floor(numel(gridnums) / 2);
 end

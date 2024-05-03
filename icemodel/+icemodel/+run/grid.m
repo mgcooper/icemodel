@@ -7,16 +7,16 @@ function grid(kwargs)
       kwargs.forcings = 'mar'
       kwargs.userdata = 'mar' % don't use "none" - set equal to forcings
       kwargs.uservars = 'albedo'
-      kwargs.simmodel = 'skinmodel'
+      kwargs.smbmodel = 'skinmodel'
       kwargs.simyears = 2008:2018
       kwargs.gridnums = loadIceMask(varnames="ID")
       kwargs.testname = 'zobs2'
    end
-   [savedata, sitename, forcings, userdata, uservars, simmodel, ...
+   [savedata, sitename, forcings, userdata, uservars, smbmodel, ...
       simyears, gridnums, testname] = dealout(kwargs);
 
    % Set the path where the output will be saved.
-   pathdata = icemodel.setpath('output', kwargs.sitename, kwargs.simmodel, ...
+   pathdata = icemodel.setpath('output', kwargs.sitename, kwargs.smbmodel, ...
       kwargs.userdata, [], kwargs.testname);
 
    % Divide the gridpoints into jobs for running in chunks.
@@ -25,11 +25,11 @@ function grid(kwargs)
    %% config
 
    % Initialize the model options.
-   opts = icemodel.setopts(simmodel, sitename, simyears, forcings, ...
+   opts = icemodel.setopts(smbmodel, sitename, simyears, forcings, ...
       userdata, uservars, savedata, [], testname);
 
    % Display the run information.
-   disp([simmodel ' ' userdata ' ' int2str(simyears(1)) ':'   ...
+   disp([smbmodel ' ' userdata ' ' int2str(simyears(1)) ':'   ...
       int2str(simyears(end)) ' ' int2str(S) ':' int2str(E)])
 
    % Run the model for each point.
@@ -42,7 +42,7 @@ function grid(kwargs)
          ['met_' int2str(thispoint) '.mat'])};
 
       % run the model
-      switch simmodel
+      switch smbmodel
          case 'icemodel'
             icemodel(opts);
          case 'skinmodel'
@@ -73,7 +73,7 @@ function grid(kwargs)
       thispoint = gridnums.(thissite);
 
       % initialize the model options
-      opts = icemodel.setopts(simmodel, sitename, simyears{n}, forcings, ...
+      opts = icemodel.setopts(smbmodel, sitename, simyears{n}, forcings, ...
          userdata, uservars, savedata, [], testname);
 
       opts.metfname = {fullfile(opts.pathinput, 'met', 'sector', ...

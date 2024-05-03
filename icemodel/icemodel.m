@@ -13,7 +13,7 @@ function [ice1, ice2, numfail] = icemodel(opts) %#codegen
    % opts - A structure containing model options and parameters. Defined by the
    %        icemodel.setopts function. The fields include:
    %        * sitename         - Site name for the model simulation
-   %        * simmodel         - Simulation model identifier
+   %        * smbmodel         - Simulation model identifier
    %        * simyears         - Years for which the simulation is done
    %        * forcings         - Type of forcing data used
    %        * userdata         - User-defined data type

@@ -34,9 +34,9 @@ function varargout = POSTPROC(ice1, ice2, opts, varargin)
    [Tf, ro_liq, Ls, Lf] = icemodel.physicalConstant('Tf', 'ro_liq', 'Ls', 'Lf');
 
    % Calculate runoff
-   if strcmp('skinmodel', opts.simmodel)
+   if strcmp('skinmodel', opts.smbmodel)
       ice1 = SRFRUNOFF(ice1, ro_liq, Ls, Lf, opts.dt);
-   elseif strcmp('icemodel', opts.simmodel)
+   elseif strcmp('icemodel', opts.smbmodel)
       ice1 = ICERUNOFF(ice1, ice2, opts);
    end
    % ice1.runoff2 = ice1.melt - ice1.freeze;
@@ -296,7 +296,7 @@ end
 %    % init tmp arrays to retime ice2
 %    tmp.Tice = nan(size(ice2.Tice,1),numel(ice1.Time));
 %
-%    if strcmp('icemodel', opts.simmodel)
+%    if strcmp('icemodel', opts.smbmodel)
 %       tmp.df_liq = nan(size(ice2.df_liq,1),numel(ice1.Time));
 %       tmp.f_ice = nan(size(ice2.f_ice,1),numel(ice1.Time));
 %       tmp.f_liq = nan(size(ice2.f_liq,1),numel(ice1.Time));
@@ -309,7 +309,7 @@ end
 %
 %       tmp.Tice(:,n) = mean(ice2.Tice(:,i1:i2),2);
 %
-%       if strcmp('icemodel', opts.simmodel)
+%       if strcmp('icemodel', opts.smbmodel)
 %          tmp.df_liq(:,n) = sum(ice2.df_liq(:,i1:i2),2);
 %          tmp.f_liq(:,n) = mean(ice2.f_liq(:,i1:i2),2);
 %          tmp.f_ice(:,n) = mean(ice2.f_ice(:,i1:i2),2);

@@ -1,4 +1,4 @@
-function pathlist = setpath(pathtype, sitename, simmodel, userdata, simyears, varargin)
+function pathlist = setpath(pathtype, sitename, smbmodel, userdata, simyears, varargin)
    %SETPATH sets icemodel input and output paths
    %
    %
@@ -12,11 +12,11 @@ function pathlist = setpath(pathtype, sitename, simmodel, userdata, simyears, va
    end
 
    if nargin < 4, userdata = ''; end
-   if nargin < 3, simmodel = ''; end
+   if nargin < 3, smbmodel = ''; end
 
    switch pathtype
       case 'output'
-         pathlist = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, simmodel, ...
+         pathlist = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, smbmodel, ...
             userdata, simyears, varargin{:});
 
       case 'input'

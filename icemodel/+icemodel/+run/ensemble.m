@@ -36,7 +36,7 @@ function ensemble(kwargs)
          forcings = {'mar', 'kanl'};
          userdata = {'merra'};
          uservars = {'albedo'};
-         simmodel = {'icemodel'};
+         smbmodel = {'icemodel'};
          simyears = 2009:2011;
 
       case 1
@@ -45,7 +45,7 @@ function ensemble(kwargs)
          forcings = {'mar', 'kanl'};
          userdata = {'none', 'mar', 'merra', 'modis', 'kanl', 'racmo'};
          uservars = {'albedo'};
-         simmodel = {'icemodel', 'skinmodel'};
+         smbmodel = {'icemodel', 'skinmodel'};
          simyears = 2016:2016;
 
       case 2
@@ -54,7 +54,7 @@ function ensemble(kwargs)
          forcings = {'mar', 'kanm'};
          userdata = {'none', 'mar', 'merra', 'modis', 'kanm', 'racmo'};
          uservars = {'albedo'};
-         simmodel = {'icemodel', 'skinmodel'};
+         smbmodel = {'icemodel', 'skinmodel'};
          simyears = 2016:2016;
 
       case 3
@@ -63,7 +63,7 @@ function ensemble(kwargs)
          forcings = {'mar', 'kanm'};
          userdata = {'none', 'mar', 'merra', 'modis', 'kanm', 'racmo'};
          uservars = {'albedo'};
-         simmodel = {'icemodel', 'skinmodel'};
+         smbmodel = {'icemodel', 'skinmodel'};
          simyears = 2015:2015;
 
       case 4
@@ -72,7 +72,7 @@ function ensemble(kwargs)
          forcings = {'mar', 'kanl'};
          userdata = {'none', 'mar', 'merra', 'modis', 'kanl'};
          uservars = {'albedo'};
-         simmodel = {'skinmodel'}; % 'icemodel',
+         smbmodel = {'skinmodel'}; % 'icemodel',
          simyears = 2009:2011;
 
       case 5
@@ -81,7 +81,7 @@ function ensemble(kwargs)
          forcings = {'mar', 'kanl'};
          userdata = {'none', 'mar', 'merra', 'modis', 'kanl', 'racmo'};
          uservars = {'albedo'};
-         simmodel = {'skinmodel'}; % 'icemodel',
+         smbmodel = {'skinmodel'}; % 'icemodel',
          simyears = 2012:2016;
 
       otherwise
@@ -92,14 +92,14 @@ function ensemble(kwargs)
 
    %% Build the ensemble list
    ensemble = ensembleList( ...
-      forcings, userdata, uservars, simmodel, simyears, sitename);
+      forcings, userdata, uservars, smbmodel, simyears, sitename);
 
    %% Run all combos
    for n = 1:ensemble.numcombos
 
       sitename = char(ensemble.allcombos.sitename(n));
       simyears = char(ensemble.allcombos.simyears(n));
-      simmodel = char(ensemble.allcombos.simmodel(n));
+      smbmodel = char(ensemble.allcombos.smbmodel(n));
       forcings = char(ensemble.allcombos.forcings(n));
       userdata = char(ensemble.allcombos.userdata(n));
       uservars = char(ensemble.allcombos.uservars(n));
@@ -112,14 +112,14 @@ function ensemble(kwargs)
       end
 
       % set the model options
-      opts = icemodel.setopts(simmodel, sitename, str2double(simyears), ...
+      opts = icemodel.setopts(smbmodel, sitename, str2double(simyears), ...
          forcings, userdata, uservars, savedata);
 
       % display the run info
-      disp([simmodel ', ' sitename ', '  forcings ', ' userdata ', ' simyears])
+      disp([smbmodel ', ' sitename ', '  forcings ', ' userdata ', ' simyears])
 
       % RUN THE MODEL
-      switch simmodel
+      switch smbmodel
          case 'icemodel'
             tic; [ice1, ice2] = icemodel(opts); toc
          case 'skinmodel'
@@ -147,7 +147,7 @@ function ensemble(kwargs)
    end
 
    % FIGURE 1 = RUNOFF (options: 'raw','mean','members','sensitivity','surf')
-   if opts.simmodel == "skinmodel"
+   if opts.smbmodel == "skinmodel"
       h1 = plotRunoff( ...
          Runoff,Discharge,Catchment, ...
          'plotsurf',true, ...

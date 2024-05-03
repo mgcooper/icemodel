@@ -1,5 +1,5 @@
 function data = getvardata(filepath, varnames, dimdata, xtype, ...
-      startcell, countcell, simmodel)
+      startcell, countcell, smbmodel)
    %GETVARDATA Read icemodel data into memory and fill the arrays.
    %
    % Allocate arrays in column-major format for efficiency.
@@ -17,7 +17,7 @@ function data = getvardata(filepath, varnames, dimdata, xtype, ...
       xtype (1, :) char {mustBeText}
       startcell (1, 1) double {mustBeNumeric} = 1
       countcell (1, 1) double {mustBeNumeric} = NaN
-      simmodel (1, :) char {mustBeText} = ""
+      smbmodel (1, :) char {mustBeText} = ""
    end
 
    % Get the dimension sizes
@@ -70,7 +70,7 @@ function data = getvardata(filepath, varnames, dimdata, xtype, ...
       tmp = load(fullfile(filepath, [sdata '_' thiscell '.mat'])).(sdata);
 
       % Set freeze zero for skinmodel (freeze is Qf, not refreeze)
-      if strcmp(sdata, 'ice1') && strcmp('skinmodel', simmodel) && isvariable('freeze', tmp)
+      if strcmp(sdata, 'ice1') && strcmp('skinmodel', smbmodel) && isvariable('freeze', tmp)
          tmp.freeze = 0 * tmp.freeze;
       end
 

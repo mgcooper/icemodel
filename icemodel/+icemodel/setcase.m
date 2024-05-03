@@ -1,10 +1,10 @@
 function casename = setcase(forcings, userdata, uservars, ...
-      simmodel, sitename, simyear)
+      smbmodel, sitename, simyear)
    arguments
       forcings char
       userdata char
       uservars char
-      simmodel char = ''
+      smbmodel char = ''
       sitename char = ''
       simyear char = ''
    end
@@ -18,7 +18,7 @@ function casename = setcase(forcings, userdata, uservars, ...
          simyear = num2str(simyear);
       end
 
-      casename = [simmodel '_' sitename '_' simyear '_' upper(forcings) ...
+      casename = [smbmodel '_' sitename '_' simyear '_' upper(forcings) ...
          '_swap_' upper(userdata) '_' uservars '.mat'];
    end
 end

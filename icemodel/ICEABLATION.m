@@ -50,7 +50,7 @@ function [surf_mlt, surf_frz, surf_sub, surf_con, surf_rof] = ICEABLATION( ...
    end
 
    % surface melt / freeze
-   if (Qm>0.0 && strcmp(opts.simmodel, 'skinmodel')) % || (Qm>0.0 && opts.skinmelt == true)
+   if (Qm>0.0 && strcmp(opts.smbmodel, 'skinmodel')) % || (Qm>0.0 && opts.skinmelt == true)
 
       imelt = Qm / (Lf * ro_liq) * dt;
       surf_mlt = surf_mlt + imelt;

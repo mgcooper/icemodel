@@ -1,4 +1,4 @@
-function writeice2(ncid, datapath, varnames, dimdata, xtype, simmodel, maxGB)
+function writeice2(ncid, datapath, varnames, dimdata, xtype, smbmodel, maxGB)
    %WRITEICE2 Write ice2 data to icemodel nc file
    %
    % WRITEICE2(NCID, DATA, VARS)
@@ -24,7 +24,7 @@ function writeice2(ncid, datapath, varnames, dimdata, xtype, simmodel, maxGB)
          {'NC_FLOAT', 'NC_DOUBLE', 'NC_INT64', 'NC_UINT64', 'NC_INT', ...
          'NC_UINT', 'NC_SHORT', 'NC_USHORT', 'NC_BYTE', 'NC_UBYTE', ...
          'NC_CHAR', 'NC_STRING'})}
-      simmodel (1, :) char {mustBeTextScalar} = ""
+      smbmodel (1, :) char {mustBeTextScalar} = ""
       maxGB (1, 1) double {mustBeNumeric} = 8
    end
 

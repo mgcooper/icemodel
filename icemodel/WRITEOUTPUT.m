@@ -4,7 +4,7 @@ function WRITEOUTPUT(ice1, ice2, opts, thisyear, time, swd, lwd, albedo)
    %#codegen
 
    % Save the data
-   if opts.savedata
+   if opts.saveflag
 
       % Post process
       [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time);

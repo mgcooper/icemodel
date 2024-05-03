@@ -89,7 +89,7 @@ end
 % ice2.f_ice(:,iter)   =  f_ice;         % fraction ice
 % ice2.f_liq(:,iter)   =  f_liq;         % fraction liq
 % ice2.df_liq(:,iter)  =  d_liq;
-% ice2.df_drn(:,iter)  =  d_drn;
+% ice2.df_drn(:,iter)  =  d_lyr;
 %
 % % % for a stripped-down run this is all that's needed:
 % % T_sfc    (iter,1)    =  Tsfc;

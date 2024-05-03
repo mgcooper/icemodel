@@ -1,7 +1,7 @@
 function [ice1, ice2, met, opts] = point(kwargs)
 
    arguments (Input)
-      kwargs.savedata (1, 1) logical = false
+      kwargs.saveflag (1, 1) logical = false
       kwargs.sitename (1, :) string {mustBeMember(kwargs.sitename, ...
          ["sector", "behar", "ak4", "slv1", "slv2", "upperbasin", "kanm", "kanl"])} = []
       kwargs.forcings (1, :) string {mustBeMember(kwargs.forcings, ...
@@ -10,41 +10,41 @@ function [ice1, ice2, met, opts] = point(kwargs)
          ["mar", "modis", "merra", "racmo", "kanm", "kanl"])} = []
       kwargs.uservars (1, :) string {mustBeMember(kwargs.uservars, ...
          ["albedo"])} = []
-      kwargs.simmodel (1, :) string {mustBeMember(kwargs.simmodel, ...
+      kwargs.smbmodel (1, :) string {mustBeMember(kwargs.smbmodel, ...
          ["icemodel", "skinmodel"])} = "skinmodel"
       kwargs.simyears (1, :) double = []
-      kwargs.gridnums (1, :) double = []
+      kwargs.gridcell (1, :) double = []
       kwargs.testname (1, :) string = []
    end
-   [savedata, sitename, forcings, userdata, uservars, simmodel, ...
-      simyears, gridnums, testname] = dealout(kwargs);
+   [saveflag, sitename, forcings, userdata, uservars, smbmodel, ...
+      simyears, gridcell, testname] = dealout(kwargs);
 
    if isempty(userdata)
       userdata = forcings;
    end
-   
+
    % varargin = struct2cell(kwargs);
    % [varargin{:}] = convertStringsToChars(varargin{:});
 
    %% Set the model options
-   opts = icemodel.setopts(simmodel, sitename, simyears, forcings, ...
-      userdata, uservars, savedata);
+   opts = icemodel.setopts(smbmodel, sitename, simyears, forcings, ...
+      userdata, uservars, saveflag);
 
-   if notempty(gridnums)
+   if notempty(gridcell)
       opts.metfname = {fullfile(opts.pathinput, 'met', 'sector', ...
-         ['met_' int2str(runpoint) '.mat'])};
+         ['met_' int2str(gridcell) '.mat'])};
    end
 
    % run the model
-   switch simmodel
+   switch smbmodel
       case 'icemodel'
-         tic; [ice1, ice2, numfail] = icemodel(opts); toc
+         tic; [ice1, ice2] = icemodel(opts); toc
       case 'skinmodel'
          tic; [ice1, ice2] = skinmodel(opts); toc
    end
 
    % load the met data and run the post processing
-   if opts.savedata
+   if saveflag
       [ice1, ice2, met] = icemodel.loadresults(opts);
    else
       [ice1, ice2, met] = POSTPROC(ice1, ice2, opts, simyears);
@@ -65,49 +65,18 @@ function [ice1, ice2, met, opts] = point(kwargs)
    end
 
    %% prep the output for plotting
-   setzero = false;
-   [Runoff, Discharge, Catchment, Melt] = prepRunoff(opts, ice1, ...
-      'set_negative_runoff_zero', setzero);
-   AblationHourly = prepAblation(opts, ice1, 'hourly', setzero);
-   AblationDaily = prepAblation(opts, ice1, 'daily', setzero);
+   [Runoff, Discharge, Catchment] = prepRunoff(opts, ice1);
+   AblationHourly = prepAblation(opts, ice1, 'hourly');
+   AblationDaily = prepAblation(opts, ice1, 'daily');
 
    % this controls the time period over which ablation and runoff are plotted
    t1 = datetime(simyears(1),6,1,0,0,0,'TimeZone','UTC');
    t2 = datetime(simyears(1),9,1,0,0,0,'TimeZone','UTC');
 
-   %% TEST
-   melt = Melt.icemodel;
-   roff = Runoff.icemodel;
-   roff(roff<0) = 0;
-
-   melt0 = cumsum(melt, 'omitnan');
-   roff1 = cumsum(Runoff.icemodel, 'omitnan');
-   roff2 = cumsum(roff, 'omitnan');
-
-   % Plot before reassigning
-   figure;
-   plot(roff1); hold on
-   plot(roff2, ':')
-   plot(melt0);
-   legend('roff', 'roff2', 'melt')
-
-   % compute the percent diff cumulative
-   (roff2(end) - melt0(end)) / melt0(end)
-   (roff1(end) - melt0(end)) / melt0(end)
-
-   % Reassign runoff
-   Runoff.icemodel = roff;
-
    %% Plot runoff
-   if opts.simmodel == "skinmodel"
-      [h1, data] = plotRunoff(Runoff, Discharge, Catchment, ...
-         'plotsurf', true, 'sitename', sitename, 'userdata', userdata, ...
-         'forcingdata', forcings);
-   else
-      [h1, data] = plotRunoff(Runoff, Discharge, Catchment, ...
-         'sitename', sitename, 'userdata', userdata, 'forcingdata', forcings, ...
-         't1', t1, 't2', t2, 'refstart', false);
-   end
+   [h1, data] = plotRunoff(Runoff, Discharge, Catchment, ...
+      'sitename', sitename, 'userdata', userdata, 'forcings', forcings, ...
+      't1', t1, 't2', t2, 'refstart', false, 'smbmodel', smbmodel);
 
    % plot ablation
    h2 = plotPromice(AblationDaily,'refstart',t1);

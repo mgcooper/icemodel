@@ -1,5 +1,5 @@
-function opts = setopts(simmodel, sitename, simyears, forcings, ...
-      userdata, uservars, savedata, casename, testname)
+function opts = setopts(smbmodel, sitename, simyears, forcings, ...
+      userdata, uservars, saveflag, casename, testname)
    %SETOPTS Set model options
    %
    %
@@ -10,18 +10,18 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
 
    if nargin < 5 || isempty(userdata); userdata = 'none'; end
    if nargin < 6 || isempty(uservars); uservars = 'albedo'; end
-   if nargin < 7 || isempty(savedata); savedata = false; end
+   if nargin < 7 || isempty(saveflag); saveflag = false; end
    if nargin < 8 || isempty(casename); casename = ''; end
    if nargin < 9 || isempty(testname); testname = ''; end
 
-   [simmodel, sitename, forcings, ...
+   [smbmodel, sitename, forcings, ...
       userdata, uservars, casename, testname] = convertStringsToChars(...
-      simmodel, sitename, forcings, userdata, uservars, casename, testname);
+      smbmodel, sitename, forcings, userdata, uservars, casename, testname);
 
    %---------------------------- save the standard options that were passed in
    %----------------------------------------------------------------------------
-   opts.savedata = savedata;
-   opts.simmodel = simmodel;
+   opts.saveflag = saveflag;
+   opts.smbmodel = smbmodel;
    opts.sitename = sitename;
    opts.forcings = forcings;
    opts.userdata = userdata;
@@ -35,7 +35,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    %----------------------------------------------------------------------------
 
    % general model settings
-   opts.spinup_loops    =  2;       % number of spin-up loops to initialize
+   opts.spinup_loops    =  1;       % number of spin-up loops to initialize
    opts.use_init        =  false;   % use pre-initialized data?
    opts.kabs_user       =  true;    % use user-defined ice absorptivity?
    opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
@@ -44,10 +44,10 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    % model parameters
    opts.z_0             =  0.001;   % Surface aero. roughness length    [m]
    opts.ro_snow_i       =  900.0;   % initial ice density               [kg/m3]
-   opts.liqresid        =  0.07;    % residual pore water fraction      [-]
+   opts.f_liq_resid     =  0.07;    % residual pore water fraction      [-]
 
    % solver options and timestepping / grid thickness
-   if strcmp(simmodel, 'icemodel')
+   if strcmp(smbmodel, 'icemodel')
 
       opts.seb_solver      = 1;        % recommended: 1
       opts.bc_type         = 1;        % recommended: 2
@@ -61,7 +61,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
       opts.z0_spectral     =  12;      % domain thickness for rad transfer    [m]
       opts.f_ice_min       =  0.01;
 
-   elseif strcmp(simmodel, 'skinmodel')
+   elseif strcmp(smbmodel, 'skinmodel')
 
       opts.seb_solver      = 1;        % recommended: 1
       opts.bc_type         = 1;        % recommended: 1
@@ -79,7 +79,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
       % opts.seb_solver = -abs(opts.seb_solver);
 
    else
-      error('unrecognized simulation model SIMMODEL')
+      error('unrecognized surface mass balance model name SMBMODEL')
    end
 
    % The mie scattering coefficients are defined for 35 grain sizes and 118
@@ -122,7 +122,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    % metfname. When writing to netcdf is implemented, that issue will go away.
 
    opts.pathinput = getenv('ICEMODELINPUTPATH');
-   opts.pathoutput = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, simmodel);
+   opts.pathoutput = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, smbmodel);
 
    if strcmp(sitename, 'sector')
       if strcmp(userdata, 'none')
@@ -147,7 +147,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
    opts.casename = icemodel.setcase(forcings, userdata, uservars);
 
    % Create folders for each simulation year in pathoutput/ if they don't exist
-   if opts.savedata
+   if opts.saveflag
 
       icemodel.mkfolders(opts);
 
@@ -178,7 +178,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
       % for n = 1:numel(simyears)
       %    simyear = num2str(simyears(n));
       %    opts.metfname{n} = ['met_' metname '_' forcings '_' simyear '_' dtstr];
-      %    opts.outfname{n} = [simmodel '_' sitename '_' simyear '_' forcings ...
+      %    opts.outfname{n} = [smbmodel '_' sitename '_' simyear '_' forcings ...
       %       '_swap_' upper(userdata) '_' uservars];
       % end
    end
@@ -198,18 +198,18 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
 
    if strcmp(sitename, 'sector')
 
-      if strcmp(simmodel, 'skinmodel')
+      if strcmp(smbmodel, 'skinmodel')
          opts.vars1 = {'Tsfc', 'Qm', 'Qe'};
          opts.vars2 = {'Tice'};
       else
 
          opts.vars1 = {'Tsfc'};
-         opts.vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_drn', 'df_evp'};
+         opts.vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp'};
       end
 
    else
 
-      if strcmp(simmodel, 'skinmodel')
+      if strcmp(smbmodel, 'skinmodel')
          % opts.vars1 = {'Tsfc', 'Qm', 'Qe'};
          % opts.vars2 = {'Tice'};
          % % opts.vars2 = {'Tice', 'f_ice', 'f_liq'};
@@ -228,7 +228,7 @@ function opts = setopts(simmodel, sitename, simyears, forcings, ...
             'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter'};
 
          opts.vars2 = ...
-            {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_drn', 'df_evp', 'Sc'};
+            {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp', 'df_lyr', 'Sc'};
       end
       % % model diagnostics
       % opts.vars3 = ...

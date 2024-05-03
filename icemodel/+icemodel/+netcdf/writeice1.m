@@ -1,4 +1,4 @@
-function writeice1(ncid, datapath, varnames, dimdata, xtype, simmodel)
+function writeice1(ncid, datapath, varnames, dimdata, xtype, smbmodel)
    %WRITEICE1 Write ice1 data to icemodel nc file
    %
    % WRITEICE1(NCID, VARS, DATA)
@@ -17,12 +17,12 @@ function writeice1(ncid, datapath, varnames, dimdata, xtype, simmodel)
          {'NC_FLOAT', 'NC_DOUBLE', 'NC_INT64', 'NC_UINT64', 'NC_INT', ...
          'NC_UINT', 'NC_SHORT', 'NC_USHORT', 'NC_BYTE', 'NC_UBYTE', ...
          'NC_CHAR', 'NC_STRING'})}
-      simmodel (1, :) char {mustBeTextScalar}
+      smbmodel (1, :) char {mustBeTextScalar}
    end
 
    % Fill the data arrays in memory.
    data = icemodel.netcdf.getvardata( ...
-      datapath, varnames, dimdata, xtype, 1, nan, simmodel);
+      datapath, varnames, dimdata, xtype, 1, nan, smbmodel);
 
    % Write the data arrays to netcdf.
    for v = 1:numel(varnames)

@@ -1,32 +1,55 @@
-
-% Apr 2024 - converted runscript to run.point
-% copied the settings in runscript below.
-
-%% runscript settings
 clearvars
 close all
 clc
 
-savedata = false;
-sitename = 'sector';
-forcings = 'mar';
-userdata = 'mar';
-uservars = 'albedo';
-simmodel = 'icemodel';
-simyears = 2018:2018;
+% This script demonstrates how to run icemodel (or skinmodel) at a point,
+% or for an individual catchment with catchment-scale average forcings
 
-% If sitename is 'sector', specify which grid point to run
-% runpoint = 239; % I think this was upperbasin
-runpoint = 2195; % see notes at end about this point
+saveflag = false;
+sitename = 'behar';
+forcings = 'kanm';
+userdata = 'kanm';
+uservars = 'albedo';
+smbmodel = 'icemodel';
+simyears = 2016:2016;
+gridcell = [];
+
+% To run an individual grid cell, specify sitename = 'sector' and the grid ID:
+% gridcell = [];
+
+% Run the model
+[ice1, ice2, met, opts] = icemodel.run.point(...
+   saveflag=saveflag, ...
+   sitename=sitename, ...
+   forcings=forcings, ...
+   smbmodel="skinmodel", ...
+   userdata=userdata, ...
+   uservars=uservars, ...
+   simyears=simyears, ...
+   gridcell=gridcell);
+
 
 % % These were the settings I had to rerun
-% sitename = 'sector';        % options: 'kanm', 'behar'
-% forcings = 'mar';           % options: 'mar','kanm'
-% userdata = 'modis';         % options: 'modis','racmo','merra','mar','kanm','none'
+% sitename = 'sector';
+% forcings = 'mar';
+% userdata = 'modis';
 % simyears = 2013:2013;
-% runpoint = 1794;
+% gridcell = 1794;
+
+% % mar albedo:
+% forcings = 'mar';
+% userdata = 'mar';
+% uservars = 'albedo';
+% smbmodel = 'icemodel';
+% simyears = 2018:2018;
+% gridcell = 239; % I think this was upperbasin
+% gridcell = 2195; % see notes at end about this point
+
 
 %% rungrid settings
+
+% This demonstrates how to run icemodel (or skinmodel) for a set of grid cells,
+% using a list of grid cell IDs.
 
 testname = 'zobs2';
 % Option to run specific grid points:
@@ -40,7 +63,7 @@ icemodel.run.grid(gridnums=gridnums, testname=testname)
 %% Example of reading from saved nc output to compare with this run
 
 % This compares the missing skinmodel/mar/zobs point 2195 for year 2018 using
-% the 'sector' plus 'runpoint' option in runscript instead of the rungrid
+% the 'sector' plus 'gridcell' option in runscript instead of the rungrid
 % option. The ice1 files were already deleted for those runs so the nc file was
 % the only way to compare so this reads a single point from them.
 %
@@ -50,11 +73,11 @@ icemodel.run.grid(gridnums=gridnums, testname=testname)
 % was something wrong with that point in particular.
 
 filename = icemodel.netcdf.setfilename( ...
-   'ice1', simmodel, forcings, userdata, sitename, simyears, ...
+   'ice1', smbmodel, forcings, userdata, sitename, simyears, ...
    fullfile(opts.pathoutput, 'zobs'));
 
 varnames = {'Tsfc', 'runoff'};
-data = icemodel.netcdf.ncread(filename, varnames, [runpoint 1], [1 8760]);
+data = icemodel.netcdf.ncread(filename, varnames, [gridcell 1], [1 8760]);
 
 figure;
 tiledlayout(1, 2)
