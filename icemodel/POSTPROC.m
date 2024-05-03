@@ -133,7 +133,7 @@ function ice2 = retimeIce2(ice2, Time)
                continue
             case {'Tice', 'f_ice', 'f_liq', 'k_eff', 'k_vap', 'ro_sno', 'cp_sno'}
                tmp.(thisfield)(:, n) = mean(ice2.(thisfield)(:, i1:i2), 2);
-            case {'df_liq', 'df_evp', 'df_drn', 'errH'}
+            case {'df_liq', 'df_evp', 'df_lyr', 'errH'}
                tmp.(thisfield)(:, n) = sum(ice2.(thisfield)(:, i1:i2), 2);
             otherwise % assume averaging is correct
                tmp.(thisfield)(:, n) = mean(ice2.(thisfield)(:, i1:i2), 2);
@@ -185,7 +185,7 @@ function [ice1, ice2] = roundData(ice1, ice2)
             ice2.(thisfield) = round(ice2.(thisfield), 3);
          case {'cp_sno','ro_sno'}
             ice2.(thisfield) = round(ice2.(thisfield), 1);
-         case {'df_liq','df_drn','df_evp','Qsub','Sc','errT','errH'}
+         case {'df_liq','df_lyr','df_evp','Qsub','Sc','errT','errH'}
             ice2.(thisfield) = round(ice2.(thisfield), 8);
       end
    end
@@ -197,7 +197,7 @@ function [ice1, ice2] = roundData(ice1, ice2)
    %       'f_ice', 5; 'f_liq', 5; 'k_vap', 5; 'k_eff', 5;
    %       'Tice', 3; 'h_melt', 3; 'h_freeze', 3;
    %       'cp_sno', 1; 'ro_sno', 1;
-   %       'df_liq', 8; 'df_drn', 8; 'Qsub', 8; 'Sc', 8; 'errT', 8; 'errH', 8
+   %       'df_liq', 8; 'df_lyr', 8; 'Qsub', 8; 'Sc', 8; 'errT', 8; 'errH', 8
    %       };
    % end
    % [fields, idx] = intersect(lookup(:, 1), fieldnames(ice2));

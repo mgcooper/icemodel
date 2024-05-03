@@ -1,30 +1,35 @@
-function [f_liq, f_ice, f_wat, T, dFdT] = MELTCURVE(T, f_liq, f_ice, ...
-      ro_wie, ro_iwe, Tf, fcp) %#codegen
-   %MELTCURVE Melt fraction curve
+function [T, f_ice, f_liq, f_wat, dFdT] = MELTCURVE(T, f_ice, f_liq, ...
+      ro_ice, ro_liq, fcp, Tf)
+   %MELTCURVE Liquid fraction-temperature curve (phase fraction function)
    %
-   % The change in frac_liq is the new frac_liq minus the old frac_liq.
-   % Increases in frac_liq are defined as positive, so the new frac_ice is
-   % the old frac_ice minus dfrac_liq scaled by volume expansion.
+   % Inputs:
+   %  T - control volume temperature [K]
+   %  f_ice - fraction of frozen water (-) (volumetric ice fraction)
+   %  f_liq - fraction of unfrozen water (-) (volumetric liquid water fraction)
+   %  fcp - freezing-curve parameter ("a1" in Jordan, 1991)
+   %  Tf - freezing point temperature [K] (triple point = 273.16)
    %
-   % DEFINITIONS:
-   %  fcp = freezing-curve parameter
-   %  T_dep = temperature depression (-)
-   %  fliq = fraction of unfrozen water (-) (redefined as liquid water fraction)
-   %
-   % Mass fraction of liquid water
-   %  fliquid = 1.0 ./ (1.0 + (fcp * T_dep) .^ 2.0);
+   % Mass fraction of liquid water:
+   %  f_ell = 1.0 ./ (1.0 + (fcp * T_dep) .^ 2.0);
    %  f_liq = f_wat ./ (1.0 + (fcp * T_dep) .^ 2.0);
-   %  f_ice = (1.0 - fliquid) .* f_wat * (ro_liq / ro_ice);
+   %  f_ice = (1.0 - f_ell) .* f_wat * (ro_liq / ro_ice);
+   %
+   % Increases in f_liq are defined as positive, so the change in f_liq is the
+   % new f_liq minus the old f_liq, and the new f_ice is the old f_ice minus
+   % df_liq times the ratio of liquid water density to ice density (volume
+   % expansion).
    %
    % See also:
+   %
+   %#codegen
 
    % Compute volumetric fraction of liquid water eq 67, Jordan
    T_dep = Tf - min(T, Tf);
 
    % Ensure f_wat does not exceed maximum capacity by more than eps
-   f_wat = min(f_liq + ro_iwe * f_ice, ro_iwe);    % f_wat_old
+   f_wat = min(f_liq + f_ice * ro_ice / ro_liq, ro_ice / ro_liq); % f_wat_old
    f_liq = f_wat ./ (1.0 + (fcp * T_dep) .^ 2.0);  % f_liq_new (eq 67, Jordan)
-   f_ice = (f_wat - f_liq) * ro_wie;               % f_ice_new
+   f_ice = (f_wat - f_liq) * ro_liq / ro_ice; % f_ice_new
 
    if nargout > 3
       % Compute temperature by inverting the fraction of liquid water function
@@ -36,21 +41,11 @@ function [f_liq, f_ice, f_wat, T, dFdT] = MELTCURVE(T, f_liq, f_ice, ...
       dFdT = 2.0 * fcp ^ 2.0 * T_dep .* f_wat ...
          ./ (1.0 + fcp ^ 2.0 * T_dep .^ 2.0) .^ 2.0;
    end
-
-   % Calculate liquid retention (need to pass prior value into the function)
-   % retention = min(0.02, max(retention, 0.75 * f_liq));
 end
 
-% Using ro_ice and ro_liq instead of ro_iwe:
-%     T_dep = Tf - min(T, Tf);
-%     f_wat = f_liq + f_ice .* ro_ice ./ ro_liq;
-%     f_liq = f_wat ./ (1.0 + (fcp * T_dep) .^ 2.0);
-%     f_ice = (f_wat - f_liq) .* ro_liq ./ ro_ice;
+% In terms of f_ell = g_liq / g_wat = 1 / (1 + (fcp * T_dep) ^ 2 ):
 %
-% ... rest is identical
-%
-% In terms of fliq = g_liq / g_wat = 1 / (1 + (fcp*T_dep) ^ 2 ):
-%
-%     df_liq_dT = 2 .* T_dep .* fcp .^ 2 ./ (1 + (fcp .* T_dep) .^ 2) .^ 2;
-%     T_liq = Tf - ((1.0 ./ fliq - 1.0) ./ fcp .^ 2.0) .^ (0.50);
-%     T_liq = Tf - sqrt((1 ./ fliq - 1)) ./ fcp
+% df_ell_dT = 2 * T_dep * fcp ^ 2 ./ (1 + (fcp * T_dep) .^ 2) .^ 2;
+% T = Tf - ((1.0 ./ f_ell - 1.0) ./ fcp ^ 2.0) .^ 0.50;
+% T = Tf - sqrt((1 ./ fliq - 1)) ./ fcp
+

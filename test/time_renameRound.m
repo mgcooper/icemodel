@@ -19,7 +19,7 @@ ice2lookup = {
    'f_ice', 5; 'f_liq', 5; 'k_vap', 5; 'k_eff', 5;
    'Tice', 3; 'h_melt', 3; 'h_freeze', 3;
    'cp_sno', 1; 'ro_sno', 1;
-   'df_liq', 8; 'df_drn', 8; 'Qsub', 8; 'Sc', 8; 'errT', 8; 'errH', 8
+   'df_liq', 8; 'df_lyr', 8; 'Qsub', 8; 'Sc', 8; 'errT', 8; 'errH', 8
    };
 
 %% For initial testing, use tic toc
@@ -28,9 +28,9 @@ ice2lookup = {
 tmp = ice1;
 tic
 for m = 1:1000
-tmp = renamevars(ice1, ...
-   oldvars(ismember(oldvars, ice1.Properties.VariableNames)), ...
-   newvars(ismember(oldvars, ice1.Properties.VariableNames)));
+   tmp = renamevars(ice1, ...
+      oldvars(ismember(oldvars, ice1.Properties.VariableNames)), ...
+      newvars(ismember(oldvars, ice1.Properties.VariableNames)));
 end
 toc
 
@@ -96,15 +96,15 @@ end
 
 % Rename Method 1: Using ismember
 function rename1(oldvars, newvars, ice1)
-    ice1 = renamevars(ice1, ...
-       oldvars(ismember(oldvars, ice1.Properties.VariableNames)), ...
-       newvars(ismember(oldvars, ice1.Properties.VariableNames)));
+   ice1 = renamevars(ice1, ...
+      oldvars(ismember(oldvars, ice1.Properties.VariableNames)), ...
+      newvars(ismember(oldvars, ice1.Properties.VariableNames)));
 end
 
 % Rename Method 2: Using intersect
 function rename2(oldvars, newvars, ice1)
-    [repvars, idx] = intersect(oldvars, ice1.Properties.VariableNames);
-    ice1 = renamevars(ice1, repvars, newvars(idx));
+   [repvars, idx] = intersect(oldvars, ice1.Properties.VariableNames);
+   ice1 = renamevars(ice1, repvars, newvars(idx));
 end
 
 %%
@@ -120,7 +120,7 @@ function round1(ice2)
             ice2.(thisfield) = round(ice2.(thisfield),3);
          case {'cp_sno', 'ro_sno'}
             ice2.(thisfield) = round(ice2.(thisfield),1);
-         case {'df_liq', 'df_drn', 'Qsub', 'Sc', 'errT', 'errH'}
+         case {'df_liq', 'df_lyr', 'Qsub', 'Sc', 'errT', 'errH'}
             ice2.(thisfield) = round(ice2.(thisfield),8);
       end
    end
@@ -128,18 +128,18 @@ end
 
 % Round Method 2: Using ismember
 function round2(ice2, ice2lookup)
-    lookup = ice2lookup(ismember(ice2lookup(:, 1), fieldnames(ice2)), :);
-    for n = 1:size(lookup, 1)
-        ice2.(lookup{n, 1}) = round(ice2.(lookup{n, 1}), lookup{n, 2});
-    end
+   lookup = ice2lookup(ismember(ice2lookup(:, 1), fieldnames(ice2)), :);
+   for n = 1:size(lookup, 1)
+      ice2.(lookup{n, 1}) = round(ice2.(lookup{n, 1}), lookup{n, 2});
+   end
 end
 
 % Round Method 3: Using intersect
 function round3(ice2, ice2lookup)
-    [fields, idx] = intersect(ice2lookup(:, 1), fieldnames(ice2));
-    for n = 1:numel(fields)
-        ice2.(fields{n}) = round(ice2.(fields{n}), ice2lookup{idx(n), 2});
-    end
+   [fields, idx] = intersect(ice2lookup(:, 1), fieldnames(ice2));
+   for n = 1:numel(fields)
+      ice2.(fields{n}) = round(ice2.(fields{n}), ice2lookup{idx(n), 2});
+   end
 end
 
 % Round Method 4: Using ismember with persistent
@@ -150,7 +150,7 @@ function round4(ice2)
          'f_ice', 5; 'f_liq', 5; 'k_vap', 5; 'k_eff', 5;
          'Tice', 3; 'h_melt', 3; 'h_freeze', 3;
          'cp_sno', 1; 'ro_sno', 1;
-         'df_liq', 8; 'df_drn', 8; 'Qsub', 8; 'Sc', 8; 'errT', 8; 'errH', 8
+         'df_liq', 8; 'df_lyr', 8; 'Qsub', 8; 'Sc', 8; 'errT', 8; 'errH', 8
          };
    end
    lookup = ice2lookup(ismember(ice2lookup(:, 1), fieldnames(ice2)), :);
@@ -167,12 +167,12 @@ function round5(ice2)
          'f_ice', 5; 'f_liq', 5; 'k_vap', 5; 'k_eff', 5;
          'Tice', 3; 'h_melt', 3; 'h_freeze', 3;
          'cp_sno', 1; 'ro_sno', 1;
-         'df_liq', 8; 'df_drn', 8; 'Qsub', 8; 'Sc', 8; 'errT', 8; 'errH', 8
+         'df_liq', 8; 'df_lyr', 8; 'Qsub', 8; 'Sc', 8; 'errT', 8; 'errH', 8
          };
    end
-    [fields, idx] = intersect(ice2lookup(:, 1), fieldnames(ice2));
-    for n = 1:numel(fields)
-        ice2.(fields{n}) = round(ice2.(fields{n}), ice2lookup{idx(n), 2});
-    end
+   [fields, idx] = intersect(ice2lookup(:, 1), fieldnames(ice2));
+   for n = 1:numel(fields)
+      ice2.(fields{n}) = round(ice2.(fields{n}), ice2lookup{idx(n), 2});
+   end
 end
 

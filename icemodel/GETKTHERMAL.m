@@ -1,4 +1,4 @@
-function ksnow = GETKTHERMAL(T,f_ice,ro_ice,ro_sno,opts)
+function ksnow = GETKTHERMAL(T, f_ice, ro_ice, ro_sno, opts)
    %GETKTHERMAL Compute mixture thermal conductivity
    %
    %

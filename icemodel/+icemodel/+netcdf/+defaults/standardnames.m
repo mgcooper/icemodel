@@ -56,7 +56,6 @@ function out = standardnames(whichdata)
             '', ... 'cumulative_sublimation_amount_in_lwe', ...      subl
             '', ... 'cumulative_condensation_amount_in_lwe', ...     cond
             '', ... 'cumulative_runoff_amount_in_lwe', ...           runoff
-            '', ... 'cumulative_drain_amount_in_lwe', ...            drain
             '', ... 'cumulative_melt_amount_in_lwe', ...             depth_melt
             '', ... 'cumulative_refreeze_amount_in_lwe', ...         depth_freeze
             '', ... 'surface_runoff_amount_in_lwe', ...              surf_runoff

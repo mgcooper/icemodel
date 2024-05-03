@@ -1,7 +1,7 @@
-function [ro_vap, dro_vapdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls)
+function [ro_vap, dro_vapdT, k_vap] = VAPORHEAT(T, f_ice, f_liq, Tf, Rv, Ls)
    %VAPORHEAT Compute saturation vapor density within porous ice
    %
-   % [H_vap, dro_vapdT, ro_vap, bd_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls)
+   % [ro_vap, dro_vapdT, k_vap] = VAPORHEAT(T, f_ice, f_liq, Tf, Rv, Ls)
    % computes the saturation vapor density within the ice and the latent heat
    % due to water vapor diffusion within the ice.
    %
@@ -21,6 +21,8 @@ function [ro_vap, dro_vapdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls)
    % for water vapor in soil at 1000 mb and 0oC.
    %
    % See also:
+   %
+   %#codegen
 
    % Define coefficients over water and ice
    persistent aw bw cw ai bi ci nd

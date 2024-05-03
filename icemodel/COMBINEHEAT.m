@@ -1,6 +1,6 @@
-function [f_liq_C, f_ice_C, T_C, Sc_C, Sp_C, d_drn, d_liq] = COMBINEHEAT( ...
-      f_liq, f_ice, T, Sc, Sp, Tf, TL, cv_ice, cv_liq, Lf, ro_ice, ro_liq, ...
-      fcp, j1, j2, d_drn, d_liq, dz)
+function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = COMBINEHEAT( ...
+      T, f_ice, f_liq, Sc, Sp, Tf, TL, cv_ice, cv_liq, Lf, ro_ice, ro_liq, ...
+      fcp, j1, j2, d_liq, dz)
    %COMBINEHEAT Combine layers conserving mass, enthalpy, and absorbed radiation
    %
    % Combine two control volumes by equating the enthalpy of the two control
@@ -120,8 +120,5 @@ function [f_liq_C, f_ice_C, T_C, Sc_C, Sp_C, d_drn, d_liq] = COMBINEHEAT( ...
    f_wat_C = m_wat_C / (ro_liq * 2 * dz);
    f_liq_C = f_wat_C / (1.0 + (fcp * Td_C) ^ 2.0); % eq 67, Jordan
    f_ice_C = (f_wat_C - f_liq_C) * ro_liq / ro_ice;
-
-   % Positive d_liq means ice melted, negative means liquid refroze.
-   d_liq(j1) = d_liq(j1) + 2 * f_liq_C - (f_liq(j1) + f_liq(j2));
-   d_drn(j1) = d_drn(j1) + max(f_liq_C / 2, 0);
+   d_liq(j1) = d_liq(j1) + max(f_liq(j1) + f_liq(j2) - f_liq_C, 0);
 end

@@ -28,7 +28,6 @@ function out = units(whichdata)
             'm w.e.', ...  subl
             'm w.e.', ...  cond
             'm w.e.', ...  runoff
-            'm w.e.', ...  drain
             'm w.e.', ...  depth_melt
             'm w.e.', ...  depth_freeze
             'm w.e.', ...  surf_runoff

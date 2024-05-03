@@ -1,5 +1,9 @@
 function [h_ice, h_liq, h_air, x_ice, x_liq] = VOLBAL(h_ice, h_liq, h_res, h_tot)
 
+   % Note: this is not used in the model, it was designed for the
+   % thickness-based formulation. It might work as-is for the
+   % volumetric fraction-based forms, but needs to be tested.
+
    % Check if ice+liq exceeds available pore space
    x_ice = max(0.0, h_ice + h_res - h_tot);
    x_liq = max(0.0, h_ice + h_liq - h_tot);

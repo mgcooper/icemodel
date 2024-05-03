@@ -19,7 +19,7 @@ ice2lookup = {
    'f_ice', 5; 'f_liq', 5; 'k_vap', 5; 'k_eff', 5;
    'Tice', 3; 'h_melt', 3; 'h_freeze', 3;
    'cp_sno', 1; 'ro_sno', 1;
-   'df_liq', 8; 'df_drn', 8; 'Qsub', 8; 'Sc', 8; 'errT', 8; 'errH', 8
+   'df_liq', 8; 'df_lyr', 8; 'Qsub', 8; 'Sc', 8; 'errT', 8; 'errH', 8
    };
 
 %% test Rename Method 1: Using ismember
@@ -46,7 +46,7 @@ for mm = 1:numel(fields)
          ice2.(thisfield) = round(ice2.(thisfield),3);
       case {'cp_sno', 'ro_sno'}
          ice2.(thisfield) = round(ice2.(thisfield),1);
-      case {'df_liq', 'df_drn', 'Qsub', 'Sc', 'errT', 'errH'}
+      case {'df_liq', 'df_lyr', 'Qsub', 'Sc', 'errT', 'errH'}
          ice2.(thisfield) = round(ice2.(thisfield),8);
    end
 end

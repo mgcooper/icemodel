@@ -1,11 +1,11 @@
-function [f_ice, f_liq, d_drn, xsubl] = ICESUBL(f_ice, f_liq, d_drn, ...
+function [f_ice, f_liq, d_con, xsubl] = ICESUBL(f_ice, f_liq, d_con, ...
       ro_ice, ro_liq, Ls, Lv, dz_therm, dt_new, Qe, f_ice_min, f_liq_resid)
-   %SUBL Compute vapor mass flux from top layer control volume
+   %SUBL Compute vapor mass flux for the top layer control volume
    %
    % f_ice = fraction of ice by volume in each control volume
    % f_liq = fraction of liquid water by volume in each control volume
-   % d_drn = change in f_liq due to water drainage from control volume
-   % xsubl = "extra" sublimation i.e., error due to sublimation exceeding f_ice
+   % d_con = condensation which exceeds control volume available porosity
+   % xsubl = sublimation which exceeds control volume fractional ice conent
    %
    %#codegen
 
@@ -21,7 +21,7 @@ function [f_ice, f_liq, d_drn, xsubl] = ICESUBL(f_ice, f_liq, d_drn, ...
    % airFraction, or "availablePorosity", and should be adjusted for f_bub.
    %
    % f_por = 1 - f_ice;             % porosityFraction
-   % f_res = liqresid * f_por;      % residualWaterFraction
+   % f_res = f_liq_resid * f_por;   % residualWaterFraction
    % f_air = 1 - f_ice - f_liq;     % airFraction or availablePorosity
    % f_ava = f_por - f_res;         % availableCapacity or potentialCapacity
    % f_sat = f_liq - f_res;         % availableWater
@@ -72,7 +72,8 @@ function [f_ice, f_liq, d_drn, xsubl] = ICESUBL(f_ice, f_liq, d_drn, ...
          else
             % some condensation stored, some converts to runoff
             f_liq(1) = f_liq(1) + aevap;
-            d_drn(1) = d_drn(1) + (pevap - aevap); % xevap = pevap - aevap
+            d_con(1) = d_con(1) + (pevap - aevap); % xevap = pevap - aevap
+            % fprintf('condensation exceeds porosity: %.6f\n', (pevap - aevap))
          end
       end
 
@@ -89,7 +90,7 @@ function [f_ice, xsubl] = SUBL(pevap, f_ice, f_ice_min, ro_ice, ro_liq, Lv, Ls)
       return
    end
 
-   % Convert potential evaporation to potential sublimation
+   % Convert potential evaporation to potential sublimation:
    % pevap = Qe / (Lv * ro_liq) * dt_new / dz_therm;
    % psubl = Qe / (Ls * ro_ice) * dt_new / dz_therm;
    % Therefore:
@@ -99,18 +100,18 @@ function [f_ice, xsubl] = SUBL(pevap, f_ice, f_ice_min, ro_ice, ro_liq, Lv, Ls)
    % is already computed wrt to them. That way evap/subl are computed using the
    % same formula: e = Qe / roL * dt / dz.
    %
-   % The conversion here is only needed when there is "extra evap", i.e., to
-   % conserve heat by allocating whatever Qe cannot be satisfied by evaporation
-   % to subl using the conversion: s = xe * roLv / roLs;
+   % The conversion here conserves heat when the surface latent heat flux, Qe,
+   % cannot be satisfied by evaporation alone (all available water evaporates),
+   % and the remainder is allocated to sublimation of ice using the conversion:
+   % s = xe * roLv / roLs
 
    % Convert potential evap to potential subl in ice frac-equivalent thickness
    psubl = pevap * (Lv * ro_liq) / (Ls * ro_ice);
    f_ice_top = f_ice(1);
 
-   % Note: since layer combination is based on f_ice, I don't think we need to
-   % check against f_min, we only need the < 0 check. If f_ice(1)+psubl is < 0,
-   % then we have an error, otherwise if f_ice(1)+psubl < f_min, the layers will
-   % be combined.
+   % Note: layer combination is based on f_ice, so requiring f_ice_top < 0
+   % should suffice (rather than <f_ice_min). If f_ice(1)+psubl<0, it will
+   % error, otherwise the layers will combine if f_ice(1)+psubl<f_min.
 
    if f_ice_top < f_ice_min
 
@@ -122,7 +123,7 @@ function [f_ice, xsubl] = SUBL(pevap, f_ice, f_ice_min, ro_ice, ro_liq, Lv, Ls)
          % all ice sublimates (asubl = f_ice(1) )
          f_ice(1) = 0.0;
 
-         % "extra" sublimation that cannot be satisfied
+         % sublimation which cannot be satisfied
          xsubl = psubl + f_ice_top;
       end
 
@@ -134,7 +135,7 @@ function [f_ice, xsubl] = SUBL(pevap, f_ice, f_ice_min, ro_ice, ro_liq, Lv, Ls)
       % all ice sublimates (asubl = -(fi - f_ice_min) )
       f_ice(1) = f_ice_min;         % keep minimum ice thickness
 
-      % "extra" sublimation that cannot be satisfied
+      % sublimation which cannot be satisfied
       xsubl = psubl + f_ice_top - f_ice_min;
    end
 end

@@ -50,7 +50,7 @@ function [ice1, ice2] = round1(ice1, ice2)
             ice2.(thisfield) = round(ice2.(thisfield),3);
          case {'cp_sno', 'ro_sno'}
             ice2.(thisfield) = round(ice2.(thisfield),1);
-         case {'df_liq', 'df_drn', 'Qsub', 'Sc', 'errT', 'errH'}
+         case {'df_liq', 'df_lyr', 'Qsub', 'Sc', 'errT', 'errH'}
             ice2.(thisfield) = round(ice2.(thisfield),8);
       end
    end
@@ -64,7 +64,7 @@ function [ice1, ice2] = round2(ice1, ice2, opts)
    ice1.runoff = round(ice1.runoff,5);
    ice1.freeze = round(ice1.freeze,5);
    try
-      ice1.drain = round(ice1.drain,5);
+      ice1.dlayer = round(ice1.dlayer,5);
    catch
    end
 
@@ -75,7 +75,7 @@ function [ice1, ice2] = round2(ice1, ice2, opts)
       ice2.df_liq = round(ice2.df_liq,8);
    end
    try
-      ice2.df_drn = round(ice2.df_drn,8);
+      ice2.df_lyr = round(ice2.df_lyr,8);
    catch
    end
 end
@@ -93,7 +93,7 @@ function [ice1, ice2] = round3(ice1, ice2)
          'f_ice', 5; 'f_liq', 5; 'k_vap', 5; 'k_eff', 5;
          'Tice', 3; 'h_melt', 3; 'h_freeze', 3;
          'cp_sno', 1; 'ro_sno', 1;
-         'df_liq', 8; 'df_drn', 8; 'Qsub', 8; 'Sc', 8; 'errT', 8; 'errH', 8
+         'df_liq', 8; 'df_lyr', 8; 'Qsub', 8; 'Sc', 8; 'errT', 8; 'errH', 8
          };
    end
 
@@ -121,7 +121,7 @@ function [ice1, ice2] = round4(ice1, ice2)
             ice2.(thisfield) = round(ice2.(thisfield),3);
          case {'cp_sno', 'ro_sno'}
             ice2.(thisfield) = round(ice2.(thisfield),1);
-         case {'df_liq', 'df_drn', 'Qsub', 'Sc', 'errT', 'errH'}
+         case {'df_liq', 'df_lyr', 'Qsub', 'Sc', 'errT', 'errH'}
             ice2.(thisfield) = round(ice2.(thisfield),8);
       end
    end

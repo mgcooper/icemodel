@@ -1,6 +1,6 @@
 function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
-      Ts, JJ, Sc, Sp, Fc, Fp, TL, TH, flmin, flmax, f_min, liqresid, ...
-      ro_iwe, ro_wie] = ICEINIT(opts, tair)
+      Ts, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, f_ice_min, ...
+      f_liq_res, ro_iwe, ro_wie] = ICEINIT(opts, tair)
    %ICEINIT initialize the 1-d ice column
    %
    %#codegen
@@ -28,23 +28,23 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
       ro_ice = ro_glc;
       ro_liq = ro_glc;
    end
-   ro_wie = ro_liq / ro_ice;
    ro_iwe = ro_ice / ro_liq;
+   ro_wie = ro_liq / ro_ice;
 
-   % LOWER AND UPPER MELT ZONE TEMPERATURE AND WATER FRACTIONS
+   % LOWER AND UPPER MELT ZONE TEMPERATURE AND WATER (MASS) FRACTION
    TL = Tf - (2.0 * Lf / (fcp ^ 2.0 * cp_ice)) ^ (1.0 / 3.0); % Eq 120
    TH = Tf - cp_liq / (Lf * 2.0 * fcp ^ 2.0);
-   flmin = 1 / (1 + (fcp * (Tf - TL)) ^ 2.0);
-   flmax = 1 / (1 + (fcp * (Tf - TH)) ^ 2.0);
+   f_ell_min = 1 / (1 + (fcp * (Tf - TL)) ^ 2.0);
+   f_ell_max = 1 / (1 + (fcp * (Tf - TH)) ^ 2.0);
 
    % INITIALIZE ICE TEMPERATURE TO AIR TEMPERATURE
    T = min(TL - 1, (tair(1) - 1) * ones(JJ, 1));
 
-   % INITIALIZE LIQUID/ICE WATER FRACTION AND BULK DENSITIES
+   % INITIALIZE LIQUID/ICE WATER FRACTION (f) AND BULK DENSITIES (g)
    T_dep = Tf - T;                           % [K]
-   fmliq = 1 ./ (1 + (fcp * T_dep) .^ 2);    % [-]
+   f_ell = 1 ./ (1 + (fcp * T_dep) .^ 2);    % [-], f_ell = liquid mass fraction
    g_ice = opts.ro_snow_i;
-   g_liq = g_ice .* (fmliq ./ (1 - fmliq));
+   g_liq = g_ice .* (f_ell ./ (1 - f_ell));
    f_liq = g_liq ./ ro_liq;
    f_ice = g_ice ./ ro_ice .* ones(JJ, 1);
 
@@ -60,8 +60,8 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
    Fp = 1;
 
    % STATE VARIABLES AND PARAMETERS NEEDED ON THE FIRST ITERATION
-   f_min = opts.f_ice_min;
-   liqresid = opts.liqresid;
+   f_ice_min = opts.f_ice_min;
+   f_liq_res = opts.f_liq_resid;
 
    Ts = T(1);
    roL = roLs;

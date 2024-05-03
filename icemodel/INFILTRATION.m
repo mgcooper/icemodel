@@ -1,5 +1,8 @@
 function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, ro_ice, ...
       ro_liq, Tf, TL, fcp, dz, dt)
+   %INFILTRATION
+   %
+   %#codegen
 
    OK = true;
    if all(T(2:end) < TL)
@@ -69,11 +72,11 @@ function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, ro_ice, ...
       xT = T; xf_liq = f_liq; xf_ice = f_ice;
 
       % Update the water fraction and temperature
-      f_wat = f_liq + f_ice * 917/1000; % ro_iwe
+      f_wat = f_liq + f_ice * ro_ice / ro_liq;
       T = Tf - sqrt((f_wat ./ f_liq - 1.0)) ./ fcp;
 
       % f_liq = f_wat ./ (1.0 + (fcp * (Tf - min(T, Tf))) .^ 2.0); % f_liq_new
-      f_ice = (f_wat - f_liq) * 1000/917; % f_ice_new
+      f_ice = (f_wat - f_liq) * ro_liq / ro_ice; % f_ice_new
    end
 
    if any(f_ice <= 1e-8)

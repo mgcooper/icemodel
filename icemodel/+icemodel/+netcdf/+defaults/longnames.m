@@ -24,7 +24,6 @@ function out = longnames(whichdata)
             'cumulative sublimation amount in meters liquid water equivalent', ...        subl
             'cumulative condensation amount in meters liquid water equivalent', ...       cond
             'cumulative runoff amount in meters liquid water equivalent', ...             runoff
-            'cumulative runoff drained in meters liquid water equivalent', ...            drain
             'cumulative melt amount in meters liquid water equivalent', ...               depth_melt
             'cumulative refreeze amount in meters liquid water equivalent', ...           depth_freeze
             'cumulative surface runoff amount in meters liquid water equivalent', ...     surf_runoff
@@ -35,7 +34,7 @@ function out = longnames(whichdata)
 
          out = {
             'thermodynamic temperature of control volume (layer) at end of timestep', ...
-            'total change in volume fraction of unfrozen water in control volume (layer) during timestep inclusive of drained water',...
+            'total change in volume fraction of unfrozen water in control volume (layer) during timestep',...
             'volume fraction of frozen water in control volume (layer) at end of timestep', ...
             'volume fraction of unfrozen water in control volume (layer) at end of timestep', ...
             };
