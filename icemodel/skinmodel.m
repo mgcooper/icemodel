@@ -6,7 +6,7 @@ function [ice1, ice2] = skinmodel(opts)
    %
    %#codegen
 
-   % INITIALIZE THE MODEL
+   %% INITIALIZE THE MODEL
 
    debug = false;
    assertF off
@@ -41,10 +41,6 @@ function [ice1, ice2] = skinmodel(opts)
 
          % INITIALIZE NEW TIMESTEP
          [dt_sum, subfail, OK] = NEWTIMESTEP(f_liq);
-
-         if ppt(metiter) > 0
-            % dt = dt_FULL_STEP / maxsubiter;
-         end
 
          % SURFACE TEMPERATURE
          ea = VAPPRESS(tair(metiter), Tf, liqflag) * rh(metiter) / 100;

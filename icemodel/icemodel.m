@@ -1,4 +1,4 @@
-function [ice1, ice2, numfail] = icemodel(opts)
+function [ice1, ice2] = icemodel(opts)
    % ICEMODEL Simulate the phase change process in glacier ice.
    %
    % This function models the phase change process in melting glacier ice. It
@@ -18,9 +18,8 @@ function [ice1, ice2, numfail] = icemodel(opts)
    %        * forcings         - Type of forcing data used
    %        * userdata         - User-defined data type
    %        * uservars         - User-defined variables
-   %        * savedata         - Flag indicating if data should be saved
+   %        * saveflag         - Flag indicating if data should be saved
    %        * testname         - Name of the test (default: 'none')
-   %        * testpoint        - Test point if applicable (default: 'none')
    %        * ... (other parameters related to the model configuration)
    %
    % Outputs:
@@ -68,9 +67,6 @@ function [ice1, ice2, numfail] = icemodel(opts)
 
    bc = opts.bc_type;
    ok = true;
-   % zD = dz(1);
-
-   numfail = zeros(maxiter, 1);
 
    %% START ITERATIONS OVER YEARS
    for thisyear = 1:numyears
@@ -99,13 +95,7 @@ function [ice1, ice2, numfail] = icemodel(opts)
                ea, cv_air, emiss, SB, roL, scoef, chi, Tf, T(1), liqflag);
          end
 
-         % Use this if computing the top layer interaction length scale
-         % xT1 = T(1);
-
          while dt_sum + TINY < dt_FULL_STEP
-
-            % subfail goes above maxsubiter when T(1) is on the TL limit I think
-            % and cannot ge
 
             % SUBSURFACE ENERGY BALANCE
             [T, f_ice, f_liq, k_eff, OK, N, a1] = ICEENBAL(T, f_ice, f_liq, ...
@@ -152,13 +142,6 @@ function [ice1, ice2, numfail] = icemodel(opts)
                dt, TINY, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs);
          end
 
-         % % Update the top layer interaction length
-         % if swd(metiter) > 1 && (T(1) - xT1) > TINY && (T(1) - min(Ts, Tf)) > TINY
-         %    zD = sqrt((k_eff(1) * dt * (T(1) - min(Ts, Tf))) ...
-         %       / (cv_ice * f_ice(1) + cv_liq * f_liq(1) * (T(1) - xT1)));
-         %    % zD = sqrt(k_eff(1) * dt / (cv_ice * f_ice(1) + cv_liq * f_liq(1)));
-         % end
-
          assertF(@() dt_sum < dt_FULL_STEP + 2 * TINY)
 
          % SAVE OUTPUT IF SPINUP IS FINISHED
@@ -182,8 +165,6 @@ function [ice1, ice2, numfail] = icemodel(opts)
          % MOVE TO THE NEXT TIMESTEP
          [metiter, subiter, dt] = NEXTSTEP(metiter, subiter, ...
             dt, dt_FULL_STEP, maxsubiter, OK);
-
-         numfail(iter) = subfail;
 
       end % timesteps (one year)
 
