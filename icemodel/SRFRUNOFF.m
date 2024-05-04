@@ -1,5 +1,7 @@
 function ice1 = SRFRUNOFF(ice1,ro_liq,Ls,Lf,dt)
    %SRFRUNOFF compute surface runoff
+   %
+   %#codegen
 
    % init arrays
    mlt = zeros(size(ice1.Qe));
@@ -34,15 +36,13 @@ function rof = SURFRUNOFF(ice1,opts)
    melt/freeze/cond were computed in (I think) ICEABLATION and added to ice1 on
    each timestep. This could be revived to experiment with a simple
    surface-based parameterization of refreezing.
-
-   lag = opts.tlagsurf;
    mlt = ice1.melt;
    frz = ice1.freeze;
    con = ice1.cond;
    rof = zeros(size(mlt));
 
-   for n = 1+lag:length(mlt)
-      mltsumlag = sum(mlt(n-lag:n) + con(n-lag:n));
+   for n = 1+opts.tlag:length(mlt)
+      mltsumlag = sum(mlt(n-opts.tlag:n) + con(n-opts.tlag:n));
       potrunoff = con(n) + mlt(n);
       potfreeze = min(frz(n),mltsumlag);
       potfreeze = max(potfreeze,0.0);

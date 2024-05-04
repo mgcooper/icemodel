@@ -18,6 +18,8 @@ function [Qm, Qf] = MFENERGY(albedo, Qsi, Qli, Qle, Qh, Qe, Qc, Qa, Ts, ...
    %  freezing case below.
    %
    % See also:
+   %
+   %#codegen
 
    Qm = 0.0;
    Qf = 0.0;

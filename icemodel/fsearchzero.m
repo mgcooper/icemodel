@@ -1,5 +1,7 @@
 function [z, exitflag, ok] = fsearchzero(f, z0, A, B, z, tol)
-   %FSEARCHZERO search for root of nonlinear function %#codegen
+   %FSEARCHZERO search for root of nonlinear function
+   %
+   %#codegen
 
    [a, b] = fzero_guess_to_bounds(f, z0, A, B); exitflag = -6; ok = false;
    if ~isnan(a)

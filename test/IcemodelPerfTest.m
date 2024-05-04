@@ -2,19 +2,19 @@ classdef IcemodelPerfTest < matlab.perftest.TestCase
 
    properties
       opts
-      savedata = false;
-      sitename = 'behar';
+      saveflag = false;
+      sitename = 'kanm';
       forcings = 'kanm';
-      userdata = 'modis';
+      userdata = [];
       uservars = 'albedo';
-      smbmodel = 'icemodel';
+      smbmodel = 'skinmodel';
       simyears = 2016;
    end
 
    properties (TestParameter)
       solver = {1, 2, 3}
    end
-   
+
    methods(TestMethodSetup)
       function setOpts(testCase)
 
@@ -25,7 +25,7 @@ classdef IcemodelPerfTest < matlab.perftest.TestCase
             testCase.forcings, ...
             testCase.userdata, ...
             testCase.uservars, ...
-            testCase.savedata);
+            testCase.saveflag);
       end
    end
 
@@ -33,10 +33,14 @@ classdef IcemodelPerfTest < matlab.perftest.TestCase
       function testSolver(testCase, solver)
 
          testCase.opts.solver = solver;
-         
+
          % standard approach (for "slow" code)
          testCase.startMeasuring
-         icemodel(testCase.opts);
+         if testCase.smbmodel == "icemodel"
+            icemodel(testCase.opts);
+         elseif testCase.smbmodel == "skinmodel"
+            skinmodel(testCase.opts);
+         end
          testCase.stopMeasuring
       end
    end

@@ -3,6 +3,8 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
    %SFCTEMP Solve the energy balance for surface temperature
    %
    % This function uses a traditional Newton-Rhapson iteration to find Tsfc
+   %
+   %#codegen
 
    persistent tol maxiter
    if isempty(tol)

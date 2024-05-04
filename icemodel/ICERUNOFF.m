@@ -13,16 +13,13 @@ function ice1 = ICERUNOFF(ice1,ice2,opts)
       melt(n) = sum(dz(1).*df_liq(df_liq(:,n)>0, n));
       freeze(n) = sum(-dz(1).*df_liq(df_liq(:,n)<0, n));
    end
-
-   tlag = opts.tlagcolumn;
    runoff = zeros(size(melt));
-
-   for n = 1+tlag:length(melt)
-      meltsumlag = sum(melt(n-tlag:n));
+   for n = 1+opts.tlag:length(melt)
+      meltsum = sum(melt(n-opts.tlag:n));
       potrunoff = melt(n);
-      potfreeze = min(freeze(n),meltsumlag);
+      potfreeze = min(freeze(n),meltsum);
       potfreeze = max(potfreeze,0.0);
-      if meltsumlag > 0.0
+      if meltsum > 0.0
          netrunoff = potrunoff-potfreeze;
          runoff(n,1) = max(runoff(n-1)+netrunoff, 0.0);
       else

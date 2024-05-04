@@ -2,8 +2,7 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
       ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, liqflag, Ts, T, ...
       k_eff, dz, solver)
    %SEBSOLVE solve the surface energy balance for the skin temperature
-   %#codegen
-   % 
+   %
    % Solver options:
    % 0 = derivative-free, slower but more robust, thus used as a fall back.
    % 1 = newton-rhapson, fast, requires analytic derivative, used as a default.
@@ -21,6 +20,8 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
    %  - For a "skinmodel", Ts never exceeds Tf when passed into functions, but
    %  within the iterations of SFCTEMP and when it comes out of SFCTEMP it can
    %  exceed Tf.
+   %
+   %#codegen
 
    tol = 1e-3;
    maxiter = 100;

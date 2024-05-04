@@ -4,6 +4,8 @@ function [upwd, dnwd] = GETUPDOWN(a, r, x, I0, z_walls, M)
    % Compute the up/down flux at each depth from the two-stream solution vector x
    %
    % See also:
+   %
+   %#codegen
 
    % X = up, Y = down
    N = M+2;

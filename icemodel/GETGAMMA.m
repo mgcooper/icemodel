@@ -22,6 +22,8 @@ function [k_eff, k_vap] = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, varargin)
    %  ksnow / (ki_ref * ka_ref)
    %
    % See also: GETKTHERMAL, VAPORHEAT
+   %
+   %#codegen
 
    % Compute snow thermal k
    g_ice = ro_ice * f_ice;

@@ -3,6 +3,8 @@ function Qsi = SOLARIN(J_day_start, iter, dt, xlat, cloud_frac, ...
    %SOLARIN Compute the incoming solar radiation.
    %
    % This assumes a daily time step.
+   %
+   %#codegen
 
    J_day = iter + J_day_start - 1;
    Qsi_sum = 0.0;

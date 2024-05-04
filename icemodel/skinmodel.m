@@ -1,8 +1,10 @@
-function [ice1, ice2] = skinmodel(opts) %#codegen
+function [ice1, ice2] = skinmodel(opts)
    %SKINMODEL Surface energy balance model for glacier ice.
    %
    %
    % See also: icemodel
+   %
+   %#codegen
 
    % INITIALIZE THE MODEL
 
@@ -78,7 +80,7 @@ function [ice1, ice2] = skinmodel(opts) %#codegen
 
          % UPDATE SURFACE FLUXES
          k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
-         [Qe, Qh, Qc, Qm, Qf, balance] = SEBFLUX(T, Ts, tair(metiter), ...
+         [Qe, Qh, Qc, Qm, ~, balance] = SEBFLUX(T, Ts, tair(metiter), ...
             swd(metiter), lwd(metiter), albedo(metiter), wspd(metiter), ...
             ppt(metiter), tppt(metiter), psfc(metiter), De(metiter), ea, ...
             Tf, k_eff, dz, cv_air, cv_liq, roL, emiss, SB, chi, epsilon, ...

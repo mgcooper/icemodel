@@ -1,5 +1,7 @@
 function proplist = completions(funcname)
    %COMPLETIONS function completions
+   %
+   %#codegen
    switch lower(funcname)
 
       case 'completions'

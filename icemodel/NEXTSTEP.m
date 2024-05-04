@@ -1,5 +1,7 @@
 function [metiter, subiter, dt_new] = NEXTSTEP(metiter, subiter, ...
       dt_new, dt_max, maxsubiter, OK)
+   %
+   %#codegen
 
    % If convergence is successful, increase the timestep
    if OK

@@ -4,6 +4,8 @@ function ksnow = GETKTHERMAL(T, f_ice, ro_ice, ro_sno, opts)
    %
    %
    % See also: GETKVAPOR
+   %
+   %#codegen
 
    % gamma_ice is bulk density of ice i.e. 'dry snow density' [g/cm3]
    gam_ice = ro_ice.*f_ice;

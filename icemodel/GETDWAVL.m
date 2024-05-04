@@ -1,5 +1,7 @@
 function dwavl = GETDWAVL(wavelength, nwavl)
    %GETDWAVL Compute first derivative of wavelength
+   %
+   %#codegen
 
    dwavl = zeros(1, nwavl);
    dwavl(1) = 2.0 * (wavelength(1, 2) - wavelength(1, 1));

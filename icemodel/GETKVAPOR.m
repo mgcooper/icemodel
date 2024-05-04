@@ -12,6 +12,8 @@ function k_vap = GETKVAPOR(T, Ls, Rv, Tf)
    % with nd the 'temperature exponent', Anderson (1976) Eq. 3.13 (& Fig. 4.3)
    %
    % See also:
+   %
+   %#codegen
 
    % Coefficients over ice.
    A = 611.15; % reference vapor pressure [Pa]

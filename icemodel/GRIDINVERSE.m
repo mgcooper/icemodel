@@ -1,5 +1,7 @@
 function dQp = GRIDINVERSE(xynet,dz_spect,dz_therm,JJ_spect,JJ_therm)
    %GRIDINVERSE Transform absorbed solar from spectral grid to thermal grid
+   %
+   %#codegen
 
    % extrapolate xynet to the bottom of the thermal grid
    JJnew = JJ_therm*dz_therm/dz_spect;

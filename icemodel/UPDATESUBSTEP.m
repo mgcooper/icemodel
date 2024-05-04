@@ -2,6 +2,8 @@ function [T, f_ice, f_liq, dt_sum, dt_new, liqflag, roL, ro_sno, cp_sno] ...
       = UPDATESUBSTEP(T, f_ice, f_liq, dt_FULL_STEP, dt_sum, dt_new, TINY, ...
       ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs)
    %UPDATESUBSTEP Return past values, allocate timestep, and update state
+   %
+   %#codegen
 
    % Allocate this substep to the timestep
    dt_sum = dt_sum + dt_new;

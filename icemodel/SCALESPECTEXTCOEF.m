@@ -12,6 +12,8 @@ function spect_extcoefs = SCALESPECTEXTCOEF(spect_extcoefs,wavelength,kice,kabs)
    % Stephen G. Warren, Richard E. Brandt, and Thomas C. Grenfell Visible and
    % near-ultraviolet absorption spectrum of ice from transmission of solar
    % radiation into snow, Applied Optics, Vol. 45 No. 21
+   %
+   %#codegen
 
    wavel = wavelength(1,:);  % [um] (micrometers)
 

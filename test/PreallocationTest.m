@@ -68,7 +68,6 @@ classdef PreallocationTest < matlab.perftest.TestCase
                x(i) = 1;
             end
          end
-
          testCase.verifyNumElements(x,1e5)
       end
    end

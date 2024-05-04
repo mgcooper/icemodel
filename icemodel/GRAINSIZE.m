@@ -22,6 +22,8 @@ function diam = GRAINSIZE(JJ, dt, ro_sno, ...
    % Rw           -  Gas constant for water vapor (461.5) (j/kg-K)
    % ro_ice       -  Ice density (917.0) (kg/m^3)
    % ro_sno(JJ)   -  Nodal bulk snow density (kg/m^3)
+   %
+   %#codegen
 
    % These are the values at the control volume boundaries.
    %  T_layer_bndry(nz_max+1)
@@ -224,7 +226,7 @@ function diam = GRAINSIZE(JJ, dt, ro_sno, ...
          if f_liq(k) < 0.09
             % Eqn. 34a of SNTH89.
             diam(k) = diam(k) + grain_scale * dt * g2 ...
-               * (f_liq(k) + 0.05) / diam(k);-
+               * (f_liq(k) + 0.05) / diam(k);
          else
             % Eqn. 34b of SNTH89.
             diam(k) = diam(k) + grain_scale * dt * g2 ...

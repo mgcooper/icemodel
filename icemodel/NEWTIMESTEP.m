@@ -1,5 +1,7 @@
 function [dt_sum, subfail, OK, d_liq, d_evp, d_lyr] = NEWTIMESTEP(f_liq)
    %NEWTIMESTEP initialize new timestep
+   %
+   %#codegen
 
    OK = false;             % assume sub-step failed
    d_liq = 0.0 * f_liq;    % reset the change in liq water content

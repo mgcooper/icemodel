@@ -60,7 +60,7 @@ assert(isequal(v_ice, g_ice .* dz ./ ro_ice), 'Test Failed: bulkdensity to volum
 assert(isequal(v_liq, m_liq ./ ro_liq), 'Test Failed: mass to volume (v_liq)');
 assert(isequal(v_ice, m_ice ./ ro_ice), 'Test Failed: mass to volume (v_ice)');
 
-%% Conversion: Mass to Mass Fraction 
+%% Conversion: Mass to Mass Fraction
 [dz, m_liq, m_ice] = deal(1, 100, 100);
 totalMass = (m_liq + m_ice);
 [fm_liq, fm_ice] = icemodel.cvconvert('mass', 'massfraction', dz, [1 1], m_liq, m_ice);

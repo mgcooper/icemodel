@@ -1,5 +1,7 @@
 function x = TRISOLVE(low, mid, upp, rhs)
    %TRISOLVE Solve tridiagonal matrix equation Ax = b for x.
+   %
+   %#codegen
 
    % Initialize
    x = zeros(size(rhs));

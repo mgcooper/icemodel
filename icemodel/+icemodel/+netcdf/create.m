@@ -1,4 +1,4 @@
-function varargout = create(filename, createMode, opts, ncprops, ncatts)
+function varargout = create(filename, createMode, kwargs, ncprops, ncatts)
    %CREATE Create a new NetCDF file with specified properties and global attributes.
    %
    %  NCID = ICEMODEL.NETCDF.CREATE(FILENAME, OPTS, NCPROPS)
@@ -60,7 +60,7 @@ function varargout = create(filename, createMode, opts, ncprops, ncatts)
          'NETCDF4', 'CLASSIC_MODEL'})} = 'NETCDF4'
 
       % Local function options
-      opts.makebackups (1, 1) logical = true
+      kwargs.makebackups (1, 1) logical = true
 
       % Netcdf property values
       ncprops.fillMode (1, :) char {mustBeMember(ncprops.fillMode, ...
@@ -88,7 +88,7 @@ function varargout = create(filename, createMode, opts, ncprops, ncatts)
    end
 
    % Back up the file if it exists.
-   makeBackupFile(filename, opts.makebackups);
+   makeBackupFile(filename, kwargs.makebackups);
 
    % Create the netcdf file with specified format.
    ncid = netcdf.create(filename, createMode);

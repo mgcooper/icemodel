@@ -6,6 +6,8 @@ function [h_resid, h_avail, h_drain, h_ice, h_liq, h_air] = LIQAVAIL( ...
    % with scalar values, nominally in a loop or for the top layer, but it might
    % work fine with vectors. Noting this because this was once upon a time
    % called from MELT or REFREEZE, where a single layer was passed in at a time.
+   %
+   %#codegen
 
    % Update theta_resid
    if T_old < Tf; theta_resid = 0.0; end

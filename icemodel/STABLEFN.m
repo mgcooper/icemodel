@@ -22,6 +22,8 @@ function S = STABLEFN(Ta, Ts, wspd, scoef)
    % Units: [1]
    %
    % See also: WINDCOEF
+   %
+   %#codegen
 
    if (Ts < Ta) % Stable case (Ri > 0).
 

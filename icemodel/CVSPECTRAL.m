@@ -4,6 +4,8 @@ function [dz_cv, delz_p, z_node, z_edge, f, z_node_bc, dz_bc] = CVSPECTRAL(Z, dz
    % [dz_cv, delz_p, z_node, z_edge, f, z_node_bc, dz_bc] = CVSPECTRAL(Z, dz)
    %
    % See also: CVMESH
+   %
+   %#codegen
 
    % Note: this is replaced by CVMESH, but retained for reference.
 

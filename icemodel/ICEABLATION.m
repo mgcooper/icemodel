@@ -1,6 +1,6 @@
 function [surf_mlt, surf_frz, surf_sub, surf_con, surf_rof] = ICEABLATION( ...
       Qm,Qe,Qf,surf_mlt,surf_frz,surf_rof,surf_sub,surf_con,ro_liq,Lf,Ls,dt, ...
-      opts,dz,ro_ice,f_ice,f_liq) %#ok<*INUSD>
+      opts,dz,ro_ice,f_ice,f_liq)
    %ICEABLATION Calculate surface melt/freeze, sublimation, and ablation rate
    %
    % note:
@@ -9,6 +9,9 @@ function [surf_mlt, surf_frz, surf_sub, surf_con, surf_rof] = ICEABLATION( ...
    % fsubl = hsubl/ht = isubl*row/roi/ht; (see f_ice update in code above)
    %
    % See also:
+   %
+   %#ok<*INUSD>
+   %#codegen
 
    % add these back to replicate the original behavior if needed
    % f_ice, f_liq, imelt, isubl

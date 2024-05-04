@@ -37,6 +37,8 @@ function [dz, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz, g)
    %   [dz, delz, z_node, z_edge, f, z_node_bc] = CVTHERMAL(10, 1);
    %
    % See also
+   %
+   %#codegen
 
    % Compute mesh edge positions
    if nargin < 3 || g == 1
@@ -73,7 +75,7 @@ function [dz, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz, g)
    end
 
    % Plot the mesh
-   % icemodel.plotmesh(Z, dz, g)
+   % icemodel.plot.mesh(Z, dz, g)
 
    % % Round all quantities to the nearest milimeter (except f)
    % [dz, delz, z_node, z_edge, z_node_bc, f] = deal( ...

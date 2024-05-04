@@ -17,6 +17,8 @@ function [Q0, dz_spect, spect_N, spect_S, solardwavl] = EXTCOEFSINIT(opts, ro_ic
    % and up-down = net solar (or - solar_absorbed).
    %
    % See also:
+   %
+   %#codegen
 
    % The grain radii that can be used for the two-stream spectral model
    radii = [ ...
@@ -29,15 +31,19 @@ function [Q0, dz_spect, spect_N, spect_S, solardwavl] = EXTCOEFSINIT(opts, ro_ic
       4.000, 4.500, 5.000, 5.500, 6.000 ];
 
    % load the pre-defined Mie scattering values.
-   load(fullfile(opts.pathinput, 'spectral', 'mie.mat'), 'mie');
+   mie = load(fullfile(opts.pathinput, 'spectral', 'mie.mat'), 'mie');
+   mie = mie.mie;
 
    % load the proto-typical spectral irradiance profile
-   load(fullfile(opts.pathinput, 'spectral', 'solar.mat'), 'solar');
+   solar = load(fullfile(opts.pathinput, 'spectral', 'solar.mat'), 'solar');
+   solar = solar.solar;
 
    % load the user-defined kabs/kice if provided
    if opts.kabs_user == true
-      load(fullfile(opts.pathinput, 'spectral', 'kabs.mat'), 'kabs');
-      load(fullfile(opts.pathinput, 'spectral', 'kice.mat'), 'kice');
+      kabs = load(fullfile(opts.pathinput, 'spectral', 'kabs.mat'), 'kabs');
+      kice = load(fullfile(opts.pathinput, 'spectral', 'kice.mat'), 'kice');
+      kabs = kabs.kabs;
+      kice = kice.kice;
    else
       kabs = []; kice = [];
    end

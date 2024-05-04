@@ -1,4 +1,7 @@
 function bulkextcoefs(bulkcoefs)
+   %ICEMODEL.PLOT.BULKEXTCOEFS
+   %
+   % Call this from within BULKEXTCOEFS
 
    figure;
    try

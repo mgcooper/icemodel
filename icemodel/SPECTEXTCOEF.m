@@ -1,5 +1,7 @@
 function spect_coefs = SPECTEXTCOEF(opts,qext,g,ss_coalb,r_snow)
    %SPECTEXTCOEF compute the spectral extinction coefficients
+   %
+   %#codegen
 
    %  bulk ext coeffs are updated each timestep with changing ice density
    iradius = opts.i_grainradius;

@@ -3,5 +3,7 @@ function Qa = QADVECT(ppt,tppt,cv_liq)
    %
    %  Qa = QADVECT(ppt, tppt, cv_liq) Computes heat flux [W m-2] due to liquid
    %  water (ppt) [m] with temperature [K] advected onto the surface.
+   %
+   %#codegen
    Qa = cv_liq * ppt * tppt;
 end

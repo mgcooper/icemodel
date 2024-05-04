@@ -1,4 +1,4 @@
-function [q, dq_dtheta] = LIQFLUX(f_liq, f_ice, liqresid, grainsz) %#codegen
+function [q, dq_dtheta] = LIQFLUX(f_liq, f_ice, liqresid, grainsz)
    %LIQFLUX Compute the liquid water flux between snowpack layers.
    %
    % Parameters:
@@ -48,6 +48,8 @@ function [q, dq_dtheta] = LIQFLUX(f_liq, f_ice, liqresid, grainsz) %#codegen
    % liquid plus melted ice fraction.
    %
    % See also:
+   %
+   %#codegen
 
    % Note, in general, 2-7% of the pore space must be filled with water before
    % any can infiltrate, so when debugging, check that

@@ -18,6 +18,8 @@ function [es, des_dT, d2es_dT2, ro_vap, dro_vapdT, d2ro_vapdT2] = VAPPRESS2(T, l
    %  Units: [Pa = J m-3 = N m-2 = kg m-1 s-2]
    %
    % See also: VAPORHEAT
+   %
+   %#codegen
 
    %  Tf = 273.16 is the triple point temperature.
    %  es = vapor pressure in Pa. (1 mb = 100 Pa).

@@ -4,6 +4,8 @@ function Ts = MELTTEMP(Ts, Tf)
    %  Ts = MELTTEMP(Ts, Tf)
    %
    % See also: MFENERGY, ENBALANCE
+   %
+   %#codegen
 
    % if (depth_swe > 0.0 && Ts > Tf)
    if Ts > Tf

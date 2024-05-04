@@ -4,6 +4,8 @@ function [g, qext, ss_coalb, wavelength] = GETSCATTERCOEFS(opts, scattercoefs)
    % read in mie.dat and store g, qext, omega, and lambda
    %
    % See also:
+   %
+   %#codegen
 
    g = scattercoefs(1:opts.nradii, 1:opts.nwavl);
    qext = scattercoefs(opts.nradii+1:2*opts.nradii, 1:opts.nwavl);

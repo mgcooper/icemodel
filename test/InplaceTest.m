@@ -17,24 +17,24 @@ classdef InplaceTest < matlab.perftest.TestCase
 
          A = testCase.A;
          B = testCase.B;
-         
+
          while(testCase.keepMeasuring)
             A(:) = A(:) + B(:);
          end
       end
-      
+
       function test_notinplace(testCase)
 
          A = testCase.A;
          B = testCase.B;
-         
+
          while(testCase.keepMeasuring)
             A = A + B;
          end
       end
 
       % function testForLoop(testCase)
-      % 
+      %
       %    while(testCase.keepMeasuring)
       %       for i=1:1e5
       %          x(i) = 1;

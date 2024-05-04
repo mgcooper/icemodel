@@ -1,29 +1,25 @@
-# icemodel
+# IceModel
 
 **A 1-d radiative-thermodynamic heat transfer model that simulates meltwater runoff from glacier ice.**
 
-- [icemodel](#icemodel)
+- [IceModel](#icemodel)
   - [Background](#background)
-  - [Usage](#usage)
-  - [Model input](#model-input)
+  - [Getting Started](#getting-started)
+  - [Advanced Use](#advanced-use)
+  - [Input Data](#input-data)
+  - [Summary](#summary)
+  - [Naming Conventions](#naming-conventions)
     - [1. met files](#1-met-files)
     - [2. user data](#2-user-data)
-  - [Example model configuration](#example-model-configuration)
-  - [Code reference](#code-reference)
-  - [Data reference](#data-reference)
-    - [Input data](#input-data)
-    - [Output data](#output-data)
-  - [Contributing modeling software](#contributing-modeling-software)
-  - [Journal reference](#journal-reference)
   - [References](#references)
 
 ## Background
 
-`icemodel` is based on models of glacier ice and snowpack described in Liston et al (1999) and Jordan (1991) (*SNTHERM*). State variables are ice temperature and liquid water content, from which various hydrologic and thermodynamic quantities are computed, including the flux of meltwater runoff.
+`IceModel` is based on models of glacier ice and snowpack described in Liston et al (1999) and Jordan (1991) (*SNTHERM*). State variables are ice temperature and liquid water content, from which hydrologic and thermodynamic quantities are computed, including meltwater runoff.
 
-Following Liston et al (1999), `icemodel` uses the two-stream radiative transfer model described in Schlatter (1972), updated with spectral detail following Brandt and Warren (1993). The surface energy balance largely follows Liston et al (1999), including the turbulent flux parameterization based on Monin-Obukhov similarity theory (Monin & Obukhov, 1954). `icemodel` draws on both Liston et al (1999) and *SNTHERM* for thermodynamics, including the vapor diffusion parameterization, but implements an enthalpy conserving phase change numerical scheme described in Clark et al. (2021) and Swaminathan and Voller (1993).
+Following Liston et al (1999), `IceModel` uses the two-stream radiative transfer model described in Schlatter (1972), updated with spectral detail following Brandt and Warren (1993). The surface energy balance largely follows Liston et al (1999), including the turbulent flux parameterization based on Monin-Obukhov similarity theory (Monin & Obukhov, 1954). `IceModel` draws on both Liston et al (1999) and *SNTHERM* for subsurface thermodynamics, including the vapor diffusion parameterization, but implements an enthalpy-conserving phase change numerical scheme described in Clark et al. (2021) and Swaminathan and Voller (1993).
 
-A detailed technical description is available here.
+A brief technical description is available [here](https://github.com/mgcooper/icemodel/blob/main/docs/IcemodelTechnicalDoc.pdf).
 
 <!-- `icemodel` solves the unsteady one-dimensional heat equation:
 
@@ -33,72 +29,79 @@ $$
 
 where *H* [J m$^{-3}$] is enthalpy, *t* [s] is time, *F* [W m$^{-2}$] is net heat flux along vertical dimension *z* [m], and *S* [W m$^{-3}$] is a source/sink term. -->
 
-## Usage
+## Getting Started
 
-The main program is `icemodel.m`. To get started, edit the configuration file in `icemodel/+icemodel/config.m` and set the global environment variables. Then open `icemodel/+icemodel/setopts.m` which is a function that sets run-specific model options and parameters. Then run the model by calling `icemodel.run.point(opts)`:
+Thanks for your interest. To get started, here's what we recommend.
 
-```[matlab]
-opts = icemodel.setopts(...)
-[ice1, ice2] = icemodel.run.point(opts)
-```
+- The main program is `icemodel/icemodel.m`. Open the function to get a sense for the model structure.
+- Open and run Example 1 in `demo/demo.m`. This will run an `IceModel` simulation for the KAN_M weather station, located on the Greenland ice sheet, for year 2016 on a 1-hr timestep.
+- Set `saveflag=true` and re-run Example 1. Notice how the `demo/output` directory is created, and the model output is saved there.
+- Set `backupflag=true` and re-run Example 1. Notice how the files are backed-up. By default, saveflag and backupflag are both false.
+
+## Advanced Use
+
+To set run-specific model options and parameters, open and edit the function `icemodel/+icemodel/setopts.m`. In your matlab terminal:
+
+- Type `edit icemodel.setopts` and press enter. Set the options and resave the function. Then run `icemodel.run.point` with the new options (see `demo.m` for an example of how to call `icemodel.run.point`).
+
+For extended use, specify the model input and output directories by editing the configuration function `icemodel/+icemodel/config.m`. By default, these directories are set to the top-level folders `input/` and `output/`. Note that the `.gitignore` file that ships with this repo ignores these folders.
 
 <!-- There are options in that script to save the model output and evaluate the results against observations. -->
 
 <!-- , such as which input forcing dataset to use, and whether to run `icemodel` or `skinmodel` -->
 
-The required inputs are in `inputs/`. These include the meteorological forcing data in `inputs/met/`, user data in `inputs/userdata/`, and the inputs to the two-stream model in `inputs/spectral/`. The spectral data inputs include values for the absorption coefficient of pure ice from Warren et al. 2008, in-situ absorption coefficients for glacier ice from Cooper et al. 2021, a proto-typical downwelling solar spectrum for the Arctic atmosphere generated with `ATRAN` (Lord, 1991), and a library of mie-scattering coefficients as described in Cooper et al. 2021. The "user data" directory contains alternative model forcing data that is "swapped out" with the standard model forcing to test hypotheses about processes and determine model sensitivity to forcings. For example, the user can select input forcing data generated from climate model output by setting the `opts.metfname` configuration parameter. This parameter points to the input meteorological forcing file in `inputs/met/`. The user can then override one or more of the forcing variables in this input file by setting `opts.userdata` and `opts.uservars` to point to an alternative forcing dataset. For example, `opts.userdata=modis` and `opts.uservars=albedo` would replace the albedo values in the input meteorological forcing file with modis albedo for the same time and location.
+## Input Data
 
-In summary:
+Example required inputs are in `demo/inputs`. These include the meteorological forcing data in `inputs/met`, user data in `inputs/userdata`, and the inputs to the two-stream spectral model in `inputs/spectral`.
+
+The `spectral` directory contains values for the absorption coefficient of pure ice from Warren et al. 2008, in-situ absorption coefficients for glacier ice from Cooper et al. 2021, a downwelling solar spectrum for the Arctic atmosphere generated with `ATRAN` (Lord, 1991), and a library of mie-scattering coefficients as described in Cooper et al. 2021. 
+
+The `userdata` directory contains alternative model forcing data that is "swapped out" with the standard model forcing to test hypotheses about processes and model sensitivity to forcings. For example, users can select input forcing data generated from climate model output by setting the `userdata` and `uservars` configuration parameters (see `demo/demo.m`), or swap weather station abledo with MODIS albedo. Setting `userdata=modis` and `uservars=albedo` would replace the albedo values in the input meteorological forcing file with modis albedo for the same time and location.
+
+## Summary
 
 1. Install this repo and place it on your Matlab path
-2. Download the input data (model forcing) from [Input data](#input-data)
-3. Edit and run the following scripts to run the model:
+2. Edit and run the following files
 
-| Script Name | Description | How to Run |
+| Function Name | Description | How to Run |
 | --- | --- | --- |
-| `icemodel.config` | global configuration settings | type `edit icemodel.config`, and edit the environment variables for your environment |
-| `icemodel.setopts` | run-specific model configuration | type `edit icemodel.setopts`, and set the desired model options |
-| `icemodel.run.point` | Script to run the model | Pass the `opts` struct returned by `icemodel.setopts` to the function (see the main example and `runscript`) |
-| `runscript` | Script to run and evaluate the model output | place this repo on your matlab path, edit and run the script |
+| `icemodel.config` | Set global configuration settings. | Type `edit icemodel.config` then press enter. Edit the environment variables and save the function. |
+| `icemodel.setopts` | Set run-specific model configuration. | Type `edit icemodel.setopts` then press enter. Edit the model options and save the function. |
+| `icemodel.run.point` | Run the model at a point. | See the example in `demo.m`, and the function arguments in `icemodel.run.point` for additional configuration. |
+| `demo.m` | Script to run and evaluate the model output. | Place this repo on your matlab path, edit and run the script. |
 
-## Model input
+## Naming Conventions
 
 ### 1. met files
 
-The met files are named using the following protocol:
-`met_SITENAME_FORCINGDATA_YYYY_TIMESTEP`
+The met (forcing) file naming convention is:
+`met_SITENAME_FORCINGS_YYYY_TIMESTEP`
 
 For example:
 
-`met_ak4_MAR_2009_1hr.mat` = met data for site ak4 from MAR forcings for year 2009 at a 1 hour timestep.
+`met_KANM_KANM_2016_1hr.mat` = met (forcing) data for site KAN-M with KAN-M forcings for year 2016 at a 1 hour timestep.
 
-`met_KANM_KANM_2009_15m.mat` = met data for site KAN-M from KAN-M forcings for year 2009 at a 15 minute timestep.
+`met_KANM_KANM_2016_15m.mat` = met (forcing) data for site KAN-M with KAN-M forcings for year 2016 at a 15 minute timestep.
 
-`met_KANM_MAR_2009_15m.mat` = met data for site KAN-M from MAR forcings for year 2009 at a 15 minute timestep.
+`met_KANM_MERRA_2016_15m.mat` = met (forcing) data for site KAN-M with MERRA-2 forcings for year 2016 at a 15 minute timestep.
 
 ### 2. user data
 
-The "userdata" files are named using the following protocol:
-`FORCINGDATA_SITENAME_YYYY`
+The "userdata" file naming convention is:
+`FORCINGS_SITENAME_YYYY`
 
 For example:
 
-`KANM_behar_2015.mat` = forcing data from the KAN-M weather station for site 'behar' for year 2015.
+`MERRA_KANM_2016.mat` = forcing data from the MERRA-2 climate model for the KAN-M weather station location for year 2016.
 
-`modis_behar_2015.mat` = modis albedo data for site 'behar' for year 2015.
-
-Say you want to run a simulation at the KAN-M weather station for year 2018 at a 15-m timesep (15 m is required for icemodel, 1 hr is suitable for skinmodel), but you want to use MODIS albedo instead of KAN-M albedo. You would use the following settings:
-
-    opts.metfname = 'met_KANM_KANM_2018_15m.mat';
-    opts.userdata = 'modis';
-    opts.uservars = 'albedo';
-
+<!-- 
 The function `METINIT.m` will then swap out the KAN-M albedo data in the met forcing data with the modis albedo.
 
-In practice, however, these options are set programmatically by passing the `sitename`, `forcingdata`, `userdata`, `uservars`, `meltmodel`, `startyear`, and `endyear` variables to the `icemodel_opts.m` function, which builds the `opts.metfname` string. The function `icemodel_run.m` is used to set these variables, pass them to `icemodel_opts.m`, and then pass `opts` to the main program `icemodel.m`.
+In practice, however, these options are set programmatically by passing the `sitename`, `forcingdata`, `userdata`, `uservars`, `meltmodel`, `startyear`, and `endyear` variables to the `icemodel_opts.m` function, which builds the `opts.metfname` string. The function `icemodel_run.m` is used to set these variables, pass them to `icemodel_opts.m`, and then pass `opts` to the main program `icemodel.m`. -->
 
-## Example model configuration
+<!-- ## Example model configuration
 
+```matlab
     % set the main configuration options
     sitename    = 'KANM';
     startyear   = 2018;
@@ -114,38 +117,39 @@ In practice, however, these options are set programmatically by passing the `sit
 
     % run the model
     [ice1,ice2,met,opts] = icemodel(opts);
+``` -->
 
-## Code reference
+<!-- ## Code reference -->
 
 <!-- will insert zenodo ref here -->
 <!-- Cooper, M G (2022). `icemodel` [code](https://doi.org/some-doi-number) -->
 
-## Data reference
+<!-- ## Data reference
 
 ### Input data
 
 | Data | Source| Download website | Usage |
 |-------|---------|-----------------|-----|
 | Climate data | MAR3.11 |  | model forcing |
-| Climate reanalysis | MERRA2 |  | model forcing |
+| Climate reanalysis | MERRA2 |  | model forcing | -->
 
-### Output data
+<!-- ### Output data
 
 Cooper, M G (2022). icemodel output [Data set](https://doi.org/some-doi-number)
 
 | Data | Format| Content | Usage |
 |-------|---------|-----------------|-----|
-| Runoff | netcdf | runoff | model output |
+| Runoff | netcdf | runoff | model output | -->
 
-## Contributing modeling software
+<!-- ## Contributing modeling software
 
 | Model | Version | Repository Link | DOI |
 |-------|---------|-----------------|-----|
-| ATRAN | version | link to code repository | link to DOI dataset |
+| ATRAN | version | link to code repository | link to DOI dataset | -->
 
-## Journal reference
+<!-- ## Reference
 
-Cooper, M G, et al. *Greenland Ice Sheet runoff reduced by meltwater refreezing in bare ice*, in revision ([preprint](https://assets.researchsquare.com/files/rs-842710/v1_covered.pdf?c=1631877020))
+Cooper, M G, et al. *Greenland Ice Sheet runoff reduced by meltwater refreezing in bare ice*, in revision ([preprint](https://assets.researchsquare.com/files/rs-842710/v1_covered.pdf?c=1631877020)) -->
 
 ## References
 

@@ -1,19 +1,19 @@
 function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
-      De, S, time] = METINIT(opts, ii)
+      De, S, time] = METINIT(opts, fileiter)
    %METINIT initialize the met file
    %
    %#codegen
 
    % The 2nd input is the index into the metfile name list generated in setopts
    if nargin < 2
-      ii = 1;
+      fileiter = 1;
    end
 
    % Load the met file
-   met = load(opts.metfname{ii}, 'met');
+   met = load(opts.metfname{fileiter}, 'met');
    met = met.met;
 
-   if strcmp('none', opts.userdata) == false
+   if ~strcmp('none', opts.userdata) && ~strcmp(opts.forcings, opts.userdata)
       met = swapMetData(met, opts);
    end
    met = prepareMetData(met, opts);
@@ -44,7 +44,7 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    end
 
    % Compute the wind transfer and stability coefficients
-   [De, S] = WINDCOEF(wspd, opts.z_0, opts.z_obs, opts.z_wind);
+   [De, S] = WINDCOEF(wspd, opts.z_0, opts.z_tair, opts.z_wind);
 end
 
 %%
@@ -97,7 +97,19 @@ function met = swapMetData(met, opts)
       end
 
    else
-      % Load the userdata and retime from hourly to 15 m if the met data is 15 m
+
+      % Most met files should have a MODIS column
+      if strcmp('modis', opts.userdata)
+         if isvariable('MODIS', met)
+            met.albedo = met.MODIS;
+
+         elseif isvariable('modis', met)
+            met.albedo = met.modis;
+         end
+         return
+      end
+
+      % Load the userdata and retime to 15 m if the met data is 15 m
       simyears = num2str(opts.simyears(1));
       userfile = [opts.userdata '_' opts.sitename '_' simyears '.mat'];
 

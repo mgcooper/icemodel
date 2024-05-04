@@ -1,5 +1,7 @@
 function Qsi = SOLARRAD(Jday,xlat,cloudfrac,xhour,slopeaz,sfcslope,transmiss)
    %SOLAR_RAD Compute the incoming solar radiation at the model timestep
+   %
+   %#codegen
 
    % Required constants.
    solar_const = 1370.;

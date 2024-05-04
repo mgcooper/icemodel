@@ -14,8 +14,8 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL(T, f_ice, ...
    % Update the water fraction
    f_wat = f_liq + f_ice * ro_ice / ro_liq;
 
-   % Update the melt-zone boundaries. These are the volumetric liquid fractions
-   % at T=TL and T=TH, given the current total water fraction.
+   % Update the melt-zone boundaries. These are the volumetric liquid 
+   % fractions at T=TL and T=TH, given the current total water fraction.
    f_liq_min = f_wat .* f_ell_min;
    f_liq_max = f_wat .* f_ell_max;
 
@@ -27,7 +27,7 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL(T, f_ice, ...
 
    % Store past values
    T_old = T;
-   f_liq_old = f_liq(1);
+   f_liq_old = f_liq;
 
    % Initialize current values
    T_iter = T_old + 2 * tol;
@@ -63,7 +63,7 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL(T, f_ice, ...
          break
       end
 
-      % Capture the past values
+      % Capture past values
       T_iter = T;
 
       % Solve the equation (predictor step)
@@ -76,18 +76,19 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL(T, f_ice, ...
       % If failure, return to the main program and shorten the timestep
       if OK == false; return; end
 
+      % Mass conservation check
       assertF(@() all(f_ice + f_liq * ro_liq / ro_ice <= 1 + eps))
 
-      % Relaxation - doesn't tend to improve convergence but keep for reference.
+      % Relaxation. Doesn't improve convergence but keep for reference.
       % T = alpha * T + (1 - alpha) * T_iter;
    end
 
    OK = iter < maxiter;
 
-   % Compute surface energy balance linearization error [K]
+   % Surface energy balance linearization error [K]
    % err0 = -(Fc + Fp * Ts) / a1 - (T(1) - Ts);
 
-   % Compute subsurface energy balance linearization error [K]
+   % Subsurface energy balance linearization error [K]
    err = (dt/dz(1) ...
       * (a2 * (T(2) - T(1)) ...
       + Fc + Fp * (Fc + a1 * T(1)) / (a1 - Fp) ...

@@ -51,7 +51,7 @@ function data = getvardata(filepath, varnames, dimdata, xtype, ...
    numcell = numel(gridcells);
 
    % Convert netcdf type to matlab type.
-   mtype = nctype2mat(xtype);
+   mtype = icemodel.netcdf.nctype2mat(xtype);
    if ismember(mtype, {'char', 'string', 'cell'})
       error( ...
          'Preallocation for %s is not supported in this function.', xtype);

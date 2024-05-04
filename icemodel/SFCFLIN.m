@@ -30,6 +30,8 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
    % F = Fc + Fp * T_new
    %
    % See also: SFCFLUX, SEBFLUX, SEBSOLVE
+   %
+   %#codegen
 
    if liqflag == true
       % Over water.

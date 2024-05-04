@@ -24,6 +24,8 @@ function [es, des_dT, T_dew] = VAPPRESS(T, Tf, liqflag, rh)
    % Units: [Pa = J m-3 = N m-2 = kg m-1 s-2]
    %
    % See also: VAPORHEAT
+   %
+   %#codegen
 
    % Not currently used, but could default to 100%
    % if nargin < 4

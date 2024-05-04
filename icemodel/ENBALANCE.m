@@ -3,6 +3,8 @@ function [Qm, Qf, Qh, Qe, Qc, Qle, balance, Ts, ea, ok] = ENBALANCE( ...
       chi, Ts, cv_air, cv_liq, emiss, SB, roL, scoef, epsilon, liqflag, ...
       Tflag, solver)
    %ENBALANCE compute the surface energy-balance and solve for tsfc
+   %
+   %#codegen
 
    % Atmospheric vapor pressure from relative humidity data.
    ea = VAPPRESS(Ta, Tf, liqflag) * rh / 100;

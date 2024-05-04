@@ -10,6 +10,8 @@ function rh = VAPPRESS2RH(ea, Ta, liqflag)
    %  Magnus formula: ea = A*exp(B*T/C+T)
    %
    % See also: VAPPRESS
+   %
+   %#codegen
 
    if liqflag == true
       % Over water.

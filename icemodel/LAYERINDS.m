@@ -1,5 +1,7 @@
-function [j1,j2] = LAYERINDS(ji,f_ice) %#codegen
+function [j1,j2] = LAYERINDS(ji,f_ice)
    %LAYERINDS compute layer indices to merge
+   %
+   %#codegen
 
    j1 = ji; % first layer to merge
 

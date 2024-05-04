@@ -6,6 +6,8 @@ function Qc = CONDUCT(k_eff, T, dz, Ts, level)
    %  Units: [W m-2] = [W m-1 K-1] * [K] * [m-1]
    %
    % See also: ENBALANCE, SEBSOLVE, SFCTEMP, MFENERGY
+   %
+   %#codegen
 
    if nargin < 5
       level = 1;

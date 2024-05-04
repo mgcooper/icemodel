@@ -1,4 +1,4 @@
-function [ice1, ice2, numfail] = icemodel(opts) %#codegen
+function [ice1, ice2, numfail] = icemodel(opts)
    % ICEMODEL Simulate the phase change process in glacier ice.
    %
    % This function models the phase change process in melting glacier ice. It
@@ -31,6 +31,8 @@ function [ice1, ice2, numfail] = icemodel(opts) %#codegen
    % met   - Struct containing the meteorological data used for the simulation.
    %
    % See also: ICEMODEL.SETOPTS
+   %
+   %%#codegen
 
    %% INITIALIZE THE MODEL
 

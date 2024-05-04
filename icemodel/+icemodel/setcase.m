@@ -9,7 +9,7 @@ function casename = setcase(forcings, userdata, uservars, ...
       simyear char = ''
    end
    if nargin == 3
-      casename = [forcings '_swap_' upper(userdata) '_' uservars];
+      casename = [forcings '_forcings_' upper(userdata) '_' uservars];
 
    elseif nargin == 6
 
@@ -19,6 +19,6 @@ function casename = setcase(forcings, userdata, uservars, ...
       end
 
       casename = [smbmodel '_' sitename '_' simyear '_' upper(forcings) ...
-         '_swap_' upper(userdata) '_' uservars '.mat'];
+         '_forcings_' upper(userdata) '_' uservars '.mat'];
    end
 end

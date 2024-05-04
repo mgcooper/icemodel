@@ -1,5 +1,7 @@
 function [Tair,Qsi,Qli,albedo,wspd,Pa,De,ea] = LOADMETDATA(met,iter,liqflag)
    %LOADMETDATA load the met data for this timestep
+   %
+   %#codegen
 
    Tair = met.tair(iter);
    wspd = met.wspd(iter);

@@ -1,6 +1,8 @@
 function [metiter, subiter, maxiter, maxsubiter, dt_new, dt_FULL_STEP, ...
       numyears, numspinup, simyears] = INITTIMESTEPS(opts, Time)
    %INITTIMESTEP initialize timestepping
+   %
+   %#codegen
 
    narginchk(0, 2)
 

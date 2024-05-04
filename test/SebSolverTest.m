@@ -8,6 +8,8 @@ classdef SebSolverTest < matlab.perftest.TestCase
       albedo
       psfc
       wspd
+      ppt
+      tppt
       rh
       ea
       k_eff
@@ -34,14 +36,16 @@ classdef SebSolverTest < matlab.perftest.TestCase
          testCase.albedo = 0.5;
          testCase.psfc = 8600;
          testCase.wspd = 5;
+         testCase.ppt = 0;
+         testCase.tppt = 274;
          testCase.rh = 80;
          testCase.ea = VAPPRESS(testCase.tair, 273.16, testCase.liqflag) ...
             .* testCase.rh/100;
          testCase.k_eff = 2;
 
          z_0 = 1e-3;
-         z_obs = 3;
-         [De, wcoef, scoef] = WINDCOEF(testCase.wspd, z_0, z_obs);
+         z_tair = 3;
+         [De, scoef, wcoef] = WINDCOEF(testCase.wspd, z_0, z_tair);
 
          testCase.De = De;
          testCase.wcoef = wcoef;
@@ -61,16 +65,17 @@ classdef SebSolverTest < matlab.perftest.TestCase
    methods(Test)
       function testSolver(testCase, solver)
 
-         [cv_air, emiss, SB, Tf, roL] = icemodel.physicalConstant(...
-            "cv_air", "emiss", "SB", "Tf", "roLv");
+         [cv_air, cv_liq, emiss, SB, Tf, roL] = icemodel.physicalConstant(...
+            "cv_air", "cv_liq", "emiss", "SB", "Tf", "roLv");
 
          % standard approach (for "slow" code)
          while(testCase.keepMeasuring)
             Tsfc = SEBSOLVE(testCase.tair, testCase.swd, testCase.lwd, ...
-               testCase.albedo, testCase.De, testCase.psfc, testCase.wspd, ...
-               testCase.ea, cv_air, emiss, SB, Tf, testCase.chi, roL, ...
-               testCase.scoef, testCase.Qc, testCase.liqflag, testCase.tair, ...
-               testCase.T, testCase.k_eff, testCase.dz, solver);
+               testCase.albedo, testCase.wspd, testCase.ppt, testCase.tppt, ...
+               testCase.psfc, testCase.De, testCase.ea, cv_air, cv_liq, ...
+               emiss, SB, Tf, testCase.chi, roL, testCase.scoef, ...
+               testCase.liqflag, testCase.tair, testCase.T, testCase.k_eff, ...
+               testCase.dz, solver);
          end
       end
    end

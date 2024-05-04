@@ -25,6 +25,8 @@ function Tdew = TDEW(T, rh, liqflag)
    %   Tdew = TDEW(20, 50);
    %
    % See also:
+   %
+   %#codegen
 
    if nargin < 3
       liqflag = true;

@@ -11,6 +11,8 @@ function [al, bl, cl, as, bs, cs] = VAPORINIT()
    % https://romps.berkeley.edu/papers/pubdata/2020/dewpoint/20dewpoint.pdf
    %
    % See also:
+   %
+   %#codegen
 
    % Define the constants following Ambaum 2020.
    T0 = 273.16;   % Reference temperature (Triple point of water) [K]

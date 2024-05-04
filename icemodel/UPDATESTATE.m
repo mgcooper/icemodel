@@ -8,6 +8,8 @@ function [k_eff, ro_sno, cp_sno, dFdT, drovdT, H, ro_vap] = UPDATESTATE( ...
    % volumetric heat capacities [J/m3/K]
    % cv_ice = cp_ice * ro_ice
    % cv_liq = cp_liq * ro_liq
+   %
+   %#codegen
 
    % Bulk density (pt) (eq 3) [kg m-3]
    ro_sno = ro_ice * f_ice + ro_liq * f_liq + ro_air * (1.0 - f_liq - f_ice);

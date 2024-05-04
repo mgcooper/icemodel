@@ -27,6 +27,8 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = GECOEFS(T, f_ice, f_liq, dHdT, ...
    % The same result is found using Jordan's definition of Pmelt and gv/gk.
    %
    % See also: ICEENBAL, TRISOLVE
+   %
+   %#codegen
 
    % Commented statements are kept for reference. In some cases they are needed
    % but are set when initialized e.g. the gv/gk/dFdT BCs, in other cases they

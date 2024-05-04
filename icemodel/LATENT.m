@@ -11,5 +11,7 @@ function Qe = LATENT(De, S, ea, es, roL, epsilon, Pa)
    % (2-m) vapor pressure, es surface saturation vapor pressure.
    %
    % See also: SENSIBLE
+   %
+   %#codegen
    Qe = roL * De * S * (epsilon / Pa * (ea - es));
 end

@@ -15,6 +15,8 @@ function [Fsfc, Fdot] = SFCFLUX(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
    % SOLAR_HEAT. if chi ~= 0, then the portion allocated to the 'skin' is
    % included. This portion represents the longwave energy that does not
    % penetrate the surface more than a mm at most.
+   %
+   %#codegen
 
    % gather terms in the SEB equation. Note that Qc = 0 for Nuemann bc.
    AAA = cv_air * De;                              % [W m-2 K-1]

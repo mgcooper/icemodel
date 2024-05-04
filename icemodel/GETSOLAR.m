@@ -6,6 +6,8 @@ function [solar, Q0] = GETSOLAR(solar, nvalues, wavelength, dwavelen)
    % then integrate it to compute Q0.
    %
    % See also:
+   %
+   %#codegen
 
    isolarvals = size(solar, 1);
    wavel_tmp = solar(:, 1);

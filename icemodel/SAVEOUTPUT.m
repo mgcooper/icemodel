@@ -1,5 +1,7 @@
 function [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, vars1, vars2, data1, data2)
    %SAVEOUTPUT
+   %
+   %#codegen
 
    % Note: the order of vars1 and vars2 (set in icemodel.setopts) must match the
    % order of data1, data2 (passed in from icemodel main). It's fine if more

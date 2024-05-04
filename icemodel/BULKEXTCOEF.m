@@ -4,6 +4,8 @@ function bulkcoefs = BULKEXTCOEF(dz_spect, ro_sno, spect_N, spect_S, solardwavl)
    %  bulkcoefs = BULKEXTCOEF(dz_spect, ro_sno, spect_N, spect_S, solardwavl)
    %
    % See also:
+   %
+   %#codegen
 
    % Compute the downward bulk extinction coefficient, scaled by the total
    % ice equivalent thickness of each layer

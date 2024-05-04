@@ -1,6 +1,8 @@
 function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ...
       k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf, varargin)
    %SKINSOLVE Solve the 1-dimensional heat conduction equation
+   %
+   %#codegen
 
    % Solver options
    tol = 1e-2;

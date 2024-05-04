@@ -4,6 +4,8 @@ function Qle = LONGOUT(Ts, emiss, SB)
    %  Qle = LONGOUT(Ts, emiss, SB)
    %
    % See also: LONGIN, ENBALANCE, SEBFLUX
+   %
+   %#codegen
 
    Qle = -emiss * SB * Ts ^ 4; % [W m-2]
 end

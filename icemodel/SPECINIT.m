@@ -1,5 +1,7 @@
-function [radii,scattercoefs,solar,kabs,kice] = SPECINIT(opts)
+function [radii,mie,solar,kabs,kice] = SPECINIT(opts)
    %SPECINIT initialize the spectral coefficients
+   %
+   %#codegen
 
    % The grain radii that can be used for the two-stream spectral model
    radii = [ 0.040, 0.050, 0.065, 0.080, 0.100, ...
@@ -11,16 +13,19 @@ function [radii,scattercoefs,solar,kabs,kice] = SPECINIT(opts)
       4.000, 4.500, 5.000, 5.500, 6.000 ];
 
    % load the pre-defined Mie scattering values.
-   load(fullfile(opts.pathinput,'spectral','mie.mat'),'mie');
-   scattercoefs = mie; clear mie;
+   mie = load(fullfile(opts.pathinput,'spectral','mie.mat'),'mie');
+   mie = mie.mie;
 
    % load the proto-typical spectral irradiance profile
-   load(fullfile(opts.pathinput,'spectral','solar.mat'),'solar');
+   solar = load(fullfile(opts.pathinput,'spectral','solar.mat'),'solar');
+   solar = solar.solar;
 
    % load the user-defined kabs/kice if provided
    if opts.kabs_user == true
-      load(fullfile(opts.pathinput,'spectral','kabs.mat'),'kabs');
-      load(fullfile(opts.pathinput,'spectral','kice.mat'),'kice');
+      kabs = load(fullfile(opts.pathinput,'spectral','kabs.mat'),'kabs');
+      kice = load(fullfile(opts.pathinput,'spectral','kice.mat'),'kice');
+      kabs = kabs.kabs;
+      kice = kice.kice;
    else
       kabs = []; kice = [];
    end

@@ -27,6 +27,8 @@ function [Tw, flag] = SOLVEWB(Ta, rh, Ls, cp, Pa, liqflag)
    %   Tw = SOLVEWB(293, 50, 2.83e6, 1005, 101325)
    %
    % See also VAPPRESS
+   %
+   %#codegen
 
    if nargin < 6
       liqflag = false;

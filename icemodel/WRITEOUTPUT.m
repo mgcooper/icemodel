@@ -6,20 +6,23 @@ function WRITEOUTPUT(ice1, ice2, opts, thisyear, time, swd, lwd, albedo)
    % Save the data
    if opts.saveflag
 
-      % Post process
+      % Post process.
       [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time);
 
-      % Write the 1-d file
-      fname = ['ice1_' opts.casename];
-      save( ...
-         fullfile(opts.pathoutput, int2str(opts.simyears(thisyear)), fname), ...
-         'ice1', '-v7.3');
+      % Set the output path for this year.
+      filepath = fullfile(opts.pathoutput, int2str(opts.simyears(thisyear)));
 
-      % Write the 2-d file
-      fname = ['ice2_' opts.casename];
-      save( ...
-         fullfile(opts.pathoutput, int2str(opts.simyears(thisyear)), fname), ...
-         'ice2', '-v7.3');
+      % Write the 1-d file.
+      filename = ['ice1_' opts.casename '.mat'];
+      filename = fullfile(filepath, filename);
+      backupfile(filename, opts.backupflag);
+      save(filename, 'ice1', '-v7.3');
+
+      % Write the 2-d file.
+      filename = ['ice2_' opts.casename '.mat'];
+      filename = fullfile(filepath, filename);
+      backupfile(filename, opts.backupflag);
+      save(filename, 'ice2', '-v7.3');
    end
 
    % [ice1,ice2] = POSTPROC2(T_sfc,T_ice,frac_ice,frac_liq,df_liq, ...

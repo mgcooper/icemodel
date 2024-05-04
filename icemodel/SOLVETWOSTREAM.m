@@ -1,5 +1,7 @@
 function xynet = SOLVETWOSTREAM(a,r,bulkcoefs,total_solar,albedo,z_walls)
    %SOLVETWOSTREAM Solve the two-stream model following Schlatter, 1972 method
+   %
+   %#codegen
 
    % notation here roughly follows Schlatter
    M = length(z_walls)-1;

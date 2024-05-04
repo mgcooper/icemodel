@@ -33,7 +33,7 @@ function writeice2(ncid, datapath, varnames, dimdata, xtype, smbmodel, maxGB)
 
    % Write in chunks of numcells, where numcells maximizes in-memory array size.
    numcells = icemodel.netcdf.maxcells(maxGB, dimsizes.depth, dimsizes.time, ...
-      numel(varnames), nctype2mat(xtype));
+      numel(varnames), icemodel.netcdf.nctype2mat(xtype));
 
    for startcell = 1:numcells:numel(dimdata.gridcell)
 

@@ -1,13 +1,12 @@
 # icemodel stuff
-# input/
-# output/
-# data/
-# *config.m - this was a bad idea, config files got deleted when I renamed functions/ to icemodel/
-# fortunately they were preserved when I pulled on personal so I recommitted them
-
-*~
+input/
+output/
+# demo/input # allow for example data
+demo/output
+data/
 
 # Mac stuff
+*~
 .DS_Store
 Desktop.ini
 
@@ -30,7 +29,6 @@ Thumbs.db
 *.old
 
 # data
-data/
 *.xlsx
 *.xlsb
 *.xls
@@ -38,7 +36,6 @@ data/
 # todo lists
 todo.md
 TODO.md
-
 
 
 # # I added these then commented them out b/c it's impossible to know if this is always desirable. Will need to manage on a case by case basis by adding to local ignore files
