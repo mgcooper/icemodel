@@ -1,9 +1,6 @@
 # icemodel stuff
 input/
 output/
-# demo/input # allow for example data
-demo/output
-data/
 
 # Mac stuff
 *~
