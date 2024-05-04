@@ -56,7 +56,7 @@ Example required inputs are in `demo/inputs`. These include the meteorological f
 
 The `spectral` directory contains values for the absorption coefficient of pure ice from Warren et al. 2008, in-situ absorption coefficients for glacier ice from Cooper et al. 2021, a downwelling solar spectrum for the Arctic atmosphere generated with `ATRAN` (Lord, 1991), and a library of mie-scattering coefficients as described in Cooper et al. 2021. 
 
-The `userdata` directory contains alternative model forcing data that is "swapped out" with the standard model forcing to test hypotheses about processes and model sensitivity to forcings. For example, users can select input forcing data generated from climate model output by setting the `userdata` and `uservars` configuration parameters (see `demo/demo.m`), or swap weather station abledo with MODIS albedo. Setting `userdata=modis` and `uservars=albedo` would replace the albedo values in the input meteorological forcing file with modis albedo for the same time and location.
+The `userdata` directory contains alternative model forcing data that is "swapped out" with the standard model forcing to test hypotheses about processes and model sensitivity to forcings. For example, users can select input forcing data generated from climate model output by setting the `userdata` and `uservars` configuration parameters (see `demo/demo.m`), or swap weather station albedo with MODIS albedo. Setting `userdata="modis"` and `uservars="albedo"` would replace the albedo values in the input meteorological forcing file with modis albedo for the same time and location.
 
 ## Summary
 
