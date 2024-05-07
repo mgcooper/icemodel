@@ -34,15 +34,20 @@ function varargout = config(kwargs, cfg)
       cfg.ICEMODELOUTPUTPATH = fullfile(demopath, "output");
    end
 
+   % Set userdata path relative to input/
    cfg.ICEMODELDATAPATH = fullfile(cfg.ICEMODELINPUTPATH, 'userdata');
+
+   % Toolbox metadata
    cfg.ICEMODEL_VERSION = icemodel.internal.version();
    cfg.ICEMODEL_REFERENCE = icemodel.internal.reference();
    cfg.ICEMODEL_CONTACT = icemodel.internal.contact();
 
+   % Set the environment variables
    for field = fieldnames(cfg)'
       setenv(field{:}, cfg.(field{:}))
    end
 
+   % Return the config if requested
    if nargout == 1
       varargout{1} = cfg;
    end
