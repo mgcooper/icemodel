@@ -3,8 +3,7 @@ function info = makencfile(datafile, datapath, savepath, smbmodel, forcings, ...
 
    arguments
       % required arguments
-      datafile (1, :) char {mustBeMember(datafile, ...
-         {'ice1', 'ice2', 'met'})}
+      datafile (1, :) char {mustBeMember(datafile, {'ice1', 'ice2', 'met'})}
       datapath (1, :) char {mustBeFolder}
       savepath (1, :) char {mustBeFolder}
       smbmodel (1, :) char {mustBeTextScalar}
@@ -14,19 +13,39 @@ function info = makencfile(datafile, datapath, savepath, smbmodel, forcings, ...
       simyears (:, :) double {mustBeNumeric}
 
       % optional arguments
-      opts.Z   (1, 1) double {mustBeNumeric} = 0
-      opts.dz  (1, 1) double {mustBeNumeric} = 0
-      opts.T   (1, 1) double {mustBeNumeric} = 8760
-      opts.dt  (1, 1) double {mustBeNumeric} = 3600
-      opts.timeunits (1, :) char {mustBeMember(opts.timeunits, ...
-         {'hours', 'seconds'})} = 'seconds'
-      opts.testwrite (1, 1) logical {mustBeNumericOrLogical} = true
-      opts.numcells (1, 1) {mustBeNumeric} = 10
-      opts.makebackups (1, 1) logical {mustBeNumericOrLogical} = true
-      opts.setchunks (1, 1) logical {mustBeNumericOrLogical} = false
+      opts.Z   (1, 1) double {mustBeNumeric} ...
+         = 0
 
-      opts.GetSizeFromData (1, :) logical {mustBeNumericOrLogical} = true
-      opts.GetSizeFromDims (1, :) logical {mustBeNumericOrLogical} = false
+      opts.dz  (1, 1) double {mustBeNumeric} ...
+         = 0
+
+      opts.T   (1, 1) double {mustBeNumeric} ...
+         = 8760
+
+      opts.dt  (1, 1) double {mustBeNumeric} ...
+         = 3600
+
+      opts.timeunits (1, :) char {mustBeMember(opts.timeunits, ...
+         {'hours', 'seconds'})} ...
+         = 'seconds'
+
+      opts.testwrite (1, 1) logical {mustBeNumericOrLogical} ...
+         = true
+
+      opts.numcells (1, 1) {mustBeNumeric} ...
+         = 10
+
+      opts.makebackups (1, 1) logical {mustBeNumericOrLogical} ...
+         = true
+
+      opts.setchunks (1, 1) logical {mustBeNumericOrLogical} ...
+         = false
+
+      opts.GetSizeFromData (1, :) logical {mustBeNumericOrLogical} ...
+         = true
+
+      opts.GetSizeFromDims (1, :) logical {mustBeNumericOrLogical} ...
+         = false
 
       % netcdf api options
       ncprops.format (1, :) char {mustBeMember(ncprops.format, ...
@@ -37,10 +56,17 @@ function info = makencfile(datafile, datapath, savepath, smbmodel, forcings, ...
       ncprops.xtype (1, :) char {mustBeMember(ncprops.xtype, ...
          {'NC_FLOAT', 'NC_DOUBLE', 'NC_INT64', 'NC_UINT64', 'NC_INT', ...
          'NC_UINT', 'NC_SHORT', 'NC_USHORT', 'NC_BYTE', 'NC_UBYTE', ...
-         'NC_CHAR', 'NC_STRING'})} = 'NC_DOUBLE'
-      ncprops.shuffle (1, 1) logical {mustBeNumericOrLogical} = true
-      ncprops.deflate (1, 1) logical {mustBeNumericOrLogical} = true
-      ncprops.deflateLevel (1, 1) double {mustBeNumeric} = 1
+         'NC_CHAR', 'NC_STRING'})} ...
+         = 'NC_DOUBLE'
+
+      ncprops.shuffle (1, 1) logical {mustBeNumericOrLogical} ...
+         = true
+
+      ncprops.deflate (1, 1) logical {mustBeNumericOrLogical} ...
+         = true
+
+      ncprops.deflateLevel (1, 1) double {mustBeNumeric} ...
+         = 1
    end
 
    % NC_INT64, NC_UINT64, NC_UINT, NC_USHORT, NC_UBYTE, NC_STRING only for nc4
