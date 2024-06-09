@@ -140,7 +140,7 @@ function [projectPath, ignoreFolder, localSourcePath, ...
 end
 
 function [requirementsList, urlList] = remoteDependencyList( ...
-      requiredFiles, projectPath, localsource, remotesource)
+      requiredFiles, projectPath, localSourcePath, remoteSourcePath)
    %REMOTEDEPENDENCYLIST Get a list of remote url's to function dependencies.
 
    % This operates on one file at a time
@@ -161,20 +161,25 @@ function [requirementsList, urlList] = remoteDependencyList( ...
 
       % If the required file exists in the local source repo, add it to the
       % requirementsList and build a full path to the remote file.
-      if contains(requiredFilePath, localsource)
+
+      % Note - this is problematic if the requiredFiles contain files which are
+      % not in localSourcePath e.g. if one project depends on another. So this
+      % needs to be refactored to work with localSourcePaths (plural).
+
+      if contains(requiredFilePath, localSourcePath)
 
          % Add file names to list of external depencies
          requirementsList(ifile) = requiredFileName;
 
          % Get the subfolder path relative to the top-level source repo
-         relativePath = erase(requiredFilePath, localsource);
+         relativePath = erase(requiredFilePath, localSourcePath);
          relativePath = strrep(relativePath, filesep , '/');
          if relativePath(1) == filesep
             relativePath = relativePath(2:end);
          end
 
          % Use '/' not fullfile b/c fullfile is platform specific
-         urlList(ifile) = remotesource + '/' + relativePath + '/' ...
+         urlList(ifile) = remoteSourcePath + '/' + relativePath + '/' ...
             + requirementsList(ifile);
       end
    end

@@ -88,8 +88,14 @@ function Requirements = getRequiredFiles(targetList, kwargs)
    % Call codetools.requiredFilesAndProducts on the file list
    [requiredFiles, requiredProducts] = processFileList(targetFiles);
 
+   % Remove required files which are listed twice - once because they already
+   % exist in the reference list, and again because they are
+   [requiredFiles, installedFiles] = detectInstalledFiles( ...
+      requiredFiles, referenceFiles);
+
    % Find missing files (required files not included in the project)
    missingFiles = setdiff(requiredFiles, referenceFiles);
+   missingFiles = setdiff(missingFiles, installedFiles);
    missingFiles = string(missingFiles);
    requiredFiles = string(requiredFiles);
 
@@ -102,6 +108,49 @@ function Requirements = getRequiredFiles(targetList, kwargs)
    Requirements.requiredFiles = requiredFiles;
    Requirements.requiredProducts = requiredProducts;
 end
+
+function [requiredFiles, installedFiles] = detectInstalledFiles( ...
+      requiredFiles, referenceFiles)
+
+   % If the required files exist both within the project (e.g. b/c they were
+   % already installed with this function) and elsewhere on the path (e.g. in
+   % the localSourcePath used by installRequiredFiles), they may be listed twice
+   % in requiredFiles, but only once in referenceFiles (the installed ones).
+   % This may occur b/c matlab.codetools.requiredFilesAndProducts finds them in
+   % localSourcePath first (b/c it is higher on the path), and then finds them
+   % in their installed location within the project. Then the setdiff above only
+   % removes the ones which are installed locally. The next step prunes the ones
+   % which exist locally but are listed as missing. Note, the desired behavior
+   % is unclear here - they could be reinstalled by default.
+
+   % installedFiles are the ones in localSourcePath, not the ones already in the
+   % toolbox b/c those are in referenceList.
+
+   % Extract file names without paths
+   [~, requiredFilenames] = fileparts(requiredFiles);
+   [~, referenceFilenames] = fileparts(referenceFiles);
+
+   % Find duplicates in requiredFilenames
+   [uniqueFilenames, ia, ic] = unique(requiredFilenames, 'stable');
+   duplicateIndices = setdiff(1:numel(requiredFilenames), ia);
+
+   % Filter to get filenames that appear more than once in requiredFiles
+   isDuplicate = accumarray(ic, 1) > 1;
+   duplicateFilenames = uniqueFilenames(isDuplicate);
+
+   % Find which of these duplicate filenames are also in the referenceFiles
+   installedFileIndices = ismember(requiredFilenames, duplicateFilenames) & ...
+      ismember(requiredFilenames, referenceFilenames);
+
+   % Extract the actual paths of these installed files from requiredFiles
+   installedDuplicateFiles = requiredFiles(installedFileIndices);
+
+   % Get the list of installed files (files identified as required but which
+   % already exist in the toolbox).
+   installedFiles = installedDuplicateFiles(~ismember(installedDuplicateFiles, ...
+      referenceFiles));
+end
+
 
 %% Local Functions
 function [requiredFiles, requiredProducts] = processFileList(fileList)
@@ -234,3 +283,4 @@ function fileList = validateFileList(fileList)
       end
    end
 end
+
