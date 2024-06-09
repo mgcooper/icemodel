@@ -35,7 +35,7 @@ function [f_ice, f_liq, d_con, xsubl] = ICESUBL(f_ice, f_liq, d_con, ...
    xsubl = 0;
 
    % Determine whether evaporation or sublimation occurs. Evaporation occurs if
-   % f_liq is > 0.02. Otherwise sublimation or condensation occurs.
+   % f_liq is > 0.02. Otherwise sublimation (or condensation) occurs.
    if f_liq_top > 0.02 || pevap > 0
 
       if pevap < 0 % evaporation
@@ -44,7 +44,6 @@ function [f_ice, f_liq, d_con, xsubl] = ICESUBL(f_ice, f_liq, d_con, ...
             % only residual water exists, send pevap to SUBL
             xevap = pevap;
 
-            % add metiter input to use this but it never triggered in tests
             %fprintf('metiter = %d, f_liq(1) < f_res\n',metiter)
 
          elseif abs(pevap) <= (f_liq_top - f_res) % availWater >= evap

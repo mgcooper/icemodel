@@ -40,8 +40,9 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    % model parameters
    opts.z_0             =  0.001;   % Surface aero. roughness length    [m]
-   opts.ro_snow_i       =  900.0;   % initial ice density               [kg/m3]
-   opts.f_liq_resid     =  0.07;    % residual pore water fraction      [-]
+   opts.ro_ice_init     =  900.0;   % initial ice density               [kg/m3]
+   opts.T_ice_init      = -8.0;     % initial ice temperature           [C]
+   opts.f_liq_resid     =  0.02;    % residual pore water fraction      [-]
 
    % solver options and timestepping / grid thickness
    if strcmp(smbmodel, 'icemodel')
@@ -54,8 +55,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.dt              = 3600;  % timestep (3600 or 900)               [s]
       opts.dz_thermal      = 0.04;  % dz for thermal heat transfer         [m]
       opts.dz_spectral     = 0.002; % dz for radiative heat transfer       [m]
-      opts.z0_thermal      = 12;    % domain thickness for heat transfer   [m]
-      opts.z0_spectral     = 4;     % domain thickness for rad transfer    [m]
+      opts.z0_thermal      = 20;    % domain thickness for heat transfer   [m]
+      opts.z0_spectral     = 8;     % domain thickness for rad transfer    [m]
       opts.f_ice_min       = 0.1;   % layer combination threshold (ice fraction)
 
    elseif strcmp(smbmodel, 'skinmodel')
