@@ -21,11 +21,11 @@ function varargout = enbal(ice1, met)
    % Replicate figure 12 in van As
    vars = {'swd', 'swu', 'lwd', 'lwu', 'shf', 'lhf', 'netr'};
    colors = [
-      0    0.0118    0.3569   % dark blue
+      0.0000    0.0118    0.3569   % dark blue
       0.0118    0.2627    0.8745   % blue
-      0.8980         0         0   % red
+      0.8980    0.0000    0.0000   % red
       0.9765    0.4510    0.0235   % orange
-      0.0118    0.2078         0   % dark green
+      0.0118    0.2078    0.0000   % dark green
       0.0824    0.6902    0.1020   % green
       0.4941    0.1176    0.6118]; % purple
 

@@ -9,7 +9,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    if nargin < 6  || isempty(uservars); uservars = 'albedo'; end
    if nargin < 7  || isempty(saveflag); saveflag = false; end
    if nargin < 8  || isempty(testname); testname = ''; end
-   if nargin < 9  || isempty(backupflag); backupflag= true; end
+   if nargin < 9  || isempty(backupflag); backupflag = true; end
 
    [smbmodel, sitename, forcings, userdata, uservars, testname] ...
       = convertStringsToChars(...
@@ -117,9 +117,9 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       % outside this function in a loop, to get ice1_1.mat, ice1_2.mat, and so
       % forth. Same for metfname. Writing to netcdf should eliminate this.
 
-      opts.pathinput = getenv('ICEMODELINPUTPATH');
+      opts.pathinput = getenv('ICEMODEL_INPUT_PATH');
       opts.pathoutput = fullfile( ...
-         getenv('ICEMODELOUTPUTPATH'), sitename, smbmodel);
+         getenv('ICEMODEL_OUTPUT_PATH'), sitename, smbmodel);
 
       if strcmp(sitename, 'sector')
          if strcmp(userdata, 'none')
@@ -133,9 +133,9 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       end
 
       assert(isfolder(opts.pathinput), ...
-         'ICEMODELINPUTPATH does not exist, set it using icemodel.config');
+         'ICEMODEL_INPUT_PATH does not exist, set it using icemodel.config');
 
-      % For test runs, option to create a subfolder in ICEMODELOUTPUTPATH
+      % For test runs, option to create a subfolder in ICEMODEL_OUTPUT_PATH
       if ~strcmp(opts.testname, 'none')
          opts.pathoutput = fullfile(opts.pathoutput, testname);
       end
@@ -149,8 +149,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
          icemodel.mkfolders(opts);
 
          % save the model opts
-         optsfile = fullfile(opts.pathoutput, 'opts', ...
-            ['opts_' opts.casename '.mat']);
+         optsfile = fullfile( ...
+            opts.pathoutput, 'opts', ['opts_' opts.casename '.mat']);
          backupfile(optsfile, backupflag);
          save(optsfile, 'opts');
       end

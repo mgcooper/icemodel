@@ -21,6 +21,9 @@ clc
 % format as the example one, save it in the input/met folder, and add the
 % sitename to the namelists in the icemodel.run.point arguments block.
 
+% Run setup() to add the project paths to the matlab path
+setup()
+
 % Source the project-level configuration.
 config = icemodel.config(casename="demo");
 
