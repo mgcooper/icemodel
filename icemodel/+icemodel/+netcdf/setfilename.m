@@ -9,7 +9,7 @@ function filename = setfilename(datafile, smbmodel, forcings, userdata, ...
       userdata (1, :) char {mustBeTextScalar}
       sitename (1, :) char {mustBeTextScalar}
       simyears (1, :) string % casts double to string
-      filepath (1, :) char {mustBeFolder} = getenv('ICEMODELOUTPUTPATH')
+      filepath (1, :) char {mustBeFolder} = getenv('ICEMODEL_OUTPUT_PATH')
       opts.extension (1, :) char {mustBeMember(opts.extension, {'nc', 'nc4'})} = 'nc4'
    end
 
