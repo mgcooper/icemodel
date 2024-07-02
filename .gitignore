@@ -2,6 +2,9 @@
 input/
 output/
 
+# vscode
+.vscode
+
 # Mac stuff
 *~
 .DS_Store

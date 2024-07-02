@@ -2,6 +2,8 @@
 
 **A 1-d radiative-thermodynamic heat transfer model for glacier ice.**
 
+[![Open in MATLAB Online](https://www.mathworks.com/images/responsive/global/open-in-matlab-online.svg)](https://matlab.mathworks.com/open/github/v1?repo=mgcooper/icemodel&file=demo/demo.m)
+
 - [IceModel](#icemodel)
   - [Background](#background)
   - [Getting Started](#getting-started)

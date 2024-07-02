@@ -16,7 +16,7 @@ function pathlist = setpath(pathtype, sitename, smbmodel, userdata, simyears, va
 
    switch pathtype
       case 'output'
-         pathlist = fullfile(getenv('ICEMODELOUTPUTPATH'), sitename, smbmodel, ...
+         pathlist = fullfile(getenv('ICEMODEL_OUTPUT_PATH'), sitename, smbmodel, ...
             userdata, simyears, varargin{:});
 
       case 'input'
