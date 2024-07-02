@@ -56,7 +56,11 @@ function varargout = physicalConstant(varargin)
       'fcp', 100, ...               % Freezing point depression constant [K-1]
       'scale_ht', 8434.5, ...       % Scale height assuming average temperature [m]
       'hrsperday', 24, ...          % Hours per day [hr]
-      'secperhr', 3600 ...          % Seconds per hour [s]
+      'secperhr', 3600, ...         % Seconds per hour [s]
+      'c0', 299792458, ...          % Speed of light in vacuum [m s-1]
+      'n_ice', 1.31, ...            % Refractive index (real) of ice
+      'n_liq', 1.33, ...            % Refractive index (real) of water
+      'n_air', 1.00  ...            % Refractive index (real) of air
       );
 
    % Assign derived values based on physical constants
