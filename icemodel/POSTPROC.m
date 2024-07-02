@@ -48,10 +48,7 @@ function varargout = POSTPROC(ice1, ice2, opts, varargin)
       [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo);
    end
 
-   % Convert surface and subsurface ice temperature from Kelvin to Celsius
-   % TODO: This is not right - this adds the triple point temperature. Besides
-   % there's no reason to convert to Celsius. But this must wait for the next
-   % release.
+   % Convert surface and subsurface ice temperature from Kelvin to Celsius.
    ice1.Tsfc = min(ice1.Tsfc - Tf, 0);
    ice2.Tice = min(ice2.Tice - Tf, 0);
 
