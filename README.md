@@ -17,6 +17,7 @@
     - [1. General conventions](#1-general-conventions)
     - [2. Met files](#2-met-files)
     - [3. User data files](#3-user-data-files)
+    - [4. Output files](#4-output-files)
   - [References](#references)
   - [System Requirements](#system-requirements)
   - [Installation Guide](#installation-guide)
@@ -133,6 +134,33 @@ For example:
 
 Each userdata file must contain a timetable named `Data` with column names matching the met file column-naming conventions. See the example met file in `demo/input/`.
 
+### 4. Output files
+
+IceModel produces two outputs: `ice1` and `ice2`, representing 1-dimensional and 2-dimensional data, respectively, with dimensions time and depth. The `ice1` data are saved in a `timetable` object and `ice2` are saved in a `struct` object. An IceModel simulation with `opts.saveflag` set true will save these two objects as well as the `opts` struct according to the following convention:
+
+- `ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY/ice1_FORCINGS_forcings_USERDATA_USERVARS.mat`
+- `ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY/ice2_FORCINGS_forcings_USERDATA_USERVARS.mat`
+- `ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/opts/opts_FORCINGS_forcings_USERDATA_USERVARS.mat`
+
+Here, `ICEMODEL_OUTPUT_PATH` is an environment variable set by the `icemodel.config` function, the lowercase "forcings" is a string literal used to join the `FORCINGS` and `USERDATA` string variables, and `SITENAME`, `SMBMODEL`, `FORCINGS`, `USERDATA`, and `USERVARS` are parameters passed to the `icemodel.setopts` function (either directly or indirectly via the helper function `icemodel.run.point`). One `YYYY` folder is created for each year in the `SIMYEARS` parameter passed to `icemodel.setopts`.
+
+Note that the `ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY` subfolders are generated automatically in the `icemodel.setopts` function if they do not exist.
+
+Example: An IceModel simulation for the KAN-M weather station location for years 2015:2016 using MERRA forcings, with `userdata='modis'` and `uservars='albedo'` will produce the following output files:
+
+`ICEMODEL_OUTPUT_PATH/kanm/icemodel/2015/ice1_merra_forcings_modis_albedo.mat`
+`ICEMODEL_OUTPUT_PATH/kanm/icemodel/2015/ice2_merra_forcings_modis_albedo.mat`
+`ICEMODEL_OUTPUT_PATH/kanm/icemodel/2016/ice1_merra_forcings_modis_albedo.mat`
+`ICEMODEL_OUTPUT_PATH/kanm/icemodel/2016/ice2_merra_forcings_modis_albedo.mat`
+`ICEMODEL_OUTPUT_PATH/kanm/icemodel/opts/opts_merra_forcings_modis_albedo.mat`
+
+If `userdata` and `uservars` are not supplied to `icemodel.setopts` or are supplied as empty arrays `[]`, or empty chars `''` (they are optional arguments but must be supplied as empty if subsequent arguments `saveflag` and/or `backupflag` are supplied), the filenames would be:
+
+`ICEMODEL_OUTPUT_PATH/kanm/icemodel/2015/ice1_merra_forcings_merra_albedo.mat`
+`ICEMODEL_OUTPUT_PATH/kanm/icemodel/2015/ice2_merra_forcings_merra_albedo.mat`
+
+Here, the `userdata` parameter takes on the value of the `forcings` parameter (`'merra'`), whereas the `uservars` parameter takes the value `'albedo'`, which is the default value set in `icemodel.setopts`. This reflects the focus of IceModel on studying the sensitivity of SMB models to ice albedo.
+
 <!-- 
 The function `METINIT.m` will then swap out the KAN-M albedo data in the met forcing data with the modis albedo.
 
@@ -223,7 +251,7 @@ Warren S G and Brandt R E 2008 *Optical constants of ice from the ultraviolet to
 - Runs on Windows 10, tested on R2017a.
 <!-- - Runs in Octave on MacOS Sonoma (Intel silicon), using Octave version 9.2. -->
 
-*Note that the main program `icemodel/icemodel.m` and core IceModel functions (UPPERCASE filenames in `icemodel/`), are written in a minimalist matlab style: all functions are compatible with code generation, all numerical methods employ custom hand-written solvers, there are no toolbox dependencies or modern matlab conveniences such as `arguments` parsers.
+*Note that the main program `icemodel/icemodel.m` and core IceModel functions (UPPERCASE filenames in `icemodel/`), are written in a minimalist matlab style: all functions are compatible with code generation, all numerical methods employ custom hand-written solvers, and there are no toolbox dependencies or modern matlab conveniences such as `arguments` input parsers.
 
 Exceptions to this style include namespace functions (e.g. `icemodel/+icemodel`), which by convention are helper functions not required by the numerical model. The `demo.m` script uses a modern matlab approach including name=value syntax (requires >=R2021a). The `arguments` parser used in `icemodel.run.point` requires >=R2019b. For users running pre-R2019b, see `demo/demo_pre_R2019.m`.
 
