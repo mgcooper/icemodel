@@ -1,4 +1,4 @@
-function varargout = config(kwargs)
+function varargout = config(varargin)
    %CONFIG Configure icemodel project paths.
    %
    %  CFG = ICEMODEL.CONFIG()
@@ -141,24 +141,8 @@ function varargout = config(kwargs)
    %
    % See also: icemodel icemodel.setopts icemodel.run
 
-   % Set default paths relative to the installation directory
-   arguments
-      kwargs.casename (1, :) string = string.empty()
-      kwargs.ICEMODEL_INPUT_PATH (1, :) string = icemodel.internal.fullpath('input')
-      kwargs.ICEMODEL_OUTPUT_PATH (1, :) string = icemodel.internal.fullpath('output')
-   end
-
-   % Override the default options for case "demo". Note to users: This option is
-   % included to create an isolated "demo/input" and "demo/output" directory
-   % structure in the top-level icemodel path. The "casename" option is not used
-   % for any other purpose.
-   if kwargs.casename == "demo"
-      demopath = icemodel.internal.fullpath("demo");
-      kwargs.ICEMODEL_INPUT_PATH = fullfile(demopath, "input");
-      kwargs.ICEMODEL_OUTPUT_PATH = fullfile(demopath, "output");
-   elseif ~isempty(casename)
-      warning('CASENAME argument currently only supports option "DEMO"')
-   end
+   % Input parsing
+   kwargs = parseinputs(varargin{:});
 
    % Set userdata path relative to input/
    kwargs.ICEMODEL_DATA_PATH = fullfile(kwargs.ICEMODEL_INPUT_PATH, 'userdata');
@@ -176,5 +160,40 @@ function varargout = config(kwargs)
    % Return the config if requested
    if nargout == 1
       varargout{1} = kwargs;
+   end
+end
+
+function kwargs = parseinputs(varargin)
+
+   % Set default paths relative to the installation directory
+   default_input_path = icemodel.internal.fullpath('input');
+   default_output_path = icemodel.internal.fullpath('output');
+
+   parser = inputParser();
+   parser.addParameter('casename', char.empty(), @isscalartext)
+   parser.addParameter('ICEMODEL_INPUT_PATH', default_input_path, @isscalartext)
+   parser.addParameter('ICEMODEL_OUTPUT_PATH', default_output_path, @isscalartext)
+   parser.parse(varargin{:})
+
+   % Override the default options for case "demo". Note to users: This option is
+   % included to create an isolated "demo/input" and "demo/output" directory
+   % structure in the top-level icemodel path. The "casename" option is not used
+   % for any other purpose.
+   if parser.Results.casename == "demo"
+      demopath = icemodel.internal.fullpath('demo');
+      kwargs.ICEMODEL_INPUT_PATH = fullfile(demopath, 'input');
+      kwargs.ICEMODEL_OUTPUT_PATH = fullfile(demopath, 'output');
+
+   elseif ~isempty(parser.Results.casename)
+      error('CASENAME argument currently only supports option "DEMO"')
+
+   else
+      kwargs.ICEMODEL_INPUT_PATH = parser.Results.ICEMODEL_INPUT_PATH;
+      kwargs.ICEMODEL_OUTPUT_PATH = parser.Results.ICEMODEL_OUTPUT_PATH;
+   end
+
+   if ~(exist(kwargs.ICEMODEL_INPUT_PATH, 'dir') == 7)
+      warning(['ICEMODEL_INPUT_PATH does not exist. ' ...
+         'Create it and save the required input files there.'])
    end
 end

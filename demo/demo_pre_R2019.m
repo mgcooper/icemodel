@@ -51,6 +51,6 @@ end
 % Run the post-processing step.
 [ice1, ice2, met] = POSTPROC(ice1, ice2, opts, simyears);
 
-% Create the demo plot of the surface energy balance compared with observed
-% forcings from the KAN-M weather station.
+% Create the demo plot comparing the simulated surface energy balance to the
+% observed values from the KANM weather station.
 icemodel.plot.enbal(ice1, met)

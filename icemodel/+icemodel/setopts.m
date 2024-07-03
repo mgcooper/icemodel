@@ -2,14 +2,78 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       userdata, uservars, testname, saveflag, backupflag)
    %SETOPTS Set model options
    %
+   %  opts = setopts(smbmodel, sitename, simyears, forcings, ...
+   %     userdata, uservars, testname, saveflag, backupflag)
    %
-   % See also: icemodel.config
+   % Inputs
+   %
+   %  SMBMODEL - "surface mass balance" model option. Options are "icemodel" or
+   %  "skinmodel". "icemodel" runs a subsurface energy balance with meltwater
+   %  storage and refreezing. "skinmodel" runs a "skin" surface energy balance
+   %  with meltwater production but no storage or refreezing.
+   %
+   %  SITENAME - a string scalar indicating the site name which is used to
+   %  locate the forcing data file and create the output file names.
+   %
+   %  SIMYEARS - a numeric scalar or vector of 4-digit years e.g. 2016, also
+   %  used to locate the correct forcing data file.
+   %
+   %  FORCINGS - a string scalar indicating the forcing data. Options are "mar",
+   %  "merra", and "racmo", indicating one of three climate models from which
+   %  icemodel forcing files have been created. Users who wish to add new
+   %  forcing files can update the icemodel.completions and arguments blocks
+   %  used throughout the repository.
+   %
+   %  USERDATA - (optional) a string scalar indicating the alternative forcing
+   %  data to be used in place of the forcing data in the forcing met file.
+   %  Options are "mar", "merra", "racmo", "modis", "kanl", and "kanm",
+   %  indicating three climate models, modis satellite albedo, and the kanl and
+   %  kanm weather stations. The default value is the value of the FORCINGS
+   %  parameter.
+   %
+   %  USERVARS - (optional) a string scalar indicating the variable name in the
+   %  userdata forcing file to be "swapped out" with the corresponding column in
+   %  the met forcing file. Any variable in the met file which also exists in
+   %  the userdata file can be swapped out, but only one variable can be swapped
+   %  out at a time.
+   %
+   %  TESTNAME - (optional) a string scalar indicating a unique run ID. If
+   %  supplied, an additional output folder will be nested under the
+   %  ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL default output folder structure.
+   %  This can be used to create an ensemble of model runs e.g.:
+   %     ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/run001
+   %     ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/run002
+   %     ...
+   %     ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/run00N
+   %
+   %  SAVEFLAG - (optional) a logical scalar indicating whether to save the
+   %  output data or not.
+   %
+   %  BACKUPFLAG - (optional) a logical scalar indicating whether to backup the
+   %  output files if they already exist.
+   %
+   % Outputs
+   %
+   %  OPTS - a struct containing the runtime model options.
+   %
+   % See also: icemodel.config icemodel.run.point
 
-   if nargin < 5  || isempty(userdata); userdata = 'none'; end
+   % Parse inputs
+   narginchk(4, 9)
+
+   if nargin < 5  || isempty(userdata); userdata = forcings; end
    if nargin < 6  || isempty(uservars); uservars = 'albedo'; end
    if nargin < 7  || isempty(testname); testname = ''; end
    if nargin < 8  || isempty(saveflag); saveflag = false; end
    if nargin < 9  || isempty(backupflag); backupflag = true; end
+
+   % Legacy option used 'none', set to forcings instead
+   if strcmp(userdata, 'none')
+      userdata = forcings;
+   end
+   if strcmp(testname, 'none')
+      testname = '';
+   end
 
    % convertStringsToChars in a pre-R2017b compatible way:
    args = {smbmodel, sitename, forcings, userdata, uservars, testname};
@@ -54,7 +118,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts.T_ice_init      = -8.0;     % initial ice temperature           [C]
    opts.f_liq_resid     =  0.02;    % residual pore water fraction      [-]
 
-   % solver options and timestepping / grid thickness
+   % solver, timestepping, and mesh options
    if strcmp(smbmodel, 'icemodel')
 
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
@@ -131,24 +195,17 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.pathoutput = fullfile( ...
          getenv('ICEMODEL_OUTPUT_PATH'), sitename, smbmodel);
 
+      % Custom option for gridded "sector"-scale runs.
       if strcmp(sitename, 'sector')
-         if strcmp(userdata, 'none')
-            % If userdata is "none", prevent creation of a "none" folder, use
-            % the forcings instead e.g. sector/icemodel/mar.
-            opts.pathoutput = fullfile(opts.pathoutput, forcings);
-         else
-            % e.g. sector/icemodel/modis.
-            opts.pathoutput = fullfile(opts.pathoutput, userdata);
-         end
+         % e.g. sector/icemodel/modis.
+         opts.pathoutput = fullfile(opts.pathoutput, userdata);
       end
 
       assert(exist(opts.pathinput, 'dir') == 7, ...
          'ICEMODEL_INPUT_PATH does not exist, set it using icemodel.config');
 
       % For test runs, option to create a subfolder in ICEMODEL_OUTPUT_PATH
-      if ~strcmp(opts.testname, 'none')
-         opts.pathoutput = fullfile(opts.pathoutput, testname);
-      end
+      opts.pathoutput = fullfile(opts.pathoutput, testname);
 
       % Create the casename. WRITEOUTPUT appends this to the base filenames.
       opts.casename = icemodel.setcase(forcings, userdata, uservars);
