@@ -42,6 +42,7 @@ where *H* [J m$^{-3}$] is enthalpy, *t* [s] is time, *F* [W m$^{-2}$] is net hea
 Thanks for your interest. To get started, here's what we recommend.
 
 - Check the [system requirements](#system-requirements) and [installation guide](#installation-guide).
+- If you do not have a MATLAB license, use a free one: [![Open in MATLAB Online](https://www.mathworks.com/images/responsive/global/open-in-matlab-online.svg)](https://matlab.mathworks.com/open/github/v1?repo=mgcooper/icemodel&file=demo/demo.m)
 - The main program is `icemodel/icemodel.m`. Open the function to get a sense for the model structure.
 - Open and run Example 1 in `demo/demo.m`. This will run an `IceModel` simulation for the KAN_M weather station, located on the Greenland ice sheet, for year 2016 on a 1-hr timestep.
 - Inspect the demo plot created by the call to `icemodel.plot.enbal`. The simulated energy fluxes should closely track the weather station values.
@@ -54,23 +55,26 @@ The examples in `demo.m` run IceModel in its "SkinModel" surface energy balance 
 
 ### Global configuration: Specify workspace paths
 
-Use the configuration function `icemodel/+icemodel/config.m` to specify the model input and output directories. By default, these directories are set to the top-level folders `input/` and `output/`. Note that the `.gitignore` file which ships with this repo ignores these folders.
+The model input and output directories default to the top-level folders `input/` and `output/` (note that the `.gitignore` in this repo ignores these folders).
 
-In your matlab terminal:
+To specify custom input and output directories, use the configuration function `icemodel/+icemodel/config.m`. In your matlab terminal:
 
-- Type `edit icemodel.config` and press enter. Read the detailed documentation to understand the model input and output directory structure, and how to set them programmatically.
+- Type `edit icemodel.config` and press enter.
+- Read the detailed documentation to understand the model input and output directory structure, and how to set them programmatically.
 
-Note that in `demo.m` the `casename` argument is passed to the configuration function: `cfg = icemodel.config(casename="demo")`. This sets the input and output folders to `demo/input` and `demo/output`. The `casename` argument to `icemodel.config` currently does not serve any other purpose.
+<!-- Note that in `demo.m` the `casename` argument is passed to the configuration function: `cfg = icemodel.config(casename="demo")`. This sets the input and output folders to `demo/input` and `demo/output`. The `casename` argument to `icemodel.config` currently does not serve any other purpose. -->
 
 ### Runtime configuration: Specify model options
 
 To set run-specific model options and parameters, open and edit the function `icemodel/+icemodel/setopts.m`. In your matlab terminal:
 
-- Type `edit icemodel.setopts` and press enter. Set the options and resave the function. Then run `icemodel.run.point` with the new options (see `demo.m` for an example of how to call `icemodel.run.point`).
+- Type `edit icemodel.setopts` and press enter.
+- Edit the options and resave the function.
+- Run the model with the new options (see `demo.m` for an example of how to call `icemodel.run.point` to run the model).
 
 ## Input Data
 
-Example required inputs are in `demo/inputs`. These include the meteorological forcing data in `inputs/met`, user data in `inputs/userdata`, and the inputs to the two-stream spectral model in `inputs/spectral`.
+Example input files are in `demo/inputs`. These include the meteorological forcing data in `inputs/met`, inputs to the two-stream spectral model in `inputs/spectral`, and optional "user data" in `inputs/userdata`.
 
 The `spectral` directory contains values for the absorption coefficient of pure ice from Warren et al. 2008, in-situ absorption coefficients for glacier ice from Cooper et al. 2021, a downwelling solar spectrum for the Arctic atmosphere generated with `ATRAN` (Lord, 1991), and a library of mie-scattering coefficients as described in Cooper et al. 2021.
 
@@ -87,7 +91,7 @@ To swap out a variable in the input met file with a variable in a userdata file,
 
 | Function Name | Description | How to Run |
 | --- | --- | --- |
-| `icemodel.config` | Set global configuration settings. | Type `edit icemodel.config` then press enter. Edit the environment variables and save the function. |
+| `icemodel.config` | Set global configuration settings. | Type `edit icemodel.config` then press enter. Set the environment variables programmatically as needed. |
 | `icemodel.setopts` | Set run-specific model configuration. | Type `edit icemodel.setopts` then press enter. Edit the model options and save the function. |
 | `icemodel.run.point` | Run the model at a point. | See the example in `demo.m`, and the function arguments in `icemodel.run.point` for additional configuration. |
 | `demo.m` | Script to run and evaluate the model output. | Place this repo on your matlab path, edit and run the script. |
@@ -96,7 +100,7 @@ To swap out a variable in the input met file with a variable in a userdata file,
 
 ### 1. General conventions
 
-- Lowercase is used exclusively in file names for operating system compatibility.
+- File names are in lowercase for operating system compatibility.
 - Non-standard characters in filename parts (e.g., "-", "&") are replaced with blanks. For example, sitename "KAN-M" becomes "kanm".
 
 <!-- - Version 7.3 MAT-files, which are based on the HDF5 format, are used for input and (by default) for output. For advanced usage -->
@@ -219,9 +223,9 @@ Warren S G and Brandt R E 2008 *Optical constants of ice from the ultraviolet to
 - Runs on Windows 10, tested on R2017a.
 <!-- - Runs in Octave on MacOS Sonoma (Intel silicon), using Octave version 9.2. -->
 
-*Note that the main program `icemodel/icemodel.m` and core IceModel functions (all of which are saved with UPPERCASE filenames in the `icemodel` folder), are written in minimalist matlab style: all functions are compatible with code generation, all numerical methods employ custom hand-written solvers, there are no toolbox dependencies or modern matlab conveniences such as `arguments` (requires >=R2019b).
+*Note that the main program `icemodel/icemodel.m` and core IceModel functions (UPPERCASE filenames in `icemodel/`), are written in a minimalist matlab style: all functions are compatible with code generation, all numerical methods employ custom hand-written solvers, there are no toolbox dependencies or modern matlab conveniences such as `arguments` parsers.
 
-Exceptions to this minimalist style include namespace functions e.g., functions in the `icemodel/+icemodel` namespace. By convention, these are helper functions which are not required by the numerical model. The `demo.m` script uses a modern matlab approach including name=value syntax (requires >=R2021a). The `arguments` input parser used in `icemodel.config` and `icemodel.run.point` requires >=R2019b.
+Exceptions to this style include namespace functions (e.g. `icemodel/+icemodel`), which by convention are helper functions not required by the numerical model. The `demo.m` script uses a modern matlab approach including name=value syntax (requires >=R2021a). The `arguments` parser used in `icemodel.run.point` requires >=R2019b. For users running pre-R2019b, see `demo/demo_pre_R2019.m`.
 
 If you encounter incompatibilities, please [open an issue](https://github.com/mgcooper/icemodel/issues).
 
