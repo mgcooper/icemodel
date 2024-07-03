@@ -28,12 +28,16 @@ function [fullpath_bk, filename_bk] = backupfile(filename, makecopy, makezip)
    end
 
    if ~isoctave && verLessThan('matlab', '9.3') % R2017b
-      isfolder = @(folder) exist(folder, 'dir') == 7;
-      isfile = @(file) exist(file, 'file') == 2;
-      convertStringsToChars = @(str) char(str);
+      folderexists = @(folder) exist(folder, 'dir') == 7;
+      fileexists = @(file) exist(file, 'file') == 2;
+      stringsToChars = @(str) char(str);
+   else
+      folderexists = @(folder) isfolder(folder);
+      fileexists = @(file) isfile(file);
+      stringsToChars = @(str) convertStringsToChars(str);
    end
 
-   filename = convertStringsToChars(filename);
+   filename = stringsToChars(filename);
    validateattributes(filename, {'char'}, {'row'}, mfilename, 'FILENAME', 1)
    validateattributes(makecopy, {'logical'}, {'scalar'}, mfilename, 'MAKECOPY', 2)
    validateattributes(makezip, {'logical'}, {'scalar'}, mfilename, 'MAKEZIP', 3)
@@ -53,21 +57,21 @@ function [fullpath_bk, filename_bk] = backupfile(filename, makecopy, makezip)
    fullpath_bk = fullfile(filepath, filename_bk);
 
    if makecopy
-      if ~isfile(fullpath) && ~isfolder(fullpath)
+      if ~fileexists(fullpath) && ~folderexists(fullpath)
          % This lets backupfile be called without if isfile() in the caller
          warning('No backup made. File not found: %s', fullpath)
          return
       end
-      if isfile(fullpath_bk) || isfolder(fullpath_bk)
+      if fileexists(fullpath_bk) || folderexists(fullpath_bk)
          warning('No backup made. Backup already exists: %s', fullpath_bk);
       else
          copyfile(fullpath, fullpath_bk);
 
          if makezip
             zip(fullpath_bk, fullpath_bk);
-            if isfolder(fullpath_bk)
+            if folderexists(fullpath_bk)
                rmdir(fullpath_bk, "s");
-            elseif isfile(fullpath_bk)
+            elseif fileexists(fullpath_bk)
                delete(fullpath_bk);
             end
             filename_bk = [filename_bk '.zip'];
