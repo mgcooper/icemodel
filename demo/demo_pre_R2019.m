@@ -17,7 +17,7 @@ setup()
 
 %% Example 1: KAN-M weather station in 2016
 
-% Set the run configuration
+% Set the run configuration.
 saveflag = false;
 sitename = 'kanm';
 forcings = 'kanm';
@@ -25,9 +25,7 @@ smbmodel = 'skinmodel';
 simyears = 2016:2016;
 backupflag = false;
 
-% Keep these options empty for this demonstration. The forcing data "swap"
-% functionality which uses userdata and uservars should be compatible with
-% R2017b, but not R2017a (due to isfolder/isfile at minimum).
+% Keep these options empty for this demonstration.
 userdata = [];
 uservars = [];
 testname = [];
@@ -38,7 +36,7 @@ testname = [];
 % used to perform each of these steps, with additional type checking via the
 % arguments block.
 
-% Set the model options
+% Set the model options.
 opts = icemodel.setopts(smbmodel, sitename, simyears, forcings, ...
    userdata, uservars, testname, saveflag, backupflag);
 
@@ -50,9 +48,9 @@ switch smbmodel
       tic; [ice1, ice2] = skinmodel(opts); toc
 end
 
-% Run the post-processing step
+% Run the post-processing step.
 [ice1, ice2, met] = POSTPROC(ice1, ice2, opts, simyears);
 
 % Create the demo plot of the surface energy balance compared with observed
-% forcings from the KAN-M weather station
+% forcings from the KAN-M weather station.
 icemodel.plot.enbal(ice1, met)
