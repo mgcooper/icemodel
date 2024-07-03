@@ -23,7 +23,7 @@ clc
 % format as the example one, save it in the input/met folder, and add the
 % sitename to the namelists in the icemodel.run.point arguments block.
 
-% Run setup() to add the project paths to the matlab path
+% Run setup() to add the project paths to the matlab path.
 setup()
 
 % Source the project-level configuration.
@@ -31,7 +31,7 @@ config = icemodel.config('casename', 'demo');
 
 %% Example 1: KAN-M weather station in 2016
 
-% Set the run configuration
+% Set the run configuration.
 saveflag = false;
 sitename = 'kanm';
 forcings = 'kanm';
@@ -39,7 +39,7 @@ smbmodel = 'skinmodel';
 simyears = 2016:2016;
 backupflag = false;
 
-% Run the model
+% Run the model.
 [ice1, ice2, met, opts] = icemodel.run.point(...
    "saveflag", saveflag, ...
    "sitename", sitename, ...
@@ -48,7 +48,8 @@ backupflag = false;
    "simyears", simyears, ...
    "backupflag", backupflag);
 
-% Demo plot
+% Create the demo plot comparing the simulated surface energy balance to the
+% observed values from the KANM weather station.
 icemodel.plot.enbal(ice1, met)
 
 %% Example 2 - Replace KAN-M albedo with MODIS albedo
