@@ -8,13 +8,18 @@
   - [Background](#background)
   - [Getting Started](#getting-started)
   - [Advanced Use](#advanced-use)
+    - [Global configuration: Specify workspace paths](#global-configuration-specify-workspace-paths)
+    - [Runtime configuration: Specify model options](#runtime-configuration-specify-model-options)
   - [Input Data](#input-data)
   - [User Data](#user-data)
   - [Summary](#summary)
   - [Naming Conventions](#naming-conventions)
-    - [1. met files](#1-met-files)
-    - [2. user data](#2-user-data)
+    - [1. General conventions](#1-general-conventions)
+    - [2. Met files](#2-met-files)
+    - [3. User data files](#3-user-data-files)
   - [References](#references)
+  - [System Requirements](#system-requirements)
+  - [Installation Guide](#installation-guide)
 
 ## Background
 
@@ -36,22 +41,32 @@ where *H* [J m$^{-3}$] is enthalpy, *t* [s] is time, *F* [W m$^{-2}$] is net hea
 
 Thanks for your interest. To get started, here's what we recommend.
 
+- Check the [system requirements](#system-requirements) and [installation guide](#installation-guide).
 - The main program is `icemodel/icemodel.m`. Open the function to get a sense for the model structure.
 - Open and run Example 1 in `demo/demo.m`. This will run an `IceModel` simulation for the KAN_M weather station, located on the Greenland ice sheet, for year 2016 on a 1-hr timestep.
+- Inspect the demo plot created by the call to `icemodel.plot.enbal`. The simulated energy fluxes should closely track the weather station values.
 - Set `saveflag=true` and re-run Example 1. Notice how the `demo/output` directory is created, and the model output is saved there.
 - Set `backupflag=true` and re-run Example 1. Notice how the files are backed-up. By default, saveflag and backupflag are both false.
 
+The examples in `demo.m` run IceModel in its "SkinModel" surface energy balance configuration. Run-time will depend on your computer, but should take less than one minute. An IceModel configuration (which includes a full subsurface energy balance) should take between one and a few minutes to run. Initial run times may be longer due to JIT compilation.
+
 ## Advanced Use
+
+### Global configuration: Specify workspace paths
+
+Use the configuration function `icemodel/+icemodel/config.m` to specify the model input and output directories. By default, these directories are set to the top-level folders `input/` and `output/`. Note that the `.gitignore` file which ships with this repo ignores these folders.
+
+In your matlab terminal:
+
+- Type `edit icemodel.config` and press enter. Read the detailed documentation to understand the model input and output directory structure, and how to set them programmatically.
+
+Note that in `demo.m` the `casename` argument is passed to the configuration function: `cfg = icemodel.config(casename="demo")`. This sets the input and output folders to `demo/input` and `demo/output`. The `casename` argument to `icemodel.config` currently does not serve any other purpose.
+
+### Runtime configuration: Specify model options
 
 To set run-specific model options and parameters, open and edit the function `icemodel/+icemodel/setopts.m`. In your matlab terminal:
 
 - Type `edit icemodel.setopts` and press enter. Set the options and resave the function. Then run `icemodel.run.point` with the new options (see `demo.m` for an example of how to call `icemodel.run.point`).
-
-For extended use, specify the model input and output directories by editing the configuration function `icemodel/+icemodel/config.m`. By default, these directories are set to the top-level folders `input/` and `output/`. Note that the `.gitignore` file that ships with this repo ignores these folders.
-
-<!-- There are options in that script to save the model output and evaluate the results against observations. -->
-
-<!-- , such as which input forcing dataset to use, and whether to run `icemodel` or `skinmodel` -->
 
 ## Input Data
 
@@ -63,7 +78,7 @@ The `spectral` directory contains values for the absorption coefficient of pure 
 
 The `inputs/userdata` directory contains alternative model forcings that can be "swapped out" with the standard model forcings to test hypotheses about processes and model sensitivity. For instance, users can prepare input forcing data generated from observations, climate model output, or satellite remote sensing, and place these files in `userdata`. Unlike the forcing files in `inputs/met`, these files do not need to contain the complete set of model forcings.
 
-To swap out a variable in the input met file with a variable in a userdata file, set the `userdata` and `uservars` configuration parameters (see `demo/demo.m`). For example, setting `userdata="modis"` and `uservars="albedo"` would replace the albedo values in the input meteorological forcing file with modis albedo for the same time and location. This would require placing a file named `MODIS_<sitename>_<year>` (see [Naming Conventions](#naming-conventions)) in the `userdata` directory, containing a timetable named `Data` with a variable (column) named `albedo`.
+To swap out a variable in the input met file with a variable in a userdata file, set the `userdata` and `uservars` configuration parameters (see `demo/demo.m`). For example, setting `userdata="modis"` and `uservars="albedo"` would replace the albedo values in the input meteorological forcing file with modis albedo for the same time and location. This would require placing a file named `<sitename>_modis_<year>` (see [Naming Conventions](#naming-conventions)) in the `userdata` directory, containing a timetable named `Data` with a variable (column) named `albedo`.
 
 ## Summary
 
@@ -79,31 +94,40 @@ To swap out a variable in the input met file with a variable in a userdata file,
 
 ## Naming Conventions
 
-### 1. met files
+### 1. General conventions
 
-The met (forcing) file naming convention is:
+- Lowercase is used exclusively in file names for operating system compatibility.
+- Non-standard characters in filename parts (e.g., "-", "&") are replaced with blanks. For example, sitename "KAN-M" becomes "kanm".
+
+<!-- - Version 7.3 MAT-files, which are based on the HDF5 format, are used for input and (by default) for output. For advanced usage -->
+
+### 2. Met files
+
+The met (forcing data) file naming convention is:
 `met_SITENAME_FORCINGS_YYYY_TIMESTEP`
 
 For example:
 
-`met_KANM_KANM_2016_1hr.mat` = met (forcing) data for site KAN-M with KAN-M forcings for year 2016 at a 1 hour timestep.
+`met_kanm_kanm_2016_1hr.mat` specifies a met (forcing) data file for site KAN-M with KAN-M forcings for year 2016 at a 1-hour timestep.
 
-`met_KANM_KANM_2016_15m.mat` = met (forcing) data for site KAN-M with KAN-M forcings for year 2016 at a 15 minute timestep.
+`met_kanm_kanm_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with KAN-M forcings for year 2016 at a 15-minute timestep.
 
-`met_KANM_MERRA_2016_15m.mat` = met (forcing) data for site KAN-M with MERRA-2 forcings for year 2016 at a 15 minute timestep.
+`met_kanm_merra_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with MERRA-2 forcings for year 2016 at a 15-minute timestep.
 
-Each met file must contain a timetable named `met` with one column for each forcing variable. See the example met file.
+Each met file must contain a timetable object named `met` with one column for each forcing variable. See the example met file.
 
-### 2. user data
+### 3. User data files
 
 The "userdata" file naming convention is:
-`FORCINGS_SITENAME_YYYY`
+`SITENAME_FORCINGS_YYYY`
+
+Note: at this time, only hourly userdata files are supported, therefore there is no `TIMESTEP` file part like the met file naming convention.
 
 For example:
 
-`MERRA_KANM_2016.mat` = forcing data from the MERRA-2 climate model for the KAN-M weather station location for year 2016.
+`KANM_MERRA_2016.mat` specifies a user data file with MERRA-2 climate model forcings for the KAN-M weather station location for year 2016.
 
-Each userdata file must contain a timetable named `Data` with column names matching the met file naming conventions.
+Each userdata file must contain a timetable named `Data` with column names matching the met file column-naming conventions. See the example met file in `demo/input/`.
 
 <!-- 
 The function `METINIT.m` will then swap out the KAN-M albedo data in the met forcing data with the modis albedo.
@@ -160,7 +184,7 @@ Cooper, M G (2022). icemodel output [Data set](https://doi.org/some-doi-number)
 
 <!-- ## Reference
 
-Cooper, M G, et al. *Greenland Ice Sheet runoff reduced by meltwater refreezing in bare ice*, in revision ([preprint](https://assets.researchsquare.com/files/rs-842710/v1_covered.pdf?c=1631877020)) -->
+Cooper, M G, et al. *Greenland Ice Sheet runoff reduced by meltwater refreezing in bare ice* -->
 
 ## References
 
@@ -185,3 +209,47 @@ Schlatter T W 1972 *The Local Surface Energy Balance and Subsurface Temperature 
 Swaminathan C R and Voller V R 1993 *ON THE ENTHALPY METHOD* International Journal of Numerical Methods for Heat & Fluid Flow 3 233–44
 
 Warren S G and Brandt R E 2008 *Optical constants of ice from the ultraviolet to the microwave: A revised compilation* J. Geophys. Res. 113 D14220, [Online](http://onlinelibrary.wiley.com/doi/10.1029/2007JD009744/abstract)
+
+## System Requirements
+
+- Requires MATLAB&reg; version >=9.2* (R2017a).
+  - R2016b is a hard limit on compatibility: IceModel forcing files are currently stored as `timetable` objects which were introduced (along with `string`) in R2016b.
+- Developed and tested on MacOS Sonoma (Intel silicon), using MATLAB R2022b.
+- Runs in MATLAB Online (a linux-based system), tested on R2022b.
+- Runs on Windows 10, tested on R2017a.
+<!-- - Runs in Octave on MacOS Sonoma (Intel silicon), using Octave version 9.2. -->
+
+*Note that the main program `icemodel/icemodel.m` and core IceModel functions (all of which are saved with UPPERCASE filenames in the `icemodel` folder), are written in minimalist matlab style: all functions are compatible with code generation, all numerical methods employ custom hand-written solvers, there are no toolbox dependencies or modern matlab conveniences such as `arguments` (requires >=R2019b).
+
+Exceptions to this minimalist style include namespace functions e.g., functions in the `icemodel/+icemodel` namespace. By convention, these are helper functions which are not required by the numerical model. The `demo.m` script uses a modern matlab approach including name=value syntax (requires >=R2021a). The `arguments` input parser used in `icemodel.config` and `icemodel.run.point` requires >=R2019b.
+
+If you encounter incompatibilities, please [open an issue](https://github.com/mgcooper/icemodel/issues).
+
+<!-- datetime, R2014b
+string, R2016b
+timetable, R2016b
+isfolder / isfile, R2017b
+isStringScalar, R2017b
+convertStringsToChars, R2017b
+arguments, R2019b
+renamevars, R2020a
+name=value, R2021a -->
+
+## Installation Guide
+
+Download this repo and place it on the matlab path.
+
+In a terminal:
+
+```sh
+git clone https://github.com/mgcooper/icemodel.git
+```
+
+In your matlab terminal:
+
+```matlab
+cd('/path/to/this/repo')
+setup()
+```
+
+Installation should only take a few seconds. If you encounter any issues, please [open an issue](https://github.com/mgcooper/icemodel/issues).
