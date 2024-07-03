@@ -26,6 +26,13 @@ function [fullpath_bk, filename_bk] = backupfile(filename, makecopy, makezip)
    if nargin < 3
       makezip = false;
    end
+
+   if ~isoctave && verLessThan('matlab', '9.3') % R2017b
+      isfolder = @(folder) exist(folder, 'dir') == 7;
+      isfile = @(file) exist(file, 'file') == 2;
+      convertStringsToChars = @(str) char(str);
+   end
+
    filename = convertStringsToChars(filename);
    validateattributes(filename, {'char'}, {'row'}, mfilename, 'FILENAME', 1)
    validateattributes(makecopy, {'logical'}, {'scalar'}, mfilename, 'MAKECOPY', 2)

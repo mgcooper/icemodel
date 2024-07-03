@@ -2,6 +2,10 @@ function mkfolders(opts)
 
    simyears = opts.simyears;
 
+   if ~isoctave && verLessThan('matlab', '9.3') % R2017b
+      isfolder = @(folder) exist(folder, 'dir') == 7;
+   end
+
    for MM = 1:numel(simyears)
 
       % set the output folder name and create it if it doesn't exist
@@ -13,7 +17,7 @@ function mkfolders(opts)
          mkdir(pathout);
       end
    end
-   
+
    % make a folder to save the model options
    if ~isfolder(fullfile(opts.pathoutput, 'opts'))
       mkdir(fullfile(opts.pathoutput, 'opts'));

@@ -41,7 +41,6 @@ function varargout = POSTPROC(ice1, ice2, opts, varargin)
    elseif strcmp('icemodel', opts.smbmodel)
       ice1 = ICERUNOFF(ice1, ice2, opts);
    end
-   % ice1.runoff2 = ice1.melt - ice1.freeze;
 
    % Compute a full state and energy balance
    if ~strcmp(opts.sitename, 'sector')
@@ -82,7 +81,7 @@ function varargout = POSTPROC(ice1, ice2, opts, varargin)
       % Rename ice1 vars to match the naming conventions i use everywhere else
       oldvars = {'Qsi','Qsr','Qsn','Qli','Qle','Qln','Qh','Qe','Qc','Qn','Tsfc'};
       newvars = {'swd','swu','swn','lwd','lwu','lwn','shf','lhf','chf','netr','tsfc'};
-      ice1 = renamevars(ice1, ...
+      ice1 = renameTableVars(ice1, ...
          oldvars(ismember(oldvars, ice1.Properties.VariableNames)), ...
          newvars(ismember(oldvars, ice1.Properties.VariableNames)));
    end
