@@ -2,7 +2,7 @@
 
 **A 1-d radiative-thermodynamic heat transfer model for glacier ice.**
 
-[![Open in MATLAB Online](https://www.mathworks.com/images/responsive/global/open-in-matlab-online.svg)](https://matlab.mathworks.com/open/github/v1?repo=mgcooper/icemodel&file=demo/demo.m)
+[![Open in MATLAB Online](https://www.mathworks.com/images/responsive/global/open-in-matlab-online.svg)](https://matlab.mathworks.com/open/github/v1?repo=mgcooper/icemodel&file=demo/demo.m) [![DOI](https://zenodo.org/badge/534812039.svg)](https://zenodo.org/doi/10.5281/zenodo.11539329) ![GitHub release (latest by date including pre-releases)](https://img.shields.io/github/v/release/mgcooper/icemodel?include_prereleases) [![GitHub license](https://img.shields.io/github/license/mgcooper/icemodel)](https://github.com/mgcooper/icemodel/blob/main/LICENSE)
 
 - [IceModel](#icemodel)
   - [Background](#background)
@@ -21,6 +21,8 @@
   - [References](#references)
   - [System Requirements](#system-requirements)
   - [Installation Guide](#installation-guide)
+  - [Contribute](#contribute)
+  - [How do I cite this?](#how-do-i-cite-this)
 
 ## Background
 
@@ -285,3 +287,11 @@ setup()
 ```
 
 Installation should only take a few seconds. If you encounter any issues, please [open an issue](https://github.com/mgcooper/icemodel/issues).
+
+## Contribute
+
+If you find a bug, have a question, or want to contribute, feel free to open an [issue](https://github.com/mgcooper/icemodel/issues) or start a [discussion](https://github.com/mgcooper/icemodel/discussions).
+
+## How do I cite this?
+
+If you find this software useful, please consider citing the software release in `CITATION.cff` (click the link in the "About" section along the right sidebar of this repo).
