@@ -76,10 +76,6 @@ end
 %%
 function met = swapMetData(met, opts)
 
-   if ~isoctave && verLessThan('matlab', '9.3') % R2017b
-      isfile = @(file) exist(file, 'file') == 2;
-   end
-
    % convert uservars to a cellstr for compatibility with multiple uservars
    if ischar(opts.uservars)
       opts.uservars = cellstr(opts.uservars);
@@ -117,7 +113,7 @@ function met = swapMetData(met, opts)
       simyears = num2str(opts.simyears(1));
       userfile = [opts.sitename '_' opts.userdata '_' simyears '.mat'];
 
-      if isfile(fullfile(opts.pathinput, 'userdata', userfile))
+      if (exist(fullfile(opts.pathinput, 'userdata', userfile), 'file') == 2)
          Data = load(fullfile(opts.pathinput, 'userdata', userfile), 'Data');
          Data = Data.Data;
          Data.Time.TimeZone = met.Time.TimeZone;

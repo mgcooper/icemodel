@@ -10,7 +10,19 @@
       [
          {"name":"proplist", "type":["cell"]}
       ]
-   },   
+   },
+   "icemodel.config":
+   {
+      "inputs": 
+      [
+         {"name":"ICEMODEL_INPUT_PATH", "kind":"namevalue", "type":"folder"},
+         {"name":"ICEMODEL_OUTPUT_PATH", "kind":"namevalue", "type":"folder"}
+      ],
+      "outputs":
+      [
+         {"name":"cfg", "type":["struct"]}
+      ]
+   },
    "icemodel.cvconvert":
    {
       "inputs":
@@ -31,6 +43,25 @@
       "outputs":
       [
          {"name":"value", "repeating":true, "type":["double", "scalar"]}
+      ]
+   },
+   "icemodel.setopts":
+   {
+      "inputs": 
+      [
+         {"name":"smbmodel",   "kind":"required",     "type":["choices=icemodel.completions('smbmodel')"], "purpose":"Option"},
+         {"name":"simyears",   "kind":"required",     "type":["numeric"]},
+         {"name":"sitename",   "kind":"required",     "type":["choices=icemodel.completions('sitename')"], "purpose":"Option"},
+         {"name":"forcings",   "kind":"required",     "type":["choices=icemodel.completions('forcings')"], "purpose":"Option"},
+         {"name":"userdata",   "kind":"positional",   "type":["choices=icemodel.completions('userdata')"], "purpose":"Option"},
+         {"name":"uservars",   "kind":"positional",   "type":["choices=icemodel.completions('uservars')"], "purpose":"Option"},
+         {"name":"testname",   "kind":"positional",   "type":[["char"], ["string", "scalar"]], "purpose":"Option"},
+         {"name":"saveflag",   "kind":"positional",   "type":["logical","scalar"],"purpose":"Option"},
+         {"name":"backupflag", "kind":"positional",   "type":["logical","scalar"],"purpose":"Option"}
+      ],
+      "outputs":
+      [
+         {"name":"opts", "type":["struct"]}
       ]
    }
 }

@@ -17,11 +17,11 @@ function casename = setcase(forcings, userdata, uservars, ...
          args{n} = char(args{n});
       end
    end
-   [smbmodel, sitename, forcings, userdata, uservars, simyear] = deal(args{:});
+   [forcings, userdata, uservars, smbmodel, sitename, simyear] = deal(args{:});
 
    % Set the casename
    if nargin == 3
-      casename = [forcings '_forcings_' upper(userdata) '_' uservars];
+      casename = [forcings '_forcings_' userdata '_' uservars];
 
    elseif nargin == 6
 
