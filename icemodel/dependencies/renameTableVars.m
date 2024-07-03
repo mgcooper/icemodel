@@ -51,7 +51,7 @@ function tbl = renameTableVars(tbl, oldvars, newvars)
    % Loop through oldvars and replace with newvars
    for n = 1:numel(oldvars)
       if any(strcmp(oldvars(n), varnames))
-         tbl.Properties.VariableNames(oldvars(n)) = newvars(n);
+         tbl.Properties.VariableNames{char(oldvars(n))} = char(newvars(n));
       else
          warning('Variable name %s not found in the table.', oldvars(n));
       end
