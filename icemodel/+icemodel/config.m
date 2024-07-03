@@ -2,8 +2,8 @@ function varargout = config(kwargs)
    %CONFIG Configure icemodel project paths.
    %
    %  CFG = ICEMODEL.CONFIG()
-   %  CFG = ICEMODEL.CONFIG(ICEMODEL_INPUT_PATH=PATH_NAME)
-   %  CFG = ICEMODEL.CONFIG(ICEMODEL_OUTPUT_PATH=PATH_NAME)
+   %  CFG = ICEMODEL.CONFIG('ICEMODEL_INPUT_PATH', PATH_NAME)
+   %  CFG = ICEMODEL.CONFIG('ICEMODEL_OUTPUT_PATH', PATH_NAME)
    %
    %% Description
    %

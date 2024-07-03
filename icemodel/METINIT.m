@@ -76,6 +76,10 @@ end
 %%
 function met = swapMetData(met, opts)
 
+   if ~isoctave && verLessThan('matlab', '9.3') % R2017b
+      isfile = @(file) exist(file, 'file') == 2;
+   end
+
    % convert uservars to a cellstr for compatibility with multiple uservars
    if ischar(opts.uservars)
       opts.uservars = cellstr(opts.uservars);
