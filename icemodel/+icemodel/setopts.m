@@ -1,5 +1,5 @@
 function opts = setopts(smbmodel, sitename, simyears, forcings, ...
-      userdata, uservars, saveflag, testname, backupflag)
+      userdata, uservars, testname, saveflag, backupflag)
    %SETOPTS Set model options
    %
    %
@@ -7,13 +7,23 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    if nargin < 5  || isempty(userdata); userdata = 'none'; end
    if nargin < 6  || isempty(uservars); uservars = 'albedo'; end
-   if nargin < 7  || isempty(saveflag); saveflag = false; end
-   if nargin < 8  || isempty(testname); testname = ''; end
+   if nargin < 7  || isempty(testname); testname = ''; end
+   if nargin < 8  || isempty(saveflag); saveflag = false; end
    if nargin < 9  || isempty(backupflag); backupflag = true; end
 
-   [smbmodel, sitename, forcings, userdata, uservars, testname] ...
-      = convertStringsToChars(...
-      smbmodel, sitename, forcings, userdata, uservars, testname);
+   % convertStringsToChars in a pre-R2017b compatible way:
+   args = {smbmodel, sitename, forcings, userdata, uservars, testname};
+   for n = 1:numel(args)
+      if isstring(args{n})
+         args{n} = char(args{n});
+      end
+   end
+   [smbmodel, sitename, forcings, userdata, uservars, testname] = deal(args{:});
+
+   % If >= R2017b:
+   % [smbmodel, sitename, forcings, userdata, uservars, testname] ...
+   %    = convertStringsToChars(...
+   %    smbmodel, sitename, forcings, userdata, uservars, testname);
 
    %------------------------- save the standard options passed in
    %--------------------------------------------------------------
@@ -132,7 +142,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
          end
       end
 
-      assert(isfolder(opts.pathinput), ...
+      assert(exist(opts.pathinput, 'dir') == 7, ...
          'ICEMODEL_INPUT_PATH does not exist, set it using icemodel.config');
 
       % For test runs, option to create a subfolder in ICEMODEL_OUTPUT_PATH

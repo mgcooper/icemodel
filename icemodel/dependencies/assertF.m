@@ -27,7 +27,7 @@ function assertF(cond, varargin)
    end
 
    % Update flag if 'on' or 'off' is passed as argument
-   if nargin == 1 && ischar(cond) || isStringScalar(cond)
+   if nargin == 1 && ischar(cond) % || isStringScalar(cond)
       cond = validatestring(cond, {'on', 'off'}, mfilename, 'ASSERTFLAG', 1);
       assertFlag = strcmp(cond, 'on');
       return

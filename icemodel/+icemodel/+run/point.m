@@ -33,7 +33,7 @@ function [ice1, ice2, met, opts] = point(kwargs)
 
    %% Set the model options
    opts = icemodel.setopts(smbmodel, sitename, simyears, forcings, ...
-      userdata, uservars, saveflag, testname, backupflag);
+      userdata, uservars, testname, saveflag, backupflag);
 
    if notempty(gridcell)
       opts.metfname = {fullfile(opts.pathinput, 'met', 'sector', ...
