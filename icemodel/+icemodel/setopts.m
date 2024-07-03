@@ -244,10 +244,10 @@ function opts = createMetFileNames(opts, sitename, forcings, simyears)
    % metfile name to met_kanm_kanm_YYYY rather than met_behar_kanm_YYYY, to
    % negate the need to create a second (identical) met_behar_kanm_YYYY file.
    if strcmpi(forcings, 'kanl') ...
-         && ismember(sitename, {'ak4','upperbasin'})
+         && ismember(sitename, {'ak4', 'upperbasin'})
       metname = 'kanl';
    elseif strcmpi(forcings, 'kanm') ...
-         && ismember(sitename, {'slv1','slv2','behar'})
+         && ismember(sitename, {'slv1', 'slv2', 'behar'})
       metname = 'kanm';
    else
       metname = sitename;
