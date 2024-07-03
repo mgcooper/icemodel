@@ -1,5 +1,5 @@
 function opts = setopts(smbmodel, sitename, simyears, forcings, ...
-      userdata, uservars, saveflag, testname, backupflag)
+      userdata, uservars, testname, saveflag, backupflag)
    %SETOPTS Set model options
    %
    %
@@ -7,8 +7,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    if nargin < 5  || isempty(userdata); userdata = 'none'; end
    if nargin < 6  || isempty(uservars); uservars = 'albedo'; end
-   if nargin < 7  || isempty(saveflag); saveflag = false; end
-   if nargin < 8  || isempty(testname); testname = ''; end
+   if nargin < 7  || isempty(testname); testname = ''; end
+   if nargin < 8  || isempty(saveflag); saveflag = false; end
    if nargin < 9  || isempty(backupflag); backupflag = true; end
 
    % convertStringsToChars in a pre-R2017b compatible way:
