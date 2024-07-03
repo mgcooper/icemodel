@@ -86,7 +86,7 @@ function met = swapMetData(met, opts)
 
       % Load the userdata and retime to 15 m if the met data is 15 m
       simyears = num2str(opts.simyears(1));
-      userfile = [opts.userdata '_' opts.sitename '_' simyears '.mat'];
+      userfile = [opts.sitename '_' opts.userdata '_' simyears '.mat'];
 
       if isfile(fullfile(opts.pathinput, 'userdata', userfile))
          Data = load(fullfile(opts.pathinput, 'userdata', userfile), 'Data');
