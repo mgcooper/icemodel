@@ -140,9 +140,11 @@ Each userdata file must contain a timetable named `Data` with column names match
 
 IceModel produces two outputs: `ice1` and `ice2`, representing 1-dimensional and 2-dimensional data, respectively, with dimensions time and depth. The `ice1` data are saved in a `timetable` object and `ice2` are saved in a `struct` object. An IceModel simulation with `opts.saveflag` set true will save these two objects as well as the `opts` struct according to the following convention:
 
-- `ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY/ice1_FORCINGS_forcings_USERDATA_USERVARS.mat`
-- `ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY/ice2_FORCINGS_forcings_USERDATA_USERVARS.mat`
-- `ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/opts/opts_FORCINGS_forcings_USERDATA_USERVARS.mat`
+```sh
+ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY/ice1_FORCINGS_forcings_USERDATA_USERVARS.mat
+ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY/ice2_FORCINGS_forcings_USERDATA_USERVARS.mat
+ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/opts/opts_FORCINGS_forcings_USERDATA_USERVARS.mat
+```
 
 Here, `ICEMODEL_OUTPUT_PATH` is an environment variable set by the `icemodel.config` function, the lowercase "forcings" is a string literal used to join the `FORCINGS` and `USERDATA` string variables, and `SITENAME`, `SMBMODEL`, `FORCINGS`, `USERDATA`, and `USERVARS` are parameters passed to the `icemodel.setopts` function (either directly or indirectly via the helper function `icemodel.run.point`). One `YYYY` folder is created for each year in the `SIMYEARS` parameter passed to `icemodel.setopts`.
 
@@ -150,16 +152,20 @@ Note that the `ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY` subfolders are gener
 
 Example: An IceModel simulation for the KAN-M weather station location for years 2015:2016 using MERRA forcings, with `userdata='modis'` and `uservars='albedo'` will produce the following output files:
 
-`ICEMODEL_OUTPUT_PATH/kanm/icemodel/2015/ice1_merra_forcings_modis_albedo.mat`
-`ICEMODEL_OUTPUT_PATH/kanm/icemodel/2015/ice2_merra_forcings_modis_albedo.mat`
-`ICEMODEL_OUTPUT_PATH/kanm/icemodel/2016/ice1_merra_forcings_modis_albedo.mat`
-`ICEMODEL_OUTPUT_PATH/kanm/icemodel/2016/ice2_merra_forcings_modis_albedo.mat`
-`ICEMODEL_OUTPUT_PATH/kanm/icemodel/opts/opts_merra_forcings_modis_albedo.mat`
+```sh
+ICEMODEL_OUTPUT_PATH/kanm/icemodel/2015/ice1_merra_forcings_modis_albedo.mat
+ICEMODEL_OUTPUT_PATH/kanm/icemodel/2015/ice2_merra_forcings_modis_albedo.mat
+ICEMODEL_OUTPUT_PATH/kanm/icemodel/2016/ice1_merra_forcings_modis_albedo.mat
+ICEMODEL_OUTPUT_PATH/kanm/icemodel/2016/ice2_merra_forcings_modis_albedo.mat
+ICEMODEL_OUTPUT_PATH/kanm/icemodel/opts/opts_merra_forcings_modis_albedo.mat
+```
 
 If `userdata` and `uservars` are not supplied to `icemodel.setopts` or are supplied as empty arrays `[]`, or empty chars `''` (they are optional arguments but must be supplied as empty if subsequent arguments `saveflag` and/or `backupflag` are supplied), the filenames would be:
 
-`ICEMODEL_OUTPUT_PATH/kanm/icemodel/2015/ice1_merra_forcings_merra_albedo.mat`
-`ICEMODEL_OUTPUT_PATH/kanm/icemodel/2015/ice2_merra_forcings_merra_albedo.mat`
+```sh
+ICEMODEL_OUTPUT_PATH/kanm/icemodel/2015/ice1_merra_forcings_merra_albedo.mat
+ICEMODEL_OUTPUT_PATH/kanm/icemodel/2015/ice2_merra_forcings_merra_albedo.mat
+```
 
 Here, the `userdata` parameter takes on the value of the `forcings` parameter (`'merra'`), whereas the `uservars` parameter takes the value `'albedo'`, which is the default value set in `icemodel.setopts`. This reflects the focus of IceModel on studying the sensitivity of SMB models to ice albedo.
 
