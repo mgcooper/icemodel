@@ -1,0 +1,36 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: IceModel
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Matthew G
+    family-names: Cooper
+    email: mguycooper@gmail.com
+    orcid: 'https://orcid.org/0000-0002-0165-209X'
+    affiliation: 'Pacific Northwest National Laboratory'
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.11539330
+repository-code: 'https://github.com/mgcooper/icemodel'
+abstract: >-
+  A 1-d radiative-thermodynamic heat transfer model of
+  glacier ice.
+keywords:
+  - glacier ice
+  - ice sheet
+  - numerical model
+  - enthalpy
+  - glaciology
+  - surface mass balance
+  - ice sheet runoff
+  - meltwater
+  - albedo
+license: BSD-3-Clause
+commit: 96895d380495d4a0be6e4527c070d869382c1860
+version: 1.0.0
+date-released: '2024-06-09'
