@@ -30,7 +30,7 @@
 
 Following Liston et al (1999), `IceModel` implements the two-stream radiative transfer model described in Schlatter (1972), updated with spectral detail following Brandt and Warren (1993). The surface energy balance largely follows Liston et al (1999), including the turbulent flux parameterization based on Monin-Obukhov similarity theory (Monin & Obukhov, 1954). `IceModel` follows both Liston et al (1999) and *SNTHERM* for subsurface thermodynamics, including representations of solar radiative heating, conductive heat transfer, and vapor diffusion, but implements an enthalpy-conserving numerical phase change scheme described in Clark et al. (2021) and Swaminathan and Voller (1993).
 
-A technical description is available [here](https://github.com/mgcooper/icemodel/blob/main/docs/IcemodelTechnicalDoc.pdf).
+A technical description is available [here](https://github.com/mgcooper/icemodel/blob/main/doc/IcemodelTechnicalDoc.pdf).
 
 <!-- `icemodel` solves the unsteady one-dimensional heat equation:
 
@@ -42,10 +42,10 @@ where *H* [J m$^{-3}$] is enthalpy, *t* [s] is time, *F* [W m$^{-2}$] is net hea
 
 ## Getting Started
 
-Thanks for your interest. To get started, here's what we recommend.
+Thanks for your interest. To get started, here's what we recommend:
 
 - Check the [system requirements](#system-requirements) and [installation guide](#installation-guide).
-- If you do not have a MATLAB license, use a free one: [![Open in MATLAB Online](https://www.mathworks.com/images/responsive/global/open-in-matlab-online.svg)](https://matlab.mathworks.com/open/github/v1?repo=mgcooper/icemodel&file=demo/demo.m)
+- If you do not have a MATLAB license, you can run this software using a free MATLAB Online account: [![Open in MATLAB Online](https://www.mathworks.com/images/responsive/global/open-in-matlab-online.svg)](https://matlab.mathworks.com/open/github/v1?repo=mgcooper/icemodel&file=demo/demo.m)
 - The main program is `icemodel/icemodel.m`. Open the function to get a sense for the model structure.
 - Open and run Example 1 in `demo/demo.m`. This will run an `IceModel` simulation for the KAN_M weather station, located on the Greenland ice sheet, for year 2016 on a 1-hr timestep.
 - Inspect the demo plot created by the call to `icemodel.plot.enbal`. The simulated energy fluxes should closely track the weather station values.
@@ -90,11 +90,12 @@ To swap out a variable in the input met file with a variable in a userdata file,
 ## Summary
 
 1. Install this repo and place it on your Matlab path
-2. Edit and run the following files
+2. Open and run `demo/demo.m`
+3. For advanced use, edit and run the following files:
 
 | Function Name | Description | How to Run |
 | --- | --- | --- |
-| `icemodel.config` | Set global configuration settings. | Type `edit icemodel.config` then press enter. Set the environment variables programmatically as needed. |
+| `icemodel.config` | Set global configuration (model input and output paths). | Type `edit icemodel.config` then press enter. Set the environment variables programmatically as needed. |
 | `icemodel.setopts` | Set run-specific model configuration. | Type `edit icemodel.setopts` then press enter. Edit the model options and save the function. |
 | `icemodel.run.point` | Run the model at a point. | See the example in `demo.m`, and the function arguments in `icemodel.run.point` for additional configuration. |
 | `demo.m` | Script to run and evaluate the model output. | Place this repo on your matlab path, edit and run the script. |
@@ -111,28 +112,29 @@ To swap out a variable in the input met file with a variable in a userdata file,
 ### 2. Met files
 
 The met (forcing data) file naming convention is:
-`met_SITENAME_FORCINGS_YYYY_TIMESTEP`
 
-For example:
+- `met_SITENAME_FORCINGS_YYYY_TIMESTEP`
 
-`met_kanm_kanm_2016_1hr.mat` specifies a met (forcing) data file for site KAN-M with KAN-M forcings for year 2016 at a 1-hour timestep.
+Examples:
 
-`met_kanm_kanm_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with KAN-M forcings for year 2016 at a 15-minute timestep.
-
-`met_kanm_merra_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with MERRA-2 forcings for year 2016 at a 15-minute timestep.
+- `met_kanm_kanm_2016_1hr.mat` specifies a met (forcing) data file for site KAN-M with KAN-M forcings for year 2016 at a 1-hour timestep.
+- `met_kanm_kanm_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with KAN-M forcings for year 2016 at a 15-minute timestep.
+- `met_kanm_merra_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with MERRA-2 forcings for year 2016 at a 15-minute timestep.
 
 Each met file must contain a timetable object named `met` with one column for each forcing variable. See the example met file.
 
 ### 3. User data files
 
 The "userdata" file naming convention is:
-`SITENAME_FORCINGS_YYYY`
 
-Note: at this time, only hourly userdata files are supported, therefore there is no `TIMESTEP` file part like the met file naming convention.
+- `SITENAME_FORCINGS_YYYY`
 
-For example:
+Note: at this time, hourly userdata files are supported, thus unlike the met file naming convention, there is no `TIMESTEP` file part.
 
-`KANM_MERRA_2016.mat` specifies a user data file with MERRA-2 climate model forcings for the KAN-M weather station location for year 2016.
+Examples:
+
+- `kanm_merra_2016.mat` specifies a user data file with MERRA-2 climate model forcings for the KAN-M weather station location for year 2016 on a 1-hr timestep.
+- `kanm_modis_2016.mat` specifies a user data file with MODIS satellite albedo values for the KAN-M weather station location for year 2016 on a 1-hr timestep.
 
 Each userdata file must contain a timetable named `Data` with column names matching the met file column-naming conventions. See the example met file in `demo/input/`.
 
