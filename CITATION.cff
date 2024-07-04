@@ -4,8 +4,7 @@
 cff-version: 1.2.0
 title: IceModel
 message: >-
-  If you use this software, please cite it using the
-  metadata from this file.
+  If you use this software, please cite it using the metadata from this file. Note: If accessing this file from a release archive, the DOI and commit hash in this file reference the pre-release version immediately prior to the full release. Please cite using the full-release DOI listed on Zenodo.
 type: software
 authors:
   - given-names: Matthew G
@@ -15,7 +14,7 @@ authors:
     affiliation: 'Pacific Northwest National Laboratory'
 identifiers:
   - type: doi
-    value: 10.5281/zenodo.11539330
+    value: 10.5281/zenodo.12645068
 repository-code: 'https://github.com/mgcooper/icemodel'
 abstract: >-
   A 1-d radiative-thermodynamic heat transfer model of
@@ -31,6 +30,6 @@ keywords:
   - meltwater
   - albedo
 license: BSD-3-Clause
-commit: 96895d380495d4a0be6e4527c070d869382c1860
-version: 1.0.0
-date-released: '2024-06-09'
+commit: f09d22dbb0b54790ad96ff53171fa2db0ef1a4b0
+version: 1.0.1
+date-released: '2024-07-04'
