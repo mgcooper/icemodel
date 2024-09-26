@@ -42,7 +42,7 @@ function varargout = listfiles(folderlist, opts)
    % See also: mfilename, mcallername, mfoldername, ismfile
 
    arguments
-      folderlist (1,:) string = pwd()
+      folderlist (:,1) string = pwd()
       opts.subfolders (1,1) logical = false
       opts.asstruct (1,1) logical = true
       opts.aslist (1,1) logical = false
@@ -51,14 +51,34 @@ function varargout = listfiles(folderlist, opts)
       opts.pattern (1,1) string = "*"
       opts.mfiles (1,1) logical = false
       opts.matfiles (1,1) logical = false
-      opts.rmpatterns (1,:) string = ""
+      opts.rmpatterns (1,:) string = ".git"
+      opts.ignoredfolders (1, :) string = []
    end
 
    opts.pattern = parseFilePattern(opts);
 
+   if opts.aslist || opts.asstring
+      opts.asstruct = false;
+   end
+
    % Create the list of files
-   list = cellmap(@(folder) processOneFolder(folder, opts), folderlist);
-   list = vertcat(list{:});
+   list = arraymap(@(folder) processOneFolder(folder, opts), folderlist);
+
+   % I think this was added to stack dir structs, but it failed when list was a
+   % cell array of paths i.e. opts.aslist == true, so I added opts.asstruct.
+   % Update: When folder is non-scalar, list is a cell array where each element
+   % is a cell array of files in a subfolder. I think that's why I had vertcat,
+   % and it failed when list was scalar b/c it tried to vertcat all the
+   % individual paths into one char array. So I added the numel > 1 check.
+   % But I am not sure if other use cases depend on the files being in separate
+   % cell elements, so I commented that out and added the aslist check.
+   if iscell(list)
+      if opts.asstruct % || numel(list) > 1
+         list = vertcat(list{:});
+      elseif numel(list) > 1 && opts.aslist
+         list = vertcat(list{:});
+      end
+   end
 
    % Parse outputs
    switch nargout
@@ -79,8 +99,8 @@ function list = processOneFolder(folder, opts)
    list(strncmp({list.name}, '.', 1)) = [];
    list = list(~[list.isdir]);
 
-   if opts.mfiles == true
-      if opts.matfiles == true
+   if opts.mfiles
+      if opts.matfiles
          list = list(...
             strncmp(reverse({list.name}), 'm.', 2) | ...
             strncmp(reverse({list.name}), 'tam.', 4));
@@ -92,7 +112,7 @@ function list = processOneFolder(folder, opts)
    % Remove files containing the "RMPATTERNS"
    list = trimfiles(list, opts);
 
-   if opts.aslist == true
+   if opts.aslist
 
       if opts.fullpath
          list = transpose(fullfile({list.folder}, {list.name}));
@@ -101,7 +121,7 @@ function list = processOneFolder(folder, opts)
       end
 
       % convert to string array if requested
-      if opts.asstring == true
+      if opts.asstring
          list = string(list);
       end
    end
@@ -119,14 +139,18 @@ function pattern = parseFilePattern(opts)
    if startsWith(pattern, ".")
       pattern = erase(pattern, ".");
    end
-   if opts.subfolders == true
+   if opts.subfolders
       if pattern ~= ""
          pattern = strcat("**/*", pattern, "*");
       else
          pattern = "**/*"; % Prevent strcat from creating **/**
       end
    else
-      pattern = strcat("*", pattern, "*");
+      if pattern ~= ""
+         pattern = strcat("*", pattern, "*");
+      else
+         pattern = "*"; % Prevent strcat from creating ** which returns subfolders
+      end
    end
 end
 
@@ -140,7 +164,7 @@ function list = trimfiles(list, opts)
    % to distinguish whether the rmpatterns apply to the fullpath or filename.
 
    % Append default patterns that should be removed
-   rmpatterns = append(opts.rmpatterns, "~$"); % add more as needed
+   rmpatterns = [opts.rmpatterns, "~$"]; % add more as needed
 
    if opts.fullpath
       files = transpose(fullfile({list.folder}, {list.name}));
