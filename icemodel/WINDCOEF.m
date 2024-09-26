@@ -52,7 +52,7 @@ function [De, S123, W1] = WINDCOEF(wspd, z_0, z_tair, z_wind)
       z_wind = z_tair;
    end
 
-   z_star = z_wind ^ 2 / z_tair;
+   z_star = (z_wind ^ 2) / z_tair;
 
    eta = 9.4;
    psi = 5.3;
