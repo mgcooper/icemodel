@@ -12,6 +12,7 @@ function [tf, vi] = isvariable(varname, tbl)
    %    varname (:,1) string
    %    T (:,:) tabular
    % end
+   varname = char(varname);
    validateattributes(varname, {'char'}, {'row'}, mfilename, 'VARNAME', 1)
    validateattributes(tbl, {'tabular'}, {'nonempty'}, mfilename, 'TBL', 1)
 

@@ -39,7 +39,7 @@ function [q, dq_dtheta] = LIQFLUX(f_liq, f_ice, liqresid, grainsz)
    % liqresid  - residual water volume / pore volume [-] (Swi)
    % f_por     - pore fraction [-]                       (phi)
    % f_res     - residual water fraction [-]
-   % liqsa1t    - water saturation [-]                    (Sw)
+   % liqsat    - water saturation [-]                    (Sw)
    % availcap  - available capacity [-]
    % relsat    - relative saturation [-]                 (Sstar)
    %

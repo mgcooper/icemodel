@@ -47,7 +47,7 @@ function [requirementsList, urlList] = installRequiredFiles(requiredFiles, kwarg
          = fullfile(toolboxpath(), "dependencies");
 
       kwargs.localSourcePath (1, :) {mustBeFolder} ...
-         = getenv('MATLABFUNCTIONPATH')
+         = getenv('MATLAB_FUNCTION_PATH')
 
       kwargs.ignoreFolder (1, :) string ...
          = "testbed"
@@ -119,7 +119,7 @@ function [projectPath, ignoreFolder, localSourcePath, ...
    end
 
    if isempty(kwargs.remoteRepoName)
-      error('Set "remotesource" or environment variable "MATLABFUNCTIONPATH"')
+      error('Set "remotesource" or environment variable "MATLAB_FUNCTION_PATH"')
    else
       GITHUB_URL = 'https://raw.githubusercontent.com/';
       remoteSourcePath = strcat(GITHUB_URL, GITHUB_USER_NAME, '/', ...
