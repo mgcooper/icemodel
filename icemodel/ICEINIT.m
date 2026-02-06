@@ -40,7 +40,7 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
    % INITIALIZE ICE TEMPERATURE
 
    % Ensure the initial temperature is below the lower phase boundary
-   T = min(TL - 1, Tf - opts.T_ice_init) * ones(JJ, 1);
+   T = min(TL - 1, Tf + opts.T_ice_init) * ones(JJ, 1);
 
    % INITIALIZE LIQUID/ICE WATER FRACTION (f) AND BULK DENSITIES (g)
    T_dep = Tf - T;                           % [K]
