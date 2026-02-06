@@ -11,6 +11,9 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
       tol = 1e-3;
       maxiter = 100;
    end
+   
+   Ts = nan;
+   ok = false;
 
    switch numel(varargin)
       case 1

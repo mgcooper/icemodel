@@ -31,6 +31,8 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
       solver = -solver;
       iterflag = false;
    end
+   
+   ok = false;
 
    Ts_old = Ts;
    switch solver

@@ -1,4 +1,4 @@
-function [fullpath_bk, filename_bk] = backupfile(filename, makecopy, makezip)
+function varargout = backupfile(filename, makecopy, makezip)
    %BACKUPFILE Create a backup file name or folder name and (optionally) a copy.
    %
    % [fullpath_bk, filename_bk] = backupfile(filename) returns the name and
@@ -79,6 +79,12 @@ function [fullpath_bk, filename_bk] = backupfile(filename, makecopy, makezip)
          end
          fprintf('Backup created: %s\n', fullpath_bk);
       end
+   end
+
+   switch nargout
+      case 1
+         varargout{1} = fullpath_bk;
+         varargout{2} = filename_bk;
    end
 end
 
