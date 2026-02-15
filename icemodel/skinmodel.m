@@ -32,7 +32,7 @@ function [ice1, ice2] = skinmodel(opts)
       numyears, numspinup] = INITTIMESTEPS(opts, time);
 
    % INITIALIZE PAST VALUES
-   [xT, xf_ice, xf_liq] = RESETSUBSTEP(T, f_ice, f_liq);
+   [xTs, xT, xf_ice, xf_liq] = RESETSUBSTEP(Ts, T, f_ice, f_liq);
 
    %% START ITERATIONS OVER YEARS
    for thisyear = 1:numyears
@@ -49,6 +49,7 @@ function [ice1, ice2] = skinmodel(opts)
             psfc(metiter), De(metiter), ea, cv_air, cv_liq, emiss, SB, Tf, ...
             chi, roL, scoef, liqflag, Ts, T, k_eff, dz, opts.seb_solver);
          Ts = MELTTEMP(Ts, Tf);
+         xTs = Ts;
 
          while dt_sum + TINY < dt_FULL_STEP
 
@@ -56,19 +57,27 @@ function [ice1, ice2] = skinmodel(opts)
             [T, OK, N] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, ...
                Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf, 1e-2, opts.maxiter);
 
+            % PROGRESS MESSAGE (SLOWS DOWN THE CODE A LOT)
+            if debug == true
+               fprintf('iter = %d (%.2f%%), dt = %.0f, success = %s\n', ...
+                  iter, 100*iter/maxiter, dt, mat2str(all(OK)))
+            end
+
             % ADAPTIVE TIME STEP
             if not(OK)
-               [T, f_ice, f_liq, subfail, subiter, dt] ...
-                  = RESETSUBSTEP(xT, xf_ice, xf_liq, dt_FULL_STEP, ...
+               [Ts, T, f_ice, f_liq, subfail, subiter, dt] ...
+                  = RESETSUBSTEP(xTs, xT, xf_ice, xf_liq, dt_FULL_STEP, ...
                   subiter, maxsubiter, subfail, dt_sum);
                if subfail < maxsubiter
                   continue
+               else
+                  % disp('subfail == maxsubiter')
                end
             end
 
             % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
-            [xT, xf_ice, xf_liq, dt_sum, dt, liqflag, roL] ...
-               = UPDATESUBSTEP(T, f_ice, f_liq, dt_FULL_STEP, dt_sum, ...
+            [xTs, xT, xf_ice, xf_liq, dt_sum, dt, liqflag, roL] ...
+               = UPDATESUBSTEP(Ts, T, f_ice, f_liq, dt_FULL_STEP, dt_sum, ...
                dt, TINY, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs);
          end
 
