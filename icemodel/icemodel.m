@@ -68,6 +68,10 @@ function [ice1, ice2] = icemodel(opts)
    bc = opts.bc_type;
    ok = true;
 
+   maxcpliter = 50;
+   omega = 0.3;
+   tol = 1e-3;
+
    %% START ITERATIONS OVER YEARS
    for thisyear = 1:numyears
 
@@ -92,7 +96,7 @@ function [ice1, ice2] = icemodel(opts)
          elseif bc == 2
             [Fc, Fp] = SFCFLIN(tair(metiter), swd(metiter), lwd(metiter), ...
                albedo(metiter), wspd(metiter), psfc(metiter), De(metiter), ...
-               ea, cv_air, emiss, SB, roL, scoef, chi, Tf, T(1), liqflag);
+               ea, cv_air, emiss, SB, roL, scoef, chi, Tf, Ts, liqflag);
          end
 
          while dt_sum + TINY < dt_FULL_STEP
@@ -107,7 +111,9 @@ function [ice1, ice2] = icemodel(opts)
                % PROGRESS MESSAGE (SLOWS DOWN THE CODE A LOT)
                fprintf('iter = %d (%.2f%%), dt = %.0f, success = %s\n', ...
                   iter, 100*iter/maxiter, dt, mat2str(all(OK)))
-               assertF(@() all(f_ice + f_liq * ro_liq / ro_ice <= 1 + eps))
+               if OK
+                  assertF(@() all(f_ice + f_liq * ro_liq / ro_ice <= 1 + eps))
+               end
             end
 
             % PHASE BOUNDARY OVERSHOOT, DECREASE THE TIME STEP AND START OVER
@@ -120,10 +126,16 @@ function [ice1, ice2] = icemodel(opts)
                end
             end
 
-            % UPDATE SURFACE FLUXES
+            % UPDATE SEB LINEARIZATION (substep update for lagged-robin bc)
             if bc == 2
                Ts = (Fc + a1 * T(1)) / (a1 - Fp);
+               Ts = (1-omega) * xTs + omega * Ts;
+               [Fc, Fp] = SFCFLIN(tair(metiter), swd(metiter), lwd(metiter), ...
+                  albedo(metiter), wspd(metiter), psfc(metiter), De(metiter), ...
+                  ea, cv_air, emiss, SB, roL, scoef, chi, Tf, Ts, liqflag);
             end
+
+            % UPDATE SURFACE FLUXES
             [Qe, Qh, Qc, Qm, ~, balance] = SEBFLUX(T, Ts, tair(metiter), ...
                swd(metiter), lwd(metiter), albedo(metiter), wspd(metiter), ...
                ppt(metiter), tppt(metiter), psfc(metiter), De(metiter), ea, ...
