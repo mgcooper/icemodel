@@ -35,7 +35,7 @@ function [ice1, ice2] = icemodel(opts)
 
    %% INITIALIZE THE MODEL
 
-   debug = true;
+   debug = false;
    assertF on
 
    % LOAD PHYSICAL CONSTANTS AND PARAMETERS
@@ -92,6 +92,9 @@ function [ice1, ice2] = icemodel(opts)
                albedo(metiter), wspd(metiter), ppt(metiter), tppt(metiter), ...
                psfc(metiter), De(metiter), ea, cv_air, cv_liq, emiss, SB, Tf, ...
                chi, roL, scoef, liqflag, Ts, T, k_eff, dz, opts.seb_solver);
+
+            % Update xTs in case of failure on first subsurface solve
+            xTs = Ts;
 
          elseif bc == 2
             [Fc, Fp] = SFCFLIN(tair(metiter), swd(metiter), lwd(metiter), ...

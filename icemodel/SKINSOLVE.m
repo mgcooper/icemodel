@@ -29,6 +29,7 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
    k_vap = 0 * T;
 
    % Solve the nonlinear heat equation by iteration (p. 47)
+   OK = false;
    for iter = 1:maxiter
 
       T_iter = T;
@@ -72,7 +73,10 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
       T = alpha * T + (1 - alpha) * T;
 
       % Prep for next iteration
-      if all(abs(T - T_iter) < tol); break; end
+      if all(abs(T - T_iter) < tol)
+         OK = true;
+         break
+      end
    end
-   OK = iter <= maxiter;
+   % OK = iter <= maxiter;
 end
