@@ -122,7 +122,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    if strcmp(smbmodel, 'icemodel')
 
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
-      opts.bc_type         = 1;     % recommended: 1 (1=dirichlet, 2=robin)
+      opts.bc_type         = 2;     % recommended: 1 (1=dirichlet, 2=robin)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
       opts.maxiter         = 50;    % 1d nonlinear heat transfer max iterations
       opts.maxcpliter      = 50;    % outer Picard iterations
