@@ -45,9 +45,14 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
                ea, cv_air, emiss, SB, Tf, chi, roL, scoef, liqflag, ...
                CONDUCT(k_eff, T, dz, old), k_eff, T, dz, iterflag);
 
-            if not(ok) || abs(old - Ts) < tol
+            if not(ok)
                break
             end
+            if abs(old - Ts) < tol
+               ok = true;
+               break
+            end
+            ok = false;
          end
 
       case 2 % Complex-step - numerical derivative
@@ -55,9 +60,14 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
          for iter = 1:maxiter
             old = Ts;
             [Ts, ok] = complexstep(@fSEB, Ta);
-            if not(ok) || abs(old - Ts) < tol
+            if not(ok)
                break
             end
+            if abs(old - Ts) < tol
+               ok = true;
+               break
+            end
+            ok = false;
          end
 
       otherwise % Derivative-free
@@ -72,9 +82,14 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
       for iter = 1:maxiter
          old = Ts;
          [Ts, ~, ok] = fsearchzero(@fSEB, old, Ta-50, Ta+50, Ta, tol);
-         if not(ok) || abs(old - Ts) < tol
+         if not(ok)
             break
          end
+         if abs(old - Ts) < tol
+            ok = true;
+            break
+         end
+         ok = false;
       end
    end
 
