@@ -35,7 +35,7 @@ function [ice1, ice2] = icemodel(opts)
 
    %% INITIALIZE THE MODEL
 
-   debug = false;
+   debug = true;
    assertF on
 
    % LOAD PHYSICAL CONSTANTS AND PARAMETERS
@@ -63,14 +63,10 @@ function [ice1, ice2] = icemodel(opts)
       numyears, numspinup] = INITTIMESTEPS(opts, time);
 
    % INITIALIZE PAST VALUES
-   [xT, xf_ice, xf_liq] = RESETSUBSTEP(T, f_ice, f_liq);
+   [xTs, xT, xf_ice, xf_liq] = RESETSUBSTEP(Ts, T, f_ice, f_liq);
 
    bc = opts.bc_type;
    ok = true;
-
-   maxcpliter = 50;
-   omega = 0.3;
-   tol = 1e-3;
 
    %% START ITERATIONS OVER YEARS
    for thisyear = 1:numyears
@@ -118,9 +114,9 @@ function [ice1, ice2] = icemodel(opts)
 
             % PHASE BOUNDARY OVERSHOOT, DECREASE THE TIME STEP AND START OVER
             if not(OK)
-               [T, f_ice, f_liq, subfail, subiter, dt] ...
-                  = RESETSUBSTEP(xT, xf_ice, xf_liq, dt_FULL_STEP, subiter, ...
-                  maxsubiter, subfail, dt_sum);
+               [Ts, T, f_ice, f_liq, subfail, subiter, dt] ...
+                  = RESETSUBSTEP(xTs, xT, xf_ice, xf_liq, dt_FULL_STEP, ...
+                  subiter, maxsubiter, subfail, dt_sum);
                if subfail < maxsubiter
                   continue
                end
@@ -129,7 +125,6 @@ function [ice1, ice2] = icemodel(opts)
             % UPDATE SEB LINEARIZATION (substep update for lagged-robin bc)
             if bc == 2
                Ts = (Fc + a1 * T(1)) / (a1 - Fp);
-               Ts = (1-omega) * xTs + omega * Ts;
                [Fc, Fp] = SFCFLIN(tair(metiter), swd(metiter), lwd(metiter), ...
                   albedo(metiter), wspd(metiter), psfc(metiter), De(metiter), ...
                   ea, cv_air, emiss, SB, roL, scoef, chi, Tf, Ts, liqflag);
@@ -149,8 +144,8 @@ function [ice1, ice2] = icemodel(opts)
                d_lyr, f_ell_min, f_liq_res);
 
             % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
-            [xT, xf_ice, xf_liq, dt_sum, dt, liqflag, roL] ...
-               = UPDATESUBSTEP(T, f_ice, f_liq, dt_FULL_STEP, dt_sum, ...
+            [xTs, xT, xf_ice, xf_liq, dt_sum, dt, liqflag, roL] ...
+               = UPDATESUBSTEP(Ts, T, f_ice, f_liq, dt_FULL_STEP, dt_sum, ...
                dt, TINY, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs);
          end
 

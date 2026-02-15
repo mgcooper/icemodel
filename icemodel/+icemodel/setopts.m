@@ -106,7 +106,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %---------------------------------------------------------
 
    % general model settings
-   opts.spinup_loops    =  2;       % number of spin-up loops to initialize
+   opts.spinup_loops    =  1;       % number of spin-up loops to initialize
    opts.use_init        =  false;   % use pre-initialized data?
    opts.kabs_user       =  true;    % use user-defined ice absorptivity?
    opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
@@ -122,7 +122,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    if strcmp(smbmodel, 'icemodel')
 
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
-      opts.bc_type         = 1;     % recommended: 1 (1=dirichlet, 2=robin)
+      opts.bc_type         = 2;     % recommended: 1 (1=dirichlet, 2=robin)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
       opts.maxiter         = 50;    % 1d nonlinear heat transfer max iterations
 
