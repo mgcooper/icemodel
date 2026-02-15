@@ -26,7 +26,7 @@ clc
 %% Set up
 
 % Run setup() to add the project paths to the matlab path.
-setup()
+% setup()
 
 % Source the project-level configuration.
 config = icemodel.config('casename', 'demo');
@@ -37,7 +37,7 @@ config = icemodel.config('casename', 'demo');
 saveflag = false;
 sitename = 'kanm';
 forcings = 'kanm';
-smbmodel = 'skinmodel';
+smbmodel = 'icemodel';
 simyears = 2016:2016;
 backupflag = false;
 
@@ -54,55 +54,55 @@ backupflag = false;
 % observed values from the KANM weather station.
 icemodel.plot.enbal(ice1, met)
 
-%% Example 2 - Replace KAN-M albedo with MODIS albedo
-
-% Set the run configuration. Use the "userdata" option to swap the albedo.
-saveflag = false;
-sitename = 'kanm';
-forcings = 'kanm';
-smbmodel = 'skinmodel';
-userdata = 'modis';
-uservars = 'albedo';
-simyears = 2016:2016;
-backupflag = false;
-
-% Run the model
-[ice1, ice2, met, opts] = icemodel.run.point(...
-   "saveflag", saveflag, ...
-   "sitename", sitename, ...
-   "forcings", forcings, ...
-   "smbmodel", smbmodel, ...
-   "simyears", simyears, ...
-   "userdata", userdata, ...
-   "uservars", uservars, ...
-   "backupflag", backupflag);
-
-% Demo plot
-icemodel.plot.enbal(ice1, met)
-
-%% Example 3 - Replace KAN-M air temperature with MERRA-2 air temperature
-
-% Set the run configuration. Use the "userdata" option to swap the air temp.
-saveflag = false;
-sitename = 'kanm';
-forcings = 'kanm';
-smbmodel = 'skinmodel';
-userdata = 'merra';
-uservars = 'tair';
-simyears = 2016:2016;
-backupflag = false;
-
-% Run the model
-[ice1, ice2, met, opts] = icemodel.run.point(...
-   "saveflag", saveflag, ...
-   "sitename", sitename, ...
-   "forcings", forcings, ...
-   "smbmodel", smbmodel, ...
-   "simyears", simyears, ...
-   "userdata", userdata, ...
-   "uservars", uservars, ...
-   "backupflag", backupflag);
-
-% Demo plot
-icemodel.plot.enbal(ice1, met)
-
+% %% Example 2 - Replace KAN-M albedo with MODIS albedo
+%
+% % Set the run configuration. Use the "userdata" option to swap the albedo.
+% saveflag = false;
+% sitename = 'kanm';
+% forcings = 'kanm';
+% smbmodel = 'skinmodel';
+% userdata = 'modis';
+% uservars = 'albedo';
+% simyears = 2016:2016;
+% backupflag = false;
+%
+% % Run the model
+% [ice1, ice2, met, opts] = icemodel.run.point(...
+%    "saveflag", saveflag, ...
+%    "sitename", sitename, ...
+%    "forcings", forcings, ...
+%    "smbmodel", smbmodel, ...
+%    "simyears", simyears, ...
+%    "userdata", userdata, ...
+%    "uservars", uservars, ...
+%    "backupflag", backupflag);
+%
+% % Demo plot
+% icemodel.plot.enbal(ice1, met)
+%
+% %% Example 3 - Replace KAN-M air temperature with MERRA-2 air temperature
+%
+% % Set the run configuration. Use the "userdata" option to swap the air temp.
+% saveflag = false;
+% sitename = 'kanm';
+% forcings = 'kanm';
+% smbmodel = 'skinmodel';
+% userdata = 'merra';
+% uservars = 'tair';
+% simyears = 2016:2016;
+% backupflag = false;
+%
+% % Run the model
+% [ice1, ice2, met, opts] = icemodel.run.point(...
+%    "saveflag", saveflag, ...
+%    "sitename", sitename, ...
+%    "forcings", forcings, ...
+%    "smbmodel", smbmodel, ...
+%    "simyears", simyears, ...
+%    "userdata", userdata, ...
+%    "uservars", uservars, ...
+%    "backupflag", backupflag);
+%
+% % Demo plot
+% icemodel.plot.enbal(ice1, met)
+%

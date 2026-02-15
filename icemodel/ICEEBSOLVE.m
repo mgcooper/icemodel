@@ -30,7 +30,7 @@ function [Ts, Fc, Fp, T, f_ice, f_liq, k_eff, OK, N, a1] = ICEEBSOLVE( ...
       % Diagnose Ts from frozen coefficients and updated (a1,T1)
       Ts = (Fc + a1 * T(1)) / (a1 - Fp);
       Ts = (1-omega) * old + omega * Ts;
-      
+
       % Update coefficients
       [Fc, Fp] = SFCFLIN(tair, swd, lwd, albedo, wspd, psfc, De, ea, ...
          cv_air, emiss, SB, roL, scoef, chi, Tf, Ts, liqflag);
