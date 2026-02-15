@@ -68,6 +68,10 @@ function [ice1, ice2] = icemodel(opts)
    bc = opts.bc_type;
    ok = true;
 
+   maxcpliter = 50;
+   omega = 0.3;
+   tol = 1e-3;
+
    %% START ITERATIONS OVER YEARS
    for thisyear = 1:numyears
 
@@ -98,10 +102,52 @@ function [ice1, ice2] = icemodel(opts)
          while dt_sum + TINY < dt_FULL_STEP
 
             % SUBSURFACE ENERGY BALANCE
-            [T, f_ice, f_liq, k_eff, OK, N, a1] = ICEENBAL(T, f_ice, f_liq, ...
-               dz, delz, fn, Sc, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, ...
-               ro_liq, Ls, Lf, roLf, Rv, Tf, fcp, TL, TH, f_ell_min, ...
-               f_ell_max, Fc, Fp, bc);
+            if bc == 3
+               % Initial values for Fc, Fp
+               [Fc, Fp] = SFCFLIN(tair(metiter), swd(metiter), lwd(metiter), ...
+                  albedo(metiter), wspd(metiter), psfc(metiter), De(metiter), ...
+                  ea, cv_air, emiss, SB, roL, scoef, chi, Tf, Ts, liqflag);
+
+               % Outer Ts convergence
+               cplOK = false;
+               for cpliter = 1:maxcpliter
+                  old = Ts;
+
+                  % Inner subsurface solve with updated Ts, Fc, Fp
+                  [T, f_ice, f_liq, k_eff, OK, N, a1] = ICEENBAL(xT, xf_ice, xf_liq, ...
+                     dz, delz, fn, Sc, dt, JJ, Ts, k_liq, ...
+                     cv_ice, cv_liq, ro_ice, ...
+                     ro_liq, Ls, Lf, roLf, Rv, Tf, fcp, TL, TH, f_ell_min, ...
+                     f_ell_max, Fc, Fp, bc);
+
+                  if not(OK)
+                     break
+                  end
+
+                  % diagnose Ts from frozen coefficients and updated (a1,T1)
+                  Ts = (Fc + a1 * T(1)) / (a1 - Fp);
+                  Ts = (1-omega) * old + omega * Ts;
+                  [Fc, Fp] = SFCFLIN(tair(metiter), swd(metiter), ...
+                     lwd(metiter), albedo(metiter), wspd(metiter), ...
+                     psfc(metiter), De(metiter), ea, cv_air, emiss, SB, roL, ...
+                     scoef, chi, Tf, Ts, liqflag);
+
+                  % check convergence
+                  if abs(Ts - old) < tol
+                     cplOK = true;
+                     break
+                  end
+               end
+
+               % Hitting max coupling iterations without cplOK is a substep fail
+               OK = OK && cplOK;
+
+            else
+               [T, f_ice, f_liq, k_eff, OK, N, a1] = ICEENBAL(T, f_ice, f_liq, ...
+                  dz, delz, fn, Sc, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, ...
+                  ro_liq, Ls, Lf, roLf, Rv, Tf, fcp, TL, TH, f_ell_min, ...
+                  f_ell_max, Fc, Fp, bc);
+            end
 
             if debug == true
                % PROGRESS MESSAGE (SLOWS DOWN THE CODE A LOT)

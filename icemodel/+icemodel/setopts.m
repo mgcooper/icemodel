@@ -125,6 +125,22 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.bc_type         = 2;     % recommended: 1 (1=dirichlet, 2=robin)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
       opts.maxiter         = 50;    % 1d nonlinear heat transfer max iterations
+      opts.maxcpliter      = 50;    % outer Picard iterations
+
+      % Fix the linearized SEB coefficients over substeps (inner_robin = FALSE)
+      % or update them on each substep (inner_robin = TRUE).
+      opts.inner_robin     = true;
+      % Updating each substep is equivalent to nesting the subsurface solver
+      % inside outer Picard iterations that drive convergence of Ts, where Ts is
+      % diagnosed from conductance and T(1) updated each substep. Fixing them is
+      % equivalent to a single block-solve (one Picard iteration). Note that the
+      % Dirichlet option uses Picard iterations to drive convergence of Ts by
+      % default, but uses lagged conductance and T(1) values.
+
+      % Update the bc option so this condition isn't checked every step.
+      if opts.bc_type == 2 && opts.inner_robin == true
+         opts.bc_type = 3;
+      end
 
       opts.dt              = 3600;  % timestep (3600 or 900)               [s]
       opts.dz_thermal      = 0.04;  % dz for thermal heat transfer         [m]

@@ -101,11 +101,11 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = GECOEFS(T, f_ice, f_liq, dHdT, ...
       case 1
          % Dirichlet: Ts = known
          bc_N = a1 * Ts;
-      case 2
+      case {2, 3}
          % Robin: qB = f(Ts)
          bc_N = a1 * Fc / (a1 - Fp);
          aN(1) = 0.0;
-      case 3
+      case 4
          % Neumann: qB = known
          % bc_N = qN;
          % aN(1) = 0.0;
@@ -123,8 +123,8 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = GECOEFS(T, f_ice, f_liq, dHdT, ...
    b(1) = b(1) + bc_N;
    b(JJ) = b(JJ) + bc_S;
 
-   % Robin:
-   if bc == 2 || bc == 3
+   % Robin (both types) and Neumann:
+   if bc > 1
       aP(1) = aP(1) - Fp * a1 / (a1 - Fp);
    end
 
