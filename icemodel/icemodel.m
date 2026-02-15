@@ -67,6 +67,7 @@ function [ice1, ice2] = icemodel(opts)
 
    bc = opts.bc_type;
    ok = true;
+   sebfail_count = 0;
 
    maxcpliter = 50;
    omega = 0.3;
@@ -92,6 +93,9 @@ function [ice1, ice2] = icemodel(opts)
                albedo(metiter), wspd(metiter), ppt(metiter), tppt(metiter), ...
                psfc(metiter), De(metiter), ea, cv_air, cv_liq, emiss, SB, Tf, ...
                chi, roL, scoef, liqflag, Ts, T, k_eff, dz, opts.seb_solver);
+            if not(ok)
+               sebfail_count = sebfail_count + 1;
+            end
 
             % Update xTs in case of failure on first subsurface solve
             xTs = Ts;
@@ -189,7 +193,7 @@ function [ice1, ice2] = icemodel(opts)
 
          % MOVE TO THE NEXT TIMESTEP
          [metiter, subiter, dt] = NEXTSTEP(metiter, subiter, ...
-            dt, dt_FULL_STEP, maxsubiter, OK);
+            dt, dt_FULL_STEP, maxsubiter, OK && ok);
 
       end % timesteps (one year)
 
@@ -204,4 +208,5 @@ function [ice1, ice2] = icemodel(opts)
          time((thisyear-numspinup)*maxiter+1:(thisyear-numspinup+1)*maxiter), ...
          swd, lwd, albedo)
    end
+   fprintf('SEBSOLVE fail count=%d\n', sebfail_count)
 end

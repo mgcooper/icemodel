@@ -8,7 +8,7 @@ function [ice1, ice2] = skinmodel(opts)
 
    %% INITIALIZE THE MODEL
 
-   debug = false;
+   debug = true;
    assertF off
 
    % LOAD PHYSICAL CONSTANTS AND PARAMETERS
@@ -18,6 +18,7 @@ function [ice1, ice2] = skinmodel(opts)
       'Ls', 'ro_air', 'ro_ice', 'ro_liq', 'roLs', 'roLv', 'Rv', 'Tf');
    TINY = 1e-8;
    chi = 1.0;
+   sebfail_count = 0;
 
    % LOAD THE FORCING DATA
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
@@ -49,6 +50,9 @@ function [ice1, ice2] = skinmodel(opts)
             psfc(metiter), De(metiter), ea, cv_air, cv_liq, emiss, SB, Tf, ...
             chi, roL, scoef, liqflag, Ts, T, k_eff, dz, opts.seb_solver);
          Ts = MELTTEMP(Ts, Tf);
+         if not(ok)
+            sebfail_count = sebfail_count + 1;
+         end
          xTs = Ts;
 
          while dt_sum + TINY < dt_FULL_STEP
@@ -109,7 +113,7 @@ function [ice1, ice2] = skinmodel(opts)
 
          % MOVE TO THE NEXT TIMESTEP
          [metiter, subiter, dt] = NEXTSTEP(metiter, subiter, ...
-            dt, dt_FULL_STEP, maxsubiter, OK);
+            dt, dt_FULL_STEP, maxsubiter, OK && ok);
 
       end % timesteps (one year)
 
@@ -124,4 +128,5 @@ function [ice1, ice2] = skinmodel(opts)
          time((thisyear-numspinup)*maxiter+1:(thisyear-numspinup+1)*maxiter), ...
          swd, lwd, albedo)
    end
+   fprintf('SEBSOLVE fail count=%d\n', sebfail_count)
 end
