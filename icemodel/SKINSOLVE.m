@@ -70,7 +70,7 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
       T = TRISOLVE(-aN, aP, -aS, b);
 
       % Apply over-relaxation
-      T = alpha * T + (1 - alpha) * T;
+      T = alpha * T + (1 - alpha) * T_iter;
 
       % Prep for next iteration
       if all(abs(T - T_iter) < tol)

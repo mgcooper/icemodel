@@ -63,8 +63,8 @@ function [ice1, ice2] = skinmodel(opts)
 
             % PROGRESS MESSAGE (SLOWS DOWN THE CODE A LOT)
             if debug == true
-               fprintf('iter = %d (%.2f%%), dt = %.0f, success = %s\n', ...
-                  iter, 100*iter/maxiter, dt, mat2str(all(OK)))
+               % fprintf('iter = %d (%.2f%%), dt = %.0f, success = %s\n', ...
+               %    iter, 100*iter/maxiter, dt, mat2str(all(OK)))
             end
 
             % ADAPTIVE TIME STEP
