@@ -50,8 +50,8 @@ function [ice1, ice2] = skinmodel(opts)
 
          while dt_sum + TINY < dt_FULL_STEP
 
-            % Pre-coupler predictor
-            k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
+            % Pre-coupler Ts predictor using checkpoint state
+            k_eff = GETGAMMA(xT, xf_ice, xf_liq, ro_ice, k_liq, Ls, Rv, Tf);
             [Ts, ok_seb] = SEBSOLVE(tair(metiter), swd(metiter), ...
                lwd(metiter), albedo(metiter), wspd(metiter), ...
                ppt(metiter), tppt(metiter), psfc(metiter), De(metiter), ...
@@ -62,7 +62,7 @@ function [ice1, ice2] = skinmodel(opts)
             ok_cpl = false;
             for cpliter = 1:maxcpliter
 
-               % Solve subsurface from checkpoint state (no physical advance)
+               % Solve subsurface from checkpoint state w/o physical advancement
                [T, ok_ieb, N] = SKINSOLVE(xT, xf_ice, xf_liq, dz, delz, fn, ...
                   dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf, ...
                   1e-2, opts.maxiter);
@@ -70,14 +70,14 @@ function [ice1, ice2] = skinmodel(opts)
                   break
                end
 
-               % Solve surface (in-loop corrector)
+               % Solve surface (in-loop corrector using updated trial state)
                old = Ts;
-               k_eff = GETGAMMA(xT, xf_ice, xf_liq, ro_ice, k_liq, Ls, Rv, Tf);
+               k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
                [Ts, ok_seb] = SEBSOLVE(tair(metiter), swd(metiter), ...
                   lwd(metiter), albedo(metiter), wspd(metiter), ...
                   ppt(metiter), tppt(metiter), psfc(metiter), De(metiter), ...
                   ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
-                  liqflag, Ts, xT, k_eff, dz, opts.seb_solver);
+                  liqflag, Ts, T, k_eff, dz, opts.seb_solver);
                Ts = MELTTEMP(Ts, Tf);
                if not(ok_seb)
                   sebfail_count = sebfail_count + 1;
@@ -109,16 +109,6 @@ function [ice1, ice2] = skinmodel(opts)
                   % fprintf('iter = %d, subfail == maxsubiter\n', iter)
                end
             end
-
-            % Final substep corrector (required for Ts-T consistency before
-            % committing xTs/xT and for SEBFLUX diagnostics).
-            k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
-            [Ts, ok_seb] = SEBSOLVE(tair(metiter), swd(metiter), ...
-               lwd(metiter), albedo(metiter), wspd(metiter), ...
-               ppt(metiter), tppt(metiter), psfc(metiter), De(metiter), ...
-               ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
-               liqflag, Ts, T, k_eff, dz, opts.seb_solver);
-            Ts = MELTTEMP(Ts, Tf);
 
             % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
             [xTs, xT, xf_ice, xf_liq, dt_sum, dt, liqflag, roL] ...
