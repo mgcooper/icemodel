@@ -19,6 +19,8 @@ function [ice1, ice2] = skinmodel(opts)
    TINY = 1e-8;
    chi = 1.0;
    sebfail_count = 0;
+   maxcpliter = opts.maxcpliter;
+   cpltol = opts.cpltol;
 
    % LOAD THE FORCING DATA
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
@@ -43,28 +45,57 @@ function [ice1, ice2] = skinmodel(opts)
          % INITIALIZE NEW TIMESTEP
          [dt_sum, subfail, ok_seb, ok_ieb] = NEWTIMESTEP(f_liq);
 
-         % SURFACE TEMPERATURE
+         % Atmospheric vapor pressure (fixed over this full forcing step).
          ea = VAPPRESS(tair(metiter), Tf, liqflag) * rh(metiter) / 100;
-         [Ts, ok] = SEBSOLVE(tair(metiter), swd(metiter), lwd(metiter), ...
-            albedo(metiter), wspd(metiter), ppt(metiter), tppt(metiter), ...
-            psfc(metiter), De(metiter), ea, cv_air, cv_liq, emiss, SB, Tf, ...
-            chi, roL, scoef, liqflag, Ts, T, k_eff, dz, opts.seb_solver);
-         Ts = MELTTEMP(Ts, Tf);
-         if not(ok)
-            sebfail_count = sebfail_count + 1;
-         end
-         xTs = Ts;
 
          while dt_sum + TINY < dt_FULL_STEP
 
-            % HEAT CONDUCTION
-            [T, OK, N] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, ...
-               Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf, 1e-2, opts.maxiter);
+            % Pre-coupler predictor
+            k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
+            [Ts, ok_seb] = SEBSOLVE(tair(metiter), swd(metiter), ...
+               lwd(metiter), albedo(metiter), wspd(metiter), ...
+               ppt(metiter), tppt(metiter), psfc(metiter), De(metiter), ...
+               ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
+               liqflag, xTs, xT, k_eff, dz, opts.seb_solver);
+            Ts = MELTTEMP(Ts, Tf);
+
+            ok_cpl = false;
+            for cpliter = 1:maxcpliter
+
+               % Solve subsurface from checkpoint state (no physical advance)
+               [T, ok_ieb, N] = SKINSOLVE(xT, xf_ice, xf_liq, dz, delz, fn, ...
+                  dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf, ...
+                  1e-2, opts.maxiter);
+               if not(ok_ieb)
+                  break
+               end
+
+               % Solve surface (in-loop corrector)
+               old = Ts;
+               k_eff = GETGAMMA(xT, xf_ice, xf_liq, ro_ice, k_liq, Ls, Rv, Tf);
+               [Ts, ok_seb] = SEBSOLVE(tair(metiter), swd(metiter), ...
+                  lwd(metiter), albedo(metiter), wspd(metiter), ...
+                  ppt(metiter), tppt(metiter), psfc(metiter), De(metiter), ...
+                  ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
+                  liqflag, Ts, xT, k_eff, dz, opts.seb_solver);
+               Ts = MELTTEMP(Ts, Tf);
+               if not(ok_seb)
+                  sebfail_count = sebfail_count + 1;
+                  break
+               end
+
+               % Check convergence
+               if abs(Ts - old) < cpltol
+                  ok_cpl = true;
+                  break
+               end
+            end
+            OK = ok_seb && ok_ieb && ok_cpl;
 
             % PROGRESS MESSAGE (SLOWS DOWN THE CODE A LOT)
-            if debug == true
-               % fprintf('iter = %d (%.2f%%), dt = %.0f, success = %s\n', ...
-               %    iter, 100*iter/maxiter, dt, mat2str(all(OK)))
+            if debug == true && not(OK)
+               fprintf('iter = %d (%.2f%%), dt = %.0f, success = %s\n', ...
+                  iter, 100*iter/maxiter, dt, mat2str(all(ok_ieb)))
             end
 
             % ADAPTIVE TIME STEP
@@ -78,6 +109,16 @@ function [ice1, ice2] = skinmodel(opts)
                   % fprintf('iter = %d, subfail == maxsubiter\n', iter)
                end
             end
+
+            % Final substep corrector (required for Ts-T consistency before
+            % committing xTs/xT and for SEBFLUX diagnostics).
+            k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
+            [Ts, ok_seb] = SEBSOLVE(tair(metiter), swd(metiter), ...
+               lwd(metiter), albedo(metiter), wspd(metiter), ...
+               ppt(metiter), tppt(metiter), psfc(metiter), De(metiter), ...
+               ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
+               liqflag, Ts, T, k_eff, dz, opts.seb_solver);
+            Ts = MELTTEMP(Ts, Tf);
 
             % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
             [xTs, xT, xf_ice, xf_liq, dt_sum, dt, liqflag, roL] ...
