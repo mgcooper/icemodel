@@ -1,9 +1,10 @@
-function [dt_sum, subfail, OK, d_liq, d_evp, d_lyr] = NEWTIMESTEP(f_liq)
+function [dt_sum, subfail, ok1, ok2, d_liq, d_evp, d_lyr] = NEWTIMESTEP(f_liq)
    %NEWTIMESTEP initialize new timestep
    %
    %#codegen
 
-   OK = false;             % assume sub-step failed
+   ok1 = false;            % assume seb failed
+   ok2 = false;            % assume ice-eb sub-step failed
    d_liq = 0.0 * f_liq;    % reset the change in liq water content
    d_evp = 0.0 * f_liq;    % reset the evaporation change in water content
    d_lyr = 0.0 * f_liq;    % reset the layer change

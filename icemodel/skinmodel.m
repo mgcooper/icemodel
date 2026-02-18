@@ -41,7 +41,7 @@ function [ice1, ice2] = skinmodel(opts)
       for iter = 1:maxiter
 
          % INITIALIZE NEW TIMESTEP
-         [dt_sum, subfail, OK] = NEWTIMESTEP(f_liq);
+         [dt_sum, subfail, ok_seb, ok_ieb] = NEWTIMESTEP(f_liq);
 
          % SURFACE TEMPERATURE
          ea = VAPPRESS(tair(metiter), Tf, liqflag) * rh(metiter) / 100;
@@ -75,7 +75,7 @@ function [ice1, ice2] = skinmodel(opts)
                if subfail < maxsubiter
                   continue
                else
-                  % disp('subfail == maxsubiter')
+                  % fprintf('iter = %d, subfail == maxsubiter\n', iter)
                end
             end
 
@@ -106,14 +106,14 @@ function [ice1, ice2] = skinmodel(opts)
             else
                [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, ...
                   opts.vars1, opts.vars2, ...
-                  {Ts, Qm, Qe, Qh, Qc, chi, balance, dt_sum, ok, OK, N}, ...
+                  {Ts, Qm, Qe, Qh, Qc, chi, balance, dt_sum, ok_seb, ok_ieb, N}, ...
                   {T, f_ice, f_liq});
             end
          end
 
          % MOVE TO THE NEXT TIMESTEP
          [metiter, subiter, dt] = NEXTSTEP(metiter, subiter, ...
-            dt, dt_FULL_STEP, maxsubiter, OK && ok);
+            dt, dt_FULL_STEP, maxsubiter, ok_ieb);
 
       end % timesteps (one year)
 
