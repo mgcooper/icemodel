@@ -124,12 +124,14 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
       opts.bc_type         = 2;     % recommended: 1 (1=dirichlet, 2=robin)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
-      opts.maxiter         = 50;    % 1d nonlinear heat transfer max iterations
-      opts.maxcpliter      = 50;    % outer Picard iterations
+      opts.maxiter         = 100;   % 1d nonlinear heat transfer max iterations
+      opts.maxcpliter      = 50;    % outer Picard iterations for Ts convergence
+      opts.cpltol          = 1e-3;  % Ts convergence tolerance
+      opts.omega           = 0.3;   % Ts relaxation factor
 
       % Fix the linearized SEB coefficients over substeps (inner_robin = FALSE)
       % or update them on each substep (inner_robin = TRUE).
-      opts.inner_robin     = true;
+      opts.inner_robin     = false;
       % Updating each substep is equivalent to nesting the subsurface solver
       % inside outer Picard iterations that drive convergence of Ts, where Ts is
       % diagnosed from conductance and T(1) updated each substep. Fixing them is
@@ -154,7 +156,10 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
       opts.bc_type         = 1;     % recommended: 1 (1=dirichlet, 2=robin)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
-      opts.maxiter         = 50;    % 1d nonlinear heat transfer max iterations
+      opts.maxiter         = 100;   % 1d nonlinear heat transfer max iterations
+      opts.maxcpliter      = 50;    % outer Picard iterations for Ts convergence
+      opts.cpltol          = 1e-3;  % Ts convergence tolerance
+      opts.omega           = 0.3;   % Ts relaxation factor
 
       opts.dt              = 3600;  % timestep (3600 or 900)               [s]
       opts.dz_thermal      = 0.04;  % dz for thermal heat transfer         [m]

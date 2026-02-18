@@ -4,6 +4,8 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
    %
    %#codegen
 
+   debug = false;
+
    % Solver options
    tol = 1e-2;
    maxiter = 100;
