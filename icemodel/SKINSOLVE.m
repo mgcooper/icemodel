@@ -69,8 +69,16 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
       % Solve the equation
       T = TRISOLVE(-aN, aP, -aS, b);
 
+      if debug == true
+         plot_temp(T, T_iter, Ts, dz)
+      end
+
       % Apply over-relaxation
       T = alpha * T + (1 - alpha) * T_iter;
+
+      if debug == true
+         plot_temp(T, T_iter, Ts, dz)
+      end
 
       % Prep for next iteration
       if all(abs(T - T_iter) < tol)
@@ -79,4 +87,14 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
       end
    end
    % OK = iter <= maxiter;
+end
+
+function plot_temp(T, T_iter, Ts, dz)
+   Z = cumsum(dz) - dz / 2;
+   figure; hold on
+   plot(T, Z)
+   plot(T_iter, Z, '--')
+   scatter(Ts, 0, 'filled')
+   set(gca, 'YDir', 'reverse')
+   legend('T', 'T iter', 'Ts')
 end

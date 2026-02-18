@@ -18,6 +18,9 @@ function varargout = POSTPROC(ice1, ice2, opts, varargin)
    %
    %#codegen
 
+   % 2/15/2026 - this fails on multi-year runs b/c when nargin == 4 it loads met
+   % for the first year
+
    % Process inputs
    if nargin == 7
       [swd, lwd, albedo, time] = deal(varargin{:});

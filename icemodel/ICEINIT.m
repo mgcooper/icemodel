@@ -5,11 +5,13 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
    %
    %#codegen
 
+   debug = false;
+
    % LOAD PHYSICAL CONSTANTS AND PARAMETERS
-   [cp_ice, cp_liq, fcp, Lf, ro_ice, ro_liq, k_liq, Tf, Ls, Rv, roLs] ...
+   [cp_ice, cp_liq, fcp, Lf, ro_ice, ro_liq, k_ice, k_liq, Tf, Ls, Rv, roLs] ...
       = icemodel.physicalConstant( ...
-      'cp_ice','cp_liq', 'fcp','Lf', 'ro_ice','ro_liq', 'k_liq','Tf', ...
-      'Ls','Rv','roLs');
+      'cp_ice','cp_liq', 'fcp','Lf', 'ro_ice','ro_liq', 'k_ice', 'k_liq', ...
+      'Tf', 'Ls','Rv','roLs');
 
    % GENERATE A THERMAL MESH
    dz_therm = opts.dz_thermal;
@@ -39,8 +41,16 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
 
    % INITIALIZE ICE TEMPERATURE
 
-   % Ensure the initial temperature is below the lower phase boundary
-   T = min(TL - 1, Tf + opts.T_ice_init) * ones(JJ, 1);
+   % Initialize with a physically scaled exponential profile anchored to the
+   % top node so T(1) = T_ref exactly. Use a slight cold offset from air to
+   % avoid a zero-gradient startup.
+   T_deep = min(TL - 1, Tf + opts.T_ice_init);
+   T_ref = min(TL - 1, min(tair(1), Tf) - 1.0);
+   Z = cumsum(dz) - dz / 2;
+   omega_yr = 2.0 * pi / (365.0 * 86400.0);
+   kappa_ice = k_ice / (ro_ice * cp_ice);
+   z_scale = sqrt(2.0 * kappa_ice / omega_yr);
+   T = T_deep + (T_ref - T_deep) .* exp(-(Z - Z(1)) ./ z_scale);
 
    % INITIALIZE LIQUID/ICE WATER FRACTION (f) AND BULK DENSITIES (g)
    T_dep = Tf - T;                           % [K]
@@ -65,7 +75,7 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
    f_ice_min = opts.f_ice_min;
    f_liq_res = opts.f_liq_resid;
 
-   Ts = T(1);
+   Ts = (min(tair(1), Tf) + T(1)) / 2;
    roL = roLs;
    liqflag = false;
    % zD = sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
@@ -86,4 +96,16 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
    % diags.LCflag = false(maxiter,1);
    % A1 = ones(JJ_therm,1);
    % A = spdiags([A1,A1,A1],-1:1,JJ_therm,JJ_therm);
+
+   function plot_T_init(T, Z, Ta, Ts)
+      figure; hold on
+      plot(T, Z)
+      scatter(Ts, 0, 'filled')
+      scatter(Ta, 0, 'filled')
+      set(gca, 'YDir', 'reverse')
+      legend('T', 'Ts', 'Ta')
+   end
+   if debug == true
+      plot_T_init(T, Z, tair(1), Ts);
+   end
 end
