@@ -16,7 +16,7 @@ function [metiter, subiter, maxiter, maxsubiter, dt_new, dt_FULL_STEP, ...
    % Compute the timestep and the total number of model timesteps
    dt_FULL_STEP = opts.dt;
    maxiter = numel(Time) / opts.numyears;
-   maxsubiter = 200;
+   maxsubiter = opts.dt; % allow 1 sec dt min
    minsubiter = 1;
 
    dt_min = dt_FULL_STEP / maxsubiter;
