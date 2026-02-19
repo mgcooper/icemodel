@@ -21,6 +21,8 @@ function [ice1, ice2] = skinmodel(opts)
    sebfail_count = 0;
    maxcpliter = opts.maxcpliter;
    cpltol = opts.cpltol;
+   omega = opts.omega;
+   sebtol = opts.sebtol;
 
    % LOAD THE FORCING DATA
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
@@ -79,16 +81,34 @@ function [ice1, ice2] = skinmodel(opts)
                   ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
                   liqflag, Ts, T, k_eff, dz, opts.seb_solver);
                Ts = MELTTEMP(Ts, Tf);
+
                if not(ok_seb)
                   sebfail_count = sebfail_count + 1;
                   break
                end
 
+               % SEB residual
+               sebres = fSEB(Ts, tair(metiter), swd(metiter), ...
+                  lwd(metiter), albedo(metiter), wspd(metiter), ...
+                  ppt(metiter), tppt(metiter), psfc(metiter), ...
+                  De(metiter), ea, cv_air, cv_liq, emiss, SB, Tf, ...
+                  chi, roL, scoef, CONDUCT(k_eff, T, dz, Ts), liqflag);
+
+               % At melt cap (Ts ~= Tf), positive residual is melt energy (Qm).
+               if Ts >= Tf - 1e-8
+                  sebres = max(-sebres, 0.0);
+               else
+                  sebres = abs(sebres);
+               end
+
                % Check convergence
-               if abs(Ts - old) < cpltol
+               if abs(Ts - old) < cpltol && sebres < sebtol
                   ok_cpl = true;
                   break
                end
+
+               % Relaxation
+               Ts = (1.0 - omega) * old + omega * Ts;
             end
             OK = ok_seb && ok_ieb && ok_cpl;
 
@@ -106,7 +126,7 @@ function [ice1, ice2] = skinmodel(opts)
                if subfail < maxsubiter
                   continue
                else
-                  % fprintf('iter = %d, subfail == maxsubiter\n', iter)
+                  fprintf('iter = %d, subfail == maxsubiter\n', iter)
                end
             end
 

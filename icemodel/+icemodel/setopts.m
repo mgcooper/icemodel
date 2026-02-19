@@ -127,6 +127,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.maxiter         = 100;   % 1d nonlinear heat transfer max iterations
       opts.maxcpliter      = 100;   % outer Picard iterations for Ts convergence
       opts.cpltol          = 1e-2;  % Ts convergence tolerance
+      opts.sebtol          = 1.0;   % SEB convergence tolerance [W m-2]
       opts.omega           = 0.3;   % Ts relaxation factor
 
       % Fix the linearized SEB coefficients over substeps (inner_robin = FALSE)
@@ -159,7 +160,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.maxiter         = 100;   % 1d nonlinear heat transfer max iterations
       opts.maxcpliter      = 100;   % outer max iterations for Ts convergence
       opts.cpltol          = 1e-2;  % outer Ts convergence tolerance
-      opts.omega           = 0.3;   % inner Ts relaxation factor
+      opts.sebtol          = 1.0;   % SEB convergence tolerance [W m-2]
+      opts.omega           = 1.6;   % inner Ts relaxation factor
 
       opts.dt              = 900;   % timestep (3600 or 900)               [s]
       opts.dz_thermal      = 0.04;  % dz for thermal heat transfer         [m]
