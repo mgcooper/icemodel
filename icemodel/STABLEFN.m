@@ -25,16 +25,25 @@ function S = STABLEFN(Ta, Ts, wspd, scoef)
    %
    %#codegen
 
-   if (Ts < Ta) % Stable case (Ri > 0).
+   % neutral blending width for neutral-transition behavior [K].
+   dT0 = 0.05;
+
+   if (Ts < Ta - dT0) % Stable case (Ri > 0).
 
       S = 1 / (1 + scoef(2) / (2 * wspd ^ 2) * (Ta - Ts) / Ta) ^ 2;
 
-   elseif (Ts > Ta) % Unstable case (Ri < 0).
+   elseif (Ts > Ta + dT0) % Unstable case (Ri < 0).
 
       S = 1 + scoef(2) / wspd ^ 2 * (Ts - Ta) / Ta ...
          / (1 + scoef(3) / wspd * sqrt((Ts - Ta) / Ta));
 
-   else % Neutrally stable case. (Ts == Ta)
-      S = 1.0;
+   else % Near-neutral transition, blend stable/unstable branches smoothly.
+      Ts_lo = Ta - dT0;
+      Ts_hi = Ta + dT0;
+      S_stable = 1 / (1 + scoef(2) / (2 * wspd ^ 2) * (Ta - Ts_lo) / Ta) ^ 2;
+      S_unstable = 1 + scoef(2) / wspd ^ 2 * (Ts_hi - Ta) / Ta ...
+         / (1 + scoef(3) / wspd * sqrt((Ts_hi - Ta) / Ta));
+      w = (Ts - Ts_lo) / (Ts_hi - Ts_lo);
+      S = (1 - w) * S_stable + w * S_unstable;
    end
 end
