@@ -75,9 +75,6 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
          plot_temp(T, T_iter, Ts, dz)
       end
 
-      % Apply over-relaxation
-      T = alpha * T + (1 - alpha) * T_iter;
-
       if debug == true
          plot_temp(T, T_iter, Ts, dz)
       end
@@ -87,6 +84,9 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
          OK = true;
          break
       end
+
+      % Apply relaxation
+      T = alpha * T + (1 - alpha) * T_iter;
    end
    % OK = iter <= maxiter;
 end

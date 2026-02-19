@@ -125,8 +125,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.bc_type         = 2;     % recommended: 1 (1=dirichlet, 2=robin)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
       opts.maxiter         = 100;   % 1d nonlinear heat transfer max iterations
-      opts.maxcpliter      = 50;    % outer Picard iterations for Ts convergence
-      opts.cpltol          = 1e-3;  % Ts convergence tolerance
+      opts.maxcpliter      = 100;   % outer Picard iterations for Ts convergence
+      opts.cpltol          = 1e-2;  % Ts convergence tolerance
       opts.omega           = 0.3;   % Ts relaxation factor
 
       % Fix the linearized SEB coefficients over substeps (inner_robin = FALSE)
@@ -144,7 +144,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
          opts.bc_type = 3;
       end
 
-      opts.dt              = 3600;  % timestep (3600 or 900)               [s]
+      opts.dt              = 900;   % timestep (3600 or 900)               [s]
       opts.dz_thermal      = 0.04;  % dz for thermal heat transfer         [m]
       opts.dz_spectral     = 0.002; % dz for radiative heat transfer       [m]
       opts.z0_thermal      = 20;    % domain thickness for heat transfer   [m]
@@ -157,11 +157,11 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.bc_type         = 1;     % recommended: 1 (1=dirichlet, 2=robin)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
       opts.maxiter         = 100;   % 1d nonlinear heat transfer max iterations
-      opts.maxcpliter      = 100;    % outer max iterations for Ts convergence
+      opts.maxcpliter      = 100;   % outer max iterations for Ts convergence
       opts.cpltol          = 1e-2;  % outer Ts convergence tolerance
       opts.omega           = 0.3;   % inner Ts relaxation factor
 
-      opts.dt              = 3600;  % timestep (3600 or 900)               [s]
+      opts.dt              = 900;   % timestep (3600 or 900)               [s]
       opts.dz_thermal      = 0.04;  % dz for thermal heat transfer         [m]
       opts.dz_spectral     = 0.002; % dz for radiative heat transfer       [m]
       opts.z0_thermal      = 12;    % domain thickness for heat transfer   [m]
