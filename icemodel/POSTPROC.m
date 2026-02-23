@@ -67,7 +67,7 @@ function varargout = POSTPROC(ice1, ice2, opts, varargin)
    ice1 = struct2table(ice1);
    ice1 = table2timetable(ice1, 'RowTimes', time);
 
-   % Retime 15 min data to hourly
+   % Retime 15 min data to hourly, removing Feb 29 values inserted by "retime".
    if opts.dt == 900
       ice1 = retime(ice1, 'hourly', 'mean');
       [ice1, ice2] = retimeLogical(ice1, ice2);

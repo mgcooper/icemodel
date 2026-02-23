@@ -45,7 +45,7 @@ function [ice1, ice2] = skinmodel(opts)
       for iter = 1:maxiter
 
          % INITIALIZE NEW TIMESTEP
-         [dt_sum, subfail, ok_seb, ok_ieb] = NEWTIMESTEP(f_liq);
+         [dt_sum, subfail, ok_seb, ok_ieb] = NEWTIMESTEP(f_liq, opts);
 
          % Atmospheric vapor pressure (fixed over this full forcing step).
          ea = VAPPRESS(tair(metiter), Tf, liqflag) * rh(metiter) / 100;
