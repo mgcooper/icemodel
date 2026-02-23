@@ -95,17 +95,15 @@ function [ice1, ice2] = skinmodel(opts)
                end
 
                % SEB residual
-               sebres = fSEB(Ts, tair(metiter), swd(metiter), ...
+               sebres = abs(fSEB(Ts, tair(metiter), swd(metiter), ...
                   lwd(metiter), albedo(metiter), wspd(metiter), ...
                   ppt(metiter), tppt(metiter), psfc(metiter), ...
                   De(metiter), ea, cv_air, cv_liq, emiss, SB, Tf, ...
-                  chi, roL, scoef, CONDUCT(k_eff, T, dz, Ts), liqflag);
+                  chi, roL, scoef, CONDUCT(k_eff, T, dz, Ts), liqflag));
 
                % At melt cap (Ts ~= Tf), positive residual is melt energy (Qm).
-               if Ts >= Tf - 1e-8
-                  sebres = max(-sebres, 0.0);
-               else
-                  sebres = abs(sebres);
+               if Ts >= Tf
+                  sebres = 0.0;
                end
 
                % Check convergence
