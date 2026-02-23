@@ -161,8 +161,10 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % solver, timestepping, and mesh options
    if strcmp(smbmodel, 'icemodel')
 
+      % Solver options. See function doc for info about each bc type.
+
+      opts.bc_type         = 2;     % recommended: 1 (1=dirichlet, 2/3=robin)
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
-      opts.bc_type         = 2;     % recommended: 1 (1=dirichlet, 2=robin)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
       opts.maxiter         = 100;   % inner thermal solver max iterations
       opts.tol             = 1e-2;  % inner thermal solver convergence tolerance [K]
@@ -180,8 +182,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    elseif strcmp(smbmodel, 'skinmodel')
 
-      opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
       opts.bc_type         = 1;     % recommended: 1 (1=dirichlet, 2=robin)
+      opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
       opts.maxiter         = 100;   % inner thermal solver max iterations
       opts.tol             = 1e-2;  % inner thermal solver convergence tolerance [K]
