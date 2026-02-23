@@ -35,7 +35,7 @@ function [ice1, ice2] = icemodel(opts)
 
    %% INITIALIZE THE MODEL
 
-   debug = false;
+   debug = true;
    assertF on
 
    % LOAD PHYSICAL CONSTANTS AND PARAMETERS
@@ -66,11 +66,10 @@ function [ice1, ice2] = icemodel(opts)
    [xTs, xT, xf_ice, xf_liq] = RESETSUBSTEP(Ts, T, f_ice, f_liq);
 
    bc = opts.bc_type;
-   ok_seb = true;
+   maxcpliter = opts.maxcpliter;
+   omega = opts.omega;
+   cpltol = opts.cpltol;
    sebfail_count = 0;
-
-   omega = 0.3;
-   tol = 1e-3;
 
    %% START ITERATIONS OVER YEARS
    for thisyear = 1:numyears
@@ -79,7 +78,7 @@ function [ice1, ice2] = icemodel(opts)
 
          % INITIALIZE NEW TIMESTEP
          [dt_sum, subfail, ok_seb, ok_ieb, d_liq, d_evp, d_lyr] = ...
-            NEWTIMESTEP(f_liq);
+            NEWTIMESTEP(f_liq, opts);
 
          % SUBSURFACE SOLAR RADIATION SOURCE-TERM
          [Sc, chi] = UPDATEEXTCOEFS(swd(metiter), albedo(metiter), ...
@@ -113,10 +112,10 @@ function [ice1, ice2] = icemodel(opts)
                [Ts, Fc, Fp, T, f_ice, f_liq, k_eff, ok_ieb, N, a1] = ...
                   ICEEBSOLVE(T, f_ice, f_liq, dz, delz, fn, Sc, dt, JJ, Ts, ...
                   k_liq, cv_ice, cv_liq, ro_ice, ro_liq, Ls, Lf, roLf, Rv, ...
-                  Tf, fcp, TL, TH, f_ell_min, f_ell_max, bc, opts.maxcpliter, ...
-                  omega, tol, tair(metiter), swd(metiter), lwd(metiter), ...
-                  albedo(metiter), wspd(metiter), psfc(metiter), De(metiter), ...
-                  ea, cv_air, emiss, SB, roL, scoef, chi, liqflag);
+                  Tf, fcp, TL, TH, f_ell_min, f_ell_max, tair(metiter), ...
+                  swd(metiter), lwd(metiter), albedo(metiter), wspd(metiter), ...
+                  psfc(metiter), De(metiter), ea, cv_air, emiss, SB, roL, ...
+                  scoef, chi, liqflag, bc, omega, maxcpliter, cpltol);
 
             else
                [T, f_ice, f_liq, k_eff, ok_ieb, N, a1] = ...

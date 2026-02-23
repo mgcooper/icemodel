@@ -7,7 +7,7 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL(T, f_ice, ...
    %#codegen
 
    % Solver options
-   tol = 1e-3;
+   tol = 1e-2;
    maxiter = 100;
    % alpha = 0.8;
 

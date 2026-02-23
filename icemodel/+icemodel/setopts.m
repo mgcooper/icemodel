@@ -56,6 +56,46 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %
    %  OPTS - a struct containing the runtime model options.
    %
+   % Boundary-condition / coupling notes (icemodel):
+   %
+   %  "Partitioned" here means the surface SEB and subsurface enthalpy
+   %  equations are solved in separate solver blocks (SEBSOLVE/SFCFLIN and
+   %  ICEENBAL), not as one monolithic nonlinear system.
+   %
+   %  bc_type = 1 (Dirichlet with lagged Ts-T coupling):
+   %   - Solve the nonlinear SEB for Ts once per full forcing step (SEBSOLVE).
+   %   - During that solve, inner iterations use an analytic Newton-Raphson,
+   %     numeric "complex step", or derivative-free (Brent's) method, set by
+   %     opts.seb_solver (see SEBSOLVE for details). SEBSOLVE may fall back to a
+   %     derivative-free root solve if Newton/complex-step fails.
+   %   - Outer fixed-point iterations repeatedly update the conductive closure
+   %     using the latest Ts iterate, while the subsurface top-node state
+   %     (temperature and conductance) remains lagged from the previous accepted
+   %     state.
+   %   - Hold the converged Ts fixed as the upper boundary condition of the
+   %     subsurface enthalpy solver (ICEENBAL) during substeps.
+   %   - Classification: partitioned, lagged, weakly coupled across the
+   %     surface/subsurface interface (lagged Ts-T coupling at full-timestep
+   %     scale, but no substep Ts-T coupling iterations).
+   %
+   %  bc_type = 2 (Robin with single coupling sweep):
+   %   - Use a linearized SEB boundary condition (SFCFLIN) in the subsurface
+   %     enthalpy solver (ICEENBAL).
+   %   - After each accepted substep, diagnose Ts from the updated top-node
+   %     state and refresh the SEB linearization for the next substep.
+   %   - No inner Ts-T convergence loop within a substep (single coupling
+   %     sweep per substep).
+   %   - Classification: partitioned, lagged, weakly coupled.
+   %
+   %  bc_type = 3 (Robin with strong Ts-T coupling iterations):
+   %   - Within each substep, perform outer fixed-point coupling iterations
+   %     between the SEB linearization and subsurface enthalpy solve until Ts
+   %     converges (with relaxation).
+   %   - Typically slower than bc_type = 2; cost depends on cpltol, maxcpliter,
+   %     relaxation, and timestep adaptation.
+   %   - Classification: partitioned, strongly coupled at substep scale
+   %     (iterative block/Picard coupling, not monolithic Newton).
+   %
    % See also: icemodel.config icemodel.run.point
 
    % Parse inputs
@@ -124,26 +164,12 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
       opts.bc_type         = 2;     % recommended: 1 (1=dirichlet, 2=robin)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
-      opts.maxiter         = 100;   % 1d nonlinear heat transfer max iterations
-      opts.maxcpliter      = 100;   % outer Picard iterations for Ts convergence
-      opts.cpltol          = 1e-2;  % Ts convergence tolerance
-      opts.sebtol          = 1.0;   % SEB convergence tolerance [W m-2]
-      opts.omega           = 0.3;   % Ts relaxation factor
-
-      % Fix the linearized SEB coefficients over substeps (inner_robin = FALSE)
-      % or update them on each substep (inner_robin = TRUE).
-      opts.inner_robin     = false;
-      % Updating each substep is equivalent to nesting the subsurface solver
-      % inside outer Picard iterations that drive convergence of Ts, where Ts is
-      % diagnosed from conductance and T(1) updated each substep. Fixing them is
-      % equivalent to a single block-solve (one Picard iteration). Note that the
-      % Dirichlet option uses Picard iterations to drive convergence of Ts by
-      % default, but uses lagged conductance and T(1) values.
-
-      % Update the bc option so this condition isn't checked every step.
-      if opts.bc_type == 2 && opts.inner_robin == true
-         opts.bc_type = 3;
-      end
+      opts.maxiter         = 100;   % inner thermal solver max iterations
+      opts.tol             = 1e-2;  % inner thermal solver convergence tolerance [K]
+      opts.maxcpliter      = 100;   % outer Ts convergence max iterations
+      opts.cpltol          = 1e-2;  % outer Ts convergence tolerance [K]
+      opts.sebtol          = 1.0;   % outer SEB convergence tolerance [W m-2]
+      opts.omega           = 0.3;   % outer Ts relaxation factor
 
       opts.dt              = 900;   % timestep (3600 or 900)               [s]
       opts.dz_thermal      = 0.04;  % dz for thermal heat transfer         [m]
@@ -157,11 +183,14 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
       opts.bc_type         = 1;     % recommended: 1 (1=dirichlet, 2=robin)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
-      opts.maxiter         = 100;   % 1d nonlinear heat transfer max iterations
-      opts.maxcpliter      = 100;   % outer max iterations for Ts convergence
-      opts.cpltol          = 1e-2;  % outer Ts convergence tolerance
-      opts.sebtol          = 1.0;   % SEB convergence tolerance [W m-2]
-      opts.omega           = 1.6;   % inner Ts relaxation factor
+      opts.maxiter         = 100;   % inner thermal solver max iterations
+      opts.tol             = 1e-2;  % inner thermal solver convergence tolerance [K]
+      opts.maxcpliter      = 100;   % outer Ts convergence max iterations
+      opts.cpltol          = 1e-2;  % outer Ts convergence tolerance [K]
+      opts.sebtol          = 1.0;   % outer SEB convergence tolerance [W m-2]
+      opts.omega           = 1.8;   % outer Ts relaxation factor
+      opts.use_aitken      = true;  % use aitken-acceleration or not
+      opts.aitken_jumpmax  = 5.0;   % acceleration guess tolerance [K]
 
       opts.dt              = 900;   % timestep (3600 or 900)               [s]
       opts.dz_thermal      = 0.04;  % dz for thermal heat transfer         [m]
