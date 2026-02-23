@@ -23,6 +23,8 @@ function [ice1, ice2] = skinmodel(opts)
    cpltol = opts.cpltol;
    omega = opts.omega;
    sebtol = opts.sebtol;
+   use_aitken = opts.use_aitken;
+   aitken_jumpmax = opts.aitken_jumpmax;
 
    % LOAD THE FORCING DATA
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
@@ -61,6 +63,11 @@ function [ice1, ice2] = skinmodel(opts)
                liqflag, xTs, xT, k_eff, dz, opts.seb_solver);
             Ts = MELTTEMP(Ts, Tf);
 
+            % Initial values for Aitken acceleration
+            Ts_1 = nan;
+            Ts_2 = nan;
+
+            % Run the coupler
             ok_cpl = false;
             for cpliter = 1:maxcpliter
 
@@ -107,8 +114,13 @@ function [ice1, ice2] = skinmodel(opts)
                   break
                end
 
-               % Relaxation
-               Ts = (1.0 - omega) * old + omega * Ts;
+               % Aitken acceleration with relaxation-fallback
+               Ts_0 = Ts;
+               Ts = MELTTEMP(aitkenscalar(Ts_2, Ts_1, Ts_0, ...
+                  (1.0 - omega) * old + omega * Ts, ... % relaxation fallback
+                  aitken_jumpmax, use_aitken), Tf);
+               Ts_2 = Ts_1;
+               Ts_1 = Ts_0;
             end
             OK = ok_seb && ok_ieb && ok_cpl;
 
