@@ -4,7 +4,7 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
    %SEBSOLVE solve the surface energy balance for the skin temperature
    %
    % Solver options:
-   % 0 = derivative-free, slower but more robust, thus used as a fall back.
+   % 0 = derivative-free, slower but more robust, used as a fall back.
    % 1 = newton-rhapson, fast, requires analytic derivative, used as a default.
    % 2 = complex-step, fast and does not require an analytical derivative.
    % -1 = no outer iterations, use this if phase change is not represented

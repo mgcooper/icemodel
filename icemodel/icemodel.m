@@ -85,27 +85,27 @@ function [ice1, ice2] = icemodel(opts)
             Q0, dz_spect, spect_N, spect_S, solardwavl, Sc, dz, ...
             ro_ice * f_ice + ro_liq * f_liq);
 
-         % SURFACE TEMPERATURE
+         % SURFACE TERMS
          ea = VAPPRESS(tair(metiter), Tf, liqflag) * rh(metiter) / 100;
-         if bc == 1
-            [Ts, ok_seb] = SEBSOLVE(tair(metiter), swd(metiter), lwd(metiter), ...
-               albedo(metiter), wspd(metiter), ppt(metiter), tppt(metiter), ...
-               psfc(metiter), De(metiter), ea, cv_air, cv_liq, emiss, SB, Tf, ...
-               chi, roL, scoef, liqflag, Ts, T, k_eff, dz, opts.seb_solver);
-            if not(ok_seb)
-               sebfail_count = sebfail_count + 1;
-            end
-
-            % Update xTs in case of failure on first subsurface solve
-            xTs = Ts;
-
-         elseif bc == 2
+         if bc == 2
             [Fc, Fp] = SFCFLIN(tair(metiter), swd(metiter), lwd(metiter), ...
                albedo(metiter), wspd(metiter), psfc(metiter), De(metiter), ...
                ea, cv_air, emiss, SB, roL, scoef, chi, Tf, Ts, liqflag);
          end
 
          while dt_sum + TINY < dt_FULL_STEP
+
+            % SURFACE TEMPERATURE (Dirichlet mode)
+            if bc == 1
+               [Ts, ok_seb] = SEBSOLVE(tair(metiter), swd(metiter), ...
+                  lwd(metiter), albedo(metiter), wspd(metiter), ...
+                  ppt(metiter), tppt(metiter), psfc(metiter), De(metiter), ...
+                  ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
+                  liqflag, Ts, T, k_eff, dz, opts.seb_solver);
+               if not(ok_seb)
+                  sebfail_count = sebfail_count + 1;
+               end
+            end
 
             % ICE ENERGY BALANCE
             if bc == 3
