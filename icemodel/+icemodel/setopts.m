@@ -63,20 +63,21 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  ICEENBAL), not as one monolithic nonlinear system.
    %
    %  bc_type = 1 (Dirichlet with lagged Ts-T coupling):
-   %   - Solve the nonlinear SEB for Ts once per full forcing step (SEBSOLVE).
+   %   - Solve the nonlinear SEB for Ts once per substep (SEBSOLVE).
    %   - During that solve, inner iterations use an analytic Newton-Raphson,
    %     numeric "complex step", or derivative-free (Brent's) method, set by
-   %     opts.seb_solver (see SEBSOLVE for details). SEBSOLVE may fall back to a
-   %     derivative-free root solve if Newton/complex-step fails.
+   %     opts.seb_solver (see SEBSOLVE for details).
    %   - Outer fixed-point iterations repeatedly update the conductive closure
    %     using the latest Ts iterate, while the subsurface top-node state
    %     (temperature and conductance) remains lagged from the previous accepted
-   %     state.
-   %   - Hold the converged Ts fixed as the upper boundary condition of the
-   %     subsurface enthalpy solver (ICEENBAL) during substeps.
+   %     substep state.
+   %   - Use the converged Ts as the upper boundary condition of the subsurface
+   %     enthalpy solver (ICEENBAL) for that substep.
    %   - Classification: partitioned, lagged, weakly coupled across the
-   %     surface/subsurface interface (lagged Ts-T coupling at full-timestep
-   %     scale, but no substep Ts-T coupling iterations).
+   %     surface/subsurface interface (one coupling sweep per substep, with
+   %     outer iterations that converge Ts against a lagged top-node conductive
+   %     closure. No strong Ts–T block-coupling around SEBSOLVE+ICEENBAL within
+   %     the substep).
    %
    %  bc_type = 2 (Robin with single coupling sweep):
    %   - Use a linearized SEB boundary condition (SFCFLIN) in the subsurface
@@ -163,7 +164,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
       % Solver options. See function doc for info about each bc type.
 
-      opts.bc_type         = 2;     % recommended: 1 (1=dirichlet, 2/3=robin)
+      opts.bc_type         = 1;     % recommended: 1 (1=dirichlet, 2/3=robin)
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
       opts.maxiter         = 100;   % inner thermal solver max iterations

@@ -16,9 +16,10 @@ function [f_ice, f_liq, d_con, xsubl] = ICESUBL(f_ice, f_liq, d_con, ...
    % Compute top-layer residual water fraction
    f_res = f_liq_resid * (1.0 - f_ice_top);
 
-   % Clarify the CV budget. Note, "availableCapacity" is a misnomer, it should
-   % be "potentialCapacity", and "availableCapacity" is actually the
-   % airFraction, or "availablePorosity", and should be adjusted for f_bub.
+   % Clarify the CV budget. Note for glacier ice or any medium w/"closed" pores,
+   % "availableCapacity" is a misnomer, it should be "potentialCapacity", and
+   % "availableCapacity" is actually the airFraction, or "availablePorosity",
+   % and should be adjusted for f_bub.
    %
    % f_por = 1 - f_ice;             % porosityFraction
    % f_res = f_liq_resid * f_por;   % residualWaterFraction
@@ -132,7 +133,7 @@ function [f_ice, xsubl] = SUBL(pevap, f_ice, f_ice_min, ro_ice, ro_liq, Lv, Ls)
 
    elseif abs(psubl) >= (f_ice_top - f_ice_min)
       % all ice sublimates (asubl = -(fi - f_ice_min) )
-      f_ice(1) = f_ice_min;         % keep minimum ice thickness
+      f_ice(1) = f_ice_min; % keep minimum ice thickness
 
       % sublimation which cannot be satisfied
       xsubl = psubl + f_ice_top - f_ice_min;
