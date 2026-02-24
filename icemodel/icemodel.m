@@ -194,7 +194,7 @@ function [ice1, ice2] = icemodel(opts)
 
          % MOVE TO THE NEXT TIMESTEP
          [metiter, subiter, dt] = NEXTSTEP(metiter, subiter, ...
-            dt, dt_FULL_STEP, maxsubiter, ok_ieb && ok_seb);
+            dt, dt_FULL_STEP, maxsubiter, ok_ieb && ok_seb, subfail, N);
 
       end % timesteps (one year)
 
