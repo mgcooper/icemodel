@@ -174,7 +174,7 @@ function [ice1, ice2] = skinmodel(opts)
 
          % MOVE TO THE NEXT TIMESTEP
          [metiter, subiter, dt] = NEXTSTEP(metiter, subiter, ...
-            dt, dt_FULL_STEP, maxsubiter, ok_ieb);
+            dt, dt_FULL_STEP, maxsubiter, ok_ieb, subfail, N);
 
       end % timesteps (one year)
 

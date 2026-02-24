@@ -173,7 +173,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.sebtol          = 1.0;   % outer SEB convergence tolerance [W m-2]
       opts.omega           = 0.3;   % outer Ts relaxation factor
 
-      opts.dt              = 900;   % timestep (3600 or 900)               [s]
+      opts.dt              = 900;   % timestep (3600 or (recommended) 900) [s]
       opts.dz_thermal      = 0.04;  % dz for thermal heat transfer         [m]
       opts.dz_spectral     = 0.002; % dz for radiative heat transfer       [m]
       opts.z0_thermal      = 20;    % domain thickness for heat transfer   [m]
@@ -194,7 +194,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.use_aitken      = true;  % use aitken-acceleration or not
       opts.aitken_jumpmax  = 5.0;   % acceleration guess tolerance [K]
 
-      opts.dt              = 900;   % timestep (3600 or 900)               [s]
+      opts.dt              = 900;   % timestep (3600 or (recommended) 900) [s]
       opts.dz_thermal      = 0.04;  % dz for thermal heat transfer         [m]
       opts.dz_spectral     = 0.002; % dz for radiative heat transfer       [m]
       opts.z0_thermal      = 12;    % domain thickness for heat transfer   [m]
