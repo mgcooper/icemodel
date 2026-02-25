@@ -43,7 +43,7 @@ function [Tw, flag] = SOLVEWB(Ta, rh, Ls, cp, Pa, liqflag)
    % Use this as a fall-back on Tw, but I kept it here to clarify the correct
    % Tdw formula for the A, B, C
    % Tdw = Tf + C * log(ea / A) / (B - log(ea / A));
-   % Tw = tair(metiter) - (tair(metiter) - Tdew) / 3
+   % Tw = tair(metstep) - (tair(metstep) - Tdew) / 3
 
    % Solver options.
    maxiter = 1000;

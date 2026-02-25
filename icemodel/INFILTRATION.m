@@ -14,7 +14,7 @@ function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, ro_ice, ...
    q = LIQFLUX(f_liq(1:end-1), f_ice(1:end-1));
 
    % If this is inside a sub iteration, scale non-zero surface flux by dt_new
-   % bc_N = q_sfc / subiter;
+   % bc_N = q_sfc / substep;
 
    % Boundary conditions
    bc_N = 0; % Infiltration rate from precipitation or surface water
@@ -143,4 +143,3 @@ end
 %    % df_liq(df_liq > 0.0 & T < TL)
 %    df_liq(T < TL) = 0.0;
 % end
-

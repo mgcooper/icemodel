@@ -45,7 +45,7 @@ function [f_ice, f_liq, d_con, xsubl] = ICESUBL(f_ice, f_liq, d_con, ...
             % only residual water exists, send pevap to SUBL
             xevap = pevap;
 
-            %fprintf('metiter = %d, f_liq(1) < f_res\n',metiter)
+            %fprintf('metstep = %d, f_liq(1) < f_res\n',metstep)
 
          elseif abs(pevap) <= (f_liq_top - f_res) % availWater >= evap
             % some water evaporates

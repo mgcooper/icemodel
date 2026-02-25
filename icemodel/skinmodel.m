@@ -18,13 +18,14 @@ function [ice1, ice2] = skinmodel(opts)
       'Ls', 'ro_air', 'ro_ice', 'ro_liq', 'roLs', 'roLv', 'Rv', 'Tf');
    TINY = 1e-8;
    chi = 1.0;
-   sebfail_count = 0;
-   maxcpliter = opts.maxcpliter;
-   cpltol = opts.cpltol;
-   omega = opts.omega;
-   sebtol = opts.sebtol;
-   use_aitken = opts.use_aitken;
-   aitken_jumpmax = opts.aitken_jumpmax;
+
+   % Unpack once before heavy loops to avoid repeated opts field access.
+   [bc_type, seb_solver, cpl_maxiter, cpl_Ts_tol, cpl_seb_tol, ...
+      cpl_alpha, cpl_aitken, cpl_jumpmax, maxiter, tol, alpha, ...
+      use_aitken, jumpmax] = icemodel.getopts(opts, ...
+      'bc_type', 'seb_solver', 'cpl_maxiter', 'cpl_Ts_tol', ...
+      'cpl_seb_tol', 'cpl_alpha', 'cpl_aitken', 'cpl_jumpmax', ...
+      'maxiter', 'tol', 'alpha', 'use_aitken', 'jumpmax');
 
    % LOAD THE FORCING DATA
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
@@ -35,32 +36,32 @@ function [ice1, ice2] = skinmodel(opts)
       = ICEINIT(opts, tair);
 
    % INITIALIZE TIMESTEPPING
-   [metiter, subiter, maxiter, maxsubiter, dt, dt_FULL_STEP, ...
+   [metstep, substep, numsteps, maxsubstep, dt, dt_FULL_STEP, ...
       numyears, numspinup] = INITTIMESTEPS(opts, time);
 
    % INITIALIZE PAST VALUES
    [xTs, xT, xf_ice, xf_liq] = RESETSUBSTEP(Ts, T, f_ice, f_liq);
 
-   %% START ITERATIONS OVER YEARS
+   %% START TIMESTEPS OVER YEARS
    for thisyear = 1:numyears
 
-      for iter = 1:maxiter
+      for timestep = 1:numsteps
 
          % INITIALIZE NEW TIMESTEP
-         [dt_sum, subfail, ok_seb, ok_ieb] = NEWTIMESTEP(f_liq, opts);
+         [dt_sum, n_subfail, ok_seb, ok_ieb] = NEWTIMESTEP(f_liq, bc_type);
 
          % Atmospheric vapor pressure (fixed over this full forcing step).
-         ea = VAPPRESS(tair(metiter), Tf, liqflag) * rh(metiter) / 100;
+         ea = VAPPRESS(tair(metstep), Tf, liqflag) * rh(metstep) / 100;
 
          while dt_sum + TINY < dt_FULL_STEP
 
             % Pre-coupler Ts predictor using checkpoint state
             k_eff = GETGAMMA(xT, xf_ice, xf_liq, ro_ice, k_liq, Ls, Rv, Tf);
-            [Ts, ok_seb] = SEBSOLVE(tair(metiter), swd(metiter), ...
-               lwd(metiter), albedo(metiter), wspd(metiter), ...
-               ppt(metiter), tppt(metiter), psfc(metiter), De(metiter), ...
+            [Ts, ok_seb] = SEBSOLVE(tair(metstep), swd(metstep), ...
+               lwd(metstep), albedo(metstep), wspd(metstep), ...
+               ppt(metstep), tppt(metstep), psfc(metstep), De(metstep), ...
                ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
-               liqflag, xTs, xT, k_eff, dz, opts.seb_solver);
+               liqflag, xTs, xT, k_eff, dz, seb_solver);
             Ts = MELTTEMP(Ts, Tf);
 
             % Initial values for Aitken acceleration
@@ -69,12 +70,12 @@ function [ice1, ice2] = skinmodel(opts)
 
             % Run the coupler
             ok_cpl = false;
-            for cpliter = 1:maxcpliter
+            for cpliter = 1:cpl_maxiter
 
                % Solve subsurface from checkpoint state w/o physical advancement
-               [T, ok_ieb, N] = SKINSOLVE(xT, xf_ice, xf_liq, dz, delz, fn, ...
+               [T, ok_ieb, n_iters] = SKINSOLVE(xT, xf_ice, xf_liq, dz, delz, fn, ...
                   dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf, ...
-                  1e-2, opts.maxiter);
+                  tol, maxiter, alpha, use_aitken, jumpmax);
                if not(ok_ieb)
                   break
                end
@@ -82,32 +83,31 @@ function [ice1, ice2] = skinmodel(opts)
                % Solve surface (in-loop corrector using updated trial state)
                old = Ts;
                k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
-               [Ts, ok_seb] = SEBSOLVE(tair(metiter), swd(metiter), ...
-                  lwd(metiter), albedo(metiter), wspd(metiter), ...
-                  ppt(metiter), tppt(metiter), psfc(metiter), De(metiter), ...
+               [Ts, ok_seb] = SEBSOLVE(tair(metstep), swd(metstep), ...
+                  lwd(metstep), albedo(metstep), wspd(metstep), ...
+                  ppt(metstep), tppt(metstep), psfc(metstep), De(metstep), ...
                   ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
-                  liqflag, Ts, T, k_eff, dz, opts.seb_solver);
+                  liqflag, Ts, T, k_eff, dz, seb_solver);
                Ts = MELTTEMP(Ts, Tf);
 
                if not(ok_seb)
-                  sebfail_count = sebfail_count + 1;
                   break
                end
 
                % SEB residual
-               sebres = abs(fSEB(Ts, tair(metiter), swd(metiter), ...
-                  lwd(metiter), albedo(metiter), wspd(metiter), ...
-                  ppt(metiter), tppt(metiter), psfc(metiter), ...
-                  De(metiter), ea, cv_air, cv_liq, emiss, SB, Tf, ...
+               seb_res = abs(fSEB(Ts, tair(metstep), swd(metstep), ...
+                  lwd(metstep), albedo(metstep), wspd(metstep), ...
+                  ppt(metstep), tppt(metstep), psfc(metstep), ...
+                  De(metstep), ea, cv_air, cv_liq, emiss, SB, Tf, ...
                   chi, roL, scoef, CONDUCT(k_eff, T, dz, Ts), liqflag));
 
                % At melt cap (Ts ~= Tf), positive residual is melt energy (Qm).
                if Ts >= Tf
-                  sebres = 0.0;
+                  seb_res = 0.0;
                end
 
                % Check convergence
-               if abs(Ts - old) < cpltol && sebres < sebtol
+               if abs(Ts - old) < cpl_Ts_tol && seb_res < cpl_seb_tol
                   ok_cpl = true;
                   break
                end
@@ -115,28 +115,28 @@ function [ice1, ice2] = skinmodel(opts)
                % Aitken acceleration with relaxation-fallback
                Ts_0 = Ts;
                Ts = MELTTEMP(aitkenscalar(Ts_2, Ts_1, Ts_0, ...
-                  (1.0 - omega) * old + omega * Ts, ... % relaxation fallback
-                  aitken_jumpmax, use_aitken), Tf);
+                  (1.0 - cpl_alpha) * old + cpl_alpha * Ts, ... % relaxation fallback
+                  cpl_jumpmax, cpl_aitken), Tf);
                Ts_2 = Ts_1;
                Ts_1 = Ts_0;
             end
-            OK = ok_seb && ok_ieb && ok_cpl;
+            ok = ok_seb && ok_ieb && ok_cpl;
 
             % PROGRESS MESSAGE (SLOWS DOWN THE CODE A LOT)
-            if debug == true && not(OK)
-               fprintf('iter = %d (%.2f%%), dt = %.0f, success = %s\n', ...
-                  iter, 100*iter/maxiter, dt, mat2str(all(ok_ieb)))
+            if debug == true && not(ok)
+               fprintf('timestep = %d (%.2f%%), dt = %.0f, success = %s\n', ...
+                  timestep, 100*timestep/numsteps, dt, mat2str(ok))
             end
 
             % ADAPTIVE TIME STEP
-            if not(OK)
-               [Ts, T, f_ice, f_liq, subfail, subiter, dt] ...
+            if not(ok)
+               [Ts, T, f_ice, f_liq, n_subfail, substep, dt] ...
                   = RESETSUBSTEP(xTs, xT, xf_ice, xf_liq, dt_FULL_STEP, ...
-                  subiter, maxsubiter, subfail, dt_sum);
-               if subfail < maxsubiter
+                  substep, maxsubstep, n_subfail, dt_sum);
+               if n_subfail < maxsubstep
                   continue
                else
-                  fprintf('iter = %d, subfail == maxsubiter\n', iter)
+                  fprintf('timestep = %d, n_subfail == maxsubstep\n', timestep)
                end
             end
 
@@ -150,9 +150,9 @@ function [ice1, ice2] = skinmodel(opts)
 
          % UPDATE SURFACE FLUXES
          k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
-         [Qe, Qh, Qc, Qm, ~, balance] = SEBFLUX(T, Ts, tair(metiter), ...
-            swd(metiter), lwd(metiter), albedo(metiter), wspd(metiter), ...
-            ppt(metiter), tppt(metiter), psfc(metiter), De(metiter), ea, ...
+         [Qe, Qh, Qc, Qm, ~, Qbal] = SEBFLUX(T, Ts, tair(metstep), ...
+            swd(metstep), lwd(metstep), albedo(metstep), wspd(metstep), ...
+            ppt(metstep), tppt(metstep), psfc(metstep), De(metstep), ea, ...
             Tf, k_eff, dz, cv_air, cv_liq, roL, emiss, SB, chi, epsilon, ...
             scoef, liqflag);
 
@@ -160,34 +160,33 @@ function [ice1, ice2] = skinmodel(opts)
          if thisyear >= numspinup
 
             if strcmp('sector', opts.sitename)
-               [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, ...
+               [ice1, ice2] = SAVEOUTPUT(timestep, ice1, ice2, ...
                   opts.vars1, opts.vars2, ...
                   {Ts, Qm, Qe},  ...
                   {T});
             else
-               [ice1, ice2] = SAVEOUTPUT(iter, ice1, ice2, ...
+               [ice1, ice2] = SAVEOUTPUT(timestep, ice1, ice2, ...
                   opts.vars1, opts.vars2, ...
-                  {Ts, Qm, Qe, Qh, Qc, chi, balance, dt_sum, ok_seb, ok_ieb, N}, ...
+                  {Ts, Qm, Qe, Qh, Qc, chi, Qbal, dt_sum, ok_seb, ok_ieb, n_iters}, ...
                   {T, f_ice, f_liq});
             end
          end
 
          % MOVE TO THE NEXT TIMESTEP
-         [metiter, subiter, dt] = NEXTSTEP(metiter, subiter, ...
-            dt, dt_FULL_STEP, maxsubiter, ok_ieb, subfail, N);
+         [metstep, substep, dt] = NEXTSTEP(metstep, substep, ...
+            dt, dt_FULL_STEP, maxsubstep, ok_ieb, n_subfail, n_iters);
 
       end % timesteps (one year)
 
-      % RESTART THE MET DATA ITERATOR DURING SPIN UP
+      % RESTART THE MET DATA STEP INDEX DURING SPIN UP
       if thisyear < numspinup
-         metiter = 1;
+         metstep = 1;
          continue
       end
 
       % WRITE TO DISK
       WRITEOUTPUT(ice1, ice2, opts, thisyear-numspinup+1, ...
-         time((thisyear-numspinup)*maxiter+1:(thisyear-numspinup+1)*maxiter), ...
+         time((thisyear-numspinup)*numsteps+1:(thisyear-numspinup+1)*numsteps), ...
          swd, lwd, albedo)
    end
-   fprintf('SEBSOLVE fail count=%d\n', sebfail_count)
 end

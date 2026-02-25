@@ -1,20 +1,20 @@
-function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL(T, f_ice, ...
+function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ICEENBAL(T, f_ice, ...
       f_liq, dz, delz, fn, Sc, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, ...
       ro_liq, Ls, Lf, roLf, Rv, Tf, fcp, TL, TH, f_ell_min, f_ell_max, ...
-      Fc, Fp, bc)
+      Fc, Fp, bc, tol, maxiter, alpha, use_aitken, jumpmax)
    %ICEENBAL Solve the ice energy balance.
    %
    %#codegen
 
    % Solver options
-   tol = 1e-2;
-   maxiter = 100;
-   % alpha = 0.8;
+   if maxiter == 1
+      alpha = 1;
+   end
 
    % Update the water fraction
    f_wat = f_liq + f_ice * ro_ice / ro_liq;
 
-   % Update the melt-zone boundaries. These are the volumetric liquid 
+   % Update the melt-zone boundaries. These are the volumetric liquid
    % fractions at T=TL and T=TH, given the current total water fraction.
    f_liq_min = f_wat .* f_ell_min;
    f_liq_max = f_wat .* f_ell_max;
@@ -32,8 +32,12 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL(T, f_ice, ...
    % Initialize current values
    T_iter = T_old + 2 * tol;
 
+   % Initial past Picard iterates for Aitken-acceleration (disabled)
+   % T_1 = nan(size(T));
+   % T_2 = nan(size(T));
+
    % Iterate to solve the nonlinear heat equation
-   OK = true;
+   ok = true;
    for iter = 0:maxiter-1
 
       % Update vapor heat
@@ -70,20 +74,30 @@ function [T, f_ice, f_liq, k_eff, OK, iter, a1, err] = ICEENBAL(T, f_ice, ...
       T = TRISOLVE(-aN, aP, -aS, b);
 
       % Update the temperature-enthalpy relationship (corrector step)
-      [T, f_ice, f_liq, OK] = MZTRANSFORM(T, T_iter, f_ice, f_liq, f_wat, ...
-         ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, f_liq_max, iM, OK);
+      [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_iter, f_ice, f_liq, f_wat, ...
+         ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, f_liq_max, iM, ok);
 
       % If failure, return to the main program and shorten the timestep
-      if OK == false; return; end
+      if ok == false; return; end
 
       % Mass conservation check
       assertF(@() all(f_ice + f_liq * ro_liq / ro_ice <= 1 + eps))
 
-      % Relaxation. Doesn't improve convergence but keep for reference.
-      % T = alpha * T + (1 - alpha) * T_iter;
+      % Relaxation and Aitken (not implemented). Proper implementation requires
+      % a MELTCURVE/MZTRANSFORM-consistent update of T, f_ice, and f_liq.
+      % T = min(Tf, alpha * T + (1 - alpha) * T_iter);
+      % if use_aitken
+      %    T_0 = T;
+      %    for mm = 1:numel(T)
+      %       T(mm) = aitkenscalar(T_2(mm), T_1(mm), T_0(mm), T(mm), ...
+      %          jumpmax);
+      %    end
+      %    T_2 = T_1;
+      %    T_1 = T_0;
+      % end
    end
 
-   OK = iter < maxiter;
+   ok = iter < maxiter;
 
    % Surface energy balance linearization error [K]
    % err0 = -(Fc + Fp * Ts) / a1 - (T(1) - Ts);

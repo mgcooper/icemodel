@@ -1,4 +1,4 @@
-function iter = time2iter(time, met)
+function step = time2iter(time, met)
 
    if ~isdatetime(time)
       [time, tf, dtype] = todatetime(time);
@@ -15,5 +15,5 @@ function iter = time2iter(time, met)
       warning('time.TimeZone does not equal met.Time.TimeZone')
       time.TimeZone = metTime.TimeZone;
    end
-   iter = find(metTime == time);
+   step = find(metTime == time);
 end

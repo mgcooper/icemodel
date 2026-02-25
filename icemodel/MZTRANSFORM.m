@@ -1,5 +1,5 @@
-function [T, f_ice, f_liq, OK] = MZTRANSFORM(T, T_old, f_ice, f_liq, f_wat, ...
-      ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, f_liq_max, iM, OK)
+function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_old, f_ice, f_liq, f_wat, ...
+      ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, f_liq_max, iM, ok)
    %MZTRANSFORM Liquid fraction change to temperature-enthalpy transformation
    %
    % This function uses the change in liquid fraction returned by the numerical
@@ -37,7 +37,7 @@ function [T, f_ice, f_liq, OK] = MZTRANSFORM(T, T_old, f_ice, f_liq, f_wat, ...
 
    % Check if the change in liquid water exceeds available ice
    if any( (T(iM) / ro_liq) >= (ro_ice / ro_liq - f_liq(iM)) )
-      OK = false;
+      ok = false;
       return
    end
 
@@ -53,7 +53,7 @@ function [T, f_ice, f_liq, OK] = MZTRANSFORM(T, T_old, f_ice, f_liq, f_wat, ...
 
    % Don't allow f_liq to exceed f_wat by more than 1% (line 113 of ftemp.f)
    if any((f_liq(iM) - f_wat(iM)) ./ f_wat(iM) > 0.01)
-      OK = false;
+      ok = false;
       return
    end
    f_liq(iM) = min(f_liq(iM), f_wat(iM) - eps);
@@ -64,7 +64,7 @@ function [T, f_ice, f_liq, OK] = MZTRANSFORM(T, T_old, f_ice, f_liq, f_wat, ...
    % Check for nodes that were within the melt zone but now have a liquid
    % fraction below the lower limit (lower phase boundary overshoot).
    if any(f_liq(iM) < 0.95*f_liq_min(iM)) || any(f_liq(iM) > 1.05*f_liq_max(iM))
-      OK = false;
+      ok = false;
       return
    end
 
@@ -78,7 +78,7 @@ function [T, f_ice, f_liq, OK] = MZTRANSFORM(T, T_old, f_ice, f_liq, f_wat, ...
    % one step (upper phase boundary overshoot).
    if any(T_old(~iM) < TL & T(~iM) >= TH) ...
          || any(T_old(~iM) > TH & T(~iM) < TL) || any(iscomplex(T))
-      OK  = false;
+      ok  = false;
       return
    end
 

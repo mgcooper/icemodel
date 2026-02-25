@@ -1,5 +1,6 @@
-function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ...
-      k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf, varargin)
+function [T, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, ...
+      Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf, tol, maxiter, alpha, ...
+      use_aitken, jumpmax)
    %SKINSOLVE Solve the 1-dimensional heat conduction equation
    %
    %#codegen
@@ -7,36 +8,23 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
    debug = false;
 
    % Solver options
-   tol = 1e-2;
-   maxiter = 100;
-   alpha = 1.8;
-   if ~isempty(varargin)
-      switch numel(varargin)
-         case 1
-            tol = varargin{1};
-         case 2
-            tol = varargin{1};
-            maxiter = varargin{2};
-         case 3
-            tol = varargin{1};
-            maxiter = varargin{2};
-            alpha = varargin{3};
-         otherwise
-      end
-   end
    if maxiter == 1
       alpha = 1;
    end
    drovdT = 0 * T;
    k_vap = 0 * T;
 
-   % Solve the nonlinear heat equation by iteration (p. 47)
-   OK = false;
+   % Initial past Picard iterates for Aitken-acceleration
+   % T_1 = nan(size(T));
+   % T_2 = nan(size(T));
+
+   % Iterate to solve the nonlinear heat equation (p. 47)
+   ok = false;
    for iter = 1:maxiter
 
       T_iter = T;
 
-      % Update thermal conductivity
+      % Update thermal conductivity (currently held constant)
       % [~, drovdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
       % k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
 
@@ -75,20 +63,26 @@ function [T, OK, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, Ts, ..
          plot_temp(T, T_iter, Ts, dz)
       end
 
-      if debug == true
-         plot_temp(T, T_iter, Ts, dz)
-      end
-
       % Prep for next iteration
       if all(abs(T - T_iter) < tol)
-         OK = true;
+         ok = true;
          break
       end
 
       % Apply relaxation
       T = alpha * T + (1 - alpha) * T_iter;
+
+      % Aitken acceleration (node-by-node) with relaxed value as fallback.
+      % if use_aitken
+      %    T_0 = T;
+      %    for mm = 1:numel(T)
+      %       T(mm) = aitkenscalar(T_2(mm), T_1(mm), T_0(mm), T(mm), ...
+      %          jumpmax);
+      %    end
+      %    T_2 = T_1;
+      %    T_1 = T_0;
+      % end
    end
-   % OK = iter <= maxiter;
 end
 
 function plot_temp(T, T_iter, Ts, dz)
