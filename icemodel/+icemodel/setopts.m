@@ -90,9 +90,9 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %
    %  bc_type = 3 (Robin with strong Ts-T coupling iterations):
    %   - Within each substep, perform outer fixed-point coupling iterations
-   %     between the SEB linearization and subsurface enthalpy solve until Ts
-   %     converges (with relaxation).
-   %   - Typically slower than bc_type = 2; cost depends on cpltol, maxcpliter,
+   %     between the SEB linearization and subsurface enthalpy solve until
+   %     Ts and SEB residual converge (with relaxation/Aitken).
+   %   - Typically slower than bc_type = 2; cost depends on cpl_Ts_tol, cpl_maxiter,
    %     relaxation, and timestep adaptation.
    %   - Classification: partitioned, strongly coupled at substep scale
    %     (iterative block/Picard coupling, not monolithic Newton).
@@ -163,17 +163,24 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    if strcmp(smbmodel, 'icemodel')
 
       % Solver options. See function doc for info about each bc type.
-
-      opts.bc_type         = 1;     % recommended: 1 (1=dirichlet, 2/3=robin)
+      opts.bc_type         = 3;     % recommended: 1 (1=dirichlet, 2/3=robin)
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
-      opts.maxiter         = 100;   % inner thermal solver max iterations
-      opts.tol             = 1e-2;  % inner thermal solver convergence tolerance [K]
-      opts.maxcpliter      = 100;   % outer Ts convergence max iterations
-      opts.cpltol          = 1e-2;  % outer Ts convergence tolerance [K]
-      opts.sebtol          = 1.0;   % outer SEB convergence tolerance [W m-2]
-      opts.omega           = 0.3;   % outer Ts relaxation factor
 
+      opts.maxiter         = 100;   % thermal solver max iterations
+      opts.tol             = 1e-2;  % thermal solver convergence tolerance [K]
+      opts.alpha           = 1.0;   % thermal solver relaxation factor (rec: 1.0)
+      opts.use_aitken      = false; % thermal solver aitken-acceleration flag
+      opts.jumpmax         = 5.0;   % thermal solver acceleration guess tolerance [K]
+
+      opts.cpl_maxiter     = 100;   % coupler Ts convergence max iterations
+      opts.cpl_Ts_tol      = 1e-2;  % coupler Ts convergence tolerance [K]
+      opts.cpl_seb_tol     = 1.0;   % coupler SEB convergence tolerance [W m-2]
+      opts.cpl_alpha       = 1.0;   % coupler Ts relaxation factor (rec: 1.0)
+      opts.cpl_aitken      = true;  % coupler Ts aitken-acceleration flag
+      opts.cpl_jumpmax     = 5.0;   % coupler Ts acceleration guess tolerance [K]
+
+      % Timestepping / mesh options
       opts.dt              = 900;   % timestep (3600 or (recommended) 900) [s]
       opts.dz_thermal      = 0.04;  % dz for thermal heat transfer         [m]
       opts.dz_spectral     = 0.002; % dz for radiative heat transfer       [m]
@@ -183,18 +190,25 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    elseif strcmp(smbmodel, 'skinmodel')
 
+      % Solver options. See function doc for info about each bc type.
       opts.bc_type         = 1;     % recommended: 1 (1=dirichlet, 2=robin)
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
-      opts.maxiter         = 100;   % inner thermal solver max iterations
-      opts.tol             = 1e-2;  % inner thermal solver convergence tolerance [K]
-      opts.maxcpliter      = 100;   % outer Ts convergence max iterations
-      opts.cpltol          = 1e-2;  % outer Ts convergence tolerance [K]
-      opts.sebtol          = 1.0;   % outer SEB convergence tolerance [W m-2]
-      opts.omega           = 1.8;   % outer Ts relaxation factor
-      opts.use_aitken      = true;  % use aitken-acceleration or not
-      opts.aitken_jumpmax  = 5.0;   % acceleration guess tolerance [K]
 
+      opts.maxiter         = 100;   % thermal solver max iterations
+      opts.tol             = 1e-2;  % thermal solver convergence tolerance [K]
+      opts.alpha           = 1.0;   % thermal solver relaxation factor
+      opts.use_aitken      = true;  % thermal solver aitken-acceleration flag
+      opts.jumpmax         = 5.0;   % thermal solver acceleration guess tolerance [K]
+
+      opts.cpl_maxiter     = 100;   % coupler Ts convergence max iterations
+      opts.cpl_Ts_tol      = 1e-2;  % coupler Ts convergence tolerance [K]
+      opts.cpl_seb_tol     = 1.0;   % coupler SEB convergence tolerance [W m-2]
+      opts.cpl_alpha       = 1.8;   % coupler Ts relaxation factor
+      opts.cpl_aitken      = true;  % coupler Ts aitken-acceleration flag
+      opts.cpl_jumpmax     = 5.0;   % coupler Ts acceleration guess tolerance [K]
+
+      % Timestepping / mesh options
       opts.dt              = 900;   % timestep (3600 or (recommended) 900) [s]
       opts.dz_thermal      = 0.04;  % dz for thermal heat transfer         [m]
       opts.dz_spectral     = 0.002; % dz for radiative heat transfer       [m]

@@ -1,4 +1,4 @@
-function [metiter, subiter, maxiter, maxsubiter, dt_new, dt_FULL_STEP, ...
+function [metstep, substep, numsteps, maxsubstep, dt_new, dt_FULL_STEP, ...
       numyears, numspinup, simyears] = INITTIMESTEPS(opts, Time)
    %INITTIMESTEP initialize timestepping
    %
@@ -6,8 +6,8 @@ function [metiter, subiter, maxiter, maxsubiter, dt_new, dt_FULL_STEP, ...
 
    narginchk(0, 2)
 
-   metiter = 1;
-   subiter = 1;
+   metstep = 1;
+   substep = 1;
 
    if nargin == 0
       return
@@ -15,12 +15,12 @@ function [metiter, subiter, maxiter, maxsubiter, dt_new, dt_FULL_STEP, ...
 
    % Compute the timestep and the total number of model timesteps
    dt_FULL_STEP = opts.dt;
-   maxiter = numel(Time) / opts.numyears;
-   maxsubiter = opts.dt; % allow 1 sec dt min
-   minsubiter = 1;
+   numsteps = numel(Time) / opts.numyears;
+   maxsubstep = opts.dt; % allow 1 sec dt min
+   minsubstep = 1;
 
-   dt_min = dt_FULL_STEP / maxsubiter;
-   dt_new = dt_FULL_STEP / minsubiter;
+   dt_min = dt_FULL_STEP / maxsubstep;
+   dt_new = dt_FULL_STEP / minsubstep;
 
    % Compute the number of spinup years and a vector of simulation years
    numspinup = opts.spinup_loops;

@@ -116,9 +116,11 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = COMBINEHEAT( ...
       end
    end
 
-   % Invert T_dC to obtain f_liq from the f_liq = f(f_wat, Tdc) relationship.
+   % Compute the water fraction of the combined CV.
    f_wat_C = m_wat_C / (ro_liq * 2 * dz);
-   f_liq_C = f_wat_C / (1.0 + (fcp * Td_C) ^ 2.0); % eq 67, Jordan
+
+   % Invert T_dC to obtain f_liq from f_liq = f(f_wat, Tdc) (eq 67, Jordan).
+   f_liq_C = f_wat_C / (1.0 + (fcp * Td_C) ^ 2.0);
    f_ice_C = (f_wat_C - f_liq_C) * ro_liq / ro_ice;
    d_liq(j1) = d_liq(j1) + max(f_liq(j1) + f_liq(j2) - f_liq_C, 0);
 end
