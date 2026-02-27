@@ -29,7 +29,7 @@ function [ice1, ice2] = icemodel(opts)
    %         column control volume mesh. Contains one column per timestep.
    % met   - Struct containing the meteorological data used for the simulation.
    %
-   % See also: ICEMODEL.SETOPTS
+   % See also: skinmodel, icemodel.setopts
    %
    %%#codegen
 
@@ -87,7 +87,7 @@ function [ice1, ice2] = icemodel(opts)
             Q0, dz_spect, spect_N, spect_S, solardwavl, Sc, dz, ...
             ro_ice * f_ice + ro_liq * f_liq);
 
-         % SURFACE TERMS
+         % SURFACE TERMS (atmospheric vapor pressure fixed over this full step)
          ea = VAPPRESS(tair(metstep), Tf, liqflag) * rh(metstep) / 100;
          if bc_type == 2
             [Fc, Fp] = SFCFLIN(tair(metstep), swd(metstep), lwd(metstep), ...
@@ -128,7 +128,7 @@ function [ice1, ice2] = icemodel(opts)
             ok = ok_seb && ok_ieb;
 
             if debug == true
-               % PROGRESS MESSAGE (SLOWS DOWN THE CODE A LOT)
+               % PROGRESS MESSAGE (slows down the code a lot)
                if not(ok)
                   fprintf('timestep = %d (%.2f%%), dt = %.0f, success = %s\n', ...
                      timestep, 100*timestep/numsteps, dt, mat2str(ok))
@@ -138,13 +138,15 @@ function [ice1, ice2] = icemodel(opts)
                end
             end
 
-            % PHASE BOUNDARY OVERSHOOT, DECREASE THE TIME STEP AND START OVER
+            % ADAPTIVE TIME STEP (shorten dt and restart substep on failure)
             if not(ok)
                [Ts, T, f_ice, f_liq, n_subfail, substep, dt] ...
                   = RESETSUBSTEP(xTs, xT, xf_ice, xf_liq, dt_FULL_STEP, ...
                   substep, maxsubstep, n_subfail, dt_sum);
                if n_subfail < maxsubstep
                   continue
+               else
+                  fprintf('timestep = %d, n_subfail == maxsubstep\n', timestep)
                end
             end
 
@@ -156,26 +158,33 @@ function [ice1, ice2] = icemodel(opts)
                   ea, cv_air, emiss, SB, roL, scoef, chi, Tf, Ts, liqflag);
             end
 
-            % UPDATE SURFACE FLUXES
-            [Qe, Qh, Qc, Qm, ~, Qbal] = SEBFLUX(T, Ts, tair(metstep), ...
-               swd(metstep), lwd(metstep), albedo(metstep), wspd(metstep), ...
-               ppt(metstep), tppt(metstep), psfc(metstep), De(metstep), ea, ...
-               Tf, k_eff, dz, cv_air, cv_liq, roL, emiss, SB, chi, epsilon, ...
-               scoef, liqflag);
+            % UPDATE POTENTIAL SURFACE NET VAPOR FLUX
+            Qe = LATENT(De(metstep), ...
+               STABLEFN(tair(metstep), Ts, wspd(metstep), scoef), ...
+               ea, VAPPRESS(Ts, Tf, liqflag), roL, epsilon, psfc(metstep));
+            d_pevp = PEVAP(Qe, Lv, ro_liq, dt, dz(1));
 
-            % COMPUTE MASS BALANCE
+            % UPDATE MASS BALANCE
             [T, f_ice, f_liq, d_liq, d_evp, d_lyr] = ICEMF(T, f_ice, f_liq, ...
                ro_ice, ro_liq, cv_ice, cv_liq, Lf, Ls, Lv, Tf, TL, fcp, ...
-               xf_liq, Sc, Sp, JJ, f_ice_min, dz(1), dt, Qe, d_liq, d_evp, ...
+               xf_liq, Sc, Sp, JJ, f_ice_min, dz(1), d_pevp, d_liq, d_evp, ...
                d_lyr, f_ell_min, f_liq_res);
 
-            % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
+            % UPDATE STATE AND SUBSTEP TIME (checkpoint state)
             [xTs, xT, xf_ice, xf_liq, dt_sum, dt, liqflag, roL] ...
                = UPDATESUBSTEP(Ts, T, f_ice, f_liq, dt_FULL_STEP, dt_sum, ...
                dt, TINY, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs);
          end
 
+         % Error if dt accumulation exceeds full step
          assertF(@() dt_sum < dt_FULL_STEP + 2 * TINY)
+
+         % DIAGNOSE SURFACE FLUXES
+         [Qe, Qh, Qc, Qm, ~, Qbal] = SEBFLUX(T, Ts, tair(metstep), ...
+            swd(metstep), lwd(metstep), albedo(metstep), wspd(metstep), ...
+            ppt(metstep), tppt(metstep), psfc(metstep), De(metstep), ea, ...
+            Tf, k_eff, dz, cv_air, cv_liq, roL, emiss, SB, chi, epsilon, ...
+            scoef, liqflag);
 
          % SAVE OUTPUT IF SPINUP IS FINISHED
          if thisyear >= numspinup

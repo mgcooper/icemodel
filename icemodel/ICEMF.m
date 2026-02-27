@@ -1,6 +1,6 @@
 function [T, f_ice, f_liq, d_liq, d_evp, d_lyr, x_err, lcflag] = ICEMF( ...
       T, f_ice, f_liq, ro_ice, ro_liq, cv_ice, cv_liq, Lf, Ls, Lv, Tf, ...
-      TL, fcp, xf_liq, Sc, Sp, JJ, f_min, dz_therm, dt_new, Qe, d_liq, ...
+      TL, fcp, xf_liq, Sc, Sp, JJ, f_min, dz_therm, d_pevp, d_liq, ...
       d_evp, d_lyr, f_ell_min, f_liq_res)
    %ICEMF Budget ice melt/freeze, evap/cond, and remesh melted layers.
    %
@@ -12,6 +12,7 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_lyr, x_err, lcflag] = ICEMF( ...
    %  xf_liq - the prior value of f_liq returned by this function.
    %  d_evp - the change in liquid water fraction due to evaporation.
    %  d_con - the change in liquid water fraction due to condensation.
+   %  d_pevp - potential vapor-driven change in top-layer liquid fraction.
    %  x_err - latent heat flux which exceeds the top layer liq/ice content.
    %  x_err is only used for debugging, it is not included in any mass budgets.
    %
@@ -22,11 +23,12 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_lyr, x_err, lcflag] = ICEMF( ...
    % Compute the surface mass balance terms
    [T, d_liq, d_evp, ~, f_ice, f_liq, x_err] = SMB(T, d_liq, d_evp, 0, ...
       f_ice, f_liq, xf_liq, TL, ro_ice, ro_liq, f_ell_min, f_liq_res, ...
-      Ls, Lv, dz_therm, dt_new, Qe, f_min, fcp, Tf);
+      Ls, Lv, d_pevp, f_min, fcp, Tf);
 
    % Combine layers if ice fraction is <f_min, or if this step's sublimation
    % would reduce it below <f_min (i.e., predict the need to combine next step)
-   lyrmrg = f_ice <= f_min | (f_ice + Qe/(Ls*ro_ice)*dt_new/dz_therm) <= f_min;
+   lyrmrg = f_ice <= f_min | ...
+      (f_ice + d_pevp * (Lv * ro_liq) / (Ls * ro_ice)) <= f_min;
 
    % lyrmrg is updated in the loop, lcflag indicates which layer(s) combined
    lcflag = lyrmrg;
@@ -63,7 +65,7 @@ end
 
 function [T, d_liq, d_evp, d_con, f_ice, f_liq, x_err] = SMB(T, d_liq, d_evp, ...
       d_con, f_ice, f_liq, xf_liq, TL, ro_ice, ro_liq, f_ell_min, f_liq_res, ...
-      Ls, Lv, dz_therm, dt_new, Qe, f_min, fcp, Tf)
+      Ls, Lv, d_pevp, f_min, fcp, Tf)
    %SMB (sub)surface mass budgets
    %
    % Positive values of d_liq indicate increasing water fraction:
@@ -92,7 +94,7 @@ function [T, d_liq, d_evp, d_con, f_ice, f_liq, x_err] = SMB(T, d_liq, d_evp, ..
 
    % Compute evaporation/condensation/sublimation.
    [f_ice, f_liq, d_con, x_err] = ICESUBL(f_ice, f_liq, d_con, ...
-      ro_ice, ro_liq, Ls, Lv, dz_therm, dt_new, Qe, f_min, f_liq_res);
+      ro_ice, ro_liq, Ls, Lv, d_pevp, f_min, f_liq_res);
 
    % Budget evap / subl.
    d_evp = d_evp + f_liq - xf_liq;
