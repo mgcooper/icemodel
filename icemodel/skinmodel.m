@@ -2,7 +2,7 @@ function [ice1, ice2] = skinmodel(opts)
    %SKINMODEL Surface energy balance model for glacier ice.
    %
    %
-   % See also: icemodel
+   % See also: icemodel, icemodel.setopts
    %
    %#codegen
 
@@ -19,19 +19,11 @@ function [ice1, ice2] = skinmodel(opts)
    TINY = 1e-8;
    chi = 1.0;
 
-   % Unpack once before heavy loops to avoid repeated opts field access.
-   [bc_type, seb_solver, cpl_maxiter, cpl_Ts_tol, cpl_seb_tol, ...
-      cpl_alpha, cpl_aitken, cpl_jumpmax, maxiter, tol, alpha, ...
-      use_aitken, jumpmax] = icemodel.getopts(opts, ...
-      'bc_type', 'seb_solver', 'cpl_maxiter', 'cpl_Ts_tol', ...
-      'cpl_seb_tol', 'cpl_alpha', 'cpl_aitken', 'cpl_jumpmax', ...
-      'maxiter', 'tol', 'alpha', 'use_aitken', 'jumpmax');
-
    % LOAD THE FORCING DATA
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
       = METINIT(opts, 1);
 
-   % INITIALIZE THE ICE COLUMN
+   % INITIALIZE THE THERMAL MODEL
    [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, JJ] ...
       = ICEINIT(opts, tair);
 
@@ -42,6 +34,14 @@ function [ice1, ice2] = skinmodel(opts)
    % INITIALIZE PAST VALUES
    [xTs, xT, xf_ice, xf_liq] = RESETSUBSTEP(Ts, T, f_ice, f_liq);
 
+   % UNPACK SOLVER OPTS
+   [bc_type, seb_solver, cpl_maxiter, cpl_Ts_tol, cpl_seb_tol, ...
+      cpl_alpha, cpl_aitken, cpl_jumpmax, maxiter, tol, alpha, ...
+      use_aitken, jumpmax] = icemodel.getopts(opts, ...
+      'bc_type', 'seb_solver', 'cpl_maxiter', 'cpl_Ts_tol', ...
+      'cpl_seb_tol', 'cpl_alpha', 'cpl_aitken', 'cpl_jumpmax', ...
+      'maxiter', 'tol', 'alpha', 'use_aitken', 'jumpmax');
+
    %% START TIMESTEPS OVER YEARS
    for thisyear = 1:numyears
 
@@ -50,7 +50,7 @@ function [ice1, ice2] = skinmodel(opts)
          % INITIALIZE NEW TIMESTEP
          [dt_sum, n_subfail, ok_seb, ok_ieb] = NEWTIMESTEP(f_liq, bc_type);
 
-         % Atmospheric vapor pressure (fixed over this full forcing step).
+         % SURFACE TERMS (atmospheric vapor pressure fixed over this full step)
          ea = VAPPRESS(tair(metstep), Tf, liqflag) * rh(metstep) / 100;
 
          while dt_sum + TINY < dt_FULL_STEP
@@ -115,20 +115,20 @@ function [ice1, ice2] = skinmodel(opts)
                % Aitken acceleration with relaxation-fallback
                Ts_0 = Ts;
                Ts = MELTTEMP(aitkenscalar(Ts_2, Ts_1, Ts_0, ...
-                  (1.0 - cpl_alpha) * old + cpl_alpha * Ts, ... % relaxation fallback
+                  (1.0 - cpl_alpha) * old + cpl_alpha * Ts, ... % relaxation
                   cpl_jumpmax, cpl_aitken), Tf);
                Ts_2 = Ts_1;
                Ts_1 = Ts_0;
             end
             ok = ok_seb && ok_ieb && ok_cpl;
 
-            % PROGRESS MESSAGE (SLOWS DOWN THE CODE A LOT)
+            % PROGRESS MESSAGE (slows down the code a lot)
             if debug == true && not(ok)
                fprintf('timestep = %d (%.2f%%), dt = %.0f, success = %s\n', ...
                   timestep, 100*timestep/numsteps, dt, mat2str(ok))
             end
 
-            % ADAPTIVE TIME STEP
+            % ADAPTIVE TIME STEP (shorten dt and restart substep on failure)
             if not(ok)
                [Ts, T, f_ice, f_liq, n_subfail, substep, dt] ...
                   = RESETSUBSTEP(xTs, xT, xf_ice, xf_liq, dt_FULL_STEP, ...
@@ -140,15 +140,16 @@ function [ice1, ice2] = skinmodel(opts)
                end
             end
 
-            % UPDATE DENSITY, HEAT CAPACITY, AND SUBSTEP TIME
+            % UPDATE STATE AND SUBSTEP TIME (checkpoint state)
             [xTs, xT, xf_ice, xf_liq, dt_sum, dt, liqflag, roL] ...
                = UPDATESUBSTEP(Ts, T, f_ice, f_liq, dt_FULL_STEP, dt_sum, ...
                dt, TINY, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs);
          end
 
+         % Error if dt accumulation exceeds full step
          assertF(@() dt_sum < dt_FULL_STEP + 2 * TINY)
 
-         % UPDATE SURFACE FLUXES
+         % DIAGNOSE SURFACE FLUXES
          k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
          [Qe, Qh, Qc, Qm, ~, Qbal] = SEBFLUX(T, Ts, tair(metstep), ...
             swd(metstep), lwd(metstep), albedo(metstep), wspd(metstep), ...
@@ -160,6 +161,7 @@ function [ice1, ice2] = skinmodel(opts)
          if thisyear >= numspinup
 
             if strcmp('sector', opts.sitename)
+
                [ice1, ice2] = SAVEOUTPUT(timestep, ice1, ice2, ...
                   opts.vars1, opts.vars2, ...
                   {Ts, Qm, Qe},  ...
