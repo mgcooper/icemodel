@@ -1,6 +1,6 @@
-function [T, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, ...
-      Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf, tol, maxiter, alpha, ...
-      use_aitken, jumpmax)
+function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
+      delz, fn, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf, tol, ...
+      maxiter, alpha)
    %SKINSOLVE Solve the 1-dimensional heat conduction equation
    %
    %#codegen
@@ -11,8 +11,14 @@ function [T, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, ...
    if maxiter == 1
       alpha = 1;
    end
-   drovdT = 0 * T;
-   k_vap = 0 * T;
+
+   % Update thermal conductivity (vapor heat currently held constant)
+   % [~, drovdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
+   % k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
+   drovdT = 0;
+
+   % Update thermal conductivity
+   k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
 
    % Initial past Picard iterates for Aitken-acceleration
    % T_1 = nan(size(T));
@@ -22,14 +28,8 @@ function [T, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, ...
    ok = false;
    for iter = 1:maxiter
 
+      % Capture current T iterate
       T_iter = T;
-
-      % Update thermal conductivity (currently held constant)
-      % [~, drovdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
-      % k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
-
-      % Update thermal conductivity
-      k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
 
       % Compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
       g_ns = [k_eff(1); k_eff(1:JJ); k_eff(JJ)];
@@ -82,6 +82,9 @@ function [T, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, delz, fn, dt, JJ, ...
       %    T_2 = T_1;
       %    T_1 = T_0;
       % end
+
+      % Update thermal conductivity (T-k_eff consistency on final iteration)
+      k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
    end
 end
 
