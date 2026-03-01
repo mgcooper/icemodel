@@ -99,12 +99,12 @@ function [T, d_liq, d_evp, d_con, f_ice, f_liq, x_err] = SMB(T, d_liq, d_evp, ..
    % Budget evap / subl.
    d_evp = d_evp + f_liq - xf_liq;
 
-   % Update the top layer temperature, if the node is in the melt zone
-   if T(1) > TL % || f_liq(1) > f_liq_min
-      T(1) = MELTCURVE(T(1), f_ice(1), f_liq(1), ro_ice, ro_liq, fcp, Tf);
-   end
-
    % Below here:
+   % f_liq = ... some modification to f_liq
    % d_XXX = f_liq - xf_liq - d_evp
-   % where f_liq on the rhs is f_liq_new
+
+   % Equivalently, re-assign xf_liq first:
+   % xf_liq = f_liq;
+   % f_liq = ... some modification to f_liq
+   % d_XXX = f_liq - xf_liq
 end
