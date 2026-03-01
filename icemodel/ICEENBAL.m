@@ -43,11 +43,11 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ICEENBAL(T, f_ice, ...
       % Update vapor heat
       [ro_vap, drovdT, k_vap] = VAPORHEAT(T, f_ice, f_liq, Tf, Rv, Ls);
 
-      % Update total enthalpy
-      H = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
-
       % Update thermal conductivity
       k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
+
+      % Update total enthalpy
+      H = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
 
       % Update the derivative of enthalpy wrt temperature
       dHdT = cv_ice * f_ice + cv_liq * f_liq;
