@@ -1,12 +1,14 @@
-function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, ro_ice, ...
+function [f_liq, f_ice, T, ok] = INFILTRATION(f_liq, f_ice, T, ro_ice, ...
       ro_liq, Tf, TL, fcp, dz, dt)
    %INFILTRATION
    %
    %#codegen
 
-   OK = true;
+   ok = false;
+
+   % Early exit if entire ice column below lower melt zone temperature
    if all(T(2:end) < TL)
-      OK = true;
+      ok = true;
       return
    end
 
@@ -62,7 +64,6 @@ function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, ro_ice, ...
 
    % First condition should never trigger
    if any(-df_liq > f_liq)
-      OK = false;
       return
    else
       % Update f_liq using explicit scheme
@@ -80,12 +81,14 @@ function [f_liq, f_ice, T, OK] = INFILTRATION(f_liq, f_ice, T, ro_ice, ...
    end
 
    if any(f_ice <= 1e-8)
-      OK = false;
+      return
    end
 
    if any(T > Tf) || any(f_liq + f_ice - 1.0 > 1e-12)
-      OK = false;
+      return
    end
+
+   ok = true;
 end
 
 % max(f_liq + f_ice - 1.0)
