@@ -31,7 +31,7 @@ function [ice1, ice2] = icemodel(opts)
    %
    % See also: skinmodel, icemodel.setopts
    %
-   %%#codegen
+   %#codegen
 
    %% INITIALIZE THE MODEL
 
@@ -97,7 +97,7 @@ function [ice1, ice2] = icemodel(opts)
 
          while dt_sum + TINY < dt_FULL_STEP
 
-            % SURFACE TEMPERATURE (Dirichlet mode)
+            % SURFACE TEMPERATURE (Dirichlet lagged coupling mode)
             if bc_type == 1
                k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
                [Ts, ok_seb] = SEBSOLVE(tair(metstep), swd(metstep), ...
@@ -108,8 +108,8 @@ function [ice1, ice2] = icemodel(opts)
             end
 
             % ICE ENERGY BALANCE
-            if bc_type == 3
-               [Ts, Fc, Fp, T, f_ice, f_liq, k_eff, ok_ieb, n_iters, a1] ...
+            if bc_type == 3 % (Robin strong coupling mode)
+               [Ts, T, f_ice, f_liq, k_eff, ok_ieb, n_iters] ...
                   = ICEEBSOLVE(T, f_ice, f_liq, dz, delz, fn, Sc, dt, JJ, Ts, ...
                   k_liq, cv_ice, cv_liq, ro_ice, ro_liq, Ls, Lf, roLf, Rv, ...
                   Tf, fcp, TL, TH, f_ell_min, f_ell_max, tair(metstep), ...
@@ -119,7 +119,7 @@ function [ice1, ice2] = icemodel(opts)
                   tol, maxiter, alpha, use_aitken, jumpmax, cpl_Ts_tol, ...
                   cpl_seb_tol, cpl_maxiter, cpl_alpha, cpl_aitken, cpl_jumpmax);
 
-            else
+            else % (Robin and Dirichlet lagged coupling mode)
                [T, f_ice, f_liq, k_eff, ok_ieb, n_iters, a1] ...
                   = ICEENBAL(T, f_ice, f_liq, dz, delz, fn, Sc, dt, JJ, Ts, ...
                   k_liq, cv_ice, cv_liq, ro_ice, ro_liq, Ls, Lf, roLf, Rv, ...
@@ -165,13 +165,13 @@ function [ice1, ice2] = icemodel(opts)
                ea, VAPPRESS(Ts, Tf, liqflag), roL, epsilon, psfc(metstep));
             d_pevp = PEVAP(Qe, Lv, ro_liq, dt, dz(1));
 
-            % UPDATE MASS BALANCE
+            % UPDATE MASS BALANCE FLUXES
             [T, f_ice, f_liq, d_liq, d_evp, d_lyr] = ICEMF(T, f_ice, f_liq, ...
                ro_ice, ro_liq, cv_ice, cv_liq, Lf, Ls, Lv, Tf, TL, fcp, ...
                xf_liq, Sc, Sp, JJ, f_ice_min, dz(1), d_pevp, d_liq, d_evp, ...
                d_lyr, f_ell_min, f_liq_res);
 
-            % UPDATE STATE AND SUBSTEP TIME (checkpoint state)
+            % CHECKPOINT STATE AND SUBSTEP TIME
             [xTs, xT, xf_ice, xf_liq, dt_sum, dt, liqflag, roL] ...
                = UPDATESUBSTEP(Ts, T, f_ice, f_liq, dt_FULL_STEP, dt_sum, ...
                dt, TINY, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs);
