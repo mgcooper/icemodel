@@ -45,7 +45,8 @@ function [Ts, T, f_ice, f_liq, k_eff, ok, n_iters] = ICEEBSOLVE( ...
          CONDUCT(k_eff, T, dz, Ts), liqflag);
 
       % Check convergence
-      if abs(Ts - old) < cpl_Ts_tol && abs(seb_res) < cpl_seb_tol
+      if (cpl_maxiter == 1) || ...
+            (abs(Ts - old) < cpl_Ts_tol && abs(seb_res) < cpl_seb_tol)
          ok_cpl = true;
          break
       end
