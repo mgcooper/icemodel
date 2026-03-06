@@ -107,7 +107,7 @@ function [ice1, ice2] = icemodel(opts)
                   liqflag, Ts, T, k_eff, dz, seb_solver);
             end
 
-            % ICE ENERGY BALANCE
+            % COUPLED SURFACE-SUBSURFACE ENERGY BALANCE
             if bc_type == 3 % (Robin strong coupling mode)
                [Ts, T, f_ice, f_liq, k_eff, ok_ieb, n_iters] ...
                   = ICEEBSOLVE(T, f_ice, f_liq, dz, delz, fn, Sc, dt, JJ, Ts, ...
