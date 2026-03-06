@@ -128,27 +128,13 @@ function [ice1, ice2] = icemodel(opts)
             end
             ok = ok_seb && ok_ieb;
 
-            if debug == true
-               % PROGRESS MESSAGE (slows down the code a lot)
-               if not(ok)
-                  fprintf('timestep = %d (%.2f%%), dt = %.0f, success = %s\n', ...
-                     timestep, 100*timestep/numsteps, dt, mat2str(ok))
-               end
-               if ok_ieb
-                  assertF(@() all(f_ice + f_liq * ro_liq / ro_ice <= 1 + eps))
-               end
-            end
-
-            % ADAPTIVE TIME STEP (shorten dt and restart substep on failure)
+            % CHECK SUBSTEP FAILURE (shorten dt and restart substep on failure)
+            [Ts, T, f_ice, f_liq, n_subfail, substep, dt, ok] = ...
+               CHECKSUBSTEP(Ts, T, f_ice, f_liq, xTs, xT, xf_ice, xf_liq, ...
+               ro_ice, ro_liq, dt_sum, dt, dt_FULL_STEP, timestep, numsteps, ...
+               substep, maxsubstep, n_subfail, debug, eps, ok);
             if not(ok)
-               [Ts, T, f_ice, f_liq, n_subfail, substep, dt] ...
-                  = RESETSUBSTEP(xTs, xT, xf_ice, xf_liq, dt_FULL_STEP, ...
-                  substep, maxsubstep, n_subfail, dt_sum);
-               if n_subfail < maxsubstep
-                  continue
-               else
-                  fprintf('timestep = %d, n_subfail == maxsubstep\n', timestep)
-               end
+               continue
             end
 
             % UPDATE SEB LINEARIZATION (substep update for lagged-robin bc)
