@@ -23,6 +23,12 @@ function [d_pevp, pevp] = PEVAP(Qe, Lv, ro_liq, dt, dz)
    %
    % See also: ICESUBL
    %
+   % TODO: Consider refactoring so Qe is computed within this function
+   %
+   % d_pevp = PEVAP(Ts, tair(metstep), wspd(metstep), psfc(metstep), ...
+   %    De(metstep), ea, scoef, epsilon, Lv, Tf, roL, ro_liq, dt, ...
+   %    dz(1), liqflag);
+   %
    %#codegen
    pevp = Qe / (Lv * ro_liq);
    d_pevp = pevp * dt / dz;
