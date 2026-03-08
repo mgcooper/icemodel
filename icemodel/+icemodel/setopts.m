@@ -1,9 +1,10 @@
 function opts = setopts(smbmodel, sitename, simyears, forcings, ...
-      userdata, uservars, testname, saveflag, backupflag)
+      userdata, uservars, testname, saveflag, backupflag, varargin)
    %SETOPTS Set model options
    %
    %  opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %     userdata, uservars, testname, saveflag, backupflag)
+   %  opts = setopts(..., 'dt', 900, 'bc_type', 3)
    %
    % Inputs
    %
@@ -52,6 +53,13 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  BACKUPFLAG - (optional) a logical scalar indicating whether to backup the
    %  output files if they already exist.
    %
+   % Optional name/value overrides
+   %
+   %  Any field already present in the returned OPTS struct can be overridden
+   %  by passing trailing name/value pairs. This is intended for solver,
+   %  timestep, and test configuration overrides after the standard run inputs
+   %  have been defined by the positional arguments.
+   %
    % Outputs
    %
    %  OPTS - a struct containing the runtime model options.
@@ -97,10 +105,11 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %   - Classification: partitioned, strongly coupled at substep scale
    %     (iterative block/Picard coupling, not monolithic Newton).
    %
-   % See also: icemodel.config icemodel.run.point
+   % See also: icemodel.config icemodel.run.point icemodel.configureRun
+   % icemodel.getopts icemodel.resetopts
 
    % Parse inputs
-   narginchk(4, 9)
+   narginchk(4, inf)
 
    if nargin < 5  || isempty(userdata); userdata = forcings; end
    if nargin < 6  || isempty(uservars); uservars = 'albedo'; end
@@ -141,7 +150,16 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts.simyears = simyears;
    opts.numyears = numel(simyears);
    opts.testname = testname;
+   opts.saveopts = saveflag;
    opts.backupflag = backupflag;
+
+   % Set defaults for values set in icemodel.configureRun
+   opts.pathinput = [];
+   opts.pathoutput = [];
+   opts.casename = [];
+   opts.metfname = {};
+   opts.vars1 = {};
+   opts.vars2 = {};
 
    %------------------------- optional settings / parameters
    %---------------------------------------------------------
@@ -163,7 +181,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    if strcmp(smbmodel, 'icemodel')
 
       % Solver options. See function doc for info about each bc type.
-      opts.bc_type         = 3;     % recommended: 1 (1=dirichlet, 2/3=robin)
+      opts.bc_type         = 2;     % recommended: 1 (1=dirichlet, 2/3=robin)
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
 
@@ -243,164 +261,20 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.z_wind =  3.0;
    end
 
+   % Lag time used by ICERUNOFF, converted from hours to timesteps.
+   opts.tlag = 6 * 3600 / opts.dt;
+
+   % Output profile. "minimal" is the lean profile historically tied to
+   % gridded sector-scale runs; "standard" is the full point-run profile.
+   if strcmp(sitename, 'sector')
+      opts.output_profile = 'minimal';
+   else
+      opts.output_profile = 'standard';
+   end
+
    %------------------------- End of user-defined model options
    %--------------------------------------------------------------
 
-   opts = setRunConfiguration(opts); % Run the automated configuration
-
-   function opts = setRunConfiguration(opts)
-
-      %------------------------- set the input and output paths
-      %---------------------------------------------------------
-
-      % WRITEOUTPUT appends ['ice1_' opts.casename '.mat'] and saves the file in
-      % a subfolder of opts.pathoutput for each year e.g. opts.pathoutput/2016.
-      %
-      % For gridded sector runs, opts.casename is set to the grid point ID
-      % outside this function in a loop, to get ice1_1.mat, ice1_2.mat, and so
-      % forth. Same for metfname. Writing to netcdf should eliminate this.
-
-      opts.pathinput = getenv('ICEMODEL_INPUT_PATH');
-      opts.pathoutput = fullfile( ...
-         getenv('ICEMODEL_OUTPUT_PATH'), sitename, smbmodel);
-
-      % Custom option for gridded "sector"-scale runs.
-      if strcmp(sitename, 'sector')
-         % e.g. sector/icemodel/modis.
-         opts.pathoutput = fullfile(opts.pathoutput, userdata);
-      end
-
-      assert(exist(opts.pathinput, 'dir') == 7, ...
-         'ICEMODEL_INPUT_PATH does not exist, set it using icemodel.config');
-
-      % For test runs, option to create a subfolder in ICEMODEL_OUTPUT_PATH
-      opts.pathoutput = fullfile(opts.pathoutput, testname);
-
-      % Create the casename. WRITEOUTPUT appends this to the base filenames.
-      opts.casename = icemodel.setcase(forcings, userdata, uservars);
-
-      % Create folders for each simulation year in output/ if they don't exist.
-      if saveflag
-
-         icemodel.mkfolders(opts);
-
-         % save the model opts
-         optsfile = fullfile( ...
-            opts.pathoutput, 'opts', ['opts_' opts.casename '.mat']);
-         backupfile(optsfile, backupflag);
-         save(optsfile, 'opts');
-      end
-
-      %---------------------------- set the met forcing file name
-      %----------------------------------------------------------------------------
-
-      if strcmp(sitename, 'sector')
-
-         % Could add logic here to deal with sector file names. For now, the
-         % metfname must be set outside this function in a loop.
-         % for n = 1:numel(runpoints)
-         %    opts.metfname = 'met_sector.mat';
-         % end
-      else
-         % Create met file names
-         opts = createMetFileNames(opts, sitename, forcings, simyears);
-
-         % append the path to the met file and out file names
-         opts.metfname = fullfile(opts.pathinput, 'met', opts.metfname);
-      end
-
-      %---------------------- set the output file variables
-      %-----------------------------------------------------
-
-      % ice1.vars1 = Surface (1-d) data
-      % ice2.vars2 = Subsurface (2-d) data
-
-      % Two important programming notes:
-      %
-      % 1) The order in which the opts.vars1 and opts.vars2 variables are set
-      % must match the order in which the data is stored in the cell arrays that
-      % are passed to SAVEOUTPUT from icemodel main.
-      %
-      % 2) If new variables are added, POSTPROC must be reviewed to ensure
-      % correct processing is applied, including rounding precision.
-
-      if strcmp(sitename, 'sector')
-
-         if strcmp(smbmodel, 'skinmodel')
-            opts.vars1 = {'Tsfc', 'Qm', 'Qe'};
-            opts.vars2 = {'Tice'};
-         else
-
-            opts.vars1 = {'Tsfc'};
-            opts.vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp'};
-         end
-
-      else
-
-         if strcmp(smbmodel, 'skinmodel')
-            % opts.vars1 = {'Tsfc', 'Qm', 'Qe'};
-            % opts.vars2 = {'Tice'};
-            % % opts.vars2 = {'Tice', 'f_ice', 'f_liq'};
-
-            opts.vars1 = ...
-               {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
-               'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter'};
-
-            opts.vars2 = ...
-               {'Tice', 'f_ice', 'f_liq'};
-
-         else
-
-            opts.vars1 = ...
-               {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
-               'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter'};
-
-            opts.vars2 = ...
-               {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp', 'df_lyr', 'Sc'};
-         end
-         % % model diagnostics
-         % opts.vars3 = ...
-         %    {'Tsfc_converged', 'Tsfc_numiter', 'Tice_converged', ...
-         %    'Tice_numiter', 'dt_sum', 'Enthalpy_residual', 'Tice_residual', ...
-         %    'Layer_combo'};
-      end
-   end
-end
-function opts = createMetFileNames(opts, sitename, forcings, simyears)
-   %CREATEMETFILENAMES Create icemodel met file names for model opts struct
-   %
-   %  opts = createMetFileNames(opts, sitename, forcings, simyears)
-   %
-   % See also: icemodel.setopts
-
-   % Deal with the case where met-station forcing data (as opposed to gridded
-   % climate model forcing data) is requested for a nearby catchment by
-   % replacing the catchment name in the metfile with the met station name.
-   % For example, if sitename=="behar" and forcingdata=="kanm", this sets the
-   % metfile name to met_kanm_kanm_YYYY rather than met_behar_kanm_YYYY, to
-   % negate the need to create a second (identical) met_behar_kanm_YYYY file.
-   if strcmpi(forcings, 'kanl') ...
-         && ismember(sitename, {'ak4', 'upperbasin'})
-      metname = 'kanl';
-   elseif strcmpi(forcings, 'kanm') ...
-         && ismember(sitename, {'slv1', 'slv2', 'behar'})
-      metname = 'kanm';
-   else
-      metname = sitename;
-   end
-
-   % Deal with the option to use 15 min vs 1 hrly forcings.
-   switch opts.dt
-      case 900
-         dtstr = '15m.mat';
-      case 3600
-         dtstr = '1hr.mat';
-   end
-   opts.tlag = 6 * 3600 / opts.dt; % hours to timesteps
-
-   % Build full file names.
-   for n = 1:numel(simyears)
-      simyear = num2str(simyears(n));
-      opts.metfname{n} = ['met_' metname '_' forcings '_' simyear '_' dtstr];
-   end
+   opts = icemodel.resetopts(opts, varargin{:});
+   opts = icemodel.configureRun(opts);
 end

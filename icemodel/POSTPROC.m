@@ -46,7 +46,7 @@ function varargout = POSTPROC(ice1, ice2, opts, varargin)
    end
 
    % Compute a full state and energy balance
-   if ~strcmp(opts.sitename, 'sector')
+   if ~strcmp(opts.output_profile, 'minimal')
       [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo);
    end
 
@@ -78,7 +78,7 @@ function varargout = POSTPROC(ice1, ice2, opts, varargin)
    % Round the data to save disk space, retaining necessary precision
    [ice1, ice2] = roundData(ice1, ice2);
 
-   if ~strcmp(opts.sitename, 'sector')
+   if ~strcmp(opts.output_profile, 'minimal')
       ice2.Time = ice1.Time; % not added in the sector case, maybe remove.
 
       % Rename ice1 vars to match the naming conventions i use everywhere else

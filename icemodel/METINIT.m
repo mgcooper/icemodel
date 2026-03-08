@@ -4,7 +4,8 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    %
    %#codegen
 
-   % The 2nd input is the index into the metfile name list generated in setopts
+   % The 2nd input is the index into the metfile name list resolved in
+   % icemodel.configureRun / icemodel.setopts.
    if nargin < 2
       fileiter = 1;
    end
