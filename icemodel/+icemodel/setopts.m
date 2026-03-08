@@ -154,7 +154,10 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts.backupflag = backupflag;
 
    % Set defaults for values set in icemodel.configureRun
+   opts.pathdata = [];
    opts.pathinput = [];
+   opts.patheval = [];
+   opts.pathuserdata = [];
    opts.pathoutput = [];
    opts.casename = [];
    opts.metfname = {};

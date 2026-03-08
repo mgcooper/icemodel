@@ -49,7 +49,7 @@ Thanks for your interest. To get started, here's what we recommend:
 - The main program is `icemodel/icemodel.m`. Open the function to get a sense for the model structure.
 - Open and run Example 1 in `demo/demo.m`. This will run an `IceModel` simulation for the KAN_M weather station, located on the Greenland ice sheet, for year 2016 on a 1-hr timestep.
 - Inspect the demo plot created by the call to `icemodel.plot.enbal`. The simulated energy fluxes should closely track the weather station values.
-- Set `saveflag=true` and re-run Example 1. Notice how the `demo/output` directory is created, and the model output is saved there.
+- Set `saveflag=true` and re-run Example 1. Notice how the `demo/data/output` directory is created, and the model output is saved there.
 - Set `backupflag=true` and re-run Example 1. Notice how the files are backed-up. By default, saveflag and backupflag are both false.
 
 The examples in `demo.m` run IceModel in its "SkinModel" surface energy balance configuration. Run-time will depend on your computer, but should take less than one minute. An IceModel configuration (which includes a full subsurface energy balance) should take between one and a few minutes to run. Initial run times may be longer due to JIT compilation.
@@ -58,14 +58,14 @@ The examples in `demo.m` run IceModel in its "SkinModel" surface energy balance 
 
 ### Global configuration: Specify workspace paths
 
-The model input and output directories default to the top-level folders `input/` and `output/` (note that the `.gitignore` in this repo ignores these folders).
+The model data directories default to the top-level folders under `data/` (note that the `.gitignore` in this repo ignores `data/input/`, `data/eval/`, and `data/output/`).
 
 To specify custom input and output directories, use the configuration function `icemodel/+icemodel/config.m`. In your matlab terminal:
 
 - Type `edit icemodel.config` and press enter.
 - Read the detailed documentation to understand the model input and output directory structure, and how to set them programmatically.
 
-<!-- Note that in `demo.m` the `casename` argument is passed to the configuration function: `cfg = icemodel.config(casename="demo")`. This sets the input and output folders to `demo/input` and `demo/output`. The `casename` argument to `icemodel.config` currently does not serve any other purpose. -->
+<!-- Note that in `demo.m` the `casename` argument is passed to the configuration function: `cfg = icemodel.config(casename="demo")`. This sets the data folders to `demo/data/input`, `demo/data/eval`, and `demo/data/output`. The `casename` argument to `icemodel.config` currently does not serve any other purpose. -->
 
 ### Runtime configuration: Specify model options
 
@@ -77,13 +77,13 @@ To set run-specific model options and parameters, open and edit the function `ic
 
 ## Input Data
 
-Example input files are in `demo/inputs`. These include the meteorological forcing data in `inputs/met`, inputs to the two-stream spectral model in `inputs/spectral`, and optional "user data" in `inputs/userdata`.
+Example input files are in `demo/data/input`. These include the meteorological forcing data in `input/met`, inputs to the two-stream spectral model in `input/spectral`, and optional "user data" in `input/userdata`.
 
 The `spectral` directory contains values for the absorption coefficient of pure ice from Warren et al. 2008, in-situ absorption coefficients for glacier ice from Cooper et al. 2021, a downwelling solar spectrum for the Arctic atmosphere generated with `ATRAN` (Lord, 1991), and a library of mie-scattering coefficients as described in Cooper et al. 2021.
 
 ## User Data
 
-The `inputs/userdata` directory contains alternative model forcings that can be "swapped out" with the standard model forcings to test hypotheses about processes and model sensitivity. For instance, users can prepare input forcing data generated from observations, climate model output, or satellite remote sensing, and place these files in `userdata`. Unlike the forcing files in `inputs/met`, these files do not need to contain the complete set of model forcings.
+The `input/userdata` directory contains alternative model forcings that can be "swapped out" with the standard model forcings to test hypotheses about processes and model sensitivity. For instance, users can prepare input forcing data generated from observations, climate model output, or satellite remote sensing, and place these files in `userdata`. Unlike the forcing files in `input/met`, these files do not need to contain the complete set of model forcings.
 
 To swap out a variable in the input met file with a variable in a userdata file, set the `userdata` and `uservars` configuration parameters (see `demo/demo.m`). For example, setting `userdata="modis"` and `uservars="albedo"` would replace the albedo values in the input meteorological forcing file with modis albedo for the same time and location. This would require placing a file named `<sitename>_modis_<year>` (see [Naming Conventions](#naming-conventions)) in the `userdata` directory, containing a timetable named `Data` with a variable (column) named `albedo`.
 
@@ -136,7 +136,7 @@ Examples:
 - `kanm_merra_2016.mat` specifies a user data file with MERRA-2 climate model forcings for the KAN-M weather station location for year 2016 on a 1-hr timestep.
 - `kanm_modis_2016.mat` specifies a user data file with MODIS satellite albedo values for the KAN-M weather station location for year 2016 on a 1-hr timestep.
 
-Each userdata file must contain a timetable named `Data` with column names matching the met file column-naming conventions. See the example met file in `demo/input/`.
+Each userdata file must contain a timetable named `Data` with column names matching the met file column-naming conventions. See the example met file in `demo/data/input/`.
 
 ### 4. Output files
 

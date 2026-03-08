@@ -11,8 +11,8 @@ clc
 %% Set the project paths
 
 % Run setup() to add the project paths to the matlab path. Note that setup()
-% also sets the ICEMODEL_INPUT_PATH and ICEMODEL_OUTPUT_PATH environment
-% variables to the demo/input and demo/output folders.
+% also calls icemodel.config('casename', 'demo'), which sets the demo/data
+% environment variables.
 setup()
 
 %% Example 1: KAN-M weather station in 2016

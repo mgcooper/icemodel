@@ -1,6 +1,9 @@
 # icemodel stuff
-input/
-output/
+data/input/
+data/eval/
+data/output/
+demo/data/output/
+test/artifacts/
 
 # vscode
 .vscode

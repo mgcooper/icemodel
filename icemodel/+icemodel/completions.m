@@ -6,7 +6,7 @@ function proplist = completions(funcname)
 
       case 'completions'
          tmp = dir( ...
-            fullfile(icemodel.projectpath, 'functions', '+icemodel', '*.m'));
+            fullfile(icemodel.projectpath, 'icemodel', '+icemodel', '*.m'));
          proplist = strrep({tmp.name}, '.m', '');
 
       case 'config'

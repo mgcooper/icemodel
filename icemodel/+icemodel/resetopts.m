@@ -46,9 +46,28 @@ function opts = resetopts(opts, varargin)
 
    % Clear derived run settings when their source fields change. These fields
    % will be re-populated by icemodel.configureRun.
+   if ismember('pathdata', names)
+      if ~ismember('pathinput', names)
+         opts.pathinput = [];
+      end
+      if ~ismember('patheval', names)
+         opts.patheval = [];
+      end
+      if ~ismember('pathoutput', names)
+         opts.pathoutput = [];
+      end
+      if ~ismember('pathuserdata', names)
+         opts.pathuserdata = [];
+      end
+   end
+
    if any(ismember(names, {'sitename', 'smbmodel', 'testname', 'userdata'})) ...
          && ~ismember('pathoutput', names)
       opts.pathoutput = [];
+   end
+
+   if ismember('pathinput', names) && ~ismember('pathuserdata', names)
+      opts.pathuserdata = [];
    end
 
    if any(ismember(names, {'forcings', 'userdata', 'uservars'})) ...

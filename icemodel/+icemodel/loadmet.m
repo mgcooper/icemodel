@@ -89,8 +89,8 @@ function met = swapMetData(met, opts)
       simyears = num2str(opts.simyears(1));
       userfile = [opts.sitename '_' opts.userdata '_' simyears '.mat'];
 
-      if (exist(fullfile(opts.pathinput, 'userdata', userfile), 'file') == 2)
-         Data = load(fullfile(opts.pathinput, 'userdata', userfile), 'Data');
+      if (exist(fullfile(opts.pathuserdata, userfile), 'file') == 2)
+         Data = load(fullfile(opts.pathuserdata, userfile), 'Data');
          Data = Data.Data;
          Data.Time.TimeZone = met.Time.TimeZone;
          if Data.Time(2)-Data.Time(1) ~= met.Time(2)-met.Time(1)
@@ -98,7 +98,7 @@ function met = swapMetData(met, opts)
          end
       else
          error('\n userdata file does not exist: \n\n %s \n', ...
-            fullfile(opts.pathinput, 'userdata', userfile));
+            fullfile(opts.pathuserdata, userfile));
       end
 
       % Swap out the data in the metfile for the user data
