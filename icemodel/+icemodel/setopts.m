@@ -111,9 +111,9 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % Parse inputs
    narginchk(4, inf)
 
-   if nargin < 5  || isempty(userdata); userdata = forcings; end
-   if nargin < 6  || isempty(uservars); uservars = 'albedo'; end
-   if nargin < 7  || isempty(testname); testname = ''; end
+   if nargin < 5  || isblanktext(userdata); userdata = forcings; end
+   if nargin < 6  || isblanktext(uservars); uservars = 'albedo'; end
+   if nargin < 7  || isblanktext(testname); testname = ''; end
    if nargin < 8  || isempty(saveflag); saveflag = false; end
    if nargin < 9  || isempty(backupflag); backupflag = true; end
 
@@ -280,4 +280,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    opts = icemodel.resetopts(opts, varargin{:});
    opts = icemodel.configureRun(opts);
+end
+
+function tf = isblanktext(x)
+   tf = isempty(x) || (isstring(x) && isscalar(x) && strlength(x) == 0);
 end
