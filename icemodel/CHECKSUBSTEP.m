@@ -3,6 +3,8 @@ function [Ts, T, f_ice, f_liq, n_subfail, substep, dt, ok] = CHECKSUBSTEP( ...
       dt, dt_FULL_STEP, timestep, numsteps, substep, maxsubstep, n_subfail, ...
       debug, eps, ok)
 
+   dt_min = dt_FULL_STEP / maxsubstep;
+
    if ok
       if debug == true
          % Mass conservation / control volume check
@@ -14,9 +16,8 @@ function [Ts, T, f_ice, f_liq, n_subfail, substep, dt, ok] = CHECKSUBSTEP( ...
          = RESETSUBSTEP(xTs, xT, xf_ice, xf_liq, dt_FULL_STEP, ...
          substep, maxsubstep, n_subfail, dt_sum);
 
-      if debug == true
-         % Print progress message
-         fprintf('timestep = %d (%.2f%%), dt = %.0f, ok = %s\n', ...
+      if debug == true && dt <= dt_min + eps && n_subfail < maxsubstep
+         fprintf('timestep = %d (%.2f%%), dt = %.0f (dt_min), ok = %s\n', ...
             timestep, 100*timestep/numsteps, dt, mat2str(ok))
       end
 
