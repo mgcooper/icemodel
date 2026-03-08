@@ -10,6 +10,8 @@ function [ice1, ice2] = skinmodel(opts)
 
    debug = true;
    assertF off
+   opts = icemodel.configureRun(opts);
+   opts = icemodel.prepareRunOutput(opts);
 
    % LOAD PHYSICAL CONSTANTS AND PARAMETERS
    [cv_air, cv_ice, cv_liq, emiss, SB, epsilon, k_liq, Ls, ro_air, ...
@@ -93,13 +95,14 @@ function [ice1, ice2] = skinmodel(opts)
          % SAVE OUTPUT IF SPINUP IS FINISHED
          if thisyear >= numspinup
 
-            if strcmp('sector', opts.sitename)
+            if strcmp(opts.output_profile, 'minimal')
 
                [ice1, ice2] = SAVEOUTPUT(timestep, ice1, ice2, ...
                   opts.vars1, opts.vars2, ...
                   {Ts, Qm, Qe},  ...
                   {T});
-            else
+
+            elseif strcmp(opts.output_profile, 'standard')
 
                [ice1, ice2] = SAVEOUTPUT(timestep, ice1, ice2, ...
                   opts.vars1, opts.vars2, ...

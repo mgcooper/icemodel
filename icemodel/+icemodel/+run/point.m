@@ -36,8 +36,9 @@ function [ice1, ice2, met, opts] = point(kwargs)
       userdata, uservars, testname, saveflag, backupflag);
 
    if notempty(gridcell)
-      opts.metfname = {fullfile(opts.pathinput, 'met', 'sector', ...
-         ['met_' int2str(gridcell) '.mat'])};
+      opts = icemodel.resetopts(opts, 'metfname', ...
+         {fullfile(opts.pathinput, 'met', 'sector', ...
+         ['met_' int2str(gridcell) '.mat'])});
    end
 
    % run the model

@@ -98,8 +98,7 @@ function varargout = config(varargin)
    %  met data files, spectral data files, and alternative forcing data
    %  (userdata) files.
    %  - The ICEMODEL_OUTPUT_PATH can be set to any folder. When an individual
-   %  simulation is configured using the icemodel.setopts() function, the
-   %  following output subdirectory structure is created:
+   %  simulation is run, the following output subdirectory structure is created:
    %
    %     ICEMODEL_OUTPUT_PATH/<sitename>/<smbmodel>
    %
@@ -129,8 +128,7 @@ function varargout = config(varargin)
    %  ICEMODEL_OUTPUT_PATH to the top-level `input` and `output` directories. If
    %  the `input` folder does not exist, the model will issue an error (input
    %  data is required to run the model). If the `output` directory does not
-   %  exist, it will be created when a simulation is created with the
-   %  icemodel.setopts function.
+   %  exist, it will be created automatically when a simulation is run.
    %
    %  2. Specify custom input and output paths.
    %

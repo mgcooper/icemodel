@@ -37,6 +37,8 @@ function [ice1, ice2] = icemodel(opts)
 
    debug = true;
    assertF on
+   opts = icemodel.configureRun(opts);
+   opts = icemodel.prepareRunOutput(opts);
 
    % LOAD PHYSICAL CONSTANTS AND PARAMETERS
    [cv_air, cv_ice, cv_liq, emiss, SB, epsilon, fcp, k_liq, Lf, ...
@@ -176,13 +178,14 @@ function [ice1, ice2] = icemodel(opts)
          % SAVE OUTPUT IF SPINUP IS FINISHED
          if thisyear >= numspinup
 
-            if strcmp('sector', opts.sitename)
+            if strcmp(opts.output_profile, 'minimal')
 
                [ice1, ice2] = SAVEOUTPUT(timestep, ice1, ice2, ...
                   opts.vars1, opts.vars2, ...
                   {Ts},  ...
                   {T, f_ice, f_liq, d_liq, d_evp});
-            else
+
+            elseif strcmp(opts.output_profile, 'standard')
 
                [ice1, ice2] = SAVEOUTPUT(timestep, ice1, ice2, ...
                   opts.vars1, opts.vars2, ...
