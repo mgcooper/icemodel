@@ -20,7 +20,7 @@ clc
 % forcings are the same in this example.
 %
 % To run icemodel (or skinmodel) for your site, create a metfile with the same
-% format as the example one, save it in the input/met folder, and add the
+   % format as the example one, save it in the demo/data/input/met folder, and add the
 % sitename to the namelists in the icemodel.run.point arguments block.
 
 %% Set up

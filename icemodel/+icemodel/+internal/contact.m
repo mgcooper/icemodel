@@ -11,7 +11,7 @@ function str = contact(new)
 
    persistent current
    if isempty(current) || nargin == 1 && strcmp('reset', new)
-      current = 'matt dot cooper at pnnl dot gov';
+      current = 'matt@sierracrestanalytics.com';
    elseif nargin == 1 && isrow(new) && ischar(new)
       current = new;
    end

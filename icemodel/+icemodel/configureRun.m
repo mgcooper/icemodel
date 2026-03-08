@@ -7,11 +7,26 @@ function opts = configureRun(opts)
    % are empty, while preserving caller-supplied values for fields such as
    % PATHINPUT, PATHOUTPUT, CASENAME, METFNAME, VARS1, and VARS2.
 
+   if ~isfield(opts, 'pathdata') || isempty(opts.pathdata)
+      opts.pathdata = getenv('ICEMODEL_DATA_PATH');
+   end
+
    if ~isfield(opts, 'pathinput') || isempty(opts.pathinput)
       opts.pathinput = getenv('ICEMODEL_INPUT_PATH');
    end
    assert(exist(opts.pathinput, 'dir') == 7, ...
       'ICEMODEL_INPUT_PATH does not exist, set it using icemodel.config');
+
+   if ~isfield(opts, 'patheval') || isempty(opts.patheval)
+      opts.patheval = getenv('ICEMODEL_EVAL_PATH');
+   end
+
+   if ~isfield(opts, 'pathuserdata') || isempty(opts.pathuserdata)
+      opts.pathuserdata = getenv('ICEMODEL_USERDATA_PATH');
+      if isempty(opts.pathuserdata)
+         opts.pathuserdata = fullfile(opts.pathinput, 'userdata');
+      end
+   end
 
    % WRITEOUTPUT appends ['ice1_' opts.casename '.mat'] and saves the file in
    % a subfolder of opts.pathoutput for each year e.g. opts.pathoutput/2016.

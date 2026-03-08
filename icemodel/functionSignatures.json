@@ -15,8 +15,12 @@
    {
       "inputs": 
       [
+         {"name":"ICEMODEL_DATA_PATH", "kind":"namevalue", "type":"folder"},
          {"name":"ICEMODEL_INPUT_PATH", "kind":"namevalue", "type":"folder"},
-         {"name":"ICEMODEL_OUTPUT_PATH", "kind":"namevalue", "type":"folder"}
+         {"name":"ICEMODEL_OUTPUT_PATH", "kind":"namevalue", "type":"folder"},
+         {"name":"ICEMODEL_EVAL_PATH", "kind":"namevalue", "type":"folder"},
+         {"name":"ICEMODEL_USERDATA_PATH", "kind":"namevalue", "type":"folder"},
+         {"name":"casename", "kind":"namevalue", "type":["choices=demo"]}
       ],
       "outputs":
       [
