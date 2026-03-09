@@ -1,0 +1,86 @@
+function cases = getRegressionCaseMatrix(tier, smbmodel)
+%GETREGRESSIONCASEMATRIX Return deterministic regression test case matrix.
+%
+%  cases = test.helpers.getRegressionCaseMatrix("smoke")
+%  cases = test.helpers.getRegressionCaseMatrix("full")
+%  cases = test.helpers.getRegressionCaseMatrix("all")
+%  cases = test.helpers.getRegressionCaseMatrix("smoke", "skinmodel")
+%
+% The formal regression matrix is intentionally compact and stable:
+% self-forced station runs at `kanm` and `kanl` for 2016. Icemodel is crossed
+% with `solver_mode = 1:3`, while skinmodel uses its default path with
+% `solver_mode = 1`.
+   arguments
+      tier = "smoke"
+      smbmodel = "all"
+   end
+
+   tier = string(tier);
+   smbmodel = string(smbmodel);
+
+   % Keep the formal regression matrix compact and fixed for stable baselines.
+   smoke = makeCases("regression_smoke", "kanm");
+   full = makeCases("regression_full", ["kanm"; "kanl"]);
+
+   switch lower(char(tier))
+      case 'smoke'
+         cases = smoke;
+      case 'full'
+         cases = full;
+      case 'all'
+         cases = [smoke; full];
+      otherwise
+         error('unrecognized regression tier: %s (expected smoke|full|all)', tier)
+   end
+
+   if ~any(strcmpi(smbmodel, "all"))
+      % Filter after construction so one helper defines the canonical cases.
+      cases = cases(ismember(cases.smbmodel, smbmodel), :);
+   end
+end
+
+function cases = makeCases(tier_name, sites)
+   models = ["icemodel"; "skinmodel"];
+   n = numel(sites) * 4;
+
+   case_id = strings(n, 1);
+   tier = strings(n, 1);
+   family = strings(n, 1);
+   smbmodel = strings(n, 1);
+   sitename = strings(n, 1);
+   forcings = strings(n, 1);
+   userdata = strings(n, 1);
+   uservars = strings(n, 1);
+   simyear = zeros(n, 1);
+   solver_mode = zeros(n, 1);
+   runoff_site = strings(n, 1);
+
+   k = 0;
+   for i = 1:numel(sites)
+      for im = 1:numel(models)
+         if models(im) == "icemodel"
+            bcs = 1:3;
+         else
+            bcs = 1;
+         end
+         for j = 1:numel(bcs)
+            k = k + 1;
+            case_id(k) = "reg_" + models(im) + "_" + sites(i) + "_2016_bc" ...
+               + int2str(bcs(j));
+            tier(k) = tier_name;
+            family(k) = "self";
+            smbmodel(k) = models(im);
+            sitename(k) = sites(i);
+            forcings(k) = sites(i);
+            userdata(k) = "";
+            uservars(k) = "";
+            simyear(k) = 2016;
+            solver_mode(k) = bcs(j);
+            runoff_site(k) = test.helpers.getRunoffSite(sites(i));
+         end
+      end
+   end
+
+   cases = table(case_id, tier, family, smbmodel, sitename, forcings, ...
+      userdata, uservars, simyear, solver_mode, runoff_site);
+end

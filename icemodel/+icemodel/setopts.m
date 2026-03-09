@@ -281,7 +281,3 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts = icemodel.resetopts(opts, varargin{:});
    opts = icemodel.configureRun(opts);
 end
-
-function tf = isblanktext(x)
-   tf = isempty(x) || (isstring(x) && isscalar(x) && strlength(x) == 0);
-end
