@@ -4,6 +4,7 @@ data/eval/
 data/output/
 demo/data/output/
 test/artifacts/
+test/backups/
 
 # vscode
 .vscode
