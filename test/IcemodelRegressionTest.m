@@ -115,7 +115,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             report_rows(r).sitename = string(c.sitename);
             report_rows(r).forcings = string(c.forcings);
             report_rows(r).simyear = c.simyear;
-            report_rows(r).solver_mode = c.solver_mode;
+            report_rows(r).solver = c.solver;
             report_rows(r).runoff_final = S.runoff_final;
             report_rows(r).melt_final = S.melt_final;
             report_rows(r).mean_Tice_numiter = S.mean_Tice_numiter;
@@ -218,7 +218,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          meta.abs_tol_runoff_m3 = IcemodelRegressionTest.runoffAbsTol();
          meta.case_builder = "test.helpers.buildFormalCaseOpts";
          meta.opts_source = "icemodel.setopts defaults";
-         meta.reset_fields = "solver_mode -> bc_type";
+         meta.reset_fields = "solver";
          meta.input_path = string(getenv('ICEMODEL_INPUT_PATH'));
          meta.output_path = string(getenv('ICEMODEL_OUTPUT_PATH'));
          meta.suite_file = string(mfilename('fullpath'));

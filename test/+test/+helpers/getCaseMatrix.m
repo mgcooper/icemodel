@@ -9,7 +9,7 @@ function cases = getCaseMatrix(tier, smbmodel)
 % Output:
 %  cases - table with columns:
 %    case_id, tier, family, smbmodel, sitename, forcings, userdata, uservars,
-%    simyear, solver_mode
+%    simyear, solver
    arguments
       tier = "smoke"
       smbmodel = "all"
@@ -60,7 +60,7 @@ function T = makeSmokeCases()
       repmat(2016, n, 1), ...
       bc, ...
       'VariableNames', {'case_id', 'tier', 'family', 'smbmodel', 'sitename', ...
-      'forcings', 'userdata', 'uservars', 'simyear', 'solver_mode'});
+      'forcings', 'userdata', 'uservars', 'simyear', 'solver'});
 end
 
 function T = makeFullCases()
@@ -77,7 +77,7 @@ function T = makeFullCases()
    userdata = strings(n, 1);
    uservars = strings(n, 1);
    simyear = zeros(n, 1);
-   solver_mode = zeros(n, 1);
+   solver = zeros(n, 1);
 
    k = 0;
    for is = 1:numel(sites)
@@ -99,12 +99,12 @@ function T = makeFullCases()
             userdata(k) = "";
             uservars(k) = "";
             simyear(k) = 2016;
-            solver_mode(k) = b;
+            solver(k) = b;
             case_id(k) = "full_" + models(im) + "_" + s + "_2016_bc" + int2str(b);
          end
       end
    end
 
    T = table(case_id, tier, family, smbmodel, sitename, forcings, userdata, ...
-      uservars, simyear, solver_mode);
+      uservars, simyear, solver);
 end

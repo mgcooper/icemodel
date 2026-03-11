@@ -1,7 +1,7 @@
 function opts = resetopts(opts, varargin)
    %RESETOPTS Override existing OPTS fields by name.
    %
-   %  opts = icemodel.resetopts(opts, 'dt', 900, 'bc_type', 3)
+   %  opts = icemodel.resetopts(opts, 'dt', 900, 'solver', 3)
    %
    % Derived run settings that depend on the overridden fields are cleared
    % unless they are explicitly set in the same call. The next call to

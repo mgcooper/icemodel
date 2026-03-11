@@ -1,5 +1,5 @@
 function [dt_sum, n_subfail, ok_seb, ok_ieb, d_liq, d_evp, d_lyr] = ...
-      NEWTIMESTEP(f_liq, bc_type)
+      NEWTIMESTEP(f_liq, solver)
    %NEWTIMESTEP initialize new timestep
    %
    %#codegen
@@ -13,7 +13,7 @@ function [dt_sum, n_subfail, ok_seb, ok_ieb, d_liq, d_evp, d_lyr] = ...
    n_subfail = 0;          % keep track of failed substeps
 
    % For non-Dirichlet bc, set ok_seb true so dt control advances (see NEXTSTEP)
-   if bc_type > 1
+   if solver > 1
       ok_seb = true;
    end
 end

@@ -8,8 +8,8 @@ function cases = getRegressionCaseMatrix(tier, smbmodel)
 %
 % The formal regression matrix is intentionally compact and stable:
 % self-forced station runs at `kanm` and `kanl` for 2016. Icemodel is crossed
-% with `solver_mode = 1:3`, while skinmodel uses its default path with
-% `solver_mode = 1`.
+% with `solver = 1:3`, while skinmodel uses its default path with
+% `solver = 1`.
    arguments
       tier = "smoke"
       smbmodel = "all"
@@ -52,7 +52,7 @@ function cases = makeCases(tier_name, sites)
    userdata = strings(n, 1);
    uservars = strings(n, 1);
    simyear = zeros(n, 1);
-   solver_mode = zeros(n, 1);
+   solver = zeros(n, 1);
    runoff_site = strings(n, 1);
 
    k = 0;
@@ -75,12 +75,12 @@ function cases = makeCases(tier_name, sites)
             userdata(k) = "";
             uservars(k) = "";
             simyear(k) = 2016;
-            solver_mode(k) = bcs(j);
+            solver(k) = bcs(j);
             runoff_site(k) = test.helpers.getRunoffSite(sites(i));
          end
       end
    end
 
    cases = table(case_id, tier, family, smbmodel, sitename, forcings, ...
-      userdata, uservars, simyear, solver_mode, runoff_site);
+      userdata, uservars, simyear, solver, runoff_site);
 end

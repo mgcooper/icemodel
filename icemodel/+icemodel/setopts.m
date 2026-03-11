@@ -4,7 +4,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %
    %  opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %     userdata, uservars, testname, saveflag, backupflag)
-   %  opts = setopts(..., 'dt', 900, 'bc_type', 3)
+   %  opts = setopts(..., 'dt', 900, 'solver', 3)
    %
    % Inputs
    %
@@ -70,7 +70,13 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  equations are solved in separate solver blocks (SEBSOLVE/SFCFLIN and
    %  ICEENBAL), not as one monolithic nonlinear system.
    %
-   %  bc_type = 1 (Dirichlet with lagged Ts-T coupling):
+   %  "Coupled" here means the two blocks exchange boundary information across
+   %  the surface/subsurface interface. "Weakly coupled" means that exchange is
+   %  done with one lagged sweep per substep. "Strongly coupled" means the
+   %  surface and subsurface blocks are iterated together within the same
+   %  substep until the interface state is mutually consistent.
+   %
+   %  solver = 1 (Dirichlet with iterated lagged closure):
    %   - Solve the nonlinear SEB for Ts once per substep (SEBSOLVE).
    %   - During that solve, inner iterations use an analytic Newton-Raphson,
    %     numeric "complex step", or derivative-free (Brent's) method, set by
@@ -82,26 +88,27 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %   - Use the converged Ts as the upper boundary condition of the subsurface
    %     enthalpy solver (ICEENBAL) for that substep.
    %   - Classification: partitioned, lagged, weakly coupled across the
-   %     surface/subsurface interface (one coupling sweep per substep, with
-   %     outer iterations that converge Ts against a lagged top-node conductive
-   %     closure. No strong Ts–T block-coupling around SEBSOLVE+ICEENBAL within
-   %     the substep).
+   %     surface/subsurface interface. The outer iterations inside SEBSOLVE
+   %     strongly converge Ts against a lagged conductive closure, but they do
+   %     not iterate Ts and the current subsurface state together within the
+   %     same substep.
    %
-   %  bc_type = 2 (Robin with single coupling sweep):
+   %  solver = 2 (Robin with single lagged sweep):
    %   - Use a linearized SEB boundary condition (SFCFLIN) in the subsurface
    %     enthalpy solver (ICEENBAL).
    %   - After each accepted substep, diagnose Ts from the updated top-node
    %     state and refresh the SEB linearization for the next substep.
    %   - No inner Ts-T convergence loop within a substep (single coupling
    %     sweep per substep).
-   %   - Classification: partitioned, lagged, weakly coupled.
+   %   - Classification: partitioned, lagged, weakly coupled (one explicit
+   %     Robin sweep per substep, no interface convergence iterations).
    %
-   %  bc_type = 3 (Robin with strong Ts-T coupling iterations):
+   %  solver = 3 (Robin with strong Ts-T coupling iterations):
    %   - Within each substep, perform outer fixed-point coupling iterations
    %     between the SEB linearization and subsurface enthalpy solve until
    %     Ts and SEB residual converge (with relaxation/Aitken).
-   %   - Typically slower than bc_type = 2; cost depends on cpl_Ts_tol, cpl_maxiter,
-   %     relaxation, and timestep adaptation.
+   %   - Typically slower than solver = 2; cost depends on cpl_Ts_tol,
+   %     cpl_maxiter, relaxation, and timestep adaptation.
    %   - Classification: partitioned, strongly coupled at substep scale
    %     (iterative block/Picard coupling, not monolithic Newton).
    %
@@ -184,7 +191,10 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    if strcmp(smbmodel, 'icemodel')
 
       % Solver options. See function doc for info about each bc type.
-      opts.bc_type         = 2;     % recommended: 1 (1=dirichlet, 2/3=robin)
+      opts.solver          = 1;     % recommended: 3
+                                    % 1 = Dirichlet w/ iterated lagged closure
+                                    % 2 = Robin w/ single lagged sweep
+                                    % 3 = Robin w/ strong coupling
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
 
@@ -212,7 +222,10 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    elseif strcmp(smbmodel, 'skinmodel')
 
       % Solver options. See function doc for info about each bc type.
-      opts.bc_type         = 1;     % recommended: 1 (1=dirichlet, 2=robin)
+      opts.solver          = 1;     % required: 1 (2/3 not implemented)
+                                    % 1 = Dirichlet w/ iterated lagged closure
+                                    % 2 = Robin w/ single lagged sweep
+                                    % 3 = Robin w/ strong coupling
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
 

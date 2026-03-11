@@ -41,10 +41,10 @@ accepted model output.
 
 Default formal regression/perf coverage:
 
-1. `icemodel`, `kanm`, `2016`, `solver_mode = 1, 2, 3`
-2. `icemodel`, `kanl`, `2016`, `solver_mode = 1, 2, 3`
-3. `skinmodel`, `kanm`, `2016`, `solver_mode = 1`
-4. `skinmodel`, `kanl`, `2016`, `solver_mode = 1`
+1. `icemodel`, `kanm`, `2016`, `solver = 1, 2, 3`
+2. `icemodel`, `kanl`, `2016`, `solver = 1, 2, 3`
+3. `skinmodel`, `kanm`, `2016`, `solver = 1`
+4. `skinmodel`, `kanl`, `2016`, `solver = 1`
 5. self-forced station runs only (`sitename == forcings`)
 
 Programmatic case enumeration:

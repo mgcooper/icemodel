@@ -18,7 +18,7 @@ function opts = buildFormalCaseOpts(c)
    opts = icemodel.setopts(c.smbmodel, c.sitename, c.simyear, ...
       c.forcings, c.userdata, c.uservars, string.empty(), false, false);
 
-   if isfield(c, 'solver_mode') && ~isempty(c.solver_mode)
-      opts = icemodel.resetopts(opts, 'bc_type', c.solver_mode);
+   if isfield(c, 'solver') && ~isempty(c.solver)
+      opts = icemodel.resetopts(opts, 'solver', c.solver);
    end
 end
