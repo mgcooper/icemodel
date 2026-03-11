@@ -34,12 +34,12 @@ function opts = buildCaseOpts()
    userdata = getenvOrDefault('ICEMODEL_TEST_USERDATA', '');
    uservars = getenvOrDefault('ICEMODEL_TEST_USERVARS', '');
    simyear = str2double(getenvOrDefault('ICEMODEL_TEST_SIMYEAR', '2016'));
-   solver_mode = str2double(getenvOrDefault('ICEMODEL_TEST_SOLVER_MODE', '2'));
+   solver = str2double(getenvOrDefault('ICEMODEL_TEST_SOLVER', '2'));
    smbmodel = getenvOrDefault('ICEMODEL_TEST_SMBMODEL', 'icemodel');
    c = struct('smbmodel', string(smbmodel), 'sitename', string(sitename), ...
       'forcings', string(forcings), 'userdata', string(userdata), ...
       'uservars', string(uservars), 'simyear', simyear, ...
-      'solver_mode', solver_mode);
+      'solver', solver);
    opts = test.helpers.buildFormalCaseOpts(c);
 end
 

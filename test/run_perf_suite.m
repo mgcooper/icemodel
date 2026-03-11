@@ -99,7 +99,7 @@ function results = run_perf_suite(kwargs)
          sample_rows(r_sample).sitename = string(c.sitename);
          sample_rows(r_sample).forcings = string(c.forcings);
          sample_rows(r_sample).simyear = c.simyear;
-         sample_rows(r_sample).solver_mode = c.solver_mode;
+         sample_rows(r_sample).solver = c.solver;
          sample_rows(r_sample).baseline_type = baseline_type;
          sample_rows(r_sample).baseline_tag = baseline_tag;
          sample_rows(r_sample).sample = i;
@@ -114,7 +114,7 @@ function results = run_perf_suite(kwargs)
          activity_rows(r_activity).sitename = string(c.sitename);
          activity_rows(r_activity).forcings = string(c.forcings);
          activity_rows(r_activity).simyear = c.simyear;
-         activity_rows(r_activity).solver_mode = c.solver_mode;
+         activity_rows(r_activity).solver = c.solver;
          if ismember('Objective', activity.Properties.VariableNames)
             activity_rows(r_activity).objective = string(activity.Objective(i));
          else
@@ -130,7 +130,7 @@ function results = run_perf_suite(kwargs)
       case_rows(r_case).sitename = string(c.sitename);
       case_rows(r_case).forcings = string(c.forcings);
       case_rows(r_case).simyear = c.simyear;
-      case_rows(r_case).solver_mode = c.solver_mode;
+      case_rows(r_case).solver = c.solver;
       case_rows(r_case).baseline_type = baseline_type;
       case_rows(r_case).baseline_tag = baseline_tag;
       case_rows(r_case).n_runs = n_runs;
@@ -173,7 +173,7 @@ function results = run_perf_suite(kwargs)
       rootdir, cases.simyear(1), baseline_type, baseline_tag, smbmodel);
    meta.case_builder = "test.helpers.buildFormalCaseOpts";
    meta.opts_source = "icemodel.setopts defaults";
-   meta.reset_fields = "solver_mode -> bc_type";
+   meta.reset_fields = "solver";
    meta.n_runs = n_runs;
    meta.n_warmups = 1;
    meta.tol_perf = tol_perf;

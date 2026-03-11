@@ -39,7 +39,7 @@ function configurePerfCaseEnv(c)
    setenv('ICEMODEL_TEST_USERDATA', char(c.userdata));
    setenv('ICEMODEL_TEST_USERVARS', char(c.uservars));
    setenv('ICEMODEL_TEST_SIMYEAR', int2str(c.simyear));
-   setenv('ICEMODEL_TEST_SOLVER_MODE', int2str(c.solver_mode));
+   setenv('ICEMODEL_TEST_SOLVER', int2str(c.solver));
 end
 
 function T = resultTable(result, propname)
