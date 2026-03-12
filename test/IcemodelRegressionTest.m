@@ -26,12 +26,14 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             'ICEMODEL_TEST_TIER', 'smoke');
          smbmodel = IcemodelRegressionTest.getenvOrDefault( ...
             'ICEMODEL_TEST_SMBMODEL_FILTER', 'all');
+         solver = IcemodelRegressionTest.getenvAsNumbers( ...
+            'ICEMODEL_TEST_SOLVER_FILTER');
          baseline_tag = IcemodelRegressionTest.getenvOrDefault( ...
             'ICEMODEL_REGRESSION_BASELINE', '');
          run_name = IcemodelRegressionTest.getenvOrDefault( ...
             'ICEMODEL_TEST_RUN_NAME', '');
          runoff_ref = test.helpers.loadRunoffReference();
-         cases = test.helpers.getRegressionCaseMatrix(tier, smbmodel);
+         cases = test.helpers.getRegressionCaseMatrix(tier, smbmodel, solver);
          testCase.assertNotEmpty(cases, ...
             sprintf('no regression cases matched tier=%s smbmodel=%s', ...
             tier, smbmodel));
@@ -51,12 +53,74 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             [ice1, ice2] = POSTPROC(ice1, ice2, opts, c.simyear); %#ok<ASGLU>
             S = test.helpers.summarizeIce1Metrics(ice1);
 
+            ridx = test.helpers.findRunoffReferenceRow(runoff_ref, c);
+            obs_window_m3 = nan;
+            mar_window_m3 = nan;
+            merra_window_m3 = nan;
+            racmo_window_m3 = nan;
+            icemodel_window_m3 = nan;
+            runoff_eval_window = nan;
+            melt_eval_window = nan;
+            obs_window_diff_m3 = nan;
+            mar_window_diff_m3 = nan;
+            merra_window_diff_m3 = nan;
+            racmo_window_diff_m3 = nan;
+
+            if ~isempty(ridx)
+               obs_window_m3 = runoff_ref.obs_final_m3(ridx);
+               mar_window_m3 = runoff_ref.mar_final_m3(ridx);
+               merra_window_m3 = runoff_ref.merra_final_m3(ridx);
+               racmo_window_m3 = runoff_ref.racmo_final_m3(ridx);
+               runoff_eval_window = test.helpers.computeCumulativeWindowDelta( ...
+                  ice1, "runoff", runoff_ref.t1(ridx), runoff_ref.t2(ridx));
+               melt_eval_window = test.helpers.computeCumulativeWindowDelta( ...
+                  ice1, "melt", runoff_ref.t1(ridx), runoff_ref.t2(ridx));
+               icemodel_window_m3 = test.helpers.computeCatchmentRunoffFinal( ...
+                  ice1, runoff_ref.area_med_m2(ridx), runoff_ref.t1(ridx), ...
+                  runoff_ref.t2(ridx));
+            end
+
             bid = test.helpers.findCaseRow(baseline, string(c.case_id));
+            base_runoff_final = nan;
+            base_melt_final = nan;
+            base_mean_Tice_numiter = nan;
+            base_max_Tice_numiter = nan;
+            base_n_not_converged = nan;
+            base_icemodel_window_m3 = nan;
+            base_runoff_eval_window = nan;
+            base_melt_eval_window = nan;
+            runoff_delta = nan;
+            melt_delta = nan;
+            icemodel_window_m3_delta = nan;
+            runoff_eval_window_delta = nan;
+            melt_eval_window_delta = nan;
             if ~isempty(bid)
+               base_runoff_final = ...
+                  testCase.getBaselineValue(baseline, bid, 'runoff_final');
+               base_melt_final = ...
+                  testCase.getBaselineValue(baseline, bid, 'melt_final');
+               base_runoff_eval_window = ...
+                  testCase.getBaselineValue(baseline, bid, 'runoff_eval_window');
+               base_melt_eval_window = ...
+                  testCase.getBaselineValue(baseline, bid, 'melt_eval_window');
+               base_mean_Tice_numiter = ...
+                  testCase.getBaselineValue(baseline, bid, 'mean_Tice_numiter');
+               base_max_Tice_numiter = ...
+                  testCase.getBaselineValue(baseline, bid, 'max_Tice_numiter');
+               base_n_not_converged = ...
+                  testCase.getBaselineValue(baseline, bid, 'n_not_converged');
                testCase.checkAgainstBaseline(S.runoff_final, ...
                   baseline, bid, 'runoff_final');
                testCase.checkAgainstBaseline(S.melt_final, ...
                   baseline, bid, 'melt_final');
+               if isfinite(runoff_eval_window)
+                  testCase.checkAgainstBaseline(runoff_eval_window, ...
+                     baseline, bid, 'runoff_eval_window');
+               end
+               if isfinite(melt_eval_window)
+                  testCase.checkAgainstBaseline(melt_eval_window, ...
+                     baseline, bid, 'melt_eval_window');
+               end
                testCase.checkAgainstBaseline(S.mean_Tice_numiter, ...
                   baseline, bid, 'mean_Tice_numiter');
                testCase.checkAgainstBaseline(S.max_Tice_numiter, ...
@@ -65,46 +129,46 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
                   baseline, bid, 'n_not_converged');
             end
 
-            ridx = test.helpers.findRunoffReferenceRow(runoff_ref, c);
-
-            obs_final = nan;
-            mar_final = nan;
-            merra_final = nan;
-            racmo_final = nan;
-            icemodel_final_m3 = nan;
-            obs_diff_m3 = nan;
-            mar_diff_m3 = nan;
-            merra_diff_m3 = nan;
-            racmo_diff_m3 = nan;
-
             if ~isempty(ridx)
-               obs_final = runoff_ref.obs_final_m3(ridx);
-               mar_final = runoff_ref.mar_final_m3(ridx);
-               merra_final = runoff_ref.merra_final_m3(ridx);
-               racmo_final = runoff_ref.racmo_final_m3(ridx);
-               icemodel_final_m3 = test.helpers.computeCatchmentRunoffFinal( ...
-                  ice1, runoff_ref.area_med_m2(ridx), runoff_ref.t1(ridx), ...
-                  runoff_ref.t2(ridx));
-
-               if ~isempty(bid) && ismember('icemodel_final_m3', ...
+               if ~isempty(bid) && ismember('icemodel_window_m3', ...
                      baseline.Properties.VariableNames)
 
-                  ref_icemodel = baseline.icemodel_final_m3(bid);
+                  ref_icemodel = baseline.icemodel_window_m3(bid);
+                  base_icemodel_window_m3 = ref_icemodel;
 
                   if isfinite(ref_icemodel)
                      tol = max(testCase.abs_tol_runoff_m3, ...
                         testCase.rel_tol_runoff_m3 * abs(ref_icemodel));
 
                      testCase.verifyLessThanOrEqual( ...
-                        abs(icemodel_final_m3 - ref_icemodel), tol, ...
+                        abs(icemodel_window_m3 - ref_icemodel), tol, ...
                         sprintf('runoff m3 mismatch case=%s', c.case_id));
                   end
                end
 
-               obs_diff_m3 = icemodel_final_m3 - obs_final;
-               mar_diff_m3 = icemodel_final_m3 - mar_final;
-               merra_diff_m3 = icemodel_final_m3 - merra_final;
-               racmo_diff_m3 = icemodel_final_m3 - racmo_final;
+               obs_window_diff_m3 = icemodel_window_m3 - obs_window_m3;
+               mar_window_diff_m3 = icemodel_window_m3 - mar_window_m3;
+               merra_window_diff_m3 = icemodel_window_m3 - merra_window_m3;
+               racmo_window_diff_m3 = icemodel_window_m3 - racmo_window_m3;
+            end
+
+            if isfinite(base_runoff_final)
+               runoff_delta = S.runoff_final - base_runoff_final;
+            end
+            if isfinite(base_melt_final)
+               melt_delta = S.melt_final - base_melt_final;
+            end
+            if isfinite(base_runoff_eval_window)
+               runoff_eval_window_delta = ...
+                  runoff_eval_window - base_runoff_eval_window;
+            end
+            if isfinite(base_melt_eval_window)
+               melt_eval_window_delta = ...
+                  melt_eval_window - base_melt_eval_window;
+            end
+            if isfinite(base_icemodel_window_m3) && isfinite(icemodel_window_m3)
+               icemodel_window_m3_delta = ...
+                  icemodel_window_m3 - base_icemodel_window_m3;
             end
 
             r = r + 1;
@@ -118,18 +182,33 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             report_rows(r).solver = c.solver;
             report_rows(r).runoff_final = S.runoff_final;
             report_rows(r).melt_final = S.melt_final;
+            report_rows(r).runoff_eval_window = runoff_eval_window;
+            report_rows(r).melt_eval_window = melt_eval_window;
             report_rows(r).mean_Tice_numiter = S.mean_Tice_numiter;
             report_rows(r).max_Tice_numiter = S.max_Tice_numiter;
             report_rows(r).n_not_converged = S.n_not_converged;
-            report_rows(r).obs_final_m3 = obs_final;
-            report_rows(r).mar_final_m3 = mar_final;
-            report_rows(r).merra_final_m3 = merra_final;
-            report_rows(r).racmo_final_m3 = racmo_final;
-            report_rows(r).icemodel_final_m3 = icemodel_final_m3;
-            report_rows(r).obs_diff_m3 = obs_diff_m3;
-            report_rows(r).mar_diff_m3 = mar_diff_m3;
-            report_rows(r).merra_diff_m3 = merra_diff_m3;
-            report_rows(r).racmo_diff_m3 = racmo_diff_m3;
+            report_rows(r).baseline_runoff_final = base_runoff_final;
+            report_rows(r).baseline_melt_final = base_melt_final;
+            report_rows(r).baseline_runoff_eval_window = base_runoff_eval_window;
+            report_rows(r).baseline_melt_eval_window = base_melt_eval_window;
+            report_rows(r).baseline_mean_Tice_numiter = base_mean_Tice_numiter;
+            report_rows(r).baseline_max_Tice_numiter = base_max_Tice_numiter;
+            report_rows(r).baseline_n_not_converged = base_n_not_converged;
+            report_rows(r).runoff_delta = runoff_delta;
+            report_rows(r).melt_delta = melt_delta;
+            report_rows(r).runoff_eval_window_delta = runoff_eval_window_delta;
+            report_rows(r).melt_eval_window_delta = melt_eval_window_delta;
+            report_rows(r).obs_window_m3 = obs_window_m3;
+            report_rows(r).mar_window_m3 = mar_window_m3;
+            report_rows(r).merra_window_m3 = merra_window_m3;
+            report_rows(r).racmo_window_m3 = racmo_window_m3;
+            report_rows(r).baseline_icemodel_window_m3 = base_icemodel_window_m3;
+            report_rows(r).icemodel_window_m3 = icemodel_window_m3;
+            report_rows(r).icemodel_window_m3_delta = icemodel_window_m3_delta;
+            report_rows(r).obs_window_diff_m3 = obs_window_diff_m3;
+            report_rows(r).mar_window_diff_m3 = mar_window_diff_m3;
+            report_rows(r).merra_window_diff_m3 = merra_window_diff_m3;
+            report_rows(r).racmo_window_diff_m3 = racmo_window_diff_m3;
             report_rows(r).timestamp_utc = datetime('now', 'TimeZone', 'UTC');
 
             case_opts(r).case_id = string(c.case_id);
@@ -139,7 +218,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
          report = struct2table(report_rows);
          meta = IcemodelRegressionTest.reportMeta( ...
-            tier, smbmodel, baseline_tag, run_name);
+            tier, smbmodel, solver, baseline_tag, run_name);
          % Save one artifact for this regression compare run.
          testCase.logReport(report, case_opts, meta);
       end
@@ -161,8 +240,17 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             sprintf('baseline mismatch var=%s', varname));
       end
 
+      function x = getBaselineValue(~, baseline, row, varname)
+         if ismember(varname, baseline.Properties.VariableNames)
+            x = baseline.(varname)(row);
+         else
+            x = nan;
+         end
+      end
+
       function logReport(~, report, case_opts, meta)
-         % Save the regression artifact and print a compact summary table.
+         % Save the full regression artifact, then print only the baseline-vs-
+         % current summary that is useful during development.
          rootdir = IcemodelRegressionTest.repoRoot();
          outdir = fullfile(rootdir, 'test', 'artifacts', char(meta.run_name));
          if exist(outdir, 'dir') ~= 7
@@ -174,13 +262,23 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             baseline_tag = char(test.helpers.sanitizeTag(meta.baseline_tag));
          end
          model_tag = IcemodelRegressionTest.smbmodelLabel(meta.smbmodel_filter);
+         solver_tag = IcemodelRegressionTest.solverLabel(meta.solver_filter);
          outfile = fullfile(outdir, ...
             sprintf('regression_report_%s%s_%s.mat', ...
-            char(meta.tier), char(model_tag), baseline_tag));
+            char(meta.tier), char(model_tag + solver_tag), baseline_tag));
          save(outfile, 'report', 'case_opts', 'meta');
          disp(outfile)
-         disp(report(:, {'case_id', 'runoff_final', 'melt_final', ...
-            'icemodel_final_m3'}))
+         disp(report(:, {'case_id', 'runoff_final', ...
+            'baseline_runoff_final', 'runoff_delta'}))
+         fprintf('\n')
+         disp(report(:, {'case_id', 'melt_final', ...
+            'baseline_melt_final', 'melt_delta'}))
+         fprintf('\n')
+         disp(report(:, {'case_id', 'runoff_eval_window', ...
+            'baseline_runoff_eval_window', 'runoff_eval_window_delta'}))
+         fprintf('\n')
+         disp(report(:, {'case_id', 'melt_eval_window', ...
+            'baseline_melt_eval_window', 'melt_eval_window_delta'}))
       end
    end
 
@@ -203,11 +301,12 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          end
       end
 
-      function meta = reportMeta(tier, smbmodel, baseline_tag, run_name)
+      function meta = reportMeta(tier, smbmodel, solver, baseline_tag, run_name)
          [run_date, run_id, run_name] = test.helpers.resolveRunStamp(run_name);
          meta = struct();
          meta.tier = string(tier);
          meta.smbmodel_filter = string(smbmodel);
+         meta.solver_filter = solver;
          meta.baseline_tag = string(baseline_tag);
          meta.run_date = run_date;
          meta.run_id = run_id;
@@ -233,6 +332,24 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             label = "";
          else
             label = "_" + test.helpers.smbmodelTag(smbmodel);
+         end
+      end
+
+      function x = getenvAsNumbers(name)
+         s = getenv(name);
+         if isempty(s)
+            x = [];
+         else
+            x = str2double(split(string(s), ','));
+            x = x(isfinite(x));
+         end
+      end
+
+      function label = solverLabel(solver)
+         if isempty(solver)
+            label = "";
+         else
+            label = "_s" + join(string(solver), '-');
          end
       end
 

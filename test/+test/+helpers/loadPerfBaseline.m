@@ -47,7 +47,7 @@ function baseline = loadPerfBaseline(simyear, baseline_tag, smbmodel, pathname)
    end
 
    if ismember('case_id', baseline.Properties.VariableNames)
-      baseline.case_id = string(baseline.case_id);
+      baseline.case_id = test.helpers.normalizeFormalCaseId(baseline.case_id);
    end
 
    if ismember('last_updated_utc', baseline.Properties.VariableNames) ...

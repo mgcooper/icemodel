@@ -5,7 +5,10 @@ function [Ts, T, f_ice, f_liq, k_eff, ok, n_iters] = ICEEBSOLVE( ...
       cv_air, emiss, SB, roL, scoef, chi, liqflag, solver, tol, maxiter, ...
       alpha, use_aitken, jumpmax, cpl_Ts_tol, cpl_seb_tol, cpl_maxiter, ...
       cpl_alpha, cpl_aitken, cpl_jumpmax)
-   %ICEEBSOLVE Coupled surface/subsurface solve for Robin strong coupling mode.
+   %ICEEBSOLVE Coupled surface/subsurface solve for Robin coupling modes.
+   %
+   % solver = 2 is the single-sweep special case of this Robin coupler
+   % (cpl_maxiter = 1). solver = 3 runs the full outer Ts-T iterations.
    %
    %#codegen
 

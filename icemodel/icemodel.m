@@ -91,11 +91,6 @@ function [ice1, ice2] = icemodel(opts)
 
          % SURFACE TERMS (atmospheric vapor pressure fixed over this full step)
          ea = VAPPRESS(tair(metstep), Tf, liqflag) * rh(metstep) / 100;
-         if solver == 2
-            [Fc, Fp] = SFCFLIN(tair(metstep), swd(metstep), lwd(metstep), ...
-               albedo(metstep), wspd(metstep), psfc(metstep), De(metstep), ...
-               ea, cv_air, emiss, SB, roL, scoef, chi, Tf, Ts, liqflag);
-         end
 
          while dt_sum + TINY < dt_FULL_STEP
 
@@ -110,7 +105,7 @@ function [ice1, ice2] = icemodel(opts)
             end
 
             % COUPLED SURFACE-SUBSURFACE ENERGY BALANCE
-            if solver == 3 % (Robin strong coupling mode)
+            if solver > 1 % (Robin single-sweep and strong coupling modes)
                [Ts, T, f_ice, f_liq, k_eff, ok_ieb, n_iters] ...
                   = ICEEBSOLVE(T, f_ice, f_liq, dz, delz, fn, Sc, dt, JJ, Ts, ...
                   k_liq, cv_ice, cv_liq, ro_ice, ro_liq, Ls, Lf, roLf, Rv, ...
@@ -121,8 +116,8 @@ function [ice1, ice2] = icemodel(opts)
                   tol, maxiter, alpha, use_aitken, jumpmax, cpl_Ts_tol, ...
                   cpl_seb_tol, cpl_maxiter, cpl_alpha, cpl_aitken, cpl_jumpmax);
 
-            else % (Robin and Dirichlet lagged coupling mode)
-               [T, f_ice, f_liq, k_eff, ok_ieb, n_iters, a1] ...
+            else % (Dirichlet iterated lagged closure mode)
+               [T, f_ice, f_liq, k_eff, ok_ieb, n_iters] ...
                   = ICEENBAL(T, f_ice, f_liq, dz, delz, fn, Sc, dt, JJ, Ts, ...
                   k_liq, cv_ice, cv_liq, ro_ice, ro_liq, Ls, Lf, roLf, Rv, ...
                   Tf, fcp, TL, TH, f_ell_min, f_ell_max, Fc, Fp, solver, ...
@@ -137,14 +132,6 @@ function [ice1, ice2] = icemodel(opts)
                substep, maxsubstep, n_subfail, debug, eps, ok);
             if not(ok)
                continue
-            end
-
-            % UPDATE SEB LINEARIZATION (substep update for lagged-robin bc)
-            if solver == 2
-               Ts = (Fc + a1 * T(1)) / (a1 - Fp);
-               [Fc, Fp] = SFCFLIN(tair(metstep), swd(metstep), lwd(metstep), ...
-                  albedo(metstep), wspd(metstep), psfc(metstep), De(metstep), ...
-                  ea, cv_air, emiss, SB, roL, scoef, chi, Tf, Ts, liqflag);
             end
 
             % UPDATE POTENTIAL SURFACE NET VAPOR FLUX

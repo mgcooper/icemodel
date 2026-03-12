@@ -6,11 +6,16 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    %  RegressionBaseline = build_regression_baseline(baseline_tag="v1.1")
    %  RegressionBaseline = build_regression_baseline(baseline="v1.01", ...
    %     tier="full", smbmodel="skinmodel")
+   %  RegressionBaseline = build_regression_baseline(baseline="rolling", ...
+   %     smbmodel="icemodel", solver=2)
+   %  RegressionBaseline = build_regression_baseline(baseline="rolling", ...
+   %     smbmodel="icemodel", solver=[1 3])
    %
    % Use this when you want to accept new modeled outputs as a rolling or
    % versioned regression baseline. This writes baseline files only; it does
    % not produce compare artifacts or evaluate pass/fail against an older
    % baseline.
+   % The optional solver filter accepts any subset of [1 2 3].
 
    arguments (Input)
       kwargs.baseline string = string.empty()
@@ -19,11 +24,12 @@ function RegressionBaseline = build_regression_baseline(kwargs)
          ["smoke", "full", "all"])} = "full"
       kwargs.smbmodel (1, :) string {mustBeMember(kwargs.smbmodel, ...
          ["all", "icemodel", "skinmodel"])} = "all"
+      kwargs.solver {mustBeValidSolverFilter(kwargs.solver)} = []
       kwargs.output_file string = string.empty()
    end
-   [baseline, baseline_tag, tier, smbmodel, output_file] = deal( ...
+   [baseline, baseline_tag, tier, smbmodel, solver, output_file] = deal( ...
       kwargs.baseline, kwargs.baseline_tag, kwargs.tier, ...
-      kwargs.smbmodel, kwargs.output_file);
+      kwargs.smbmodel, kwargs.solver, kwargs.output_file);
 
    % Expand smbmodel="all" into one rolling/release baseline file per model.
    if smbmodel == "all"
@@ -35,7 +41,7 @@ function RegressionBaseline = build_regression_baseline(kwargs)
       for i = 1:numel(models)
          baselines{i} = build_regression_baseline( ...
             baseline=baseline, baseline_tag=baseline_tag, tier=tier, ...
-            smbmodel=models(i));
+            smbmodel=models(i), solver=solver);
       end
       RegressionBaseline = vertcat(baselines{:});
       return
@@ -44,7 +50,8 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    % Resolve the baseline target, configure paths, and load formal cases.
    [baseline_type, baseline_tag, output_file, rootdir, input_path, ...
       output_path, cases] = test.helpers.prepareBaselineBuild( ...
-      "regression", baseline, baseline_tag, tier, smbmodel, output_file);
+      "regression", baseline, baseline_tag, tier, smbmodel, output_file, ...
+      NaN, solver);
 
    % Load the static runoff reference used to derive catchment totals.
    runoff_ref = test.helpers.loadRunoffReference();
@@ -64,9 +71,15 @@ function RegressionBaseline = build_regression_baseline(kwargs)
       S = test.helpers.summarizeIce1Metrics(ice1);
       ridx = test.helpers.findRunoffReferenceRow(runoff_ref, c);
 
-      icemodel_final_m3 = nan;
+      icemodel_window_m3 = nan;
+      runoff_eval_window = nan;
+      melt_eval_window = nan;
       if ~isempty(ridx)
-         icemodel_final_m3 = test.helpers.computeCatchmentRunoffFinal( ...
+         runoff_eval_window = test.helpers.computeCumulativeWindowDelta( ...
+            ice1, "runoff", runoff_ref.t1(ridx), runoff_ref.t2(ridx));
+         melt_eval_window = test.helpers.computeCumulativeWindowDelta( ...
+            ice1, "melt", runoff_ref.t1(ridx), runoff_ref.t2(ridx));
+         icemodel_window_m3 = test.helpers.computeCatchmentRunoffFinal( ...
             ice1, runoff_ref.area_med_m2(ridx), runoff_ref.t1(ridx), ...
             runoff_ref.t2(ridx));
       end
@@ -83,10 +96,12 @@ function RegressionBaseline = build_regression_baseline(kwargs)
       rows(k).solver = c.solver;
       rows(k).runoff_final = S.runoff_final;
       rows(k).melt_final = S.melt_final;
+      rows(k).runoff_eval_window = runoff_eval_window;
+      rows(k).melt_eval_window = melt_eval_window;
       rows(k).mean_Tice_numiter = S.mean_Tice_numiter;
       rows(k).max_Tice_numiter = S.max_Tice_numiter;
       rows(k).n_not_converged = S.n_not_converged;
-      rows(k).icemodel_final_m3 = icemodel_final_m3;
+      rows(k).icemodel_window_m3 = icemodel_window_m3;
       rows(k).last_updated_utc = datetime('now', 'TimeZone', 'UTC');
 
       case_opts(k).case_id = string(c.case_id);
@@ -118,6 +133,17 @@ function RegressionBaseline = build_regression_baseline(kwargs)
       mkdir(outdir);
    end
    save(char(output_file), 'RegressionBaseline', 'case_opts', 'meta');
+end
+
+function mustBeValidSolverFilter(x)
+   if isempty(x)
+      return
+   end
+   mustBeNumeric(x)
+   mustBeInteger(x)
+   if any(~ismember(x, [1 2 3]))
+      error('solver must be empty or a subset of [1 2 3]')
+   end
 end
 
 function varargout = runModel(opts)

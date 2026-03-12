@@ -16,6 +16,10 @@ function results = run_test_bootstrap(kwargs)
    %  results = run_test_bootstrap()
    %  results = run_test_bootstrap(baseline_tag="v1.1")
    %  results = run_test_bootstrap(baseline_tag="v1.1", smbmodel="skinmodel")
+   %  results = run_test_bootstrap(baseline_tag="v1.1", smbmodel="icemodel", ...
+   %     solver=2)
+   %  results = run_test_bootstrap(baseline_tag="v1.1", smbmodel="icemodel", ...
+   %     solver=[1 3])
    %  results = run_test_bootstrap(baseline_tag="v1.1", smbmodel="all", ...
    %     clean_artifacts=true, clean_baselines=true)
    %
@@ -40,6 +44,7 @@ function results = run_test_bootstrap(kwargs)
    %  - This bootstrap does not rebuild test/references/runoff_reference.mat.
    %  - smbmodel="all" is virtual: it rebuilds per-model files for each formal
    %    model and runs the union of those cases.
+   %  - The optional solver filter accepts any subset of [1 2 3].
    %  - Compare runs are read-only with respect to baselines. Baseline updates
    %    happen through the explicit build/snapshot actions above.
 
@@ -47,14 +52,16 @@ function results = run_test_bootstrap(kwargs)
       kwargs.baseline_tag (1, :) string = "v1.1"
       kwargs.smbmodel (1, :) string {mustBeMember(kwargs.smbmodel, ...
          ["all", "icemodel", "skinmodel"])} = "all"
+      kwargs.solver {mustBeValidSolverFilter(kwargs.solver)} = []
       kwargs.clean_artifacts (1, 1) logical = false
       kwargs.clean_baselines (1, 1) logical = false
       kwargs.backup_before_clean (1, 1) logical = true
    end
-   [baseline_tag, smbmodel, clean_artifacts, clean_baselines, ...
+   [baseline_tag, smbmodel, solver, clean_artifacts, clean_baselines, ...
       backup_before_clean] = deal( ...
-      kwargs.baseline_tag, kwargs.smbmodel, kwargs.clean_artifacts, ...
-      kwargs.clean_baselines, kwargs.backup_before_clean);
+      kwargs.baseline_tag, kwargs.smbmodel, kwargs.solver, ...
+      kwargs.clean_artifacts, kwargs.clean_baselines, ...
+      kwargs.backup_before_clean);
 
    % Ensure test/ and dependencies/ are on path
    rootdir = fileparts(mfilename('fullpath'));
@@ -88,26 +95,28 @@ function results = run_test_bootstrap(kwargs)
    results.run_name = run_name;
    results.baseline_tag = baseline_tag;
    results.smbmodel = smbmodel;
+   results.solver = solver;
 
    % Generate the canonical list of all formal suite cases and run them.
    cases = test.helpers.getFormalTestSuiteCases();
    for i = 1:height(cases)
       c = cases(i, :);
-      results.(c.result_field) = runStep(c, baseline_tag, smbmodel, run_name);
+      results.(c.result_field) = runStep(c, baseline_tag, smbmodel, solver, run_name);
    end
 
    results.regression_passed = collectPassFlags(results, cases, "regression");
    results.perf_passed = collectPassFlags(results, cases, "perf");
 end
 
-function out = runStep(c, baseline_tag, smbmodel, run_name)
+function out = runStep(c, baseline_tag, smbmodel, solver, run_name)
    switch c.suite
       case "regression"
          switch c.action
             case "build"
                % Accept the current modeled outputs as the rolling baseline.
                out = build_regression_baseline( ...
-                  baseline="rolling", tier=c.tier, smbmodel=smbmodel);
+                  baseline="rolling", tier=c.tier, smbmodel=smbmodel, ...
+                  solver=solver);
 
             case "snapshot"
                % Freeze the current rolling baseline into a versioned release.
@@ -118,7 +127,7 @@ function out = runStep(c, baseline_tag, smbmodel, run_name)
             case "run"
                % Compare current outputs against the requested baseline.
                out = run_regression_suite( ...
-                  tier=c.tier, smbmodel=smbmodel, ...
+                  tier=c.tier, smbmodel=smbmodel, solver=solver, ...
                   baseline=resolveBaseline(c.baseline_mode, baseline_tag), ...
                   run_name=run_name);
 
@@ -131,7 +140,8 @@ function out = runStep(c, baseline_tag, smbmodel, run_name)
             case "build"
                % Accept the current runtimes as the rolling baseline.
                out = build_perf_baseline( ...
-                  baseline="rolling", tier=c.tier, smbmodel=smbmodel);
+                  baseline="rolling", tier=c.tier, smbmodel=smbmodel, ...
+                  solver=solver);
 
             case "snapshot"
                % Freeze the current rolling baseline into a versioned release.
@@ -142,7 +152,7 @@ function out = runStep(c, baseline_tag, smbmodel, run_name)
             case "run"
                % Compare current runtimes against the requested baseline.
                out = run_perf_suite( ...
-                  tier=c.tier, smbmodel=smbmodel, ...
+                  tier=c.tier, smbmodel=smbmodel, solver=solver, ...
                   baseline=resolveBaseline(c.baseline_mode, baseline_tag), ...
                   run_name=run_name);
 
@@ -210,4 +220,15 @@ function backupToFolder(source, backupdir)
    pathname = backupfile(source, true, true);
    [~, name, ext] = fileparts(pathname);
    movefile(pathname, fullfile(backupdir, [name ext]));
+end
+
+function mustBeValidSolverFilter(x)
+   if isempty(x)
+      return
+   end
+   mustBeNumeric(x)
+   mustBeInteger(x)
+   if any(~ismember(x, [1 2 3]))
+      error('solver must be empty or a subset of [1 2 3]')
+   end
 end

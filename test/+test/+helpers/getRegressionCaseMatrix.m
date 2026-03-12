@@ -1,10 +1,11 @@
-function cases = getRegressionCaseMatrix(tier, smbmodel)
+function cases = getRegressionCaseMatrix(tier, smbmodel, solver)
 %GETREGRESSIONCASEMATRIX Return deterministic regression test case matrix.
 %
 %  cases = test.helpers.getRegressionCaseMatrix("smoke")
 %  cases = test.helpers.getRegressionCaseMatrix("full")
 %  cases = test.helpers.getRegressionCaseMatrix("all")
 %  cases = test.helpers.getRegressionCaseMatrix("smoke", "skinmodel")
+%  cases = test.helpers.getRegressionCaseMatrix("smoke", "icemodel", 2)
 %
 % The formal regression matrix is intentionally compact and stable:
 % self-forced station runs at `kanm` and `kanl` for 2016. Icemodel is crossed
@@ -13,6 +14,7 @@ function cases = getRegressionCaseMatrix(tier, smbmodel)
    arguments
       tier = "smoke"
       smbmodel = "all"
+      solver = []
    end
 
    tier = string(tier);
@@ -37,9 +39,14 @@ function cases = getRegressionCaseMatrix(tier, smbmodel)
       % Filter after construction so one helper defines the canonical cases.
       cases = cases(ismember(cases.smbmodel, smbmodel), :);
    end
+
+   if ~isempty(solver)
+      cases = cases(ismember(cases.solver, solver), :);
+   end
 end
 
 function cases = makeCases(tier_name, sites)
+   year = 2016;
    models = ["icemodel"; "skinmodel"];
    n = numel(sites) * 4;
 
@@ -65,8 +72,9 @@ function cases = makeCases(tier_name, sites)
          end
          for j = 1:numel(bcs)
             k = k + 1;
-            case_id(k) = "reg_" + models(im) + "_" + sites(i) + "_2016_bc" ...
-               + int2str(bcs(j));
+            simyear(k) = year;
+            case_id(k) = test.helpers.makeFormalCaseId( ...
+               models(im), sites(i), simyear(k), bcs(j));
             tier(k) = tier_name;
             family(k) = "self";
             smbmodel(k) = models(im);
@@ -74,7 +82,6 @@ function cases = makeCases(tier_name, sites)
             forcings(k) = sites(i);
             userdata(k) = "";
             uservars(k) = "";
-            simyear(k) = 2016;
             solver(k) = bcs(j);
             runoff_site(k) = test.helpers.getRunoffSite(sites(i));
          end
