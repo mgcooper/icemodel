@@ -93,13 +93,16 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %     not iterate Ts and the current subsurface state together within the
    %     same substep.
    %
-   %  solver = 2 (Robin with single lagged sweep):
+   %  solver = 2 (Robin with single sweep):
    %   - Use a linearized SEB boundary condition (SFCFLIN) in the subsurface
    %     enthalpy solver (ICEENBAL).
    %   - After each accepted substep, diagnose Ts from the updated top-node
    %     state and refresh the SEB linearization for the next substep.
    %   - No inner Ts-T convergence loop within a substep (single coupling
    %     sweep per substep).
+   %   - Note: this is the one-iteration special case of the same partitioned
+   %     Robin coupler used by solver = 3, implemented by forcing cpl_maxiter=1
+   %     so each substep performs exactly one Robin sweep.
    %   - Classification: partitioned, lagged, weakly coupled (one explicit
    %     Robin sweep per substep, no interface convergence iterations).
    %
@@ -190,11 +193,15 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % solver, timestepping, and mesh options
    if strcmp(smbmodel, 'icemodel')
 
-      % Solver options. See function doc for info about each bc type.
-      opts.solver          = 1;     % recommended: 3
-                                    % 1 = Dirichlet w/ iterated lagged closure
-                                    % 2 = Robin w/ single lagged sweep
-                                    % 3 = Robin w/ strong coupling
+      % Solver options. See function doc for info about each solver mode.
+
+      % main solver mode (surface-subsurface coupler)
+      % 1 = Dirichlet w/ lagged Ts-T closure iterations
+      % 2 = Robin w/ single Ts-T coupling iteration
+      % 3 = Robin w/ strong Ts-T coupling iterations
+      opts.solver          = 3;     % recommended: 3
+
+      % surface (SEB) solver (Dirichlet Ts boundary condition when solver = 1)
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
 
@@ -221,11 +228,15 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    elseif strcmp(smbmodel, 'skinmodel')
 
-      % Solver options. See function doc for info about each bc type.
+      % Solver options. See function doc for info about each solver mode.
+
+      % main solver mode (surface-subsurface coupler)
+      % 1 = Dirichlet w/ lagged Ts-T closure iterations
+      % 2 = Robin w/ single Ts-T coupling iteration
+      % 3 = Robin w/ strong Ts-T coupling iterations
       opts.solver          = 1;     % required: 1 (2/3 not implemented)
-                                    % 1 = Dirichlet w/ iterated lagged closure
-                                    % 2 = Robin w/ single lagged sweep
-                                    % 3 = Robin w/ strong coupling
+
+      % surface (SEB) solver (Dirichlet Ts boundary condition when solver = 1)
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
 
@@ -253,14 +264,19 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       error('unrecognized surface mass balance model name SMBMODEL')
    end
 
+   % Set cpl_maxiter=1 for solver=2 to force one-sweep Ts-T coupling.
+   if opts.solver == 2
+      opts.cpl_maxiter = 1;
+   end
+
    % The mie scattering coefficients are defined for 35 grain sizes and 118
    % spectral bands. Define those dimensions here, they are used to read in
    % the data array in GETSCATTERCOEFS. Also set the grain size index.
    opts.nwavl           = 118;
    opts.nradii          = 35;
-   opts.i_grainradius   = 25;          % index 25 = 2.0 mm              [#]
+   opts.i_grainradius   = 25;       % index 25 = 2.0 mm                    [#]
 
-   % Define the height of the air temperature and wind observations     [m]
+   % Define the height of the air temperature and wind observations        [m]
    if strcmp(forcings, 'mar')
 
       opts.z_tair = 2.0;

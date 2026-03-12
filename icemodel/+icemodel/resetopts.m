@@ -44,6 +44,15 @@ function opts = resetopts(opts, varargin)
       opts.tlag = 6 * 3600 / opts.dt;
    end
 
+   % Re-apply solver-dependent coupling defaults unless explicitly overridden.
+   if ismember('solver', names) && ~ismember('cpl_maxiter', names)
+      if opts.solver == 2
+         opts.cpl_maxiter = 1;
+      else
+         opts.cpl_maxiter = 100;
+      end
+   end
+
    % Clear derived run settings when their source fields change. These fields
    % will be re-populated by icemodel.configureRun.
    if ismember('pathdata', names)

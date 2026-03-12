@@ -5,10 +5,15 @@ function PerfBaseline = build_perf_baseline(kwargs)
    %  PerfBaseline = build_perf_baseline(baseline_tag="v1.1")
    %  PerfBaseline = build_perf_baseline(baseline="v1.1", tier="full", ...
    %     smbmodel="skinmodel")
+   %  PerfBaseline = build_perf_baseline(baseline="rolling", ...
+   %     smbmodel="icemodel", solver=2)
+   %  PerfBaseline = build_perf_baseline(baseline="rolling", ...
+   %     smbmodel="icemodel", solver=[1 3])
    %
    % Use this when you want to accept new runtime measurements as a rolling
    % or versioned perf baseline. This writes baseline files only; it does not
    % produce compare artifacts or evaluate pass/fail against an older baseline.
+   % The optional solver filter accepts any subset of [1 2 3].
 
    arguments (Input)
       kwargs.baseline string = string.empty()
@@ -17,15 +22,16 @@ function PerfBaseline = build_perf_baseline(kwargs)
          ["smoke", "full", "all"])} = "full"
       kwargs.smbmodel (1, :) string {mustBeMember(kwargs.smbmodel, ...
          ["all", "icemodel", "skinmodel"])} = "all"
+      kwargs.solver {mustBeValidSolverFilter(kwargs.solver)} = []
       kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
       kwargs.n_runs (1, 1) double {mustBeInteger, mustBePositive} = 3
       kwargs.tol_perf (1, 1) double {mustBePositive} = 0.20
       kwargs.output_file string = string.empty()
    end
-   [baseline, baseline_tag, tier, smbmodel, simyear, n_runs, tol_perf, ...
-      output_file] = deal(kwargs.baseline, kwargs.baseline_tag, kwargs.tier, ...
-      kwargs.smbmodel, kwargs.simyear, kwargs.n_runs, kwargs.tol_perf, ...
-      kwargs.output_file);
+   [baseline, baseline_tag, tier, smbmodel, solver, simyear, n_runs, ...
+      tol_perf, output_file] = deal(kwargs.baseline, kwargs.baseline_tag, ...
+      kwargs.tier, kwargs.smbmodel, kwargs.solver, kwargs.simyear, ...
+      kwargs.n_runs, kwargs.tol_perf, kwargs.output_file);
 
    % Expand smbmodel="all" into one rolling/release baseline file per model.
    if smbmodel == "all"
@@ -37,7 +43,7 @@ function PerfBaseline = build_perf_baseline(kwargs)
       for i = 1:numel(models)
          baselines{i} = build_perf_baseline( ...
             baseline=baseline, baseline_tag=baseline_tag, tier=tier, ...
-            smbmodel=models(i), simyear=simyear, n_runs=n_runs, ...
+            smbmodel=models(i), solver=solver, simyear=simyear, n_runs=n_runs, ...
             tol_perf=tol_perf);
       end
       PerfBaseline = vertcat(baselines{:});
@@ -47,7 +53,7 @@ function PerfBaseline = build_perf_baseline(kwargs)
    % Resolve the baseline target, configure paths, and load formal cases.
    [baseline_type, baseline_tag, output_file, rootdir, input_path, ...
       output_path, cases] = test.helpers.prepareBaselineBuild("perf", ...
-      baseline, baseline_tag, tier, smbmodel, output_file, simyear);
+      baseline, baseline_tag, tier, smbmodel, output_file, simyear, solver);
 
    % Set up the per-case MATLAB performance experiment once.
    suite = testsuite(fullfile(rootdir, 'test', 'IcemodelPerfTest.m'));
@@ -122,4 +128,15 @@ function PerfBaseline = build_perf_baseline(kwargs)
       mkdir(outdir);
    end
    save(char(output_file), 'PerfBaseline', 'case_opts', 'meta');
+end
+
+function mustBeValidSolverFilter(x)
+   if isempty(x)
+      return
+   end
+   mustBeNumeric(x)
+   mustBeInteger(x)
+   if any(~ismember(x, [1 2 3]))
+      error('solver must be empty or a subset of [1 2 3]')
+   end
 end

@@ -40,7 +40,7 @@ function baseline = loadRegressionBaseline(baseline_tag, smbmodel, pathname)
       pathname, ["RegressionBaseline", "baseline"]);
 
    if ismember('case_id', baseline.Properties.VariableNames)
-      baseline.case_id = string(baseline.case_id);
+      baseline.case_id = test.helpers.normalizeFormalCaseId(baseline.case_id);
    end
    if ismember('baseline_tag', baseline.Properties.VariableNames)
       baseline.baseline_tag = string(baseline.baseline_tag);

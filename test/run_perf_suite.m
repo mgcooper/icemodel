@@ -4,12 +4,16 @@ function results = run_perf_suite(kwargs)
    %  results = run_perf_suite()
    %  results = run_perf_suite(tier="smoke")
    %  results = run_perf_suite(tier="smoke", smbmodel="skinmodel")
+   %  results = run_perf_suite(tier="smoke", smbmodel="icemodel", solver=2)
+   %  results = run_perf_suite(tier="smoke", smbmodel="icemodel", solver=[2 3])
+   %  results = run_perf_suite(tier="smoke", smbmodel="icemodel", solver=[1 3])
    %  results = run_perf_suite(tier="full", baseline="v1.1")
    %
    % Use this for normal performance comparisons against an existing rolling
    % or release baseline. This function does not update baselines; it only
    % runs the formal cases, compares runtime to the requested baseline, and
    % writes one artifact under test/artifacts/<run_name>/.
+   % The optional solver filter accepts any subset of [1 2 3].
    %
    % CLI entrypoint:
    %  matlab -batch "run('/ABS/PATH/icemodel/test/run_perf_suite.m')"
@@ -19,14 +23,15 @@ function results = run_perf_suite(kwargs)
          ["smoke", "full", "all"])} = "smoke"
       kwargs.smbmodel (1, :) string {mustBeMember(kwargs.smbmodel, ...
          ["all", "icemodel", "skinmodel"])} = "all"
+      kwargs.solver {mustBeValidSolverFilter(kwargs.solver)} = []
       kwargs.n_runs (1, 1) double {mustBeInteger, mustBePositive} = 3
       kwargs.tol_perf (1, 1) double {mustBePositive} = 0.20
       kwargs.baseline (1, :) string = "rolling"
       kwargs.run_name string = string.empty()
    end
-   [tier, smbmodel, n_runs, tol_perf, baseline_tag, run_name] = deal( ...
-      kwargs.tier, kwargs.smbmodel, kwargs.n_runs, kwargs.tol_perf, ...
-      kwargs.baseline, kwargs.run_name);
+   [tier, smbmodel, solver, n_runs, tol_perf, baseline_tag, run_name] = deal( ...
+      kwargs.tier, kwargs.smbmodel, kwargs.solver, kwargs.n_runs, ...
+      kwargs.tol_perf, kwargs.baseline, kwargs.run_name);
 
    % Resolve the requested baseline and shared batch run identifier.
    [baseline_type, baseline_tag] = test.helpers.resolveBaselineSelector( ...
@@ -40,7 +45,7 @@ function results = run_perf_suite(kwargs)
    [input_path, output_path] = test.helpers.configureModelPaths(rootdir);
 
    % Build the deterministic case list and load the requested baseline.
-   cases = test.helpers.getCaseMatrix(tier, smbmodel);
+   cases = test.helpers.getCaseMatrix(tier, smbmodel, solver);
    if isempty(cases)
       error('no performance cases matched tier=%s smbmodel=%s', tier, smbmodel)
    end
@@ -164,6 +169,7 @@ function results = run_perf_suite(kwargs)
    meta = struct();
    meta.tier = tier;
    meta.smbmodel_filter = smbmodel;
+    meta.solver_filter = solver;
    meta.baseline_type = baseline_type;
    meta.baseline_tag = baseline_tag;
    meta.run_date = run_date;
@@ -199,6 +205,17 @@ function results = run_perf_suite(kwargs)
    results.passed = isempty(failed_cases);
 end
 
+function mustBeValidSolverFilter(x)
+   if isempty(x)
+      return
+   end
+   mustBeNumeric(x)
+   mustBeInteger(x)
+   if any(~ismember(x, [1 2 3]))
+      error('solver must be empty or a subset of [1 2 3]')
+   end
+end
+
 function artifact_file = logArtifacts(rootdir, sample_detail, ...
       activity_detail, case_summary, case_opts, meta)
    % Save one performance artifact for this compare run.
@@ -213,9 +230,10 @@ function artifact_file = logArtifacts(rootdir, sample_detail, ...
       baseline_label = "vs_" + test.helpers.sanitizeTag(meta.baseline_tag);
    end
    model_label = smbmodelLabel(meta.smbmodel_filter);
+   solver_label = solverLabel(meta.solver_filter);
    artifact_file = fullfile(outdir, ...
       sprintf('perf_results_%s%s_%s.mat', ...
-      char(meta.tier), char(model_label), char(baseline_label)));
+      char(meta.tier), char(model_label + solver_label), char(baseline_label)));
    save(artifact_file, 'sample_detail', 'activity_detail', ...
       'case_summary', 'case_opts', 'meta');
    disp(artifact_file)
@@ -254,5 +272,13 @@ function label = smbmodelLabel(smbmodel)
       label = "";
    else
       label = "_" + test.helpers.smbmodelTag(smbmodel);
+   end
+end
+
+function label = solverLabel(solver)
+   if isempty(solver)
+      label = "";
+   else
+      label = "_s" + join(string(solver), '-');
    end
 end

@@ -1,6 +1,6 @@
 function [baseline_type, baseline_tag, output_file, rootdir, input_path, ...
       output_path, cases] = prepareBaselineBuild(kind, baseline, ...
-      baseline_tag, tier, smbmodel, output_file, simyear)
+      baseline_tag, tier, smbmodel, output_file, simyear, solver)
 %PREPAREBASELINEBUILD Resolve shared setup for perf/regression baseline builds.
 %
 %  [baseline_type, baseline_tag, output_file, rootdir, input_path, ...
@@ -15,7 +15,7 @@ function [baseline_type, baseline_tag, output_file, rootdir, input_path, ...
 %
 % Inputs:
 %  kind - "perf" or "regression"
-%  baseline, baseline_tag, smbmodel, output_file, simyear
+%  baseline, baseline_tag, smbmodel, output_file, simyear, solver
 %    forwarded to the baseline-path/case selection logic
 %
 % Output:
@@ -33,6 +33,7 @@ function [baseline_type, baseline_tag, output_file, rootdir, input_path, ...
          ["all", "icemodel", "skinmodel"])} = "all"
       output_file string = string.empty()
       simyear double = NaN
+      solver = []
    end
 
    [baseline_type, baseline_tag, output_file] = ...
@@ -46,7 +47,7 @@ function [baseline_type, baseline_tag, output_file, rootdir, input_path, ...
 
    switch kind
       case "perf"
-         cases = test.helpers.getCaseMatrix(tier, smbmodel);
+         cases = test.helpers.getCaseMatrix(tier, smbmodel, solver);
          if isempty(cases)
             error('no performance cases matched tier=%s smbmodel=%s', ...
                tier, smbmodel)
@@ -57,7 +58,7 @@ function [baseline_type, baseline_tag, output_file, rootdir, input_path, ...
          end
 
       case "regression"
-         cases = test.helpers.getRegressionCaseMatrix(tier, smbmodel);
+         cases = test.helpers.getRegressionCaseMatrix(tier, smbmodel, solver);
          if isempty(cases)
             error('no regression cases matched tier=%s smbmodel=%s', ...
                tier, smbmodel)
