@@ -82,7 +82,8 @@ function [vars1, vars2] = defaultOutputVariables(opts)
    % which the data are stored in the cell arrays passed to SAVEOUTPUT from the
    % model main functions.
    %
-   % 2) If new variables are added, POSTPROC must be reviewed to ensure correct
+   % 2) If new variables are added, icemodel.postprocess must be reviewed to
+   % ensure correct
    % processing is applied, including rounding precision.
 
    profile = string(opts.output_profile);

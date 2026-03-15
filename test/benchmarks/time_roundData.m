@@ -4,7 +4,7 @@ function [t1, t2, t3, t4] = time_roundData(ice1, ice2)
    % round2
 
    % For these tests, need to run icemodel with the roudn step turned off in
-   % POSTPROC, which is annoying but its the actual data, see test_renameRound for
+   % postprocess, which is annoying but its the actual data, see test_renameRound for
    % synthetic testing.
 
    ice1test = ice1;
@@ -126,4 +126,3 @@ function [ice1, ice2] = round4(ice1, ice2)
       end
    end
 end
-

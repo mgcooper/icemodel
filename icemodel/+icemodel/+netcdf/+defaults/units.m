@@ -22,7 +22,7 @@ function out = units(whichdata)
       case 'ice1'
 
          out = {
-            'degC', ...    Tsfc (changed from K due to conversion in POSTPROC)
+            'degC', ...    Tsfc (changed from K due to conversion in postprocess)
             'm w.e.', ...  melt
             'm w.e.', ...  freeze
             'm w.e.', ...  subl
@@ -37,7 +37,7 @@ function out = units(whichdata)
       case 'ice2'
 
          out = {
-            'degC', ... % changed from K due to conversion in POSTPROC
+            'degC', ... % changed from K due to conversion in postprocess
             '1', ...
             '1', ...
             '1', ...

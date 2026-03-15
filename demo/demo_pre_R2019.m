@@ -49,7 +49,7 @@ switch smbmodel
 end
 
 % Run the post-processing step.
-[ice1, ice2, met] = POSTPROC(ice1, ice2, opts, simyears);
+[ice1, ice2, met] = icemodel.postprocess(ice1, ice2, opts, simyears);
 
 % Create the demo plot comparing the simulated surface energy balance to the
 % observed values from the KANM weather station.

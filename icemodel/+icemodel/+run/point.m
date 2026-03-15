@@ -54,6 +54,7 @@ function [ice1, ice2, met, opts] = point(kwargs)
    if saveflag
       [ice1, ice2, met] = icemodel.loadresults(opts);
    else
-      [ice1, ice2, met] = POSTPROC(ice1, ice2, opts, opts.output_years);
+      [ice1, ice2, met] = icemodel.postprocess( ...
+         ice1, ice2, opts, opts.output_years);
    end
 end

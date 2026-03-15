@@ -78,7 +78,8 @@ function RegressionBaseline = build_regression_baseline(kwargs)
       opts_run = icemodel.test.helpers.setModelOptsForCase(c);
 
       [ice1, ice2] = runModel(opts_run);
-      [ice1, ~] = POSTPROC(ice1, ice2, opts_run, opts_run.output_years);
+      [ice1, ~] = icemodel.postprocess( ...
+         ice1, ice2, opts_run, opts_run.output_years);
       S = icemodel.test.helpers.summarizeIce1Metrics(ice1);
       ridx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);
 

@@ -120,60 +120,20 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    % Parse inputs
    narginchk(4, inf)
-
-   if nargin < 5  || isblanktext(userdata); userdata = forcings; end
-   if nargin < 6  || isblanktext(uservars); uservars = 'albedo'; end
-   if nargin < 7  || isblanktext(testname); testname = ''; end
-   if nargin < 8  || isempty(saveflag); saveflag = false; end
-   if nargin < 9  || isempty(backupflag); backupflag = true; end
-
-   % Legacy option used 'none', set to forcings instead
-   if strcmp(userdata, 'none')
-      userdata = forcings;
-   end
-   if strcmp(testname, 'none')
-      testname = '';
-   end
-
-   % convertStringsToChars in a pre-R2017b compatible way:
-   args = {smbmodel, sitename, forcings, userdata, uservars, testname};
-   for n = 1:numel(args)
-      if isstring(args{n})
-         args{n} = char(args{n});
-      end
-   end
-   [smbmodel, sitename, forcings, userdata, uservars, testname] = deal(args{:});
-
-   % If >= R2017b:
-   % [smbmodel, sitename, forcings, userdata, uservars, testname] ...
-   %    = convertStringsToChars(...
-   %    smbmodel, sitename, forcings, userdata, uservars, testname);
+   if nargin < 5; userdata = []; end
+   if nargin < 6; uservars = []; end
+   if nargin < 7; testname = []; end
+   if nargin < 8; saveflag = []; end
+   if nargin < 9; backupflag = []; end
+   [smbmodel, sitename, simyears, forcings, userdata, uservars, ...
+      testname, saveflag, backupflag] = parseinputs(nargin, ...
+      smbmodel, sitename, simyears, forcings, userdata, uservars, ...
+      testname, saveflag, backupflag);
 
    %------------------------- save the standard options passed in
    %--------------------------------------------------------------
-   opts.saveflag = saveflag;
-   opts.smbmodel = smbmodel;
-   opts.sitename = sitename;
-   opts.forcings = forcings;
-   opts.userdata = userdata;
-   opts.uservars = uservars;
-   opts.simyears = simyears;
-   opts.numyears = numel(simyears);
-   opts.output_years = [];
-   opts.testname = testname;
-   opts.saveopts = saveflag;
-   opts.backupflag = backupflag;
-
-   % Set defaults for values set in icemodel.configureRun
-   opts.pathdata = [];
-   opts.pathinput = [];
-   opts.patheval = [];
-   opts.pathuserdata = [];
-   opts.pathoutput = [];
-   opts.casename = [];
-   opts.metfname = {};
-   opts.vars1 = {};
-   opts.vars2 = {};
+   opts = initopts(smbmodel, sitename, simyears, forcings, ...
+      userdata, uservars, testname, saveflag, backupflag);
 
    %------------------------- optional settings / parameters
    %---------------------------------------------------------
@@ -306,4 +266,71 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    opts = icemodel.resetopts(opts, varargin{:});
    opts = icemodel.configureRun(opts);
+end
+
+%%
+function [smbmodel, sitename, simyears, forcings, userdata, uservars, ...
+      testname, saveflag, backupflag] = parseinputs(nin, smbmodel, ...
+      sitename, simyears, forcings, userdata, uservars, testname, ...
+      saveflag, backupflag)
+
+   if nin < 5 || isblanktext(userdata)
+      userdata = forcings;
+   end
+   if nin < 6 || isblanktext(uservars)
+      uservars = 'albedo';
+   end
+   if nin < 7 || isblanktext(testname)
+      testname = '';
+   end
+   if nin < 8 || isempty(saveflag)
+      saveflag = false;
+   end
+   if nin < 9 || isempty(backupflag)
+      backupflag = true;
+   end
+
+   if strcmpi(userdata, 'none')
+      userdata = forcings;
+   end
+   if strcmpi(testname, 'none')
+      testname = '';
+   end
+
+   args = {smbmodel, sitename, forcings, userdata, uservars, testname};
+   for n = 1:numel(args)
+      if isstring(args{n})
+         args{n} = char(args{n});
+      end
+   end
+   [smbmodel, sitename, forcings, userdata, uservars, testname] = deal(args{:});
+end
+
+%%
+function opts = initopts(smbmodel, sitename, simyears, forcings, ...
+      userdata, uservars, testname, saveflag, backupflag)
+
+   opts.saveflag = saveflag;
+   opts.smbmodel = smbmodel;
+   opts.sitename = sitename;
+   opts.forcings = forcings;
+   opts.userdata = userdata;
+   opts.uservars = uservars;
+   opts.simyears = simyears;
+   opts.numyears = numel(simyears);
+   opts.output_years = [];
+   opts.testname = testname;
+   opts.saveopts = saveflag;
+   opts.backupflag = backupflag;
+
+   % Set defaults for values set in icemodel.configureRun
+   opts.pathdata = [];
+   opts.pathinput = [];
+   opts.patheval = [];
+   opts.pathuserdata = [];
+   opts.pathoutput = [];
+   opts.casename = [];
+   opts.metfname = {};
+   opts.vars1 = {};
+   opts.vars2 = {};
 end

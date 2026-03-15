@@ -55,7 +55,8 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             opts = icemodel.test.helpers.setModelOptsForCase(c);
 
             [ice1, ice2] = runModel(opts);
-            [ice1, ice2] = POSTPROC(ice1, ice2, opts, opts.output_years); %#ok<ASGLU>
+            [ice1, ice2] = icemodel.postprocess( ...
+               ice1, ice2, opts, opts.output_years); %#ok<ASGLU>
             S = icemodel.test.helpers.summarizeIce1Metrics(ice1);
 
             ridx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);

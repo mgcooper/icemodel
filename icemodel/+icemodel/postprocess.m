@@ -1,19 +1,21 @@
-function varargout = POSTPROC(ice1, ice2, opts, varargin)
-   %POSTPROC post process the simulation data
+function varargout = postprocess(ice1, ice2, opts, varargin)
+   %POSTPROCESS Post-process simulation output.
    %
    % Syntax:
    %
-   % [ice1, ice2] = POSTPROC(ice1, ice2, opts, simyears)
-   % [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time)
+   % [ice1, ice2] = icemodel.postprocess(ice1, ice2, opts, simyears)
+   % [ice1, ice2] = icemodel.postprocess(ice1, ice2, opts, swd, lwd, ...
+   %    albedo, time)
    %
    % Description:
    %
-   % [ice1, ice2] = POSTPROC(ice1, ice2, opts, simyears) Loads the met data
-   % resolved in opts. SIMYEARS may be a scalar year or a year vector; a scalar
-   % year subsets the met data to that year, while a vector returns the full
-   % concatenated met series for those years.
+   % [ice1, ice2] = icemodel.postprocess(ice1, ice2, opts, simyears)
+   % Loads the met data resolved in opts. SIMYEARS may be a scalar year or a
+   % year vector; a scalar year subsets the met data to that year, while a
+   % vector returns the full concatenated met series for those years.
    %
-   % [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time)
+   % [ice1, ice2] = icemodel.postprocess(ice1, ice2, opts, swd, lwd, ...
+   %    albedo, time)
    %
    % See also:
    %

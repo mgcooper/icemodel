@@ -23,13 +23,13 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    time = met.Time;
    albedo = met.albedo;
 
-   if isvariable('rain', met)
-      rain = met.rain / 3600; % opts.dt - the mar rain/snow is mWE / hr not / dt
-      rain(isnan(rain)) = 0.0;
-      rain = 0 * tair;
-   else
-      rain = 0 * tair;
-   end
+   % Rainfall forcing is still ignored in the core time integration.
+   % Keep the legacy zero-rain behavior explicit here until rain/snow/ppt
+   % forcing support is implemented consistently.
+   rain = 0 * tair;
+
+   % TODO: support snowfall, and confirm if forcing files are consistent wrt
+   % rain/snow/ppt/prec variable names
 
    % Solve for wet bulb
    [Ls, cp_air] = icemodel.physicalConstant('Ls', 'cp_air');
@@ -38,6 +38,7 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
       tppt(n) = SOLVEWB(tair(n), rh(n), Ls, cp_air, psfc(n));
    end
 
-   % Compute the wind transfer and stability coefficients
-   [De, S] = WINDCOEF(wspd, opts.z_0, opts.z_tair, opts.z_wind);
+   % The canonical met loader already computes De after all swaps/subsetting.
+   De = met.De;
+   [~, S] = WINDCOEF(wspd, opts.z_0, opts.z_tair, opts.z_wind);
 end

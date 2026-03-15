@@ -45,10 +45,10 @@ function met = loadOneMetFile(opts, fileiter)
    met = load(opts.metfname{fileiter}, 'met');
    met = met.met;
 
-   if ~strcmp('none', opts.userdata) && ~strcmp(opts.forcings, opts.userdata)
+   met = prepareMetData(met, opts);
+   if shouldSwapUserdata(opts)
       met = swapMetData(met, opts);
    end
-   met = prepareMetData(met, opts);
 end
 
 %%
@@ -64,90 +64,129 @@ function met = prepareMetData(met, opts)
    % subset the met file to the requested simyears
    met = met(ismember(year(met.Time), opts.simyears), :);
 
-   % check for bad modis data before swapping out default albedo for modis
-   varmodis = {'modis', 'MODIS'};
-   hasmodis = ismember(varmodis, met.Properties.VariableNames);
-   if any(hasmodis)
-      bi = met.(varmodis{hasmodis}) <= 0 | met.(varmodis{hasmodis}) >= 1;
-      if sum(bi) > 0
-         met.(varmodis{hasmodis})(bi) = met.albedo(bi);
-         warning('bad albedo')
-      end
-   end
    met.Time.TimeZone = 'UTC';
 end
 
 %%
 function met = swapMetData(met, opts)
 
-   % convert uservars to a cellstr for compatibility with multiple uservars
-   if ischar(opts.uservars)
-      opts.uservars = cellstr(opts.uservars);
+   uservars = normalizeUservars(opts.uservars);
+   simyear = year(met.Time);
+   for thisyear = reshape(unique(simyear)', 1, [])
+      ii = simyear == thisyear;
+      Data = [];
+
+      for n = 1:numel(uservars)
+         targetvar = uservars{n};
+         requireVariable(met, targetvar, 'met');
+
+         sourcevar = findSourceVar(met.Properties.VariableNames, ...
+            inlineSourceCandidates(opts.userdata, targetvar));
+         if isempty(sourcevar)
+            if isempty(Data)
+               Data = loadExternalUserdata(opts, thisyear, met.Time(ii));
+            end
+            sourcevar = findSourceVar(Data.Properties.VariableNames, ...
+               externalSourceCandidates(opts.userdata, targetvar));
+            if isempty(sourcevar)
+               error('userdata variable for "%s" not found in %s source', ...
+                  targetvar, opts.userdata);
+            end
+            swapdata = Data.(sourcevar);
+         else
+            swapdata = met.(sourcevar)(ii);
+         end
+
+         swapdata = sanitizeSwapData(swapdata, sourcevar, met.(targetvar)(ii));
+         met.(targetvar)(ii) = swapdata;
+      end
+   end
+end
+
+%%
+function tf = shouldSwapUserdata(opts)
+
+   tf = ~isblanktext(opts.userdata) ...
+      && ~strcmpi(opts.userdata, 'none') ...
+      && ~strcmpi(opts.forcings, opts.userdata);
+end
+
+%%
+function uservars = normalizeUservars(uservars)
+
+   if ischar(uservars)
+      uservars = cellstr(uservars);
+   elseif isstring(uservars)
+      uservars = cellstr(uservars);
+   end
+end
+
+%%
+function Data = loadExternalUserdata(opts, thisyear, mettime)
+
+   userfile = [opts.sitename '_' opts.userdata '_' int2str(thisyear) '.mat'];
+   filepath = fullfile(opts.pathuserdata, userfile);
+   if exist(filepath, 'file') ~= 2
+      error('\n userdata file does not exist: \n\n %s \n', filepath);
    end
 
-   is_grid_run = strcmp(opts.sitename, 'sector');
+   Data = load(filepath, 'Data');
+   if ~isfield(Data, 'Data')
+      error('userdata file does not contain timetable "Data": %s', filepath);
+   end
+   Data = Data.Data;
+   Data.Time.TimeZone = mettime.TimeZone;
+   Data = retime(Data, mettime, 'linear');
+end
 
-   if is_grid_run
+%%
+function candidates = inlineSourceCandidates(userdata, targetvar)
 
-      % For grid runs, the met file already carries the grid-cell forcing and
-      % userdata swaps are currently limited to replacing forcing albedo with
-      % the embedded MODIS albedo field.
-
-      % Activate this and move the swap loop below outside the else to swap
-      % generic variables for gridded runs.
-      % Data = met;
-      % if strcmp('modis', opts.userdata)
-      %    Data.modis = met.modis;
-      % end
-
-      if strcmp('modis', opts.userdata)
-         met.albedo = met.modis;
-      end
-
+   if strcmpi(userdata, 'modis') && strcmpi(targetvar, 'albedo')
+      candidates = {'modis', 'MODIS'};
    else
+      candidates = {};
+   end
+end
 
-      % Most met files should have a MODIS column
-      if strcmp('modis', opts.userdata)
-         if isvariable('MODIS', met)
-            met.albedo = met.MODIS;
+%%
+function candidates = externalSourceCandidates(userdata, targetvar)
 
-         elseif isvariable('modis', met)
-            met.albedo = met.modis;
-         end
+   candidates = {targetvar};
+   if strcmpi(userdata, 'modis') && strcmpi(targetvar, 'albedo')
+      candidates = [{'modis', 'MODIS'}, candidates];
+   end
+end
+
+%%
+function varname = findSourceVar(varnames, candidates)
+
+   varname = '';
+   for n = 1:numel(candidates)
+      idx = find(strcmpi(varnames, candidates{n}), 1);
+      if ~isempty(idx)
+         varname = varnames{idx};
          return
       end
+   end
+end
 
-      % Load the userdata by year and swap it into the matching met rows.
-      for thisyear = reshape(unique(year(met.Time))', 1, [])
-         userfile = [opts.sitename '_' opts.userdata '_' int2str(thisyear) '.mat'];
-         filepath = fullfile(opts.pathuserdata, userfile);
-         if exist(filepath, 'file') ~= 2
-            error('\n userdata file does not exist: \n\n %s \n', filepath);
-         end
+%%
+function requireVariable(T, varname, label)
 
-         Data = load(filepath, 'Data');
-         Data = Data.Data;
-         ii = year(met.Time) == thisyear;
-         Data.Time.TimeZone = met.Time.TimeZone;
-         if Data.Time(2)-Data.Time(1) ~= met.Time(2)-met.Time(1)
-            Data = retime(Data, met.Time(ii), 'linear');
-         else
-            Data = Data(isbetween(Data.Time, met.Time(find(ii, 1)), ...
-               met.Time(find(ii, 1, 'last'))), :);
-         end
+   if ~isvariable(varname, T)
+      error('%s does not contain variable "%s"', label, varname);
+   end
+end
 
-         % Swap out the data in the metfile for the user data
-         for n = 1:numel(opts.uservars)
-            thisvar  = opts.uservars{n};
-            swapvar  = thisvar;
+%%
+function values = sanitizeSwapData(values, sourcevar, fallback)
 
-            % MODIS requires changing the variable name to albedo
-            if strcmpi('modis', opts.userdata) && strcmpi('albedo', thisvar)
-               thisvar = 'albedo';
-               swapvar = 'modis';
-            end
-            met.(thisvar)(ii) = Data.(swapvar);
-         end
+   if any(strcmpi(sourcevar, {'modis'}))
+      bad = values <= 0 | values >= 1;
+      if any(bad)
+         values(bad) = fallback(bad);
+         warning('bad albedo')
       end
    end
 end
