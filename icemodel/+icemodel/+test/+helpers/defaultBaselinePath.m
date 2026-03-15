@@ -1,8 +1,8 @@
 function pathname = defaultBaselinePath(kind, baseline_type, baseline_tag, smbmodel, simyear)
 %DEFAULTBASELINEPATH Return the canonical baseline path for test tooling.
 %
-%  pathname = test.helpers.defaultBaselinePath("perf", "rolling", "", "skinmodel", 2016)
-%  pathname = test.helpers.defaultBaselinePath("regression", "release", "v1.1", "icemodel")
+%  pathname = icemodel.test.helpers.defaultBaselinePath("perf", "rolling", "", "skinmodel", 2016)
+%  pathname = icemodel.test.helpers.defaultBaselinePath("regression", "release", "v1.1", "icemodel")
 
    arguments
       kind (1, :) string {mustBeMember(kind, ["perf", "regression"])}
@@ -12,8 +12,8 @@ function pathname = defaultBaselinePath(kind, baseline_type, baseline_tag, smbmo
       simyear double = NaN
    end
 
-   rootdir = fileparts(fileparts(fileparts(fileparts(mfilename('fullpath')))));
-   model_tag = test.helpers.smbmodelTag(smbmodel);
+   rootdir = icemodel.internal.fullpath();
+   model_tag = icemodel.test.helpers.smbmodelTag(smbmodel);
 
    switch kind
       case "perf"
@@ -26,7 +26,7 @@ function pathname = defaultBaselinePath(kind, baseline_type, baseline_tag, smbmo
          else
             pathname = fullfile(rootdir, 'test', 'baselines', ...
                sprintf('perf_baseline_%d_%s_%s.mat', ...
-               simyear, test.helpers.sanitizeTag(baseline_tag), model_tag));
+               simyear, icemodel.test.helpers.sanitizeTag(baseline_tag), model_tag));
          end
 
       case "regression"
@@ -35,7 +35,7 @@ function pathname = defaultBaselinePath(kind, baseline_type, baseline_tag, smbmo
                "regression_baseline_rolling_" + model_tag + ".mat");
          else
             pathname = fullfile(rootdir, 'test', 'baselines', ...
-               "regression_baseline_" + test.helpers.sanitizeTag(baseline_tag) ...
+               "regression_baseline_" + icemodel.test.helpers.sanitizeTag(baseline_tag) ...
                + "_" + model_tag + ".mat");
          end
    end

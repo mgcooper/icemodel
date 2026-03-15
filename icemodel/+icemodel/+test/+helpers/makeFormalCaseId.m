@@ -1,7 +1,7 @@
 function case_id = makeFormalCaseId(smbmodel, sitename, simyear, solver)
 %MAKEFORMALCASEID Return canonical formal-suite identifier for one model run.
 %
-%  case_id = test.helpers.makeFormalCaseId("icemodel", "kanm", 2016, 2)
+%  case_id = icemodel.test.helpers.makeFormalCaseId("icemodel", "kanm", 2016, 2)
 %
 % The identifier is intentionally independent of suite tier (smoke/full) and
 % suite type (perf/regression). It represents the underlying physical run so

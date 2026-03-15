@@ -14,7 +14,7 @@ function idx = findRunoffReferenceRow(T, c)
    if isfield(c, 'runoff_site') && ~isempty(c.runoff_site)
       sitename = string(c.runoff_site);
    else
-      sitename = test.helpers.getRunoffSite(c.sitename);
+      sitename = icemodel.test.helpers.getRunoffSite(c.sitename);
    end
 
    idx = find(T.sitename == sitename ...

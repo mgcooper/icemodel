@@ -1,7 +1,7 @@
 function cases = getFormalTestSuiteCases()
 %GETFORMALTESTSUITECASES Return the canonical formal test-suite cases.
 %
-%  cases = test.helpers.getFormalTestSuiteCases()
+%  cases = icemodel.test.helpers.getFormalTestSuiteCases()
 %
 % Use this helper when you need the ordered list of top-level formal suite
 % cases. These are suite-level build/snapshot/run cases such as
@@ -19,8 +19,8 @@ function cases = getFormalTestSuiteCases()
 %  - This is the single source of truth for the possible formal suite cases
 %    used by `run_test_bootstrap`.
 %  - These are not the underlying model run cases. Model/site/year/solver
-%    combinations are defined separately by `test.helpers.getCaseMatrix` and
-%    `test.helpers.getRegressionCaseMatrix`.
+%    combinations are defined separately by `icemodel.test.helpers.getPerfCaseMatrix`
+%    and `icemodel.test.helpers.getRegressionCaseMatrix`.
 %  - The helper returns regression cases first, then perf cases. Within each
 %    suite, the ordering is:
 %       1. rolling baseline build

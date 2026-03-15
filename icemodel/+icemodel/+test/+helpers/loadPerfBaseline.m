@@ -1,10 +1,10 @@
 function baseline = loadPerfBaseline(simyear, baseline_tag, smbmodel, pathname)
    %LOADPERFBASELINE Load rolling or release performance baseline table.
    %
-   %  baseline = test.helpers.loadPerfBaseline(2016)
-   %  baseline = test.helpers.loadPerfBaseline(2016, "rolling", "all")
-   %  baseline = test.helpers.loadPerfBaseline(2016, "v1.1", "skinmodel")
-   %  baseline = test.helpers.loadPerfBaseline(2016, "v1.1", "skinmodel", pathname)
+   %  baseline = icemodel.test.helpers.loadPerfBaseline(2016)
+   %  baseline = icemodel.test.helpers.loadPerfBaseline(2016, "rolling", "all")
+   %  baseline = icemodel.test.helpers.loadPerfBaseline(2016, "v1.1", "skinmodel")
+   %  baseline = icemodel.test.helpers.loadPerfBaseline(2016, "v1.1", "skinmodel", pathname)
    arguments
       simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
       baseline_tag string = "rolling"
@@ -13,7 +13,7 @@ function baseline = loadPerfBaseline(simyear, baseline_tag, smbmodel, pathname)
    end
 
    [baseline_type, baseline_tag] = ...
-      test.helpers.resolveBaselineSelector(baseline_tag);
+      icemodel.test.helpers.resolveBaselineSelector(baseline_tag);
 
    % smbmodel="all" is virtual: load and concatenate the per-model files.
    if string(smbmodel) == "all" ...
@@ -25,10 +25,8 @@ function baseline = loadPerfBaseline(simyear, baseline_tag, smbmodel, pathname)
    end
 
    if isempty(pathname) || (isstring(pathname) && all(strlength(pathname) == 0))
-      rootdir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
-      pathname = ...
-         defaultBaselinePath(rootdir, simyear, baseline_type, baseline_tag, ...
-         smbmodel);
+      pathname = icemodel.test.helpers.defaultBaselinePath( ...
+         "perf", baseline_type, baseline_tag, smbmodel, simyear);
    end
 
    pathname = char(pathname);
@@ -39,7 +37,7 @@ function baseline = loadPerfBaseline(simyear, baseline_tag, smbmodel, pathname)
 
    % Normalize saved MAT content back into a standard table schema.
    baseline = ...
-      test.helpers.loadSavedTable(pathname, ["PerfBaseline", "baseline"]);
+      icemodel.test.helpers.loadSavedTable(pathname, ["PerfBaseline", "baseline"]);
 
    if ~isempty(baseline) ...
          && ismember('simyear', baseline.Properties.VariableNames)
@@ -47,7 +45,7 @@ function baseline = loadPerfBaseline(simyear, baseline_tag, smbmodel, pathname)
    end
 
    if ismember('case_id', baseline.Properties.VariableNames)
-      baseline.case_id = test.helpers.normalizeFormalCaseId(baseline.case_id);
+      baseline.case_id = icemodel.test.helpers.normalizeFormalCaseId(baseline.case_id);
    end
 
    if ismember('last_updated_utc', baseline.Properties.VariableNames) ...
@@ -61,39 +59,23 @@ function baseline = loadPerfBaseline(simyear, baseline_tag, smbmodel, pathname)
 end
 
 function baseline = loadAllModels(simyear, baseline_type, baseline_tag)
-   rootdir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
-   models = test.helpers.formalSmbmodels();
+   models = icemodel.test.helpers.formalSmbmodels();
    tables = cell(numel(models), 1);
    k = 0;
    for i = 1:numel(models)
-      pathname = defaultBaselinePath(rootdir, simyear, baseline_type, ...
-         baseline_tag, models(i));
+      pathname = icemodel.test.helpers.defaultBaselinePath( ...
+         "perf", baseline_type, baseline_tag, models(i), simyear);
       if exist(char(pathname), 'file') ~= 2
          continue
       end
       k = k + 1;
-      tables{k} = test.helpers.loadPerfBaseline( ...
+      tables{k} = icemodel.test.helpers.loadPerfBaseline( ...
          simyear, baseline_tag, models(i), pathname);
    end
    if k == 0
       baseline = table();
    else
       baseline = vertcat(tables{1:k});
-   end
-end
-
-function pathname = defaultBaselinePath(...
-      rootdir, simyear, baseline_type, baseline_tag, smbmodel)
-
-   model_tag = test.helpers.smbmodelTag(smbmodel);
-
-   if baseline_type == "rolling"
-      pathname = fullfile(rootdir, 'baselines', ...
-         sprintf('perf_baseline_%d_rolling_%s.mat', simyear, model_tag));
-   else
-      pathname = fullfile(rootdir, 'baselines', ...
-         sprintf('perf_baseline_%d_%s_%s.mat', ...
-         simyear, test.helpers.sanitizeTag(baseline_tag), model_tag));
    end
 end
 

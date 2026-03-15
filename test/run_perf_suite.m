@@ -7,13 +7,19 @@ function results = run_perf_suite(kwargs)
    %  results = run_perf_suite(tier="smoke", smbmodel="icemodel", solver=2)
    %  results = run_perf_suite(tier="smoke", smbmodel="icemodel", solver=[2 3])
    %  results = run_perf_suite(tier="smoke", smbmodel="icemodel", solver=[1 3])
+   %  results = run_perf_suite(simyear=2017, smoke_sites="kanm", ...
+   %     full_sites=["kanm"; "kanl"])
    %  results = run_perf_suite(tier="full", baseline="v1.1")
    %
    % Use this for normal performance comparisons against an existing rolling
    % or release baseline. This function does not update baselines; it only
    % runs the formal cases, compares runtime to the requested baseline, and
    % writes one artifact under test/artifacts/<run_name>/.
+   % If formal cases later include spinup years, the perf path strips them so
+   % the timed region reflects only the analyzed output years.
    % The optional solver filter accepts any subset of [1 2 3].
+   % The formal benchmark year and smoke/full site selections are surfaced in
+   % this arguments block so they are never buried in helper subfunctions.
    %
    % CLI entrypoint:
    %  matlab -batch "run('/ABS/PATH/icemodel/test/run_perf_suite.m')"
@@ -23,36 +29,49 @@ function results = run_perf_suite(kwargs)
          ["smoke", "full", "all"])} = "smoke"
       kwargs.smbmodel (1, :) string {mustBeMember(kwargs.smbmodel, ...
          ["all", "icemodel", "skinmodel"])} = "all"
-      kwargs.solver {mustBeValidSolverFilter(kwargs.solver)} = []
+      kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} = []
+      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
+      kwargs.smoke_sites string = "kanm"
+      kwargs.full_sites string = ["kanm"; "kanl"]
       kwargs.n_runs (1, 1) double {mustBeInteger, mustBePositive} = 3
       kwargs.tol_perf (1, 1) double {mustBePositive} = 0.20
       kwargs.baseline (1, :) string = "rolling"
       kwargs.run_name string = string.empty()
    end
-   [tier, smbmodel, solver, n_runs, tol_perf, baseline_tag, run_name] = deal( ...
-      kwargs.tier, kwargs.smbmodel, kwargs.solver, kwargs.n_runs, ...
-      kwargs.tol_perf, kwargs.baseline, kwargs.run_name);
+   [tier, smbmodel, solver, simyear, smoke_sites, full_sites, n_runs, ...
+      tol_perf, baseline_tag, run_name] = deal( ...
+      kwargs.tier, kwargs.smbmodel, kwargs.solver, kwargs.simyear, ...
+      string(kwargs.smoke_sites(:)), string(kwargs.full_sites(:)), ...
+      kwargs.n_runs, kwargs.tol_perf, kwargs.baseline, kwargs.run_name);
 
    % Resolve the requested baseline and shared batch run identifier.
-   [baseline_type, baseline_tag] = test.helpers.resolveBaselineSelector( ...
+   [baseline_type, baseline_tag] = icemodel.test.helpers.resolveBaselineSelector( ...
       baseline_tag);
-   [run_date, run_id, run_name] = test.helpers.resolveRunStamp(run_name);
+   [run_date, run_id, run_name] = icemodel.test.helpers.resolveRunStamp(run_name);
 
    % Ensure test/ is on path and configure the model data paths.
    thisdir = fileparts(mfilename('fullpath'));
-   rootdir = fileparts(thisdir);
+   addpath(fullfile(fileparts(thisdir), 'icemodel'))
+   rootdir = icemodel.internal.fullpath();
+   thisdir = icemodel.internal.fullpath('test');
    addpath(thisdir);
-   [input_path, output_path] = test.helpers.configureModelPaths(rootdir);
+   [input_path, output_path] = icemodel.test.helpers.configureModelPaths(rootdir);
 
    % Build the deterministic case list and load the requested baseline.
-   cases = test.helpers.getCaseMatrix(tier, smbmodel, solver);
+   cases = icemodel.test.helpers.getPerfCaseMatrix( ...
+      tier=tier, smbmodel=smbmodel, solver=solver, simyear=simyear, ...
+      smoke_sites=smoke_sites, full_sites=full_sites);
    if isempty(cases)
       error('no performance cases matched tier=%s smbmodel=%s', tier, smbmodel)
    end
-   suite = testsuite(fullfile(thisdir, 'IcemodelPerfTest.m'));
+   benchmark_year = unique(cases.simyear);
+   assert(isscalar(benchmark_year), ...
+      'formal perf suite expects exactly one benchmark year')
+   suite = testsuite(fullfile(thisdir, 'regression', ...
+      'IcemodelPerfTest.m'));
    experiment = matlab.perftest.TimeExperiment.withFixedSampleSize( ...
       n_runs, 'NumWarmups', 1);
-   baseline = test.helpers.loadPerfBaseline(cases.simyear(1), baseline_tag, ...
+   baseline = icemodel.test.helpers.loadPerfBaseline(benchmark_year, baseline_tag, ...
       smbmodel);
 
    % Initial values.
@@ -65,7 +84,7 @@ function results = run_perf_suite(kwargs)
 
       % Run the test
       c = cases(icase, :);
-      perf_data = test.helpers.runPerfCase(experiment, suite, c);
+      perf_data = icemodel.test.helpers.runPerfCase(experiment, suite, c);
 
       % Extract results
       samples = perf_data.samples;
@@ -78,7 +97,7 @@ function results = run_perf_suite(kwargs)
       ref_wall = nan;
       gate_wall = nan;
       passed_perf = valid;
-      bid = test.helpers.findCaseRow(baseline, string(c.case_id));
+      bid = icemodel.test.helpers.findCaseRow(baseline, string(c.case_id));
       if ~isempty(bid)
          ref_wall = baseline.median_wall_s(bid);
          if isfinite(ref_wall) && ref_wall > 0
@@ -153,7 +172,8 @@ function results = run_perf_suite(kwargs)
 
       case_opts(r_case).case_id = string(c.case_id);
       case_opts(r_case).case = table2struct(c);
-      case_opts(r_case).opts = test.helpers.buildFormalCaseOpts(c);
+      case_opts(r_case).opts = icemodel.test.helpers.setModelOptsForCase( ...
+         c, include_spinup=false);
 
       if ~passed_perf
          failed_cases(end+1, 1) = string(c.case_id); %#ok<AGROW>
@@ -175,10 +195,14 @@ function results = run_perf_suite(kwargs)
    meta.run_date = run_date;
    meta.run_id = run_id;
    meta.run_name = run_name;
+   meta.simyear = benchmark_year;
+   meta.smoke_sites = smoke_sites;
+   meta.full_sites = full_sites;
    meta.baseline_file = perfBaselineFile( ...
-      rootdir, cases.simyear(1), baseline_type, baseline_tag, smbmodel);
-   meta.case_builder = "test.helpers.buildFormalCaseOpts";
+      rootdir, benchmark_year, baseline_type, baseline_tag, smbmodel);
+   meta.case_builder = "icemodel.test.helpers.setModelOptsForCase";
    meta.opts_source = "icemodel.setopts defaults";
+   meta.spinup_policy = "perf excludes spinup years from timed opts";
    meta.reset_fields = "solver";
    meta.n_runs = n_runs;
    meta.n_warmups = 1;
@@ -186,7 +210,8 @@ function results = run_perf_suite(kwargs)
    meta.experiment = "matlab.perftest.TimeExperiment.withFixedSampleSize";
    meta.input_path = string(input_path);
    meta.output_path = string(output_path);
-   meta.suite_file = string(fullfile(thisdir, 'IcemodelPerfTest.m'));
+   meta.suite_file = string(fullfile(thisdir, 'regression', ...
+      'IcemodelPerfTest.m'));
    meta.matlab_version = string(version);
    meta.host = string(computer);
    meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
@@ -205,17 +230,6 @@ function results = run_perf_suite(kwargs)
    results.passed = isempty(failed_cases);
 end
 
-function mustBeValidSolverFilter(x)
-   if isempty(x)
-      return
-   end
-   mustBeNumeric(x)
-   mustBeInteger(x)
-   if any(~ismember(x, [1 2 3]))
-      error('solver must be empty or a subset of [1 2 3]')
-   end
-end
-
 function artifact_file = logArtifacts(rootdir, sample_detail, ...
       activity_detail, case_summary, case_opts, meta)
    % Save one performance artifact for this compare run.
@@ -227,7 +241,7 @@ function artifact_file = logArtifacts(rootdir, sample_detail, ...
    if meta.baseline_type == "rolling"
       baseline_label = 'vs_rolling';
    else
-      baseline_label = "vs_" + test.helpers.sanitizeTag(meta.baseline_tag);
+      baseline_label = "vs_" + icemodel.test.helpers.sanitizeTag(meta.baseline_tag);
    end
    model_label = smbmodelLabel(meta.smbmodel_filter);
    solver_label = solverLabel(meta.solver_filter);
@@ -245,7 +259,7 @@ function pathname = perfBaselineFile(rootdir, simyear, ...
       baseline_type, baseline_tag, smbmodel)
 
    if smbmodel == "all"
-      models = test.helpers.formalSmbmodels();
+      models = icemodel.test.helpers.formalSmbmodels();
       pathname = strings(numel(models), 1);
       for i = 1:numel(models)
          pathname(i) = perfBaselineFile(rootdir, simyear, baseline_type, ...
@@ -254,7 +268,7 @@ function pathname = perfBaselineFile(rootdir, simyear, ...
       return
    end
 
-   model_tag = test.helpers.smbmodelTag(smbmodel);
+   model_tag = icemodel.test.helpers.smbmodelTag(smbmodel);
 
    if baseline_type == "rolling"
       pathname = fullfile(rootdir, 'test', 'baselines', ...
@@ -262,7 +276,7 @@ function pathname = perfBaselineFile(rootdir, simyear, ...
    else
       pathname = fullfile(rootdir, 'test', 'baselines', ...
          sprintf('perf_baseline_%d_%s_%s.mat', simyear, ...
-         test.helpers.sanitizeTag(baseline_tag), model_tag));
+         icemodel.test.helpers.sanitizeTag(baseline_tag), model_tag));
    end
 end
 
@@ -271,7 +285,7 @@ function label = smbmodelLabel(smbmodel)
    if any(strcmpi(smbmodel, "all"))
       label = "";
    else
-      label = "_" + test.helpers.smbmodelTag(smbmodel);
+      label = "_" + icemodel.test.helpers.smbmodelTag(smbmodel);
    end
 end
 

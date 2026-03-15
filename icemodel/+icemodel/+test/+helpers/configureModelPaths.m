@@ -1,7 +1,7 @@
 function [input_path, output_path, eval_path] = configureModelPaths(rootdir)
 %CONFIGUREMODELPATHS Configure icemodel test/build paths.
 %
-%  [input_path, output_path, eval_path] = test.helpers.configureModelPaths(rootdir)
+%  [input_path, output_path, eval_path] = icemodel.test.helpers.configureModelPaths(rootdir)
 %
 % Formal tests use one fixed public input tree under demo/data/input. This keeps the
 % suite independent of the sibling runoff project once the required test files

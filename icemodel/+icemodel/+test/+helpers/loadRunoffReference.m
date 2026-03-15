@@ -1,9 +1,9 @@
 function ref = loadRunoffReference(simyear, pathname)
    %LOADRUNOFFREFERENCE Load runoff reference baseline table.
    %
-   %  ref = test.helpers.loadRunoffReference()
-   %  ref = test.helpers.loadRunoffReference(2016)
-   %  ref = test.helpers.loadRunoffReference(2016, pathname)
+   %  ref = icemodel.test.helpers.loadRunoffReference()
+   %  ref = icemodel.test.helpers.loadRunoffReference(2016)
+   %  ref = icemodel.test.helpers.loadRunoffReference(2016, pathname)
    %
    % Returns:
    %  ref - table with columns:
@@ -15,7 +15,7 @@ function ref = loadRunoffReference(simyear, pathname)
       simyear = [];
    end
    if nargin < 2 || isempty(pathname)
-      rootdir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+      rootdir = icemodel.internal.fullpath();
       pathname = resolveDefaultPaths(rootdir, simyear);
    end
 
@@ -42,7 +42,7 @@ function ref = loadRunoffReference(simyear, pathname)
 end
 
 function pathname = resolveDefaultPaths(rootdir, simyear)
-   refdir = fullfile(rootdir, 'references');
+   refdir = fullfile(rootdir, 'test', 'references');
    pathname = fullfile(refdir, 'runoff_reference.mat');
    if exist(pathname, 'file') == 2
       return
@@ -65,7 +65,7 @@ function pathname = resolveDefaultPaths(rootdir, simyear)
 end
 
 function raw = loadReference(pathname)
-   raw = test.helpers.loadSavedTable(pathname, ["RunoffReference", "ref"]);
+   raw = icemodel.test.helpers.loadSavedTable(pathname, ["RunoffReference", "ref"]);
 end
 
 function ref = normalizeReference(raw)

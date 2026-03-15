@@ -10,12 +10,16 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    %     smbmodel="icemodel", solver=2)
    %  RegressionBaseline = build_regression_baseline(baseline="rolling", ...
    %     smbmodel="icemodel", solver=[1 3])
+   %  RegressionBaseline = build_regression_baseline(simyear=2017, ...
+   %     smoke_sites="kanm", full_sites=["kanm"; "kanl"])
    %
    % Use this when you want to accept new modeled outputs as a rolling or
    % versioned regression baseline. This writes baseline files only; it does
    % not produce compare artifacts or evaluate pass/fail against an older
    % baseline.
    % The optional solver filter accepts any subset of [1 2 3].
+   % The formal comparison year and smoke/full site selections are explicit
+   % here rather than buried in the regression case matrix helper.
 
    arguments (Input)
       kwargs.baseline string = string.empty()
@@ -24,37 +28,44 @@ function RegressionBaseline = build_regression_baseline(kwargs)
          ["smoke", "full", "all"])} = "full"
       kwargs.smbmodel (1, :) string {mustBeMember(kwargs.smbmodel, ...
          ["all", "icemodel", "skinmodel"])} = "all"
-      kwargs.solver {mustBeValidSolverFilter(kwargs.solver)} = []
+      kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} = []
+      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
+      kwargs.smoke_sites string = "kanm"
+      kwargs.full_sites string = ["kanm"; "kanl"]
       kwargs.output_file string = string.empty()
    end
-   [baseline, baseline_tag, tier, smbmodel, solver, output_file] = deal( ...
+   [baseline, baseline_tag, tier, smbmodel, solver, simyear, smoke_sites, ...
+      full_sites, output_file] = deal( ...
       kwargs.baseline, kwargs.baseline_tag, kwargs.tier, ...
-      kwargs.smbmodel, kwargs.solver, kwargs.output_file);
+      kwargs.smbmodel, kwargs.solver, kwargs.simyear, ...
+      string(kwargs.smoke_sites(:)), string(kwargs.full_sites(:)), ...
+      kwargs.output_file);
 
    % Expand smbmodel="all" into one rolling/release baseline file per model.
    if smbmodel == "all"
       if ~isblanktext(output_file)
          error('output_file is only supported for a single smbmodel')
       end
-      models = test.helpers.formalSmbmodels();
+      models = icemodel.test.helpers.formalSmbmodels();
       baselines = cell(numel(models), 1);
       for i = 1:numel(models)
          baselines{i} = build_regression_baseline( ...
             baseline=baseline, baseline_tag=baseline_tag, tier=tier, ...
-            smbmodel=models(i), solver=solver);
+            smbmodel=models(i), solver=solver, simyear=simyear, ...
+            smoke_sites=smoke_sites, full_sites=full_sites);
       end
       RegressionBaseline = vertcat(baselines{:});
       return
    end
 
    % Resolve the baseline target, configure paths, and load formal cases.
-   [baseline_type, baseline_tag, output_file, rootdir, input_path, ...
-      output_path, cases] = test.helpers.prepareBaselineBuild( ...
+   [baseline_type, baseline_tag, output_file, ~, input_path, ...
+      output_path, cases] = icemodel.test.helpers.prepareBaselineBuild( ...
       "regression", baseline, baseline_tag, tier, smbmodel, output_file, ...
-      NaN, solver);
+      simyear, solver, smoke_sites, full_sites);
 
    % Load the static runoff reference used to derive catchment totals.
-   runoff_ref = test.helpers.loadRunoffReference();
+   runoff_ref = icemodel.test.helpers.loadRunoffReference();
 
    % Preallocate row containers for the accepted baseline summary and opts.
    rows = struct([]);
@@ -64,22 +75,22 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    % Run each formal case and save the accepted scalar regression state.
    for icase = 1:height(cases)
       c = cases(icase, :);
-      opts_run = test.helpers.buildFormalCaseOpts(c);
+      opts_run = icemodel.test.helpers.setModelOptsForCase(c);
 
       [ice1, ice2] = runModel(opts_run);
-      [ice1, ice2] = POSTPROC(ice1, ice2, opts_run, c.simyear); %#ok<ASGLU>
-      S = test.helpers.summarizeIce1Metrics(ice1);
-      ridx = test.helpers.findRunoffReferenceRow(runoff_ref, c);
+      [ice1, ~] = POSTPROC(ice1, ice2, opts_run, opts_run.output_years);
+      S = icemodel.test.helpers.summarizeIce1Metrics(ice1);
+      ridx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);
 
       icemodel_window_m3 = nan;
       runoff_eval_window = nan;
       melt_eval_window = nan;
       if ~isempty(ridx)
-         runoff_eval_window = test.helpers.computeCumulativeWindowDelta( ...
+         runoff_eval_window = icemodel.test.helpers.computeCumulativeWindowDelta( ...
             ice1, "runoff", runoff_ref.t1(ridx), runoff_ref.t2(ridx));
-         melt_eval_window = test.helpers.computeCumulativeWindowDelta( ...
+         melt_eval_window = icemodel.test.helpers.computeCumulativeWindowDelta( ...
             ice1, "melt", runoff_ref.t1(ridx), runoff_ref.t2(ridx));
-         icemodel_window_m3 = test.helpers.computeCatchmentRunoffFinal( ...
+         icemodel_window_m3 = icemodel.test.helpers.computeCatchmentRunoffFinal( ...
             ice1, runoff_ref.area_med_m2(ridx), runoff_ref.t1(ridx), ...
             runoff_ref.t2(ridx));
       end
@@ -116,9 +127,12 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    meta = struct();
    meta.tier = tier;
    meta.smbmodel_filter = smbmodel;
+   meta.simyear = simyear;
+   meta.smoke_sites = smoke_sites;
+   meta.full_sites = full_sites;
    meta.baseline_type = baseline_type;
    meta.baseline_tag = baseline_tag;
-   meta.case_builder = "test.helpers.buildFormalCaseOpts";
+   meta.case_builder = "icemodel.test.helpers.setModelOptsForCase";
    meta.opts_source = "icemodel.setopts defaults";
    meta.reset_fields = "solver";
    meta.input_path = string(input_path);
@@ -133,17 +147,6 @@ function RegressionBaseline = build_regression_baseline(kwargs)
       mkdir(outdir);
    end
    save(char(output_file), 'RegressionBaseline', 'case_opts', 'meta');
-end
-
-function mustBeValidSolverFilter(x)
-   if isempty(x)
-      return
-   end
-   mustBeNumeric(x)
-   mustBeInteger(x)
-   if any(~ismember(x, [1 2 3]))
-      error('solver must be empty or a subset of [1 2 3]')
-   end
 end
 
 function varargout = runModel(opts)

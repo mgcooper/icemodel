@@ -1,8 +1,8 @@
 function final_m3 = computeCatchmentRunoffFinal(ice1, area_med_m2, t1, t2, timevec)
 %COMPUTECATCHMENTRUNOFFFINAL Convert point runoff to catchment cumulative final.
 %
-%  final_m3 = test.helpers.computeCatchmentRunoffFinal(ice1, area_med_m2, t1, t2)
-%  final_m3 = test.helpers.computeCatchmentRunoffFinal(ice1, area_med_m2, t1, t2, timevec)
+%  final_m3 = icemodel.test.helpers.computeCatchmentRunoffFinal(ice1, area_med_m2, t1, t2)
+%  final_m3 = icemodel.test.helpers.computeCatchmentRunoffFinal(ice1, area_med_m2, t1, t2, timevec)
 %
 % Inputs:
 %  ice1        - timetable or struct containing cumulative point runoff [m]

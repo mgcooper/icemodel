@@ -30,7 +30,9 @@ function RunoffReference = build_runoff_reference_from_runoff(kwargs)
    end
 
    % Resolve the repo root, runoff repo root, and default output file.
-   rootdir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+   tooldir = fileparts(mfilename('fullpath'));
+   addpath(fullfile(fileparts(fileparts(tooldir)), 'icemodel'))
+   rootdir = icemodel.internal.fullpath();
    if strlength(runoff_root) == 0
       runoff_root = fullfile(fileparts(rootdir), 'runoff');
    end
@@ -103,7 +105,7 @@ function RunoffReference = build_runoff_reference_from_runoff(kwargs)
 
             % Save the derived scalar comparison context for this row.
             k = k + 1;
-            rows(k).sitename = string(sitename); %#ok<AGROW>
+            rows(k).sitename = string(sitename);
             rows(k).forcings = string(forcings);
             rows(k).simyear = simyear_i;
             rows(k).t1 = t1_ref;
@@ -125,7 +127,7 @@ function RunoffReference = build_runoff_reference_from_runoff(kwargs)
    end
 
    % Convert the assembled rows and write the static reference file.
-   RunoffReference = struct2table(rows); %#ok<NASGU>
+   RunoffReference = struct2table(rows);
    outdir = fileparts(char(output_file));
    if exist(outdir, 'dir') ~= 7
       mkdir(outdir);

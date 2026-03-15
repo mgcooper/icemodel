@@ -21,6 +21,6 @@ function PerfBaseline = snapshot_perf_baseline(kwargs)
       kwargs.overwrite, kwargs.output_file);
 
    % Copy the current rolling perf baseline into a versioned release file.
-   PerfBaseline = test.helpers.snapshotBaseline( ...
+   PerfBaseline = icemodel.test.helpers.snapshotBaseline( ...
       "perf", baseline_tag, smbmodel, overwrite, output_file, simyear);
 end

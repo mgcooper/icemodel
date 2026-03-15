@@ -3,7 +3,7 @@ function [baseline_type, baseline_tag, output_file] = resolveBaselineBuild( ...
 %RESOLVEBASELINEBUILD Resolve baseline type/tag and default output file.
 %
 %  [baseline_type, baseline_tag, output_file] = ...
-%     test.helpers.resolveBaselineBuild("perf", baseline, baseline_tag, smbmodel, output_file, simyear)
+%     icemodel.test.helpers.resolveBaselineBuild("perf", baseline, baseline_tag, smbmodel, output_file, simyear)
 
    arguments
       kind (1, :) string {mustBeMember(kind, ["perf", "regression"])}
@@ -30,7 +30,7 @@ function [baseline_type, baseline_tag, output_file] = resolveBaselineBuild( ...
    end
 
    if isblanktext(output_file)
-      output_file = test.helpers.defaultBaselinePath( ...
+      output_file = icemodel.test.helpers.defaultBaselinePath( ...
          kind, baseline_type, baseline_tag, smbmodel, simyear);
    end
 end

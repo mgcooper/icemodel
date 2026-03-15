@@ -22,22 +22,27 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
    methods (Test)
       function testCoreRegression(testCase)
          % Read the requested case matrix/baseline from the runner env vars.
-         tier = IcemodelRegressionTest.getenvOrDefault( ...
-            'ICEMODEL_TEST_TIER', 'smoke');
-         smbmodel = IcemodelRegressionTest.getenvOrDefault( ...
-            'ICEMODEL_TEST_SMBMODEL_FILTER', 'all');
+         tier = IcemodelRegressionTest.getenvRequired('ICEMODEL_TEST_TIER');
+         smbmodel = IcemodelRegressionTest.getenvRequired( ...
+            'ICEMODEL_TEST_SMBMODEL_FILTER');
          solver = IcemodelRegressionTest.getenvAsNumbers( ...
             'ICEMODEL_TEST_SOLVER_FILTER');
-         baseline_tag = IcemodelRegressionTest.getenvOrDefault( ...
-            'ICEMODEL_REGRESSION_BASELINE', '');
-         run_name = IcemodelRegressionTest.getenvOrDefault( ...
-            'ICEMODEL_TEST_RUN_NAME', '');
-         runoff_ref = test.helpers.loadRunoffReference();
-         cases = test.helpers.getRegressionCaseMatrix(tier, smbmodel, solver);
+         simyear = str2double(IcemodelRegressionTest.getenvRequired( ...
+            'ICEMODEL_TEST_SIMYEAR_FILTER'));
+         smoke_sites = IcemodelRegressionTest.getenvAsStrings( ...
+            'ICEMODEL_TEST_SMOKE_SITES');
+         full_sites = IcemodelRegressionTest.getenvAsStrings( ...
+            'ICEMODEL_TEST_FULL_SITES');
+         baseline_tag = getenv('ICEMODEL_REGRESSION_BASELINE');
+         run_name = getenv('ICEMODEL_TEST_RUN_NAME');
+         runoff_ref = icemodel.test.helpers.loadRunoffReference();
+         cases = icemodel.test.helpers.getRegressionCaseMatrix( ...
+            tier=tier, smbmodel=smbmodel, solver=solver, simyear=simyear, ...
+            smoke_sites=smoke_sites, full_sites=full_sites);
          testCase.assertNotEmpty(cases, ...
             sprintf('no regression cases matched tier=%s smbmodel=%s', ...
             tier, smbmodel));
-         baseline = test.helpers.loadRegressionBaseline(baseline_tag, ...
+         baseline = icemodel.test.helpers.loadRegressionBaseline(baseline_tag, ...
             smbmodel);
 
          report_rows = struct([]);
@@ -47,13 +52,13 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          % Run each formal case, compare to baseline, and collect a report row.
          for icase = 1:height(cases)
             c = cases(icase, :);
-            opts = test.helpers.buildFormalCaseOpts(c);
+            opts = icemodel.test.helpers.setModelOptsForCase(c);
 
             [ice1, ice2] = runModel(opts);
-            [ice1, ice2] = POSTPROC(ice1, ice2, opts, c.simyear); %#ok<ASGLU>
-            S = test.helpers.summarizeIce1Metrics(ice1);
+            [ice1, ice2] = POSTPROC(ice1, ice2, opts, opts.output_years); %#ok<ASGLU>
+            S = icemodel.test.helpers.summarizeIce1Metrics(ice1);
 
-            ridx = test.helpers.findRunoffReferenceRow(runoff_ref, c);
+            ridx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);
             obs_window_m3 = nan;
             mar_window_m3 = nan;
             merra_window_m3 = nan;
@@ -71,16 +76,16 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
                mar_window_m3 = runoff_ref.mar_final_m3(ridx);
                merra_window_m3 = runoff_ref.merra_final_m3(ridx);
                racmo_window_m3 = runoff_ref.racmo_final_m3(ridx);
-               runoff_eval_window = test.helpers.computeCumulativeWindowDelta( ...
+               runoff_eval_window = icemodel.test.helpers.computeCumulativeWindowDelta( ...
                   ice1, "runoff", runoff_ref.t1(ridx), runoff_ref.t2(ridx));
-               melt_eval_window = test.helpers.computeCumulativeWindowDelta( ...
+               melt_eval_window = icemodel.test.helpers.computeCumulativeWindowDelta( ...
                   ice1, "melt", runoff_ref.t1(ridx), runoff_ref.t2(ridx));
-               icemodel_window_m3 = test.helpers.computeCatchmentRunoffFinal( ...
+               icemodel_window_m3 = icemodel.test.helpers.computeCatchmentRunoffFinal( ...
                   ice1, runoff_ref.area_med_m2(ridx), runoff_ref.t1(ridx), ...
                   runoff_ref.t2(ridx));
             end
 
-            bid = test.helpers.findCaseRow(baseline, string(c.case_id));
+            bid = icemodel.test.helpers.findCaseRow(baseline, string(c.case_id));
             base_runoff_final = nan;
             base_melt_final = nan;
             base_mean_Tice_numiter = nan;
@@ -218,7 +223,8 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
          report = struct2table(report_rows);
          meta = IcemodelRegressionTest.reportMeta( ...
-            tier, smbmodel, solver, baseline_tag, run_name);
+            tier, smbmodel, solver, simyear, smoke_sites, full_sites, ...
+            baseline_tag, run_name);
          % Save one artifact for this regression compare run.
          testCase.logReport(report, case_opts, meta);
       end
@@ -259,7 +265,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          if meta.baseline_tag == ""
             baseline_tag = 'nobaseline';
          else
-            baseline_tag = char(test.helpers.sanitizeTag(meta.baseline_tag));
+            baseline_tag = char(icemodel.test.helpers.sanitizeTag(meta.baseline_tag));
          end
          model_tag = IcemodelRegressionTest.smbmodelLabel(meta.smbmodel_filter);
          solver_tag = IcemodelRegressionTest.solverLabel(meta.solver_filter);
@@ -286,27 +292,30 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       function ensureModelConfigPaths()
          rootdir = IcemodelRegressionTest.repoRoot();
          addpath(fullfile(rootdir, 'test'));
-         test.helpers.configureModelPaths(rootdir);
+         icemodel.test.helpers.configureModelPaths(rootdir);
       end
 
       function rootdir = repoRoot()
-         testdir = fileparts(mfilename('fullpath'));
-         rootdir = fileparts(testdir);
+         rootdir = icemodel.internal.fullpath();
       end
 
-      function s = getenvOrDefault(name, default)
+      function s = getenvRequired(name)
          s = getenv(name);
          if isempty(s)
-            s = default;
+            error('missing required regression env var: %s', name)
          end
       end
 
-      function meta = reportMeta(tier, smbmodel, solver, baseline_tag, run_name)
-         [run_date, run_id, run_name] = test.helpers.resolveRunStamp(run_name);
+      function meta = reportMeta(tier, smbmodel, solver, simyear, ...
+            smoke_sites, full_sites, baseline_tag, run_name)
+         [run_date, run_id, run_name] = icemodel.test.helpers.resolveRunStamp(run_name);
          meta = struct();
          meta.tier = string(tier);
          meta.smbmodel_filter = string(smbmodel);
          meta.solver_filter = solver;
+         meta.simyear = simyear;
+         meta.smoke_sites = smoke_sites;
+         meta.full_sites = full_sites;
          meta.baseline_tag = string(baseline_tag);
          meta.run_date = run_date;
          meta.run_id = run_id;
@@ -315,7 +324,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          meta.abs_tol_scalar = IcemodelRegressionTest.scalarAbsTol();
          meta.rel_tol_runoff_m3 = IcemodelRegressionTest.runoffRelTol();
          meta.abs_tol_runoff_m3 = IcemodelRegressionTest.runoffAbsTol();
-         meta.case_builder = "test.helpers.buildFormalCaseOpts";
+         meta.case_builder = "icemodel.test.helpers.setModelOptsForCase";
          meta.opts_source = "icemodel.setopts defaults";
          meta.reset_fields = "solver";
          meta.input_path = string(getenv('ICEMODEL_INPUT_PATH'));
@@ -331,7 +340,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          if any(strcmpi(smbmodel, "all"))
             label = "";
          else
-            label = "_" + test.helpers.smbmodelTag(smbmodel);
+            label = "_" + icemodel.test.helpers.smbmodelTag(smbmodel);
          end
       end
 
@@ -342,6 +351,16 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          else
             x = str2double(split(string(s), ','));
             x = x(isfinite(x));
+         end
+      end
+
+      function x = getenvAsStrings(name)
+         s = getenv(name);
+         if isempty(s)
+            x = strings(0, 1);
+         else
+            x = split(string(s), ',');
+            x = x(x ~= "");
          end
       end
 

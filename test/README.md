@@ -1,7 +1,7 @@
-# Formal Test Suite
+# Test Suite
 
-This folder contains the formal performance and regression workflow for the
-public `icemodel` repo.
+This folder contains the public test runners, regression data, unit tests,
+and component benchmark material for the public `icemodel` repo.
 
 ## Layout
 
@@ -13,10 +13,16 @@ public `icemodel` repo.
      regression
 3. `references/`
    - static external reference data such as `runoff_reference.mat`
-4. `tools/`
+4. `regression/`
+   - software-level regression classes, including performance regression
+5. `unit/`
+   - ordinary unit tests intended for default discovery
+6. `benchmarks/`
+   - component and one-off benchmark/perf experiments
+7. `tools/`
    - explicit build/snapshot utilities
-5. `+test/+helpers/`
-   - shared helper functions used by the suite
+8. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/+icemodel/+test/+helpers/`
+   - shared helper functions under the `icemodel.test.helpers.*` namespace
 
 ## Files
 
@@ -37,9 +43,9 @@ accepted model output.
 1. `baselines/regression_baseline_rolling_<smbmodel>.mat`
 2. `baselines/regression_baseline_<version>_<smbmodel>.mat`
 
-## Formal matrix
+## Regression Matrix
 
-Default formal regression/perf coverage:
+Default software-level regression coverage:
 
 1. `icemodel`, `kanm`, `2016`, `solver = 1, 2, 3`
 2. `icemodel`, `kanl`, `2016`, `solver = 1, 2, 3`
@@ -47,14 +53,16 @@ Default formal regression/perf coverage:
 4. `skinmodel`, `kanl`, `2016`, `solver = 1`
 5. self-forced station runs only (`sitename == forcings`)
 
-Programmatic case enumeration:
+Programmatic regression helpers:
 
-1. `test.helpers.getCaseMatrix(...)`
-   - canonical formal performance case matrix
-2. `test.helpers.getRegressionCaseMatrix(...)`
-   - canonical formal regression case matrix
-3. `test.helpers.getFormalTestSuiteCases()`
-   - canonical ordered formal suite cases used by
+1. `icemodel.test.helpers.getPerfCaseMatrix(...)`
+   - canonical performance-regression case matrix
+2. `icemodel.test.helpers.getRegressionCaseMatrix(...)`
+   - canonical numerical-regression case matrix
+3. `icemodel.test.helpers.setModelOptsForCase(...)`
+   - canonical builder for the model `opts` used by one regression case
+4. `icemodel.test.helpers.getFormalTestSuiteCases()`
+   - canonical ordered regression/bootstrap cases used by
      `run_test_bootstrap(...)`
 
 ## Which tool to use

@@ -1,7 +1,7 @@
 function S = runPerfCase(experiment, suite, c)
    %RUNPERFCASE Run one formal performance case and normalize the result.
    %
-   %  S = test.helpers.runPerfCase(experiment, suite, c)
+   %  S = icemodel.test.helpers.runPerfCase(experiment, suite, c)
    %
    % Output fields:
    %  samples, activity, sample_times, activity_times, valid, n_warmups
@@ -39,6 +39,16 @@ function configurePerfCaseEnv(c)
    setenv('ICEMODEL_TEST_USERDATA', char(c.userdata));
    setenv('ICEMODEL_TEST_USERVARS', char(c.uservars));
    setenv('ICEMODEL_TEST_SIMYEAR', int2str(c.simyear));
+   if isfield(c, 'simyears') && ~isempty(c.simyears)
+      setenv('ICEMODEL_TEST_SIMYEARS', strjoin(string(c.simyears), ','));
+   else
+      setenv('ICEMODEL_TEST_SIMYEARS', '');
+   end
+   if isfield(c, 'n_spinup_years') && ~isempty(c.n_spinup_years)
+      setenv('ICEMODEL_TEST_N_SPINUP_YEARS', int2str(c.n_spinup_years));
+   else
+      setenv('ICEMODEL_TEST_N_SPINUP_YEARS', '0');
+   end
    setenv('ICEMODEL_TEST_SOLVER', int2str(c.solver));
 end
 

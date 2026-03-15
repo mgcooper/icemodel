@@ -1,11 +1,13 @@
 function [baseline_type, baseline_tag, output_file, rootdir, input_path, ...
       output_path, cases] = prepareBaselineBuild(kind, baseline, ...
-      baseline_tag, tier, smbmodel, output_file, simyear, solver)
+      baseline_tag, tier, smbmodel, output_file, simyear, solver, ...
+      smoke_sites, full_sites)
 %PREPAREBASELINEBUILD Resolve shared setup for perf/regression baseline builds.
 %
 %  [baseline_type, baseline_tag, output_file, rootdir, input_path, ...
-%     output_path, cases] = test.helpers.prepareBaselineBuild(kind, ...
-%     baseline, baseline_tag, tier, smbmodel, output_file, simyear)
+%     output_path, cases] = icemodel.test.helpers.prepareBaselineBuild(kind, ...
+%     baseline, baseline_tag, tier, smbmodel, output_file, simyear, ...
+%     solver, smoke_sites, full_sites)
 %
 % This helper centralizes the common build-time setup shared by
 % `build_perf_baseline` and `build_regression_baseline`:
@@ -15,7 +17,8 @@ function [baseline_type, baseline_tag, output_file, rootdir, input_path, ...
 %
 % Inputs:
 %  kind - "perf" or "regression"
-%  baseline, baseline_tag, smbmodel, output_file, simyear, solver
+%  baseline, baseline_tag, smbmodel, output_file, simyear, solver,
+%  smoke_sites, full_sites
 %    forwarded to the baseline-path/case selection logic
 %
 % Output:
@@ -34,31 +37,33 @@ function [baseline_type, baseline_tag, output_file, rootdir, input_path, ...
       output_file string = string.empty()
       simyear double = NaN
       solver = []
+      smoke_sites string = "kanm"
+      full_sites string = ["kanm"; "kanl"]
    end
 
    [baseline_type, baseline_tag, output_file] = ...
-      test.helpers.resolveBaselineBuild(kind, baseline, baseline_tag, ...
+      icemodel.test.helpers.resolveBaselineBuild(kind, baseline, baseline_tag, ...
       smbmodel, output_file, simyear);
 
-   rootdir = fileparts(fileparts(fileparts(fileparts(mfilename('fullpath')))));
+   rootdir = icemodel.internal.fullpath();
    addpath(rootdir);
    addpath(fullfile(rootdir, 'test'));
-   [input_path, output_path] = test.helpers.configureModelPaths(rootdir);
+   [input_path, output_path] = icemodel.test.helpers.configureModelPaths(rootdir);
 
    switch kind
       case "perf"
-         cases = test.helpers.getCaseMatrix(tier, smbmodel, solver);
+         cases = icemodel.test.helpers.getPerfCaseMatrix( ...
+            tier=tier, smbmodel=smbmodel, solver=solver, simyear=simyear, ...
+            smoke_sites=smoke_sites, full_sites=full_sites);
          if isempty(cases)
             error('no performance cases matched tier=%s smbmodel=%s', ...
                tier, smbmodel)
          end
-         cases = cases(cases.simyear == simyear, :);
-         if isempty(cases)
-            error('no performance cases matched simyear=%d', simyear)
-         end
 
       case "regression"
-         cases = test.helpers.getRegressionCaseMatrix(tier, smbmodel, solver);
+         cases = icemodel.test.helpers.getRegressionCaseMatrix( ...
+            tier=tier, smbmodel=smbmodel, solver=solver, simyear=simyear, ...
+            smoke_sites=smoke_sites, full_sites=full_sites);
          if isempty(cases)
             error('no regression cases matched tier=%s smbmodel=%s', ...
                tier, smbmodel)

@@ -19,6 +19,6 @@ function RegressionBaseline = snapshot_regression_baseline(kwargs)
       kwargs.output_file);
 
    % Copy the current rolling regression baseline into a versioned release file.
-   RegressionBaseline = test.helpers.snapshotBaseline( ...
+   RegressionBaseline = icemodel.test.helpers.snapshotBaseline( ...
       "regression", baseline_tag, smbmodel, overwrite, output_file);
 end

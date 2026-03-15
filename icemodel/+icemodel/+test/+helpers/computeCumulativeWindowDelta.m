@@ -1,8 +1,8 @@
 function x = computeCumulativeWindowDelta(ice1, varname, t1, t2, timevec)
 %COMPUTECUMULATIVEWINDOWDELTA Return cumulative-variable change over a window.
 %
-%  x = test.helpers.computeCumulativeWindowDelta(ice1, "melt", t1, t2)
-%  x = test.helpers.computeCumulativeWindowDelta(ice1, "runoff", t1, t2, timevec)
+%  x = icemodel.test.helpers.computeCumulativeWindowDelta(ice1, "melt", t1, t2)
+%  x = icemodel.test.helpers.computeCumulativeWindowDelta(ice1, "runoff", t1, t2, timevec)
 %
 % Inputs:
 %  ice1    - timetable or struct containing a cumulative variable

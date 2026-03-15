@@ -1,10 +1,10 @@
 function baseline = loadRegressionBaseline(baseline_tag, smbmodel, pathname)
    %LOADREGRESSIONBASELINE Load rolling or versioned icemodel regression baseline table.
    %
-   %  baseline = test.helpers.loadRegressionBaseline()
-   %  baseline = test.helpers.loadRegressionBaseline("rolling", "all")
-   %  baseline = test.helpers.loadRegressionBaseline("v1.01", "skinmodel")
-   %  baseline = test.helpers.loadRegressionBaseline("v1.1", "skinmodel", pathname)
+   %  baseline = icemodel.test.helpers.loadRegressionBaseline()
+   %  baseline = icemodel.test.helpers.loadRegressionBaseline("rolling", "all")
+   %  baseline = icemodel.test.helpers.loadRegressionBaseline("v1.01", "skinmodel")
+   %  baseline = icemodel.test.helpers.loadRegressionBaseline("v1.1", "skinmodel", pathname)
    arguments
       baseline_tag string = string.empty()
       smbmodel string = "all"
@@ -26,8 +26,10 @@ function baseline = loadRegressionBaseline(baseline_tag, smbmodel, pathname)
    end
 
    if isempty(pathname) || (isstring(pathname) && all(strlength(pathname) == 0))
-      rootdir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
-      pathname = defaultBaselinePath(rootdir, baseline_tag, smbmodel);
+      [baseline_type, baseline_tag] = ...
+         icemodel.test.helpers.resolveBaselineSelector(baseline_tag);
+      pathname = icemodel.test.helpers.defaultBaselinePath( ...
+         "regression", baseline_type, baseline_tag, smbmodel);
    end
    pathname = char(pathname);
 
@@ -36,11 +38,11 @@ function baseline = loadRegressionBaseline(baseline_tag, smbmodel, pathname)
    end
 
    % Normalize saved MAT content back into a standard table schema.
-   baseline = test.helpers.loadSavedTable(...
+   baseline = icemodel.test.helpers.loadSavedTable(...
       pathname, ["RegressionBaseline", "baseline"]);
 
    if ismember('case_id', baseline.Properties.VariableNames)
-      baseline.case_id = test.helpers.normalizeFormalCaseId(baseline.case_id);
+      baseline.case_id = icemodel.test.helpers.normalizeFormalCaseId(baseline.case_id);
    end
    if ismember('baseline_tag', baseline.Properties.VariableNames)
       baseline.baseline_tag = string(baseline.baseline_tag);
@@ -69,34 +71,24 @@ function baseline = loadRegressionBaseline(baseline_tag, smbmodel, pathname)
 end
 
 function baseline = loadAllModels(baseline_tag)
-   rootdir = fileparts(fileparts(fileparts(mfilename('fullpath'))));
-   models = test.helpers.formalSmbmodels();
+   [baseline_type, baseline_tag] = ...
+      icemodel.test.helpers.resolveBaselineSelector(baseline_tag);
+   models = icemodel.test.helpers.formalSmbmodels();
    tables = cell(numel(models), 1);
    k = 0;
    for i = 1:numel(models)
-      pathname = defaultBaselinePath(rootdir, baseline_tag, models(i));
+      pathname = icemodel.test.helpers.defaultBaselinePath( ...
+         "regression", baseline_type, baseline_tag, models(i));
       if exist(char(pathname), 'file') ~= 2
          continue
       end
       k = k + 1;
-      tables{k} = test.helpers.loadRegressionBaseline( ...
+      tables{k} = icemodel.test.helpers.loadRegressionBaseline( ...
          baseline_tag, models(i), pathname);
    end
    if k == 0
       baseline = table();
    else
       baseline = vertcat(tables{1:k});
-   end
-end
-
-function pathname = defaultBaselinePath(rootdir, baseline_tag, smbmodel)
-   model_tag = test.helpers.smbmodelTag(smbmodel);
-   if lower(baseline_tag) == "rolling"
-      pathname = fullfile(rootdir, ...
-         'baselines', "regression_baseline_rolling_" + model_tag + ".mat");
-   else
-      pathname = fullfile(rootdir, 'baselines', ...
-         "regression_baseline_" + test.helpers.sanitizeTag(baseline_tag) + ...
-         "_" + model_tag + ".mat");
    end
 end

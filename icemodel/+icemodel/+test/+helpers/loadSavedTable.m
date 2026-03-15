@@ -17,7 +17,7 @@ function T = loadSavedTable(pathname, varnames)
    if istable(raw)
       T = raw;
    elseif isstruct(raw)
-      T = test.helpers.structToTable(raw);
+      T = icemodel.test.helpers.structToTable(raw);
    else
       error('unsupported saved table format: %s', class(raw))
    end

@@ -20,6 +20,8 @@ function results = run_test_bootstrap(kwargs)
    %     solver=2)
    %  results = run_test_bootstrap(baseline_tag="v1.1", smbmodel="icemodel", ...
    %     solver=[1 3])
+   %  results = run_test_bootstrap(simyear=2017, smoke_sites="kanm", ...
+   %     full_sites=["kanm"; "kanl"])
    %  results = run_test_bootstrap(baseline_tag="v1.1", smbmodel="all", ...
    %     clean_artifacts=true, clean_baselines=true)
    %
@@ -44,6 +46,8 @@ function results = run_test_bootstrap(kwargs)
    %  - This bootstrap does not rebuild test/references/runoff_reference.mat.
    %  - smbmodel="all" is virtual: it rebuilds per-model files for each formal
    %    model and runs the union of those cases.
+   %  - The formal comparison year and smoke/full site selections are explicit
+   %    here so they are not hidden in lower-level helpers.
    %  - The optional solver filter accepts any subset of [1 2 3].
    %  - Compare runs are read-only with respect to baselines. Baseline updates
    %    happen through the explicit build/snapshot actions above.
@@ -52,21 +56,28 @@ function results = run_test_bootstrap(kwargs)
       kwargs.baseline_tag (1, :) string = "v1.1"
       kwargs.smbmodel (1, :) string {mustBeMember(kwargs.smbmodel, ...
          ["all", "icemodel", "skinmodel"])} = "all"
-      kwargs.solver {mustBeValidSolverFilter(kwargs.solver)} = []
+      kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} = []
+      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
+      kwargs.smoke_sites string = "kanm"
+      kwargs.full_sites string = ["kanm"; "kanl"]
       kwargs.clean_artifacts (1, 1) logical = false
       kwargs.clean_baselines (1, 1) logical = false
       kwargs.backup_before_clean (1, 1) logical = true
    end
-   [baseline_tag, smbmodel, solver, clean_artifacts, clean_baselines, ...
-      backup_before_clean] = deal( ...
+   [baseline_tag, smbmodel, solver, simyear, smoke_sites, full_sites, ...
+      clean_artifacts, clean_baselines, backup_before_clean] = deal( ...
       kwargs.baseline_tag, kwargs.smbmodel, kwargs.solver, ...
+      kwargs.simyear, string(kwargs.smoke_sites(:)), ...
+      string(kwargs.full_sites(:)), ...
       kwargs.clean_artifacts, kwargs.clean_baselines, ...
       kwargs.backup_before_clean);
 
    % Ensure test/ and dependencies/ are on path
-   rootdir = fileparts(mfilename('fullpath'));
+   testdir = fileparts(mfilename('fullpath'));
+   addpath(fullfile(fileparts(testdir), 'icemodel'))
+   rootdir = icemodel.internal.fullpath('test');
    addpath(rootdir)
-   addpath(fullfile(fileparts(rootdir), 'icemodel', 'dependencies'))
+   addpath(icemodel.internal.fullpath('icemodel', 'dependencies'))
 
    % Set the directory paths
    baselinesdir = fullfile(rootdir, 'baselines');
@@ -74,7 +85,7 @@ function results = run_test_bootstrap(kwargs)
    backupzipdir = fullfile(rootdir, 'backups');
 
    % Create the YYYYMMDD-HHMMSS run_name
-   [~, ~, run_name] = test.helpers.resolveRunStamp(string.empty());
+   [~, ~, run_name] = icemodel.test.helpers.resolveRunStamp(string.empty());
 
    % Backup and delete existing artifacts and baselines
    if clean_artifacts && exist(artifactsdir, 'dir') == 7
@@ -96,19 +107,24 @@ function results = run_test_bootstrap(kwargs)
    results.baseline_tag = baseline_tag;
    results.smbmodel = smbmodel;
    results.solver = solver;
+   results.simyear = simyear;
+   results.smoke_sites = smoke_sites;
+   results.full_sites = full_sites;
 
    % Generate the canonical list of all formal suite cases and run them.
-   cases = test.helpers.getFormalTestSuiteCases();
+   cases = icemodel.test.helpers.getFormalTestSuiteCases();
    for i = 1:height(cases)
       c = cases(i, :);
-      results.(c.result_field) = runStep(c, baseline_tag, smbmodel, solver, run_name);
+      results.(c.result_field) = runStep(c, baseline_tag, smbmodel, solver, ...
+         simyear, smoke_sites, full_sites, run_name);
    end
 
    results.regression_passed = collectPassFlags(results, cases, "regression");
    results.perf_passed = collectPassFlags(results, cases, "perf");
 end
 
-function out = runStep(c, baseline_tag, smbmodel, solver, run_name)
+function out = runStep(c, baseline_tag, smbmodel, solver, simyear, ...
+      smoke_sites, full_sites, run_name)
    switch c.suite
       case "regression"
          switch c.action
@@ -116,7 +132,8 @@ function out = runStep(c, baseline_tag, smbmodel, solver, run_name)
                % Accept the current modeled outputs as the rolling baseline.
                out = build_regression_baseline( ...
                   baseline="rolling", tier=c.tier, smbmodel=smbmodel, ...
-                  solver=solver);
+                  solver=solver, simyear=simyear, smoke_sites=smoke_sites, ...
+                  full_sites=full_sites);
 
             case "snapshot"
                % Freeze the current rolling baseline into a versioned release.
@@ -128,6 +145,8 @@ function out = runStep(c, baseline_tag, smbmodel, solver, run_name)
                % Compare current outputs against the requested baseline.
                out = run_regression_suite( ...
                   tier=c.tier, smbmodel=smbmodel, solver=solver, ...
+                  simyear=simyear, smoke_sites=smoke_sites, ...
+                  full_sites=full_sites, ...
                   baseline=resolveBaseline(c.baseline_mode, baseline_tag), ...
                   run_name=run_name);
 
@@ -141,7 +160,8 @@ function out = runStep(c, baseline_tag, smbmodel, solver, run_name)
                % Accept the current runtimes as the rolling baseline.
                out = build_perf_baseline( ...
                   baseline="rolling", tier=c.tier, smbmodel=smbmodel, ...
-                  solver=solver);
+                  solver=solver, simyear=simyear, ...
+                  smoke_sites=smoke_sites, full_sites=full_sites);
 
             case "snapshot"
                % Freeze the current rolling baseline into a versioned release.
@@ -153,6 +173,8 @@ function out = runStep(c, baseline_tag, smbmodel, solver, run_name)
                % Compare current runtimes against the requested baseline.
                out = run_perf_suite( ...
                   tier=c.tier, smbmodel=smbmodel, solver=solver, ...
+                  simyear=simyear, smoke_sites=smoke_sites, ...
+                  full_sites=full_sites, ...
                   baseline=resolveBaseline(c.baseline_mode, baseline_tag), ...
                   run_name=run_name);
 
@@ -220,15 +242,4 @@ function backupToFolder(source, backupdir)
    pathname = backupfile(source, true, true);
    [~, name, ext] = fileparts(pathname);
    movefile(pathname, fullfile(backupdir, [name ext]));
-end
-
-function mustBeValidSolverFilter(x)
-   if isempty(x)
-      return
-   end
-   mustBeNumeric(x)
-   mustBeInteger(x)
-   if any(~ismember(x, [1 2 3]))
-      error('solver must be empty or a subset of [1 2 3]')
-   end
 end

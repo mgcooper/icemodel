@@ -1,7 +1,7 @@
 function S = summarizeIce1Metrics(ice1)
 %SUMMARIZEICE1METRICS Extract core regression metrics from ice1 output.
 %
-%  S = test.helpers.summarizeIce1Metrics(ice1)
+%  S = icemodel.test.helpers.summarizeIce1Metrics(ice1)
 %
 % Output fields:
 %  runoff_final, melt_final, mean_Tice_numiter, max_Tice_numiter,

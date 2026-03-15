@@ -1,7 +1,7 @@
 function case_id = normalizeFormalCaseId(case_id)
 %NORMALIZEFORMALCASEID Normalize legacy formal-suite identifiers.
 %
-%  case_id = test.helpers.normalizeFormalCaseId(case_id)
+%  case_id = icemodel.test.helpers.normalizeFormalCaseId(case_id)
 %
 % Older saved perf/regression baselines encoded suite prefixes (smoke_/full_/
 % reg_) and used `_bcN` for the solver index. Normalize those forms so current
