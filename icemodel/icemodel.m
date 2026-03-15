@@ -1,4 +1,4 @@
-function [ice1, ice2] = icemodel(opts)
+function [ice1, ice2, opts] = icemodel(opts)
    % ICEMODEL Simulate the phase change process in glacier ice.
    %
    % This function models the phase change process in melting glacier ice. It
@@ -8,6 +8,7 @@ function [ice1, ice2] = icemodel(opts)
    %
    % Syntax:
    % [ice1, ice2] = ICEMODEL(opts)
+   % [ice1, ice2, opts] = ICEMODEL(opts)
    %
    % Inputs:
    % opts - A structure containing model options and parameters. Defined by the
@@ -27,7 +28,8 @@ function [ice1, ice2] = icemodel(opts)
    %         near-surface atmosphere. Contains one value per timestep.
    % ice2  - 2-dimensional data storing variables defined on the subsurface ice
    %         column control volume mesh. Contains one column per timestep.
-   % met   - Struct containing the meteorological data used for the simulation.
+   % opts  - Finalized runtime configuration after icemodel.configureRun() has
+   %         applied the last non-negotiable pre-execution updates.
    %
    % See also: skinmodel, icemodel.setopts
    %
@@ -50,7 +52,7 @@ function [ice1, ice2] = icemodel(opts)
 
    % LOAD THE FORCING DATA
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
-      = METINIT(opts, 1);
+      = METINIT(opts);
 
    % INITIALIZE THE THERMAL MODEL
    [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, JJ, ...
@@ -63,6 +65,10 @@ function [ice1, ice2] = icemodel(opts)
    % INITIALIZE TIMESTEPPING
    [metstep, substep, numsteps, maxsubstep, dt, dt_FULL_STEP, ...
       numyears, numspinup] = INITTIMESTEPS(opts, time);
+   if ~opts.saveflag && numyears - numspinup > 1
+      ice1_all = [];
+      ice2_all = [];
+   end
 
    % INITIALIZE PAST VALUES
    [xTs, xT, xf_ice, xf_liq] = RESETSUBSTEP(Ts, T, f_ice, f_liq);
@@ -163,7 +169,7 @@ function [ice1, ice2] = icemodel(opts)
             scoef, liqflag);
 
          % SAVE OUTPUT IF SPINUP IS FINISHED
-         if thisyear >= numspinup
+         if thisyear > numspinup
 
             if strcmp(opts.output_profile, 'minimal')
 
@@ -188,14 +194,25 @@ function [ice1, ice2] = icemodel(opts)
       end % timesteps (one year)
 
       % RESTART THE MET DATA STEP INDEX DURING SPIN UP
-      if thisyear < numspinup
-         metstep = 1;
+      if thisyear <= numspinup
          continue
       end
 
+      % Concatenate yearly raw output when running multi-year simulations
+      % without writing each year to disk.
+      if ~opts.saveflag && numyears - numspinup > 1
+         [ice1_all, ice2_all] = icemodel.concatoutput(ice1_all, ice2_all, ...
+            ice1, ice2);
+      end
+
       % WRITE TO DISK
-      WRITEOUTPUT(ice1, ice2, opts, thisyear-numspinup+1, ...
-         time((thisyear-numspinup)*numsteps+1:(thisyear-numspinup+1)*numsteps), ...
-         swd, lwd, albedo)
+      yridx = (thisyear-1)*numsteps+1:thisyear*numsteps;
+      WRITEOUTPUT(ice1, ice2, opts, thisyear, ...
+         time(yridx), swd(yridx), lwd(yridx), albedo(yridx))
+   end
+
+   if ~opts.saveflag && numyears - numspinup > 1
+      ice1 = ice1_all;
+      ice2 = ice2_all;
    end
 end

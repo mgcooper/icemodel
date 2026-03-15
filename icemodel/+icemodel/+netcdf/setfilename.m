@@ -22,10 +22,10 @@ function filename = setfilename(datafile, smbmodel, forcings, userdata, ...
          opts.extension}, '.'));
    end
 
-   if numel(simyears) == 1
+   if isscalar(simyears)
       filename = filename{1};
    end
 
-   % temporary hack - replace 'sector' with 'sw'
+   % Temporary hack for the legacy grid sitename.
    filename = strrep(filename, '.sector.', '.sw.');
 end

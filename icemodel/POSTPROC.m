@@ -3,14 +3,15 @@ function varargout = POSTPROC(ice1, ice2, opts, varargin)
    %
    % Syntax:
    %
-   % [ice1, ice2] = POSTPROC(ice1, ice2, opts, simyear)
+   % [ice1, ice2] = POSTPROC(ice1, ice2, opts, simyears)
    % [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time)
    %
    % Description:
    %
-   % [ice1, ice2] = POSTPROC(ice1, ice2, opts, simyear) Loads the met file
-   % based on the information in opts and the simulation year. The year is
-   % needed because the opts struct can be setup for multi-year simulations.
+   % [ice1, ice2] = POSTPROC(ice1, ice2, opts, simyears) Loads the met data
+   % resolved in opts. SIMYEARS may be a scalar year or a year vector; a scalar
+   % year subsets the met data to that year, while a vector returns the full
+   % concatenated met series for those years.
    %
    % [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time)
    %
@@ -18,15 +19,19 @@ function varargout = POSTPROC(ice1, ice2, opts, varargin)
    %
    %#codegen
 
-   % 2/15/2026 - this fails on multi-year runs b/c when nargin == 4 it loads met
-   % for the first year
-
    % Process inputs
    if nargin == 7
       [swd, lwd, albedo, time] = deal(varargin{:});
    elseif nargin == 4
-      simyear = varargin{1};
-      met = icemodel.loadmet(opts, find(opts.simyears == simyear));
+      simyears = varargin{1};
+      met = icemodel.loadmet(opts);
+      if isscalar(simyears)
+         ii = year(met.Time) == simyears;
+         if countTimeSteps(ice1) == height(met)
+            [ice1, ice2] = subsetOutput(ice1, ice2, ii);
+         end
+         met = met(ii, :);
+      end
       swd = met.swd;
       lwd = met.lwd;
       albedo = met.albedo;
@@ -79,7 +84,7 @@ function varargout = POSTPROC(ice1, ice2, opts, varargin)
    [ice1, ice2] = roundData(ice1, ice2);
 
    if ~strcmp(opts.output_profile, 'minimal')
-      ice2.Time = ice1.Time; % not added in the sector case, maybe remove.
+      ice2.Time = ice1.Time; % not added in legacy grid saves, maybe remove.
 
       % Rename ice1 vars to match the naming conventions i use everywhere else
       oldvars = {'Qsi','Qsr','Qsn','Qli','Qle','Qln','Qh','Qe','Qc','Qn','Tsfc'};
@@ -98,9 +103,38 @@ function varargout = POSTPROC(ice1, ice2, opts, varargin)
          varargout{2} = ice2;
 
          if nargin == 7
-            met = icemodel.loadmet(opts, find(opts.simyears == year(time(1))));
+            met = icemodel.loadmet(opts);
+            met = met(isbetween(met.Time, time(1), time(end)), :);
          end
          varargout{3} = icemodel.processmet(met);
+   end
+end
+
+%%
+function n = countTimeSteps(ice1)
+
+   fields = fieldnames(ice1);
+   n = size(ice1.(fields{1}), 1);
+end
+
+%%
+function [ice1, ice2] = subsetOutput(ice1, ice2, ii)
+
+   fields = fieldnames(ice1);
+   for n = 1:numel(fields)
+      ice1.(fields{n}) = ice1.(fields{n})(ii, :);
+   end
+
+   fields = fieldnames(ice2);
+   for n = 1:numel(fields)
+      thisfield = fields{n};
+      if strcmp(thisfield, 'Z')
+         continue
+      elseif strcmp(thisfield, 'Time')
+         ice2.Time = ice2.Time(ii, :);
+      else
+         ice2.(thisfield) = ice2.(thisfield)(:, ii);
+      end
    end
 end
 
@@ -115,7 +149,7 @@ function ice2 = retimeIce2(ice2, Time)
    for n = 1:numel(fields)
       tmp.(fields{n}) = nan(size(ice2.Tice, 1), numel(Time));
    end
-   % Replace Z, if this is not a sector run
+   % Replace Z, if this is not a legacy grid run
    if isfield(ice2, 'Z')
       tmp.Z = ice2.Z;
    end
@@ -285,7 +319,7 @@ end
 % Sc = dQ/dz is the source term (divergence of the net solar downflux)
 
 
-% The original method when I saved the sector output
+% The original method when I saved the grid output
 %
 % % Retime to hourly
 % if opts.dt == 900

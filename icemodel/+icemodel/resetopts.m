@@ -89,8 +89,10 @@ function opts = resetopts(opts, varargin)
       opts.metfname = {};
    end
 
+   opts.output_years = icemodel.outputYears(opts);
+
    if any(ismember(names, {'sitename'})) && ~ismember('output_profile', names)
-      opts.output_profile = [];
+      opts.output_profile = 'standard';
    end
 
    if any(ismember(names, {'sitename', 'smbmodel', 'output_profile'})) ...

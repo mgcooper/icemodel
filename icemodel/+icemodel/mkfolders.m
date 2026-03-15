@@ -1,6 +1,6 @@
 function mkfolders(opts)
 
-   simyears = opts.simyears;
+   simyears = icemodel.outputYears(opts);
 
    for MM = 1:numel(simyears)
 

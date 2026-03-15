@@ -6,7 +6,7 @@ function proplist = completions(funcname)
 
       case 'completions'
          tmp = dir( ...
-            fullfile(icemodel.projectpath, 'icemodel', '+icemodel', '*.m'));
+            fullfile(icemodel.internal.fullpath, 'icemodel', '+icemodel', '*.m'));
          proplist = strrep({tmp.name}, '.m', '');
 
       case 'config'
@@ -26,20 +26,31 @@ function proplist = completions(funcname)
             'secperhr', 'roLv', 'roLs', 'roLf', 'cv_air', 'cv_ice', 'cv_liq', ...
             'ro_iwe', 'ro_wie', 'emissSB', 'fcpsq', 'secperday', 'c0'}.';
 
+      case 'solver'
+         proplist = cellstr(string(icemodel.namelists.solver()));
+
+      case 'testtier'
+         proplist = {'smoke', 'full', 'all'}.';
+
+      case 'testsmbmodel'
+         proplist = [{'all'}; cellstr(icemodel.namelists.smbmodel())];
+
+      case 'rollingbaseline'
+         proplist = {'rolling'}.';
+
       case 'smbmodel'
-         proplist = {'icemodel', 'skinmodel'}.';
+         proplist = cellstr(icemodel.namelists.smbmodel());
 
       case 'forcings'
-         proplist = {'mar', 'racmo', 'merra'}.';
+         proplist = cellstr(icemodel.namelists.forcings());
 
       case 'sitename'
-         proplist = {'sector', 'behar', 'ak4', 'slv1', 'slv2', 'upperbasin', ...
-            'kanm', 'kanl'}.';
+         proplist = cellstr(icemodel.namelists.sitename());
 
       case 'userdata'
-         proplist = {'mar', 'modis', 'merra', 'racmo', 'kanm', 'kanl'}.';
+         proplist = cellstr(icemodel.namelists.userdata());
 
       case 'uservars'
-         proplist = {'albedo', 'tair', 'swd', 'lwd', 'rh', 'wsdp'}.';
+         proplist = cellstr(icemodel.namelists.uservars());
    end
 end

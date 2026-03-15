@@ -1,14 +1,45 @@
 function [met, opts] = loadmet(opts, fileiter) %#codegen
-   %LOADMET this mirrors METINIT but returns the full timetable
+   %LOADMET Load one or more icemodel met files as a timetable.
+   %
+   %  met = icemodel.loadmet(opts) loads and concatenates all met files named
+   %  in opts.metfname. This is the canonical path for multi-year runs.
+   %
+   %  met = icemodel.loadmet(opts, fileiter) loads only the requested met file
+   %  index/indices from opts.metfname.
 
-   % The 2nd input is the index into the metfile name list resolved in
-   % icemodel.configureRun / icemodel.setopts.
-   if nargin < 2
-      fileiter = 1;
-   end
    if nargin < 1
       opts = icemodel.setopts('icemodel', 'behar', 2016, 'kanm');
    end
+   if nargin < 2 || isempty(fileiter)
+      fileiter = 1:numel(opts.metfname);
+   end
+
+   % Load and post-process each requested file before concatenation so yearly
+   % userdata swaps remain aligned with the source met file year.
+   metcell = cell(1, numel(fileiter));
+   for n = 1:numel(fileiter)
+      metcell{n} = loadOneMetFile(opts, fileiter(n));
+   end
+
+   if isscalar(metcell)
+      met = metcell{1};
+   else
+      met = vertcat(metcell{:});
+      met = sortrows(met);
+   end
+
+   % Require the concatenated met data to cover every requested simulation
+   % year, whether the source is one multi-year file or one file per year.
+   if ~all(ismember(opts.simyears(:), unique(year(met.Time))))
+      error('met data do not cover all requested simulation years')
+   end
+
+   % Compute the wind transfer coefficient for the processed met data.
+   met.De = WINDCOEF(met.wspd, opts.z_0, opts.z_tair, opts.z_wind);
+end
+
+%%
+function met = loadOneMetFile(opts, fileiter)
 
    % Load the met file
    met = load(opts.metfname{fileiter}, 'met');
@@ -18,9 +49,6 @@ function [met, opts] = loadmet(opts, fileiter) %#codegen
       met = swapMetData(met, opts);
    end
    met = prepareMetData(met, opts);
-
-   % Compute the wind transfer and stability coefficients
-   met.De = WINDCOEF(met.wspd, opts.z_0, opts.z_tair, opts.z_wind);
 end
 
 %%
@@ -57,12 +85,16 @@ function met = swapMetData(met, opts)
       opts.uservars = cellstr(opts.uservars);
    end
 
-   if strcmp(opts.sitename, 'sector')
+   is_grid_run = strcmp(opts.sitename, 'sector');
 
-      % Swap out the forcing data albedo for modis albedo
+   if is_grid_run
+
+      % For grid runs, the met file already carries the grid-cell forcing and
+      % userdata swaps are currently limited to replacing forcing albedo with
+      % the embedded MODIS albedo field.
 
       % Activate this and move the swap loop below outside the else to swap
-      % generic variables for gridded (sector) runs.
+      % generic variables for gridded runs.
       % Data = met;
       % if strcmp('modis', opts.userdata)
       %    Data.modis = met.modis;
@@ -85,33 +117,37 @@ function met = swapMetData(met, opts)
          return
       end
 
-      % Load the userdata and retime to 15 m if the met data is 15 m
-      simyears = num2str(opts.simyears(1));
-      userfile = [opts.sitename '_' opts.userdata '_' simyears '.mat'];
+      % Load the userdata by year and swap it into the matching met rows.
+      for thisyear = reshape(unique(year(met.Time))', 1, [])
+         userfile = [opts.sitename '_' opts.userdata '_' int2str(thisyear) '.mat'];
+         filepath = fullfile(opts.pathuserdata, userfile);
+         if exist(filepath, 'file') ~= 2
+            error('\n userdata file does not exist: \n\n %s \n', filepath);
+         end
 
-      if (exist(fullfile(opts.pathuserdata, userfile), 'file') == 2)
-         Data = load(fullfile(opts.pathuserdata, userfile), 'Data');
+         Data = load(filepath, 'Data');
          Data = Data.Data;
+         ii = year(met.Time) == thisyear;
          Data.Time.TimeZone = met.Time.TimeZone;
          if Data.Time(2)-Data.Time(1) ~= met.Time(2)-met.Time(1)
-            Data = retime(Data, met.Time, 'linear');
+            Data = retime(Data, met.Time(ii), 'linear');
+         else
+            Data = Data(isbetween(Data.Time, met.Time(find(ii, 1)), ...
+               met.Time(find(ii, 1, 'last'))), :);
          end
-      else
-         error('\n userdata file does not exist: \n\n %s \n', ...
-            fullfile(opts.pathuserdata, userfile));
-      end
 
-      % Swap out the data in the metfile for the user data
-      for n = 1:numel(opts.uservars)
-         thisvar  = opts.uservars{n};
-         swapvar  = thisvar;
+         % Swap out the data in the metfile for the user data
+         for n = 1:numel(opts.uservars)
+            thisvar  = opts.uservars{n};
+            swapvar  = thisvar;
 
-         % MODIS requires changing the variable name to albedo
-         if strcmpi('modis', opts.userdata) && strcmpi('albedo', thisvar)
-            thisvar = 'albedo';
-            swapvar = 'modis';
+            % MODIS requires changing the variable name to albedo
+            if strcmpi('modis', opts.userdata) && strcmpi('albedo', thisvar)
+               thisvar = 'albedo';
+               swapvar = 'modis';
+            end
+            met.(thisvar)(ii) = Data.(swapvar);
          end
-         met.(thisvar) = Data.(swapvar);
       end
    end
 end

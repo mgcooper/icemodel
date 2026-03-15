@@ -8,78 +8,52 @@ function opts = configureRun(opts)
    % PATHINPUT, PATHOUTPUT, CASENAME, METFNAME, VARS1, and VARS2.
 
    if ~isfield(opts, 'pathdata') || isempty(opts.pathdata)
-      opts.pathdata = getenv('ICEMODEL_DATA_PATH');
+      opts.pathdata = icemodel.setpath('data');
    end
 
+   % OUTPUT_YEARS are the post-spinup years retained in saved/postprocessed
+   % output. Keep them derived from SIMYEARS and N_SPINUP_YEARS.
+   opts.output_years = icemodel.outputYears(opts);
+
    if ~isfield(opts, 'pathinput') || isempty(opts.pathinput)
-      opts.pathinput = getenv('ICEMODEL_INPUT_PATH');
+      opts.pathinput = icemodel.setpath('input');
    end
    assert(exist(opts.pathinput, 'dir') == 7, ...
       'ICEMODEL_INPUT_PATH does not exist, set it using icemodel.config');
 
    if ~isfield(opts, 'patheval') || isempty(opts.patheval)
-      opts.patheval = getenv('ICEMODEL_EVAL_PATH');
+      opts.patheval = icemodel.setpath('eval');
    end
 
    if ~isfield(opts, 'pathuserdata') || isempty(opts.pathuserdata)
-      opts.pathuserdata = getenv('ICEMODEL_USERDATA_PATH');
-      if isempty(opts.pathuserdata)
-         opts.pathuserdata = fullfile(opts.pathinput, 'userdata');
-      end
+      opts.pathuserdata = icemodel.setpath('userdata');
    end
 
    % WRITEOUTPUT appends ['ice1_' opts.casename '.mat'] and saves the file in
    % a subfolder of opts.pathoutput for each year e.g. opts.pathoutput/2016.
    %
-   % For gridded sector runs, opts.casename is set to the grid point ID
-   % outside this function in a loop (icemodel.run.grid in the runoff project),
-   % to get ice1_1.mat, ice1_2.mat, and so forth. Same for metfname. Writing to
-   % netcdf should eliminate this.
-   %
-   % Also note that for gridded sector runs, "userdata" is appended to the
-   % output folder. This is a legacy method: sector output filenames use the
-   % grid-cell number rather than the forcing/userdata/uservars naming used for
-   % point runs, so the swap case is distinguished at the folder level:
-   %    ICEMODEL_OUTPUT_PATH/sector/icemodel/mar
-   %    ICEMODEL_OUTPUT_PATH/sector/icemodel/modis
-   % In practice these sector runs used MAR forcing in both cases, with the
-   % second folder indicating the modis-albedo swap.
+   % For grid runs, opts.casename and opts.metfname are set outside this
+   % function in the wrapper that loops over grid-cell IDs. Core icemodel only
+   % provides the canonical base output folder; any legacy extra subfoldering
+   % for gridded workflows belongs in the wrapper, not here.
    if ~isfield(opts, 'pathoutput') || isempty(opts.pathoutput)
-      opts.pathoutput = fullfile( ...
-         getenv('ICEMODEL_OUTPUT_PATH'), opts.sitename, opts.smbmodel);
-      if strcmp(opts.sitename, 'sector')
-         opts.pathoutput = fullfile(opts.pathoutput, opts.userdata);
-      end
-      opts.pathoutput = fullfile(opts.pathoutput, opts.testname);
+      opts.pathoutput = icemodel.setpath('output', ...
+         opts.sitename, opts.smbmodel, '', [], opts.testname);
    end
 
    % Create the casename. WRITEOUTPUT appends this to the base filenames.
-   % Note that for gridded runs, casename is modified to represent the grid
-   % number, see icemodel.run.grid in the runoff project.
+   % For grid runs, the wrapper overwrites this with the grid-cell ID.
    if ~isfield(opts, 'casename') || isempty(opts.casename)
       opts.casename = icemodel.setcase(opts.forcings, opts.userdata, opts.uservars);
    end
 
    if ~isfield(opts, 'output_profile') || isempty(opts.output_profile)
-      if strcmp(opts.sitename, 'sector')
-         opts.output_profile = 'minimal';
-      else
-         opts.output_profile = 'standard';
-      end
+      opts.output_profile = 'standard';
    end
 
    if ~isfield(opts, 'metfname') || isempty(opts.metfname)
-      if strcmp(opts.sitename, 'sector')
-         % Could add logic here to deal with sector file names. For now, the
-         % metfname must be set outside this function in a loop.
-         % for n = 1:numel(runpoints)
-         %    opts.metfname = 'met_sector.mat';
-         % end
-         opts.metfname = {};
-      else
-         opts.metfname = fullfile(opts.pathinput, 'met', ...
-            icemodel.createMetFileNames(opts));
-      end
+      opts.metfname = fullfile(opts.pathinput, 'met', ...
+         icemodel.createMetFileNames(opts));
    elseif ischar(opts.metfname) || isstring(opts.metfname)
       opts.metfname = cellstr(opts.metfname);
    end
@@ -112,7 +86,7 @@ function [vars1, vars2] = defaultOutputVariables(opts)
    % processing is applied, including rounding precision.
 
    profile = string(opts.output_profile);
-   if lower(profile) == "sector"
+   if any(lower(profile) == ["sector", "grid"])
       profile = "minimal";
    end
 

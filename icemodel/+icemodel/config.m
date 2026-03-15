@@ -225,6 +225,11 @@ function kwargs = parseinputs(varargin)
 
    kwargs.ICEMODEL_DATA_PATH = getresult(parser, 'ICEMODEL_DATA_PATH', ...
       default_data_path);
+   default_input_path = fullfile(kwargs.ICEMODEL_DATA_PATH, 'input');
+   default_output_path = fullfile(kwargs.ICEMODEL_DATA_PATH, 'output');
+   default_eval_path = fullfile(kwargs.ICEMODEL_DATA_PATH, 'eval');
+   default_user_path = fullfile(default_input_path, 'userdata');
+
    kwargs.ICEMODEL_INPUT_PATH = getresult(parser, 'ICEMODEL_INPUT_PATH', ...
       default_input_path);
    kwargs.ICEMODEL_OUTPUT_PATH = getresult(parser, 'ICEMODEL_OUTPUT_PATH', ...
