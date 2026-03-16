@@ -19,13 +19,16 @@ function test_basepath(testCase)
 end
 
 function test_functionSignatures(testCase)
-   % Validate the JSON and get the table
+   % Validate the toolbox-level signatures.
    T = validateFunctionSignaturesJSON(fullfile( ...
       icemodel.internal.fullpath(), 'icemodel', 'functionSignatures.json'));
+   T_test = validateFunctionSignaturesJSON(fullfile( ...
+      icemodel.internal.fullpath(), 'test', 'functionSignatures.json'));
 
-   % Check if the table is empty
    testCase.verifyEmpty(T, ...
       'The functionSignatures.json file contains invalid entries.');
+   testCase.verifyEmpty(T_test, ...
+      'The test/functionSignatures.json file contains invalid entries.');
 end
 
 function test_buildpath(testCase)
