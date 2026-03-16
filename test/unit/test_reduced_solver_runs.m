@@ -6,7 +6,7 @@ end
 function setup(testCase)
 
    testCase.TestData.workspace = icemodel.test.fixtures.makeSyntheticWorkspace( ...
-      2016, configure=true, nsteps=24, dt_seconds=3600);
+      2016, configure=true, nsteps=96, dt_seconds=900);
 end
 
 function teardown(testCase)
@@ -27,7 +27,7 @@ function test_skinmodel_reduced_run_stays_bounded(testCase)
 
    icemodel.test.verify.verifyProcessedOutputBounds( ...
       testCase, ice1_pp, ice2_pp);
-   testCase.verifyEqual(height(ice1_pp), workspace.nsteps);
+   testCase.verifyEqual(height(ice1_pp), workspace.nsteps / 4);
 end
 
 function test_icemodel_reduced_runs_stay_bounded_across_solver_modes(testCase)

@@ -112,6 +112,31 @@
          {"name":"results", "type":["struct"]}
       ]
    },
+   "run_unit_suite":
+   {
+      "inputs":
+      [
+         {"name":"selector",        "kind":"namevalue", "type":[["char"],["string","scalar"]]},
+         {"name":"debug",           "kind":"namevalue", "type":["logical","scalar"]},
+         {"name":"stop_on_failure", "kind":"namevalue", "type":["logical","scalar"]},
+         {"name":"verbosity",       "kind":"namevalue", "type":["choices=terse,concise,detailed"]}
+      ],
+      "outputs":
+      [
+         {"name":"results", "type":["matlab.unittest.TestResult"]}
+      ]
+   },
+   "run_benchmark_suite":
+   {
+      "inputs":
+      [
+         {"name":"testname", "kind":"positional", "type":[["char"],["string","scalar"]]}
+      ],
+      "outputs":
+      [
+         {"name":"results", "type":["matlab.perftest.TimeResult"]}
+      ]
+   },
    "run_regression_suite":
    {
       "inputs":

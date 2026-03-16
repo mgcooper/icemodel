@@ -18,7 +18,7 @@ and component benchmark material for the public `icemodel` repo.
 5. `unit/`
    - ordinary unit tests intended for default discovery
 6. `benchmarks/`
-   - component and one-off benchmark/perf experiments
+   - component benchmarks and selected exploratory microbenchmarks
 7. `tools/`
    - explicit build/snapshot utilities
 8. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/+icemodel/+test/+helpers/`
@@ -90,7 +90,17 @@ Programmatic regression helpers:
 7. `run_perf_suite(...)`
    - Use for normal compare runs against rolling or release perf baselines.
    - This writes artifacts under `test/artifacts/<yyyymmdd-HHMMSS>/`.
-8. `build_runoff_reference_from_runoff(...)`
+8. `run_unit_suite(...)`
+   - Use for folder-based unit-test discovery under `test/unit/`.
+   - Supports `debug=true` to stop on first failure for inspection.
+9. `run_benchmark_suite(...)`
+   - Use for the formal benchmark suite under `test/benchmarks/`.
+   - This is separate from formal perf regression and does not use baselines.
+   - Benchmark-specific interpretation notes should live with the benchmark
+     file itself when the timing result motivated a code choice.
+   - The rename/round history is reconciled into `RenameRoundTest.m` rather
+     than split across separate manual scripts.
+10. `build_runoff_reference_from_runoff(...)`
    - Use to refresh the static runoff reference data in `test/references/`.
    - This is separate from baseline management and requires the sibling
      `runoff` project.
