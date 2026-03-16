@@ -1,8 +1,8 @@
-function results = run_unit_suite(kwargs)
+function results = run_unit_suite(options)
    %RUN_UNIT_SUITE Run icemodel unit tests with folder-based discovery.
    %
    %  results = run_unit_suite()
-   %  results = run_unit_suite(selector="test_met_contracts.m")
+   %  results = run_unit_suite(selector="test_met_contracts")
    %  results = run_unit_suite(selector="contracts")
    %  results = run_unit_suite(debug=true)
    %
@@ -13,10 +13,10 @@ function results = run_unit_suite(kwargs)
    %  - an absolute/relative existing file or folder path
 
    arguments
-      kwargs.selector string = string.empty()
-      kwargs.debug (1, 1) logical = false
-      kwargs.stop_on_failure (1, 1) logical = false
-      kwargs.verbosity (1, :) string {mustBeMember(kwargs.verbosity, ...
+      options.selector (1, 1) string = ""
+      options.debug (1, 1) logical = false
+      options.stop_on_failure (1, 1) logical = false
+      options.verbosity (1, :) string {mustBeMember(options.verbosity, ...
          ["terse", "concise", "detailed"])} = "detailed"
    end
 
@@ -30,11 +30,11 @@ function results = run_unit_suite(kwargs)
    addpath(thisdir)
    unitdir = fullfile(thisdir, 'unit');
 
-   suite = buildUnitSuite(unitdir, kwargs.selector);
+   suite = buildUnitSuite(unitdir, options.selector);
    runner = TestRunner.withTextOutput('Verbosity', ...
-      mapVerbosity(kwargs.verbosity));
+      mapVerbosity(options.verbosity));
 
-   if kwargs.debug || kwargs.stop_on_failure
+   if options.debug || options.stop_on_failure
       runner.addPlugin(StopOnFailuresPlugin)
    end
 

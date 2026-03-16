@@ -1,22 +1,20 @@
-function results = run_benchmark_suite(varargin)
+function results = run_benchmark_suite(options)
    %RUN_BENCHMARK_SUITE Run component benchmarks under test/benchmarks.
    %
    %  results = run_benchmark_suite()
-   %  results = run_benchmark_suite("SebSolverTest")
+   %  results = run_benchmark_suite(testname="SebSolverTest")
    %
    % Use this runner for component benchmarks and one-off performance
    % experiments. For formal performance regression against managed rolling or
    % release baselines, use `run_perf_suite(...)` instead.
    %
-   % See RoundRenameTest for notes on results that informed postprocess.
+   % See RenameRoundTest for notes on results that informed postprocess.
+
+   arguments
+      options.testname (1, :) string = ""
+   end
 
    import matlab.perftest.TimeExperiment
-
-   if nargin < 1
-      testname = "";
-   else
-      testname = string(varargin{1});
-   end
 
    thisdir = fileparts(mfilename('fullpath'));
    addpath(fullfile(fileparts(thisdir), 'icemodel'))
@@ -24,7 +22,7 @@ function results = run_benchmark_suite(varargin)
 
    % Resolve the simple benchmark names used in this helper to the formal
    % benchmark suite. Callers can still pass an explicit path or selector.
-   target = resolveBenchmarkTarget(testname);
+   target = resolveBenchmarkTarget(options.testname);
    if exist(target, 'dir') == 7
       suite = testsuite(target, 'IncludingSubfolders', true);
    else

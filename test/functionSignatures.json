@@ -1,0 +1,657 @@
+{
+   "_schemaVersion": "1.0.0",
+   "run_perf_suite": {
+      "inputs": [
+         {
+            "name": "tier",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('testtier')"
+            ]
+         },
+         {
+            "name": "smbmodel",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('testsmbmodel')"
+            ]
+         },
+         {
+            "name": "solver",
+            "kind": "namevalue",
+            "type": [
+               "numeric"
+            ]
+         },
+         {
+            "name": "simyear",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "smoke_sites",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('sitename')"
+            ]
+         },
+         {
+            "name": "full_sites",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('sitename')"
+            ]
+         },
+         {
+            "name": "n_runs",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "tol_perf",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "baseline",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "string",
+                  "scalar"
+               ],
+               "choices=icemodel.completions('rollingbaseline')"
+            ]
+         },
+         {
+            "name": "run_name",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "char"
+               ],
+               [
+                  "string",
+                  "scalar"
+               ]
+            ]
+         }
+      ],
+      "outputs": [
+         {
+            "name": "results",
+            "type": [
+               "struct"
+            ]
+         }
+      ]
+   },
+   "run_unit_suite": {
+      "inputs": [
+         {
+            "name": "selector",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('unittest')"
+            ]
+         },
+         {
+            "name": "debug",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
+         },
+         {
+            "name": "stop_on_failure",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
+         },
+         {
+            "name": "verbosity",
+            "kind": "namevalue",
+            "type": [
+               "choices=terse,concise,detailed"
+            ]
+         }
+      ],
+      "outputs": [
+         {
+            "name": "results",
+            "type": [
+               "matlab.unittest.TestResult"
+            ]
+         }
+      ]
+   },
+   "run_benchmark_suite": {
+      "inputs": [
+         {
+            "name": "testname",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('benchmark')"
+            ]
+         }
+      ],
+      "outputs": [
+         {
+            "name": "results",
+            "type": [
+               "matlab.perftest.TimeResult"
+            ]
+         }
+      ]
+   },
+   "run_regression_suite": {
+      "inputs": [
+         {
+            "name": "tier",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('testtier')"
+            ]
+         },
+         {
+            "name": "smbmodel",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('testsmbmodel')"
+            ]
+         },
+         {
+            "name": "solver",
+            "kind": "namevalue",
+            "type": [
+               "numeric"
+            ]
+         },
+         {
+            "name": "simyear",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "smoke_sites",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('sitename')"
+            ]
+         },
+         {
+            "name": "full_sites",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('sitename')"
+            ]
+         },
+         {
+            "name": "baseline",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "string",
+                  "scalar"
+               ],
+               "choices=icemodel.completions('rollingbaseline')"
+            ]
+         },
+         {
+            "name": "run_name",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "char"
+               ],
+               [
+                  "string",
+                  "scalar"
+               ]
+            ]
+         }
+      ],
+      "outputs": [
+         {
+            "name": "results",
+            "type": [
+               "matlab.unittest.TestResult"
+            ]
+         }
+      ]
+   },
+   "run_test_bootstrap": {
+      "inputs": [
+         {
+            "name": "baseline_tag",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "string",
+                  "scalar"
+               ],
+               [
+                  "char"
+               ]
+            ]
+         },
+         {
+            "name": "smbmodel",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('testsmbmodel')"
+            ]
+         },
+         {
+            "name": "solver",
+            "kind": "namevalue",
+            "type": [
+               "numeric"
+            ]
+         },
+         {
+            "name": "simyear",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "smoke_sites",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('sitename')"
+            ]
+         },
+         {
+            "name": "full_sites",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('sitename')"
+            ]
+         },
+         {
+            "name": "clean_artifacts",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
+         },
+         {
+            "name": "clean_baselines",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
+         },
+         {
+            "name": "backup_before_clean",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
+         }
+      ],
+      "outputs": [
+         {
+            "name": "results",
+            "type": [
+               "struct"
+            ]
+         }
+      ]
+   },
+   "build_perf_baseline": {
+      "inputs": [
+         {
+            "name": "baseline",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "string",
+                  "scalar"
+               ],
+               "choices=icemodel.completions('rollingbaseline')"
+            ]
+         },
+         {
+            "name": "baseline_tag",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "string",
+                  "scalar"
+               ],
+               [
+                  "char"
+               ]
+            ]
+         },
+         {
+            "name": "tier",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('testtier')"
+            ]
+         },
+         {
+            "name": "smbmodel",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('testsmbmodel')"
+            ]
+         },
+         {
+            "name": "solver",
+            "kind": "namevalue",
+            "type": [
+               "numeric"
+            ]
+         },
+         {
+            "name": "simyear",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "smoke_sites",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('sitename')"
+            ]
+         },
+         {
+            "name": "full_sites",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('sitename')"
+            ]
+         },
+         {
+            "name": "n_runs",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "tol_perf",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "output_file",
+            "kind": "namevalue",
+            "type": "file"
+         }
+      ],
+      "outputs": [
+         {
+            "name": "PerfBaseline",
+            "type": [
+               "table"
+            ]
+         }
+      ]
+   },
+   "build_regression_baseline": {
+      "inputs": [
+         {
+            "name": "baseline",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "string",
+                  "scalar"
+               ],
+               "choices=icemodel.completions('rollingbaseline')"
+            ]
+         },
+         {
+            "name": "baseline_tag",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "string",
+                  "scalar"
+               ],
+               [
+                  "char"
+               ]
+            ]
+         },
+         {
+            "name": "tier",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('testtier')"
+            ]
+         },
+         {
+            "name": "smbmodel",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('testsmbmodel')"
+            ]
+         },
+         {
+            "name": "solver",
+            "kind": "namevalue",
+            "type": [
+               "numeric"
+            ]
+         },
+         {
+            "name": "simyear",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "smoke_sites",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('sitename')"
+            ]
+         },
+         {
+            "name": "full_sites",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('sitename')"
+            ]
+         },
+         {
+            "name": "output_file",
+            "kind": "namevalue",
+            "type": "file"
+         }
+      ],
+      "outputs": [
+         {
+            "name": "RegressionBaseline",
+            "type": [
+               "table"
+            ]
+         }
+      ]
+   },
+   "snapshot_perf_baseline": {
+      "inputs": [
+         {
+            "name": "baseline_tag",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "string",
+                  "scalar"
+               ],
+               [
+                  "char"
+               ]
+            ]
+         },
+         {
+            "name": "smbmodel",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('testsmbmodel')"
+            ]
+         },
+         {
+            "name": "simyear",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "overwrite",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
+         },
+         {
+            "name": "output_file",
+            "kind": "namevalue",
+            "type": "file"
+         }
+      ],
+      "outputs": [
+         {
+            "name": "PerfBaseline",
+            "type": [
+               "table"
+            ]
+         }
+      ]
+   },
+   "snapshot_regression_baseline": {
+      "inputs": [
+         {
+            "name": "baseline_tag",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "string",
+                  "scalar"
+               ],
+               [
+                  "char"
+               ]
+            ]
+         },
+         {
+            "name": "smbmodel",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('testsmbmodel')"
+            ]
+         },
+         {
+            "name": "overwrite",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
+         },
+         {
+            "name": "output_file",
+            "kind": "namevalue",
+            "type": "file"
+         }
+      ],
+      "outputs": [
+         {
+            "name": "RegressionBaseline",
+            "type": [
+               "table"
+            ]
+         }
+      ]
+   },
+   "build_runoff_reference_from_runoff": {
+      "inputs": [
+         {
+            "name": "simyear",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "runoff_root",
+            "kind": "namevalue",
+            "type": "folder"
+         },
+         {
+            "name": "output_file",
+            "kind": "namevalue",
+            "type": "file"
+         }
+      ],
+      "outputs": [
+         {
+            "name": "RunoffReference",
+            "type": [
+               "table"
+            ]
+         }
+      ]
+   }
+}

@@ -5,38 +5,34 @@ function proplist = completions(funcname)
    switch lower(funcname)
 
       case 'completions'
-         tmp = dir( ...
-            fullfile(icemodel.internal.fullpath, 'icemodel', '+icemodel', '*.m'));
-         proplist = strrep({tmp.name}, '.m', '');
+         proplist = cellstr(icemodel.namelists.completions());
 
       case 'config'
-         proplist = {'demo'}.';
-         % To re-enable completions:
-         % {"name":"casename", "kind":"namevalue", "type":["choices=icemodel.completions('config')"]},
+         proplist = cellstr(icemodel.namelists.config());
 
       case 'cvconvert'
-         proplist = {'volumefraction', 'bulkdensity', 'mass', 'volume', ...
-            'massfraction', 'totaldensity'}.';
+         proplist = cellstr(icemodel.namelists.cvconvert());
 
       case 'physicalconstant'
-         proplist = {'Tf', 'Lv', 'Lf', 'Ls', 'ro_air', 'ro_ice', 'ro_liq', ...
-            'cp_air', 'cp_liq', 'cp_ice', 'k_liq', 'k_ice', 'Rd', 'Rv', 'SB', ...
-            'emiss', 'gravity', 'kappa', 'kappa_p', 'epsilon', 'P0', 'es0', ...
-            'S0', 'N0', 'psychro', 'dalr', 'malr', 'fcp', 'scale_ht', 'hrsperday', ...
-            'secperhr', 'roLv', 'roLs', 'roLf', 'cv_air', 'cv_ice', 'cv_liq', ...
-            'ro_iwe', 'ro_wie', 'emissSB', 'fcpsq', 'secperday', 'c0'}.';
+         proplist = cellstr(icemodel.namelists.physicalconstant());
 
       case 'solver'
          proplist = cellstr(string(icemodel.namelists.solver()));
 
       case 'testtier'
-         proplist = {'smoke', 'full', 'all'}.';
+         proplist = cellstr(icemodel.namelists.testtier());
 
       case 'testsmbmodel'
-         proplist = [{'all'}; cellstr(icemodel.namelists.smbmodel())];
+         proplist = cellstr(icemodel.namelists.testsmbmodel());
+
+      case 'benchmark'
+         proplist = cellstr(icemodel.namelists.benchmark());
+
+      case 'unittest'
+         proplist = cellstr(icemodel.namelists.unittest());
 
       case 'rollingbaseline'
-         proplist = {'rolling'}.';
+         proplist = cellstr(icemodel.namelists.rollingbaseline());
 
       case 'smbmodel'
          proplist = cellstr(icemodel.namelists.smbmodel());

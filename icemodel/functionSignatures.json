@@ -1,259 +1,352 @@
 {
    "_schemaVersion": "1.0.0",
-   "icemodel.completions":
-   {
-      "inputs": 
-      [
-         {"name":"funcname", "type":["choices=icemodel.completions('completions')"]}
+   "icemodel.completions": {
+      "inputs": [
+         {
+            "name": "funcname",
+            "type": [
+               "choices=icemodel.completions('completions')"
+            ]
+         }
       ],
-      "outputs":
-      [
-         {"name":"proplist", "type":["cell"]}
+      "outputs": [
+         {
+            "name": "proplist",
+            "type": [
+               "cell"
+            ]
+         }
       ]
    },
-   "icemodel.config":
-   {
-      "inputs": 
-      [
-         {"name":"ICEMODEL_DATA_PATH", "kind":"namevalue", "type":"folder"},
-         {"name":"ICEMODEL_INPUT_PATH", "kind":"namevalue", "type":"folder"},
-         {"name":"ICEMODEL_OUTPUT_PATH", "kind":"namevalue", "type":"folder"},
-         {"name":"ICEMODEL_EVAL_PATH", "kind":"namevalue", "type":"folder"},
-         {"name":"ICEMODEL_USERDATA_PATH", "kind":"namevalue", "type":"folder"},
-         {"name":"casename", "kind":"namevalue", "type":["choices=demo"]}
+   "icemodel.config": {
+      "inputs": [
+         {
+            "name": "ICEMODEL_DATA_PATH",
+            "kind": "namevalue",
+            "type": "folder"
+         },
+         {
+            "name": "ICEMODEL_INPUT_PATH",
+            "kind": "namevalue",
+            "type": "folder"
+         },
+         {
+            "name": "ICEMODEL_OUTPUT_PATH",
+            "kind": "namevalue",
+            "type": "folder"
+         },
+         {
+            "name": "ICEMODEL_EVAL_PATH",
+            "kind": "namevalue",
+            "type": "folder"
+         },
+         {
+            "name": "ICEMODEL_USERDATA_PATH",
+            "kind": "namevalue",
+            "type": "folder"
+         },
+         {
+            "name": "casename",
+            "kind": "namevalue",
+            "type": [
+               "choices=demo"
+            ]
+         }
       ],
-      "outputs":
-      [
-         {"name":"cfg", "type":["struct"]}
+      "outputs": [
+         {
+            "name": "cfg",
+            "type": [
+               "struct"
+            ]
+         }
       ]
    },
-   "icemodel.cvconvert":
-   {
-      "inputs":
-      [
-         {"name":"convertFrom", "kind":"required", "type":["choices=icemodel.completions('cvconvert')"]},
-         {"name":"convertTo", "kind":"required", "type":["choices=icemodel.completions('cvconvert')"]},
-         {"name":"CV", "kind":"required", "type":[["numeric", "scalar"],["numeric", "2d"]]},
-         {"name":"constants", "kind":"required", "type":[["numeric", "scalar"],["numeric", "2d"]]},
-         {"name":"varargin", "kind":"required", "repeating":true, "type":["numeric", "vector"]}
+   "icemodel.cvconvert": {
+      "inputs": [
+         {
+            "name": "convertFrom",
+            "kind": "required",
+            "type": [
+               "choices=icemodel.completions('cvconvert')"
+            ]
+         },
+         {
+            "name": "convertTo",
+            "kind": "required",
+            "type": [
+               "choices=icemodel.completions('cvconvert')"
+            ]
+         },
+         {
+            "name": "CV",
+            "kind": "required",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ],
+               [
+                  "numeric",
+                  "2d"
+               ]
+            ]
+         },
+         {
+            "name": "constants",
+            "kind": "required",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ],
+               [
+                  "numeric",
+                  "2d"
+               ]
+            ]
+         },
+         {
+            "name": "varargin",
+            "kind": "required",
+            "repeating": true,
+            "type": [
+               "numeric",
+               "vector"
+            ]
+         }
       ]
    },
-   "icemodel.physicalConstant":
-   {
-      "inputs":
-      [
-         {"name":"name", "kind":"required", "repeating":true, "type":["choices=icemodel.completions('physicalConstant')"]}
+   "icemodel.physicalConstant": {
+      "inputs": [
+         {
+            "name": "name",
+            "kind": "required",
+            "repeating": true,
+            "type": [
+               "choices=icemodel.completions('physicalConstant')"
+            ]
+         }
       ],
-      "outputs":
-      [
-         {"name":"value", "repeating":true, "type":["double", "scalar"]}
+      "outputs": [
+         {
+            "name": "value",
+            "repeating": true,
+            "type": [
+               "double",
+               "scalar"
+            ]
+         }
       ]
    },
-   "icemodel.setopts":
-   {
-      "inputs": 
-      [
-         {"name":"smbmodel",   "kind":"required",     "type":["choices=icemodel.completions('smbmodel')"], "purpose":"Option"},
-         {"name":"simyears",   "kind":"required",     "type":["numeric"]},
-         {"name":"sitename",   "kind":"required",     "type":["choices=icemodel.completions('sitename')"], "purpose":"Option"},
-         {"name":"forcings",   "kind":"required",     "type":["choices=icemodel.completions('forcings')"], "purpose":"Option"},
-         {"name":"userdata",   "kind":"positional",   "type":["choices=icemodel.completions('userdata')"], "purpose":"Option"},
-         {"name":"uservars",   "kind":"positional",   "type":["choices=icemodel.completions('uservars')"], "purpose":"Option"},
-         {"name":"testname",   "kind":"positional",   "type":[["char"], ["string", "scalar"]], "purpose":"Option"},
-         {"name":"saveflag",   "kind":"positional",   "type":["logical","scalar"],"purpose":"Option"},
-         {"name":"backupflag", "kind":"positional",   "type":["logical","scalar"],"purpose":"Option"}
+   "icemodel.setopts": {
+      "inputs": [
+         {
+            "name": "smbmodel",
+            "kind": "required",
+            "type": [
+               "choices=icemodel.completions('smbmodel')"
+            ],
+            "purpose": "Option"
+         },
+         {
+            "name": "simyears",
+            "kind": "required",
+            "type": [
+               "numeric"
+            ]
+         },
+         {
+            "name": "sitename",
+            "kind": "required",
+            "type": [
+               "choices=icemodel.completions('sitename')"
+            ],
+            "purpose": "Option"
+         },
+         {
+            "name": "forcings",
+            "kind": "required",
+            "type": [
+               "choices=icemodel.completions('forcings')"
+            ],
+            "purpose": "Option"
+         },
+         {
+            "name": "userdata",
+            "kind": "positional",
+            "type": [
+               "choices=icemodel.completions('userdata')"
+            ],
+            "purpose": "Option"
+         },
+         {
+            "name": "uservars",
+            "kind": "positional",
+            "type": [
+               "choices=icemodel.completions('uservars')"
+            ],
+            "purpose": "Option"
+         },
+         {
+            "name": "testname",
+            "kind": "positional",
+            "type": [
+               [
+                  "char"
+               ],
+               [
+                  "string",
+                  "scalar"
+               ]
+            ],
+            "purpose": "Option"
+         },
+         {
+            "name": "saveflag",
+            "kind": "positional",
+            "type": [
+               "logical",
+               "scalar"
+            ],
+            "purpose": "Option"
+         },
+         {
+            "name": "backupflag",
+            "kind": "positional",
+            "type": [
+               "logical",
+               "scalar"
+            ],
+            "purpose": "Option"
+         }
       ],
-      "outputs":
-      [
-         {"name":"opts", "type":["struct"]}
+      "outputs": [
+         {
+            "name": "opts",
+            "type": [
+               "struct"
+            ]
+         }
       ]
    },
-   "icemodel.run.point":
-   {
-      "inputs":
-      [
-         {"name":"saveflag",        "kind":"namevalue", "type":["logical","scalar"]},
-         {"name":"sitename",        "kind":"namevalue", "type":["choices=icemodel.completions('sitename')"]},
-         {"name":"forcings",        "kind":"namevalue", "type":["choices=icemodel.completions('forcings')"]},
-         {"name":"userdata",        "kind":"namevalue", "type":["choices=icemodel.completions('userdata')"]},
-         {"name":"uservars",        "kind":"namevalue", "type":["choices=icemodel.completions('uservars')"]},
-         {"name":"smbmodel",        "kind":"namevalue", "type":["choices=icemodel.completions('smbmodel')"]},
-         {"name":"simyears",        "kind":"namevalue", "type":["numeric"]},
-         {"name":"gridcell",        "kind":"namevalue", "type":[["numeric","scalar"]]},
-         {"name":"testname",        "kind":"namevalue", "type":[["char"],["string","scalar"]]},
-         {"name":"backupflag",      "kind":"namevalue", "type":["logical","scalar"]},
-         {"name":"n_spinup_years",  "kind":"namevalue", "type":["double","scalar"]}
+   "icemodel.run.point": {
+      "inputs": [
+         {
+            "name": "saveflag",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
+         },
+         {
+            "name": "sitename",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('sitename')"
+            ]
+         },
+         {
+            "name": "forcings",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('forcings')"
+            ]
+         },
+         {
+            "name": "userdata",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('userdata')"
+            ]
+         },
+         {
+            "name": "uservars",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('uservars')"
+            ]
+         },
+         {
+            "name": "smbmodel",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('smbmodel')"
+            ]
+         },
+         {
+            "name": "simyears",
+            "kind": "namevalue",
+            "type": [
+               "numeric"
+            ]
+         },
+         {
+            "name": "gridcell",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "testname",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "char"
+               ],
+               [
+                  "string",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "backupflag",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
+         },
+         {
+            "name": "n_spinup_years",
+            "kind": "namevalue",
+            "type": [
+               "double",
+               "scalar"
+            ]
+         }
       ],
-      "outputs":
-      [
-         {"name":"ice1", "type":["table"]},
-         {"name":"ice2", "type":["table"]},
-         {"name":"met",  "type":["table"]},
-         {"name":"opts", "type":["struct"]}
-      ]
-   },
-   "run_perf_suite":
-   {
-      "inputs":
-      [
-         {"name":"tier",        "kind":"namevalue", "type":["choices=icemodel.completions('testtier')"]},
-         {"name":"smbmodel",    "kind":"namevalue", "type":["choices=icemodel.completions('testsmbmodel')"]},
-         {"name":"solver",      "kind":"namevalue", "type":["numeric"]},
-         {"name":"simyear",     "kind":"namevalue", "type":[["numeric","scalar"]]},
-         {"name":"smoke_sites", "kind":"namevalue", "type":["choices=icemodel.completions('sitename')"]},
-         {"name":"full_sites",  "kind":"namevalue", "type":["choices=icemodel.completions('sitename')"]},
-         {"name":"n_runs",      "kind":"namevalue", "type":[["numeric","scalar"]]},
-         {"name":"tol_perf",    "kind":"namevalue", "type":[["numeric","scalar"]]},
-         {"name":"baseline",    "kind":"namevalue", "type":[["string","scalar"],"choices=icemodel.completions('rollingbaseline')"]},
-         {"name":"run_name",    "kind":"namevalue", "type":[["char"],["string","scalar"]]}
-      ],
-      "outputs":
-      [
-         {"name":"results", "type":["struct"]}
-      ]
-   },
-   "run_unit_suite":
-   {
-      "inputs":
-      [
-         {"name":"selector",        "kind":"namevalue", "type":[["char"],["string","scalar"]]},
-         {"name":"debug",           "kind":"namevalue", "type":["logical","scalar"]},
-         {"name":"stop_on_failure", "kind":"namevalue", "type":["logical","scalar"]},
-         {"name":"verbosity",       "kind":"namevalue", "type":["choices=terse,concise,detailed"]}
-      ],
-      "outputs":
-      [
-         {"name":"results", "type":["matlab.unittest.TestResult"]}
-      ]
-   },
-   "run_benchmark_suite":
-   {
-      "inputs":
-      [
-         {"name":"testname", "kind":"positional", "type":[["char"],["string","scalar"]]}
-      ],
-      "outputs":
-      [
-         {"name":"results", "type":["matlab.perftest.TimeResult"]}
-      ]
-   },
-   "run_regression_suite":
-   {
-      "inputs":
-      [
-         {"name":"tier",        "kind":"namevalue", "type":["choices=icemodel.completions('testtier')"]},
-         {"name":"smbmodel",    "kind":"namevalue", "type":["choices=icemodel.completions('testsmbmodel')"]},
-         {"name":"solver",      "kind":"namevalue", "type":["numeric"]},
-         {"name":"simyear",     "kind":"namevalue", "type":[["numeric","scalar"]]},
-         {"name":"smoke_sites", "kind":"namevalue", "type":["choices=icemodel.completions('sitename')"]},
-         {"name":"full_sites",  "kind":"namevalue", "type":["choices=icemodel.completions('sitename')"]},
-         {"name":"baseline",    "kind":"namevalue", "type":[["string","scalar"],"choices=icemodel.completions('rollingbaseline')"]},
-         {"name":"run_name",    "kind":"namevalue", "type":[["char"],["string","scalar"]]}
-      ],
-      "outputs":
-      [
-         {"name":"results", "type":["matlab.unittest.TestResult"]}
-      ]
-   },
-   "run_test_bootstrap":
-   {
-      "inputs":
-      [
-         {"name":"baseline_tag",        "kind":"namevalue", "type":[["string","scalar"],["char"]]},
-         {"name":"smbmodel",            "kind":"namevalue", "type":["choices=icemodel.completions('testsmbmodel')"]},
-         {"name":"solver",              "kind":"namevalue", "type":["numeric"]},
-         {"name":"simyear",             "kind":"namevalue", "type":[["numeric","scalar"]]},
-         {"name":"smoke_sites",         "kind":"namevalue", "type":["choices=icemodel.completions('sitename')"]},
-         {"name":"full_sites",          "kind":"namevalue", "type":["choices=icemodel.completions('sitename')"]},
-         {"name":"clean_artifacts",     "kind":"namevalue", "type":["logical","scalar"]},
-         {"name":"clean_baselines",     "kind":"namevalue", "type":["logical","scalar"]},
-         {"name":"backup_before_clean", "kind":"namevalue", "type":["logical","scalar"]}
-      ],
-      "outputs":
-      [
-         {"name":"results", "type":["struct"]}
-      ]
-   },
-   "build_perf_baseline":
-   {
-      "inputs":
-      [
-         {"name":"baseline",     "kind":"namevalue", "type":[["string","scalar"],"choices=icemodel.completions('rollingbaseline')"]},
-         {"name":"baseline_tag", "kind":"namevalue", "type":[["string","scalar"],["char"]]},
-         {"name":"tier",         "kind":"namevalue", "type":["choices=icemodel.completions('testtier')"]},
-         {"name":"smbmodel",     "kind":"namevalue", "type":["choices=icemodel.completions('testsmbmodel')"]},
-         {"name":"solver",       "kind":"namevalue", "type":["numeric"]},
-         {"name":"simyear",      "kind":"namevalue", "type":[["numeric","scalar"]]},
-         {"name":"smoke_sites",  "kind":"namevalue", "type":["choices=icemodel.completions('sitename')"]},
-         {"name":"full_sites",   "kind":"namevalue", "type":["choices=icemodel.completions('sitename')"]},
-         {"name":"n_runs",       "kind":"namevalue", "type":[["numeric","scalar"]]},
-         {"name":"tol_perf",     "kind":"namevalue", "type":[["numeric","scalar"]]},
-         {"name":"output_file",  "kind":"namevalue", "type":"file"}
-      ],
-      "outputs":
-      [
-         {"name":"PerfBaseline", "type":["table"]}
-      ]
-   },
-   "build_regression_baseline":
-   {
-      "inputs":
-      [
-         {"name":"baseline",     "kind":"namevalue", "type":[["string","scalar"],"choices=icemodel.completions('rollingbaseline')"]},
-         {"name":"baseline_tag", "kind":"namevalue", "type":[["string","scalar"],["char"]]},
-         {"name":"tier",         "kind":"namevalue", "type":["choices=icemodel.completions('testtier')"]},
-         {"name":"smbmodel",     "kind":"namevalue", "type":["choices=icemodel.completions('testsmbmodel')"]},
-         {"name":"solver",       "kind":"namevalue", "type":["numeric"]},
-         {"name":"simyear",      "kind":"namevalue", "type":[["numeric","scalar"]]},
-         {"name":"smoke_sites",  "kind":"namevalue", "type":["choices=icemodel.completions('sitename')"]},
-         {"name":"full_sites",   "kind":"namevalue", "type":["choices=icemodel.completions('sitename')"]},
-         {"name":"output_file",  "kind":"namevalue", "type":"file"}
-      ],
-      "outputs":
-      [
-         {"name":"RegressionBaseline", "type":["table"]}
-      ]
-   },
-   "snapshot_perf_baseline":
-   {
-      "inputs":
-      [
-         {"name":"baseline_tag", "kind":"namevalue", "type":[["string","scalar"],["char"]]},
-         {"name":"smbmodel",     "kind":"namevalue", "type":["choices=icemodel.completions('testsmbmodel')"]},
-         {"name":"simyear",      "kind":"namevalue", "type":[["numeric","scalar"]]},
-         {"name":"overwrite",    "kind":"namevalue", "type":["logical","scalar"]},
-         {"name":"output_file",  "kind":"namevalue", "type":"file"}
-      ],
-      "outputs":
-      [
-         {"name":"PerfBaseline", "type":["table"]}
-      ]
-   },
-   "snapshot_regression_baseline":
-   {
-      "inputs":
-      [
-         {"name":"baseline_tag", "kind":"namevalue", "type":[["string","scalar"],["char"]]},
-         {"name":"smbmodel",     "kind":"namevalue", "type":["choices=icemodel.completions('testsmbmodel')"]},
-         {"name":"overwrite",    "kind":"namevalue", "type":["logical","scalar"]},
-         {"name":"output_file",  "kind":"namevalue", "type":"file"}
-      ],
-      "outputs":
-      [
-         {"name":"RegressionBaseline", "type":["table"]}
-      ]
-   },
-   "build_runoff_reference_from_runoff":
-   {
-      "inputs":
-      [
-         {"name":"simyear",      "kind":"namevalue", "type":[["numeric","scalar"]]},
-         {"name":"runoff_root",  "kind":"namevalue", "type":"folder"},
-         {"name":"output_file",  "kind":"namevalue", "type":"file"}
-      ],
-      "outputs":
-      [
-         {"name":"RunoffReference", "type":["table"]}
+      "outputs": [
+         {
+            "name": "ice1",
+            "type": [
+               "table"
+            ]
+         },
+         {
+            "name": "ice2",
+            "type": [
+               "table"
+            ]
+         },
+         {
+            "name": "met",
+            "type": [
+               "table"
+            ]
+         },
+         {
+            "name": "opts",
+            "type": [
+               "struct"
+            ]
+         }
       ]
    }
 }
