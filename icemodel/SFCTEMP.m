@@ -40,7 +40,10 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
    % Gather terms in the SEB equation.
    AAA = cv_air * De;   % [W m-2 K-1]
    CCC = 0.622 / Pa;    % [Pa-1] = [m3 J-1]
-   EEE = chi * (1.0 - albedo) * Qsi + emiss * Qli + Qc + a1 * T(1); % [W m-2]
+   EEE = chi * (1.0 - albedo) * Qsi + emiss * Qli + Qc; % [W m-2]
+   if a1 ~= 0.0
+      EEE = EEE + a1 * T(1);
+   end
    FFF = roL * De;      % [W m-2]
 
    % Compute the constants used in the stability coefficient computations.
