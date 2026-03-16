@@ -11,6 +11,8 @@ function [met, filepath] = makeSyntheticMetFile(simyear, kwargs)
       kwargs.forcings (1, :) char = 'kanm'
       kwargs.nsteps (1, 1) double {mustBeInteger, mustBePositive} = 48
       kwargs.dt_seconds (1, 1) double {mustBePositive} = 3600
+      kwargs.include_modis (1, 1) logical = false
+      kwargs.modis_varname (1, :) char = 'MODIS'
       kwargs.metdir (1, :) char = ''
    end
 
@@ -29,6 +31,10 @@ function [met, filepath] = makeSyntheticMetFile(simyear, kwargs)
    ppt = zeros(kwargs.nsteps, 1);
 
    met = timetable(Time, tair, swd, lwd, albedo, wspd, rh, psfc, ppt);
+   if kwargs.include_modis
+      modis = min(max(albedo - 0.05, 0.05), 0.95);
+      met.(kwargs.modis_varname) = modis;
+   end
 
    filepath = '';
    if ~isempty(kwargs.metdir)
