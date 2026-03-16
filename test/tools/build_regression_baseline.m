@@ -68,61 +68,47 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    runoff_ref = icemodel.test.helpers.loadRunoffReference();
 
    % Preallocate row containers for the accepted baseline summary and opts.
-   rows = struct([]);
+   row_cells = cell(height(cases), 1);
    case_opts = struct([]);
-   k = 0;
 
    % Run each formal case and save the accepted scalar regression state.
    for icase = 1:height(cases)
       c = cases(icase, :);
       opts_run = icemodel.test.helpers.setModelOptsForCase(c);
 
-      [ice1, ice2] = runModel(opts_run);
+      [ice1, ice2] = icemodel.test.helpers.runSmbModel(opts_run);
       [ice1, ~] = icemodel.postprocess( ...
          ice1, ice2, opts_run, opts_run.output_years);
-      S = icemodel.test.helpers.summarizeIce1Metrics(ice1);
       ridx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);
-
-      icemodel_window_m3 = nan;
-      runoff_eval_window = nan;
-      melt_eval_window = nan;
-      if ~isempty(ridx)
-         runoff_eval_window = icemodel.test.helpers.computeCumulativeWindowDelta( ...
-            ice1, "runoff", runoff_ref.t1(ridx), runoff_ref.t2(ridx));
-         melt_eval_window = icemodel.test.helpers.computeCumulativeWindowDelta( ...
-            ice1, "melt", runoff_ref.t1(ridx), runoff_ref.t2(ridx));
-         icemodel_window_m3 = icemodel.test.helpers.computeCatchmentRunoffFinal( ...
-            ice1, runoff_ref.area_med_m2(ridx), runoff_ref.t1(ridx), ...
-            runoff_ref.t2(ridx));
+      met = icemodel.test.helpers.loadProcessedMetForOutputYears(opts_run);
+      if isempty(ridx)
+         refrow = [];
+      else
+         refrow = runoff_ref(ridx, :);
       end
+      S = icemodel.test.helpers.summarizeIce1Metrics(ice1, met, refrow);
 
-      k = k + 1;
-      rows(k).case_id = string(c.case_id);
-      rows(k).tier = string(c.tier);
-      rows(k).baseline_type = baseline_type;
-      rows(k).baseline_tag = baseline_tag;
-      rows(k).smbmodel = string(c.smbmodel);
-      rows(k).sitename = string(c.sitename);
-      rows(k).forcings = string(c.forcings);
-      rows(k).simyear = c.simyear;
-      rows(k).solver = c.solver;
-      rows(k).runoff_final = S.runoff_final;
-      rows(k).melt_final = S.melt_final;
-      rows(k).runoff_eval_window = runoff_eval_window;
-      rows(k).melt_eval_window = melt_eval_window;
-      rows(k).mean_Tice_numiter = S.mean_Tice_numiter;
-      rows(k).max_Tice_numiter = S.max_Tice_numiter;
-      rows(k).n_not_converged = S.n_not_converged;
-      rows(k).icemodel_window_m3 = icemodel_window_m3;
-      rows(k).last_updated_utc = datetime('now', 'TimeZone', 'UTC');
+      row = struct();
+      row.case_id = string(c.case_id);
+      row.tier = string(c.tier);
+      row.baseline_type = baseline_type;
+      row.baseline_tag = baseline_tag;
+      row.smbmodel = string(c.smbmodel);
+      row.sitename = string(c.sitename);
+      row.forcings = string(c.forcings);
+      row.simyear = c.simyear;
+      row.solver = c.solver;
+      row = copyMetricFields(row, S);
+      row.last_updated_utc = datetime('now', 'TimeZone', 'UTC');
+      row_cells{icase} = row;
 
-      case_opts(k).case_id = string(c.case_id);
-      case_opts(k).case = table2struct(c);
-      case_opts(k).opts = opts_run;
+      case_opts(icase).case_id = string(c.case_id);
+      case_opts(icase).case = table2struct(c);
+      case_opts(icase).opts = opts_run;
    end
 
    % Convert the accepted case rows into the saved baseline table.
-   RegressionBaseline = struct2table(rows);
+   RegressionBaseline = struct2table(vertcat(row_cells{:}));
 
    % Record the build metadata alongside the accepted baseline values.
    meta = struct();
@@ -150,14 +136,11 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    save(char(output_file), 'RegressionBaseline', 'case_opts', 'meta');
 end
 
-function varargout = runModel(opts)
-   % Dispatch to the requested core model kernel.
-   switch opts.smbmodel
-      case 'icemodel'
-         [varargout{1:nargout}] = icemodel(opts);
-      case 'skinmodel'
-         [varargout{1:nargout}] = skinmodel(opts);
-      otherwise
-         error('unsupported smbmodel: %s', opts.smbmodel)
+function row = copyMetricFields(row, S)
+
+   names = string(fieldnames(S));
+   for i = 1:numel(names)
+      name = char(names(i));
+      row.(name) = S.(name);
    end
 end

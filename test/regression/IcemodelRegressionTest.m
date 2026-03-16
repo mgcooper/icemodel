@@ -35,6 +35,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             'ICEMODEL_TEST_FULL_SITES');
          baseline_tag = getenv('ICEMODEL_REGRESSION_BASELINE');
          run_name = getenv('ICEMODEL_TEST_RUN_NAME');
+
          runoff_ref = icemodel.test.helpers.loadRunoffReference();
          cases = icemodel.test.helpers.getRegressionCaseMatrix( ...
             tier=tier, smbmodel=smbmodel, solver=solver, simyear=simyear, ...
@@ -54,168 +55,108 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             c = cases(icase, :);
             opts = icemodel.test.helpers.setModelOptsForCase(c);
 
-            [ice1, ice2] = runModel(opts);
+            [ice1, ice2] = icemodel.test.helpers.runSmbModel(opts);
             [ice1, ice2] = icemodel.postprocess( ...
                ice1, ice2, opts, opts.output_years); %#ok<ASGLU>
-            S = icemodel.test.helpers.summarizeIce1Metrics(ice1);
 
             ridx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);
-            obs_window_m3 = nan;
-            mar_window_m3 = nan;
-            merra_window_m3 = nan;
-            racmo_window_m3 = nan;
-            icemodel_window_m3 = nan;
-            runoff_eval_window = nan;
-            melt_eval_window = nan;
-            obs_window_diff_m3 = nan;
-            mar_window_diff_m3 = nan;
-            merra_window_diff_m3 = nan;
-            racmo_window_diff_m3 = nan;
-
-            if ~isempty(ridx)
-               obs_window_m3 = runoff_ref.obs_final_m3(ridx);
-               mar_window_m3 = runoff_ref.mar_final_m3(ridx);
-               merra_window_m3 = runoff_ref.merra_final_m3(ridx);
-               racmo_window_m3 = runoff_ref.racmo_final_m3(ridx);
-               runoff_eval_window = icemodel.test.helpers.computeCumulativeWindowDelta( ...
-                  ice1, "runoff", runoff_ref.t1(ridx), runoff_ref.t2(ridx));
-               melt_eval_window = icemodel.test.helpers.computeCumulativeWindowDelta( ...
-                  ice1, "melt", runoff_ref.t1(ridx), runoff_ref.t2(ridx));
-               icemodel_window_m3 = icemodel.test.helpers.computeCatchmentRunoffFinal( ...
-                  ice1, runoff_ref.area_med_m2(ridx), runoff_ref.t1(ridx), ...
-                  runoff_ref.t2(ridx));
+            met = icemodel.test.helpers.loadProcessedMetForOutputYears(opts);
+            if isempty(ridx)
+               refrow = [];
+            else
+               refrow = runoff_ref(ridx, :);
             end
+            S = icemodel.test.helpers.summarizeIce1Metrics(ice1, met, refrow);
+
+            % Init values
+            [base_runoff_final, base_melt_final, base_runoff_eval, ...
+               base_melt_eval, runoff_delta, melt_delta, runoff_eval_delta, ...
+               melt_eval_delta, runoff_pct_delta, melt_pct_delta, ...
+               runoff_eval_pct_delta, melt_eval_pct_delta, ...
+               base_mean_Tice_numiter, base_max_Tice_numiter, ...
+               base_n_not_converged] = deal(nan);
 
             bid = icemodel.test.helpers.findCaseRow(baseline, string(c.case_id));
-            base_runoff_final = nan;
-            base_melt_final = nan;
-            base_mean_Tice_numiter = nan;
-            base_max_Tice_numiter = nan;
-            base_n_not_converged = nan;
-            base_icemodel_window_m3 = nan;
-            base_runoff_eval_window = nan;
-            base_melt_eval_window = nan;
-            runoff_delta = nan;
-            melt_delta = nan;
-            icemodel_window_m3_delta = nan;
-            runoff_eval_window_delta = nan;
-            melt_eval_window_delta = nan;
             if ~isempty(bid)
                base_runoff_final = ...
                   testCase.getBaselineValue(baseline, bid, 'runoff_final');
                base_melt_final = ...
                   testCase.getBaselineValue(baseline, bid, 'melt_final');
-               base_runoff_eval_window = ...
-                  testCase.getBaselineValue(baseline, bid, 'runoff_eval_window');
-               base_melt_eval_window = ...
-                  testCase.getBaselineValue(baseline, bid, 'melt_eval_window');
+               base_runoff_eval = ...
+                  testCase.getBaselineValue(baseline, bid, 'runoff_eval');
+               base_melt_eval = ...
+                  testCase.getBaselineValue(baseline, bid, 'melt_eval');
                base_mean_Tice_numiter = ...
                   testCase.getBaselineValue(baseline, bid, 'mean_Tice_numiter');
                base_max_Tice_numiter = ...
                   testCase.getBaselineValue(baseline, bid, 'max_Tice_numiter');
                base_n_not_converged = ...
                   testCase.getBaselineValue(baseline, bid, 'n_not_converged');
-               testCase.checkAgainstBaseline(S.runoff_final, ...
-                  baseline, bid, 'runoff_final');
-               testCase.checkAgainstBaseline(S.melt_final, ...
-                  baseline, bid, 'melt_final');
-               if isfinite(runoff_eval_window)
-                  testCase.checkAgainstBaseline(runoff_eval_window, ...
-                     baseline, bid, 'runoff_eval_window');
-               end
-               if isfinite(melt_eval_window)
-                  testCase.checkAgainstBaseline(melt_eval_window, ...
-                     baseline, bid, 'melt_eval_window');
-               end
-               testCase.checkAgainstBaseline(S.mean_Tice_numiter, ...
-                  baseline, bid, 'mean_Tice_numiter');
-               testCase.checkAgainstBaseline(S.max_Tice_numiter, ...
-                  baseline, bid, 'max_Tice_numiter');
-               testCase.checkAgainstBaseline(S.n_not_converged, ...
-                  baseline, bid, 'n_not_converged');
-            end
-
-            if ~isempty(ridx)
-               if ~isempty(bid) && ismember('icemodel_window_m3', ...
-                     baseline.Properties.VariableNames)
-
-                  ref_icemodel = baseline.icemodel_window_m3(bid);
-                  base_icemodel_window_m3 = ref_icemodel;
-
-                  if isfinite(ref_icemodel)
-                     tol = max(testCase.abs_tol_runoff_m3, ...
-                        testCase.rel_tol_runoff_m3 * abs(ref_icemodel));
-
-                     testCase.verifyLessThanOrEqual( ...
-                        abs(icemodel_window_m3 - ref_icemodel), tol, ...
-                        sprintf('runoff m3 mismatch case=%s', c.case_id));
+               metric_names = string(fieldnames(S));
+               for imetric = 1:numel(metric_names)
+                  this_metric = metric_names(imetric);
+                  actual = S.(char(this_metric));
+                  if isfinite(actual)
+                     testCase.checkAgainstBaseline(actual, ...
+                        baseline, bid, char(this_metric));
                   end
                end
-
-               obs_window_diff_m3 = icemodel_window_m3 - obs_window_m3;
-               mar_window_diff_m3 = icemodel_window_m3 - mar_window_m3;
-               merra_window_diff_m3 = icemodel_window_m3 - merra_window_m3;
-               racmo_window_diff_m3 = icemodel_window_m3 - racmo_window_m3;
             end
 
             if isfinite(base_runoff_final)
                runoff_delta = S.runoff_final - base_runoff_final;
+               runoff_pct_delta = IcemodelRegressionTest.computePctDelta( ...
+                  S.runoff_final, base_runoff_final);
             end
             if isfinite(base_melt_final)
                melt_delta = S.melt_final - base_melt_final;
+               melt_pct_delta = IcemodelRegressionTest.computePctDelta( ...
+                  S.melt_final, base_melt_final);
             end
-            if isfinite(base_runoff_eval_window)
-               runoff_eval_window_delta = ...
-                  runoff_eval_window - base_runoff_eval_window;
+            if isfinite(base_runoff_eval)
+               runoff_eval_delta = ...
+                  S.runoff_eval - base_runoff_eval;
+               runoff_eval_pct_delta = ...
+                  IcemodelRegressionTest.computePctDelta( ...
+                  S.runoff_eval, base_runoff_eval);
             end
-            if isfinite(base_melt_eval_window)
-               melt_eval_window_delta = ...
-                  melt_eval_window - base_melt_eval_window;
-            end
-            if isfinite(base_icemodel_window_m3) && isfinite(icemodel_window_m3)
-               icemodel_window_m3_delta = ...
-                  icemodel_window_m3 - base_icemodel_window_m3;
+            if isfinite(base_melt_eval)
+               melt_eval_delta = ...
+                  S.melt_eval - base_melt_eval;
+               melt_eval_pct_delta = ...
+                  IcemodelRegressionTest.computePctDelta( ...
+                  S.melt_eval, base_melt_eval);
             end
 
+            row = struct(); %#ok<*AGROW>
+            row.case_id = string(c.case_id);
+            row.tier = string(c.tier);
+            row.baseline_tag = string(baseline_tag);
+            row.smbmodel = string(c.smbmodel);
+            row.sitename = string(c.sitename);
+            row.forcings = string(c.forcings);
+            row.simyear = c.simyear;
+            row.solver = c.solver;
+            row = testCase.copyMetricFields(row, S);
+            row.baseline_runoff_final = base_runoff_final;
+            row.baseline_melt_final = base_melt_final;
+            row.baseline_runoff_eval = base_runoff_eval;
+            row.baseline_melt_eval = base_melt_eval;
+            row.baseline_mean_Tice_numiter = base_mean_Tice_numiter;
+            row.baseline_max_Tice_numiter = base_max_Tice_numiter;
+            row.baseline_n_not_converged = base_n_not_converged;
+            row.runoff_delta = runoff_delta;
+            row.melt_delta = melt_delta;
+            row.runoff_eval_delta = runoff_eval_delta;
+            row.melt_eval_delta = melt_eval_delta;
+            row.runoff_pct_delta = runoff_pct_delta;
+            row.melt_pct_delta = melt_pct_delta;
+            row.runoff_eval_pct_delta = runoff_eval_pct_delta;
+            row.melt_eval_pct_delta = melt_eval_pct_delta;
+            row.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
+            report_rows = vertcat(report_rows, row);
+
             r = r + 1;
-            report_rows(r).case_id = string(c.case_id); %#ok<*AGROW>
-            report_rows(r).tier = string(c.tier);
-            report_rows(r).baseline_tag = string(baseline_tag);
-            report_rows(r).smbmodel = string(c.smbmodel);
-            report_rows(r).sitename = string(c.sitename);
-            report_rows(r).forcings = string(c.forcings);
-            report_rows(r).simyear = c.simyear;
-            report_rows(r).solver = c.solver;
-            report_rows(r).runoff_final = S.runoff_final;
-            report_rows(r).melt_final = S.melt_final;
-            report_rows(r).runoff_eval_window = runoff_eval_window;
-            report_rows(r).melt_eval_window = melt_eval_window;
-            report_rows(r).mean_Tice_numiter = S.mean_Tice_numiter;
-            report_rows(r).max_Tice_numiter = S.max_Tice_numiter;
-            report_rows(r).n_not_converged = S.n_not_converged;
-            report_rows(r).baseline_runoff_final = base_runoff_final;
-            report_rows(r).baseline_melt_final = base_melt_final;
-            report_rows(r).baseline_runoff_eval_window = base_runoff_eval_window;
-            report_rows(r).baseline_melt_eval_window = base_melt_eval_window;
-            report_rows(r).baseline_mean_Tice_numiter = base_mean_Tice_numiter;
-            report_rows(r).baseline_max_Tice_numiter = base_max_Tice_numiter;
-            report_rows(r).baseline_n_not_converged = base_n_not_converged;
-            report_rows(r).runoff_delta = runoff_delta;
-            report_rows(r).melt_delta = melt_delta;
-            report_rows(r).runoff_eval_window_delta = runoff_eval_window_delta;
-            report_rows(r).melt_eval_window_delta = melt_eval_window_delta;
-            report_rows(r).obs_window_m3 = obs_window_m3;
-            report_rows(r).mar_window_m3 = mar_window_m3;
-            report_rows(r).merra_window_m3 = merra_window_m3;
-            report_rows(r).racmo_window_m3 = racmo_window_m3;
-            report_rows(r).baseline_icemodel_window_m3 = base_icemodel_window_m3;
-            report_rows(r).icemodel_window_m3 = icemodel_window_m3;
-            report_rows(r).icemodel_window_m3_delta = icemodel_window_m3_delta;
-            report_rows(r).obs_window_diff_m3 = obs_window_diff_m3;
-            report_rows(r).mar_window_diff_m3 = mar_window_diff_m3;
-            report_rows(r).merra_window_diff_m3 = merra_window_diff_m3;
-            report_rows(r).racmo_window_diff_m3 = racmo_window_diff_m3;
-            report_rows(r).timestamp_utc = datetime('now', 'TimeZone', 'UTC');
 
             case_opts(r).case_id = string(c.case_id);
             case_opts(r).case = table2struct(c);
@@ -229,9 +170,18 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          % Save one artifact for this regression compare run.
          testCase.logReport(report, case_opts, meta);
       end
+
    end
 
    methods (Access = private)
+      function row = copyMetricFields(~, row, S)
+         names = string(fieldnames(S));
+         for i = 1:numel(names)
+            name = char(names(i));
+            row.(name) = S.(name);
+         end
+      end
+
       function checkAgainstBaseline(testCase, actual, baseline, row, varname)
          % Compare one scalar regression metric against the selected baseline.
          if ~ismember(varname, baseline.Properties.VariableNames)
@@ -241,8 +191,13 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          if ~isfinite(expected)
             return
          end
-         tol = max(testCase.abs_tol_scalar, ...
-            testCase.rel_tol_scalar * abs(expected));
+         if endsWith(string(varname), "_m3")
+            tol = max(testCase.abs_tol_runoff_m3, ...
+               testCase.rel_tol_runoff_m3 * abs(expected));
+         else
+            tol = max(testCase.abs_tol_scalar, ...
+               testCase.rel_tol_scalar * abs(expected));
+         end
          testCase.verifyLessThanOrEqual(abs(actual - expected), tol, ...
             sprintf('baseline mismatch var=%s', varname));
       end
@@ -275,17 +230,23 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             char(meta.tier), char(model_tag + solver_tag), baseline_tag));
          save(outfile, 'report', 'case_opts', 'meta');
          disp(outfile)
-         disp(report(:, {'case_id', 'runoff_final', ...
-            'baseline_runoff_final', 'runoff_delta'}))
+         disp(makeDisplayTable(report, ...
+            'runoff_final', 'baseline_runoff_final', 'runoff_pct_delta', ...
+            'runoff', 'baseline', 'pct_delta'))
          fprintf('\n')
-         disp(report(:, {'case_id', 'melt_final', ...
-            'baseline_melt_final', 'melt_delta'}))
+         disp(makeDisplayTable(report, ...
+            'melt_final', 'baseline_melt_final', 'melt_pct_delta', ...
+            'melt', 'baseline', 'pct_delta'))
          fprintf('\n')
-         disp(report(:, {'case_id', 'runoff_eval_window', ...
-            'baseline_runoff_eval_window', 'runoff_eval_window_delta'}))
+         disp(makeDisplayTable(report, ...
+            'runoff_eval', 'baseline_runoff_eval', ...
+            'runoff_eval_pct_delta', ...
+            'runoff_eval', 'baseline_eval', 'pct_delta'))
          fprintf('\n')
-         disp(report(:, {'case_id', 'melt_eval_window', ...
-            'baseline_melt_eval_window', 'melt_eval_window_delta'}))
+         disp(makeDisplayTable(report, ...
+            'melt_eval', 'baseline_melt_eval', ...
+            'melt_eval_pct_delta', ...
+            'melt_eval', 'baseline_eval', 'pct_delta'))
       end
    end
 
@@ -309,7 +270,10 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
       function meta = reportMeta(tier, smbmodel, solver, simyear, ...
             smoke_sites, full_sites, baseline_tag, run_name)
-         [run_date, run_id, run_name] = icemodel.test.helpers.resolveRunStamp(run_name);
+
+         [run_date, run_id, run_name] = ...
+            icemodel.test.helpers.resolveRunStamp(run_name);
+
          meta = struct();
          meta.tier = string(tier);
          meta.smbmodel_filter = string(smbmodel);
@@ -389,16 +353,21 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          x = 1.0;
       end
    end
+
+   methods (Static, Access = private)
+      function pct = computePctDelta(actual, baseline)
+         pct = nan;
+         if isfinite(actual) && isfinite(baseline) && baseline ~= 0
+            pct = 100 * (actual - baseline) / baseline;
+         end
+      end
+   end
 end
 
-function varargout = runModel(opts)
-   % Dispatch to the requested model kernel.
-   switch opts.smbmodel
-      case 'icemodel'
-         [varargout{1:nargout}] = icemodel(opts);
-      case 'skinmodel'
-         [varargout{1:nargout}] = skinmodel(opts);
-      otherwise
-         error('unsupported smbmodel: %s', opts.smbmodel)
-   end
+function T = makeDisplayTable(report, current_var, baseline_var, pct_var, ...
+      current_label, baseline_label, pct_label)
+
+   T = table(report.case_id, report.(current_var), report.(baseline_var), ...
+      report.(pct_var), 'VariableNames', ...
+      {'case_id', current_label, baseline_label, pct_label});
 end

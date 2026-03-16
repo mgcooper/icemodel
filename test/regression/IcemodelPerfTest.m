@@ -20,7 +20,7 @@ classdef IcemodelPerfTest < matlab.perftest.TestCase
          % Time only the core model call. Setup and reporting stay outside the
          % measured region.
          testCase.startMeasuring
-         runModel(testCase.opts);
+         icemodel.test.helpers.runSmbModel(testCase.opts);
          testCase.stopMeasuring
       end
    end
@@ -39,26 +39,16 @@ function opts = buildCaseOpts()
    simyears = getenv('ICEMODEL_TEST_SIMYEARS');
    n_spinup_years = str2double(getenvRequired('ICEMODEL_TEST_N_SPINUP_YEARS'));
    solver = str2double(getenvRequired('ICEMODEL_TEST_SOLVER'));
+
    c = struct('smbmodel', string(smbmodel), 'sitename', string(sitename), ...
       'forcings', string(forcings), 'userdata', string(userdata), ...
       'uservars', string(uservars), 'simyear', simyear, 'solver', solver);
+
    if ~isempty(simyears)
       c.simyears = parseSimyears(simyears);
       c.n_spinup_years = n_spinup_years;
    end
    opts = icemodel.test.helpers.setModelOptsForCase(c, include_spinup=false);
-end
-
-function runModel(opts)
-   % Dispatch to the requested model kernel.
-   switch opts.smbmodel
-      case 'icemodel'
-         icemodel(opts);
-      case 'skinmodel'
-         skinmodel(opts);
-      otherwise
-         error('unsupported smbmodel: %s', opts.smbmodel)
-   end
 end
 
 function s = getenvRequired(name)
