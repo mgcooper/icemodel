@@ -118,7 +118,11 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % See also: icemodel.config icemodel.run.point icemodel.configureRun
    % icemodel.getopts icemodel.resetopts
 
-   % Parse inputs
+   % Parse inputs.
+   % Keep explicit positional parsing here instead of an arguments block for
+   % pre-R2019b compatibility. Namespace/test helpers may use arguments
+   % blocks, but this core runtime entry point should preserve the older
+   % calling contract until that compatibility target is intentionally dropped.
    narginchk(4, inf)
    if nargin < 5; userdata = []; end
    if nargin < 6; uservars = []; end
@@ -140,7 +144,11 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    % general model settings
    opts.n_spinup_years  =  0;       % number of leading simulation years used only for spinup
-   opts.use_init        =  false;   % use pre-initialized data?
+   opts.use_init        =  false;   % reserved for later generic initialization support
+   opts.initfile        =  '';      % reserved generic initialization source
+   opts.use_restart     =  false;   % load an exact year-boundary restart state?
+   opts.restartfile     =  '';      % restart state file used when use_restart=true
+   opts.saverestart     =  false;   % save a restart state at each year boundary
    opts.kabs_user       =  true;    % use user-defined ice absorptivity?
    opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
    opts.calendar_type   =  'noleap';
@@ -297,6 +305,7 @@ function [smbmodel, sitename, simyears, forcings, userdata, uservars, ...
       testname = '';
    end
 
+   % convertStringsToChars in a pre-R2017b compatible way:
    args = {smbmodel, sitename, forcings, userdata, uservars, testname};
    for n = 1:numel(args)
       if isstring(args{n})
@@ -304,6 +313,11 @@ function [smbmodel, sitename, simyears, forcings, userdata, uservars, ...
       end
    end
    [smbmodel, sitename, forcings, userdata, uservars, testname] = deal(args{:});
+
+   % If >= R2017b:
+   % [smbmodel, sitename, forcings, userdata, uservars, testname] ...
+   %    = convertStringsToChars(...
+   %    smbmodel, sitename, forcings, userdata, uservars, testname);
 end
 
 %%
@@ -329,6 +343,7 @@ function opts = initopts(smbmodel, sitename, simyears, forcings, ...
    opts.patheval = [];
    opts.pathuserdata = [];
    opts.pathoutput = [];
+   opts.pathrestart = [];
    opts.casename = [];
    opts.metfname = {};
    opts.vars1 = {};

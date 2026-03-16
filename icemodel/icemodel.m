@@ -193,6 +193,11 @@ function [ice1, ice2, opts] = icemodel(opts)
 
       end % timesteps (one year)
 
+      if isfield(opts, 'saverestart') && opts.saverestart
+         icemodel.saveRestartState(opts, opts.simyears(thisyear), ...
+            T, f_ice, f_liq, Ts);
+      end
+
       % RESTART THE MET DATA STEP INDEX DURING SPIN UP
       if thisyear <= numspinup
          continue

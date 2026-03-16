@@ -1,9 +1,25 @@
-function met = processmet(met)
-   %PROCESSMET post process an icemodel met file
+function met = processmet(met, kwargs)
+   %PROCESSMET Post-process an icemodel met timetable.
+   %
+   %  met = icemodel.processmet(met)
+   %  met = icemodel.processmet(met, newTimeStep="native")
+   %  met = icemodel.processmet(met, newTimeStep="hourly")
+   %
+   % Default is "hourly"
+   %
+   % See also: icemodel.loadmet, icemodel.postprocess
+
+   arguments
+      met timetable
+      kwargs.newTimeStep (1, :) string {mustBeMember(kwargs.newTimeStep, ...
+         ["native", "hourly"])} = "hourly"
+   end
 
    [Tf, emiss, SB] = icemodel.physicalConstant('Tf', 'emiss', 'SB');
 
-   met = retime(met, 'hourly', 'mean');
+   if kwargs.newTimeStep == "hourly"
+      met = retime(met, 'hourly', 'mean');
+   end
    met = met(~(month(met.Time) == 2 & day(met.Time) == 29), :);
 
    if ~isvariable('tsfc', met)

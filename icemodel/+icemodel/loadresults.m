@@ -28,7 +28,7 @@ function [ice1, ice2, met] = loadresults(opts, varargin)
    % Load the met data for the requested years and post-process it.
    met = icemodel.loadmet(opts);
    met = met(ismember(year(met.Time), simyears), :);
-   met = icemodel.processmet(met);
+   met = icemodel.processmet(met, newTimeStep="hourly");
 
    % Load the simulation results, concatenating yearly files if needed.
    ice1 = [];

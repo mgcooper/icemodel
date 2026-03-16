@@ -6,6 +6,7 @@ function pathlist = setpath(pathtype, sitename, smbmodel, userdata, simyears, va
    %  pathlist = icemodel.setpath('eval')
    %  pathlist = icemodel.setpath('userdata')
    %  pathlist = icemodel.setpath('output', sitename, smbmodel)
+   %  pathlist = icemodel.setpath('restart', sitename, smbmodel)
    %  pathlist = icemodel.setpath('output', sitename, smbmodel, userdata)
    %  pathlist = icemodel.setpath('output', sitename, smbmodel, userdata, ...
    %     simyears, testname)
@@ -47,6 +48,11 @@ function pathlist = setpath(pathtype, sitename, smbmodel, userdata, simyears, va
          else
             pathlist = fullfile(parts{:}, simyears);
          end
+
+      case 'restart'
+         parts = [{resolveOutputPath(), sitename, smbmodel}, varargin, {'restart'}];
+         parts = parts(~cellfun(@isblankpart, parts));
+         pathlist = fullfile(parts{:});
 
       otherwise
          error('unrecognized pathtype: %s', pathtype)

@@ -75,6 +75,10 @@ function opts = resetopts(opts, varargin)
       opts.pathoutput = [];
    end
 
+   if ismember('pathoutput', names) && ~ismember('pathrestart', names)
+      opts.pathrestart = [];
+   end
+
    if ismember('pathinput', names) && ~ismember('pathuserdata', names)
       opts.pathuserdata = [];
    end

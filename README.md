@@ -146,11 +146,12 @@ IceModel produces two outputs: `ice1` and `ice2`, representing 1-dimensional and
 ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY/ice1_FORCINGS_forcings_USERDATA_USERVARS.mat
 ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY/ice2_FORCINGS_forcings_USERDATA_USERVARS.mat
 ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/opts/opts_FORCINGS_forcings_USERDATA_USERVARS.mat
+ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/restart/restart_FORCINGS_forcings_USERDATA_USERVARS_YYYY.mat
 ```
 
 Here, `ICEMODEL_OUTPUT_PATH` is an environment variable set by the `icemodel.config` function, the lowercase "forcings" is a string literal used to join the `FORCINGS` and `USERDATA` string variables, and `SITENAME`, `SMBMODEL`, `FORCINGS`, `USERDATA`, and `USERVARS` are parameters passed to the `icemodel.setopts` function (either directly or indirectly via the helper function `icemodel.run.point`). One `YYYY` folder is created for each year in the `SIMYEARS` parameter passed to `icemodel.setopts`.
 
-Note that the `ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY` subfolders are generated automatically when the model run starts if they do not exist.
+Note that the `ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY` subfolders are generated automatically when the model run starts if they do not exist. If `opts.saverestart` is enabled, a sibling `restart/` folder is also created under the same run output directory and stores one year-boundary restart file per saved year.
 
 Example: An IceModel simulation for the KAN-M weather station location for years 2015:2016 using MERRA forcings, with `userdata='modis'` and `uservars='albedo'` will produce the following output files:
 

@@ -108,7 +108,7 @@ function varargout = postprocess(ice1, ice2, opts, varargin)
             met = icemodel.loadmet(opts);
             met = met(isbetween(met.Time, time(1), time(end)), :);
          end
-         varargout{3} = icemodel.processmet(met);
+         varargout{3} = icemodel.processmet(met, newTimeStep="hourly");
    end
 end
 

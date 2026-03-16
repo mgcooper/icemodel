@@ -41,6 +41,11 @@ function opts = configureRun(opts)
          opts.sitename, opts.smbmodel, '', [], opts.testname);
    end
 
+   if ~isfield(opts, 'pathrestart') || isempty(opts.pathrestart)
+      opts.pathrestart = icemodel.setpath('restart', ...
+         opts.sitename, opts.smbmodel, opts.userdata, [], opts.testname);
+   end
+
    % Create the casename. WRITEOUTPUT appends this to the base filenames.
    % For grid runs, the wrapper overwrites this with the grid-cell ID.
    if ~isfield(opts, 'casename') || isempty(opts.casename)
