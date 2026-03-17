@@ -5,7 +5,11 @@ end
 
 function setup(testCase)
 
-   rootdir = tempname;
+   tmpdir = fullfile(icemodel.internal.fullpath(), 'test', 'artifacts', 'tmp');
+   if exist(tmpdir, 'dir') ~= 7
+      mkdir(tmpdir);
+   end
+   rootdir = tempname(tmpdir);
    inputdir = fullfile(rootdir, 'input');
    metdir = fullfile(inputdir, 'met');
    evaldir = fullfile(rootdir, 'eval');

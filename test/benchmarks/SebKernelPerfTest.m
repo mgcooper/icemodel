@@ -1,5 +1,5 @@
-classdef SebSolverTest < matlab.perftest.TestCase
-   %SEBSOLVERTEST Component benchmark for the standalone SEB surface solve.
+classdef SebKernelPerfTest < matlab.perftest.TestCase
+   %SEBKERNELPERFTEST Benchmark the standalone SEB surface-solve kernel.
 
    properties
       T
@@ -69,6 +69,8 @@ classdef SebSolverTest < matlab.perftest.TestCase
 
    methods (Test)
       function testSolver(testCase, seb_solver)
+         batch_size = sebBenchmarkBatchSize(seb_solver);
+
          % Benchmark only the SEBSOLVE call for each available root finder.
          [Ts, ok] = SEBSOLVE(testCase.Ta, testCase.Qsi, testCase.Qli, ...
             testCase.albedo, testCase.wspd, testCase.ppt, testCase.tppt, ...
@@ -81,18 +83,33 @@ classdef SebSolverTest < matlab.perftest.TestCase
          testCase.assertThat(Ts, matlab.unittest.constraints.IsFinite)
 
          while testCase.keepMeasuring
-            [Ts, ok] = SEBSOLVE(testCase.Ta, testCase.Qsi, testCase.Qli, ...
-               testCase.albedo, testCase.wspd, testCase.ppt, testCase.tppt, ...
-               testCase.Pa, testCase.De, testCase.ea, testCase.cv_air, ...
-               testCase.cv_liq, testCase.emiss, testCase.SB, testCase.Tf, ...
-               testCase.chi, testCase.roL, testCase.scoef, testCase.liqflag, ...
-               testCase.Ts0, testCase.T, testCase.k_eff, testCase.dz, ...
-               seb_solver);
+            for n = 1:batch_size
+               [Ts, ok] = SEBSOLVE(testCase.Ta, testCase.Qsi, ...
+                  testCase.Qli, testCase.albedo, testCase.wspd, ...
+                  testCase.ppt, testCase.tppt, testCase.Pa, testCase.De, ...
+                  testCase.ea, testCase.cv_air, testCase.cv_liq, ...
+                  testCase.emiss, testCase.SB, testCase.Tf, testCase.chi, ...
+                  testCase.roL, testCase.scoef, testCase.liqflag, ...
+                  testCase.Ts0, testCase.T, testCase.k_eff, testCase.dz, ...
+                  seb_solver);
+            end
 
             if ~ok || ~isfinite(Ts)
                error('SEBSOLVE benchmark failed for seb_solver=%d', seb_solver)
             end
          end
       end
+   end
+end
+
+function batch_size = sebBenchmarkBatchSize(seb_solver)
+
+   switch seb_solver
+      case 1
+         batch_size = 16;
+      case 2
+         batch_size = 6;
+      otherwise
+         batch_size = 1;
    end
 end

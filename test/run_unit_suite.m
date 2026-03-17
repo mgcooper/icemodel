@@ -27,6 +27,7 @@ function results = run_unit_suite(options)
 
    thisdir = fileparts(mfilename('fullpath'));
    addpath(fullfile(fileparts(thisdir), 'icemodel'))
+   addpath(fullfile(fileparts(thisdir), 'icemodel', 'dependencies'))
    addpath(thisdir)
    unitdir = fullfile(thisdir, 'unit');
 

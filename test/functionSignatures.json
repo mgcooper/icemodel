@@ -151,6 +151,62 @@
             "type": [
                "choices=icemodel.completions('benchmark')"
             ]
+         },
+         {
+            "name": "include_subfolders",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
+         },
+         {
+            "name": "num_warmups",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "max_samples",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "relative_margin_of_error",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "confidence_level",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
+            "name": "show_summary",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
          }
       ],
       "outputs": [

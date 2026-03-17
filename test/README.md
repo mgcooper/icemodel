@@ -19,10 +19,11 @@ and component benchmark material for the public `icemodel` repo.
    - ordinary unit tests intended for default discovery
 6. `benchmarks/`
    - component benchmarks and selected exploratory microbenchmarks
-   - representative solver benchmarks now live in:
-     `SebSolverTest.m`, `ColumnKernelPerfTest.m`,
-     `SpectralKernelPerfTest.m`, `RenameRoundTest.m`,
-     and `TryCatchTest.m`
+   - top-level benchmark files are the core kernel benchmarks run by default
+   - opt-in microbenchmarks can live in subfolders such as `benchmarks/micro/`
+   - representative core benchmark files now live in:
+     `SebKernelPerfTest.m`, `ColumnKernelPerfTest.m`,
+     and `SpectralKernelPerfTest.m`
 7. `tools/`
    - explicit build/snapshot utilities
 8. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/+icemodel/+test/+helpers/`
@@ -100,6 +101,11 @@ Programmatic regression helpers:
 9. `run_benchmark_suite(...)`
    - Use for the formal benchmark suite under `test/benchmarks/`.
    - This is separate from formal perf regression and does not use baselines.
+   - By default it runs only the top-level benchmark files.
+   - Use `include_subfolders=true` to opt into nested microbenchmarks.
+   - Use runner options such as `num_warmups`, `max_samples`,
+     `relative_margin_of_error`, and `confidence_level` to control the
+     sampling budget without rewriting the benchmark itself.
    - The benchmark suite is intended to explain where runtime is spent, not
      just compare alternative implementations in isolation.
    - Sampling-error warnings from the MATLAB perf framework are not test
