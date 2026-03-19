@@ -1,7 +1,7 @@
 function opts = buildSyntheticOpts(workspace, smbmodel, simyears, kwargs)
-%BUILDSYNTHETICOPTS Build resolved OPTS for synthetic unit-test runs.
-%
-%  opts = icemodel.test.helpers.buildSyntheticOpts(workspace, "skinmodel", 2016)
+   %BUILDSYNTHETICOPTS Build resolved OPTS for synthetic unit-test runs.
+   %
+   %  opts = icemodel.test.helpers.buildSyntheticOpts(workspace, "skinmodel", 2016)
 
    arguments
       workspace struct
@@ -23,15 +23,18 @@ function opts = buildSyntheticOpts(workspace, smbmodel, simyears, kwargs)
       kwargs.metfname = {}
    end
 
+   % Start from the normal model defaults for this synthetic site/model.
    opts = icemodel.setopts(smbmodel, workspace.sitename, simyears, ...
       workspace.forcings, kwargs.userdata, kwargs.uservars, ...
       kwargs.testname, kwargs.saveflag, kwargs.backupflag);
 
+   % Prefer the fixture timestep unless the caller overrode it explicitly.
    dt_value = kwargs.dt;
    if ~isfinite(dt_value)
       dt_value = workspace.dt_seconds;
    end
 
+   % Collect the override fields once so RESETOPTS stays data-driven.
    names = {'n_spinup_years', 'pathinput', 'pathuserdata', 'patheval', ...
       'output_profile', 'use_restart', 'restartfile', 'saverestart', 'dt'};
    values = {kwargs.n_spinup_years, workspace.inputdir, ...
@@ -50,6 +53,7 @@ function opts = buildSyntheticOpts(workspace, smbmodel, simyears, kwargs)
       values{end+1} = kwargs.metfname;
    end
 
+   % Finalize all derived run fields before returning the OPTS struct.
    resetargs = reshape([names; values], 1, []);
    opts = icemodel.resetopts(opts, resetargs{:});
    opts = icemodel.configureRun(opts);

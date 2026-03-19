@@ -13,6 +13,8 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
 
    methods (TestClassSetup)
       function buildSpectralState(testCase)
+         % Build one synthetic spectral state and cache the derived density
+         % transform used by the two benchmarked spectral paths.
          testCase.workspace = icemodel.test.fixtures.makeSyntheticWorkspace( ...
             2016, configure=true, nsteps=24, dt_seconds=900);
          testCase.state = icemodel.test.fixtures.makeSyntheticColumnState( ...
@@ -20,6 +22,9 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
             include_spectral=true, testname='spectral_perf_kernel');
 
          s = testCase.state;
+
+         % Recreate the current UPDATEEXTCOEFS density-to-bulkcoefs path so
+         % the microbenchmarks exercise the same spectral bottleneck.
          testCase.ro_sno = s.ro_ice * s.f_ice + s.ro_liq * s.f_liq + ...
             s.ro_air * (1 - s.f_ice - s.f_liq);
          ro_sno_spect = max(interp1(cumsum(s.dz) - s.dz / 2, ...
@@ -39,14 +44,18 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
 
    methods (TestClassTeardown)
       function cleanupSpectralState(testCase)
+         % Tear down the synthetic workspace after the class finishes.
          icemodel.test.fixtures.cleanupSyntheticWorkspace(testCase.workspace);
       end
    end
 
    methods (Test)
       function testTwoStreamSolve(testCase)
+         % Benchmark just the two-stream linear solve on fixed coefficients.
          s = testCase.state;
-         batch_size = 8;
+         % The bare two-stream solve is fast enough that a wide batch is
+         % needed for stable error-controlled timing.
+         batch_size = 384;
          xynet = SOLVETWOSTREAM(testCase.a, testCase.r, ...
             testCase.bulkcoefs, s.Q0, s.albedo, testCase.z_walls);
          testCase.assertTrue(all(isfinite(xynet)));
@@ -63,7 +72,13 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
       end
 
       function testUpdateExtCoefs(testCase)
+         % Benchmark the inline spectral coefficient update path used during
+         % production runs.
          s = testCase.state;
+         % UPDATEEXTCOEFS is already dominated by the exponential spectral
+         % transform, so keep the batch large but bounded to preserve a
+         % short overall suite runtime.
+         batch_size = 8192;
          [Sc_new, chi] = UPDATEEXTCOEFS(s.swd, s.albedo, s.Q0, ...
             s.dz_spect, s.spect_N, s.spect_S, s.solardwavl, s.Sc, s.dz, ...
             testCase.ro_sno);
@@ -71,9 +86,11 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
          testCase.assertTrue(isfinite(chi));
 
          while testCase.keepMeasuring
-            [Sc_new, chi] = UPDATEEXTCOEFS(s.swd, s.albedo, s.Q0, ...
-               s.dz_spect, s.spect_N, s.spect_S, s.solardwavl, s.Sc, ...
-               s.dz, testCase.ro_sno);
+            for n = 1:batch_size
+               [Sc_new, chi] = UPDATEEXTCOEFS(s.swd, s.albedo, s.Q0, ...
+                  s.dz_spect, s.spect_N, s.spect_S, s.solardwavl, s.Sc, ...
+                  s.dz, testCase.ro_sno);
+            end
             if ~all(isfinite(Sc_new)) || ~isfinite(chi)
                error('UPDATEEXTCOEFS benchmark produced a non-finite result')
             end

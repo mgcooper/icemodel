@@ -10,18 +10,29 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       abs_tol_scalar (1, 1) double = 1e-9
       rel_tol_runoff_m3 (1, 1) double = 1e-4
       abs_tol_runoff_m3 (1, 1) double = 1.0
+      env_cleanup
    end
 
    methods (TestMethodSetup)
-      function configurePaths(~)
-         % Configure the public demo/data paths used by the formal suite.
-         IcemodelRegressionTest.ensureModelConfigPaths();
+      function configurePaths(testCase)
+         % Install the canonical test config so direct class runs and
+         % runner-based runs see the same environment.
+         [~, ~, ~, ~, testCase.env_cleanup] = ...
+            icemodel.test.helpers.bootstrapTestEnvironment();
+      end
+   end
+
+   methods (TestMethodTeardown)
+      function restorePaths(testCase)
+         % Release the setup cleanup handle after each regression case.
+         testCase.env_cleanup = [];
       end
    end
 
    methods (Test)
       function testCoreRegression(testCase)
-         % Read the requested case matrix/baseline from the runner env vars.
+         % Read the requested case matrix/baseline selectors from the
+         % runner-owned environment variables.
          tier = IcemodelRegressionTest.getenvRequired('ICEMODEL_TEST_TIER');
          smbmodel = IcemodelRegressionTest.getenvRequired( ...
             'ICEMODEL_TEST_SMBMODEL_FILTER');
@@ -36,6 +47,8 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          baseline_tag = getenv('ICEMODEL_REGRESSION_BASELINE');
          run_name = getenv('ICEMODEL_TEST_RUN_NAME');
 
+         % Resolve the retained formal cases and the matched accepted baseline
+         % before entering the per-case compare loop.
          runoff_ref = icemodel.test.helpers.loadRunoffReference();
          cases = icemodel.test.helpers.getRegressionCaseMatrix( ...
             tier=tier, smbmodel=smbmodel, solver=solver, simyear=simyear, ...
@@ -46,6 +59,8 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          baseline = icemodel.test.helpers.loadRegressionBaseline(baseline_tag, ...
             smbmodel);
 
+         % Accumulate the compare report and resolved opts for one saved
+         % artifact per regression run.
          report_rows = struct([]);
          case_opts = struct([]);
          r = 0;
@@ -59,6 +74,8 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             [ice1, ice2] = icemodel.postprocess( ...
                ice1, ice2, opts, opts.output_years); %#ok<ASGLU>
 
+            % Summarize the retained output years against the matched runoff
+            % reference row, if one exists for this formal case.
             ridx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);
             met = icemodel.test.helpers.loadProcessedMetForOutputYears(opts);
             if isempty(ridx)
@@ -68,7 +85,8 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             end
             S = icemodel.test.helpers.summarizeIce1Metrics(ice1, met, refrow);
 
-            % Init values
+            % Initialize the baseline-vs-current compare fields before probing
+            % the accepted baseline row for this case.
             [base_runoff_final, base_melt_final, base_runoff_eval, ...
                base_melt_eval, runoff_delta, melt_delta, runoff_eval_delta, ...
                melt_eval_delta, runoff_pct_delta, melt_pct_delta, ...
@@ -103,6 +121,8 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
                end
             end
 
+            % Convert the matched baseline values into absolute and percent
+            % deltas for the saved compare artifact.
             if isfinite(base_runoff_final)
                runoff_delta = S.runoff_final - base_runoff_final;
                runoff_pct_delta = IcemodelRegressionTest.computePctDelta( ...
@@ -128,6 +148,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
                   S.melt_eval, base_melt_eval);
             end
 
+            % Save the current-vs-baseline context for the output artifact.
             row = struct(); %#ok<*AGROW>
             row.case_id = string(c.case_id);
             row.tier = string(c.tier);
@@ -167,6 +188,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          meta = IcemodelRegressionTest.reportMeta( ...
             tier, smbmodel, solver, simyear, smoke_sites, full_sites, ...
             baseline_tag, run_name);
+
          % Save one artifact for this regression compare run.
          testCase.logReport(report, case_opts, meta);
       end
@@ -175,6 +197,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
    methods (Access = private)
       function row = copyMetricFields(~, row, S)
+         % Copy the scalar metric struct into one artifact row.
          names = string(fieldnames(S));
          for i = 1:numel(names)
             name = char(names(i));
@@ -203,6 +226,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       end
 
       function x = getBaselineValue(~, baseline, row, varname)
+         % Read one baseline value when the saved table carries that column.
          if ismember(varname, baseline.Properties.VariableNames)
             x = baseline.(varname)(row);
          else
@@ -213,11 +237,15 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       function logReport(~, report, case_opts, meta)
          % Save the full regression artifact, then print only the baseline-vs-
          % current summary that is useful during development.
-         rootdir = IcemodelRegressionTest.repoRoot();
-         outdir = fullfile(rootdir, 'test', 'artifacts', char(meta.run_name));
+
+         % Create the run-specific artifact folder before saving the report.
+         testdir = icemodel.getpath('test');
+         outdir = fullfile(testdir, 'artifacts', char(meta.run_name));
          if exist(outdir, 'dir') ~= 7
             mkdir(outdir);
          end
+
+         % Format the baseline/model/solver tags used by the saved filename.
          if meta.baseline_tag == ""
             baseline_tag = 'nobaseline';
          else
@@ -228,6 +256,8 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          outfile = fullfile(outdir, ...
             sprintf('regression_report_%s%s_%s.mat', ...
             char(meta.tier), char(model_tag + solver_tag), baseline_tag));
+
+         % Save the full artifact, then print the compact compare summaries.
          save(outfile, 'report', 'case_opts', 'meta');
          disp(outfile)
          disp(makeDisplayTable(report, ...
@@ -251,17 +281,11 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
    end
 
    methods (Static, Access = private)
-      function ensureModelConfigPaths()
-         rootdir = IcemodelRegressionTest.repoRoot();
-         addpath(fullfile(rootdir, 'test'));
-         icemodel.test.helpers.configureModelPaths(rootdir);
-      end
-
-      function rootdir = repoRoot()
-         rootdir = icemodel.internal.fullpath();
-      end
-
       function s = getenvRequired(name)
+         %GETENVREQUIRED Read one required regression env var or error cleanly.
+         %
+         % The test bootstrap installs config paths, but the runner still
+         % owns the concrete ICEMODEL_TEST_* selectors for one compare run.
          s = getenv(name);
          if isempty(s)
             error('missing required regression env var: %s', name)
@@ -270,10 +294,13 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
       function meta = reportMeta(tier, smbmodel, solver, simyear, ...
             smoke_sites, full_sites, baseline_tag, run_name)
+         %REPORTMETA Build the saved metadata struct for one regression artifact.
 
+         % Resolve the shared run stamp before filling the saved metadata.
          [run_date, run_id, run_name] = ...
             icemodel.test.helpers.resolveRunStamp(run_name);
 
+         % Record the compare selector, tolerances, and resolved path context.
          meta = struct();
          meta.tier = string(tier);
          meta.smbmodel_filter = string(smbmodel);
@@ -292,8 +319,8 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          meta.case_builder = "icemodel.test.helpers.setModelOptsForCase";
          meta.opts_source = "icemodel.setopts defaults";
          meta.reset_fields = "solver";
-         meta.input_path = string(getenv('ICEMODEL_INPUT_PATH'));
-         meta.output_path = string(getenv('ICEMODEL_OUTPUT_PATH'));
+         meta.input_path = string(icemodel.getpath('input'));
+         meta.output_path = string(icemodel.getpath('output'));
          meta.suite_file = string(mfilename('fullpath'));
          meta.matlab_version = string(version);
          meta.host = string(computer);
@@ -301,6 +328,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       end
 
       function label = smbmodelLabel(smbmodel)
+         %SMBMODELLABEL Format the smbmodel selector for artifact filenames.
          smbmodel = string(smbmodel);
          if any(strcmpi(smbmodel, "all"))
             label = "";
@@ -310,6 +338,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       end
 
       function x = getenvAsNumbers(name)
+         %GETENVASNUMBERS Parse a numeric vector env var.
          s = getenv(name);
          if isempty(s)
             x = [];
@@ -320,6 +349,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       end
 
       function x = getenvAsStrings(name)
+         %GETENVASSTRINGS Parse a comma-delimited string env var.
          s = getenv(name);
          if isempty(s)
             x = strings(0, 1);
@@ -330,6 +360,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       end
 
       function label = solverLabel(solver)
+         %SOLVERLABEL Format the solver filter for artifact filenames.
          if isempty(solver)
             label = "";
          else
@@ -338,24 +369,29 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       end
 
       function x = scalarRelTol()
+         %SCALARRELTOL Return the scalar relative regression tolerance.
          x = 1e-6;
       end
 
       function x = scalarAbsTol()
+         %SCALARABSTOL Return the scalar absolute regression tolerance.
          x = 1e-9;
       end
 
       function x = runoffRelTol()
+         %RUNOFFRELTOL Return the runoff relative regression tolerance.
          x = 1e-4;
       end
 
       function x = runoffAbsTol()
+         %RUNOFFABSTOL Return the runoff absolute regression tolerance.
          x = 1.0;
       end
    end
 
    methods (Static, Access = private)
       function pct = computePctDelta(actual, baseline)
+         %COMPUTEPCTDELTA Compute percent change against a baseline value.
          pct = nan;
          if isfinite(actual) && isfinite(baseline) && baseline ~= 0
             pct = 100 * (actual - baseline) / baseline;
@@ -366,6 +402,7 @@ end
 
 function T = makeDisplayTable(report, current_var, baseline_var, pct_var, ...
       current_label, baseline_label, pct_label)
+   %MAKEDISPLAYTABLE Build one compact console summary table from the artifact.
 
    T = table(report.case_id, report.(current_var), report.(baseline_var), ...
       report.(pct_var), 'VariableNames', ...

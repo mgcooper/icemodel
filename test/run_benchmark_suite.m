@@ -4,6 +4,7 @@ function results = run_benchmark_suite(options)
    %  results = run_benchmark_suite()
    %  results = run_benchmark_suite(testname="SebKernelPerfTest")
    %  results = run_benchmark_suite(testname="micro", include_subfolders=true)
+   %  results = run_benchmark_suite(sampling_profile="fast")
    %
    % Use this runner for component benchmarks and one-off performance
    % experiments. The default suite uses only the top-level benchmark files
@@ -17,24 +18,50 @@ function results = run_benchmark_suite(options)
    arguments
       options.testname (1, :) string = ""
       options.include_subfolders (1, 1) logical = false
-      options.num_warmups (1, 1) double {mustBeInteger, mustBeNonnegative} = 4
-      options.max_samples (1, 1) double {mustBeInteger, mustBePositive} = 100
-      options.relative_margin_of_error (1, 1) double {mustBePositive} = 0.02
-      options.confidence_level (1, 1) double {mustBePositive, ...
-         mustBeLessThanOrEqual(options.confidence_level, 1.0)} = 0.98
+      options.sampling_profile (1, :) string ...
+         {icemodel.validators.mustBeBenchmarkSamplingProfileName( ...
+         options.sampling_profile)} = "default"
+      options.num_warmups (1, 1) double = NaN
+      options.max_samples (1, 1) double = NaN
+      options.relative_margin_of_error (1, 1) double = NaN
+      options.confidence_level (1, 1) double = NaN
       options.show_summary (1, 1) logical = true
    end
 
    import matlab.perftest.TimeExperiment
 
-   thisdir = fileparts(mfilename('fullpath'));
-   addpath(fullfile(fileparts(thisdir), 'icemodel'))
-   addpath(fullfile(fileparts(thisdir), 'icemodel', 'dependencies'))
-   addpath(thisdir)
+   % Install the canonical formal-suite config and keep the cleanup handle
+   % in scope so the caller's environment is restored on return.
+   [~, ~, ~, ~, suite_cleanup] = ...
+      icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>
 
-   % Resolve the simple benchmark names used in this helper to the formal
-   % benchmark suite. Callers can still pass an explicit path or selector.
+   % Set the experiment sampling options.
+   [num_warmups, max_samples, relative_margin_of_error, ...
+      confidence_level] = resolveSamplingOptions(options);
+
+   % Resolve the requested benchmark selector before constructing the
+   % limiting-sampling-error experiment.
+   suite = buildBenchmarkSuite(options);
+
+   % Run the component benchmark experiment.
+   experiment = TimeExperiment.limitingSamplingError( ...
+      "NumWarmups", num_warmups, ...
+      "MaxSamples", max_samples, ...
+      "RelativeMarginOfError", relative_margin_of_error, ...
+      "ConfidenceLevel", confidence_level);
+   results = run(experiment, suite);
+
+   if options.show_summary
+      disp(compactBenchmarkSummary(results));
+   end
+end
+
+function suite = buildBenchmarkSuite(options)
+   %BUILDBENCHMARKSUITE Resolve the requested benchmark file/folder selector.
+
+   % Resolve simple benchmark names to the formal benchmark file/folder.
    target = resolveBenchmarkTarget(options.testname);
+
    if exist(target, 'dir') == 7
       if options.include_subfolders
          suite = testsuite(target, 'IncludingSubfolders', true);
@@ -44,54 +71,78 @@ function results = run_benchmark_suite(options)
    else
       suite = testsuite(target);
    end
-   experiment = TimeExperiment.limitingSamplingError( ...
-      "NumWarmups", options.num_warmups, ...
-      "MaxSamples", options.max_samples, ...
-      "RelativeMarginOfError", options.relative_margin_of_error, ...
-      "ConfidenceLevel", options.confidence_level);
-   results = run(experiment, suite);
+end
 
-   if options.show_summary
-      disp(sampleSummary(results));
+function [num_warmups, max_samples, relative_margin_of_error, ...
+      confidence_level] = resolveSamplingOptions(options)
+   %RESOLVESAMPLINGOPTIONS Merge profile defaults with explicit overrides.
+
+   [num_warmups, max_samples, relative_margin_of_error, ...
+      confidence_level] = profileDefaults(options.sampling_profile);
+
+   % Explicit numeric overrides win over the named profile defaults.
+   if ~isnan(options.num_warmups)
+      num_warmups = options.num_warmups;
    end
+   if ~isnan(options.max_samples)
+      max_samples = options.max_samples;
+   end
+   if ~isnan(options.relative_margin_of_error)
+      relative_margin_of_error = options.relative_margin_of_error;
+   end
+   if ~isnan(options.confidence_level)
+      confidence_level = options.confidence_level;
+   end
+
+   mustBeInteger(num_warmups);
+   mustBeNonnegative(num_warmups);
+   mustBeInteger(max_samples);
+   mustBePositive(max_samples);
+   mustBePositive(relative_margin_of_error);
+   mustBePositive(confidence_level);
+   mustBeLessThanOrEqual(confidence_level, 1.0);
 end
 
 function target = resolveBenchmarkTarget(testname)
-   rootdir = icemodel.internal.fullpath();
+   %RESOLVEBENCHMARKTARGET Map a selector string to a benchmark file/folder.
 
-   if isempty(testname) || all(strlength(testname) == 0)
-      target = fullfile(rootdir, 'test', 'benchmarks');
+   testdir = icemodel.getpath('test');
+   benchdir = fullfile(testdir, 'benchmarks');
+
+   % Default to the top-level core benchmark suite. Microbenchmarks live in
+   % subfolders and are opt-in through explicit selectors.
+   if isblanktext(testname)
+      target = benchdir;
       return
    end
 
-   testname = string(testname);
    if contains(testname, filesep) || endsWith(testname, ".m")
       target = char(testname);
       return
    end
 
-   target = fullfile(rootdir, 'test', 'benchmarks', char(testname) + ".m");
+   target = fullfile(benchdir, char(testname) + ".m");
    if exist(target, 'file') == 2
       return
    end
 
-   target = fullfile(rootdir, 'test', 'benchmarks', char(testname));
+   target = fullfile(benchdir, char(testname));
    if exist(target, 'dir') == 7
       return
    end
 
-   dirhits = dir(fullfile(rootdir, 'test', 'benchmarks', '**', char(testname)));
+   dirhits = dir(fullfile(benchdir, '**', char(testname)));
    dirhits = dirhits([dirhits.isdir]);
-   if numel(dirhits) == 1
+   if isscalar(dirhits)
       target = fullfile(dirhits(1).folder, dirhits(1).name);
       return
    elseif numel(dirhits) > 1
       error('benchmark selector is ambiguous: %s', testname)
    end
 
-   filehits = dir(fullfile(rootdir, 'test', 'benchmarks', '**', ...
+   filehits = dir(fullfile(benchdir, '**', ...
       char(testname) + ".m"));
-   if numel(filehits) == 1
+   if isscalar(filehits)
       target = fullfile(filehits(1).folder, filehits(1).name);
       return
    elseif numel(filehits) > 1
@@ -99,4 +150,41 @@ function target = resolveBenchmarkTarget(testname)
    end
 
    error('benchmark selector does not resolve to a file/folder: %s', testname)
+end
+
+function [num_warmups, max_samples, relative_margin_of_error, ...
+      confidence_level] = profileDefaults(profile_name)
+   %PROFILEDEFAULTS Return the named sampling policy for benchmark runs.
+
+   switch char(profile_name)
+      case 'fast'
+         num_warmups = 2;
+         max_samples = 20;
+         relative_margin_of_error = 0.10;
+         confidence_level = 0.90;
+
+      case 'default'
+         num_warmups = 4;
+         max_samples = 300;
+         relative_margin_of_error = 0.02;
+         confidence_level = 0.98;
+
+      case 'strict'
+         num_warmups = 6;
+         max_samples = 600;
+         relative_margin_of_error = 0.01;
+         confidence_level = 0.99;
+
+      otherwise
+         error('unsupported sampling profile: %s', profile_name)
+   end
+end
+
+function summary = compactBenchmarkSummary(results)
+   %COMPACTBENCHMARKSUMMARY Keep only the main timing columns for display.
+
+   summary = sampleSummary(results);
+   keep = ["Name", "SampleSize", "Mean", "StandardDeviation"];
+   keep = keep(ismember(keep, string(summary.Properties.VariableNames)));
+   summary = summary(:, cellstr(keep));
 end

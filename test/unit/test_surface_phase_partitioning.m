@@ -1,9 +1,11 @@
 function tests = test_surface_phase_partitioning
-%TEST_SURFACE_PHASE_PARTITIONING Verify dry/wet vapor partition behavior.
+   %TEST_SURFACE_PHASE_PARTITIONING Verify dry/wet vapor partition behavior.
    tests = functiontests(localfunctions);
 end
 
 function test_dry_deposition_adds_ice(testCase)
+   % Dry deposition on a cold surface should go directly into the ice
+   % fraction rather than creating a liquid film.
 
    [ro_ice, ro_liq, Ls, Lv] = icemodel.physicalConstant( ...
       'ro_ice', 'ro_liq', 'Ls', 'Lv');
@@ -22,6 +24,8 @@ function test_dry_deposition_adds_ice(testCase)
 end
 
 function test_wet_condensation_stays_liquid(testCase)
+   % Once the surface is already wet, condensation should remain in the
+   % liquid branch instead of increasing the ice fraction.
 
    [ro_ice, ro_liq, Ls, Lv] = icemodel.physicalConstant( ...
       'ro_ice', 'ro_liq', 'Ls', 'Lv');
@@ -40,6 +44,8 @@ function test_wet_condensation_stays_liquid(testCase)
 end
 
 function test_dry_sublimation_removes_ice(testCase)
+   % Dry sublimation should remove ice mass without creating spurious
+   % liquid water.
 
    [ro_ice, ro_liq, Ls, Lv] = icemodel.physicalConstant( ...
       'ro_ice', 'ro_liq', 'Ls', 'Lv');
@@ -56,6 +62,8 @@ function test_dry_sublimation_removes_ice(testCase)
 end
 
 function test_vappress_honors_satflag(testCase)
+   % The phase flag should switch between ice and liquid saturation vapor
+   % pressure curves at the same temperature.
 
    Tf = icemodel.physicalConstant('Tf');
    es_iceflag = VAPPRESS(Tf - 5, Tf, false);

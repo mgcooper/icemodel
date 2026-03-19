@@ -15,8 +15,7 @@ function ref = loadRunoffReference(simyear, pathname)
       simyear = [];
    end
    if nargin < 2 || isempty(pathname)
-      rootdir = icemodel.internal.fullpath();
-      pathname = resolveDefaultPaths(rootdir, simyear);
+      pathname = resolveDefaultPaths(icemodel.getpath('test'), simyear);
    end
 
    if isempty(pathname)
@@ -24,10 +23,8 @@ function ref = loadRunoffReference(simyear, pathname)
    end
 
    if iscell(pathname)
-      refs = cell(numel(pathname), 1);
-      for i = 1:numel(pathname)
-         refs{i} = normalizeReference(loadReference(pathname{i}));
-      end
+      refs = cellfun(@(p) normalizeReference(loadReference(p)), pathname, ...
+         'UniformOutput', false);
       ref = vertcat(refs{:});
    else
       if exist(pathname, 'file') ~= 2
@@ -41,8 +38,9 @@ function ref = loadRunoffReference(simyear, pathname)
    end
 end
 
-function pathname = resolveDefaultPaths(rootdir, simyear)
-   refdir = fullfile(rootdir, 'test', 'references');
+function pathname = resolveDefaultPaths(testdir, simyear)
+   %RESOLVEDEFAULTPATHS Resolve the default runoff-reference file(s) to load.
+   refdir = fullfile(testdir, 'references');
    pathname = fullfile(refdir, 'runoff_reference.mat');
    if exist(pathname, 'file') == 2
       return
@@ -65,10 +63,12 @@ function pathname = resolveDefaultPaths(rootdir, simyear)
 end
 
 function raw = loadReference(pathname)
+   %LOADREFERENCE Load one runoff reference MAT file into a table.
    raw = icemodel.test.helpers.loadSavedTable(pathname, ["RunoffReference", "ref"]);
 end
 
 function ref = normalizeReference(raw)
+   %NORMALIZEREFERENCE Normalize saved runoff reference columns and types.
    ref = raw;
 
    required = ["sitename", "forcings", "simyear", "t1", "t2", ...

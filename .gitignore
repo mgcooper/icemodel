@@ -5,6 +5,8 @@ data/output/
 demo/data/output/
 test/artifacts/
 test/backups/
+test/baselines/profiler/
+test/benchmarks/profiler/
 
 # vscode
 .vscode

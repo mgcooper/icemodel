@@ -34,9 +34,9 @@ function test_setopts_treats_empty_optional_inputs_as_omitted(testCase)
    verifyEqual(testCase, opts.testname, '');
 end
 
-function test_setpath_omits_empty_placeholders(testCase)
-   expected = icemodel.setpath('output', 'site', 'model', '', [], 'run001');
-   returned = icemodel.setpath('output', 'site', 'model', [], [], {}, 'run001');
+function test_getpath_omits_empty_placeholders(testCase)
+   expected = icemodel.getpath('output', 'site', 'model', '', [], 'run001');
+   returned = icemodel.getpath('output', 'site', 'model', [], [], {}, 'run001');
 
    verifyEqual(testCase, returned, expected);
 end

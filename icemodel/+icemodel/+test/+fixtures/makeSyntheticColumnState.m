@@ -1,11 +1,11 @@
 function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
-%MAKESYNTHETICCOLUMNSTATE Build a resolved synthetic column kernel state.
-%
-%  state = icemodel.test.fixtures.makeSyntheticColumnState(workspace, "icemodel")
-%
-% The returned struct contains a benign initialized column, resolved opts,
-% forcing data for one met step, and the physical constants needed by the
-% core solver kernels.
+   %MAKESYNTHETICCOLUMNSTATE Build a resolved synthetic column kernel state.
+   %
+   %  state = icemodel.test.fixtures.makeSyntheticColumnState(workspace, "icemodel")
+   %
+   % The returned struct contains a benign initialized column, resolved opts,
+   % forcing data for one met step, and the physical constants needed by the
+   % core solver kernels.
 
    arguments
       workspace struct
@@ -22,20 +22,24 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
       simyears = workspace.simyears(1);
    end
 
+   % Resolve one benign OPTS struct and load the matching forcing slice.
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
       workspace, smbmodel, simyears, ...
       solver=kwargs.solver, testname=kwargs.testname, output_profile='standard');
    met = icemodel.loadmet(opts);
 
+   % Initialize the column state exactly as the model kernel would.
    [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, ...
       JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, f_ice_min, ...
       f_liq_res, ro_iwe, ro_wie] = ICEINIT(opts, met.tair);
 
    metstep = kwargs.metstep;
+   % Extract one forcing step and the corresponding transfer coefficients.
    [tair, swd, lwd, albedo, wspd, psfc, De, ea] = LOADMETDATA(met, metstep, ...
       liqflag);
    [~, scoef] = WINDCOEF(wspd, opts.z_0, opts.z_tair, opts.z_wind);
 
+   % Carry precipitation fields when the synthetic met fixture defines them.
    if ismember('ppt', met.Properties.VariableNames)
       ppt = met.ppt(metstep);
    else
@@ -53,6 +57,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
       'SB', 'k_liq', 'ro_ice', 'ro_liq', 'ro_air', 'Ls', 'Lf', 'roLf', ...
       'Rv', 'Tf', 'epsilon', 'roLs', 'roLv', 'fcp');
 
+   % Package the resolved state so kernel tests can reuse it directly.
    state = struct();
    state.workspace = workspace;
    state.opts = opts;
@@ -131,6 +136,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    state.cpl_aitken = opts.cpl_aitken;
    state.cpl_jumpmax = opts.cpl_jumpmax;
 
+   % Attach the spectral grid only for tests that exercise that path.
    if kwargs.include_spectral
       [Q0, dz_spect, spect_N, spect_S, solardwavl] = EXTCOEFSINIT(opts, ro_ice);
       state.Q0 = Q0;

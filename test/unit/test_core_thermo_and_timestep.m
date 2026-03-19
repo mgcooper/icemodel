@@ -1,9 +1,11 @@
 function tests = test_core_thermo_and_timestep
-%TEST_CORE_THERMO_AND_TIMESTEP Verify local thermo and substep contracts.
+   %TEST_CORE_THERMO_AND_TIMESTEP Verify local thermo and substep contracts.
    tests = functiontests(localfunctions);
 end
 
 function test_vappress_derivative_matches_finite_difference(testCase)
+   % Check the analytic vapor-pressure derivative against a centered finite
+   % difference so downstream linearizations have a stable local reference.
 
    Tf = icemodel.physicalConstant('Tf');
    T = Tf - 8.0;
@@ -16,6 +18,8 @@ function test_vappress_derivative_matches_finite_difference(testCase)
 end
 
 function test_tdew_matches_vappress_inverse(testCase)
+   % Dew-point helpers should agree with the inverse path exposed through
+   % VAPPRESS when both use the ice-curve relation.
 
    Tf = icemodel.physicalConstant('Tf');
    T = Tf - 5.0;
@@ -28,6 +32,8 @@ function test_tdew_matches_vappress_inverse(testCase)
 end
 
 function test_loadmetdata_respects_liqflag(testCase)
+   % LOADMETDATA should switch between ice and liquid saturation relations
+   % when the caller flips the liquid-phase flag.
 
    [met, ~] = icemodel.test.fixtures.makeSyntheticMetFile(2016, 'nsteps', 1);
    met.De = 0.01;
@@ -39,6 +45,8 @@ function test_loadmetdata_respects_liqflag(testCase)
 end
 
 function test_metsub_interpolates_midstep_for_enabled_option(testCase)
+   % With substep interpolation enabled, METSUB should evaluate the forcing
+   % state halfway through the parent step.
 
    opts.met_substep_interp = true;
    Tf = icemodel.physicalConstant('Tf');
@@ -62,6 +70,8 @@ function test_metsub_interpolates_midstep_for_enabled_option(testCase)
 end
 
 function test_metsub_returns_step_value_when_interp_disabled(testCase)
+   % With interpolation disabled, METSUB should hold the parent-step value
+   % and still compute a consistent vapor pressure from that state.
 
    opts.met_substep_interp = false;
    Tf = icemodel.physicalConstant('Tf');
@@ -77,6 +87,8 @@ function test_metsub_returns_step_value_when_interp_disabled(testCase)
 end
 
 function test_sfcflin_matches_surface_terms_at_linearization_point(testCase)
+   % The linearized surface flux coefficients should reproduce the full
+   % surface residual at the temperature used for the linearization.
 
    [cv_air, emiss, SB, roLs, Tf] = icemodel.physicalConstant( ...
       'cv_air', 'emiss', 'SB', 'roLs', 'Tf');

@@ -1,7 +1,7 @@
 function verifyProcessedOutputBounds(testCase, ice1, ice2)
-%VERIFYPROCESSEDOUTPUTBOUNDS Verify basic physical bounds of processed output.
-%
-%  icemodel.test.verify.verifyProcessedOutputBounds(testCase, ice1, ice2)
+   %VERIFYPROCESSEDOUTPUTBOUNDS Verify basic physical bounds of processed output.
+   %
+   %  icemodel.test.verify.verifyProcessedOutputBounds(testCase, ice1, ice2)
 
    arguments
       testCase
@@ -9,6 +9,7 @@ function verifyProcessedOutputBounds(testCase, ice1, ice2)
       ice2 struct
    end
 
+   % Processed outputs should always contain finite retained timesteps.
    testCase.verifyGreaterThan(height(ice1), 0);
    testCase.verifyTrue(all(isfinite(ice1{:, :}), 'all'), ...
       'processed ice1 output contains non-finite values');
@@ -17,6 +18,8 @@ function verifyProcessedOutputBounds(testCase, ice1, ice2)
       testCase.verifyEqual(numel(ice2.Time), height(ice1));
    end
 
+   % Check phase-fraction bounds using the same density convention as the
+   % core column model.
    [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
    if isfield(ice2, 'f_ice')
       testCase.verifyGreaterThanOrEqual(min(ice2.f_ice(:)), -1e-9);
@@ -31,6 +34,7 @@ function verifyProcessedOutputBounds(testCase, ice1, ice2)
       testCase.verifyLessThanOrEqual(max(massfrac(:)), 1 + 1e-6);
    end
 
+   % Retained cumulative diagnostics should remain monotone after processing.
    if ismember('runoff', ice1.Properties.VariableNames)
       testCase.verifyGreaterThanOrEqual(min(diff(ice1.runoff)), -1e-6);
    end

@@ -1,9 +1,10 @@
 function tests = test_flux_and_thermo_kernels
-%TEST_FLUX_AND_THERMO_KERNELS Verify local thermo and surface-flux kernels.
+   %TEST_FLUX_AND_THERMO_KERNELS Verify local thermo and surface-flux kernels.
    tests = functiontests(localfunctions);
 end
 
 function test_pressure_decreases_with_elevation(testCase)
+   % Pressure should monotonically decrease with elevation in the helper.
 
    sea_level = PRESSURE(0);
    summit = PRESSURE(1500);
@@ -13,6 +14,8 @@ function test_pressure_decreases_with_elevation(testCase)
 end
 
 function test_longwave_fluxes_have_expected_signs(testCase)
+   % Longwave-in should remain positive while longwave-out stays negative
+   % under the project sign convention.
 
    SB = icemodel.physicalConstant('SB');
    Qli_dry = LONGIN(263.15, 150, SB);
@@ -25,6 +28,8 @@ function test_longwave_fluxes_have_expected_signs(testCase)
 end
 
 function test_turbulent_flux_kernels_follow_sign_convention(testCase)
+   % Positive sensible and latent fluxes should correspond to transfer
+   % toward the surface under the standard kernel sign convention.
 
    Qh = SENSIBLE(1e-3, 1.2, 270, 268, 1200);
    Qe = LATENT(1e-3, 1.2, 350, 300, 2.5e9, 0.622, 78000);
@@ -36,6 +41,8 @@ function test_turbulent_flux_kernels_follow_sign_convention(testCase)
 end
 
 function test_windcoef_and_stablefn_cover_neutral_stable_and_unstable(testCase)
+   % The Monin-Obukhov stability helper should span neutral, stable, and
+   % unstable branches with the expected ordering.
 
    [De, scoef] = WINDCOEF(4.0, 1e-3, 3.0, 3.0);
    S_neutral = STABLEFN(268, 268, 4.0, scoef);
@@ -49,6 +56,8 @@ function test_windcoef_and_stablefn_cover_neutral_stable_and_unstable(testCase)
 end
 
 function test_vappress2rh_recovers_saturation_for_ice_and_water(testCase)
+   % The RH conversion should map each saturation vapor pressure back to
+   % roughly 100 percent for both phase relations.
 
    T = 268.15;
    rh_ice = VAPPRESS2RH(VAPPRESS2(T, false), T, false);
@@ -59,6 +68,8 @@ function test_vappress2rh_recovers_saturation_for_ice_and_water(testCase)
 end
 
 function test_getkvapor_matches_vaporheat_dry_branch(testCase)
+   % GETKVAPOR is the dry-branch shortcut used by VAPORHEAT and should
+   % match that branch exactly.
 
    [Ls, Rv, Tf] = icemodel.physicalConstant('Ls', 'Rv', 'Tf');
    T = [260; 265; 270];
@@ -72,6 +83,8 @@ function test_getkvapor_matches_vaporheat_dry_branch(testCase)
 end
 
 function test_getgamma_stays_positive_and_responds_to_liquid(testCase)
+   % Effective conductivity should stay positive and increase as the same
+   % state gains more liquid water.
 
    [ro_ice, k_liq, Ls, Rv, Tf] = icemodel.physicalConstant( ...
       'ro_ice', 'k_liq', 'Ls', 'Rv', 'Tf');
@@ -89,6 +102,8 @@ function test_getgamma_stays_positive_and_responds_to_liquid(testCase)
 end
 
 function test_updateState_matches_component_kernels(testCase)
+   % UPDATESTATE should stay consistent with the lower-level thermo helpers
+   % it wraps into one state-update call.
 
    [ro_ice, ro_liq, ro_air, cv_ice, cv_liq, k_liq, roLf, Ls, Rv, Tf, ...
       fcp] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'ro_air', ...
@@ -120,6 +135,8 @@ function test_updateState_matches_component_kernels(testCase)
 end
 
 function test_solvewb_returns_air_temperature_at_saturation(testCase)
+   % Wet-bulb temperature should collapse to air temperature at saturation
+   % and fall below it for drier air.
 
    [Ls, cp_air, Pa] = icemodel.physicalConstant('Ls', 'cp_air', 'P0');
    Ta = 268.15;

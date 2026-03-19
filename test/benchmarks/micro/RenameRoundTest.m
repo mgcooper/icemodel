@@ -25,6 +25,7 @@ classdef RenameRoundTest < matlab.perftest.TestCase
 
    methods (TestMethodSetup)
       function generateTestData(testCase)
+         % Build representative rename and rounding payloads once per method.
          [testCase.ice1_rename, testCase.oldvars, testCase.newvars] = ...
             createRenameData();
          [testCase.ice2_round, testCase.ice2lookup] = createRoundData();
@@ -40,6 +41,7 @@ classdef RenameRoundTest < matlab.perftest.TestCase
 
    methods (Test)
       function testRenameIsmember(testCase)
+         % Measure the `ismember`-based rename strategy.
          renamed = renameUsingIsmember(testCase.ice1_rename, ...
             testCase.oldvars, testCase.newvars);
          testCase.assertNotEmpty(renamed)
@@ -55,6 +57,7 @@ classdef RenameRoundTest < matlab.perftest.TestCase
       end
 
       function testRenameIntersect(testCase)
+         % Measure the `intersect`-based rename strategy.
          renamed = renameUsingIntersect(testCase.ice1_rename, ...
             testCase.oldvars, testCase.newvars);
          testCase.assertNotEmpty(renamed)
@@ -70,6 +73,7 @@ classdef RenameRoundTest < matlab.perftest.TestCase
       end
 
       function testRoundSwitch(testCase)
+         % Measure the switch-based field-precision rounder.
          rounded = roundUsingSwitch(testCase.ice2_round);
          testCase.assertNotEmpty(rounded)
 
@@ -83,6 +87,7 @@ classdef RenameRoundTest < matlab.perftest.TestCase
       end
 
       function testRoundIsmember(testCase)
+         % Measure the lookup-based rounder driven by `ismember`.
          rounded = roundUsingIsmember(testCase.ice2_round, ...
             testCase.ice2lookup);
          testCase.assertNotEmpty(rounded)
@@ -98,6 +103,7 @@ classdef RenameRoundTest < matlab.perftest.TestCase
       end
 
       function testRoundIntersect(testCase)
+         % Measure the lookup-based rounder driven by `intersect`.
          rounded = roundUsingIntersect(testCase.ice2_round, ...
             testCase.ice2lookup);
          testCase.assertNotEmpty(rounded)
@@ -113,6 +119,7 @@ classdef RenameRoundTest < matlab.perftest.TestCase
       end
 
       function testRoundIsmemberPersistent(testCase)
+         % Measure the persistent `ismember` lookup variant.
          rounded = roundUsingIsmemberPersistent(testCase.ice2_round);
          testCase.assertNotEmpty(rounded)
 
@@ -126,6 +133,7 @@ classdef RenameRoundTest < matlab.perftest.TestCase
       end
 
       function testRoundIntersectPersistent(testCase)
+         % Measure the persistent `intersect` lookup variant.
          rounded = roundUsingIntersectPersistent(testCase.ice2_round);
          testCase.assertNotEmpty(rounded)
 
@@ -278,6 +286,7 @@ function ice2 = roundUsingIntersectPersistent(ice2)
 end
 
 function ice2lookup = createIce2Lookup()
+%CREATEICE2LOOKUP Define the field-to-rounding-precision lookup table.
    ice2lookup = {
       'f_ice', 5; 'f_liq', 5; 'k_vap', 5; 'k_eff', 5; ...
       'Tice', 3; 'h_melt', 3; 'h_freeze', 3; ...

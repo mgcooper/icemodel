@@ -17,6 +17,8 @@ function RunoffReference = build_runoff_reference_from_runoff(kwargs)
       kwargs.runoff_root string = string.empty()
       kwargs.output_file string = string.empty()
    end
+
+   % Deal out arguments.
    [simyear, runoff_root, output_file] = deal(kwargs.simyear, ...
       kwargs.runoff_root, kwargs.output_file);
 
@@ -29,29 +31,36 @@ function RunoffReference = build_runoff_reference_from_runoff(kwargs)
       end
    end
 
-   % Resolve the repo root, runoff repo root, and default output file.
-   tooldir = fileparts(mfilename('fullpath'));
-   addpath(fullfile(fileparts(fileparts(tooldir)), 'icemodel'))
-   rootdir = icemodel.internal.fullpath();
-   if strlength(runoff_root) == 0
+   % Add the canonical repo/test source tree before resolving repo-local
+   % paths for the runoff reference build. Keep the cleanup handle in scope
+   % so path/config state is restored when this entrypoint returns.
+   [rootdir, ~, ~, ~, suite_cleanup] = ...
+      icemodel.test.helpers.bootstrapTestEnvironment(configure_paths=false);
+   assert(isa(suite_cleanup, 'onCleanup'));
+   testdir = icemodel.getpath('test');
+
+   % Resolve the runoff repo root and default output file.
+   if isblanktext(runoff_root)
       runoff_root = fullfile(fileparts(rootdir), 'runoff');
    end
-   if strlength(output_file) == 0
+   if isblanktext(output_file)
       if isempty(simyear)
-         output_file = fullfile(rootdir, 'test', 'references', ...
+         output_file = fullfile(testdir, 'references', ...
             'runoff_reference.mat');
       else
-         output_file = fullfile(rootdir, 'test', 'references', ...
+         output_file = fullfile(testdir, 'references', ...
             sprintf('runoff_reference_%d.mat', simyear));
       end
    end
 
-   % Ensure the sibling runoff repo exists, then expose its functions.
+   % Ensure the sibling runoff repo exists before touching its data or paths.
    if exist(char(runoff_root), 'dir') ~= 7
-      error('runoff root not found: %s', runoff_root)
+      error('runoff root not found: %s', char(runoff_root))
    end
 
-   addpath(genpath(fullfile(char(runoff_root), 'functions')));
+   % Run the sibling loaders under the runoff repo's own data config, then
+   % restore the caller's path/config state on exit.
+   runoff_cleanup = bootstrapRunoffEnvironment(runoff_root); %#ok<NASGU>
 
    % Enumerate all supported runoff reference sites and forcing families.
    sites = {'behar', 'ak4', 'slv1', 'slv2', 'upperbasin'};
@@ -136,6 +145,7 @@ function RunoffReference = build_runoff_reference_from_runoff(kwargs)
 end
 
 function f = localForcingForSite(site)
+   %LOCALFORCINGFORSITE Map runoff sites to their local forcing families.
    switch lower(site)
       case {'behar', 'slv1', 'slv2', 'kanm'}
          f = 'kanm';
@@ -147,6 +157,7 @@ function f = localForcingForSite(site)
 end
 
 function simyears = getReferenceYears(opts, simyear)
+   %GETREFERENCEYEARS Resolve the runoff-reference years to build.
    if isempty(simyear)
       simyears = opts.simyears(:).';
    elseif any(opts.simyears == simyear)
@@ -157,6 +168,7 @@ function simyears = getReferenceYears(opts, simyear)
 end
 
 function [t1, t2] = getPlotWindow(opts, simyear)
+   %GETPLOTWINDOW Resolve the requested reference comparison window.
    try
       t1 = datetime(simyear, opts.m1, opts.d1, opts.h1, 0, 0, 'TimeZone', 'UTC');
       t2 = datetime(simyear, opts.m2, opts.d2, opts.h2, 0, 0, 'TimeZone', 'UTC');
@@ -167,6 +179,7 @@ function [t1, t2] = getPlotWindow(opts, simyear)
 end
 
 function [t1, t2] = getReferenceWindow(Discharge, sitename, t1_req, t2_req)
+   %GETREFERENCEWINDOW Clip the requested window to valid observations.
    iobs = find(~isnan(Discharge.QM));
    if isempty(iobs)
       error('No valid discharge observations found for site: %s', sitename)
@@ -182,6 +195,7 @@ function [t1, t2] = getReferenceWindow(Discharge, sitename, t1_req, t2_req)
 end
 
 function x = getObservedFinal(Discharge, t1, t2)
+   %GETOBSERVEDFINAL Compute the retained observed runoff change.
    ikeep = isbetween(Discharge.Time, t1, t2);
    q = Discharge.QM(ikeep);
    if isempty(q)
@@ -194,6 +208,7 @@ function x = getObservedFinal(Discharge, t1, t2)
 end
 
 function x = getRunoffFinal(Data, area_m2, t1, t2)
+   %GETRUNOFFFINAL Compute the retained modeled runoff change in cubic meters.
    x = nan;
 
    if ~istimetable(Data) || ~ismember('runoff', Data.Properties.VariableNames)
@@ -212,16 +227,75 @@ function x = getRunoffFinal(Data, area_m2, t1, t2)
 end
 
 function note = getNotes(simyear)
+   %GETNOTES Build the provenance note for one runoff reference row.
    note = "Derived via loadDischarge + " + ...
       "loadRunoff(Data) using prep_runoff window logic";
    note = note + "; reference year " + simyear;
 end
 
 function a = getArea(Catchment, size_name)
+   %GETAREA Read one catchment area scalar from the runoff struct.
    a = nan;
    if isfield(Catchment, size_name) ...
          && isfield(Catchment.(size_name), 'ease') ...
          && isfield(Catchment.(size_name).ease, 'area')
       a = Catchment.(size_name).ease.area;
+   end
+end
+
+function cleanup = bootstrapRunoffEnvironment(runoff_root)
+   %BOOTSTRAPRUNOFFENVIRONMENT Install runoff function paths and data config.
+
+   % Snapshot the caller's current icemodel environment and MATLAB path.
+   [cfg_prev, extra_names, extra_values, old_path] = snapshotEnvironment();
+
+   % Expose the runoff function tree before calling its loaders.
+   addpath(genpath(fullfile(char(runoff_root), 'functions')))
+
+   % Point the shared ICEMODEL_* paths at the runoff repo's managed data.
+   data_root = fullfile(char(runoff_root), 'data', 'icemodel');
+   icemodel.config( ...
+      'ICEMODEL_DATA_PATH', data_root, ...
+      'ICEMODEL_INPUT_PATH', fullfile(data_root, 'input'), ...
+      'ICEMODEL_OUTPUT_PATH', fullfile(data_root, 'output'), ...
+      'ICEMODEL_EVAL_PATH', fullfile(data_root, 'eval'), ...
+      'ICEMODEL_USERDATA_PATH', fullfile(data_root, 'input', 'userdata'));
+
+   cleanup = onCleanup(@() restoreEnvironment( ...
+      cfg_prev, extra_names, extra_values, old_path));
+end
+
+function [cfg_prev, extra_names, extra_values, old_path] = snapshotEnvironment()
+   %SNAPSHOTENVIRONMENT Capture the caller's path/config state for restore.
+
+   % Snapshot the current ICEMODEL_* config through the canonical getter.
+   cfg_prev = icemodel.config('getenv', true);
+
+   % Preserve the extra env vars that runoff startup code may use or mutate.
+   extra_names = ["GEUSRUNOFFPATH", "ICEMODEL_PROJECT_PATH"];
+   extra_values = cell(size(extra_names));
+   for n = 1:numel(extra_names)
+      extra_values{n} = getenv(extra_names(n));
+   end
+
+   % Restore the full MATLAB path so transient runoff paths do not leak.
+   old_path = path();
+end
+
+function restoreEnvironment(cfg_prev, extra_names, extra_values, old_path)
+   %RESTOREENVIRONMENT Restore the caller's original path/config state.
+
+   % Restore the original MATLAB path before returning to the caller.
+   path(old_path)
+
+   % Restore the caller's previous ICEMODEL_* config exactly as it was.
+   names = fieldnames(cfg_prev);
+   for n = 1:numel(names)
+      setenv(names{n}, cfg_prev.(names{n}));
+   end
+
+   % Restore the non-ICEMODEL extras that the runoff workflow may use.
+   for n = 1:numel(extra_names)
+      setenv(extra_names(n), extra_values{n});
    end
 end

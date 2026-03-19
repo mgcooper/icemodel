@@ -1,9 +1,11 @@
 function tests = test_spectral_kernels
-%TEST_SPECTRAL_KERNELS Verify spectral and radiative-transfer kernels.
+   %TEST_SPECTRAL_KERNELS Verify spectral and radiative-transfer kernels.
    tests = functiontests(localfunctions);
 end
 
 function setup(testCase)
+   % Build one spectral-enabled column state so the spectral helpers all
+   % see the same controlled geometry and forcing setup.
 
    workspace = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
       configure=true, nsteps=24, dt_seconds=900);
@@ -14,12 +16,15 @@ function setup(testCase)
 end
 
 function teardown(testCase)
+   % Remove the shared spectral workspace after the file-level tests end.
 
    icemodel.test.fixtures.cleanupSyntheticWorkspace( ...
       testCase.TestData.workspace);
 end
 
 function test_solarrad_distinguishes_day_and_night(testCase)
+   % SOLARRAD should produce zero at night while remaining positive during
+   % daytime on the same site geometry.
 
    Qday = SOLARRAD(180, 45, 0.2, 12, 180, 5, 0.7);
    Qnight = SOLARRAD(180, 45, 0.2, 0, 180, 5, 0.7);
@@ -29,6 +34,8 @@ function test_solarrad_distinguishes_day_and_night(testCase)
 end
 
 function test_getdwavl_and_getsolar_return_positive_weights(testCase)
+   % Spectral quadrature weights and integrated solar input should remain
+   % positive for a simple monotonic wavelength grid.
 
    wavelength = [0.4 0.6 1.0 1.4];
    dwavl = GETDWAVL(wavelength, numel(wavelength));
@@ -41,6 +48,8 @@ function test_getdwavl_and_getsolar_return_positive_weights(testCase)
 end
 
 function test_specinit_and_getscattercoefs_return_expected_shapes(testCase)
+   % SPECINIT and GETSCATTERCOEFS should agree with the configured spectral
+   % dimensions exposed through the synthetic state.
 
    s = testCase.TestData.state;
    [~, mie, solar, kabs, kice] = SPECINIT(s.opts);
@@ -58,6 +67,8 @@ function test_specinit_and_getscattercoefs_return_expected_shapes(testCase)
 end
 
 function test_getaandr_and_getupdown_return_finite_fluxes(testCase)
+   % The two-stream coefficient helpers should return finite up/down fluxes
+   % on a compact hand-built coefficient profile.
 
    bulkcoefs = [1.0; 1.2; 1.4; 1.4; 1.4];
    [a, r] = GETAANDR(bulkcoefs, 0.5);
@@ -72,6 +83,8 @@ function test_getaandr_and_getupdown_return_finite_fluxes(testCase)
 end
 
 function test_solvetwostream_returns_finite_net_flux_profile(testCase)
+   % SOLVETWOSTREAM should return a finite net-flux profile with the top
+   % boundary reflecting the imposed incoming radiation.
 
    bulkcoefs = [1.0; 1.2; 1.4; 1.4; 1.4; 1.4];
    [a, r] = GETAANDR(bulkcoefs, 0.5);
@@ -84,6 +97,8 @@ function test_solvetwostream_returns_finite_net_flux_profile(testCase)
 end
 
 function test_extcoefsinit_and_updateextcoefs_return_finite_terms(testCase)
+   % UPDATEEXTCOEFS should keep the spectral source term and chi finite on
+   % the shared synthetic spectral state.
 
    s = testCase.TestData.state;
    ro_sno = s.ro_ice * s.f_ice + s.ro_liq * s.f_liq + ...

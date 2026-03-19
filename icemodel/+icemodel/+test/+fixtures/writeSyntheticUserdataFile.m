@@ -1,7 +1,7 @@
 function filepath = writeSyntheticUserdataFile(userdatadir, simyear, kwargs)
-%WRITESYNTHETICUSERDATAFILE Write a synthetic yearly userdata timetable.
-%
-%  filepath = icemodel.test.fixtures.writeSyntheticUserdataFile(userdatadir, simyear)
+   %WRITESYNTHETICUSERDATAFILE Write a synthetic yearly userdata timetable.
+   %
+   %  filepath = icemodel.test.fixtures.writeSyntheticUserdataFile(userdatadir, simyear)
 
    arguments
       userdatadir (1, :) char
@@ -15,6 +15,7 @@ function filepath = writeSyntheticUserdataFile(userdatadir, simyear, kwargs)
       kwargs.values double = []
    end
 
+   % Build the synthetic time vector unless the caller supplied one.
    if isempty(kwargs.Time)
       dt = seconds(kwargs.dt_seconds);
       t0 = datetime(simyear, 1, 1, 0, 0, 0, 'TimeZone', 'UTC');
@@ -23,6 +24,7 @@ function filepath = writeSyntheticUserdataFile(userdatadir, simyear, kwargs)
       Time = kwargs.Time;
    end
 
+   % Fill one smooth userdata series unless explicit values were provided.
    if isempty(kwargs.values)
       tod_hours = hour(Time) + minute(Time) / 60 + second(Time) / 3600;
       values = min(max(0.55 + 0.03 * sin(2 * pi * tod_hours / 24), 0.05), 0.95);
@@ -31,6 +33,7 @@ function filepath = writeSyntheticUserdataFile(userdatadir, simyear, kwargs)
    end
    values = reshape(values, [], 1);
 
+   % Save the file in the same yearly naming scheme as real userdata inputs.
    Data = timetable(Time, values, 'VariableNames', {kwargs.varname});
 
    filepath = fullfile(userdatadir, ...

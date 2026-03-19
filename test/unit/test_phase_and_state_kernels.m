@@ -1,9 +1,11 @@
 function tests = test_phase_and_state_kernels
-%TEST_PHASE_AND_STATE_KERNELS Verify phase-change and state-update kernels.
+   %TEST_PHASE_AND_STATE_KERNELS Verify phase-change and state-update kernels.
    tests = functiontests(localfunctions);
 end
 
 function test_meltcurve_and_freezecurve_are_self_consistent(testCase)
+   % MELTCURVE and FREEZECURVE should agree when applied to the same melt-
+   % zone state.
 
    [ro_ice, ro_liq, fcp, Tf] = icemodel.physicalConstant( ...
       'ro_ice', 'ro_liq', 'fcp', 'Tf');
@@ -23,6 +25,8 @@ function test_meltcurve_and_freezecurve_are_self_consistent(testCase)
 end
 
 function test_melttemp_caps_above_freezing(testCase)
+   % MELTTEMP should clip supercooled inputs at freezing but leave colder
+   % values untouched.
 
    Tf = icemodel.physicalConstant('Tf');
    testCase.verifyEqual(MELTTEMP(Tf + 3, Tf), Tf);
@@ -30,6 +34,8 @@ function test_melttemp_caps_above_freezing(testCase)
 end
 
 function test_liqavail_drains_only_available_liquid(testCase)
+   % LIQAVAIL should respect the residual liquid floor and only drain the
+   % liquid that is actually available above that floor.
 
    [h_resid, h_avail, h_drain, h_ice, h_liq, h_air] = LIQAVAIL( ...
       0.7, 0.2, 0.1, 274, 273.16, 0.02, 0.0, true, 1.0);
@@ -42,6 +48,8 @@ function test_liqavail_drains_only_available_liquid(testCase)
 end
 
 function test_volbal_drains_excess_and_respects_total_volume(testCase)
+   % VOLBAL should preserve total volume while routing any overflow into
+   % explicit excess terms.
 
    [h_ice, h_liq, h_air, x_ice, x_liq] = VOLBAL(0.8, 0.4, 0.05, 1.0);
 
@@ -51,6 +59,8 @@ function test_volbal_drains_excess_and_respects_total_volume(testCase)
 end
 
 function test_pevap_preserves_sign_and_scaling(testCase)
+   % PEVAP should keep the latent-mass increment proportional to the
+   % underlying evaporative power input.
 
    [d_pevp, pevp] = PEVAP(50, 2.5e6, 1000, 900, 0.04);
 
@@ -59,6 +69,8 @@ function test_pevap_preserves_sign_and_scaling(testCase)
 end
 
 function test_mztransform_updates_melt_zone_consistently(testCase)
+   % MZTRANSFORM should move a melt-zone state forward without skipping
+   % phase bounds or producing impossible phase fractions.
 
    [ro_ice, ro_liq, fcp, Lf, cp_ice, cp_liq, Tf] = ...
       icemodel.physicalConstant('ro_ice', 'ro_liq', 'fcp', 'Lf', ...
@@ -88,6 +100,8 @@ function test_mztransform_updates_melt_zone_consistently(testCase)
 end
 
 function test_mztransform_rejects_phase_skip(testCase)
+   % The transform should reject an attempted jump that skips across the
+   % melt-zone bounds.
 
    [ro_ice, ro_liq, fcp, Lf, cp_ice, cp_liq, Tf] = ...
       icemodel.physicalConstant('ro_ice', 'ro_liq', 'fcp', 'Lf', ...
@@ -108,6 +122,8 @@ function test_mztransform_rejects_phase_skip(testCase)
 end
 
 function test_gecoefs_applies_robin_top_boundary_adjustment(testCase)
+   % GECOEFS should change the top-row diagonal and source terms when the
+   % Robin boundary path is requested.
 
    JJ = 3;
    T = [268; 267; 266];
@@ -145,6 +161,8 @@ function test_gecoefs_applies_robin_top_boundary_adjustment(testCase)
 end
 
 function test_iceablation_and_surface_runoff_budget(testCase)
+   % Surface ablation helpers should report melt, sublimation, and runoff
+   % in a self-consistent budget on a simple forcing state.
 
    opts = struct('smbmodel', 'skinmodel', 'skinfreeze', true);
    [surf_mlt, surf_frz, surf_sub, surf_con, surf_rof] = ICEABLATION( ...
@@ -159,6 +177,8 @@ function test_iceablation_and_surface_runoff_budget(testCase)
 end
 
 function test_surface_runoff_and_ice_runoff_build_cumulative_series(testCase)
+   % The runoff accumulators should produce monotonic cumulative series from
+   % incremental latent-mass inputs.
 
    ice1 = struct('Qe', [-10; 5; 0], 'Qm', [20; -5; 10]);
    ice1 = SRFRUNOFF(ice1, 1000, 2.84e6, 3.34e5, 3600);
@@ -173,6 +193,8 @@ function test_surface_runoff_and_ice_runoff_build_cumulative_series(testCase)
 end
 
 function test_icemf_combines_a_thin_surface_layer(testCase)
+   % ICEMF should combine a too-thin surface layer while preserving the
+   % expected output array sizes and merge diagnostic.
 
    [ro_ice, ro_liq, cv_ice, cv_liq, Lf, Ls, Lv, Tf] = ...
       icemodel.physicalConstant('ro_ice', 'ro_liq', 'cv_ice', 'cv_liq', ...

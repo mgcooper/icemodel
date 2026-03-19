@@ -6,26 +6,27 @@ function baseline = loadRegressionBaseline(baseline_tag, smbmodel, pathname)
    %  baseline = icemodel.test.helpers.loadRegressionBaseline("v1.01", "skinmodel")
    %  baseline = icemodel.test.helpers.loadRegressionBaseline("v1.1", "skinmodel", pathname)
    arguments
-      baseline_tag string = string.empty()
+      baseline_tag (1, :) string = ""
       smbmodel string = "all"
-      pathname = string.empty()
+      pathname (1, :) string = ""
    end
 
-   if isempty(baseline_tag) || ...
-         (isstring(baseline_tag) && all(strlength(baseline_tag) == 0))
+   % An empty selector means there is no requested regression baseline only
+   % when the caller has not already provided an explicit file to load.
+   if isblanktext(pathname) && isblanktext(baseline_tag)
       baseline = table();
       return
    end
 
    % smbmodel="all" is virtual: load and concatenate the per-model files.
-   if string(smbmodel) == "all" ...
-         && (isempty(pathname) || (isstring(pathname) ...
-         && all(strlength(pathname) == 0)))
+   if smbmodel == "all" && isblanktext(pathname)
       baseline = loadAllModels(baseline_tag);
       return
    end
 
-   if isempty(pathname) || (isstring(pathname) && all(strlength(pathname) == 0))
+   % Resolve the canonical baseline file unless the caller already passed
+   % an explicit pathname.
+   if isblanktext(pathname)
       [baseline_type, baseline_tag] = ...
          icemodel.test.helpers.resolveBaselineSelector(baseline_tag);
       pathname = icemodel.test.helpers.defaultBaselinePath( ...
@@ -71,24 +72,20 @@ function baseline = loadRegressionBaseline(baseline_tag, smbmodel, pathname)
 end
 
 function baseline = loadAllModels(baseline_tag)
+   %LOADALLMODELS Concatenate per-model regression baselines for smbmodel="all".
    [baseline_type, baseline_tag] = ...
       icemodel.test.helpers.resolveBaselineSelector(baseline_tag);
-   models = icemodel.test.helpers.formalSmbmodels();
-   tables = cell(numel(models), 1);
-   k = 0;
-   for i = 1:numel(models)
-      pathname = icemodel.test.helpers.defaultBaselinePath( ...
-         "regression", baseline_type, baseline_tag, models(i));
-      if exist(char(pathname), 'file') ~= 2
-         continue
-      end
-      k = k + 1;
-      tables{k} = icemodel.test.helpers.loadRegressionBaseline( ...
-         baseline_tag, models(i), pathname);
-   end
-   if k == 0
+   models = icemodel.namelists.smbmodel("test");
+   pathnames = arrayfun(@(mdl) icemodel.test.helpers.defaultBaselinePath( ...
+      "regression", baseline_type, baseline_tag, mdl), ...
+      models, 'UniformOutput', false);
+   exists = cellfun(@(p) exist(char(p), 'file') == 2, pathnames);
+   if ~any(exists)
       baseline = table();
    else
-      baseline = vertcat(tables{1:k});
+      tables = cellfun(@(mdl, p) icemodel.test.helpers.loadRegressionBaseline( ...
+         baseline_tag, string(mdl), string(p)), ...
+         num2cell(models(exists)), pathnames(exists), 'UniformOutput', false);
+      baseline = vertcat(tables{:});
    end
 end

@@ -1,11 +1,13 @@
 function tests = test_mesh_and_timestep_kernels
-%TEST_MESH_AND_TIMESTEP_KERNELS Verify mesh and timestep-update kernels.
+   %TEST_MESH_AND_TIMESTEP_KERNELS Verify mesh and timestep-update kernels.
    tests = functiontests(localfunctions);
 end
 
 function test_cvmesh_uniform_and_exponential_layout(testCase)
+   % CVMESH should preserve the requested depth while changing only the
+   % spacing pattern between uniform and exponential layouts.
 
-   [dz_u, delz_u, ~, z_edge_u, f_u] = CVMESH(1.0, 0.25);
+   [dz_u, ~, ~, z_edge_u, f_u] = CVMESH(1.0, 0.25);
    [dz_e, ~, ~, z_edge_e] = CVMESH(1.0, 0.10, 1.5);
 
    testCase.verifyEqual(sum(dz_u), 1.0, 'AbsTol', 1e-12);
@@ -16,6 +18,8 @@ function test_cvmesh_uniform_and_exponential_layout(testCase)
 end
 
 function test_gridforward_and_gridinverse_transform_shapes(testCase)
+   % The spectral grid forward/inverse helpers should preserve the expected
+   % vector sizes on simple controlled inputs.
 
    ro_sno = GRIDFORWARD([300; 400; 500], [0.2; 0.6; 1.0], [0.1; 0.5; 0.9]);
    dQp = GRIDINVERSE([10; 9; 8; 7], 0.5, 1.0, 4, 2);
@@ -26,6 +30,8 @@ function test_gridforward_and_gridinverse_transform_shapes(testCase)
 end
 
 function test_layerinds_selects_expected_merge_neighbors(testCase)
+   % LAYERINDS should pick the expected merge partner at the top, over a
+   % zero-thickness layer, and for a nonzero interior layer.
 
    [j1_top, j2_top] = LAYERINDS(1, [0.0; 0.5; 0.4]);
    [j1_zero, j2_zero] = LAYERINDS(2, [0.4; 0.0; 0.2]);
@@ -39,6 +45,8 @@ function test_layerinds_selects_expected_merge_neighbors(testCase)
 end
 
 function test_trisolve_matches_backslash(testCase)
+   % The tridiagonal solver should reproduce MATLAB's dense solve on a
+   % compact reference system.
 
    low = [0; -1; -1];
    mid = [4; 4; 4];
@@ -52,6 +60,8 @@ function test_trisolve_matches_backslash(testCase)
 end
 
 function test_conduct_matches_level_formulas(testCase)
+   % CONDUCT should reproduce the top-boundary and interior finite-volume
+   % forms used elsewhere in the column model.
 
    k_eff = [2; 4];
    T = [270; 268];
@@ -67,6 +77,8 @@ function test_conduct_matches_level_formulas(testCase)
 end
 
 function test_inittimesteps_and_newtimestep_follow_solver_contract(testCase)
+   % Initialization and top-level timestep helpers should honor the public
+   % solver contract for step size, warmup count, and flags.
 
    opts = struct('dt', 900, 'numyears', 2, 'n_spinup_years', 1, ...
       'simyears', [2015 2016]);
@@ -89,6 +101,8 @@ function test_inittimesteps_and_newtimestep_follow_solver_contract(testCase)
 end
 
 function test_nextstep_adapts_substep_divisor(testCase)
+   % NEXTSTEP should shrink or grow the substep divisor based on the recent
+   % convergence history and hard failures.
 
    [~, substep_fast, dt_fast] = NEXTSTEP(1, 3, 300, 900, 9, true, 0, 1);
    [~, substep_slow, dt_slow] = NEXTSTEP(1, 3, 300, 900, 9, true, 2, 15);
@@ -103,6 +117,8 @@ function test_nextstep_adapts_substep_divisor(testCase)
 end
 
 function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
+   % Reset and update helpers should restore failed-substep state, then
+   % advance the accepted state and diagnostics consistently.
 
    [ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs] = ...
       icemodel.physicalConstant('ro_ice', 'ro_liq', 'ro_air', 'cv_ice', ...
@@ -129,6 +145,8 @@ function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
 end
 
 function test_checksubstep_forces_advance_at_maxsubstep(testCase)
+   % Once the max-substep limit is reached, CHECKSUBSTEP should force the
+   % accepted state forward instead of stalling the timestep.
 
    [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok] = CHECKSUBSTEP( ...
       270, [269; 268], [0.9; 0.9], [0.01; 0.01], 271, [270; 269], ...

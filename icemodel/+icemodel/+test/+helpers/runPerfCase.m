@@ -6,10 +6,12 @@ function S = runPerfCase(experiment, suite, c)
    % Output fields:
    %  samples, activity, sample_times, activity_times, valid, n_warmups
 
+   % Expose the current formal case through env vars used by the perf class.
    configurePerfCaseEnv(c);
    perf_result = run(experiment, suite);
    perf_result = perf_result(1);
 
+   % Normalize MATLAB perf objects into plain tables and numeric vectors.
    samples = resultTable(perf_result, 'Samples');
    activity = resultTable(perf_result, 'TestActivity');
    tcol = measuredTimeColumn(samples);
@@ -18,6 +20,7 @@ function S = runPerfCase(experiment, suite, c)
       error('unable to find measured time column in perf result Samples table')
    end
 
+   % Return one compact struct so callers do not depend on perf object APIs.
    S = struct();
    S.samples = samples;
    S.activity = activity;
@@ -33,6 +36,7 @@ function S = runPerfCase(experiment, suite, c)
 end
 
 function configurePerfCaseEnv(c)
+   %CONFIGUREPERFCASEENV Export one perf case into the regression class env.
    setenv('ICEMODEL_TEST_SMBMODEL', char(c.smbmodel));
    setenv('ICEMODEL_TEST_SITENAME', char(c.sitename));
    setenv('ICEMODEL_TEST_FORCINGS', char(c.forcings));
@@ -53,6 +57,7 @@ function configurePerfCaseEnv(c)
 end
 
 function T = resultTable(result, propname)
+   %RESULTTABLE Convert one MATLAB perf result property into a table.
    T = result.(propname);
    if isstruct(T)
       T = struct2table(T);
@@ -60,6 +65,7 @@ function T = resultTable(result, propname)
 end
 
 function name = measuredTimeColumn(T)
+   %MEASUREDTIMECOLUMN Locate the timing column emitted by the perf framework.
    name = '';
    if isempty(T)
       return
@@ -73,12 +79,14 @@ function name = measuredTimeColumn(T)
 end
 
 function x = toSeconds(x)
+   %TOSECONDS Convert duration arrays into raw numeric seconds.
    if isduration(x)
       x = seconds(x);
    end
 end
 
 function n = countWarmups(activity)
+   %COUNTWARMUPS Count warmup entries in the perf activity log.
    n = 0;
    if isempty(activity) || ...
          ~ismember('Objective', activity.Properties.VariableNames)

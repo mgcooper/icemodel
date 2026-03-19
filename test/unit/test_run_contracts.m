@@ -1,21 +1,26 @@
 function tests = test_run_contracts
-%TEST_RUN_CONTRACTS Verify run-option and path-derivation contracts.
+   %TEST_RUN_CONTRACTS Verify run-option and path-derivation contracts.
    tests = functiontests(localfunctions);
 end
 
 function setup(testCase)
+   % Build one synthetic workspace that exposes path, spinup, and output-
+   % year contracts without depending on external project data.
 
    testCase.TestData.workspace = icemodel.test.fixtures.makeSyntheticWorkspace( ...
       [2015; 2016; 2017], configure=true, nsteps=24, dt_seconds=3600);
 end
 
 function teardown(testCase)
+   % Remove the shared synthetic workspace after the contract checks finish.
 
    icemodel.test.fixtures.cleanupSyntheticWorkspace( ...
       testCase.TestData.workspace);
 end
 
 function test_setopts_normalizes_none_inputs(testCase)
+   % Legacy "none" placeholders should be normalized into the current
+   % userdata/uservars/testname contract.
 
    opts = icemodel.setopts('skinmodel', 'kanm', [2015 2016 2017], ...
       'kanm', "none", "", "none", false, false);
@@ -28,6 +33,8 @@ function test_setopts_normalizes_none_inputs(testCase)
 end
 
 function test_resetopts_updates_output_years_and_coupler_defaults(testCase)
+   % RESETOPTS should recompute retained output years and switch coupler
+   % defaults when the solver mode changes.
 
    workspace = testCase.TestData.workspace;
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
@@ -42,6 +49,8 @@ function test_resetopts_updates_output_years_and_coupler_defaults(testCase)
 end
 
 function test_configureRun_preserves_explicit_overrides(testCase)
+   % CONFIGURERUN should honor explicit caller overrides instead of
+   % rebuilding those fields from the default path/case contract.
 
    workspace = testCase.TestData.workspace;
    custom_output = fullfile(workspace.rootdir, 'custom_output');
@@ -67,11 +76,13 @@ function test_configureRun_preserves_explicit_overrides(testCase)
    testCase.verifyEqual(opts.vars2, {'Tice'});
 end
 
-function test_setpath_builds_restart_path_without_blank_parts(testCase)
+function test_getpath_builds_restart_path_without_blank_parts(testCase)
+   % GETPATH should omit blank components instead of leaving empty folders
+   % in the restart path.
 
-   output_root = getenv('ICEMODEL_OUTPUT_PATH');
-   path_plain = icemodel.setpath('restart', 'kanm', 'skinmodel');
-   path_test = icemodel.setpath('restart', 'kanm', 'skinmodel', ...
+   output_root = icemodel.getpath('output');
+   path_plain = icemodel.getpath('restart', 'kanm', 'skinmodel');
+   path_test = icemodel.getpath('restart', 'kanm', 'skinmodel', ...
       '', [], 'case01');
 
    testCase.verifyEqual(path_plain, ...
@@ -80,7 +91,20 @@ function test_setpath_builds_restart_path_without_blank_parts(testCase)
       fullfile(output_root, 'kanm', 'skinmodel', 'case01', 'restart'));
 end
 
+function test_setpath_remains_a_compatibility_alias(testCase)
+   % SETPATH should continue to match GETPATH while older callers migrate.
+
+   returned = icemodel.setpath('restart', 'kanm', 'skinmodel', '', [], ...
+      'case01');
+   expected = icemodel.getpath('restart', 'kanm', 'skinmodel', '', [], ...
+      'case01');
+
+   testCase.verifyEqual(returned, expected);
+end
+
 function test_configureRun_builds_default_restart_path(testCase)
+   % When pathrestart is cleared, CONFIGURERUN should rebuild it from the
+   % configured output root and case identity.
 
    workspace = testCase.TestData.workspace;
    opts = icemodel.test.helpers.buildSyntheticOpts( ...

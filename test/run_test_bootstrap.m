@@ -46,16 +46,16 @@ function results = run_test_bootstrap(kwargs)
    %  - This bootstrap does not rebuild test/references/runoff_reference.mat.
    %  - smbmodel="all" is virtual: it rebuilds per-model files for each formal
    %    model and runs the union of those cases.
-   %  - The formal comparison year and smoke/full site selections are explicit
-   %    here so they are not hidden in lower-level helpers.
+   %  - SMOKE_SITES and FULL_SITES are advanced overrides for the site lists
+   %    used by each formal tier.
    %  - The optional solver filter accepts any subset of [1 2 3].
    %  - Compare runs are read-only with respect to baselines. Baseline updates
    %    happen through the explicit build/snapshot actions above.
 
    arguments (Input)
       kwargs.baseline_tag (1, :) string = "v1.1"
-      kwargs.smbmodel (1, :) string {mustBeMember(kwargs.smbmodel, ...
-         ["all", "icemodel", "skinmodel"])} = "all"
+      kwargs.smbmodel (1, :) string ...
+         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} = "all"
       kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} = []
       kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
       kwargs.smoke_sites string = "kanm"
@@ -64,22 +64,22 @@ function results = run_test_bootstrap(kwargs)
       kwargs.clean_baselines (1, 1) logical = false
       kwargs.backup_before_clean (1, 1) logical = true
    end
+
+   % Deal out arguments.
    [baseline_tag, smbmodel, solver, simyear, smoke_sites, full_sites, ...
       clean_artifacts, clean_baselines, backup_before_clean] = deal( ...
-      kwargs.baseline_tag, kwargs.smbmodel, kwargs.solver, ...
-      kwargs.simyear, string(kwargs.smoke_sites(:)), ...
-      string(kwargs.full_sites(:)), ...
-      kwargs.clean_artifacts, kwargs.clean_baselines, ...
-      kwargs.backup_before_clean);
+      kwargs.baseline_tag, kwargs.smbmodel, kwargs.solver, kwargs.simyear, ...
+      reshape(kwargs.smoke_sites, [], 1), reshape(kwargs.full_sites, [], 1), ...
+      kwargs.clean_artifacts, kwargs.clean_baselines, kwargs.backup_before_clean);
 
-   % Ensure test/ and dependencies/ are on path
-   testdir = fileparts(mfilename('fullpath'));
-   addpath(fullfile(fileparts(testdir), 'icemodel'))
-   rootdir = icemodel.internal.fullpath('test');
-   addpath(rootdir)
-   addpath(icemodel.internal.fullpath('icemodel', 'dependencies'))
+   % Bootstrap the broad source/test trees once for the full workflow.
+   % Keep the cleanup handle in scope so the caller's config is restored
+   % when this entrypoint returns.
+   [~, ~, ~, ~, suite_cleanup] = ...
+      icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>
 
    % Set the directory paths
+   rootdir = icemodel.getpath('test');
    baselinesdir = fullfile(rootdir, 'baselines');
    artifactsdir = fullfile(rootdir, 'artifacts');
    backupzipdir = fullfile(rootdir, 'backups');
@@ -125,6 +125,7 @@ end
 
 function out = runStep(c, baseline_tag, smbmodel, solver, simyear, ...
       smoke_sites, full_sites, run_name)
+   %RUNSTEP Execute one suite lifecycle step from the bootstrap matrix.
    switch c.suite
       case "regression"
          switch c.action
@@ -188,6 +189,7 @@ function out = runStep(c, baseline_tag, smbmodel, solver, simyear, ...
 end
 
 function passed = collectPassFlags(results, cases, suite)
+   %COLLECTPASSFLAGS Extract pass/fail flags from one suite result struct.
    run_cases = cases(cases.suite == suite & cases.action == "run", :);
    passed = struct();
 
@@ -203,6 +205,7 @@ function passed = collectPassFlags(results, cases, suite)
 end
 
 function baseline = resolveBaseline(baseline_mode, baseline_tag)
+   %RESOLVEBASELINE Resolve the baseline selector for one bootstrap step.
    if baseline_mode == "rolling"
       baseline = "rolling";
    else
@@ -211,11 +214,13 @@ function baseline = resolveBaseline(baseline_mode, baseline_tag)
 end
 
 function tf = hasContents(folder)
+   %HASCONTENTS Return true when a folder exists and is non-empty.
    listing = dir(folder);
    tf = any(~ismember(string({listing.name}), [".", ".."]));
 end
 
 function removeFolder(folder)
+   %REMOVEFOLDER Remove one folder if it exists.
    listing = dir(folder);
    listing = listing(~ismember(string({listing.name}), [".", ".."]));
    for i = 1:numel(listing)
@@ -229,6 +234,7 @@ function removeFolder(folder)
 end
 
 function removeMatFiles(folder)
+   %REMOVEMATFILES Remove top-level MAT files from a folder.
    files = dir(fullfile(folder, '*.mat'));
    for i = 1:numel(files)
       delete(fullfile(files(i).folder, files(i).name));
@@ -236,6 +242,7 @@ function removeMatFiles(folder)
 end
 
 function backupToFolder(source, backupdir)
+   %BACKUPTOFOLDER Copy one file or folder into a backup location.
    if exist(backupdir, 'dir') ~= 7
       mkdir(backupdir);
    end

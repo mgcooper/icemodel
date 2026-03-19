@@ -1,40 +1,40 @@
 function cases = getFormalTestSuiteCases()
-%GETFORMALTESTSUITECASES Return the canonical formal test-suite cases.
-%
-%  cases = icemodel.test.helpers.getFormalTestSuiteCases()
-%
-% Use this helper when you need the ordered list of top-level formal suite
-% cases. These are suite-level build/snapshot/run cases such as
-% `perf_full_release` or `regression_smoke_rolling`.
-%
-% Output:
-%  cases - table with one row per formal suite case and columns:
-%    suite         : regression | perf
-%    action        : build | snapshot | run
-%    tier          : smoke | full for compare runs; full/blank for build/snapshot
-%    baseline_mode : rolling | release
-%    result_field  : generated field name used in run_test_bootstrap results
-%
-% Notes:
-%  - This is the single source of truth for the possible formal suite cases
-%    used by `run_test_bootstrap`.
-%  - These are not the underlying model run cases. Model/site/year/solver
-%    combinations are defined separately by `icemodel.test.helpers.getPerfCaseMatrix`
-%    and `icemodel.test.helpers.getRegressionCaseMatrix`.
-%  - The helper returns regression cases first, then perf cases. Within each
-%    suite, the ordering is:
-%       1. rolling baseline build
-%       2. release baseline snapshot
-%       3. smoke/full compare against rolling baseline
-%       4. smoke/full compare against release baseline
-%
-% Why this exists:
-%  - `run_test_bootstrap` needs one canonical definition of the formal suite
-%    lifecycle so adding or removing a suite-level case later is a one-file
-%    edit.
-%  - The generated `result_field` values keep bootstrap result names
-%    consistent with the case metadata instead of maintaining a second
-%    hand-written list.
+   %GETFORMALTESTSUITECASES Return the canonical formal test-suite cases.
+   %
+   %  cases = icemodel.test.helpers.getFormalTestSuiteCases()
+   %
+   % Use this helper when you need the ordered list of top-level formal suite
+   % cases. These are suite-level build/snapshot/run cases such as
+   % `perf_full_release` or `regression_smoke_rolling`.
+   %
+   % Output:
+   %  cases - table with one row per formal suite case and columns:
+   %    suite         : regression | perf
+   %    action        : build | snapshot | run
+   %    tier          : smoke | full for compare runs; full/blank for build/snapshot
+   %    baseline_mode : rolling | release
+   %    result_field  : generated field name used in run_test_bootstrap results
+   %
+   % Notes:
+   %  - This is the single source of truth for the possible formal suite cases
+   %    used by `run_test_bootstrap`.
+   %  - These are not the underlying model run cases. Model/site/year/solver
+   %    combinations are defined separately by `icemodel.test.helpers.getPerfCaseMatrix`
+   %    and `icemodel.test.helpers.getRegressionCaseMatrix`.
+   %  - The helper returns regression cases first, then perf cases. Within each
+   %    suite, the ordering is:
+   %       1. rolling baseline build
+   %       2. release baseline snapshot
+   %       3. smoke/full compare against rolling baseline
+   %       4. smoke/full compare against release baseline
+   %
+   % Why this exists:
+   %  - `run_test_bootstrap` needs one canonical definition of the formal suite
+   %    lifecycle so adding or removing a suite-level case later is a one-file
+   %    edit.
+   %  - The generated `result_field` values keep bootstrap result names
+   %    consistent with the case metadata instead of maintaining a second
+   %    hand-written list.
 
    % Concatenate the regression and perf lifecycle cases into one ordered
    % table. Each suite contributes the same build/snapshot/run pattern.

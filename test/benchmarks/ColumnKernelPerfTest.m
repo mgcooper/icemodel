@@ -9,6 +9,8 @@ classdef ColumnKernelPerfTest < matlab.perftest.TestCase
 
    methods (TestClassSetup)
       function buildSyntheticColumns(testCase)
+         % Build one stable skin column and one stable ice column so each
+         % benchmark reuses the same resolved kernel inputs.
          testCase.workspace = icemodel.test.fixtures.makeSyntheticWorkspace( ...
             2016, configure=true, nsteps=24, dt_seconds=900);
          testCase.skin = icemodel.test.fixtures.makeSyntheticColumnState( ...
@@ -22,13 +24,19 @@ classdef ColumnKernelPerfTest < matlab.perftest.TestCase
 
    methods (TestClassTeardown)
       function cleanupSyntheticColumns(testCase)
+         % Tear down the synthetic workspace after the class finishes.
          icemodel.test.fixtures.cleanupSyntheticWorkspace(testCase.workspace);
       end
    end
 
    methods (Test)
       function testUpdateState(testCase)
+         % Benchmark the state-update algebra used by the enthalpy solve.
          s = testCase.ice;
+         % UPDATESTATE is extremely fast, so each timed sample needs a
+         % large batch to avoid framework noise at the default and strict
+         % sampling targets.
+         batch_size = 4096;
          [H, k_eff, dHdT, dLdT, drovdT, ro_vap] = UPDATESTATE(s.T, ...
             s.f_ice, s.f_liq, s.f_wat, s.ro_ice, s.ro_liq, s.ro_air, ...
             s.cv_ice, s.cv_liq, s.k_liq, s.roLf, s.Ls, s.Rv, s.Tf, s.fcp);
@@ -36,10 +44,12 @@ classdef ColumnKernelPerfTest < matlab.perftest.TestCase
             ro_vap])));
 
          while testCase.keepMeasuring
-            [H, k_eff, dHdT, dLdT, drovdT, ro_vap] = UPDATESTATE(s.T, ...
-               s.f_ice, s.f_liq, s.f_wat, s.ro_ice, s.ro_liq, s.ro_air, ...
-               s.cv_ice, s.cv_liq, s.k_liq, s.roLf, s.Ls, s.Rv, s.Tf, ...
-               s.fcp);
+            for n = 1:batch_size
+               [H, k_eff, dHdT, dLdT, drovdT, ro_vap] = UPDATESTATE(s.T, ...
+                  s.f_ice, s.f_liq, s.f_wat, s.ro_ice, s.ro_liq, ...
+                  s.ro_air, s.cv_ice, s.cv_liq, s.k_liq, s.roLf, s.Ls, ...
+                  s.Rv, s.Tf, s.fcp);
+            end
             if ~all(isfinite([H; k_eff; dHdT; dLdT; drovdT; ro_vap]))
                error('UPDATESTATE benchmark produced a non-finite result')
             end
@@ -47,7 +57,11 @@ classdef ColumnKernelPerfTest < matlab.perftest.TestCase
       end
 
       function testSkinSolve(testCase)
+         % Benchmark the standalone skin-column solve on a fixed state.
          s = testCase.skin;
+         % SKINSOLVE is already coarse enough that a modest batch gives a
+         % stable sample without stretching the suite runtime.
+         batch_size = 64;
          [T, f_ice, f_liq, k_eff, ok] = SKINSOLVE(s.T, s.f_ice, s.f_liq, ...
             s.dz, s.delz, s.fn, s.opts.dt, s.JJ, s.Ts, s.k_liq, s.cv_ice, ...
             s.cv_liq, s.ro_ice, s.Ls, s.Rv, s.Tf, s.tol, s.maxiter, ...
@@ -56,10 +70,12 @@ classdef ColumnKernelPerfTest < matlab.perftest.TestCase
          testCase.assertTrue(all(isfinite([T; f_ice; f_liq; k_eff])));
 
          while testCase.keepMeasuring
-            [T, f_ice, f_liq, k_eff, ok] = SKINSOLVE(s.T, s.f_ice, ...
-               s.f_liq, s.dz, s.delz, s.fn, s.opts.dt, s.JJ, s.Ts, ...
-               s.k_liq, s.cv_ice, s.cv_liq, s.ro_ice, s.Ls, s.Rv, s.Tf, ...
-               s.tol, s.maxiter, s.alpha);
+            for n = 1:batch_size
+               [T, f_ice, f_liq, k_eff, ok] = SKINSOLVE(s.T, s.f_ice, ...
+                  s.f_liq, s.dz, s.delz, s.fn, s.opts.dt, s.JJ, s.Ts, ...
+                  s.k_liq, s.cv_ice, s.cv_liq, s.ro_ice, s.Ls, s.Rv, ...
+                  s.Tf, s.tol, s.maxiter, s.alpha);
+            end
             if ~ok || ~all(isfinite([T; f_ice; f_liq; k_eff]))
                error('SKINSOLVE benchmark failed to converge')
             end
@@ -67,8 +83,11 @@ classdef ColumnKernelPerfTest < matlab.perftest.TestCase
       end
 
       function testSkinEbSolve(testCase)
+         % Benchmark the coupled skin energy-balance solve.
          s = testCase.skin;
-         batch_size = 4;
+         % The coupled skin solve has moderate jitter, so use a wider batch
+         % than the standalone solve to keep strict-profile runs stable.
+         batch_size = 64;
          [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok] = SKINEBSOLVE( ...
             s.Ts, s.T, s.f_ice, s.f_liq, s.dz, s.delz, s.fn, s.opts.dt, ...
             s.JJ, s.ro_ice, s.k_liq, s.cv_ice, s.cv_liq, s.Ls, s.Rv, ...
@@ -100,8 +119,11 @@ classdef ColumnKernelPerfTest < matlab.perftest.TestCase
       end
 
       function testIceEnbal(testCase)
+         % Benchmark the interior enthalpy/phase solve for one full column.
          s = testCase.ice;
-         batch_size = 5;
+         % ICEENBAL is one of the heavier column kernels but still benefits
+         % from a wider batch to hit the runner's error target reliably.
+         batch_size = 256;
          [T, f_ice, f_liq, k_eff, ok] = ICEENBAL(s.T, s.f_ice, s.f_liq, ...
             s.dz, s.delz, s.fn, s.Sc, s.opts.dt, s.JJ, s.Ts, s.k_liq, ...
             s.cv_ice, s.cv_liq, s.ro_ice, s.ro_liq, s.Ls, s.Lf, s.roLf, ...
@@ -127,8 +149,11 @@ classdef ColumnKernelPerfTest < matlab.perftest.TestCase
       end
 
       function testIceEbSolve(testCase)
+         % Benchmark the coupled ice-column + SEB solve.
          s = testCase.ice;
-         batch_size = 4;
+         % ICEEBSOLVE carries both column and SEB work, so scale the batch
+         % enough to keep variance low without making the suite sluggish.
+         batch_size = 128;
          [Ts, T, f_ice, f_liq, k_eff, ok] = ICEEBSOLVE(s.T, s.f_ice, ...
             s.f_liq, s.dz, s.delz, s.fn, s.Sc, s.opts.dt, s.JJ, s.Ts, ...
             s.k_liq, s.cv_ice, s.cv_liq, s.ro_ice, s.ro_liq, s.Ls, s.Lf, ...

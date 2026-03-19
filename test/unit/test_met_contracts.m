@@ -1,21 +1,26 @@
 function tests = test_met_contracts
-%TEST_MET_CONTRACTS Verify met loading, processing, and saved-result paths.
+   %TEST_MET_CONTRACTS Verify met loading, processing, and saved-result paths.
    tests = functiontests(localfunctions);
 end
 
 function setup(testCase)
+   % Build one synthetic workspace and reuse it across the met contract
+   % tests so the fixture cost stays out of each individual assertion.
 
    testCase.TestData.workspace = icemodel.test.fixtures.makeSyntheticWorkspace( ...
       [2015; 2016], configure=true, nsteps=24, dt_seconds=3600);
 end
 
 function teardown(testCase)
+   % Remove the shared synthetic workspace after the file-level tests end.
 
    icemodel.test.fixtures.cleanupSyntheticWorkspace( ...
       testCase.TestData.workspace);
 end
 
 function test_loadmet_concatenates_years_and_computes_exchange(testCase)
+   % Multi-year loads should concatenate years and derive exchange terms
+   % like De exactly once through the namespaced loading path.
 
    workspace = testCase.TestData.workspace;
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
@@ -32,6 +37,8 @@ function test_loadmet_concatenates_years_and_computes_exchange(testCase)
 end
 
 function test_loadmet_swaps_inline_modis_from_metfile(testCase)
+   % Inline MODIS-style data embedded in the met file should override the
+   % requested output variable when userdata is selected.
 
    workspace = testCase.TestData.workspace;
    [met_src, ~] = icemodel.test.fixtures.makeSyntheticMetFile(2016, ...
@@ -50,6 +57,8 @@ function test_loadmet_swaps_inline_modis_from_metfile(testCase)
 end
 
 function test_loadmet_swaps_external_userdata_file(testCase)
+   % External userdata files should override the selected met variable when
+   % the requested timetable contains the expected replacement field.
 
    workspace = testCase.TestData.workspace;
    opts_base = icemodel.test.helpers.buildSyntheticOpts( ...
@@ -73,6 +82,8 @@ function test_loadmet_swaps_external_userdata_file(testCase)
 end
 
 function test_loadmet_errors_when_userdata_file_lacks_Data(testCase)
+   % Corrupt userdata files should fail loudly instead of silently falling
+   % back to the met data.
 
    workspace = testCase.TestData.workspace;
    filepath = fullfile(workspace.userdatadir, 'kanm_modis_2016.mat');
@@ -95,6 +106,8 @@ function test_loadmet_errors_when_userdata_file_lacks_Data(testCase)
 end
 
 function test_processmet_supports_native_and_hourly_cadence(testCase)
+   % PROCESSMET should preserve native cadence when requested and collapse
+   % to hourly outputs when the hourly contract is requested instead.
 
    [met_native, ~] = icemodel.test.fixtures.makeSyntheticMetFile(2016, ...
       'nsteps', 8, 'dt_seconds', 900);
@@ -110,6 +123,8 @@ function test_processmet_supports_native_and_hourly_cadence(testCase)
 end
 
 function test_loadresults_defaults_to_output_years(testCase)
+   % LOADRESULTS should prefer opts.output_years when the saved run spans
+   % spinup and retained output years.
 
    workspace = testCase.TestData.workspace;
    pathoutput = fullfile(workspace.outputdir, 'kanm', 'skinmodel', ...
@@ -133,6 +148,8 @@ function test_loadresults_defaults_to_output_years(testCase)
 end
 
 function test_postprocess_explicit_met_return_is_hourly(testCase)
+   % The explicit met output from POSTPROCESS should stay aligned with the
+   % hourly postprocessed model outputs.
 
    localws = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
       configure=true, nsteps=96, dt_seconds=900);

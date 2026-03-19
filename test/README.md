@@ -1,7 +1,7 @@
 # Test Suite
 
 This folder contains the public test runners, regression data, unit tests,
-and component benchmark material for the public `icemodel` repo.
+and **component** benchmark material for the public `icemodel` repo.
 
 ## Layout
 
@@ -95,17 +95,18 @@ Programmatic regression helpers:
 7. `run_perf_suite(...)`
    - Use for normal compare runs against rolling or release perf baselines.
    - This writes artifacts under `test/artifacts/<yyyymmdd-HHMMSS>/`.
+   - By default it also runs the managed core benchmark suite and stores the
+     benchmark timing comparison alongside the formal perf artifact.
 8. `run_unit_suite(...)`
    - Use for folder-based unit-test discovery under `test/unit/`.
    - Supports `debug=true` to stop on first failure for inspection.
 9. `run_benchmark_suite(...)`
    - Use for the formal benchmark suite under `test/benchmarks/`.
-   - This is separate from formal perf regression and does not use baselines.
+   - This remains the standalone component-benchmark runner.
    - By default it runs only the top-level benchmark files.
    - Use `include_subfolders=true` to opt into nested microbenchmarks.
-   - Use runner options such as `num_warmups`, `max_samples`,
-     `relative_margin_of_error`, and `confidence_level` to control the
-     sampling budget without rewriting the benchmark itself.
+   - Use `sampling_profile="fast|default|strict"` for common sampling
+     budgets, or override the numeric runner controls directly when needed.
    - The benchmark suite is intended to explain where runtime is spent, not
      just compare alternative implementations in isolation.
    - Sampling-error warnings from the MATLAB perf framework are not test
@@ -119,6 +120,12 @@ Programmatic regression helpers:
    - Use to refresh the static runoff reference data in `test/references/`.
    - This is separate from baseline management and requires the sibling
      `runoff` project.
+11. `validate_test_suite(...)`
+   - Use to exercise the public test-suite surface end to end without
+     mutating managed baselines.
+   - This validates signatures, Code Analyzer cleanliness, runner selector
+     variants, per-file discovery, and build/snapshot tools against
+     temporary outputs.
 
 ## Execution policy
 
@@ -128,3 +135,7 @@ Formal suites run from `icemodel` only and read these local files:
 2. references from `test/references/`
 
 They do not require `runoff` on path at execution time.
+
+Rolling baseline rebuilds automatically archive the prior managed MAT file
+and any saved profiler artifacts under `test/baselines/archive/` before the
+new rolling baseline is written.

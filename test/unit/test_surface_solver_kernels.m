@@ -1,9 +1,11 @@
 function tests = test_surface_solver_kernels
-%TEST_SURFACE_SOLVER_KERNELS Verify local surface and column solver kernels.
+   %TEST_SURFACE_SOLVER_KERNELS Verify local surface and column solver kernels.
    tests = functiontests(localfunctions);
 end
 
 function setup(testCase)
+   % Build paired skinmodel and icemodel synthetic columns so the surface
+   % and coupled column solvers can be exercised on matched states.
 
    workspace = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
       configure=true, nsteps=24, dt_seconds=900);
@@ -15,12 +17,15 @@ function setup(testCase)
 end
 
 function teardown(testCase)
+   % Remove the shared synthetic columns after the file-level tests end.
 
    icemodel.test.fixtures.cleanupSyntheticWorkspace( ...
       testCase.TestData.workspace);
 end
 
 function test_sfcflux_derivative_matches_finite_difference(testCase)
+   % SFCFLUX should return a derivative consistent with a centered finite
+   % difference about the same surface state.
 
    s = testCase.TestData.skin;
    Ts = s.Ts;
@@ -43,6 +48,8 @@ function test_sfcflux_derivative_matches_finite_difference(testCase)
 end
 
 function test_sfctemp_finds_small_surface_residual(testCase)
+   % SFCTEMP should find a temperature that leaves only a small residual in
+   % the explicit surface-flux balance.
 
    s = testCase.TestData.skin;
    Qc = CONDUCT(s.k_eff, s.T, s.dz, s.Ts);
@@ -58,6 +65,8 @@ function test_sfctemp_finds_small_surface_residual(testCase)
 end
 
 function test_sebsolve_converges_across_root_finders(testCase)
+   % All standalone SEBSOLVE root-finder modes should converge on the same
+   % synthetic forcing state.
 
    s = testCase.TestData.skin;
    for seb_solver = 0:2
@@ -77,6 +86,8 @@ function test_sebsolve_converges_across_root_finders(testCase)
 end
 
 function test_enbalance_matches_energy_balance_residual(testCase)
+   % ENBALANCE should report the same residual as the explicit ENBAL helper
+   % built from its returned component fluxes.
 
    s = testCase.TestData.skin;
    rh = s.met.rh(s.metstep);
@@ -93,6 +104,8 @@ function test_enbalance_matches_energy_balance_residual(testCase)
 end
 
 function test_skinsolve_returns_finite_bounded_state(testCase)
+   % SKINSOLVE should keep the skin column finite and phase-bounded on the
+   % shared synthetic state.
 
    s = testCase.TestData.skin;
    [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(s.T, s.f_ice, s.f_liq, ...
@@ -108,6 +121,8 @@ function test_skinsolve_returns_finite_bounded_state(testCase)
 end
 
 function test_skinebsolve_converges_on_synthetic_column(testCase)
+   % The coupled skin energy-balance solve should converge and keep the
+   % phase fractions inside their physical bounds.
 
    s = testCase.TestData.skin;
    [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok, n_iters] = ...
@@ -129,6 +144,8 @@ function test_skinebsolve_converges_on_synthetic_column(testCase)
 end
 
 function test_iceenbal_and_iceebsolve_converge_on_synthetic_column(testCase)
+   % The direct and coupled icemodel column solves should both converge on
+   % the shared synthetic state and preserve phase bounds.
 
    s = testCase.TestData.ice;
    [T_dir, f_ice_dir, f_liq_dir, k_eff_dir, ok_dir, iter_dir] = ICEENBAL( ...

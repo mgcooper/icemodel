@@ -69,6 +69,8 @@ classdef SebKernelPerfTest < matlab.perftest.TestCase
 
    methods (Test)
       function testSolver(testCase, seb_solver)
+         % Benchmark one SEBSOLVE root-finder variant on a fixed surface
+         % state so only solver-path overhead changes between cases.
          batch_size = sebBenchmarkBatchSize(seb_solver);
 
          % Benchmark only the SEBSOLVE call for each available root finder.
@@ -103,13 +105,20 @@ classdef SebKernelPerfTest < matlab.perftest.TestCase
 end
 
 function batch_size = sebBenchmarkBatchSize(seb_solver)
+   %SEBBENCHMARKBATCHSIZE Return calibrated batch sizes for SEB perf cases.
 
    switch seb_solver
       case 1
-         batch_size = 16;
+         % The secant/newton variant stays quick enough that it still needs
+         % a large batch to stay above framework precision.
+         batch_size = 2048;
       case 2
-         batch_size = 6;
+         % The constrained solve is similarly quick once the setup state is
+         % fixed, so batch it aggressively as well.
+         batch_size = 2048;
       otherwise
-         batch_size = 1;
+         % The fallback solver is also fast relative to the framework
+         % clock, so use the same scale as the other SEB variants.
+         batch_size = 2048;
    end
 end

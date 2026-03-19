@@ -1,9 +1,9 @@
 function [met, filepath] = makeSyntheticMetFile(simyear, kwargs)
-%MAKESYNTHETICMETFILE Build a simple synthetic forcing timetable for tests.
-%
-%  met = icemodel.test.fixtures.makeSyntheticMetFile(simyear)
-%  [met, filepath] = icemodel.test.fixtures.makeSyntheticMetFile(simyear, ...
-%     sitename="kanm", forcings="kanm", metdir="/tmp")
+   %MAKESYNTHETICMETFILE Build a simple synthetic forcing timetable for tests.
+   %
+   %  met = icemodel.test.fixtures.makeSyntheticMetFile(simyear)
+   %  [met, filepath] = icemodel.test.fixtures.makeSyntheticMetFile(simyear, ...
+   %     sitename="kanm", forcings="kanm", metdir="/tmp")
 
    arguments
       simyear (1, 1) double {mustBeInteger, mustBePositive}
@@ -16,6 +16,7 @@ function [met, filepath] = makeSyntheticMetFile(simyear, kwargs)
       kwargs.metdir (1, :) char = ''
    end
 
+   % Build one simple, smooth forcing year with a stable diurnal cycle.
    dt = seconds(kwargs.dt_seconds);
    t0 = datetime(simyear, 1, 1, 0, 0, 0, 'TimeZone', 'UTC');
    Time = transpose(t0 + dt * (0:kwargs.nsteps-1));
@@ -32,10 +33,12 @@ function [met, filepath] = makeSyntheticMetFile(simyear, kwargs)
 
    met = timetable(Time, tair, swd, lwd, albedo, wspd, rh, psfc, ppt);
    if kwargs.include_modis
+      % Mirror the albedo shape for optional synthetic userdata tests.
       modis = min(max(albedo - 0.05, 0.05), 0.95);
       met.(kwargs.modis_varname) = modis;
    end
 
+   % Optionally persist the timetable using the normal met-file naming.
    filepath = '';
    if ~isempty(kwargs.metdir)
       tag = formatTimestepTag(kwargs.dt_seconds);
@@ -47,6 +50,7 @@ function [met, filepath] = makeSyntheticMetFile(simyear, kwargs)
 end
 
 function tag = formatTimestepTag(dt_seconds)
+   %FORMATTIMESTEPTAG Convert a synthetic timestep into the met filename tag.
 
    if mod(dt_seconds, 3600) == 0
       tag = [int2str(dt_seconds / 3600) 'hr'];

@@ -4,38 +4,20 @@ function tests = test_restart_reproducibility
 end
 
 function setup(testCase)
+   % Keep restart workspaces under the canonical test-artifacts tmp root so
+   % failed cases leave inspectable artifacts in the repo-local test tree.
+   tmpdir = fullfile(icemodel.getpath('test'), 'artifacts', 'tmp');
+   workspace = icemodel.test.fixtures.makeSyntheticWorkspace([2015; 2016], ...
+      configure=false, parentdir=tmpdir);
 
-   tmpdir = fullfile(icemodel.internal.fullpath(), 'test', 'artifacts', 'tmp');
-   if exist(tmpdir, 'dir') ~= 7
-      mkdir(tmpdir);
-   end
-   rootdir = tempname(tmpdir);
-   inputdir = fullfile(rootdir, 'input');
-   metdir = fullfile(inputdir, 'met');
-   evaldir = fullfile(rootdir, 'eval');
-   outdir = fullfile(rootdir, 'output');
-
-   mkdir(rootdir);
-   mkdir(inputdir);
-   mkdir(metdir);
-   mkdir(evaldir);
-   mkdir(outdir);
-
-   spectral_src = icemodel.internal.fullpath( ...
-      'demo', 'data', 'input', 'spectral');
-   spectral_dst = fullfile(inputdir, 'spectral');
-   copyfile(spectral_src, spectral_dst);
-
-   icemodel.test.fixtures.writeSyntheticMetFile(metdir, 2015);
-   icemodel.test.fixtures.writeSyntheticMetFile(metdir, 2016);
-
-   testCase.TestData.rootdir = rootdir;
-   testCase.TestData.inputdir = inputdir;
-   testCase.TestData.evaldir = evaldir;
-   testCase.TestData.outdir = outdir;
+   testCase.TestData.rootdir = workspace.rootdir;
+   testCase.TestData.inputdir = workspace.inputdir;
+   testCase.TestData.evaldir = workspace.evaldir;
+   testCase.TestData.outdir = workspace.outputdir;
 end
 
 function teardown(testCase)
+   % Remove the restart workspace after the file-level checks complete.
 
    rootdir = testCase.TestData.rootdir;
    if exist(rootdir, 'dir') == 7
@@ -44,16 +26,22 @@ function teardown(testCase)
 end
 
 function test_skinmodel_year_boundary_restart(testCase)
+   % Skinmodel should reproduce the retained output when resumed from the
+   % year-boundary restart file.
 
    verifyRestartRun(testCase, "skinmodel", 1);
 end
 
 function test_icemodel_year_boundary_restart(testCase)
+   % Icemodel should reproduce the retained output when resumed from the
+   % year-boundary restart file.
 
    verifyRestartRun(testCase, "icemodel", 2);
 end
 
 function verifyRestartRun(testCase, smbmodel, solver)
+   % Compare a continuous two-year run against a split seed/resume pair and
+   % require exact agreement before and after postprocessing.
 
    simyears = [2015 2016];
 
@@ -87,6 +75,7 @@ function verifyRestartRun(testCase, smbmodel, solver)
 end
 
 function opts = buildOpts(testCase, smbmodel, simyears, kwargs)
+   %BUILDOPTS Build one restart-test OPTS struct inside the synthetic workspace.
 
    arguments
       testCase
@@ -103,6 +92,8 @@ function opts = buildOpts(testCase, smbmodel, simyears, kwargs)
    opts = icemodel.setopts(char(smbmodel), 'kanm', simyears, ...
       'kanm', 'kanm', 'albedo', char(kwargs.run_tag), false, false);
 
+   % Override the workspace roots so the restart run stays isolated inside
+   % the synthetic test workspace.
    pathoutput = fullfile(testCase.TestData.outdir, char(kwargs.run_tag));
    pathuserdata = fullfile(testCase.TestData.inputdir, 'userdata');
    if exist(pathuserdata, 'dir') ~= 7
@@ -121,4 +112,7 @@ function opts = buildOpts(testCase, smbmodel, simyears, kwargs)
       'saverestart', kwargs.saverestart, ...
       'use_restart', kwargs.use_restart, ...
       'restartfile', kwargs.restartfile);
+
+   % Finalize the derived output/restart paths after overriding the roots.
+   opts = icemodel.configureRun(opts);
 end

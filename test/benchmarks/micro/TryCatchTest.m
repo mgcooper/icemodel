@@ -11,6 +11,7 @@ classdef TryCatchTest < matlab.perftest.TestCase
 
    methods(Test)
       function testTryCatch(testCase, handling_mode, throws_error)
+         % Measure both the no-error and throwing paths for each catch form.
          if throws_error
             a = 2;
             b = "dog";
@@ -18,7 +19,7 @@ classdef TryCatchTest < matlab.perftest.TestCase
          else
             a = 2;
             b = 1;
-            batch_size = 10000;
+            batch_size = 100000;
          end
 
          if handling_mode == 1
@@ -40,6 +41,7 @@ classdef TryCatchTest < matlab.perftest.TestCase
 end
 
 function c = trycatchWithHandling(a, b)
+%TRYCATCHWITHHANDLING Execute the `catch ME` branch under test.
 
    try
       c = a - b;
@@ -49,6 +51,7 @@ function c = trycatchWithHandling(a, b)
 end
 
 function c = trycatchWithoutHandling(a, b)
+%TRYCATCHWITHOUTHANDLING Execute the bare `catch` branch under test.
 
    try
       c = a - b;

@@ -68,6 +68,21 @@
             ]
          },
          {
+            "name": "include_benchmarks",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
+         },
+         {
+            "name": "benchmark_sampling_profile",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('benchmarksamplingprofile')"
+            ]
+         },
+         {
             "name": "baseline",
             "kind": "namevalue",
             "type": [
@@ -130,7 +145,7 @@
             "name": "verbosity",
             "kind": "namevalue",
             "type": [
-               "choices=terse,concise,detailed"
+               "choices=icemodel.completions('testverbosity')"
             ]
          }
       ],
@@ -158,6 +173,13 @@
             "type": [
                "logical",
                "scalar"
+            ]
+         },
+         {
+            "name": "sampling_profile",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('benchmarksamplingprofile')"
             ]
          },
          {
@@ -478,6 +500,39 @@
             ]
          },
          {
+            "name": "include_benchmarks",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
+         },
+         {
+            "name": "benchmark_sampling_profile",
+            "kind": "namevalue",
+            "type": [
+               "choices=icemodel.completions('benchmarksamplingprofile')"
+            ]
+         },
+         {
+            "name": "include_profile_artifacts",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
+         },
+         {
+            "name": "profile_history_size",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
+            ]
+         },
+         {
             "name": "output_file",
             "kind": "namevalue",
             "type": "file"
@@ -561,6 +616,24 @@
             "kind": "namevalue",
             "type": [
                "choices=icemodel.completions('sitename')"
+            ]
+         },
+         {
+            "name": "include_profile_artifacts",
+            "kind": "namevalue",
+            "type": [
+               "logical",
+               "scalar"
+            ]
+         },
+         {
+            "name": "profile_history_size",
+            "kind": "namevalue",
+            "type": [
+               [
+                  "numeric",
+                  "scalar"
+               ]
             ]
          },
          {

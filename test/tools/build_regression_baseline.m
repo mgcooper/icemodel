@@ -4,7 +4,7 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    %
    %  RegressionBaseline = build_regression_baseline(baseline="rolling")
    %  RegressionBaseline = build_regression_baseline(baseline_tag="v1.1")
-   %  RegressionBaseline = build_regression_baseline(baseline="v1.01", ...
+   %  RegressionBaseline = build_regression_baseline(baseline_tag="v1.01", ...
    %     tier="full", smbmodel="skinmodel")
    %  RegressionBaseline = build_regression_baseline(baseline="rolling", ...
    %     smbmodel="icemodel", solver=2)
@@ -16,55 +16,84 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    % Use this when you want to accept new modeled outputs as a rolling or
    % versioned regression baseline. This writes baseline files only; it does
    % not produce compare artifacts or evaluate pass/fail against an older
-   % baseline.
+   % baseline. By default it also saves a profiler report from a separate
+   % diagnostic rerun so the accepted baseline and the timing diagnostics are
+   % archived together.
+   %
+   % A custom OUTPUT_FILE is supported only when SMBMODEL resolves to one
+   % concrete formal model. Multi-model requests write the managed per-model
+   % baseline files under test/baselines/.
+   %
    % The optional solver filter accepts any subset of [1 2 3].
    % The formal comparison year and smoke/full site selections are explicit
    % here rather than buried in the regression case matrix helper.
 
    arguments (Input)
-      kwargs.baseline string = string.empty()
+      kwargs.baseline (1, :) string ...
+         {icemodel.validators.mustBeRollingBaselineName(kwargs.baseline)} ...
+         = "rolling"
       kwargs.baseline_tag string = string.empty()
-      kwargs.tier (1, :) string {mustBeMember(kwargs.tier, ...
-         ["smoke", "full", "all"])} = "full"
-      kwargs.smbmodel (1, :) string {mustBeMember(kwargs.smbmodel, ...
-         ["all", "icemodel", "skinmodel"])} = "all"
+      kwargs.tier (1, :) string ...
+         {icemodel.validators.mustBeTestTierName(kwargs.tier)} = "full"
+      kwargs.smbmodel (1, :) string ...
+         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} = "all"
       kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} = []
       kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
       kwargs.smoke_sites string = "kanm"
       kwargs.full_sites string = ["kanm"; "kanl"]
+      kwargs.include_profile_artifacts (1, 1) logical = true
+      kwargs.profile_history_size (1, 1) double {mustBeInteger, ...
+         mustBePositive} = 25000000
       kwargs.output_file string = string.empty()
    end
-   [baseline, baseline_tag, tier, smbmodel, solver, simyear, smoke_sites, ...
-      full_sites, output_file] = deal( ...
-      kwargs.baseline, kwargs.baseline_tag, kwargs.tier, ...
-      kwargs.smbmodel, kwargs.solver, kwargs.simyear, ...
-      string(kwargs.smoke_sites(:)), string(kwargs.full_sites(:)), ...
-      kwargs.output_file);
 
-   % Expand smbmodel="all" into one rolling/release baseline file per model.
-   if smbmodel == "all"
-      if ~isblanktext(output_file)
-         error('output_file is only supported for a single smbmodel')
-      end
-      models = icemodel.test.helpers.formalSmbmodels();
-      baselines = cell(numel(models), 1);
-      for i = 1:numel(models)
-         baselines{i} = build_regression_baseline( ...
-            baseline=baseline, baseline_tag=baseline_tag, tier=tier, ...
-            smbmodel=models(i), solver=solver, simyear=simyear, ...
-            smoke_sites=smoke_sites, full_sites=full_sites);
-      end
-      RegressionBaseline = vertcat(baselines{:});
-      return
+   % Keep the cleanup handle in scope so the caller's config is restored
+   % when this entrypoint returns.
+   [~, ~, ~, ~, suite_cleanup] = ...
+      icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>
+
+   % Deal out arguments.
+   [baseline, baseline_tag, tier, smbmodel, solver, simyear, smoke_sites, ...
+      full_sites, include_profile_artifacts, profile_history_size, output_file] ...
+      = deal( ...
+      kwargs.baseline, kwargs.baseline_tag, kwargs.tier, kwargs.smbmodel, ...
+      kwargs.solver, kwargs.simyear, reshape(kwargs.smoke_sites, [], 1), ...
+      reshape(kwargs.full_sites, [], 1), kwargs.include_profile_artifacts, ...
+      kwargs.profile_history_size, kwargs.output_file);
+
+   % Expand the requested formal model selector once at the entrypoint.
+   models = icemodel.test.helpers.resolveRequestedSmbmodels(smbmodel);
+
+   % A custom output file is only coherent for one concrete model build.
+   if numel(models) > 1 && ~isblanktext(output_file)
+      error(['output_file overrides only one managed baseline file. Omit ', ...
+         'it when smbmodel expands to more than one formal model.'])
    end
 
+   % Build the baselines.
+   baselines = arrayfun(@(mdl) buildSingleModelRegressionBaseline( ...
+      baseline, baseline_tag, tier, mdl, solver, simyear, ...
+      smoke_sites, full_sites, include_profile_artifacts, ...
+      profile_history_size, output_file), ...
+      models, 'UniformOutput', false);
+
+   % Collapse to a single table.
+   RegressionBaseline = vertcat(baselines{:});
+end
+
+function RegressionBaseline = buildSingleModelRegressionBaseline( ...
+      baseline, baseline_tag, tier, smbmodel, solver, simyear, ...
+      smoke_sites, full_sites, include_profile_artifacts, ...
+      profile_history_size, output_file)
+   %BUILDSINGLEMODELREGRESSIONBASELINE Build one canonical regression baseline.
+
    % Resolve the baseline target, configure paths, and load formal cases.
-   [baseline_type, baseline_tag, output_file, ~, input_path, ...
-      output_path, cases] = icemodel.test.helpers.prepareBaselineBuild( ...
+   [baseline_type, baseline_tag, output_file, input_path, output_path, ...
+      cases] = icemodel.test.helpers.prepareBaselineBuild( ...
       "regression", baseline, baseline_tag, tier, smbmodel, output_file, ...
       simyear, solver, smoke_sites, full_sites);
 
-   % Load the static runoff reference used to derive catchment totals.
+   % Load the static runoff reference once before entering the case loop.
    runoff_ref = icemodel.test.helpers.loadRunoffReference();
 
    % Preallocate row containers for the accepted baseline summary and opts.
@@ -76,9 +105,14 @@ function RegressionBaseline = build_regression_baseline(kwargs)
       c = cases(icase, :);
       opts_run = icemodel.test.helpers.setModelOptsForCase(c);
 
+      % Run the case and postprocess the retained output years into the
+      % scalar metrics carried by the regression baseline.
       [ice1, ice2] = icemodel.test.helpers.runSmbModel(opts_run);
       [ice1, ~] = icemodel.postprocess( ...
          ice1, ice2, opts_run, opts_run.output_years);
+
+      % Load the matched runoff reference row, if one exists, before
+      % summarizing the retained yearly outputs.
       ridx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);
       met = icemodel.test.helpers.loadProcessedMetForOutputYears(opts_run);
       if isempty(ridx)
@@ -122,21 +156,42 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    meta.case_builder = "icemodel.test.helpers.setModelOptsForCase";
    meta.opts_source = "icemodel.setopts defaults";
    meta.reset_fields = "solver";
+   meta.include_profile_artifacts = include_profile_artifacts;
+   meta.profile_history_size = profile_history_size;
    meta.input_path = string(input_path);
    meta.output_path = string(output_path);
    meta.matlab_version = string(version);
    meta.host = string(computer);
    meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
 
+   % Rolling baselines are acceptance targets. Archive the prior managed
+   % state before overwriting it so older accepted outputs remain available.
+   if baseline_type == "rolling"
+      icemodel.test.helpers.archiveManagedBaseline(output_file, "regression");
+   end
+
+   % Save profiler diagnostics in a separate rerun so the accepted baseline
+   % state above stays independent from the profiling instrumentation.
+   profile_summary = table();
+   profile_meta = struct();
+   profile_artifacts = struct();
+   if include_profile_artifacts
+      [profile_summary, profile_meta, profile_artifacts] = ...
+         icemodel.test.helpers.captureBaselineProfile( ...
+         "regression", cases, output_file, history_size=profile_history_size);
+   end
+
    % Save the rolling or release regression baseline file.
    outdir = fileparts(char(output_file));
    if exist(outdir, 'dir') ~= 7
       mkdir(outdir);
    end
-   save(char(output_file), 'RegressionBaseline', 'case_opts', 'meta');
+   save(char(output_file), 'RegressionBaseline', 'case_opts', 'meta', ...
+      'profile_summary', 'profile_meta', 'profile_artifacts');
 end
 
 function row = copyMetricFields(row, S)
+   %COPYMETRICFIELDS Copy the scalar metric struct into one baseline row.
 
    names = string(fieldnames(S));
    for i = 1:numel(names)

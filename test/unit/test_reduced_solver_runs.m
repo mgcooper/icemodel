@@ -1,21 +1,26 @@
 function tests = test_reduced_solver_runs
-%TEST_REDUCED_SOLVER_RUNS Verify bounded output on small synthetic runs.
+   %TEST_REDUCED_SOLVER_RUNS Verify bounded output on small synthetic runs.
    tests = functiontests(localfunctions);
 end
 
 function setup(testCase)
+   % Reuse one reduced synthetic workspace so each solver-mode test runs on
+   % the same controlled forcing and column geometry.
 
    testCase.TestData.workspace = icemodel.test.fixtures.makeSyntheticWorkspace( ...
       2016, configure=true, nsteps=96, dt_seconds=900);
 end
 
 function teardown(testCase)
+   % Remove the shared reduced workspace after the file-level tests end.
 
    icemodel.test.fixtures.cleanupSyntheticWorkspace( ...
       testCase.TestData.workspace);
 end
 
 function test_skinmodel_reduced_run_stays_bounded(testCase)
+   % A compact skinmodel run should finish with bounded, finite outputs on
+   % the shared synthetic forcing file.
 
    workspace = testCase.TestData.workspace;
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
@@ -31,6 +36,8 @@ function test_skinmodel_reduced_run_stays_bounded(testCase)
 end
 
 function test_icemodel_reduced_runs_stay_bounded_across_solver_modes(testCase)
+   % Run the icemodel across all supported solver modes to make sure the
+   % reduced synthetic case remains finite and bounded in each branch.
 
    workspace = testCase.TestData.workspace;
    for solver = 1:3
