@@ -8,10 +8,10 @@ function setup(testCase)
    % see the same controlled geometry and forcing setup.
 
    workspace = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
-      configure=true, nsteps=24, dt_seconds=900);
+      configure=true, nsteps=96, dt_seconds=900);
    testCase.TestData.workspace = workspace;
    testCase.TestData.state = icemodel.test.fixtures.makeSyntheticColumnState( ...
-      workspace, 'icemodel', solver=3, include_spectral=true, ...
+      workspace, 'icemodel', solver=3, metstep=49, include_spectral=true, ...
       testname='spectral_kernel');
 end
 
@@ -111,4 +111,70 @@ function test_extcoefsinit_and_updateextcoefs_return_finite_terms(testCase)
    testCase.verifyTrue(all(isfinite(Sc_new)));
    testCase.verifyGreaterThan(chi, 0);
    testCase.verifyLessThanOrEqual(chi, 1 + 1e-9);
+end
+
+function test_bulkextcoefs_matches_updateextcoefs_transform(testCase)
+   % BULKEXTCOEFS should reproduce the exact spectral extinction transform
+   % embedded in the historical UPDATEEXTCOEFS implementation.
+
+   s = testCase.TestData.state;
+   ro_sno = s.ro_ice * s.f_ice + s.ro_liq * s.f_liq + ...
+      s.ro_air * (1 - s.f_ice - s.f_liq);
+   grid_thermal = cumsum(s.dz) - s.dz / 2;
+   grid_spectral = cumsum(s.dz_spect) - s.dz_spect / 2;
+   ro_sno_spect = max(GRIDFORWARD(ro_sno, grid_thermal, grid_spectral), 300);
+
+   legacy = -log((sum(s.solardwavl .* exp(s.spect_S .* ro_sno_spect), 2)) ...
+      ./ (sum(s.solardwavl .* exp(s.spect_N .* ro_sno_spect), 2))) ...
+      ./ s.dz_spect(1);
+   legacy = vertcat(legacy, legacy(end), legacy(end));
+   helper = BULKEXTCOEFS(s.dz_spect, ro_sno_spect, s.spect_N, ...
+      s.spect_S, s.solardwavl);
+
+   testCase.verifyEqual(helper, legacy, 'AbsTol', 1e-12);
+end
+
+function test_updateextcoefsdecomposed_matches_legacy_updateextcoefs(testCase)
+   % UPDATEEXTCOEFSDECOMPOSED should match the current inline kernel so the
+   % perf benchmark isolates call overhead rather than behavior changes.
+
+   s = testCase.TestData.state;
+   ro_sno = s.ro_ice * s.f_ice + s.ro_liq * s.f_liq + ...
+      s.ro_air * (1 - s.f_ice - s.f_liq);
+   [~, ~, ~, z_walls] = CVMESH(s.opts.z0_spectral, s.opts.dz_spectral);
+   grid_thermal = cumsum(s.dz) - s.dz / 2;
+   grid_spectral = cumsum(s.dz_spect) - s.dz_spect / 2;
+
+   [Sc_inline, chi_inline] = UPDATEEXTCOEFSINLINELEGACY(s.swd, s.albedo, ...
+      s.Q0, s.dz_spect, s.spect_N, s.spect_S, s.solardwavl, s.Sc, ...
+      s.dz, ro_sno);
+   [Sc_decomp, chi_decomp] = UPDATEEXTCOEFSDECOMPOSED(s.swd, s.albedo, ...
+      s.Q0, s.dz_spect, s.spect_N, s.spect_S, s.solardwavl, s.Sc, ...
+      s.dz, ro_sno);
+
+   testCase.verifyEqual(Sc_decomp, Sc_inline, 'RelTol', 1e-12, ...
+      'AbsTol', 1e-12);
+   testCase.verifyEqual(chi_decomp, chi_inline, 'AbsTol', 1e-12);
+end
+
+function test_bulkextcoefslookup_stays_close_to_exact_transform(testCase)
+   % BULKEXTCOEFSLOOKUP is approximate, but on the integer-density lookup
+   % grid it should stay close to the exact bulk-extinction profile.
+
+   s = testCase.TestData.state;
+   ro_sno = s.ro_ice * s.f_ice + s.ro_liq * s.f_liq + ...
+      s.ro_air * (1 - s.f_ice - s.f_liq);
+   grid_thermal = cumsum(s.dz) - s.dz / 2;
+   grid_spectral = cumsum(s.dz_spect) - s.dz_spect / 2;
+   ro_sno_spect = max(GRIDFORWARD(ro_sno, grid_thermal, grid_spectral), 300);
+   lookup = MAKEBULKEXTCOEFSLOOKUP(s.dz_spect, s.spect_N, s.spect_S, ...
+      s.solardwavl);
+
+   exact = BULKEXTCOEFS(s.dz_spect, ro_sno_spect, s.spect_N, ...
+      s.spect_S, s.solardwavl);
+   approx = BULKEXTCOEFSLOOKUP(ro_sno_spect, lookup);
+   rel_err = max(abs(approx - exact) ./ max(abs(exact), 1e-12));
+
+   testCase.verifyTrue(all(isfinite(approx)));
+   testCase.verifyLessThan(rel_err, 0.02);
 end

@@ -365,6 +365,7 @@ function artifact_file = logArtifacts(sample_detail, ...
    disp(artifact_file)
    disp(case_summary(:, {'case_id', 'median_wall_s', 'ref_wall_s', ...
       'gate_wall_s', 'passed_perf'}))
+   printBenchmarkComparison(benchmark)
 end
 
 function benchmark = runBenchmarkDiagnostics(simyear, baseline_tag, smbmodel, ...
@@ -382,6 +383,8 @@ function benchmark = runBenchmarkDiagnostics(simyear, baseline_tag, smbmodel, ..
 
    bench_results = run_benchmark_suite( ...
       sampling_profile=benchmark_sampling_profile, show_summary=false);
+   [current_signature, suite_files] = ...
+      icemodel.test.helpers.benchmarkSuiteSignature();
    benchmark.summary = sampleSummary(bench_results);
    if ~isempty(benchmark.summary) ...
          && ismember('Name', benchmark.summary.Properties.VariableNames)
@@ -393,11 +396,35 @@ function benchmark = runBenchmarkDiagnostics(simyear, baseline_tag, smbmodel, ..
       loadBenchmarkBaselineFromPerf( ...
       simyear, baseline_tag, smbmodel);
    benchmark.comparison = compareBenchmarkSummary( ...
-      benchmark.summary, baseline_summary);
+      benchmark.summary, baseline_summary, baseline_meta, current_signature);
    benchmark.meta = struct();
    benchmark.meta.sampling_profile = benchmark_sampling_profile;
+   benchmark.meta.current_signature = current_signature;
+   benchmark.meta.suite_files = suite_files;
    benchmark.meta.baseline_file = source_file;
    benchmark.meta.baseline_meta = baseline_meta;
+   if isfield(baseline_meta, 'suite_signature')
+      benchmark.meta.baseline_signature = string(baseline_meta.suite_signature);
+   else
+      benchmark.meta.baseline_signature = "";
+   end
+   if isempty(source_file)
+      benchmark.meta.baseline_compatible = false;
+      benchmark.meta.compare_reason = "no embedded benchmark baseline found";
+   elseif benchmark.meta.baseline_signature == ""
+      benchmark.meta.baseline_compatible = false;
+      benchmark.meta.compare_reason = ...
+         "embedded benchmark baseline predates suite signatures";
+   else
+      benchmark.meta.baseline_compatible = ...
+         benchmark.meta.current_signature == benchmark.meta.baseline_signature;
+      if benchmark.meta.baseline_compatible
+         benchmark.meta.compare_reason = "";
+      else
+         benchmark.meta.compare_reason = ...
+            "embedded benchmark baseline was built from a different benchmark suite";
+      end
+   end
    benchmark.meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
 end
 
@@ -457,7 +484,8 @@ function [BenchmarkBaseline, meta, source_file] = loadBenchmarkBaselineFromPerf(
    end
 end
 
-function comparison = compareBenchmarkSummary(current_summary, baseline_summary)
+function comparison = compareBenchmarkSummary(current_summary, baseline_summary, ...
+      baseline_meta, current_signature)
    %COMPAREBENCHMARKSUMMARY Join current benchmark timings to a baseline.
 
    if isempty(current_summary)
@@ -475,12 +503,23 @@ function comparison = compareBenchmarkSummary(current_summary, baseline_summary)
    end
 
    n_rows = height(comparison);
+   comparison.baseline_compatible = false(n_rows, 1);
    comparison.ref_mean = nan(n_rows, 1);
    comparison.ref_std = nan(n_rows, 1);
    comparison.pct_delta = nan(n_rows, 1);
 
+   % Only trust benchmark deltas when the embedded baseline came from the
+   % same benchmark-suite definition as the current checkout.
+   if ~isstruct(baseline_meta) || ~isfield(baseline_meta, 'suite_signature') ...
+         || isblanktext(baseline_meta.suite_signature) ...
+         || string(baseline_meta.suite_signature) ~= string(current_signature)
+      return
+   end
+
+   comparison.baseline_compatible(:) = true;
+
    % Populate reference values only where the managed perf bundle includes
-   % the same benchmark name.
+   % the same benchmark name from a compatible suite definition.
    if isempty(baseline_summary) || ...
          ~ismember('Name', baseline_summary.Properties.VariableNames)
       return
@@ -503,6 +542,34 @@ function comparison = compareBenchmarkSummary(current_summary, baseline_summary)
             100 * (comparison.Mean(i) - comparison.ref_mean(i)) ...
             / comparison.ref_mean(i);
       end
+   end
+end
+
+function printBenchmarkComparison(benchmark)
+   %PRINTBENCHMARKCOMPARISON Show a compact benchmark summary/comparison.
+
+   if isempty(benchmark.summary)
+      return
+   end
+
+   disp('Benchmark summary:')
+   disp(benchmark.summary(:, intersect(["Name", "SampleSize", "Mean", ...
+      "StandardDeviation"], ...
+      string(benchmark.summary.Properties.VariableNames), 'stable')))
+
+   if isempty(benchmark.comparison)
+      return
+   end
+
+   if isfield(benchmark.meta, 'baseline_compatible') ...
+         && benchmark.meta.baseline_compatible
+      disp('Benchmark comparison:')
+      disp(benchmark.comparison(:, intersect(["Name", "Mean", "ref_mean", ...
+         "pct_delta"], ...
+         string(benchmark.comparison.Properties.VariableNames), 'stable')))
+   elseif isfield(benchmark.meta, 'compare_reason')
+      fprintf('Benchmark comparison skipped: %s\n', ...
+         char(benchmark.meta.compare_reason));
    end
 end
 

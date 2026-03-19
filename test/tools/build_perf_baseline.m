@@ -247,6 +247,8 @@ function [BenchmarkBaseline, meta] = buildBenchmarkBaseline(kwargs)
    % exact component suite developers can run directly.
    results = run_benchmark_suite( ...
       sampling_profile=kwargs.sampling_profile, show_summary=false);
+   [suite_signature, suite_files] = ...
+      icemodel.test.helpers.benchmarkSuiteSignature();
 
    BenchmarkBaseline = sampleSummary(results);
    if ~isempty(BenchmarkBaseline) ...
@@ -259,6 +261,8 @@ function [BenchmarkBaseline, meta] = buildBenchmarkBaseline(kwargs)
    meta = struct();
    meta.sampling_profile = kwargs.sampling_profile;
    meta.include_subfolders = false;
+   meta.suite_signature = suite_signature;
+   meta.suite_files = suite_files;
    meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
    meta.matlab_version = string(version);
    meta.host = string(computer);
