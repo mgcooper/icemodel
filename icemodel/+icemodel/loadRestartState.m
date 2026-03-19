@@ -7,7 +7,7 @@ function restart = loadRestartState(opts)
 %  opts.use_restart = true
 %  opts.restartfile = full path to a saved restart state
 
-   if ~isfield(opts, 'restartfile') || isblanktext(opts.restartfile)
+   if ~isfield(opts, 'restartfile') || icemodel.isblankinput(opts.restartfile)
       error('opts.restartfile must be set when opts.use_restart is true')
    end
 

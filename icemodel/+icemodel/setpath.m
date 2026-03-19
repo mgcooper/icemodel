@@ -4,6 +4,7 @@ function pathlist = setpath(pathtype, sitename, smbmodel, userdata, simyears, va
    %  pathlist = icemodel.setpath('data')
    %  pathlist = icemodel.setpath('input')
    %  pathlist = icemodel.setpath('eval')
+   %  pathlist = icemodel.setpath('test')
    %  pathlist = icemodel.setpath('userdata')
    %  pathlist = icemodel.setpath('output', sitename, smbmodel)
    %  pathlist = icemodel.setpath('restart', sitename, smbmodel)
@@ -36,12 +37,15 @@ function pathlist = setpath(pathtype, sitename, smbmodel, userdata, simyears, va
       case 'eval'
          pathlist = appendParts(resolveEvalPath(), varargin);
 
+      case 'test'
+         pathlist = appendParts(icemodel.internal.fullpath('test'), varargin);
+
       case 'userdata'
          pathlist = appendParts(resolveUserdataPath(), varargin);
 
       case 'output'
          parts = [{resolveOutputPath(), sitename, smbmodel, userdata}, varargin];
-         parts = parts(~cellfun(@isblankpart, parts));
+         parts = parts(~cellfun(@icemodel.isblankpart, parts));
 
          if isempty(simyears)
             pathlist = fullfile(parts{:});
@@ -51,7 +55,7 @@ function pathlist = setpath(pathtype, sitename, smbmodel, userdata, simyears, va
 
       case 'restart'
          parts = [{resolveOutputPath(), sitename, smbmodel}, varargin, {'restart'}];
-         parts = parts(~cellfun(@isblankpart, parts));
+         parts = parts(~cellfun(@icemodel.isblankpart, parts));
          pathlist = fullfile(parts{:});
 
       otherwise
@@ -59,18 +63,9 @@ function pathlist = setpath(pathtype, sitename, smbmodel, userdata, simyears, va
    end
 end
 
-function tf = isblankpart(value)
-
-   if iscell(value)
-      tf = isempty(value);
-   else
-      tf = isblanktext(value);
-   end
-end
-
 function pathlist = appendParts(pathname, parts)
    parts = [{pathname}, parts];
-   parts = parts(~cellfun(@isblankpart, parts));
+   parts = parts(~cellfun(@icemodel.isblankpart, parts));
    pathlist = fullfile(parts{:});
 end
 

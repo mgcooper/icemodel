@@ -282,13 +282,13 @@ function [smbmodel, sitename, simyears, forcings, userdata, uservars, ...
       sitename, simyears, forcings, userdata, uservars, testname, ...
       saveflag, backupflag)
 
-   if nin < 5 || isblanktext(userdata)
+   if nin < 5 || icemodel.isblankinput(userdata)
       userdata = forcings;
    end
-   if nin < 6 || isblanktext(uservars)
+   if nin < 6 || icemodel.isblankinput(uservars)
       uservars = 'albedo';
    end
-   if nin < 7 || isblanktext(testname)
+   if nin < 7 || icemodel.isblankinput(testname)
       testname = '';
    end
    if nin < 8 || isempty(saveflag)
