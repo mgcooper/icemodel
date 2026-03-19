@@ -61,6 +61,9 @@ function [ice1, ice2, opts] = icemodel(opts)
 
    % INITIALIZE THE SPECTRAL MODEL
    [Q0, dz_spect, spect_N, spect_S, solardwavl] = EXTCOEFSINIT(opts, ro_ice);
+   grid_thermal = cumsum(dz) - dz / 2;
+   grid_spectral = cumsum(dz_spect) - dz_spect / 2;
+   z_walls_spectral = [0; cumsum(dz_spect)];
 
    % INITIALIZE TIMESTEPPING
    [metstep, substep, numsteps, maxsubstep, dt, dt_FULL_STEP, ...
@@ -91,9 +94,10 @@ function [ice1, ice2, opts] = icemodel(opts)
             = NEWTIMESTEP(f_liq, solver);
 
          % SUBSURFACE SOLAR RADIATION SOURCE-TERM
-         [Sc, chi] = UPDATEEXTCOEFS(swd(metstep), albedo(metstep), ...
-            Q0, dz_spect, spect_N, spect_S, solardwavl, Sc, dz, ...
-            ro_ice * f_ice + ro_liq * f_liq);
+         [Sc, chi] = UPDATEEXTCOEFSDECOMPOSEDCACHED(swd(metstep), ...
+            albedo(metstep), Q0, dz_spect, spect_N, spect_S, ...
+            solardwavl, Sc, dz, ro_ice * f_ice + ro_liq * f_liq, ...
+            grid_thermal, grid_spectral, z_walls_spectral);
 
          % SURFACE TERMS (atmospheric vapor pressure fixed over this full step)
          ea = VAPPRESS(tair(metstep), Tf, liqflag) * rh(metstep) / 100;

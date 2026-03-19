@@ -1,4 +1,4 @@
-function xynet = SOLVETWOSTREAM(a,r,bulkcoefs,total_solar,albedo,z_walls)
+function [xynet, upwd, dnwd] = SOLVETWOSTREAM(a,r,bulkcoefs,total_solar,albedo,z_walls)
    %SOLVETWOSTREAM Solve the two-stream model following Schlatter, 1972 method
    %
    %#codegen
@@ -56,11 +56,11 @@ function xynet = SOLVETWOSTREAM(a,r,bulkcoefs,total_solar,albedo,z_walls)
    x = TRISOLVE(e,f,g,b);
 
    % Add the boundary conditions to up and reconstruct down.
-   [up,down] = GETUPDOWN(a,r,x,total_solar,z_walls,M);
+   [upwd, dnwd] = GETUPDOWN(a,r,x,total_solar,z_walls,M);
 
    % Build an array of source-term values on the c.v. boundaries.
-   xynet = (up(2:M)+up(3:M+1))./2.0-(down(2:M)+down(3:M+1))./2.0;
-   xynet = vertcat(up(1)-down(1), xynet);
+   xynet = (upwd(2:M)+upwd(3:M+1))./2.0-(dnwd(2:M)+dnwd(3:M+1))./2.0;
+   xynet = vertcat(upwd(1)-dnwd(1), xynet);
 
    % Ensure xynet(1) is equal to the total absorbed radiation. This corrects
    %   for any (very) small errors in the two-stream model, typically due to a
