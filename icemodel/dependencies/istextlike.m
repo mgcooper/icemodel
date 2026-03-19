@@ -11,13 +11,27 @@ function tf = istextlike(x, varargin)
    %
    %  TF = ISTEXTLIKE(..., 'nontrivial') requires nonzero-length text values.
    %
-   %  This is the container-level text predicate used by icemodel's
-   %  dependency-layer validators. Use ISSCALARTEXT for legacy scalar parsing
-   %  semantics and ISBLANKTEXT for blank-text detection.
+   %  This is the container-level text predicate in matfunclib-style helper
+   %  code. Use ISSCALARTEXT for legacy scalar-text parsing semantics and
+   %  ISBLANKTEXT for blank-text detection.
+   %
+   % Examples
+   %  istextlike({"test", "value"})
+   %  istextlike({'test', "value"})
+   %  istextlike({"test", 1})
+   %  istextlike({"test", 1}, 'any')
+   %  istextlike({'', ""}, 'nontrivial')
    %
    % See also ischarlike isscalartext isblanktext
    %
    %#codegen
+
+   arguments
+      x
+   end
+   arguments (Repeating)
+      varargin
+   end
 
    [opt, args, nargs] = parseoptarg(varargin, {'all', 'any', 'each'}, 'all');
 

@@ -1,5 +1,5 @@
 function tests = test_text_helpers
-   %TEST_TEXT_HELPERS Test text and blank-input helper behavior.
+   %TEST_TEXT_HELPERS Test text helper behavior.
    tests = functiontests(localfunctions);
 end
 
@@ -11,22 +11,6 @@ function test_isblanktext_matches_text_only_semantics(testCase)
    verifyFalse(testCase, isblanktext([]));
    verifyFalse(testCase, isblanktext(missing));
    verifyFalse(testCase, isblanktext('abc'));
-end
-
-function test_isblankinput_preserves_empty_placeholder_behavior(testCase)
-   verifyTrue(testCase, icemodel.isblankinput([]));
-   verifyTrue(testCase, icemodel.isblankinput(''));
-   verifyTrue(testCase, icemodel.isblankinput(""));
-   verifyFalse(testCase, icemodel.isblankinput(0));
-end
-
-function test_isblankpart_handles_path_part_placeholders(testCase)
-   verifyTrue(testCase, icemodel.isblankpart(''));
-   verifyTrue(testCase, icemodel.isblankpart(""));
-   verifyTrue(testCase, icemodel.isblankpart({}));
-
-   verifyFalse(testCase, icemodel.isblankpart([]));
-   verifyFalse(testCase, icemodel.isblankpart({'run001'}));
 end
 
 function test_istextlike_alias_preserves_ischarlike_behavior(testCase)
@@ -48,4 +32,11 @@ function test_setopts_treats_empty_optional_inputs_as_omitted(testCase)
    verifyEqual(testCase, opts.userdata, 'kanm');
    verifyEqual(testCase, opts.uservars, 'albedo');
    verifyEqual(testCase, opts.testname, '');
+end
+
+function test_setpath_omits_empty_placeholders(testCase)
+   expected = icemodel.setpath('output', 'site', 'model', '', [], 'run001');
+   returned = icemodel.setpath('output', 'site', 'model', [], [], {}, 'run001');
+
+   verifyEqual(testCase, returned, expected);
 end

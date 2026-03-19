@@ -3,9 +3,9 @@ function tf = ischarlike(x, varargin)
    %
    %  TF = ISCHARLIKE(X, ...) forwards to ISTEXTLIKE(X, ...).
    %
-   %  The historical name ISCHARLIKE is preserved for backward compatibility.
-   %  New code should prefer ISTEXTLIKE when the intent is "contains only text
-   %  values" rather than specifically "is char-like".
+   %  The historical name ISCHARLIKE is preserved for backward compatibility,
+   %  but the predicate is really about text-like containers rather than only
+   %  char-like values. New code should prefer ISTEXTLIKE.
    %
    % See also ISTEXTLIKE
 

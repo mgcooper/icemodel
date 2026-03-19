@@ -27,6 +27,8 @@ function pathlist = setpath(pathtype, sitename, smbmodel, userdata, simyears, va
       simyears = arrayfun(@num2str, simyears(:), 'un', false);
    end
 
+   omitpart = @(value) isempty(value) || isblanktext(value);
+
    switch char(pathtype)
       case 'data'
          pathlist = appendParts(resolveDataPath(), varargin);
@@ -45,7 +47,7 @@ function pathlist = setpath(pathtype, sitename, smbmodel, userdata, simyears, va
 
       case 'output'
          parts = [{resolveOutputPath(), sitename, smbmodel, userdata}, varargin];
-         parts = parts(~cellfun(@icemodel.isblankpart, parts));
+         parts = parts(~cellfun(omitpart, parts));
 
          if isempty(simyears)
             pathlist = fullfile(parts{:});
@@ -55,7 +57,7 @@ function pathlist = setpath(pathtype, sitename, smbmodel, userdata, simyears, va
 
       case 'restart'
          parts = [{resolveOutputPath(), sitename, smbmodel}, varargin, {'restart'}];
-         parts = parts(~cellfun(@icemodel.isblankpart, parts));
+         parts = parts(~cellfun(omitpart, parts));
          pathlist = fullfile(parts{:});
 
       otherwise
@@ -65,7 +67,7 @@ end
 
 function pathlist = appendParts(pathname, parts)
    parts = [{pathname}, parts];
-   parts = parts(~cellfun(@icemodel.isblankpart, parts));
+   parts = parts(~cellfun(@(value) isempty(value) || isblanktext(value), parts));
    pathlist = fullfile(parts{:});
 end
 

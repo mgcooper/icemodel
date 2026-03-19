@@ -8,10 +8,19 @@ function tf = isblanktext(x)
    %  TF = ISBLANKTEXT(X) returns false for non-text inputs, missing strings,
    %  nonscalar string arrays, and nonblank text values.
    %
-   %  This complements ISSCALARTEXT by detecting blank text directly rather
-   %  than inheriting ISSCALARTEXT's legacy parser behavior.
+   %  This complements ISSCALARTEXT by handling blank-text detection directly
+   %  instead of inheriting ISSCALARTEXT's legacy acceptance of '' as scalar
+   %  text.
    %
-   % See also isscalartext
+   % Examples
+   %  isblanktext("")
+   %  isblanktext('')
+   %  isblanktext(string.empty())
+   %  isblanktext("abc")
+
+   arguments
+      x
+   end
 
    if ischar(x)
       tf = isempty(x) || (isrow(x) && strlength(string(x)) == 0);
