@@ -1,5 +1,5 @@
 function mustBeForcingName(arg)
-%MUSTBEFORCINGNAME Validate that input is a valid forcing-source name.
+   %MUSTBEFORCINGNAME Validate that input is a valid forcing-source name.
 
    valid = icemodel.namelists.forcings();
    if ~ismember(string(arg), valid)

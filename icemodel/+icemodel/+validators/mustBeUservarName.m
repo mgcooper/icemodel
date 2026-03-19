@@ -1,5 +1,5 @@
 function mustBeUservarName(arg)
-%MUSTBEUSERVARNAME Validate that input is a valid userdata variable name.
+   %MUSTBEUSERVARNAME Validate that input is a valid userdata variable name.
 
    if isempty(arg)
       return

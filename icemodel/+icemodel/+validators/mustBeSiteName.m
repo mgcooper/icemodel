@@ -1,5 +1,5 @@
 function mustBeSiteName(arg)
-%MUSTBESITENAME Validate that input is a valid core point-run site name.
+   %MUSTBESITENAME Validate that input is a valid core point-run site name.
 
    valid = icemodel.namelists.sitename();
    if ~ismember(string(arg), valid)

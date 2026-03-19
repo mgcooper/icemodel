@@ -22,14 +22,23 @@ function proplist = completions(funcname)
       case 'testtier'
          proplist = cellstr(icemodel.namelists.testtier());
 
+      case 'testverbosity'
+         proplist = cellstr(icemodel.namelists.testverbosity());
+
       case 'testsmbmodel'
          proplist = cellstr(icemodel.namelists.testsmbmodel());
 
       case 'benchmark'
          proplist = cellstr(icemodel.namelists.benchmark());
 
+      case 'benchmarksamplingprofile'
+         proplist = cellstr(icemodel.namelists.benchmarksamplingprofile());
+
       case 'unittest'
          proplist = cellstr(icemodel.namelists.unittest());
+
+      case 'getpath'
+         proplist = cellstr(icemodel.namelists.getpath());
 
       case 'rollingbaseline'
          proplist = cellstr(icemodel.namelists.rollingbaseline());

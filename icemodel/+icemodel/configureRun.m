@@ -8,7 +8,7 @@ function opts = configureRun(opts)
    % PATHINPUT, PATHOUTPUT, CASENAME, METFNAME, VARS1, and VARS2.
 
    if ~isfield(opts, 'pathdata') || isempty(opts.pathdata)
-      opts.pathdata = icemodel.setpath('data');
+      opts.pathdata = icemodel.getpath('data');
    end
 
    % OUTPUT_YEARS are the post-spinup years retained in saved/postprocessed
@@ -16,17 +16,17 @@ function opts = configureRun(opts)
    opts.output_years = icemodel.outputYears(opts);
 
    if ~isfield(opts, 'pathinput') || isempty(opts.pathinput)
-      opts.pathinput = icemodel.setpath('input');
+      opts.pathinput = icemodel.getpath('input');
    end
    assert(exist(opts.pathinput, 'dir') == 7, ...
       'ICEMODEL_INPUT_PATH does not exist, set it using icemodel.config');
 
    if ~isfield(opts, 'patheval') || isempty(opts.patheval)
-      opts.patheval = icemodel.setpath('eval');
+      opts.patheval = icemodel.getpath('eval');
    end
 
    if ~isfield(opts, 'pathuserdata') || isempty(opts.pathuserdata)
-      opts.pathuserdata = icemodel.setpath('userdata');
+      opts.pathuserdata = icemodel.getpath('userdata');
    end
 
    % WRITEOUTPUT appends ['ice1_' opts.casename '.mat'] and saves the file in
@@ -37,12 +37,12 @@ function opts = configureRun(opts)
    % provides the canonical base output folder; any legacy extra subfoldering
    % for gridded workflows belongs in the wrapper, not here.
    if ~isfield(opts, 'pathoutput') || isempty(opts.pathoutput)
-      opts.pathoutput = icemodel.setpath('output', ...
+      opts.pathoutput = icemodel.getpath('output', ...
          opts.sitename, opts.smbmodel, '', [], opts.testname);
    end
 
    if ~isfield(opts, 'pathrestart') || isempty(opts.pathrestart)
-      opts.pathrestart = icemodel.setpath('restart', ...
+      opts.pathrestart = icemodel.getpath('restart', ...
          opts.sitename, opts.smbmodel, opts.userdata, [], opts.testname);
    end
 

@@ -3,5 +3,5 @@ function list = testsmbmodel()
 %
 %  list = icemodel.namelists.testsmbmodel()
 
-   list = ["all"; icemodel.namelists.smbmodel()];
+   list = ["all"; icemodel.namelists.smbmodel("test")];
 end

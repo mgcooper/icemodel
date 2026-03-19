@@ -1,7 +1,7 @@
-function mustBeSmbmodelName(arg)
-   %MUSTBESMBMODELNAME Validate that input is a valid core smbmodel name.
+function mustBeTestSmbmodelSelector(arg)
+   %MUSTBETESTSMBMODELSELECTOR Validate one formal suite smbmodel selector.
 
-   valid = icemodel.namelists.smbmodel();
+   valid = icemodel.namelists.testsmbmodel();
    if ~ismember(string(arg), valid)
       eid = ['icemodel:validators:' mfilename];
       msg = sprintf('Value must be one of:\n%s', strjoin(cellstr(valid), ', '));

@@ -3,5 +3,5 @@ function list = config()
 %
 %  list = icemodel.namelists.config()
 
-   list = "demo";
+   list = ["demo"; "test"];
 end
