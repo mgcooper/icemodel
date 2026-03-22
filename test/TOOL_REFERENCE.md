@@ -130,8 +130,6 @@ Key options:
   - usually `rolling`
 - `smoke_sites`, `full_sites`
   - advanced site overrides
-- `spectral_variant`
-  - temporary study hook, not intended as the long-term production contract
 
 Important runtime contract:
 
@@ -180,8 +178,6 @@ Key options:
   - also run managed component benchmarks
 - `benchmark_sampling_profile`
   - sampling budget for those managed benchmarks
-- `spectral_variant`
-  - temporary study hook
 
 Important note:
 
@@ -285,10 +281,9 @@ Purpose:
 
 It reports:
 
-1. kernel timings
-2. direct whole-model timings
-3. optional formal perf timings
-4. output-agreement metrics
+1. kernel timings (inlined, exact, lookup — calls functions directly)
+2. direct whole-model timings (exact vs lookup via `opts.lookup_k_bulk`)
+3. output-agreement metrics
 
 Default use:
 
@@ -296,7 +291,6 @@ Default use:
 clear functions
 report = summarize_spectral_perf( ...
     simyear=2016, ...
-    include_formal_perf=false, ...
     n_direct_runs=1);
 ```
 
@@ -307,8 +301,7 @@ clear functions
 report = summarize_spectral_perf( ...
     simyear=2016, ...
     include_full_model=false, ...
-    include_direct_model=false, ...
-    include_formal_perf=false);
+    include_direct_model=false);
 ```
 
 Key options:
@@ -317,8 +310,6 @@ Key options:
   - master switch for the whole-model sections
 - `include_direct_model`
   - include direct `tic/toc` whole-model timings
-- `include_formal_perf`
-  - include formal `run_perf_suite(...)` timings
 - `n_direct_runs`
   - number of repeated direct whole-model runs
 - `output_file`
@@ -326,7 +317,7 @@ Key options:
 
 Use when:
 
-- you are comparing `inlined`, `functions`, and `lookup`
+- you are comparing exact vs lookup spectral paths
 - you want a focused spectral report instead of the full bootstrap workflow
 
 ### `run_spectral_study_bootstrap`
@@ -439,7 +430,6 @@ clear functions
 report = audit_formal_substep_failures( ...
     tier="full", ...
     smbmodel="icemodel", ...
-    spectral_variant="functions", ...
     stop_on_first_issue=true);
 ```
 
@@ -480,17 +470,13 @@ Use when:
    - `snapshot_regression_baseline(...)`
    - `snapshot_perf_baseline(...)`
 
-## Current Spectral Variant Contract
+## Spectral Variant Interface
 
-Current study variants:
+Production interface:
 
-- `inlined`
-- `functions`
-- `lookup`
+- `opts.lookup_k_bulk = true` (default) — lookup-table bulk extinction
+- `opts.lookup_k_bulk = false` — exact bulk-extinction transform
 
-Current intent:
-
-- keep `inlined` only as a preserved study reference
-- compare `functions` vs `lookup` for accepted model structure
-- after acceptance, remove unnecessary study-only control flow from the
-  production path
+Kernel benchmarks and study tools call the spectral functions directly and
+retain all three historical variants (inlined, exact, lookup) for comparison.
+The `inlined` variant lives in `test/legacy/SPECTRALSOURCETERM_INLINE.m`.

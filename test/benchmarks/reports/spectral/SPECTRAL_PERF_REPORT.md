@@ -22,29 +22,35 @@ The study answers two separate questions:
 
 ## Production Code Shape
 
-The production spectral solve is now organized as:
+`opts.lookup_k_bulk` (default `true`) controls whether the production path
+uses the lookup-table approximation or the exact bulk-extinction transform.
+`EXTCOEFSINIT` builds the lookup table when `opts.lookup_k_bulk` is true and
+passes it as `k_bulk_lookup` to `SPECTRALSOURCETERM`, which dispatches on
+`isempty(k_bulk_lookup)`.
 
-1. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/SPECTRALSOURCETERM.m`
-   - main entrypoint used by `icemodel.m`
+1. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/EXTCOEFSINIT.m`
+   - initializes spectral geometry and optical coefficients
+   - builds `k_bulk_lookup` when `opts.lookup_k_bulk` is true
+2. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/SPECTRALSOURCETERM.m`
+   - main entrypoint called by `icemodel.m`
    - remaps thermal density to the spectral grid
-   - chooses exact bulk coefficients or lookup bulk coefficients
+   - chooses exact or lookup bulk coefficients via `isempty(k_bulk_lookup)`
    - solves the two-stream system
    - reconstructs net spectral flux
    - collapses that flux to the thermal-grid source term and `chi`
-2. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/BULKEXTCOEFS.m`
+3. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/BULKEXTCOEFS.m`
    - exact bulk-extinction transform
-3. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/BULKEXTCOEFSLOOKUP.m`
+4. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/BULKEXTCOEFSLOOKUP.m`
    - lookup bulk-extinction transform
-4. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/SOLVETWOSTREAM.m`
+5. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/SOLVETWOSTREAM.m`
    - two-stream solve on the spectral grid
-5. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/SPECTRALNETFLUX.m`
+6. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/SPECTRALNETFLUX.m`
    - reconstructs net spectral flux from the up/down solution
-6. `/Users/mattcooper/MATLAB/projects/icemodel/test/legacy/SPECTRALSOURCETERM_INLINE.m`
-   - preserved historical inline reference used only by the study
-
-`/Users/mattcooper/MATLAB/projects/icemodel/icemodel/UPDATEEXTCOEFS.m`
-now has a real role again: it rebuilds `k_ext`, `tau_N`, and `tau_S` from the
-loaded optical-property tables for one optical grain-radius index.
+7. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/UPDATEEXTCOEFS.m`
+   - rebuilds `k_ext`, `tau_N`, `tau_S` (and optionally `k_bulk_lookup`) for
+     one optical grain-radius index; designed for future grain-size evolution
+8. `/Users/mattcooper/MATLAB/projects/icemodel/test/legacy/SPECTRALSOURCETERM_INLINE.m`
+   - preserved historical inline reference used only by kernel benchmarks
 
 ## How To Reproduce
 

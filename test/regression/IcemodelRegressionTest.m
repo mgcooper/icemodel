@@ -45,7 +45,6 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          full_sites = IcemodelRegressionTest.getenvAsStrings( ...
             'ICEMODEL_TEST_FULL_SITES');
          baseline_tag = getenv('ICEMODEL_REGRESSION_BASELINE');
-         spectral_variant = getenv('ICEMODEL_TEST_SPECTRAL_VARIANT');
          run_name = getenv('ICEMODEL_TEST_RUN_NAME');
 
          % Resolve the retained formal cases and the matched accepted baseline
@@ -69,8 +68,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          % Run each formal case, compare to baseline, and collect a report row.
          for icase = 1:height(cases)
             c = cases(icase, :);
-            opts = icemodel.test.helpers.setModelOptsForCase(c, ...
-               spectral_variant=string(spectral_variant));
+            opts = icemodel.test.helpers.setModelOptsForCase(c);
 
             [ice1, ice2] = icemodel.test.helpers.runSmbModel(opts);
             [ice1, ice2] = icemodel.postprocess( ...
@@ -189,7 +187,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          report = struct2table(report_rows);
          meta = IcemodelRegressionTest.reportMeta( ...
             tier, smbmodel, solver, simyear, smoke_sites, full_sites, ...
-            baseline_tag, spectral_variant, run_name);
+            baseline_tag, run_name);
 
          % Save one artifact for this regression compare run.
          testCase.logReport(report, case_opts, meta);
@@ -322,7 +320,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       end
 
       function meta = reportMeta(tier, smbmodel, solver, simyear, ...
-            smoke_sites, full_sites, baseline_tag, spectral_variant, run_name)
+            smoke_sites, full_sites, baseline_tag, run_name)
          %REPORTMETA Build the saved metadata struct for one regression artifact.
 
          % Resolve the shared run stamp before filling the saved metadata.
@@ -338,7 +336,6 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          meta.smoke_sites = smoke_sites;
          meta.full_sites = full_sites;
          meta.baseline_tag = string(baseline_tag);
-         meta.spectral_variant = string(spectral_variant);
          meta.run_date = run_date;
          meta.run_id = run_id;
          meta.run_name = run_name;

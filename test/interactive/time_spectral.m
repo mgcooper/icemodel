@@ -13,13 +13,13 @@ opts0 = icemodel.resetopts(opts0, ...
    'n_spinup_years', 0);
 opts0 = icemodel.configureRun(opts0);
 
-% Time each spectral variant directly around the main model call.
-variants = ["inlined"; "functions"; "lookup"];
+% Time exact vs lookup directly around the main model call.
+variants = ["exact"; "lookup"];
 times = nan(size(variants));
 
 for i = 1:numel(variants)
    opts = opts0;
-   opts.test_spectral_variant = variants(i);
+   opts.lookup_k_bulk = (variants(i) == "lookup");
    opts.testname = "manual_" + variants(i);
 
    icemodel(opts); % warmup
@@ -45,6 +45,5 @@ if run_perf_suite_flag
       solver=2, ...
       baseline="rolling", ...
       n_runs=1, ...
-      include_benchmarks=false, ...
-      spectral_variant="lookup");
+      include_benchmarks=false);
 end

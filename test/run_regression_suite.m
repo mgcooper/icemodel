@@ -38,16 +38,15 @@ function results = run_regression_suite(kwargs)
       kwargs.smoke_sites string = "kanm"
       kwargs.full_sites string = ["kanm"; "kanl"]
       kwargs.baseline (1, :) string = "rolling"
-      kwargs.spectral_variant (1, :) string = ""
       kwargs.run_name string = string.empty()
    end
 
    % Deal out arguments.
    [tier, smbmodel, solver, simyear, smoke_sites, full_sites, baseline, ...
-      spectral_variant, run_name] = deal(kwargs.tier, kwargs.smbmodel, ...
+      run_name] = deal(kwargs.tier, kwargs.smbmodel, ...
       kwargs.solver, kwargs.simyear, reshape(kwargs.smoke_sites, [], 1), ...
       reshape(kwargs.full_sites, [], 1), kwargs.baseline, ...
-      kwargs.spectral_variant, kwargs.run_name);
+      kwargs.run_name);
 
    % Resolve full path to the test/ dir.
    thisdir = icemodel.getpath('test');
@@ -70,7 +69,7 @@ function results = run_regression_suite(kwargs)
    % Run the canonical single-model workflow for each requested model.
    per_model = arrayfun(@(mdl) runSingleModelRegression( ...
       runner, suite, tier, mdl, solver, simyear, ...
-      smoke_sites, full_sites, baseline, spectral_variant, run_name), ...
+      smoke_sites, full_sites, baseline, run_name), ...
       models, 'UniformOutput', false);
 
    % Combine results into a common struct.
@@ -78,21 +77,21 @@ function results = run_regression_suite(kwargs)
 end
 
 function results = runSingleModelRegression(runner, suite, tier, smbmodel, ...
-      solver, simyear, smoke_sites, full_sites, baseline, spectral_variant, ...
+      solver, simyear, smoke_sites, full_sites, baseline, ...
       run_name)
    %RUNSINGLEMODELREGRESSION Configure one formal model regression run.
 
    % Provide the requested regression selection to the unittest class.
    selector_cleanup = configureRegressionSelectorEnv( ...
       tier, smbmodel, solver, simyear, smoke_sites, full_sites, ...
-      baseline, spectral_variant, run_name); %#ok<NASGU>
+      baseline, run_name); %#ok<NASGU>
 
    % Run the formal regression class for this concrete smbmodel.
    results = runner.run(suite);
 end
 
 function cleanup = configureRegressionSelectorEnv(tier, smbmodel, solver, ...
-      simyear, smoke_sites, full_sites, baseline, spectral_variant, run_name)
+      simyear, smoke_sites, full_sites, baseline, run_name)
    %CONFIGUREREGRESSIONSELECTORENV Export one regression selection contract.
    %
    % This is file-local glue for the regression runner. The unittest class
@@ -108,7 +107,6 @@ function cleanup = configureRegressionSelectorEnv(tier, smbmodel, solver, ...
       "ICEMODEL_TEST_SMOKE_SITES"
       "ICEMODEL_TEST_FULL_SITES"
       "ICEMODEL_REGRESSION_BASELINE"
-      "ICEMODEL_TEST_SPECTRAL_VARIANT"
       "ICEMODEL_TEST_RUN_NAME"];
    oldvals = arrayfun(@(name) string(getenv(name)), names, ...
       'UniformOutput', false);
@@ -121,7 +119,6 @@ function cleanup = configureRegressionSelectorEnv(tier, smbmodel, solver, ...
    setenv('ICEMODEL_TEST_SMOKE_SITES', char(join(smoke_sites, ',')));
    setenv('ICEMODEL_TEST_FULL_SITES', char(join(full_sites, ',')));
    setenv('ICEMODEL_REGRESSION_BASELINE', char(baseline));
-   setenv('ICEMODEL_TEST_SPECTRAL_VARIANT', char(spectral_variant));
    setenv('ICEMODEL_TEST_RUN_NAME', char(run_name));
 
    % Restore the prior selector state when the runner returns.

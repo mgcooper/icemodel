@@ -193,6 +193,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.dz_spectral     = 0.002; % dz for radiative heat transfer       [m]
       opts.z0_thermal      = 20;    % domain thickness for heat transfer   [m]
       opts.z0_spectral     = 8;     % domain thickness for rad transfer    [m]
+      opts.lookup_k_bulk   = true;  % use lookup-table bulk extinction     [-]
       opts.f_ice_min       = 0.1;   % layer combination threshold (ice fraction)
 
    elseif strcmp(smbmodel, 'skinmodel')

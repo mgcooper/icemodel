@@ -5,14 +5,14 @@ function report = summarize_spectral_perf(kwargs)
    %  report = summarize_spectral_perf(output_file="/tmp/spectral_perf.mat")
    %
    % This diagnostic reports:
-   %  1. kernel timings for the inlined, functions, and lookup paths
-   %  2. direct whole-model timings for the same spectral variants
-   %  3. optional formal perf-suite timings for the same variants
-   %  4. agreement metrics against the historical inlined path using the same
+   %  1. kernel timings for the inlined, exact, and lookup paths
+   %  2. direct whole-model timings for exact vs lookup
+   %  3. agreement metrics against the historical inlined path using the same
    %     scalar summary semantics as the formal regression suite
    %
-   % The default run keeps the heavier formal perf-suite sweep disabled so the
-   % report remains practical to run interactively.
+   % The kernel section preserves all three variants (inlined, exact, lookup)
+   % because those functions are called directly. The direct-model section
+   % compares only exact vs lookup via opts.lookup_k_bulk.
 
    arguments
       kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
@@ -21,7 +21,6 @@ function report = summarize_spectral_perf(kwargs)
       kwargs.solver (1, 1) double {mustBeMember(kwargs.solver, [1 2 3])} = 2
       kwargs.include_full_model (1, 1) logical = true
       kwargs.include_direct_model (1, 1) logical = true
-      kwargs.include_formal_perf (1, 1) logical = false
       kwargs.n_direct_runs (1, 1) double {mustBeInteger, mustBePositive} = 1
    end
 
@@ -34,23 +33,17 @@ function report = summarize_spectral_perf(kwargs)
    % transforms from the rest of the model runtime.
    kernels = summarizeSpectralKernelPerf(kwargs.simyear);
 
-   % Direct TIC/TOC and formal perf measurements both wrap only the model call.
+   % Direct TIC/TOC measurement wraps only the model call.
    direct_model = struct();
-   formal_perf = struct();
    if kwargs.include_full_model && kwargs.include_direct_model
       direct_model = summarizeSpectralDirectModelPerf(kwargs.simyear, ...
          kwargs.smoke_site, kwargs.solver, kwargs.n_direct_runs);
-   end
-   if kwargs.include_full_model && kwargs.include_formal_perf
-      formal_perf = summarizeSpectralFormalPerf(kwargs.simyear, ...
-         kwargs.smoke_site, kwargs.solver);
    end
 
    % Return the report and optionally save it for later comparison.
    report = struct();
    report.kernels = kernels;
    report.direct_model = direct_model;
-   report.formal_perf = formal_perf;
    report.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
    report.matlab_version = string(version);
    report.host = string(computer);
@@ -74,13 +67,9 @@ function report = summarize_spectral_perf(kwargs)
    if isfield(report.direct_model, 'timing')
       disp('Spectral direct-model timing summary:')
       disp(report.direct_model.timing(:, {'variant', 'median_wall_s', ...
-         'speedup_vs_inlined'}))
+         'speedup_vs_exact'}))
       disp('Spectral direct-model output agreement:')
       disp(report.direct_model.accuracy)
-   end
-   if isfield(report.formal_perf, 'timing')
-      disp('Spectral formal perf timing summary:')
-      disp(report.formal_perf.timing)
    end
 end
 
@@ -190,9 +179,9 @@ end
 
 function report = summarizeSpectralDirectModelPerf(simyear, smoke_site, ...
       solver, n_runs)
-   %SUMMARIZESPECTRALDIRECTMODELPERF Time direct whole-model runs by variant.
+   %SUMMARIZESPECTRALDIRECTMODELPERF Time exact vs lookup whole-model runs.
 
-   % Build one formal smoke case and reuse it across all variant sweeps.
+   % Build one formal smoke case and reuse it across both variants.
    cases = icemodel.test.helpers.getPerfCaseMatrix(tier="smoke", ...
       smbmodel="icemodel", solver=solver, simyear=simyear, ...
       smoke_sites=smoke_site);
@@ -201,15 +190,15 @@ function report = summarizeSpectralDirectModelPerf(simyear, smoke_site, ...
          height(cases))
    end
    c = cases(1, :);
-   variants = ["inlined"; "functions"; "lookup"];
+   variants = ["exact"; "lookup"];
    outputs = cell(numel(variants), 1);
    wall_s = nan(numel(variants), n_runs);
 
    % Time each variant directly around RUNSMBMODEL so the summary exposes the
    % wall-clock behavior without any perf-framework sampling wrapper.
    for i = 1:numel(variants)
-      opts = icemodel.test.helpers.setModelOptsForCase(c, ...
-         spectral_variant=variants(i));
+      opts = icemodel.test.helpers.setModelOptsForCase(c);
+      opts.lookup_k_bulk = (variants(i) == "lookup");
       opts.testname = "direct_spectral_" + variants(i);
 
       icemodel.test.helpers.runSmbModel(opts);
@@ -228,7 +217,7 @@ function report = summarizeSpectralDirectModelPerf(simyear, smoke_site, ...
       min(wall_s, [], 2), max(wall_s, [], 2), ...
       'VariableNames', {'variant', 'median_wall_s', 'mean_wall_s', ...
       'min_wall_s', 'max_wall_s'});
-   timing.speedup_vs_inlined = timing.median_wall_s(1) ./ timing.median_wall_s;
+   timing.speedup_vs_exact = timing.median_wall_s(1) ./ timing.median_wall_s;
 
    accuracy = compareVariantOutputs(outputs, variants);
 
@@ -241,39 +230,6 @@ function report = summarizeSpectralDirectModelPerf(simyear, smoke_site, ...
       "Direct TIC/TOC around RUNSMBMODEL for one formal smoke ICEMODEL ", ...
       "case. This includes the full model runtime but no perf-framework ", ...
       "sampling."];
-end
-
-function report = summarizeSpectralFormalPerf(simyear, smoke_site, solver)
-   %SUMMARIZESPECTRALFORMALPERF Time the same variants via RUN_PERF_SUITE.
-
-   variants = ["inlined"; "functions"; "lookup"];
-   runs = cell(numel(variants), 1);
-
-   % Reuse the formal perf runner so the reported times match the accepted
-   % performance workflow. This still measures only RUNSMBMODEL because
-   % IcemodelPerfTest wraps STARTMEASURING/STOPMEASURING around that call.
-   for i = 1:numel(variants)
-      runs{i} = run_perf_suite(tier="smoke", smbmodel="icemodel", ...
-         solver=solver, simyear=simyear, smoke_sites=smoke_site, ...
-         n_runs=1, include_benchmarks=false, spectral_variant=variants(i));
-   end
-
-   wall_s = cellfun(@(r) r.case_summary.median_wall_s(1), runs);
-   ref_wall_s = cellfun(@(r) r.case_summary.ref_wall_s(1), runs);
-   passed = cellfun(@(r) r.case_summary.passed_perf(1), runs);
-
-   timing = table(variants, wall_s, ref_wall_s, passed, ...
-      'VariableNames', {'variant', 'median_wall_s', 'baseline_wall_s', ...
-      'passed_perf'});
-   timing.speedup_vs_inlined = wall_s(1) ./ timing.median_wall_s;
-
-   report = struct();
-   report.timing = timing;
-   report.run_outputs = runs;
-   report.measurement_note = [ ...
-      "RUN_PERF_SUITE case_summary timing. The measured region in ", ...
-      "IcemodelPerfTest is only RUNSMBMODEL, so these are model-call ", ...
-      "times reported through the formal perf harness."];
 end
 
 function T = compareVariantOutputs(outputs, variants)

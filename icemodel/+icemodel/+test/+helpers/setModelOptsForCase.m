@@ -9,7 +9,6 @@ function opts = setModelOptsForCase(c, kwargs)
    arguments
       c
       kwargs.include_spinup (1, 1) logical = true
-      kwargs.spectral_variant (1, :) string = ""
    end
 
    % Accept either a one-row case table or an equivalent scalar struct.
@@ -33,11 +32,6 @@ function opts = setModelOptsForCase(c, kwargs)
       opts = icemodel.resetopts(opts, 'solver', c.solver);
    end
 
-   % Test-only perf experiments can override the spectral implementation
-   % without changing the public runtime contract or saved baselines.
-   if ~isblanktext(kwargs.spectral_variant)
-      opts.test_spectral_variant = lower(kwargs.spectral_variant);
-   end
 end
 
 function [simyears, n_spinup_years] = resolveSimulationYears(c, include_spinup)

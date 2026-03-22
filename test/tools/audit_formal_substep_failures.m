@@ -3,8 +3,6 @@ function report = audit_formal_substep_failures(kwargs)
    %
    %  report = audit_formal_substep_failures()
    %  report = audit_formal_substep_failures(tier="full", smbmodel="icemodel")
-   %  report = audit_formal_substep_failures( ...
-   %     tier="full", smbmodel="icemodel", spectral_variant="functions")
    %  report = audit_formal_substep_failures(output_file="/tmp/substep_audit.mat")
    %
    % Use this when you want to identify which formal cases emit the
@@ -19,7 +17,6 @@ function report = audit_formal_substep_failures(kwargs)
       kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
       kwargs.smoke_sites string = "kanm"
       kwargs.full_sites string = ["kanm"; "kanl"]
-      kwargs.spectral_variant (1, :) string = ""
       kwargs.stop_on_first_issue (1, 1) logical = false
       kwargs.output_file (1, :) string = ""
    end
@@ -57,8 +54,7 @@ function report = audit_formal_substep_failures(kwargs)
       fprintf('Substep audit case %d/%d: %s\n', ...
          icase, height(cases), c.case_id)
 
-      opts = icemodel.test.helpers.setModelOptsForCase(c, ...
-         spectral_variant=kwargs.spectral_variant);
+      opts = icemodel.test.helpers.setModelOptsForCase(c);
 
       t0 = tic;
       txt = evalc('[ice1, ice2] = icemodel.test.helpers.runSmbModel(opts);'); %#ok<NASGU,ASGLU>
@@ -94,7 +90,6 @@ function report = audit_formal_substep_failures(kwargs)
    report.simyear = kwargs.simyear;
    report.smoke_sites = reshape(kwargs.smoke_sites, [], 1);
    report.full_sites = reshape(kwargs.full_sites, [], 1);
-   report.spectral_variant = kwargs.spectral_variant;
    report.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
    report.matlab_version = string(version);
    report.host = string(computer);

@@ -56,11 +56,6 @@ function configurePerfCaseEnv(c)
    end
    setenv('ICEMODEL_TEST_N_SPINUP_YEARS', int2str(n_spinup_years));
    setenv('ICEMODEL_TEST_SOLVER', int2str(c.solver));
-   if isfield(c, 'spectral_variant') && ~isblanktext(c.spectral_variant)
-      setenv('ICEMODEL_TEST_SPECTRAL_VARIANT', char(c.spectral_variant));
-   else
-      setenv('ICEMODEL_TEST_SPECTRAL_VARIANT', '');
-   end
 end
 
 function T = resultTable(result, propname)

@@ -68,10 +68,8 @@ function [ice1, ice2, opts] = icemodel(opts)
       f_ice_min, f_liq_res] = ICEINIT(opts, tair);
 
    % INITIALIZE THE SPECTRAL MODEL
-   [I0, dz_spect, z_nodes_spect, z_edges_spect, tau_N, tau_S, solar_dwavel] ...
-      = EXTCOEFSINIT(opts, ro_ice);
-   [spectral_variant, k_bulk_lookup] ...
-      = configureSpectralVariant(opts, dz_spect, tau_N, tau_S, solar_dwavel);
+   [I0, dz_spect, z_nodes_spect, z_edges_spect, tau_N, tau_S, solar_dwavel, ...
+      k_bulk_lookup] = EXTCOEFSINIT(opts, ro_ice);
 
    % INITIALIZE TIMESTEPPING
    [metstep, substep, numsteps, maxsubstep, dt, dt_FULL_STEP, ...
@@ -94,24 +92,10 @@ function [ice1, ice2, opts] = icemodel(opts)
             = NEWTIMESTEP(f_liq, solver);
 
          % SUBSURFACE SOLAR RADIATION SOURCE-TERM
-         switch spectral_variant
-            case "inlined"
-               [Sc, chi] = SPECTRALSOURCETERM_INLINE(swd(metstep), ...
-                  albedo(metstep), I0, dz_spect, tau_N, tau_S, solar_dwavel, ...
-                  dz, ro_ice * f_ice + ro_liq * f_liq, z_nodes, z_nodes_spect);
-            case "functions"
-               [Sc, chi] = SPECTRALSOURCETERM(swd(metstep), ...
-                  albedo(metstep), I0, dz_spect, tau_N, tau_S, solar_dwavel, ...
-                  dz, ro_ice * f_ice + ro_liq * f_liq, z_nodes, z_nodes_spect, ...
-                  z_edges_spect, k_bulk_lookup);
-            case "lookup"
-               [Sc, chi] = SPECTRALSOURCETERM(swd(metstep), ...
-                  albedo(metstep), I0, dz_spect, tau_N, tau_S, solar_dwavel, ...
-                  dz, ro_ice * f_ice + ro_liq * f_liq, z_nodes, z_nodes_spect, ...
-                  z_edges_spect, k_bulk_lookup);
-            otherwise
-               error('Unrecognized spectral variant')
-         end
+         [Sc, chi] = SPECTRALSOURCETERM(swd(metstep), ...
+            albedo(metstep), I0, dz_spect, tau_N, tau_S, solar_dwavel, ...
+            dz, ro_ice * f_ice + ro_liq * f_liq, z_nodes, z_nodes_spect, ...
+            z_edges_spect, k_bulk_lookup);
 
          % SURFACE TERMS (atmospheric vapor pressure fixed over this full step)
          ea = VAPPRESS(tair(metstep), Tf, liqflag) * rh(metstep) / 100;
@@ -239,32 +223,5 @@ function [ice1, ice2, opts] = icemodel(opts)
    if ~opts.saveflag && numyears - numspinup > 1
       ice1 = ice1_all;
       ice2 = ice2_all;
-   end
-end
-
-function [variant, bulk_lookup] = configureSpectralVariant(opts, dz_spect, ...
-      tau_N, tau_S, solar_dwavel)
-   %CONFIGURESPECTRALVARIANT Resolve the spectral update implementation.
-
-   % Use the lookup bulk-extinction path in production. Tests and perf reports
-   % can set OPTS.test_spectral_variant to benchmark the exact organized path
-   % or the preserved legacy inline path against that accepted default.
-   if isfield(opts, 'test_spectral_variant')
-      variant = lower(string(opts.test_spectral_variant));
-   else
-      variant = "lookup";
-   end
-
-   switch variant
-      case {"lookup", ""}
-         variant = "lookup";
-         bulk_lookup = icemodel.makeBulkExtCoefsLookup(dz_spect, ...
-            tau_N, tau_S, solar_dwavel);
-      case "functions"
-         bulk_lookup = struct([]);
-      case "inlined"
-         bulk_lookup = struct([]);
-      otherwise
-         error('unrecognized test_spectral_variant: %s', variant)
    end
 end

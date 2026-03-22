@@ -48,8 +48,6 @@ function opts = buildCaseOpts()
    simyears = getenv('ICEMODEL_TEST_SIMYEARS');
    n_spinup_years = str2double(getenvRequired('ICEMODEL_TEST_N_SPINUP_YEARS'));
    solver = str2double(getenvRequired('ICEMODEL_TEST_SOLVER'));
-   spectral_variant = getenv('ICEMODEL_TEST_SPECTRAL_VARIANT');
-
    % Rebuild the formal case struct and hand it to the shared opts helper.
    c = struct('smbmodel', string(smbmodel), 'sitename', string(sitename), ...
       'forcings', string(forcings), 'userdata', string(userdata), ...
@@ -59,12 +57,7 @@ function opts = buildCaseOpts()
       c.simyears = parseSimyears(simyears);
       c.n_spinup_years = n_spinup_years;
    end
-   if isempty(spectral_variant)
-      opts = icemodel.test.helpers.setModelOptsForCase(c);
-   else
-      opts = icemodel.test.helpers.setModelOptsForCase(c, ...
-         spectral_variant=string(spectral_variant));
-   end
+   opts = icemodel.test.helpers.setModelOptsForCase(c);
 end
 
 function s = getenvRequired(name)
