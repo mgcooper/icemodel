@@ -171,3 +171,27 @@ Interpretation:
 2. `lookup` remains the clear production speed path.
 3. The solver/control fixes did not introduce any formal `dt_min` or
    `maxsubstep` failures in the `icemodel` full matrix.
+
+## Resolution
+
+`lookup` is accepted as the production default. `opts.lookup_k_bulk` controls
+whether the production path uses the lookup-table approximation (`true`, default)
+or the exact bulk-extinction transform (`false`).
+
+The `inlined` variant is preserved as a kernel-only reference in `test/legacy/`.
+The `functions` path (exact organized helpers) is retained as the analytical
+reference and accessible via `opts.lookup_k_bulk = false`.
+
+## Direct-Model Timing Note
+
+The direct whole-model timings above were measured during a long MATLAB session and
+appear inflated relative to expected steady-state performance. Expected 1-year
+runtimes in a fresh session are approximately:
+
+- `icemodel`, solver 1 or 2: ~12 s
+- `icemodel`, solver 3: ~17 s
+- `skinmodel`: ~10 s
+
+The formal test suite runs 2-year cases (1 spinup + 1 retained output year), so
+formal runtimes are roughly 2x the 1-year values. These timings will be
+regenerated in a fresh MATLAB session and updated here before final acceptance.

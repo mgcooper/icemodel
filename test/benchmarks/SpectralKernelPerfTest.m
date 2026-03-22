@@ -6,61 +6,66 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
       state
       ro_sno
       ro_sno_spect
-      bulkcoefs
-      a
-      r
-      z_walls
-      grid_thermal
-      grid_spectral
-      bulk_lookup
+      k_bulk
+      z_nodes
+      z_nodes_spect
+      z_edges_spect
+      k_bulk_lookup
+      k_bulk_lookup_empty
    end
 
    methods (TestClassSetup)
       function buildSpectralState(testCase)
-         % Build one synthetic spectral state and cache the exact and
-         % approximate transforms used by the benchmarked paths.
+
+         % Configure the workspace
          testCase.workspace = icemodel.test.fixtures.makeSyntheticWorkspace( ...
             2016, configure=true, nsteps=96, dt_seconds=900);
-         testCase.state = icemodel.test.fixtures.makeSyntheticColumnState( ...
-            testCase.workspace, 'icemodel', solver=3, ...
-            include_spectral=true, metstep=49, ...
-            testname='spectral_perf_kernel');
 
+         % Build one synthetic spectral state and cache the exact and
+         % approximate transforms used by the benchmarked paths.
+         testCase.state = icemodel.test.fixtures.makeSyntheticColumnState( ...
+            testCase.workspace, 'icemodel', solver=3, include_spectral=true, ...
+            metstep=49, testname='spectral_perf_kernel');
          s = testCase.state;
 
-         % Cache the thermal-grid density and the spectral-grid remap used
-         % by every UPDATEEXTCOEFS variant below.
+         % Cache the thermal-grid density and the spectral-grid remap used by
+         % every spectral source-term variant below.
          testCase.ro_sno = s.ro_ice * s.f_ice + s.ro_liq * s.f_liq + ...
             s.ro_air * (1 - s.f_ice - s.f_liq);
-         testCase.grid_thermal = cumsum(s.dz) - s.dz / 2;
-         testCase.grid_spectral = cumsum(s.dz_spect) - s.dz_spect / 2;
-         testCase.ro_sno_spect = max(GRIDFORWARD(testCase.ro_sno, ...
-            testCase.grid_thermal, testCase.grid_spectral), 300);
+         testCase.z_nodes = s.z_nodes;
+         testCase.z_nodes_spect = s.z_nodes_spect;
+         testCase.z_edges_spect = s.z_edges_spect;
+         testCase.ro_sno_spect = max(interp1(testCase.z_nodes, ...
+            testCase.ro_sno, testCase.z_nodes_spect, ...
+            'nearest', 'extrap'), 300);
 
-         % Build the exact bulk coefficients and two-stream coefficients once
-         % for the narrower solve-only benchmark below.
-         testCase.bulkcoefs = BULKEXTCOEFS(s.dz_spect, ...
-            testCase.ro_sno_spect, s.spect_N, s.spect_S, s.solardwavl);
-         [testCase.a, testCase.r] = GETAANDR(testCase.bulkcoefs, s.albedo);
-         [~, ~, ~, testCase.z_walls] = CVMESH(s.opts.z0_spectral, ...
-            s.opts.dz_spectral);
+         % Build the exact bulk coefficients once for the narrow bulk and
+         % two-stream benchmarks below.
+         testCase.k_bulk = BULKEXTCOEFS( ...
+            s.dz_spect, testCase.ro_sno_spect, s.tau_N, s.tau_S, s.solar_dwavel);
 
-         % Precompute the approximate density lookup used by the fast-path
-         % exploratory benchmarks.
-         testCase.bulk_lookup = MAKEBULKEXTCOEFSLOOKUP(s.dz_spect, ...
-            s.spect_N, s.spect_S, s.solardwavl);
+         % Precompute the lookup used by the fast-path exploratory benchmarks.
+         testCase.k_bulk_lookup = icemodel.makeBulkExtCoefsLookup(s.dz_spect, ...
+            s.tau_N, s.tau_S, s.solar_dwavel);
 
-         % Verify that the exact function-call decomposition reproduces the
-         % current inlined UPDATEEXTCOEFS path before timing either branch.
-         [Sc_inline, chi_inline] = UPDATEEXTCOEFSINLINELEGACY(s.swd, ...
-            s.albedo, s.Q0, s.dz_spect, s.spect_N, s.spect_S, ...
-            s.solardwavl, s.Sc, s.dz, testCase.ro_sno);
-         [Sc_function, chi_function] = UPDATEEXTCOEFSDECOMPOSED(s.swd, ...
-            s.albedo, s.Q0, s.dz_spect, s.spect_N, s.spect_S, ...
-            s.solardwavl, s.Sc, s.dz, testCase.ro_sno);
-         assert(max(abs(Sc_inline - Sc_function)) < 1e-10 * ...
-            max(1, max(abs(Sc_inline))));
-         assert(abs(chi_inline - chi_function) < 1e-12);
+         % Create an empty lookup table for the exact path.
+         testCase.k_bulk_lookup_empty = struct([]);
+
+         % Verify that the exact functions path reproduces the historical
+         % inlined path before timing either branch.
+         [Sc_inlined, chi_inlined] = SPECTRALSOURCETERM_INLINE(s.swd, ...
+            s.albedo, s.I0, s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, ...
+            s.dz, testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect);
+
+         [Sc_functions, chi_functions] = SPECTRALSOURCETERM(s.swd, ...
+            s.albedo, s.I0, s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, ...
+            s.dz, testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect, ...
+            testCase.z_edges_spect, testCase.k_bulk_lookup_empty);
+
+         assert(max(abs(Sc_inlined - Sc_functions)) < 1e-10 * ...
+            max(1, max(abs(Sc_inlined))));
+
+         assert(abs(chi_inlined - chi_functions) < 1e-12);
       end
    end
 
@@ -73,19 +78,22 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
 
    methods (Test)
       function testBulkExtCoefsExact(testCase)
+
          % Benchmark the exact exponential/log bulk-extinction transform.
          s = testCase.state;
          batch_size = 32;
-         bulkcoefs_out = BULKEXTCOEFS(s.dz_spect, testCase.ro_sno_spect, ...
-            s.spect_N, s.spect_S, s.solardwavl);
-         testCase.assertTrue(all(isfinite(bulkcoefs_out)));
+
+         % Compute the bulk extinction coefficients and verify they're finite
+         k_bulk_out = BULKEXTCOEFS(s.dz_spect, testCase.ro_sno_spect, ...
+            s.tau_N, s.tau_S, s.solar_dwavel);
+         testCase.assertTrue(all(isfinite(k_bulk_out)));
 
          while testCase.keepMeasuring
             for n = 1:batch_size
-               bulkcoefs_out = BULKEXTCOEFS(s.dz_spect, testCase.ro_sno_spect, ...
-                  s.spect_N, s.spect_S, s.solardwavl);
+               k_bulk_out = BULKEXTCOEFS(s.dz_spect, testCase.ro_sno_spect, ...
+                  s.tau_N, s.tau_S, s.solar_dwavel);
             end
-            if ~all(isfinite(bulkcoefs_out))
+            if ~all(isfinite(k_bulk_out))
                error('BULKEXTCOEFS benchmark produced a non-finite result')
             end
          end
@@ -94,16 +102,16 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
       function testBulkExtCoefsLookup(testCase)
          % Benchmark the approximate lookup-table bulk-extinction path.
          batch_size = 1024;
-         bulkcoefs_out = BULKEXTCOEFSLOOKUP(testCase.ro_sno_spect, ...
-            testCase.bulk_lookup);
-         testCase.assertTrue(all(isfinite(bulkcoefs_out)));
+         k_bulk_out = BULKEXTCOEFSLOOKUP(testCase.ro_sno_spect, ...
+            testCase.k_bulk_lookup);
+         testCase.assertTrue(all(isfinite(k_bulk_out)));
 
          while testCase.keepMeasuring
             for n = 1:batch_size
-               bulkcoefs_out = BULKEXTCOEFSLOOKUP(testCase.ro_sno_spect, ...
-                  testCase.bulk_lookup);
+               k_bulk_out = BULKEXTCOEFSLOOKUP(testCase.ro_sno_spect, ...
+                  testCase.k_bulk_lookup);
             end
-            if ~all(isfinite(bulkcoefs_out))
+            if ~all(isfinite(k_bulk_out))
                error(['BULKEXTCOEFSLOOKUP benchmark produced a non-finite ', ...
                   'result'])
             end
@@ -114,14 +122,14 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
          % Benchmark just the two-stream linear solve on fixed coefficients.
          s = testCase.state;
          batch_size = 384;
-         xynet = SOLVETWOSTREAM(testCase.a, testCase.r, ...
-            testCase.bulkcoefs, s.Q0, s.albedo, testCase.z_walls);
+         [~, ~, xynet] = SOLVETWOSTREAM(s.I0, s.albedo, ...
+            testCase.k_bulk, testCase.z_edges_spect);
          testCase.assertTrue(all(isfinite(xynet)));
 
          while testCase.keepMeasuring
             for n = 1:batch_size
-               xynet = SOLVETWOSTREAM(testCase.a, testCase.r, ...
-                  testCase.bulkcoefs, s.Q0, s.albedo, testCase.z_walls);
+               [~, ~, xynet] = SOLVETWOSTREAM(s.I0, s.albedo, ...
+                  testCase.k_bulk, testCase.z_edges_spect);
             end
             if ~all(isfinite(xynet))
                error('SOLVETWOSTREAM benchmark produced a non-finite result')
@@ -129,98 +137,80 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
          end
       end
 
-      function testUpdateExtCoefsInlineLegacy(testCase)
-         % Benchmark the historical inlined UPDATEEXTCOEFS implementation.
+      function testSourceTermInlined(testCase)
+         % Benchmark the historical inlined spectral source-term implementation.
          s = testCase.state;
          batch_size = 256;
-         [Sc_new, chi] = UPDATEEXTCOEFSINLINELEGACY(s.swd, s.albedo, ...
-            s.Q0, s.dz_spect, s.spect_N, s.spect_S, s.solardwavl, s.Sc, ...
-            s.dz, testCase.ro_sno);
+         
+         [Sc_new, chi] = SPECTRALSOURCETERM_INLINE(s.swd, s.albedo, s.I0, ...
+            s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ...
+            testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect);
+         
          testCase.assertTrue(all(isfinite(Sc_new)));
          testCase.assertTrue(isfinite(chi));
 
          while testCase.keepMeasuring
             for n = 1:batch_size
-               [Sc_new, chi] = UPDATEEXTCOEFSINLINELEGACY(s.swd, s.albedo, ...
-                  s.Q0, s.dz_spect, s.spect_N, s.spect_S, s.solardwavl, ...
-                  s.Sc, s.dz, testCase.ro_sno);
+               [Sc_new, chi] = SPECTRALSOURCETERM_INLINE(s.swd, s.albedo, ...
+                  s.I0, s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ...
+                  testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect);
             end
             if ~all(isfinite(Sc_new)) || ~isfinite(chi)
-               error(['inline UPDATEEXTCOEFS benchmark produced a ', ...
+               error(['inlined spectral source-term benchmark produced a ', ...
                   'non-finite result'])
             end
          end
       end
 
-      function testUpdateExtCoefsFunctionExact(testCase)
-         % Benchmark the exact drop-in helper-call replacement for UPDATEEXTCOEFS.
+      function testSourceTermFunctions(testCase)
+         % Benchmark the organized exact spectral source-term path.
          s = testCase.state;
          batch_size = 256;
-         [Sc_new, chi] = UPDATEEXTCOEFSDECOMPOSED(s.swd, s.albedo, ...
-            s.Q0, s.dz_spect, s.spect_N, s.spect_S, s.solardwavl, ...
-            s.Sc, s.dz, testCase.ro_sno);
+         
+         [Sc_new, chi] = SPECTRALSOURCETERM(s.swd, s.albedo, ...
+            s.I0, s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ...
+            testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect, ...
+            testCase.z_edges_spect, testCase.k_bulk_lookup_empty);
+         
          testCase.assertTrue(all(isfinite(Sc_new)));
          testCase.assertTrue(isfinite(chi));
 
          while testCase.keepMeasuring
             for n = 1:batch_size
-               [Sc_new, chi] = UPDATEEXTCOEFSDECOMPOSED(s.swd, s.albedo, ...
-                  s.Q0, s.dz_spect, s.spect_N, s.spect_S, ...
-                  s.solardwavl, s.Sc, s.dz, testCase.ro_sno);
+               [Sc_new, chi] = SPECTRALSOURCETERM(s.swd, s.albedo, s.I0, ...
+                  s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ...
+                  testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect, ...
+                  testCase.z_edges_spect, testCase.k_bulk_lookup_empty);
             end
             if ~all(isfinite(Sc_new)) || ~isfinite(chi)
-               error(['function UPDATEEXTCOEFS benchmark produced a ', ...
+               error(['functions spectral source-term benchmark produced a ', ...
                   'non-finite result'])
             end
          end
       end
 
-      function testUpdateExtCoefsFunctionExactCached(testCase)
-         % Benchmark the exact helper-call path with cached spectral geometry.
+      function testSourceTermLookup(testCase)
+         % Benchmark the shared source-term path with lookup bulk coefficients.
          s = testCase.state;
          batch_size = 256;
-         [Sc_new, chi] = UPDATEEXTCOEFSDECOMPOSEDCACHED(s.swd, s.albedo, ...
-            s.Q0, s.dz_spect, s.spect_N, s.spect_S, s.solardwavl, s.Sc, ...
-            s.dz, testCase.ro_sno, testCase.grid_thermal, ...
-            testCase.grid_spectral, testCase.z_walls);
+         
+         [Sc_new, chi] = SPECTRALSOURCETERM(s.swd, s.albedo, ...
+            s.I0, s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ...
+            testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect, ...
+            testCase.z_edges_spect, testCase.k_bulk_lookup);
+         
          testCase.assertTrue(all(isfinite(Sc_new)));
          testCase.assertTrue(isfinite(chi));
 
          while testCase.keepMeasuring
             for n = 1:batch_size
-               [Sc_new, chi] = UPDATEEXTCOEFSDECOMPOSEDCACHED(s.swd, ...
-                  s.albedo, s.Q0, s.dz_spect, s.spect_N, s.spect_S, ...
-                  s.solardwavl, s.Sc, s.dz, testCase.ro_sno, ...
-                  testCase.grid_thermal, testCase.grid_spectral, ...
-                  testCase.z_walls);
+               [Sc_new, chi] = SPECTRALSOURCETERM(s.swd, s.albedo, s.I0, ...
+                  s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ...
+                  testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect, ...
+                  testCase.z_edges_spect, testCase.k_bulk_lookup);
             end
             if ~all(isfinite(Sc_new)) || ~isfinite(chi)
-               error(['cached function UPDATEEXTCOEFS benchmark produced a ', ...
-                  'non-finite result'])
-            end
-         end
-      end
-
-      function testUpdateExtCoefsFunctionLookup(testCase)
-         % Benchmark the exploratory function-call path with lookup bulkcoefs.
-         s = testCase.state;
-         batch_size = 256;
-         [Sc_new, chi] = UPDATEEXTCOEFSLOOKUP(s.swd, s.albedo, ...
-            s.Q0, s.dz_spect, s.Sc, s.dz, testCase.ro_sno, ...
-            testCase.grid_thermal, testCase.grid_spectral, ...
-            testCase.z_walls, testCase.bulk_lookup);
-         testCase.assertTrue(all(isfinite(Sc_new)));
-         testCase.assertTrue(isfinite(chi));
-
-         while testCase.keepMeasuring
-            for n = 1:batch_size
-               [Sc_new, chi] = UPDATEEXTCOEFSLOOKUP(s.swd, s.albedo, ...
-                  s.Q0, s.dz_spect, s.Sc, s.dz, testCase.ro_sno, ...
-                  testCase.grid_thermal, testCase.grid_spectral, ...
-                  testCase.z_walls, testCase.bulk_lookup);
-            end
-            if ~all(isfinite(Sc_new)) || ~isfinite(chi)
-               error(['lookup UPDATEEXTCOEFS benchmark produced a ', ...
+               error(['lookup spectral source-term benchmark produced a ', ...
                   'non-finite result'])
             end
          end

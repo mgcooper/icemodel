@@ -29,3 +29,8 @@ report = summarize_postprocess_perf(simyear=2016);
 - Accuracy is reported as the maximum absolute difference against the legacy
   timetable `retime` output.
 - This tool is intentionally separate from `run_spectral_study_bootstrap`.
+
+## Resolution
+
+The fixed-step hourly aggregation is accepted as the production default. The
+legacy `retime` branch remains as a fallback for non-aligned timetable spacing.
