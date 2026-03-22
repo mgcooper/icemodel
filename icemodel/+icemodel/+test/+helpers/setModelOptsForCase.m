@@ -9,6 +9,7 @@ function opts = setModelOptsForCase(c, kwargs)
    arguments
       c
       kwargs.include_spinup (1, 1) logical = true
+      kwargs.spectral_variant (1, :) string = ""
    end
 
    % Accept either a one-row case table or an equivalent scalar struct.
@@ -31,6 +32,12 @@ function opts = setModelOptsForCase(c, kwargs)
    if isfield(c, 'solver') && ~isempty(c.solver)
       opts = icemodel.resetopts(opts, 'solver', c.solver);
    end
+
+   % Test-only perf experiments can override the spectral implementation
+   % without changing the public runtime contract or saved baselines.
+   if ~isblanktext(kwargs.spectral_variant)
+      opts.test_spectral_variant = lower(kwargs.spectral_variant);
+   end
 end
 
 function [simyears, n_spinup_years] = resolveSimulationYears(c, include_spinup)
@@ -41,14 +48,17 @@ function [simyears, n_spinup_years] = resolveSimulationYears(c, include_spinup)
    if isfield(c, 'simyears') && ~isempty(c.simyears)
       simyears = c.simyears;
    elseif isfield(c, 'simyear') && ~isempty(c.simyear)
-      simyears = c.simyear;
+      simyears = [c.simyear - 1, c.simyear];
    else
       error('formal case is missing simyear/simyears')
    end
 
-   % Default to no spinup when the case matrix does not specify one.
+   % Default formal cases to one leading spinup year when only SIMYEAR is
+   % given and the case matrix has not overridden that policy explicitly.
    if isfield(c, 'n_spinup_years') && ~isempty(c.n_spinup_years)
       n_spinup_years = c.n_spinup_years;
+   elseif isfield(c, 'simyear') && ~isempty(c.simyear)
+      n_spinup_years = 1;
    else
       n_spinup_years = 0;
    end

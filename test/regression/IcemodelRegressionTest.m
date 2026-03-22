@@ -45,6 +45,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          full_sites = IcemodelRegressionTest.getenvAsStrings( ...
             'ICEMODEL_TEST_FULL_SITES');
          baseline_tag = getenv('ICEMODEL_REGRESSION_BASELINE');
+         spectral_variant = getenv('ICEMODEL_TEST_SPECTRAL_VARIANT');
          run_name = getenv('ICEMODEL_TEST_RUN_NAME');
 
          % Resolve the retained formal cases and the matched accepted baseline
@@ -68,7 +69,8 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          % Run each formal case, compare to baseline, and collect a report row.
          for icase = 1:height(cases)
             c = cases(icase, :);
-            opts = icemodel.test.helpers.setModelOptsForCase(c);
+            opts = icemodel.test.helpers.setModelOptsForCase(c, ...
+               spectral_variant=string(spectral_variant));
 
             [ice1, ice2] = icemodel.test.helpers.runSmbModel(opts);
             [ice1, ice2] = icemodel.postprocess( ...
@@ -187,7 +189,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          report = struct2table(report_rows);
          meta = IcemodelRegressionTest.reportMeta( ...
             tier, smbmodel, solver, simyear, smoke_sites, full_sites, ...
-            baseline_tag, run_name);
+            baseline_tag, spectral_variant, run_name);
 
          % Save one artifact for this regression compare run.
          testCase.logReport(report, case_opts, meta);
@@ -214,13 +216,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          if ~isfinite(expected)
             return
          end
-         if endsWith(string(varname), "_m3")
-            tol = max(testCase.abs_tol_runoff_m3, ...
-               testCase.rel_tol_runoff_m3 * abs(expected));
-         else
-            tol = max(testCase.abs_tol_scalar, ...
-               testCase.rel_tol_scalar * abs(expected));
-         end
+         tol = testCase.metricTolerance(char(varname), expected);
          testCase.verifyLessThanOrEqual(abs(actual - expected), tol, ...
             sprintf('baseline mismatch var=%s', varname));
       end
@@ -232,6 +228,39 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          else
             x = nan;
          end
+      end
+
+      function tol = metricTolerance(testCase, varname, expected)
+         % Return one metric-specific scalar tolerance.
+
+         if endsWith(string(varname), "_m3")
+            tol = max(testCase.abs_tol_runoff_m3, ...
+               testCase.rel_tol_runoff_m3 * abs(expected));
+            return
+         end
+
+         if any(startsWith(string(varname), ["runoff_", "melt_"]))
+            tol = max(1e-4, 1e-4 * abs(expected));
+            return
+         end
+
+         if contains(varname, "numiter")
+            tol = 0.5;
+            return
+         end
+
+         if contains(varname, "not_converged")
+            tol = 1.0;
+            return
+         end
+
+         if startsWith(varname, "closure_") || startsWith(varname, "gof_")
+            tol = 5e-3;
+            return
+         end
+
+         tol = max(testCase.abs_tol_scalar, ...
+            testCase.rel_tol_scalar * abs(expected));
       end
 
       function logReport(~, report, case_opts, meta)
@@ -293,7 +322,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       end
 
       function meta = reportMeta(tier, smbmodel, solver, simyear, ...
-            smoke_sites, full_sites, baseline_tag, run_name)
+            smoke_sites, full_sites, baseline_tag, spectral_variant, run_name)
          %REPORTMETA Build the saved metadata struct for one regression artifact.
 
          % Resolve the shared run stamp before filling the saved metadata.
@@ -309,6 +338,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          meta.smoke_sites = smoke_sites;
          meta.full_sites = full_sites;
          meta.baseline_tag = string(baseline_tag);
+         meta.spectral_variant = string(spectral_variant);
          meta.run_date = run_date;
          meta.run_id = run_id;
          meta.run_name = run_name;
@@ -316,8 +346,12 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          meta.abs_tol_scalar = IcemodelRegressionTest.scalarAbsTol();
          meta.rel_tol_runoff_m3 = IcemodelRegressionTest.runoffRelTol();
          meta.abs_tol_runoff_m3 = IcemodelRegressionTest.runoffAbsTol();
+         meta.metric_tolerance_policy = ...
+            "metric-specific tolerances for runoff/melt, iteration, closure, and GOF metrics";
          meta.case_builder = "icemodel.test.helpers.setModelOptsForCase";
          meta.opts_source = "icemodel.setopts defaults";
+         meta.spinup_policy = ...
+            "formal regression runs include the canonical leading spinup year";
          meta.reset_fields = "solver";
          meta.input_path = string(icemodel.getpath('input'));
          meta.output_path = string(icemodel.getpath('output'));

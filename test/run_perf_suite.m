@@ -21,8 +21,9 @@ function results = run_perf_suite(kwargs)
    % By default it also runs the managed core benchmark suite and saves those
    % diagnostic timings alongside the formal perf artifact.
    %
-   % If formal cases later include spinup years, the perf path strips them so
-   % the timed region reflects only the analyzed output years.
+   % Formal perf cases use the same canonical runtime contract as regression:
+   % one leading spinup year plus one retained output year when the case
+   % matrix carries only SIMYEAR.
    %
    % The optional solver filter accepts any subset of [1 2 3].
    %
@@ -48,6 +49,7 @@ function results = run_perf_suite(kwargs)
       kwargs.benchmark_sampling_profile (1, :) string ...
          {icemodel.validators.mustBeBenchmarkSamplingProfileName( ...
          kwargs.benchmark_sampling_profile)} = "default"
+      kwargs.spectral_variant (1, :) string = ""
       kwargs.baseline (1, :) string = "rolling"
       kwargs.run_name string = string.empty()
    end
@@ -55,11 +57,12 @@ function results = run_perf_suite(kwargs)
    % Deal out arguments.
    [tier, smbmodel, solver, simyear, smoke_sites, full_sites, n_runs, ...
       tol_perf, include_benchmarks, benchmark_sampling_profile, ...
-      baseline_selector, run_name] = deal( ...
+      spectral_variant, baseline_selector, run_name] = deal( ...
       kwargs.tier, kwargs.smbmodel, kwargs.solver, kwargs.simyear, ...
       reshape(kwargs.smoke_sites, [], 1), reshape(kwargs.full_sites, [], 1), ...
       kwargs.n_runs, kwargs.tol_perf, kwargs.include_benchmarks, ...
-      kwargs.benchmark_sampling_profile, kwargs.baseline, kwargs.run_name);
+      kwargs.benchmark_sampling_profile, kwargs.spectral_variant, ...
+      kwargs.baseline, kwargs.run_name);
 
    % Resolve full path to the test/ dir.
    thisdir = icemodel.getpath('test');
@@ -93,7 +96,7 @@ function results = run_perf_suite(kwargs)
       input_path, output_path, thisdir, experiment, suite, tier, ...
       mdl, solver, simyear, smoke_sites, full_sites, baseline_type, ...
       baseline_tag, run_date, run_id, run_name, n_runs, tol_perf, ...
-      include_benchmarks, benchmark_sampling_profile), ...
+      include_benchmarks, benchmark_sampling_profile, spectral_variant), ...
       models, 'UniformOutput', false);
 
    % Combine results into a common struct.
@@ -104,7 +107,7 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       thisdir, experiment, suite, tier, smbmodel, solver, simyear, ...
       smoke_sites, full_sites, baseline_type, baseline_tag, run_date, ...
       run_id, run_name, n_runs, tol_perf, include_benchmarks, ...
-      benchmark_sampling_profile)
+      benchmark_sampling_profile, spectral_variant)
    %RUNSINGLEMODELPERFSUITE Run the formal perf workflow for one smbmodel.
 
    % Build the deterministic case list and load the matching managed baseline.
@@ -123,8 +126,10 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       'formal perf suite expects exactly one benchmark year')
 
    % Load the accepted baseline that matches this concrete formal model.
-   baseline = icemodel.test.helpers.loadPerfBaseline( ...
+   [baseline, baseline_meta] = icemodel.test.helpers.loadPerfBaseline( ...
       benchmark_year, baseline_tag, smbmodel);
+   [baseline_compatible, compare_reason] = perfBaselineCompatibility( ...
+      baseline_meta);
 
    % Accumulate the measured sample/activity rows for the saved artifact.
    [sample_rows, activity_rows, case_rows, case_opts] = deal(struct([]));
@@ -136,7 +141,13 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
 
       % Run the case.
       c = cases(icase, :);
-      perf_data = icemodel.test.helpers.runPerfCase(experiment, suite, c);
+      if isblanktext(spectral_variant)
+         c_run = c;
+      else
+         c_run = c;
+         c_run.spectral_variant = spectral_variant;
+      end
+      perf_data = icemodel.test.helpers.runPerfCase(experiment, suite, c_run);
 
       % Extract results for this case.
       samples = perf_data.samples;
@@ -149,8 +160,11 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       ref_wall = nan;
       gate_wall = nan;
       passed_perf = valid;
+      case_compare_reason = compare_reason;
       bid = icemodel.test.helpers.findCaseRow(baseline, string(c.case_id));
-      if ~isempty(bid)
+      if ~baseline_compatible
+         passed_perf = valid;
+      elseif ~isempty(bid)
          ref_wall = baseline.median_wall_s(bid);
          if isfinite(ref_wall) && ref_wall > 0
             if ismember('tol_perf', baseline.Properties.VariableNames) ...
@@ -164,6 +178,8 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
             passed_perf = passed_perf ...
                && median(sample_times, 'omitnan') <= gate_wall;
          end
+      else
+         case_compare_reason = "case not found in compatible perf baseline";
       end
 
       % Save the per-sample timings for later inspection.
@@ -220,6 +236,8 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       case_rows(r_case).max_wall_s = max(sample_times, [], 'omitnan');
       case_rows(r_case).ref_wall_s = ref_wall;
       case_rows(r_case).gate_wall_s = gate_wall;
+      case_rows(r_case).baseline_compatible = baseline_compatible;
+      case_rows(r_case).compare_reason = case_compare_reason;
       case_rows(r_case).valid = valid;
       case_rows(r_case).passed_perf = passed_perf;
       case_rows(r_case).last_updated_utc = datetime('now', 'TimeZone', 'UTC');
@@ -227,7 +245,7 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       case_opts(r_case).case_id = string(c.case_id);
       case_opts(r_case).case = table2struct(c);
       case_opts(r_case).opts = icemodel.test.helpers.setModelOptsForCase( ...
-         c, include_spinup=false);
+         c, spectral_variant=spectral_variant);
 
       if ~passed_perf
          failed_cases(end+1, 1) = string(c.case_id); %#ok<AGROW>
@@ -254,9 +272,11 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    meta.full_sites = full_sites;
    meta.baseline_file = perfBaselineFile( ...
       benchmark_year, baseline_type, baseline_tag, smbmodel);
+   meta.spectral_variant = spectral_variant;
    meta.case_builder = "icemodel.test.helpers.setModelOptsForCase";
    meta.opts_source = "icemodel.setopts defaults";
-   meta.spinup_policy = "perf excludes spinup years from timed opts";
+   meta.spinup_policy = ...
+      "formal perf runs include the canonical leading spinup year";
    meta.reset_fields = "solver";
    meta.n_runs = n_runs;
    meta.n_warmups = 1;
@@ -270,6 +290,9 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       'IcemodelPerfTest.m'));
    meta.matlab_version = string(version);
    meta.host = string(computer);
+   meta.baseline_meta = baseline_meta;
+   meta.baseline_compatible = baseline_compatible;
+   meta.compare_reason = compare_reason;
    meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
 
    % Run the supporting component benchmarks for this saved compare artifact.
@@ -364,7 +387,12 @@ function artifact_file = logArtifacts(sample_detail, ...
       'benchmark_comparison', 'benchmark_meta', 'meta');
    disp(artifact_file)
    disp(case_summary(:, {'case_id', 'median_wall_s', 'ref_wall_s', ...
-      'gate_wall_s', 'passed_perf'}))
+      'gate_wall_s', 'baseline_compatible', 'passed_perf'}))
+   if isfield(meta, 'baseline_compatible') && ~meta.baseline_compatible ...
+         && isfield(meta, 'compare_reason') && ~isblanktext(meta.compare_reason)
+      fprintf('Whole-model perf comparison skipped: %s\n', ...
+         char(meta.compare_reason));
+   end
    printBenchmarkComparison(benchmark)
 end
 
@@ -570,6 +598,40 @@ function printBenchmarkComparison(benchmark)
    elseif isfield(benchmark.meta, 'compare_reason')
       fprintf('Benchmark comparison skipped: %s\n', ...
          char(benchmark.meta.compare_reason));
+   end
+end
+
+function [compatible, reason] = perfBaselineCompatibility(baseline_meta)
+   %PERFBASELINECOMPATIBILITY Decide whether wall-time comparison is fair.
+
+   compatible = false;
+   reason = "";
+
+   if ~isstruct(baseline_meta) || isempty(fieldnames(baseline_meta))
+      reason = "perf baseline metadata not found";
+      return
+   end
+
+   if ~isfield(baseline_meta, 'matlab_version') || ...
+         ~isfield(baseline_meta, 'host') || ...
+         isblanktext(baseline_meta.matlab_version) || ...
+         isblanktext(baseline_meta.host)
+      reason = "perf baseline predates environment metadata";
+      return
+   end
+
+   current_version = string(version);
+   current_host = string(computer);
+   baseline_version = string(baseline_meta.matlab_version);
+   baseline_host = string(baseline_meta.host);
+   compatible = current_version == baseline_version && ...
+      current_host == baseline_host;
+
+   if ~compatible
+      reason = sprintf([ ...
+         'baseline built under MATLAB %s on %s; current environment is ', ...
+         'MATLAB %s on %s'], char(baseline_version), char(baseline_host), ...
+         char(current_version), char(current_host));
    end
 end
 

@@ -1,9 +1,8 @@
-function RunoffReference = build_runoff_reference_from_runoff(kwargs)
-   %BUILD_RUNOFF_REFERENCE_FROM_RUNOFF Build runoff reference baseline from
-   %runoff repo.
+function RunoffReference = build_runoff_reference(kwargs)
+   %BUILD_RUNOFF_REFERENCE Build runoff reference baseline from runoff repo.
    %
-   %  RunoffReference = build_runoff_reference_from_runoff()
-   %  RunoffReference = build_runoff_reference_from_runoff(simyear=2016)
+   %  RunoffReference = build_runoff_reference()
+   %  RunoffReference = build_runoff_reference(simyear=2016)
    %
    % With no SIMYEAR input, build references for all valid observation years at
    % each site. With SIMYEAR specified, build only rows for sites where that

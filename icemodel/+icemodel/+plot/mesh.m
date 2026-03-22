@@ -81,19 +81,21 @@ function mesh(Z, dz, growth_factor)
    % % set(gca,'YDir', 'reverse', 'YScale', 'log')
    %
    %
-   % %% Use this if within UPDATEEXTCOEFS
+   % %% Use this for any mesh with node/edge coordinates
    %
-   % x = ones(size(z_walls));
+   % x = ones(size(z_edge));
    %
    % figure
    % hold on
-   % plot(ones(size(z_spect)), z_spect, 'o', ...
+   % plot(ones(size(z_node)), z_node, 'o', ...
    %    'MarkerEdgeColor', 'none');
-   % for n = 1:numel(z_walls)
-   %    plot([x(n)/2 x(n)+x(n)/2], [z_walls(n) z_walls(n)], 'k', 'LineWidth', 1)
+   % for n = 1:numel(z_edge)
+   %    plot([x(n)/2 x(n)+x(n)/2], [z_edge(n) z_edge(n)], 'k', ...
+   %       'LineWidth', 1)
    % end
    % set(gca, 'YDir', 'reverse')
    %
    %
-   % plot([ones(size(z_walls)) ones(size(z_walls))]', [z_walls z_walls]')
+   % plot([ones(size(z_edge)) ones(size(z_edge))]', ...
+   %    [z_edge z_edge]')
 end

@@ -83,12 +83,11 @@ function test_mztransform_updates_melt_zone_consistently(testCase)
    T_old = Tf - 0.5;
    f_wat = 0.85;
    f_liq = f_wat / (1 + (fcp * (Tf - T_old)) ^ 2);
-   f_ice = (f_wat - f_liq) * ro_liq / ro_ice;
    f_liq_min = f_wat * f_ell_min;
    f_liq_max = f_wat * f_ell_max;
 
    [T_new, f_ice_new, f_liq_new, ok] = MZTRANSFORM(ro_liq * 0.002, T_old, ...
-      f_ice, f_liq, f_wat, ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, ...
+      f_liq, f_wat, ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, ...
       f_liq_max, true, true);
 
    testCase.verifyTrue(ok);
@@ -97,6 +96,66 @@ function test_mztransform_updates_melt_zone_consistently(testCase)
    testCase.verifyLessThanOrEqual(f_ice_new + f_liq_new * ro_liq / ro_ice, ...
       1 + 1e-9);
    testCase.verifyLessThanOrEqual(T_new, Tf);
+end
+
+function test_mztransform_allows_melt_zone_exit_to_frozen_branch(testCase)
+   % A node that starts within the melt zone may legitimately freeze back
+   % below TL during the corrector step without forcing a timestep retry, as
+   % long as the predictor overshoots the melt-zone boundary only slightly.
+
+   [ro_ice, ro_liq, fcp, Lf, cp_ice, cp_liq, Tf] = ...
+      icemodel.physicalConstant('ro_ice', 'ro_liq', 'fcp', 'Lf', ...
+      'cp_ice', 'cp_liq', 'Tf');
+   TL = Tf - (2.0 * Lf / (fcp ^ 2.0 * cp_ice)) ^ (1.0 / 3.0);
+   TH = Tf - cp_liq / (Lf * 2.0 * fcp ^ 2.0);
+   f_ell_min = 1 / (1 + (fcp * (Tf - TL)) ^ 2.0);
+   f_ell_max = 1 / (1 + (fcp * (Tf - TH)) ^ 2.0);
+
+   T_old = TL + 0.01;
+   f_wat = 0.85;
+   f_liq = f_wat / (1 + (fcp * (Tf - T_old)) ^ 2);
+   f_liq_min = f_wat * f_ell_min;
+   f_liq_max = f_wat * f_ell_max;
+   d_fliq = 0.97 * f_liq_min - f_liq;
+
+   [T_new, f_ice_new, f_liq_new, ok] = MZTRANSFORM(ro_liq * d_fliq, T_old, ...
+      f_liq, f_wat, ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, ...
+      f_liq_max, true, true);
+
+   testCase.verifyTrue(ok);
+   testCase.verifyLessThan(T_new, TL);
+   testCase.verifyLessThan(f_liq_new, f_liq_min);
+   testCase.verifyGreaterThan(f_liq_new, 0);
+   testCase.verifyLessThanOrEqual(f_ice_new + f_liq_new * ro_liq / ro_ice, ...
+      1 + 1e-9);
+end
+
+function test_mztransform_rejects_large_freeze_out_overshoot(testCase)
+   % A large overshoot of the lower melt-zone boundary should be rejected so
+   % the timestep can be shortened before trusting the transformed predictor.
+
+   [ro_ice, ro_liq, fcp, Lf, cp_ice, cp_liq, Tf] = ...
+      icemodel.physicalConstant('ro_ice', 'ro_liq', 'fcp', 'Lf', ...
+      'cp_ice', 'cp_liq', 'Tf');
+   TL = Tf - (2.0 * Lf / (fcp ^ 2.0 * cp_ice)) ^ (1.0 / 3.0);
+   TH = Tf - cp_liq / (Lf * 2.0 * fcp ^ 2.0);
+   f_ell_min = 1 / (1 + (fcp * (Tf - TL)) ^ 2.0);
+   f_ell_max = 1 / (1 + (fcp * (Tf - TH)) ^ 2.0);
+
+   T_old = TL + 0.01;
+   f_wat = 0.85;
+   f_liq = f_wat / (1 + (fcp * (Tf - T_old)) ^ 2);
+   f_liq_min = f_wat * f_ell_min;
+   f_liq_max = f_wat * f_ell_max;
+   d_fliq = -1.5 * f_liq;
+
+   [T_new, ~, f_liq_new, ok] = MZTRANSFORM(ro_liq * d_fliq, T_old, ...
+      f_liq, f_wat, ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, ...
+      f_liq_max, true, true);
+
+   testCase.verifyFalse(ok);
+   testCase.verifyLessThan(T_new, 0);
+   testCase.verifyLessThan(f_liq_new, f_liq_min);
 end
 
 function test_mztransform_rejects_phase_skip(testCase)
@@ -112,9 +171,8 @@ function test_mztransform_rejects_phase_skip(testCase)
    f_ell_max = 1 / (1 + (fcp * (Tf - TH)) ^ 2.0);
    f_wat = 0.85;
    f_liq = f_wat / (1 + (fcp * (Tf - (TL - 1))) ^ 2);
-   f_ice = (f_wat - f_liq) * ro_liq / ro_ice;
 
-   [~, ~, ~, ok] = MZTRANSFORM(TH + 0.5, TL - 1.0, f_ice, f_liq, f_wat, ...
+   [~, ~, ~, ok] = MZTRANSFORM(TH + 0.5, TL - 1.0, f_liq, f_wat, ...
       ro_ice, ro_liq, Tf, TL, TH, fcp, f_wat * f_ell_min, ...
       f_wat * f_ell_max, false, true);
 

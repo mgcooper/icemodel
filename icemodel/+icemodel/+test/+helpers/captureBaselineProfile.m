@@ -16,6 +16,7 @@ function [profile_summary, profile_meta, profile_artifacts] = ...
       output_file {mustBeTextScalar}
       kwargs.history_size (1, 1) double {mustBeInteger, mustBePositive} = ...
          25000000
+      kwargs.spectral_variant (1, :) string = ""
    end
 
    % Replace any previous managed profile bundle for this baseline target.
@@ -34,9 +35,9 @@ function [profile_summary, profile_meta, profile_artifacts] = ...
    % Re-run the accepted workflow for the selected suite type.
    switch kind
       case "perf"
-         profilePerfBuild(cases);
+         profilePerfBuild(cases, kwargs.spectral_variant);
       case "regression"
-         profileRegressionBuild(cases);
+         profileRegressionBuild(cases, kwargs.spectral_variant);
    end
 
    profile off
@@ -64,24 +65,29 @@ function [profile_summary, profile_meta, profile_artifacts] = ...
    profile_artifacts.info_file = string(info_file);
 end
 
-function profilePerfBuild(cases)
+function profilePerfBuild(cases, spectral_variant)
    %PROFILEPERFBUILD Re-run the managed perf cases under MATLAB profiling.
 
    for icase = 1:height(cases)
-      opts_run = icemodel.test.helpers.setModelOptsForCase( ...
-         cases(icase, :), include_spinup=false);
+      fprintf('Profiling perf case %d/%d: %s\n', ...
+         icase, height(cases), cases.case_id(icase))
+      opts_run = icemodel.test.helpers.setModelOptsForCase(cases(icase, :), ...
+         spectral_variant=spectral_variant);
       icemodel.test.helpers.runSmbModel(opts_run);
    end
 end
 
-function profileRegressionBuild(cases)
+function profileRegressionBuild(cases, spectral_variant)
    %PROFILEREGRESSIONBUILD Re-run regression cases under MATLAB profiling.
 
    runoff_ref = icemodel.test.helpers.loadRunoffReference();
 
    for icase = 1:height(cases)
       c = cases(icase, :);
-      opts_run = icemodel.test.helpers.setModelOptsForCase(c);
+      fprintf('Profiling regression case %d/%d: %s\n', ...
+         icase, height(cases), c.case_id)
+      opts_run = icemodel.test.helpers.setModelOptsForCase(c, ...
+         spectral_variant=spectral_variant);
       [ice1, ice2] = icemodel.test.helpers.runSmbModel(opts_run);
       [ice1, ~] = icemodel.postprocess( ...
          ice1, ice2, opts_run, opts_run.output_years);
