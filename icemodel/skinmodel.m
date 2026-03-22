@@ -30,8 +30,8 @@ function [ice1, ice2, opts] = skinmodel(opts)
       = METINIT(opts);
 
    % INITIALIZE THE THERMAL MODEL
-   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, JJ] ...
-      = ICEINIT(opts, tair);
+   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, ~, roL, liqflag, ...
+      Ts, JJ] = ICEINIT(opts, tair);
 
    % INITIALIZE TIMESTEPPING
    [metstep, substep, numsteps, maxsubstep, dt, dt_FULL_STEP, ...

@@ -1,6 +1,6 @@
-function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
-      Ts, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, f_ice_min, ...
-      f_liq_res, ro_iwe, ro_wie] = ICEINIT(opts, tair)
+function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, ...
+      roL, liqflag, Ts, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, ...
+      f_ell_max, f_ice_min, f_liq_res, ro_iwe, ro_wie] = ICEINIT(opts, tair)
    %ICEINIT initialize the 1-d ice column
    %
    %#codegen
@@ -16,7 +16,7 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
    % GENERATE A THERMAL MESH
    dz_therm = opts.dz_thermal;
    z0_therm = opts.z0_thermal;
-   [dz, delz, ~, ~, fn] = CVMESH(z0_therm, dz_therm);
+   [dz, delz, z_nodes, ~, fn] = CVMESH(z0_therm, dz_therm);
 
    % NUMBER OF TIMESTEPS TO INITIALIZE OUTPUTS
    maxiter = numel(tair) / opts.numyears;
@@ -55,11 +55,10 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
       % avoid a zero-gradient startup.
       T_deep = min(TL - 1, Tf + opts.T_ice_init);
       T_ref = min(TL - 1, min(tair(1), Tf) - 1.0);
-      Z = cumsum(dz) - dz / 2;
       omega_yr = 2.0 * pi / (365.0 * 86400.0);
       kappa_ice = k_ice / (ro_ice * cp_ice);
       z_scale = sqrt(2.0 * kappa_ice / omega_yr);
-      T = T_deep + (T_ref - T_deep) .* exp(-(Z - Z(1)) ./ z_scale);
+      T = T_deep + (T_ref - T_deep) .* exp(-(z_nodes - z_nodes(1)) ./ z_scale);
 
       % INITIALIZE LIQUID/ICE WATER FRACTION (f) AND BULK DENSITIES (g)
       T_dep = Tf - T;                           % [K]
@@ -121,7 +120,7 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, ...
       legend('T', 'Ts', 'Ta')
    end
    if debug == true
-      plot_T_init(T, Z, tair(1), Ts);
+      plot_T_init(T, z_nodes, tair(1), Ts);
    end
 end
 

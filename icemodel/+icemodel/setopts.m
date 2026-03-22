@@ -168,7 +168,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       % 1 = Dirichlet w/ lagged Ts-T closure iterations
       % 2 = Robin w/ single Ts-T coupling iteration
       % 3 = Robin w/ strong Ts-T coupling iterations
-      opts.solver          = 2;     % recommended: 3
+      opts.solver          = 3;     % recommended: 3
 
       % surface (SEB) solver (Dirichlet Ts boundary condition when solver = 1)
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
@@ -241,7 +241,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % The mie scattering coefficients are defined for 35 grain sizes and 118
    % spectral bands. Define those dimensions here, they are used to read in
    % the data array in GETSCATTERCOEFS. Also set the grain size index.
-   opts.nwavl           = 118;
+   opts.nwavel          = 118;
    opts.nradii          = 35;
    opts.i_grainradius   = 25;       % index 25 = 2.0 mm                    [#]
 

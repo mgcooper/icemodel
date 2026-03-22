@@ -1,21 +1,21 @@
-function bulkcoefs = BULKEXTCOEFS(dz_spect, ro_sno, spect_N, spect_S, solardwavl)
-   %BULKEXTCOEFS Compute spectral bulk extinction coefficients.
+function k_bulk = BULKEXTCOEFS(dz_spect, ro_sno, tau_N, tau_S, solar_dwavel)
+   %BULKEXTCOEFS Compute bulk (spectrally integrated) extinction coefficients.
    %
-   %  bulkcoefs = BULKEXTCOEFS(dz_spect, ro_sno, spect_N, spect_S, solardwavl)
+   %  k_bulk = BULKEXTCOEFS(dz_spect, ro_sno, tau_N, tau_S, solar_dwavel)
    %
    % Inputs correspond to one spectral-grid density profile and the fixed
-   % spectral integration coefficients returned by EXTCOEFSINIT.
+   % spectral integration coefficients tau_N/S returned by EXTCOEFSINIT.
    %
    %#codegen
 
-   % Match UPDATEEXTCOEFS by capping unrealistically light densities and
-   % using the leading spectral grid spacing in the integrated transform.
-   ro_sno = max(ro_sno, 300);
-   dz_bulk = dz_spect(1);
+   % The transform assumes the spectral grid spacing is uniform, so it uses
+   % DZ_SPECT(1) as the representative layer thickness. If DZ_SPECT is
+   % nonuniform, this transform needs to be updated.
+   ro_sno = max(ro_sno(:), 300.0);
 
    % Integrate the spectrally weighted extinction exactly on the spectral
    % grid, then pad the lower boundaries for the two-stream solve.
-   bulkcoefs = -log((sum(solardwavl .* exp(spect_S .* ro_sno), 2)) ...
-      ./ (sum(solardwavl .* exp(spect_N .* ro_sno), 2))) ./ dz_bulk;
-   bulkcoefs = vertcat(bulkcoefs, bulkcoefs(end), bulkcoefs(end));
+   k_bulk = -log((sum(solar_dwavel .* exp(tau_S .* ro_sno), 2)) ...
+      ./ (sum(solar_dwavel .* exp(tau_N .* ro_sno), 2))) / dz_spect(1);
+   k_bulk = vertcat(k_bulk, k_bulk(end), k_bulk(end));
 end

@@ -92,6 +92,11 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
       end
    end
 
+   if not(ok)
+      dumpSebSolveFailure(solver, iter, Ts_old, Ts, Ta, Qsi, Qli, albedo, ...
+         wspd, ppt, tppt, Pa, De, ea, liqflag, k_eff, T, dz);
+   end
+
    % Note: nested function captures updated Qc on each iteration.
    function f = fSEB(Ts)
       f = chi * (1.0 - albedo) * Qsi + emiss * (Qli - SB * Ts ^ 4) ...
@@ -133,4 +138,37 @@ function [x, ok, iter] = complexstep(f, x0)
       old = x;
    end
    x = x0; % ok = false
+end
+
+function dumpSebSolveFailure(solver, iter, Ts_old, Ts, Ta, Qsi, Qli, ...
+      albedo, wspd, ppt, tppt, Pa, De, ea, liqflag, k_eff, T, dz)
+   %DUMPSEBSOLVEFAILURE Save SEB root-find failure diagnostics on demand.
+
+   debug_file = getenv('ICEMODEL_DEBUG_SEBSOLVE_FILE');
+   if isempty(debug_file)
+      return
+   end
+
+   debug_state = struct();
+   debug_state.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
+   debug_state.solver = solver;
+   debug_state.iter = iter;
+   debug_state.Ts_old = Ts_old;
+   debug_state.Ts = Ts;
+   debug_state.Ta = Ta;
+   debug_state.Qsi = Qsi;
+   debug_state.Qli = Qli;
+   debug_state.albedo = albedo;
+   debug_state.wspd = wspd;
+   debug_state.ppt = ppt;
+   debug_state.tppt = tppt;
+   debug_state.Pa = Pa;
+   debug_state.De = De;
+   debug_state.ea = ea;
+   debug_state.liqflag = liqflag;
+   debug_state.k_eff = k_eff;
+   debug_state.T = T;
+   debug_state.dz = dz;
+
+   save(debug_file, 'debug_state');
 end

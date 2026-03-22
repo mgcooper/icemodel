@@ -88,10 +88,27 @@ function [dz, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz, g)
    % delz_n = 0.5 * dz_bc(2:N+2); % interface-to-next point
 
    % For reference
-   % z_walls = [0; cumsum(dz_spect); sum(dz_spect) + dz_spect(end)];
-   % z_walls = round([0; z_spect + dz_spect/2; z_spect(end) + 3*dz_spect/2], 3);
-   % z_walls = [z_walls; z_walls(end) + (z_walls(end) - z_walls(end-1))];
-   % z_spect = z_walls(1:end-2) + diff(z_walls(1:end-1)) / 2;
+   % z_edges = [0; cumsum(dz_spect); sum(dz_spect) + dz_spect(end)];
+   % z_edges = round([0; z_spect + dz_spect/2; z_spect(end) + 3*dz_spect/2], 3);
+   % z_edges = [z_edges; z_edges(end) + (z_edges(end) - z_edges(end - 1))];
+   % z_spect = z_edges(1:end - 2) + diff(z_edges(1:end - 1)) / 2;
+
+   % Legacy CVSPECTRAL reference
+   % This was the earlier fixed-dz spectral mesh builder before the spectral
+   % model was consolidated onto CVMESH. Keep the construction here as a note
+   % because it documents the old staggered spectral layout explicitly.
+   %
+   % N = Z / dz;                      % number of nodes [#]
+   % dz_cv = dz * ones(N, 1);
+   % delz_b = 0.0;                   % cv width at the boundaries
+   % dz_bc = [delz_b; dz_cv; delz_b];% c.v. widths including boundaries
+   % delz_s = 0.5 * dz_bc(1:N + 1);  % interface-to-previous point
+   % delz_n = 0.5 * dz_bc(2:N + 2);  % interface-to-next point
+   % delz_p = delz_s + delz_n;       % distance between grid points
+   % z_node_bc = [0; cumsum(delz_p)];% grid point coordinates w/ boundaries
+   % z_edge = [0; cumsum(dz_cv)];    % interface coordinates
+   % z_node = z_node_bc(2:end - 1);  % grid nodes
+   % f = delz_n ./ delz_p;           % interface conductivity weighting factor
 end
 
 %% Exponential mesh
