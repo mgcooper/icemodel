@@ -77,7 +77,8 @@ function Requirements = getRequiredFiles(targetList, kwargs)
       targetList (1, :) string
       kwargs.ignoreList (1, :) string = []
       kwargs.referenceList (1, :) string {mustBeFolder} = projectpath()
-      kwargs.requirementsFileName (1, :) string = "requirements.mat"
+      kwargs.requirementsFileName (1, 1) string {mustBeTextScalar} = ...
+         fullfile(toolboxpath(), "dependencies", "requirements.mat");
       kwargs.saveRequirementsFile (1, 1) logical = false
    end
 
@@ -180,10 +181,10 @@ function [targetFiles, referenceFiles, requirementsFileName, ...
    saveRequirementsFile = kwargs.saveRequirementsFile;
 
    % Validate each member of the target file / folder list
-   targetList = cellfun(@validateFileList, targetList, 'Uniform', false);
+   targetList = string(cellfun(@validateFileList, targetList, 'Uniform', false));
 
    % Decided this does not need to be validated.
-   % ignoreList = cellfun(@validateFileList, ignoreList, 'Uniform', false);
+   % ignoreList = string(cellfun(@validateFileList, ignoreList, 'Uniform', false));
 
    % If target is a folder, convert to file list
    [targetFiles, referenceFiles] = prepareFileLists(...
@@ -240,6 +241,14 @@ function fileList = fileListFromFolderList(folderList)
          "subfolders", true, "mfiles", true, "matfiles", true, ...
          "aslist", true, "fullpath", true, "asstring", true);
    end
+   % 3/21/2026 - Not sure if this is supposed to collapse to a nx1 cell array,
+   % where n = numel(folderList), or a 1x1 cell array with all files. It
+   % requires to repeated calls to vertcat(fileList{:}) to get a mx1 string
+   % array, where m = numel(files), which is needed in prepareFileLists to avoid
+   % setdiff errors b/c setdiff requires two cell arrays of chars, or two string
+   % arrays. So for now I use the method in prepareFileLists where I expand the
+   % fileLists using {:}, but it should happen here
+   fileList = vertcat(fileList{:});
    fileList = vertcat(fileList{:});
 end
 

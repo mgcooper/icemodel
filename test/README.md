@@ -3,6 +3,10 @@
 This folder contains the public test runners, regression data, unit tests,
 and **component** benchmark material for the public `icemodel` repo.
 
+Operator-facing usage notes for the public runners and study tools live in:
+
+- `/Users/mattcooper/MATLAB/projects/icemodel/test/TOOL_REFERENCE.md`
+
 ## Layout
 
 1. `artifacts/`
@@ -57,6 +61,13 @@ Default software-level regression coverage:
 3. `skinmodel`, `kanm`, `2016`, `solver = 1`
 4. `skinmodel`, `kanl`, `2016`, `solver = 1`
 5. self-forced station runs only (`sitename == forcings`)
+
+Formal runtime contract for the default regression/perf matrices:
+
+1. the case matrix carries one canonical retained `simyear`
+2. the runtime contract expands that to `[simyear - 1, simyear]`
+3. `n_spinup_years = 1`
+4. `output_years = simyear`
 
 Programmatic regression helpers:
 
