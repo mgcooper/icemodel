@@ -12,57 +12,115 @@ function [Ts, T, f_ice, f_liq, k_eff, ok, n_iters] = ICEEBSOLVE( ...
    %
    %#codegen
 
-   % Initial values for SEB linearization coefficients Fc, Fp
+   % Initial values for SEB linearization coefficients Fc, Fp.
    [Fc, Fp] = SFCFLIN(tair, swd, lwd, albedo, wspd, psfc, De, ea, cv_air, ...
       emiss, SB, roL, scoef, chi, Tf, Ts, liqflag);
 
-   % Initial past Picard iterates for Aitken-acceleration
+   % Initial past Picard iterates for Aitken-acceleration.
    Ts_1 = nan;
    Ts_2 = nan;
 
-   % Run outer Ts-T convergence loop (iterative block/Picard coupling)
+   % Initial values for convergence checks.
+   Ts_old = Ts;
+   Ts_diag = Ts;
    ok_cpl = false;
-   for cpliter = 1:cpl_maxiter
-      old = Ts;
+   seb_res = nan;
 
-      % Inner subsurface solve with updated Ts, Fc, Fp and checkpoint state
+   % Run outer Ts-T convergence loop (iterative block/Picard coupling).
+   for cpliter = 1:cpl_maxiter
+      Ts_old = Ts;
+
+      % Inner subsurface solve with updated Ts, Fc, Fp and checkpoint state.
       [T, f_ice, f_liq, k_eff, ok, n_iters, a1] = ICEENBAL(xT, xf_ice, xf_liq, ...
          dz, delz, fn, Sc, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, ...
          ro_liq, Ls, Lf, roLf, Rv, Tf, fcp, TL, TH, f_ell_min, f_ell_max, ...
          Fc, Fp, solver, tol, maxiter, alpha, use_aitken, jumpmax);
 
-      if not(ok)
+      if ~ok
+         dumpIceEbSolveFailure("iceenbal_failed", Ts, Ts_diag, Ts_old, T, ...
+            f_ice, f_liq, k_eff, Sc, dt, Fc, Fp, cpliter, cpl_maxiter, ...
+            cpl_Ts_tol, cpl_seb_tol, seb_res, ok_cpl, n_iters);
          break
       end
 
-      % Diagnose Ts from frozen coefficients and updated (a1,T1)
+      % Diagnose Ts from frozen coefficients and updated (a1, T1).
       Ts = (Fc + a1 * T(1)) / (a1 - Fp);
+      Ts_diag = Ts;
 
-      % Update SEB linearization coefficients Fc, Fp
+      % Update SEB linearization coefficients Fc, Fp.
       [Fc, Fp] = SFCFLIN(tair, swd, lwd, albedo, wspd, psfc, De, ea, ...
          cv_air, emiss, SB, roL, scoef, chi, Tf, Ts, liqflag);
 
-      % Diagnose SEB residual
+      % Diagnose SEB residual.
       seb_res = fSEB(Ts, tair, swd, lwd, albedo, wspd, ppt, tppt, ...
          psfc, De, ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
          CONDUCT(k_eff, T, dz, Ts), liqflag);
 
-      % Check convergence (bypass coupler if cpl_maxiter == 1)
+      % Check convergence (bypass coupler if cpl_maxiter == 1).
       if (cpl_maxiter == 1) || ...
-            (abs(Ts - old) < cpl_Ts_tol && abs(seb_res) < cpl_seb_tol)
+            (abs(Ts - Ts_old) < cpl_Ts_tol && abs(seb_res) < cpl_seb_tol)
          ok_cpl = true;
          break
       end
 
-      % Aitken acceleration with relaxation-fallback (on failure or ~cpl_aitken)
+      % Aitken acceleration w/ relaxation-fallback (on failure or ~cpl_aitken).
       Ts_0 = Ts;
       Ts = aitkenscalar(Ts_2, Ts_1, Ts_0, ...
-         (1.0 - cpl_alpha) * old + cpl_alpha * Ts, ... % relaxation
+         (1.0 - cpl_alpha) * Ts_old + cpl_alpha * Ts, ... % relaxation
          cpl_jumpmax, cpl_aitken);
       Ts_2 = Ts_1;
       Ts_1 = Ts_0;
+
+      % The accelerated iterate is the actual state carried into the next
+      % coupling sweep. Accept convergence here as well so a stationary
+      % Aitken iterate cannot fall through the loop and fail spuriously at
+      % cpl_maxiter.
+      if abs(Ts - Ts_old) < cpl_Ts_tol && abs(seb_res) < cpl_seb_tol
+         ok_cpl = true;
+         break
+      end
    end
 
    % Hitting max coupling iterations without ok_cpl is a substep fail
    ok = ok && ok_cpl;
+   if ~ok
+      dumpIceEbSolveFailure("coupler_nonconvergence", Ts, Ts_diag, Ts_old, T, ...
+         f_ice, f_liq, k_eff, Sc, dt, Fc, Fp, cpliter, cpl_maxiter, ...
+         cpl_Ts_tol, cpl_seb_tol, seb_res, ok_cpl, n_iters);
+   end
+end
+
+function dumpIceEbSolveFailure(reason, Ts, Ts_diag, Ts_old, T, f_ice, ...
+      f_liq, k_eff, Sc, dt, Fc, Fp, cpliter, cpl_maxiter, cpl_Ts_tol, ...
+      cpl_seb_tol, seb_res, ok_cpl, n_iters)
+   %DUMPICEEBSOLVEFAILURE Save coupled ice-SEB solver diagnostics on demand.
+
+   debug_file = getenv('ICEMODEL_DEBUG_ICEEBSOLVE_FILE');
+   if isempty(debug_file)
+      return
+   end
+
+   debug_state = struct();
+   debug_state.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
+   debug_state.reason = reason;
+   debug_state.Ts = Ts;
+   debug_state.Ts_diag = Ts_diag;
+   debug_state.Ts_old = Ts_old;
+   debug_state.T = T;
+   debug_state.f_ice = f_ice;
+   debug_state.f_liq = f_liq;
+   debug_state.k_eff = k_eff;
+   debug_state.Sc = Sc;
+   debug_state.dt = dt;
+   debug_state.Fc = Fc;
+   debug_state.Fp = Fp;
+   debug_state.cpliter = cpliter;
+   debug_state.cpl_maxiter = cpl_maxiter;
+   debug_state.cpl_Ts_tol = cpl_Ts_tol;
+   debug_state.cpl_seb_tol = cpl_seb_tol;
+   debug_state.seb_res = seb_res;
+   debug_state.ok_cpl = ok_cpl;
+   debug_state.n_iters = n_iters;
+
+   save(debug_file, 'debug_state');
 end

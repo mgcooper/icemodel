@@ -86,6 +86,11 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
       % Update thermal conductivity (T-k_eff consistency on final iteration)
       k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
    end
+
+   if not(ok)
+      dumpSkinSolveFailure(T, f_ice, f_liq, k_eff, dz, delz, dt, Ts, iter, ...
+         maxiter);
+   end
 end
 
 function plot_temp(T, T_iter, Ts, dz)
@@ -96,4 +101,29 @@ function plot_temp(T, T_iter, Ts, dz)
    scatter(Ts, 0, 'filled')
    set(gca, 'YDir', 'reverse')
    legend('T', 'T iter', 'Ts')
+end
+
+function dumpSkinSolveFailure(T, f_ice, f_liq, k_eff, dz, delz, dt, Ts, ...
+      iter, maxiter)
+   %DUMPSKINSOLVEFAILURE Save skin conduction solver diagnostics on demand.
+
+   debug_file = getenv('ICEMODEL_DEBUG_SKINSOLVE_FILE');
+   if isempty(debug_file)
+      return
+   end
+
+   debug_state = struct();
+   debug_state.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
+   debug_state.T = T;
+   debug_state.f_ice = f_ice;
+   debug_state.f_liq = f_liq;
+   debug_state.k_eff = k_eff;
+   debug_state.dz = dz;
+   debug_state.delz = delz;
+   debug_state.dt = dt;
+   debug_state.Ts = Ts;
+   debug_state.iter = iter;
+   debug_state.maxiter = maxiter;
+
+   save(debug_file, 'debug_state');
 end

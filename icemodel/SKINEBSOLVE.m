@@ -21,6 +21,9 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok, n_iters] = ...
 
    % Run the coupler
    ok_cpl = false;
+   seb_res = nan;
+   old = Ts;
+   Ts_diag = Ts;
    for cpliter = 1:cpl_maxiter
 
       % Inner subsurface solve from checkpoint state w/o physical advancement
@@ -28,6 +31,9 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok, n_iters] = ...
          xf_ice, xf_liq, dz, delz, fn, dt, JJ, Ts, k_liq, cv_ice, ...
          cv_liq, ro_ice, Ls, Rv, Tf, tol, maxiter, alpha);
       if not(ok_ieb)
+         dumpSkinEbSolveFailure("skinsolve_failed", Ts, Ts_diag, old, T, ...
+            f_ice, f_liq, k_eff, dt, cpliter, cpl_maxiter, cpl_Ts_tol, ...
+            cpl_seb_tol, seb_res, n_iters, ok_seb, ok_ieb, ok_cpl);
          break
       end
 
@@ -37,8 +43,12 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok, n_iters] = ...
          psfc, De, ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
          liqflag, Ts, T, k_eff, dz, seb_solver);
       Ts = MELTTEMP(Ts, Tf);
+      Ts_diag = Ts;
 
       if not(ok_seb)
+         dumpSkinEbSolveFailure("sebsolve_failed", Ts, Ts_diag, old, T, ...
+            f_ice, f_liq, k_eff, dt, cpliter, cpl_maxiter, cpl_Ts_tol, ...
+            cpl_seb_tol, seb_res, n_iters, ok_seb, ok_ieb, ok_cpl);
          break
       end
 
@@ -66,7 +76,51 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok, n_iters] = ...
          cpl_jumpmax, cpl_aitken), Tf);
       Ts_2 = Ts_1;
       Ts_1 = Ts_0;
+
+      if abs(Ts - old) < cpl_Ts_tol && seb_res < cpl_seb_tol
+         ok_cpl = true;
+         break
+      end
    end
 
    ok = ok_seb && ok_ieb && ok_cpl;
+   if not(ok)
+      dumpSkinEbSolveFailure("coupler_nonconvergence", Ts, Ts_diag, old, T, ...
+         f_ice, f_liq, k_eff, dt, cpliter, cpl_maxiter, cpl_Ts_tol, ...
+         cpl_seb_tol, seb_res, n_iters, ok_seb, ok_ieb, ok_cpl);
+   end
+end
+
+function dumpSkinEbSolveFailure(reason, Ts, Ts_diag, Ts_old, T, f_ice, ...
+      f_liq, k_eff, dt, cpliter, cpl_maxiter, cpl_Ts_tol, cpl_seb_tol, ...
+      seb_res, n_iters, ok_seb, ok_ieb, ok_cpl)
+   %DUMPSKINEBSOLVEFAILURE Save coupled skin-model solver diagnostics.
+
+   debug_file = getenv('ICEMODEL_DEBUG_SKINEBSOLVE_FILE');
+   if isempty(debug_file)
+      return
+   end
+
+   debug_state = struct();
+   debug_state.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
+   debug_state.reason = reason;
+   debug_state.Ts = Ts;
+   debug_state.Ts_diag = Ts_diag;
+   debug_state.Ts_old = Ts_old;
+   debug_state.T = T;
+   debug_state.f_ice = f_ice;
+   debug_state.f_liq = f_liq;
+   debug_state.k_eff = k_eff;
+   debug_state.dt = dt;
+   debug_state.cpliter = cpliter;
+   debug_state.cpl_maxiter = cpl_maxiter;
+   debug_state.cpl_Ts_tol = cpl_Ts_tol;
+   debug_state.cpl_seb_tol = cpl_seb_tol;
+   debug_state.seb_res = seb_res;
+   debug_state.n_iters = n_iters;
+   debug_state.ok_seb = ok_seb;
+   debug_state.ok_ieb = ok_ieb;
+   debug_state.ok_cpl = ok_cpl;
+
+   save(debug_file, 'debug_state');
 end
