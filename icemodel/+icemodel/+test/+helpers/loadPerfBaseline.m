@@ -1,16 +1,21 @@
-function baseline = loadPerfBaseline(simyear, baseline_tag, smbmodel, pathname)
+function [baseline, meta] = loadPerfBaseline(simyear, baseline_tag, smbmodel, pathname)
    %LOADPERFBASELINE Load rolling or release performance baseline table.
    %
    %  baseline = icemodel.test.helpers.loadPerfBaseline(2016)
-   %  baseline = icemodel.test.helpers.loadPerfBaseline(2016, "rolling", "all")
-   %  baseline = icemodel.test.helpers.loadPerfBaseline(2016, "v1.1", "skinmodel")
-   %  baseline = icemodel.test.helpers.loadPerfBaseline(2016, "v1.1", "skinmodel", pathname)
+   %  [baseline, meta] = icemodel.test.helpers.loadPerfBaseline(2016, ...
+   %     "rolling", "all")
+   %  [baseline, meta] = icemodel.test.helpers.loadPerfBaseline(2016, ...
+   %     "v1.1", "skinmodel")
+   %  [baseline, meta] = icemodel.test.helpers.loadPerfBaseline(2016, ...
+   %     "v1.1", "skinmodel", pathname)
    arguments
       simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
       baseline_tag (1, :) string = "rolling"
       smbmodel (1, :) string = "all"
       pathname (1, :) string = ""
    end
+
+   meta = struct();
 
    [baseline_type, baseline_tag] = ...
       icemodel.test.helpers.resolveBaselineSelector(baseline_tag);
@@ -33,6 +38,11 @@ function baseline = loadPerfBaseline(simyear, baseline_tag, smbmodel, pathname)
    if exist(pathname, 'file') ~= 2
       baseline = table();
       return
+   end
+
+   if any(string({whos('-file', pathname).name}) == "meta")
+      S = load(pathname, 'meta');
+      meta = normalizeMeta(S.meta);
    end
 
    % Normalize saved MAT content back into a standard table schema.
@@ -93,4 +103,29 @@ function baseline = addMetadata(baseline, baseline_type, baseline_tag, smbmodel)
       baseline.smbmodel_filter = repmat(string(smbmodel), height(baseline), 1);
    end
    baseline.smbmodel_filter = string(baseline.smbmodel_filter);
+end
+
+function meta = normalizeMeta(meta)
+   %NORMALIZEMETA Normalize saved baseline metadata into current string types.
+
+   if ~isstruct(meta)
+      meta = struct();
+      return
+   end
+
+   if isfield(meta, 'baseline_type')
+      meta.baseline_type = string(meta.baseline_type);
+   end
+   if isfield(meta, 'baseline_tag')
+      meta.baseline_tag = string(meta.baseline_tag);
+   end
+   if isfield(meta, 'smbmodel_filter')
+      meta.smbmodel_filter = string(meta.smbmodel_filter);
+   end
+   if isfield(meta, 'matlab_version')
+      meta.matlab_version = string(meta.matlab_version);
+   end
+   if isfield(meta, 'host')
+      meta.host = string(meta.host);
+   end
 end

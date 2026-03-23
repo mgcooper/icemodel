@@ -4,7 +4,7 @@ function [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new] = RESETSUBSTEP( ...
    %
    %#codegen
    if nargout > 4
-      n_subfail = n_subfail + 1;
+      n_subfail = min(n_subfail + 1, maxsubstep);
       substep = min(substep + 1, maxsubstep);
 
       % Activate this for aggressive timestep shortening.

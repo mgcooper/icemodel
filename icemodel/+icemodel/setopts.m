@@ -153,6 +153,10 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
    opts.calendar_type   =  'noleap';
 
+   % debug mode — enable via resetopts(opts, 'debug', true)
+   opts.debug           =  false;   % enable solver diagnostic dumps
+   opts.debug_path      =  '';      % override for debug output folder
+
    % model parameters
    opts.z_0             =  0.001;   % Surface aero. roughness length    [m]
    opts.ro_ice_init     =  900.0;   % initial ice density               [kg/m3]
@@ -193,6 +197,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.dz_spectral     = 0.002; % dz for radiative heat transfer       [m]
       opts.z0_thermal      = 20;    % domain thickness for heat transfer   [m]
       opts.z0_spectral     = 8;     % domain thickness for rad transfer    [m]
+      opts.lookup_k_bulk   = true;  % use lookup-table bulk extinction     [-]
       opts.f_ice_min       = 0.1;   % layer combination threshold (ice fraction)
 
    elseif strcmp(smbmodel, 'skinmodel')
@@ -241,7 +246,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % The mie scattering coefficients are defined for 35 grain sizes and 118
    % spectral bands. Define those dimensions here, they are used to read in
    % the data array in GETSCATTERCOEFS. Also set the grain size index.
-   opts.nwavl           = 118;
+   opts.nwavel          = 118;
    opts.nradii          = 35;
    opts.i_grainradius   = 25;       % index 25 = 2.0 mm                    [#]
 

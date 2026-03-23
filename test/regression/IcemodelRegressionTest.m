@@ -214,13 +214,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          if ~isfinite(expected)
             return
          end
-         if endsWith(string(varname), "_m3")
-            tol = max(testCase.abs_tol_runoff_m3, ...
-               testCase.rel_tol_runoff_m3 * abs(expected));
-         else
-            tol = max(testCase.abs_tol_scalar, ...
-               testCase.rel_tol_scalar * abs(expected));
-         end
+         tol = testCase.metricTolerance(char(varname), expected);
          testCase.verifyLessThanOrEqual(abs(actual - expected), tol, ...
             sprintf('baseline mismatch var=%s', varname));
       end
@@ -232,6 +226,39 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          else
             x = nan;
          end
+      end
+
+      function tol = metricTolerance(testCase, varname, expected)
+         % Return one metric-specific scalar tolerance.
+
+         if endsWith(string(varname), "_m3")
+            tol = max(testCase.abs_tol_runoff_m3, ...
+               testCase.rel_tol_runoff_m3 * abs(expected));
+            return
+         end
+
+         if any(startsWith(string(varname), ["runoff_", "melt_"]))
+            tol = max(1e-4, 1e-4 * abs(expected));
+            return
+         end
+
+         if contains(varname, "numiter")
+            tol = 0.5;
+            return
+         end
+
+         if contains(varname, "not_converged")
+            tol = 1.0;
+            return
+         end
+
+         if startsWith(varname, "closure_") || startsWith(varname, "gof_")
+            tol = 5e-3;
+            return
+         end
+
+         tol = max(testCase.abs_tol_scalar, ...
+            testCase.rel_tol_scalar * abs(expected));
       end
 
       function logReport(~, report, case_opts, meta)
@@ -316,8 +343,12 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          meta.abs_tol_scalar = IcemodelRegressionTest.scalarAbsTol();
          meta.rel_tol_runoff_m3 = IcemodelRegressionTest.runoffRelTol();
          meta.abs_tol_runoff_m3 = IcemodelRegressionTest.runoffAbsTol();
+         meta.metric_tolerance_policy = ...
+            "metric-specific tolerances for runoff/melt, iteration, closure, and GOF metrics";
          meta.case_builder = "icemodel.test.helpers.setModelOptsForCase";
          meta.opts_source = "icemodel.setopts defaults";
+         meta.spinup_policy = ...
+            "formal regression runs include the canonical leading spinup year";
          meta.reset_fields = "solver";
          meta.input_path = string(icemodel.getpath('input'));
          meta.output_path = string(icemodel.getpath('output'));

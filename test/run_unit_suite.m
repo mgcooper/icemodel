@@ -18,7 +18,7 @@ function results = run_unit_suite(options)
       options.stop_on_failure (1, 1) logical = false
       options.verbosity (1, :) string ...
          {icemodel.validators.mustBeTestVerbosityName(options.verbosity)} ...
-         = "detailed"
+         = "concise" % "terse" "concise" "detailed"
    end
 
    import matlab.unittest.TestRunner
@@ -47,6 +47,17 @@ function results = run_unit_suite(options)
 
    % Run the suite.
    results = runner.run(suite);
+
+   % Print the results to the screen
+   if options.verbosity == "detailed"
+      for n = 1:numel(results)
+         if results(n).Passed
+            fprintf('Passed Test %s:%s\n', int2str(n), results(n).Name);
+         else
+            fprintf('Failed Test %s:%s\n', int2str(n), results(n).Name);
+         end
+      end
+   end
 end
 
 function suite = buildUnitSuite(unitdir, selector)

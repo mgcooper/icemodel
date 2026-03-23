@@ -44,15 +44,17 @@ function configurePerfCaseEnv(c)
    setenv('ICEMODEL_TEST_USERVARS', char(c.uservars));
    setenv('ICEMODEL_TEST_SIMYEAR', int2str(c.simyear));
    if isfield(c, 'simyears') && ~isempty(c.simyears)
-      setenv('ICEMODEL_TEST_SIMYEARS', strjoin(string(c.simyears), ','));
+      simyears = c.simyears;
    else
-      setenv('ICEMODEL_TEST_SIMYEARS', '');
+      simyears = [c.simyear - 1, c.simyear];
    end
+   setenv('ICEMODEL_TEST_SIMYEARS', strjoin(string(simyears), ','));
    if isfield(c, 'n_spinup_years') && ~isempty(c.n_spinup_years)
-      setenv('ICEMODEL_TEST_N_SPINUP_YEARS', int2str(c.n_spinup_years));
+      n_spinup_years = c.n_spinup_years;
    else
-      setenv('ICEMODEL_TEST_N_SPINUP_YEARS', '0');
+      n_spinup_years = 1;
    end
+   setenv('ICEMODEL_TEST_N_SPINUP_YEARS', int2str(n_spinup_years));
    setenv('ICEMODEL_TEST_SOLVER', int2str(c.solver));
 end
 

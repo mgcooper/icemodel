@@ -168,3 +168,59 @@ function test_postprocess_explicit_met_return_is_hourly(testCase)
    testCase.verifyEqual(height(met_pp), 24);
    clear cleanup
 end
+
+function test_retimeHourlyFixedStep_matches_legacy_hourly_mean(testCase)
+   % The fixed-step hourly aggregation helper should reproduce the legacy
+   % timetable RETIME path exactly on aligned 15-minute model output.
+
+   localws = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
+      configure=true, nsteps=96, dt_seconds=900);
+   cleanup = onCleanup(@() icemodel.test.fixtures.cleanupSyntheticWorkspace( ...
+      localws));
+
+   % Run one synthetic quarter-hour case and convert the raw surface output
+   % into the same timetable form POSTPROCESS retimes.
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      localws, 'skinmodel', 2016, dt=900, solver=1, ...
+      testname='postprocess_retime_equivalence');
+   [ice1_raw, ~, opts] = icemodel.test.helpers.runSmbModel(opts);
+   met = icemodel.loadmet(opts);
+   ice1_tt = rawIce1ToTimetable(ice1_raw, met.Time);
+
+   % Compare the legacy timetable RETIME result to the fixed-step helper.
+   legacy = legacyHourlyMean(ice1_tt);
+   fixed = icemodel.retimeHourlyFixedStep(ice1_tt);
+
+   testCase.verifyEqual(fixed.Time, legacy.Time);
+   testCase.verifyEqual(double(fixed{:,:}), double(legacy{:,:}), ...
+      'AbsTol', 5e-5);
+   clear cleanup
+end
+
+function ice1_tt = rawIce1ToTimetable(ice1_raw, time)
+   %RAWICE1TOTIMETABLE Convert raw model output to POSTPROCESS timetable form.
+
+   % Match POSTPROCESS by converting logical convergence flags to single
+   % before building the timetable-backed hourly series.
+   if isfield(ice1_raw, 'Tice_converged')
+      ice1_raw.Tice_converged = single(ice1_raw.Tice_converged);
+   end
+   if isfield(ice1_raw, 'Tsfc_converged')
+      ice1_raw.Tsfc_converged = single(ice1_raw.Tsfc_converged);
+   end
+
+   % Convert the raw struct into the exact timetable shape retimed by
+   % POSTPROCESS.
+   time.TimeZone = 'UTC';
+   ice1_tt = struct2table(ice1_raw);
+   ice1_tt = table2timetable(ice1_tt, 'RowTimes', time);
+end
+
+function ice1_hourly = legacyHourlyMean(ice1_tt)
+   %LEGACYHOURLYMEAN Reproduce the timetable RETIME branch from POSTPROCESS.
+
+   % Match the legacy path exactly, including the leap-day removal.
+   ice1_hourly = retime(ice1_tt, 'hourly', 'mean');
+   ice1_hourly = ice1_hourly(~(month(ice1_hourly.Time) == 2 ...
+      & day(ice1_hourly.Time) == 29), :);
+end

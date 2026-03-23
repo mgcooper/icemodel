@@ -73,6 +73,15 @@ function opts = configureRun(opts)
          opts.vars2 = vars2;
       end
    end
+
+   % Configure debug diagnostic output when debug mode is enabled via
+   % resetopts(opts, 'debug', true). This derives a default debug output
+   % folder under ICEMODEL_OUTPUT_PATH/debug/... (paralleling the standard
+   % output path structure) and installs the per-kernel environment
+   % variables that the solver dump functions already check.
+   if isfield(opts, 'debug') && opts.debug
+      opts = configureDebugPaths(opts);
+   end
 end
 
 function [vars1, vars2] = defaultOutputVariables(opts)
@@ -119,5 +128,51 @@ function [vars1, vars2] = defaultOutputVariables(opts)
 
       otherwise
          error('unrecognized output profile: %s', profile)
+   end
+end
+
+function opts = configureDebugPaths(opts)
+   %CONFIGUREDEBUGPATHS Derive the debug output folder and install env vars.
+   %
+   % When opts.debug is true and opts.debug_path is empty, the default root
+   % is ICEMODEL_OUTPUT_PATH/debug/sitename/smbmodel[/testname], paralleling
+   % the standard output path structure. A user-supplied opts.debug_path
+   % overrides the entire root.
+   %
+   % The per-kernel ICEMODEL_DEBUG_*_FILE environment variables are set so
+   % the existing dump functions (dumpIceEnbalFailure, dumpMZTransformFailure,
+   % etc.) activate without manual env-var configuration.
+
+   if isfield(opts, 'debug_path') && ~isempty(opts.debug_path) ...
+         && ~isblanktext(string(opts.debug_path))
+      debug_root = opts.debug_path;
+   else
+      parts = {icemodel.getpath('output'), 'debug', opts.sitename, opts.smbmodel};
+      if isfield(opts, 'testname') && ~isempty(opts.testname) ...
+            && ~isblanktext(string(opts.testname))
+         parts{end+1} = opts.testname;
+      end
+      debug_root = fullfile(parts{:});
+   end
+
+   opts.debug_path = debug_root;
+
+   if exist(debug_root, 'dir') ~= 7
+      mkdir(debug_root);
+   end
+
+   % Install the per-kernel debug file paths. Each kernel checks its own
+   % env var and saves diagnostic state only when the var is non-empty.
+   debug_files = { ...
+      'ICEMODEL_DEBUG_ICEENBAL_FILE',    'debug_iceenbal.mat'; ...
+      'ICEMODEL_DEBUG_MZTRANSFORM_FILE', 'debug_mztransform.mat'; ...
+      'ICEMODEL_DEBUG_SEBSOLVE_FILE',    'debug_sebsolve.mat'; ...
+      'ICEMODEL_DEBUG_SKINSOLVE_FILE',   'debug_skinsolve.mat'; ...
+      'ICEMODEL_DEBUG_ICEEBSOLVE_FILE',  'debug_iceebsolve.mat'; ...
+      'ICEMODEL_DEBUG_SKINEBSOLVE_FILE', 'debug_skinebsolve.mat'; ...
+      'ICEMODEL_DEBUG_MAXSUBSTEP_FILE',  'debug_maxsubstep.mat'; ...
+      };
+   for k = 1:size(debug_files, 1)
+      setenv(debug_files{k, 1}, fullfile(debug_root, debug_files{k, 2}));
    end
 end

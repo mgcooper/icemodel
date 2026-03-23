@@ -1,42 +1,26 @@
-function [solar, Q0] = GETSOLAR(solar, nvalues, wavelength, dwavelen)
-   %GETSOLAR Interpolate the spectral solar radiation
+function [I0, solar, solar_dwavel] = GETSOLAR(solar_spectrum, wavel, dwavel)
+   %GETSOLAR Interpolate the reference solar spectrum to the model grid.
    %
-   % [solar, Q0] = GETSOLAR(solar, nvalues, wavelength, dwavelen)
-   % Interpolate the spectral solar radiation to the 118 bands of mie.dat, and
-   % then integrate it to compute Q0.
+   %  [I0, solar, solar_dwavel] = GETSOLAR(solar_spectrum, wavel, dwavel)
    %
-   % See also:
+   % solar_spectrum is a two-column array, the first column is wavelength, the
+   % second column is solar irradiance.
+   %
+   % The spectral model works with one fixed prototype solar spectrum. I0 is the
+   % corresponding integrated incoming shortwave over that prototype spectrum.
+   %
+   % The model ships optical properties (mie.dat) on a defined 118-band
+   % wavelength grid. The solar spectrum is interpolated to these bands here.
    %
    %#codegen
 
-   isolarvals = size(solar, 1);
-   wavel_tmp = solar(:, 1);
-   solar_tmp = solar(:, 2);
+   % Interpolate the tabulated solar spectrum onto the model wavelength grid.
+   solar = interp1(solar_spectrum(:, 1), solar_spectrum(:, 2), ...
+      wavel, 'linear');
+   solar = solar(:).';
 
-   % Generate a dummy downward solar spectrum using the above _tmp
-   % data strings, interpolating to the wavelengths of interest.
-   temp = nan(nvalues, 1);
-   for k = 1:nvalues
-      x = wavelength(1, k);
-      for i = 1:isolarvals-1
-         if (x > wavel_tmp(i))
-            icount = i;
-         end
-      end
-      x1 = wavel_tmp(icount);
-      x2 = wavel_tmp(icount+1);
-      y1 = solar_tmp(icount);
-      y2 = solar_tmp(icount+1);
-
-      temp(k) = y1 + (x - x1) * (y2 - y1) / (x2 - x1);
-   end
-
-   % mgc this is different than glen's code
-   solar = temp';
-
-   % Integrate the solar radiation.
-   Q0 = 0.0;
-   for k = 1:nvalues
-      Q0 = Q0 + solar(k) * dwavelen(k);
-   end
+   % Integrate the interpolated spectrum with the configured quadrature
+   % weights to recover the total incoming prototype flux.
+   solar_dwavel = solar .* dwavel;
+   I0 = sum(solar_dwavel);
 end

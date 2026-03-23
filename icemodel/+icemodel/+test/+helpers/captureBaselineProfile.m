@@ -68,8 +68,9 @@ function profilePerfBuild(cases)
    %PROFILEPERFBUILD Re-run the managed perf cases under MATLAB profiling.
 
    for icase = 1:height(cases)
-      opts_run = icemodel.test.helpers.setModelOptsForCase( ...
-         cases(icase, :), include_spinup=false);
+      fprintf('Profiling perf case %d/%d: %s\n', ...
+         icase, height(cases), cases.case_id(icase))
+      opts_run = icemodel.test.helpers.setModelOptsForCase(cases(icase, :));
       icemodel.test.helpers.runSmbModel(opts_run);
    end
 end
@@ -81,6 +82,8 @@ function profileRegressionBuild(cases)
 
    for icase = 1:height(cases)
       c = cases(icase, :);
+      fprintf('Profiling regression case %d/%d: %s\n', ...
+         icase, height(cases), c.case_id)
       opts_run = icemodel.test.helpers.setModelOptsForCase(c);
       [ice1, ice2] = icemodel.test.helpers.runSmbModel(opts_run);
       [ice1, ~] = icemodel.postprocess( ...

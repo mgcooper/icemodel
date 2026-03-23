@@ -17,16 +17,15 @@ function test_cvmesh_uniform_and_exponential_layout(testCase)
    testCase.verifyGreaterThan(dz_e(end), dz_e(1));
 end
 
-function test_gridforward_and_gridinverse_transform_shapes(testCase)
-   % The spectral grid forward/inverse helpers should preserve the expected
-   % vector sizes on simple controlled inputs.
+function test_interp1_nearest_preserves_expected_spectral_remap(testCase)
+   % The spectral density remap now uses direct nearest-neighbor interp1, so
+   % verify the expected shape and values on a compact controlled example.
 
-   ro_sno = GRIDFORWARD([300; 400; 500], [0.2; 0.6; 1.0], [0.1; 0.5; 0.9]);
-   dQp = GRIDINVERSE([10; 9; 8; 7], 0.5, 1.0, 4, 2);
+   ro_sno = interp1([0.2; 0.6; 1.0], [300; 400; 500], [0.1; 0.5; 0.9], ...
+      'nearest', 'extrap');
 
    testCase.verifyEqual(numel(ro_sno), 3);
    testCase.verifyEqual(ro_sno, [300; 400; 500]);
-   testCase.verifyEqual(dQp, [2; 2], 'AbsTol', 1e-12);
 end
 
 function test_layerinds_selects_expected_merge_neighbors(testCase)
@@ -104,9 +103,9 @@ function test_nextstep_adapts_substep_divisor(testCase)
    % NEXTSTEP should shrink or grow the substep divisor based on the recent
    % convergence history and hard failures.
 
-   [~, substep_fast, dt_fast] = NEXTSTEP(1, 3, 300, 900, 9, true, 0, 1);
-   [~, substep_slow, dt_slow] = NEXTSTEP(1, 3, 300, 900, 9, true, 2, 15);
-   [~, substep_fail, dt_fail] = NEXTSTEP(1, 3, 300, 900, 9, false, 0, 0);
+   [~, substep_fast, dt_fast] = NEXTSTEP(1, 3, 900, 9, true, 0, 1);
+   [~, substep_slow, dt_slow] = NEXTSTEP(1, 3, 900, 9, true, 2, 15);
+   [~, substep_fail, dt_fail] = NEXTSTEP(1, 3, 900, 9, false, 0, 0);
 
    testCase.verifyLessThan(substep_fast, 3);
    testCase.verifyGreaterThan(substep_slow, 3);
@@ -161,4 +160,24 @@ function test_checksubstep_forces_advance_at_maxsubstep(testCase)
    testCase.verifyEqual(n_subfail, 2);
    testCase.verifyEqual(substep, 2);
    testCase.verifyEqual(dt_new, 450, 'AbsTol', 1e-12);
+end
+
+function test_checksubstep_clamps_overshot_failure_count(testCase)
+   % Even if a caller enters CHECKSUBSTEP with an already-overshot failure
+   % count, the timestep controller should clamp to the accepted dt_min state
+   % and force advance instead of stalling forever at dt_min.
+
+   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok] = CHECKSUBSTEP( ...
+      270, [269; 268], [0.9; 0.9], [0.01; 0.01], 271, [270; 269], ...
+      [0.8; 0.8], [0.02; 0.02], 917, 1000, 150, 450, 900, 1, 10, 10, 10, ...
+      10, false, eps, false);
+
+   testCase.verifyTrue(ok);
+   testCase.verifyEqual(Ts, 271);
+   testCase.verifyEqual(T, [270; 269]);
+   testCase.verifyEqual(f_ice, [0.8; 0.8]);
+   testCase.verifyEqual(f_liq, [0.02; 0.02]);
+   testCase.verifyEqual(n_subfail, 10);
+   testCase.verifyEqual(substep, 10);
+   testCase.verifyEqual(dt_new, 90, 'AbsTol', 1e-12);
 end

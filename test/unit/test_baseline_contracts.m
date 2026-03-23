@@ -146,6 +146,21 @@ function test_resolveRequestedSmbmodels_preserves_single_model_selector(testCase
    testCase.verifyEqual(models(:), "skinmodel");
 end
 
+function test_setModelOptsForCase_defaults_to_two_year_contract(testCase)
+   % Formal single-year case definitions should expand to one spinup year
+   % plus the retained comparison year.
+
+   c = struct('smbmodel', "icemodel", 'sitename', "kanm", ...
+      'forcings', "kanm", 'userdata', "", 'uservars', "", ...
+      'simyear', 2016, 'solver', 2);
+
+   opts = icemodel.test.helpers.setModelOptsForCase(c);
+
+   testCase.verifyEqual(opts.simyears, [2015 2016]);
+   testCase.verifyEqual(opts.n_spinup_years, 1);
+   testCase.verifyEqual(opts.output_years, 2016);
+end
+
 function test_bootstrapTestEnvironment_restores_caller_config(testCase)
    % The suite bootstrap should install the canonical demo config for the
    % run, then restore the caller's previous config on cleanup.
@@ -167,6 +182,30 @@ function test_bootstrapTestEnvironment_restores_caller_config(testCase)
       string(custom_output));
 
    clear restore_output
+end
+
+function test_loadPerfBaseline_returns_saved_metadata(testCase)
+   % Perf baseline loads should expose the saved build metadata so runners can
+   % decide whether whole-model wall-time comparison is fair.
+
+   filepath = [tempname '.mat'];
+   cleanup = onCleanup(@() deleteIfExists(filepath));
+
+   PerfBaseline = table( ...
+      "icemodel_kanm_2016_solver2", ...
+      12.3, ...
+      'VariableNames', {'case_id', 'median_wall_s'});
+   meta = struct('matlab_version', "24.2.0 (R2024b)", 'host', "MACA64");
+   save(filepath, 'PerfBaseline', 'meta');
+
+   [loaded, loaded_meta] = icemodel.test.helpers.loadPerfBaseline( ...
+      2016, "rolling", "icemodel", filepath);
+
+   testCase.verifyEqual(loaded.case_id, "icemodel_kanm_2016_solver2");
+   testCase.verifyEqual(loaded_meta.matlab_version, "24.2.0 (R2024b)");
+   testCase.verifyEqual(loaded_meta.host, "MACA64");
+
+   clear cleanup
 end
 
 function deleteIfExists(filepath)

@@ -29,9 +29,9 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    met = icemodel.loadmet(opts);
 
    % Initialize the column state exactly as the model kernel would.
-   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, ...
-      JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, f_ice_min, ...
-      f_liq_res, ro_iwe, ro_wie] = ICEINIT(opts, met.tair);
+   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, roL, ...
+      liqflag, Ts, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, ...
+      f_ice_min, f_liq_res, ro_iwe, ro_wie] = ICEINIT(opts, met.tair);
 
    metstep = kwargs.metstep;
    % Extract one forcing step and the corresponding transfer coefficients.
@@ -74,6 +74,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    state.fn = fn;
    state.dz = dz;
    state.delz = delz;
+   state.z_nodes = z_nodes;
    state.Ts = Ts;
    state.JJ = JJ;
    state.Sc = Sc;
@@ -138,11 +139,29 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
 
    % Attach the spectral grid only for tests that exercise that path.
    if kwargs.include_spectral
-      [Q0, dz_spect, spect_N, spect_S, solardwavl] = EXTCOEFSINIT(opts, ro_ice);
-      state.Q0 = Q0;
+      [I0, dz_spect, z_nodes_spect, z_edges_spect, tau_N, ...
+         tau_S, solar_dwavel, ~, qext, g, coalbedo, kabs, kice, ...
+         wavel, radii] = EXTCOEFSINIT(opts, ro_ice);
+
+      % Recover k_ext for tests that need the initialized coefficients.
+      [~, ~, ~, k_ext] = UPDATEEXTCOEFS(qext, g, coalbedo, kabs, kice, ...
+         wavel, radii, opts.i_grainradius, z_edges_spect, dz_spect, ...
+         solar_dwavel, ro_ice, false);
+
+      state.I0 = I0;
       state.dz_spect = dz_spect;
-      state.spect_N = spect_N;
-      state.spect_S = spect_S;
-      state.solardwavl = solardwavl;
+      state.z_nodes_spect = z_nodes_spect;
+      state.z_edges_spect = z_edges_spect;
+      state.tau_N = tau_N;
+      state.tau_S = tau_S;
+      state.solar_dwavel = solar_dwavel;
+      state.qext = qext;
+      state.g = g;
+      state.coalbedo = coalbedo;
+      state.radii = radii;
+      state.wavel = wavel;
+      state.k_ext = k_ext;
+      state.kice = kice;
+      state.kabs = kabs;
    end
 end

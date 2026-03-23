@@ -74,11 +74,12 @@ function varargout = postprocess(ice1, ice2, opts, varargin)
    ice1 = struct2table(ice1);
    ice1 = table2timetable(ice1, 'RowTimes', time);
 
-   % Retime 15 min data to hourly, removing Feb 29 values inserted by "retime".
+   % Retime 15 min data to hourly using the fixed-step reshape helper.
+   % opts.dt == 900 guarantees the cadence; the helper only needs the sample
+   % count to be divisible by 4 and the first sample aligned to the hour.
    if opts.dt == 900
-      ice1 = retime(ice1, 'hourly', 'mean');
+      ice1 = icemodel.retimeHourlyFixedStep(ice1);
       [ice1, ice2] = retimeLogical(ice1, ice2);
-      ice1 = ice1(~(month(ice1.Time) == 2 & day(ice1.Time) == 29), :);
       ice2 = retimeIce2(ice2, ice1.Time);
    end
 
@@ -139,6 +140,8 @@ function [ice1, ice2] = subsetOutput(ice1, ice2, ii)
       end
    end
 end
+
+%%
 
 %%
 function ice2 = retimeIce2(ice2, Time)

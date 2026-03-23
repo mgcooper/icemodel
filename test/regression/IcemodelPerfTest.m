@@ -38,8 +38,7 @@ function opts = buildCaseOpts()
    %BUILDCASEOPTS Resolve one formal perf case from environment variables.
 
    % Read one perf case definition from environment variables and resolve it
-   % through the formal case builder. Perf opts always exclude spinup years so
-   % the timed region reflects only the analyzed output years.
+   % through the shared formal case builder.
    smbmodel = getenvRequired('ICEMODEL_TEST_SMBMODEL');
    sitename = getenvRequired('ICEMODEL_TEST_SITENAME');
    forcings = getenvRequired('ICEMODEL_TEST_FORCINGS');
@@ -49,7 +48,6 @@ function opts = buildCaseOpts()
    simyears = getenv('ICEMODEL_TEST_SIMYEARS');
    n_spinup_years = str2double(getenvRequired('ICEMODEL_TEST_N_SPINUP_YEARS'));
    solver = str2double(getenvRequired('ICEMODEL_TEST_SOLVER'));
-
    % Rebuild the formal case struct and hand it to the shared opts helper.
    c = struct('smbmodel', string(smbmodel), 'sitename', string(sitename), ...
       'forcings', string(forcings), 'userdata', string(userdata), ...
@@ -59,7 +57,7 @@ function opts = buildCaseOpts()
       c.simyears = parseSimyears(simyears);
       c.n_spinup_years = n_spinup_years;
    end
-   opts = icemodel.test.helpers.setModelOptsForCase(c, include_spinup=false);
+   opts = icemodel.test.helpers.setModelOptsForCase(c);
 end
 
 function s = getenvRequired(name)
