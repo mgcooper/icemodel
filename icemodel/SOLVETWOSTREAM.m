@@ -1,69 +1,79 @@
-function xynet = SOLVETWOSTREAM(a,r,bulkcoefs,total_solar,albedo,z_walls)
-   %SOLVETWOSTREAM Solve the two-stream model following Schlatter, 1972 method
+function [up, dn, xynet] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
+   %SOLVETWOSTREAM Solve Schlatter's two-stream system.
+   %
+   %  [up, dn] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
+   %  [up, dn, xynet] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
+   %
+   % The notation here stays close to Schlatter's formulation. The solved
+   % quantity is the radiative transfer state on the staggered spectral grid,
+   % while XYnet (returned as optional XYNET) is the derived net-flux profile.
    %
    %#codegen
 
-   % notation here roughly follows Schlatter
-   M = length(z_walls)-1;
-   xmu = bulkcoefs;
+   % Notation here roughly follows Schlatter.
+   M = numel(z_edges) - 1;
 
-   %  e = A_sub = sub diagonal
-   %  f = A_main = main diagonal
-   %  g = A_super = super diagonal
-   %  b = b_vector = right hand side
-   %  x = rad = solution
+   % Compute the absorption and reflection coefficients at each interface.
+   a = ((1.0 - albedo) / (1.0 + albedo)) * k_bulk;
+   r = (2.0 * albedo / (1.0 - albedo ^ 2)) * k_bulk;
 
-   % extend y_wall downward by one c.v.
-   dz_bottom = z_walls(M+1) - z_walls(M);
-   z_walls(M+2) = z_walls(M+1) + dz_bottom;
+   % e = A_sub = sub diagonal
+   % f = A_main = main diagonal
+   % g = A_super = super diagonal
+   % b = b_vector = right hand side
+   % x = rad = solution
 
-   % since bulk_extcoefs were computed with y_wall, do the same here
-   deltaz = z_walls(2) - z_walls(1);
+   % Extend the spectral edge coordinates downward by one control volume so the
+   % lower boundary matches the padded bulk-extinction coefficients.
+   dz_bottom = z_edges(M + 1) - z_edges(M);
+   z_edges(M + 2) = z_edges(M + 1) + dz_bottom;
 
-   % initialize the matrix
-   e = zeros(M+1,1);
-   f = zeros(M+1,1);
-   g = zeros(M+1,1);
-   b = zeros(M+1,1);
+   % BULKEXTCOEFS is parameterized on the spectral cell thickness, so use the
+   % same top-edge spacing in the upper boundary condition.
+   deltaz = z_edges(2) - z_edges(1);
 
-   % Account for the upper boundary condition
-   alfa = 1.0/(a(1)+r(1));
+   % Initialize the tridiagonal system.
+   e = zeros(M + 1, 1);
+   f = zeros(M + 1, 1);
+   g = zeros(M + 1, 1);
+   b = zeros(M + 1, 1);
+
+   % Account for the upper boundary condition.
+   alfa = 1.0 / (a(1) + r(1));
    e(1) = 0.0;
    f(1) = 1.0;
-   g(1) = -alfa/(deltaz+alfa);
-   b(1) = r(1)*total_solar*deltaz * alfa/(deltaz+alfa);
+   g(1) = -alfa / (deltaz + alfa);
+   b(1) = r(1) * I0 * deltaz * alfa / (deltaz + alfa);
 
-   % Fill the vectors between the boundaries
-   deltaz = z_walls(3:M+2)-z_walls(2:M+1);
-   % tmp1 = deltaz ./ (2.0 .* r(2:M+1));
-   % tmp2 = a(2:M+1) .* (r(3:M+2) - r(1:M));
-   % tmp3 = r(2:M+1) .* (a(3:M+2) - a(1:M));
-   % tmp4 = (2.0 + deltaz.^2 .* xmu(2:M+1).^2);
-   e(2:M+1) = 1.0 + (r(3:M+2) - r(1:M)) ./ (4.0.*r(2:M+1));
-   % f(2:M+1) = tmp1 .* (tmp2 - tmp3) - tmp4;
-   g(2:M+1) = 1.0 - (r(3:M+2) - r(1:M)) ./ (4.0*r(2:M+1));
-   b(2:M+1) = 0.0;
+   % Fill the system between the boundaries.
+   deltaz = z_edges(3:M + 2) - z_edges(2:M + 1);
+   e(2:M + 1) = 1.0 + (r(3:M + 2) - r(1:M)) ./ (4.0 * r(2:M + 1));
+   g(2:M + 1) = 1.0 - (r(3:M + 2) - r(1:M)) ./ (4.0 * r(2:M + 1));
+   b(2:M + 1) = 0.0;
+   f(2:M + 1) = deltaz ./ (2.0 * r(2:M + 1)) .* ...
+      (a(2:M + 1) .* (r(3:M + 2) - r(1:M)) ...
+      - r(2:M + 1) .* (a(3:M + 2) - a(1:M))) ...
+      - (2.0 + deltaz .^ 2 .* k_bulk(2:M + 1) .^ 2);
 
-   % see if this speeds it up
-   f(2:M+1) = deltaz./(2.0.*r(2:M+1)).*(a(2:M+1).*(r(3:M+2)-r(1:M))-...
-      r(2:M+1).*(a(3:M+2)-a(1:M)))-(2.0+deltaz.^2.*xmu(2:M+1).^2);
+   % Account for the lower boundary condition.
+   g(M + 1) = 0.0;
+   b(M + 1) = 0.0;
 
-   % Account for the lower boundary condition
-   g(M+1) = 0.0;
-   b(M+1) = 0.0;
+   % Solve the tridiagonal system.
+   x = TRISOLVE(e, f, g, b);
 
-   % Solve the equation
-   x = TRISOLVE(e,f,g,b);
+   % Reconstruct the up/down fluxes.
+   [up, dn] = GETUPDOWN(a, r, x, I0, z_edges, M);
 
-   % Add the boundary conditions to up and reconstruct down.
-   [up,down] = GETUPDOWN(a,r,x,total_solar,z_walls,M);
+   % Optionally return Schlatter's XYnet profile using the same interface
+   % indexing as the direct two-stream formulation.
+   if nargout > 2
+      xynet = (up(2:M) + up(3:M + 1)) / 2.0 - (dn(2:M) + dn(3:M + 1)) / 2.0;
+      xynet = [up(1) - dn(1); xynet];
 
-   % Build an array of source-term values on the c.v. boundaries.
-   xynet = (up(2:M)+up(3:M+1))./2.0-(down(2:M)+down(3:M+1))./2.0;
-   xynet = vertcat(up(1)-down(1), xynet);
-
-   % Ensure xynet(1) is equal to the total absorbed radiation. This corrects
-   %   for any (very) small errors in the two-stream model, typically due to a
-   %   spectral grid that is too shallow to absorb all the radiation
-   xynet(1) = min(-total_solar*(1-albedo),xynet(1));
+      % Ensure the surface value matches the total absorbed shortwave. This
+      % corrects any very small residual from a spectral grid that is too
+      % shallow to absorb all of the incoming radiation.
+      xynet(1) = min(-I0 * (1 - albedo), xynet(1));
+   end
 end

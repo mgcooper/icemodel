@@ -8,78 +8,57 @@ function opts = configureRun(opts)
    % PATHINPUT, PATHOUTPUT, CASENAME, METFNAME, VARS1, and VARS2.
 
    if ~isfield(opts, 'pathdata') || isempty(opts.pathdata)
-      opts.pathdata = getenv('ICEMODEL_DATA_PATH');
+      opts.pathdata = icemodel.getpath('data');
    end
 
+   % OUTPUT_YEARS are the post-spinup years retained in saved/postprocessed
+   % output. Keep them derived from SIMYEARS and N_SPINUP_YEARS.
+   opts.output_years = icemodel.outputYears(opts);
+
    if ~isfield(opts, 'pathinput') || isempty(opts.pathinput)
-      opts.pathinput = getenv('ICEMODEL_INPUT_PATH');
+      opts.pathinput = icemodel.getpath('input');
    end
    assert(exist(opts.pathinput, 'dir') == 7, ...
       'ICEMODEL_INPUT_PATH does not exist, set it using icemodel.config');
 
    if ~isfield(opts, 'patheval') || isempty(opts.patheval)
-      opts.patheval = getenv('ICEMODEL_EVAL_PATH');
+      opts.patheval = icemodel.getpath('eval');
    end
 
    if ~isfield(opts, 'pathuserdata') || isempty(opts.pathuserdata)
-      opts.pathuserdata = getenv('ICEMODEL_USERDATA_PATH');
-      if isempty(opts.pathuserdata)
-         opts.pathuserdata = fullfile(opts.pathinput, 'userdata');
-      end
+      opts.pathuserdata = icemodel.getpath('userdata');
    end
 
    % WRITEOUTPUT appends ['ice1_' opts.casename '.mat'] and saves the file in
    % a subfolder of opts.pathoutput for each year e.g. opts.pathoutput/2016.
    %
-   % For gridded sector runs, opts.casename is set to the grid point ID
-   % outside this function in a loop (icemodel.run.grid in the runoff project),
-   % to get ice1_1.mat, ice1_2.mat, and so forth. Same for metfname. Writing to
-   % netcdf should eliminate this.
-   %
-   % Also note that for gridded sector runs, "userdata" is appended to the
-   % output folder. This is a legacy method: sector output filenames use the
-   % grid-cell number rather than the forcing/userdata/uservars naming used for
-   % point runs, so the swap case is distinguished at the folder level:
-   %    ICEMODEL_OUTPUT_PATH/sector/icemodel/mar
-   %    ICEMODEL_OUTPUT_PATH/sector/icemodel/modis
-   % In practice these sector runs used MAR forcing in both cases, with the
-   % second folder indicating the modis-albedo swap.
+   % For grid runs, opts.casename and opts.metfname are set outside this
+   % function in the wrapper that loops over grid-cell IDs. Core icemodel only
+   % provides the canonical base output folder; any legacy extra subfoldering
+   % for gridded workflows belongs in the wrapper, not here.
    if ~isfield(opts, 'pathoutput') || isempty(opts.pathoutput)
-      opts.pathoutput = fullfile( ...
-         getenv('ICEMODEL_OUTPUT_PATH'), opts.sitename, opts.smbmodel);
-      if strcmp(opts.sitename, 'sector')
-         opts.pathoutput = fullfile(opts.pathoutput, opts.userdata);
-      end
-      opts.pathoutput = fullfile(opts.pathoutput, opts.testname);
+      opts.pathoutput = icemodel.getpath('output', ...
+         opts.sitename, opts.smbmodel, '', [], opts.testname);
+   end
+
+   if ~isfield(opts, 'pathrestart') || isempty(opts.pathrestart)
+      opts.pathrestart = icemodel.getpath('restart', ...
+         opts.sitename, opts.smbmodel, opts.userdata, [], opts.testname);
    end
 
    % Create the casename. WRITEOUTPUT appends this to the base filenames.
-   % Note that for gridded runs, casename is modified to represent the grid
-   % number, see icemodel.run.grid in the runoff project.
+   % For grid runs, the wrapper overwrites this with the grid-cell ID.
    if ~isfield(opts, 'casename') || isempty(opts.casename)
       opts.casename = icemodel.setcase(opts.forcings, opts.userdata, opts.uservars);
    end
 
    if ~isfield(opts, 'output_profile') || isempty(opts.output_profile)
-      if strcmp(opts.sitename, 'sector')
-         opts.output_profile = 'minimal';
-      else
-         opts.output_profile = 'standard';
-      end
+      opts.output_profile = 'standard';
    end
 
    if ~isfield(opts, 'metfname') || isempty(opts.metfname)
-      if strcmp(opts.sitename, 'sector')
-         % Could add logic here to deal with sector file names. For now, the
-         % metfname must be set outside this function in a loop.
-         % for n = 1:numel(runpoints)
-         %    opts.metfname = 'met_sector.mat';
-         % end
-         opts.metfname = {};
-      else
-         opts.metfname = fullfile(opts.pathinput, 'met', ...
-            icemodel.createMetFileNames(opts));
-      end
+      opts.metfname = fullfile(opts.pathinput, 'met', ...
+         icemodel.createMetFileNames(opts));
    elseif ischar(opts.metfname) || isstring(opts.metfname)
       opts.metfname = cellstr(opts.metfname);
    end
@@ -93,6 +72,15 @@ function opts = configureRun(opts)
       if ~isfield(opts, 'vars2') || isempty(opts.vars2)
          opts.vars2 = vars2;
       end
+   end
+
+   % Configure debug diagnostic output when debug mode is enabled via
+   % resetopts(opts, 'debug', true). This derives a default debug output
+   % folder under ICEMODEL_OUTPUT_PATH/debug/... (paralleling the standard
+   % output path structure) and installs the per-kernel environment
+   % variables that the solver dump functions already check.
+   if isfield(opts, 'debug') && opts.debug
+      opts = configureDebugPaths(opts);
    end
 end
 
@@ -108,11 +96,12 @@ function [vars1, vars2] = defaultOutputVariables(opts)
    % which the data are stored in the cell arrays passed to SAVEOUTPUT from the
    % model main functions.
    %
-   % 2) If new variables are added, POSTPROC must be reviewed to ensure correct
+   % 2) If new variables are added, icemodel.postprocess must be reviewed to
+   % ensure correct
    % processing is applied, including rounding precision.
 
    profile = string(opts.output_profile);
-   if lower(profile) == "sector"
+   if any(lower(profile) == ["sector", "grid"])
       profile = "minimal";
    end
 
@@ -139,5 +128,51 @@ function [vars1, vars2] = defaultOutputVariables(opts)
 
       otherwise
          error('unrecognized output profile: %s', profile)
+   end
+end
+
+function opts = configureDebugPaths(opts)
+   %CONFIGUREDEBUGPATHS Derive the debug output folder and install env vars.
+   %
+   % When opts.debug is true and opts.debug_path is empty, the default root
+   % is ICEMODEL_OUTPUT_PATH/debug/sitename/smbmodel[/testname], paralleling
+   % the standard output path structure. A user-supplied opts.debug_path
+   % overrides the entire root.
+   %
+   % The per-kernel ICEMODEL_DEBUG_*_FILE environment variables are set so
+   % the existing dump functions (dumpIceEnbalFailure, dumpMZTransformFailure,
+   % etc.) activate without manual env-var configuration.
+
+   if isfield(opts, 'debug_path') && ~isempty(opts.debug_path) ...
+         && ~isblanktext(string(opts.debug_path))
+      debug_root = opts.debug_path;
+   else
+      parts = {icemodel.getpath('output'), 'debug', opts.sitename, opts.smbmodel};
+      if isfield(opts, 'testname') && ~isempty(opts.testname) ...
+            && ~isblanktext(string(opts.testname))
+         parts{end+1} = opts.testname;
+      end
+      debug_root = fullfile(parts{:});
+   end
+
+   opts.debug_path = debug_root;
+
+   if exist(debug_root, 'dir') ~= 7
+      mkdir(debug_root);
+   end
+
+   % Install the per-kernel debug file paths. Each kernel checks its own
+   % env var and saves diagnostic state only when the var is non-empty.
+   debug_files = { ...
+      'ICEMODEL_DEBUG_ICEENBAL_FILE',    'debug_iceenbal.mat'; ...
+      'ICEMODEL_DEBUG_MZTRANSFORM_FILE', 'debug_mztransform.mat'; ...
+      'ICEMODEL_DEBUG_SEBSOLVE_FILE',    'debug_sebsolve.mat'; ...
+      'ICEMODEL_DEBUG_SKINSOLVE_FILE',   'debug_skinsolve.mat'; ...
+      'ICEMODEL_DEBUG_ICEEBSOLVE_FILE',  'debug_iceebsolve.mat'; ...
+      'ICEMODEL_DEBUG_SKINEBSOLVE_FILE', 'debug_skinebsolve.mat'; ...
+      'ICEMODEL_DEBUG_MAXSUBSTEP_FILE',  'debug_maxsubstep.mat'; ...
+      };
+   for k = 1:size(debug_files, 1)
+      setenv(debug_files{k, 1}, fullfile(debug_root, debug_files{k, 2}));
    end
 end

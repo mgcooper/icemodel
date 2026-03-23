@@ -1,15 +1,14 @@
-function [metstep, substep, dt_new] = NEXTSTEP(metstep, substep, ...
-      dt_new, dt_max, maxsubstep, ok, n_subfail, n_iters)
+function [metstep, substep, dt_new] = NEXTSTEP(metstep, substep, dt_max, ...
+      maxsubstep, ok, n_subfail, n_iters)
    %NEXTSTEP Advance forcing index and adapt substep size for next full step.
    %
    % Syntax:
-   % [metstep, substep, dt_new] = NEXTSTEP(metstep, substep, dt_new, ...
+   % [metstep, substep, dt_new] = NEXTSTEP(metstep, substep, ...
    %    dt_max, maxsubstep, ok, n_subfail, n_iters)
    %
    % Inputs:
    % metstep    - current forcing step index
    % substep    - current substep divisor (dt_new = dt_max / substep)
-   % dt_new     - current substep length
    % dt_max     - full forcing-step length
    % maxsubstep - max allowed substep divisor (sets dt_min)
    % ok         - full-step success flag
@@ -43,7 +42,7 @@ function [metstep, substep, dt_new] = NEXTSTEP(metstep, substep, ...
 
    % Start a short cooldown window after any failed substep/full-step fail
    % so dt does not re-grow immediately after a difficult step.
-   if not(ok) || n_subfail > 0
+   if ~ok || n_subfail > 0
       cooldown = 2;
    end
 

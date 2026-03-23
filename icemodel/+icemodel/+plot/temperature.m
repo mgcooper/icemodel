@@ -1,16 +1,18 @@
-function temperature(T, dz)
+function temperature(T, dz, z_nodes)
    %ICEMODEL.PLOT.TEMPERATURE
    %
    % Inputs
    %  T - vector of temperatures
    %  dz - vector of cv thicknesses
-   %
-   % need this in a function, and an anonymous one to create z_therm:
+   %  z_nodes - optional precomputed thermal node coordinates
 
-   znodes = @(dz) cumsum(dz) - dz / 2;
+   % Reuse the caller-provided thermal node coordinates when available.
+   if nargin < 3 || isempty(z_nodes)
+      z_nodes = cumsum(dz) - dz / 2;
+   end
 
    figure;
-   plot(T, znodes(dz)); set(gca, 'YDir', 'Reverse')
+   plot(T, z_nodes); set(gca, 'YDir', 'Reverse')
    xlabel('Temperature [K]')
    ylabel('Depth [m]')
 

@@ -50,7 +50,7 @@ function [es, des_dT, T_dew] = VAPPRESS(T, Tf, liqflag, rh)
       liqflag = false;
    end
 
-   if liqflag == true % || T >= Tf
+   if liqflag == true
       es = saturationVaporPressure(T, Tf, aw, bw, cw);
 
       % If requested, compute the derivative of es wrt temperature
@@ -68,7 +68,7 @@ function [es, des_dT, T_dew] = VAPPRESS(T, Tf, liqflag, rh)
 
    % If requested, compute dew point from relative humidity
    if nargout == 3
-      if liqflag == true % || T >= Tf
+      if liqflag == true
          T_dew = dewPointTemperature(es * rh / 100, Tf, aw, bw, cw);
       else
          T_dew = dewPointTemperature(es * rh / 100, Tf, ai, bi, ci);

@@ -1,5 +1,11 @@
-function [radii,mie,solar,kabs,kice] = SPECINIT(opts)
-   %SPECINIT initialize the spectral coefficients
+function [radii, mie, solar_spectrum, kabs, kice] = SPECINIT(opts)
+   %SPECINIT Legacy one-shot loader for spectral input tables.
+   %
+   %  [radii, mie, solar_spectrum, kabs, kice] = SPECINIT(opts)
+   %
+   % The active spectral init path now uses GETSCATTERCOEFS, GETSOLAR, and
+   % EXTCOEFSINIT directly. Keep this helper for ad hoc inspection of the raw
+   % spectral input tables.
    %
    %#codegen
 
@@ -17,8 +23,8 @@ function [radii,mie,solar,kabs,kice] = SPECINIT(opts)
    mie = mie.mie;
 
    % load the proto-typical spectral irradiance profile
-   solar = load(fullfile(opts.pathinput,'spectral','solar.mat'),'solar');
-   solar = solar.solar;
+   solar_spectrum = load(fullfile(opts.pathinput,'spectral','solar.mat'),'solar');
+   solar_spectrum = solar_spectrum.solar;
 
    % load the user-defined kabs/kice if provided
    if opts.kabs_user == true

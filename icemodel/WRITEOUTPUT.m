@@ -7,7 +7,8 @@ function WRITEOUTPUT(ice1, ice2, opts, thisyear, time, swd, lwd, albedo)
    if opts.saveflag
 
       % Post process.
-      [ice1, ice2] = POSTPROC(ice1, ice2, opts, swd, lwd, albedo, time);
+      [ice1, ice2] = icemodel.postprocess( ...
+         ice1, ice2, opts, swd, lwd, albedo, time);
 
       % Set the output path for this year.
       filepath = fullfile(opts.pathoutput, int2str(opts.simyears(thisyear)));

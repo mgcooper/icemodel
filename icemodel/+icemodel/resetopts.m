@@ -75,6 +75,19 @@ function opts = resetopts(opts, varargin)
       opts.pathoutput = [];
    end
 
+   if ismember('pathoutput', names) && ~ismember('pathrestart', names)
+      opts.pathrestart = [];
+   end
+
+   % Clear the derived debug path when its source fields change, so
+   % configureRun will rebuild it from the updated output root.
+   if any(ismember(names, {'pathdata', 'pathoutput', 'sitename', 'smbmodel', ...
+         'testname', 'debug'})) ...
+         && ~ismember('debug_path', names) ...
+         && isfield(opts, 'debug_path')
+      opts.debug_path = '';
+   end
+
    if ismember('pathinput', names) && ~ismember('pathuserdata', names)
       opts.pathuserdata = [];
    end
@@ -89,8 +102,10 @@ function opts = resetopts(opts, varargin)
       opts.metfname = {};
    end
 
+   opts.output_years = icemodel.outputYears(opts);
+
    if any(ismember(names, {'sitename'})) && ~ismember('output_profile', names)
-      opts.output_profile = [];
+      opts.output_profile = 'standard';
    end
 
    if any(ismember(names, {'sitename', 'smbmodel', 'output_profile'})) ...

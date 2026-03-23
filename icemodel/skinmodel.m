@@ -1,14 +1,17 @@
-function [ice1, ice2] = skinmodel(opts)
+function [ice1, ice2, opts] = skinmodel(opts)
    %SKINMODEL Surface energy balance model for glacier ice.
    %
+   % [ice1, ice2] = SKINMODEL(opts)
+   % [ice1, ice2, opts] = SKINMODEL(opts)
    %
+   % OPTS is returned so callers can inspect the finalized runtime
+   % configuration after icemodel.configureRun() has resolved derived fields.
    % See also: icemodel, icemodel.setopts
    %
    %#codegen
 
    %% INITIALIZE THE MODEL
 
-   debug = true;
    assertF off
    opts = icemodel.configureRun(opts);
    opts = icemodel.prepareRunOutput(opts);
@@ -23,15 +26,19 @@ function [ice1, ice2] = skinmodel(opts)
 
    % LOAD THE FORCING DATA
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
-      = METINIT(opts, 1);
+      = METINIT(opts);
 
    % INITIALIZE THE THERMAL MODEL
-   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, JJ] ...
-      = ICEINIT(opts, tair);
+   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, ~, roL, liqflag, ...
+      Ts, JJ] = ICEINIT(opts, tair);
 
    % INITIALIZE TIMESTEPPING
    [metstep, substep, numsteps, maxsubstep, dt, dt_FULL_STEP, ...
       numyears, numspinup] = INITTIMESTEPS(opts, time);
+   if ~opts.saveflag && numyears - numspinup > 1
+      ice1_all = [];
+      ice2_all = [];
+   end
 
    % INITIALIZE PAST VALUES
    [xTs, xT, xf_ice, xf_liq] = RESETSUBSTEP(Ts, T, f_ice, f_liq);
@@ -39,7 +46,7 @@ function [ice1, ice2] = skinmodel(opts)
    % UNPACK SOLVER OPTS
    [solver, seb_solver, cpl_maxiter, cpl_Ts_tol, cpl_seb_tol, ...
       cpl_alpha, cpl_aitken, cpl_jumpmax, maxiter, tol, alpha, ...
-      use_aitken, jumpmax] = icemodel.getopts(opts, ...
+      ~, ~] = icemodel.getopts(opts, ...
       'solver', 'seb_solver', 'cpl_maxiter', 'cpl_Ts_tol', ...
       'cpl_seb_tol', 'cpl_alpha', 'cpl_aitken', 'cpl_jumpmax', ...
       'maxiter', 'tol', 'alpha', 'use_aitken', 'jumpmax');
@@ -65,13 +72,13 @@ function [ice1, ice2] = skinmodel(opts)
                ppt(metstep), tppt(metstep), psfc(metstep), De(metstep), ...
                ea, cv_air, emiss, SB, chi, roL, scoef, liqflag, seb_solver, ...
                tol, maxiter, alpha, cpl_maxiter, cpl_Ts_tol, cpl_seb_tol, ...
-               cpl_alpha, cpl_aitken, cpl_jumpmax);
+               cpl_alpha, cpl_aitken, cpl_jumpmax, opts.debug);
 
             % CHECK SUBSTEP FAILURE (shorten dt and restart substep on failure)
             [Ts, T, f_ice, f_liq, n_subfail, substep, dt, ok] = ...
                CHECKSUBSTEP(Ts, T, f_ice, f_liq, xTs, xT, xf_ice, xf_liq, ...
                ro_ice, ro_liq, dt_sum, dt, dt_FULL_STEP, timestep, numsteps, ...
-               substep, maxsubstep, n_subfail, debug, eps, ok);
+               substep, maxsubstep, n_subfail, opts.debug, eps, ok);
             if not(ok)
                continue
             end
@@ -93,7 +100,7 @@ function [ice1, ice2] = skinmodel(opts)
             scoef, liqflag);
 
          % SAVE OUTPUT IF SPINUP IS FINISHED
-         if thisyear >= numspinup
+         if thisyear > numspinup
 
             if strcmp(opts.output_profile, 'minimal')
 
@@ -112,20 +119,36 @@ function [ice1, ice2] = skinmodel(opts)
          end
 
          % MOVE TO THE NEXT TIMESTEP
-         [metstep, substep, dt] = NEXTSTEP(metstep, substep, ...
-            dt, dt_FULL_STEP, maxsubstep, ok, n_subfail, n_iters);
+         [metstep, substep, dt] = NEXTSTEP(metstep, substep, dt_FULL_STEP, ...
+            maxsubstep, ok, n_subfail, n_iters);
 
       end % timesteps (one year)
 
+      if isfield(opts, 'saverestart') && opts.saverestart
+         icemodel.saveRestartState(opts, opts.simyears(thisyear), ...
+            T, f_ice, f_liq, Ts);
+      end
+
       % RESTART THE MET DATA STEP INDEX DURING SPIN UP
-      if thisyear < numspinup
-         metstep = 1;
+      if thisyear <= numspinup
          continue
       end
 
+      % Concatenate yearly raw output when running multi-year simulations
+      % without writing each year to disk.
+      if ~opts.saveflag && numyears - numspinup > 1
+         [ice1_all, ice2_all] = icemodel.concatoutput(ice1_all, ice2_all, ...
+            ice1, ice2);
+      end
+
       % WRITE TO DISK
-      WRITEOUTPUT(ice1, ice2, opts, thisyear-numspinup+1, ...
-         time((thisyear-numspinup)*numsteps+1:(thisyear-numspinup+1)*numsteps), ...
-         swd, lwd, albedo)
+      yridx = (thisyear-1)*numsteps+1:thisyear*numsteps;
+      WRITEOUTPUT(ice1, ice2, opts, thisyear, ...
+         time(yridx), swd(yridx), lwd(yridx), albedo(yridx))
+   end
+
+   if ~opts.saveflag && numyears - numspinup > 1
+      ice1 = ice1_all;
+      ice2 = ice2_all;
    end
 end

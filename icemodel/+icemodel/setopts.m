@@ -19,11 +19,11 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  SIMYEARS - a numeric scalar or vector of 4-digit years e.g. 2016, also
    %  used to locate the correct forcing data file.
    %
-   %  FORCINGS - a string scalar indicating the forcing data. Options are "mar",
-   %  "merra", and "racmo", indicating one of three climate models from which
-   %  icemodel forcing files have been created. Users who wish to add new
-   %  forcing files can update the icemodel.completions and arguments blocks
-   %  used throughout the repository.
+   %  FORCINGS - a string scalar indicating the forcing data. Standard values
+   %  include the climate-model forcings "mar", "merra", and "racmo", plus
+   %  supported self-forced station runs such as "kanm" and "kanl". Users who
+   %  wish to add new forcing files can update the icemodel.namelists
+   %  definitions used throughout the repository.
    %
    %  USERDATA - (optional) a string scalar indicating the alternative forcing
    %  data to be used in place of the forcing data in the forcing met file.
@@ -109,7 +109,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  solver = 3 (Robin with strong Ts-T coupling iterations):
    %   - Within each substep, perform outer fixed-point coupling iterations
    %     between the SEB linearization and subsurface enthalpy solve until
-   %     Ts and SEB residual converge (with relaxation/Aitken).
+   %     Ts and SEB residual converge (with relaxation/Aitken acceleration).
    %   - Typically slower than solver = 2; cost depends on cpl_Ts_tol,
    %     cpl_maxiter, relaxation, and timestep adaptation.
    %   - Classification: partitioned, strongly coupled at substep scale
@@ -118,71 +118,44 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % See also: icemodel.config icemodel.run.point icemodel.configureRun
    % icemodel.getopts icemodel.resetopts
 
-   % Parse inputs
+   % Parse inputs.
+   % Keep explicit positional parsing here instead of an arguments block for
+   % pre-R2019b compatibility. Namespace/test helpers may use arguments
+   % blocks, but this core runtime entry point should preserve the older
+   % calling contract until that compatibility target is intentionally dropped.
    narginchk(4, inf)
-
-   if nargin < 5  || isblanktext(userdata); userdata = forcings; end
-   if nargin < 6  || isblanktext(uservars); uservars = 'albedo'; end
-   if nargin < 7  || isblanktext(testname); testname = ''; end
-   if nargin < 8  || isempty(saveflag); saveflag = false; end
-   if nargin < 9  || isempty(backupflag); backupflag = true; end
-
-   % Legacy option used 'none', set to forcings instead
-   if strcmp(userdata, 'none')
-      userdata = forcings;
-   end
-   if strcmp(testname, 'none')
-      testname = '';
-   end
-
-   % convertStringsToChars in a pre-R2017b compatible way:
-   args = {smbmodel, sitename, forcings, userdata, uservars, testname};
-   for n = 1:numel(args)
-      if isstring(args{n})
-         args{n} = char(args{n});
-      end
-   end
-   [smbmodel, sitename, forcings, userdata, uservars, testname] = deal(args{:});
-
-   % If >= R2017b:
-   % [smbmodel, sitename, forcings, userdata, uservars, testname] ...
-   %    = convertStringsToChars(...
-   %    smbmodel, sitename, forcings, userdata, uservars, testname);
+   if nargin < 5; userdata = []; end
+   if nargin < 6; uservars = []; end
+   if nargin < 7; testname = []; end
+   if nargin < 8; saveflag = []; end
+   if nargin < 9; backupflag = []; end
+   [smbmodel, sitename, simyears, forcings, userdata, uservars, ...
+      testname, saveflag, backupflag] = parseinputs(nargin, ...
+      smbmodel, sitename, simyears, forcings, userdata, uservars, ...
+      testname, saveflag, backupflag);
 
    %------------------------- save the standard options passed in
    %--------------------------------------------------------------
-   opts.saveflag = saveflag;
-   opts.smbmodel = smbmodel;
-   opts.sitename = sitename;
-   opts.forcings = forcings;
-   opts.userdata = userdata;
-   opts.uservars = uservars;
-   opts.simyears = simyears;
-   opts.numyears = numel(simyears);
-   opts.testname = testname;
-   opts.saveopts = saveflag;
-   opts.backupflag = backupflag;
-
-   % Set defaults for values set in icemodel.configureRun
-   opts.pathdata = [];
-   opts.pathinput = [];
-   opts.patheval = [];
-   opts.pathuserdata = [];
-   opts.pathoutput = [];
-   opts.casename = [];
-   opts.metfname = {};
-   opts.vars1 = {};
-   opts.vars2 = {};
+   opts = initopts(smbmodel, sitename, simyears, forcings, ...
+      userdata, uservars, testname, saveflag, backupflag);
 
    %------------------------- optional settings / parameters
    %---------------------------------------------------------
 
    % general model settings
-   opts.spinup_loops    =  1;       % number of spin-up loops to initialize
-   opts.use_init        =  false;   % use pre-initialized data?
+   opts.n_spinup_years  =  0;       % number of leading simulation years used only for spinup
+   opts.use_init        =  false;   % reserved for later generic initialization support
+   opts.initfile        =  '';      % reserved generic initialization source
+   opts.use_restart     =  false;   % load an exact year-boundary restart state?
+   opts.restartfile     =  '';      % restart state file used when use_restart=true
+   opts.saverestart     =  false;   % save a restart state at each year boundary
    opts.kabs_user       =  true;    % use user-defined ice absorptivity?
    opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
    opts.calendar_type   =  'noleap';
+
+   % debug mode — enable via resetopts(opts, 'debug', true)
+   opts.debug           =  false;   % enable solver diagnostic dumps
+   opts.debug_path      =  '';      % override for debug output folder
 
    % model parameters
    opts.z_0             =  0.001;   % Surface aero. roughness length    [m]
@@ -199,7 +172,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       % 1 = Dirichlet w/ lagged Ts-T closure iterations
       % 2 = Robin w/ single Ts-T coupling iteration
       % 3 = Robin w/ strong Ts-T coupling iterations
-      opts.solver          = 3;     % recommended: 3
+      opts.solver          = 2;     % recommended: 3
 
       % surface (SEB) solver (Dirichlet Ts boundary condition when solver = 1)
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
@@ -224,6 +197,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.dz_spectral     = 0.002; % dz for radiative heat transfer       [m]
       opts.z0_thermal      = 20;    % domain thickness for heat transfer   [m]
       opts.z0_spectral     = 8;     % domain thickness for rad transfer    [m]
+      opts.lookup_k_bulk   = true;  % use lookup-table bulk extinction     [-]
       opts.f_ice_min       = 0.1;   % layer combination threshold (ice fraction)
 
    elseif strcmp(smbmodel, 'skinmodel')
@@ -272,7 +246,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % The mie scattering coefficients are defined for 35 grain sizes and 118
    % spectral bands. Define those dimensions here, they are used to read in
    % the data array in GETSCATTERCOEFS. Also set the grain size index.
-   opts.nwavl           = 118;
+   opts.nwavel          = 118;
    opts.nradii          = 35;
    opts.i_grainradius   = 25;       % index 25 = 2.0 mm                    [#]
 
@@ -296,17 +270,87 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % Lag time used by ICERUNOFF, converted from hours to timesteps.
    opts.tlag = 6 * 3600 / opts.dt;
 
-   % Output profile. "minimal" is the lean profile historically tied to
-   % gridded sector-scale runs; "standard" is the full point-run profile.
-   if strcmp(sitename, 'sector')
-      opts.output_profile = 'minimal';
-   else
-      opts.output_profile = 'standard';
-   end
+   % Output profile. "minimal" is the lean profile used when wrappers request
+   % reduced grid-style output; "standard" is the full point-run profile.
+   opts.output_profile = 'standard';
 
    %------------------------- End of user-defined model options
    %--------------------------------------------------------------
 
    opts = icemodel.resetopts(opts, varargin{:});
    opts = icemodel.configureRun(opts);
+end
+
+%%
+function [smbmodel, sitename, simyears, forcings, userdata, uservars, ...
+      testname, saveflag, backupflag] = parseinputs(nin, smbmodel, ...
+      sitename, simyears, forcings, userdata, uservars, testname, ...
+      saveflag, backupflag)
+
+   if nin < 5 || isempty(userdata) || isblanktext(userdata)
+      userdata = forcings;
+   end
+   if nin < 6 || isempty(uservars) || isblanktext(uservars)
+      uservars = 'albedo';
+   end
+   if nin < 7 || isempty(testname) || isblanktext(testname)
+      testname = '';
+   end
+   if nin < 8 || isempty(saveflag)
+      saveflag = false;
+   end
+   if nin < 9 || isempty(backupflag)
+      backupflag = true;
+   end
+
+   if strcmpi(userdata, 'none')
+      userdata = forcings;
+   end
+   if strcmpi(testname, 'none')
+      testname = '';
+   end
+
+   % convertStringsToChars in a pre-R2017b compatible way:
+   args = {smbmodel, sitename, forcings, userdata, uservars, testname};
+   for n = 1:numel(args)
+      if isstring(args{n})
+         args{n} = char(args{n});
+      end
+   end
+   [smbmodel, sitename, forcings, userdata, uservars, testname] = deal(args{:});
+
+   % If >= R2017b:
+   % [smbmodel, sitename, forcings, userdata, uservars, testname] ...
+   %    = convertStringsToChars(...
+   %    smbmodel, sitename, forcings, userdata, uservars, testname);
+end
+
+%%
+function opts = initopts(smbmodel, sitename, simyears, forcings, ...
+      userdata, uservars, testname, saveflag, backupflag)
+
+   opts.saveflag = saveflag;
+   opts.smbmodel = smbmodel;
+   opts.sitename = sitename;
+   opts.forcings = forcings;
+   opts.userdata = userdata;
+   opts.uservars = uservars;
+   opts.simyears = simyears;
+   opts.numyears = numel(simyears);
+   opts.output_years = [];
+   opts.testname = testname;
+   opts.saveopts = saveflag;
+   opts.backupflag = backupflag;
+
+   % Set defaults for values set in icemodel.configureRun
+   opts.pathdata = [];
+   opts.pathinput = [];
+   opts.patheval = [];
+   opts.pathuserdata = [];
+   opts.pathoutput = [];
+   opts.pathrestart = [];
+   opts.casename = [];
+   opts.metfname = {};
+   opts.vars1 = {};
+   opts.vars2 = {};
 end

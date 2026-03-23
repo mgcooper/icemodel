@@ -1,5 +1,5 @@
 function [aN, aP, aS, b, iM, a1, a2, aP01] = GECOEFS(T, f_ice, f_liq, dHdT, ...
-      dFdT, drovdT, dH, Sc, k_eff, delz, fn, dz, dt, Ts, Ls, Lf, ro_liq, TL, ...
+      dLdT, drovdT, dH, Sc, k_eff, delz, fn, dz, dt, Ts, Ls, Lf, ro_liq, TL, ...
       JJ, Fc, Fp, bc)
    %GECOEFS Compute the general equation coefficients
    %
@@ -31,7 +31,7 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = GECOEFS(T, f_ice, f_liq, dHdT, ...
    %#codegen
 
    % Commented statements are kept for reference. In some cases they are needed
-   % but are set when initialized e.g. the gv/gk/dFdT BCs, in other cases they
+   % but are set when initialized e.g. the gv/gk/dLdT BCs, in other cases they
    % are not used but would be for a frozen soil model.
 
    % Melt zone indices
@@ -46,26 +46,26 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = GECOEFS(T, f_ice, f_liq, dHdT, ...
 
    % Coefficients for nodes below the melt zone [W m-2 K-1]
    f_air = (1.0 - f_ice - f_liq);
-   aP0 = (dHdT + Lf * ro_liq * dFdT + Ls * f_air .* drovdT) .* dz / dt;
+   aP0 = (dHdT + Lf * ro_liq * dLdT + Ls * f_air .* drovdT) .* dz / dt;
    gv = ones(JJ, 1);     % Eq 123
    gk = zeros(JJ, 1);    % Eq 123
    LfMZ = zeros(JJ, 1);  % Eq 123, melt-zone latent heat switch
 
    aP01 = aP0(1);
 
-   % % If using g_liq instead of f_liq in the definition of dFdT as in SNTHERM:
-   % aP0 = (dHdT + Lf * ro_sno .* dFdT + Ls * f_air .* drovdT)
+   % % If using g_liq instead of f_liq in the definition of dLdT as in SNTHERM:
+   % aP0 = (dHdT + Lf * ro_sno .* dLdT + Ls * f_air .* drovdT)
 
    % Cofficients for nodes inside the melt zone [W m-2 K-1]
    if sum(iM) > 0
       aP0(iM) = (dHdT(iM) + Ls * f_air(iM) .* drovdT(iM)) .* dz(iM) / dt;
-      gv(iM) = 1 ./ (ro_liq * dFdT(iM)); % Eq 122b
+      gv(iM) = 1 ./ (ro_liq * dLdT(iM)); % Eq 122b
       gk(iM) = T(iM);
       LfMZ(iM) = Lf * dz(iM) / dt;
 
       % % If using g_liq instead of f_liq as in SNTHERM:
-      % gv(iM) = 1 ./ (ro_sno(iM) .* dFdT(iM)); % Eq 122b
-      % gv(iM) = 1 ./ (ro_liq * f_wat(iM) .* dFdT(iM)); % Eq 122b
+      % gv(iM) = 1 ./ (ro_sno(iM) .* dLdT(iM)); % Eq 122b
+      % gv(iM) = 1 ./ (ro_liq * f_wat(iM) .* dLdT(iM)); % Eq 122b
    end
 
    % % For a soil model, would need indices above the melt zone
@@ -73,7 +73,7 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = GECOEFS(T, f_ice, f_liq, dHdT, ...
    %    aP0(iL) = cv_liq * dz / dt;
    %  % gv(iM) = 1.0;
    %  % gk(iM) = 0.0;
-   %  % dFdT(iL) = 0.0;
+   %  % dLdT(iL) = 0.0;
    % end
 
    % Adjust gv/gk in terms of N/P/S. Set gkN(1) = 0 and gkS(JJ+1) = 0 to account

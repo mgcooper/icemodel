@@ -9,7 +9,7 @@ function vmat = extractice2(ice2, varname, t1, t2, z1, z2, dz, dt)
       z1 = 0
       z2 = 2
       dz = 0.04
-      dt = 3600; % 900 use 3600 b/c this more often called after POSTPROC
+      dt = 3600; % 900 use 3600 b/c this more often called after postprocess
    end
 
    if isdatetime(t1) && isdatetime(t2)

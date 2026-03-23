@@ -1,24 +1,11 @@
-function pathlist = setpath(pathtype, sitename, smbmodel, userdata, simyears, varargin)
-   %SETPATH sets icemodel input and output paths
+function pathlist = setpath(varargin)
+   %SETPATH Compatibility wrapper for icemodel.getpath.
    %
+   %  pathlist = icemodel.setpath(...)
    %
+   % Use icemodel.getpath(...) for new code. This wrapper exists so older
+   % callers continue to resolve the same canonical paths while the repo
+   % transitions to the clearer getter name.
 
-   narginchk(2, Inf)
-
-   if nargin < 5 || isempty(simyears)
-      simyears = '';
-   else
-      simyears = arrayfun(@num2str, simyears(:), 'un', false);
-   end
-
-   if nargin < 4, userdata = ''; end
-   if nargin < 3, smbmodel = ''; end
-
-   switch pathtype
-      case 'output'
-         pathlist = fullfile(getenv('ICEMODEL_OUTPUT_PATH'), sitename, smbmodel, ...
-            userdata, simyears, varargin{:});
-
-      case 'input'
-   end
+   pathlist = icemodel.getpath(varargin{:});
 end

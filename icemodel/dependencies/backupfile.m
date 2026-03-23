@@ -84,6 +84,8 @@ function varargout = backupfile(filename, makecopy, makezip)
    switch nargout
       case 1
          varargout{1} = fullpath_bk;
+      case 2
+         varargout{1} = fullpath_bk;
          varargout{2} = filename_bk;
    end
 end

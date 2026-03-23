@@ -15,6 +15,7 @@ function [metstep, substep, numsteps, maxsubstep, dt_new, dt_FULL_STEP, ...
 
    % Compute the timestep and the total number of model timesteps
    dt_FULL_STEP = opts.dt;
+   assert(mod(numel(Time), opts.numyears) == 0)
    numsteps = numel(Time) / opts.numyears;
    maxsubstep = opts.dt; % allow 1 sec dt min
    minsubstep = 1;
@@ -22,11 +23,11 @@ function [metstep, substep, numsteps, maxsubstep, dt_new, dt_FULL_STEP, ...
    dt_min = dt_FULL_STEP / maxsubstep;
    dt_new = dt_FULL_STEP / minsubstep;
 
-   % Compute the number of spinup years and a vector of simulation years
-   numspinup = opts.spinup_loops;
+   % Compute the number of leading spinup years. The forcing years in
+   % opts.simyears are run in order; the first numspinup years are excluded
+   % from saved/postprocessed output.
+   numspinup = opts.n_spinup_years;
+   assert(numspinup < opts.numyears)
    simyears = opts.simyears(:);
-   if numspinup > 1
-      simyears = [repmat(simyears(1), numspinup,1); simyears(2:end)];
-   end
    numyears = numel(simyears);
 end

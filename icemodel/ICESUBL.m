@@ -1,12 +1,13 @@
 function [f_ice, f_liq, d_con, xd_sbl] = ICESUBL(f_ice, f_liq, d_con, ...
-      ro_ice, ro_liq, Ls, Lv, d_pevp, f_ice_min, f_liq_resid)
+      ro_ice, ro_liq, Ls, Lv, d_pevp, wetflag, f_ice_min, f_liq_resid)
    %ICESUBL Apply potential vapor-driven fraction change at the top layer
    %
    % f_ice = fraction of ice by volume in each control volume
    % f_liq = fraction of liquid water by volume in each control volume
-   % d_pevp = potential vapor-driven change in top-layer liquid fraction
    % d_con = condensation which exceeds control volume available porosity
-   % xd_sbl = sublimation which exceeds control volume fractional ice content
+   % d_pevp = potential vapor-driven change in top-layer liquid fraction
+   % xd_sbl = vapor-driven ice change which exceeds control-volume limits
+   % wetflag = liquid-film flag used for mass partitioning
    %
    %#codegen
 
@@ -33,9 +34,10 @@ function [f_ice, f_liq, d_con, xd_sbl] = ICESUBL(f_ice, f_liq, d_con, ...
    xd_evp = 0;
    xd_sbl = 0;
 
-   % Determine whether evaporation or sublimation occurs. Evaporation occurs if
-   % f_liq is > 0.02. Otherwise sublimation (or condensation) occurs.
-   if f_liq_top > 0.02 || d_pevp > 0
+   % If a liquid film is present, partition vapor exchange through the liquid
+   % reservoir first. Otherwise route it directly to the ice phase so dry/cold
+   % deposition forms ice rather than spurious liquid water.
+   if wetflag
 
       if d_pevp < 0 % evaporation
 
@@ -58,7 +60,8 @@ function [f_ice, f_liq, d_con, xd_sbl] = ICESUBL(f_ice, f_liq, d_con, ...
          end
 
          % Send energy demand not satisfied by evaporation to SUBL
-         [f_ice, xd_sbl] = SUBL(xd_evp, f_ice, f_ice_min, ro_ice, ro_liq, Lv, Ls);
+         [f_ice, xd_sbl] = SUBL(xd_evp, f_ice, f_liq, f_ice_min, ro_ice, ...
+            ro_liq, Lv, Ls);
 
       elseif d_pevp > 0 % condensation
 
@@ -75,18 +78,19 @@ function [f_ice, f_liq, d_con, xd_sbl] = ICESUBL(f_ice, f_liq, d_con, ...
          end
       end
 
-   else % sublimation
-      [f_ice, xd_sbl] = SUBL(d_pevp, f_ice, f_ice_min, ro_ice, ro_liq, Lv, Ls);
+   else % dry/cold ice: sublimation or direct deposition to ice
+      [f_ice, xd_sbl] = SUBL(d_pevp, f_ice, f_liq, f_ice_min, ro_ice, ...
+         ro_liq, Lv, Ls);
    end
 end
 
-%% Sublimation
-function [f_ice, xd_sbl] = SUBL(d_pevp, f_ice, f_ice_min, ro_ice, ro_liq, Lv, Ls)
+%% Vapor exchange with the ice phase
+function [f_ice, xd_sbl] = SUBL(d_pevp, f_ice, f_liq, f_ice_min, ro_ice, ...
+      ro_liq, Lv, Ls)
 
    xd_sbl = 0;
-   if d_pevp >= 0
-      return
-   end
+   f_liq_top = f_liq(1);
+   f_ice_top = f_ice(1);
 
    % Convert potential evaporation to potential sublimation:
    % d_pevp = Qe / (Lv * ro_liq) * dt_new / dz_therm;
@@ -105,12 +109,35 @@ function [f_ice, xd_sbl] = SUBL(d_pevp, f_ice, f_ice_min, ro_ice, ro_liq, Lv, Ls
 
    % Convert potential evap to potential subl in ice frac-equivalent thickness
    d_psbl = d_pevp * (Lv * ro_liq) / (Ls * ro_ice);
-   f_ice_top = f_ice(1);
+
+   % Budget deposition
+   if d_psbl == 0
+      return
+
+   elseif d_psbl > 0 % deposition to ice
+      f_air_top = 1.0 - f_liq_top - f_ice_top;
+
+      if f_air_top <= 0
+         % no pore/air space remains for new ice
+         xd_sbl = d_psbl;
+
+      elseif d_psbl <= f_air_top
+         % all deposition can be stored as new ice
+         f_ice(1) = f_ice(1) + d_psbl;
+
+      else
+         % fill the remaining air space and return the unsatisfied remainder
+         f_ice(1) = f_ice(1) + f_air_top;
+         xd_sbl = d_psbl - f_air_top;
+      end
+      return
+   end
 
    % Note: layer combination is based on f_ice, so requiring f_ice_top < 0
    % should suffice (rather than <f_ice_min). If f_ice(1) + d_psbl < 0, it will
    % error, otherwise the layers will combine if f_ice(1) + d_psbl < f_min.
 
+   % Budget sublimation
    if f_ice_top < f_ice_min
 
       if abs(d_psbl) < f_ice_top

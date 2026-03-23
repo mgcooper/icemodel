@@ -65,8 +65,8 @@ end
 
 function [T, d_liq, d_evp, d_con, f_ice, f_liq, x_err] = SMB(T, d_liq, d_evp, ...
       d_con, f_ice, f_liq, xf_liq, TL, ro_ice, ro_liq, f_ell_min, f_liq_res, ...
-      Ls, Lv, d_pevp, f_min, fcp, Tf)
-   %SMB (sub)surface mass budgets
+      Ls, Lv, d_pevp, f_min, ~, ~)
+   %SMB surface/subsurface mass budgets, expressed as fluxes
    %
    % Positive values of d_liq indicate increasing water fraction:
    % d_liq > 0 = melt.
@@ -82,7 +82,6 @@ function [T, d_liq, d_evp, d_con, f_ice, f_liq, x_err] = SMB(T, d_liq, d_evp, ..
 
    % Reset past values for budgeting evap/condensation.
    xf_liq = f_liq;
-   xf_ice = f_ice;
 
    % Update the residual unfrozen water fraction defined by the phase fraction
    % characteristic function at the lower temperature boundary. This ensures
@@ -92,9 +91,15 @@ function [T, d_liq, d_evp, d_con, f_ice, f_liq, x_err] = SMB(T, d_liq, d_evp, ..
       f_liq_res = max(f_liq_res, f_liq_min / (1 - f_ice(1)));
    end
 
+   % Wetflag controls liquid-film mass partitioning only. Treat only liquid
+   % above the residual-water floor as a mobile surface film. Keep this
+   % separate from the SEB surface saturation flag used for vapor pressure.
+   f_res_top = f_liq_res * (1.0 - f_ice(1));
+   wetflag = f_liq(1) > f_res_top;
+
    % Compute evaporation/condensation/sublimation.
    [f_ice, f_liq, d_con, x_err] = ICESUBL(f_ice, f_liq, d_con, ...
-      ro_ice, ro_liq, Ls, Lv, d_pevp, f_min, f_liq_res);
+      ro_ice, ro_liq, Ls, Lv, d_pevp, wetflag, f_min, f_liq_res);
 
    % Budget evap / subl.
    d_evp = d_evp + f_liq - xf_liq;

@@ -1,6 +1,6 @@
 function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
       ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, liqflag, Ts, T, ...
-      k_eff, dz, solver)
+      k_eff, dz, solver, debug)
    %SEBSOLVE solve the surface energy balance for the skin temperature
    %
    % Solver options:
@@ -32,7 +32,7 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
       iterflag = false;
    end
 
-   ok = false;
+   ok_cpl = false;
    Ts_old = Ts;
    switch solver
 
@@ -44,14 +44,13 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
                ea, cv_air, emiss, SB, Tf, chi, roL, scoef, liqflag, ...
                CONDUCT(k_eff, T, dz, old), k_eff, T, dz, iterflag);
 
-            if not(ok)
+            if ~ok
                break
             end
             if abs(old - Ts) < tol
-               ok = true;
+               ok_cpl = true;
                break
             end
-            ok = false;
          end
 
       case 2 % Complex-step - numerical derivative
@@ -59,14 +58,13 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
          for iter = 1:maxiter
             old = Ts;
             [Ts, ok] = complexstep(@fSEB, Ta);
-            if not(ok)
+            if ~ok
                break
             end
             if abs(old - Ts) < tol
-               ok = true;
+               ok_cpl = true;
                break
             end
-            ok = false;
          end
 
       otherwise % Derivative-free
@@ -74,22 +72,29 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
    end
 
    % Derivative-free solver
-   if solver == 0 || not(ok) || abs(Ts - Ta) > 20
+   if solver == 0 || ~ok_cpl || abs(Ts - Ta) > 20
 
       Ts = Ts_old;
 
       for iter = 1:maxiter
          old = Ts;
          [Ts, ~, ok] = fsearchzero(@fSEB, old, Ta-50, Ta+50, Ta, tol);
-         if not(ok)
+         if ~ok
             break
          end
          if abs(old - Ts) < tol
-            ok = true;
+            ok_cpl = true;
             break
          end
-         ok = false;
       end
+   end
+   
+   % Hitting max coupling iterations without ok_cpl is a substep fail
+   ok = ok && ok_cpl;
+
+   if ~ok && debug
+      dumpSebSolveFailure(solver, iter, Ts_old, Ts, Ta, Qsi, Qli, albedo, ...
+         wspd, ppt, tppt, Pa, De, ea, liqflag, k_eff, T, dz, ok_cpl);
    end
 
    % Note: nested function captures updated Qc on each iteration.
@@ -133,4 +138,38 @@ function [x, ok, iter] = complexstep(f, x0)
       old = x;
    end
    x = x0; % ok = false
+end
+
+function dumpSebSolveFailure(solver, iter, Ts_old, Ts, Ta, Qsi, Qli, ...
+      albedo, wspd, ppt, tppt, Pa, De, ea, liqflag, k_eff, T, dz, ok_cpl)
+   %DUMPSEBSOLVEFAILURE Save SEB root-find failure diagnostics on demand.
+
+   debug_file = getenv('ICEMODEL_DEBUG_SEBSOLVE_FILE');
+   if isempty(debug_file)
+      return
+   end
+
+   debug_state = struct();
+   debug_state.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
+   debug_state.solver = solver;
+   debug_state.iter = iter;
+   debug_state.Ts_old = Ts_old;
+   debug_state.Ts = Ts;
+   debug_state.Ta = Ta;
+   debug_state.Qsi = Qsi;
+   debug_state.Qli = Qli;
+   debug_state.albedo = albedo;
+   debug_state.wspd = wspd;
+   debug_state.ppt = ppt;
+   debug_state.tppt = tppt;
+   debug_state.Pa = Pa;
+   debug_state.De = De;
+   debug_state.ea = ea;
+   debug_state.liqflag = liqflag;
+   debug_state.k_eff = k_eff;
+   debug_state.T = T;
+   debug_state.dz = dz;
+   debug_state.ok_cpl = ok_cpl;
+
+   save(debug_file, 'debug_state');
 end

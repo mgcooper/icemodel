@@ -1,4 +1,4 @@
-function [ice1, ice2] = icemodel(opts)
+function [ice1, ice2, opts] = icemodel(opts)
    % ICEMODEL Simulate the phase change process in glacier ice.
    %
    % This function models the phase change process in melting glacier ice. It
@@ -8,6 +8,7 @@ function [ice1, ice2] = icemodel(opts)
    %
    % Syntax:
    % [ice1, ice2] = ICEMODEL(opts)
+   % [ice1, ice2, opts] = ICEMODEL(opts)
    %
    % Inputs:
    % opts - A structure containing model options and parameters. Defined by the
@@ -27,7 +28,8 @@ function [ice1, ice2] = icemodel(opts)
    %         near-surface atmosphere. Contains one value per timestep.
    % ice2  - 2-dimensional data storing variables defined on the subsurface ice
    %         column control volume mesh. Contains one column per timestep.
-   % met   - Struct containing the meteorological data used for the simulation.
+   % opts  - Finalized runtime configuration after icemodel.configureRun() has
+   %         applied the last non-negotiable pre-execution updates.
    %
    % See also: skinmodel, icemodel.setopts
    %
@@ -35,7 +37,7 @@ function [ice1, ice2] = icemodel(opts)
 
    %% INITIALIZE THE MODEL
 
-   debug = true;
+   % Runtime configuration
    assertF on
    opts = icemodel.configureRun(opts);
    opts = icemodel.prepareRunOutput(opts);
@@ -48,32 +50,37 @@ function [ice1, ice2] = icemodel(opts)
       'Ls','Lv','ro_air','ro_ice','ro_liq','roLf','roLs','roLv', 'Rv','Tf');
    TINY = 1e-8;
 
+   % UNPACK SOLVER OPTS
+   [solver, seb_solver, maxiter, tol, alpha, use_aitken, jumpmax, ...
+      cpl_maxiter, cpl_Ts_tol, cpl_seb_tol, cpl_alpha, cpl_aitken, cpl_jumpmax] ...
+      = icemodel.getopts(opts, ...
+      'solver', 'seb_solver', 'maxiter', 'tol', 'alpha', 'use_aitken', ...
+      'jumpmax', 'cpl_maxiter', 'cpl_Ts_tol', 'cpl_seb_tol', 'cpl_alpha', ...
+      'cpl_aitken', 'cpl_jumpmax');
+
    % LOAD THE FORCING DATA
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
-      = METINIT(opts, 1);
+      = METINIT(opts);
 
    % INITIALIZE THE THERMAL MODEL
-   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, roL, liqflag, Ts, JJ, ...
-      Sc, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, f_ice_min, f_liq_res] ...
-      = ICEINIT(opts, tair);
+   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, roL, ...
+      liqflag, Ts, JJ, ~, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, ...
+      f_ice_min, f_liq_res] = ICEINIT(opts, tair);
 
    % INITIALIZE THE SPECTRAL MODEL
-   [Q0, dz_spect, spect_N, spect_S, solardwavl] = EXTCOEFSINIT(opts, ro_ice);
+   [I0, dz_spect, z_nodes_spect, z_edges_spect, tau_N, tau_S, solar_dwavel, ...
+      k_bulk_lookup] = EXTCOEFSINIT(opts, ro_ice);
 
    % INITIALIZE TIMESTEPPING
    [metstep, substep, numsteps, maxsubstep, dt, dt_FULL_STEP, ...
       numyears, numspinup] = INITTIMESTEPS(opts, time);
+   if ~opts.saveflag && (numyears - numspinup) > 1
+      ice1_all = [];
+      ice2_all = [];
+   end
 
    % INITIALIZE PAST VALUES
    [xTs, xT, xf_ice, xf_liq] = RESETSUBSTEP(Ts, T, f_ice, f_liq);
-
-   % UNPACK SOLVER OPTS
-   [solver, seb_solver, maxiter, tol, alpha, use_aitken, ...
-      jumpmax, cpl_maxiter, cpl_Ts_tol, cpl_seb_tol, cpl_alpha, ...
-      cpl_aitken, cpl_jumpmax] = icemodel.getopts(opts, ...
-      'solver', 'seb_solver', 'maxiter', 'tol', 'alpha', 'use_aitken', ...
-      'jumpmax', 'cpl_maxiter', 'cpl_Ts_tol', 'cpl_seb_tol', 'cpl_alpha', ...
-      'cpl_aitken', 'cpl_jumpmax');
 
    %% START TIMESTEPS OVER YEARS
    for thisyear = 1:numyears
@@ -85,27 +92,36 @@ function [ice1, ice2] = icemodel(opts)
             = NEWTIMESTEP(f_liq, solver);
 
          % SUBSURFACE SOLAR RADIATION SOURCE-TERM
-         [Sc, chi] = UPDATEEXTCOEFS(swd(metstep), albedo(metstep), ...
-            Q0, dz_spect, spect_N, spect_S, solardwavl, Sc, dz, ...
-            ro_ice * f_ice + ro_liq * f_liq);
+         [Sc, chi] = SPECTRALSOURCETERM(swd(metstep), ...
+            albedo(metstep), I0, dz_spect, tau_N, tau_S, solar_dwavel, ...
+            dz, ro_ice * f_ice + ro_liq * f_liq, z_nodes, z_nodes_spect, ...
+            z_edges_spect, k_bulk_lookup);
 
          % SURFACE TERMS (atmospheric vapor pressure fixed over this full step)
          ea = VAPPRESS(tair(metstep), Tf, liqflag) * rh(metstep) / 100;
 
          while dt_sum + TINY < dt_FULL_STEP
 
-            % SURFACE TEMPERATURE (Dirichlet lagged coupling mode)
-            if solver == 1
+            if solver == 1 % Dirichlet iterated lagged closure mode
+
+               % SURFACE TEMPERATURE
                k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
                [Ts, ok_seb] = SEBSOLVE(tair(metstep), swd(metstep), ...
                   lwd(metstep), albedo(metstep), wspd(metstep), ...
                   ppt(metstep), tppt(metstep), psfc(metstep), De(metstep), ...
                   ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
-                  liqflag, Ts, T, k_eff, dz, seb_solver);
-            end
+                  liqflag, Ts, T, k_eff, dz, seb_solver, opts.debug);
 
-            % COUPLED SURFACE-SUBSURFACE ENERGY BALANCE
-            if solver > 1 % (Robin single-sweep and strong coupling modes)
+               % SUBSURFACE ENERGY BALANCE
+               [T, f_ice, f_liq, k_eff, ok_ieb, n_iters] ...
+                  = ICEENBAL(T, f_ice, f_liq, dz, delz, fn, Sc, dt, JJ, Ts, ...
+                  k_liq, cv_ice, cv_liq, ro_ice, ro_liq, Ls, Lf, roLf, Rv, ...
+                  Tf, fcp, TL, TH, f_ell_min, f_ell_max, Fc, Fp, solver, ...
+                  tol, maxiter, alpha, use_aitken, jumpmax, opts.debug);
+
+            elseif solver > 1 % Robin single-sweep and strong coupling modes
+
+               % COUPLED SURFACE-SUBSURFACE ENERGY BALANCE
                [Ts, T, f_ice, f_liq, k_eff, ok_ieb, n_iters] ...
                   = ICEEBSOLVE(T, f_ice, f_liq, dz, delz, fn, Sc, dt, JJ, Ts, ...
                   k_liq, cv_ice, cv_liq, ro_ice, ro_liq, Ls, Lf, roLf, Rv, ...
@@ -114,23 +130,18 @@ function [ice1, ice2] = icemodel(opts)
                   ppt(metstep), tppt(metstep), psfc(metstep), De(metstep), ...
                   ea, cv_air, emiss, SB, roL, scoef, chi, liqflag, solver, ...
                   tol, maxiter, alpha, use_aitken, jumpmax, cpl_Ts_tol, ...
-                  cpl_seb_tol, cpl_maxiter, cpl_alpha, cpl_aitken, cpl_jumpmax);
-
-            else % (Dirichlet iterated lagged closure mode)
-               [T, f_ice, f_liq, k_eff, ok_ieb, n_iters] ...
-                  = ICEENBAL(T, f_ice, f_liq, dz, delz, fn, Sc, dt, JJ, Ts, ...
-                  k_liq, cv_ice, cv_liq, ro_ice, ro_liq, Ls, Lf, roLf, Rv, ...
-                  Tf, fcp, TL, TH, f_ell_min, f_ell_max, Fc, Fp, solver, ...
-                  tol, maxiter, alpha, use_aitken, jumpmax);
+                  cpl_seb_tol, cpl_maxiter, cpl_alpha, cpl_aitken, cpl_jumpmax, ...
+                  opts.debug);
             end
             ok = ok_seb && ok_ieb;
 
             % CHECK SUBSTEP FAILURE (shorten dt and restart substep on failure)
-            [Ts, T, f_ice, f_liq, n_subfail, substep, dt, ok] = ...
-               CHECKSUBSTEP(Ts, T, f_ice, f_liq, xTs, xT, xf_ice, xf_liq, ...
+            [Ts, T, f_ice, f_liq, n_subfail, substep, dt, ok] ...
+               = CHECKSUBSTEP(Ts, T, f_ice, f_liq, xTs, xT, xf_ice, xf_liq, ...
                ro_ice, ro_liq, dt_sum, dt, dt_FULL_STEP, timestep, numsteps, ...
-               substep, maxsubstep, n_subfail, debug, eps, ok);
-            if not(ok)
+               substep, maxsubstep, n_subfail, opts.debug, eps, ok);
+
+            if ~ok
                continue
             end
 
@@ -163,7 +174,7 @@ function [ice1, ice2] = icemodel(opts)
             scoef, liqflag);
 
          % SAVE OUTPUT IF SPINUP IS FINISHED
-         if thisyear >= numspinup
+         if thisyear > numspinup
 
             if strcmp(opts.output_profile, 'minimal')
 
@@ -182,20 +193,36 @@ function [ice1, ice2] = icemodel(opts)
          end
 
          % MOVE TO THE NEXT TIMESTEP
-         [metstep, substep, dt] = NEXTSTEP(metstep, substep, ...
-            dt, dt_FULL_STEP, maxsubstep, ok, n_subfail, n_iters);
+         [metstep, substep, dt] = NEXTSTEP(metstep, substep, dt_FULL_STEP, ...
+            maxsubstep, ok, n_subfail, n_iters);
 
       end % timesteps (one year)
 
+      if isfield(opts, 'saverestart') && opts.saverestart
+         icemodel.saveRestartState(opts, opts.simyears(thisyear), ...
+            T, f_ice, f_liq, Ts);
+      end
+
       % RESTART THE MET DATA STEP INDEX DURING SPIN UP
-      if thisyear < numspinup
-         metstep = 1;
+      if thisyear <= numspinup
          continue
       end
 
+      % Concatenate yearly raw output when running multi-year simulations
+      % without writing each year to disk.
+      if ~opts.saveflag && numyears - numspinup > 1
+         [ice1_all, ice2_all] = icemodel.concatoutput(ice1_all, ice2_all, ...
+            ice1, ice2);
+      end
+
       % WRITE TO DISK
-      WRITEOUTPUT(ice1, ice2, opts, thisyear-numspinup+1, ...
-         time((thisyear-numspinup)*numsteps+1:(thisyear-numspinup+1)*numsteps), ...
-         swd, lwd, albedo)
+      yridx = (thisyear-1)*numsteps+1:thisyear*numsteps;
+      WRITEOUTPUT(ice1, ice2, opts, thisyear, ...
+         time(yridx), swd(yridx), lwd(yridx), albedo(yridx))
+   end
+
+   if ~opts.saveflag && numyears - numspinup > 1
+      ice1 = ice1_all;
+      ice2 = ice2_all;
    end
 end

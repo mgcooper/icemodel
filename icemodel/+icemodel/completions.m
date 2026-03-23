@@ -5,41 +5,57 @@ function proplist = completions(funcname)
    switch lower(funcname)
 
       case 'completions'
-         tmp = dir( ...
-            fullfile(icemodel.projectpath, 'icemodel', '+icemodel', '*.m'));
-         proplist = strrep({tmp.name}, '.m', '');
+         proplist = cellstr(icemodel.namelists.completions());
 
       case 'config'
-         proplist = {'demo'}.';
-         % To re-enable completions:
-         % {"name":"casename", "kind":"namevalue", "type":["choices=icemodel.completions('config')"]},
+         proplist = cellstr(icemodel.namelists.config());
 
       case 'cvconvert'
-         proplist = {'volumefraction', 'bulkdensity', 'mass', 'volume', ...
-            'massfraction', 'totaldensity'}.';
+         proplist = cellstr(icemodel.namelists.cvconvert());
 
       case 'physicalconstant'
-         proplist = {'Tf', 'Lv', 'Lf', 'Ls', 'ro_air', 'ro_ice', 'ro_liq', ...
-            'cp_air', 'cp_liq', 'cp_ice', 'k_liq', 'k_ice', 'Rd', 'Rv', 'SB', ...
-            'emiss', 'gravity', 'kappa', 'kappa_p', 'epsilon', 'P0', 'es0', ...
-            'S0', 'N0', 'psychro', 'dalr', 'malr', 'fcp', 'scale_ht', 'hrsperday', ...
-            'secperhr', 'roLv', 'roLs', 'roLf', 'cv_air', 'cv_ice', 'cv_liq', ...
-            'ro_iwe', 'ro_wie', 'emissSB', 'fcpsq', 'secperday', 'c0'}.';
+         proplist = cellstr(icemodel.namelists.physicalconstant());
+
+      case 'solver'
+         proplist = cellstr(string(icemodel.namelists.solver()));
+
+      case 'testtier'
+         proplist = cellstr(icemodel.namelists.testtier());
+
+      case 'testverbosity'
+         proplist = cellstr(icemodel.namelists.testverbosity());
+
+      case 'testsmbmodel'
+         proplist = cellstr(icemodel.namelists.testsmbmodel());
+
+      case 'benchmark'
+         proplist = cellstr(icemodel.namelists.benchmark());
+
+      case 'benchmarksamplingprofile'
+         proplist = cellstr(icemodel.namelists.benchmarksamplingprofile());
+
+      case 'unittest'
+         proplist = cellstr(icemodel.namelists.unittest());
+
+      case 'getpath'
+         proplist = cellstr(icemodel.namelists.getpath());
+
+      case 'rollingbaseline'
+         proplist = cellstr(icemodel.namelists.rollingbaseline());
 
       case 'smbmodel'
-         proplist = {'icemodel', 'skinmodel'}.';
+         proplist = cellstr(icemodel.namelists.smbmodel());
 
       case 'forcings'
-         proplist = {'mar', 'racmo', 'merra'}.';
+         proplist = cellstr(icemodel.namelists.forcings());
 
       case 'sitename'
-         proplist = {'sector', 'behar', 'ak4', 'slv1', 'slv2', 'upperbasin', ...
-            'kanm', 'kanl'}.';
+         proplist = cellstr(icemodel.namelists.sitename());
 
       case 'userdata'
-         proplist = {'mar', 'modis', 'merra', 'racmo', 'kanm', 'kanl'}.';
+         proplist = cellstr(icemodel.namelists.userdata());
 
       case 'uservars'
-         proplist = {'albedo', 'tair', 'swd', 'lwd', 'rh', 'wsdp'}.';
+         proplist = cellstr(icemodel.namelists.uservars());
    end
 end

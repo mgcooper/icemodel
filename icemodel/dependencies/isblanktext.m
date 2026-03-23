@@ -1,35 +1,36 @@
 function tf = isblanktext(x)
-   %ISBLANKTEXT Return true for omitted or zero-length text inputs
+   %ISBLANKTEXT Return true for blank text values.
    %
-   %  TF = ISBLANKTEXT(X) returns TF = true when X is:
-   %   1. an empty array such as string.empty()
-   %   2. a scalar text value with zero characters, such as '' or ""
+   %  TF = ISBLANKTEXT(X) returns TF = true when X is blank text:
+   %   1. a zero-length char array such as '' or char.empty()
+   %   2. a zero-length string value such as "" or string.empty()
    %
-   % This complements ISSCALARTEXT by distinguishing blank/omitted text from
-   % nonblank scalar text.
+   %  TF = ISBLANKTEXT(X) returns false for non-text inputs, missing strings,
+   %  nonscalar string arrays, and nonblank text values.
+   %
+   %  This complements ISSCALARTEXT by handling blank-text detection directly
+   %  instead of inheriting ISSCALARTEXT's legacy acceptance of '' as scalar
+   %  text.
    %
    % Examples
-   % tf = isblanktext("")
-   % tf =
-   % logical
-   %  1
-   %
-   % tf = isblanktext(string.empty())
-   % tf =
-   % logical
-   %  1
-   %
-   % tf = isblanktext("abc")
-   % tf =
-   % logical
-   %  0
+   %  isblanktext("")
+   %  isblanktext('')
+   %  isblanktext(string.empty())
+   %  isblanktext("abc")
 
-   narginchk(1, 1)
+   arguments
+      x
+   end
 
-   if isempty(x)
-      tf = true;
+   if ischar(x)
+      tf = isempty(x) || (isrow(x) && strlength(string(x)) == 0);
       return
    end
 
-   tf = isscalartext(x) && strlength(string(x)) == 0;
+   if isstring(x)
+      tf = isempty(x) || (isscalar(x) && ~ismissing(x) && strlength(x) == 0);
+      return
+   end
+
+   tf = false;
 end

@@ -2,6 +2,8 @@ function varargout = config(varargin)
    %CONFIG Configure icemodel project paths.
    %
    %  CFG = ICEMODEL.CONFIG()
+   %  CFG = ICEMODEL.CONFIG("setenv", false)
+   %  CFG = ICEMODEL.CONFIG("getenv", true)
    %  CFG = ICEMODEL.CONFIG('ICEMODEL_DATA_PATH', PATH_NAME)
    %  CFG = ICEMODEL.CONFIG('ICEMODEL_INPUT_PATH', PATH_NAME)
    %  CFG = ICEMODEL.CONFIG('ICEMODEL_OUTPUT_PATH', PATH_NAME)
@@ -16,6 +18,14 @@ function varargout = config(varargin)
    %  (ICEMODEL_EVAL_PATH), optional userdata swap files
    %  (ICEMODEL_USERDATA_PATH), and the location where model output files are
    %  saved (ICEMODEL_OUTPUT_PATH).
+   %
+   %  CFG = ICEMODEL.CONFIG("setenv", false) Resolves the requested
+   %  configuration structure without mutating the caller's environment.
+   %  With no explicit overrides, this previews the default project config.
+   %
+   %  CFG = ICEMODEL.CONFIG("getenv", true) Returns the current
+   %  environment-backed ICEMODEL_* configuration without mutating it.
+   %  Unset path variables fall back to the default project layout.
    %
    %  CFG = ICEMODEL.CONFIG("ICEMODEL_DATA_PATH", PATH_NAME) Sets the
    %  environment variable ICEMODEL_DATA_PATH to PATH_NAME. PATH_NAME is a
@@ -68,6 +78,11 @@ function varargout = config(varargin)
    %  ICEMODEL_USERDATA_PATH - The path to optional userdata swap files. The
    %                           default value is ICEMODEL_INPUT_PATH/userdata.
    %
+   %  Restart files are not configured through a separate environment
+   %  variable. By default they are written under:
+   %     ICEMODEL_OUTPUT_PATH/<sitename>/<smbmodel>/<userdata>/<testname>/restart
+   %  with blank path components omitted in the usual way.
+   %
    % Note that all input arguments are specified as name-value pairs, also known
    % as keyword arguments (kwargs). Specify inputs using comma-separated
    % name-value pairs: icemodel.config("ICEMODEL_INPUT_PATH", PATH_NAME), or
@@ -108,6 +123,7 @@ function varargout = config(varargin)
    %  icemodel/data/input/userdata/  input user data (default ICEMODEL_USERDATA_PATH)
    %  icemodel/data/eval/            evaluation/reference data (ICEMODEL_EVAL_PATH)
    %  icemodel/data/output/          model output data (ICEMODEL_OUTPUT_PATH)
+   %  icemodel/data/output/.../restart/ year-boundary restart states
    %
    % The default configuration above assumes ICEMODEL_DATA_PATH is nested inside
    % the top level project path, alongside the model code, but this is not
@@ -145,6 +161,10 @@ function varargout = config(varargin)
    %
    %     ICEMODEL_OUTPUT_PATH/<sitename>/<smbmodel>/<testname>
    %
+   %  If opts.saverestart is true, restart files are written under:
+   %
+   %     ICEMODEL_OUTPUT_PATH/<sitename>/<smbmodel>/<testname>/restart
+   %
    %  See demo.m for an example of how to set simulation options using
    %  icemodel.setopts.
    %
@@ -173,16 +193,18 @@ function varargout = config(varargin)
    % See also: icemodel icemodel.setopts icemodel.run.point
 
    % Input parsing
-   kwargs = parseinputs(varargin{:});
+   [kwargs, do_setenv] = parseinputs(varargin{:});
 
    % Toolbox metadata
    kwargs.ICEMODEL_VERSION = icemodel.internal.version();
    kwargs.ICEMODEL_REFERENCE = icemodel.internal.reference();
    kwargs.ICEMODEL_CONTACT = icemodel.internal.contact();
 
-   % Set the environment variables
-   for field = fieldnames(kwargs)'
-      setenv(field{:}, kwargs.(field{:}))
+   % Set the environment variables unless the caller requested a dry run.
+   if do_setenv
+      for field = fieldnames(kwargs)'
+         setenv(field{:}, kwargs.(field{:}))
+      end
    end
 
    % Return the config if requested
@@ -191,48 +213,87 @@ function varargout = config(varargin)
    end
 end
 
-function kwargs = parseinputs(varargin)
-
-   % Set default paths relative to the installation directory
-   default_data_path = icemodel.internal.fullpath('data');
-   default_input_path = fullfile(default_data_path, 'input');
-   default_output_path = fullfile(default_data_path, 'output');
-   default_eval_path = fullfile(default_data_path, 'eval');
-   default_user_path = fullfile(default_input_path, 'userdata');
+function [kwargs, do_setenv] = parseinputs(varargin)
 
    parser = inputParser();
    parser.addParameter('casename', char.empty(), @isscalartext)
-   parser.addParameter('ICEMODEL_DATA_PATH', default_data_path, @isscalartext)
-   parser.addParameter('ICEMODEL_INPUT_PATH', default_input_path, @isscalartext)
-   parser.addParameter('ICEMODEL_OUTPUT_PATH', default_output_path, @isscalartext)
-   parser.addParameter('ICEMODEL_EVAL_PATH', default_eval_path, @isscalartext)
-   parser.addParameter('ICEMODEL_USERDATA_PATH', default_user_path, @isscalartext)
+   parser.addParameter('setenv', true, @(x) isscalar(x) && islogical(x))
+   parser.addParameter('getenv', false, @(x) isscalar(x) && islogical(x))
+   parser.addParameter('ICEMODEL_DATA_PATH', char.empty(), @isscalartext)
+   parser.addParameter('ICEMODEL_INPUT_PATH', char.empty(), @isscalartext)
+   parser.addParameter('ICEMODEL_OUTPUT_PATH', char.empty(), @isscalartext)
+   parser.addParameter('ICEMODEL_EVAL_PATH', char.empty(), @isscalartext)
+   parser.addParameter('ICEMODEL_USERDATA_PATH', char.empty(), @isscalartext)
    parser.parse(varargin{:})
+   do_setenv = parser.Results.setenv;
 
-   % Override the default options for case "demo". Note to users: This option
-   % is used to create an isolated "demo/data/..." directory structure in the
-   % top-level icemodel path. There is only one "casename" option - "demo" -
-   % its only purpose is to configure the demo.
-   if strcmp(parser.Results.casename, 'demo')
-      default_data_path = icemodel.internal.fullpath('demo', 'data');
-      default_input_path = fullfile(default_data_path, 'input');
-      default_output_path = fullfile(default_data_path, 'output');
-      default_eval_path = fullfile(default_data_path, 'eval');
-      default_user_path = fullfile(default_input_path, 'userdata');
-   elseif ~isempty(parser.Results.casename)
-      error('CASENAME argument currently only supports option "DEMO"')
+   has_case_override = ~isempty(parser.Results.casename);
+   has_path_override = any([ ...
+      ~isempty(parser.Results.ICEMODEL_DATA_PATH)
+      ~isempty(parser.Results.ICEMODEL_INPUT_PATH)
+      ~isempty(parser.Results.ICEMODEL_OUTPUT_PATH)
+      ~isempty(parser.Results.ICEMODEL_EVAL_PATH)
+      ~isempty(parser.Results.ICEMODEL_USERDATA_PATH)]);
+
+   if parser.Results.getenv
+      if has_case_override || has_path_override
+         error(['GETENV mode does not accept casename or explicit path ' ...
+            'overrides.'])
+      end
+      do_setenv = false;
    end
 
-   kwargs.ICEMODEL_DATA_PATH = getresult(parser, 'ICEMODEL_DATA_PATH', ...
-      default_data_path);
-   kwargs.ICEMODEL_INPUT_PATH = getresult(parser, 'ICEMODEL_INPUT_PATH', ...
-      default_input_path);
-   kwargs.ICEMODEL_OUTPUT_PATH = getresult(parser, 'ICEMODEL_OUTPUT_PATH', ...
-      default_output_path);
-   kwargs.ICEMODEL_EVAL_PATH = getresult(parser, 'ICEMODEL_EVAL_PATH', ...
-      default_eval_path);
-   kwargs.ICEMODEL_USERDATA_PATH = getresult(parser, 'ICEMODEL_USERDATA_PATH', ...
-      default_user_path);
+   % Override the default options for the repo-local demo/test data tree.
+   % TEST is a readability alias used by the formal suite; it resolves to
+   % the same canonical demo/data workspace as DEMO.
+   if any(strcmp(parser.Results.casename, {'demo', 'test'}))
+      default_data_path = icemodel.internal.fullpath('demo', 'data');
+   elseif ~isempty(parser.Results.casename)
+      error(['CASENAME argument currently only supports options ', ...
+         '"DEMO" and "TEST"'])
+   else
+      default_data_path = icemodel.internal.fullpath('data');
+   end
+
+   % GETENV mode reads the caller's current environment-backed config without
+   % mutating it. Otherwise, build the requested/default config preview.
+   if parser.Results.getenv
+      current_data_path = getenv('ICEMODEL_DATA_PATH');
+      kwargs.ICEMODEL_DATA_PATH = resolvePathValue( ...
+         current_data_path, default_data_path);
+   else
+      kwargs.ICEMODEL_DATA_PATH = resolvePathValue( ...
+         parser.Results.ICEMODEL_DATA_PATH, default_data_path);
+   end
+
+   % Rebuild defaults depending on "demo/data" or default "data/" top folder.
+   default_input_path = fullfile(kwargs.ICEMODEL_DATA_PATH, 'input');
+   default_output_path = fullfile(kwargs.ICEMODEL_DATA_PATH, 'output');
+   default_eval_path = fullfile(kwargs.ICEMODEL_DATA_PATH, 'eval');
+   default_user_path = fullfile(default_input_path, 'userdata');
+
+   % Choose defaults or user-supplied values. In the no-override dry-run case,
+   % pull from the current environment first so callers can inspect the active
+   % config without mutating it.
+   if parser.Results.getenv
+      kwargs.ICEMODEL_INPUT_PATH = resolvePathValue( ...
+         getenv('ICEMODEL_INPUT_PATH'), default_input_path);
+      kwargs.ICEMODEL_OUTPUT_PATH = resolvePathValue( ...
+         getenv('ICEMODEL_OUTPUT_PATH'), default_output_path);
+      kwargs.ICEMODEL_EVAL_PATH = resolvePathValue( ...
+         getenv('ICEMODEL_EVAL_PATH'), default_eval_path);
+      kwargs.ICEMODEL_USERDATA_PATH = resolvePathValue( ...
+         getenv('ICEMODEL_USERDATA_PATH'), default_user_path);
+   else
+      kwargs.ICEMODEL_INPUT_PATH = resolvePathValue( ...
+         parser.Results.ICEMODEL_INPUT_PATH, default_input_path);
+      kwargs.ICEMODEL_OUTPUT_PATH = resolvePathValue( ...
+         parser.Results.ICEMODEL_OUTPUT_PATH, default_output_path);
+      kwargs.ICEMODEL_EVAL_PATH = resolvePathValue( ...
+         parser.Results.ICEMODEL_EVAL_PATH, default_eval_path);
+      kwargs.ICEMODEL_USERDATA_PATH = resolvePathValue( ...
+         parser.Results.ICEMODEL_USERDATA_PATH, default_user_path);
+   end
 
    if ~(exist(kwargs.ICEMODEL_INPUT_PATH, 'dir') == 7)
       warning(['ICEMODEL_INPUT_PATH does not exist. ' ...
@@ -240,10 +301,10 @@ function kwargs = parseinputs(varargin)
    end
 end
 
-function value = getresult(parser, name, default_value)
-   if ismember(name, parser.UsingDefaults)
+function value = resolvePathValue(input_value, default_value)
+   if isempty(input_value)
       value = default_value;
    else
-      value = parser.Results.(name);
+      value = input_value;
    end
 end
