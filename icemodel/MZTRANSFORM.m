@@ -1,5 +1,5 @@
 function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_iter, f_liq, f_wat, dLdT, ...
-      ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, f_liq_max, i_M, ok)
+      ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, f_liq_max, i_M, ok, debug)
    %MZTRANSFORM Liquid fraction change to temperature-enthalpy transformation
    %
    % This function uses the change in liquid fraction returned by the numerical
@@ -84,8 +84,10 @@ function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_iter, f_liq, f_wat, dLdT, ...
          (f_liq(i_M) > (1.0 + tol) * f_liq_max(i_M)) ...
          )
 
-      dumpMZTransformFailure("pmelt_overshot_melt_zone_bounds", T, T_iter, ...
-         f_ice, f_liq, f_wat, f_liq_min, f_liq_max, i_M);
+      if debug
+         dumpMZTransformFailure("pmelt_overshot_melt_zone_bounds", T, T_iter, ...
+            f_ice, f_liq, f_wat, f_liq_min, f_liq_max, i_M);
+      end
 
       ok = false;
       return
@@ -163,8 +165,10 @@ function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_iter, f_liq, f_wat, dLdT, ...
          iscomplex(T)) || any(~isfinite(T) ...
          )
 
-      dumpMZTransformFailure("skipped_melt_zone_or_complex", T, T_iter, ...
-         f_ice, f_liq, f_wat, f_liq_min, f_liq_max, i_M);
+      if debug
+         dumpMZTransformFailure("skipped_melt_zone_or_complex", T, T_iter, ...
+            f_ice, f_liq, f_wat, f_liq_min, f_liq_max, i_M);
+      end
 
       ok  = false;
       return

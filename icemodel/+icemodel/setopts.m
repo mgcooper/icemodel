@@ -153,6 +153,10 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
    opts.calendar_type   =  'noleap';
 
+   % debug mode — enable via resetopts(opts, 'debug', true)
+   opts.debug           =  false;   % enable solver diagnostic dumps
+   opts.debug_path      =  '';      % override for debug output folder
+
    % model parameters
    opts.z_0             =  0.001;   % Surface aero. roughness length    [m]
    opts.ro_ice_init     =  900.0;   % initial ice density               [kg/m3]
@@ -168,7 +172,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       % 1 = Dirichlet w/ lagged Ts-T closure iterations
       % 2 = Robin w/ single Ts-T coupling iteration
       % 3 = Robin w/ strong Ts-T coupling iterations
-      opts.solver          = 3;     % recommended: 3
+      opts.solver          = 2;     % recommended: 3
 
       % surface (SEB) solver (Dirichlet Ts boundary condition when solver = 1)
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)

@@ -1,11 +1,9 @@
 function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
       delz, fn, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf, tol, ...
-      maxiter, alpha)
+      maxiter, alpha, debug)
    %SKINSOLVE Solve the 1-dimensional heat conduction equation
    %
    %#codegen
-
-   debug = false;
 
    % Solver options
    if maxiter == 1
@@ -59,10 +57,6 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
       % Solve the equation
       T = TRISOLVE(-aN, aP, -aS, b);
 
-      if debug == true
-         plot_temp(T, T_iter, Ts, dz)
-      end
-
       % Prep for next iteration
       if all(abs(T - T_iter) < tol)
          ok = true;
@@ -87,20 +81,10 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
       k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
    end
 
-   if not(ok)
+   if ~ok && debug
       dumpSkinSolveFailure(T, f_ice, f_liq, k_eff, dz, delz, dt, Ts, iter, ...
          maxiter);
    end
-end
-
-function plot_temp(T, T_iter, Ts, dz)
-   Z = cumsum(dz) - dz / 2;
-   figure; hold on
-   plot(T, Z)
-   plot(T_iter, Z, '--')
-   scatter(Ts, 0, 'filled')
-   set(gca, 'YDir', 'reverse')
-   legend('T', 'T iter', 'Ts')
 end
 
 function dumpSkinSolveFailure(T, f_ice, f_liq, k_eff, dz, delz, dt, Ts, ...

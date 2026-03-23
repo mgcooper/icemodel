@@ -6,15 +6,11 @@ function [Ts, T, f_ice, f_liq, n_subfail, substep, dt, ok] = CHECKSUBSTEP( ...
    dt_min = dt_FULL_STEP / maxsubstep;
 
    if ok
-      if debug == true
-         % Mass conservation / control volume check
-         assertF(@() all(f_ice + f_liq * ro_liq / ro_ice <= 1 + eps))
-      end
+      % Mass conservation / control volume check
+      assertF(@() all(f_ice + f_liq * ro_liq / ro_ice <= 1 + eps))
    else
-      % Dump the failing state before reset if this failure will saturate
-      % the substep budget or if an explicit debug dump was requested.
-      if (n_subfail + 1 >= maxsubstep) || ...
-            ~isempty(getenv('ICEMODEL_DEBUG_MAXSUBSTEP_FILE'))
+      % Dump the failing state when debug mode is enabled.
+      if debug
          dumpMaxsubstepDebugState(Ts, T, f_ice, f_liq, ...
             xTs, xT, xf_ice, xf_liq, dt_sum, dt, dt_FULL_STEP, timestep, ...
             numsteps, substep, maxsubstep, n_subfail + 1);

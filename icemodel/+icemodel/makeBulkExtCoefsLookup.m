@@ -8,7 +8,7 @@ function lookup = makeBulkExtCoefsLookup(dz_spect, tau_N, ...
    %
    % The lookup is approximate because it quantizes snow density to the
    % supplied RO_GRID before evaluating the spectral transform.
-
+   %
    %#codegen
 
    % Default to an integer-density lookup over the current supported range.
@@ -22,10 +22,9 @@ function lookup = makeBulkExtCoefsLookup(dz_spect, tau_N, ...
    % Build one bulk-extinction profile per quantized density.
    n_bulk = size(tau_N, 1) + 2;
    table = zeros(n_bulk, numel(ro_grid));
-   for i = 1:numel(ro_grid)
-      table(:, i) = BULKEXTCOEFS(dz_spect, ...
-         ro_grid(i) * ones(size(tau_N, 1), 1), ...
-         tau_N, tau_S, solar_dwavel);
+   for n = 1:numel(ro_grid)
+      table(:, n) = BULKEXTCOEFS(dz_spect, ...
+         ro_grid(n) * ones(size(tau_N, 1), 1), tau_N, tau_S, solar_dwavel);
    end
 
    % Record the lookup metadata needed by the fast gather path.

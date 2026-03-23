@@ -79,6 +79,15 @@ function opts = resetopts(opts, varargin)
       opts.pathrestart = [];
    end
 
+   % Clear the derived debug path when its source fields change, so
+   % configureRun will rebuild it from the updated output root.
+   if any(ismember(names, {'pathdata', 'pathoutput', 'sitename', 'smbmodel', ...
+         'testname', 'debug'})) ...
+         && ~ismember('debug_path', names) ...
+         && isfield(opts, 'debug_path')
+      opts.debug_path = '';
+   end
+
    if ismember('pathinput', names) && ~ismember('pathuserdata', names)
       opts.pathuserdata = [];
    end

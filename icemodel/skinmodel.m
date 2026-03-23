@@ -12,7 +12,6 @@ function [ice1, ice2, opts] = skinmodel(opts)
 
    %% INITIALIZE THE MODEL
 
-   debug = true;
    assertF off
    opts = icemodel.configureRun(opts);
    opts = icemodel.prepareRunOutput(opts);
@@ -73,13 +72,13 @@ function [ice1, ice2, opts] = skinmodel(opts)
                ppt(metstep), tppt(metstep), psfc(metstep), De(metstep), ...
                ea, cv_air, emiss, SB, chi, roL, scoef, liqflag, seb_solver, ...
                tol, maxiter, alpha, cpl_maxiter, cpl_Ts_tol, cpl_seb_tol, ...
-               cpl_alpha, cpl_aitken, cpl_jumpmax);
+               cpl_alpha, cpl_aitken, cpl_jumpmax, opts.debug);
 
             % CHECK SUBSTEP FAILURE (shorten dt and restart substep on failure)
             [Ts, T, f_ice, f_liq, n_subfail, substep, dt, ok] = ...
                CHECKSUBSTEP(Ts, T, f_ice, f_liq, xTs, xT, xf_ice, xf_liq, ...
                ro_ice, ro_liq, dt_sum, dt, dt_FULL_STEP, timestep, numsteps, ...
-               substep, maxsubstep, n_subfail, debug, eps, ok);
+               substep, maxsubstep, n_subfail, opts.debug, eps, ok);
             if not(ok)
                continue
             end
@@ -120,8 +119,8 @@ function [ice1, ice2, opts] = skinmodel(opts)
          end
 
          % MOVE TO THE NEXT TIMESTEP
-         [metstep, substep, dt] = NEXTSTEP(metstep, substep, ...
-            dt, dt_FULL_STEP, maxsubstep, ok, n_subfail, n_iters);
+         [metstep, substep, dt] = NEXTSTEP(metstep, substep, dt_FULL_STEP, ...
+            maxsubstep, ok, n_subfail, n_iters);
 
       end % timesteps (one year)
 

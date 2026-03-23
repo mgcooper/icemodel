@@ -37,7 +37,7 @@ function [ice1, ice2, opts] = icemodel(opts)
 
    %% INITIALIZE THE MODEL
 
-   debug = true;
+   % Runtime configuration
    assertF on
    opts = icemodel.configureRun(opts);
    opts = icemodel.prepareRunOutput(opts);
@@ -64,7 +64,7 @@ function [ice1, ice2, opts] = icemodel(opts)
 
    % INITIALIZE THE THERMAL MODEL
    [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, roL, ...
-      liqflag, Ts, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, ...
+      liqflag, Ts, JJ, ~, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, ...
       f_ice_min, f_liq_res] = ICEINIT(opts, tair);
 
    % INITIALIZE THE SPECTRAL MODEL
@@ -110,14 +110,14 @@ function [ice1, ice2, opts] = icemodel(opts)
                   lwd(metstep), albedo(metstep), wspd(metstep), ...
                   ppt(metstep), tppt(metstep), psfc(metstep), De(metstep), ...
                   ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
-                  liqflag, Ts, T, k_eff, dz, seb_solver);
+                  liqflag, Ts, T, k_eff, dz, seb_solver, opts.debug);
 
                % SUBSURFACE ENERGY BALANCE
                [T, f_ice, f_liq, k_eff, ok_ieb, n_iters] ...
                   = ICEENBAL(T, f_ice, f_liq, dz, delz, fn, Sc, dt, JJ, Ts, ...
                   k_liq, cv_ice, cv_liq, ro_ice, ro_liq, Ls, Lf, roLf, Rv, ...
                   Tf, fcp, TL, TH, f_ell_min, f_ell_max, Fc, Fp, solver, ...
-                  tol, maxiter, alpha, use_aitken, jumpmax);
+                  tol, maxiter, alpha, use_aitken, jumpmax, opts.debug);
 
             elseif solver > 1 % Robin single-sweep and strong coupling modes
 
@@ -130,7 +130,8 @@ function [ice1, ice2, opts] = icemodel(opts)
                   ppt(metstep), tppt(metstep), psfc(metstep), De(metstep), ...
                   ea, cv_air, emiss, SB, roL, scoef, chi, liqflag, solver, ...
                   tol, maxiter, alpha, use_aitken, jumpmax, cpl_Ts_tol, ...
-                  cpl_seb_tol, cpl_maxiter, cpl_alpha, cpl_aitken, cpl_jumpmax);
+                  cpl_seb_tol, cpl_maxiter, cpl_alpha, cpl_aitken, cpl_jumpmax, ...
+                  opts.debug);
             end
             ok = ok_seb && ok_ieb;
 
@@ -138,9 +139,9 @@ function [ice1, ice2, opts] = icemodel(opts)
             [Ts, T, f_ice, f_liq, n_subfail, substep, dt, ok] ...
                = CHECKSUBSTEP(Ts, T, f_ice, f_liq, xTs, xT, xf_ice, xf_liq, ...
                ro_ice, ro_liq, dt_sum, dt, dt_FULL_STEP, timestep, numsteps, ...
-               substep, maxsubstep, n_subfail, debug, eps, ok);
+               substep, maxsubstep, n_subfail, opts.debug, eps, ok);
 
-            if not(ok)
+            if ~ok
                continue
             end
 
@@ -192,8 +193,8 @@ function [ice1, ice2, opts] = icemodel(opts)
          end
 
          % MOVE TO THE NEXT TIMESTEP
-         [metstep, substep, dt] = NEXTSTEP(metstep, substep, ...
-            dt, dt_FULL_STEP, maxsubstep, ok, n_subfail, n_iters);
+         [metstep, substep, dt] = NEXTSTEP(metstep, substep, dt_FULL_STEP, ...
+            maxsubstep, ok, n_subfail, n_iters);
 
       end % timesteps (one year)
 

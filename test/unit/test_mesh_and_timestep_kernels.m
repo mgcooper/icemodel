@@ -103,9 +103,9 @@ function test_nextstep_adapts_substep_divisor(testCase)
    % NEXTSTEP should shrink or grow the substep divisor based on the recent
    % convergence history and hard failures.
 
-   [~, substep_fast, dt_fast] = NEXTSTEP(1, 3, 300, 900, 9, true, 0, 1);
-   [~, substep_slow, dt_slow] = NEXTSTEP(1, 3, 300, 900, 9, true, 2, 15);
-   [~, substep_fail, dt_fail] = NEXTSTEP(1, 3, 300, 900, 9, false, 0, 0);
+   [~, substep_fast, dt_fast] = NEXTSTEP(1, 3, 900, 9, true, 0, 1);
+   [~, substep_slow, dt_slow] = NEXTSTEP(1, 3, 900, 9, true, 2, 15);
+   [~, substep_fail, dt_fail] = NEXTSTEP(1, 3, 900, 9, false, 0, 0);
 
    testCase.verifyLessThan(substep_fast, 3);
    testCase.verifyGreaterThan(substep_slow, 3);

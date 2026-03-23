@@ -3,7 +3,7 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok, n_iters] = ...
       k_liq, cv_ice, cv_liq, Ls, Rv, Tf, tair, swd, lwd, albedo, wspd, ...
       ppt, tppt, psfc, De, ea, cv_air, emiss, SB, chi, roL, scoef, ...
       liqflag, seb_solver, tol, maxiter, alpha, cpl_maxiter, cpl_Ts_tol, ...
-      cpl_seb_tol, cpl_alpha, cpl_aitken, cpl_jumpmax)
+      cpl_seb_tol, cpl_alpha, cpl_aitken, cpl_jumpmax, debug)
    %SKINEBSOLVE Coupled skin-subsurface Ts-T solve.
    %
    %#codegen
@@ -12,43 +12,50 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok, n_iters] = ...
    k_eff = GETGAMMA(xT, xf_ice, xf_liq, ro_ice, k_liq, Ls, Rv, Tf);
    [Ts, ok_seb] = SEBSOLVE(tair, swd, lwd, albedo, wspd, ppt, tppt, ...
       psfc, De, ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
-      liqflag, xTs, xT, k_eff, dz, seb_solver);
+      liqflag, xTs, xT, k_eff, dz, seb_solver, debug);
    Ts = MELTTEMP(Ts, Tf);
 
    % Initialize past Picard iterates for Aitken-acceleration
    Ts_1 = nan;
    Ts_2 = nan;
 
-   % Run the coupler
+   % Initial values for convergence checks
    ok_cpl = false;
-   seb_res = nan;
-   old = Ts;
+   Ts_old = Ts;
    Ts_diag = Ts;
+   seb_res = nan;
+
+   % Run outer Ts-T convergence loop (iterative block/Picard coupling).
    for cpliter = 1:cpl_maxiter
 
       % Inner subsurface solve from checkpoint state w/o physical advancement
       [T, f_ice, f_liq, k_eff, ok_ieb, n_iters] = SKINSOLVE(xT, ...
          xf_ice, xf_liq, dz, delz, fn, dt, JJ, Ts, k_liq, cv_ice, ...
-         cv_liq, ro_ice, Ls, Rv, Tf, tol, maxiter, alpha);
-      if not(ok_ieb)
-         dumpSkinEbSolveFailure("skinsolve_failed", Ts, Ts_diag, old, T, ...
-            f_ice, f_liq, k_eff, dt, cpliter, cpl_maxiter, cpl_Ts_tol, ...
-            cpl_seb_tol, seb_res, n_iters, ok_seb, ok_ieb, ok_cpl);
+         cv_liq, ro_ice, Ls, Rv, Tf, tol, maxiter, alpha, debug);
+
+      if ~ok_ieb
+         if debug
+            dumpSkinEbSolveFailure("skinsolve_failed", Ts, Ts_diag, Ts_old, ...
+               T, f_ice, f_liq, k_eff, dt, cpliter, cpl_maxiter, cpl_Ts_tol, ...
+               cpl_seb_tol, seb_res, n_iters, ok_seb, ok_ieb, ok_cpl);
+         end
          break
       end
 
       % Inner surface solve (in-loop corrector using updated trial state)
-      old = Ts;
+      Ts_old = Ts;
       [Ts, ok_seb] = SEBSOLVE(tair, swd, lwd, albedo, wspd, ppt, tppt, ...
          psfc, De, ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
-         liqflag, Ts, T, k_eff, dz, seb_solver);
+         liqflag, Ts, T, k_eff, dz, seb_solver, debug);
       Ts = MELTTEMP(Ts, Tf);
       Ts_diag = Ts;
 
       if not(ok_seb)
-         dumpSkinEbSolveFailure("sebsolve_failed", Ts, Ts_diag, old, T, ...
-            f_ice, f_liq, k_eff, dt, cpliter, cpl_maxiter, cpl_Ts_tol, ...
-            cpl_seb_tol, seb_res, n_iters, ok_seb, ok_ieb, ok_cpl);
+         if debug
+            dumpSkinEbSolveFailure("sebsolve_failed", Ts, Ts_diag, Ts_old, T, ...
+               f_ice, f_liq, k_eff, dt, cpliter, cpl_maxiter, cpl_Ts_tol, ...
+               cpl_seb_tol, seb_res, n_iters, ok_seb, ok_ieb, ok_cpl);
+         end
          break
       end
 
@@ -64,7 +71,7 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok, n_iters] = ...
 
       % Check convergence (bypass coupler if cpl_maxiter == 1)
       if (cpl_maxiter == 1) || ...
-            abs(Ts - old) < cpl_Ts_tol && seb_res < cpl_seb_tol
+            abs(Ts - Ts_old) < cpl_Ts_tol && seb_res < cpl_seb_tol
          ok_cpl = true;
          break
       end
@@ -72,21 +79,23 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok, n_iters] = ...
       % Aitken acceleration with relaxation-fallback
       Ts_0 = Ts;
       Ts = MELTTEMP(aitkenscalar(Ts_2, Ts_1, Ts_0, ...
-         (1.0 - cpl_alpha) * old + cpl_alpha * Ts, ... % relaxation
+         (1.0 - cpl_alpha) * Ts_old + cpl_alpha * Ts, ... % relaxation
          cpl_jumpmax, cpl_aitken), Tf);
       Ts_2 = Ts_1;
       Ts_1 = Ts_0;
 
-      if abs(Ts - old) < cpl_Ts_tol && seb_res < cpl_seb_tol
+      if abs(Ts - Ts_old) < cpl_Ts_tol && seb_res < cpl_seb_tol
          ok_cpl = true;
          break
       end
    end
 
+   % Hitting max coupling iterations without ok_cpl is a substep fail
    ok = ok_seb && ok_ieb && ok_cpl;
-   if not(ok)
-      dumpSkinEbSolveFailure("coupler_nonconvergence", Ts, Ts_diag, old, T, ...
-         f_ice, f_liq, k_eff, dt, cpliter, cpl_maxiter, cpl_Ts_tol, ...
+
+   if ~ok && debug
+      dumpSkinEbSolveFailure("coupler_nonconvergence", Ts, Ts_diag, Ts_old, ...
+         T, f_ice, f_liq, k_eff, dt, cpliter, cpl_maxiter, cpl_Ts_tol, ...
          cpl_seb_tol, seb_res, n_iters, ok_seb, ok_ieb, ok_cpl);
    end
 end
