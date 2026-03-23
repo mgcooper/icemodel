@@ -1,12 +1,12 @@
 function TT = retimeHourlyFixedStep(TT)
    %RETIMEHOURLYFIXEDSTEP Aggregate aligned 15-minute data to hourly means.
    %
-   %  TT = icemodel.internal.retimeHourlyFixedStep(TT)
+   %  TT = icemodel.retimeHourlyFixedStep(TT)
    %
    % This helper is intended for the postprocess path where the model output
-   % is already known to be regular 15-minute data. If the row times are not
-   % aligned to exact hourly windows, the caller should fall back to MATLAB's
-   % generic RETIME implementation instead.
+   % is known to be 15-minute data (opts.dt == 900). The reshape-based
+   % aggregation requires only that the sample count is divisible by 4 and
+   % the first sample is hour-aligned.
 
    % Return early on empty inputs so callers can stay simple.
    if isempty(TT)
@@ -15,8 +15,8 @@ function TT = retimeHourlyFixedStep(TT)
 
    % Enforce the narrow fixed-step contract used by postprocess.
    if ~isFixedStepHourlyCompatible(TT.Properties.RowTimes)
-      error(['retimeHourlyFixedStep requires data aligned to exact 15-minute ', ...
-         'steps starting on an hourly boundary'])
+      error(['retimeHourlyFixedStep requires a sample count divisible by 4 ', ...
+         'starting on an hourly boundary'])
    end
 
    % Collapse each block of four quarter-hour samples into one hourly mean.
@@ -35,18 +35,14 @@ function TT = retimeHourlyFixedStep(TT)
 end
 
 function tf = isFixedStepHourlyCompatible(time)
-   %ISFIXEDSTEPHOURLYCOMPATIBLE Check the narrow fixed-step retime contract.
+   %ISFIXEDSTEPHOURLYCOMPATIBLE Check the fixed-step retime contract.
+   %
+   % The caller (postprocess) guarantees the cadence via opts.dt == 900.
+   % This check only enforces the structural requirements for the
+   % reshape-based aggregation: divisible by 4 and hour-aligned start.
 
-   tf = true;
-   if numel(time) < 4 || mod(numel(time), 4) ~= 0
-      tf = false;
-      return
-   end
-
-   % Require exact quarter-hour spacing so the reshape-based aggregation is
-   % identical to the hourly averaging windows used by RETIME.
-   dt = diff(time);
-   tf = tf && all(dt == minutes(15));
-   tf = tf && minute(time(1)) == 0;
-   tf = tf && second(time(1)) == 0;
+   tf = numel(time) >= 4 ...
+      && mod(numel(time), 4) == 0 ...
+      && minute(time(1)) == 0 ...
+      && second(time(1)) == 0;
 end

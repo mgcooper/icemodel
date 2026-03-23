@@ -189,7 +189,7 @@ function test_retimeHourlyFixedStep_matches_legacy_hourly_mean(testCase)
 
    % Compare the legacy timetable RETIME result to the fixed-step helper.
    legacy = legacyHourlyMean(ice1_tt);
-   fixed = icemodel.internal.retimeHourlyFixedStep(ice1_tt);
+   fixed = icemodel.retimeHourlyFixedStep(ice1_tt);
 
    testCase.verifyEqual(fixed.Time, legacy.Time);
    testCase.verifyEqual(double(fixed{:,:}), double(legacy{:,:}), ...

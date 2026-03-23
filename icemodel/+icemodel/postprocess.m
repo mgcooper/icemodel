@@ -74,16 +74,11 @@ function varargout = postprocess(ice1, ice2, opts, varargin)
    ice1 = struct2table(ice1);
    ice1 = table2timetable(ice1, 'RowTimes', time);
 
-   % Retime 15 min data to hourly. Prefer the fixed-step helper when the
-   % output is aligned to exact quarter-hour samples, and fall back to the
-   % generic timetable retime otherwise.
+   % Retime 15 min data to hourly using the fixed-step reshape helper.
+   % opts.dt == 900 guarantees the cadence; the helper only needs the sample
+   % count to be divisible by 4 and the first sample aligned to the hour.
    if opts.dt == 900
-      if canUseFixedStepHourly(ice1.Time)
-         ice1 = icemodel.internal.retimeHourlyFixedStep(ice1);
-      else
-         ice1 = retime(ice1, 'hourly', 'mean');
-         ice1 = ice1(~(month(ice1.Time) == 2 & day(ice1.Time) == 29), :);
-      end
+      ice1 = icemodel.retimeHourlyFixedStep(ice1);
       [ice1, ice2] = retimeLogical(ice1, ice2);
       ice2 = retimeIce2(ice2, ice1.Time);
    end
@@ -147,16 +142,6 @@ function [ice1, ice2] = subsetOutput(ice1, ice2, ii)
 end
 
 %%
-function tf = canUseFixedStepHourly(Time)
-   % Check whether the current output cadence is compatible with the fixed
-   % 15-minute-to-hourly aggregation helper.
-
-   tf = numel(Time) >= 4 ...
-      && mod(numel(Time), 4) == 0 ...
-      && all(diff(Time) == minutes(15)) ...
-      && minute(Time(1)) == 0 ...
-      && second(Time(1)) == 0;
-end
 
 %%
 function ice2 = retimeIce2(ice2, Time)

@@ -29,12 +29,12 @@ function report = summarize_postprocess_perf(kwargs)
 
    % Measure the legacy timetable RETIME branch against the fixed-step path.
    legacy_s = timeit(@() legacyHourlyMean(ice1_tt));
-   fixed_s = timeit(@() icemodel.internal.retimeHourlyFixedStep(ice1_tt));
+   fixed_s = timeit(@() icemodel.retimeHourlyFixedStep(ice1_tt));
 
    % Confirm the fixed-step helper reproduces the legacy output exactly on
    % the aligned 15-minute timetable used by postprocess.
    legacy = legacyHourlyMean(ice1_tt);
-   fixed = icemodel.internal.retimeHourlyFixedStep(ice1_tt);
+   fixed = icemodel.retimeHourlyFixedStep(ice1_tt);
 
    report = struct();
    report.timing = table(["retime_legacy"; "retime_fixed_step"], ...

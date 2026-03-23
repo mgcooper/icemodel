@@ -49,12 +49,12 @@ classdef PostprocessPerfTest < matlab.perftest.TestCase
       function testHourlyRetimeFixedStep(testCase)
          % Benchmark the fixed-step hourly aggregation helper.
          batch_size = 64;
-         ice1_hourly = icemodel.internal.retimeHourlyFixedStep(testCase.ice1_tt);
+         ice1_hourly = icemodel.retimeHourlyFixedStep(testCase.ice1_tt);
          testCase.assertTrue(~isempty(ice1_hourly));
 
          while testCase.keepMeasuring
             for n = 1:batch_size
-               ice1_hourly = icemodel.internal.retimeHourlyFixedStep( ...
+               ice1_hourly = icemodel.retimeHourlyFixedStep( ...
                   testCase.ice1_tt);
             end
             if isempty(ice1_hourly)
