@@ -34,7 +34,7 @@ passes it as `k_bulk_lookup` to `SPECTRALSOURCETERM`, which dispatches on
 2. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/SPECTRALSOURCETERM.m`
    - main entrypoint called by `icemodel.m`
    - remaps thermal density to the spectral grid
-   - chooses exact or lookup bulk coefficients via `isempty(k_bulk_lookup)`
+   - chooses exact or lookup bulk extinction coefficients via `isempty(k_bulk_lookup)`
    - solves the two-stream system
    - reconstructs net spectral flux
    - collapses that flux to the thermal-grid source term and `chi`
@@ -47,7 +47,7 @@ passes it as `k_bulk_lookup` to `SPECTRALSOURCETERM`, which dispatches on
 6. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/SPECTRALNETFLUX.m`
    - reconstructs net spectral flux from the up/down solution
 7. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/UPDATEEXTCOEFS.m`
-   - rebuilds `k_ext`, `tau_N`, `tau_S` (and optionally `k_bulk_lookup`) for
+   - rebuilds `tau_N`, `tau_S`, `k_ext` (and optionally `k_bulk_lookup`) for
      one optical grain-radius index; designed for future grain-size evolution
 8. `/Users/mattcooper/MATLAB/projects/icemodel/test/legacy/SPECTRALSOURCETERM_INLINE.m`
    - preserved historical inline reference used only by kernel benchmarks

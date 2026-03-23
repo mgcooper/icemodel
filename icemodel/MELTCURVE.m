@@ -40,6 +40,7 @@ function [T, f_ice, f_liq, f_wat, dFdT] = MELTCURVE(T, f_ice, f_liq, ...
       % Differentiate the freezing curve w.r.t temperature, eq 68, Jordan
       dFdT = 2.0 * fcp ^ 2.0 * T_dep .* f_wat ...
          ./ (1.0 + fcp ^ 2.0 * T_dep .^ 2.0) .^ 2.0;
+      dFdT = max(dFdT, sqrt(eps));
    end
 end
 

@@ -39,8 +39,8 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
             testCase.ro_sno, testCase.z_nodes_spect, ...
             'nearest', 'extrap'), 300);
 
-         % Build the exact bulk coefficients once for the narrow bulk and
-         % two-stream benchmarks below.
+         % Build the exact bulk extinction coefficients once for the narrow
+         % bulk and two-stream benchmarks below.
          testCase.k_bulk = BULKEXTCOEFS( ...
             s.dz_spect, testCase.ro_sno_spect, s.tau_N, s.tau_S, s.solar_dwavel);
 

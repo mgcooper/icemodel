@@ -390,7 +390,7 @@ Use when:
 
 Purpose:
 
-- save comparison figures for bulk coefficients, spectral net flux,
+- save comparison figures for bulk extinction coefficients, spectral net flux,
   spectral divergence, and thermal source term
 
 Use when:

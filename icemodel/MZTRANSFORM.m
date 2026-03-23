@@ -1,4 +1,4 @@
-function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_old, f_liq, f_wat, ...
+function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_iter, f_liq, f_wat, dLdT, ...
       ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, f_liq_max, i_M, ok)
    %MZTRANSFORM Liquid fraction change to temperature-enthalpy transformation
    %
@@ -30,16 +30,19 @@ function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_old, f_liq, f_wat, ...
    % Nodes that already started inside the melt zone are allowed to leave it
    % during the corrector step as long as the predictor overshoots the melt-
    % zone phase bounds only slightly. Small overshoots are projected onto the
-   % correct branch using the old melt-zone slope; larger overshoots trigger
-   % timestep reduction.
+   % correct branch using the iteration-start melt-zone slope; larger
+   % overshoots trigger timestep reduction.
    %
    % Notes:
-   %  - T_old is needed both for the melt-zone skipping check and for the
-   %    linearized projection of nodes that exit the melt zone.
+   %  - T_iter is the temperature at the start of the current inner iteration,
+   %    needed both for the melt-zone skipping check and for the linearized
+   %    projection of nodes that exit the melt zone.
+   %  - dLdT is the freeze-curve derivative df_liq/dT evaluated at T_iter,
+   %    passed in from ICEENBAL to avoid redundant recomputation.
    %  - f_liq_min/max are f_liq at T=TL/TH, given the current f_wat, not the
    %    min/max possible f_liq (but f_liq_max = f_wat for an ice model)
    %  - i_M is the melt zone nodes at each inner iteration, f_wat is the
-   %    water fraction at the start of the outer iterations.
+   %    water fraction at the current Picard (outer) iteration.
    %
    % See also: FREEZECURVE MELTCURVE
    %
@@ -81,7 +84,7 @@ function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_old, f_liq, f_wat, ...
          (f_liq(i_M) > (1.0 + tol) * f_liq_max(i_M)) ...
          )
 
-      dumpMZTransformFailure("pmelt_overshot_melt_zone_bounds", T, T_old, ...
+      dumpMZTransformFailure("pmelt_overshot_melt_zone_bounds", T, T_iter, ...
          f_ice, f_liq, f_wat, f_liq_min, f_liq_max, i_M);
 
       ok = false;
@@ -89,7 +92,7 @@ function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_old, f_liq, f_wat, ...
    end
 
    %%% Update temperature
-   % Below here, transform T(i_M) = ro_liq * (f_liq_new - f_liq_old) -> T_new
+   % Below here, transform T(i_M) = ro_liq * (f_liq_new - f_liq_old) to T_new
    %
    % The older version applied the melt-zone analytic inverse to all melt-zone
    % nodes that survived the tol overshoot check (like Jordan). That is not
@@ -116,10 +119,10 @@ function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_old, f_liq, f_wat, ...
 
    % Note: above uses the new f_liq directly, which is correct. Don't use this
    % update (use it below for nodes that have exited):
-   % T(i_M) = T_old(i_M) + T(i_M) ./ (ro_liq * dFdT_old(i_M));
+   % T(i_M) = T_iter(i_M) + T(i_M) ./ (ro_liq * dLdT_iter(i_M));
 
    % For nodes that exit the melt zone with only a small predictor overshoot,
-   % use the local linearized predictor dFdT to move T onto the frozen or liquid
+   % use the local linearized predictor dLdT to move T onto the frozen or liquid
    % branch, then let the next nonlinear iteration rebuild the coefficients with
    % the updated classification.
 
@@ -129,21 +132,16 @@ function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_old, f_liq, f_wat, ...
    if any(i_lo | i_hi)
 
       % What below does conceptually:
-      % T_new ≈ T_old + P / (ro_liq * (dF/dT)_old)
-      %       = T_old + (f_liq_new - f_liq_old) / (dF/dT)_old
+      % T_new ≈ T_iter + P / (ro_liq * (dL/dT)_iter)
+      %       = T_iter + (f_liq_new - f_liq_old) / (dL/dT)_iter
       %
-      % This uses the old melt-zone slope because the predictor was formed
-      % using the old melt-zone linearization, and nodes that have just exited
-      % the melt zone do not yet have a branch-consistent new temperature from
-      % which to evaluate an updated slope.
+      % This uses the iteration-start melt-zone slope because the predictor was
+      % formed using that linearization, and nodes that have just exited the
+      % melt zone do not yet have a branch-consistent new temperature from which
+      % to evaluate an updated slope.
 
-      % Evaluate dFdT at nodes within the melt zone using T_old
-      dFdT_old = FREEZECURVE(T_old(i_M), ro_ice, ro_liq, fcp, Tf, ...
-         [], [], f_wat(i_M));
-
-      % Linearized temperature update evaluated on melt-zone nodes using
-      % T_old and dFdT_old
-      T_new = T_old(i_M) + T(i_M) ./ (ro_liq * dFdT_old);
+      % Compute the linearized temperature update on the melt-zone node subset.
+      T_new = T_iter(i_M) + T(i_M) ./ (ro_liq * dLdT(i_M));
 
       % Update nodes that exited the melt zone onto the frozen branch
       if any(i_lo(i_M))
@@ -158,14 +156,14 @@ function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_old, f_liq, f_wat, ...
 
    % Fully crossing the melt zone in one step is a failure
    if any( ...
-         T_old(~i_M) < TL & T(~i_M) >= TH) || ...
+         T_iter(~i_M) < TL & T(~i_M) >= TH) || ...
          any( ...
-         T_old(~i_M) > TH & T(~i_M) < TL) || ...
+         T_iter(~i_M) > TH & T(~i_M) < TL) || ...
          any( ...
          iscomplex(T)) || any(~isfinite(T) ...
          )
 
-      dumpMZTransformFailure("skipped_melt_zone_or_complex", T, T_old, ...
+      dumpMZTransformFailure("skipped_melt_zone_or_complex", T, T_iter, ...
          f_ice, f_liq, f_wat, f_liq_min, f_liq_max, i_M);
 
       ok  = false;
@@ -176,7 +174,7 @@ function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_old, f_liq, f_wat, ...
    [T, f_ice, f_liq] = MELTCURVE(T, f_ice, f_liq, ro_ice, ro_liq, fcp, Tf);
 end
 
-function dumpMZTransformFailure(reason, T, T_old, f_ice, f_liq, ...
+function dumpMZTransformFailure(reason, T, T_iter, f_ice, f_liq, ...
       f_wat, f_liq_min, f_liq_max, i_M)
    %DUMPMZTRANSFORMFAILURE Save melt-zone failure diagnostics on demand.
 
@@ -189,7 +187,7 @@ function dumpMZTransformFailure(reason, T, T_old, f_ice, f_liq, ...
    debug_state.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
    debug_state.reason = reason;
    debug_state.T = T;
-   debug_state.T_old = T_old;
+   debug_state.T_iter = T_iter;
    debug_state.f_ice = f_ice;
    debug_state.f_liq = f_liq;
    debug_state.f_wat = f_wat;

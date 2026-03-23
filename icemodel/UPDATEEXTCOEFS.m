@@ -1,21 +1,22 @@
-function [k_ext, tau_N, tau_S, k_bulk_lookup] = UPDATEEXTCOEFS(qext, g, ...
-      coalbedo, radii, iradius, z_edges, ro_ice, wavel, kice, kabs, ...
-      dz_spect, solar_dwavel, do_lookup)
+function [tau_N, tau_S, k_bulk_lookup, k_ext] = UPDATEEXTCOEFS(qext, g, ...
+      coalbedo, kabs, kice, wavel, radii, iradius, z_edges_spect, dz_spect, ...
+      solar_dwavel, ro_ice, use_lookup)
    %UPDATEEXTCOEFS Update spectral extinction coefficients for one grain radius.
    %
-   %  [k_ext, tau_N, tau_S] = UPDATEEXTCOEFS(qext, g, coalbedo, radii, ...
-   %     iradius, z_edges, ro_ice, wavel, kice, kabs)
-   %  [k_ext, tau_N, tau_S, k_bulk_lookup] = UPDATEEXTCOEFS(..., ...
-   %     dz_spect, solar_dwavel, do_lookup)
+   %  [tau_N, tau_S, k_bulk_lookup, k_ext] = UPDATEEXTCOEFS(qext, g, ...
+   %     coalbedo, kabs, kice, wavel, radii, iradius, z_edges_spect, ...
+   %     dz_spect, solar_dwavel, ro_ice, use_lookup)
    %
    % This helper computes k_ext for the requested optical grain-radius index,
    % or interpolated index, applies the optional impurity scaling, then
-   % precomputes tau_N and tau_S for the exact bulk-extinction transform. It is
-   % the natural entry point if a future grain-growth model needs to refresh
-   % k_ext during the timestep loop without reloading the optical tables.
+   % precomputes tau_N and tau_S for the exact bulk-extinction coefficient
+   % transform. It is the natural entry point if a future grain-growth model
+   % needs to refresh k_ext during the timestep loop without reloading the
+   % optical tables.
    %
-   % When DZ_SPECT, SOLAR_DWAVEL, and DO_LOOKUP are provided and DO_LOOKUP is
-   % true, the bulk-extinction lookup table is also refreshed.
+   % When USE_LOOKUP is true, the bulk-extinction lookup table is also built
+   % and returned through K_BULK_LOOKUP. Otherwise K_BULK_LOOKUP is an empty
+   % struct, which causes SPECTRALSOURCETERM to use the exact transform.
    %
    %#codegen
 
@@ -25,17 +26,17 @@ function [k_ext, tau_N, tau_S, k_bulk_lookup] = UPDATEEXTCOEFS(qext, g, ...
       error('kice and kabs must both be empty or both be provided')
    end
    if ~isempty(kice)
-      k_ext = SCALESPECTEXTCOEFS(k_ext, wavel, kice, kabs);
+      k_ext = SCALESPECTEXTCOEFS(k_ext, kabs, kice, wavel);
    end
 
    % Compute specific optical depth (precomputed arguments to the exponential
    % function in BULKEXTCOEFS)
-   tau_edges = -(z_edges * k_ext) / ro_ice;
+   tau_edges = -(z_edges_spect * k_ext) / ro_ice;
    tau_N = tau_edges(1:end - 1, :);
    tau_S = tau_edges(2:end, :);
 
-   % Optionally refresh the bulk-extinction lookup table.
-   if nargin >= 13 && do_lookup
+   % Build the bulk-extinction lookup table when requested.
+   if use_lookup
       k_bulk_lookup = icemodel.makeBulkExtCoefsLookup( ...
          dz_spect, tau_N, tau_S, solar_dwavel);
    else

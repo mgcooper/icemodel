@@ -14,14 +14,14 @@ function test_meltcurve_and_freezecurve_are_self_consistent(testCase)
    f_liq = f_wat ./ (1 + (fcp * (Tf - T_in)) .^ 2);
    f_ice = (f_wat - f_liq) * ro_liq / ro_ice;
 
-   [T_out, f_ice_out, f_liq_out, f_wat_out, dFdT] = MELTCURVE(T_in, f_ice, ...
+   [T_out, f_ice_out, f_liq_out, f_wat_out, dLdT] = MELTCURVE(T_in, f_ice, ...
       f_liq, ro_ice, ro_liq, fcp, Tf);
-   [dFdT_ref, f_wat_ref] = FREEZECURVE(T_out, f_ice_out, f_liq_out, ...
-      ro_ice, ro_liq, fcp, Tf);
+   [dLdT_ref, f_wat_ref] = FREEZECURVE(T_out, ro_ice, ro_liq, fcp, Tf, ...
+      f_ice_out, f_liq_out);
 
    testCase.verifyEqual(T_out, T_in, 'AbsTol', 1e-10);
    testCase.verifyEqual(f_wat_out, f_wat_ref, 'AbsTol', 1e-12);
-   testCase.verifyEqual(dFdT, dFdT_ref, 'RelTol', 1e-12);
+   testCase.verifyEqual(dLdT, dLdT_ref, 'RelTol', 1e-12);
 end
 
 function test_melttemp_caps_above_freezing(testCase)
@@ -85,9 +85,10 @@ function test_mztransform_updates_melt_zone_consistently(testCase)
    f_liq = f_wat / (1 + (fcp * (Tf - T_old)) ^ 2);
    f_liq_min = f_wat * f_ell_min;
    f_liq_max = f_wat * f_ell_max;
+   dLdT = FREEZECURVE(T_old, ro_ice, ro_liq, fcp, Tf, [], [], f_wat);
 
    [T_new, f_ice_new, f_liq_new, ok] = MZTRANSFORM(ro_liq * 0.002, T_old, ...
-      f_liq, f_wat, ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, ...
+      f_liq, f_wat, dLdT, ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, ...
       f_liq_max, true, true);
 
    testCase.verifyTrue(ok);
@@ -117,9 +118,10 @@ function test_mztransform_allows_melt_zone_exit_to_frozen_branch(testCase)
    f_liq_min = f_wat * f_ell_min;
    f_liq_max = f_wat * f_ell_max;
    d_fliq = 0.97 * f_liq_min - f_liq;
+   dLdT = FREEZECURVE(T_old, ro_ice, ro_liq, fcp, Tf, [], [], f_wat);
 
    [T_new, f_ice_new, f_liq_new, ok] = MZTRANSFORM(ro_liq * d_fliq, T_old, ...
-      f_liq, f_wat, ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, ...
+      f_liq, f_wat, dLdT, ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, ...
       f_liq_max, true, true);
 
    testCase.verifyTrue(ok);
@@ -148,9 +150,10 @@ function test_mztransform_rejects_large_freeze_out_overshoot(testCase)
    f_liq_min = f_wat * f_ell_min;
    f_liq_max = f_wat * f_ell_max;
    d_fliq = -1.5 * f_liq;
+   dLdT = FREEZECURVE(T_old, ro_ice, ro_liq, fcp, Tf, [], [], f_wat);
 
    [T_new, ~, f_liq_new, ok] = MZTRANSFORM(ro_liq * d_fliq, T_old, ...
-      f_liq, f_wat, ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, ...
+      f_liq, f_wat, dLdT, ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, ...
       f_liq_max, true, true);
 
    testCase.verifyFalse(ok);
@@ -171,8 +174,9 @@ function test_mztransform_rejects_phase_skip(testCase)
    f_ell_max = 1 / (1 + (fcp * (Tf - TH)) ^ 2.0);
    f_wat = 0.85;
    f_liq = f_wat / (1 + (fcp * (Tf - (TL - 1))) ^ 2);
+   dLdT = 0;
 
-   [~, ~, ~, ok] = MZTRANSFORM(TH + 0.5, TL - 1.0, f_liq, f_wat, ...
+   [~, ~, ~, ok] = MZTRANSFORM(TH + 0.5, TL - 1.0, f_liq, f_wat, dLdT, ...
       ro_ice, ro_liq, Tf, TL, TH, fcp, f_wat * f_ell_min, ...
       f_wat * f_ell_max, false, true);
 
@@ -188,7 +192,7 @@ function test_gecoefs_applies_robin_top_boundary_adjustment(testCase)
    f_ice = 0.9 * ones(JJ, 1);
    f_liq = 0.01 * ones(JJ, 1);
    dHdT = 1.8e6 * ones(JJ, 1);
-   dFdT = 1e-3 * ones(JJ, 1);
+   dLdT = 1e-3 * ones(JJ, 1);
    drovdT = 1e-6 * ones(JJ, 1);
    dH = zeros(JJ, 1);
    Sc = zeros(JJ, 1);
@@ -205,10 +209,10 @@ function test_gecoefs_applies_robin_top_boundary_adjustment(testCase)
    Fc = 10;
    Fp = -5;
 
-   [~, aP_dir, ~, b_dir, ~, a1] = GECOEFS(T, f_ice, f_liq, dHdT, dFdT, ...
+   [~, aP_dir, ~, b_dir, ~, a1] = GECOEFS(T, f_ice, f_liq, dHdT, dLdT, ...
       drovdT, dH, Sc, k_eff, delz, fn, dz, dt, Ts, Ls, Lf, ro_liq, TL, ...
       JJ, Fc, Fp, 1);
-   [~, aP_rob, ~, b_rob] = GECOEFS(T, f_ice, f_liq, dHdT, dFdT, drovdT, ...
+   [~, aP_rob, ~, b_rob] = GECOEFS(T, f_ice, f_liq, dHdT, dLdT, drovdT, ...
       dH, Sc, k_eff, delz, fn, dz, dt, Ts, Ls, Lf, ro_liq, TL, JJ, Fc, ...
       Fp, 2);
 

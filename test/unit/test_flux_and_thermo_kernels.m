@@ -123,7 +123,7 @@ function test_updateState_matches_component_kernels(testCase)
    k_eff_ref = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, k_vap_ref);
    H_ref = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, ...
       Ls * ro_vap_ref, Tf);
-   dLdT_ref = FREEZECURVE(T, f_ice, f_liq, ro_ice, ro_liq, fcp, Tf);
+   dLdT_ref = FREEZECURVE(T, ro_ice, ro_liq, fcp, Tf, f_ice, f_liq);
 
    testCase.verifyEqual(ro_vap, ro_vap_ref, 'RelTol', 1e-12);
    testCase.verifyEqual(drovdT, drovdT_ref, 'RelTol', 1e-12);

@@ -140,8 +140,14 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    % Attach the spectral grid only for tests that exercise that path.
    if kwargs.include_spectral
       [I0, dz_spect, z_nodes_spect, z_edges_spect, tau_N, ...
-         tau_S, solar_dwavel, qext, g, coalbedo, radii, ...
-         wavel, dwavel, k_ext, kice, kabs] = EXTCOEFSINIT(opts, ro_ice);
+         tau_S, solar_dwavel, ~, qext, g, coalbedo, kabs, kice, ...
+         wavel, radii] = EXTCOEFSINIT(opts, ro_ice);
+
+      % Recover k_ext for tests that need the initialized coefficients.
+      [~, ~, ~, k_ext] = UPDATEEXTCOEFS(qext, g, coalbedo, kabs, kice, ...
+         wavel, radii, opts.i_grainradius, z_edges_spect, dz_spect, ...
+         solar_dwavel, ro_ice, false);
+
       state.I0 = I0;
       state.dz_spect = dz_spect;
       state.z_nodes_spect = z_nodes_spect;
@@ -154,7 +160,6 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
       state.coalbedo = coalbedo;
       state.radii = radii;
       state.wavel = wavel;
-      state.dwavel = dwavel;
       state.k_ext = k_ext;
       state.kice = kice;
       state.kabs = kabs;
