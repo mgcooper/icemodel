@@ -100,6 +100,9 @@ function results = run_perf_suite(kwargs)
 
    % Combine results into a common struct.
    results = combinePerfResults(per_model);
+
+   % TODO: Display the results
+   % icemodel.test.helpers.displayPerfResults(results)
 end
 
 function results = runSingleModelPerfSuite(input_path, output_path, ...
@@ -262,8 +265,8 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    meta.simyear = benchmark_year;
    meta.smoke_sites = smoke_sites;
    meta.full_sites = full_sites;
-   meta.baseline_file = perfBaselineFile( ...
-      benchmark_year, baseline_type, baseline_tag, smbmodel);
+   meta.baseline_file = icemodel.test.helpers.defaultBaselinePath( ...
+      "perf", baseline_type, baseline_tag, smbmodel, benchmark_year);
    meta.case_builder = "icemodel.test.helpers.setModelOptsForCase";
    meta.opts_source = "icemodel.setopts defaults";
    meta.spinup_policy = ...
@@ -294,11 +297,21 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
 
    % Run the supporting component benchmarks for this saved compare artifact.
-   benchmark = runBenchmarkDiagnostics(benchmark_year, baseline_tag, smbmodel, ...
+   benchmark = icemodel.test.helpers.runBenchmarkDiagnostics( ...
+      benchmark_year, baseline_tag, smbmodel, ...
       include_benchmarks, benchmark_sampling_profile);
-   artifact_file = logArtifacts(sample_detail, activity_detail, ...
+
+   % Save the artifacts file.
+   artifact_file = saveArtifacts(sample_detail, activity_detail, ...
       case_summary, case_opts, benchmark, meta);
 
+   % Report if whole-model perf comparison was skipped
+   if ~meta.baseline_compatible && ~isblanktext(meta.compare_reason)
+      fprintf('Whole-model perf comparison skipped: %s\n', ...
+         char(meta.compare_reason));
+   end
+
+   % Assemble the results.
    results = struct();
    results.case_summary = case_summary;
    results.sample_detail = sample_detail;
@@ -309,6 +322,10 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    results.artifact_file = string(artifact_file);
    results.failed_cases = failed_cases;
    results.passed = isempty(failed_cases);
+
+   % Display the perf report for this case.
+   % TODO: pass results to renamed displayPerfResults in main function
+   icemodel.test.helpers.displayPerfSummary(case_summary, benchmark)
 end
 
 function results = combinePerfResults(per_model)
@@ -353,9 +370,9 @@ function results = combinePerfResults(per_model)
    results.passed = all(pass_flags);
 end
 
-function artifact_file = logArtifacts(sample_detail, ...
+function artifact_file = saveArtifacts(sample_detail, ...
       activity_detail, case_summary, case_opts, benchmark, meta)
-   %LOGARTIFACTS Save the perf comparison artifact bundle for one run.
+   %saveArtifacts Save the perf comparison artifact bundle for one run.
 
    % Create the run-specific artifact folder before saving the compare MAT.
    testdir = icemodel.getpath('test');
@@ -379,224 +396,10 @@ function artifact_file = logArtifacts(sample_detail, ...
    benchmark_comparison = benchmark.comparison;
    benchmark_meta = benchmark.meta;
 
-   % Save the full compare artifact, then print the compact case summary.
    save(artifact_file, 'sample_detail', 'activity_detail', ...
       'case_summary', 'case_opts', 'benchmark_summary', ...
       'benchmark_comparison', 'benchmark_meta', 'meta');
    disp(artifact_file)
-   disp(case_summary(:, {'case_id', 'median_wall_s', 'ref_wall_s', ...
-      'gate_wall_s', 'baseline_compatible', 'passed_perf'}))
-   if isfield(meta, 'baseline_compatible') && ~meta.baseline_compatible ...
-         && isfield(meta, 'compare_reason') && ~isblanktext(meta.compare_reason)
-      fprintf('Whole-model perf comparison skipped: %s\n', ...
-         char(meta.compare_reason));
-   end
-   printBenchmarkComparison(benchmark)
-end
-
-function benchmark = runBenchmarkDiagnostics(simyear, baseline_tag, smbmodel, ...
-      include_benchmarks, benchmark_sampling_profile)
-   %RUNBENCHMARKDIAGNOSTICS Run and compare the managed component benchmarks.
-
-   benchmark = struct();
-   benchmark.summary = table();
-   benchmark.comparison = table();
-   benchmark.meta = struct();
-
-   if ~include_benchmarks
-      return
-   end
-
-   bench_results = run_benchmark_suite( ...
-      sampling_profile=benchmark_sampling_profile, show_summary=false);
-   [current_signature, suite_files] = ...
-      icemodel.test.helpers.benchmarkSuiteSignature();
-   benchmark.summary = sampleSummary(bench_results);
-   if ~isempty(benchmark.summary) ...
-         && ismember('Name', benchmark.summary.Properties.VariableNames)
-      benchmark.summary.Name = string(benchmark.summary.Name);
-   end
-   benchmark.summary.Valid = reshape(logical([bench_results.Valid]), [], 1);
-
-   [baseline_summary, baseline_meta, source_file] = ...
-      loadBenchmarkBaselineFromPerf( ...
-      simyear, baseline_tag, smbmodel);
-   benchmark.comparison = compareBenchmarkSummary( ...
-      benchmark.summary, baseline_summary, baseline_meta, current_signature);
-   benchmark.meta = struct();
-   benchmark.meta.sampling_profile = benchmark_sampling_profile;
-   benchmark.meta.current_signature = current_signature;
-   benchmark.meta.suite_files = suite_files;
-   benchmark.meta.baseline_file = source_file;
-   benchmark.meta.baseline_meta = baseline_meta;
-   if isfield(baseline_meta, 'suite_signature')
-      benchmark.meta.baseline_signature = string(baseline_meta.suite_signature);
-   else
-      benchmark.meta.baseline_signature = "";
-   end
-   if isempty(source_file)
-      benchmark.meta.baseline_compatible = false;
-      benchmark.meta.compare_reason = "no embedded benchmark baseline found";
-   elseif benchmark.meta.baseline_signature == ""
-      benchmark.meta.baseline_compatible = false;
-      benchmark.meta.compare_reason = ...
-         "embedded benchmark baseline predates suite signatures";
-   else
-      benchmark.meta.baseline_compatible = ...
-         benchmark.meta.current_signature == benchmark.meta.baseline_signature;
-      if benchmark.meta.baseline_compatible
-         benchmark.meta.compare_reason = "";
-      else
-         benchmark.meta.compare_reason = ...
-            "embedded benchmark baseline was built from a different benchmark suite";
-      end
-   end
-   benchmark.meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
-end
-
-function [BenchmarkBaseline, meta, source_file] = loadBenchmarkBaselineFromPerf( ...
-      simyear, baseline_tag, smbmodel)
-   %LOADBENCHMARKBASELINEFROMPERF Load managed benchmark timing from perf files.
-
-   % Resolve the perf baseline selector once before probing model files.
-   [baseline_type, baseline_tag] = ...
-      icemodel.test.helpers.resolveBaselineSelector(baseline_tag);
-
-   % Probe the requested formal-model file(s) until one carries the managed
-   % benchmark bundle saved with the perf baseline.
-   if smbmodel == "all"
-      models = icemodel.namelists.smbmodel("test");
-   else
-      models = string(smbmodel);
-   end
-
-   BenchmarkBaseline = table();
-   meta = struct();
-   source_file = "";
-
-   for i = 1:numel(models)
-      candidate = icemodel.test.helpers.defaultBaselinePath( ...
-         "perf", baseline_type, baseline_tag, models(i), simyear);
-      if exist(char(candidate), 'file') ~= 2
-         continue
-      end
-
-      % Probe the MAT variables first so older perf baselines that predate
-      % benchmark bundles do not emit missing-variable warnings.
-      matvars = string({whos('-file', char(candidate)).name});
-      has_baseline = any(matvars == "BenchmarkBaseline");
-      has_meta = any(matvars == "benchmark_meta");
-      if ~has_baseline && ~has_meta
-         continue
-      end
-
-      % Load only the variables that actually exist in this baseline file.
-      if has_baseline && has_meta
-         S = load(char(candidate), 'BenchmarkBaseline', 'benchmark_meta');
-      elseif has_baseline
-         S = load(char(candidate), 'BenchmarkBaseline');
-      else
-         S = load(char(candidate), 'benchmark_meta');
-      end
-
-      if has_baseline
-         BenchmarkBaseline = S.BenchmarkBaseline;
-      end
-      if has_meta
-         meta = S.benchmark_meta;
-      end
-      source_file = string(candidate);
-      return
-   end
-end
-
-function comparison = compareBenchmarkSummary(current_summary, baseline_summary, ...
-      baseline_meta, current_signature)
-   %COMPAREBENCHMARKSUMMARY Join current benchmark timings to a baseline.
-
-   if isempty(current_summary)
-      comparison = table();
-      return
-   end
-
-   % Keep only the timing columns that are meaningful for direct
-   % benchmark-to-baseline comparison.
-   comparison = current_summary(:, intersect(["Name", "SampleSize", "Mean", ...
-      "StandardDeviation"], string(current_summary.Properties.VariableNames), ...
-      'stable'));
-   if ~ismember('Name', comparison.Properties.VariableNames)
-      return
-   end
-
-   n_rows = height(comparison);
-   comparison.baseline_compatible = false(n_rows, 1);
-   comparison.ref_mean = nan(n_rows, 1);
-   comparison.ref_std = nan(n_rows, 1);
-   comparison.pct_delta = nan(n_rows, 1);
-
-   % Only trust benchmark deltas when the embedded baseline came from the
-   % same benchmark-suite definition as the current checkout.
-   if ~isstruct(baseline_meta) || ~isfield(baseline_meta, 'suite_signature') ...
-         || isblanktext(baseline_meta.suite_signature) ...
-         || string(baseline_meta.suite_signature) ~= string(current_signature)
-      return
-   end
-
-   comparison.baseline_compatible(:) = true;
-
-   % Populate reference values only where the managed perf bundle includes
-   % the same benchmark name from a compatible suite definition.
-   if isempty(baseline_summary) || ...
-         ~ismember('Name', baseline_summary.Properties.VariableNames)
-      return
-   end
-
-   for i = 1:n_rows
-      hit = find(string(baseline_summary.Name) == string(comparison.Name(i)), ...
-         1);
-      if isempty(hit)
-         continue
-      end
-      if ismember('Mean', baseline_summary.Properties.VariableNames)
-         comparison.ref_mean(i) = baseline_summary.Mean(hit);
-      end
-      if ismember('StandardDeviation', baseline_summary.Properties.VariableNames)
-         comparison.ref_std(i) = baseline_summary.StandardDeviation(hit);
-      end
-      if isfinite(comparison.ref_mean(i)) && comparison.ref_mean(i) > 0
-         comparison.pct_delta(i) = ...
-            100 * (comparison.Mean(i) - comparison.ref_mean(i)) ...
-            / comparison.ref_mean(i);
-      end
-   end
-end
-
-function printBenchmarkComparison(benchmark)
-   %PRINTBENCHMARKCOMPARISON Show a compact benchmark summary/comparison.
-
-   if isempty(benchmark.summary)
-      return
-   end
-
-   disp('Benchmark summary:')
-   disp(benchmark.summary(:, intersect(["Name", "SampleSize", "Mean", ...
-      "StandardDeviation"], ...
-      string(benchmark.summary.Properties.VariableNames), 'stable')))
-
-   if isempty(benchmark.comparison)
-      return
-   end
-
-   if isfield(benchmark.meta, 'baseline_compatible') ...
-         && benchmark.meta.baseline_compatible
-      disp('Benchmark comparison:')
-      disp(benchmark.comparison(:, intersect(["Name", "Mean", "ref_mean", ...
-         "pct_delta"], ...
-         string(benchmark.comparison.Properties.VariableNames), 'stable')))
-   elseif isfield(benchmark.meta, 'compare_reason')
-      fprintf('Benchmark comparison skipped: %s\n', ...
-         char(benchmark.meta.compare_reason));
-   end
 end
 
 function [compatible, reason] = perfBaselineCompatibility(baseline_meta)
@@ -630,23 +433,6 @@ function [compatible, reason] = perfBaselineCompatibility(baseline_meta)
          'baseline built under MATLAB %s on %s; current environment is ', ...
          'MATLAB %s on %s'], char(baseline_version), char(baseline_host), ...
          char(current_version), char(current_host));
-   end
-end
-
-function pathname = perfBaselineFile(simyear, ...
-      baseline_type, baseline_tag, smbmodel)
-   %PERFBASELINEFILE Build the saved perf artifact filename for one run.
-
-   testdir = icemodel.getpath('test');
-   model_tag = icemodel.test.helpers.smbmodelTag(smbmodel);
-
-   if baseline_type == "rolling"
-      pathname = fullfile(testdir, 'baselines', ...
-         sprintf('perf_baseline_%d_rolling_%s.mat', simyear, model_tag));
-   else
-      pathname = fullfile(testdir, 'baselines', ...
-         sprintf('perf_baseline_%d_%s_%s.mat', simyear, ...
-         icemodel.test.helpers.sanitizeTag(baseline_tag), model_tag));
    end
 end
 
