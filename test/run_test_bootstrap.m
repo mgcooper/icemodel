@@ -53,16 +53,34 @@ function results = run_test_bootstrap(kwargs)
    %    happen through the explicit build/snapshot actions above.
 
    arguments (Input)
-      kwargs.baseline_tag (1, :) string = "v1.1"
+
+      kwargs.baseline_tag (1, :) string ...
+         = "v1.1"
+
       kwargs.smbmodel (1, :) string ...
-         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} = "all"
-      kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} = []
-      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
-      kwargs.smoke_sites string = "kanm"
-      kwargs.full_sites string = ["kanm"; "kanl"]
-      kwargs.clean_artifacts (1, 1) logical = false
-      kwargs.clean_baselines (1, 1) logical = false
-      kwargs.backup_before_clean (1, 1) logical = true
+         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} ...
+         = "all"
+
+      kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} ...
+         = []
+
+      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 2016
+
+      kwargs.smoke_sites string ...
+         = "kanm"
+
+      kwargs.full_sites string ...
+         = ["kanm"; "kanl"]
+
+      kwargs.clean_artifacts (1, 1) logical ...
+         = false
+
+      kwargs.clean_baselines (1, 1) logical ...
+         = false
+
+      kwargs.backup_before_clean (1, 1) logical ...
+         = true
    end
 
    % Deal out arguments.

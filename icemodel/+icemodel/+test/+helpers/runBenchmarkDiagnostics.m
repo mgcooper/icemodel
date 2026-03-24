@@ -12,30 +12,51 @@ function benchmark = runBenchmarkDiagnostics(simyear, baseline_tag, smbmodel, ..
    %   comparison - table joining current to baseline with pct_delta
    %   meta       - struct with compatibility flags and provenance
 
+   % Initialize an empty benchmark struct for early return when benchmarks
+   % are disabled.
    benchmark = struct();
    benchmark.summary = table();
    benchmark.comparison = table();
    benchmark.meta = struct();
 
+   % Short-circuit when the caller disabled component benchmarks.
    if ~include_benchmarks
       return
    end
 
+   % Run the managed benchmark suite with summary display suppressed
+   % (display is handled by displayPerfResults at the runner level).
    bench_results = run_benchmark_suite( ...
       sampling_profile=benchmark_sampling_profile, show_summary=false);
+
+   % Compute the current suite content hash for baseline compatibility.
    [current_signature, suite_files] = ...
       icemodel.test.helpers.benchmarkSuiteSignature();
+
+   % Build the summary table from the benchmark MeasurementResult array.
    benchmark.summary = sampleSummary(bench_results);
+
+   % Coerce benchmark names to string and ensure the Name column is
+   % consistent across MATLAB versions.
    if ~isempty(benchmark.summary) ...
          && ismember('Name', benchmark.summary.Properties.VariableNames)
       benchmark.summary.Name = string(benchmark.summary.Name);
    end
+
+   % Carry the Valid flag from each benchmark result for artifact
+   % completeness.
    benchmark.summary.Valid = reshape(logical([bench_results.Valid]), [], 1);
 
+   % Load the embedded benchmark baseline from the matching perf baseline.
    [baseline_summary, baseline_meta, source_file] = ...
       loadBenchmarkBaselineFromPerf(simyear, baseline_tag, smbmodel);
+
+   % Compare current benchmark timings against the loaded baseline.
    benchmark.comparison = compareBenchmarkSummary( ...
       benchmark.summary, baseline_summary, baseline_meta, current_signature);
+
+   % Populate benchmark metadata: sampling profile, suite signatures,
+   % baseline provenance, and compatibility status.
    benchmark.meta = struct();
    benchmark.meta.sampling_profile = benchmark_sampling_profile;
    benchmark.meta.current_signature = current_signature;
@@ -47,6 +68,8 @@ function benchmark = runBenchmarkDiagnostics(simyear, baseline_tag, smbmodel, ..
    else
       benchmark.meta.baseline_signature = "";
    end
+
+   % Determine baseline compatibility based on suite signature matching.
    if isempty(source_file)
       benchmark.meta.baseline_compatible = false;
       benchmark.meta.compare_reason = "no embedded benchmark baseline found";
@@ -71,19 +94,25 @@ function [BenchmarkBaseline, meta, source_file] = loadBenchmarkBaselineFromPerf(
       simyear, baseline_tag, smbmodel)
    %LOADBENCHMARKBASELINEFROMPERF Load managed benchmark timing from perf files.
 
+   % Resolve the perf baseline selector once before probing model files.
    [baseline_type, baseline_tag] = ...
       icemodel.test.helpers.resolveBaselineSelector(baseline_tag);
 
+   % Expand the model selector to probe one or more baseline files.
    if smbmodel == "all"
       models = icemodel.namelists.smbmodel("test");
    else
       models = string(smbmodel);
    end
 
+   % Initialize empty returns for the case where no matching baseline is
+   % found.
    BenchmarkBaseline = table();
    meta = struct();
    source_file = "";
 
+   % Probe each candidate baseline file until one carries the managed
+   % benchmark bundle.
    for i = 1:numel(models)
       candidate = icemodel.test.helpers.defaultBaselinePath( ...
          "perf", baseline_type, baseline_tag, models(i), simyear);
@@ -91,6 +120,8 @@ function [BenchmarkBaseline, meta, source_file] = loadBenchmarkBaselineFromPerf(
          continue
       end
 
+      % Probe the MAT variables first so older perf baselines that predate
+      % benchmark bundles do not emit missing-variable warnings.
       matvars = string({whos('-file', char(candidate)).name});
       has_baseline = any(matvars == "BenchmarkBaseline");
       has_meta = any(matvars == "benchmark_meta");
@@ -98,6 +129,7 @@ function [BenchmarkBaseline, meta, source_file] = loadBenchmarkBaselineFromPerf(
          continue
       end
 
+      % Load only the variables that actually exist in this baseline file.
       if has_baseline && has_meta
          S = load(char(candidate), 'BenchmarkBaseline', 'benchmark_meta');
       elseif has_baseline
@@ -121,11 +153,15 @@ function comparison = compareBenchmarkSummary(current_summary, baseline_summary,
       baseline_meta, current_signature)
    %COMPAREBENCHMARKSUMMARY Join current benchmark timings to a baseline.
 
+   % Early return for empty current summary.
    if isempty(current_summary)
       comparison = table();
       return
    end
 
+   % Retain only the timing columns meaningful for benchmark-to-baseline
+   % comparison. intersect selects only columns present in the table for
+   % forward-compatible column selection.
    comparison = current_summary(:, intersect(["Name", "SampleSize", "Mean", ...
       "StandardDeviation"], string(current_summary.Properties.VariableNames), ...
       'stable'));
@@ -133,12 +169,15 @@ function comparison = compareBenchmarkSummary(current_summary, baseline_summary,
       return
    end
 
+   % Initialize baseline comparison columns with default NaN/false values.
    n_rows = height(comparison);
    comparison.baseline_compatible = false(n_rows, 1);
    comparison.ref_mean = nan(n_rows, 1);
    comparison.ref_std = nan(n_rows, 1);
    comparison.pct_delta = nan(n_rows, 1);
 
+   % Only trust benchmark deltas when the embedded baseline was built from
+   % the same benchmark-suite definition as the current checkout.
    if ~isstruct(baseline_meta) || ~isfield(baseline_meta, 'suite_signature') ...
          || isblanktext(baseline_meta.suite_signature) ...
          || string(baseline_meta.suite_signature) ~= string(current_signature)
@@ -147,11 +186,14 @@ function comparison = compareBenchmarkSummary(current_summary, baseline_summary,
 
    comparison.baseline_compatible(:) = true;
 
+   % Guard against missing or incompatible baseline summary tables.
    if isempty(baseline_summary) || ...
          ~ismember('Name', baseline_summary.Properties.VariableNames)
       return
    end
 
+   % Populate reference values where the baseline includes a matching
+   % benchmark by name.
    for i = 1:n_rows
       hit = find(string(baseline_summary.Name) == string(comparison.Name(i)), ...
          1);

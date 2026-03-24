@@ -32,28 +32,57 @@ function PerfBaseline = build_perf_baseline(kwargs)
    % here rather than hidden in the case-matrix helper.
 
    arguments (Input)
+
       kwargs.baseline (1, :) string ...
          {icemodel.validators.mustBeRollingBaselineName(kwargs.baseline)} ...
          = "rolling"
-      kwargs.baseline_tag string = string.empty()
+
+      kwargs.baseline_tag string ...
+         = string.empty()
+
       kwargs.tier (1, :) string ...
-         {icemodel.validators.mustBeTestTierName(kwargs.tier)} = "full"
+         {icemodel.validators.mustBeTestTierName(kwargs.tier)} ...
+         = "full"
+
       kwargs.smbmodel (1, :) string ...
-         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} = "all"
-      kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} = []
-      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
-      kwargs.smoke_sites string = "kanm"
-      kwargs.full_sites string = ["kanm"; "kanl"]
-      kwargs.n_runs (1, 1) double {mustBeInteger, mustBePositive} = 3
-      kwargs.tol_perf (1, 1) double {mustBePositive} = 0.20
-      kwargs.include_benchmarks (1, 1) logical = true
+         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} ...
+         = "all"
+
+      kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} ...
+         = []
+
+      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 2016
+
+      kwargs.smoke_sites string ...
+         = "kanm"
+
+      kwargs.full_sites string ...
+         = ["kanm"; "kanl"]
+
+      kwargs.n_runs (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 3
+
+      kwargs.tol_perf (1, 1) double {mustBePositive} ...
+         = 0.20
+
+      kwargs.include_benchmarks (1, 1) logical ...
+         = true
+
       kwargs.benchmark_sampling_profile (1, :) string ...
          {icemodel.validators.mustBeBenchmarkSamplingProfileName( ...
-         kwargs.benchmark_sampling_profile)} = "default"
-      kwargs.include_profile_artifacts (1, 1) logical = true
+         kwargs.benchmark_sampling_profile)} ...
+         = "default"
+
+      kwargs.include_profile_artifacts (1, 1) logical ...
+         = true
+
       kwargs.profile_history_size (1, 1) double {mustBeInteger, ...
-         mustBePositive} = 25000000
-      kwargs.output_file string = string.empty()
+         mustBePositive} ...
+         = 25000000
+
+      kwargs.output_file string ...
+         = string.empty()
    end
 
    % Keep the cleanup handle in scope so the caller's config is restored
@@ -261,6 +290,7 @@ function [BenchmarkBaseline, meta] = buildBenchmarkBaseline(kwargs)
    % exact component suite developers can run directly.
    results = run_benchmark_suite( ...
       sampling_profile=kwargs.sampling_profile, show_summary=false);
+
    [suite_signature, suite_files] = ...
       icemodel.test.helpers.benchmarkSuiteSignature();
 

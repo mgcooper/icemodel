@@ -35,22 +35,46 @@ function results = run_perf_suite(kwargs)
    %  matlab -batch "run('/ABS/PATH/icemodel/test/run_perf_suite.m')"
 
    arguments (Input)
+
       kwargs.tier (1, :) string ...
-         {icemodel.validators.mustBeTestTierName(kwargs.tier)} = "smoke"
+         {icemodel.validators.mustBeTestTierName(kwargs.tier)} ...
+         = "smoke"
+
       kwargs.smbmodel (1, :) string ...
-         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} = "all"
-      kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} = []
-      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
-      kwargs.smoke_sites string = "kanm"
-      kwargs.full_sites string = ["kanm"; "kanl"]
-      kwargs.n_runs (1, 1) double {mustBeInteger, mustBePositive} = 3
-      kwargs.tol_perf (1, 1) double {mustBePositive} = 0.20
-      kwargs.include_benchmarks (1, 1) logical = true
+         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} ...
+         = "all"
+
+      kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} ...
+         = []
+
+      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 2016
+
+      kwargs.smoke_sites string ...
+         = "kanm"
+
+      kwargs.full_sites string ...
+         = ["kanm"; "kanl"]
+
+      kwargs.n_runs (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 3
+
+      kwargs.tol_perf (1, 1) double {mustBePositive} ...
+         = 0.20
+
+      kwargs.include_benchmarks (1, 1) logical ...
+         = true
+
       kwargs.benchmark_sampling_profile (1, :) string ...
          {icemodel.validators.mustBeBenchmarkSamplingProfileName( ...
-         kwargs.benchmark_sampling_profile)} = "default"
-      kwargs.baseline (1, :) string = "rolling"
-      kwargs.run_name string = string.empty()
+         kwargs.benchmark_sampling_profile)} ...
+         = "default"
+
+      kwargs.baseline (1, :) string ...
+         = "rolling"
+
+      kwargs.run_name string ...
+         = string.empty()
    end
 
    % Deal out arguments.
@@ -64,7 +88,7 @@ function results = run_perf_suite(kwargs)
       kwargs.baseline, kwargs.run_name);
 
    % Resolve full path to the test/ dir.
-   thisdir = icemodel.getpath('test');
+   testdir = icemodel.getpath('test');
 
    % Resolve the requested baseline and shared batch run identifier.
    [baseline_type, baseline_tag] = ...
@@ -84,7 +108,7 @@ function results = run_perf_suite(kwargs)
 
    % Build the MATLAB perf experiment once, then reuse it for each
    % single-model perf workflow below.
-   suite = testsuite(fullfile(thisdir, 'regression', ...
+   suite = testsuite(fullfile(testdir, 'regression', ...
       'IcemodelPerfTest.m'));
    experiment = matlab.perftest.TimeExperiment.withFixedSampleSize( ...
       n_runs, 'NumWarmups', 1);
@@ -92,7 +116,7 @@ function results = run_perf_suite(kwargs)
    % Run the canonical single-model workflow for each requested model and
    % merge the saved compare summaries into one returned struct.
    per_model = arrayfun(@(mdl) runSingleModelPerfSuite( ...
-      input_path, output_path, thisdir, experiment, suite, tier, ...
+      input_path, output_path, testdir, experiment, suite, tier, ...
       mdl, solver, simyear, smoke_sites, full_sites, baseline_type, ...
       baseline_tag, run_date, run_id, run_name, n_runs, tol_perf, ...
       include_benchmarks, benchmark_sampling_profile), ...
@@ -374,14 +398,14 @@ function artifact_file = saveArtifacts(sample_detail, ...
       activity_detail, case_summary, case_opts, benchmark, meta)
    %saveArtifacts Save the perf comparison artifact bundle for one run.
 
-   % Create the run-specific artifact folder before saving the compare MAT.
+   % Create the run-specific artifact folder before saving the report.
    testdir = icemodel.getpath('test');
    outdir = fullfile(testdir, 'artifacts', char(meta.run_name));
    if exist(outdir, 'dir') ~= 7
       mkdir(outdir);
    end
 
-   % Format the baseline/model labels used by the saved artifact filename.
+   % Format the baseline/model/solver tags used by the saved filename.
    if meta.baseline_type == "rolling"
       baseline_label = 'vs_rolling';
    else

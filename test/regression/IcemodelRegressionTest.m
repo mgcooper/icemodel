@@ -80,12 +80,12 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
             % Summarize the retained output years against the matched runoff
             % reference row, if one exists for this formal case.
-            ridx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);
+            idx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);
             met = icemodel.test.helpers.loadProcessedMetForOutputYears(opts);
-            if isempty(ridx)
+            if isempty(idx)
                refrow = [];
             else
-               refrow = runoff_ref(ridx, :);
+               refrow = runoff_ref(idx, :);
             end
             S = icemodel.test.helpers.summarizeIce1Metrics(ice1, met, refrow);
 
@@ -103,7 +103,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             all_baseline_fields = [ ...
                string(delta_specs(:, 1)); baseline_only(:)];
 
-
+            % Initialize fields nan
             base = struct();
             for f = all_baseline_fields'
                base.(f) = nan;
@@ -144,7 +144,9 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
                row.("baseline_" + f) = base.(f);
             end
 
-            %
+            % Compute absolute and percent deltas for each tracked metric pair
+            % using the delta_specs table. computeDelta returns NaN when the
+            % baseline value is NaN (case not found) or zero (undefined pct).
             for i = 1:size(delta_specs, 1)
                [row.(delta_specs{i, 2}), row.(delta_specs{i, 3})] = ...
                   IcemodelRegressionTest.computeDelta( ...
@@ -242,23 +244,31 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       function artifact_file = saveArtifacts(~, report, case_opts, meta)
          %saveArtifacts Save the regression comparison artifact for one run.
 
+         % Create the run-specific artifact folder before saving the report.
          testdir = icemodel.getpath('test');
          outdir = fullfile(testdir, 'artifacts', char(meta.run_name));
          if exist(outdir, 'dir') ~= 7
             mkdir(outdir);
          end
 
+         % Format the baseline/model/solver tags used by the saved filename.
          if meta.baseline_tag == ""
             baseline_tag = 'nobaseline';
          else
-            baseline_tag = char(icemodel.test.helpers.sanitizeTag(meta.baseline_tag));
+            baseline_tag = char( ...
+               icemodel.test.helpers.sanitizeTag(meta.baseline_tag));
          end
-         model_tag = IcemodelRegressionTest.smbmodelLabel(meta.smbmodel_filter);
-         solver_tag = IcemodelRegressionTest.solverLabel(meta.solver_filter);
+         model_tag = IcemodelRegressionTest.smbmodelLabel( ...
+            meta.smbmodel_filter);
+         solver_tag = IcemodelRegressionTest.solverLabel( ...
+            meta.solver_filter);
+
+         % Build the artifact filename.
          artifact_file = fullfile(outdir, ...
             sprintf('regression_report_%s%s_%s.mat', ...
             char(meta.tier), char(model_tag + solver_tag), baseline_tag));
 
+         % Save the artifact file.
          save(artifact_file, 'report', 'case_opts', 'meta');
       end
    end

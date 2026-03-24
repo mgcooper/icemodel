@@ -10,10 +10,14 @@ function validate_test_suite(kwargs)
    % the build/snapshot tools against temporary output files.
 
    arguments
+
       kwargs.benchmark_sampling_profile (1, 1) string ...
          {icemodel.validators.mustBeBenchmarkSamplingProfileName( ...
-         kwargs.benchmark_sampling_profile)} = "fast"
-      kwargs.include_runoff_reference (1, 1) logical = true
+         kwargs.benchmark_sampling_profile)} ...
+         = "fast"
+
+      kwargs.include_runoff_reference (1, 1) logical ...
+         = true
    end
 
    benchmark_sampling_profile = kwargs.benchmark_sampling_profile;

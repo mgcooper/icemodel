@@ -9,22 +9,49 @@
 
 % Configuration
 do_snapshot = false;
-baseline_tag = "v1.0";  % used only when do_snapshot is true
+baseline_tag = ['v' icemodel.internal.version]; % used when do_snapshot is true
 
 % Build rolling baselines. The standard rebuild is to run with default options.
 RegressionBaseline = build_regression_baseline();
 PerfBaseline = build_perf_baseline();
 
-% Display baseline results
+% Summaries are printed when build_* functions are run.
+% For reference, this displays the same baseline results.
 icemodel.test.helpers.displayPerfSummary(PerfBaseline)
+
+% The file name can also be set and passed to the display function
+filename = icemodel.test.helpers.defaultBaselinePath("perf");
+icemodel.test.helpers.displayPerfSummary(filename)
 
 % Verify with a smoke perf run
 perf_results = run_perf_suite( ...
    tier="smoke", smbmodel="icemodel", solver=2, include_benchmarks=false);
 
+% Display perf results
+icemodel.test.helpers.displayPerfResults(perf_results)
+
 % Verify with a smoke regression run
 regression_results = run_regression_suite( ...
    tier="smoke", smbmodel="icemodel", solver=2);
+
+% Display regression results
+icemodel.test.helpers.displayRegressionResults(regression_results)
+
+%% Scratch space to demo path building and results display
+
+filename = icemodel.test.helpers.defaultBaselinePath("perf");
+icemodel.test.helpers.displayPerfSummary(filename)
+
+filename = icemodel.test.helpers.defaultBaselinePath("perf", ...
+   "baseline_type", "release", ...
+   "baseline_tag", "v1.1");
+icemodel.test.helpers.displayPerfSummary(filename)
+
+% This works but the file doesn't exist
+icemodel.test.helpers.defaultBaselinePath("perf", "skinmodel", ...
+   "baseline_type", "release", ...
+   "baseline_tag", "v1.0.1")
+icemodel.test.helpers.displayPerfSummary(filename)
 
 %% Snapshots
 

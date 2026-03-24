@@ -16,16 +16,32 @@ function results = run_benchmark_suite(options)
    % See RenameRoundTest for notes on results that informed postprocess.
 
    arguments
-      options.testname (1, :) string = ""
-      options.include_subfolders (1, 1) logical = false
+
+      options.testname (1, :) string ...
+         = ""
+
+      options.include_subfolders (1, 1) logical ...
+         = false
+
       options.sampling_profile (1, :) string ...
          {icemodel.validators.mustBeBenchmarkSamplingProfileName( ...
-         options.sampling_profile)} = "default"
-      options.num_warmups (1, 1) double = NaN
-      options.max_samples (1, 1) double = NaN
-      options.relative_margin_of_error (1, 1) double = NaN
-      options.confidence_level (1, 1) double = NaN
-      options.show_summary (1, 1) logical = true
+         options.sampling_profile)} ...
+         = "default"
+
+      options.num_warmups (1, 1) double ...
+         = NaN
+
+      options.max_samples (1, 1) double ...
+         = NaN
+
+      options.relative_margin_of_error (1, 1) double ...
+         = NaN
+
+      options.confidence_level (1, 1) double ...
+         = NaN
+
+      options.show_summary (1, 1) logical ...
+         = true
    end
 
    import matlab.perftest.TimeExperiment

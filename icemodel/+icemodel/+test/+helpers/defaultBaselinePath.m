@@ -25,20 +25,21 @@ function pathname = defaultBaselinePath(kind, baseline_type, baseline_tag, smbmo
          if baseline_type == "rolling"
             pathname = fullfile(testdir, 'baselines', ...
                sprintf('perf_baseline_%d_rolling_%s.mat', simyear, model_tag));
-         else
+         else % "release"
             pathname = fullfile(testdir, 'baselines', ...
                sprintf('perf_baseline_%d_%s_%s.mat', ...
-               simyear, icemodel.test.helpers.sanitizeTag(baseline_tag), model_tag));
+               simyear, icemodel.test.helpers.sanitizeTag( ...
+               baseline_tag), model_tag));
          end
 
       case "regression"
          if baseline_type == "rolling"
             pathname = fullfile(testdir, 'baselines', ...
                "regression_baseline_rolling_" + model_tag + ".mat");
-         else
+         else % release
             pathname = fullfile(testdir, 'baselines', ...
-               "regression_baseline_" + icemodel.test.helpers.sanitizeTag(baseline_tag) ...
-               + "_" + model_tag + ".mat");
+               "regression_baseline_" + icemodel.test.helpers.sanitizeTag( ...
+               baseline_tag) + "_" + model_tag + ".mat");
          end
    end
 end

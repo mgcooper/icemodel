@@ -13,9 +13,16 @@ function results = run_unit_suite(options)
    %  - an absolute/relative existing file or folder path
 
    arguments
-      options.selector (1, 1) string = ""
-      options.debug (1, 1) logical = false
-      options.stop_on_failure (1, 1) logical = false
+
+      options.selector (1, 1) string ...
+         = ""
+
+      options.debug (1, 1) logical ...
+         = false
+
+      options.stop_on_failure (1, 1) logical ...
+         = false
+
       options.verbosity (1, :) string ...
          {icemodel.validators.mustBeTestVerbosityName(options.verbosity)} ...
          = "concise" % "terse" "concise" "detailed"

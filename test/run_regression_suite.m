@@ -29,16 +29,32 @@ function results = run_regression_suite(kwargs)
    %  matlab -batch "run('/ABS/PATH/icemodel/test/run_regression_suite.m')"
 
    arguments (Input)
+
       kwargs.tier (1, :) string ...
-         {icemodel.validators.mustBeTestTierName(kwargs.tier)} = "smoke"
+         {icemodel.validators.mustBeTestTierName(kwargs.tier)} ...
+         = "smoke"
+
       kwargs.smbmodel (1, :) string ...
-         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} = "all"
-      kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} = []
-      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
-      kwargs.smoke_sites string = "kanm"
-      kwargs.full_sites string = ["kanm"; "kanl"]
-      kwargs.baseline (1, :) string = "rolling"
-      kwargs.run_name string = string.empty()
+         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} ...
+         = "all"
+
+      kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} ...
+         = []
+
+      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 2016
+
+      kwargs.smoke_sites string ...
+         = "kanm"
+
+      kwargs.full_sites string ...
+         = ["kanm"; "kanl"]
+
+      kwargs.baseline (1, :) string ...
+         = "rolling"
+
+      kwargs.run_name string ...
+         = string.empty()
    end
 
    % Deal out arguments.
@@ -49,7 +65,7 @@ function results = run_regression_suite(kwargs)
       kwargs.run_name);
 
    % Resolve full path to the test/ dir.
-   thisdir = icemodel.getpath('test');
+   testdir = icemodel.getpath('test');
 
    % Bootstrap the source/test trees once for CLI and interactive runs.
    % Keep the cleanup handle in scope so the caller's config is restored
@@ -62,7 +78,7 @@ function results = run_regression_suite(kwargs)
 
    % Build the unittest suite once, then run the canonical single-model flow
    % for each requested formal model.
-   suite = testsuite(fullfile(thisdir, 'regression', ...
+   suite = testsuite(fullfile(testdir, 'regression', ...
       'IcemodelRegressionTest.m'));
    runner = matlab.unittest.TestRunner.withTextOutput;
 

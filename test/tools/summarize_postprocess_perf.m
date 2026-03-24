@@ -5,8 +5,11 @@ function report = summarize_postprocess_perf(kwargs)
    %  report = summarize_postprocess_perf(output_file="/tmp/postprocess_perf.mat")
 
    arguments
-      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
-      kwargs.output_file (1, :) string = ""
+      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 2016
+
+      kwargs.output_file (1, :) string ...
+         = ""
    end
 
    % Install the formal test config once so the fixture helpers resolve the
@@ -17,12 +20,20 @@ function report = summarize_postprocess_perf(kwargs)
    % Build one representative quarter-hour surface-output timetable.
    workspace = icemodel.test.fixtures.makeSyntheticWorkspace(kwargs.simyear, ...
       configure=true, nsteps=96, dt_seconds=900);
+
+   % Save the pre-run configuration and restore it on exit.
    cleanup = onCleanup(@() icemodel.test.fixtures.cleanupSyntheticWorkspace( ...
       workspace));
+
+   % Build model opts.
    opts = icemodel.test.helpers.buildSyntheticOpts(workspace, ...
       'skinmodel', kwargs.simyear, dt=900, solver=1, ...
       testname='postprocess_perf_summary');
+
+   % Run the model.
    [ice1_raw, ~, opts] = icemodel.test.helpers.runSmbModel(opts);
+
+   % Post porocess.
    met = icemodel.loadmet(opts);
    ice1_tt = rawIce1ToTimetable(ice1_raw, met.Time);
    ice1_tt = repeatQuarterHourTimetable(ice1_tt, 35040);
@@ -36,14 +47,20 @@ function report = summarize_postprocess_perf(kwargs)
    legacy = legacyHourlyMean(ice1_tt);
    fixed = icemodel.retimeHourlyFixedStep(ice1_tt);
 
+   % Create the report.
    report = struct();
+
    report.timing = table(["retime_legacy"; "retime_fixed_step"], ...
       [legacy_s; fixed_s], ...
       'VariableNames', {'variant', 'seconds_per_call'});
-   report.timing.speedup_vs_legacy = legacy_s ./ report.timing.seconds_per_call;
+
+   report.timing.speedup_vs_legacy = ...
+      legacy_s ./ report.timing.seconds_per_call;
+
    report.accuracy = table("retime_fixed_step", ...
       max(abs(double(fixed{:,:}) - double(legacy{:,:})), [], 'all'), ...
       'VariableNames', {'variant', 'max_abs_err'});
+
    report.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
 
    if ~isblanktext(kwargs.output_file)
