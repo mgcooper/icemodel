@@ -1,12 +1,8 @@
 function [k_eff, k_vap] = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, varargin)
-   %GETGAMMA Compute thermal conductivity (gamma)
+   %GETGAMMA Compute effective thermal conductivity (gamma).
    %
    % gamma = ki + kv, where ki is thermal conductivity of ice and kv is vapor
    % diffusivity. gamma is used as ke in Patankar (e.g. eq. 4.9 pg. 45)
-   %
-   %  A = 611.15; % reference vapor pressure [Pa]
-   %  B = 22.452; % unitless coefficient
-   %  C = 272.55; % unitless coefficient
    %
    %  kfirn is a reference conductivity for firn
    %  ksnow is a reference conductivity for snow
@@ -25,14 +21,8 @@ function [k_eff, k_vap] = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, varargin)
    %
    %#codegen
 
-   % Compute snow thermal k
-   g_ice = ro_ice * f_ice;
-   theta = 1 ./ (1 + exp(-0.04 * (g_ice - 450.0)));
-   kfirn = 2.107 + 0.003618 * (g_ice - 917.0);
-   ksnow = 0.024 - 0.000123 * g_ice + 2.5e-6 * g_ice .^ 2;
-   kiceT = 9.828 * exp(-0.0057 * T);
-   k_sno = 0.47461 * (1 - theta) .* kiceT .* ksnow ...
-      + theta .* kiceT / 2.107 .* kfirn;
+   % Compute snow thermal conductivity (Calonne 2019 Eq. 5)
+   k_sno = GETKTHERMAL(T, f_ice, ro_ice);
 
    switch nargin
       case 6
@@ -40,14 +30,12 @@ function [k_eff, k_vap] = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, varargin)
          k_vap = varargin{1};
 
       case 8
-         % Compute dry snow vapor k: (Ls·De)/(Rv·T)(∂es/∂T-es/T)
+         % Compute dry snow vapor k via GETKVAPOR
          Ls = varargin{1};
          Rv = varargin{2};
          Tf = varargin{3};
-         es = 611.15 * exp((22.452 * (T - Tf)) ./ (272.55 + T - Tf)); % [Pa]
-         k_vap = Ls * 9e-5 * (T / Tf) .^ 6 ./ (Rv * T) ...
-            .* (22.452 * 272.55 .* es ./ ((272.55 + T - Tf) .^ 2) ... % ∂es/∂T
-            - es ./ T); % es/T
+         k_vap = GETKVAPOR(T, Ls, Rv, Tf);
+
       otherwise
          % do not compute k_vap
          k_vap = 0;
