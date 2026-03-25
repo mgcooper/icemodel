@@ -36,6 +36,11 @@ function varargout = physicalConstant(varargin)
       'cp_liq', 4218.0, ...         % Specific heat capacity of water at 0°C [J kg-1 K-1]
       'cp_ice', 2093.0, ...         % Specific heat capacity of ice at 0°C [J kg-1 K-1]
       'cp_vap', 1846.0, ...         % specific heat capacity of water vapor at constant pressure [J kg-1 K-1]
+      'cpv_l', 2040.0, ...          % Optimal vapor cp over liquid (Ambaum 2020) [J kg-1 K-1]
+      'cpv_i', 1885.0, ...          % Optimal vapor cp over ice (Ambaum 2020) [J kg-1 K-1]
+      'cvv', 1418.0, ...            % Specific heat of vapor at constant volume (Romps 2017) [J kg-1 K-1]
+      'E0v', 2.3740e6, ...          % Internal energy difference: vapor vs liquid at triple point (Romps 2017) [J kg-1]
+      'E0s', 0.3337e6, ...          % Internal energy difference: liquid vs solid at triple point (Romps 2017) [J kg-1]
       'k_liq', 0.561, ...           % Thermal conductivity of water at 0°C [W m-1 K-1]
       'k_ice', 2.22, ...            % Thermal conductivity of ice at 0°C [W m-1 K-1]
       'Rd', 287.0, ...              % Gas constant for dry air [J kg-1 K-1]
@@ -48,19 +53,7 @@ function varargout = physicalConstant(varargin)
       'epsilon', 0.622, ...         % Ratio of molar mass of dry air to that of water vapor [1]
       'P0', 101325.0, ...           % One atmosphere [Pa]
       'es0', 611.2, ...             % Reference saturation vapor pressure at 0°C [Pa]
-      'S0', 1361.0, ...             % Solar constant [W m-2]
-      'N0', 0.08, ...               % Marshall-Palmer parameter [cm-4]
-      'psychro', 66.1, ...          % Psychrometric constant [Pa K-1]
-      'dalr', 9.76, ...             % Dry adiabatic lapse rate [K km-1]
-      'malr', 5.1, ...              % Moist adiabatic lapse rate [K km-1]
-      'fcp', 100, ...               % Freezing point depression constant [K-1]
-      'scale_ht', 8434.5, ...       % Scale height assuming average temperature [m]
-      'hrsperday', 24, ...          % Hours per day [hr]
-      'secperhr', 3600, ...         % Seconds per hour [s]
-      'c0', 299792458, ...          % Speed of light in vacuum [m s-1]
-      'n_ice', 1.31, ...            % Refractive index (real) of ice
-      'n_liq', 1.33, ...            % Refractive index (real) of water
-      'n_air', 1.00  ...            % Refractive index (real) of air
+      'c0', 299792458  ...          % Speed of light in vacuum [m s-1]
       );
 
    % Assign derived values based on physical constants
@@ -76,29 +69,22 @@ function varargout = physicalConstant(varargin)
    constants.roLs = constants.ro_air * constants.Ls;        % [J m-3]
    constants.roLf = constants.ro_liq * constants.Lf;        % [J m-3]
 
-   % Need to add for VAPORHEAT:
-   % Ls / Rv
-   % Lv / Rv
+   % Latent heat to gas constant ratios
+   constants.Ls_o_Rv = constants.Ls / constants.Rv;  % [K]
+   constants.Lv_o_Rv = constants.Lv / constants.Rv;  % [K]
 
-   % Water vapor coefficients [kg m-3 K]
-   ci = 611.15 * exp(constants.Ls / (constants.Rv * constants.Tf)) / constants.Rv;
-   cl = 611.21 * exp(constants.Lv / (constants.Rv * constants.Tf)) / constants.Rv;
+   % Buck (1981) saturation vapor density coefficients [kg m-3 K] — retain for
+   % reference, production uses Ambaum (2020) via VAPORINIT / parameterLookup.
+   % ci = 611.15 * exp(constants.Ls / (constants.Rv * constants.Tf)) / constants.Rv;
+   % cl = 611.21 * exp(constants.Lv / (constants.Rv * constants.Tf)) / constants.Rv;
 
    % Ratios of intrinsic ice and water density
    constants.ro_iwe = constants.ro_ice / constants.ro_liq;  % [1]
    constants.ro_wie = constants.ro_liq / constants.ro_ice;  % [1]
 
-   % Freezing point depression parameter ^2
-   constants.fcpsq = constants.fcp^2;                       % [K-2]
-
-   % Emissivity x Stefan-Boltzmann constant [W m-2 K-4]
-   constants.emissSB = constants.emiss * constants.SB;      % [W m-2 K-4]
-
-   % Time conversions
-   constants.secperday = constants.hrsperday * constants.secperhr;
-
-   if (nargout == 1 && nargin == 0) || (strcmp('all', varargin{1}))
+   if (nargout == 1 && nargin == 0) || (nargin > 0 && strcmp('all', varargin{1}))
       varargout{1} = constants;
+      return
    end
    for n = 1:nargin
       arg = varargin{n};
