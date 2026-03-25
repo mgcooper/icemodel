@@ -1,32 +1,38 @@
 function k_vap = GETKVAPOR(T, Ls, Rv, Tf)
-   %GETKVAPOR Compute the vapor heat diffusion coefficient
+   %GETKVAPOR Compute the vapor heat diffusion coefficient.
    %
    %  k_vap = GETKVAPOR(T, Ls, Rv, Tf)
    %
-   % This follows Anderson (1976)
+   % This follows Anderson (1976):
    %  k = Ls * De / (Rv * T) * de_s / dT
    %
    % where:
-   %  De = 9e-5 * (T / Tf) ^ nd;
+   %  De = De0 * (T / Tf) ^ nd;
    %
    % with nd the 'temperature exponent', Anderson (1976) Eq. 3.13 (& Fig. 4.3)
    %
-   % See also:
+   % See also: VAPORHEAT, GETGAMMA, icemodel.kernels.buckVaporPressure
    %
    %#codegen
 
-   % Coefficients over ice.
-   A = 611.15; % reference vapor pressure [Pa]
-   B = 22.452; % unitless coefficient
-   C = 272.55; % unitless coefficient
+   % Ambaum (2020) Rankine-Kirchhoff coefficients over ice
+   persistent ai bi ci nd De0
+   if isempty(ai)
+      [ai, bi, ci, nd, De0] = icemodel.parameterLookup( ...
+         'ai', 'bi', 'ci', 'nd', 'De0');
+   end
 
-   % Compute saturation vapor pressure and its derivative wrt temperature
-   es = A * exp(B * (T - Tf) ./ (C + T - Tf));     % [Pa]
-   des_dT = B * C * es ./ (C + T - Tf) .^ 2;       % [Pa K-1]
+   % Saturation vapor pressure over ice [Pa]: es = a * exp(b/T) * T^c
+   es = ai * exp(bi ./ T) .* T .^ ci;
 
-   % Compute vapor diffusivity and the vapor thermal diffusion coefficient
-   De = 9e-5 * (T / Tf) .^ 14;                        % [m2 s-1]
-   k_vap = Ls * De ./ (Rv * T) .* (des_dT - es ./ T); % [W m-1 K-1]
+   % Derivative of es wrt temperature [Pa K-1]
+   des_dT = es ./ T .* (ci - bi ./ T);
+
+   % Vapor diffusivity [m2 s-1]
+   De = De0 * (T / Tf) .^ nd;
+
+   % Vapor thermal diffusion coefficient [W m-1 K-1]
+   k_vap = Ls * De ./ (Rv * T) .* (des_dT - es ./ T);
 
    % % From GETGAMMA before I added k_vap to VAPORHEAT:
    %

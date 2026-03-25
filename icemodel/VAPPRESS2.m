@@ -1,42 +1,46 @@
 function [es, des_dT, d2es_dT2, ro_vap, dro_vapdT, d2ro_vapdT2] = VAPPRESS2(T, liqflag)
-   %VAPPRESS Compute saturation vapor pressure over liquid or solid water
+   %VAPPRESS2 Compute saturation vapor pressure over liquid or ice.
    %
-   %  ES = VAPPRESS(T, TF, LIQFLAG) Computes saturation vapor pressure
-   %  using the Rankine–Kirchhoff formula, following Ambaum (2020):
+   %  ES = VAPPRESS2(T, LIQFLAG) computes saturation vapor pressure
+   %  using the Ambaum (2020) Rankine-Kirchhoff formula:
    %
-   %     ES = A * exp(B / T) * T ^ C
+   %     ES = A * exp(B / T) * T ^ C   [Pa]
    %
-   %  Where A, B, C are coefficients derived from physical constants given in
-   %  Ambaum (2020).
+   %  where (al, bl, cl) are coefficients over liquid and (ai, bi, ci) are
+   %  over ice, obtained from icemodel.parameterLookup.
    %
-   %  [ES, dES_dT] = VAPPRESS(T, TF, LIQFLAG) Also computes the derivative of
-   %  vapor with respect to temperature.
+   %  [ES, dES_dT] = VAPPRESS2(T, LIQFLAG) Also computes the derivative of
+   %  saturation vapor pressure with respect to temperature.
    %
-   %  [ES, dES_dT, d2ES_dT2] = VAPPRESS(T, TF, LIQFLAG) Also computes the second
-   %  derivative of vapor with respect to temperature.
+   %  [ES, dES_dT, d2ES_dT2] = VAPPRESS2(T, LIQFLAG) Also computes the
+   %  second derivative.
+   %
+   %  [..., RO_VAP, DRO_VAPDT, D2RO_VAPDT2] = VAPPRESS2(T, LIQFLAG) Also
+   %  computes saturation vapor density and its temperature derivatives.
    %
    %  Units: [Pa = J m-3 = N m-2 = kg m-1 s-2]
    %
-   % See also: VAPORHEAT
+   % See also: VAPPRESS, VAPORHEAT
    %
    %#codegen
 
-   %  Tf = 273.16 is the triple point temperature.
-   %  es = vapor pressure in Pa. (1 mb = 100 Pa).
-   %
-   %  https://romps.berkeley.edu/papers/pubdata/2021/ambaum/21ambaum.pdf
-   %  https://romps.berkeley.edu/papers/pubdata/2020/dewpoint/20dewpoint.pdf
+   % Ambaum (2020) Rankine-Kirchhoff coefficients (i = ice, l = liquid)
+   persistent al bl cl ai bi ci
+   if isempty(al)
+      [al, bl, cl, ai, bi, ci] = icemodel.parameterLookup( ...
+         'al', 'bl', 'cl', 'ai', 'bi', 'ci');
+   end
 
-   % Define coefficients over water and ice
+   persistent Rv
+   if isempty(Rv)
+      Rv = icemodel.physicalConstant('Rv');
+   end
+
+   % Select phase coefficients
    if nargin < 2 || liqflag
-      a = 9.7070e+24;
-      b = -6716.9;
-      c = -4.72885;
+      a = al; b = bl; c = cl;
    else
-      % Over ice
-      a = 7.5948e+13;
-      b = -6273.12;
-      c = -0.45986;
+      a = ai; b = bi; c = ci;
    end
 
    % Compute saturation vapor pressure
@@ -51,7 +55,6 @@ function [es, des_dT, d2es_dT2, ro_vap, dro_vapdT, d2ro_vapdT2] = VAPPRESS2(T, l
 
    % Compute vapor density and derivatives
    if nargout > 3
-      Rv = 461;
       ro_vap = saturationVaporDensity(T, es, Rv);
       if nargout > 5
          [dro_vapdT, d2ro_vapdT2] = saturationVaporDensityDerivative( ...
@@ -63,13 +66,13 @@ function [es, des_dT, d2es_dT2, ro_vap, dro_vapdT, d2ro_vapdT2] = VAPPRESS2(T, l
    end
 
    % Actual expressions for latent enthalpies:
-   % Lv = Lv0 + (cpv_l - cpl) * (T - T0);
-   % Ls = Ls0 + (cpv_s - cps) * (T - T0);
+   % Lv = Lv0 + (cpv_l - cp_liq) * (T - T0);
+   % Ls = Ls0 + (cpv_i - cp_ice) * (T - T0);
 end
 
 %%
 function es = saturationVaporPressure(T, a, b, c)
-   %SATURATIONVAPORPRESSURE Compute saturation vapor pressure over water or ice
+   %SATURATIONVAPORPRESSURE Ambaum (2020) saturation vapor pressure
    es = a * exp(b ./ T) .* T .^ c; % [Pa]
 end
 
@@ -89,7 +92,7 @@ function [des_dT, d2es_dT2] = saturationVaporPressureDerivative(T, es, b, c)
 end
 
 function ro_vap = saturationVaporDensity(T, es, Rv) %#ok<*DEFNU>
-   %SATURATIONVAPORDENSITY Compute saturation vapor density
+   %SATURATIONVAPORDENSITY Saturation vapor density from ideal gas law
    ro_vap = es ./ (Rv .* T); % [kg m-3]
 end
 
@@ -102,12 +105,7 @@ function [dro_vapdT, d2ro_vapdT2] = saturationVaporDensityDerivative(T, es, ...
    % dro_vapdT = ro_vap ./ T .* (c - b ./ T - 1);
 
    if nargout == 2
-      % Second derivative % [kg m-3 K-2]
-
-      % something is wrong with this one
-      % d2ro_vapdT2 = (des_dT - es ./ T.^2 .* (2 * (c - b ./ T) - 1)) ./ (Rv * T);
-
-      % In terms of ro_vap (notice analogous form to d2es_dT2):
+      % Second derivative [kg m-3 K-2]
       d2ro_vapdT2 = ro_vap ./ T.^2 .* ((c-2) * (c-1 - 2*b./T) + b^2 ./ T.^2);
    end
 end

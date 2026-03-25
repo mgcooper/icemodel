@@ -30,9 +30,13 @@ function diam = GRAINSIZE(JJ, dt, ro_sno, ...
    %  dz_bndry(nz_max+1)
    %  diff_coef_bndry(nz_max+1)
 
+   persistent De0
+   if isempty(De0)
+      De0 = icemodel.parameterLookup('De0_sntherm');
+   end
+
    g1 = 5.0e-7;
    g2 = 4.0e-12;
-   De0 = 9.2e-5;
 
    % Calculate the vapor diffusion constants for water(w) and ice(i).
    % e0 /613.6/

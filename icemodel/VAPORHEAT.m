@@ -1,5 +1,5 @@
 function [ro_vap, dro_vapdT, k_vap] = VAPORHEAT(T, f_ice, f_liq, Tf, Rv, Ls)
-   %VAPORHEAT Compute saturation vapor density within porous ice
+   %VAPORHEAT Compute saturation vapor density within porous ice.
    %
    % [ro_vap, dro_vapdT, k_vap] = VAPORHEAT(T, f_ice, f_liq, Tf, Rv, Ls)
    % computes the saturation vapor density within the ice and the latent heat
@@ -7,65 +7,52 @@ function [ro_vap, dro_vapdT, k_vap] = VAPORHEAT(T, f_ice, f_liq, Tf, Rv, Ls)
    %
    % ro_vap    - Vapor mass per vapor volume, a function of temperature.
    % dro_vapdT - The derivative of ro_vap with respect to temperature.
-   % H_vap     - Vapor enthalpy per unit volume [J / m3]
-   % k=i       - wrt ice
-   % k=l       - wrt liq
+   % k_vap     - Vapor thermal diffusion coefficient [W m-1 K-1]
    %
    % ro_vap is analogous to an intrinsic density. The calculations assume the
    % air voids are saturated with respect to water vapor.
    %
-   % De0s = 9.2e-5 [m2 s-1] is the reference effective diffusion coefficient for
-   % water vapor in snow at 1000 mb and 0oC. (See Jordan pg v. Nomenclature).
+   % De0 = 9e-5 [m2 s-1] is the reference effective diffusion coefficient for
+   % water vapor in snow (see Jordan pg v. Nomenclature).
    %
-   % De0g = 1.61e-5 * porosity is the reference effective diffusion coefficient
-   % for water vapor in soil at 1000 mb and 0oC.
-   %
-   % See also:
+   % See also: GETGAMMA, GETKVAPOR
    %
    %#codegen
 
-   % Define coefficients over water and ice
-   persistent aw bw cw ai bi ci nd
-   if isempty(aw)
-      aw = 611.21;
-      bw = 17.502;
-      cw = 240.97;
-      ai = 611.15;
-      bi = 22.452;
-      ci = 272.55;
-      nd = 14;
+   % Ambaum (2020) Rankine-Kirchhoff coefficients (i = ice, l = liquid)
+   persistent al bl cl ai bi ci nd De0
+   if isempty(al)
+      [al, bl, cl, ai, bi, ci, nd, De0] = icemodel.parameterLookup( ...
+         'al', 'bl', 'cl', 'ai', 'bi', 'ci', 'nd', 'De0');
    end
 
-   % Locate the indices with and without water
+   % Locate the indices with and without liquid water
    iM = f_liq > 0.02;
 
-   % Saturation vapor pressure over ice [Pa]
-   es = ai * exp(bi * (T - Tf) ./ (ci + T - Tf));
+   % Saturation vapor pressure over ice [Pa]: es = a * exp(b/T) * T^c
+   es = ai * exp(bi ./ T) .* T .^ ci;
 
-   % Saturation vapor pressure over water [Pa]
+   % Saturation vapor pressure over liquid [Pa]
    if sum(iM) > 0
-      es(iM) = aw * exp(bw * (T(iM) - Tf) ./ (cw + T(iM) - Tf));
+      es(iM) = al * exp(bl ./ T(iM)) .* T(iM) .^ cl;
    end
 
-   % Equilibrium water vapor density wrt phase k: [kg m-3]
+   % Equilibrium water vapor density wrt phase k [kg m-3]
    ro_vap = es ./ (Rv * T);
 
-   % Derivative of vapor density wrt to temperature over ice [kg m-3 K-1]
-   dro_vapdT = ro_vap .* (bi * ci ./ (ci + T - Tf) .^ 2 - 1 ./ T);
+   % Derivative of vapor density wrt temperature over ice [kg m-3 K-1]
+   dro_vapdT = ro_vap ./ T .* (ci - bi ./ T - 1);
 
-   % Derivative of vapor density wrt to temperature over water
+   % Derivative of vapor density wrt temperature over liquid
    if sum(iM) > 0
-      dro_vapdT(iM) = ro_vap(iM) .* (bw * cw ./ ...
-         (cw + T(iM) - Tf) .^ 2 - 1 ./ T(iM));
+      dro_vapdT(iM) = ro_vap(iM) ./ T(iM) .* (cl - bl ./ T(iM) - 1);
    end
 
    % Vapor diffusivity [m2 s-1]
-   % De = 9.0e-5 * (T / Tf) .^ 6;
+   % De = De0 * (T / Tf) .^ nd;
 
    % Vapor thermal diffusion coefficient [W m-1 K-1]: Ls * De * dro_vapdT
-   k_vap = Ls * 9.0e-5 * (T / Tf) .^ nd .* dro_vapdT;
-
-   % k_vap = Ls * 2.1664062e-19 * T .^ 14 .* dro_vapdT;
+   k_vap = Ls * De0 * (T / Tf) .^ nd .* dro_vapdT;
 
    % Below here not currently implemented, but would be used for grain growth
 

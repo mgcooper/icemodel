@@ -13,7 +13,6 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
    %  SEB = F0 + F(T)
    %      = F0 + F' + (dF/dT)' * (T - T')
    %      = F0 + F' + (dF/dT)' * T - (dF/dT)' * T'
-   %      = F0 + F' - (dF/dT)' * T' + (dF/dT)' * T
    %      = Fc + Fp * T
    %
    % where
@@ -33,24 +32,28 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
    %
    %#codegen
 
+   % Ambaum (2020) Rankine-Kirchhoff coefficients (i = ice, l = liquid)
+   persistent al bl cl ai bi ci
+   if isempty(al)
+      [al, bl, cl, ai, bi, ci] = icemodel.parameterLookup( ...
+         'al', 'bl', 'cl', 'ai', 'bi', 'ci');
+   end
+
    if liqflag == true
-      % Over water.
-      A = 611.210;
-      B = 17.502;
-      C = 240.97;
+      a = al; b = bl; c = cl;
    else
-      % Over ice.
-      A = 611.150;
-      B = 22.452;
-      C = 272.55;
+      a = ai; b = bi; c = ci;
    end
 
    % Compute the constants used in the stability coefficient computations
    B1 = scoef(2) / (Ta * wspd ^ 2);
    B2 = scoef(3) / (sqrt(Ta) * wspd);
 
-   % Compute saturation vapor pressure
-   es = A * exp(B * (Ts - Tf) / (C + Ts - Tf));
+   % Saturation vapor pressure: es = a * exp(b / T) * T ^ c  [Pa]
+   es = a * exp(b / Ts) * Ts ^ c;
+
+   % Derivative of es wrt temperature: des_dT = es / T * (c - b / T)
+   des_dT = es / Ts * (c - b / Ts);
 
    % This accounts for an increase in turbulent fluxes under unstable conditions
    if Ts > Ta
@@ -72,11 +75,11 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
    Sc_Qh = cv_air * De * S * Ta;
    Sp_Qh = -cv_air * De * S;
 
-   % latent heat flux:
+   % latent heat flux (linearization of es around Ts):
+   % es(T) ≈ es(Ts) + des_dT * (T - Ts) = (es - des_dT * Ts) + des_dT * T
    Sc_Qe = roL * De * 0.622 / Pa * S ...
-      * (ea - es * (1 - B * C * Ts / (C + Ts - Tf) ^ 2));
-   Sp_Qe = -roL * De * 0.622 / Pa * S ...
-      * es * B * C / (C + Ts - Tf) ^ 2;
+      * (ea - es + des_dT * Ts);
+   Sp_Qe = -roL * De * 0.622 / Pa * S * des_dT;
 
    % combine net sw, incoming lw, conduction, and snow/rain heat flux:
    Sc = Sc_Qle + Sc_Qh + Sc_Qe + emiss * Qli + chi * Qsi * (1.0 - albedo);

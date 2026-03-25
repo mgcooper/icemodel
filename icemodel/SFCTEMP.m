@@ -11,7 +11,14 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
       tol = 1e-3;
       maxiter = 100;
    end
-   
+
+   % Ambaum (2020) Rankine-Kirchhoff coefficients (i = ice, l = liquid)
+   persistent al bl cl ai bi ci
+   if isempty(al)
+      [al, bl, cl, ai, bi, ci] = icemodel.parameterLookup( ...
+         'al', 'bl', 'cl', 'ai', 'bi', 'ci');
+   end
+
    Ts = nan;
    ok = false;
 
@@ -50,25 +57,22 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
    B1 = scoef(2) / (Ta * wspd ^ 2);
    B2 = scoef(3) / (sqrt(Ta) * wspd);
 
-   % Define the vapor pressure coefficients.
+   % Select phase coefficients for Ambaum vapor pressure
    if liqflag == true
-      % Over water.
-      A = 611.21;
-      B = 17.502;
-      C = 240.97;
+      a = al; b = bl; c = cl;
    else
-      % Over ice.
-      A = 611.15;
-      B = 22.452;
-      C = 272.55;
+      a = ai; b = bi; c = ci;
    end
 
    old = Ta;
 
    for iter = 1:maxiter
 
-      % Update surface saturation vapor pressure
-      es = A * exp(B * (old - Tf) / (C + old - Tf));
+      % Saturation vapor pressure: es = a * exp(b / T) * T ^ c  [Pa]
+      es = a * exp(b / old) * old ^ c;
+
+      % Derivative of es wrt temperature
+      des_dT = es / old * (c - b / old);
 
       % Account for an increase in turbulent fluxes under unstable conditions.
       if old < Ta
@@ -92,7 +96,7 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
 
       dfdT = -4.0 * emiss * SB * old ^ 3 ...
          + S * -AAA + AAA * (Ta - old) * dS ...
-         + S * -FFF * CCC * es * B * C / (C + old - Tf) ^ 2 ...
+         + S * -FFF * CCC * des_dT ...
          + FFF * CCC * (ea - es) * dS ...
          - a1;
 
