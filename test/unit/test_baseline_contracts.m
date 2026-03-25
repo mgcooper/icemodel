@@ -31,15 +31,7 @@ function test_resolveBaselineBuild_defaults_blank_selector_to_rolling(testCase)
       "regression_baseline_rolling_skinmodel.mat"));
 end
 
-function test_loadRegressionBaseline_returns_empty_for_blank_selector(testCase)
-   % A blank selector is the explicit "no baseline" case.
-
-   baseline = icemodel.test.helpers.loadRegressionBaseline("", "all");
-   testCase.verifyTrue(istable(baseline));
-   testCase.verifyEmpty(baseline);
-end
-
-function test_loadRegressionBaseline_normalizes_legacy_schema(testCase)
+function test_loadBaseline_regression_normalizes_legacy_schema(testCase)
    % Legacy baseline rows should be upgraded into the current schema on
    % load so older accepted files remain usable during the transition.
 
@@ -55,8 +47,8 @@ function test_loadRegressionBaseline_normalizes_legacy_schema(testCase)
       'VariableNames', {'case_id', 'runoff_final', 'last_updated_utc'});
    save(filepath, 'baseline');
 
-   loaded = icemodel.test.helpers.loadRegressionBaseline( ...
-      "rolling", "icemodel", filepath);
+   loaded = icemodel.test.helpers.loadBaseline("regression", ...
+      smbmodel="icemodel", filename=filepath);
 
    testCase.verifyEqual(loaded.case_id, "icemodel_kanm_2016_solver2");
    testCase.verifyEqual(loaded.baseline_tag, "");
@@ -66,7 +58,7 @@ function test_loadRegressionBaseline_normalizes_legacy_schema(testCase)
    clear cleanup
 end
 
-function test_loadRegressionBaseline_prefers_explicit_path(testCase)
+function test_loadBaseline_regression_prefers_explicit_path(testCase)
    % Explicit baseline paths should still load rolling files even when the
    % rolling selector has already been normalized to a blank tag.
 
@@ -79,8 +71,8 @@ function test_loadRegressionBaseline_prefers_explicit_path(testCase)
       'VariableNames', {'case_id', 'runoff_final'});
    save(filepath, 'RegressionBaseline');
 
-   loaded = icemodel.test.helpers.loadRegressionBaseline("", ...
-      "icemodel", filepath);
+   loaded = icemodel.test.helpers.loadBaseline("regression", ...
+      smbmodel="icemodel", filename=filepath);
 
    testCase.verifyEqual(loaded.case_id, "icemodel_kanm_2016_solver2");
    testCase.verifyEqual(loaded.runoff_final, 1.5);
@@ -184,7 +176,7 @@ function test_bootstrapTestEnvironment_restores_caller_config(testCase)
    clear restore_output
 end
 
-function test_loadPerfBaseline_returns_saved_metadata(testCase)
+function test_loadBaseline_perf_returns_saved_metadata(testCase)
    % Perf baseline loads should expose the saved build metadata so runners can
    % decide whether whole-model wall-time comparison is fair.
 
@@ -198,14 +190,95 @@ function test_loadPerfBaseline_returns_saved_metadata(testCase)
    meta = struct('matlab_version', "24.2.0 (R2024b)", 'host', "MACA64");
    save(filepath, 'PerfBaseline', 'meta');
 
-   [loaded, loaded_meta] = icemodel.test.helpers.loadPerfBaseline( ...
-      2016, "rolling", "icemodel", filepath);
+   [loaded, loaded_meta] = icemodel.test.helpers.loadBaseline("perf", ...
+      smbmodel="icemodel", filename=filepath);
 
    testCase.verifyEqual(loaded.case_id, "icemodel_kanm_2016_solver2");
    testCase.verifyEqual(loaded_meta.matlab_version, "24.2.0 (R2024b)");
    testCase.verifyEqual(loaded_meta.host, "MACA64");
 
    clear cleanup
+end
+
+function test_baselineFilePath_returns_rolling_perf_by_default(testCase)
+   % The default call should return the rolling perf baseline for icemodel.
+
+   pathname = icemodel.test.helpers.baselineFilePath("perf");
+   testCase.verifyTrue(contains(pathname, ...
+      "perf_baseline_2016_rolling_icemodel.mat"));
+end
+
+function test_baselineFilePath_accepts_smbmodel_name_value(testCase)
+   % smbmodel should be a name-value argument.
+
+   pathname = icemodel.test.helpers.baselineFilePath("perf", ...
+      smbmodel="skinmodel");
+   testCase.verifyTrue(contains(pathname, ...
+      "perf_baseline_2016_rolling_skinmodel.mat"));
+end
+
+function test_baselineFilePath_tag_implies_release(testCase)
+   % Providing a baseline_tag without baseline_type should infer release.
+
+   pathname = icemodel.test.helpers.baselineFilePath("perf", ...
+      baseline_tag="v1.1");
+   testCase.verifyTrue(contains(pathname, ...
+      "perf_baseline_2016_v1_1_icemodel.mat"));
+end
+
+function test_baselineFilePath_returns_rolling_regression(testCase)
+   % Regression baselines do not include simyear in the filename.
+
+   pathname = icemodel.test.helpers.baselineFilePath("regression");
+   testCase.verifyTrue(contains(pathname, ...
+      "regression_baseline_rolling_icemodel.mat"));
+end
+
+function test_baselineFilePath_resolves_latest_release(testCase)
+   % baseline_type="release" without a tag should resolve the latest version.
+
+   pathname = icemodel.test.helpers.baselineFilePath("perf", ...
+      baseline_type="release");
+   testCase.verifyTrue(contains(pathname, "v1_1"));
+end
+
+function test_loadBaseline_perf_returns_nonempty_table(testCase)
+   % Loading the rolling perf baseline should return a populated table.
+
+   baseline = icemodel.test.helpers.loadBaseline("perf");
+   testCase.verifyFalse(isempty(baseline));
+   testCase.verifyTrue(istable(baseline));
+end
+
+function test_loadBaseline_regression_returns_nonempty_table(testCase)
+   % Loading the rolling regression baseline should return a populated table.
+
+   baseline = icemodel.test.helpers.loadBaseline("regression");
+   testCase.verifyFalse(isempty(baseline));
+   testCase.verifyTrue(istable(baseline));
+end
+
+function test_artifactFilePath_returns_existing_file(testCase)
+   % The default call should find the most recent perf artifact.
+
+   pathname = icemodel.test.helpers.artifactFilePath("perf");
+   testCase.verifyTrue(exist(pathname, 'file') == 2);
+end
+
+function test_referenceFilePath_returns_runoff_path(testCase)
+   % The runoff reference path should point to the references directory.
+
+   pathname = icemodel.test.helpers.referenceFilePath("runoff");
+   testCase.verifyTrue(contains(pathname, "references"));
+   testCase.verifyTrue(contains(pathname, "runoff_reference"));
+end
+
+function test_loadReference_returns_nonempty_table(testCase)
+   % Loading the runoff reference should return a populated table.
+
+   ref = icemodel.test.helpers.loadReference("runoff");
+   testCase.verifyFalse(isempty(ref));
+   testCase.verifyTrue(istable(ref));
 end
 
 function deleteIfExists(filepath)
