@@ -15,7 +15,7 @@ function results = run_benchmark_suite(options)
    %
    % See RenameRoundTest for notes on results that informed postprocess.
 
-   arguments
+   arguments (Input)
 
       options.testname (1, :) string ...
          = ""

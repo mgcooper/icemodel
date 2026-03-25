@@ -2,11 +2,13 @@ function displayRegressionSummary(report)
    %DISPLAYREGRESSIONSUMMARY Display compact regression compare summaries.
    %
    %  icemodel.test.helpers.displayRegressionSummary(report)
-   %  icemodel.test.helpers.displayRegressionSummary(artifact_file)
+   %  icemodel.test.helpers.displayRegressionSummary(filepath)
    %
-   % The one-argument table form displays the four baseline-vs-current compare
-   % tables (runoff, melt, runoff_eval, melt_eval). The one-argument string
-   % form loads the report from a saved regression artifact MAT file.
+   % The one-argument table form displays the four baseline-vs-current
+   % compare tables (runoff, melt, runoff_eval, melt_eval). The one-argument
+   % string form loads the report from a saved MAT file. The file can be
+   % either a baseline file (e.g., regression_baseline_rolling_icemodel.mat)
+   % or an artifact file (e.g., regression_report_smoke_icemodel_s2_rolling.mat).
 
    if nargin == 1 && (ischar(report) || isStringScalar(report))
       report = loadFromFile(report);

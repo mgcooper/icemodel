@@ -12,7 +12,7 @@ function results = run_unit_suite(options)
    %  - a subfolder under test/unit/
    %  - an absolute/relative existing file or folder path
 
-   arguments
+   arguments (Input)
 
       options.selector (1, 1) string ...
          = ""

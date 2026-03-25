@@ -2,15 +2,17 @@ function displayPerfSummary(case_summary, benchmark)
    %DISPLAYPERFSUMMARY Display a compact perf case summary and benchmark table.
    %
    %  icemodel.test.helpers.displayPerfSummary(case_summary, benchmark)
-   %  icemodel.test.helpers.displayPerfSummary(artifact_file)
+   %  icemodel.test.helpers.displayPerfSummary(filepath)
    %
-   % The two-argument form displays in-memory tables from run_perf_suite or
-   % build_perf_baseline. The one-argument form loads a saved perf artifact
-   % or baseline MAT file and displays whatever it contains.
+   % The two-argument form displays in-memory tables returned by
+   % run_perf_suite or build_perf_baseline. The one-argument string form
+   % loads a saved MAT file and displays whatever it contains. The file can
+   % be either a baseline file (e.g., perf_baseline_2016_rolling_icemodel.mat)
+   % or an artifact file (e.g., perf_results_smoke_icemodel_s2_vs_rolling.mat).
    %
    % If run_perf_suite is called with include_benchmarks=false, then the
-   % benchmark struct will have an empty benchmark.summary table and results are
-   % not reported.
+   % benchmark struct will have an empty benchmark.summary table and results
+   % are not reported.
 
    if nargin == 1 && (ischar(case_summary) || isStringScalar(case_summary))
       [case_summary, benchmark] = loadFromFile(case_summary);
