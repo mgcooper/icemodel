@@ -125,8 +125,8 @@ function results = run_perf_suite(kwargs)
    % Combine results into a common struct.
    results = combinePerfResults(per_model);
 
-   % TODO: Display the results
-   % icemodel.test.helpers.displayPerfResults(results)
+   % Display the results.
+   icemodel.test.helpers.displayPerfResults(results)
 end
 
 function results = runSingleModelPerfSuite(input_path, output_path, ...
@@ -152,8 +152,8 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       'formal perf suite expects exactly one benchmark year')
 
    % Load the accepted baseline that matches this concrete formal model.
-   [baseline, baseline_meta] = icemodel.test.helpers.loadPerfBaseline( ...
-      benchmark_year, baseline_tag, smbmodel);
+   [baseline, baseline_meta] = icemodel.test.helpers.loadBaseline("perf", ...
+      smbmodel=smbmodel, baseline_tag=baseline_tag, simyear=benchmark_year);
    [baseline_compatible, compare_reason] = perfBaselineCompatibility( ...
       baseline_meta);
 
@@ -289,8 +289,9 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    meta.simyear = benchmark_year;
    meta.smoke_sites = smoke_sites;
    meta.full_sites = full_sites;
-   meta.baseline_file = icemodel.test.helpers.defaultBaselinePath( ...
-      "perf", baseline_type, baseline_tag, smbmodel, benchmark_year);
+   meta.baseline_file = icemodel.test.helpers.baselineFilePath("perf", ...
+      smbmodel=smbmodel, baseline_type=baseline_type, ...
+      baseline_tag=baseline_tag, simyear=benchmark_year);
    meta.case_builder = "icemodel.test.helpers.setModelOptsForCase";
    meta.opts_source = "icemodel.setopts defaults";
    meta.spinup_policy = ...
@@ -329,12 +330,6 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    artifact_file = saveArtifacts(sample_detail, activity_detail, ...
       case_summary, case_opts, benchmark, meta);
 
-   % Report if whole-model perf comparison was skipped
-   if ~meta.baseline_compatible && ~isblanktext(meta.compare_reason)
-      fprintf('Whole-model perf comparison skipped: %s\n', ...
-         char(meta.compare_reason));
-   end
-
    % Assemble the results.
    results = struct();
    results.case_summary = case_summary;
@@ -346,10 +341,6 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    results.artifact_file = string(artifact_file);
    results.failed_cases = failed_cases;
    results.passed = isempty(failed_cases);
-
-   % Display the perf report for this case.
-   % TODO: pass results to renamed displayPerfResults in main function
-   icemodel.test.helpers.displayPerfSummary(case_summary, benchmark)
 end
 
 function results = combinePerfResults(per_model)
@@ -398,32 +389,25 @@ function artifact_file = saveArtifacts(sample_detail, ...
       activity_detail, case_summary, case_opts, benchmark, meta)
    %saveArtifacts Save the perf comparison artifact bundle for one run.
 
-   % Create the run-specific artifact folder before saving the report.
-   testdir = icemodel.getpath('test');
-   outdir = fullfile(testdir, 'artifacts', char(meta.run_name));
+   % Build the canonical artifact path.
+   artifact_file = icemodel.test.helpers.artifactFilePath("perf", ...
+      tier=meta.tier, smbmodel=meta.smbmodel_filter, ...
+      solver=meta.solver_filter, baseline_type=meta.baseline_type, ...
+      baseline_tag=meta.baseline_tag, run_name=meta.run_name);
+
+   % Create the run-specific artifact folder before saving.
+   outdir = fileparts(artifact_file);
    if exist(outdir, 'dir') ~= 7
       mkdir(outdir);
    end
 
-   % Format the baseline/model/solver tags used by the saved filename.
-   if meta.baseline_type == "rolling"
-      baseline_label = 'vs_rolling';
-   else
-      baseline_label = "vs_" + icemodel.test.helpers.sanitizeTag(meta.baseline_tag);
-   end
-   model_label = smbmodelLabel(meta.smbmodel_filter);
-   solver_label = solverLabel(meta.solver_filter);
-   artifact_file = fullfile(outdir, ...
-      sprintf('perf_results_%s%s_%s.mat', ...
-      char(meta.tier), char(model_label + solver_label), char(baseline_label)));
-   benchmark_summary = benchmark.summary;
-   benchmark_comparison = benchmark.comparison;
-   benchmark_meta = benchmark.meta;
-
+   % Save the benchmark struct as-is so the artifact content matches the
+   % results struct returned by run_perf_suite.
    save(artifact_file, 'sample_detail', 'activity_detail', ...
-      'case_summary', 'case_opts', 'benchmark_summary', ...
-      'benchmark_comparison', 'benchmark_meta', 'meta');
-   disp(artifact_file)
+      'case_summary', 'case_opts', 'benchmark', 'meta');
+
+   % Print the loaded filename to the console.
+   icemodel.test.helpers.printFilePath(artifact_file, "save");
 end
 
 function [compatible, reason] = perfBaselineCompatibility(baseline_meta)
@@ -460,16 +444,3 @@ function [compatible, reason] = perfBaselineCompatibility(baseline_meta)
    end
 end
 
-function label = smbmodelLabel(smbmodel)
-   %SMBMODELLABEL Format the smbmodel selector for perf artifact filenames.
-   label = "_" + icemodel.test.helpers.smbmodelTag(string(smbmodel));
-end
-
-function label = solverLabel(solver)
-   %SOLVERLABEL Format the solver filter for perf artifact filenames.
-   if isempty(solver)
-      label = "";
-   else
-      label = "_s" + join(string(solver), '-');
-   end
-end

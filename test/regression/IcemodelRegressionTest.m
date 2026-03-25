@@ -11,19 +11,24 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       rel_tol_runoff_m3 (1, 1) double = 1e-4
       abs_tol_runoff_m3 (1, 1) double = 1.0
       env_cleanup
+      caseinfo
    end
 
    methods (TestMethodSetup)
-      function configurePaths(testCase)
+      function configureCases(testCase)
          % Install the canonical test config so direct class runs and
          % runner-based runs see the same environment.
          [~, ~, ~, ~, testCase.env_cleanup] = ...
             icemodel.test.helpers.bootstrapTestEnvironment();
+
+         % Resolve the case matrix, baseline, and runoff reference once
+         % before the per-case compare loop.
+         testCase.caseinfo = buildRegressionCaseInfo();
       end
    end
 
    methods (TestMethodTeardown)
-      function restorePaths(testCase)
+      function restoreConfig(testCase)
          % Release the setup cleanup handle after each regression case.
          testCase.env_cleanup = [];
       end
@@ -31,37 +36,12 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
    methods (Test)
       function testCoreRegression(testCase)
-         % Read the requested case matrix/baseline selectors from the
-         % runner-owned environment variables.
-         tier = IcemodelRegressionTest.getenvRequired('ICEMODEL_TEST_TIER');
-         smbmodel = IcemodelRegressionTest.getenvRequired( ...
-            'ICEMODEL_TEST_SMBMODEL_FILTER');
-         solver = IcemodelRegressionTest.getenvAsNumbers( ...
-            'ICEMODEL_TEST_SOLVER_FILTER');
-         simyear = str2double(IcemodelRegressionTest.getenvRequired( ...
-            'ICEMODEL_TEST_SIMYEAR_FILTER'));
-         smoke_sites = IcemodelRegressionTest.getenvAsStrings( ...
-            'ICEMODEL_TEST_SMOKE_SITES');
-         full_sites = IcemodelRegressionTest.getenvAsStrings( ...
-            'ICEMODEL_TEST_FULL_SITES');
-         baseline_tag = getenv('ICEMODEL_REGRESSION_BASELINE');
-         run_name = getenv('ICEMODEL_TEST_RUN_NAME');
-
-         % Resolve the retained formal cases and the matched accepted baseline
-         % before entering the per-case compare loop.
-         runoff_ref = icemodel.test.helpers.loadRunoffReference();
-         cases = icemodel.test.helpers.getRegressionCaseMatrix( ...
-            tier=tier, smbmodel=smbmodel, solver=solver, simyear=simyear, ...
-            smoke_sites=smoke_sites, full_sites=full_sites);
-
-         % Confirm the case exists.
-         testCase.assertNotEmpty(cases, ...
-            sprintf('no regression cases matched tier=%s smbmodel=%s', ...
-            tier, smbmodel));
-
-         % Load the baseline.
-         baseline = icemodel.test.helpers.loadRegressionBaseline( ...
-            baseline_tag, smbmodel);
+         % Unpack the pre-resolved case matrix, baseline, and runoff
+         % reference from the caseinfo struct built in configureCases.
+         cases = testCase.caseinfo.cases;
+         baseline = testCase.caseinfo.baseline;
+         runoff_ref = testCase.caseinfo.runoff_ref;
+         baseline_tag = testCase.caseinfo.baseline_tag;
 
          % Accumulate the compare report and resolved opts for one saved
          % artifact per regression run.
@@ -163,14 +143,10 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          end
 
          report = struct2table(report_rows);
-         meta = IcemodelRegressionTest.reportMeta( ...
-            tier, smbmodel, solver, simyear, smoke_sites, full_sites, ...
-            baseline_tag, run_name);
+         meta = IcemodelRegressionTest.reportMeta(testCase.caseinfo);
 
-         % Save the artifact and display the comparison summary.
-         artifact_file = testCase.saveArtifacts(report, case_opts, meta);
-         disp(artifact_file)
-         icemodel.test.helpers.displayRegressionReport(report)
+         % Save the artifact for the runner-level display and results struct.
+         testCase.saveArtifacts(report, case_opts, meta);
       end
 
    end
@@ -241,35 +217,27 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             testCase.rel_tol_scalar * abs(expected));
       end
 
-      function artifact_file = saveArtifacts(~, report, case_opts, meta)
+      function saveArtifacts(~, report, case_opts, meta)
          %saveArtifacts Save the regression comparison artifact for one run.
 
-         % Create the run-specific artifact folder before saving the report.
-         testdir = icemodel.getpath('test');
-         outdir = fullfile(testdir, 'artifacts', char(meta.run_name));
+         % Build the canonical artifact path.
+         artifact_file = icemodel.test.helpers.artifactFilePath( ...
+            "regression", tier=meta.tier, smbmodel=meta.smbmodel_filter, ...
+            solver=meta.solver_filter, ...
+            baseline_tag=meta.baseline_tag, run_name=meta.run_name);
+
+         % Create the run-specific artifact folder before saving.
+         outdir = fileparts(artifact_file);
          if exist(outdir, 'dir') ~= 7
             mkdir(outdir);
          end
 
-         % Format the baseline/model/solver tags used by the saved filename.
-         if meta.baseline_tag == ""
-            baseline_tag = 'nobaseline';
-         else
-            baseline_tag = char( ...
-               icemodel.test.helpers.sanitizeTag(meta.baseline_tag));
-         end
-         model_tag = IcemodelRegressionTest.smbmodelLabel( ...
-            meta.smbmodel_filter);
-         solver_tag = IcemodelRegressionTest.solverLabel( ...
-            meta.solver_filter);
-
-         % Build the artifact filename.
-         artifact_file = fullfile(outdir, ...
-            sprintf('regression_report_%s%s_%s.mat', ...
-            char(meta.tier), char(model_tag + solver_tag), baseline_tag));
-
          % Save the artifact file.
          save(artifact_file, 'report', 'case_opts', 'meta');
+
+         % Export the artifact path so the runner can load it after the
+         % unittest framework returns control.
+         setenv('ICEMODEL_REGRESSION_ARTIFACT_FILE', artifact_file);
       end
    end
 
@@ -285,23 +253,26 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          end
       end
 
-      function meta = reportMeta(tier, smbmodel, solver, simyear, ...
-            smoke_sites, full_sites, baseline_tag, run_name)
-         %REPORTMETA Build the saved metadata struct for one regression artifact.
+      function meta = reportMeta(info)
+         %REPORTMETA Build the metadata struct for one regression artifact.
+         %
+         % Accepts the caseinfo struct built by buildRegressionCaseInfo, which
+         % carries all the selector and site fields needed for the artifact
+         % metadata.
 
          % Resolve the shared run stamp before filling the saved metadata.
          [run_date, run_id, run_name] = ...
-            icemodel.test.helpers.resolveRunStamp(run_name);
+            icemodel.test.helpers.resolveRunStamp(info.run_name);
 
          % Record the compare selector, tolerances, and resolved path context.
          meta = struct();
-         meta.tier = string(tier);
-         meta.smbmodel_filter = string(smbmodel);
-         meta.solver_filter = solver;
-         meta.simyear = simyear;
-         meta.smoke_sites = smoke_sites;
-         meta.full_sites = full_sites;
-         meta.baseline_tag = string(baseline_tag);
+         meta.tier = string(info.tier);
+         meta.smbmodel_filter = string(info.smbmodel);
+         meta.solver_filter = info.solver;
+         meta.simyear = info.simyear;
+         meta.smoke_sites = info.smoke_sites;
+         meta.full_sites = info.full_sites;
+         meta.baseline_tag = string(info.baseline_tag);
          meta.run_date = run_date;
          meta.run_id = run_id;
          meta.run_name = run_name;
@@ -324,16 +295,6 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
       end
 
-      function label = smbmodelLabel(smbmodel)
-         %SMBMODELLABEL Format the smbmodel selector for artifact filenames.
-         smbmodel = string(smbmodel);
-         if any(strcmpi(smbmodel, "all"))
-            label = "";
-         else
-            label = "_" + icemodel.test.helpers.smbmodelTag(smbmodel);
-         end
-      end
-
       function x = getenvAsNumbers(name)
          %GETENVASNUMBERS Parse a numeric vector env var.
          s = getenv(name);
@@ -353,15 +314,6 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          else
             x = split(string(s), ',');
             x = x(x ~= "");
-         end
-      end
-
-      function label = solverLabel(solver)
-         %SOLVERLABEL Format the solver filter for artifact filenames.
-         if isempty(solver)
-            label = "";
-         else
-            label = "_s" + join(string(solver), '-');
          end
       end
 
@@ -398,5 +350,82 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             end
          end
       end
+   end
+end
+
+function info = buildRegressionCaseInfo()
+   %BUILDREGRESSIONCASEINFO Resolve the full regression case matrix and baseline.
+   %
+   % Reads the suite-selection env vars installed by the runner (or by
+   % bootstrapTestEnvironment for direct class runs), builds the case matrix,
+   % loads the baseline and runoff reference, and returns a struct carrying
+   % everything testCoreRegression needs.
+
+   % Read the suite selector from environment variables.
+   tier = getenvOrDefault('ICEMODEL_TEST_TIER', 'smoke');
+   smbmodel = getenvOrDefault('ICEMODEL_TEST_SMBMODEL_FILTER', 'all');
+   solver = parseNumericEnv('ICEMODEL_TEST_SOLVER_FILTER');
+   simyear = str2double(getenvOrDefault('ICEMODEL_TEST_SIMYEAR_FILTER', '2016'));
+   smoke_sites = parseStringEnv('ICEMODEL_TEST_SMOKE_SITES', "kanm");
+   full_sites = parseStringEnv('ICEMODEL_TEST_FULL_SITES', ["kanm"; "kanl"]);
+   baseline_tag = getenvOrDefault('ICEMODEL_REGRESSION_BASELINE', 'rolling');
+   run_name = string(getenv('ICEMODEL_TEST_RUN_NAME'));
+
+   % Build the formal regression case matrix from the resolved selectors.
+   cases = icemodel.test.helpers.getRegressionCaseMatrix( ...
+      tier=tier, smbmodel=smbmodel, solver=solver, simyear=simyear, ...
+      smoke_sites=smoke_sites, full_sites=full_sites);
+
+   assert(~isempty(cases), ...
+      'regression case matrix is empty for tier=%s smbmodel=%s solver=[%s]', ...
+      tier, smbmodel, join(string(solver), ','));
+
+   % Load the accepted baseline and runoff reference for comparison.
+   baseline = icemodel.test.helpers.loadBaseline("regression", ...
+      smbmodel=smbmodel, baseline_tag=baseline_tag);
+   runoff_ref = icemodel.test.helpers.loadReference("runoff");
+
+   % Pack everything into a single struct for testCoreRegression.
+   info = struct();
+   info.tier = string(tier);
+   info.smbmodel = string(smbmodel);
+   info.solver = solver;
+   info.simyear = simyear;
+   info.smoke_sites = smoke_sites;
+   info.full_sites = full_sites;
+   info.baseline_tag = string(baseline_tag);
+   info.run_name = run_name;
+   info.cases = cases;
+   info.baseline = baseline;
+   info.runoff_ref = runoff_ref;
+end
+
+function s = getenvOrDefault(name, default)
+   %GETENVORDEFAULT Read an env var with a fallback default.
+   s = getenv(name);
+   if isempty(s)
+      s = default;
+   end
+end
+
+function x = parseNumericEnv(name)
+   %PARSENUMERICENV Parse a comma-delimited numeric env var.
+   s = getenv(name);
+   if isempty(s)
+      x = [];
+   else
+      x = str2double(split(string(s), ','));
+      x = x(isfinite(x));
+   end
+end
+
+function x = parseStringEnv(name, default)
+   %PARSESTRINGENV Parse a comma-delimited string env var with a fallback.
+   s = getenv(name);
+   if isempty(s)
+      x = default;
+   else
+      x = split(string(s), ',');
+      x = x(x ~= "");
    end
 end

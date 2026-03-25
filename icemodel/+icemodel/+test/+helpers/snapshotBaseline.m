@@ -16,8 +16,9 @@ function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, ou
 
    % Default to the canonical release-baseline path for this target.
    if isblanktext(output_file)
-      output_file = icemodel.test.helpers.defaultBaselinePath( ...
-         kind, "release", baseline_tag, smbmodel, simyear);
+      output_file = icemodel.test.helpers.baselineFilePath(kind, ...
+         smbmodel=smbmodel, baseline_type="release", ...
+         baseline_tag=baseline_tag, simyear=simyear);
    end
 
    if exist(char(output_file), 'file') == 2 && ~overwrite
@@ -25,8 +26,8 @@ function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, ou
    end
 
    % Copy from the current rolling baseline bundle, not from a rerun.
-   source_file = icemodel.test.helpers.defaultBaselinePath( ...
-      kind, "rolling", "", smbmodel, simyear);
+   source_file = icemodel.test.helpers.baselineFilePath(kind, ...
+      smbmodel=smbmodel, simyear=simyear);
    if exist(char(source_file), 'file') ~= 2
       error('rolling %s baseline is missing: %s', kind, char(source_file))
    end

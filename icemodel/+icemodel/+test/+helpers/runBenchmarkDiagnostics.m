@@ -114,8 +114,9 @@ function [BenchmarkBaseline, meta, source_file] = loadBenchmarkBaselineFromPerf(
    % Probe each candidate baseline file until one carries the managed
    % benchmark bundle.
    for i = 1:numel(models)
-      candidate = icemodel.test.helpers.defaultBaselinePath( ...
-         "perf", baseline_type, baseline_tag, models(i), simyear);
+      candidate = icemodel.test.helpers.baselineFilePath("perf", ...
+         smbmodel=models(i), baseline_type=baseline_type, ...
+         baseline_tag=baseline_tag, simyear=simyear);
       if exist(char(candidate), 'file') ~= 2
          continue
       end

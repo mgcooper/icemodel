@@ -120,7 +120,7 @@ function RegressionBaseline = buildSingleModelRegressionBaseline( ...
       simyear, solver, smoke_sites, full_sites);
 
    % Load the static runoff reference once before entering the case loop.
-   runoff_ref = icemodel.test.helpers.loadRunoffReference();
+   runoff_ref = icemodel.test.helpers.loadReference("runoff");
 
    % Preallocate row containers for the accepted baseline summary and opts.
    row_cells = cell(height(cases), 1);

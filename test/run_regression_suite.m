@@ -88,8 +88,11 @@ function results = run_regression_suite(kwargs)
       smoke_sites, full_sites, baseline, run_name), ...
       models, 'UniformOutput', false);
 
-   % Combine results into a common struct.
-   results = vertcat(per_model{:});
+   % Combine per-model results into a common struct and display.
+   results = combineRegressionResults(per_model);
+
+   % Display the results.
+   icemodel.test.helpers.displayRegressionResults(results)
 end
 
 function results = runSingleModelRegression(runner, suite, tier, smbmodel, ...
@@ -103,7 +106,53 @@ function results = runSingleModelRegression(runner, suite, tier, smbmodel, ...
       baseline, run_name); %#ok<NASGU>
 
    % Run the formal regression class for this concrete smbmodel.
-   results = runner.run(suite);
+   test_result = runner.run(suite);
+
+   % Load the artifact saved by IcemodelRegressionTest to build the
+   % results struct that mirrors the perf suite contract.
+   artifact_file = getenv('ICEMODEL_REGRESSION_ARTIFACT_FILE');
+   S = load(artifact_file, 'report', 'case_opts', 'meta');
+   results = struct();
+   results.report = S.report;
+   results.case_opts = S.case_opts;
+   results.meta = S.meta;
+   results.artifact_file = string(artifact_file);
+   results.test_result = test_result;
+   results.passed = all([test_result.Passed]);
+   if results.passed
+      results.failed_cases = strings(0, 1);
+   else
+      results.failed_cases = S.report.case_id(~[test_result.Passed]);
+   end
+end
+
+function results = combineRegressionResults(per_model)
+   %COMBINEREGRESSIONRESULTS Merge one-or-more single-model regression results.
+
+   if isscalar(per_model)
+      results = per_model{1};
+      return
+   end
+
+   % Extract each returned field once, then concatenate the per-model pieces.
+   report = cellfun(@(s) s.report, per_model, 'UniformOutput', false);
+   case_opts = cellfun(@(s) s.case_opts(:), per_model, 'UniformOutput', false);
+   meta = cellfun(@(s) s.meta, per_model, 'UniformOutput', false);
+   artifact_file = cellfun(@(s) string(s.artifact_file(:)), per_model, ...
+      'UniformOutput', false);
+   test_result = cellfun(@(s) s.test_result, per_model, 'UniformOutput', false);
+   failed_cases = cellfun(@(s) string(s.failed_cases(:)), per_model, ...
+      'UniformOutput', false);
+   pass_flags = cellfun(@(s) s.passed, per_model);
+
+   results = struct();
+   results.report = vertcat(report{:});
+   results.case_opts = vertcat(case_opts{:});
+   results.meta = vertcat(meta{:});
+   results.artifact_file = vertcat(artifact_file{:});
+   results.test_result = horzcat(test_result{:});
+   results.failed_cases = vertcat(failed_cases{:});
+   results.passed = all(pass_flags);
 end
 
 function cleanup = configureRegressionSelectorEnv(tier, smbmodel, solver, ...

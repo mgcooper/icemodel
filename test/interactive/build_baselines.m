@@ -20,7 +20,7 @@ PerfBaseline = build_perf_baseline();
 icemodel.test.helpers.displayPerfSummary(PerfBaseline)
 
 % The file name can also be set and passed to the display function
-filename = icemodel.test.helpers.defaultBaselinePath("perf");
+filename = icemodel.test.helpers.baselineFilePath("perf");
 icemodel.test.helpers.displayPerfSummary(filename)
 
 % Verify with a smoke perf run
@@ -39,18 +39,18 @@ icemodel.test.helpers.displayRegressionResults(regression_results)
 
 %% Scratch space to demo path building and results display
 
-filename = icemodel.test.helpers.defaultBaselinePath("perf");
+filename = icemodel.test.helpers.baselineFilePath("perf");
 icemodel.test.helpers.displayPerfSummary(filename)
 
-filename = icemodel.test.helpers.defaultBaselinePath("perf", ...
-   "baseline_type", "release", ...
-   "baseline_tag", "v1.1");
+filename = icemodel.test.helpers.baselineFilePath("perf", ...
+   baseline_type="release", baseline_tag="v1.1");
 icemodel.test.helpers.displayPerfSummary(filename)
 
 % This works but the file doesn't exist
-icemodel.test.helpers.defaultBaselinePath("perf", "skinmodel", ...
-   "baseline_type", "release", ...
-   "baseline_tag", "v1.0.1")
+icemodel.test.helpers.baselineFilePath("perf", ...
+   smbmodel="skinmodel", ...
+   baseline_type="release", ...
+   baseline_tag="v1.0.1")
 icemodel.test.helpers.displayPerfSummary(filename)
 
 %% Snapshots
