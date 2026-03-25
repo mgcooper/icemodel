@@ -7,8 +7,9 @@ function test_meltcurve_and_freezecurve_are_self_consistent(testCase)
    % MELTCURVE and FREEZECURVE should agree when applied to the same melt-
    % zone state.
 
-   [ro_ice, ro_liq, fcp, Tf] = icemodel.physicalConstant( ...
-      'ro_ice', 'ro_liq', 'fcp', 'Tf');
+   [ro_ice, ro_liq, Tf] = icemodel.physicalConstant( ...
+      'ro_ice', 'ro_liq', 'Tf');
+   fcp = icemodel.parameterLookup('fcp');
    T_in = [Tf - 1.5; Tf - 0.8; Tf - 0.2];
    f_wat = [0.85; 0.85; 0.85];
    f_liq = f_wat ./ (1 + (fcp * (Tf - T_in)) .^ 2);
@@ -72,9 +73,10 @@ function test_mztransform_updates_melt_zone_consistently(testCase)
    % MZTRANSFORM should move a melt-zone state forward without skipping
    % phase bounds or producing impossible phase fractions.
 
-   [ro_ice, ro_liq, fcp, Lf, cp_ice, cp_liq, Tf] = ...
-      icemodel.physicalConstant('ro_ice', 'ro_liq', 'fcp', 'Lf', ...
+   [ro_ice, ro_liq, Lf, cp_ice, cp_liq, Tf] = ...
+      icemodel.physicalConstant('ro_ice', 'ro_liq', 'Lf', ...
       'cp_ice', 'cp_liq', 'Tf');
+   fcp = icemodel.parameterLookup('fcp');
    TL = Tf - (2.0 * Lf / (fcp ^ 2.0 * cp_ice)) ^ (1.0 / 3.0);
    TH = Tf - cp_liq / (Lf * 2.0 * fcp ^ 2.0);
    f_ell_min = 1 / (1 + (fcp * (Tf - TL)) ^ 2.0);
@@ -104,9 +106,10 @@ function test_mztransform_allows_melt_zone_exit_to_frozen_branch(testCase)
    % below TL during the corrector step without forcing a timestep retry, as
    % long as the predictor overshoots the melt-zone boundary only slightly.
 
-   [ro_ice, ro_liq, fcp, Lf, cp_ice, cp_liq, Tf] = ...
-      icemodel.physicalConstant('ro_ice', 'ro_liq', 'fcp', 'Lf', ...
+   [ro_ice, ro_liq, Lf, cp_ice, cp_liq, Tf] = ...
+      icemodel.physicalConstant('ro_ice', 'ro_liq', 'Lf', ...
       'cp_ice', 'cp_liq', 'Tf');
+   fcp = icemodel.parameterLookup('fcp');
    TL = Tf - (2.0 * Lf / (fcp ^ 2.0 * cp_ice)) ^ (1.0 / 3.0);
    TH = Tf - cp_liq / (Lf * 2.0 * fcp ^ 2.0);
    f_ell_min = 1 / (1 + (fcp * (Tf - TL)) ^ 2.0);
@@ -136,9 +139,10 @@ function test_mztransform_rejects_large_freeze_out_overshoot(testCase)
    % A large overshoot of the lower melt-zone boundary should be rejected so
    % the timestep can be shortened before trusting the transformed predictor.
 
-   [ro_ice, ro_liq, fcp, Lf, cp_ice, cp_liq, Tf] = ...
-      icemodel.physicalConstant('ro_ice', 'ro_liq', 'fcp', 'Lf', ...
+   [ro_ice, ro_liq, Lf, cp_ice, cp_liq, Tf] = ...
+      icemodel.physicalConstant('ro_ice', 'ro_liq', 'Lf', ...
       'cp_ice', 'cp_liq', 'Tf');
+   fcp = icemodel.parameterLookup('fcp');
    TL = Tf - (2.0 * Lf / (fcp ^ 2.0 * cp_ice)) ^ (1.0 / 3.0);
    TH = Tf - cp_liq / (Lf * 2.0 * fcp ^ 2.0);
    f_ell_min = 1 / (1 + (fcp * (Tf - TL)) ^ 2.0);
@@ -165,9 +169,10 @@ function test_mztransform_rejects_phase_skip(testCase)
    % The transform should reject an attempted jump that skips across the
    % melt-zone bounds.
 
-   [ro_ice, ro_liq, fcp, Lf, cp_ice, cp_liq, Tf] = ...
-      icemodel.physicalConstant('ro_ice', 'ro_liq', 'fcp', 'Lf', ...
+   [ro_ice, ro_liq, Lf, cp_ice, cp_liq, Tf] = ...
+      icemodel.physicalConstant('ro_ice', 'ro_liq', 'Lf', ...
       'cp_ice', 'cp_liq', 'Tf');
+   fcp = icemodel.parameterLookup('fcp');
    TL = Tf - (2.0 * Lf / (fcp ^ 2.0 * cp_ice)) ^ (1.0 / 3.0);
    TH = Tf - cp_liq / (Lf * 2.0 * fcp ^ 2.0);
    f_ell_min = 1 / (1 + (fcp * (Tf - TL)) ^ 2.0);

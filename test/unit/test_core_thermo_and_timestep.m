@@ -90,8 +90,9 @@ function test_sfcflin_matches_surface_terms_at_linearization_point(testCase)
    % The linearized surface flux coefficients should reproduce the full
    % surface residual at the temperature used for the linearization.
 
-   [cv_air, emiss, SB, roLs, Tf] = icemodel.physicalConstant( ...
-      'cv_air', 'emiss', 'SB', 'roLs', 'Tf');
+   [cv_air, SB, roLs, Tf] = icemodel.physicalConstant( ...
+      'cv_air', 'SB', 'roLs', 'Tf');
+   emiss = icemodel.parameterLookup('emiss');
    [De, scoef] = WINDCOEF(4.0, 0.001, 2.0, 3.0);
 
    Ta = Tf - 10.0;
