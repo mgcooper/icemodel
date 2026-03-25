@@ -13,10 +13,17 @@ function report = summarize_spectral_density_floor(kwargs)
    %     densities on those retained states
 
    arguments
-      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
-      kwargs.solver (1, 1) double {mustBeMember(kwargs.solver, [1 2 3])} = 2
-      kwargs.smoke_site (1, :) string = "kanm"
-      kwargs.output_file (1, :) string = ""
+      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 2016
+
+      kwargs.solver (1, 1) double {mustBeMember(kwargs.solver, [1 2 3])} ...
+         = 2
+
+      kwargs.smoke_site (1, :) string ...
+         = "kanm"
+
+      kwargs.output_file (1, :) string ...
+         = ""
    end
 
    % Install the canonical suite config once so the formal case uses the same
@@ -32,8 +39,12 @@ function report = summarize_spectral_density_floor(kwargs)
    if height(cases) ~= 1
       error('spectral density-floor summary expected one smoke case')
    end
+
+   % Build model opts
    opts = icemodel.test.helpers.setModelOptsForCase(cases(1, :));
    opts = icemodel.resetopts(opts, 'output_profile', 'standard');
+
+   % Run the model
    [~, ice2, opts] = icemodel.test.helpers.runSmbModel(opts);
 
    % Rebuild the spectral grid once so each timestep reuses the same geometry.
@@ -51,6 +62,7 @@ function report = summarize_spectral_density_floor(kwargs)
    worst_bulk_rel = 0;
    worst_step = 0;
 
+   % Generate results.
    for istep = 1:size(ice2.f_ice, 2)
       ro_sno = ro_ice * ice2.f_ice(:, istep) + ro_liq * ice2.f_liq(:, istep);
       raw = interp1(z_nodes_therm, ro_sno, z_nodes_spect, ...
@@ -72,13 +84,16 @@ function report = summarize_spectral_density_floor(kwargs)
       k_bulk_raw = computeBulkExactNoFloor(dz_spect, raw, tau_N, tau_S, ...
          solar_dwavel);
 
-      rel = max(abs(k_bulk_floor - k_bulk_raw) ./ max(abs(k_bulk_floor), 1e-12));
+      rel = max( ...
+         abs(k_bulk_floor - k_bulk_raw) ./ max(abs(k_bulk_floor), 1e-12) ...
+         );
       if rel > worst_bulk_rel
          worst_bulk_rel = rel;
          worst_step = istep;
       end
    end
 
+   % Build the report
    report = struct();
    report.case_id = string(cases.case_id(1));
    report.simyears = opts.simyears;
@@ -90,6 +105,7 @@ function report = summarize_spectral_density_floor(kwargs)
    report.worst_step = worst_step;
    report.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
 
+   % Save the file.
    if ~isblanktext(kwargs.output_file)
       outdir = fileparts(char(kwargs.output_file));
       if ~isempty(outdir) && exist(outdir, 'dir') ~= 7

@@ -19,26 +19,59 @@ function results = run_spectral_study_bootstrap(kwargs)
    % Those steps use the requested SPECTRAL_VARIANT for the formal suite.
 
    arguments
-      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
-      kwargs.solver (1, 1) double {mustBeMember(kwargs.solver, [1 2 3])} = 2
+      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 2016
+
+      kwargs.solver (1, 1) double {mustBeMember(kwargs.solver, [1 2 3])} ...
+         = 2
+
       kwargs.smbmodel (1, :) string ...
-         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} = "all"
-      kwargs.smoke_sites string = "kanm"
-      kwargs.full_sites string = ["kanm"; "kanl"]
+         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} ...
+         = "all"
+
+      kwargs.smoke_sites string ...
+         = "kanm"
+
+      kwargs.full_sites string ...
+         = ["kanm"; "kanl"]
+
       kwargs.spectral_variant (1, :) string ...
          {mustBeMember(kwargs.spectral_variant, ...
-         ["inlined", "functions", "lookup"])} = "lookup"
-      kwargs.n_direct_runs (1, 1) double {mustBeInteger, mustBePositive} = 1
-      kwargs.include_density_floor (1, 1) logical = true
-      kwargs.include_spectral_perf (1, 1) logical = true
-      kwargs.include_figures (1, 1) logical = true
-      kwargs.include_regression_acceptance (1, 1) logical = false
-      kwargs.include_perf_acceptance (1, 1) logical = false
-      kwargs.include_benchmarks (1, 1) logical = false
-      kwargs.rebuild_regression_baseline (1, 1) logical = false
-      kwargs.rebuild_perf_baseline (1, 1) logical = false
-      kwargs.output_root (1, :) string = ""
-      kwargs.run_name (1, :) string = ""
+         ["inlined", "functions", "lookup"])} ...
+         = "lookup"
+
+      kwargs.n_direct_runs (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 1
+
+      kwargs.include_density_floor (1, 1) logical ...
+         = true
+
+      kwargs.include_spectral_perf (1, 1) logical ...
+         = true
+
+      kwargs.include_figures (1, 1) logical ...
+         = true
+
+      kwargs.include_regression_acceptance (1, 1) logical ...
+         = false
+
+      kwargs.include_perf_acceptance (1, 1) logical ...
+         = false
+
+      kwargs.include_benchmarks (1, 1) logical ...
+         = false
+
+      kwargs.rebuild_regression_baseline (1, 1) logical ...
+         = false
+
+      kwargs.rebuild_perf_baseline (1, 1) logical ...
+         = false
+
+      kwargs.output_root (1, :) string ...
+         = ""
+
+      kwargs.run_name (1, :) string ...
+         = ""
    end
 
    % Deal out arguments.

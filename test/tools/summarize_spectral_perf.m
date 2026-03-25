@@ -15,12 +15,24 @@ function report = summarize_spectral_perf(kwargs)
    % compares only exact vs lookup via opts.lookup_k_bulk.
 
    arguments
-      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
-      kwargs.output_file (1, :) string = ""
-      kwargs.smoke_site (1, :) string = "kanm"
-      kwargs.solver (1, 1) double {mustBeMember(kwargs.solver, [1 2 3])} = 2
-      kwargs.include_full_model (1, 1) logical = true
-      kwargs.include_direct_model (1, 1) logical = true
+      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 2016
+
+      kwargs.output_file (1, :) string ...
+         = ""
+
+      kwargs.smoke_site (1, :) string ...
+         = "kanm"
+
+      kwargs.solver (1, 1) double {mustBeMember(kwargs.solver, [1 2 3])} ...
+         = 2
+
+      kwargs.include_full_model (1, 1) logical ...
+         = true
+
+      kwargs.include_direct_model (1, 1) logical ...
+         = true
+
       kwargs.n_direct_runs (1, 1) double {mustBeInteger, mustBePositive} = 1
    end
 
@@ -48,6 +60,7 @@ function report = summarize_spectral_perf(kwargs)
    report.matlab_version = string(version);
    report.host = string(computer);
 
+   % Save the file.
    if ~isblanktext(kwargs.output_file)
       outdir = fileparts(char(kwargs.output_file));
       if ~isempty(outdir) && exist(outdir, 'dir') ~= 7

@@ -11,12 +11,22 @@ function report = plot_spectral_variant_profiles(kwargs)
    %  4. thermal-grid volumetric source term after collapse
 
    arguments
-      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
-      kwargs.output_dir (1, :) string = fullfile(icemodel.getpath('test'), ...
+
+      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 2016
+
+      kwargs.output_dir (1, :) string ...
+         = fullfile(icemodel.getpath('test'), ...
          'benchmarks', 'figures', 'spectral', 'manual')
-      kwargs.smbmodel (1, :) string = "icemodel"
-      kwargs.solver (1, 1) double {mustBeMember(kwargs.solver, [1 2 3])} = 3
-      kwargs.metstep (1, 1) double {mustBeInteger, mustBePositive} = 49
+
+      kwargs.smbmodel (1, :) string ...
+         = "icemodel"
+
+      kwargs.solver (1, 1) double {mustBeMember(kwargs.solver, [1 2 3])} ...
+         = 3
+
+      kwargs.metstep (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 49
    end
 
    % Install the suite config so the synthetic workspace uses the canonical
@@ -105,7 +115,7 @@ function profiles = buildProfiles(s)
    k_lookup = icemodel.makeBulkExtCoefsLookup( ...
       s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel);
    k_lookup_empty = struct([]);
-   
+
    % Build the functions-path and lookup bulk-extinction profiles.
    bulk_functions = BULKEXTCOEFS( ...
       s.dz_spect, ro_sno_spect, s.tau_N, s.tau_S, s.solar_dwavel);
@@ -131,7 +141,7 @@ function profiles = buildProfiles(s)
    [Sc_functions, chi_functions] = SPECTRALSOURCETERM(s.swd, s.albedo, ...
       s.I0, s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ro_sno, ...
       s.z_nodes, s.z_nodes_spect, s.z_edges_spect, k_lookup_empty);
-   
+
    [Sc_lookup, chi_lookup] = SPECTRALSOURCETERM(s.swd, s.albedo, ...
       s.I0, s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ro_sno, ...
       s.z_nodes, s.z_nodes_spect, s.z_edges_spect, k_lookup);

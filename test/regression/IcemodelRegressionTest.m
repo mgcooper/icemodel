@@ -11,19 +11,24 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       rel_tol_runoff_m3 (1, 1) double = 1e-4
       abs_tol_runoff_m3 (1, 1) double = 1.0
       env_cleanup
+      caseinfo
    end
 
    methods (TestMethodSetup)
-      function configurePaths(testCase)
+      function configureCases(testCase)
          % Install the canonical test config so direct class runs and
          % runner-based runs see the same environment.
          [~, ~, ~, ~, testCase.env_cleanup] = ...
             icemodel.test.helpers.bootstrapTestEnvironment();
+
+         % Resolve the case matrix, baseline, and runoff reference once
+         % before the per-case compare loop.
+         testCase.caseinfo = buildRegressionCaseInfo();
       end
    end
 
    methods (TestMethodTeardown)
-      function restorePaths(testCase)
+      function restoreConfig(testCase)
          % Release the setup cleanup handle after each regression case.
          testCase.env_cleanup = [];
       end
@@ -31,33 +36,12 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
    methods (Test)
       function testCoreRegression(testCase)
-         % Read the requested case matrix/baseline selectors from the
-         % runner-owned environment variables.
-         tier = IcemodelRegressionTest.getenvRequired('ICEMODEL_TEST_TIER');
-         smbmodel = IcemodelRegressionTest.getenvRequired( ...
-            'ICEMODEL_TEST_SMBMODEL_FILTER');
-         solver = IcemodelRegressionTest.getenvAsNumbers( ...
-            'ICEMODEL_TEST_SOLVER_FILTER');
-         simyear = str2double(IcemodelRegressionTest.getenvRequired( ...
-            'ICEMODEL_TEST_SIMYEAR_FILTER'));
-         smoke_sites = IcemodelRegressionTest.getenvAsStrings( ...
-            'ICEMODEL_TEST_SMOKE_SITES');
-         full_sites = IcemodelRegressionTest.getenvAsStrings( ...
-            'ICEMODEL_TEST_FULL_SITES');
-         baseline_tag = getenv('ICEMODEL_REGRESSION_BASELINE');
-         run_name = getenv('ICEMODEL_TEST_RUN_NAME');
-
-         % Resolve the retained formal cases and the matched accepted baseline
-         % before entering the per-case compare loop.
-         runoff_ref = icemodel.test.helpers.loadRunoffReference();
-         cases = icemodel.test.helpers.getRegressionCaseMatrix( ...
-            tier=tier, smbmodel=smbmodel, solver=solver, simyear=simyear, ...
-            smoke_sites=smoke_sites, full_sites=full_sites);
-         testCase.assertNotEmpty(cases, ...
-            sprintf('no regression cases matched tier=%s smbmodel=%s', ...
-            tier, smbmodel));
-         baseline = icemodel.test.helpers.loadRegressionBaseline(baseline_tag, ...
-            smbmodel);
+         % Unpack the pre-resolved case matrix, baseline, and runoff
+         % reference from the caseinfo struct built in configureCases.
+         cases = testCase.caseinfo.cases;
+         baseline = testCase.caseinfo.baseline;
+         runoff_ref = testCase.caseinfo.runoff_ref;
+         baseline_tag = testCase.caseinfo.baseline_tag;
 
          % Accumulate the compare report and resolved opts for one saved
          % artifact per regression run.
@@ -76,79 +60,55 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
             % Summarize the retained output years against the matched runoff
             % reference row, if one exists for this formal case.
-            ridx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);
+            idx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);
             met = icemodel.test.helpers.loadProcessedMetForOutputYears(opts);
-            if isempty(ridx)
+            if isempty(idx)
                refrow = [];
             else
-               refrow = runoff_ref(ridx, :);
+               refrow = runoff_ref(idx, :);
             end
             S = icemodel.test.helpers.summarizeIce1Metrics(ice1, met, refrow);
 
-            % Initialize the baseline-vs-current compare fields before probing
-            % the accepted baseline row for this case.
-            [base_runoff_final, base_melt_final, base_runoff_eval, ...
-               base_melt_eval, runoff_delta, melt_delta, runoff_eval_delta, ...
-               melt_eval_delta, runoff_pct_delta, melt_pct_delta, ...
-               runoff_eval_pct_delta, melt_eval_pct_delta, ...
-               base_mean_Tice_numiter, base_max_Tice_numiter, ...
-               base_n_not_converged] = deal(nan);
+            % Metrics with baseline lookup and delta/pct-delta pairs.
+            delta_specs = {
+               'runoff_final',  'runoff_delta',      'runoff_pct_delta'
+               'melt_final',    'melt_delta',        'melt_pct_delta'
+               'runoff_eval',   'runoff_eval_delta', 'runoff_eval_pct_delta'
+               'melt_eval',     'melt_eval_delta',   'melt_eval_pct_delta'
+               };
 
+            % Metrics with baseline lookup only (no delta pair).
+            baseline_only = ["mean_Tice_numiter", "max_Tice_numiter", ...
+               "n_not_converged"];
+            all_baseline_fields = [ ...
+               string(delta_specs(:, 1)); baseline_only(:)];
+
+            % Initialize fields nan
+            base = struct();
+            for f = all_baseline_fields'
+               base.(f) = nan;
+            end
+
+            % Load the accepted baseline values for this case.
             bid = icemodel.test.helpers.findCaseRow(baseline, string(c.case_id));
+
+            % Populate the fields
             if ~isempty(bid)
-               base_runoff_final = ...
-                  testCase.getBaselineValue(baseline, bid, 'runoff_final');
-               base_melt_final = ...
-                  testCase.getBaselineValue(baseline, bid, 'melt_final');
-               base_runoff_eval = ...
-                  testCase.getBaselineValue(baseline, bid, 'runoff_eval');
-               base_melt_eval = ...
-                  testCase.getBaselineValue(baseline, bid, 'melt_eval');
-               base_mean_Tice_numiter = ...
-                  testCase.getBaselineValue(baseline, bid, 'mean_Tice_numiter');
-               base_max_Tice_numiter = ...
-                  testCase.getBaselineValue(baseline, bid, 'max_Tice_numiter');
-               base_n_not_converged = ...
-                  testCase.getBaselineValue(baseline, bid, 'n_not_converged');
+               for f = all_baseline_fields'
+                  base.(f) = testCase.getBaselineValue(baseline, bid, f);
+               end
                metric_names = string(fieldnames(S));
                for imetric = 1:numel(metric_names)
-                  this_metric = metric_names(imetric);
-                  actual = S.(char(this_metric));
+                  actual = S.(metric_names(imetric));
                   if isfinite(actual)
                      testCase.checkAgainstBaseline(actual, ...
-                        baseline, bid, char(this_metric));
+                        baseline, bid, metric_names(imetric));
                   end
                end
             end
 
-            % Convert the matched baseline values into absolute and percent
-            % deltas for the saved compare artifact.
-            if isfinite(base_runoff_final)
-               runoff_delta = S.runoff_final - base_runoff_final;
-               runoff_pct_delta = IcemodelRegressionTest.computePctDelta( ...
-                  S.runoff_final, base_runoff_final);
-            end
-            if isfinite(base_melt_final)
-               melt_delta = S.melt_final - base_melt_final;
-               melt_pct_delta = IcemodelRegressionTest.computePctDelta( ...
-                  S.melt_final, base_melt_final);
-            end
-            if isfinite(base_runoff_eval)
-               runoff_eval_delta = ...
-                  S.runoff_eval - base_runoff_eval;
-               runoff_eval_pct_delta = ...
-                  IcemodelRegressionTest.computePctDelta( ...
-                  S.runoff_eval, base_runoff_eval);
-            end
-            if isfinite(base_melt_eval)
-               melt_eval_delta = ...
-                  S.melt_eval - base_melt_eval;
-               melt_eval_pct_delta = ...
-                  IcemodelRegressionTest.computePctDelta( ...
-                  S.melt_eval, base_melt_eval);
-            end
-
-            % Save the current-vs-baseline context for the output artifact.
+            % Build the report row with case identity, current metrics,
+            % baseline values, and computed deltas.
             row = struct(); %#ok<*AGROW>
             row.case_id = string(c.case_id);
             row.tier = string(c.tier);
@@ -159,21 +119,19 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             row.simyear = c.simyear;
             row.solver = c.solver;
             row = testCase.copyMetricFields(row, S);
-            row.baseline_runoff_final = base_runoff_final;
-            row.baseline_melt_final = base_melt_final;
-            row.baseline_runoff_eval = base_runoff_eval;
-            row.baseline_melt_eval = base_melt_eval;
-            row.baseline_mean_Tice_numiter = base_mean_Tice_numiter;
-            row.baseline_max_Tice_numiter = base_max_Tice_numiter;
-            row.baseline_n_not_converged = base_n_not_converged;
-            row.runoff_delta = runoff_delta;
-            row.melt_delta = melt_delta;
-            row.runoff_eval_delta = runoff_eval_delta;
-            row.melt_eval_delta = melt_eval_delta;
-            row.runoff_pct_delta = runoff_pct_delta;
-            row.melt_pct_delta = melt_pct_delta;
-            row.runoff_eval_pct_delta = runoff_eval_pct_delta;
-            row.melt_eval_pct_delta = melt_eval_pct_delta;
+
+            for f = all_baseline_fields'
+               row.("baseline_" + f) = base.(f);
+            end
+
+            % Compute absolute and percent deltas for each tracked metric pair
+            % using the delta_specs table. computeDelta returns NaN when the
+            % baseline value is NaN (case not found) or zero (undefined pct).
+            for i = 1:size(delta_specs, 1)
+               [row.(delta_specs{i, 2}), row.(delta_specs{i, 3})] = ...
+                  IcemodelRegressionTest.computeDelta( ...
+                  S.(delta_specs{i, 1}), base.(delta_specs{i, 1}));
+            end
             row.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
             report_rows = vertcat(report_rows, row);
 
@@ -185,12 +143,10 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          end
 
          report = struct2table(report_rows);
-         meta = IcemodelRegressionTest.reportMeta( ...
-            tier, smbmodel, solver, simyear, smoke_sites, full_sites, ...
-            baseline_tag, run_name);
+         meta = IcemodelRegressionTest.reportMeta(testCase.caseinfo);
 
-         % Save one artifact for this regression compare run.
-         testCase.logReport(report, case_opts, meta);
+         % Save the artifact for the runner-level display and results struct.
+         testCase.saveArtifacts(report, case_opts, meta);
       end
 
    end
@@ -261,49 +217,27 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             testCase.rel_tol_scalar * abs(expected));
       end
 
-      function logReport(~, report, case_opts, meta)
-         % Save the full regression artifact, then print only the baseline-vs-
-         % current summary that is useful during development.
+      function saveArtifacts(~, report, case_opts, meta)
+         %saveArtifacts Save the regression comparison artifact for one run.
 
-         % Create the run-specific artifact folder before saving the report.
-         testdir = icemodel.getpath('test');
-         outdir = fullfile(testdir, 'artifacts', char(meta.run_name));
+         % Build the canonical artifact path.
+         artifact_file = icemodel.test.helpers.artifactFilePath( ...
+            "regression", tier=meta.tier, smbmodel=meta.smbmodel_filter, ...
+            solver=meta.solver_filter, ...
+            baseline_tag=meta.baseline_tag, run_name=meta.run_name);
+
+         % Create the run-specific artifact folder before saving.
+         outdir = fileparts(artifact_file);
          if exist(outdir, 'dir') ~= 7
             mkdir(outdir);
          end
 
-         % Format the baseline/model/solver tags used by the saved filename.
-         if meta.baseline_tag == ""
-            baseline_tag = 'nobaseline';
-         else
-            baseline_tag = char(icemodel.test.helpers.sanitizeTag(meta.baseline_tag));
-         end
-         model_tag = IcemodelRegressionTest.smbmodelLabel(meta.smbmodel_filter);
-         solver_tag = IcemodelRegressionTest.solverLabel(meta.solver_filter);
-         outfile = fullfile(outdir, ...
-            sprintf('regression_report_%s%s_%s.mat', ...
-            char(meta.tier), char(model_tag + solver_tag), baseline_tag));
+         % Save the artifact file.
+         save(artifact_file, 'report', 'case_opts', 'meta');
 
-         % Save the full artifact, then print the compact compare summaries.
-         save(outfile, 'report', 'case_opts', 'meta');
-         disp(outfile)
-         disp(makeDisplayTable(report, ...
-            'runoff_final', 'baseline_runoff_final', 'runoff_pct_delta', ...
-            'runoff', 'baseline', 'pct_delta'))
-         fprintf('\n')
-         disp(makeDisplayTable(report, ...
-            'melt_final', 'baseline_melt_final', 'melt_pct_delta', ...
-            'melt', 'baseline', 'pct_delta'))
-         fprintf('\n')
-         disp(makeDisplayTable(report, ...
-            'runoff_eval', 'baseline_runoff_eval', ...
-            'runoff_eval_pct_delta', ...
-            'runoff_eval', 'baseline_eval', 'pct_delta'))
-         fprintf('\n')
-         disp(makeDisplayTable(report, ...
-            'melt_eval', 'baseline_melt_eval', ...
-            'melt_eval_pct_delta', ...
-            'melt_eval', 'baseline_eval', 'pct_delta'))
+         % Export the artifact path so the runner can load it after the
+         % unittest framework returns control.
+         setenv('ICEMODEL_REGRESSION_ARTIFACT_FILE', artifact_file);
       end
    end
 
@@ -319,23 +253,26 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          end
       end
 
-      function meta = reportMeta(tier, smbmodel, solver, simyear, ...
-            smoke_sites, full_sites, baseline_tag, run_name)
-         %REPORTMETA Build the saved metadata struct for one regression artifact.
+      function meta = reportMeta(info)
+         %REPORTMETA Build the metadata struct for one regression artifact.
+         %
+         % Accepts the caseinfo struct built by buildRegressionCaseInfo, which
+         % carries all the selector and site fields needed for the artifact
+         % metadata.
 
          % Resolve the shared run stamp before filling the saved metadata.
          [run_date, run_id, run_name] = ...
-            icemodel.test.helpers.resolveRunStamp(run_name);
+            icemodel.test.helpers.resolveRunStamp(info.run_name);
 
          % Record the compare selector, tolerances, and resolved path context.
          meta = struct();
-         meta.tier = string(tier);
-         meta.smbmodel_filter = string(smbmodel);
-         meta.solver_filter = solver;
-         meta.simyear = simyear;
-         meta.smoke_sites = smoke_sites;
-         meta.full_sites = full_sites;
-         meta.baseline_tag = string(baseline_tag);
+         meta.tier = string(info.tier);
+         meta.smbmodel_filter = string(info.smbmodel);
+         meta.solver_filter = info.solver;
+         meta.simyear = info.simyear;
+         meta.smoke_sites = info.smoke_sites;
+         meta.full_sites = info.full_sites;
+         meta.baseline_tag = string(info.baseline_tag);
          meta.run_date = run_date;
          meta.run_id = run_id;
          meta.run_name = run_name;
@@ -358,16 +295,6 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
       end
 
-      function label = smbmodelLabel(smbmodel)
-         %SMBMODELLABEL Format the smbmodel selector for artifact filenames.
-         smbmodel = string(smbmodel);
-         if any(strcmpi(smbmodel, "all"))
-            label = "";
-         else
-            label = "_" + icemodel.test.helpers.smbmodelTag(smbmodel);
-         end
-      end
-
       function x = getenvAsNumbers(name)
          %GETENVASNUMBERS Parse a numeric vector env var.
          s = getenv(name);
@@ -387,15 +314,6 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          else
             x = split(string(s), ',');
             x = x(x ~= "");
-         end
-      end
-
-      function label = solverLabel(solver)
-         %SOLVERLABEL Format the solver filter for artifact filenames.
-         if isempty(solver)
-            label = "";
-         else
-            label = "_s" + join(string(solver), '-');
          end
       end
 
@@ -421,21 +339,93 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
    end
 
    methods (Static, Access = private)
-      function pct = computePctDelta(actual, baseline)
-         %COMPUTEPCTDELTA Compute percent change against a baseline value.
-         pct = nan;
-         if isfinite(actual) && isfinite(baseline) && baseline ~= 0
-            pct = 100 * (actual - baseline) / baseline;
+      function [abs_delta, pct_delta] = computeDelta(actual, baseline)
+         %COMPUTEDELTA Compute absolute and percent change against a baseline.
+         abs_delta = nan;
+         pct_delta = nan;
+         if isfinite(actual) && isfinite(baseline)
+            abs_delta = actual - baseline;
+            if baseline ~= 0
+               pct_delta = 100 * abs_delta / baseline;
+            end
          end
       end
    end
 end
 
-function T = makeDisplayTable(report, current_var, baseline_var, pct_var, ...
-      current_label, baseline_label, pct_label)
-   %MAKEDISPLAYTABLE Build one compact console summary table from the artifact.
+function info = buildRegressionCaseInfo()
+   %BUILDREGRESSIONCASEINFO Resolve the full regression case matrix and baseline.
+   %
+   % Reads the suite-selection env vars installed by the runner (or by
+   % bootstrapTestEnvironment for direct class runs), builds the case matrix,
+   % loads the baseline and runoff reference, and returns a struct carrying
+   % everything testCoreRegression needs.
 
-   T = table(report.case_id, report.(current_var), report.(baseline_var), ...
-      report.(pct_var), 'VariableNames', ...
-      {'case_id', current_label, baseline_label, pct_label});
+   % Read the suite selector from environment variables.
+   tier = getenvOrDefault('ICEMODEL_TEST_TIER', 'smoke');
+   smbmodel = getenvOrDefault('ICEMODEL_TEST_SMBMODEL_FILTER', 'all');
+   solver = parseNumericEnv('ICEMODEL_TEST_SOLVER_FILTER');
+   simyear = str2double(getenvOrDefault('ICEMODEL_TEST_SIMYEAR_FILTER', '2016'));
+   smoke_sites = parseStringEnv('ICEMODEL_TEST_SMOKE_SITES', "kanm");
+   full_sites = parseStringEnv('ICEMODEL_TEST_FULL_SITES', ["kanm"; "kanl"]);
+   baseline_tag = getenvOrDefault('ICEMODEL_REGRESSION_BASELINE', 'rolling');
+   run_name = string(getenv('ICEMODEL_TEST_RUN_NAME'));
+
+   % Build the formal regression case matrix from the resolved selectors.
+   cases = icemodel.test.helpers.getRegressionCaseMatrix( ...
+      tier=tier, smbmodel=smbmodel, solver=solver, simyear=simyear, ...
+      smoke_sites=smoke_sites, full_sites=full_sites);
+
+   assert(~isempty(cases), ...
+      'regression case matrix is empty for tier=%s smbmodel=%s solver=[%s]', ...
+      tier, smbmodel, join(string(solver), ','));
+
+   % Load the accepted baseline and runoff reference for comparison.
+   baseline = icemodel.test.helpers.loadBaseline("regression", ...
+      smbmodel=smbmodel, baseline_tag=baseline_tag);
+   runoff_ref = icemodel.test.helpers.loadReference("runoff");
+
+   % Pack everything into a single struct for testCoreRegression.
+   info = struct();
+   info.tier = string(tier);
+   info.smbmodel = string(smbmodel);
+   info.solver = solver;
+   info.simyear = simyear;
+   info.smoke_sites = smoke_sites;
+   info.full_sites = full_sites;
+   info.baseline_tag = string(baseline_tag);
+   info.run_name = run_name;
+   info.cases = cases;
+   info.baseline = baseline;
+   info.runoff_ref = runoff_ref;
+end
+
+function s = getenvOrDefault(name, default)
+   %GETENVORDEFAULT Read an env var with a fallback default.
+   s = getenv(name);
+   if isempty(s)
+      s = default;
+   end
+end
+
+function x = parseNumericEnv(name)
+   %PARSENUMERICENV Parse a comma-delimited numeric env var.
+   s = getenv(name);
+   if isempty(s)
+      x = [];
+   else
+      x = str2double(split(string(s), ','));
+      x = x(isfinite(x));
+   end
+end
+
+function x = parseStringEnv(name, default)
+   %PARSESTRINGENV Parse a comma-delimited string env var with a fallback.
+   s = getenv(name);
+   if isempty(s)
+      x = default;
+   else
+      x = split(string(s), ',');
+      x = x(x ~= "");
+   end
 end

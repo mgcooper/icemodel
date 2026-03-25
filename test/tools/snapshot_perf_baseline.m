@@ -11,11 +11,19 @@ function PerfBaseline = snapshot_perf_baseline(kwargs)
    % formal model.
 
    arguments (Input)
+
       kwargs.baseline_tag (1, :) string
+
       kwargs.smbmodel (1, :) string ...
-         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} = "all"
-      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
-      kwargs.overwrite (1, 1) logical = false
+         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} ...
+         = "all"
+
+      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 2016
+
+      kwargs.overwrite (1, 1) logical ...
+         = false
+
       kwargs.output_file string = string.empty()
    end
 

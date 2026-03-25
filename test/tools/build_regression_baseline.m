@@ -33,22 +33,43 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    % here rather than buried in the regression case matrix helper.
 
    arguments (Input)
+
       kwargs.baseline (1, :) string ...
          {icemodel.validators.mustBeRollingBaselineName(kwargs.baseline)} ...
          = "rolling"
-      kwargs.baseline_tag string = string.empty()
+
+      kwargs.baseline_tag string ...
+         = string.empty()
+
       kwargs.tier (1, :) string ...
-         {icemodel.validators.mustBeTestTierName(kwargs.tier)} = "full"
+         {icemodel.validators.mustBeTestTierName(kwargs.tier)} ...
+         = "full"
+
       kwargs.smbmodel (1, :) string ...
-         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} = "all"
-      kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} = []
-      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
-      kwargs.smoke_sites string = "kanm"
-      kwargs.full_sites string = ["kanm"; "kanl"]
-      kwargs.include_profile_artifacts (1, 1) logical = true
+         {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} ...
+         = "all"
+
+      kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} ...
+         = []
+
+      kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} ...
+         = 2016
+
+      kwargs.smoke_sites string ...
+         = "kanm"
+
+      kwargs.full_sites string ...
+         = ["kanm"; "kanl"]
+
+      kwargs.include_profile_artifacts (1, 1) logical ...
+         = true
+
       kwargs.profile_history_size (1, 1) double {mustBeInteger, ...
-         mustBePositive} = 25000000
-      kwargs.output_file string = string.empty()
+         mustBePositive} ...
+         = 25000000
+
+      kwargs.output_file string ...
+         = string.empty()
    end
 
    % Keep the cleanup handle in scope so the caller's config is restored
@@ -99,7 +120,7 @@ function RegressionBaseline = buildSingleModelRegressionBaseline( ...
       simyear, solver, smoke_sites, full_sites);
 
    % Load the static runoff reference once before entering the case loop.
-   runoff_ref = icemodel.test.helpers.loadRunoffReference();
+   runoff_ref = icemodel.test.helpers.loadReference("runoff");
 
    % Preallocate row containers for the accepted baseline summary and opts.
    row_cells = cell(height(cases), 1);
@@ -120,12 +141,12 @@ function RegressionBaseline = buildSingleModelRegressionBaseline( ...
 
       % Load the matched runoff reference row, if one exists, before
       % summarizing the retained yearly outputs.
-      ridx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);
+      idx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);
       met = icemodel.test.helpers.loadProcessedMetForOutputYears(opts_run);
-      if isempty(ridx)
+      if isempty(idx)
          refrow = [];
       else
-         refrow = runoff_ref(ridx, :);
+         refrow = runoff_ref(idx, :);
       end
       S = icemodel.test.helpers.summarizeIce1Metrics(ice1, met, refrow);
 

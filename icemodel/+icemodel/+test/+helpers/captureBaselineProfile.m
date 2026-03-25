@@ -78,7 +78,7 @@ end
 function profileRegressionBuild(cases)
    %PROFILEREGRESSIONBUILD Re-run regression cases under MATLAB profiling.
 
-   runoff_ref = icemodel.test.helpers.loadRunoffReference();
+   runoff_ref = icemodel.test.helpers.loadReference("runoff");
 
    for icase = 1:height(cases)
       c = cases(icase, :);

@@ -7,7 +7,7 @@ classdef IcemodelPerfTest < matlab.perftest.TestCase
    end
 
    methods (TestMethodSetup)
-      function configureCase(testCase)
+      function configureCases(testCase)
          % Install the canonical test config before timing begins so direct
          % class runs and runner-based runs see the same environment.
          [~, ~, ~, ~, testCase.env_cleanup] = ...
@@ -17,7 +17,7 @@ classdef IcemodelPerfTest < matlab.perftest.TestCase
    end
 
    methods (TestMethodTeardown)
-      function restoreCaseConfig(testCase)
+      function restoreConfig(testCase)
          % Release the setup cleanup handle after each timed case.
          testCase.env_cleanup = [];
       end
