@@ -15,7 +15,8 @@ function met = processmet(met, kwargs)
          ["native", "hourly"])} = "hourly"
    end
 
-   [Tf, emiss, SB] = icemodel.physicalConstant('Tf', 'emiss', 'SB');
+   [Tf, SB] = icemodel.physicalConstant('Tf', 'SB');
+   emiss = icemodel.parameterLookup('emiss');
 
    if kwargs.newTimeStep == "hourly"
       met = retime(met, 'hourly', 'mean');

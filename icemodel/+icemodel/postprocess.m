@@ -254,10 +254,11 @@ function [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo)
    % if time or disk space is limited, instead compute them after the
    % simulation.
 
-   % Load physical constants
-   [Tf,emissSB,cv_ice,cv_liq,ro_ice,ro_liq,ro_air,k_liq,Ls,Rv,emiss] = ...
-      icemodel.physicalConstant('Tf','emissSB','cv_ice','cv_liq','ro_ice', ...
-      'ro_liq','ro_air','k_liq','Ls','Rv','emiss');
+   % Load physical constants and parameters
+   [Tf,cv_ice,cv_liq,ro_ice,ro_liq,ro_air,k_liq,Ls,Rv] = ...
+      icemodel.physicalConstant('Tf','cv_ice','cv_liq','ro_ice', ...
+      'ro_liq','ro_air','k_liq','Ls','Rv');
+   [emissSB, emiss] = icemodel.parameterLookup('emissSB', 'emiss');
 
    % Compute bulk density (kg/m3), heat capacity (J/kg/K), thermal K (W/m/K)
    T_ice = ice2.Tice;
