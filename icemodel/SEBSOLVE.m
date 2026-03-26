@@ -4,19 +4,21 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
    %SEBSOLVE solve the surface energy balance for the skin temperature
    %
    % Solver options:
-   % 0 = derivative-free, slower but more robust, used as a fall back.
-   % 1 = newton-rhapson, fast, requires analytic derivative, used as a default.
-   % 2 = complex-step, fast and does not require an analytical derivative.
+   %  0 = derivative-free, slower but more robust, used as a fall back.
+   %  1 = newton-rhapson, fast, requires analytic derivative, used as a default.
+   %  2 = complex-step, fast and does not require an analytical derivative.
    % -1 = no outer iterations, use this if phase change is not represented
-   % explicitly in the model.
+   %      explicitly in the model.
    % >2 = experimental.
    %
    % Important programming notes:
    %  - The outer iterations control the convergence of the Ts calculation wrt
    %  the conduction term. Thus old is initialized to Ts outside the outer loop.
+   %
    %  - In SFCTEMP or complexstep or any derivative-based method, old must be
    %  initialized to Ta to avoid divergence during spinup, keeping in mind that
    %  the conduction passed into SFCTEMP is computed with old = Ts.
+   %
    %  - For a "skinmodel", Ts never exceeds Tf when passed into functions, but
    %  within the iterations of SFCTEMP and when it comes out of SFCTEMP it can
    %  exceed Tf.
@@ -88,7 +90,7 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
          end
       end
    end
-   
+
    % Hitting max coupling iterations without ok_cpl is a substep fail
    ok = ok && ok_cpl;
 

@@ -14,7 +14,7 @@ function varargout = parameterLookup(varargin)
    %
    %  Canonical vapor coefficients are from Ambaum (2020), computed by
    %  VAPORINIT. Buck (1981) coefficients are preserved in
-   %  icemodel.kernels.buckVaporPressure.
+   %  icemodel.kernels.buckVaporModel.
    %
    % See also: icemodel.physicalConstant, VAPORINIT
    %
@@ -23,7 +23,7 @@ function varargout = parameterLookup(varargin)
    narginchk(0, Inf);
 
    % -----------------------------------------------------------------------
-   % Ambaum (2020) Rankine-Kirchhoff vapor coefficients (canonical)
+   % Ambaum (2020) / Romps (2021) Rankine-Kirchhoff vapor coefficients (canonical)
    % -----------------------------------------------------------------------
    % Computed from physical constants via VAPORINIT. The formula is:
    %   es = a * exp(b / T) * T ^ c   [Pa]
@@ -35,24 +35,24 @@ function varargout = parameterLookup(varargin)
    % -----------------------------------------------------------------------
 
    params = struct( ...
-      'al', al_, ...                  % Rankine-Kirchhoff coefficient over liquid [Pa K^-c]
-      'bl', bl_, ...                  % Rankine-Kirchhoff coefficient over liquid [K]
-      'cl', cl_, ...                  % Rankine-Kirchhoff exponent over liquid [1]
-      'ai', ai_, ...                  % Rankine-Kirchhoff coefficient over ice [Pa K^-c]
-      'bi', bi_, ...                  % Rankine-Kirchhoff coefficient over ice [K]
-      'ci', ci_, ...                  % Rankine-Kirchhoff exponent over ice [1]
-      'nd', 6, ...                    % Vapor diffusivity temperature exponent [1]
-      'De0', 9e-5, ...               % Reference vapor diffusivity [m2 s-1]
-      'De0_sntherm', 9.2e-5, ...     % SNTHERM89 reference vapor diffusivity [m2 s-1]
+      'al', al_, ...             % Rankine-Kirchhoff coefficient over liquid [Pa K^-c]
+      'bl', bl_, ...             % Rankine-Kirchhoff coefficient over liquid [K]
+      'cl', cl_, ...             % Rankine-Kirchhoff exponent over liquid [1]
+      'ai', ai_, ...             % Rankine-Kirchhoff coefficient over ice [Pa K^-c]
+      'bi', bi_, ...             % Rankine-Kirchhoff coefficient over ice [K]
+      'ci', ci_, ...             % Rankine-Kirchhoff exponent over ice [1]
+      'nd', 6, ...               % Vapor diffusivity temperature exponent [1]
+      'De0', 9e-5, ...           % Reference vapor diffusivity [m2 s-1]
+      'De0_sntherm', 9.2e-5, ... % SNTHERM89 reference vapor diffusivity [m2 s-1]
       ...
       ... % ----------------------------------------------------------------
       ... % Surface and radiation parameters
       ... % ----------------------------------------------------------------
-      'emiss', 0.98, ...             % Surface emissivity for ice [1]
-      'S0', 1361.0, ...              % Solar constant [W m-2]
-      'n_ice', 1.31, ...            % Refractive index (real) of ice [1]
-      'n_liq', 1.33, ...            % Refractive index (real) of water [1]
-      'n_air', 1.00, ...            % Refractive index (real) of air [1]
+      'emiss', 0.98, ...         % Surface emissivity for ice [1]
+      'S0', 1361.0, ...          % Solar constant [W m-2]
+      'n_ice', 1.31, ...         % Refractive index (real) of ice [1]
+      'n_liq', 1.33, ...         % Refractive index (real) of water [1]
+      'n_air', 1.00, ...         % Refractive index (real) of air [1]
       ...
       ... % ----------------------------------------------------------------
       ... % Empirical and derived atmospheric parameters

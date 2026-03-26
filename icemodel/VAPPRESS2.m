@@ -2,7 +2,7 @@ function [es, des_dT, d2es_dT2, ro_vap, dro_vapdT, d2ro_vapdT2] = VAPPRESS2(T, l
    %VAPPRESS2 Compute saturation vapor pressure over liquid or ice.
    %
    %  ES = VAPPRESS2(T, LIQFLAG) computes saturation vapor pressure
-   %  using the Ambaum (2020) Rankine-Kirchhoff formula:
+   %  using the Ambaum (2020) / Romps (2021) Rankine-Kirchhoff formula:
    %
    %     ES = A * exp(B / T) * T ^ C   [Pa]
    %
@@ -24,7 +24,7 @@ function [es, des_dT, d2es_dT2, ro_vap, dro_vapdT, d2ro_vapdT2] = VAPPRESS2(T, l
    %
    %#codegen
 
-   % Ambaum (2020) Rankine-Kirchhoff coefficients (i = ice, l = liquid)
+   % Ambaum (2020) / Romps (2021) Rankine-Kirchhoff coefficients (i=ice, l=liq)
    persistent al bl cl ai bi ci
    if isempty(al)
       [al, bl, cl, ai, bi, ci] = icemodel.parameterLookup( ...
@@ -72,7 +72,7 @@ end
 
 %%
 function es = saturationVaporPressure(T, a, b, c)
-   %SATURATIONVAPORPRESSURE Ambaum (2020) saturation vapor pressure
+   %SATURATIONVAPORPRESSURE Ambaum (2020) / Romps (2021) saturation vapor pressure
    es = a * exp(b ./ T) .* T .^ c; % [Pa]
 end
 

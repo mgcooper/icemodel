@@ -2,7 +2,7 @@ function Tdew = TDEW(T, rh, liqflag)
    %TDEW Compute dew point temperature from air temperature and humidity.
    %
    % Dew point is the temperature at which the air reaches saturation. For
-   % the Ambaum (2020) Rankine-Kirchhoff formula es = a * exp(b/T) * T^c,
+   % the Ambaum (2020) / Romps (2021) Rankine-Kirchhoff formula es = a * exp(b/T) * T^c,
    % the dew point is transcendental and solved by Newton iteration.
    %
    % Syntax:
@@ -26,7 +26,7 @@ function Tdew = TDEW(T, rh, liqflag)
       liqflag = true;
    end
 
-   % Ambaum (2020) Rankine-Kirchhoff coefficients (i = ice, l = liquid)
+   % Ambaum (2020) / Romps (2021) Rankine-Kirchhoff coefficients (i=ice, l=liq)
    persistent al bl cl ai bi ci
    if isempty(al)
       [al, bl, cl, ai, bi, ci] = icemodel.parameterLookup( ...

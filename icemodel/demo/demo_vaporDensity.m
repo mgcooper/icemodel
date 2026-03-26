@@ -159,100 +159,100 @@ d2e_s_dT2 = subs(d2e_s_dT2, T^(c-2) * a * exp(b/T), e_s/T^2) %[output:85d99bbb]
 diff(exp(b/T), T) %[output:7877f4b3]
 %%
 % NOTE: The only functional difference between Romps and Ambaum is Romps uses
-   % cv_liq whereas Ambaum uses cp_liq in the exponent on (T/To). I think Ambaum
-   % addresses this on page 4253, top right. 
-   
-   % Based on Ambaum's Fig 4, it appears fine to compute wrt water or solid, it
-   % will only make a large difference at low temperatures, 
-   % Since RH is likely relative to water, and mar definitely was computed wrt
-   % water, for the surface 
-   
-   % Ambaum key points: 
-   % - Recommended values are for the entire range -60-100oC
-   % - Recommended values set cp_liq = 4220 and optimize cp_vap = 2040
-   % - Figure 3 shows less error with the actual triple point cp_vap = 1888
-   % - But this is supercooled water, and the difference is minor above -10oC
-   % - Since cp_vap is not used elsewhere, and if it were, the optimal value
-   %   could be adopted, there's no reason not to use cp_vap = 2040
-   %
-   % Over ice, he says "triple point values can be used":
-   % - cp_ice - cp_vap = 2097 - 1888.2 = 208.8
-   % But his recommended value for cp_ice - cp_vap is 212, so the triple point
-   % value of cp_vap over ice must be:
-   % - cp_vap = cp_ice - 212 = 2097 - 212 = 1885
-   % 
-   % 
-   
-   % Ambaum Eq. 13-15 and 17-19:
-   % cp_liq = 4220;     % Triple-point value, this is fixed
-   % cp_lmv = 2180;     % cp_liq - cp_vap, optimized
-   % cp_vap = 2040;     % optimized; actual triple point value = 1888.2;
-   % cp_ice = 2097;     % Triple-point value, this is fixed
-   % cp_imv = 212;      % cp_ice - cp_vap = 2097 - 1885
-   
-   % L0 = 2.501e6;      % Latent heat of vaporization at 0°C [J kg-1]
-   % es0 = 611.655;
-   % Rv = 461.52;       % Gas constant for water vapor [J kg-1 K-1]
-   
-   % cp_
-   
-   % Note: above gives cp_vap = 1879.
-   % Ambaum got 1888.2 at the triple point, and says this value yields a value
-   % for cp_liq "fairly close to its measured triple point value". NOTE: it is
-   % not correct to compute cp_liq = 2180 + cp_vap = 4059, because the value
-   % 2180 was selected by Ambaum to give cp_vap = 2040. 
-   % Thus cp_liq = 2180 + 2040 = 4220, almost identical to my value 4218.
-   
-   % Ambaum says at low temperatures, the best fit is for the actual triple
-   % point value of cp_vap, not the one above, which produces better results
-   % over a larger temperature range up to 100oC. 
-   %
-   % Ambaum's triple-point values:
-   % cp_vap = 1888.2;
-   % cp_liq = 4220;
-   % cp_ice = 2097;
-   %
-   % Those values give cp_liq - cp_vap = 2331.8;
-   % See Ambaum Figure 3 for why those values are used rather than his
-   % recommended cp_liq - cp_vap = 2180, which yields cp_vap = 2040.
-   
-   % Regarding ice, Ambaum mentions that the derivation assumes "the heat
-   % capacity at constant pressure is constant over the temperature range of
-   % interest" which is not good for ice, but they start with that assumption
-   % then check the result and find good accuracy. 
-   
-   
-   
-   
-   % From Romps:
-   % Rv = 461;                      % specific gas constant for water vapor [J kg-1 K-1]
-   % cp_liq = 4119;                 % specific heat capacity of liquid water
-   % cp_ice = 1861;
-   % cv_vap = 1418;                 % specific heat capacity of water vapor at constant volume [J kg-1 K-1]
-   % cv_liq = cp_liq;               % specific heat capacity of water at constant volume [J kg-1 K-1]
-   % cv_ice = cp_ice;               % specific heat capacity of ice at constant volume [J kg-1 K-1]
-   % cp_vap = cv_vap + Rv;          % specific heat capacity of water vapor at constant pressure [J kg-1 K-1]
-   % Ptrip = 611.65;                % triple point vapor pressure
-   
-   % Romps' expression for saturation vapor pressure:
-   % pv_ice = pv0 * (T / T0) .^ (cp_vap - cv_ice)
+% cv_liq whereas Ambaum uses cp_liq in the exponent on (T/To). I think Ambaum
+% addresses this on page 4253, top right. 
 
-   % Note, the specific heat capacity of water vapor at constant pressure is
-   % computed as:
-   % cp_vap = cv_vap + Rv
-   % where
-   % cv_vap = 1384.5
-   %
-   % % Constants
-   % R = 8.314; % J/mol.K, Universal gas constant
-   % molar_mass_water_vapor = 18.015;  % g/mol, Molar mass of water vapor
-   %
-   % % Molar heat capacity at constant volume for water vapor (non-linear
-   % triatomic molecule):
-   % cv_molar = 6 / 2 * R;
-   %
-   % % Convert to specific heat capacity (J/kg.K)
-   % cv_vap = cv_molar / (molar_mass_water_vapor / 1000); % molar mass to kg/mol
+% Based on Ambaum's Fig 4, it appears fine to compute wrt water or solid, it
+% will only make a large difference at low temperatures, 
+% Since RH is likely relative to water, and mar definitely was computed wrt
+% water, for the surface 
+
+% Ambaum key points: 
+% - Recommended values are for the entire range -60-100oC
+% - Recommended values set cp_liq = 4220 and optimize cp_vap = 2040
+% - Figure 3 shows less error with the actual triple point cp_vap = 1888
+% - But this is supercooled water, and the difference is minor above -10oC
+% - Since cp_vap is not used elsewhere, and if it were, the optimal value
+%   could be adopted, there's no reason not to use cp_vap = 2040
+%
+% Over ice, he says "triple point values can be used":
+% - cp_ice - cp_vap = 2097 - 1888.2 = 208.8
+% But his recommended value for cp_ice - cp_vap is 212, so the triple point
+% value of cp_vap over ice must be:
+% - cp_vap = cp_ice - 212 = 2097 - 212 = 1885
+% 
+% 
+
+% Ambaum Eq. 13-15 and 17-19:
+% cp_liq = 4220;     % Triple-point value, this is fixed
+% cp_lmv = 2180;     % cp_liq - cp_vap, optimized
+% cp_vap = 2040;     % optimized; actual triple point value = 1888.2;
+% cp_ice = 2097;     % Triple-point value, this is fixed
+% cp_imv = 212;      % cp_ice - cp_vap = 2097 - 1885
+
+% L0 = 2.501e6;      % Latent heat of vaporization at 0°C [J kg-1]
+% es0 = 611.655;
+% Rv = 461.52;       % Gas constant for water vapor [J kg-1 K-1]
+
+% cp_
+
+% Note: above gives cp_vap = 1879.
+% Ambaum got 1888.2 at the triple point, and says this value yields a value
+% for cp_liq "fairly close to its measured triple point value". NOTE: it is
+% not correct to compute cp_liq = 2180 + cp_vap = 4059, because the value
+% 2180 was selected by Ambaum to give cp_vap = 2040. 
+% Thus cp_liq = 2180 + 2040 = 4220, almost identical to my value 4218.
+
+% Ambaum says at low temperatures, the best fit is for the actual triple
+% point value of cp_vap, not the one above, which produces better results
+% over a larger temperature range up to 100oC. 
+%
+% Ambaum's triple-point values:
+% cp_vap = 1888.2;
+% cp_liq = 4220;
+% cp_ice = 2097;
+%
+% Those values give cp_liq - cp_vap = 2331.8;
+% See Ambaum Figure 3 for why those values are used rather than his
+% recommended cp_liq - cp_vap = 2180, which yields cp_vap = 2040.
+
+% Regarding ice, Ambaum mentions that the derivation assumes "the heat
+% capacity at constant pressure is constant over the temperature range of
+% interest" which is not good for ice, but they start with that assumption
+% then check the result and find good accuracy. 
+
+
+
+
+% From Romps:
+% Rv = 461;                      % specific gas constant for water vapor [J kg-1 K-1]
+% cp_liq = 4119;                 % specific heat capacity of liquid water
+% cp_ice = 1861;
+% cv_vap = 1418;                 % specific heat capacity of water vapor at constant volume [J kg-1 K-1]
+% cv_liq = cp_liq;               % specific heat capacity of water at constant volume [J kg-1 K-1]
+% cv_ice = cp_ice;               % specific heat capacity of ice at constant volume [J kg-1 K-1]
+% cp_vap = cv_vap + Rv;          % specific heat capacity of water vapor at constant pressure [J kg-1 K-1]
+% Ptrip = 611.65;                % triple point vapor pressure
+
+% Romps' expression for saturation vapor pressure:
+% pv_ice = pv0 * (T / T0) .^ (cp_vap - cv_ice)
+
+% Note, the specific heat capacity of water vapor at constant pressure is
+% computed as:
+% cp_vap = cv_vap + Rv
+% where
+% cv_vap = 1384.5
+%
+% % Constants
+% R = 8.314; % J/mol.K, Universal gas constant
+% molar_mass_water_vapor = 18.015;  % g/mol, Molar mass of water vapor
+%
+% % Molar heat capacity at constant volume for water vapor (non-linear
+% triatomic molecule):
+% cv_molar = 6 / 2 * R;
+%
+% % Convert to specific heat capacity (J/kg.K)
+% cv_vap = cv_molar / (molar_mass_water_vapor / 1000); % molar mass to kg/mol
 
    
 

@@ -15,13 +15,17 @@ function [al, bl, cl, ai, bi, ci] = VAPORINIT()
    %  values (4220, 2097) but produce negligible differences in the derived
    %  coefficients.
    %
-   %  For the algebraic derivation and equivalence with Romps (2017), see:
+   %  For the algebraic derivation and equivalence with Romps (2021), see:
    %     icemodel.kernels.latentEnthalpyWater
    %     icemodel.kernels.saturationVaporPressure
    %
    %  References:
-   %     Ambaum (2020): https://romps.berkeley.edu/papers/pubdata/2021/ambaum/21ambaum.pdf
-   %     Romps (2017): https://romps.berkeley.edu/papers/pubdata/2020/dewpoint/20dewpoint.pdf
+   %     Ambaum (2020), "Accurate, simple equation for saturated vapour
+   %        pressure over water and ice." QJRMS, 146, 4252-4258.
+   %        DOI: 10.1002/qj.3899
+   %     Romps (2021), "The Rankine-Kirchhoff approximations for moist
+   %        thermodynamics." QJRMS, 147(741), 3493-3497.
+   %        DOI: 10.1002/qj.4154
    %
    % See also: icemodel.parameterLookup, icemodel.physicalConstant,
    %  icemodel.kernels.latentEnthalpyWater, icemodel.kernels.saturationVaporPressure

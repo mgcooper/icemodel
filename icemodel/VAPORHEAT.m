@@ -19,7 +19,7 @@ function [ro_vap, dro_vapdT, k_vap] = VAPORHEAT(T, f_ice, f_liq, Tf, Rv, Ls)
    %
    %#codegen
 
-   % Ambaum (2020) Rankine-Kirchhoff coefficients (i = ice, l = liquid)
+   % Ambaum (2020) / Romps (2021) Rankine-Kirchhoff coefficients (i=ice, l=liq)
    persistent al bl cl ai bi ci nd De0
    if isempty(al)
       [al, bl, cl, ai, bi, ci, nd, De0] = icemodel.parameterLookup( ...

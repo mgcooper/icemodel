@@ -3,7 +3,7 @@ function es = saturationVaporPressure(T, liqflag)
    %
    %  ES = saturationVaporPressure(T) computes saturation vapor pressure over
    %  liquid using the Clausius-Clapeyron equation with temperature-dependent
-   %  latent enthalpy following Romps (2017) / Ambaum (2020).
+   %  latent enthalpy following Ambaum (2020) / Romps (2021).
    %
    %  ES = saturationVaporPressure(T, LIQFLAG) computes over liquid (true) or
    %  ice (false).
@@ -14,8 +14,12 @@ function es = saturationVaporPressure(T, liqflag)
    %  coefficients derived in VAPORINIT from these same expressions.
    %
    %  References:
-   %     Ambaum (2020): https://romps.berkeley.edu/papers/pubdata/2021/ambaum/21ambaum.pdf
-   %     Romps (2017): https://romps.berkeley.edu/papers/pubdata/2020/dewpoint/20dewpoint.pdf
+   %     Ambaum (2020), "Accurate, simple equation for saturated vapour
+   %        pressure over water and ice." QJRMS, 146, 4252-4258.
+   %        DOI: 10.1002/qj.3899
+   %     Romps (2021), "The Rankine-Kirchhoff approximations for moist
+   %        thermodynamics." QJRMS, 147(741), 3493-3497.
+   %        DOI: 10.1002/qj.4154
    %
    % See also: VAPORINIT, icemodel.kernels.latentEnthalpyWater
 
@@ -24,7 +28,7 @@ function es = saturationVaporPressure(T, liqflag)
    % whereas Ambaum optimized values separately for liquid and ice.
 
    % -----------------------------------------------------------------------
-   % Constants following Romps (2017) — retain for reference
+   % Constants following Romps (2021) — retain for reference
    % -----------------------------------------------------------------------
    T0 = 273.16;    % Triple point temperature [K]
    Rv = 461;       % Specific gas constant for water vapor [J/kg/K]
@@ -55,7 +59,7 @@ function es = saturationVaporPressure(T, liqflag)
    % (T/T0) ^ ((cpv - cpl) / Rv)  % Ambaum (identical since cvl = cpl)
    %
    % Le = E0v + Rv * T + (cvv - cvl) * (T - T0);   % Romps
-   % Le = L0 + (cpv_l - cpl) * (T - T0);            % Ambaum
+   % Le = L0 + (cpv_l - cpl) * (T - T0);           % Ambaum
    %
    % The two expressions are equivalent under a substitution of cvv = cpv-Rv:
    % Le = E0v + Rv * T + (cvv - cvl) * (T - T0);    % Romps

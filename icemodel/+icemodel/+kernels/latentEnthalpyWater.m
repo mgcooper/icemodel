@@ -2,22 +2,35 @@ function [Le, Ls] = latentEnthalpyWater(T)
    %LATENTHALPYWATER Canonical Romps/Ambaum latent enthalpy reference.
    %
    %  [Le, Ls] = latentEnthalpyWater(T) computes the specific latent enthalpy
-   %  of vaporization Le(T) and sublimation Ls(T) following Romps (2017).
+   %  of vaporization Le(T) and sublimation Ls(T) following Romps (2021).
    %
-   %  This file is the canonical reference implementation for the Romps (2017)
-   %  and Ambaum (2020) latent enthalpy expressions and their algebraic
-   %  equivalence. Paper-specific notation (cvv, cvl, cvs) is retained here
-   %  for direct traceability to the published equations. Production code uses
-   %  icemodel-centric names (cp_ice, cp_liq, cpv_l, cpv_i) via VAPORINIT.
+   %  This file is the canonical reference implementation for the Romps (2021)
+   %  latent enthalpy expressions and their algebraic equivalence with the
+   %  Ambaum (2020) formulation. Paper-specific notation (cvv, cvl, cvs) is
+   %  retained here for direct traceability to the published equations.
+   %  Production code uses icemodel-centric names (cp_ice, cp_liq, cpv_l,
+   %  cpv_i) via VAPORINIT.
+   %
+   %  Note on temperature dependence: Le(T) and Ls(T) are linear in T,
+   %  reflecting the Kirchhoff relation dL/dT = cpv - cp_phase. The
+   %  Rankine-Kirchhoff saturation vapor pressure formula es = a*exp(b/T)*T^c
+   %  absorbs this temperature dependence into the coefficients a, b, c. As a
+   %  result, production code (VAPPRESS, VAPORHEAT, etc.) correctly treats L as
+   %  constant at the reference value (Lv0 = 2.501e6, Ls0 = 2.834e6 J/kg) —
+   %  the L(T) effect is already encoded in the Rankine-Kirchhoff exponents.
    %
    %  References:
-   %     Romps (2017): https://romps.berkeley.edu/papers/pubdata/2020/dewpoint/20dewpoint.pdf
-   %     Ambaum (2020): https://romps.berkeley.edu/papers/pubdata/2021/ambaum/21ambaum.pdf
+   %     Ambaum (2020), "Accurate, simple equation for saturated vapour
+   %        pressure over water and ice." QJRMS, 146, 4252-4258.
+   %        DOI: 10.1002/qj.3899
+   %     Romps (2021), "The Rankine-Kirchhoff approximations for moist
+   %        thermodynamics." QJRMS, 147(741), 3493-3497.
+   %        DOI: 10.1002/qj.4154
    %
    % See also: VAPORINIT, icemodel.kernels.saturationVaporPressure
 
    % -----------------------------------------------------------------------
-   % Constants following Romps (2017)
+   % Constants following Romps (2021)
    % -----------------------------------------------------------------------
    % These use constant-volume heat capacities (cv) as published in Romps.
    % Romps optimized cvl, cvs, and Rv simultaneously, finding one set of
@@ -43,9 +56,9 @@ function Le = latentHeatVaporization(T, E0v, Rv, cvv, cvl, T0)
    %LATENTHEATVAPORIZATION Specific latent enthalpy of vaporization Le(T).
    %
    % T - Temperature [K]
-   % E0v, Rv, cvv, cvl, T0 - Constants (Romps 2017)
+   % E0v, Rv, cvv, cvl, T0 - Constants (Romps 2021)
 
-   % Romps (2017) expression:
+   % Romps (2021) expression:
    Le = E0v + Rv * T + (cvv - cvl) * (T - T0);
 
    % -----------------------------------------------------------------------
@@ -63,15 +76,16 @@ function Le = latentHeatVaporization(T, E0v, Rv, cvv, cvl, T0)
    % The Romps and Ambaum expressions are algebraically equivalent under the
    % substitution cvv = cpv - Rv (since cv + R = cp for an ideal gas):
    %
-   %   Romps:  Le = E0v + Rv*T + (cvv - cvl)*(T - T0)
-   %         = E0v + Rv*T + (cpv - Rv - cvl)*(T - T0)
-   %         = E0v + Rv*T + (cpv - cvl)*(T - T0) - Rv*(T - T0)
-   %         = E0v + Rv*T0 + (cpv - cvl)*(T - T0)
-   %         = L0 + (cpv - cvl)*(T - T0)
+   %   Romps:
+   %     Le = E0v + Rv * T + (cvv - cvl) * (T - T0)
+   %        = E0v + Rv * T + (cpv - Rv - cvl) * (T - T0)
+   %        = E0v + Rv * T + (cpv - cvl) * (T - T0) - Rv * (T - T0)
+   %        = E0v + Rv * T0 + (cpv - cvl) * (T - T0)
+   %        = L0 + (cpv - cvl) * (T - T0)
    %
    %   which equals Ambaum's expression given cvl = cpl:
    %
-   %   Ambaum: Le = Lv0 + (cpv_l - cp_liq)*(T - T0)
+   %   Ambaum: Le = Lv0 + (cpv_l - cp_liq) * (T - T0)
    %
    %   where Lv0 = E0v + Rv*T0 = 2.501e6 [J/kg]
    %
@@ -92,7 +106,20 @@ function Ls = latentHeatSublimation(T, T0, E0v, E0s, Rv, cvv, cvs)
    %LATENTHEATSUBLIMATION Specific latent enthalpy of sublimation Ls(T).
    %
    % T - Temperature [K]
-   % T0, E0v, E0s, Rv, cvv, cvs - Constants (Romps 2017)
+   % T0, E0v, E0s, Rv, cvv, cvs - Constants (Romps 2021)
 
    Ls = E0v + E0s + Rv * T + (cvv - cvs) * (T - T0);
 end
+
+% Older notes, may be clearer than above.
+%
+% Ambaum:
+% L0 = E0v + Rv * T0;
+% Le = L0 + (cvv + Rv - cvl) * (T - T0);
+
+% Lv = Lv0 + (cpv_l - cpl) * (T - T0);
+% Ls = Ls0 + (cpv_s - cps) * (T - T0);
+
+% L0 = 2.501e6;
+% Le = L0 - (cpl - cpv) * (T - T0);
+% Le = 2.501e6 - 2180 * (T - T0);

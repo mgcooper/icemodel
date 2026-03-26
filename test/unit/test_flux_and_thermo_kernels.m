@@ -177,7 +177,7 @@ function test_ambaum_buck_agreement(testCase)
    Tf = 273.16;
 
    es_ambaum = VAPPRESS(T, Tf, false);
-   es_buck = icemodel.kernels.buckVaporPressure(T, Tf, false);
+   es_buck = icemodel.kernels.buckVaporModel(T, Tf, false);
 
    testCase.verifyEqual(es_ambaum, es_buck, 'RelTol', 0.01);
 end
@@ -214,4 +214,66 @@ function test_getkthermal_matches_getgamma_k_sno(testCase)
    testCase.verifyGreaterThan(min(k_sno), 0);
    testCase.verifyGreaterThan(k_sno(1), k_sno(3), ...
       'Higher ice fraction should yield higher thermal conductivity');
+end
+
+function test_ambaum_derivative_chain_consistency(testCase)
+   % Verify that all analytical derivatives in the Ambaum/Romps chain
+   % match centered finite differences to within RelTol 1e-6.
+   %
+   % This tests the complete chain: es -> des_dT -> d2es_dT2,
+   % ro_vap -> dro_vapdT -> d2ro_vapdT2, and cross-function agreement
+   % between VAPPRESS2, VAPORHEAT, and GETKVAPOR.
+
+   [Ls, Rv, Tf] = icemodel.physicalConstant('Ls', 'Rv', 'Tf');
+
+   T = (235:0.5:273)';
+   h = 1e-6;  % finite difference step [K]
+
+   % --- es derivatives via VAPPRESS2 ---
+
+   [es, des_dT, d2es_dT2, ro_vap, dro_vapdT, d2ro_vapdT2] = ...
+      VAPPRESS2(T, false);
+   [es_p, des_dT_p, ~, ro_vap_p, dro_vapdT_p] = VAPPRESS2(T + h, false);
+   [es_m, des_dT_m, ~, ro_vap_m, dro_vapdT_m] = VAPPRESS2(T - h, false);
+
+   % 1. des_dT: numerical first derivative of es
+   des_dT_num = (es_p - es_m) / (2 * h);
+   testCase.verifyEqual(des_dT, des_dT_num, 'RelTol', 1e-6, ...
+      'des_dT analytical vs finite difference');
+
+   % 2. d2es_dT2: numerical second derivative of es
+   d2es_dT2_num = (des_dT_p - des_dT_m) / (2 * h);
+   testCase.verifyEqual(d2es_dT2, d2es_dT2_num, 'RelTol', 1e-6, ...
+      'd2es_dT2 analytical vs finite difference');
+
+   % 3. dro_vapdT: numerical first derivative of ro_vap
+   dro_vapdT_num = (ro_vap_p - ro_vap_m) / (2 * h);
+   testCase.verifyEqual(dro_vapdT, dro_vapdT_num, 'RelTol', 1e-6, ...
+      'dro_vapdT analytical vs finite difference');
+
+   % 4. d2ro_vapdT2: numerical second derivative of ro_vap
+   d2ro_vapdT2_num = (dro_vapdT_p - dro_vapdT_m) / (2 * h);
+   testCase.verifyEqual(d2ro_vapdT2, d2ro_vapdT2_num, 'RelTol', 1e-6, ...
+      'd2ro_vapdT2 analytical vs finite difference');
+
+   % --- Cross-function agreement ---
+
+   % 5. VAPORHEAT dro_vapdT matches VAPPRESS2 dro_vapdT (same formula,
+   %    different code path: expanded form vs quotient form)
+   f_ice = ones(size(T));
+   f_liq = zeros(size(T));
+   [~, dro_vapdT_vh] = VAPORHEAT(T, f_ice, f_liq, Tf, Rv, Ls);
+   testCase.verifyEqual(dro_vapdT_vh, dro_vapdT, 'RelTol', 1e-10, ...
+      'VAPORHEAT dro_vapdT vs VAPPRESS2 dro_vapdT');
+
+   % 6. GETKVAPOR k_vap matches VAPORHEAT dry-branch k_vap
+   [~, ~, k_vap_vh] = VAPORHEAT(T, f_ice, f_liq, Tf, Rv, Ls);
+   k_vap_gk = GETKVAPOR(T, Ls, Rv, Tf);
+   testCase.verifyEqual(k_vap_gk, k_vap_vh, 'RelTol', 1e-10, ...
+      'GETKVAPOR k_vap vs VAPORHEAT k_vap');
+
+   % 7. VAPPRESS des_dT matches VAPPRESS2 des_dT
+   [~, des_dT_vp] = VAPPRESS(T, Tf, false);
+   testCase.verifyEqual(des_dT_vp, des_dT, 'RelTol', 1e-10, ...
+      'VAPPRESS des_dT vs VAPPRESS2 des_dT');
 end

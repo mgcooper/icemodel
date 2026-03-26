@@ -11,11 +11,11 @@ function k_vap = GETKVAPOR(T, Ls, Rv, Tf)
    %
    % with nd the 'temperature exponent', Anderson (1976) Eq. 3.13 (& Fig. 4.3)
    %
-   % See also: VAPORHEAT, GETGAMMA, icemodel.kernels.buckVaporPressure
+   % See also: VAPORHEAT, GETGAMMA, icemodel.kernels.buckVaporModel
    %
    %#codegen
 
-   % Ambaum (2020) Rankine-Kirchhoff coefficients over ice
+   % Ambaum (2020) / Romps (2021) Rankine-Kirchhoff coefficients over ice
    persistent ai bi ci nd De0
    if isempty(ai)
       [ai, bi, ci, nd, De0] = icemodel.parameterLookup( ...
@@ -33,12 +33,4 @@ function k_vap = GETKVAPOR(T, Ls, Rv, Tf)
 
    % Vapor thermal diffusion coefficient [W m-1 K-1]
    k_vap = Ls * De ./ (Rv * T) .* (des_dT - es ./ T);
-
-   % % From GETGAMMA before I added k_vap to VAPORHEAT:
-   %
-   % % Compute snow vapor k: (Ls·De)/(Rv·T)(∂es/∂T-es/T)
-   % es = 611.15 * exp((22.452 * (T - Tf)) ./ (272.55 + T - Tf)); % [Pa]
-   % k_vap = Ls * 9e-5 * (T / Tf) .^ 6 ./ (Rv * T) ...
-   %    .* (22.452 * 272.55 .* es ./ ((272.55 + T - Tf) .^ 2) ... % ∂es/∂T
-   %    - es ./ T); % es/T
 end

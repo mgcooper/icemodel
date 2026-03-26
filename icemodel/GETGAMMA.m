@@ -44,7 +44,7 @@ function [k_eff, k_vap] = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, varargin)
    % Combine the dry snow and liquid water values into a bulk wet-snow value:
    k_sno = f_liq .* k_liq + f_ice .* k_sno;
 
-   % Combine the wet snow and vapor values:
+   % % Combine the wet snow and vapor values:
    k_eff = (f_liq + f_ice) .* k_sno + (1.0 - f_liq - f_ice) .* k_vap;
 
    % Combine the dry snow, liquid water, and vapor values into a bulk value:

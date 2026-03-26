@@ -3,13 +3,14 @@ function rh = VAPPRESS2RH(ea, Ta, liqflag)
    %
    %  rh = VAPPRESS2RH(ea, Ta, liqflag) computes relative humidity [%] from
    %  atmospheric vapor pressure ea [Pa] and air temperature Ta [K] using the
-   %  Ambaum (2020) Rankine-Kirchhoff saturation vapor pressure formula.
+   %  Ambaum (2020) / Romps (2021) Rankine-Kirchhoff saturation vapor pressure
+   %  formula.
    %
    % See also: VAPPRESS
    %
    %#codegen
 
-   % Ambaum (2020) Rankine-Kirchhoff coefficients (i = ice, l = liquid)
+   % Ambaum (2020) / Romps (2021) Rankine-Kirchhoff coefficients (i=ice, l=liq)
    persistent al bl cl ai bi ci
    if isempty(al)
       [al, bl, cl, ai, bi, ci] = icemodel.parameterLookup( ...

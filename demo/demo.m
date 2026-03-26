@@ -44,7 +44,7 @@ switch runcase
       saveflag = false;
       sitename = 'kanm';
       forcings = 'kanm';
-      smbmodel = 'icemodel';
+      smbmodel = 'skinmodel';
       simyears = 2016:2016;
       backupflag = false;
 

@@ -1,5 +1,5 @@
 function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
-      emiss, SB, Tf, chi, roL, scoef, liqflag, varargin)
+      emiss, SB, ~, chi, roL, scoef, liqflag, varargin)
    %SFCTEMP Solve the energy balance for surface temperature
    %
    % This function uses a traditional Newton-Rhapson iteration to find Tsfc
@@ -12,16 +12,14 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
       maxiter = 100;
    end
 
-   % Ambaum (2020) Rankine-Kirchhoff coefficients (i = ice, l = liquid)
+   % Ambaum (2020) / Romps (2021) Rankine-Kirchhoff coefficients (i=ice, l=liq)
    persistent al bl cl ai bi ci
    if isempty(al)
       [al, bl, cl, ai, bi, ci] = icemodel.parameterLookup( ...
          'al', 'bl', 'cl', 'ai', 'bi', 'ci');
    end
 
-   Ts = nan;
-   ok = false;
-
+   % Parse inputs
    switch numel(varargin)
       case 1
          Qc = varargin{1};
@@ -57,15 +55,16 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
    B1 = scoef(2) / (Ta * wspd ^ 2);
    B2 = scoef(3) / (sqrt(Ta) * wspd);
 
-   % Select phase coefficients for Ambaum vapor pressure
+   % Select phase coefficients for Rankine-Kirchhoff vapor pressure
    if liqflag == true
       a = al; b = bl; c = cl;
    else
       a = ai; b = bi; c = ci;
    end
 
+   Ts = nan;
+   ok = false;
    old = Ta;
-
    for iter = 1:maxiter
 
       % Saturation vapor pressure: es = a * exp(b / T) * T ^ c  [Pa]

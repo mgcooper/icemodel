@@ -1,8 +1,8 @@
-function [es, des_dT, T_dew] = VAPPRESS(T, Tf, liqflag, rh)
+function [es, des_dT, T_dew] = VAPPRESS(T, ~, liqflag, rh)
    %VAPPRESS Compute saturation vapor pressure over liquid or ice.
    %
    %  ES = VAPPRESS(T, TF, LIQFLAG) computes saturation vapor pressure
-   %  using the Ambaum (2020) Rankine-Kirchhoff formula:
+   %  using the Ambaum (2020) / Romps (2021) Rankine-Kirchhoff formula:
    %
    %     ES = A * exp(B / T) * T ^ C   [Pa]
    %
@@ -16,15 +16,15 @@ function [es, des_dT, T_dew] = VAPPRESS(T, Tf, liqflag, rh)
    %  dew point temperature in Kelvins.
    %
    %  Note: the Tf argument is retained for signature compatibility but is
-   %  not used by the Ambaum formula (which operates in absolute temperature).
+   %  not used by the Rankine-Kirchhoff formula (which operates in absolute temperature).
    %
    % Units: [Pa = J m-3 = N m-2 = kg m-1 s-2]
    %
-   % See also: VAPORHEAT, icemodel.kernels.buckVaporPressure
+   % See also: VAPORHEAT, icemodel.kernels.buckVaporModel
    %
    %#codegen
 
-   % Ambaum (2020) Rankine-Kirchhoff coefficients (i = ice, l = liquid)
+   % Ambaum (2020) / Romps (2021) Rankine-Kirchhoff coefficients (i=ice, l=liq)
    persistent al bl cl ai bi ci
    if isempty(al)
       [al, bl, cl, ai, bi, ci] = icemodel.parameterLookup( ...
@@ -65,7 +65,7 @@ function [es, des_dT, T_dew] = VAPPRESS(T, Tf, liqflag, rh)
 end
 
 function es = saturationVaporPressure(T, a, b, c)
-   %SATURATIONVAPORPRESSURE Ambaum (2020) saturation vapor pressure
+   %SATURATIONVAPORPRESSURE Ambaum (2020) / Romps (2021) saturation vapor pressure
    es = a * exp(b ./ T) .* T .^ c; % [Pa]
 end
 
@@ -75,10 +75,10 @@ function des_dT = saturationVaporPressureDerivative(T, es, b, c)
 end
 
 function T_dew = dewPointTemperature(e_air, a, b, c)
-   %DEWPOINTTEMPERATURE Dew point temperature from Ambaum (2020) inversion
+   %DEWPOINTTEMPERATURE Dew point temperature via Newton inversion
    %
-   %  For the Ambaum formula es = a * exp(b/T) * T^c, the dew point is the
-   %  solution of: e_air = a * exp(b/T_dew) * T_dew^c
+   %  For the Rankine-Kirchhoff formula es = a * exp(b/T) * T^c, the dew point
+   %  is the solution of: e_air = a * exp(b/T_dew) * T_dew^c
    %
    %  This is transcendental in T_dew. Use Newton iteration starting from
    %  an initial guess based on the ideal gas approximation.
@@ -88,9 +88,9 @@ function T_dew = dewPointTemperature(e_air, a, b, c)
 
    % Newton iteration (typically converges in 3-5 steps)
    for iter = 1:10
-      es_guess = a * exp(b ./ T_dew) .* T_dew .^ c;
-      des_dT = es_guess ./ T_dew .* (c - b ./ T_dew);
-      T_dew = T_dew - (es_guess - e_air) ./ des_dT;
+      guess = a * exp(b ./ T_dew) .* T_dew .^ c;
+      des_dT = guess ./ T_dew .* (c - b ./ T_dew);
+      T_dew = T_dew - (guess - e_air) ./ des_dT;
    end
 end
 

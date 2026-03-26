@@ -32,7 +32,7 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
    %
    %#codegen
 
-   % Ambaum (2020) Rankine-Kirchhoff coefficients (i = ice, l = liquid)
+   % Ambaum (2020) / Romps (2021) Rankine-Kirchhoff coefficients (i=ice, l=liq)
    persistent al bl cl ai bi ci
    if isempty(al)
       [al, bl, cl, ai, bi, ci] = icemodel.parameterLookup( ...
