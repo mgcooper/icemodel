@@ -122,13 +122,13 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
          % Benchmark just the two-stream linear solve on fixed coefficients.
          s = testCase.state;
          batch_size = 384;
-         [~, ~, xynet] = SOLVETWOSTREAM(s.I0, s.albedo, ...
+         xynet = SOLVETWOSTREAM(s.I0, s.albedo, ...
             testCase.k_bulk, testCase.z_edges_spect);
          testCase.assertTrue(all(isfinite(xynet)));
 
          while testCase.keepMeasuring
             for n = 1:batch_size
-               [~, ~, xynet] = SOLVETWOSTREAM(s.I0, s.albedo, ...
+               xynet = SOLVETWOSTREAM(s.I0, s.albedo, ...
                   testCase.k_bulk, testCase.z_edges_spect);
             end
             if ~all(isfinite(xynet))

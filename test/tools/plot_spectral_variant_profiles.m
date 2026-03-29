@@ -122,17 +122,10 @@ function profiles = buildProfiles(s)
    bulk_lookup = BULKEXTCOEFSLOOKUP(ro_sno_spect, k_lookup);
 
    % Solve the two-stream system for the exact and lookup bulk coefficients.
-   [up_functions, dn_functions] = SOLVETWOSTREAM( ...
+   Q_functions = SOLVETWOSTREAM( ...
       s.I0, s.albedo, bulk_functions, s.z_edges_spect);
-   [up_lookup, dn_lookup] = SOLVETWOSTREAM( ...
+   Q_lookup = SOLVETWOSTREAM( ...
       s.I0, s.albedo, bulk_lookup, s.z_edges_spect);
-
-   % Convert the staggered fluxes to the net-flux and absorbed-divergence
-   % profiles consumed by the source-term update.
-   Q_functions = SPECTRALNETFLUX( ...
-      s.I0, s.albedo, up_functions, dn_functions, s.dz_spect);
-   Q_lookup = SPECTRALNETFLUX( ...
-      s.I0, s.albedo, up_lookup, dn_lookup, s.dz_spect);
    dQ_functions = Q_functions(1:end - 1) - Q_functions(2:end);
    dQ_lookup = Q_lookup(1:end - 1) - Q_lookup(2:end);
 
