@@ -18,7 +18,7 @@ function [Qe, Qh, Qc, Qm, Qf, Qbal] = SEBFLUX(T, xTs, Ta, Qsi, Qli, ...
 
    Ts       =  MELTTEMP(xTs,Tf);
    S        =  STABLEFN(Ta,Ts,wspd,scoef);
-   es       =  VAPPRESS(Ts,Tf,liqflag);
+   es       =  VAPPRESS(Ts,liqflag);
    Qe       =  LATENT(De,S,ea,es,roL,epsilon,Pa);
    Qh       =  SENSIBLE(De,S,Ta,Ts,cv_air);
    Qle      =  LONGOUT(Ts,emiss,SB);

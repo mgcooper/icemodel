@@ -36,11 +36,8 @@ function [Sc, chi] = SPECTRALSOURCETERM(Qsi, albedo, I0, dz_spect, tau_N, ...
       k_bulk = BULKEXTCOEFSLOOKUP(ro_sno_spect, k_bulk_lookup);
    end
 
-   % Solve the two-stream system for the up and down fluxes.
-   [Qup, Qdn] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges_spect);
-
-   % Reconstruct the net flux.
-   Qnet = SPECTRALNETFLUX(I0, albedo, Qup, Qdn, dz_spect);
+   % Solve the two-stream system for the net flux at each interface.
+   Qnet = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges_spect);
 
    % Collapse the spectral-grid net flux to the thermal-grid source term and
    % compute the chi partition used by the SEB coupling.
@@ -59,8 +56,7 @@ function [Sc, chi] = spectralNetFluxToSourceTerm(Qsi, I0, albedo, Qnet, ...
    % dz_spect - subsurface spectral mesh layer thicknesses
    % dz_therm - subsurface thermal mesh layer thicknesses
 
-   % Convert the spectral net-flux profile to absorbed spectral flux over each
-   % spectral control volume.
+   % Convert the net-flux profile to absorbed flux over each spectral CV.
    dQnet_spect = Qnet(1:end - 1) - Qnet(2:end);
 
    % Aggregate the absorbed spectral flux onto the thermal control volumes.

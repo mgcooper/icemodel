@@ -9,26 +9,28 @@ function test_vappress_derivative_matches_finite_difference(testCase)
 
    Tf = icemodel.physicalConstant('Tf');
    T = Tf - 8.0;
-   [es, des_dT] = VAPPRESS(T, Tf, false);
+   [es, des_dT] = VAPPRESS(T, false);
    h = 1e-3;
-   fd = (VAPPRESS(T + h, Tf, false) - VAPPRESS(T - h, Tf, false)) / (2 * h);
+   fd = (VAPPRESS(T + h, false) - VAPPRESS(T - h, false)) / (2 * h);
 
    testCase.verifyGreaterThan(es, 0);
    testCase.verifyEqual(des_dT, fd, 'RelTol', 1e-6);
 end
 
-function test_tdew_matches_vappress_inverse(testCase)
-   % Dew-point helpers should agree with the inverse path exposed through
-   % VAPPRESS when both use the ice-curve relation.
+function test_tdewpoint_inverts_vappress(testCase)
+   % TDEWPOINT should invert VAPPRESS: es(Tdew) should equal ea = es(T)*rh/100.
 
    Tf = icemodel.physicalConstant('Tf');
    T = Tf - 5.0;
    rh = 75;
 
-   Tdew_direct = TDEW(T, rh, false);
-   [~, ~, Tdew_from_vappress] = VAPPRESS(T, Tf, false, rh);
+   Tdew = TDEWPOINT(T, rh, false);
+   ea = VAPPRESS(T, false) * rh / 100;
+   es_at_Tdew = VAPPRESS(Tdew, false);
 
-   testCase.verifyEqual(Tdew_direct, Tdew_from_vappress, 'AbsTol', 1e-10);
+   testCase.verifyEqual(es_at_Tdew, ea, 'RelTol', 1e-8);
+   testCase.verifyLessThan(Tdew, T, ...
+      'Dew point should be below air temperature for rh < 100');
 end
 
 function test_loadmetdata_respects_liqflag(testCase)
@@ -66,7 +68,7 @@ function test_metsub_interpolates_midstep_for_enabled_option(testCase)
    testCase.verifyEqual(ppt, 1);
    testCase.verifyEqual(tppt, 268.5);
    testCase.verifyEqual(De, 0.015);
-   testCase.verifyEqual(ea, VAPPRESS(271, Tf, true) * 0.80, 'RelTol', 1e-12);
+   testCase.verifyEqual(ea, VAPPRESS(271, true) * 0.80, 'RelTol', 1e-12);
 end
 
 function test_metsub_returns_step_value_when_interp_disabled(testCase)
@@ -83,15 +85,16 @@ function test_metsub_returns_step_value_when_interp_disabled(testCase)
 
    testCase.verifyEqual([tair swd lwd albedo wspd rh psfc ppt tppt De], ...
       [270 100 220 0.60 3 70 78000 0 268 0.01], 'AbsTol', 1e-12);
-   testCase.verifyEqual(ea, VAPPRESS(270, Tf, false) * 0.70, 'RelTol', 1e-12);
+   testCase.verifyEqual(ea, VAPPRESS(270, false) * 0.70, 'RelTol', 1e-12);
 end
 
 function test_sfcflin_matches_surface_terms_at_linearization_point(testCase)
    % The linearized surface flux coefficients should reproduce the full
    % surface residual at the temperature used for the linearization.
 
-   [cv_air, emiss, SB, roLs, Tf] = icemodel.physicalConstant( ...
-      'cv_air', 'emiss', 'SB', 'roLs', 'Tf');
+   [cv_air, SB, roLs, Tf, epsilon] = icemodel.physicalConstant( ...
+      'cv_air', 'SB', 'roLs', 'Tf', 'epsilon');
+   emiss = icemodel.parameterLookup('emiss');
    [De, scoef] = WINDCOEF(4.0, 0.001, 2.0, 3.0);
 
    Ta = Tf - 10.0;
@@ -103,17 +106,17 @@ function test_sfcflin_matches_surface_terms_at_linearization_point(testCase)
    Pa = 78000.0;
    chi = 1.0;
    liqflag = false;
-   ea = 0.8 * VAPPRESS(Ta, Tf, liqflag);
+   ea = 0.8 * VAPPRESS(Ta, liqflag);
 
    [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
       emiss, SB, roLs, scoef, chi, Tf, Ts, liqflag);
 
-   es = VAPPRESS(Ts, Tf, liqflag);
+   es = VAPPRESS(Ts, liqflag);
    S = STABLEFN(Ta, Ts, wspd, scoef);
    F = emiss * (Qli - SB * Ts ^ 4) ...
       + chi * Qsi * (1 - albedo) ...
       + cv_air * De * (Ta - Ts) * S ...
-      + roLs * De * 0.622 / Pa * (ea - es) * S;
+      + roLs * De * epsilon / Pa * (ea - es) * S;
 
    testCase.verifyEqual(Sc + Sp * Ts, F, 'RelTol', 1e-10);
 end

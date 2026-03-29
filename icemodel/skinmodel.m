@@ -17,10 +17,11 @@ function [ice1, ice2, opts] = skinmodel(opts)
    opts = icemodel.prepareRunOutput(opts);
 
    % LOAD PHYSICAL CONSTANTS AND PARAMETERS
-   [cv_air, cv_ice, cv_liq, emiss, SB, epsilon, k_liq, Ls, ro_air, ...
+   [cv_air, cv_ice, cv_liq, SB, epsilon, k_liq, Ls, ro_air, ...
       ro_ice, ro_liq, roLs, roLv, Rv, Tf] = icemodel.physicalConstant( ...
-      'cv_air', 'cv_ice', 'cv_liq', 'emiss', 'SB', 'epsilon', 'k_liq', ...
+      'cv_air', 'cv_ice', 'cv_liq', 'SB', 'epsilon', 'k_liq', ...
       'Ls', 'ro_air', 'ro_ice', 'ro_liq', 'roLs', 'roLv', 'Rv', 'Tf');
+   emiss = icemodel.parameterLookup('emiss');
    TINY = 1e-8;
    chi = 1.0;
 
@@ -29,8 +30,9 @@ function [ice1, ice2, opts] = skinmodel(opts)
       = METINIT(opts);
 
    % INITIALIZE THE THERMAL MODEL
-   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, ~, roL, liqflag, ...
-      Ts, JJ] = ICEINIT(opts, tair);
+   r_eff = 0;
+   [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
+      ~, roL, liqflag, JJ] = ICEINIT(opts, tair, r_eff);
 
    % INITIALIZE TIMESTEPPING
    [metstep, substep, numsteps, maxsubstep, dt, dt_FULL_STEP, ...
@@ -60,7 +62,7 @@ function [ice1, ice2, opts] = skinmodel(opts)
          [dt_sum, n_subfail, ok_seb, ok_ieb] = NEWTIMESTEP(f_liq, solver);
 
          % SURFACE TERMS (atmospheric vapor pressure fixed over this full step)
-         ea = VAPPRESS(tair(metstep), Tf, liqflag) * rh(metstep) / 100;
+         ea = VAPPRESS(tair(metstep), liqflag) * rh(metstep) / 100;
 
          while dt_sum + TINY < dt_FULL_STEP
 
@@ -126,7 +128,7 @@ function [ice1, ice2, opts] = skinmodel(opts)
 
       if isfield(opts, 'saverestart') && opts.saverestart
          icemodel.saveRestartState(opts, opts.simyears(thisyear), ...
-            T, f_ice, f_liq, Ts);
+            T, f_ice, f_liq, Ts, r_eff);
       end
 
       % RESTART THE MET DATA STEP INDEX DURING SPIN UP

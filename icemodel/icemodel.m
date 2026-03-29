@@ -43,11 +43,12 @@ function [ice1, ice2, opts] = icemodel(opts)
    opts = icemodel.prepareRunOutput(opts);
 
    % LOAD PHYSICAL CONSTANTS AND PARAMETERS
-   [cv_air, cv_ice, cv_liq, emiss, SB, epsilon, fcp, k_liq, Lf, ...
+   [cv_air, cv_ice, cv_liq, SB, epsilon, k_liq, Lf, ...
       Ls, Lv, ro_air, ro_ice, ro_liq, roLf, roLs, roLv, Rv, Tf] ...
       = icemodel.physicalConstant( ...
-      'cv_air','cv_ice','cv_liq','emiss', 'SB','epsilon','fcp','k_liq','Lf', ...
-      'Ls','Lv','ro_air','ro_ice','ro_liq','roLf','roLs','roLv', 'Rv','Tf');
+      'cv_air','cv_ice','cv_liq','SB','epsilon','k_liq','Lf', ...
+      'Ls','Lv','ro_air','ro_ice','ro_liq','roLf','roLs','roLv','Rv','Tf');
+   [emiss, fcp] = icemodel.parameterLookup('emiss', 'fcp');
    TINY = 1e-8;
 
    % UNPACK SOLVER OPTS
@@ -62,14 +63,14 @@ function [ice1, ice2, opts] = icemodel(opts)
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
       = METINIT(opts);
 
-   % INITIALIZE THE THERMAL MODEL
-   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, roL, ...
-      liqflag, Ts, JJ, ~, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, ...
-      f_ice_min, f_liq_res] = ICEINIT(opts, tair);
-
    % INITIALIZE THE SPECTRAL MODEL
    [I0, dz_spect, z_nodes_spect, z_edges_spect, tau_N, tau_S, solar_dwavel, ...
-      k_bulk_lookup] = EXTCOEFSINIT(opts, ro_ice);
+      k_bulk_lookup, r_eff] = EXTCOEFSINIT(opts, ro_ice);
+
+   % INITIALIZE THE THERMAL MODEL
+   [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, z_nodes, ...
+      roL, liqflag, JJ, ~, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, ...
+      f_ice_min, f_liq_res] = ICEINIT(opts, tair, r_eff);
 
    % INITIALIZE TIMESTEPPING
    [metstep, substep, numsteps, maxsubstep, dt, dt_FULL_STEP, ...
@@ -98,14 +99,14 @@ function [ice1, ice2, opts] = icemodel(opts)
             z_edges_spect, k_bulk_lookup);
 
          % SURFACE TERMS (atmospheric vapor pressure fixed over this full step)
-         ea = VAPPRESS(tair(metstep), Tf, liqflag) * rh(metstep) / 100;
+         ea = VAPPRESS(tair(metstep), liqflag) * rh(metstep) / 100;
 
          while dt_sum + TINY < dt_FULL_STEP
 
             if solver == 1 % Dirichlet iterated lagged closure mode
 
                % SURFACE TEMPERATURE
-               k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
+               k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq);
                [Ts, ok_seb] = SEBSOLVE(tair(metstep), swd(metstep), ...
                   lwd(metstep), albedo(metstep), wspd(metstep), ...
                   ppt(metstep), tppt(metstep), psfc(metstep), De(metstep), ...
@@ -148,7 +149,7 @@ function [ice1, ice2, opts] = icemodel(opts)
             % UPDATE POTENTIAL SURFACE NET VAPOR FLUX
             Qe = LATENT(De(metstep), ...
                STABLEFN(tair(metstep), Ts, wspd(metstep), scoef), ...
-               ea, VAPPRESS(Ts, Tf, liqflag), roL, epsilon, psfc(metstep));
+               ea, VAPPRESS(Ts, liqflag), roL, epsilon, psfc(metstep));
             d_pevp = PEVAP(Qe, Lv, ro_liq, dt, dz(1));
 
             % UPDATE MASS BALANCE FLUXES
@@ -165,6 +166,10 @@ function [ice1, ice2, opts] = icemodel(opts)
 
          % Error if dt accumulation exceeds full step
          assertF(@() dt_sum < dt_FULL_STEP + 2 * TINY)
+
+         % UPDATE GRAIN SIZE VIA VAPOR MASS TRANSFER
+         r_eff = VAPORTRANSFER(T, Ts, f_ice, f_liq, r_eff, dz, delz, ...
+            fn, dt_FULL_STEP);
 
          % DIAGNOSE SURFACE FLUXES
          [Qe, Qh, Qc, Qm, ~, Qbal] = SEBFLUX(T, Ts, tair(metstep), ...
@@ -188,7 +193,7 @@ function [ice1, ice2, opts] = icemodel(opts)
                [ice1, ice2] = SAVEOUTPUT(timestep, ice1, ice2, ...
                   opts.vars1, opts.vars2, ...
                   {Ts, Qm, Qe, Qh, Qc, chi, Qbal, dt_sum, ok_seb, ok_ieb, n_iters}, ...
-                  {T, f_ice, f_liq, d_liq, d_evp, d_lyr, Sc});
+                  {T, f_ice, f_liq, d_liq, d_evp, d_lyr, Sc, r_eff});
             end
          end
 
@@ -200,7 +205,7 @@ function [ice1, ice2, opts] = icemodel(opts)
 
       if isfield(opts, 'saverestart') && opts.saverestart
          icemodel.saveRestartState(opts, opts.simyears(thisyear), ...
-            T, f_ice, f_liq, Ts);
+            T, f_ice, f_liq, Ts, r_eff);
       end
 
       % RESTART THE MET DATA STEP INDEX DURING SPIN UP

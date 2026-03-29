@@ -1,11 +1,11 @@
 function restart = loadRestartState(opts)
-%LOADRESTARTSTATE Load a saved year-boundary restart state.
-%
-%  restart = icemodel.loadRestartState(opts)
-%
-% Requires:
-%  opts.use_restart = true
-%  opts.restartfile = full path to a saved restart state
+   %LOADRESTARTSTATE Load a saved year-boundary restart state.
+   %
+   %  restart = icemodel.loadRestartState(opts)
+   %
+   % Requires:
+   %  opts.use_restart = true
+   %  opts.restartfile = full path to a saved restart state
 
    if ~isfield(opts, 'restartfile') || isempty(opts.restartfile) ...
          || isblanktext(opts.restartfile)

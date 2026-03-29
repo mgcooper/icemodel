@@ -1,7 +1,12 @@
 function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
-      delz, fn, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, Rv, Tf, tol, ...
+      delz, fn, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, ~, ~, tol, ...
       maxiter, alpha, debug)
    %SKINSOLVE Solve the 1-dimensional heat conduction equation
+   %
+   % Note: Rv and Tf (positions 15-16) are unused by the skinmodel. Ls
+   % (position 14) is used in the enthalpy coefficient even when drovdT = 0,
+   % so the equation structure is preserved for vapor reinstatement. The slots
+   % are retained for call-site compatibility with skinmodel.m.
    %
    %#codegen
 
@@ -10,13 +15,17 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
       alpha = 1;
    end
 
-   % Update thermal conductivity (vapor heat currently held constant)
-   % [~, drovdT, k_vap] = VAPORHEAT(T, f_liq, f_ice, Tf, Rv, Ls);
-   % k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
+   % Thermal conductivity without vapor diffusion (skinmodel).
+   k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, 0);
+
+   % Vapor density derivative excluded from enthalpy budget (skinmodel).
    drovdT = 0;
 
-   % Update thermal conductivity
-   k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
+   % To reinstate vapor-aware conductivity and enthalpy:
+   % Note: same update would be required within iterations, see ICEENBAL.
+   % [~, drovdT] = VAPORDENSITY(T, f_liq);
+   % k_vap = VAPORK(T, f_liq, drovdT);
+   % k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
 
    % Initial past Picard iterates for Aitken-acceleration
    % T_1 = nan(size(T));
@@ -77,8 +86,9 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
       %    T_1 = T_0;
       % end
 
-      % Update thermal conductivity (T-k_eff consistency on final iteration)
-      k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
+      % Update thermal conductivity (T-k_eff consistency on final iteration).
+      % To reinstate: k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
+      k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, 0);
    end
 
    if ~ok && debug

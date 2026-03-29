@@ -1,19 +1,26 @@
 function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok, n_iters] = ...
       SKINEBSOLVE(xTs, xT, xf_ice, xf_liq, dz, delz, fn, dt, JJ, ro_ice, ...
-      k_liq, cv_ice, cv_liq, Ls, Rv, Tf, tair, swd, lwd, albedo, wspd, ...
+      k_liq, cv_ice, cv_liq, Ls, ~, Tf, tair, swd, lwd, albedo, wspd, ...
       ppt, tppt, psfc, De, ea, cv_air, emiss, SB, chi, roL, scoef, ...
       liqflag, seb_solver, tol, maxiter, alpha, cpl_maxiter, cpl_Ts_tol, ...
       cpl_seb_tol, cpl_alpha, cpl_aitken, cpl_jumpmax, debug)
    %SKINEBSOLVE Coupled skin-subsurface Ts-T solve.
    %
+   % Note: Rv (position 15) is unused by the skinmodel. Ls (position 14) is
+   % passed through to SKINSOLVE for the enthalpy equation. The slots are
+   % retained for call-site compatibility with skinmodel.m.
+   %
    %#codegen
 
-   % Pre-coupler Ts predictor using checkpoint state
-   k_eff = GETGAMMA(xT, xf_ice, xf_liq, ro_ice, k_liq, Ls, Rv, Tf);
+   % Pre-coupler Ts predictor using checkpoint state.
+   k_eff = BULKTHERMALK(xT, xf_ice, xf_liq, ro_ice, k_liq, 0);
    [Ts, ok_seb] = SEBSOLVE(tair, swd, lwd, albedo, wspd, ppt, tppt, ...
       psfc, De, ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, ...
       liqflag, xTs, xT, k_eff, dz, seb_solver, debug);
    Ts = MELTTEMP(Ts, Tf);
+
+   % To reinstate vapor-aware thermal conductivity, replace call above with:
+   % k_eff = BULKTHERMALK(xT, xf_ice, xf_liq, ro_ice, k_liq, k_vap);
 
    % Initialize past Picard iterates for Aitken-acceleration
    Ts_1 = nan;
@@ -31,7 +38,7 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok, n_iters] = ...
       % Inner subsurface solve from checkpoint state w/o physical advancement
       [T, f_ice, f_liq, k_eff, ok_ieb, n_iters] = SKINSOLVE(xT, ...
          xf_ice, xf_liq, dz, delz, fn, dt, JJ, Ts, k_liq, cv_ice, ...
-         cv_liq, ro_ice, Ls, Rv, Tf, tol, maxiter, alpha, debug);
+         cv_liq, ro_ice, Ls, [], Tf, tol, maxiter, alpha, debug);
 
       if ~ok_ieb
          if debug

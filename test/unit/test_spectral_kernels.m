@@ -76,9 +76,9 @@ function test_solvetwostream_returns_finite_net_flux_profile(testCase)
 
    bulkcoefs = [1.0; 1.2; 1.4; 1.4; 1.4; 1.4];
    z_edges = [0; 0.1; 0.2; 0.3; 0.4];
-   [~, ~, xynet] = SOLVETWOSTREAM(100, 0.5, bulkcoefs, z_edges);
+   xynet = SOLVETWOSTREAM(100, 0.5, bulkcoefs, z_edges);
 
-   testCase.verifyEqual(numel(xynet), 4);
+   testCase.verifyEqual(numel(xynet), numel(z_edges));
    testCase.verifyTrue(all(isfinite(xynet)));
    testCase.verifyLessThanOrEqual(xynet(1), -50 + 1e-9);
 end

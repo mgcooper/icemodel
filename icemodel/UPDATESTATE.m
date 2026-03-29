@@ -13,11 +13,14 @@ function [H, k_eff, dHdT, dLdT, drovdT, ro_vap, ro_sno, cp_sno] = ...
 
    % Note: if this is called within solver iterations, ensure f_wat = f_wat_old
 
-   % Change in saturation vapor density with temperature [kg m-3]
-   [ro_vap, drovdT, k_vap] = VAPORHEAT(T, f_ice, f_liq, Tf, Rv, Ls);
+   % Saturation vapor density and temperature derivative [kg m-3, kg m-3 K-1]
+   [ro_vap, drovdT] = VAPORDENSITY(T, f_liq);
+
+   % Vapor thermal diffusion coefficient [W m-1 K-1]
+   k_vap = VAPORK(T, f_liq, drovdT);
 
    % Effective thermal conductivity [W m-1 K-1]
-   k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
+   k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
 
    % Total enthalpy [J m-3]
    H = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);

@@ -1,122 +1,99 @@
-function [es, des_dT, T_dew] = VAPPRESS(T, Tf, liqflag, rh)
-   %VAPPRESS Compute saturation vapor pressure over water or ice.
+function [es, des_dT, d2es_dT2] = VAPPRESS(T, liqflag)
+   %VAPPRESS Compute saturation vapor pressure over liquid or ice.
    %
-   %  E_SAT = VAPPRESS(T, TF, LIQFLAG) Computes saturation vapor pressure
-   %  using the Rankine–Kirchhoff formula:
+   %  ES = VAPPRESS(T, LIQFLAG) computes saturation vapor pressure
+   %  using the Ambaum (2020) / Romps (2021) Rankine-Kirchhoff formula:
    %
-   %     E_SAT = ES0 * exp(B * (T - Tf) / (C + T - Tf))
+   %     ES = A * exp(B / T) * T ^ C   [Pa]
    %
-   %  Where A, B, C are coefficients from Buck (1981), and Tf = 273.16 is
-   %  the triple point temperature. Note that temperatures for Buck's
-   %  equations are in deg C, and vapor pressures are in mb. Here they have
-   %  been converted so the calculations are done with temperatures in K,
-   %  and vapor pressures in Pa. (1 mb = 100 Pa). Curves ew1 and ei2 are
-   %  adopted for water and ice, respectively (See Buck Eq. 3,8 and Table 2).
+   %  where (al, bl, cl) are coefficients over liquid and (ai, bi, ci) are
+   %  over ice, obtained from icemodel.parameterLookup.
    %
-   %  [E_SAT, E_AIR] = VAPPRESS(T, TF, LIQFLAG, RH) Also computes vapor
-   %  pressure from relative humidity: E_AIR = E_SAT * RH / 100.
+   %  [ES, DES_DT] = VAPPRESS(T, LIQFLAG) also computes the first
+   %  temperature derivative:
    %
-   %  [E_SAT, E_AIR, T_DEW] = VAPPRESS(T, TF, LIQFLAG, RH) Also computes the
-   %  dew point temperature in Kelvins.
+   %     d(es)/dT = es / T * (c - b / T)   [Pa K-1]
    %
-   %  Note that A is the reference vapor pressure, es0 [Pa]
+   %  [ES, DES_DT, D2ES_DT2] = VAPPRESS(T, LIQFLAG) also computes the
+   %  second temperature derivative:
+   %
+   %     d2(es)/dT2 = es / T^2 * ((c - 1) * (c - 2*b/T) + b^2/T^2)
+   %
+   %  This is equivalent to differentiating des_dT = es/T * (c - b/T)
+   %  directly and is the pressure-side half of the derivative chain used
+   %  by VAPORDENSITY.
+   %
+   % Notes
+   %
+   %  des_dT      = es     / T   * (c - b/T)
+   %  dro_vapdT   = ro_vap / T   * (c - b/T - 1)
+   %
+   %  d2es_dT2    = es     / T^2 * ((c-1) * (c - 2*b/T)     + b^2 / T^2)
+   %  d2ro_vapdT2 = ro_vap / T^2 * ((c-2) * (c - 2*b/T - 1) + b^2 / T^2)
+   %
+   % Compute directly from es terms (forms above involve expensive ^'s):
+   %
+   %  dro_vapdT   = (des_dT - es / T) / (Rv * T)
+   %
+   %  d2es_dT2    = c/T     * (des_dT    + es/T)     - des_dT / T    * (2 + b/T)
+   %  d2ro_vapdT2 = (c-1)/T * (dro_vapdT + ro_vap/T) - dro_vapdT / T * (2 + b/T)
+   %              = (c-1) * des_dT / (Rv * T^2) - dro_vapdT / T * (2 + b/T)
+   %              = (d2es_dT2 - 2*des_dT/T + 2*es/T^2) / (Rv*T)
    %
    % Units: [Pa = J m-3 = N m-2 = kg m-1 s-2]
    %
-   % See also: VAPORHEAT
+   % See also: VAPORDENSITY, TDEWPOINT, icemodel.kernels.buckVaporModel
    %
    %#codegen
 
-   % Not currently used, but could default to 100%
-   % if nargin < 4
-   %    rh = 100 * ones(size(T));
-   % end
-
-   % Define coefficients over water and ice
-   persistent aw bw cw ai bi ci
-   if isempty(aw)
-      aw = 611.21;
-      bw = 17.502; % 18.678
-      cw = 240.97;
-      ai = 611.15;
-      bi = 22.452;
-      ci = 272.55;
+   % Ambaum (2020) / Romps (2021) Rankine-Kirchhoff coefficients (i=ice, l=liq)
+   persistent al bl cl ai bi ci
+   if isempty(al)
+      [al, bl, cl, ai, bi, ci] = icemodel.parameterLookup( ...
+         'al', 'bl', 'cl', 'ai', 'bi', 'ci');
    end
 
    if nargin < 2
-      Tf = 273.16;
-   end
-   if nargin < 3
       liqflag = false;
    end
 
-   if liqflag == true
-      es = saturationVaporPressure(T, Tf, aw, bw, cw);
+   % saturation vapor pressure over liquid
+   if liqflag
+      es = saturationVaporPressure(T, al, bl, cl);
 
-      % If requested, compute the derivative of es wrt temperature
+      % derivative wrt temperature
       if nargout > 1
-         des_dT = saturationVaporPressureDerivative(T, Tf, es, bw, cw);
+         des_dT = saturationVaporPressureDerivative(T, es, bl, cl);
+      end
+      if nargout > 2
+         d2es_dT2 = saturationVaporPressureSecondDerivative(T, es, bl, cl);
       end
    else
-      es = saturationVaporPressure(T, Tf, ai, bi, ci);
+      % saturation vapor pressure over ice
+      es = saturationVaporPressure(T, ai, bi, ci);
 
-      % If requested, compute the derivative of es wrt temperature
+      % derivative wrt temperature
       if nargout > 1
-         des_dT = saturationVaporPressureDerivative(T, Tf, es, bi, ci);
+         des_dT = saturationVaporPressureDerivative(T, es, bi, ci);
       end
-   end
-
-   % If requested, compute dew point from relative humidity
-   if nargout == 3
-      if liqflag == true
-         T_dew = dewPointTemperature(es * rh / 100, Tf, aw, bw, cw);
-      else
-         T_dew = dewPointTemperature(es * rh / 100, Tf, ai, bi, ci);
+      if nargout > 2
+         d2es_dT2 = saturationVaporPressureSecondDerivative(T, es, bi, ci);
       end
    end
 end
 
-function es = saturationVaporPressure(T, Tf, a, b, c)
-   %SATURATIONVAPORPRESSURE Compute saturation vapor pressure over water or ice
-   es = a * exp(b * (T - Tf) ./ (c + T - Tf)); % [Pa]
+function es = saturationVaporPressure(T, a, b, c)
+   %SATURATIONVAPORPRESSURE Ambaum (2020) / Romps (2021) sat vapor pressure
+   es = a * exp(b ./ T) .* T .^ c; % [Pa]
 end
 
-function des_dT = saturationVaporPressureDerivative(T, Tf, es, b, c)
+function des_dT = saturationVaporPressureDerivative(T, es, b, c)
    %SATURATIONVAPORPRESSUREDERIVATIVE Derivative of es wrt temperature
-   des_dT = b * c * es ./ (c + T - Tf) .^ 2; % [Pa K-1]
+   des_dT = es ./ T .* (c - b ./ T); % [Pa K-1]
 end
 
-function T_dew = dewPointTemperature(e_air, Tf, a, b, c)
-   %DEWPOINTTEMPERATURE Compute dew point temperature over water or ice
-   T_dew = Tf + c * log(e_air / a) / (b - log(e_air / a));
+function d2es_dT2 = saturationVaporPressureSecondDerivative(T, es, b, c)
+   %SATURATIONVAPORPRESSURESECONDDERIVATIVE Second derivative of es wrt T
+   b_over_T = b ./ T;
+   d2es_dT2 = es ./ T .^ 2 .* ((c - 1) .* (c - 2 * b_over_T) + b_over_T .^ 2);
 end
-
-function ro_vap = saturationVaporDensity(es, T, Rv) %#ok<*DEFNU>
-   %SATURATIONVAPORDENSITY Compute saturation vapor density
-   ro_vap = es ./ (Rv .* T); % [kg m-3]
-end
-
-function dro_vapdT = saturationVaporDensityDerivative(ro_vap, T, Tf, b, c)
-   %SATURATIONVAPORDENSITYDERIVATIVE Derivative of saturation vapor density
-   dro_vapdT = ro_vap .* (b * c ./ (c + T - Tf) .^ 2 - 1 ./ T); % [kg m-3 K-1]
-
-   % % Equivalently:
-   % dro_vapdT = es ./ (Rv * T) .* (b * c ./ (c + T - Tf) .^ 2 - 1 ./ T);
-   % dro_vapdT = (des_dT - es ./ T) ./ (Rv * T);
-end
-%% Notes
-%
-% To convert from e_sat to T:
-%
-% T = Tf + c * log(e_sat / a) / (b - log(e_sat / a));
-%
-% Thus to compute Tdew, substitute e_air for e_sat:
-%
-% T = Tf + c * log(e_air / a) / (b - log(e_air / a));
-%
-% Buck suggests ew1, ei2, fw3, fi3. Below are expressions for f, not used
-% here, but for reference:
-% fw3 = 1.0007 + 3.46e-6 * P; % note: P is in mb, need to convert.
-% fi3 = 1.0003 + 4.18e-6 * P;
-%
-% These enhancement factors are not implemented.

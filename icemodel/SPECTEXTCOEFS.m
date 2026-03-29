@@ -19,7 +19,7 @@ function k_ext = SPECTEXTCOEFS(qext, g, coalbedo, radii, iradius)
    w0 = 1.0 - w1;
 
    % Convert grain radius from mm to um.
-   r_snow = (w0 * radii(i0) + w1 * radii(i1)) / 1000.0;
+   r_eff = (w0 * radii(i0) + w1 * radii(i1)) / 1000.0;
 
    % Compute the optical properties for this grain radius.
    g_r = w0 * g(i0, :) + w1 * g(i1, :);
@@ -27,7 +27,7 @@ function k_ext = SPECTEXTCOEFS(qext, g, coalbedo, radii, iradius)
    coalbedo_r = w0 * coalbedo(i0, :) + w1 * coalbedo(i1, :);
 
    % Compute the spectral extinction coefficients.
-   sigma_e = (3.0 / 4.0) * qext_r / r_snow;
+   sigma_e = (3.0 / 4.0) * qext_r / r_eff;
    k_ext = sigma_e .* sqrt(coalbedo_r - coalbedo_r .* g_r ...
       + coalbedo_r .^ 2 .* g_r);
 end

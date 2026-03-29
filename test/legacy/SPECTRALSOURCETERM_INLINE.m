@@ -78,8 +78,10 @@ function [Sc, chi] = SPECTRALSOURCETERM_INLINE(Qsi, albedo, I0, dz_spect, ...
       - (up(M) - up(M - 1)) / (deltaz(M - 2) * r(M))];
    [up, dn] = smoothFluxProfiles(up, dn, M);
 
-   % Convert the net spectral flux to the absorbed source term.
-   Q = SPECTRALNETFLUX(I0, albedo, up, dn, dz_spect);
+   % Reconstruct the net flux from the staggered up/down fluxes.
+   M = numel(dz_spect) + 2;
+   Q = [min(-I0 * (1 - albedo), up(1) - dn(1)); ...
+      (up(2:M - 1) + up(3:M)) / 2.0 - (dn(2:M - 1) + dn(3:M)) / 2.0];
    [Sc, chi] = inlineNetFluxToSourceTerm(Qsi, albedo, I0, Q, dz_spect, ...
       dz_therm);
 end

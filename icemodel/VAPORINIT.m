@@ -1,45 +1,57 @@
-function [al, bl, cl, as, bs, cs] = VAPORINIT()
-   %VAPORINIT Initialize the vapor model.
+function [al, bl, cl, ai, bi, ci] = VAPORINIT()
+   %VAPORINIT Initialize Ambaum (2020) Rankine-Kirchhoff vapor coefficients.
    %
-   % T0 - Triple point temperature [K]
-   % es0
-   % Rv
-   % cvv
-   % cvl
+   %  [AL, BL, CL, AI, BI, CI] = VAPORINIT() computes the Rankine-Kirchhoff
+   %  coefficients for the Ambaum (2020) saturation vapor pressure formula:
    %
-   % https://romps.berkeley.edu/papers/pubdata/2021/ambaum/21ambaum.pdf
-   % https://romps.berkeley.edu/papers/pubdata/2020/dewpoint/20dewpoint.pdf
+   %     es = a * exp(b / T) * T ^ c   [Pa]
    %
-   % See also:
+   %  where (al, bl, cl) are over liquid and (ai, bi, ci) are over ice.
+   %
+   %  Physical constants are obtained from icemodel.physicalConstant. Optimal
+   %  vapor heat capacities (cpv_l, cpv_i) are from Ambaum (2020). The
+   %  measurement-consensus values of cp_liq and cp_ice from physicalConstant
+   %  are used (4218, 2093), which differ slightly from the Ambaum fitting
+   %  values (4220, 2097) but produce negligible differences in the derived
+   %  coefficients.
+   %
+   %  For the algebraic derivation and equivalence with Romps (2021), see:
+   %     icemodel.kernels.latentEnthalpyWater
+   %     icemodel.kernels.saturationVaporPressure
+   %
+   %  References:
+   %     Ambaum (2020), "Accurate, simple equation for saturated vapour
+   %        pressure over water and ice." QJRMS, 146, 4252-4258.
+   %        DOI: 10.1002/qj.3899
+   %     Romps (2021), "The Rankine-Kirchhoff approximations for moist
+   %        thermodynamics." QJRMS, 147(741), 3493-3497.
+   %        DOI: 10.1002/qj.4154
+   %
+   % See also: icemodel.parameterLookup, icemodel.physicalConstant,
+   %  icemodel.kernels.latentEnthalpyWater, icemodel.kernels.saturationVaporPressure
    %
    %#codegen
 
-   % Define the constants following Ambaum 2020.
-   T0 = 273.16;   % Reference temperature (Triple point of water) [K]
-   Rv = 461;      % Specific gas constant for water vapor [J/kg/K]
-   Lv0 = 2.501e6; %
-   Ls0 = 2.834e6; %
-   es0 = 611.65;  % Reference saturation vapor pressure over water [Pa]
-   cpl = 4220;    %
-   cps = 2097;
+   % Obtain physical constants from the canonical source.
+   [T0, Rv, Lv0, Ls0, es0, cp_liq, cp_ice, cpv_l, cpv_i] ...
+      = icemodel.physicalConstant( ...
+      'Tf', 'Rv', 'Lv', 'Ls', 'es0', 'cp_liq', 'cp_ice', 'cpv_l', 'cpv_i');
 
-   % Optimal values of cp_vap over liquid and solid water from Ambaum 2020
-   cpv_l = 2040;
-   cpv_s = 1885;
+   % Combined heat capacity differences [J/kg/K]
+   cpv_l_star = cpv_l - cp_liq;   % = 2040 - 4218 = -2178
+   cpv_i_star = cpv_i - cp_ice;   % = 1885 - 2093 = -208
 
-   % Combined values
-   cpv_l_star = cpv_l - cpl;
-   cpv_s_star = cpv_s - cps;
+   % Adjusted reference latent heats [J/kg]
    Lv0_star = Lv0 - cpv_l_star * T0;
-   Ls0_star = Ls0 - cpv_s_star * T0;
+   Ls0_star = Ls0 - cpv_i_star * T0;
 
-   % Coefficients over liquid
+   % Rankine-Kirchhoff coefficients over liquid
    bl = -Lv0_star / Rv;
    cl = cpv_l_star / Rv;
    al = es0 * exp(-bl / T0) / T0 ^ cl;
 
-   % Coefficients over solid
-   bs = -Ls0_star / Rv;
-   cs = cpv_s_star / Rv;
-   as = es0 * exp(-bs / T0) / T0 ^ cs;
+   % Rankine-Kirchhoff coefficients over ice
+   bi = -Ls0_star / Rv;
+   ci = cpv_i_star / Rv;
+   ai = es0 * exp(-bi / T0) / T0 ^ ci;
 end
