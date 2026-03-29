@@ -63,23 +63,14 @@ function [ice1, ice2, opts] = icemodel(opts)
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, scoef, time] ...
       = METINIT(opts);
 
-   % INITIALIZE THE THERMAL MODEL
-   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, roL, ...
-      liqflag, Ts, JJ, ~, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, ...
-      f_ice_min, f_liq_res] = ICEINIT(opts, tair);
-
    % INITIALIZE THE SPECTRAL MODEL
    [I0, dz_spect, z_nodes_spect, z_edges_spect, tau_N, tau_S, solar_dwavel, ...
       k_bulk_lookup, r_eff] = EXTCOEFSINIT(opts, ro_ice);
 
-   % INITIALIZE GRAIN RADIUS (from spectral model optical grain radius, mm->m)
-   r_eff = r_eff / 1000 * ones(JJ, 1);
-   if opts.use_restart
-      restart = icemodel.loadRestartState(opts);
-      if isfield(restart, 'r_eff') && isequal(size(restart.r_eff), size(r_eff))
-         r_eff = restart.r_eff;
-      end
-   end
+   % INITIALIZE THE THERMAL MODEL
+   [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, z_nodes, ...
+      roL, liqflag, JJ, ~, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, ...
+      f_ice_min, f_liq_res] = ICEINIT(opts, tair, r_eff);
 
    % INITIALIZE TIMESTEPPING
    [metstep, substep, numsteps, maxsubstep, dt, dt_FULL_STEP, ...
@@ -114,7 +105,7 @@ function [ice1, ice2, opts] = icemodel(opts)
 
             if solver == 1 % Dirichlet iterated lagged closure mode
 
-               % SURFACE TEMPERATURE (phase-aware k_eff via BULKTHERMALK)
+               % SURFACE TEMPERATURE
                k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq);
                [Ts, ok_seb] = SEBSOLVE(tair(metstep), swd(metstep), ...
                   lwd(metstep), albedo(metstep), wspd(metstep), ...

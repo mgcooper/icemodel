@@ -58,6 +58,10 @@ function verifyRestartRun(testCase, smbmodel, solver)
    restart = load(restart_file, 'restart');
    testCase.verifyTrue(isfield(restart.restart, 'opts'), ...
       'expected restart file to preserve resolved opts metadata');
+   if smbmodel == "icemodel"
+      testCase.verifyTrue(isfield(restart.restart, 'r_eff'), ...
+         'expected icemodel restart file to preserve r_eff');
+   end
 
    opts_resume = buildOpts(testCase, smbmodel, 2016, ...
       run_tag="resume", solver=solver, use_restart=true, restartfile=restart_file);

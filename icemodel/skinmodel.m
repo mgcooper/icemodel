@@ -30,8 +30,9 @@ function [ice1, ice2, opts] = skinmodel(opts)
       = METINIT(opts);
 
    % INITIALIZE THE THERMAL MODEL
-   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, ~, roL, liqflag, ...
-      Ts, JJ] = ICEINIT(opts, tair);
+   r_eff = 0;
+   [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
+      ~, roL, liqflag, JJ] = ICEINIT(opts, tair, r_eff);
 
    % INITIALIZE TIMESTEPPING
    [metstep, substep, numsteps, maxsubstep, dt, dt_FULL_STEP, ...
@@ -127,7 +128,7 @@ function [ice1, ice2, opts] = skinmodel(opts)
 
       if isfield(opts, 'saverestart') && opts.saverestart
          icemodel.saveRestartState(opts, opts.simyears(thisyear), ...
-            T, f_ice, f_liq, Ts);
+            T, f_ice, f_liq, Ts, r_eff);
       end
 
       % RESTART THE MET DATA STEP INDEX DURING SPIN UP
