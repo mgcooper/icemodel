@@ -123,7 +123,8 @@ function [vars1, vars2] = defaultOutputVariables(opts)
          if strcmp(opts.smbmodel, 'skinmodel')
             vars2 = {'Tice', 'f_ice', 'f_liq'};
          else
-            vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp', 'df_lyr', 'Sc'};
+            vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp', 'df_lyr', ...
+               'Sc', 'r_eff'};
          end
 
       otherwise

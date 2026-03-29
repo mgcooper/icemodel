@@ -9,6 +9,6 @@ function [Tair,Qsi,Qli,albedo,wspd,Pa,De,ea] = LOADMETDATA(met,metstep,liqflag)
    Qli = met.lwd(metstep);
    Pa = met.psfc(metstep);
    De = met.De(metstep);
-   ea = VAPPRESS(Tair, 273.16, liqflag) * met.rh(metstep) / 100;
+   ea = VAPPRESS(Tair, liqflag) * met.rh(metstep) / 100;
    albedo = met.albedo(metstep);
 end

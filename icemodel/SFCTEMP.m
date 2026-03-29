@@ -1,5 +1,5 @@
 function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
-      emiss, SB, Tf, chi, roL, scoef, liqflag, varargin)
+      emiss, SB, ~, chi, roL, scoef, liqflag, varargin)
    %SFCTEMP Solve the energy balance for surface temperature
    %
    % This function uses a traditional Newton-Rhapson iteration to find Tsfc
@@ -11,10 +11,13 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
       tol = 1e-3;
       maxiter = 100;
    end
-   
-   Ts = nan;
-   ok = false;
 
+   persistent Tf epsilon
+   if isempty(Tf)
+      [Tf, epsilon] = icemodel.physicalConstant('Tf', 'epsilon');
+   end
+
+   % Parse inputs
    switch numel(varargin)
       case 1
          Qc = varargin{1};
@@ -39,7 +42,7 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
 
    % Gather terms in the SEB equation.
    AAA = cv_air * De;   % [W m-2 K-1]
-   CCC = 0.622 / Pa;    % [Pa-1] = [m3 J-1]
+   CCC = epsilon / Pa;  % [Pa-1] = [m3 J-1]
    EEE = chi * (1.0 - albedo) * Qsi + emiss * Qli + Qc; % [W m-2]
    if a1 ~= 0.0
       EEE = EEE + a1 * T(1);
@@ -50,25 +53,13 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
    B1 = scoef(2) / (Ta * wspd ^ 2);
    B2 = scoef(3) / (sqrt(Ta) * wspd);
 
-   % Define the vapor pressure coefficients.
-   if liqflag == true
-      % Over water.
-      A = 611.21;
-      B = 17.502;
-      C = 240.97;
-   else
-      % Over ice.
-      A = 611.15;
-      B = 22.452;
-      C = 272.55;
-   end
-
+   Ts = nan;
+   ok = false;
    old = Ta;
-
    for iter = 1:maxiter
 
-      % Update surface saturation vapor pressure
-      es = A * exp(B * (old - Tf) / (C + old - Tf));
+      % Saturation vapor pressure and derivative from VAPPRESS
+      [es, des_dT] = VAPPRESS(old, liqflag);
 
       % Account for an increase in turbulent fluxes under unstable conditions.
       if old < Ta
@@ -92,7 +83,7 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
 
       dfdT = -4.0 * emiss * SB * old ^ 3 ...
          + S * -AAA + AAA * (Ta - old) * dS ...
-         + S * -FFF * CCC * es * B * C / (C + old - Tf) ^ 2 ...
+         + S * -FFF * CCC * des_dT ...
          + FFF * CCC * (ea - es) * dS ...
          - a1;
 

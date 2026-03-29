@@ -39,5 +39,5 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, ea] ...
    tppt = (1.0 - w) * tppt_v(i1) + w * tppt_v(i2);
    De = (1.0 - w) * De_v(i1) + w * De_v(i2);
 
-   ea = VAPPRESS(tair, Tf, liqflag) * rh / 100;
+   ea = VAPPRESS(tair, liqflag) * rh / 100;
 end

@@ -1,6 +1,7 @@
-function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, ...
-      roL, liqflag, Ts, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, ...
-      f_ell_max, f_ice_min, f_liq_res, ro_iwe, ro_wie] = ICEINIT(opts, tair)
+function [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
+      z_nodes, roL, liqflag, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, ...
+      f_ell_max, f_ice_min, f_liq_res, ro_iwe, ro_wie] = ICEINIT( ...
+      opts, tair, r_eff)
    %ICEINIT initialize the 1-d ice column
    %
    %#codegen
@@ -8,10 +9,13 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, ...
    debug = false;
 
    % LOAD PHYSICAL CONSTANTS AND PARAMETERS
-   [cp_ice, cp_liq, fcp, Lf, ro_ice, ro_liq, k_ice, k_liq, Tf, Ls, Rv, roLs, roLv] ...
+   [cp_ice, cp_liq, Lf, ro_ice, ro_liq, k_ice, k_liq, Tf, roLs, roLv] ...
       = icemodel.physicalConstant( ...
-      'cp_ice','cp_liq', 'fcp','Lf', 'ro_ice','ro_liq', 'k_ice', 'k_liq', ...
-      'Tf', 'Ls','Rv','roLs','roLv');
+      'cp_ice','cp_liq','Lf', 'ro_ice','ro_liq', 'k_ice', 'k_liq', ...
+      'Tf', 'roLs','roLv');
+
+   [fcp, f_liq_phase_switch_threshold] = icemodel.parameterLookup( ...
+      'fcp', 'f_liq_phase_switch_threshold');
 
    % GENERATE A THERMAL MESH
    dz_therm = opts.dz_thermal;
@@ -47,9 +51,9 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, ...
       f_ice = restart.f_ice;
       f_liq = restart.f_liq;
       Ts = restart.Ts;
-      validateRestartState(T, f_ice, f_liq, Ts, JJ);
+      r_eff = restart.r_eff;
+      validateRestartState(T, f_ice, f_liq, Ts, r_eff, JJ);
    else
-
       % Initialize with a physically scaled exponential profile anchored to the
       % top node so T(1) = T_ref exactly. Use a slight cold offset from air to
       % avoid a zero-gradient startup.
@@ -68,10 +72,11 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, ...
       f_liq = g_liq ./ ro_liq;
       f_ice = g_ice ./ ro_ice .* ones(JJ, 1);
       Ts = (min(tair(1), Tf) + T(1)) / 2;
+      r_eff = r_eff / 1000 * ones(JJ, 1); % convert mm->m for VAPORTRANSFER
    end
 
-   % THERMAL CONDUCTIVITY
-   k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
+   % THERMAL CONDUCTIVITY (initialization only; f_liq ≈ 0 so k_vap ≈ 0)
+   k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq);
 
    % SOURCE TERM LINEARIZATION VECTORS
    Sc = zeros(JJ, 1);
@@ -86,7 +91,7 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, ...
    f_liq_res = opts.f_liq_resid;
 
    % SEB flag used for  for vapor-pressure phase selection
-   liqflag = f_liq(1) > 0.02;
+   liqflag = f_liq(1) > f_liq_phase_switch_threshold;
    if liqflag
       roL = roLv;
    else
@@ -124,9 +129,9 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, ...
    end
 end
 
-function validateRestartState(T, f_ice, f_liq, Ts, JJ)
+function validateRestartState(T, f_ice, f_liq, Ts, r_eff, JJ)
 
-   state_vars = {T, f_ice, f_liq};
+   state_vars = {T, f_ice, f_liq, r_eff};
    for n = 1:numel(state_vars)
       x = state_vars{n};
       if ~isvector(x) || numel(x) ~= JJ

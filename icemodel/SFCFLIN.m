@@ -13,7 +13,6 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
    %  SEB = F0 + F(T)
    %      = F0 + F' + (dF/dT)' * (T - T')
    %      = F0 + F' + (dF/dT)' * T - (dF/dT)' * T'
-   %      = F0 + F' - (dF/dT)' * T' + (dF/dT)' * T
    %      = Fc + Fp * T
    %
    % where
@@ -33,24 +32,17 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
    %
    %#codegen
 
-   if liqflag == true
-      % Over water.
-      A = 611.210;
-      B = 17.502;
-      C = 240.97;
-   else
-      % Over ice.
-      A = 611.150;
-      B = 22.452;
-      C = 272.55;
+   persistent epsilon
+   if isempty(epsilon)
+      epsilon = icemodel.physicalConstant('epsilon');
    end
 
    % Compute the constants used in the stability coefficient computations
    B1 = scoef(2) / (Ta * wspd ^ 2);
    B2 = scoef(3) / (sqrt(Ta) * wspd);
 
-   % Compute saturation vapor pressure
-   es = A * exp(B * (Ts - Tf) / (C + Ts - Tf));
+   % Saturation vapor pressure and derivative from VAPPRESS
+   [es, des_dT] = VAPPRESS(Ts, liqflag);
 
    % This accounts for an increase in turbulent fluxes under unstable conditions
    if Ts > Ta
@@ -72,11 +64,11 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
    Sc_Qh = cv_air * De * S * Ta;
    Sp_Qh = -cv_air * De * S;
 
-   % latent heat flux:
-   Sc_Qe = roL * De * 0.622 / Pa * S ...
-      * (ea - es * (1 - B * C * Ts / (C + Ts - Tf) ^ 2));
-   Sp_Qe = -roL * De * 0.622 / Pa * S ...
-      * es * B * C / (C + Ts - Tf) ^ 2;
+   % latent heat flux (linearization of es around Ts):
+   % es(T) ≈ es(Ts) + des_dT * (T - Ts) = (es - des_dT * Ts) + des_dT * T
+   Sc_Qe = roL * De * epsilon / Pa * S ...
+      * (ea - es + des_dT * Ts);
+   Sp_Qe = -roL * De * epsilon / Pa * S * des_dT;
 
    % combine net sw, incoming lw, conduction, and snow/rain heat flux:
    Sc = Sc_Qle + Sc_Qh + Sc_Qe + emiss * Qli + chi * Qsi * (1.0 - albedo);

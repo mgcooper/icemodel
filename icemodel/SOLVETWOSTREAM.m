@@ -1,12 +1,29 @@
-function [up, dn, xynet] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
-   %SOLVETWOSTREAM Solve Schlatter's two-stream system.
+function [Qnet, Qup, Qdn] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
+   %SOLVETWOSTREAM Solve Schlatter's two-stream radiative transfer system.
    %
-   %  [up, dn] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
-   %  [up, dn, xynet] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
+   %  Qnet = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
+   %  [Qnet, Qup, Qdn] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
    %
-   % The notation here stays close to Schlatter's formulation. The solved
-   % quantity is the radiative transfer state on the staggered spectral grid,
-   % while XYnet (returned as optional XYNET) is the derived net-flux profile.
+   %  Solves the two-stream equations on the staggered spectral grid for the
+   %  upward (Qup) and downward (Qdn) diffuse flux profiles, then reconstructs
+   %  the interface net flux Qnet (Schlatter's XYnet). The primary output Qnet
+   %  gives the net spectral flux at each spectral control-volume interface.
+   %
+   %  Inputs:
+   %     I0      - Incident spectral irradiance at the top surface [W m-2]
+   %     albedo  - Surface albedo [1]
+   %     k_bulk  - Bulk spectral extinction coefficients on the spectral grid
+   %               [m-1], padded by BULKEXTCOEFS or BULKEXTCOEFSLOOKUP
+   %     z_edges - Spectral control-volume edge depths [m] (M+1 values for M CVs)
+   %
+   %  Outputs:
+   %     Qnet - Interface net spectral flux profile [W m-2] (M+1 values: one
+   %            per spectral CV edge, from the top surface through the bottom).
+   %            The absorbed flux in each spectral CV is Qnet(k) - Qnet(k+1).
+   %            A min(-I0*(1-albedo),...) guard at the top boundary ensures the
+   %            surface absorbed flux never exceeds the physical limit.
+   %     Qup  - Upward diffuse flux on the staggered grid [W m-2] (M+2 values)
+   %     Qdn  - Downward diffuse flux on the staggered grid [W m-2] (M+2 values)
    %
    %#codegen
 
@@ -25,18 +42,18 @@ function [up, dn, xynet] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
 
    % Extend the spectral edge coordinates downward by one control volume so the
    % lower boundary matches the padded bulk-extinction coefficients.
-   dz_bottom = z_edges(M + 1) - z_edges(M);
-   z_edges(M + 2) = z_edges(M + 1) + dz_bottom;
+   dz_bottom = z_edges(M+1) - z_edges(M);
+   z_edges(M+2) = z_edges(M+1) + dz_bottom;
 
    % BULKEXTCOEFS is parameterized on the spectral cell thickness, so use the
    % same top-edge spacing in the upper boundary condition.
    deltaz = z_edges(2) - z_edges(1);
 
    % Initialize the tridiagonal system.
-   e = zeros(M + 1, 1);
-   f = zeros(M + 1, 1);
-   g = zeros(M + 1, 1);
-   b = zeros(M + 1, 1);
+   e = zeros(M+1, 1);
+   f = zeros(M+1, 1);
+   g = zeros(M+1, 1);
+   b = zeros(M+1, 1);
 
    % Account for the upper boundary condition.
    alfa = 1.0 / (a(1) + r(1));
@@ -46,34 +63,28 @@ function [up, dn, xynet] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
    b(1) = r(1) * I0 * deltaz * alfa / (deltaz + alfa);
 
    % Fill the system between the boundaries.
-   deltaz = z_edges(3:M + 2) - z_edges(2:M + 1);
-   e(2:M + 1) = 1.0 + (r(3:M + 2) - r(1:M)) ./ (4.0 * r(2:M + 1));
-   g(2:M + 1) = 1.0 - (r(3:M + 2) - r(1:M)) ./ (4.0 * r(2:M + 1));
-   b(2:M + 1) = 0.0;
-   f(2:M + 1) = deltaz ./ (2.0 * r(2:M + 1)) .* ...
-      (a(2:M + 1) .* (r(3:M + 2) - r(1:M)) ...
-      - r(2:M + 1) .* (a(3:M + 2) - a(1:M))) ...
-      - (2.0 + deltaz .^ 2 .* k_bulk(2:M + 1) .^ 2);
+   deltaz = z_edges(3:M+2) - z_edges(2:M+1);
+   e(2:M+1) = 1.0 + (r(3:M+2) - r(1:M)) ./ (4.0 * r(2:M+1));
+   g(2:M+1) = 1.0 - (r(3:M+2) - r(1:M)) ./ (4.0 * r(2:M+1));
+   b(2:M+1) = 0.0;
+   f(2:M+1) = deltaz ./ (2.0 * r(2:M+1)) .* (a(2:M+1) .* (r(3:M+2) - r(1:M)) ...
+      - r(2:M+1) .* (a(3:M+2) - a(1:M))) ...
+      - (2.0 + deltaz .^ 2 .* k_bulk(2:M+1) .^ 2);
 
    % Account for the lower boundary condition.
-   g(M + 1) = 0.0;
-   b(M + 1) = 0.0;
+   g(M+1) = 0.0;
+   b(M+1) = 0.0;
 
    % Solve the tridiagonal system.
    x = TRISOLVE(e, f, g, b);
 
    % Reconstruct the up/down fluxes.
-   [up, dn] = GETUPDOWN(a, r, x, I0, z_edges, M);
+   [Qup, Qdn] = GETUPDOWN(a, r, x, I0, z_edges, M);
 
-   % Optionally return Schlatter's XYnet profile using the same interface
-   % indexing as the direct two-stream formulation.
-   if nargout > 2
-      xynet = (up(2:M) + up(3:M + 1)) / 2.0 - (dn(2:M) + dn(3:M + 1)) / 2.0;
-      xynet = [up(1) - dn(1); xynet];
-
-      % Ensure the surface value matches the total absorbed shortwave. This
-      % corrects any very small residual from a spectral grid that is too
-      % shallow to absorb all of the incoming radiation.
-      xynet(1) = min(-I0 * (1 - albedo), xynet(1));
-   end
+   % Compute the net flux at each interface (Schlatter's XYnet). The staggered
+   % up/dn have M+2 elements; averaging adjacent pairs gives M+1 interface
+   % values (one per spectral CV edge, top through bottom). The min(-I0...
+   % correction ensures the surface flux equals the total absorbed shortwave.
+   Qnet = [min(-I0 * (1 - albedo), Qup(1) - Qdn(1)); ...
+      (Qup(2:M+1) + Qup(3:M+2)) / 2.0 - (Qdn(2:M+1) + Qdn(3:M+2)) / 2.0];
 end

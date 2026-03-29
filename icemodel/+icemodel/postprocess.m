@@ -254,17 +254,19 @@ function [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo)
    % if time or disk space is limited, instead compute them after the
    % simulation.
 
-   % Load physical constants
-   [Tf,emissSB,cv_ice,cv_liq,ro_ice,ro_liq,ro_air,k_liq,Ls,Rv,emiss] = ...
-      icemodel.physicalConstant('Tf','emissSB','cv_ice','cv_liq','ro_ice', ...
-      'ro_liq','ro_air','k_liq','Ls','Rv','emiss');
+   % Load physical constants and parameters
+   [Tf,cv_ice,cv_liq,ro_ice,ro_liq,ro_air,k_liq] = ...
+      icemodel.physicalConstant('Tf','cv_ice','cv_liq','ro_ice', ...
+      'ro_liq','ro_air','k_liq');
+   [emissSB, emiss] = icemodel.parameterLookup('emissSB', 'emiss');
 
    % Compute bulk density (kg/m3), heat capacity (J/kg/K), thermal K (W/m/K)
    T_ice = ice2.Tice;
    f_liq = ice2.f_liq;
    f_ice = ice2.f_ice;
 
-   [k_eff, k_vap] = GETGAMMA(T_ice, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
+   % Phase-aware effective conductivity for diagnostics
+   [k_eff, k_vap] = BULKTHERMALK(T_ice, f_ice, f_liq, ro_ice, k_liq);
    ro_sno = ro_ice * f_ice + ro_liq * f_liq + ro_air * (1.0 - f_liq - f_ice);
    cp_sno = (cv_ice * f_ice + cv_liq * f_liq) ./ ro_sno;
 

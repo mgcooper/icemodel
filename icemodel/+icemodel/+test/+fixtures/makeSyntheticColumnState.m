@@ -28,10 +28,19 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
       solver=kwargs.solver, testname=kwargs.testname, output_profile='standard');
    met = icemodel.loadmet(opts);
 
+   % Seed the thermal grain-radius state only for icemodel.
+   r_eff = 0;
+   if strcmp(smbmodel, 'icemodel')
+      ro_ice0 = icemodel.physicalConstant('ro_ice');
+      [~, ~, ~, ~, ~, ~, ~, ~, r_eff] = EXTCOEFSINIT( ...
+         opts, ro_ice0);
+   end
+
    % Initialize the column state exactly as the model kernel would.
-   [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, roL, ...
-      liqflag, Ts, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, ...
-      f_ice_min, f_liq_res, ro_iwe, ro_wie] = ICEINIT(opts, met.tair);
+   [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
+      z_nodes, roL, liqflag, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, ...
+      f_ell_max, f_ice_min, f_liq_res, ro_iwe, ro_wie] = ICEINIT( ...
+      opts, met.tair, r_eff);
 
    metstep = kwargs.metstep;
    % Extract one forcing step and the corresponding transfer coefficients.
@@ -51,11 +60,12 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
       tppt = tair;
    end
 
-   [cv_air, cv_liq, cv_ice, emiss, SB, k_liq, ro_ice, ro_liq, ro_air, ...
-      Ls, Lf, roLf, Rv, Tf, epsilon, roLs, roLv, fcp] = ...
-      icemodel.physicalConstant('cv_air', 'cv_liq', 'cv_ice', 'emiss', ...
+   [cv_air, cv_liq, cv_ice, SB, k_liq, ro_ice, ro_liq, ro_air, ...
+      Ls, Lf, roLf, Rv, Tf, epsilon, roLs, roLv] = ...
+      icemodel.physicalConstant('cv_air', 'cv_liq', 'cv_ice', ...
       'SB', 'k_liq', 'ro_ice', 'ro_liq', 'ro_air', 'Ls', 'Lf', 'roLf', ...
-      'Rv', 'Tf', 'epsilon', 'roLs', 'roLv', 'fcp');
+      'Rv', 'Tf', 'epsilon', 'roLs', 'roLv');
+   [emiss, fcp] = icemodel.parameterLookup('emiss', 'fcp');
 
    % Package the resolved state so kernel tests can reuse it directly.
    state = struct();
@@ -69,6 +79,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    state.T = T;
    state.f_ice = f_ice;
    state.f_liq = f_liq;
+   state.r_eff = r_eff;
    state.f_wat = f_liq + f_ice * ro_ice / ro_liq;
    state.k_eff = k_eff;
    state.fn = fn;
@@ -140,7 +151,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    % Attach the spectral grid only for tests that exercise that path.
    if kwargs.include_spectral
       [I0, dz_spect, z_nodes_spect, z_edges_spect, tau_N, ...
-         tau_S, solar_dwavel, ~, qext, g, coalbedo, kabs, kice, ...
+         tau_S, solar_dwavel, ~, ~, qext, g, coalbedo, kabs, kice, ...
          wavel, radii] = EXTCOEFSINIT(opts, ro_ice);
 
       % Recover k_ext for tests that need the initialized coefficients.

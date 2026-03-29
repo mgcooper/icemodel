@@ -77,11 +77,6 @@ function [dz, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz, g)
    % Plot the mesh
    % icemodel.plot.mesh(Z, dz, g)
 
-   % % Round all quantities to the nearest milimeter (except f)
-   % [dz, delz, z_node, z_edge, z_node_bc, f] = deal( ...
-   %    round(dz, 3), round(delz, 3), round(z_node, 3), round(z_edge, 3), ...
-   %    round(z_node_bc, 3), round(f, 3));
-
    % % These quantities are not computed, but may be useful.
    % dz_bc = [delz_b; dz; delz_b]; % array of c.v. widths including boundaries
    % delz_s = 0.5 * dz_bc(1:N+1); % interface-to-previous point

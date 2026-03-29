@@ -1,7 +1,7 @@
-function saveRestartState(opts, simyear, T, f_ice, f_liq, Ts)
+function saveRestartState(opts, simyear, T, f_ice, f_liq, Ts, r_eff)
 %SAVERESTARTSTATE Save the year-boundary state needed for a restart.
 %
-%  icemodel.saveRestartState(opts, simyear, T, f_ice, f_liq, Ts)
+%  icemodel.saveRestartState(opts, simyear, T, f_ice, f_liq, Ts, r_eff)
 
    restart = struct();
    restart.simyear = simyear;
@@ -9,6 +9,7 @@ function saveRestartState(opts, simyear, T, f_ice, f_liq, Ts)
    restart.f_ice = f_ice;
    restart.f_liq = f_liq;
    restart.Ts = Ts;
+   restart.r_eff = r_eff;
    restart.casename = string(opts.casename);
    restart.smbmodel = string(opts.smbmodel);
    restart.opts = opts;

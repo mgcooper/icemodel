@@ -1,12 +1,12 @@
 function [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, k_bulk_lookup, ...
-      qext, g, coalbedo, kabs, kice, wavel, radii] = EXTCOEFSINIT( ...
+      r_eff, qext, g, coalbedo, kabs, kice, wavel, radii] = EXTCOEFSINIT( ...
       opts, ro_ice)
    %EXTCOEFSINIT Initialize the spectral geometry and optical coefficients.
    %
    %  [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, ...
-   %     k_bulk_lookup] = EXTCOEFSINIT(opts, ro_ice)
+   %     k_bulk_lookup, r_eff] = EXTCOEFSINIT(opts, ro_ice)
    %  [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, ...
-   %     k_bulk_lookup, qext, g, coalbedo, kabs, kice, wavel, ...
+   %     k_bulk_lookup, r_eff, qext, g, coalbedo, kabs, kice, wavel, ...
    %     radii] = EXTCOEFSINIT(opts, ro_ice)
    %
    % z_nodes are the centers of the spectral control volumes. z_edges includes
@@ -16,7 +16,8 @@ function [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, k_bulk_lookup, .
    %
    % The additional optical-property outputs are returned so a future grain-size
    % evolution model can refresh k_ext through UPDATEEXTCOEFS without reloading
-   % the Mie tables every timestep.
+   % the Mie tables every timestep. r_eff is the configured optical grain radius
+   % from the Mie lookup table, which ICEINIT expands onto the thermal mesh.
    %
    %#codegen
 
@@ -48,4 +49,11 @@ function [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, k_bulk_lookup, .
    [tau_N, tau_S, k_bulk_lookup] = UPDATEEXTCOEFS(qext, g, coalbedo, ...
       kabs, kice, wavel, radii, opts.i_grainradius, z_edges, dz, ...
       solar_dwavel, ro_ice, opts.lookup_k_bulk);
+
+   % Return the initial optical grain radius [mm] from the lookup table.
+   % Note: this is the optically equivalent radius from the Mie tables. It's
+   % currently used to initialize the thermal grain radius tracked by
+   % VAPORTRANSFER but these concepts are not identical; coupling them is future
+   % work (see UPDATEEXTCOEFS).
+   r_eff = radii(opts.i_grainradius);
 end
