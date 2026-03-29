@@ -44,43 +44,61 @@ function displayPerfResults(results)
 
    % Report if whole-model perf comparison was skipped due to environment
    % mismatch (e.g., different MATLAB version or host platform).
-   if isfield(results.meta, 'baseline_compatible') ...
-         && ~results.meta.baseline_compatible ...
-         && isfield(results.meta, 'compare_reason') ...
-         && ~isblanktext(results.meta.compare_reason)
-      fprintf('Whole-model perf comparison skipped: %s\n', ...
-         char(results.meta.compare_reason));
+   for k = 1:numel(results.meta)
+      meta = results.meta(k);
+      if isfield(meta, 'baseline_compatible') ...
+            && ~all(meta.baseline_compatible) ...
+            && isfield(meta, 'compare_reason') ...
+            && hasText(meta.compare_reason)
+
+         fprintf('Whole-model perf comparison skipped%s: %s\n', ...
+            char(resultLabelSuffix(results, k)), ...
+            char(compactText(meta.compare_reason)));
+      end
    end
 
    % --- Benchmark summary ---
    % Benchmarks are optional (include_benchmarks=false produces empty
    % benchmark.summary), so this is a legitimate emptiness check.
-   if ~isempty(results.benchmark.summary)
-      fprintf('Benchmark summary:\n')
-      keep = intersect(["Name", "SampleSize", "Mean", ...
-         "StandardDeviation"], ...
-         string(results.benchmark.summary.Properties.VariableNames), ...
-         'stable');
-      if ~isempty(keep)
-         disp(results.benchmark.summary(:, keep))
+   for k = 1:numel(results.benchmark)
+      benchmark = results.benchmark(k);
+      if isfield(benchmark, 'summary') && ~isempty(benchmark.summary)
+         fprintf('Benchmark summary%s:\n', ...
+            char(resultLabelSuffix(results, k)))
+         keep = intersect(["Name", "SampleSize", "Mean", ...
+            "StandardDeviation"], ...
+            string(benchmark.summary.Properties.VariableNames), ...
+            'stable');
+         if ~isempty(keep)
+            disp(benchmark.summary(:, keep))
+         end
       end
    end
 
    % --- Benchmark comparison ---
-   if ~isempty(results.benchmark.comparison)
-      if isfield(results.benchmark.meta, 'baseline_compatible') ...
-            && results.benchmark.meta.baseline_compatible
-         fprintf('Benchmark comparison:\n')
+   for k = 1:numel(results.benchmark)
+      benchmark = results.benchmark(k);
+      if ~isfield(benchmark, 'comparison') || isempty(benchmark.comparison)
+         continue
+      end
+
+      if isfield(benchmark, 'meta') ...
+            && isfield(benchmark.meta, 'baseline_compatible') ...
+            && all(benchmark.meta.baseline_compatible)
+         fprintf('Benchmark comparison%s:\n', ...
+            char(resultLabelSuffix(results, k)))
          keep = intersect(["Name", "Mean", "ref_mean", "pct_delta"], ...
-            string(results.benchmark.comparison.Properties.VariableNames), ...
+            string(benchmark.comparison.Properties.VariableNames), ...
             'stable');
          if ~isempty(keep)
-            disp(results.benchmark.comparison(:, keep))
+            disp(benchmark.comparison(:, keep))
          end
-      elseif isfield(results.benchmark.meta, 'compare_reason') ...
-            && ~isblanktext(results.benchmark.meta.compare_reason)
-         fprintf('Benchmark comparison skipped: %s\n', ...
-            char(results.benchmark.meta.compare_reason));
+      elseif isfield(benchmark, 'meta') ...
+            && isfield(benchmark.meta, 'compare_reason') ...
+            && hasText(benchmark.meta.compare_reason)
+         fprintf('Benchmark comparison skipped%s: %s\n', ...
+            char(resultLabelSuffix(results, k)), ...
+            char(compactText(benchmark.meta.compare_reason)));
       end
    end
 end
@@ -143,4 +161,53 @@ function results = loadFromFile(filepath)
    end
 
    results.artifact_file = string(filepath);
+end
+
+function suffix = resultLabelSuffix(results, idx)
+   %RESULTLABELSUFFIX Build a compact label for multi-result displays.
+
+   suffix = "";
+   parts = strings(0, 1);
+
+   if isfield(results, 'meta') && idx <= numel(results.meta)
+      meta = results.meta(idx);
+      if isfield(meta, 'smbmodel_filter') && hasText(meta.smbmodel_filter)
+         parts(end + 1) = string(meta.smbmodel_filter);
+      end
+      if isfield(meta, 'solver_filter') && hasText(meta.solver_filter)
+         parts(end + 1) = "solver " + string(meta.solver_filter);
+      end
+   end
+
+   if isempty(parts) && isfield(results, 'artifact_file')
+      artifact_file = string(results.artifact_file(:));
+      if idx <= numel(artifact_file) && hasText(artifact_file(idx))
+         [~, name, ext] = fileparts(char(artifact_file(idx)));
+         parts = string(name + ext);
+      end
+   end
+
+   if ~isempty(parts)
+      suffix = " (" + strjoin(parts, ", ") + ")";
+   end
+end
+
+function tf = hasText(value)
+   %HASTEXT True when the value contains any non-blank text.
+
+   if isempty(value)
+      tf = false;
+      return
+   end
+
+   value = string(value(:));
+   tf = any(~isblanktext(value));
+end
+
+function text = compactText(value)
+   %COMPACTTEXT Collapse one-or-more text values into one display string.
+
+   value = string(value(:));
+   value = value(~isblanktext(value));
+   text = strjoin(value, "; ");
 end
