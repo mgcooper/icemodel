@@ -76,7 +76,8 @@ drov_dT_jordan = c1_ice ./ T.^2 .* (Ti_exp - 1) .* exp(-Ti_exp);
 %[text] Vapor density derivative:
 %[text] $\\frac{d\\rho\_v}{dT} = \\frac{\\rho\_v}{T}\\left(c - \\frac{b}{T} - 1\\right)$
 %[text] This is the production formulation in icemodel. Coefficients are derived in VAPORINIT from physical constants following Ambaum (2020).
-[es_amb, des_dT_amb, d2es_dT2_amb, rov_amb, drov_dT_amb] = VAPPRESS2(T, false);
+[es_amb, des_dT_amb, d2es_dT2_amb] = VAPPRESS(T, false);
+[rov_amb, drov_dT_amb, d2rov_dT2_amb] = VAPORDENSITY(T, zeros(size(T))); %#ok<NASGU>
 %[text] ### Compare formulations
 figure('Name', 'Saturation Vapor Pressure: Three Formulations') %[output:5fa07397]
 tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact') %[output:5fa07397]

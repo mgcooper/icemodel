@@ -32,28 +32,17 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
    %
    %#codegen
 
-   % Ambaum (2020) / Romps (2021) Rankine-Kirchhoff coefficients (i=ice, l=liq)
-   persistent al bl cl ai bi ci
-   if isempty(al)
-      [al, bl, cl, ai, bi, ci] = icemodel.parameterLookup( ...
-         'al', 'bl', 'cl', 'ai', 'bi', 'ci');
-   end
-
-   if liqflag == true
-      a = al; b = bl; c = cl;
-   else
-      a = ai; b = bi; c = ci;
+   persistent epsilon
+   if isempty(epsilon)
+      epsilon = icemodel.physicalConstant('epsilon');
    end
 
    % Compute the constants used in the stability coefficient computations
    B1 = scoef(2) / (Ta * wspd ^ 2);
    B2 = scoef(3) / (sqrt(Ta) * wspd);
 
-   % Saturation vapor pressure: es = a * exp(b / T) * T ^ c  [Pa]
-   es = a * exp(b / Ts) * Ts ^ c;
-
-   % Derivative of es wrt temperature: des_dT = es / T * (c - b / T)
-   des_dT = es / Ts * (c - b / Ts);
+   % Saturation vapor pressure and derivative from VAPPRESS
+   [es, des_dT] = VAPPRESS(Ts, liqflag);
 
    % This accounts for an increase in turbulent fluxes under unstable conditions
    if Ts > Ta
@@ -77,9 +66,9 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
 
    % latent heat flux (linearization of es around Ts):
    % es(T) ≈ es(Ts) + des_dT * (T - Ts) = (es - des_dT * Ts) + des_dT * T
-   Sc_Qe = roL * De * 0.622 / Pa * S ...
+   Sc_Qe = roL * De * epsilon / Pa * S ...
       * (ea - es + des_dT * Ts);
-   Sp_Qe = -roL * De * 0.622 / Pa * S * des_dT;
+   Sp_Qe = -roL * De * epsilon / Pa * S * des_dT;
 
    % combine net sw, incoming lw, conduction, and snow/rain heat flux:
    Sc = Sc_Qle + Sc_Qh + Sc_Qe + emiss * Qli + chi * Qsi * (1.0 - albedo);

@@ -109,6 +109,7 @@ function [es, des_dT, ro_vap, dro_vapdT, k_vap, T_dew] = buckVaporModel( ...
    if nargout > 4
       De = De0 * (T / Tf) .^ nd;
       k_vap = L * De .* dro_vapdT;
+      % Equivalently: Ls * De ./ (Rv * T) .* (des_dT - es ./ T);
    end
 
    % Dew point temperature [K]

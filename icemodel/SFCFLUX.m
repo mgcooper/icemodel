@@ -18,9 +18,14 @@ function [Fsfc, Fdot] = SFCFLUX(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
    %
    %#codegen
 
+   persistent epsilon
+   if isempty(epsilon)
+      epsilon = icemodel.physicalConstant('epsilon');
+   end
+
    % gather terms in the SEB equation. Note that Qc = 0 for Nuemann bc.
    AAA = cv_air * De;                              % [W m-2 K-1]
-   CCC = 0.622 / Pa;                               % [Pa-1] = [m3 J-1]
+   CCC = epsilon / Pa;                             % [Pa-1] = [m3 J-1]
    EEE = chi*Qsi*(1.0-albedo) + emiss*Qli + Qc;    % [W m-2]
    FFF = roL * De;                                 % [W m-2]
 
@@ -35,7 +40,7 @@ function [Fsfc, Fdot] = SFCFLUX(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
       EEE - emiss*SB.*Ts.^4 + ...
       AAA.*Sfnc(Ta,Ts,wspd,scoef).*(Ta-Ts) ...
       + FFF.*CCC.*Sfnc(Ta,Ts,wspd,scoef) ...
-      .* (ea-Vfnc(Ts,Tf,liqflag));
+      .* (ea-Vfnc(Ts,liqflag));
    % + cp_liq*ppt*Tppt; % ppt in kg/m2/s
    Fsfc = fSEB(Ts);
    Fdot = (fSEB(Ts+1e-10)-Fsfc)/1e-10;

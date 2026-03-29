@@ -61,7 +61,7 @@ function [ice1, ice2, opts] = skinmodel(opts)
          [dt_sum, n_subfail, ok_seb, ok_ieb] = NEWTIMESTEP(f_liq, solver);
 
          % SURFACE TERMS (atmospheric vapor pressure fixed over this full step)
-         ea = VAPPRESS(tair(metstep), Tf, liqflag) * rh(metstep) / 100;
+         ea = VAPPRESS(tair(metstep), liqflag) * rh(metstep) / 100;
 
          while dt_sum + TINY < dt_FULL_STEP
 

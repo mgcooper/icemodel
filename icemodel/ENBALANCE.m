@@ -7,7 +7,7 @@ function [Qm, Qf, Qh, Qe, Qc, Qle, balance, Ts, ea, ok] = ENBALANCE( ...
    %#codegen
 
    % Atmospheric vapor pressure from relative humidity data.
-   ea = VAPPRESS(Ta, Tf, liqflag) * rh / 100;
+   ea = VAPPRESS(Ta, liqflag) * rh / 100;
 
    % Incoming longwave if not provided
    % Qli = LONGIN(Ta, ea, SB);
@@ -37,7 +37,7 @@ function [Qm, Qf, Qh, Qe, Qc, Qle, balance, Ts, ea, ok] = ENBALANCE( ...
    S = STABLEFN(Ta, Ts0, wspd, scoef);
 
    % Compute saturation water vapor pressure at the surface.
-   es = VAPPRESS(Ts0, Tf, liqflag);
+   es = VAPPRESS(Ts0, liqflag);
 
    % Compute the latent heat flux.
    Qe = LATENT(De, S, ea, es, roL, epsilon, Pa);

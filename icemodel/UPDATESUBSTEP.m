@@ -5,6 +5,12 @@ function [Ts, T, f_ice, f_liq, dt_sum, dt_new, liqflag, roL, ro_sno, cp_sno] ...
    %
    %#codegen
 
+   persistent f_liq_phase_switch_threshold
+   if isempty(f_liq_phase_switch_threshold)
+      f_liq_phase_switch_threshold = icemodel.parameterLookup( ...
+         'f_liq_phase_switch_threshold');
+   end
+
    % Allocate this substep to the timestep
    dt_sum = dt_sum + dt_new;
 
@@ -17,8 +23,10 @@ function [Ts, T, f_ice, f_liq, dt_sum, dt_new, liqflag, roL, ro_sno, cp_sno] ...
 
    if nargout > 5
 
-      % Top node contains >2% liquid water
-      liqflag = f_liq(1) > 0.02;
+      % Top node contains enough liquid water to use the liquid-phase curve.
+      liqflag = f_liq(1) > f_liq_phase_switch_threshold;
+
+      % roL is for surface equations - subsurface node "wetness" varies
       if liqflag
          roL = roLv;  % ro_air * Lv
       else

@@ -32,10 +32,9 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    % rain/snow/ppt/prec variable names
 
    % Solve for wet bulb
-   [Ls, cp_air] = icemodel.physicalConstant('Ls', 'cp_air');
    tppt = nan(size(rh));
    for n = 1:numel(rh)
-      tppt(n) = SOLVEWB(tair(n), rh(n), Ls, cp_air, psfc(n));
+      tppt(n) = TWETBULB(tair(n), rh(n), psfc(n));
    end
 
    % The canonical met loader already computes De after all swaps/subsetting.

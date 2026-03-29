@@ -12,7 +12,8 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, ...
       = icemodel.physicalConstant( ...
       'cp_ice','cp_liq','Lf', 'ro_ice','ro_liq', 'k_ice', 'k_liq', ...
       'Tf', 'Ls','Rv','roLs','roLv');
-   fcp = icemodel.parameterLookup('fcp');
+   [fcp, f_liq_phase_switch_threshold] = icemodel.parameterLookup( ...
+      'fcp', 'f_liq_phase_switch_threshold');
 
    % GENERATE A THERMAL MESH
    dz_therm = opts.dz_thermal;
@@ -71,8 +72,8 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, ...
       Ts = (min(tair(1), Tf) + T(1)) / 2;
    end
 
-   % THERMAL CONDUCTIVITY
-   k_eff = GETGAMMA(T, f_ice, f_liq, ro_ice, k_liq, Ls, Rv, Tf);
+   % THERMAL CONDUCTIVITY (initialization only; f_liq ≈ 0 so k_vap ≈ 0)
+   k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq);
 
    % SOURCE TERM LINEARIZATION VECTORS
    Sc = zeros(JJ, 1);
@@ -87,7 +88,7 @@ function [ice1, ice2, T, f_ice, f_liq, k_eff, fn, dz, delz, z_nodes, ...
    f_liq_res = opts.f_liq_resid;
 
    % SEB flag used for  for vapor-pressure phase selection
-   liqflag = f_liq(1) > 0.02;
+   liqflag = f_liq(1) > f_liq_phase_switch_threshold;
    if liqflag
       roL = roLv;
    else

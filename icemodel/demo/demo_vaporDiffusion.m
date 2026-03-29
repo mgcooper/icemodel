@@ -191,7 +191,7 @@ histogram(k_vap(:) ./ k_eff(:))
    % dv_dT = zeros(N, 1);
    % 
    % for n = 1:N
-   %    [es,des] = VAPPRESS(T(n), Tf, f_liq(n) > 0.02);
+   %    [es,des] = VAPPRESS(T(n), f_liq(n) > f_liq_phase_switch_threshold);
    %    rovap(n) = es / (Rv * T(n));
    %    dv_dT(n) = (des - es / T(n)) / (Rv * T(n));
    %    k_vap(n) = De_Ls(n) * dv_dT(n);
@@ -205,8 +205,8 @@ histogram(k_vap(:) ./ k_eff(:))
    % d_ro_vap = zeros(N, 1);
    % 
    % for n = 1:N
-   % 
-   %    [es, d_es] = VAPPRESS(T(n), Tf, f_liq(n) > 0.02);
+   %
+   %    [es, d_es] = VAPPRESS(T(n), f_liq(n) > f_liq_phase_switch_threshold);
    % 
    %    ro_vap(n) = es / (Rv * T(n));
    %    d_ro_vap(n) = (d_es - es / T(n)) / (Rv * T(n));
@@ -269,7 +269,7 @@ k_vap = Ls * De ./ (Rv .* T) .* desi_dT;        % [W m-1 K-1]
 %
 % d_rov_dT = c1k / T^2 * (Tk - 1) * exp(-Tk)
 %
-% where k = ice if f_liq <= 0.02 and k = liq otherwise
+% where k = ice if f_liq <= f_liq_phase_switch_threshold and k = liq otherwise
 % c1_ice and c1_liq are combined constants which can be computed a priori
 % T_ice and T_liq have to be computed on the fly once f_liq is known
 
@@ -278,7 +278,7 @@ Lv = 2.500e6;
 c1_ice = 8.047e9;                                  % [kg/m3 K]
 c1_liq = 5.726e8;                                  % [kg/m3 K]
 
-% Locate nodes with f_liq >= 0.02
+% Locate nodes in the liquid branch
 iliq = T >= TL;
 
 % Compute the exponent Tk
