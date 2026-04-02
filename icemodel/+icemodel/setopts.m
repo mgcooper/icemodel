@@ -160,8 +160,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    % Surface turbulent-flux scheme. Keep the explicit bulk-Richardson
    % path as the default runtime contract; bulk-MO is opt-in via resetopts.
-   % The bulk-MO compatibility guard (currently solver=1, seb_solver=2)
-   % is enforced in configureRun, which owns final runtime-contract checks.
+   % The bulk-MO runtime guard is enforced in configureRun, which owns the
+   % final runtime-contract checks.
    opts.turbulent_flux_scheme = 'bulk_richardson'; % 'bulk_richardson', 'bulk_mo'
 
    % Surface roughness lengths are tunable THF parameters. Leave them empty

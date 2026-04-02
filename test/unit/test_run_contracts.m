@@ -104,7 +104,8 @@ function test_turbulent_flux_option_defaults_follow_runtime_contract(testCase)
 end
 
 function test_configureRun_guards_bulk_mo_solver_contract(testCase)
-   % The bulk-MO scheme is v1-only for solver=1 and seb_solver=2.
+   % The bulk-MO scheme requires seb_solver=2 and should be accepted by the
+   % current Dirichlet and Robin solver paths.
 
    workspace = testCase.TestData.workspace;
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
@@ -115,10 +116,17 @@ function test_configureRun_guards_bulk_mo_solver_contract(testCase)
    testCase.verifyError(@() icemodel.configureRun(opts_bad_seb), ...
       'icemodel:configureRun:bulkMoRequiresSebSolver2');
 
-   opts_bad_solver = icemodel.resetopts(opts, ...
+   opts_ok_solver2 = icemodel.resetopts(opts, ...
       'turbulent_flux_scheme', 'bulk_mo', 'seb_solver', 2, 'solver', 2);
-   testCase.verifyError(@() icemodel.configureRun(opts_bad_solver), ...
-      'icemodel:configureRun:bulkMoRequiresSolver1');
+   opts_ok_solver2 = icemodel.configureRun(opts_ok_solver2);
+   testCase.verifyEqual(opts_ok_solver2.turbulent_flux_scheme, 'bulk_mo');
+   testCase.verifyEqual(opts_ok_solver2.cpl_maxiter, 1);
+
+   opts_ok_solver3 = icemodel.resetopts(opts, ...
+      'turbulent_flux_scheme', 'bulk_mo', 'seb_solver', 2, 'solver', 3);
+   opts_ok_solver3 = icemodel.configureRun(opts_ok_solver3);
+   testCase.verifyEqual(opts_ok_solver3.turbulent_flux_scheme, 'bulk_mo');
+   testCase.verifyEqual(opts_ok_solver3.cpl_maxiter, 100);
 end
 
 function test_configureRun_preserves_explicit_overrides(testCase)

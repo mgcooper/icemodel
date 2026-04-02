@@ -202,6 +202,31 @@ function test_bulk_mo_cold_state_remains_continuous(testCase)
    testCase.verifyLessThan(abs(Qe2 - Qe1), 1e-3);
 end
 
+function test_bulk_mo_robin_linearization_matches_finite_difference(testCase)
+   % The bulk-MO Robin linearization should match a finite-difference slope
+   % of the non-conductive surface flux.
+
+   s = icemodel.test.fixtures.makeSyntheticColumnState( ...
+      testCase.TestData.workspace, 'icemodel', solver=3, seb_solver=2, ...
+      turbulent_flux_scheme='bulk_mo', z0_ice=0.02, ...
+      testname='bulk_mo_robin_linearization');
+
+   [Fc, Fp, diag] = icemodel.surface.surface_flux_linearization_bulk_mo( ...
+      s.Ts, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, s.tppt, ...
+      s.psfc, s.De, s.ea, s.chi, s.roL, s.liqflag, s.ro_sfc, ...
+      s.snow_depth, s.opts);
+
+   h = 1e-5;
+   q_plus = surface_flux_bulk_mo(s.Ts + h, s);
+   q_minus = surface_flux_bulk_mo(s.Ts - h, s);
+   dq_fd = (q_plus - q_minus) / (2 * h);
+
+   testCase.verifyTrue(all(isfinite([Fc, Fp, diag.q_surface, ...
+      diag.dq_surface_dTs])));
+   testCase.verifyEqual(Fc + Fp * s.Ts, diag.q_surface, 'RelTol', 1e-10);
+   testCase.verifyEqual(Fp, dq_fd, 'RelTol', 5e-3);
+end
+
 function test_bulk_mo_synthetic_icemodel_run_completes(testCase)
    % A synthetic icemodel run with the supported bulk-MO configuration
    % should complete and return finite Tsfc, Qh, and Qe outputs.
@@ -217,6 +242,36 @@ function test_bulk_mo_synthetic_icemodel_run_completes(testCase)
    testCase.verifyTrue(all(isfinite(ice1.Tsfc)));
    testCase.verifyTrue(all(isfinite(ice1.Qe)));
    testCase.verifyTrue(all(isfinite(ice1.Qh)));
+end
+
+function test_bulk_mo_synthetic_icemodel_robin_run_completes(testCase)
+   % A synthetic icemodel run with the Robin bulk-MO configuration should
+   % complete and return finite surface state and turbulent flux outputs.
+
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      testCase.TestData.workspace, 'icemodel', 2016, solver=3, ...
+      seb_solver=2, turbulent_flux_scheme='bulk_mo', z0_ice=0.02, ...
+      testname='icemodel_bulk_mo_robin_run');
+
+   [ice1, ~, opts_out] = icemodel(opts);
+
+   testCase.verifyEqual(opts_out.turbulent_flux_scheme, 'bulk_mo');
+   testCase.verifyEqual(opts_out.solver, 3);
+   testCase.verifyTrue(all(isfinite(ice1.Tsfc)));
+   testCase.verifyTrue(all(isfinite(ice1.Qe)));
+   testCase.verifyTrue(all(isfinite(ice1.Qh)));
+end
+
+function q_surface = surface_flux_bulk_mo(Ts, s)
+   %SURFACE_FLUX_BULK_MO Evaluate the non-conductive surface flux at Ts.
+
+   [Qe, Qh] = icemodel.surface.turbulent_heat_flux(s.tair, Ts, s.wspd, ...
+      s.psfc, s.De, s.ea, s.cv_air, s.roL, s.scoef, s.liqflag, s.ro_sfc, ...
+      s.snow_depth, s.opts);
+   Qle = LONGOUT(Ts, s.emiss, s.SB);
+   Qa = QADVECT(s.ppt, s.tppt, s.cv_liq);
+   q_surface = ENBAL(s.albedo, s.emiss, s.chi, s.swd, s.lwd, Qle, Qh, Qe, ...
+      0.0, Qa, 0.0);
 end
 
 function test_potential_surface_vapor_tendency_uses_physical_surface_temperature(testCase)
