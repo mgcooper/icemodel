@@ -1,20 +1,31 @@
-function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
-      emiss, SB, ~, chi, roL, scoef, liqflag, varargin)
-   %SFCTEMP Solve the energy balance for surface temperature
+function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, ...
+      De, ea, chi, roL, scoef, liqflag, varargin)
+   %SFCTEMP Solve the explicit bulk-Richardson SEB for surface temperature.
    %
-   % This function uses a traditional Newton-Rhapson iteration to find Tsfc
+   % This function uses a Newton-Raphson iteration to solve the explicit
+   % bulk-Richardson surface residual for Ts. The residual includes:
+   %   absorbed shortwave
+   %   net longwave
+   %   sensible heat
+   %   latent heat
+   %   conductive heat
+   %   precipitation-advected heat Qa
    %
    %#codegen
 
+   % Default solver options
    persistent tol maxiter
    if isempty(tol)
       tol = 1e-3;
       maxiter = 100;
    end
 
-   persistent Tf epsilon
+   % Load physical constants and parameters
+   persistent Tf cv_air cv_liq emiss SB epsilon
    if isempty(Tf)
-      [Tf, epsilon] = icemodel.physicalConstant('Tf', 'epsilon');
+      [Tf, cv_air, cv_liq, SB, epsilon] = icemodel.physicalConstant(...
+         "Tf", "cv_air", "cv_liq", "SB", "epsilon");
+      emiss = icemodel.parameterLookup('emiss');
    end
 
    % Parse inputs
@@ -40,44 +51,28 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
          error('unrecognized number of inputs')
    end
 
-   % Gather terms in the SEB equation.
+   % Gather Ts-independent terms in the SEB equation.
+   Qa = QADVECT(ppt, tppt, cv_liq); % [W m-2]
    AAA = cv_air * De;   % [W m-2 K-1]
    CCC = epsilon / Pa;  % [Pa-1] = [m3 J-1]
-   EEE = chi * (1.0 - albedo) * Qsi + emiss * Qli + Qc; % [W m-2]
+   EEE = chi * (1.0 - albedo) * Qsi + emiss * Qli + Qc + Qa; % [W m-2]
    if a1 ~= 0.0
       EEE = EEE + a1 * T(1);
    end
-   FFF = roL * De;      % [W m-2]
-
-   % Compute the constants used in the stability coefficient computations.
-   B1 = scoef(2) / (Ta * wspd ^ 2);
-   B2 = scoef(3) / (sqrt(Ta) * wspd);
+   FFF = roL * De; % [W m-2]
 
    Ts = nan;
    ok = false;
    old = Ta;
    for iter = 1:maxiter
 
-      % Saturation vapor pressure and derivative from VAPPRESS
+      % Saturation vapor pressure and derivative from VAPPRESS.
       [es, des_dT] = VAPPRESS(old, liqflag);
 
-      % Account for an increase in turbulent fluxes under unstable conditions.
-      if old < Ta
-         % Stable case.
-         S = 1.0 / (1.0 + B1 / 2.0 * (Ta - old)) ^ 2;
-         dS = 2.0 * B1 / 2.0 / (1.0 + B1 / 2.0 * (Ta - old)) ^ 3;
+      % Bulkk richardson stability factor and derivative.
+      [S, dS] = STABLEFN(Ta, old, wspd, scoef);
 
-      elseif old > Ta
-         % Unstable case.
-         S = 1.0 + B1 * (old - Ta) / (1.0 + B2 * sqrt(old - Ta));
-         dS = B1 / (1.0 + B2 * sqrt(old - Ta)) - (B1 * B2 * (old - Ta)) ...
-            / (2.0 * (1.0 + B2 * sqrt(old - Ta)) ^ 2 * sqrt(old - Ta));
-      else
-         % Neutrally stable case.
-         S = 1.0;
-         dS = 0;
-      end
-
+      % Evaluate the flux and derivative
       f = EEE - emiss * SB * old ^ 4 + AAA * (Ta - old) * S ...
          + FFF * CCC * (ea - es) * S - a1 * old;
 

@@ -1,12 +1,7 @@
 function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
-      delz, fn, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, ~, ~, tol, ...
+      delz, fn, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, tol, ...
       maxiter, alpha, debug)
    %SKINSOLVE Solve the 1-dimensional heat conduction equation
-   %
-   % Note: Rv and Tf (positions 15-16) are unused by the skinmodel. Ls
-   % (position 14) is used in the enthalpy coefficient even when drovdT = 0,
-   % so the equation structure is preserved for vapor reinstatement. The slots
-   % are retained for call-site compatibility with skinmodel.m.
    %
    %#codegen
 

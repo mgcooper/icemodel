@@ -1,6 +1,6 @@
 function [Qe, Qh, Qc, Qm, Qf, Qbal] = SEBFLUX(T, xTs, Ta, Qsi, Qli, ...
-      albedo, wspd, ppt, tppt, Pa, De, ea, Tf, k_eff, dz, cv_air, cv_liq, ...
-      roL, emiss, SB, chi, epsilon, scoef, liqflag)
+      albedo, wspd, ppt, tppt, Pa, De, ea, Tf, k_eff, dz, roL, chi, ...
+      scoef, liqflag, ro_sfc, snow_depth, opts)
    %SEBFLUX using the new top node temperature, compute a new surface flux
    %
    %
@@ -16,16 +16,21 @@ function [Qe, Qh, Qc, Qm, Qf, Qbal] = SEBFLUX(T, xTs, Ta, Qsi, Qli, ...
    %
    %#codegen
 
-   Ts       =  MELTTEMP(xTs,Tf);
-   S        =  STABLEFN(Ta,Ts,wspd,scoef);
-   es       =  VAPPRESS(Ts,liqflag);
-   Qe       =  LATENT(De,S,ea,es,roL,epsilon,Pa);
-   Qh       =  SENSIBLE(De,S,Ta,Ts,cv_air);
-   Qle      =  LONGOUT(Ts,emiss,SB);
-   Qc       =  CONDUCT(k_eff,T,dz,Ts);
-   Qa       =  QADVECT(ppt,tppt,cv_liq);
-   [Qm,Qf]  =  MFENERGY(albedo,Qsi,Qli,Qle,Qh,Qe,Qc,Qa,xTs,Tf, ... % Note: xTs
-               Ta,wspd,ppt,tppt,De,ea,roL,Pa,cv_liq,cv_air,emiss,SB,k_eff, ...
-               T,dz,epsilon,scoef,chi);
-   Qbal     =  ENBAL(albedo,emiss,chi,Qsi,Qli,Qle,Qh,Qe,Qc,Qa,Qm);
+   persistent emiss
+   if isempty(emiss)
+      emiss = icemodel.parameterLookup('emiss');
+   end
+
+   Ts = MELTTEMP(xTs,Tf);
+
+   [Ts, Qe, Qh, Qc, Qa, Qle, balance] = ...
+      icemodel.surface.surface_energy_balance_terms(Ts, Ta, Qsi, ...
+      Qli, albedo, wspd, ppt, tppt, Pa, De, ea, T, k_eff, dz, ...
+      roL, chi, scoef, liqflag, ro_sfc, snow_depth, opts);
+
+   [Qm,Qf] = MFENERGY(albedo,Qsi,Qli,Qle,Qh,Qe,Qc,Qa,xTs,Tf, ... % Note: xTs
+      Ta,wspd,ppt,tppt,De,ea,roL,Pa,k_eff,T,dz,scoef,chi,ro_sfc, ...
+      snow_depth,opts);
+
+   Qbal = ENBAL(albedo,emiss,chi,Qsi,Qli,Qle,Qh,Qe,Qc,Qa,Qm);
 end

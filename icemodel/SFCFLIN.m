@@ -1,5 +1,5 @@
-function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
-      ea, cv_air, emiss, SB, roL, scoef, chi, Tf, Ts, liqflag)
+function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
+      ea, cv_air, cv_liq, emiss, SB, roL, scoef, chi, Tf, Ts, liqflag)
    %SFCFLIN Linearize the surface energy balance equation
    %
    % The linearization is of the form: F = Fc + Fp * T
@@ -37,22 +37,11 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
       epsilon = icemodel.physicalConstant('epsilon');
    end
 
-   % Compute the constants used in the stability coefficient computations
-   B1 = scoef(2) / (Ta * wspd ^ 2);
-   B2 = scoef(3) / (sqrt(Ta) * wspd);
-
    % Saturation vapor pressure and derivative from VAPPRESS
    [es, des_dT] = VAPPRESS(Ts, liqflag);
 
-   % This accounts for an increase in turbulent fluxes under unstable conditions
-   if Ts > Ta
-      B3 = 1 + B2 * sqrt(Ts - Ta);
-      S = 1 + B1 * (Ts - Ta) / B3;
-   elseif Ts < Ta
-      S = 1 / (1 + B1 / 2 * (Ta - Ts)) ^ 2;
-   else
-      S = 1.0;
-   end
+   % Keep the linearization based on the bulk richardson scheme.
+   S = STABLEFN(Ta, Ts, wspd, scoef);
 
    % linearizations
 
@@ -70,7 +59,12 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
       * (ea - es + des_dT * Ts);
    Sp_Qe = -roL * De * epsilon / Pa * S * des_dT;
 
-   % combine net sw, incoming lw, conduction, and snow/rain heat flux:
-   Sc = Sc_Qle + Sc_Qh + Sc_Qe + emiss * Qli + chi * Qsi * (1.0 - albedo);
-   Sp = Sp_Qle + Sp_Qh + Sp_Qe;
+   % precipitation-advected heat:
+   Sc_Qa = QADVECT(ppt, tppt, cv_liq);
+   Sp_Qa = 0;
+
+   % combine net sw, incoming lw, and precipitation-advected heat:
+   Sc = Sc_Qle + Sc_Qh + Sc_Qe + emiss * Qli + chi * Qsi * (1.0 - albedo) ...
+      + Sc_Qa;
+   Sp = Sp_Qle + Sp_Qh + Sp_Qe + Sp_Qa;
 end

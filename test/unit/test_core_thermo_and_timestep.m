@@ -92,8 +92,8 @@ function test_sfcflin_matches_surface_terms_at_linearization_point(testCase)
    % The linearized surface flux coefficients should reproduce the full
    % surface residual at the temperature used for the linearization.
 
-   [cv_air, SB, roLs, Tf, epsilon] = icemodel.physicalConstant( ...
-      'cv_air', 'SB', 'roLs', 'Tf', 'epsilon');
+   [cv_air, cv_liq, SB, roLs, Tf, epsilon] = icemodel.physicalConstant( ...
+      'cv_air', 'cv_liq', 'SB', 'roLs', 'Tf', 'epsilon');
    emiss = icemodel.parameterLookup('emiss');
    [De, scoef] = WINDCOEF(4.0, 0.001, 2.0, 3.0);
 
@@ -103,20 +103,23 @@ function test_sfcflin_matches_surface_terms_at_linearization_point(testCase)
    Qli = 240.0;
    albedo = 0.6;
    wspd = 4.0;
+   ppt = 2e-4;
+   tppt = Ta + 4.0;
    Pa = 78000.0;
    chi = 1.0;
    liqflag = false;
    ea = 0.8 * VAPPRESS(Ta, liqflag);
 
-   [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
-      emiss, SB, roLs, scoef, chi, Tf, Ts, liqflag);
+   [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ea, ...
+      cv_air, cv_liq, emiss, SB, roLs, scoef, chi, Tf, Ts, liqflag);
 
    es = VAPPRESS(Ts, liqflag);
    S = STABLEFN(Ta, Ts, wspd, scoef);
    F = emiss * (Qli - SB * Ts ^ 4) ...
       + chi * Qsi * (1 - albedo) ...
       + cv_air * De * (Ta - Ts) * S ...
-      + roLs * De * epsilon / Pa * (ea - es) * S;
+      + roLs * De * epsilon / Pa * (ea - es) * S ...
+      + QADVECT(ppt, tppt, cv_liq);
 
    testCase.verifyEqual(Sc + Sp * Ts, F, 'RelTol', 1e-10);
 end

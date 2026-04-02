@@ -1,6 +1,6 @@
-function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
-      ea, cv_air, cv_liq, emiss, SB, Tf, chi, roL, scoef, liqflag, Ts, T, ...
-      k_eff, dz, solver, debug)
+function [Ts, ok] = SEBSOLVE(Ts, Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, ...
+      De, ea, chi, roL, scoef, liqflag, T, k_eff, dz, ro_sfc, snow_depth, ...
+      solver, debug, opts)
    %SEBSOLVE solve the surface energy balance for the skin temperature
    %
    % Solver options:
@@ -25,12 +25,8 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
    %
    %#codegen
 
-   persistent epsilon
-   if isempty(epsilon)
-      epsilon = icemodel.physicalConstant('epsilon');
-   end
-
    tol = 1e-3;
+   seb_tol = 1.0;
    maxiter = 100;
    iterflag = true;
    if solver < 0
@@ -47,14 +43,14 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
 
          for iter = 1:maxiter
             old = Ts;
-            [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
-               ea, cv_air, emiss, SB, Tf, chi, roL, scoef, liqflag, ...
-               CONDUCT(k_eff, T, dz, old), k_eff, T, dz, iterflag);
+            [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, ...
+               De, ea, chi, roL, scoef, liqflag, CONDUCT(k_eff, T, dz, old), ...
+               k_eff, T, dz, iterflag);
 
             if ~ok
                break
             end
-            if abs(old - Ts) < tol
+            if abs(old - Ts) < tol && abs(fSEB(Ts)) < seb_tol
                ok_cpl = true;
                break
             end
@@ -68,7 +64,7 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
             if ~ok
                break
             end
-            if abs(old - Ts) < tol
+            if abs(old - Ts) < tol && abs(fSEB(Ts)) < seb_tol
                ok_cpl = true;
                break
             end
@@ -89,7 +85,7 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
          if ~ok
             break
          end
-         if abs(old - Ts) < tol
+         if abs(old - Ts) < tol && abs(fSEB(Ts)) < seb_tol
             ok_cpl = true;
             break
          end
@@ -101,17 +97,15 @@ function [Ts, ok] = SEBSOLVE(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
 
    if ~ok && debug
       dumpSebSolveFailure(solver, iter, Ts_old, Ts, Ta, Qsi, Qli, albedo, ...
-         wspd, ppt, tppt, Pa, De, ea, liqflag, k_eff, T, dz, ok_cpl);
+         wspd, ppt, tppt, Pa, De, ea, chi, roL, scoef, liqflag, k_eff, T, ...
+         dz, ro_sfc, snow_depth, ok_cpl, opts);
    end
 
-   % Note: nested function captures updated Qc on each iteration.
+   % Note: nested function captures updated Qe, Qh, and Qc on each iteration.
    function f = fSEB(Ts)
-      f = chi * (1.0 - albedo) * Qsi + emiss * (Qli - SB * Ts ^ 4) ...
-         + CONDUCT(k_eff, T, dz, Ts) ...
-         + cv_air * De * (Ta - Ts) * STABLEFN(Ta, Ts, wspd, scoef) ...
-         + roL * De * epsilon / Pa * (ea - VAPPRESS(Ts, liqflag)) ...
-         * STABLEFN(Ta, Ts, wspd, scoef) ...
-         + QADVECT(ppt, tppt, cv_liq);
+      f = icemodel.surface.surface_energy_balance_residual(Ts, Ta, Qsi, ...
+         Qli, albedo, wspd, ppt, tppt, Pa, De, ea, chi, roL, scoef, ...
+         CONDUCT(k_eff, T, dz, Ts), liqflag, ro_sfc, snow_depth, opts);
    end
 end
 
@@ -148,7 +142,8 @@ function [x, ok, iter] = complexstep(f, x0)
 end
 
 function dumpSebSolveFailure(solver, iter, Ts_old, Ts, Ta, Qsi, Qli, ...
-      albedo, wspd, ppt, tppt, Pa, De, ea, liqflag, k_eff, T, dz, ok_cpl)
+      albedo, wspd, ppt, tppt, Pa, De, ea, chi, roL, scoef, liqflag, ...
+      k_eff, T, dz, ro_sfc, snow_depth, ok_cpl, opts)
    %DUMPSEBSOLVEFAILURE Save SEB root-find failure diagnostics on demand.
 
    debug_file = getenv('ICEMODEL_DEBUG_SEBSOLVE_FILE');
@@ -172,11 +167,22 @@ function dumpSebSolveFailure(solver, iter, Ts_old, Ts, Ta, Qsi, Qli, ...
    debug_state.Pa = Pa;
    debug_state.De = De;
    debug_state.ea = ea;
+   debug_state.chi = chi;
+   debug_state.roL = roL;
+   debug_state.scoef = scoef;
    debug_state.liqflag = liqflag;
    debug_state.k_eff = k_eff;
    debug_state.T = T;
    debug_state.dz = dz;
+   debug_state.ro_sfc = ro_sfc;
+   debug_state.snow_depth = snow_depth;
+   debug_state.turbulent_flux_scheme = char(opts.turbulent_flux_scheme);
    debug_state.ok_cpl = ok_cpl;
 
    save(debug_file, 'debug_state');
+
+   icemodel.surface.dump_turbulent_heat_flux_debug_state( ...
+      "sebsolve_nonconvergence", Ts_old, Ts, Ta, Qsi, Qli, albedo, wspd, ...
+      ppt, tppt, Pa, De, ea, chi, roL, scoef, liqflag, T, k_eff, dz, ...
+      ro_sfc, snow_depth, opts);
 end

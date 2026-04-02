@@ -1,12 +1,12 @@
-function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ICEENBAL(T, f_ice, ...
-      f_liq, dz, delz, fn, Sc, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, ...
-      ro_liq, Ls, Lf, roLf, Rv, Tf, fcp, TL, TH, f_ell_min, f_ell_max, ...
-      Fc, Fp, bc, tol, maxiter, ~, ~, ~, debug)
+function [T_ice, f_ice, f_liq, k_eff, ok, iter, a1, err] = ICEENBAL(T_sfc, ...
+      T_ice, f_ice, f_liq, Fc, Fp, Sc, ~, dz, delz, fn, dt, JJ, k_liq, ...
+      cv_ice, cv_liq, ro_ice, ro_liq, Ls, Lf, roLf, Tf, fcp, TL, TH, ...
+      f_ell_min, f_ell_max, solver, tol, maxiter, ~, ~, debug)
    %ICEENBAL Solve the ice energy balance.
    %
-   % use_aitken and jumpmax are kept in the public contract so the older
-   % thermal-solver option surface remains stable while node-wise Aitken
-   % acceleration stays disabled here.
+   % The Sp, use_aitken, and jumpmax inputs are kept in the public contract
+   % so the older thermal-solver option surface remains stable while node-wise
+   % Aitken acceleration stays disabled here.
    %
    %#codegen
 
@@ -19,17 +19,17 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ICEENBAL(T, f_ice, ...
    f_liq_max = f_wat .* f_ell_max;
 
    % Compute vapor density [kg m-3]
-   ro_vap = VAPORDENSITY(T, f_liq);
+   ro_vap = VAPORDENSITY(T_ice, f_liq);
 
    % Compute enthalpy [J m-3]
-   H_old = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
+   H_old = TOTALHEAT(T_ice, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
 
    % Store past values
-   T_old = T;
+   T_ice_old = T_ice;
    f_liq_old = f_liq;
 
    % Initialize current values
-   T_iter = T_old + 2 * tol;
+   T_iter = T_ice_old + 2 * tol;
 
    % Initial past Picard iterates for Aitken-acceleration (disabled)
    % T_1 = nan(size(T));
@@ -40,50 +40,50 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ICEENBAL(T, f_ice, ...
    for iter = 0:maxiter-1
 
       % Update vapor density and derivative [kg m-3, kg m-3 K-1]
-      [ro_vap, drovdT] = VAPORDENSITY(T, f_liq);
+      [ro_vap, dro_vapdT] = VAPORDENSITY(T_ice, f_liq);
 
       % Update vapor thermal diffusion coefficient [W m-1 K-1]
-      k_vap = VAPORK(T, f_liq, drovdT);
+      k_vap = VAPORK(T_ice, f_liq, dro_vapdT);
 
       % Update bulk (effective) thermal conductivity
-      k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
+      k_eff = BULKTHERMALK(T_ice, f_ice, f_liq, ro_ice, k_liq, k_vap);
 
       % Update total enthalpy
-      H = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
+      H = TOTALHEAT(T_ice, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
 
       % Update the derivative of enthalpy wrt temperature
       dHdT = cv_ice * f_ice + cv_liq * f_liq;
-      dLdT = 2.0 * fcp ^ 2.0 * (Tf - min(T, Tf)) .* f_wat ...
-         ./ (1.0 + fcp ^ 2.0 * (Tf - min(T, Tf)) .^ 2.0) .^ 2.0;
+      dLdT = 2.0 * fcp ^ 2.0 * (Tf - min(T_ice, Tf)) .* f_wat ...
+         ./ (1.0 + fcp ^ 2.0 * (Tf - min(T_ice, Tf)) .^ 2.0) .^ 2.0;
 
       % Update the general equation coefficients
-      [aN, aP, aS, b, iM, a1, a2] = GECOEFS(T, f_ice, f_liq, dHdT, dLdT, ...
-         drovdT, H-H_old, Sc, k_eff, delz, fn, dz, dt, Ts, Ls, Lf, ro_liq, ...
-         TL, JJ, Fc, Fp, bc);
+      [aN, aP, aS, b, iM, a1, a2] = GECOEFS(T_ice, f_ice, f_liq, dHdT, dLdT, ...
+         dro_vapdT, H-H_old, Sc, k_eff, delz, fn, dz, dt, T_sfc, Ls, Lf, ro_liq, ...
+         TL, JJ, Fc, Fp, solver);
 
       % % Check diagonal dominance and condition number
       % icemodel.checkdiags(aP, aN, aS)
 
       % Exit here so the state variables are updated on the final iteration
-      if all(abs(T - T_iter) < tol)
+      if all(abs(T_ice - T_iter) < tol)
          break
       end
 
       % Capture past values
-      T_iter = T;
+      T_iter = T_ice;
 
       % Solve the equation (predictor step)
-      T = TRISOLVE(-aN, aP, -aS, b);
+      T_ice = TRISOLVE(-aN, aP, -aS, b);
 
       % Update the temperature-enthalpy relationship (corrector step)
-      [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_iter, f_liq, f_wat, dLdT, ...
+      [T_ice, f_ice, f_liq, ok] = MZTRANSFORM(T_ice, T_iter, f_liq, f_wat, dLdT, ...
          ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, f_liq_max, iM, ok, debug);
 
       % If failure, return to the main program and shorten the timestep
       if ~ok
          if debug
-            dumpIceEnbalFailure("mztransform_rejected_state", T, T_old, ...
-               T_iter, f_ice, f_liq, f_wat, k_eff, Sc, dt, Ts, iM, iter, ...
+            dumpIceEnbalFailure("mztransform_rejected_state", T_ice, T_ice_old, ...
+               T_iter, f_ice, f_liq, f_wat, k_eff, Sc, dt, T_sfc, iM, iter, ...
                maxiter, aN, aP, aS, b);
          end
          return
@@ -109,8 +109,8 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ICEENBAL(T, f_ice, ...
    ok = iter < maxiter;
 
    if ~ok && debug
-      dumpIceEnbalFailure("maxiter_nonconvergence", T, T_old, T_iter, ...
-         f_ice, f_liq, f_wat, k_eff, Sc, dt, Ts, iM, iter, maxiter, ...
+      dumpIceEnbalFailure("maxiter_nonconvergence", T_ice, T_ice_old, T_iter, ...
+         f_ice, f_liq, f_wat, k_eff, Sc, dt, T_sfc, iM, iter, maxiter, ...
          aN, aP, aS, b);
    end
 
@@ -119,12 +119,12 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ICEENBAL(T, f_ice, ...
 
    % Subsurface energy balance linearization error [K]
    err = (dt/dz(1) ...
-      * (a2 * (T(2) - T(1)) ...
-      + Fc + Fp * (Fc + a1 * T(1)) / (a1 - Fp) ...
+      * (a2 * (T_ice(2) - T_ice(1)) ...
+      + Fc + Fp * (Fc + a1 * T_ice(1)) / (a1 - Fp) ...
       + Sc(1) * dz(1)) ...
       - ro_liq * Lf * (f_liq(1) - f_liq_old(1)) ) ...
-      / (dHdT(1) + Ls * drovdT(1) * (1 - f_ice(1) - f_liq(1)))...
-      - (T(1) - T_old(1));
+      / (dHdT(1) + Ls * dro_vapdT(1) * (1 - f_ice(1) - f_liq(1)))...
+      - (T_ice(1) - T_ice_old(1));
 end
 
 function dumpIceEnbalFailure(reason, T, T_old, T_iter, f_ice, f_liq, ...

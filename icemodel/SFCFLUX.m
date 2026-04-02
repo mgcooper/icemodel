@@ -1,6 +1,6 @@
-function [Fsfc, Fdot] = SFCFLUX(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
-      Ts, Qc, ea, cv_air, emiss, SB, roL, Tf, scoef, chi, liqflag)
-   %SFCFLUX Solve the energy balance for surface temperature
+function [Fsfc, Fdot] = SFCFLUX(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, ...
+      De, Ts, Qc, ea, cv_air, cv_liq, emiss, SB, roL, Tf, scoef, chi, liqflag)
+   %SFCFLUX Evaluate the explicit bulk-Richardson surface residual.
    %
    % The surface flux includes Qc for general use, but note for a
    % coupled surface/column with neumann bc at the top, Qc = 0 when this is
@@ -18,32 +18,14 @@ function [Fsfc, Fdot] = SFCFLUX(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
    %
    %#codegen
 
-   persistent epsilon
-   if isempty(epsilon)
-      epsilon = icemodel.physicalConstant('epsilon');
-   end
-
-   % gather terms in the SEB equation. Note that Qc = 0 for Nuemann bc.
-   AAA = cv_air * De;                              % [W m-2 K-1]
-   CCC = epsilon / Pa;                             % [Pa-1] = [m3 J-1]
-   EEE = chi*Qsi*(1.0-albedo) + emiss*Qli + Qc;    % [W m-2]
-   FFF = roL * De;                                 % [W m-2]
-
-   % % Compute the constants used in the stability coefficient computations
-   % B1 = scoef(2)/(Ta*wspd^2);                  % [K-1]
-   % B2 = scoef(3)/(sqrt(Ta)*wspd);              % [K-1]
-
-   % fzero
-   Sfnc = @STABLEFN;
-   Vfnc = @VAPPRESS;
-   fSEB = @(Ts) ...
-      EEE - emiss*SB.*Ts.^4 + ...
-      AAA.*Sfnc(Ta,Ts,wspd,scoef).*(Ta-Ts) ...
-      + FFF.*CCC.*Sfnc(Ta,Ts,wspd,scoef) ...
-      .* (ea-Vfnc(Ts,liqflag));
-   % + cp_liq*ppt*Tppt; % ppt in kg/m2/s
-   Fsfc = fSEB(Ts);
-   Fdot = (fSEB(Ts+1e-10)-Fsfc)/1e-10;
+   % Total surface flux
+   Fsfc = surface_flux_residual(Ts, Ta, Qsi, Qli, albedo, wspd, ppt, tppt, ...
+      Pa, De, Qc, ea, cv_air, cv_liq, emiss, SB, roL, scoef, chi, liqflag);
+   
+   % Numerical derivative
+   Fdot = (surface_flux_residual(Ts + 1e-10, Ta, Qsi, Qli, albedo, wspd, ...
+      ppt, tppt, Pa, De, Qc, ea, cv_air, cv_liq, emiss, SB, roL, scoef, ...
+      chi, liqflag) - Fsfc) / 1e-10;
 
    % % for testing
    % Qr = EEE - emiss*SB.*Ts.^4;
@@ -52,4 +34,21 @@ function [Fsfc, Fdot] = SFCFLUX(Ta, Qsi, Qli, albedo, wspd, Pa, De, ...
    %
    % % total heat = net radiation + sensible + latent
    % Q = Qr + Qh + Qe
+end
+
+function Fsfc = surface_flux_residual(Ts, Ta, Qsi, Qli, albedo, wspd, ppt, ...
+      tppt, Pa, De, Qc, ea, cv_air, cv_liq, emiss, SB, roL, scoef, chi, ...
+      liqflag)
+   %SURFACE_FLUX_RESIDUAL Evaluate the explicit SEB residual used by SFCFLUX.
+   %
+   % This helper is file-local rather than nested because the residual has a
+   % stable standalone contract and includes every flux term used by the
+   % explicit bulk-Richardson surface solve, including precipitation advection.
+
+   [Qe, Qh] = icemodel.surface.turbulent_heat_flux_bulk_richardson( ...
+      Ta, Ts, wspd, Pa, De, ea, cv_air, roL, scoef, liqflag, NaN);
+   Qa = QADVECT(ppt, tppt, cv_liq);
+
+   Fsfc = chi * Qsi * (1.0 - albedo) + emiss * (Qli - SB * Ts ^ 4) ...
+      + Qc + Qa + Qh + Qe;
 end

@@ -56,6 +56,28 @@ function test_windcoef_and_stablefn_cover_neutral_stable_and_unstable(testCase)
    testCase.verifyGreaterThan(S_unstable, 1.0);
 end
 
+function test_stablefn_derivative_matches_finite_difference(testCase)
+   % STABLEFN should return a Ts derivative consistent with finite
+   % differences in stable, unstable, and near-neutral regimes.
+
+   [~, scoef] = WINDCOEF(4.0, 1e-3, 3.0, 3.0);
+   Ta = 268.15;
+   wspd = 4.0;
+   h = 1e-6;
+   Ts_cases = [Ta - 2.0, Ta, Ta + 2.0];
+
+   for n = 1:numel(Ts_cases)
+      Ts = Ts_cases(n);
+      [~, dSdTs] = STABLEFN(Ta, Ts, wspd, scoef);
+      S_plus = STABLEFN(Ta, Ts + h, wspd, scoef);
+      S_minus = STABLEFN(Ta, Ts - h, wspd, scoef);
+      dSdTs_fd = (S_plus - S_minus) / (2 * h);
+
+      testCase.verifyEqual(dSdTs, dSdTs_fd, 'RelTol', 1e-5, ...
+         sprintf('Derivative mismatch at Ts = %.3f K', Ts));
+   end
+end
+
 function test_vappress2rh_recovers_saturation_for_ice_and_water(testCase)
    % The RH conversion should map each saturation vapor pressure back to
    % roughly 100 percent for both phase relations.
@@ -201,11 +223,26 @@ function test_parameterLookup_returns_expected_fields(testCase)
    params = icemodel.parameterLookup('all');
 
    testCase.verifyTrue(isstruct(params));
-   expected = {'al','bl','cl','ai','bi','ci','nd','De0','emiss','fcp'};
+   expected = {'al','bl','cl','ai','bi','ci','nd','De0','emiss','fcp', ...
+      'thf_bulk_richardson_eta', 'thf_bulk_richardson_psi', ...
+      'thf_bulk_richardson_neutral_transition_width', 'thf_bulk_iter_max', ...
+      'thf_bulk_holtslag_aa', 'thf_bulk_dyer_gamma', ...
+      'thf_bulk_andreas_ch1', 'thf_bulk_smeets_a0'};
    for k = 1:numel(expected)
       testCase.verifyTrue(isfield(params, expected{k}), ...
          sprintf('Missing field: %s', expected{k}));
    end
+end
+
+function test_atmosphericVaporPressure_matches_direct_contract(testCase)
+   % The centralized helper should preserve the current ea contract.
+
+   Ta = 268.15;
+   rh = 72.0;
+   ea_ref = VAPPRESS(Ta, false) * rh / 100;
+   ea = icemodel.surface.atmospheric_vapor_pressure(Ta, rh, false);
+
+   testCase.verifyEqual(ea, ea_ref, 'RelTol', 1e-12);
 end
 
 function test_thermalk_positive_and_density_dependent(testCase)
