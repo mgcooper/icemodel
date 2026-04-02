@@ -74,7 +74,7 @@ function varargout = parameterLookup(varargin)
       ... ----------------------------------------------------------------
       'emiss', 0.98, ...            Surface emissivity for ice [1]
       'thf_z0_bulk', 0.001, ...     Default aerodynamic roughness for bulk-Richardson fluxes [m]
-      'thf_z0_ice', 0.01, ...       Default bare-ice momentum roughness for bulk-MO [m]
+      'thf_z0_ice', 0.003, ...      Default bare-ice momentum roughness for bulk-MO [m]
       'thf_z0_snow_low_density', 0.001, ...   Default low-density snow/firn roughness [m]
       'thf_z0_snow_high_density', 0.001, ...  Default high-density snow/firn roughness [m]
       'thf_bulk_richardson_eta', 9.4, ...    Bulk-Richardson stability coefficient eta [1]

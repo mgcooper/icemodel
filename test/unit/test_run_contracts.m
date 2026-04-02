@@ -64,6 +64,7 @@ function test_turbulent_flux_option_defaults_follow_runtime_contract(testCase)
    testCase.verifyEqual(opts.turbulent_flux_scheme, 'bulk_richardson');
    testCase.verifyEqual(opts.z_relh, opts.z_tair);
    testCase.verifyEqual(opts.z0_bulk, z0_bulk_default, 'AbsTol', 1e-12);
+   testCase.verifyEqual(z0_ice_default, 0.003, 'AbsTol', 1e-12);
    testCase.verifyEqual(opts.z0_ice, z0_ice_default, 'AbsTol', 1e-12);
    testCase.verifyEqual(opts.z0_snow_low_density, z0_snow_low_default, ...
       'AbsTol', 1e-12);
