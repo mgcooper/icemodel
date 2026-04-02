@@ -76,22 +76,18 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  surface and subsurface blocks are iterated together within the same
    %  substep until the interface state is mutually consistent.
    %
-   %  solver = 1 (Dirichlet with iterated lagged closure):
-   %   - Solve the nonlinear SEB for Ts once per substep (SEBSOLVE).
-   %   - During that solve, inner iterations use an analytic Newton-Raphson,
-   %     numeric "complex step", or derivative-free (Brent's) method, set by
-   %     opts.seb_solver (see SEBSOLVE for details).
-   %   - Outer fixed-point iterations repeatedly update the conductive closure
-   %     using the latest Ts iterate, while the subsurface top-node state
-   %     (temperature and conductance) remains lagged from the previous accepted
-   %     substep state.
-   %   - Use the converged Ts as the upper boundary condition of the subsurface
-   %     enthalpy solver (ICEENBAL) for that substep.
-   %   - Classification: partitioned, lagged, weakly coupled across the
-   %     surface/subsurface interface. The outer iterations inside SEBSOLVE
-   %     strongly converge Ts against a lagged conductive closure, but they do
-   %     not iterate Ts and the current subsurface state together within the
-   %     same substep.
+   %  solver = 1 (coupled Dirichlet Ts-T iterations):
+   %   - Solve the nonlinear SEB for a trial Ts (SEBSOLVE).
+   %   - Use that Ts as the upper boundary condition of the subsurface
+   %     enthalpy solver (ICEENBAL), then repeat the surface/subsurface
+   %     exchange until Ts and the accepted updated-state SEB residual are
+   %     mutually consistent within the same substep.
+   %   - During each SEBSOLVE call, inner surface iterations use an analytic
+   %     Newton-Raphson, numeric "complex step", or derivative-free (Brent's)
+   %     method, set by opts.seb_solver (see SEBSOLVE for details).
+   %   - Classification: partitioned and strongly coupled at substep scale
+   %     through iterative block/Picard Dirichlet coupling, not monolithic
+   %     Newton over the full surface-subsurface state.
    %
    %  solver = 2 (Robin with single sweep):
    %   - Use a linearized SEB boundary condition (SFCFLIN) in the subsurface
@@ -182,7 +178,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       % Solver options. See function doc for info about each solver mode.
 
       % main solver mode (surface-subsurface coupler)
-      % 1 = Dirichlet w/ lagged Ts-T closure iterations
+      % 1 = coupled Dirichlet Ts-T iterations
       % 2 = Robin w/ single Ts-T coupling iteration
       % 3 = Robin w/ strong Ts-T coupling iterations
       opts.solver          = 3;     % recommended: 3
@@ -218,7 +214,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       % Solver options. See function doc for info about each solver mode.
 
       % main solver mode (surface-subsurface coupler)
-      % 1 = Dirichlet w/ lagged Ts-T closure iterations
+      % 1 = coupled Dirichlet Ts-T iterations
       % 2 = Robin w/ single Ts-T coupling iteration
       % 3 = Robin w/ strong Ts-T coupling iterations
       opts.solver          = 1;     % required: 1 (2/3 not implemented)
