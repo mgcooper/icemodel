@@ -162,6 +162,37 @@ function test_bulk_mo_synthetic_icemodel_run_completes(testCase)
    testCase.verifyTrue(all(isfinite(ice1.Qh)));
 end
 
+function test_potential_surface_vapor_tendency_uses_physical_surface_temperature(testCase)
+   % Potential vapor tendency should evaluate Qe using the physical
+   % diagnosed surface temperature even if the solver-internal Ts exceeds Tf.
+
+   s = icemodel.test.fixtures.makeSyntheticColumnState( ...
+      testCase.TestData.workspace, 'icemodel', solver=1, seb_solver=2, ...
+      turbulent_flux_scheme='bulk_mo', z0_ice=0.02, ...
+      testname='potential_vapor_tendency');
+   Lv = icemodel.physicalConstant('Lv');
+   Ts_solver = s.Tf + 3.0;
+
+   [d_pevp, pevp, Qe, Ts_phys] = ...
+      icemodel.surface.potential_surface_vapor_tendency(Ts_solver, s.Tf, ...
+      s.tair, s.wspd, s.psfc, s.De, s.ea, s.cv_air, s.roL, s.scoef, ...
+      s.liqflag, s.ro_sfc, s.snow_depth, s.opts, Lv, s.ro_liq, ...
+      s.opts.dt, s.dz(1));
+
+   [Qe_phys, ~] = icemodel.surface.turbulent_heat_flux(s.tair, ...
+      MELTTEMP(Ts_solver, s.Tf), s.wspd, s.psfc, s.De, s.ea, s.cv_air, ...
+      s.roL, s.scoef, s.liqflag, s.ro_sfc, s.snow_depth, s.opts);
+   [Qe_uncapped, ~] = icemodel.surface.turbulent_heat_flux(s.tair, ...
+      Ts_solver, s.wspd, s.psfc, s.De, s.ea, s.cv_air, s.roL, s.scoef, ...
+      s.liqflag, s.ro_sfc, s.snow_depth, s.opts);
+
+   testCase.verifyEqual(Ts_phys, s.Tf, 'AbsTol', 1e-12);
+   testCase.verifyEqual(Qe, Qe_phys, 'RelTol', 1e-12);
+   testCase.verifyNotEqual(Qe, Qe_uncapped);
+   testCase.verifyEqual(pevp, Qe / (Lv * s.ro_liq), 'RelTol', 1e-12);
+   testCase.verifyEqual(d_pevp, pevp * s.opts.dt / s.dz(1), 'RelTol', 1e-12);
+end
+
 function test_thf_debug_dump_reuses_diag_contract(testCase)
    % The THF failure dump should preserve the same diag-style diagnostics
    % returned interactively so failed states can be replayed later.

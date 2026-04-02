@@ -23,11 +23,9 @@ function [d_pevp, pevp] = PEVAP(Qe, Lv, ro_liq, dt, dz)
    %
    % See also: ICESUBL
    %
-   % TODO: Consider refactoring so Qe is computed within this function
-   %
-   % d_pevp = PEVAP(Ts, tair(metstep), wspd(metstep), psfc(metstep), ...
-   %    De(metstep), ea, scoef, epsilon, Lv, Tf, roL, ro_liq, dt, ...
-   %    dz(1), liqflag);
+   % The combined surface-flux + PEVAP contract now lives in
+   % icemodel.surface.potential_surface_vapor_tendency(...), which applies
+   % the physical Ts = min(Ts, Tf) rule before evaluating Qe.
    %
    %#codegen
    pevp = Qe / (Lv * ro_liq);
