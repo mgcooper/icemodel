@@ -55,6 +55,63 @@ function test_bulk_richardson_dispatch_matches_legacy_flux_kernels(testCase)
    testCase.verifyEqual(diag.scheme, 'bulk_richardson');
 end
 
+function test_bulk_richardson_scalar_exchange_experiment_weakens_rough_ice_fluxes(testCase)
+   % The scalar-exchange diagnostic experiment should keep production fluxes
+   % unchanged while showing weaker scalar transfer over rough ice.
+
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      testCase.TestData.workspace, 'icemodel', 2016, solver=1, ...
+      z0_bulk=0.05, testname='bulk_richardson_scalar_experiment');
+
+   Ta = 268.15;
+   Ts = 263.15;
+   wspd = 6.0;
+   Pa = 90000.0;
+   rh = 75.0;
+   ea = icemodel.surface.atmospheric_vapor_pressure(Ta, rh, false);
+   [cv_air, roLs] = icemodel.physicalConstant('cv_air', 'roLs');
+   [De, scoef] = WINDCOEF(wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
+
+   [Qe, Qh, diag] = icemodel.surface.turbulent_heat_flux(Ta, Ts, wspd, Pa, ...
+      De, ea, cv_air, roLs, scoef, false, 650.0, 0.0, opts);
+
+   testCase.verifyTrue(diag.scalar_exchange_active);
+   testCase.verifyGreaterThan(diag.scalar_exchange_z_obs, diag.z0m);
+   testCase.verifyLessThan(diag.z0h, diag.z0m);
+   testCase.verifyLessThan(diag.z0q, diag.z0m);
+   testCase.verifyLessThan(diag.scalar_exchange_De_h, De);
+   testCase.verifyLessThan(diag.scalar_exchange_De_e, De);
+   testCase.verifyEqual(Qh, cv_air * De * diag.stability_factor * (Ta - Ts), ...
+      'RelTol', 1e-12);
+   testCase.verifyEqual(Qe, roLs * De * diag.stability_factor ...
+      * (0.622 / Pa * (ea - diag.es_sfc)), 'RelTol', 1e-12);
+   testCase.verifyLessThan(abs(diag.scalar_exchange_Qh), abs(Qh));
+   testCase.verifyLessThan(abs(diag.scalar_exchange_Qe), abs(Qe));
+end
+
+function test_bulk_richardson_scalar_exchange_diagnostic_is_noop_for_calm_air(testCase)
+   % The scalar-exchange experiment should degrade gracefully when the
+   % current De contract provides no usable aerodynamic signal.
+
+   Ta = 268.15;
+   Ts = 263.15;
+   wspd = 0.0;
+   Pa = 90000.0;
+   De = 0.0;
+   ea = 300.0;
+   cv_air = icemodel.physicalConstant('cv_air');
+   roLs = icemodel.physicalConstant('roLs');
+
+   [Qe, Qh, diag] = icemodel.surface.turbulent_heat_flux_bulk_richardson( ...
+      Ta, Ts, wspd, Pa, De, ea, cv_air, roLs, [NaN, NaN, NaN], false, 0.05);
+
+   testCase.verifyFalse(diag.scalar_exchange_active);
+   testCase.verifyEqual(diag.scalar_exchange_De_h, 0.0, 'AbsTol', 1e-12);
+   testCase.verifyEqual(diag.scalar_exchange_De_e, 0.0, 'AbsTol', 1e-12);
+   testCase.verifyEqual(diag.scalar_exchange_Qh, Qh, 'AbsTol', 1e-12);
+   testCase.verifyEqual(diag.scalar_exchange_Qe, Qe, 'AbsTol', 1e-12);
+end
+
 function test_bulk_mo_finite_and_weaker_scalar_exchange_for_rough_ice(testCase)
    % Rough bare ice should not force scalar exchange to increase as much as
    % the legacy single-z0 formulation at the same momentum roughness.
