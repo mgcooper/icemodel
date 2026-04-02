@@ -35,7 +35,7 @@ function [met, opts] = loadmet(opts, fileiter) %#codegen
    end
 
    % Compute the wind transfer coefficient for the processed met data.
-   met.De = WINDCOEF(met.wspd, opts.z_0, opts.z_tair, opts.z_wind);
+   met.De = WINDCOEF(met.wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
 end
 
 %%

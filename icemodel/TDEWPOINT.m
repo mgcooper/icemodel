@@ -34,7 +34,7 @@ function Tdew = TDEWPOINT(T, rh, liqflag)
    end
 
    % Actual vapor pressure [Pa]
-   ea = VAPPRESS(T, liqflag) .* rh / 100;
+   ea = icemodel.surface.atmospheric_vapor_pressure(T, rh, liqflag);
 
    % Initial guess: invert dominant exponential (ignoring T^c term)
    if liqflag

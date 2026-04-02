@@ -44,7 +44,7 @@ function [Tw, ok] = TWETBULB(Ta, rh, Pa, liqflag)
    end
 
    % Actual vapor pressure from relative humidity [Pa]
-   ea = VAPPRESS(Ta, liqflag) * rh / 100.0;
+   ea = icemodel.surface.atmospheric_vapor_pressure(Ta, rh, liqflag);
 
    % Solver options
    maxiter = 1000;

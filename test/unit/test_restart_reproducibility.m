@@ -94,7 +94,8 @@ function opts = buildOpts(testCase, smbmodel, simyears, kwargs)
    end
 
    opts = icemodel.setopts(char(smbmodel), 'kanm', simyears, ...
-      'kanm', 'kanm', 'albedo', char(kwargs.run_tag), false, false);
+      'kanm', 'kanm', 'albedo', char(kwargs.run_tag), false, false, ...
+      'turbulent_flux_scheme', 'bulk_richardson');
 
    % Override the workspace roots so the restart run stays isolated inside
    % the synthetic test workspace.

@@ -1,6 +1,24 @@
 function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
       De, S, time] = METINIT(opts, fileiter)
-   %METINIT initialize the met file
+   %METINIT Load and expand the meteorological forcing vectors.
+   %
+   %  [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, De, S, time] ...
+   %     = METINIT(opts)
+   %  ... = METINIT(opts, fileiter)
+   %
+   % Outputs:
+   %  tair   - air temperature [K]
+   %  swd    - downwelling shortwave radiation [W m^-2]
+   %  lwd    - downwelling longwave radiation [W m^-2]
+   %  albedo - surface albedo [1]
+   %  wspd   - wind speed [m s^-1]
+   %  rh     - relative humidity [%]
+   %  psfc   - surface pressure [Pa]
+   %  rain   - rainfall-rate placeholder [kg m^-2 s^-1]
+   %  tppt   - precipitation wet-bulb temperature [K]
+   %  De     - aerodynamic exchange coefficient from WINDCOEF [m s^-1]
+   %  S      - legacy stability-coefficient vector from WINDCOEF [1]
+   %  time   - forcing timestamps [datetime]
    %
    %#codegen
 
@@ -39,5 +57,5 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
 
    % The canonical met loader already computes De after all swaps/subsetting.
    De = met.De;
-   [~, S] = WINDCOEF(wspd, opts.z_0, opts.z_tair, opts.z_wind);
+   [~, S] = WINDCOEF(wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
 end

@@ -23,7 +23,8 @@ function test_setopts_normalizes_none_inputs(testCase)
    % userdata/uservars/testname contract.
 
    opts = icemodel.setopts('skinmodel', 'kanm', [2015 2016 2017], ...
-      'kanm', "none", "", "none", false, false);
+      'kanm', "none", "", "none", false, false, ...
+      'turbulent_flux_scheme', 'bulk_richardson');
 
    testCase.verifyEqual(opts.userdata, 'kanm');
    testCase.verifyEqual(opts.uservars, 'albedo');
@@ -46,6 +47,52 @@ function test_resetopts_updates_output_years_and_coupler_defaults(testCase)
 
    opts = icemodel.resetopts(opts, 'solver', 3);
    testCase.verifyEqual(opts.cpl_maxiter, 100);
+end
+
+function test_turbulent_flux_option_defaults_follow_runtime_contract(testCase)
+   % The new turbulent-flux options should default to the legacy scheme and
+   % keep z_relh coupled to z_tair unless explicitly overridden.
+
+   workspace = testCase.TestData.workspace;
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'icemodel', 2016, solver=1);
+   [z0_bulk_default, z0_ice_default, z0_snow_low_default, ...
+      z0_snow_high_default] = icemodel.parameterLookup( ...
+      'thf_z0_bulk', 'thf_z0_ice', 'thf_z0_snow_low_density', ...
+      'thf_z0_snow_high_density');
+
+   testCase.verifyEqual(opts.turbulent_flux_scheme, 'bulk_richardson');
+   testCase.verifyEqual(opts.z_relh, opts.z_tair);
+   testCase.verifyEqual(opts.z0_bulk, z0_bulk_default, 'AbsTol', 1e-12);
+   testCase.verifyEqual(opts.z0_ice, z0_ice_default, 'AbsTol', 1e-12);
+   testCase.verifyEqual(opts.z0_snow_low_density, z0_snow_low_default, ...
+      'AbsTol', 1e-12);
+   testCase.verifyEqual(opts.z0_snow_high_density, z0_snow_high_default, ...
+      'AbsTol', 1e-12);
+
+   opts = icemodel.resetopts(opts, 'z_tair', 4.0);
+   testCase.verifyEqual(opts.z_relh, 4.0);
+
+   opts = icemodel.resetopts(opts, 'z_relh', 6.0, 'z_tair', 3.0);
+   testCase.verifyEqual(opts.z_relh, 6.0);
+end
+
+function test_configureRun_guards_bulk_mo_solver_contract(testCase)
+   % The bulk-MO scheme is v1-only for solver=1 and seb_solver=2.
+
+   workspace = testCase.TestData.workspace;
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'icemodel', 2016, solver=1);
+
+   opts_bad_seb = icemodel.resetopts(opts, ...
+      'turbulent_flux_scheme', 'bulk_mo', 'seb_solver', 1);
+   testCase.verifyError(@() icemodel.configureRun(opts_bad_seb), ...
+      'icemodel:configureRun:bulkMoRequiresSebSolver2');
+
+   opts_bad_solver = icemodel.resetopts(opts, ...
+      'turbulent_flux_scheme', 'bulk_mo', 'seb_solver', 2, 'solver', 2);
+   testCase.verifyError(@() icemodel.configureRun(opts_bad_solver), ...
+      'icemodel:configureRun:bulkMoRequiresSolver1');
 end
 
 function test_configureRun_preserves_explicit_overrides(testCase)

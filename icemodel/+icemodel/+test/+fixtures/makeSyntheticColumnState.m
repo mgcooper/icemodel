@@ -12,6 +12,10 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
       smbmodel (1, :) char {mustBeMember(smbmodel, {'icemodel', 'skinmodel'})}
       kwargs.simyears = []
       kwargs.solver (1, 1) double = NaN
+      kwargs.seb_solver (1, 1) double = NaN
+      kwargs.turbulent_flux_scheme (1, :) char = ''
+      kwargs.z0_bulk (1, 1) double = NaN
+      kwargs.z0_ice (1, 1) double = NaN
       kwargs.metstep (1, 1) double {mustBeInteger, mustBePositive} = 1
       kwargs.testname (1, :) char = 'column_state'
       kwargs.include_spectral (1, 1) logical = false
@@ -25,7 +29,11 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    % Resolve one benign OPTS struct and load the matching forcing slice.
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
       workspace, smbmodel, simyears, ...
-      solver=kwargs.solver, testname=kwargs.testname, output_profile='standard');
+      solver=kwargs.solver, seb_solver=kwargs.seb_solver, ...
+      turbulent_flux_scheme=kwargs.turbulent_flux_scheme, ...
+      z0_bulk=kwargs.z0_bulk, ...
+      z0_ice=kwargs.z0_ice, testname=kwargs.testname, ...
+      output_profile='standard');
    met = icemodel.loadmet(opts);
 
    % Seed the thermal grain-radius state only for icemodel.
@@ -46,7 +54,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    % Extract one forcing step and the corresponding transfer coefficients.
    [tair, swd, lwd, albedo, wspd, psfc, De, ea] = LOADMETDATA(met, metstep, ...
       liqflag);
-   [~, scoef] = WINDCOEF(wspd, opts.z_0, opts.z_tair, opts.z_wind);
+   [~, scoef] = WINDCOEF(wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
 
    % Carry precipitation fields when the synthetic met fixture defines them.
    if ismember('ppt', met.Properties.VariableNames)
@@ -87,6 +95,8 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    state.delz = delz;
    state.z_nodes = z_nodes;
    state.Ts = Ts;
+   state.ro_sfc = icemodel.surface.surface_bulk_density(f_ice(1), f_liq(1));
+   state.snow_depth = 0.0;
    state.JJ = JJ;
    state.Sc = Sc;
    state.Sp = Sp;

@@ -9,6 +9,6 @@ function [Tair,Qsi,Qli,albedo,wspd,Pa,De,ea] = LOADMETDATA(met,metstep,liqflag)
    Qli = met.lwd(metstep);
    Pa = met.psfc(metstep);
    De = met.De(metstep);
-   ea = VAPPRESS(Tair, liqflag) * met.rh(metstep) / 100;
+   ea = icemodel.surface.atmospheric_vapor_pressure(Tair, met.rh(metstep), liqflag);
    albedo = met.albedo(metstep);
 end

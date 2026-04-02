@@ -158,10 +158,23 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts.debug_path      =  '';      % override for debug output folder
 
    % model parameters
-   opts.z_0             =  0.001;   % Surface aero. roughness length    [m]
    opts.ro_ice_init     =  900.0;   % initial ice density               [kg/m3]
    opts.T_ice_init      = -8.0;     % initial ice temperature           [C]
    opts.f_liq_resid     =  0.02;    % residual pore water fraction      [-]
+
+   % Surface turbulent-flux scheme. Keep the explicit bulk-Richardson
+   % path as the default runtime contract; bulk-MO is opt-in via resetopts.
+   % The bulk-MO compatibility guard (currently solver=1, seb_solver=2)
+   % is enforced in configureRun, which owns final runtime-contract checks.
+   opts.turbulent_flux_scheme = 'bulk_richardson'; % 'bulk_richardson', 'bulk_mo'
+
+   % Surface roughness lengths are tunable THF parameters. Leave them empty
+   % here and let configureRun resolve the canonical defaults from
+   % parameterLookup unless the caller overrides them explicitly.
+   opts.z0_bulk = [];
+   opts.z0_ice = [];
+   opts.z0_snow_low_density = [];
+   opts.z0_snow_high_density = [];
 
    % solver, timestepping, and mesh options
    if strcmp(smbmodel, 'icemodel')
@@ -175,7 +188,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.solver          = 3;     % recommended: 3
 
       % surface (SEB) solver (Dirichlet Ts boundary condition when solver = 1)
-      opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
+      opts.seb_solver      = 2;     % recommended: 2 (1=analytic, 2=numeric)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
 
       opts.maxiter         = 100;   % thermal solver max iterations
@@ -266,6 +279,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.z_tair =  2.0;
       opts.z_wind =  3.0;
    end
+   opts.z_relh = opts.z_tair; % humidity observation height       [m]
 
    % Lag time used by ICERUNOFF, converted from hours to timesteps.
    opts.tlag = 6 * 3600 / opts.dt;

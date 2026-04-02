@@ -7,6 +7,8 @@ function opts = configureRun(opts)
    % are empty, while preserving caller-supplied values for fields such as
    % PATHINPUT, PATHOUTPUT, CASENAME, METFNAME, VARS1, and VARS2.
 
+   opts = validateTurbulentFluxOptions(opts);
+
    if ~isfield(opts, 'pathdata') || isempty(opts.pathdata)
       opts.pathdata = icemodel.getpath('data');
    end
@@ -81,6 +83,57 @@ function opts = configureRun(opts)
    % variables that the solver dump functions already check.
    if isfield(opts, 'debug') && opts.debug
       opts = configureDebugPaths(opts);
+   end
+end
+
+function opts = validateTurbulentFluxOptions(opts)
+   %VALIDATETURBULENTFLUXOPTIONS Validate the turbulent-flux option surface.
+
+   [z0_bulk_default, z0_ice_default, z0_snow_low_default, ...
+      z0_snow_high_default] = icemodel.parameterLookup( ...
+      'thf_z0_bulk', 'thf_z0_ice', 'thf_z0_snow_low_density', ...
+      'thf_z0_snow_high_density');
+
+   if ~isfield(opts, 'turbulent_flux_scheme') ...
+         || isempty(opts.turbulent_flux_scheme)
+      opts.turbulent_flux_scheme = 'bulk_richardson';
+   end
+
+   scheme = lower(char(opts.turbulent_flux_scheme));
+   if ~ismember(scheme, {'bulk_richardson', 'bulk_mo'})
+      error('icemodel:configureRun:unknownTurbulentFluxScheme', ...
+         'Unrecognized turbulent flux scheme: %s', opts.turbulent_flux_scheme);
+   end
+   opts.turbulent_flux_scheme = scheme;
+
+   if ~isfield(opts, 'z_relh') || isempty(opts.z_relh)
+      opts.z_relh = opts.z_tair;
+   end
+
+   if ~isfield(opts, 'z0_bulk') || isempty(opts.z0_bulk)
+      opts.z0_bulk = z0_bulk_default;
+   end
+   if ~isfield(opts, 'z0_ice') || isempty(opts.z0_ice)
+      opts.z0_ice = z0_ice_default;
+   end
+   if ~isfield(opts, 'z0_snow_low_density') || isempty(opts.z0_snow_low_density)
+      opts.z0_snow_low_density = z0_snow_low_default;
+   end
+   if ~isfield(opts, 'z0_snow_high_density') || isempty(opts.z0_snow_high_density)
+      opts.z0_snow_high_density = z0_snow_high_default;
+   end
+
+   if strcmp(scheme, 'bulk_mo')
+      if opts.solver ~= 1
+         error('icemodel:configureRun:bulkMoRequiresSolver1', ...
+            ['turbulent_flux_scheme=''bulk_mo'' currently requires ' ...
+            'opts.solver = 1.']);
+      end
+      if opts.seb_solver ~= 2
+         error('icemodel:configureRun:bulkMoRequiresSebSolver2', ...
+            ['turbulent_flux_scheme=''bulk_mo'' currently requires ' ...
+            'opts.seb_solver = 2.']);
+      end
    end
 end
 
@@ -168,6 +221,7 @@ function opts = configureDebugPaths(opts)
       'ICEMODEL_DEBUG_ICEENBAL_FILE',    'debug_iceenbal.mat'; ...
       'ICEMODEL_DEBUG_MZTRANSFORM_FILE', 'debug_mztransform.mat'; ...
       'ICEMODEL_DEBUG_SEBSOLVE_FILE',    'debug_sebsolve.mat'; ...
+      'ICEMODEL_DEBUG_THF_FILE',         'debug_thf.mat'; ...
       'ICEMODEL_DEBUG_SKINSOLVE_FILE',   'debug_skinsolve.mat'; ...
       'ICEMODEL_DEBUG_ICEEBSOLVE_FILE',  'debug_iceebsolve.mat'; ...
       'ICEMODEL_DEBUG_SKINEBSOLVE_FILE', 'debug_skinebsolve.mat'; ...
