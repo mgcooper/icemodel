@@ -141,7 +141,7 @@ function [vars1, vars2] = defaultOutputVariables(opts)
    % ice1.vars1 = Surface (1-d) data
    % ice2.vars2 = Subsurface (2-d) data
    %
-   % Supported output profiles are "standard" and "minimal".
+   % Supported output profiles are "standard", "minimal", and "diagnostic".
    %
    % Two important programming notes:
    %
@@ -172,6 +172,22 @@ function [vars1, vars2] = defaultOutputVariables(opts)
          vars1 = ...
             {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
             'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter'};
+
+         if strcmp(opts.smbmodel, 'skinmodel')
+            vars2 = {'Tice', 'f_ice', 'f_liq'};
+         else
+            vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp', 'df_lyr', ...
+               'Sc', 'r_eff'};
+         end
+
+      case 'diagnostic'
+         vars1 = ...
+            {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
+            'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter', ...
+            'n_subfail', 'ea', 'De', 'scoef_gamma', 'scoef_b1_num', ...
+            'scoef_b2_num', 'roL', 'ro_sfc', ...
+            'thf_es_sfc', 'thf_stability_factor', 'thf_z0m', 'thf_z0h', ...
+            'thf_z0q', 'thf_u_star', 'thf_L', 'thf_Re', 'thf_numiter'};
 
          if strcmp(opts.smbmodel, 'skinmodel')
             vars2 = {'Tice', 'f_ice', 'f_liq'};

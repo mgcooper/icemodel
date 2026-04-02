@@ -281,7 +281,9 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts.tlag = 6 * 3600 / opts.dt;
 
    % Output profile. "minimal" is the lean profile used when wrappers request
-   % reduced grid-style output; "standard" is the full point-run profile.
+   % reduced grid-style output; "standard" is the full point-run profile; and
+   % "diagnostic" extends the point-run profile with lightweight solver/THF
+   % debugging scalars.
    opts.output_profile = 'standard';
 
    %------------------------- End of user-defined model options

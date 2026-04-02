@@ -147,6 +147,41 @@ function test_loadresults_defaults_to_output_years(testCase)
    testCase.verifyEqual(unique(year(met.Time))', 2016);
 end
 
+function test_loadresults_preserves_diagnostic_output_profile_fields(testCase)
+   % Saved diagnostic-profile outputs should reload with the accepted
+   % solver/THF debugging scalars intact.
+
+   workspace = testCase.TestData.workspace;
+   pathoutput = fullfile(workspace.outputdir, 'kanm', 'icemodel', ...
+      'loadresults_diagnostic');
+   if exist(pathoutput, 'dir') ~= 7
+      mkdir(pathoutput);
+   end
+   if exist(fullfile(pathoutput, '2016'), 'dir') ~= 7
+      mkdir(fullfile(pathoutput, '2016'));
+   end
+
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'icemodel', 2016, saveflag=true, ...
+      output_profile='diagnostic', solver=1, seb_solver=2, ...
+      turbulent_flux_scheme='bulk_mo', z0_ice=0.02, ...
+      pathoutput=pathoutput, testname='loadresults_diagnostic');
+   [~, ~, opts] = icemodel.test.helpers.runSmbModel(opts);
+
+   [ice1, ~, met] = icemodel.loadresults(opts);
+
+   testCase.verifyTrue(all(ismember( ...
+      {'n_subfail', 'ea', 'De', 'scoef_gamma', 'scoef_b1_num', ...
+      'scoef_b2_num', 'roL', 'ro_sfc', ...
+      'thf_es_sfc', 'thf_z0m', 'thf_z0h', 'thf_z0q', 'thf_u_star', ...
+      'thf_L', 'thf_Re', 'thf_numiter'}, ice1.Properties.VariableNames)));
+   testCase.verifyTrue(all(isfinite(ice1.ro_sfc)));
+   testCase.verifyTrue(all(isfinite(ice1.thf_u_star)));
+   testCase.verifyTrue(all(isfinite(ice1.thf_L)));
+   testCase.verifyTrue(all(isfinite(ice1.thf_numiter)));
+   testCase.verifyEqual(unique(year(met.Time))', 2016);
+end
+
 function test_postprocess_explicit_met_return_is_hourly(testCase)
    % The explicit met output from POSTPROCESS should stay aligned with the
    % hourly postprocessed model outputs.

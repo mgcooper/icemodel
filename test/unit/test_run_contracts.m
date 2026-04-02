@@ -49,6 +49,31 @@ function test_resetopts_updates_output_years_and_coupler_defaults(testCase)
    testCase.verifyEqual(opts.cpl_maxiter, 100);
 end
 
+function test_diagnostic_output_profile_extends_standard_surface_contract(testCase)
+   % The diagnostic output profile should extend the standard scalar surface
+   % schema without changing the standard profile itself.
+
+   workspace = testCase.TestData.workspace;
+   opts_standard = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'icemodel', 2016, output_profile='standard');
+   opts_diag = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'icemodel', 2016, output_profile='diagnostic');
+
+   diagnostic_suffix = { ...
+      'n_subfail', 'ea', 'De', 'scoef_gamma', 'scoef_b1_num', ...
+      'scoef_b2_num', 'roL', 'ro_sfc', ...
+      'thf_es_sfc', 'thf_stability_factor', 'thf_z0m', 'thf_z0h', ...
+      'thf_z0q', 'thf_u_star', 'thf_L', 'thf_Re', 'thf_numiter'};
+
+   testCase.verifyEqual(opts_standard.output_profile, 'standard');
+   testCase.verifyEqual(opts_diag.output_profile, 'diagnostic');
+   testCase.verifyEqual(opts_diag.vars1(1:numel(opts_standard.vars1)), ...
+      opts_standard.vars1);
+   testCase.verifyEqual(opts_diag.vars1(numel(opts_standard.vars1)+1:end), ...
+      diagnostic_suffix);
+   testCase.verifyEqual(opts_diag.vars2, opts_standard.vars2);
+end
+
 function test_turbulent_flux_option_defaults_follow_runtime_contract(testCase)
    % The new turbulent-flux options should default to the legacy scheme and
    % keep z_relh coupled to z_tair unless explicitly overridden.
