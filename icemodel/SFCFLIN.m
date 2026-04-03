@@ -1,5 +1,5 @@
-function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
-      ea, cv_air, cv_liq, emiss, SB, roL, scoef, chi, Tf, Ts, liqflag)
+function [Sc, Sp] = SFCFLIN(tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, De, ...
+      ea_atm, roL, br_coefs, chi, T_sfc, liqflag)
    %SFCFLIN Linearize the surface energy balance equation
    %
    % The linearization is of the form: F = Fc + Fp * T
@@ -32,32 +32,34 @@ function [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ...
    %
    %#codegen
 
-   persistent epsilon
-   if isempty(epsilon)
-      epsilon = icemodel.physicalConstant('epsilon');
+   persistent cv_air cv_liq emiss SB epsilon
+   if isempty(cv_air)
+      [cv_air, cv_liq, SB, epsilon] = icemodel.physicalConstant( ...
+         'cv_air', 'cv_liq', 'SB', 'epsilon');
+      emiss = icemodel.parameterLookup('emiss');
    end
 
    % Saturation vapor pressure and derivative from VAPPRESS
-   [es, des_dT] = VAPPRESS(Ts, liqflag);
+   [es_sfc, des_dT] = VAPPRESS(T_sfc, liqflag);
 
    % Keep the linearization based on the bulk richardson scheme.
-   S = STABLEFN(Ta, Ts, wspd, scoef);
+   stability = STABLEFN(T_sfc, tair, wspd, br_coefs);
 
    % linearizations
 
-   % outgoing longwave (note: -Qle = -emiss * SB * Ts ^ 4):
-   Sc_Qle = 3 * emiss * SB * Ts ^ 4;
-   Sp_Qle = -4 / 3 * Sc_Qle / Ts;
+   % outgoing longwave (note: -Qle = -emiss * SB * T_sfc ^ 4):
+   Sc_Qle = 3 * emiss * SB * T_sfc ^ 4;
+   Sp_Qle = -4 / 3 * Sc_Qle / T_sfc;
 
    % sensible heat flux:
-   Sc_Qh = cv_air * De * S * Ta;
-   Sp_Qh = -cv_air * De * S;
+   Sc_Qh = cv_air * De * stability * tair;
+   Sp_Qh = -cv_air * De * stability;
 
-   % latent heat flux (linearization of es around Ts):
-   % es(T) ≈ es(Ts) + des_dT * (T - Ts) = (es - des_dT * Ts) + des_dT * T
-   Sc_Qe = roL * De * epsilon / Pa * S ...
-      * (ea - es + des_dT * Ts);
-   Sp_Qe = -roL * De * epsilon / Pa * S * des_dT;
+   % latent heat flux (linearization of es_sfc around T_sfc):
+   % es(T) ≈ es_sfc + des_dT * (T - T_sfc) = (es_sfc - des_dT * T_sfc) + des_dT * T
+   Sc_Qe = roL * De * epsilon / psfc * stability ...
+      * (ea_atm - es_sfc + des_dT * T_sfc);
+   Sp_Qe = -roL * De * epsilon / psfc * stability * des_dT;
 
    % precipitation-advected heat:
    Sc_Qa = QADVECT(ppt, tppt, cv_liq);

@@ -1,13 +1,13 @@
-function [S, dSdTs] = STABLEFN(Ta, Ts, wspd, scoef)
-   %STABLEFN Compute the stability function
+function [stability, dstability] = STABLEFN(T_sfc, tair, wspd, br_coefs)
+   %STABLEFN Compute the stability function and derivative wrt T_sfc.
    %
-   % S = STABLEFN(Ta, Ts, wspd, scoef)
+   % stability = STABLEFN(T_sfc, tair, wspd, br_coefs)
    %
    % Following the Louis/Liston bulk-Richardson parameterization
    % (see Appendix 1 of Liston et al. 1999):
    %
    %    S = 1.0;
-   %    Ri = 9.81 * z_obs / (Ta * wspd ^ 2) * (Ta - Ts);
+   %    Ri = 9.81 * z_obs / (tair * wspd ^ 2) * (tair - T_sfc);
    %    De = wcoef * wspd;
    %    gamma = 5.3 * 9.4 * De / wspd * sqrt((z_obs / z_0));
    %
@@ -18,20 +18,20 @@ function [S, dSdTs] = STABLEFN(Ta, Ts, wspd, scoef)
    %    end
    %
    % For unstable, the absolute value of the Richardson number is implicit
-   % because Ts>Ta implies Ts-Ta>0, see Appendix of Liston et al 1999
+   % because T_sfc>tair implies T_sfc-tair>0, see Appendix of Liston et al 1999
    %
    % Legacy implementation, for comparison with notes.
    %
-   %  if Ts < Ta % Stable case
+   %  if T_sfc < tair % Stable case
    %
-   %     S = 1 / (1 + B1 / 2 * (Ta - Ts)) ^ 2;
-   %     dS = 2 * B1 / 2 / (1 + B1 / 2 * (Ta - Ts)) ^ 3;
+   %     S = 1 / (1 + B1 / 2 * (tair - T_sfc)) ^ 2;
+   %     dS = 2 * B1 / 2 / (1 + B1 / 2 * (tair - T_sfc)) ^ 3;
    %
-   %  elseif Ts > Ta % Unstable case
+   %  elseif T_sfc > tair % Unstable case
    %
-   %     S = 1 + B1 * (Ts - Ta) / (1 + B2 * sqrt(Ts - Ta));
-   %     dS = B1 / (1 + B2 * sqrt(Ts - Ta)) - (B1 * B2 * (Ts - Ta)) ...
-   %        / (2 * (1 + B2 * sqrt(Ts - Ta)) ^ 2 * sqrt(Ts - Ta));
+   %     S = 1 + B1 * (T_sfc - tair) / (1 + B2 * sqrt(T_sfc - tair));
+   %     dS = B1 / (1 + B2 * sqrt(T_sfc - tair)) - (B1 * B2 * (T_sfc - tair)) ...
+   %        / (2 * (1 + B2 * sqrt(T_sfc - tair)) ^ 2 * sqrt(T_sfc - tair));
    %
    %  else % Neutrally stable case.
    %     S = 1.0;
@@ -51,78 +51,78 @@ function [S, dSdTs] = STABLEFN(Ta, Ts, wspd, scoef)
          'thf_bulk_richardson_neutral_transition_width');
    end
 
-   [B1, B2] = bulk_stability_terms(Ta, wspd, scoef);
+   [B1, B2] = bulk_stability_terms(tair, wspd, br_coefs);
 
    % Branch on the real temperature only. This keeps the stable/unstable
    % switch fixed during complex-step differentiation while still letting the
-   % downstream branch formulas operate on the possibly complex Ts value.
-   Ts_real = real(Ts);
+   % downstream branch formulas operate on the possibly complex T_sfc value.
+   T_sfc_real = real(T_sfc);
 
-   if Ts_real < Ta - dT0
+   if T_sfc_real < tair - dT0
 
-      [S, dSdTs] = stableBranch(Ta, Ts, B1);
+      [stability, dstability] = stableBranch(T_sfc, tair, B1);
 
-   elseif Ts_real > Ta + dT0
+   elseif T_sfc_real > tair + dT0
 
-      [S, dSdTs] = unstableBranch(Ta, Ts, B1, B2);
+      [stability, dstability] = unstableBranch(T_sfc, tair, B1, B2);
 
    else
-      [S, dSdTs] = neutralBranch(Ta, Ts, B1, B2, dT0);
+      [stability, dstability] = neutralBranch(T_sfc, tair, B1, B2, dT0);
    end
 end
 
-function [B1, B2] = bulk_stability_terms(Ta, wspd, scoef)
+function [B1, B2] = bulk_stability_terms(tair, wspd, br_coefs)
    %BULK_STABILITY_TERMS Return the bulk-Richardson branch coefficients.
 
-   B1 = scoef(2) / (Ta * wspd ^ 2);
-   B2 = scoef(3) / (sqrt(Ta) * wspd);
+   B1 = br_coefs(2) / (tair * wspd ^ 2);
+   B2 = br_coefs(3) / (sqrt(tair) * wspd);
 end
 
-function [S, dSdTs] = stableBranch(Ta, Ts, B1)
+function [S, dSdT] = stableBranch(T_sfc, tair, B1)
    %STABLEBRANCH Evaluate the stable Louis/Liston branch and derivative.
    %
-   % S = (1 + B1/2 * (Ta - Ts)) ^ -2;
-   % dSdTs = B1 * S ^ 3/2;
+   % S = (1 + B1/2 * (tair - T_sfc)) ^ -2;
+   % dSdT = B1 * S ^ 3/2;
 
-   B3 = 1 + 0.5 * B1 * (Ta - Ts);
+   B3 = 1 + 0.5 * B1 * (tair - T_sfc);
    S = B3 ^ -2;
 
    if nargout > 1
-      dSdTs = B1 * B3 ^ -3;
+      dSdT = B1 * B3 ^ -3;
    end
 end
 
-function [S, dSdTs] = unstableBranch(Ta, Ts, B1, B2)
+function [S, dSdT] = unstableBranch(T_sfc, tair, B1, B2)
    %UNSTABLEBRANCH Evaluate the unstable Louis/Liston branch and derivative.
    %
-   % B3 = 1 + B2 * sqrt(Ts - Ta)
-   % S = 1 + B1 * (Ts - Ta) / B3
-   % dSdTs = B1 / B3 - (B1 * B2 * (Ts - Ta)) / (2 * B3 ^ 2 * sqrt(Ts - Ta))
+   % B3 = 1 + B2 * sqrt(T_sfc - tair)
+   % S = 1 + B1 * (T_sfc - tair) / B3
+   % dSdT = B1/B3 - (B1*B2 * (T_sfc - tair)) / (2 * B3^2 * sqrt(T_sfc - tair))
 
-   dT = Ts - Ta;
+   dT = T_sfc - tair;
    sqrt_dT = sqrt(dT);
    B3 = 1 + B2 * sqrt_dT;
 
    S = 1 + B1 * dT / B3;
 
    if nargout > 1
-      dSdTs = B1 / B3 - 0.5 * B1 * B2 * sqrt_dT / B3^2;
+      dSdT = B1 / B3 - 0.5 * B1 * B2 * sqrt_dT / B3^2;
    end
 end
 
-function [S, dSdTs] = neutralBranch(Ta, Ts, B1, B2, dT0)
+function [S, dSdT] = neutralBranch(T_sfc, tair, B1, B2, dT0)
    % Near-neutral transition, blend stable/unstable branches smoothly.
 
-   Ts_lo = Ta - dT0;
-   Ts_hi = Ta + dT0;
+   T_sfc_lo = tair - dT0;
+   T_sfc_hi = tair + dT0;
 
-   S_stable = stableBranch(Ta, Ts_lo, B1);
-   S_unstable = unstableBranch(Ta, Ts_hi, B1, B2);
+   S_stable = stableBranch(T_sfc_lo, tair, B1);
+   S_unstable = unstableBranch(T_sfc_hi, tair, B1, B2);
 
-   w = (Ts - Ts_lo) / (Ts_hi - Ts_lo);
+   w = (T_sfc - T_sfc_lo) / (T_sfc_hi - T_sfc_lo);
    S = (1 - w) * S_stable + w * S_unstable;
 
    if nargout > 1
-      dSdTs = (S_unstable - S_stable) / (Ts_hi - Ts_lo);
+      dSdT = (S_unstable - S_stable) / (T_sfc_hi - T_sfc_lo);
    end
 end

@@ -26,12 +26,14 @@ function test_meltcurve_and_freezecurve_are_self_consistent(testCase)
 end
 
 function test_melttemp_caps_above_freezing(testCase)
-   % MELTTEMP should clip supercooled inputs at freezing but leave colder
-   % values untouched.
+   % icemodel.kernels.physical_surface_temperature should clip supercooled
+   % inputs at freezing but leave colder values untouched.
 
    Tf = icemodel.physicalConstant('Tf');
-   testCase.verifyEqual(MELTTEMP(Tf + 3, Tf), Tf);
-   testCase.verifyEqual(MELTTEMP(Tf - 2, Tf), Tf - 2);
+   testCase.verifyEqual( ...
+      icemodel.kernels.physical_surface_temperature(Tf + 3), Tf);
+   testCase.verifyEqual( ...
+      icemodel.kernels.physical_surface_temperature(Tf - 2), Tf - 2);
 end
 
 function test_liqavail_drains_only_available_liquid(testCase)
@@ -60,13 +62,18 @@ function test_volbal_drains_excess_and_respects_total_volume(testCase)
 end
 
 function test_pevap_preserves_sign_and_scaling(testCase)
-   % PEVAP should keep the latent-mass increment proportional to the
-   % underlying evaporative power input.
+   % potential_surface_vapor_tendency should keep the latent-mass increment
+   % proportional to the underlying evaporative power input.
 
-   [d_pevp, pevp] = PEVAP(50, 2.5e6, 1000, 900, 0.04);
+   Qe = 50;
+   dt = 900;
+   dz = 0.04;
+
+   [d_pevp, pevp] = ...
+      icemodel.kernels.potential_surface_vapor_tendency(Qe, dt, dz);
 
    testCase.verifyGreaterThan(d_pevp, 0);
-   testCase.verifyEqual(d_pevp, pevp * 900 / 0.04, 'RelTol', 1e-12);
+   testCase.verifyEqual(d_pevp, pevp * dt / dz, 'RelTol', 1e-12);
 end
 
 function test_mztransform_updates_melt_zone_consistently(testCase)

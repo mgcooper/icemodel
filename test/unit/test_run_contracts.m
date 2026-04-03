@@ -60,8 +60,8 @@ function test_diagnostic_output_profile_extends_standard_surface_contract(testCa
       workspace, 'icemodel', 2016, output_profile='diagnostic');
 
    diagnostic_suffix = { ...
-      'n_subfail', 'ea', 'De', 'scoef_gamma', 'scoef_b1_num', ...
-      'scoef_b2_num', 'roL', 'ro_sfc', ...
+      'n_subfail', 'ea_atm', 'De', 'br_coefs_gamma', 'br_coefs_b1_num', ...
+      'br_coefs_b2_num', 'roL', 'ro_sfc', ...
       'thf_es_sfc', 'thf_stability_factor', 'thf_z0m', 'thf_z0h', ...
       'thf_z0q', 'thf_u_star', 'thf_L', 'thf_Re', 'thf_numiter'};
 
@@ -87,6 +87,7 @@ function test_turbulent_flux_option_defaults_follow_runtime_contract(testCase)
       'thf_z0_snow_high_density');
 
    testCase.verifyEqual(opts.turbulent_flux_scheme, 'bulk_richardson');
+   testCase.verifyFalse(opts.use_forcing_snow_depth_for_thf);
    testCase.verifyEqual(opts.z_relh, opts.z_tair);
    testCase.verifyEqual(opts.z0_bulk, z0_bulk_default, 'AbsTol', 1e-12);
    testCase.verifyEqual(z0_ice_default, 0.003, 'AbsTol', 1e-12);
@@ -101,6 +102,22 @@ function test_turbulent_flux_option_defaults_follow_runtime_contract(testCase)
 
    opts = icemodel.resetopts(opts, 'z_relh', 6.0, 'z_tair', 3.0);
    testCase.verifyEqual(opts.z_relh, 6.0);
+end
+
+function test_configureRun_preserves_explicit_forcing_snow_depth_override(testCase)
+   % The forcing snow-depth hook should stay caller-controlled and opt-in.
+
+   workspace = testCase.TestData.workspace;
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'icemodel', 2016, solver=1);
+
+   opts = icemodel.resetopts(opts, ...
+      'turbulent_flux_scheme', 'bulk_mo', ...
+      'seb_solver', 2, ...
+      'use_forcing_snow_depth_for_thf', true);
+   opts = icemodel.configureRun(opts);
+
+   testCase.verifyTrue(opts.use_forcing_snow_depth_for_thf);
 end
 
 function test_configureRun_guards_bulk_mo_solver_contract(testCase)
@@ -127,6 +144,25 @@ function test_configureRun_guards_bulk_mo_solver_contract(testCase)
    opts_ok_solver3 = icemodel.configureRun(opts_ok_solver3);
    testCase.verifyEqual(opts_ok_solver3.turbulent_flux_scheme, 'bulk_mo');
    testCase.verifyEqual(opts_ok_solver3.cpl_maxiter, 100);
+end
+
+function test_configureRun_preserves_explicit_thf_roughness_overrides(testCase)
+   % Explicit THF roughness overrides should remain the caller-controlled
+   % calibration path rather than being replaced by the global defaults.
+
+   workspace = testCase.TestData.workspace;
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'icemodel', 2016, solver=1);
+
+   opts = icemodel.resetopts(opts, ...
+      'turbulent_flux_scheme', 'bulk_mo', ...
+      'seb_solver', 2, ...
+      'z0_ice', 0.007, ...
+      'z0_bulk', 0.0025);
+   opts = icemodel.configureRun(opts);
+
+   testCase.verifyEqual(opts.z0_ice, 0.007, 'AbsTol', 1e-12);
+   testCase.verifyEqual(opts.z0_bulk, 0.0025, 'AbsTol', 1e-12);
 end
 
 function test_configureRun_preserves_explicit_overrides(testCase)

@@ -13,6 +13,7 @@ function [met, filepath] = makeSyntheticMetFile(simyear, kwargs)
       kwargs.dt_seconds (1, 1) double {mustBePositive} = 3600
       kwargs.include_modis (1, 1) logical = false
       kwargs.modis_varname (1, :) char = 'MODIS'
+      kwargs.snow_depth = []
       kwargs.metdir (1, :) char = ''
    end
 
@@ -32,6 +33,18 @@ function [met, filepath] = makeSyntheticMetFile(simyear, kwargs)
    ppt = zeros(kwargs.nsteps, 1);
 
    met = timetable(Time, tair, swd, lwd, albedo, wspd, rh, psfc, ppt);
+   if ~isempty(kwargs.snow_depth)
+      snow_depth = kwargs.snow_depth;
+      if isscalar(snow_depth)
+         snow_depth = repmat(snow_depth, kwargs.nsteps, 1);
+      else
+         snow_depth = snow_depth(:);
+      end
+      if numel(snow_depth) ~= kwargs.nsteps
+         error('snow_depth must be scalar or length nsteps')
+      end
+      met.snowd = snow_depth;
+   end
    if kwargs.include_modis
       % Mirror the albedo shape for optional synthetic userdata tests.
       modis = min(max(albedo - 0.05, 0.05), 0.95);

@@ -31,13 +31,21 @@ function test_turbulent_flux_kernels_follow_sign_convention(testCase)
    % Positive sensible and latent fluxes should correspond to transfer
    % toward the surface under the standard kernel sign convention.
 
-   epsilon = icemodel.physicalConstant('epsilon');
-   Qh = SENSIBLE(1e-3, 1.2, 270, 268, 1200);
-   Qe = LATENT(1e-3, 1.2, 350, 300, 2.5e9, epsilon, 78000);
+   T_sfc = 268;
+   tair = 270;
+   De = 1e-3;
+   stability = 1.2;
+   es_sfc = 300;
+   ea_atm = 350;
+   psfc = 78000;
+   roL = 2.5e9;
+
+   Qh = SENSIBLE(T_sfc, tair, De, stability);
+   Qe = LATENT(es_sfc, ea_atm, De, stability, psfc, roL);
 
    testCase.verifyGreaterThan(Qh, 0);
    testCase.verifyGreaterThan(Qe, 0);
-   testCase.verifyEqual(SENSIBLE(1e-3, 1.0, 270, 270, 1200), 0, ...
+   testCase.verifyEqual(SENSIBLE(tair, tair, De, 1.0), 0, ...
       'AbsTol', 1e-12);
 end
 
@@ -45,10 +53,18 @@ function test_windcoef_and_stablefn_cover_neutral_stable_and_unstable(testCase)
    % The Monin-Obukhov stability helper should span neutral, stable, and
    % unstable branches with the expected ordering.
 
-   [De, scoef] = WINDCOEF(4.0, 1e-3, 3.0, 3.0);
-   S_neutral = STABLEFN(268, 268, 4.0, scoef);
-   S_stable = STABLEFN(268, 265, 4.0, scoef);
-   S_unstable = STABLEFN(268, 271, 4.0, scoef);
+   T_sfc_neutral = 268;
+   tair = 268;
+   T_sfc_stable = 265;
+   T_sfc_unstable = 271;
+   wspd = 4.0;
+   z0_bulk = 1e-3;
+   z_tair = 3.0;
+   z_wind = 3.0;
+   [De, br_coefs] = WINDCOEF(wspd, z0_bulk, z_tair, z_wind);
+   S_neutral = STABLEFN(T_sfc_neutral, tair, wspd, br_coefs);
+   S_stable = STABLEFN(T_sfc_stable, tair, wspd, br_coefs);
+   S_unstable = STABLEFN(T_sfc_unstable, tair, wspd, br_coefs);
 
    testCase.verifyGreaterThan(De, 0);
    testCase.verifyEqual(S_neutral, 1.0, 'AbsTol', 5e-3);
@@ -60,22 +76,52 @@ function test_stablefn_derivative_matches_finite_difference(testCase)
    % STABLEFN should return a Ts derivative consistent with finite
    % differences in stable, unstable, and near-neutral regimes.
 
-   [~, scoef] = WINDCOEF(4.0, 1e-3, 3.0, 3.0);
-   Ta = 268.15;
+   z0_bulk = 1e-3;
+   z_tair = 3.0;
+   z_wind = 3.0;
+   [~, br_coefs] = WINDCOEF(4.0, z0_bulk, z_tair, z_wind);
+   tair = 268.15;
    wspd = 4.0;
    h = 1e-6;
-   Ts_cases = [Ta - 2.0, Ta, Ta + 2.0];
+   T_sfc_cases = [tair - 2.0, tair, tair + 2.0];
 
-   for n = 1:numel(Ts_cases)
-      Ts = Ts_cases(n);
-      [~, dSdTs] = STABLEFN(Ta, Ts, wspd, scoef);
-      S_plus = STABLEFN(Ta, Ts + h, wspd, scoef);
-      S_minus = STABLEFN(Ta, Ts - h, wspd, scoef);
+   for n = 1:numel(T_sfc_cases)
+      T_sfc = T_sfc_cases(n);
+      [~, dSdTs] = STABLEFN(T_sfc, tair, wspd, br_coefs);
+      S_plus = STABLEFN(T_sfc + h, tair, wspd, br_coefs);
+      S_minus = STABLEFN(T_sfc - h, tair, wspd, br_coefs);
       dSdTs_fd = (S_plus - S_minus) / (2 * h);
 
       testCase.verifyEqual(dSdTs, dSdTs_fd, 'RelTol', 1e-5, ...
-         sprintf('Derivative mismatch at Ts = %.3f K', Ts));
+         sprintf('Derivative mismatch at T_sfc = %.3f K', T_sfc));
    end
+end
+
+function test_stablefn_neutral_blend_matches_documented_endpoint_formulas(testCase)
+   % The near-neutral branch should linearly blend the stable and unstable
+   % endpoint formulas across the configured transition width.
+
+   z0_bulk = 1e-3;
+   z_tair = 3.0;
+   z_wind = 3.0;
+   wspd = 4.0;
+   tair = 268.15;
+   [~, br_coefs] = WINDCOEF(wspd, z0_bulk, z_tair, z_wind);
+   dT0 = icemodel.parameterLookup( ...
+      'thf_bulk_richardson_neutral_transition_width');
+
+   B1 = br_coefs(2) / (tair * wspd ^ 2);
+   B2 = br_coefs(3) / (sqrt(tair) * wspd);
+
+   S_stable_edge = (1 + 0.5 * B1 * dT0) ^ -2;
+   S_unstable_edge = 1 + B1 * dT0 / (1 + B2 * sqrt(dT0));
+   S_expected = 0.5 * (S_stable_edge + S_unstable_edge);
+   dSdT_expected = (S_unstable_edge - S_stable_edge) / (2 * dT0);
+
+   [S_neutral, dSdT_neutral] = STABLEFN(tair, tair, wspd, br_coefs);
+
+   testCase.verifyEqual(S_neutral, S_expected, 'RelTol', 1e-12);
+   testCase.verifyEqual(dSdT_neutral, dSdT_expected, 'RelTol', 1e-12);
 end
 
 function test_vappress2rh_recovers_saturation_for_ice_and_water(testCase)

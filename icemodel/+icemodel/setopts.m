@@ -165,12 +165,15 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts.turbulent_flux_scheme = 'bulk_richardson'; % 'bulk_richardson', 'bulk_mo'
 
    % Surface roughness lengths are tunable THF parameters. Leave them empty
-   % here and let configureRun resolve the canonical defaults from
-   % parameterLookup unless the caller overrides them explicitly.
+   % here and let configureRun resolve the canonical global defaults from
+   % parameterLookup unless the caller overrides them explicitly. Site-level
+   % calibration should use explicit resetopts(...) overrides rather than
+   % hidden site policy in the generic runtime defaults.
    opts.z0_bulk = [];
    opts.z0_ice = [];
    opts.z0_snow_low_density = [];
    opts.z0_snow_high_density = [];
+   opts.use_forcing_snow_depth_for_thf = false;
 
    % solver, timestepping, and mesh options
    if strcmp(smbmodel, 'icemodel')
@@ -181,7 +184,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       % 1 = coupled Dirichlet Ts-T iterations
       % 2 = Robin w/ single Ts-T coupling iteration
       % 3 = Robin w/ strong Ts-T coupling iterations
-      opts.solver          = 3;     % recommended: 3
+      opts.solver          = 2;     % recommended: 3
 
       % surface (SEB) solver (Dirichlet Ts boundary condition when solver = 1)
       opts.seb_solver      = 2;     % recommended: 2 (1=analytic, 2=numeric)

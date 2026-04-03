@@ -1,5 +1,5 @@
-function [Fsfc, Fdot] = SFCFLUX(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, ...
-      De, Ts, Qc, ea, cv_air, cv_liq, emiss, SB, roL, Tf, scoef, chi, liqflag)
+function [Fsfc, Fdot] = SFCFLUX(tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, ...
+      De, T_sfc, Qc, ea_atm, roL, br_coefs, chi, liqflag)
    %SFCFLUX Evaluate the explicit bulk-Richardson surface residual.
    %
    % The surface flux includes Qc for general use, but note for a
@@ -19,12 +19,12 @@ function [Fsfc, Fdot] = SFCFLUX(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, ...
    %#codegen
 
    % Total surface flux
-   Fsfc = surface_flux_residual(Ts, Ta, Qsi, Qli, albedo, wspd, ppt, tppt, ...
-      Pa, De, Qc, ea, cv_air, cv_liq, emiss, SB, roL, scoef, chi, liqflag);
-   
+   Fsfc = surface_flux_residual(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, tppt, ...
+      psfc, De, Qc, ea_atm, roL, br_coefs, chi, liqflag);
+
    % Numerical derivative
-   Fdot = (surface_flux_residual(Ts + 1e-10, Ta, Qsi, Qli, albedo, wspd, ...
-      ppt, tppt, Pa, De, Qc, ea, cv_air, cv_liq, emiss, SB, roL, scoef, ...
+   Fdot = (surface_flux_residual(T_sfc + 1e-10, tair, Qsi, Qli, albedo, wspd, ...
+      ppt, tppt, psfc, De, Qc, ea_atm, roL, br_coefs, ...
       chi, liqflag) - Fsfc) / 1e-10;
 
    % % for testing
@@ -36,19 +36,24 @@ function [Fsfc, Fdot] = SFCFLUX(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, ...
    % Q = Qr + Qh + Qe
 end
 
-function Fsfc = surface_flux_residual(Ts, Ta, Qsi, Qli, albedo, wspd, ppt, ...
-      tppt, Pa, De, Qc, ea, cv_air, cv_liq, emiss, SB, roL, scoef, chi, ...
-      liqflag)
+function Fsfc = surface_flux_residual(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, ...
+      tppt, psfc, De, Qc, ea_atm, roL, br_coefs, chi, liqflag)
    %SURFACE_FLUX_RESIDUAL Evaluate the explicit SEB residual used by SFCFLUX.
    %
    % This helper is file-local rather than nested because the residual has a
    % stable standalone contract and includes every flux term used by the
    % explicit bulk-Richardson surface solve, including precipitation advection.
 
+   persistent cv_liq emiss SB
+   if isempty(cv_liq)
+      [cv_liq, SB] = icemodel.physicalConstant('cv_liq', 'SB');
+      emiss = icemodel.parameterLookup('emiss');
+   end
+
    [Qe, Qh] = icemodel.surface.turbulent_heat_flux_bulk_richardson( ...
-      Ta, Ts, wspd, Pa, De, ea, cv_air, roL, scoef, liqflag, NaN);
+      T_sfc, tair, wspd, psfc, ea_atm, De, br_coefs, roL, liqflag, NaN);
    Qa = QADVECT(ppt, tppt, cv_liq);
 
-   Fsfc = chi * Qsi * (1.0 - albedo) + emiss * (Qli - SB * Ts ^ 4) ...
+   Fsfc = chi * Qsi * (1.0 - albedo) + emiss * (Qli - SB * T_sfc ^ 4) ...
       + Qc + Qa + Qh + Qe;
 end

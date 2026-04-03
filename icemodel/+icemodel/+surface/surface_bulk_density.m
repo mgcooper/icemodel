@@ -4,8 +4,8 @@ function ro_sfc = surface_bulk_density(f_ice_sfc, f_liq_sfc)
    %  ro_sfc = icemodel.surface.surface_bulk_density(f_ice_sfc, f_liq_sfc)
    %
    % The returned density includes the air-filled pore fraction so
-   % melt-weathered ice remains on the ice path until a snow layer exists.
-
+   % melt-weathered ice remains on the thf ice path until a snow layer exists.
+   %
    %#codegen
 
    persistent ro_ice ro_liq ro_air

@@ -1,5 +1,5 @@
-function [Qe, Qh, diag] = turbulent_heat_flux_bulk_richardson(Ta, Ts, ...
-      wspd, Pa, De, ea_atm, cv_air, roL, scoef, liqflag, z0_bulk)
+function [Qe, Qh, diag] = turbulent_heat_flux_bulk_richardson(T_sfc, tair, ...
+      wspd, psfc, ea_atm, De, br_coefs, roL, liqflag, z0_bulk)
    %TURBULENT_HEAT_FLUX_BULK_RICHARDSON Evaluate the explicit THF scheme.
    %
    %  [Qe, Qh] = icemodel.surface.turbulent_heat_flux_bulk_richardson(...)
@@ -11,32 +11,34 @@ function [Qe, Qh, diag] = turbulent_heat_flux_bulk_richardson(Ta, Ts, ...
    %
    %#codegen
 
-   persistent epsilon
-   if isempty(epsilon)
-      epsilon = icemodel.physicalConstant('epsilon');
-   end
-
-   es_sfc = VAPPRESS(Ts, liqflag);
-   St = STABLEFN(Ta, Ts, wspd, scoef);
-   Qe = LATENT(De, St, ea_atm, es_sfc, roL, epsilon, Pa);
-   Qh = SENSIBLE(De, St, Ta, Ts, cv_air);
+   % Saturation vapor pressure at the surface
+   es_sfc = VAPPRESS(T_sfc, liqflag);
+   
+   % Bulk-Richardson stability factor
+   stability = STABLEFN(T_sfc, tair, wspd, br_coefs);
+   
+   % Latent heat flux at the surface
+   Qe = LATENT(es_sfc, ea_atm, De, stability, psfc, roL);
+   
+   % Sensible heat flux at the surface
+   Qh = SENSIBLE(T_sfc, tair, De, stability);
 
    if nargout > 2
-      diag = bulk_richardson_diag(Ta, Ts, wspd, Pa, De, ea_atm, cv_air, ...
-         roL, St, es_sfc, z0_bulk);
+      diag = bulk_richardson_diag(T_sfc, es_sfc, tair, wspd, psfc, De, ...
+         ea_atm, stability, roL, z0_bulk);
    end
 end
 
-function diag = bulk_richardson_diag(Ta, Ts, wspd, Pa, De, ea_atm, cv_air, ...
-      roL, stability_factor, es_sfc, z0_bulk)
+function diag = bulk_richardson_diag(T_sfc, es_sfc, tair, wspd, psfc, De, ...
+      ea_atm, stability, roL, z0_bulk)
    %BULK_RICHARDSON_DIAG Assemble optional diagnostics for test/debug use.
 
-   diag_scalar = icemodel.surface.bulk_richardson_scalar_exchange(Ta, Ts, ...
-      wspd, Pa, De, ea_atm, cv_air, roL, stability_factor, es_sfc, z0_bulk);
+   diag_scalar = icemodel.surface.bulk_richardson_scalar_exchange(T_sfc, es_sfc, tair, ...
+      wspd, psfc, De, ea_atm, stability, roL, z0_bulk);
 
    diag = struct( ...
       'scheme', 'bulk_richardson', ...
-      'stability_factor', stability_factor, ...
+      'stability_factor', stability, ...
       'es_sfc', es_sfc, ...
       'z0m', z0_bulk, ...
       'z0h', diag_scalar.z0h, ...

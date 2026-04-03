@@ -21,6 +21,7 @@ function opts = buildSyntheticOpts(workspace, smbmodel, simyears, kwargs)
       kwargs.z0_ice (1, 1) double = NaN
       kwargs.z0_snow_low_density (1, 1) double = NaN
       kwargs.z0_snow_high_density (1, 1) double = NaN
+      kwargs.use_forcing_snow_depth_for_thf (1, 1) logical = false
       kwargs.n_spinup_years (1, 1) double {mustBeNonnegative, mustBeInteger} = 0
       kwargs.pathoutput (1, :) char = ''
       kwargs.use_restart (1, 1) logical = false
@@ -66,11 +67,11 @@ function opts = buildSyntheticOpts(workspace, smbmodel, simyears, kwargs)
    % Collect the override fields once so RESETOPTS stays data-driven.
    names = {'n_spinup_years', 'pathinput', 'pathuserdata', 'patheval', ...
       'output_profile', 'use_restart', 'restartfile', 'saverestart', 'dt', ...
-      'turbulent_flux_scheme'};
+      'turbulent_flux_scheme', 'use_forcing_snow_depth_for_thf'};
    values = {kwargs.n_spinup_years, workspace.inputdir, ...
       workspace.userdatadir, workspace.evaldir, kwargs.output_profile, ...
       kwargs.use_restart, kwargs.restartfile, kwargs.saverestart, dt_value, ...
-      turbulent_flux_scheme};
+      turbulent_flux_scheme, kwargs.use_forcing_snow_depth_for_thf};
    if isfinite(kwargs.solver)
       names{end+1} = 'solver';
       values{end+1} = kwargs.solver;

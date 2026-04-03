@@ -1,7 +1,7 @@
-function residual = surface_energy_balance_residual(Ts, Ta, Qsi, Qli, ...
-      albedo, wspd, ppt, tppt, Pa, De, ea, chi, roL, scoef, Qc, ...
+function residual = surface_energy_balance_residual(T_sfc, tair, Qsi, Qli, ...
+      albedo, wspd, ppt, tppt, psfc, De, ea_atm, chi, roL, br_coefs, Qc, ...
       liqflag, ro_sfc, snow_depth, opts)
-   %SURFACE_ENERGY_BALANCE_RESIDUAL Return the SEB residual at Ts.
+   %SURFACE_ENERGY_BALANCE_RESIDUAL Return the SEB residual at T_sfc.
    %
    %  residual = icemodel.surface.surface_energy_balance_residual(...)
    %
@@ -11,16 +11,15 @@ function residual = surface_energy_balance_residual(Ts, Ta, Qsi, Qli, ...
    %
    %#codegen
 
-   persistent cv_air cv_liq emiss SB
-   if isempty(cv_air)
-      [cv_air, cv_liq, SB] = icemodel.physicalConstant( ...
-         'cv_air', 'cv_liq', 'SB');
+   persistent cv_liq emiss SB
+   if isempty(cv_liq)
+      [cv_liq, SB] = icemodel.physicalConstant('cv_liq', 'SB');
       emiss = icemodel.parameterLookup('emiss');
    end
 
-   [Qe, Qh] = icemodel.surface.turbulent_heat_flux(Ta, Ts, wspd, Pa, De, ...
-      ea, cv_air, roL, scoef, liqflag, ro_sfc, snow_depth, opts);
+   [Qe, Qh] = icemodel.surface.turbulent_heat_flux(T_sfc, tair, wspd, psfc, ...
+      ea_atm, De, br_coefs, ro_sfc, snow_depth, roL, liqflag, opts);
 
-   residual = chi * (1.0 - albedo) * Qsi + emiss * (Qli - SB * Ts ^ 4) ...
+   residual = chi * (1.0 - albedo) * Qsi + emiss * (Qli - SB * T_sfc ^ 4) ...
       + Qc + Qh + Qe + QADVECT(ppt, tppt, cv_liq);
 end

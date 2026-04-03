@@ -1,5 +1,5 @@
-function diag_scalar = bulk_richardson_scalar_exchange(Ta, Ts, wspd, Pa, ...
-      De, ea_atm, cv_air, roL, stability_factor, es_sfc, z0_bulk)
+function diag_scalar = bulk_richardson_scalar_exchange(T_sfc, es_sfc, tair, ...
+      wspd, psfc, De, ea_atm, stability, roL, z0_bulk)
    %BULK_RICHARDSON_SCALAR_EXCHANGE Diagnose a scalar-exchange alternative.
    %
    %  diag_scalar = icemodel.surface.bulk_richardson_scalar_exchange(...)
@@ -15,9 +15,10 @@ function diag_scalar = bulk_richardson_scalar_exchange(Ta, Ts, wspd, Pa, ...
    %
    %#codegen
 
-   persistent epsilon kappa nu_air
+   persistent epsilon kappa nu_air cv_air
    if isempty(epsilon)
-      [epsilon, kappa] = icemodel.physicalConstant('epsilon', 'kappa');
+      [epsilon, kappa, cv_air] = icemodel.physicalConstant( ...
+         'epsilon', 'kappa', 'cv_air');
       nu_air = 1.461e-5;
    end
 
@@ -35,17 +36,17 @@ function diag_scalar = bulk_richardson_scalar_exchange(Ta, Ts, wspd, Pa, ...
 
    if ~(isfinite(wspd) && isfinite(De) && isfinite(z0_bulk)) ...
          || wspd <= 0 || De <= 0 || z0_bulk <= 0
-      diag_scalar.Qh = cv_air * De * stability_factor * (Ta - Ts);
-      diag_scalar.Qe = roL * De * stability_factor ...
-         * (epsilon / Pa * (ea_atm - es_sfc));
+      diag_scalar.Qh = cv_air * De * stability * (tair - T_sfc);
+      diag_scalar.Qe = roL * De * stability ...
+         * (epsilon / psfc * (ea_atm - es_sfc));
       return
    end
 
    Cd = De / wspd;
    if ~(isfinite(Cd) && Cd > 0)
-      diag_scalar.Qh = cv_air * De * stability_factor * (Ta - Ts);
-      diag_scalar.Qe = roL * De * stability_factor ...
-         * (epsilon / Pa * (ea_atm - es_sfc));
+      diag_scalar.Qh = cv_air * De * stability * (tair - T_sfc);
+      diag_scalar.Qe = roL * De * stability ...
+         * (epsilon / psfc * (ea_atm - es_sfc));
       return
    end
 
@@ -57,9 +58,9 @@ function diag_scalar = bulk_richardson_scalar_exchange(Ta, Ts, wspd, Pa, ...
 
    if ~(isfinite(z_obs) && isfinite(u_star) && isfinite(Re) && ...
          isfinite(z0h) && isfinite(z0q) && z_obs > z0h && z_obs > z0q)
-      diag_scalar.Qh = cv_air * De * stability_factor * (Ta - Ts);
-      diag_scalar.Qe = roL * De * stability_factor ...
-         * (epsilon / Pa * (ea_atm - es_sfc));
+      diag_scalar.Qh = cv_air * De * stability * (tair - T_sfc);
+      diag_scalar.Qe = roL * De * stability ...
+         * (epsilon / psfc * (ea_atm - es_sfc));
       return
    end
 
@@ -74,9 +75,9 @@ function diag_scalar = bulk_richardson_scalar_exchange(Ta, Ts, wspd, Pa, ...
    diag_scalar.z0q = z0q;
    diag_scalar.De_h = De_h;
    diag_scalar.De_e = De_e;
-   diag_scalar.Qh = cv_air * De_h * stability_factor * (Ta - Ts);
-   diag_scalar.Qe = roL * De_e * stability_factor ...
-      * (epsilon / Pa * (ea_atm - es_sfc));
+   diag_scalar.Qh = cv_air * De_h * stability * (tair - T_sfc);
+   diag_scalar.Qe = roL * De_e * stability ...
+      * (epsilon / psfc * (ea_atm - es_sfc));
 end
 
 function [z0h, z0q] = scalar_roughness_lengths(z0_bulk, Re)

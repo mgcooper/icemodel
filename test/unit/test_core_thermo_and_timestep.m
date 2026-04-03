@@ -95,31 +95,34 @@ function test_sfcflin_matches_surface_terms_at_linearization_point(testCase)
    [cv_air, cv_liq, SB, roLs, Tf, epsilon] = icemodel.physicalConstant( ...
       'cv_air', 'cv_liq', 'SB', 'roLs', 'Tf', 'epsilon');
    emiss = icemodel.parameterLookup('emiss');
-   [De, scoef] = WINDCOEF(4.0, 0.001, 2.0, 3.0);
+   wspd = 4.0;
+   z0_bulk = 0.001;
+   z_tair = 2.0;
+   z_wind = 3.0;
+   [De, br_coefs] = WINDCOEF(wspd, z0_bulk, z_tair, z_wind);
 
-   Ta = Tf - 10.0;
-   Ts = Tf - 5.0;
+   tair = Tf - 10.0;
+   T_sfc = Tf - 5.0;
    Qsi = 200.0;
    Qli = 240.0;
    albedo = 0.6;
-   wspd = 4.0;
    ppt = 2e-4;
-   tppt = Ta + 4.0;
-   Pa = 78000.0;
+   tppt = tair + 4.0;
+   psfc = 78000.0;
    chi = 1.0;
    liqflag = false;
-   ea = 0.8 * VAPPRESS(Ta, liqflag);
+   ea_atm = 0.8 * VAPPRESS(tair, liqflag);
 
-   [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ea, ...
-      cv_air, cv_liq, emiss, SB, roLs, scoef, chi, Tf, Ts, liqflag);
+   [Sc, Sp] = SFCFLIN(tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, De, ...
+      ea_atm, roLs, br_coefs, chi, T_sfc, liqflag);
 
-   es = VAPPRESS(Ts, liqflag);
-   S = STABLEFN(Ta, Ts, wspd, scoef);
-   F = emiss * (Qli - SB * Ts ^ 4) ...
+   es_sfc = VAPPRESS(T_sfc, liqflag);
+   stability = STABLEFN(T_sfc, tair, wspd, br_coefs);
+   F = emiss * (Qli - SB * T_sfc ^ 4) ...
       + chi * Qsi * (1 - albedo) ...
-      + cv_air * De * (Ta - Ts) * S ...
-      + roLs * De * epsilon / Pa * (ea - es) * S ...
+      + cv_air * De * (tair - T_sfc) * stability ...
+      + roLs * De * epsilon / psfc * (ea_atm - es_sfc) * stability ...
       + QADVECT(ppt, tppt, cv_liq);
 
-   testCase.verifyEqual(Sc + Sp * Ts, F, 'RelTol', 1e-10);
+   testCase.verifyEqual(Sc + Sp * T_sfc, F, 'RelTol', 1e-10);
 end

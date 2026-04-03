@@ -32,6 +32,40 @@ function test_surface_roughness_length_switches_on_snow_depth(testCase)
    testCase.verifyEqual(z0m_snow_high, 5e-4, 'AbsTol', 1e-12);
 end
 
+function test_forcing_snow_depth_hook_can_switch_bulk_mo_to_snow_roughness(testCase)
+   % The optional forcing snow-depth hook should switch the bulk-MO
+   % roughness path without requiring a full snow model.
+
+   workspace = testCase.TestData.workspace;
+   snow_depth = 0.08 + zeros(workspace.nsteps, 1);
+   icemodel.test.fixtures.makeSyntheticMetFile(2016, ...
+      'sitename', workspace.sitename, ...
+      'forcings', workspace.forcings, ...
+      'nsteps', workspace.nsteps, ...
+      'dt_seconds', workspace.dt_seconds, ...
+      'snow_depth', snow_depth, ...
+      'metdir', workspace.metdir);
+
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'icemodel', 2016, solver=1, seb_solver=2, ...
+      turbulent_flux_scheme='bulk_mo', ...
+      use_forcing_snow_depth_for_thf=true, ...
+      z0_ice=0.02, z0_snow_low_density=0.0015, ...
+      testname='forcing_snow_depth_hook');
+   met = icemodel.loadmet(opts);
+   [~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, forcing_snow_depth] = METINIT(opts);
+
+   snow_depth_scalar = icemodel.surface.resolve_forcing_snow_depth( ...
+      forcing_snow_depth, 1, opts.use_forcing_snow_depth_for_thf);
+   z0m = icemodel.surface.surface_roughness_length( ...
+      snow_depth_scalar, 350.0, opts.z0_ice, ...
+      opts.z0_snow_low_density, opts.z0_snow_high_density);
+
+   testCase.verifyEqual(met.snow_depth(1), snow_depth(1), 'AbsTol', 1e-12);
+   testCase.verifyEqual(snow_depth_scalar, snow_depth(1), 'AbsTol', 1e-12);
+   testCase.verifyEqual(z0m, opts.z0_snow_low_density, 'AbsTol', 1e-12);
+end
+
 function test_bulk_richardson_dispatch_matches_legacy_flux_kernels(testCase)
    % The dispatcher should reproduce the legacy sensible/latent formulas
    % when the configured scheme is bulk_richardson.
@@ -39,16 +73,15 @@ function test_bulk_richardson_dispatch_matches_legacy_flux_kernels(testCase)
    s = icemodel.test.fixtures.makeSyntheticColumnState( ...
       testCase.TestData.workspace, 'icemodel', solver=1, ...
       testname='bulk_richardson_dispatch');
-   Ts = MELTTEMP(s.Ts, s.Tf);
-   S = STABLEFN(s.tair, Ts, s.wspd, s.scoef);
-   es_sfc = VAPPRESS(Ts, s.liqflag);
-   epsilon = icemodel.physicalConstant('epsilon');
-   Qe_ref = LATENT(s.De, S, s.ea, es_sfc, s.roL, epsilon, s.psfc);
-   Qh_ref = SENSIBLE(s.De, S, s.tair, Ts, s.cv_air);
+   T_sfc = icemodel.kernels.physical_surface_temperature(s.Ts);
+   stability = STABLEFN(T_sfc, s.tair, s.wspd, s.br_coefs);
+   es_sfc = VAPPRESS(T_sfc, s.liqflag);
+   Qe_ref = LATENT(es_sfc, s.ea_atm, s.De, stability, s.psfc, s.roL);
+   Qh_ref = SENSIBLE(T_sfc, s.tair, s.De, stability);
 
-   [Qe, Qh, diag] = icemodel.surface.turbulent_heat_flux(s.tair, Ts, s.wspd, s.psfc, ...
-      s.De, s.ea, s.cv_air, s.roL, s.scoef, s.liqflag, s.ro_sfc, ...
-      s.snow_depth, s.opts);
+   [Qe, Qh, diag] = icemodel.surface.turbulent_heat_flux(T_sfc, s.tair, s.wspd, ...
+      s.psfc, s.ea_atm, s.De, s.br_coefs, s.ro_sfc, s.snow_depth, s.roL, ...
+      s.liqflag, s.opts);
 
    testCase.verifyEqual(Qe, Qe_ref, 'RelTol', 1e-12);
    testCase.verifyEqual(Qh, Qh_ref, 'RelTol', 1e-12);
@@ -63,17 +96,20 @@ function test_bulk_richardson_scalar_exchange_experiment_weakens_rough_ice_fluxe
       testCase.TestData.workspace, 'icemodel', 2016, solver=1, ...
       z0_bulk=0.05, testname='bulk_richardson_scalar_experiment');
 
-   Ta = 268.15;
-   Ts = 263.15;
+   tair = 268.15;
+   T_sfc = 263.15;
    wspd = 6.0;
-   Pa = 90000.0;
+   psfc = 90000.0;
    rh = 75.0;
-   ea = icemodel.surface.atmospheric_vapor_pressure(Ta, rh, false);
-   [cv_air, roLs] = icemodel.physicalConstant('cv_air', 'roLs');
-   [De, scoef] = WINDCOEF(wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
+   ea_atm = icemodel.surface.atmospheric_vapor_pressure(tair, rh, false);
+   [roLs, epsilon] = icemodel.physicalConstant('roLs', 'epsilon');
+   [De, br_coefs] = WINDCOEF(wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
 
-   [Qe, Qh, diag] = icemodel.surface.turbulent_heat_flux(Ta, Ts, wspd, Pa, ...
-      De, ea, cv_air, roLs, scoef, false, 650.0, 0.0, opts);
+   ro_sfc = 650.0;
+   snow_depth = 0.0;
+   liqflag = false;
+   [Qe, Qh, diag] = icemodel.surface.turbulent_heat_flux(T_sfc, tair, wspd, psfc, ...
+      ea_atm, De, br_coefs, ro_sfc, snow_depth, roLs, liqflag, opts);
 
    testCase.verifyTrue(diag.scalar_exchange_active);
    testCase.verifyGreaterThan(diag.scalar_exchange_z_obs, diag.z0m);
@@ -81,10 +117,11 @@ function test_bulk_richardson_scalar_exchange_experiment_weakens_rough_ice_fluxe
    testCase.verifyLessThan(diag.z0q, diag.z0m);
    testCase.verifyLessThan(diag.scalar_exchange_De_h, De);
    testCase.verifyLessThan(diag.scalar_exchange_De_e, De);
-   testCase.verifyEqual(Qh, cv_air * De * diag.stability_factor * (Ta - Ts), ...
+   cv_air = icemodel.physicalConstant('cv_air');
+   testCase.verifyEqual(Qh, cv_air * De * diag.stability_factor * (tair - T_sfc), ...
       'RelTol', 1e-12);
    testCase.verifyEqual(Qe, roLs * De * diag.stability_factor ...
-      * (0.622 / Pa * (ea - diag.es_sfc)), 'RelTol', 1e-12);
+      * (epsilon / psfc * (ea_atm - diag.es_sfc)), 'RelTol', 1e-12);
    testCase.verifyLessThan(abs(diag.scalar_exchange_Qh), abs(Qh));
    testCase.verifyLessThan(abs(diag.scalar_exchange_Qe), abs(Qe));
 end
@@ -93,17 +130,19 @@ function test_bulk_richardson_scalar_exchange_diagnostic_is_noop_for_calm_air(te
    % The scalar-exchange experiment should degrade gracefully when the
    % current De contract provides no usable aerodynamic signal.
 
-   Ta = 268.15;
-   Ts = 263.15;
+   tair = 268.15;
+   T_sfc = 263.15;
    wspd = 0.0;
-   Pa = 90000.0;
+   psfc = 90000.0;
    De = 0.0;
-   ea = 300.0;
-   cv_air = icemodel.physicalConstant('cv_air');
+   ea_atm = 300.0;
    roLs = icemodel.physicalConstant('roLs');
+   br_coefs = [NaN, NaN, NaN];
+   liqflag = false;
+   z0_bulk = 0.05;
 
    [Qe, Qh, diag] = icemodel.surface.turbulent_heat_flux_bulk_richardson( ...
-      Ta, Ts, wspd, Pa, De, ea, cv_air, roLs, [NaN, NaN, NaN], false, 0.05);
+      T_sfc, tair, wspd, psfc, ea_atm, De, br_coefs, roLs, liqflag, z0_bulk);
 
    testCase.verifyFalse(diag.scalar_exchange_active);
    testCase.verifyEqual(diag.scalar_exchange_De_h, 0.0, 'AbsTol', 1e-12);
@@ -124,19 +163,22 @@ function test_bulk_mo_finite_and_weaker_scalar_exchange_for_rough_ice(testCase)
       seb_solver=2, turbulent_flux_scheme='bulk_mo', z0_bulk=0.05, ...
       z0_ice=0.05, testname='rough_bulk_mo');
 
-   Ta = 268.15;
-   Ts = 263.15;
+   tair = 268.15;
+   T_sfc = 263.15;
    wspd = 6.0;
-   Pa = 90000.0;
+   psfc = 90000.0;
    rh = 75.0;
-   ea = icemodel.surface.atmospheric_vapor_pressure(Ta, rh, false);
-   [cv_air, roLs] = icemodel.physicalConstant('cv_air', 'roLs');
-   [De, scoef] = WINDCOEF(wspd, 0.05, opts_liston.z_tair, opts_liston.z_wind);
+   ea_atm = icemodel.surface.atmospheric_vapor_pressure(tair, rh, false);
+   roLs = icemodel.physicalConstant('roLs');
+   [De, br_coefs] = WINDCOEF(wspd, 0.05, opts_liston.z_tair, opts_liston.z_wind);
 
-   [Qe_liston, Qh_liston] = icemodel.surface.turbulent_heat_flux(Ta, Ts, wspd, Pa, ...
-      De, ea, cv_air, roLs, scoef, false, 650.0, 0.0, opts_liston);
-   [Qe_vanas, Qh_vanas, diag_vanas] = icemodel.surface.turbulent_heat_flux(Ta, Ts, ...
-      wspd, Pa, De, ea, cv_air, roLs, scoef, false, 650.0, 0.0, opts_vanas);
+   ro_sfc = 650.0;
+   snow_depth = 0.0;
+   liqflag = false;
+   [Qe_liston, Qh_liston] = icemodel.surface.turbulent_heat_flux(T_sfc, tair, wspd, psfc, ...
+      ea_atm, De, br_coefs, ro_sfc, snow_depth, roLs, liqflag, opts_liston);
+   [Qe_vanas, Qh_vanas, diag_vanas] = icemodel.surface.turbulent_heat_flux(T_sfc, tair, ...
+      wspd, psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, roLs, liqflag, opts_vanas);
 
    testCase.verifyTrue(all(isfinite([Qe_vanas, Qh_vanas, diag_vanas.L, ...
       diag_vanas.u_star, diag_vanas.z0h, diag_vanas.z0q])));
@@ -152,19 +194,21 @@ function test_bulk_mo_respects_surface_phase_switch(testCase)
       testCase.TestData.workspace, 'icemodel', 2016, solver=1, ...
       seb_solver=2, turbulent_flux_scheme='bulk_mo', testname='phase_bulk_mo');
 
-   Ta = 273.15;
-   Ts = 272.15;
+   tair = 273.15;
+   T_sfc = 272.15;
    wspd = 5.0;
-   Pa = 90000.0;
-   ea = icemodel.surface.atmospheric_vapor_pressure(Ta, 90.0, false);
-   [cv_air, roLs] = icemodel.physicalConstant('cv_air', 'roLs');
-   [De, scoef] = WINDCOEF(wspd, opts_vanas.z0_bulk, opts_vanas.z_tair, ...
+   psfc = 90000.0;
+   ea_atm = icemodel.surface.atmospheric_vapor_pressure(tair, 90.0, false);
+   roLs = icemodel.physicalConstant('roLs');
+   [De, br_coefs] = WINDCOEF(wspd, opts_vanas.z0_bulk, opts_vanas.z_tair, ...
       opts_vanas.z_wind);
+   ro_sfc = 600.0;
+   snow_depth = 0.0;
 
-   [Qe_ice, ~, diag_ice] = icemodel.surface.turbulent_heat_flux(Ta, Ts, wspd, Pa, ...
-      De, ea, cv_air, roLs, scoef, false, 600.0, 0.0, opts_vanas);
-   [Qe_liq, ~, diag_liq] = icemodel.surface.turbulent_heat_flux(Ta, Ts, wspd, Pa, ...
-      De, ea, cv_air, roLs, scoef, true, 600.0, 0.0, opts_vanas);
+   [Qe_ice, ~, diag_ice] = icemodel.surface.turbulent_heat_flux(T_sfc, tair, wspd, psfc, ...
+      ea_atm, De, br_coefs, ro_sfc, snow_depth, roLs, false, opts_vanas);
+   [Qe_liq, ~, diag_liq] = icemodel.surface.turbulent_heat_flux(T_sfc, tair, wspd, psfc, ...
+      ea_atm, De, br_coefs, ro_sfc, snow_depth, roLs, true, opts_vanas);
 
    testCase.verifyNotEqual(diag_ice.es_sfc, diag_liq.es_sfc);
    testCase.verifyNotEqual(Qe_ice, Qe_liq);
@@ -179,23 +223,23 @@ function test_bulk_mo_cold_state_remains_continuous(testCase)
       seb_solver=2, turbulent_flux_scheme='bulk_mo', ...
       testname='cold_bulk_mo_continuity');
 
-   Ta = 260.755;
+   tair = 260.755;
    wspd = 1.41;
-   Pa = 87416.0;
-   ea = 150.425;
+   psfc = 87416.0;
+   ea_atm = 150.425;
+   T_sfc_1 = 245.2210;
+   T_sfc_2 = 245.2220;
    ro_sfc = 135.536437794510;
    snow_depth = 0.0;
    liqflag = false;
    roL = 3.664362e6;
-   scoef = 6.170329907002;
-   cv_air = icemodel.physicalConstant('cv_air');
+   De = 0.0;
+   br_coefs = [];
 
-   [Qe1, Qh1, diag1] = icemodel.surface.turbulent_heat_flux(Ta, 245.2210, ...
-      wspd, Pa, 0.0, ea, cv_air, roL, scoef, liqflag, ro_sfc, ...
-      snow_depth, opts_vanas);
-   [Qe2, Qh2, diag2] = icemodel.surface.turbulent_heat_flux(Ta, 245.2220, ...
-      wspd, Pa, 0.0, ea, cv_air, roL, scoef, liqflag, ro_sfc, ...
-      snow_depth, opts_vanas);
+   [Qe1, Qh1, diag1] = icemodel.surface.turbulent_heat_flux(T_sfc_1, tair, ...
+      wspd, psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, roL, liqflag, opts_vanas);
+   [Qe2, Qh2, diag2] = icemodel.surface.turbulent_heat_flux(T_sfc_2, tair, ...
+      wspd, psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, roL, liqflag, opts_vanas);
 
    testCase.verifyTrue(all(isfinite([Qe1, Qh1, Qe2, Qh2, diag1.L, diag2.L])));
    testCase.verifyLessThan(abs(Qh2 - Qh1), 1e-2);
@@ -213,7 +257,7 @@ function test_bulk_mo_robin_linearization_matches_finite_difference(testCase)
 
    [Fc, Fp, diag] = icemodel.surface.surface_flux_linearization_bulk_mo( ...
       s.Ts, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, s.tppt, ...
-      s.psfc, s.De, s.ea, s.chi, s.roL, s.liqflag, s.ro_sfc, ...
+      s.psfc, s.De, s.ea_atm, s.chi, s.roL, s.liqflag, s.ro_sfc, ...
       s.snow_depth, s.opts);
 
    h = 1e-5;
@@ -262,16 +306,15 @@ function test_bulk_mo_synthetic_icemodel_robin_run_completes(testCase)
    testCase.verifyTrue(all(isfinite(ice1.Qh)));
 end
 
-function q_surface = surface_flux_bulk_mo(Ts, s)
-   %SURFACE_FLUX_BULK_MO Evaluate the non-conductive surface flux at Ts.
+function q_surface = surface_flux_bulk_mo(T_sfc, s)
+   %SURFACE_FLUX_BULK_MO Evaluate the non-conductive surface flux at T_sfc.
 
-   [Qe, Qh] = icemodel.surface.turbulent_heat_flux(s.tair, Ts, s.wspd, ...
-      s.psfc, s.De, s.ea, s.cv_air, s.roL, s.scoef, s.liqflag, s.ro_sfc, ...
-      s.snow_depth, s.opts);
-   Qle = LONGOUT(Ts, s.emiss, s.SB);
+   [Qe, Qh] = icemodel.surface.turbulent_heat_flux(T_sfc, s.tair, s.wspd, ...
+      s.psfc, s.ea_atm, s.De, s.br_coefs, s.ro_sfc, s.snow_depth, s.roL, ...
+      s.liqflag, s.opts);
+   Qle = LONGOUT(T_sfc, s.emiss, s.SB);
    Qa = QADVECT(s.ppt, s.tppt, s.cv_liq);
-   q_surface = ENBAL(s.albedo, s.emiss, s.chi, s.swd, s.lwd, Qle, Qh, Qe, ...
-      0.0, Qa, 0.0);
+   q_surface = ENBAL(s.chi, s.albedo, s.swd, s.lwd, Qle, Qh, Qe, 0.0, Qa, 0.0);
 end
 
 function test_potential_surface_vapor_tendency_uses_physical_surface_temperature(testCase)
@@ -286,17 +329,17 @@ function test_potential_surface_vapor_tendency_uses_physical_surface_temperature
    Ts_solver = s.Tf + 3.0;
 
    [d_pevp, pevp, Qe, Ts_phys] = ...
-      icemodel.surface.potential_surface_vapor_tendency(Ts_solver, s.Tf, ...
-      s.tair, s.wspd, s.psfc, s.De, s.ea, s.cv_air, s.roL, s.scoef, ...
-      s.liqflag, s.ro_sfc, s.snow_depth, s.opts, Lv, s.ro_liq, ...
-      s.opts.dt, s.dz(1));
+      icemodel.surface.potential_surface_vapor_tendency(Ts_solver, s.tair, ...
+      s.wspd, s.psfc, s.ea_atm, s.De, s.br_coefs, s.snow_depth, s.f_ice(1), ...
+      s.f_liq(1), s.opts.dt, s.dz(1), s.roL, s.liqflag, s.opts);
 
-   [Qe_phys, ~] = icemodel.surface.turbulent_heat_flux(s.tair, ...
-      MELTTEMP(Ts_solver, s.Tf), s.wspd, s.psfc, s.De, s.ea, s.cv_air, ...
-      s.roL, s.scoef, s.liqflag, s.ro_sfc, s.snow_depth, s.opts);
-   [Qe_uncapped, ~] = icemodel.surface.turbulent_heat_flux(s.tair, ...
-      Ts_solver, s.wspd, s.psfc, s.De, s.ea, s.cv_air, s.roL, s.scoef, ...
-      s.liqflag, s.ro_sfc, s.snow_depth, s.opts);
+   [Qe_phys, ~] = icemodel.surface.turbulent_heat_flux( ...
+      icemodel.kernels.physical_surface_temperature(Ts_solver), ...
+      s.tair, s.wspd, s.psfc, s.ea_atm, s.De, s.br_coefs, s.ro_sfc, ...
+      s.snow_depth, s.roL, s.liqflag, s.opts);
+   [Qe_uncapped, ~] = icemodel.surface.turbulent_heat_flux( ...
+      Ts_solver, s.tair, s.wspd, s.psfc, s.ea_atm, s.De, s.br_coefs, ...
+      s.ro_sfc, s.snow_depth, s.roL, s.liqflag, s.opts);
 
    testCase.verifyEqual(Ts_phys, s.Tf, 'AbsTol', 1e-12);
    testCase.verifyEqual(Qe, Qe_phys, 'RelTol', 1e-12);
@@ -322,7 +365,7 @@ function test_thf_debug_dump_reuses_diag_contract(testCase)
 
    icemodel.surface.dump_turbulent_heat_flux_debug_state( ...
       'unit_test', s.Ts, s.Ts - 0.5, s.tair, s.swd, s.lwd, s.albedo, ...
-      s.wspd, s.ppt, s.tppt, s.psfc, s.De, s.ea, s.chi, s.roL, s.scoef, ...
+      s.wspd, s.ppt, s.tppt, s.psfc, s.De, s.ea_atm, s.chi, s.roL, s.br_coefs, ...
       s.liqflag, s.T, s.k_eff, s.dz, s.ro_sfc, s.snow_depth, s.opts);
 
    loaded = load(debug_file, 'debug_state');

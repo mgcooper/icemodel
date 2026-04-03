@@ -52,7 +52,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
 
    metstep = kwargs.metstep;
    % Extract one forcing step and the corresponding transfer coefficients.
-   [tair, swd, lwd, albedo, wspd, psfc, De, ea] = LOADMETDATA(met, metstep, ...
+   [tair, swd, lwd, albedo, wspd, psfc, De, ea, forcing_snow_depth] = LOADMETDATA(met, metstep, ...
       liqflag);
    [~, scoef] = WINDCOEF(wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
 
@@ -96,7 +96,8 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    state.z_nodes = z_nodes;
    state.Ts = Ts;
    state.ro_sfc = icemodel.surface.surface_bulk_density(f_ice(1), f_liq(1));
-   state.snow_depth = 0.0;
+   state.snow_depth = icemodel.surface.resolve_forcing_snow_depth( ...
+      forcing_snow_depth, 1, opts.use_forcing_snow_depth_for_thf);
    state.JJ = JJ;
    state.Sc = Sc;
    state.Sp = Sp;
@@ -122,8 +123,8 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    state.tppt = tppt;
    state.psfc = psfc;
    state.De = De;
-   state.ea = ea;
-   state.scoef = scoef;
+   state.ea_atm = ea;
+   state.br_coefs = scoef;
    state.chi = 1.0;
 
    state.cv_air = cv_air;

@@ -1,8 +1,8 @@
 function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
-      De, S, time] = METINIT(opts, fileiter)
+      De, br_coefs, time, snow_depth] = METINIT(opts, fileiter)
    %METINIT Load and expand the meteorological forcing vectors.
    %
-   %  [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, De, S, time] ...
+   %  [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, De, br_coefs, time] ...
    %     = METINIT(opts)
    %  ... = METINIT(opts, fileiter)
    %
@@ -17,8 +17,9 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    %  rain   - rainfall-rate placeholder [kg m^-2 s^-1]
    %  tppt   - precipitation wet-bulb temperature [K]
    %  De     - aerodynamic exchange coefficient from WINDCOEF [m s^-1]
-   %  S      - legacy stability-coefficient vector from WINDCOEF [1]
+   %  br_coefs - legacy stability-coefficient vector from WINDCOEF [1]
    %  time   - forcing timestamps [datetime]
+   %  snow_depth - optional forcing snow depth [m]; NaN when unavailable
    %
    %#codegen
 
@@ -40,6 +41,11 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    psfc = met.psfc;
    time = met.Time;
    albedo = met.albedo;
+   if isvariable('snow_depth', met)
+      snow_depth = met.snow_depth;
+   else
+      snow_depth = nan(size(tair));
+   end
 
    % Rainfall forcing is still ignored in the core time integration.
    % Keep the legacy zero-rain behavior explicit here until rain/snow/ppt
@@ -47,7 +53,10 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    rain = 0 * tair;
 
    % TODO: support snowfall, and confirm if forcing files are consistent wrt
-   % rain/snow/ppt/prec variable names
+   % rain/snow/ppt/prec variable names. The optional forcing-snow-depth hook
+   % used by the THF roughness selector is standardized separately as
+   % `snow_depth`, but it does not imply a full snow-model mass/energy
+   % treatment and may remain NaN in existing station datasets.
 
    % Solve for wet bulb
    tppt = nan(size(rh));
@@ -57,5 +66,5 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
 
    % The canonical met loader already computes De after all swaps/subsetting.
    De = met.De;
-   [~, S] = WINDCOEF(wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
+   [~, br_coefs] = WINDCOEF(wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
 end

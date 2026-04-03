@@ -1,5 +1,5 @@
-function [Fc, Fp, diag] = surface_flux_linearization_bulk_mo(Ts, Ta, ...
-      Qsi, Qli, albedo, wspd, ppt, tppt, Pa, De, ea, chi, roL, liqflag, ...
+function [Fc, Fp, diag] = surface_flux_linearization_bulk_mo(T_sfc, tair, ...
+      Qsi, Qli, albedo, wspd, ppt, tppt, psfc, De, ea_atm, chi, roL, liqflag, ...
       ro_sfc, snow_depth, opts)
    %SURFACE_FLUX_LINEARIZATION_BULK_MO Linearize the bulk-MO surface flux.
    %
@@ -7,7 +7,7 @@ function [Fc, Fp, diag] = surface_flux_linearization_bulk_mo(Ts, Ta, ...
    %  [Fc, Fp, diag] = icemodel.surface.surface_flux_linearization_bulk_mo(...)
    %
    % The Robin coupler expects a linear boundary-flux form:
-   %   q_surface(Ts) ≈ Fc + Fp * Ts
+   %   q_surface(T_sfc) ≈ Fc + Fp * T_sfc
    %
    % This helper evaluates the current surface flux state, then computes the
    % local derivative using a complex-step perturbation. It intentionally
@@ -22,17 +22,17 @@ function [Fc, Fp, diag] = surface_flux_linearization_bulk_mo(Ts, Ta, ...
       h = 1e-10;
    end
 
-   q_surface = surface_flux(Ts, Ta, Qsi, Qli, albedo, wspd, ppt, tppt, ...
-      Pa, De, ea, chi, roL, liqflag, ro_sfc, snow_depth, opts);
-   q_surface_step = surface_flux(Ts + 1i * h, Ta, Qsi, Qli, albedo, wspd, ...
-      ppt, tppt, Pa, De, ea, chi, roL, liqflag, ro_sfc, snow_depth, opts);
+   q_surface = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, tppt, ...
+      psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, snow_depth, opts);
+   q_surface_step = surface_flux(T_sfc + 1i * h, tair, Qsi, Qli, albedo, wspd, ...
+      ppt, tppt, psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, snow_depth, opts);
 
    Fp = imag(q_surface_step) / h;
-   Fc = q_surface - Fp * Ts;
+   Fc = q_surface - Fp * T_sfc;
 
    if nargout > 2
-      [~, diag_thf] = surface_flux(Ts, Ta, Qsi, Qli, albedo, wspd, ppt, ...
-         tppt, Pa, De, ea, chi, roL, liqflag, ro_sfc, snow_depth, opts);
+      [~, diag_thf] = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, ...
+         tppt, psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, snow_depth, opts);
       diag = struct( ...
          'scheme', 'bulk_mo', ...
          'q_surface', q_surface, ...
@@ -41,28 +41,27 @@ function [Fc, Fp, diag] = surface_flux_linearization_bulk_mo(Ts, Ta, ...
    end
 end
 
-function [q_surface, diag_thf] = surface_flux(Ts, Ta, Qsi, Qli, albedo, wspd, ppt, ...
-      tppt, Pa, De, ea, chi, roL, liqflag, ro_sfc, snow_depth, opts)
-   %SURFACE_FLUX Evaluate the non-conductive surface flux at Ts.
+function [q_surface, diag_thf] = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, ...
+      tppt, psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, snow_depth, opts)
+   %SURFACE_FLUX Evaluate the non-conductive surface flux at T_sfc.
 
-   persistent cv_air cv_liq emiss SB
+   persistent cv_liq emiss SB
    if isempty(cv_liq)
-      [cv_air, cv_liq, SB] = icemodel.physicalConstant( ...
-         'cv_air', 'cv_liq', 'SB');
+      [cv_liq, SB] = icemodel.physicalConstant('cv_liq', 'SB');
       emiss = icemodel.parameterLookup('emiss');
    end
 
+   % bulk_mo does not use br_coefs; pass [] as placeholder for the dispatcher.
    if nargout > 1
-      [Qe, Qh, diag_thf] = icemodel.surface.turbulent_heat_flux(Ta, Ts, ...
-         wspd, Pa, De, ea, cv_air, roL, 0.0, liqflag, ro_sfc, ...
-         snow_depth, opts);
+      [Qe, Qh, diag_thf] = icemodel.surface.turbulent_heat_flux(T_sfc, tair, ...
+         wspd, psfc, ea_atm, De, [], ro_sfc, snow_depth, roL, liqflag, opts);
    else
-      [Qe, Qh] = icemodel.surface.turbulent_heat_flux(Ta, Ts, wspd, Pa, ...
-         De, ea, cv_air, roL, 0.0, liqflag, ro_sfc, snow_depth, opts);
+      [Qe, Qh] = icemodel.surface.turbulent_heat_flux(T_sfc, tair, wspd, psfc, ...
+         ea_atm, De, [], ro_sfc, snow_depth, roL, liqflag, opts);
       diag_thf = struct([]);
    end
 
-   Qle = LONGOUT(Ts, emiss, SB);
+   Qle = LONGOUT(T_sfc, emiss, SB);
    Qa = QADVECT(ppt, tppt, cv_liq);
-   q_surface = ENBAL(albedo, emiss, chi, Qsi, Qli, Qle, Qh, Qe, 0.0, Qa, 0.0);
+   q_surface = ENBAL(chi, albedo, Qsi, Qli, Qle, Qh, Qe, 0.0, Qa, 0.0);
 end

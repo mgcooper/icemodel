@@ -1,6 +1,6 @@
-function [Qm, Qf] = MFENERGY(albedo, Qsi, Qli, Qle, Qh, Qe, Qc, Qa, Ts, ...
-      Tf, Ta, wspd, ppt, tppt, De, ea, roL, Pa, k_eff, T, dz, scoef, ...
-      chi, ro_sfc, snow_depth, opts)
+function [Qm, Qf] = MFENERGY(T_sfc, chi, albedo, Qsi, Qli, Qle, Qh, Qe, Qc, ...
+      Qa, tair, wspd, psfc, ppt, tppt, ea_atm, br_coefs, De, T, k_eff, dz, ...
+      ro_sfc, snow_depth, roL, opts)
    %MFENERGY Compute the energy available for melting or freezing.
    %
    %  Qm > 0 is the energy surplus available for melting ice.
@@ -12,23 +12,23 @@ function [Qm, Qf] = MFENERGY(albedo, Qsi, Qli, Qle, Qh, Qe, Qc, Qa, Ts, ...
    %
    %#codegen
 
-   persistent emiss
-   if isempty(emiss)
-      emiss = icemodel.parameterLookup('emiss');
+   persistent Tf
+   if isempty(Tf)
+      Tf = icemodel.physicalConstant('Tf');
    end
 
    Qm = 0.0;
    Qf = 0.0;
 
-   if Ts >= Tf
+   if T_sfc >= Tf
       % Compute melt energy
-      Qm = ENBAL(albedo, emiss, chi, Qsi, Qli, Qle, Qh, Qe, Qc, Qa, 0.0);
+      Qm = ENBAL(chi, albedo, Qsi, Qli, Qle, Qh, Qe, Qc, Qa, 0.0);
    else
       % Compute energy needed to reach melt temp (energy deficit)
       [~, ~, ~, ~, ~, ~, balance] = ...
-         icemodel.surface.surface_energy_balance_terms(Tf, Ta, Qsi, Qli, ...
-         albedo, wspd, ppt, tppt, Pa, De, ea, T, k_eff, dz, roL, chi, ...
-         scoef, true, ro_sfc, snow_depth, opts);
+         icemodel.surface.surface_energy_balance_terms(Tf, tair, Qsi, Qli, ...
+         albedo, wspd, ppt, tppt, psfc, De, ea_atm, T, k_eff, dz, roL, chi, ...
+         br_coefs, true, ro_sfc, snow_depth, opts);
       Qf = -balance;
    end
 end

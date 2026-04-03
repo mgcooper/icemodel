@@ -147,7 +147,7 @@ function test_checksubstep_forces_advance_at_maxsubstep(testCase)
    % Once the max-substep limit is reached, CHECKSUBSTEP should force the
    % accepted state forward instead of stalling the timestep.
 
-   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok] = CHECKSUBSTEP( ...
+   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok, forced_advance] = CHECKSUBSTEP( ...
       270, [269; 268], [0.9; 0.9], [0.01; 0.01], 271, [270; 269], ...
       [0.8; 0.8], [0.02; 0.02], 917, 1000, 150, 450, 900, 1, 10, 1, 2, 1, ...
       false, eps, false);
@@ -160,6 +160,7 @@ function test_checksubstep_forces_advance_at_maxsubstep(testCase)
    testCase.verifyEqual(n_subfail, 2);
    testCase.verifyEqual(substep, 2);
    testCase.verifyEqual(dt_new, 450, 'AbsTol', 1e-12);
+   testCase.verifyTrue(forced_advance);
 end
 
 function test_checksubstep_clamps_overshot_failure_count(testCase)
@@ -167,7 +168,7 @@ function test_checksubstep_clamps_overshot_failure_count(testCase)
    % count, the timestep controller should clamp to the accepted dt_min state
    % and force advance instead of stalling forever at dt_min.
 
-   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok] = CHECKSUBSTEP( ...
+   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok, forced_advance] = CHECKSUBSTEP( ...
       270, [269; 268], [0.9; 0.9], [0.01; 0.01], 271, [270; 269], ...
       [0.8; 0.8], [0.02; 0.02], 917, 1000, 150, 450, 900, 1, 10, 10, 10, ...
       10, false, eps, false);
@@ -180,4 +181,56 @@ function test_checksubstep_clamps_overshot_failure_count(testCase)
    testCase.verifyEqual(n_subfail, 10);
    testCase.verifyEqual(substep, 10);
    testCase.verifyEqual(dt_new, 90, 'AbsTol', 1e-12);
+   testCase.verifyTrue(forced_advance);
+end
+
+function test_checksubstep_debug_dump_records_force_advance_context(testCase)
+   % The maxsubstep debug dump should record whether the current failure
+   % triggered force advance and the projected cross-timestep streak.
+
+   debug_file = [tempname '.mat'];
+   cleanup = onCleanup(@() cleanupDebugFile(debug_file)); %#ok<NASGU>
+   setenv('ICEMODEL_DEBUG_MAXSUBSTEP_FILE', debug_file);
+
+   CHECKSUBSTEP(270, [269; 268], [0.9; 0.9], [0.01; 0.01], 271, [270; 269], ...
+      [0.8; 0.8], [0.02; 0.02], 917, 1000, 150, 450, 900, 1, 10, 1, 2, 1, ...
+      true, eps, false, 450, 900);
+
+   loaded = load(debug_file, 'debug_state');
+   debug_state = loaded.debug_state;
+
+   testCase.verifyTrue(debug_state.forced_advance);
+   testCase.verifyEqual(debug_state.force_advance_streak_dt, 900, ...
+      'AbsTol', 1e-12);
+   testCase.verifyEqual(debug_state.force_advance_limit_dt, 900, ...
+      'AbsTol', 1e-12);
+end
+
+function test_force_advance_guard_resets_after_recovery(testCase)
+   % A successful accepted substep should clear any prior force-advance
+   % streak so transient recoveries do not poison later timesteps.
+
+   streak_dt = icemodel.updateForceAdvanceGuard(300, true, 300, 900, 2, 10, ...
+      'icemodel');
+   streak_dt = icemodel.updateForceAdvanceGuard(streak_dt, false, 300, 900, ...
+      2, 10, 'icemodel');
+
+   testCase.verifyEqual(streak_dt, 0, 'AbsTol', 0);
+end
+
+function test_force_advance_guard_errors_after_full_timestep(testCase)
+   % Persistent force advance beyond one full forcing step should fail fast
+   % instead of allowing a long broken run to limp onward.
+
+   testCase.verifyError(@() icemodel.updateForceAdvanceGuard(900, true, 1, ...
+      900, 2, 10, 'icemodel'), 'icemodel:ForceAdvanceStreakExceeded');
+end
+
+function cleanupDebugFile(debug_file)
+   %CLEANUPDEBUGFILE Restore the debug env var and remove the temp MAT file.
+
+   setenv('ICEMODEL_DEBUG_MAXSUBSTEP_FILE', '');
+   if exist(debug_file, 'file') == 2
+      delete(debug_file);
+   end
 end

@@ -1,10 +1,10 @@
-function [Ts, Qe, Qh, Qc, Qa, Qle, balance, diag_turbulent] = ...
-      surface_energy_balance_terms(Ts, Ta, Qsi, Qli, albedo, ...
-      wspd, ppt, tppt, Pa, De, ea, T, k_eff, dz, roL, chi, scoef, ...
+function [T_sfc, Qe, Qh, Qc, Qa, Qle, balance, diag_turbulent] = ...
+      surface_energy_balance_terms(T_sfc, tair, Qsi, Qli, albedo, ...
+      wspd, ppt, tppt, psfc, De, ea_atm, T, k_eff, dz, roL, chi, br_coefs, ...
       liqflag, ro_sfc, snow_depth, opts)
-   %SURFACE_ENERGY_BALANCE_TERMS Evaluate the full SEB term set at Ts.
+   %SURFACE_ENERGY_BALANCE_TERMS Evaluate the full SEB term set at T_sfc.
    %
-   %  [Ts, Qe, Qh, Qc, Qa, Qle, balance] = ...
+   %  [T_sfc, Qe, Qh, Qc, Qa, Qle, balance] = ...
    %     icemodel.surface.surface_energy_balance_terms(...)
    %
    % The returned terms are:
@@ -15,35 +15,34 @@ function [Ts, Qe, Qh, Qc, Qa, Qle, balance, diag_turbulent] = ...
    %   Qle emitted longwave heat flux                    [W m^-2]
    %   balance  surface energy-balance residual with Qm=0 [W m^-2]
    %
-   % This helper is the canonical “evaluate the surface budget at Ts”
+   % This helper is the canonical "evaluate the surface budget at T_sfc"
    % contract for the touched SEB stack.
 
    %#codegen
 
-   persistent cv_air cv_liq emiss SB
-   if isempty(cv_air)
-      [cv_air, cv_liq, SB] = icemodel.physicalConstant( ...
-         'cv_air', 'cv_liq', 'SB');
+   persistent cv_liq emiss SB
+   if isempty(cv_liq)
+      [cv_liq, SB] = icemodel.physicalConstant('cv_liq', 'SB');
       emiss = icemodel.parameterLookup('emiss');
    end
 
    % Turbulent sensible and latent heat exchange.
    if nargout > 7
       [Qe, Qh, diag_turbulent] = icemodel.surface.turbulent_heat_flux( ...
-         Ta, Ts, wspd, Pa, De, ea, cv_air, roL, scoef, liqflag, ...
-         ro_sfc, snow_depth, opts);
+         T_sfc, tair, wspd, psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, ...
+         roL, liqflag, opts);
    else
       [Qe, Qh] = icemodel.surface.turbulent_heat_flux( ...
-         Ta, Ts, wspd, Pa, De, ea, cv_air, roL, scoef, liqflag, ...
-         ro_sfc, snow_depth, opts);
+         T_sfc, tair, wspd, psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, ...
+         roL, liqflag, opts);
       diag_turbulent = struct([]);
    end
 
    % Surface longwave emission, subsurface conduction, and precipitation heat.
-   Qle = LONGOUT(Ts, emiss, SB);
-   Qc = CONDUCT(k_eff, T, dz, Ts);
+   Qle = LONGOUT(T_sfc, emiss, SB);
+   Qc = CONDUCT(k_eff, T, dz, T_sfc);
    Qa = QADVECT(ppt, tppt, cv_liq);
 
    % The residual is the energy available for melt when Qm is set to zero.
-   balance = ENBAL(albedo, emiss, chi, Qsi, Qli, Qle, Qh, Qe, Qc, Qa, 0.0);
+   balance = ENBAL(chi, albedo, Qsi, Qli, Qle, Qh, Qe, Qc, Qa, 0.0);
 end

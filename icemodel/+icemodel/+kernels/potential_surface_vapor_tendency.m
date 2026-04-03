@@ -1,5 +1,6 @@
-function [d_pevp, pevp] = PEVAP(Qe, Lv, ro_liq, dt, dz)
-   %PEVAP Potential vapor tendency as top-layer liquid fraction change and flux
+function [d_pevp, pevp] = potential_surface_vapor_tendency(Qe, dt, dz)
+   %POTENTIAL_SURFACE_VAPOR_TENDENCY Potential vapor tendency as top-layer
+   %liquid fraction change and flux
    %
    % Definition:
    % d_pevp = (Qe / (Lv * ro_liq)) * (dt / dz)
@@ -23,11 +24,17 @@ function [d_pevp, pevp] = PEVAP(Qe, Lv, ro_liq, dt, dz)
    %
    % See also: ICESUBL
    %
-   % The combined surface-flux + PEVAP contract now lives in
+   % The combined surface-flux + PEVAP contract lives in
    % icemodel.surface.potential_surface_vapor_tendency(...), which applies
    % the physical Ts = min(Ts, Tf) rule before evaluating Qe.
    %
    %#codegen
+
+   persistent Lv ro_liq
+   if isempty(Lv)
+      [Lv, ro_liq] = icemodel.physicalConstant("Lv", "ro_liq");
+   end
+
    pevp = Qe / (Lv * ro_liq);
    d_pevp = pevp * dt / dz;
 end

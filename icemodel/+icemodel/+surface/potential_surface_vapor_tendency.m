@@ -1,7 +1,7 @@
-function [d_pevp, pevp, Qe, Ts_phys] = potential_surface_vapor_tendency( ...
-      Ts, Tf, Ta, wspd, Pa, De, ea, cv_air, roL, scoef, liqflag, ro_sfc, ...
-      snow_depth, opts, Lv, ro_liq, dt, dz)
-   %POTENTIAL_SURFACE_VAPOR_TENDENCY Evaluate the top-layer vapor tendency.
+function [d_pevp, pevp, Qe, T_sfc_phys] = potential_surface_vapor_tendency( ...
+      T_sfc, tair, wspd, psfc, ea_atm, De, br_coefs, snow_depth, f_ice, f_liq, ...
+      dt, dz, roL, liqflag, opts)
+   %POTENTIAL_SURFACE_VAPOR_TENDENCY Top-layer potential vapor tendency.
    %
    %  [d_pevp, pevp, Qe, Ts_phys] = ...
    %     icemodel.surface.potential_surface_vapor_tendency(...)
@@ -11,10 +11,21 @@ function [d_pevp, pevp, Qe, Ts_phys] = potential_surface_vapor_tendency( ...
    % Tf; the turbulent latent-heat flux and derived vapor tendency must use
    % the physical diagnosed surface temperature Ts_phys = min(Ts, Tf).
    %
+   % Delegates to icemodel.kernels.potential_surface_vapor_tendency
+   %
+   % See also: ICESUBL icemodel.kernels.potential_surface_vapor_tendency
+   %
    %#codegen
 
-   Ts_phys = MELTTEMP(Ts, Tf);
-   [Qe, ~] = icemodel.surface.turbulent_heat_flux(Ta, Ts_phys, wspd, Pa, ...
-      De, ea, cv_air, roL, scoef, liqflag, ro_sfc, snow_depth, opts);
-   [d_pevp, pevp] = PEVAP(Qe, Lv, ro_liq, dt, dz);
+   % Update surface density for the surface turbulent heat flux scheme.
+   ro_sfc = icemodel.surface.surface_bulk_density(f_ice, f_liq);
+
+   % Update latent heat flux.
+   T_sfc_phys = icemodel.kernels.physical_surface_temperature(T_sfc);
+   [Qe, ~] = icemodel.surface.turbulent_heat_flux(T_sfc_phys, tair, wspd, ...
+      psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, roL, liqflag, opts);
+
+   % Compute potential vapor tendency and derivative.
+   [d_pevp, pevp] = ...
+      icemodel.kernels.potential_surface_vapor_tendency(Qe, dt, dz);
 end

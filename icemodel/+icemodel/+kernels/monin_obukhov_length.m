@@ -21,7 +21,7 @@ function L = monin_obukhov_length(u_star, theta_air, q_air, theta_star, q_star)
    denom = gravity * kappa * theta_star * (1 + moisture_coeff * q_star);
 
    if abs(denom) < 1e-12
-      denom = denom + sign_or_one(denom) * 1e-12;
+      denom = denom + icemodel.kernels.sign_or_one(denom) * 1e-12;
    end
 
    L = numer / denom;

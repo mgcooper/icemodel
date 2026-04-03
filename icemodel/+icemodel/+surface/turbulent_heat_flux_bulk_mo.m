@@ -1,5 +1,5 @@
-function [Qe, Qh, diag] = turbulent_heat_flux_bulk_mo(Ta, Ts, wspd, Pa, ...
-      ea, cv_air, roL, liqflag, ro_sfc, snow_depth, opts)
+function [Qe, Qh, diag] = turbulent_heat_flux_bulk_mo(T_sfc, tair, wspd, ...
+      psfc, ea_atm, ro_sfc, snow_depth, roL, liqflag, opts)
    %TURBULENT_HEAT_FLUX_BULK_MO Evaluate the bulk Monin-Obukhov THF scheme.
    %
    %  [Qe, Qh] = icemodel.surface.turbulent_heat_flux_bulk_mo(...)
@@ -37,14 +37,20 @@ function [Qe, Qh, diag] = turbulent_heat_flux_bulk_mo(Ta, Ts, wspd, Pa, ...
    %
    %#codegen
 
-   persistent P0 kappa_p ro_air_ref wind_speed_min L_initial L_tol iter_max
+   persistent P0 kappa_p ro_air_ref cv_air wspd_min L_initial L_tol iter_max
    if isempty(P0)
-      [P0, kappa_p, ro_air_ref] = icemodel.physicalConstant( ...
-         'P0', 'kappa_p', 'ro_air');
-      [wind_speed_min, L_initial, L_tol, iter_max] = ...
+      
+      % Load physical constants
+      [P0, kappa_p, ro_air_ref, cv_air] = icemodel.physicalConstant( ...
+         'P0', 'kappa_p', 'ro_air', 'cv_air');
+      
+      % Load parameters
+      [wspd_min, L_initial, L_tol, iter_max] = ...
          icemodel.parameterLookup('thf_bulk_ws_min', 'thf_bulk_L_initial', ...
          'thf_bulk_L_tol', 'thf_bulk_iter_max');
    end
+   
+   
 
    % Observation heights and surface roughness lengths.
    z_q = opts.z_relh;
@@ -58,21 +64,21 @@ function [Qe, Qh, diag] = turbulent_heat_flux_bulk_mo(Ta, Ts, wspd, Pa, ...
    % stack, so divide by a reference air density to recover the specific
    % quantities c_p [J kg^-1 K^-1] and L_v/s [J kg^-1] needed by the classic
    % flux formulas rho_atm * c_p * u_* * theta_* & rho_atm * L_v/s * u_* * q_*.
-   es_sfc = VAPPRESS(Ts, liqflag);
-   ro_atm = icemodel.kernels.moist_air_density(Pa, ea, Ta);
-   nu_air = icemodel.kernels.air_kinematic_viscosity(Ta, ro_atm);
+   es_sfc = VAPPRESS(T_sfc, liqflag);
+   ro_atm = icemodel.kernels.moist_air_density(psfc, ea_atm, tair);
+   nu_air = icemodel.kernels.air_kinematic_viscosity(tair, ro_atm);
    cp_air = cv_air / ro_air_ref;
    Le_air = roL / ro_air_ref;
 
-   q_air = icemodel.kernels.specific_humidity_from_vapor_pressure(ea, Pa);
-   q_sfc = icemodel.kernels.specific_humidity_from_vapor_pressure(es_sfc, Pa);
-   theta_air = Ta * (P0 / Pa) ^ kappa_p;
-   theta_sfc = Ts * (P0 / Pa) ^ kappa_p;
+   q_air = icemodel.kernels.specific_humidity_from_vapor_pressure(ea_atm, psfc);
+   q_sfc = icemodel.kernels.specific_humidity_from_vapor_pressure(es_sfc, psfc);
+   theta_air = tair * (P0 / psfc) ^ kappa_p;
+   theta_sfc = T_sfc * (P0 / psfc) ^ kappa_p;
 
    % Return early if wind speed is below the minimum threshold. This avoids
    % unstable log/roughness diagnostics when the surface layer is effectively
    % decoupled.
-   if wspd <= wind_speed_min
+   if wspd <= wspd_min
       Qe = 0.0;
       Qh = 0.0;
       if nargout > 2
@@ -175,7 +181,7 @@ function theta_or_q_star = exchange_scale(delta_value, z_obs, z0_scalar, ...
 
    denom = log(z_obs / z0_scalar) - psi_scalar_z + psi_scalar_0;
    if abs(denom) < 1e-12
-      denom = denom + sign_or_one(denom) * 1e-12;
+      denom = denom + icemodel.kernels.sign_or_one(denom) * 1e-12;
    end
 
    theta_or_q_star = kappa * delta_value / denom;

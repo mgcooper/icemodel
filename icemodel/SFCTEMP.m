@@ -1,5 +1,5 @@
-function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, ...
-      De, ea, chi, roL, scoef, liqflag, varargin)
+function [T_sfc, ok] = SFCTEMP(tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, ...
+      De, ea_atm, chi, roL, br_coefs, liqflag, varargin)
    %SFCTEMP Solve the explicit bulk-Richardson SEB for surface temperature.
    %
    % This function uses a Newton-Raphson iteration to solve the explicit
@@ -21,10 +21,10 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, ...
    end
 
    % Load physical constants and parameters
-   persistent Tf cv_air cv_liq emiss SB epsilon
-   if isempty(Tf)
-      [Tf, cv_air, cv_liq, SB, epsilon] = icemodel.physicalConstant(...
-         "Tf", "cv_air", "cv_liq", "SB", "epsilon");
+   persistent cv_air cv_liq emiss SB epsilon
+   if isempty(cv_air)
+      [cv_air, cv_liq, SB, epsilon] = icemodel.physicalConstant(...
+         "cv_air", "cv_liq", "SB", "epsilon");
       emiss = icemodel.parameterLookup('emiss');
    end
 
@@ -51,47 +51,47 @@ function [Ts, ok] = SFCTEMP(Ta, Qsi, Qli, albedo, wspd, ppt, tppt, Pa, ...
          error('unrecognized number of inputs')
    end
 
-   % Gather Ts-independent terms in the SEB equation.
+   % Gather T_sfc-independent terms in the SEB equation.
    Qa = QADVECT(ppt, tppt, cv_liq); % [W m-2]
    AAA = cv_air * De;   % [W m-2 K-1]
-   CCC = epsilon / Pa;  % [Pa-1] = [m3 J-1]
+   CCC = epsilon / psfc;  % [Pa-1] = [m3 J-1]
    EEE = chi * (1.0 - albedo) * Qsi + emiss * Qli + Qc + Qa; % [W m-2]
    if a1 ~= 0.0
       EEE = EEE + a1 * T(1);
    end
    FFF = roL * De; % [W m-2]
 
-   Ts = nan;
+   T_sfc = nan;
    ok = false;
-   old = Ta;
+   old = tair;
    for iter = 1:maxiter
 
       % Saturation vapor pressure and derivative from VAPPRESS.
-      [es, des_dT] = VAPPRESS(old, liqflag);
+      [es_sfc, des_dT] = VAPPRESS(old, liqflag);
 
-      % Bulkk richardson stability factor and derivative.
-      [S, dS] = STABLEFN(Ta, old, wspd, scoef);
+      % Bulk richardson stability factor and derivative.
+      [stability, dstability] = STABLEFN(old, tair, wspd, br_coefs);
 
       % Evaluate the flux and derivative
-      f = EEE - emiss * SB * old ^ 4 + AAA * (Ta - old) * S ...
-         + FFF * CCC * (ea - es) * S - a1 * old;
+      f = EEE - emiss * SB * old ^ 4 + AAA * (tair - old) * stability ...
+         + FFF * CCC * (ea_atm - es_sfc) * stability - a1 * old;
 
       dfdT = -4.0 * emiss * SB * old ^ 3 ...
-         + S * -AAA + AAA * (Ta - old) * dS ...
-         + S * -FFF * CCC * des_dT ...
-         + FFF * CCC * (ea - es) * dS ...
+         + stability * -AAA + AAA * (tair - old) * dstability ...
+         + stability * -FFF * CCC * des_dT ...
+         + FFF * CCC * (ea_atm - es_sfc) * dstability ...
          - a1;
 
-      Ts = old - f / dfdT;
+      T_sfc = old - f / dfdT;
 
-      if abs(Ts - old) < tol
+      if abs(T_sfc - old) < tol
          ok = true;
          return
-      elseif isnan(Ts) || iter == maxiter
+      elseif ~isfinite(T_sfc) || iter == maxiter
          ok = false;
-         Ts = Ta;
+         T_sfc = tair;
          return
       end
-      old = Ts;
+      old = T_sfc;
    end
 end

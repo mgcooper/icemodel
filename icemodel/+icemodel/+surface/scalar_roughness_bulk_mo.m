@@ -50,7 +50,7 @@ function [z0h, z0q, u_star, Re] = scalar_roughness_bulk_mo(wspd, z0m, ...
    % momentum roughness and stability corrections.
    denom = log(z_wind / z0m) - psi_mz + psi_m0;
    if abs(denom) < 1e-12
-      denom = denom + sign_or_one(denom) * 1e-12;
+      denom = denom + icemodel.kernels.sign_or_one(denom) * 1e-12;
    end
 
    % Diagnose friction velocity and the associated roughness Reynolds number.
