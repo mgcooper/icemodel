@@ -122,7 +122,8 @@ end
 
 function test_configureRun_guards_bulk_mo_solver_contract(testCase)
    % The bulk-MO scheme requires seb_solver=2 and should be accepted by the
-   % current Dirichlet and Robin solver paths.
+   % current Dirichlet and Robin solver paths. configureRun now coerces the
+   % surface solver to seb_solver=2 with a warning instead of erroring.
 
    workspace = testCase.TestData.workspace;
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
@@ -130,8 +131,13 @@ function test_configureRun_guards_bulk_mo_solver_contract(testCase)
 
    opts_bad_seb = icemodel.resetopts(opts, ...
       'turbulent_flux_scheme', 'bulk_mo', 'seb_solver', 1);
-   testCase.verifyError(@() icemodel.configureRun(opts_bad_seb), ...
+   testCase.verifyWarning(@() icemodel.configureRun(opts_bad_seb), ...
       'icemodel:configureRun:bulkMoRequiresSebSolver2');
+   warn_state = warning('off', 'icemodel:configureRun:bulkMoRequiresSebSolver2');
+   cleanup = onCleanup(@() warning(warn_state));
+   opts_bad_seb = icemodel.configureRun(opts_bad_seb);
+   testCase.verifyEqual(opts_bad_seb.seb_solver, 2);
+   clear cleanup
 
    opts_ok_solver2 = icemodel.resetopts(opts, ...
       'turbulent_flux_scheme', 'bulk_mo', 'seb_solver', 2, 'solver', 2);

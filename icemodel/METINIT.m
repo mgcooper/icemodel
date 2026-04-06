@@ -17,8 +17,8 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    %  rain   - rainfall-rate placeholder [kg m^-2 s^-1]
    %  tppt   - precipitation wet-bulb temperature [K]
    %  De     - aerodynamic exchange coefficient from WINDCOEF [m s^-1]
-   %  br_coefs - legacy stability-coefficient vector from WINDCOEF [1]
    %  time   - forcing timestamps [datetime]
+   %  br_coefs - bulk Richardson stability-coefficient vector from WINDCOEF [1]
    %  snow_depth - optional forcing snow depth [m]; NaN when unavailable
    %
    %#codegen

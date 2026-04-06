@@ -7,7 +7,7 @@ function [Fc, Fp, diag] = surface_flux_linearization_bulk_mo(T_sfc, tair, ...
    %  [Fc, Fp, diag] = icemodel.surface.surface_flux_linearization_bulk_mo(...)
    %
    % The Robin coupler expects a linear boundary-flux form:
-   %   q_surface(T_sfc) ≈ Fc + Fp * T_sfc
+   %   Q_sfc(T_sfc) ≈ Fc + Fp * T_sfc
    %
    % This helper evaluates the current surface flux state, then computes the
    % local derivative using a complex-step perturbation. It intentionally
@@ -22,35 +22,43 @@ function [Fc, Fp, diag] = surface_flux_linearization_bulk_mo(T_sfc, tair, ...
       h = 1e-10;
    end
 
-   q_surface = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, tppt, ...
+   % Surface heat flux.
+   Q_sfc = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, tppt, ...
       psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, snow_depth, opts);
-   q_surface_step = surface_flux(T_sfc + 1i * h, tair, Qsi, Qli, albedo, wspd, ...
+
+   % Surface heat flux complex-step perturbation.
+   Q_sfc_step = surface_flux(T_sfc + 1i * h, tair, Qsi, Qli, albedo, wspd, ...
       ppt, tppt, psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, snow_depth, opts);
 
-   Fp = imag(q_surface_step) / h;
-   Fc = q_surface - Fp * T_sfc;
+   % Linearization.
+   Fp = imag(Q_sfc_step) / h;
+   Fc = Q_sfc - Fp * T_sfc;
 
+   % Parse outputs.
    if nargout > 2
       [~, diag_thf] = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, ...
          tppt, psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, snow_depth, opts);
       diag = struct( ...
          'scheme', 'bulk_mo', ...
-         'q_surface', q_surface, ...
+         'q_surface', Q_sfc, ...
          'dq_surface_dTs', Fp, ...
          'thf', diag_thf);
    end
 end
 
-function [q_surface, diag_thf] = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, ...
-      tppt, psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, snow_depth, opts)
+function [Q_sfc, diag_thf] = surface_flux(T_sfc, tair, Qsi, Qli, albedo, ...
+      wspd, ppt, tppt, psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, ...
+      snow_depth, opts)
    %SURFACE_FLUX Evaluate the non-conductive surface flux at T_sfc.
 
+   % Load physical constants and parameters.
    persistent cv_liq emiss SB
    if isempty(cv_liq)
       [cv_liq, SB] = icemodel.physicalConstant('cv_liq', 'SB');
       emiss = icemodel.parameterLookup('emiss');
    end
 
+   % Sensible and latent heat fluxes.
    % bulk_mo does not use br_coefs; pass [] as placeholder for the dispatcher.
    if nargout > 1
       [Qe, Qh, diag_thf] = icemodel.surface.turbulent_heat_flux(T_sfc, tair, ...
@@ -61,7 +69,12 @@ function [q_surface, diag_thf] = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wsp
       diag_thf = struct([]);
    end
 
+   % Emitted longwave.
    Qle = LONGOUT(T_sfc, emiss, SB);
+
+   % Precipitation advected heat flux.
    Qa = QADVECT(ppt, tppt, cv_liq);
-   q_surface = ENBAL(chi, albedo, Qsi, Qli, Qle, Qh, Qe, 0.0, Qa, 0.0);
+
+   % Net non-conductive heat flux.
+   Q_sfc = ENBAL(chi, albedo, Qsi, Qli, Qle, Qh, Qe, 0.0, Qa, 0.0);
 end

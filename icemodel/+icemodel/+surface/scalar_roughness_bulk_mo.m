@@ -46,30 +46,30 @@ function [z0h, z0q, u_star, Re] = scalar_roughness_bulk_mo(wspd, z0m, ...
       return
    end
 
-   % Convert the observed wind speed to friction velocity using the current
+   % Diagnose friction velocity from the observed wind speed using the current
    % momentum roughness and stability corrections.
    denom = log(z_wind / z0m) - psi_mz + psi_m0;
    if abs(denom) < 1e-12
       denom = denom + icemodel.kernels.sign_or_one(denom) * 1e-12;
    end
-
-   % Diagnose friction velocity and the associated roughness Reynolds number.
    % u_* = kappa U / (ln(z/z0m) - psi_m(z/L) + psi_m(z0m/L))
    u_star = kappa * wspd / denom;
+
+   % Diagnose the associated roughness Reynolds number.
    Re = u_star * z0m / nu_air;
 
-   % The Andreas and Smeets closures are functions of the real-valued
-   % roughness Reynolds number. Use the real part so complex-step
-   % perturbations preserve the same physical closure branch.
-   roughness_re = max(real(Re), 1e-12);
-   log_Re = log(roughness_re);
+   % The Andreas and Smeets closures are functions of the real-valued roughness
+   % Reynolds number. Use the real part so complex-step perturbations preserve
+   % the same physical closure branch.
+   roughness_Re = max(real(Re), 1e-12);
+   log_Re = log(roughness_Re);
 
    % Snow/firn uses the Andreas piecewise polynomial fits across three
    % roughness-Reynolds regimes.
    if use_snow_closure
-      if roughness_re <= re1
+      if roughness_Re <= re1
          idx = 1;
-      elseif roughness_re < re2
+      elseif roughness_Re < re2
          idx = 2;
       else
          idx = 3;

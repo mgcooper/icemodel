@@ -11,18 +11,22 @@ function [Qe, Qh, diag] = turbulent_heat_flux_bulk_richardson(T_sfc, tair, ...
    %
    %#codegen
 
-   % Saturation vapor pressure at the surface
+   % Saturation vapor pressure at the surface.
    es_sfc = VAPPRESS(T_sfc, liqflag);
-   
-   % Bulk-Richardson stability factor
-   stability = STABLEFN(T_sfc, tair, wspd, br_coefs);
-   
-   % Latent heat flux at the surface
-   Qe = LATENT(es_sfc, ea_atm, De, stability, psfc, roL);
-   
-   % Sensible heat flux at the surface
-   Qh = SENSIBLE(T_sfc, tair, De, stability);
 
+   % Bulk-Richardson stability factor.
+   stability = STABLEFN(T_sfc, tair, wspd, br_coefs);
+
+   % Latent heat flux at the surface.
+   Qe = LATENT(es_sfc, ea_atm, De, stability, psfc, roL);
+
+   % Sensible heat flux at the surface. Keep as an optional second output for
+   % callers like potential_surface_vapor_tendency that only require Qe.
+   if nargout > 1
+      Qh = SENSIBLE(T_sfc, tair, De, stability);
+   end
+
+   % Diagnostics for callers that request it.
    if nargout > 2
       diag = bulk_richardson_diag(T_sfc, es_sfc, tair, wspd, psfc, De, ...
          ea_atm, stability, roL, z0_bulk);

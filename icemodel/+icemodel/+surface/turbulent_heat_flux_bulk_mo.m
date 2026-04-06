@@ -37,20 +37,20 @@ function [Qe, Qh, diag] = turbulent_heat_flux_bulk_mo(T_sfc, tair, wspd, ...
    %
    %#codegen
 
-   persistent P0 kappa_p ro_air_ref cv_air wspd_min L_initial L_tol iter_max
+   % Load physical constants
+   persistent P0 kappa_p ro_air_ref cv_air
    if isempty(P0)
-      
-      % Load physical constants
       [P0, kappa_p, ro_air_ref, cv_air] = icemodel.physicalConstant( ...
          'P0', 'kappa_p', 'ro_air', 'cv_air');
-      
-      % Load parameters
+   end
+
+   % Load parameters
+   persistent wspd_min L_initial L_tol iter_max
+   if isempty(P0)
       [wspd_min, L_initial, L_tol, iter_max] = ...
          icemodel.parameterLookup('thf_bulk_ws_min', 'thf_bulk_L_initial', ...
          'thf_bulk_L_tol', 'thf_bulk_iter_max');
    end
-   
-   
 
    % Observation heights and surface roughness lengths.
    z_q = opts.z_relh;
@@ -110,7 +110,14 @@ function [Qe, Qh, diag] = turbulent_heat_flux_bulk_mo(T_sfc, tair, wspd, ...
 
    for n_iter = 1:iter_max
 
-      % Initial scalar roughness lengths.
+      % Initial momentum exchange scale (friction velocity) from observed wind
+      % speed and the current momentum roughness and stability corrections.
+
+
+      % Roughness Reynolds number from u_*.
+
+
+      % Initial scalar roughness lengths from Re.
       [z0h, z0q] = icemodel.surface.scalar_roughness_bulk_mo( ...
          wspd, z0m, psi_m0, psi_mz, nu_air, z_u, use_snow_closure);
 
@@ -118,7 +125,7 @@ function [Qe, Qh, diag] = turbulent_heat_flux_bulk_mo(T_sfc, tair, wspd, ...
       [psi_m0, psi_mz, psi_h0, psi_hz, psi_q0, psi_qz] = ...
          profile_corrections_bulk_mo(L, z0m, z_u, z0h, z_t, z0q, z_q, is_stable);
 
-      % Recompute scalar roughness, u_star and Reynolds roughness with updated
+      % Recompute scalar roughness, u_* and Reynolds roughness with updated
       % momentum correction.
       [z0h, z0q, u_star, Re] = icemodel.surface.scalar_roughness_bulk_mo( ...
          wspd, z0m, psi_m0, psi_mz, nu_air, z_u, use_snow_closure);
@@ -132,8 +139,10 @@ function [Qe, Qh, diag] = turbulent_heat_flux_bulk_mo(T_sfc, tair, wspd, ...
       % fluxes. ro_atm is the local moist-air density, so using ro_atm here
       % is more consistent than assuming the fixed reference density used by
       % the older bulk-Richardson path.
-      Qh = ro_atm * cp_air * u_star * theta_star;
       Qe = ro_atm * Le_air * u_star * q_star;
+      if nargout > 1
+         Qh = ro_atm * cp_air * u_star * theta_star;
+      end
 
       % Update the Monin-Obukhov stability length from the current exchange
       % state. L depends on the sensible/moisture exchange scales, so this
@@ -164,6 +173,13 @@ end
 function theta_or_q_star = exchange_scale(delta_value, z_obs, z0_scalar, ...
       psi_scalar_z, psi_scalar_0)
    %EXCHANGE_SCALE Return theta_* or q_* from the scalar transfer relation.
+   %
+   % The momentum (wind) transfer relation is:
+   %   u_* = kappa * delta_wind / ...
+   %     (ln(z_wind / z0m) - psi_m(z_wind/L) + psi_m(z0m/L))
+   %
+   % Here delta_wind is wspd_z_obs - wspd_sfc, with wspd_sfc = 0 and z_wind the
+   % wind speed observation height.
    %
    % The scalar transfer relation is:
    %   scalar_* = kappa * delta_scalar / ...

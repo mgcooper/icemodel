@@ -24,7 +24,7 @@ function [T_sfc, ok] = SFCTEMP(tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, ..
    persistent cv_air cv_liq emiss SB epsilon
    if isempty(cv_air)
       [cv_air, cv_liq, SB, epsilon] = icemodel.physicalConstant(...
-         "cv_air", "cv_liq", "SB", "epsilon");
+         'cv_air', 'cv_liq', 'SB', 'epsilon');
       emiss = icemodel.parameterLookup('emiss');
    end
 
@@ -66,8 +66,8 @@ function [T_sfc, ok] = SFCTEMP(tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, ..
    old = tair;
    for iter = 1:maxiter
 
-      % Saturation vapor pressure and derivative from VAPPRESS.
-      [es_sfc, des_dT] = VAPPRESS(old, liqflag);
+      % Surface saturation vapor pressure and derivative from VAPPRESS.
+      [es_sfc, des_sfc_dT] = VAPPRESS(old, liqflag);
 
       % Bulk richardson stability factor and derivative.
       [stability, dstability] = STABLEFN(old, tair, wspd, br_coefs);
@@ -78,7 +78,7 @@ function [T_sfc, ok] = SFCTEMP(tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, ..
 
       dfdT = -4.0 * emiss * SB * old ^ 3 ...
          + stability * -AAA + AAA * (tair - old) * dstability ...
-         + stability * -FFF * CCC * des_dT ...
+         + stability * -FFF * CCC * des_sfc_dT ...
          + FFF * CCC * (ea_atm - es_sfc) * dstability ...
          - a1;
 
