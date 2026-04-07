@@ -211,7 +211,7 @@ function exchange_star = turbulent_exchange_scale(delta_value, z_obs, ...
 
    denom = log(z_obs / z0_exchange) - psi_exchange_z + psi_exchange_0;
    if abs(denom) < 1e-12
-      denom = denom + icemodel.kernels.sign_or_one(denom) * 1e-12;
+      denom = denom + icemodel.numerics.sign_or_one(denom) * 1e-12;
    end
 
    exchange_star = kappa * delta_value / denom;

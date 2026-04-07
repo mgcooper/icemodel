@@ -4,8 +4,10 @@ Purpose: generic math algorithms shared across model domains.
 
 Current contents:
 - `trisolve`
-- `aitken_scalar`
-- `search_zero`
+- `aitkenscalar`
+- `fsearchzero`
+- `complexstep`
+- `sign_or_one`
 
 Rules:
 - only truly domain-generic methods belong here

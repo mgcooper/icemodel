@@ -1,6 +1,6 @@
-function [x_next, ok] = aitken_scalar( ...
+function [x_next, ok] = aitkenscalar( ...
       xkm2, xkm1, xk, x_fallback, jumpmax, varargin)
-   % Apply scalar Aitken Delta-squared acceleration with safeguard checks.
+   %AITKENSCALAR Apply scalar Aitken Delta-squared acceleration with safeguards.
    %
    %#codegen
 

@@ -65,7 +65,7 @@ function [T_sfc, ok] = solve_surface_energy_balance(T_sfc, tair, Qsi, Qli, ...
 
          for iter = 1:maxiter
             old = T_sfc;
-            [T_sfc, ok] = complexstep(@surface_residual, old);
+            [T_sfc, ok] = icemodel.numerics.complexstep(@surface_residual, old);
             if ~ok
                break
             end
@@ -86,7 +86,7 @@ function [T_sfc, ok] = solve_surface_energy_balance(T_sfc, tair, Qsi, Qli, ...
 
       for iter = 1:maxiter
          old = T_sfc;
-         [T_sfc, ~, ok] = icemodel.numerics.search_zero(@surface_residual, old, ...
+         [T_sfc, ~, ok] = icemodel.numerics.fsearchzero(@surface_residual, old, ...
             tair-50, tair+50, tair, tol);
          if ~ok
             break
@@ -114,55 +114,6 @@ function [T_sfc, ok] = solve_surface_energy_balance(T_sfc, tair, Qsi, Qli, ...
          Qsi, Qli, albedo, wspd, ppt, tppt, psfc, De, ea_atm, chi, roL, br_coefs, ...
          CONDUCT(k_eff, T, dz, T_sfc_local), liqflag, ro_sfc, snow_depth, opts);
    end
-end
-
-function [x, ok, iter] = complexstep(f, x0)
-   %COMPLEXSTEP Find root of nonlinear function using the Newton Rhapson method.
-   %
-   % Note: this uses the complex-step numerical derivative.
-   %
-   % The Newton iterate itself must remain on the real axis. The
-   % underlying SEB residual contains regime switches (for example the
-   % stable/unstable bulk-Richardson branch selection), so the complex-step
-   % perturbation is only used to obtain dfdx at a real state. The
-   % unperturbed residual f(old) is required to be real-valued on the real
-   % axis; if not, fail loudly because that indicates a contract bug in the
-   % residual implementation rather than a valid Newton state.
-
-   persistent h dh tol maxiter imag_factor_tol
-   if isempty(tol)
-      h = 1e-10;
-      dh = 1i * h;
-      tol = 1e-3;
-      maxiter = 100;
-      imag_factor_tol = 100;
-   end
-
-   ok = false;
-   old = real(x0);
-   for iter = 1:maxiter
-
-      f_old = f(old);
-      imag_tol = imag_factor_tol * eps(max(1.0, abs(real(f_old))));
-      if abs(imag(f_old)) > imag_tol
-         error('icemodel:ComplexStepResidualNotReal', ...
-            ['complexstep residual must stay real on the real axis; ', ...
-            'got imag(f(x)) = %.3e at x = %.15g.'], imag(f_old), old);
-      end
-      dfdx = imag(f(old + dh)) / h;
-      x = real(old - real(f_old) / dfdx);
-
-      if abs(x - old) < tol
-         ok = true;
-         return
-
-      elseif ~isfinite(x)
-         x = x0;
-         return
-      end
-      old = x;
-   end
-   x = x0; % ok = false
 end
 
 function dumpSebSolveFailure(solver, iter, T_sfc_old, T_sfc, tair, Qsi, Qli, ...

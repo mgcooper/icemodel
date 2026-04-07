@@ -1,5 +1,5 @@
-function [z, exitflag, ok] = search_zero(f, z0, A, B, z, tol)
-   % Search for a scalar nonlinear root using bounded Brent fallback.
+function [z, exitflag, ok] = fsearchzero(f, z0, A, B, z, tol)
+   %FSEARCHZERO Search for a scalar nonlinear root using bounded Brent fallback.
    %
    %#codegen
 
