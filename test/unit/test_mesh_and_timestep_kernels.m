@@ -53,7 +53,7 @@ function test_trisolve_matches_backslash(testCase)
    rhs = [2; 6; 2];
    A = [4 -1 0; -1 4 -1; 0 -1 4];
 
-   x = TRISOLVE(low, mid, upp, rhs);
+   x = icemodel.numerics.trisolve(low, mid, upp, rhs);
 
    testCase.verifyEqual(x, A \ rhs, 'AbsTol', 1e-12);
 end
@@ -84,9 +84,14 @@ function test_inittimesteps_and_newtimestep_follow_solver_contract(testCase)
    Time = transpose(datetime(2015, 1, 1) + minutes(15) * (0:7));
 
    [metstep, substep, numsteps, maxsubstep, dt_new, dt_full, numyears, ...
-      numspinup, simyears] = INITTIMESTEPS(opts, Time);
-   [dt_sum, n_subfail, ok_seb_1, ok_ieb_1] = NEWTIMESTEP(zeros(3, 1), 1);
-   [~, ~, ok_seb_2, ok_ieb_2] = NEWTIMESTEP(zeros(3, 1), 2);
+      numspinup, simyears] = icemodel.timestepping.initialize_timesteps( ...
+      opts, Time);
+   
+   [dt_sum, n_subfail, ok_seb_1, ok_ieb_1] = ...
+      icemodel.timestepping.newtimestep(zeros(3, 1), 1);
+   
+   [~, ~, ok_seb_2, ok_ieb_2] = icemodel.timestepping.newtimestep( ...
+      zeros(3, 1), 2);
 
    testCase.verifyEqual([metstep substep numsteps maxsubstep], [1 1 4 900]);
    testCase.verifyEqual([dt_new dt_full numyears numspinup], [900 900 2 1]);
@@ -99,13 +104,16 @@ function test_inittimesteps_and_newtimestep_follow_solver_contract(testCase)
    testCase.verifyFalse(ok_ieb_2);
 end
 
-function test_nextstep_adapts_substep_divisor(testCase)
-   % NEXTSTEP should shrink or grow the substep divisor based on the recent
+function test_nexttimestep_adapts_substep_divisor(testCase)
+   % nexttimestep should shrink or grow the substep divisor based on the recent
    % convergence history and hard failures.
 
-   [~, substep_fast, dt_fast] = NEXTSTEP(1, 3, 900, 9, true, 0, 1);
-   [~, substep_slow, dt_slow] = NEXTSTEP(1, 3, 900, 9, true, 2, 15);
-   [~, substep_fail, dt_fail] = NEXTSTEP(1, 3, 900, 9, false, 0, 0);
+   [~, substep_fast, dt_fast] = icemodel.timestepping.nexttimestep(1, 3, 900, 9, ...
+      true, 0, 1);
+   [~, substep_slow, dt_slow] = icemodel.timestepping.nexttimestep(1, 3, 900, 9, ...
+      true, 2, 15);
+   [~, substep_fail, dt_fail] = icemodel.timestepping.nexttimestep(1, 3, 900, 9, ...
+      false, 0, 0);
 
    testCase.verifyLessThan(substep_fast, 3);
    testCase.verifyGreaterThan(substep_slow, 3);
@@ -122,12 +130,15 @@ function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
    [ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs] = ...
       icemodel.physicalConstant('ro_ice', 'ro_liq', 'ro_air', 'cv_ice', ...
       'cv_liq', 'roLv', 'roLs');
-   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new] = RESETSUBSTEP( ...
+   
+   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new] = ...
+      icemodel.timestepping.resetsubstep( ...
       270, [269; 268], [0.9; 0.9], [0.01; 0.01], 900, 2, 9, 0, 450);
 
    [Ts_up, T_up, f_ice_up, f_liq_up, dt_sum, dt_next, liqflag, roL, ...
-      ro_sno, cp_sno] = UPDATESUBSTEP(Ts, T, f_ice, f_liq, 900, 450, 300, ...
-      1e-12, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs);
+      ro_sno, cp_sno] = icemodel.timestepping.updatesubstep(Ts, T, f_ice, ...
+      f_liq, 900, 450, 300, 1e-12, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, ...
+      roLv, roLs);
 
    testCase.verifyEqual([Ts_up; T_up], [270; 269; 268], 'AbsTol', 0);
    testCase.verifyEqual([f_ice_up; f_liq_up], [0.9; 0.9; 0.01; 0.01], ...
@@ -144,13 +155,13 @@ function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
 end
 
 function test_checksubstep_forces_advance_at_maxsubstep(testCase)
-   % Once the max-substep limit is reached, CHECKSUBSTEP should force the
+   % Once the max-substep limit is reached, checksubstep should force the
    % accepted state forward instead of stalling the timestep.
 
-   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok, forced_advance] = CHECKSUBSTEP( ...
-      270, [269; 268], [0.9; 0.9], [0.01; 0.01], 271, [270; 269], ...
-      [0.8; 0.8], [0.02; 0.02], 917, 1000, 150, 450, 900, 1, 10, 1, 2, 1, ...
-      false, eps, false);
+   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok, forced_advance] = ...
+      icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
+      [0.01; 0.01], 271, [270; 269], [0.8; 0.8], [0.02; 0.02], 917, 1000, ...
+      150, 450, 900, 1, 10, 1, 2, 1, false, eps, false);
 
    testCase.verifyTrue(ok);
    testCase.verifyEqual(Ts, 271);
@@ -164,14 +175,14 @@ function test_checksubstep_forces_advance_at_maxsubstep(testCase)
 end
 
 function test_checksubstep_clamps_overshot_failure_count(testCase)
-   % Even if a caller enters CHECKSUBSTEP with an already-overshot failure
+   % Even if a caller enters checksubstep with an already-overshot failure
    % count, the timestep controller should clamp to the accepted dt_min state
    % and force advance instead of stalling forever at dt_min.
 
-   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok, forced_advance] = CHECKSUBSTEP( ...
-      270, [269; 268], [0.9; 0.9], [0.01; 0.01], 271, [270; 269], ...
-      [0.8; 0.8], [0.02; 0.02], 917, 1000, 150, 450, 900, 1, 10, 10, 10, ...
-      10, false, eps, false);
+   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok, forced_advance] = ...
+      icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
+      [0.01; 0.01], 271, [270; 269], [0.8; 0.8], [0.02; 0.02], 917, 1000, ...
+      150, 450, 900, 1, 10, 10, 10, 10, false, eps, false);
 
    testCase.verifyTrue(ok);
    testCase.verifyEqual(Ts, 271);
@@ -192,9 +203,9 @@ function test_checksubstep_debug_dump_records_force_advance_context(testCase)
    cleanup = onCleanup(@() cleanupDebugFile(debug_file)); %#ok<NASGU>
    setenv('ICEMODEL_DEBUG_MAXSUBSTEP_FILE', debug_file);
 
-   CHECKSUBSTEP(270, [269; 268], [0.9; 0.9], [0.01; 0.01], 271, [270; 269], ...
-      [0.8; 0.8], [0.02; 0.02], 917, 1000, 150, 450, 900, 1, 10, 1, 2, 1, ...
-      true, eps, false, 450, 900);
+   icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
+      [0.01; 0.01], 271, [270; 269], [0.8; 0.8], [0.02; 0.02], 917, 1000, ...
+      150, 450, 900, 1, 10, 1, 2, 1, true, eps, false, 450, 900);
 
    loaded = load(debug_file, 'debug_state');
    debug_state = loaded.debug_state;
@@ -210,10 +221,10 @@ function test_force_advance_guard_resets_after_recovery(testCase)
    % A successful accepted substep should clear any prior force-advance
    % streak so transient recoveries do not poison later timesteps.
 
-   streak_dt = icemodel.updateForceAdvanceGuard(300, true, 300, 900, 2, 10, ...
-      'icemodel');
-   streak_dt = icemodel.updateForceAdvanceGuard(streak_dt, false, 300, 900, ...
-      2, 10, 'icemodel');
+   streak_dt = icemodel.timestepping.update_force_advance_guard(300, true, 300, ...
+      900, 2, 10, 'icemodel');
+   streak_dt = icemodel.timestepping.update_force_advance_guard(streak_dt, false, ...
+      300, 900, 2, 10, 'icemodel');
 
    testCase.verifyEqual(streak_dt, 0, 'AbsTol', 0);
 end
@@ -222,8 +233,8 @@ function test_force_advance_guard_errors_after_full_timestep(testCase)
    % Persistent force advance beyond one full forcing step should fail fast
    % instead of allowing a long broken run to limp onward.
 
-   testCase.verifyError(@() icemodel.updateForceAdvanceGuard(900, true, 1, ...
-      900, 2, 10, 'icemodel'), 'icemodel:ForceAdvanceStreakExceeded');
+   testCase.verifyError(@() icemodel.timestepping.update_force_advance_guard(900, ...
+      true, 1, 900, 2, 10, 'icemodel'), 'icemodel:ForceAdvanceStreakExceeded');
 end
 
 function cleanupDebugFile(debug_file)

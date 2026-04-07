@@ -17,8 +17,9 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, ea] ...
    %       dt_FULL_STEP, liqflag0, Tf, tair, swd, lwd, albedo, wspd, rh, ...
    %       psfc, ppt, tppt, De);
    %
-   % then replace the vars passed to SEBSOLVE with the _s variants, and
-   % re-compute ea prior to diagnosing fluxes (SEBFLUX)
+   % then replace the vars passed to solve_surface_energy_balance with the
+   % _s variants, and re-compute ea prior to diagnosing fluxes
+   % (diagnose_surface_energy_fluxes)
 
    i1 = metstep;
    i2 = min(metstep + 1, numel(tair_v));

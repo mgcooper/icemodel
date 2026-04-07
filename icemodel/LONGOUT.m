@@ -3,7 +3,7 @@ function Qle = LONGOUT(Ts, emiss, SB)
    %
    %  Qle = LONGOUT(Ts, emiss, SB)
    %
-   % See also: LONGIN, ENBALANCE, SEBFLUX
+   % See also: LONGIN, icemodel.surface.diagnose_surface_energy_fluxes
    %
    %#codegen
 

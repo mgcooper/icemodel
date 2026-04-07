@@ -26,14 +26,14 @@ function test_meltcurve_and_freezecurve_are_self_consistent(testCase)
 end
 
 function test_melttemp_caps_above_freezing(testCase)
-   % icemodel.kernels.physical_surface_temperature should clip supercooled
+   % icemodel.surface.physical_surface_temperature should clip supercooled
    % inputs at freezing but leave colder values untouched.
 
    Tf = icemodel.physicalConstant('Tf');
    testCase.verifyEqual( ...
-      icemodel.kernels.physical_surface_temperature(Tf + 3), Tf);
+      icemodel.surface.physical_surface_temperature(Tf + 3), Tf);
    testCase.verifyEqual( ...
-      icemodel.kernels.physical_surface_temperature(Tf - 2), Tf - 2);
+      icemodel.surface.physical_surface_temperature(Tf - 2), Tf - 2);
 end
 
 function test_liqavail_drains_only_available_liquid(testCase)

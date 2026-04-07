@@ -67,7 +67,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % Boundary-condition / coupling notes (icemodel):
    %
    %  "Partitioned" here means the surface SEB and subsurface enthalpy
-   %  equations are solved in separate solver blocks (SEBSOLVE/SFCFLIN and
+   %  equations are solved in separate solver blocks
+   %  (solve_surface_energy_balance/surface_flux_linearization and
    %  ICEENBAL), not as one monolithic nonlinear system.
    %
    %  "Coupled" here means the two blocks exchange boundary information across
@@ -77,20 +78,24 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  substep until the interface state is mutually consistent.
    %
    %  solver = 1 (coupled Dirichlet Ts-T iterations):
-   %   - Solve the nonlinear SEB for a trial Ts (SEBSOLVE).
+   %   - Solve the nonlinear SEB for a trial Ts
+   %     (icemodel.surface.solve_surface_energy_balance).
    %   - Use that Ts as the upper boundary condition of the subsurface
    %     enthalpy solver (ICEENBAL), then repeat the surface/subsurface
    %     exchange until Ts and the accepted updated-state SEB residual are
    %     mutually consistent within the same substep.
-   %   - During each SEBSOLVE call, inner surface iterations use an analytic
+   %   - During each solve_surface_energy_balance call, inner surface
+   %     iterations use an analytic
    %     Newton-Raphson, numeric "complex step", or derivative-free (Brent's)
-   %     method, set by opts.seb_solver (see SEBSOLVE for details).
+   %     method, set by opts.seb_solver (see solve_surface_energy_balance for
+   %     details).
    %   - Classification: partitioned and strongly coupled at substep scale
    %     through iterative block/Picard Dirichlet coupling, not monolithic
    %     Newton over the full surface-subsurface state.
    %
    %  solver = 2 (Robin with single sweep):
-   %   - Use a linearized SEB boundary condition (SFCFLIN) in the subsurface
+   %   - Use a linearized SEB boundary condition
+   %     (surface_flux_linearization) in the subsurface
    %     enthalpy solver (ICEENBAL).
    %   - After each accepted substep, diagnose Ts from the updated top-node
    %     state and refresh the SEB linearization for the next substep.
@@ -184,7 +189,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       % 1 = coupled Dirichlet Ts-T iterations
       % 2 = Robin w/ single Ts-T coupling iteration
       % 3 = Robin w/ strong Ts-T coupling iterations
-      opts.solver          = 3;     % recommended: 3
+      opts.solver          = 1;     % recommended: 3
 
       % surface (SEB) solver (Dirichlet Ts boundary condition when solver = 1)
       opts.seb_solver      = 2;     % recommended: 2 (1=analytic, 2=numeric)

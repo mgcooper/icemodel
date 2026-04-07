@@ -16,9 +16,9 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    %  psfc   - surface pressure [Pa]
    %  rain   - rainfall-rate placeholder [kg m^-2 s^-1]
    %  tppt   - precipitation wet-bulb temperature [K]
-   %  De     - aerodynamic exchange coefficient from WINDCOEF [m s^-1]
+   %  De     - aerodynamic exchange coefficient from exchange_coefficients [m s^-1]
    %  time   - forcing timestamps [datetime]
-   %  br_coefs - bulk Richardson stability-coefficient vector from WINDCOEF [1]
+   %  br_coefs - bulk Richardson stability-coefficient vector from exchange_coefficients [1]
    %  snow_depth - optional forcing snow depth [m]; NaN when unavailable
    %
    %#codegen
@@ -66,5 +66,7 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
 
    % The canonical met loader already computes De after all swaps/subsetting.
    De = met.De;
-   [~, br_coefs] = WINDCOEF(wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
+   [~, br_coefs] = ...
+      icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
+      wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
 end

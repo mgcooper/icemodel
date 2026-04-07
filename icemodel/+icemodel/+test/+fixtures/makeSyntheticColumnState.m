@@ -54,7 +54,9 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    % Extract one forcing step and the corresponding transfer coefficients.
    [tair, swd, lwd, albedo, wspd, psfc, De, ea, forcing_snow_depth] = LOADMETDATA(met, metstep, ...
       liqflag);
-   [~, scoef] = WINDCOEF(wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
+   [~, scoef] = ...
+      icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
+      wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
 
    % Carry precipitation fields when the synthetic met fixture defines them.
    if ismember('ppt', met.Properties.VariableNames)

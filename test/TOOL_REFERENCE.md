@@ -435,7 +435,7 @@ report = audit_formal_substep_failures( ...
 
 Use when:
 
-- a baseline build or regression run prints CHECKSUBSTEP fallback messages
+- a baseline build or regression run prints `check_substep` fallback messages
 - you want to know which exact formal case triggered them before rebuilding
   baselines
 
@@ -457,7 +457,7 @@ Use when:
    - direct-model agreement
    - figures
    - density-floor audit
-3. if any 2-year formal case emits CHECKSUBSTEP fallback messages, run:
+3. if any 2-year formal case emits `check_substep` fallback messages, run:
    - `audit_formal_substep_failures(...)`
 4. `run_spectral_study_bootstrap(... include_regression_acceptance=true, include_perf_acceptance=true)`
 5. only after that, rebuild rolling baselines if the change is accepted

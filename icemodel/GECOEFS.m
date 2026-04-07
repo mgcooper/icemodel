@@ -4,10 +4,11 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = GECOEFS(T, f_ice, f_liq, dHdT, ...
    %GECOEFS Compute the general equation coefficients
    %
    %  This function constructs the lower, middle, and upper diagonals of the
-   %  A matrix in a form compatible with TRISOLVE.
+   %  A matrix in a form compatible with icemodel.numerics.trisolve.
    %
    %  Note: ro_sno * cp_sno = (cv_ice * f_ice + cv_liq * f_liq)
-   %  See UPDATESTATE (or UPDATESUBSTEP) for how ro_sno and cp_sno are computed
+   %  See UPDATESTATE (or icemodel.timestepping.updatesubstep) for how ro_sno
+   %  and cp_sno are computed.
    %
    %  Subtle point: Pmelt here is identical to SNTHRM:
    %     P = g_liq - g_liq_o
@@ -26,7 +27,7 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = GECOEFS(T, f_ice, f_liq, dHdT, ...
    %
    % The same result is found using Jordan's definition of Pmelt and gv/gk.
    %
-   % See also: ICEENBAL, TRISOLVE
+   % See also: ICEENBAL, icemodel.numerics.trisolve
    %
    %#codegen
 

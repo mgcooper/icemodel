@@ -40,13 +40,16 @@ function test_turbulent_flux_kernels_follow_sign_convention(testCase)
    psfc = 78000;
    roL = 2.5e9;
 
-   Qh = SENSIBLE(T_sfc, tair, De, stability);
-   Qe = LATENT(es_sfc, ea_atm, De, stability, psfc, roL);
+   Qh = icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux( ...
+      T_sfc, tair, De, stability);
+   Qe = icemodel.surface.turbulence.bulk_richardson.latent_heat_flux( ...
+      es_sfc, ea_atm, De, stability, psfc, roL);
 
    testCase.verifyGreaterThan(Qh, 0);
    testCase.verifyGreaterThan(Qe, 0);
-   testCase.verifyEqual(SENSIBLE(tair, tair, De, 1.0), 0, ...
-      'AbsTol', 1e-12);
+   testCase.verifyEqual( ...
+      icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux( ...
+      tair, tair, De, 1.0), 0, 'AbsTol', 1e-12);
 end
 
 function test_windcoef_and_stablefn_cover_neutral_stable_and_unstable(testCase)
@@ -61,10 +64,15 @@ function test_windcoef_and_stablefn_cover_neutral_stable_and_unstable(testCase)
    z0_bulk = 1e-3;
    z_tair = 3.0;
    z_wind = 3.0;
-   [De, br_coefs] = WINDCOEF(wspd, z0_bulk, z_tair, z_wind);
-   S_neutral = STABLEFN(T_sfc_neutral, tair, wspd, br_coefs);
-   S_stable = STABLEFN(T_sfc_stable, tair, wspd, br_coefs);
-   S_unstable = STABLEFN(T_sfc_unstable, tair, wspd, br_coefs);
+   [De, br_coefs] = ...
+      icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
+      wspd, z0_bulk, z_tair, z_wind);
+   S_neutral = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
+      T_sfc_neutral, tair, wspd, br_coefs);
+   S_stable = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
+      T_sfc_stable, tair, wspd, br_coefs);
+   S_unstable = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
+      T_sfc_unstable, tair, wspd, br_coefs);
 
    testCase.verifyGreaterThan(De, 0);
    testCase.verifyEqual(S_neutral, 1.0, 'AbsTol', 5e-3);
@@ -73,13 +81,15 @@ function test_windcoef_and_stablefn_cover_neutral_stable_and_unstable(testCase)
 end
 
 function test_stablefn_derivative_matches_finite_difference(testCase)
-   % STABLEFN should return a Ts derivative consistent with finite
+   % stability_factor should return a Ts derivative consistent with finite
    % differences in stable, unstable, and near-neutral regimes.
 
    z0_bulk = 1e-3;
    z_tair = 3.0;
    z_wind = 3.0;
-   [~, br_coefs] = WINDCOEF(4.0, z0_bulk, z_tair, z_wind);
+   [~, br_coefs] = ...
+      icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
+      4.0, z0_bulk, z_tair, z_wind);
    tair = 268.15;
    wspd = 4.0;
    h = 1e-6;
@@ -87,9 +97,13 @@ function test_stablefn_derivative_matches_finite_difference(testCase)
 
    for n = 1:numel(T_sfc_cases)
       T_sfc = T_sfc_cases(n);
-      [~, dSdTs] = STABLEFN(T_sfc, tair, wspd, br_coefs);
-      S_plus = STABLEFN(T_sfc + h, tair, wspd, br_coefs);
-      S_minus = STABLEFN(T_sfc - h, tair, wspd, br_coefs);
+      [~, dSdTs] = ...
+         icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
+         T_sfc, tair, wspd, br_coefs);
+      S_plus = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
+         T_sfc + h, tair, wspd, br_coefs);
+      S_minus = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
+         T_sfc - h, tair, wspd, br_coefs);
       dSdTs_fd = (S_plus - S_minus) / (2 * h);
 
       testCase.verifyEqual(dSdTs, dSdTs_fd, 'RelTol', 1e-5, ...
@@ -106,7 +120,9 @@ function test_stablefn_neutral_blend_matches_documented_endpoint_formulas(testCa
    z_wind = 3.0;
    wspd = 4.0;
    tair = 268.15;
-   [~, br_coefs] = WINDCOEF(wspd, z0_bulk, z_tair, z_wind);
+   [~, br_coefs] = ...
+      icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
+      wspd, z0_bulk, z_tair, z_wind);
    dT0 = icemodel.parameterLookup( ...
       'thf_bulk_richardson_neutral_transition_width');
 
@@ -118,7 +134,9 @@ function test_stablefn_neutral_blend_matches_documented_endpoint_formulas(testCa
    S_expected = 0.5 * (S_stable_edge + S_unstable_edge);
    dSdT_expected = (S_unstable_edge - S_stable_edge) / (2 * dT0);
 
-   [S_neutral, dSdT_neutral] = STABLEFN(tair, tair, wspd, br_coefs);
+   [S_neutral, dSdT_neutral] = ...
+      icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
+      tair, tair, wspd, br_coefs);
 
    testCase.verifyEqual(S_neutral, S_expected, 'RelTol', 1e-12);
    testCase.verifyEqual(dSdT_neutral, dSdT_expected, 'RelTol', 1e-12);

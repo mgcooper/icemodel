@@ -76,7 +76,7 @@ function [Qnet, Qup, Qdn] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
    b(M+1) = 0.0;
 
    % Solve the tridiagonal system.
-   x = TRISOLVE(e, f, g, b);
+   x = icemodel.numerics.trisolve(e, f, g, b);
 
    % Reconstruct the up/down fluxes.
    [Qup, Qdn] = GETUPDOWN(a, r, x, I0, z_edges, M);

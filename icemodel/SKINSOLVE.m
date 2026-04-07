@@ -59,7 +59,7 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
       b(JJ) = b(JJ) + bc_S;
 
       % Solve the equation
-      T = TRISOLVE(-aN, aP, -aS, b);
+      T = icemodel.numerics.trisolve(-aN, aP, -aS, b);
 
       % Prep for next iteration
       if all(abs(T - T_iter) < tol)
@@ -74,7 +74,8 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
       % if use_aitken
       %    T_0 = T;
       %    for mm = 1:numel(T)
-      %       T(mm) = aitkenscalar(T_2(mm), T_1(mm), T_0(mm), T(mm), ...
+      %       T(mm) = icemodel.numerics.aitken_scalar(T_2(mm), T_1(mm), ...
+      %          T_0(mm), T(mm), ...
       %          jumpmax);
       %    end
       %    T_2 = T_1;
