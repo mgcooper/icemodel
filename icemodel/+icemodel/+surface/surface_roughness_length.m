@@ -7,7 +7,7 @@ function z0m = surface_roughness_length(snow_depth, ro_sfc, z0_ice, ...
    % Bare ice is selected by snow depth alone. The surface density only
    % splits the snow/firn branch into lower-density versus higher-density
    % roughness values.
-
+   %
    %#codegen
 
    persistent ro_threshold

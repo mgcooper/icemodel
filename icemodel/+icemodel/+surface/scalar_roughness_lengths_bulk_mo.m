@@ -1,28 +1,25 @@
-function [z0h, z0q, u_star, Re] = scalar_roughness_bulk_mo(wspd, z0m, ...
-      psi_m0, psi_mz, nu_air, z_wind, use_snow_closure)
-   %SCALAR_ROUGHNESS_BULK_MO Return scalar roughness lengths for bulk-MO.
+function [z0h, z0q] = scalar_roughness_lengths_bulk_mo(Re, z0m, use_snow_closure)
+   %SCALAR_ROUGHNESS_LENGTHS_BULK_MO Return scalar roughness lengths for bulk-MO.
    %
    % The bulk-MO scheme carries one momentum roughness length z0m and then
    % diagnoses scalar roughness lengths for heat and moisture:
    %   z0h = temperature roughness length [m]
    %   z0q = humidity roughness length [m]
-   %   u_* = friction velocity [m s^-1]
    %   Re_* = u_* z0m / nu_air = roughness Reynolds number [1]
    %
    % The scalar roughness closure depends on surface type:
    %   Andreas (2002) over snow/firn
    %   Smeets and van den Broeke (2008) over rough bare ice
    %
-   % Inputs psi_m0 and psi_mz are the Monin-Obukhov momentum profile
-   % corrections evaluated at z0m/L and z_wind/L. They enter through the
-   % momentum transfer denominator used to diagnose u_*.
+   % The friction velocity u_* and the associated roughness Reynolds number
+   % Re_* are diagnosed by the parent bulk-MO solver before this helper is
+   % called. This helper owns only the scalar roughness closure itself.
    %
    %#codegen
 
-   persistent kappa z0_min z0_fallback
+   persistent z0_min z0_fallback
    persistent re1 re2 ch1 ch2 ch3 cq1 cq2 cq3 a0 a1 a2
-   if isempty(kappa)
-      kappa = icemodel.physicalConstant('kappa');
+   if isempty(z0_min)
       [z0_min, z0_fallback, re1, re2, ch1, ch2, ch3, cq1, cq2, cq3, ...
          a0, a1, a2] = icemodel.parameterLookup( ...
          'thf_bulk_scalar_roughness_min', ...
@@ -35,28 +32,14 @@ function [z0h, z0q, u_star, Re] = scalar_roughness_bulk_mo(wspd, z0m, ...
          'thf_bulk_smeets_a2');
    end
 
-   % A zero-wind limit has no turbulent exchange. Return a tiny fallback
-   % scalar roughness so downstream logs stay defined if the diagnostic state
-   % is inspected later.
-   if wspd <= 0
+   % When the roughness Reynolds number collapses to zero, turbulent exchange
+   % also collapses. Return a tiny fallback scalar roughness so downstream
+   % logarithms remain defined if the diagnostic state is inspected later.
+   if real(Re) <= 0
       z0h = z0_fallback;
       z0q = z0_fallback;
-      u_star = 0;
-      Re = 0;
       return
    end
-
-   % Diagnose friction velocity from the observed wind speed using the current
-   % momentum roughness and stability corrections.
-   denom = log(z_wind / z0m) - psi_mz + psi_m0;
-   if abs(denom) < 1e-12
-      denom = denom + icemodel.kernels.sign_or_one(denom) * 1e-12;
-   end
-   % u_* = kappa U / (ln(z/z0m) - psi_m(z/L) + psi_m(z0m/L))
-   u_star = kappa * wspd / denom;
-
-   % Diagnose the associated roughness Reynolds number.
-   Re = u_star * z0m / nu_air;
 
    % The Andreas and Smeets closures are functions of the real-valued roughness
    % Reynolds number. Use the real part so complex-step perturbations preserve
