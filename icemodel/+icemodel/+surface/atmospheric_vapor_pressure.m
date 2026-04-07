@@ -5,11 +5,11 @@ function ea = atmospheric_vapor_pressure(Tair, rh, liqflag)
    %
    % This preserves the current repo contract:
    %
-   %   ea = VAPPRESS(Tair, liqflag) * rh / 100
+   %   ea = icemodel.vapor.vappress(Tair, liqflag) * rh / 100
    %
    % where RH is supplied in percent and ea is returned in Pa.
    %
    %#codegen
 
-   ea = VAPPRESS(Tair, liqflag) .* rh ./ 100;
+   ea = icemodel.vapor.vappress(Tair, liqflag) .* rh ./ 100;
 end

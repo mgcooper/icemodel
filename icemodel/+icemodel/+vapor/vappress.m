@@ -1,7 +1,7 @@
-function [es, des_dT, d2es_dT2] = VAPPRESS(T, liqflag)
-   %VAPPRESS Compute saturation vapor pressure over liquid or ice.
+function [es, des_dT, d2es_dT2] = vappress(T, liqflag)
+   %vappress Compute saturation vapor pressure over liquid or ice.
    %
-   %  ES = VAPPRESS(T, LIQFLAG) computes saturation vapor pressure
+   %  ES = icemodel.vapor.vappress(T, LIQFLAG) computes saturation vapor pressure
    %  using the Ambaum (2020) / Romps (2021) Rankine-Kirchhoff formula:
    %
    %     ES = A * exp(B / T) * T ^ C   [Pa]
@@ -9,19 +9,19 @@ function [es, des_dT, d2es_dT2] = VAPPRESS(T, liqflag)
    %  where (al, bl, cl) are coefficients over liquid and (ai, bi, ci) are
    %  over ice, obtained from icemodel.parameterLookup.
    %
-   %  [ES, DES_DT] = VAPPRESS(T, LIQFLAG) also computes the first
+   %  [ES, DES_DT] = icemodel.vapor.vappress(T, LIQFLAG) also computes the first
    %  temperature derivative:
    %
    %     d(es)/dT = es / T * (c - b / T)   [Pa K-1]
    %
-   %  [ES, DES_DT, D2ES_DT2] = VAPPRESS(T, LIQFLAG) also computes the
+   %  [ES, DES_DT, D2ES_DT2] = icemodel.vapor.vappress(T, LIQFLAG) also computes the
    %  second temperature derivative:
    %
    %     d2(es)/dT2 = es / T^2 * ((c - 1) * (c - 2*b/T) + b^2/T^2)
    %
    %  This is equivalent to differentiating des_dT = es/T * (c - b/T)
    %  directly and is the pressure-side half of the derivative chain used
-   %  by VAPORDENSITY.
+   %  by icemodel.vapor.vapordensity.
    %
    % Notes
    %
@@ -42,7 +42,8 @@ function [es, des_dT, d2es_dT2] = VAPPRESS(T, liqflag)
    %
    % Units: [Pa = J m-3 = N m-2 = kg m-1 s-2]
    %
-   % See also: VAPORDENSITY, TDEWPOINT, icemodel.kernels.buckVaporModel
+   % See also: icemodel.vapor.vapordensity, icemodel.vapor.tdewpoint,
+   %  icemodel.kernels.buckVaporModel
    %
    %#codegen
 

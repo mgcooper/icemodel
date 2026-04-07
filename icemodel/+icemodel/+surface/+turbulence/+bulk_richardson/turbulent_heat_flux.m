@@ -14,7 +14,7 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, ...
    %#codegen
 
    % Saturation vapor pressure at the surface.
-   es_sfc = VAPPRESS(T_sfc, liqflag);
+   es_sfc = icemodel.vapor.vappress(T_sfc, liqflag);
 
    % Bulk-Richardson stability factor.
    stability = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...

@@ -51,7 +51,7 @@ d2_e_s_dT2_expr = diff(e_s_expr, T, 2);
 %[text] $\\quad \\quad = \\frac{\\rho\_v}{T} \\left( \\frac{1}{T} - \\frac{ 2 }{ c^\* + T} \\right) + \\frac{d\\rho\_v}{dT} \\left( \\frac{1}{\\rho\_v} \\frac{ d\\rho\_v }{ dT } - \\frac{ 2 }{ c^\* + T} \\right)$
 % rho_v ./ T * (1 ./ T - 2 ./ (c + T - T_f)) + d_rho_v_dT .* ( d_rho_v_dT ./ rho_v - 2 ./ (c + T - T_f))
 %[text] I think above is most concise in terms of $\\rho\_v$. What is most concise in terms of $e\_s$?
-%[text] This first one has the fewest number of operations and no powers. This is implemented in VAPPRESS:
+%[text] This first one has the fewest number of operations and no powers. This is implemented in icemodel.vapor.vappress:
 %[text] $\\frac{d^2\\rho\_v}{dT^2} = \\frac{1}{R\_v T} \\left\[ \\frac{de\_s}{dT} \\left( \\frac{1}{e\_s} \\frac{de\_s}{dT} - \\frac{2}{c^\*} \\right) - \\frac{2}{T} \\left( \\frac{de\_s}{dT} - \\frac{e\_s}{T} \\right) \\right\]$
 % (de_s_dT * (de_s_dT ./ e_s - 2 ./ cstar) - 2 * (de_s_dT - es ./ T) ./ T) ./ (Rv * T)
 %[text] $= \\frac{1}{R\_v T} \\left\[ \\frac{de\_s}{dT} \\left( \\frac{1}{e\_s} \\frac{de\_s}{dT} - \\frac{2}{c^\*} - \\frac{2}{T} \\right) + \\frac{2 e\_s}{T^2} \\right\]$

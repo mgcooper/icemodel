@@ -1,7 +1,7 @@
-function [al, bl, cl, ai, bi, ci] = VAPORINIT()
-   %VAPORINIT Initialize Ambaum (2020) Rankine-Kirchhoff vapor coefficients.
+function [al, bl, cl, ai, bi, ci] = vaporinit()
+   %vaporinit Initialize Ambaum (2020) Rankine-Kirchhoff vapor coefficients.
    %
-   %  [AL, BL, CL, AI, BI, CI] = VAPORINIT() computes the Rankine-Kirchhoff
+   %  [AL, BL, CL, AI, BI, CI] = icemodel.vapor.vaporinit() computes the Rankine-Kirchhoff
    %  coefficients for the Ambaum (2020) saturation vapor pressure formula:
    %
    %     es = a * exp(b / T) * T ^ c   [Pa]

@@ -17,7 +17,7 @@ function [es, des_dT, ro_vap, dro_vapdT, k_vap, T_dew] = buckVaporModel( ...
    %
    %  This is an empirical fit to experimental data, distinct from the
    %  Rankine-Kirchhoff form es = a * exp(b/T) * T^c used in production
-   %  (see VAPPRESS). Buck's formula can equivalently be written in absolute
+   %  (see icemodel.vapor.vappress). Buck's formula can equivalently be written in absolute
    %  Kelvin as es = A * exp(B*T/(C'+T)) with C' = C + Tf, but the original
    %  Celsius-offset form is retained here to match the published coefficients.
    %
@@ -42,7 +42,7 @@ function [es, des_dT, ro_vap, dro_vapdT, k_vap, T_dew] = buckVaporModel( ...
    %  dew point temperature in Kelvins from relative humidity [%].
    %
    %  This is the archived Buck (1981) implementation. Production code uses
-   %  Ambaum (2020) / Romps (2021) via VAPPRESS / icemodel.parameterLookup.
+   %  Ambaum (2020) / Romps (2021) via icemodel.vapor.vappress / icemodel.parameterLookup.
    %
    %  Derivative chain summary (Buck):
    %
@@ -54,7 +54,7 @@ function [es, des_dT, ro_vap, dro_vapdT, k_vap, T_dew] = buckVaporModel( ...
    %     k_vap    = De * Ls * dro_vapdT
    %              = De*Ls/(Rv*T) * (des_dT - es/T)
    %
-   % See also: VAPPRESS, icemodel.parameterLookup
+   % See also: icemodel.vapor.vappress, icemodel.parameterLookup
 
    % Buck (1981) coefficients (i = ice, l = liquid)
    al = 611.21;

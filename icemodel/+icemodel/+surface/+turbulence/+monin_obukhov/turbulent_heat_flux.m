@@ -66,14 +66,14 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
    % stack, so divide by a reference air density to recover the specific
    % quantities c_p [J kg^-1 K^-1] and L_v/s [J kg^-1] needed by the classic
    % flux formulas rho_atm * c_p * u_* * theta_* & rho_atm * L_v/s * u_* * q_*.
-   es_sfc = VAPPRESS(T_sfc, liqflag);
-   ro_atm = icemodel.kernels.moist_air_density(psfc, ea_atm, tair);
+   es_sfc = icemodel.vapor.vappress(T_sfc, liqflag);
+   ro_atm = icemodel.vapor.moist_air_density(psfc, ea_atm, tair);
    nu_air = icemodel.kernels.air_kinematic_viscosity(tair, ro_atm);
    cp_air = cv_air / ro_air_ref;
    Le_air = roL / ro_air_ref;
 
-   q_air = icemodel.kernels.specific_humidity_from_vapor_pressure(ea_atm, psfc);
-   q_sfc = icemodel.kernels.specific_humidity_from_vapor_pressure(es_sfc, psfc);
+   q_air = icemodel.vapor.specific_humidity_from_vapor_pressure(ea_atm, psfc);
+   q_sfc = icemodel.vapor.specific_humidity_from_vapor_pressure(es_sfc, psfc);
    theta_air = tair * (P0 / psfc) ^ kappa_p;
    theta_sfc = T_sfc * (P0 / psfc) ^ kappa_p;
 

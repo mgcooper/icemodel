@@ -9,24 +9,24 @@ function test_vappress_derivative_matches_finite_difference(testCase)
 
    Tf = icemodel.physicalConstant('Tf');
    T = Tf - 8.0;
-   [es, des_dT] = VAPPRESS(T, false);
+   [es, des_dT] = icemodel.vapor.vappress(T, false);
    h = 1e-3;
-   fd = (VAPPRESS(T + h, false) - VAPPRESS(T - h, false)) / (2 * h);
+   fd = (icemodel.vapor.vappress(T + h, false) - icemodel.vapor.vappress(T - h, false)) / (2 * h);
 
    testCase.verifyGreaterThan(es, 0);
    testCase.verifyEqual(des_dT, fd, 'RelTol', 1e-6);
 end
 
 function test_tdewpoint_inverts_vappress(testCase)
-   % TDEWPOINT should invert VAPPRESS: es(Tdew) should equal ea = es(T)*rh/100.
+   % icemodel.vapor.tdewpoint should invert icemodel.vapor.vappress: es(Tdew) should equal ea = es(T)*rh/100.
 
    Tf = icemodel.physicalConstant('Tf');
    T = Tf - 5.0;
    rh = 75;
 
-   Tdew = TDEWPOINT(T, rh, false);
-   ea = VAPPRESS(T, false) * rh / 100;
-   es_at_Tdew = VAPPRESS(Tdew, false);
+   Tdew = icemodel.vapor.tdewpoint(T, rh, false);
+   ea = icemodel.vapor.vappress(T, false) * rh / 100;
+   es_at_Tdew = icemodel.vapor.vappress(Tdew, false);
 
    testCase.verifyEqual(es_at_Tdew, ea, 'RelTol', 1e-8);
    testCase.verifyLessThan(Tdew, T, ...
@@ -68,7 +68,7 @@ function test_metsub_interpolates_midstep_for_enabled_option(testCase)
    testCase.verifyEqual(ppt, 1);
    testCase.verifyEqual(tppt, 268.5);
    testCase.verifyEqual(De, 0.015);
-   testCase.verifyEqual(ea, VAPPRESS(271, true) * 0.80, 'RelTol', 1e-12);
+   testCase.verifyEqual(ea, icemodel.vapor.vappress(271, true) * 0.80, 'RelTol', 1e-12);
 end
 
 function test_metsub_returns_step_value_when_interp_disabled(testCase)
@@ -85,7 +85,7 @@ function test_metsub_returns_step_value_when_interp_disabled(testCase)
 
    testCase.verifyEqual([tair swd lwd albedo wspd rh psfc ppt tppt De], ...
       [270 100 220 0.60 3 70 78000 0 268 0.01], 'AbsTol', 1e-12);
-   testCase.verifyEqual(ea, VAPPRESS(270, false) * 0.70, 'RelTol', 1e-12);
+   testCase.verifyEqual(ea, icemodel.vapor.vappress(270, false) * 0.70, 'RelTol', 1e-12);
 end
 
 function test_sfcflin_matches_surface_terms_at_linearization_point(testCase)
@@ -113,14 +113,14 @@ function test_sfcflin_matches_surface_terms_at_linearization_point(testCase)
    psfc = 78000.0;
    chi = 1.0;
    liqflag = false;
-   ea_atm = 0.8 * VAPPRESS(tair, liqflag);
+   ea_atm = 0.8 * icemodel.vapor.vappress(tair, liqflag);
 
    [Sc, Sp] = ...
       icemodel.surface.turbulence.bulk_richardson.surface_flux_linearization( ...
       tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, De, ea_atm, roLs, ...
       br_coefs, chi, T_sfc, liqflag);
 
-   es_sfc = VAPPRESS(T_sfc, liqflag);
+   es_sfc = icemodel.vapor.vappress(T_sfc, liqflag);
    stability = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
       T_sfc, tair, wspd, br_coefs);
    F = emiss * (Qli - SB * T_sfc ^ 4) ...

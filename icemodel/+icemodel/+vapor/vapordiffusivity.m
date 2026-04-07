@@ -1,7 +1,7 @@
-function De = VAPORDIFFUSIVITY(T, Pa)
-   %VAPORDIFFUSIVITY effective water vapor diffusion coefficient in porous ice.
+function De = vapordiffusivity(T, Pa)
+   %vapordiffusivity effective water vapor diffusion coefficient in porous ice.
    %
-   %  De = VAPORDIFFUSIVITY(T, Pa)
+   %  De = icemodel.vapor.vapordiffusivity(T, Pa)
    %
    %  Computes the effective water vapor diffusion coefficient in snow/ice:
    %
@@ -18,7 +18,7 @@ function De = VAPORDIFFUSIVITY(T, Pa)
    %  Output:
    %     De - Effective vapor diffusivity [m2 s-1]
    %
-   % See also: VAPORK, VAPORTRANSFER
+   % See also: icemodel.vapor.vapork, VAPORTRANSFER
    %
    %#codegen
 

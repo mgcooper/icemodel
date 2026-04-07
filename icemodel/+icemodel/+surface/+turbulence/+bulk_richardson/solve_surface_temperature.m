@@ -66,8 +66,8 @@ function [T_sfc, ok] = solve_surface_temperature(tair, Qsi, Qli, albedo, wspd, p
    old = tair;
    for iter = 1:maxiter
 
-      % Surface saturation vapor pressure and derivative from VAPPRESS.
-      [es_sfc, des_sfc_dT] = VAPPRESS(old, liqflag);
+      % Surface saturation vapor pressure and derivative from icemodel.vapor.vappress.
+      [es_sfc, des_sfc_dT] = icemodel.vapor.vappress(old, liqflag);
 
       % Bulk richardson stability factor and derivative.
       [stability, dstability] = ...

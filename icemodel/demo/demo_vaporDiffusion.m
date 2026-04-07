@@ -159,7 +159,7 @@ mode(k_vap(:) ./ k_eff(:))
 figure;
 histogram(k_vap(:) ./ k_eff(:))
 %%
-%[text] Cut out of VAPORHEAT after I finished reconciling and retained the basic structure of VAPORHEAT by adding the same ai,bi,ci aw, bw,cw stuff from VAPPRESS, but below are ideas for how to use VAPPRESS 
+%[text] Cut out of VAPORHEAT after I finished reconciling and retained the basic structure of VAPORHEAT by adding the same ai,bi,ci aw, bw,cw stuff from icemodel.vapor.vappress, but below are ideas for how to use icemodel.vapor.vappress
 % Alternative but correct definitions:
    %
    % Following Jordan, using vapor pressure:
@@ -191,7 +191,7 @@ histogram(k_vap(:) ./ k_eff(:))
    % dv_dT = zeros(N, 1);
    % 
    % for n = 1:N
-   %    [es,des] = VAPPRESS(T(n), f_liq(n) > f_liq_phase_switch_threshold);
+   %    [es,des] = icemodel.vapor.vappress(T(n), f_liq(n) > f_liq_phase_switch_threshold);
    %    rovap(n) = es / (Rv * T(n));
    %    dv_dT(n) = (des - es / T(n)) / (Rv * T(n));
    %    k_vap(n) = De_Ls(n) * dv_dT(n);
@@ -206,7 +206,7 @@ histogram(k_vap(:) ./ k_eff(:))
    % 
    % for n = 1:N
    %
-   %    [es, d_es] = VAPPRESS(T(n), f_liq(n) > f_liq_phase_switch_threshold);
+   %    [es, d_es] = icemodel.vapor.vappress(T(n), f_liq(n) > f_liq_phase_switch_threshold);
    % 
    %    ro_vap(n) = es / (Rv * T(n));
    %    d_ro_vap(n) = (d_es - es / T(n)) / (Rv * T(n));
@@ -293,7 +293,7 @@ CkT(iliq) = c1_liq / T(iliq) .^ 2 .* (Tliq - 1) .* exp(-Tliq);
 
 % Compute vapor diffusion thermal conductivity
 k_vap = Ls * De .* CkT;
-%[text] I also had this at the top of VAPOR, which computed sat vapor pressure, but I combined into VAPPRESS:
+%[text] I also had this at the top of VAPOR, which computed sat vapor pressure, but I combined into icemodel.vapor.vappress:
 %VAPOR compute the saturation vapor pressure at the surface
 %
 % capital P in Jordan
@@ -382,7 +382,7 @@ k_vap = Ls * De ./ (Rv * T) .* desi_dT; % [W m-1 K-1]
 % kvap          = De0 * (T / Tfp) ^ n * Ls / (Rv * T) * desi/dT
 
 % es0 = VAPOR = sat. water vapor pressure at the surface (wrt ice or water)
-% ea  = VAPPRESS = same as above, but for the atmosphere above the surface
+% ea  = icemodel.vapor.vappress = same as above, but for the atmosphere above the surface
 % esi = same as above, but over ice/water within the ice matrix, used in GETGAMMA
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

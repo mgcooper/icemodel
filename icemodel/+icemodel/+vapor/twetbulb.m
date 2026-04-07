@@ -1,11 +1,11 @@
-function [Tw, ok] = TWETBULB(Ta, rh, Pa, liqflag)
-   %TWETBULB Compute wet-bulb temperature from air temperature and humidity.
+function [Tw, ok] = twetbulb(Ta, rh, Pa, liqflag)
+   %twetbulb Compute wet-bulb temperature from air temperature and humidity.
    %
-   %  [Tw, flag] = TWETBULB(Ta, rh, Pa)
-   %  [Tw, flag] = TWETBULB(Ta, rh, Pa, liqflag)
+   %  [Tw, flag] = icemodel.vapor.twetbulb(Ta, rh, Pa)
+   %  [Tw, flag] = icemodel.vapor.twetbulb(Ta, rh, Pa, liqflag)
    %
    %  Solves the psychrometric equation for wet-bulb temperature using
-   %  Newton iteration with analytic derivatives from VAPPRESS:
+   %  Newton iteration with analytic derivatives from icemodel.vapor.vappress:
    %
    %     f(Tw) = Tw - Ta + (Ls/cp_air) * (epsilon/Pa) * (es(Tw) - ea) = 0
    %
@@ -29,7 +29,7 @@ function [Tw, ok] = TWETBULB(Ta, rh, Pa, liqflag)
    %     Stull (2011), "Wet-Bulb Temperature from Relative Humidity and Air
    %     Temperature." Journal of Applied Meteorology and Climatology, 50(11).
    %
-   % See also: VAPPRESS, TDEWPOINT
+   % See also: icemodel.vapor.vappress, icemodel.vapor.tdewpoint
    %
    %#codegen
 
@@ -57,7 +57,7 @@ function [Tw, ok] = TWETBULB(Ta, rh, Pa, liqflag)
    coeff = Ls / cp_air * epsilon / Pa;
    for n = 1:maxiter
 
-      [es_wb, des_dT_wb] = VAPPRESS(old, liqflag);
+      [es_wb, des_dT_wb] = icemodel.vapor.vappress(old, liqflag);
 
       f = old - Ta + coeff * (es_wb - ea);
       fprime = 1.0 + coeff * des_dT_wb;
@@ -73,6 +73,6 @@ function [Tw, ok] = TWETBULB(Ta, rh, Pa, liqflag)
    end
 
    % Heuristic fallback (Stull 2011): Tw = Ta - (Ta - Tdew) / 3
-   Tdew = TDEWPOINT(Ta, rh, liqflag);
+   Tdew = icemodel.vapor.tdewpoint(Ta, rh, liqflag);
    Tw = Ta - (Ta - Tdew) / 3;
 end

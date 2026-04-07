@@ -8,7 +8,7 @@ function vaporModel(T)
    %  Figure 1: es, des_dT, d2es_dT2, ro_vap, dro_vapdT, k_vap
    %  Figure 2: Relative differences between Buck and Ambaum
    %
-   % See also: VAPPRESS, VAPORDENSITY, icemodel.kernels.buckVaporModel,
+   % See also: icemodel.vapor.vappress, icemodel.vapor.vapordensity, icemodel.kernels.buckVaporModel,
    %           icemodel.kernels.saturationVaporPressure
 
    if nargin < 1
@@ -26,9 +26,9 @@ function vaporModel(T)
    % ---------------------------------------------------------------------
    % 2. Ambaum (2020) / Romps (2021) — production
    % ---------------------------------------------------------------------
-   [es_amb, des_dT_amb, d2es_dT2_amb] = VAPPRESS(T, false);
-   [ro_vap_amb, dro_vapdT_amb] = VAPORDENSITY(T, zeros(size(T)));
-   k_vap_amb = VAPORK(T, zeros(size(T)), dro_vapdT_amb);
+   [es_amb, des_dT_amb, d2es_dT2_amb] = icemodel.vapor.vappress(T, false);
+   [ro_vap_amb, dro_vapdT_amb] = icemodel.vapor.vapordensity(T, zeros(size(T)));
+   k_vap_amb = icemodel.vapor.vapork(T, zeros(size(T)), dro_vapdT_amb);
 
    % ---------------------------------------------------------------------
    % 3. Reference Clausius-Clapeyron kernel (Romps exact, es only)

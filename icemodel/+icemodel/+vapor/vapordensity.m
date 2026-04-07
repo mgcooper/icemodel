@@ -1,8 +1,8 @@
-function [ro_vap, dro_vapdT, d2ro_vapdT2] = VAPORDENSITY(T, f_liq)
-   %VAPORDENSITY Compute saturation vapor density in porous ice.
+function [ro_vap, dro_vapdT, d2ro_vapdT2] = vapordensity(T, f_liq)
+   %vapordensity Compute saturation vapor density in porous ice.
    %
-   %  ro_vap = VAPORDENSITY(T, f_liq)
-   %  [ro_vap, dro_vapdT, d2ro_vapdT2] = VAPORDENSITY(T, f_liq)
+   %  ro_vap = icemodel.vapor.vapordensity(T, f_liq)
+   %  [ro_vap, dro_vapdT, d2ro_vapdT2] = icemodel.vapor.vapordensity(T, f_liq)
    %
    %  Computes the equilibrium (saturation) water vapor density and its
    %  temperature derivative within the air voids of porous ice. The air
@@ -33,7 +33,7 @@ function [ro_vap, dro_vapdT, d2ro_vapdT2] = VAPORDENSITY(T, f_liq)
    %     dro_vap/dT = ro_vap / T * (c - b/T - 1)
    %     d2ro_vap/dT2 = ro_vap / T^2 * ((c-2) * (c - 2*b/T - 1) + b^2/T^2)
    %
-   % See also: VAPORK, VAPPRESS, VAPORTRANSFER
+   % See also: icemodel.vapor.vapork, icemodel.vapor.vappress, VAPORTRANSFER
    %
    %#codegen
 
@@ -45,22 +45,22 @@ function [ro_vap, dro_vapdT, d2ro_vapdT2] = VAPORDENSITY(T, f_liq)
    end
 
    if nargout > 2
-      [es, des_dT, d2es_dT2] = VAPPRESS(T, false);
+      [es, des_dT, d2es_dT2] = icemodel.vapor.vappress(T, false);
    elseif nargout > 1
-      [es, des_dT] = VAPPRESS(T, false);
+      [es, des_dT] = icemodel.vapor.vappress(T, false);
    else
-      es = VAPPRESS(T, false);
+      es = icemodel.vapor.vappress(T, false);
    end
 
    % Override with liquid for wet cells
    wet = f_liq > f_liq_phase_switch_threshold;
    if any(wet)
       if nargout > 2
-         [es(wet), des_dT(wet), d2es_dT2(wet)] = VAPPRESS(T(wet), true);
+         [es(wet), des_dT(wet), d2es_dT2(wet)] = icemodel.vapor.vappress(T(wet), true);
       elseif nargout > 1
-         [es(wet), des_dT(wet)] = VAPPRESS(T(wet), true);
+         [es(wet), des_dT(wet)] = icemodel.vapor.vappress(T(wet), true);
       else
-         es(wet) = VAPPRESS(T(wet), true);
+         es(wet) = icemodel.vapor.vappress(T(wet), true);
       end
    end
 

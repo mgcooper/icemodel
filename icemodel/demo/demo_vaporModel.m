@@ -75,9 +75,9 @@ drov_dT_jordan = c1_ice ./ T.^2 .* (Ti_exp - 1) .* exp(-Ti_exp);
 %[text] $\\frac{d^2 e\_s}{dT^2} = \\frac{e\_s}{T^2}\\left\[(c-1)\\left(c - \\frac{2b}{T}\\right) + \\frac{b^2}{T^2}\\right\]$
 %[text] Vapor density derivative:
 %[text] $\\frac{d\\rho\_v}{dT} = \\frac{\\rho\_v}{T}\\left(c - \\frac{b}{T} - 1\\right)$
-%[text] This is the production formulation in icemodel. Coefficients are derived in VAPORINIT from physical constants following Ambaum (2020).
-[es_amb, des_dT_amb, d2es_dT2_amb] = VAPPRESS(T, false);
-[rov_amb, drov_dT_amb, d2rov_dT2_amb] = VAPORDENSITY(T, zeros(size(T))); %#ok<NASGU>
+%[text] This is the production formulation in icemodel. Coefficients are derived in icemodel.vapor.vaporinit from physical constants following Ambaum (2020).
+[es_amb, des_dT_amb, d2es_dT2_amb] = icemodel.vapor.vappress(T, false);
+[rov_amb, drov_dT_amb, d2rov_dT2_amb] = icemodel.vapor.vapordensity(T, zeros(size(T))); %#ok<NASGU>
 %[text] ### Compare formulations
 figure('Name', 'Saturation Vapor Pressure: Three Formulations') %[output:5fa07397]
 tiledlayout(1, 2, 'TileSpacing', 'compact', 'Padding', 'compact') %[output:5fa07397]
@@ -228,7 +228,7 @@ title('Vapor heat transfer coefficient (Jordan compact form)') %[output:83d4516c
 %[text] where $c^\* = c - T\_f$ (the Celsius-offset form).
 %[text] The second derivative of vapor density:
 %[text] $\\frac{d^2\\rho\_v}{dT^2} = \\frac{\\rho\_v}{T}\\left(\\frac{1}{T} - \\frac{2}{c^\* + T}\\right) + \\frac{d\\rho\_v}{dT}\\left(\\frac{1}{\\rho\_v}\\frac{d\\rho\_v}{dT} - \\frac{2}{c^\* + T}\\right)$
-%[text] Note: the second derivative expressed in terms of $e\_s$ (minimum operations, implemented in VAPPRESS):
+%[text] Note: the second derivative expressed in terms of $e\_s$ (minimum operations, implemented in icemodel.vapor.vappress):
 %[text] $\\frac{d^2\\rho\_v}{dT^2} = \\frac{1}{R\_v T}\\left\[\\frac{de\_s}{dT}\\left(\\frac{1}{e\_s}\\frac{de\_s}{dT} - \\frac{2}{c^\*}\\right) - \\frac{2}{T}\\left(\\frac{de\_s}{dT} - \\frac{e\_s}{T}\\right)\\right\]$
 %%
 %[text] ## References
