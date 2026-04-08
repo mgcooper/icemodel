@@ -32,7 +32,7 @@ function test_surface_roughness_length_switches_on_snow_depth(testCase)
    testCase.verifyEqual(z0m_snow_high, 5e-4, 'AbsTol', 1e-12);
 end
 
-function test_forcing_snow_depth_hook_can_switch_bulk_mo_to_snow_roughness(testCase)
+function test_forcing_snow_depth_hook_switches_to_snow_roughness(testCase)
    % The optional forcing snow-depth hook should switch the bulk-MO
    % roughness path without requiring a full snow model.
 
@@ -48,7 +48,7 @@ function test_forcing_snow_depth_hook_can_switch_bulk_mo_to_snow_roughness(testC
 
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
       workspace, 'icemodel', 2016, solver=1, seb_solver=2, ...
-      turbulent_flux_scheme='bulk_mo', ...
+      turbulent_flux_scheme='monin_obukhov', ...
       use_forcing_snow_depth_for_thf=true, ...
       z0_ice=0.02, z0_snow_low_density=0.0015, ...
       testname='forcing_snow_depth_hook');
@@ -76,7 +76,7 @@ function test_bulk_richardson_dispatch_matches_legacy_flux_kernels(testCase)
    T_sfc = icemodel.surface.physical_surface_temperature(s.Ts);
    stability = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
       T_sfc, s.tair, s.wspd, s.br_coefs);
-   es_sfc = icemodel.vapor.vappress(T_sfc, s.liqflag);
+   es_sfc = icemodel.vapor.saturation_vapor_pressure(T_sfc, s.liqflag);
    Qe_ref = icemodel.surface.turbulence.bulk_richardson.latent_heat_flux( ...
       es_sfc, s.ea_atm, s.De, stability, s.psfc, s.roL);
    Qh_ref = icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux( ...
@@ -91,7 +91,7 @@ function test_bulk_richardson_dispatch_matches_legacy_flux_kernels(testCase)
    testCase.verifyEqual(diag.scheme, 'bulk_richardson');
 end
 
-function test_bulk_richardson_scalar_exchange_experiment_weakens_rough_ice_fluxes(testCase)
+function test_bulk_richardson_scalar_exchange_weakens_rough_ice_fluxes(testCase)
    % The scalar-exchange diagnostic experiment should keep production fluxes
    % unchanged while showing weaker scalar transfer over rough ice.
 
@@ -132,7 +132,7 @@ function test_bulk_richardson_scalar_exchange_experiment_weakens_rough_ice_fluxe
    testCase.verifyLessThan(abs(diag.scalar_exchange_Qe), abs(Qe));
 end
 
-function test_bulk_richardson_scalar_exchange_diagnostic_is_noop_for_calm_air(testCase)
+function test_bulk_richardson_scalar_exchange_noop_for_calm_air(testCase)
    % The scalar-exchange experiment should degrade gracefully when the
    % current De contract provides no usable aerodynamic signal.
 
@@ -167,7 +167,7 @@ function test_bulk_mo_finite_and_weaker_scalar_exchange_for_rough_ice(testCase)
       testname='rough_bulk_richardson');
    opts_vanas = icemodel.test.helpers.buildSyntheticOpts( ...
       testCase.TestData.workspace, 'icemodel', 2016, solver=1, ...
-      seb_solver=2, turbulent_flux_scheme='bulk_mo', z0_bulk=0.05, ...
+      seb_solver=2, turbulent_flux_scheme='monin_obukhov', z0_bulk=0.05, ...
       z0_ice=0.05, testname='rough_bulk_mo');
 
    tair = 268.15;
@@ -198,13 +198,13 @@ function test_bulk_mo_finite_and_weaker_scalar_exchange_for_rough_ice(testCase)
    testCase.verifyLessThan(abs(Qe_vanas), abs(Qe_liston));
 end
 
-function test_bulk_mo_respects_surface_phase_switch(testCase)
+function test_monin_obukhov_respects_surface_phase_switch(testCase)
    % Surface saturation should change when liqflag switches at the same
    % atmospheric state.
 
    opts_vanas = icemodel.test.helpers.buildSyntheticOpts( ...
       testCase.TestData.workspace, 'icemodel', 2016, solver=1, ...
-      seb_solver=2, turbulent_flux_scheme='bulk_mo', testname='phase_bulk_mo');
+      seb_solver=2, turbulent_flux_scheme='monin_obukhov', testname='phase_bulk_mo');
 
    tair = 273.15;
    T_sfc = 272.15;
@@ -229,13 +229,13 @@ function test_bulk_mo_respects_surface_phase_switch(testCase)
    testCase.verifyNotEqual(Qe_ice, Qe_liq);
 end
 
-function test_bulk_mo_cold_state_remains_continuous(testCase)
+function test_monin_obukhov_cold_state_remains_continuous(testCase)
    % The cold stable bulk-MO replay state that used to trip the 2015
    % spinup run should vary smoothly across small Ts perturbations.
 
    opts_vanas = icemodel.test.helpers.buildSyntheticOpts( ...
       testCase.TestData.workspace, 'icemodel', 2016, solver=1, ...
-      seb_solver=2, turbulent_flux_scheme='bulk_mo', ...
+      seb_solver=2, turbulent_flux_scheme='monin_obukhov', ...
       testname='cold_bulk_mo_continuity');
 
    tair = 260.755;
@@ -261,13 +261,13 @@ function test_bulk_mo_cold_state_remains_continuous(testCase)
    testCase.verifyLessThan(abs(Qe2 - Qe1), 1e-3);
 end
 
-function test_bulk_mo_robin_linearization_matches_finite_difference(testCase)
+function test_monin_obukhov_linearization_matches_finite_difference(testCase)
    % The bulk-MO Robin linearization should match a finite-difference slope
    % of the non-conductive surface flux.
 
    s = icemodel.test.fixtures.makeSyntheticColumnState( ...
       testCase.TestData.workspace, 'icemodel', solver=3, seb_solver=2, ...
-      turbulent_flux_scheme='bulk_mo', z0_ice=0.02, ...
+      turbulent_flux_scheme='monin_obukhov', z0_ice=0.02, ...
       testname='bulk_mo_robin_linearization');
 
    [Fc, Fp, diag] = ...
@@ -287,35 +287,35 @@ function test_bulk_mo_robin_linearization_matches_finite_difference(testCase)
    testCase.verifyEqual(Fp, dq_fd, 'RelTol', 5e-3);
 end
 
-function test_bulk_mo_synthetic_icemodel_run_completes(testCase)
+function test_monin_obukhov_synthetic_icemodel_run_completes(testCase)
    % A synthetic icemodel run with the supported bulk-MO configuration
    % should complete and return finite Tsfc, Qh, and Qe outputs.
 
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
       testCase.TestData.workspace, 'icemodel', 2016, solver=1, ...
-      seb_solver=2, turbulent_flux_scheme='bulk_mo', z0_ice=0.02, ...
+      seb_solver=2, turbulent_flux_scheme='monin_obukhov', z0_ice=0.02, ...
       testname='icemodel_bulk_mo_run');
 
    [ice1, ~, opts_out] = icemodel(opts);
 
-   testCase.verifyEqual(opts_out.turbulent_flux_scheme, 'bulk_mo');
+   testCase.verifyEqual(opts_out.turbulent_flux_scheme, 'monin_obukhov');
    testCase.verifyTrue(all(isfinite(ice1.Tsfc)));
    testCase.verifyTrue(all(isfinite(ice1.Qe)));
    testCase.verifyTrue(all(isfinite(ice1.Qh)));
 end
 
-function test_bulk_mo_synthetic_icemodel_robin_run_completes(testCase)
+function test_monin_obukhov_synthetic_icemodel_robin_run_completes(testCase)
    % A synthetic icemodel run with the Robin bulk-MO configuration should
    % complete and return finite surface state and turbulent flux outputs.
 
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
       testCase.TestData.workspace, 'icemodel', 2016, solver=3, ...
-      seb_solver=2, turbulent_flux_scheme='bulk_mo', z0_ice=0.02, ...
+      seb_solver=2, turbulent_flux_scheme='monin_obukhov', z0_ice=0.02, ...
       testname='icemodel_bulk_mo_robin_run');
 
    [ice1, ~, opts_out] = icemodel(opts);
 
-   testCase.verifyEqual(opts_out.turbulent_flux_scheme, 'bulk_mo');
+   testCase.verifyEqual(opts_out.turbulent_flux_scheme, 'monin_obukhov');
    testCase.verifyEqual(opts_out.solver, 3);
    testCase.verifyTrue(all(isfinite(ice1.Tsfc)));
    testCase.verifyTrue(all(isfinite(ice1.Qe)));
@@ -333,13 +333,13 @@ function q_surface = surface_flux_bulk_mo(T_sfc, s)
    q_surface = ENBAL(s.chi, s.albedo, s.swd, s.lwd, Qle, Qh, Qe, 0.0, Qa, 0.0);
 end
 
-function test_potential_surface_vapor_tendency_uses_physical_surface_temperature(testCase)
+function test_vapor_tendency_uses_physical_surface_temperature(testCase)
    % Potential vapor tendency should evaluate Qe using the physical
    % diagnosed surface temperature even if the solver-internal Ts exceeds Tf.
 
    s = icemodel.test.fixtures.makeSyntheticColumnState( ...
       testCase.TestData.workspace, 'icemodel', solver=1, seb_solver=2, ...
-      turbulent_flux_scheme='bulk_mo', z0_ice=0.02, ...
+      turbulent_flux_scheme='monin_obukhov', z0_ice=0.02, ...
       testname='potential_vapor_tendency');
    Lv = icemodel.physicalConstant('Lv');
    Ts_solver = s.Tf + 3.0;
@@ -371,7 +371,7 @@ function test_thf_debug_dump_reuses_diag_contract(testCase)
    workspace = testCase.TestData.workspace;
    s = icemodel.test.fixtures.makeSyntheticColumnState(workspace, ...
       'icemodel', solver=1, seb_solver=2, ...
-      turbulent_flux_scheme='bulk_mo', z0_ice=0.02, ...
+      turbulent_flux_scheme='monin_obukhov', z0_ice=0.02, ...
       testname='thf_debug_dump');
 
    debug_file = [tempname, '.mat'];
@@ -388,8 +388,8 @@ function test_thf_debug_dump_reuses_diag_contract(testCase)
    debug_state = loaded.debug_state;
 
    testCase.verifyEqual(debug_state.reason, 'unit_test');
-   testCase.verifyEqual(debug_state.scheme, 'bulk_mo');
-   testCase.verifyEqual(debug_state.thf_at_Ts.diag.scheme, 'bulk_mo');
+   testCase.verifyEqual(debug_state.scheme, 'monin_obukhov');
+   testCase.verifyEqual(debug_state.thf_at_Ts.diag.scheme, 'monin_obukhov');
    testCase.verifyTrue(isfield(debug_state.seb, 'dfdT_complex_step_at_Ta'));
    testCase.verifyTrue(isfield(debug_state.seb, 'fsearchzero_ok'));
 end

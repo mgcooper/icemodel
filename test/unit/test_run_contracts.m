@@ -49,7 +49,7 @@ function test_resetopts_updates_output_years_and_coupler_defaults(testCase)
    testCase.verifyEqual(opts.cpl_maxiter, 100);
 end
 
-function test_diagnostic_output_profile_extends_standard_surface_contract(testCase)
+function test_diagnostic_output_profile_extends_surface_contract(testCase)
    % The diagnostic output profile should extend the standard scalar surface
    % schema without changing the standard profile itself.
 
@@ -104,7 +104,7 @@ function test_turbulent_flux_option_defaults_follow_runtime_contract(testCase)
    testCase.verifyEqual(opts.z_relh, 6.0);
 end
 
-function test_configureRun_preserves_explicit_forcing_snow_depth_override(testCase)
+function test_configureRun_preserves_forcing_snow_depth_override(testCase)
    % The forcing snow-depth hook should stay caller-controlled and opt-in.
 
    workspace = testCase.TestData.workspace;
@@ -112,7 +112,7 @@ function test_configureRun_preserves_explicit_forcing_snow_depth_override(testCa
       workspace, 'icemodel', 2016, solver=1);
 
    opts = icemodel.resetopts(opts, ...
-      'turbulent_flux_scheme', 'bulk_mo', ...
+      'turbulent_flux_scheme', 'monin_obukhov', ...
       'seb_solver', 2, ...
       'use_forcing_snow_depth_for_thf', true);
    opts = icemodel.configureRun(opts);
@@ -120,7 +120,7 @@ function test_configureRun_preserves_explicit_forcing_snow_depth_override(testCa
    testCase.verifyTrue(opts.use_forcing_snow_depth_for_thf);
 end
 
-function test_configureRun_guards_bulk_mo_solver_contract(testCase)
+function test_configureRun_guards_monin_obukhov_solver_contract(testCase)
    % The bulk-MO scheme requires seb_solver=2 and should be accepted by the
    % current Dirichlet and Robin solver paths. configureRun now coerces the
    % surface solver to seb_solver=2 with a warning instead of erroring.
@@ -130,25 +130,25 @@ function test_configureRun_guards_bulk_mo_solver_contract(testCase)
       workspace, 'icemodel', 2016, solver=1);
 
    opts_bad_seb = icemodel.resetopts(opts, ...
-      'turbulent_flux_scheme', 'bulk_mo', 'seb_solver', 1);
+      'turbulent_flux_scheme', 'monin_obukhov', 'seb_solver', 1);
    testCase.verifyWarning(@() icemodel.configureRun(opts_bad_seb), ...
-      'icemodel:configureRun:bulkMoRequiresSebSolver2');
-   warn_state = warning('off', 'icemodel:configureRun:bulkMoRequiresSebSolver2');
+      'icemodel:configureRun:moninObukhovRequiresSebSolver2');
+   warn_state = warning('off', 'icemodel:configureRun:moninObukhovRequiresSebSolver2');
    cleanup = onCleanup(@() warning(warn_state));
    opts_bad_seb = icemodel.configureRun(opts_bad_seb);
    testCase.verifyEqual(opts_bad_seb.seb_solver, 2);
    clear cleanup
 
    opts_ok_solver2 = icemodel.resetopts(opts, ...
-      'turbulent_flux_scheme', 'bulk_mo', 'seb_solver', 2, 'solver', 2);
+      'turbulent_flux_scheme', 'monin_obukhov', 'seb_solver', 2, 'solver', 2);
    opts_ok_solver2 = icemodel.configureRun(opts_ok_solver2);
-   testCase.verifyEqual(opts_ok_solver2.turbulent_flux_scheme, 'bulk_mo');
+   testCase.verifyEqual(opts_ok_solver2.turbulent_flux_scheme, 'monin_obukhov');
    testCase.verifyEqual(opts_ok_solver2.cpl_maxiter, 1);
 
    opts_ok_solver3 = icemodel.resetopts(opts, ...
-      'turbulent_flux_scheme', 'bulk_mo', 'seb_solver', 2, 'solver', 3);
+      'turbulent_flux_scheme', 'monin_obukhov', 'seb_solver', 2, 'solver', 3);
    opts_ok_solver3 = icemodel.configureRun(opts_ok_solver3);
-   testCase.verifyEqual(opts_ok_solver3.turbulent_flux_scheme, 'bulk_mo');
+   testCase.verifyEqual(opts_ok_solver3.turbulent_flux_scheme, 'monin_obukhov');
    testCase.verifyEqual(opts_ok_solver3.cpl_maxiter, 100);
 end
 
@@ -161,7 +161,7 @@ function test_configureRun_preserves_explicit_thf_roughness_overrides(testCase)
       workspace, 'icemodel', 2016, solver=1);
 
    opts = icemodel.resetopts(opts, ...
-      'turbulent_flux_scheme', 'bulk_mo', ...
+      'turbulent_flux_scheme', 'monin_obukhov', ...
       'seb_solver', 2, ...
       'z0_ice', 0.007, ...
       'z0_bulk', 0.0025);

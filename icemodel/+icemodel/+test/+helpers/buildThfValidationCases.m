@@ -7,13 +7,13 @@ function cases = buildThfValidationCases(kwargs)
    % Name-value options:
    %   sites        - string array of site names, default ["kanm" "kanl"]
    %   schemes      - string array of THF schemes, default
-   %                  ["bulk_richardson" "bulk_mo"]
+   %                  ["bulk_richardson" "monin_obukhov"]
    %   spinup_sites - subset of SITES that should also include the
    %                  [2015 2016] / n_spinup_years = 1 cases
 
    arguments
       kwargs.sites string = ["kanm" "kanl"]
-      kwargs.schemes string = ["bulk_richardson" "bulk_mo"]
+      kwargs.schemes string = ["bulk_richardson" "monin_obukhov"]
       kwargs.spinup_sites string = string.empty(1, 0)
    end
 

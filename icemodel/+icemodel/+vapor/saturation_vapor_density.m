@@ -1,8 +1,8 @@
-function [ro_vap, dro_vapdT, d2ro_vapdT2] = vapordensity(T, f_liq)
-   %vapordensity Compute saturation vapor density in porous ice.
+function [ro_vap, dro_vapdT, d2ro_vapdT2] = saturation_vapor_density(T, f_liq)
+   %saturation_vapor_density Compute saturation vapor density in porous ice.
    %
-   %  ro_vap = icemodel.vapor.vapordensity(T, f_liq)
-   %  [ro_vap, dro_vapdT, d2ro_vapdT2] = icemodel.vapor.vapordensity(T, f_liq)
+   %  ro_vap = icemodel.vapor.saturation_vapor_density(T, f_liq)
+   %  [ro_vap, dro_vapdT, d2ro_vapdT2] = icemodel.vapor.saturation_vapor_density(T, f_liq)
    %
    %  Computes the equilibrium (saturation) water vapor density and its
    %  temperature derivative within the air voids of porous ice. The air
@@ -33,7 +33,8 @@ function [ro_vap, dro_vapdT, d2ro_vapdT2] = vapordensity(T, f_liq)
    %     dro_vap/dT = ro_vap / T * (c - b/T - 1)
    %     d2ro_vap/dT2 = ro_vap / T^2 * ((c-2) * (c - 2*b/T - 1) + b^2/T^2)
    %
-   % See also: icemodel.vapor.vapork, icemodel.vapor.vappress, VAPORTRANSFER
+   % See also: icemodel.vapor.vapor_thermal_diffusion_coefficient,
+   %  icemodel.vapor.saturation_vapor_pressure, VAPORTRANSFER
    %
    %#codegen
 
@@ -45,22 +46,24 @@ function [ro_vap, dro_vapdT, d2ro_vapdT2] = vapordensity(T, f_liq)
    end
 
    if nargout > 2
-      [es, des_dT, d2es_dT2] = icemodel.vapor.vappress(T, false);
+      [es, des_dT, d2es_dT2] = icemodel.vapor.saturation_vapor_pressure(T, false);
    elseif nargout > 1
-      [es, des_dT] = icemodel.vapor.vappress(T, false);
+      [es, des_dT] = icemodel.vapor.saturation_vapor_pressure(T, false);
    else
-      es = icemodel.vapor.vappress(T, false);
+      es = icemodel.vapor.saturation_vapor_pressure(T, false);
    end
 
    % Override with liquid for wet cells
    wet = f_liq > f_liq_phase_switch_threshold;
    if any(wet)
       if nargout > 2
-         [es(wet), des_dT(wet), d2es_dT2(wet)] = icemodel.vapor.vappress(T(wet), true);
+         [es(wet), des_dT(wet), d2es_dT2(wet)] = ...
+            icemodel.vapor.saturation_vapor_pressure(T(wet), true);
       elseif nargout > 1
-         [es(wet), des_dT(wet)] = icemodel.vapor.vappress(T(wet), true);
+         [es(wet), des_dT(wet)] = ...
+            icemodel.vapor.saturation_vapor_pressure(T(wet), true);
       else
-         es(wet) = icemodel.vapor.vappress(T(wet), true);
+         es(wet) = icemodel.vapor.saturation_vapor_pressure(T(wet), true);
       end
    end
 

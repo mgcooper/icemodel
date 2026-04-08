@@ -7,7 +7,7 @@ function results = validate_bulk_mo_bare_ice_roughness(z0_ice_values, make_plots
 %  results = validate_bulk_mo_bare_ice_roughness([], false, 1:2)
 %
 % This helper keeps the full-year THF validation contract and focuses only
-% on the `bulk_mo` bare-ice momentum roughness question. It uses the shared
+% on the `monin_obukhov` bare-ice momentum roughness question. It uses the shared
 % real-case case-builder plus explicit `z0_ice` overrides so site-specific
 % calibration can be compared without baking any hidden site policy into the
 % production defaults. The current cases are:
@@ -27,7 +27,7 @@ if nargin < 3 || isempty(case_idx)
 end
 
 cases = icemodel.test.helpers.buildThfValidationCases( ...
-   schemes="bulk_mo", ...
+   schemes="monin_obukhov", ...
    spinup_sites=["kanm" "kanl"]);
 if ~isempty(case_idx)
    cases = cases(case_idx);
@@ -48,7 +48,7 @@ for i = 1:numel(cases)
 
       overrides = struct( ...
          'z0_ice', z0_ice, ...
-         'testname', sprintf('bulk_mo_rough_%s_%s', c.site, ...
+         'testname', sprintf('monin_obukhov_rough_%s_%s', c.site, ...
          strrep(num2str(z0_ice, '%.4f'), '.', 'p')));
       [ice1, met, opts, metrics, runtime_seconds] = ...
          icemodel.test.helpers.runThfValidationCase(c, overrides=overrides);

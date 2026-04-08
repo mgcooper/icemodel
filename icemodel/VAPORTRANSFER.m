@@ -16,7 +16,8 @@ function [radius, U_vap_faces, dm_vap] = VAPORTRANSFER(T, Ts, f_ice, f_liq, ...
    % where De = De0 * (T / Tf)^nd is the effective vapor diffusivity (Yen's
    % enhancement) and ro_vap = es / (Rv * T) is the saturation vapor density
    % from the ideal gas law. Saturation vapor pressure es is obtained from
-   % icemodel.vapor.vappress (Ambaum 2020 / Romps 2021 Rankine-Kirchhoff formula).
+   % icemodel.vapor.saturation_vapor_pressure (Ambaum 2020 / Romps 2021
+   % Rankine-Kirchhoff formula).
    %
    % Interface diffusivities use Patankar (1980) harmonic mean (Eq. 4.9).
    % Boundary conditions: Dirichlet (surface Ts) at top, zero-flux at bottom.
@@ -60,7 +61,10 @@ function [radius, U_vap_faces, dm_vap] = VAPORTRANSFER(T, Ts, f_ice, f_liq, ...
    %      Technical documentation for SNTHERM.89." CRREL Special Report 91-16.
    %   Patankar (1980), "Numerical Heat Transfer and Fluid Flow." CRC Press.
    %
-   % See also: icemodel.vapor.vapordensity, icemodel.vapor.vapordiffusivity, icemodel.vapor.vappress, BULKTHERMALK, icemodel.radiation.initialize_spectral_model
+   % See also: icemodel.vapor.saturation_vapor_density,
+   %  icemodel.vapor.vapor_diffusivity,
+   %  icemodel.vapor.saturation_vapor_pressure, BULKTHERMALK,
+   %  icemodel.radiation.initialize_spectral_model
    %
    %#codegen
 
@@ -75,15 +79,15 @@ function [radius, U_vap_faces, dm_vap] = VAPORTRANSFER(T, Ts, f_ice, f_liq, ...
    % --- Saturation vapor density at each node ---
 
    % Phase-aware vapor density [kg m-3] and diffusivity [m2 s-1] at each node.
-   ro_vap = icemodel.vapor.vapordensity(T, f_liq);
-   De = icemodel.vapor.vapordiffusivity(T);
+   ro_vap = icemodel.vapor.saturation_vapor_density(T, f_liq);
+   De = icemodel.vapor.vapor_diffusivity(T);
 
    % --- Surface ghost node ---
 
    % Use ice-phase es at surface (sublimating interface)
    f_liq_s = 0;
-   ro_vap_s = icemodel.vapor.vapordensity(Ts, f_liq_s);
-   De_s = icemodel.vapor.vapordiffusivity(Ts);
+   ro_vap_s = icemodel.vapor.saturation_vapor_density(Ts, f_liq_s);
+   De_s = icemodel.vapor.vapor_diffusivity(Ts);
 
    % --- Vapor flux at control volume interfaces (Patankar Eq. 4.9) ---
 

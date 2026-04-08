@@ -167,7 +167,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % path as the default runtime contract; bulk-MO is opt-in via resetopts.
    % The bulk-MO runtime guard is enforced in configureRun, which owns the
    % final runtime-contract checks.
-   opts.turbulent_flux_scheme = 'bulk_richardson'; % 'bulk_richardson', 'bulk_mo'
+   opts.turbulent_flux_scheme = 'bulk_richardson'; % 'bulk_richardson', 'monin_obukhov'
 
    % Surface roughness lengths are tunable THF parameters. Leave them empty
    % here and let configureRun resolve the canonical global defaults from

@@ -66,8 +66,8 @@ function test_vappress_honors_satflag(testCase)
    % pressure curves at the same temperature.
 
    Tf = icemodel.physicalConstant('Tf');
-   es_iceflag = icemodel.vapor.vappress(Tf - 5, false);
-   es_waterflag = icemodel.vapor.vappress(Tf - 5, true);
+   es_iceflag = icemodel.vapor.saturation_vapor_pressure(Tf - 5, false);
+   es_waterflag = icemodel.vapor.saturation_vapor_pressure(Tf - 5, true);
 
    testCase.verifyNotEqual(es_iceflag, es_waterflag);
    testCase.verifyGreaterThan(es_waterflag, es_iceflag);

@@ -87,7 +87,7 @@ function varargout = physicalConstant(varargin)
    % [kg m-3 K], as used by Jordan (1991) / SNTHERM89. These would be used if
    % SNTHERMs vapor model were adopted. The give rho_s = c/T * exp(-L/(Rv*T))
    % when combined with the ideal gas law. Retained for reference only;
-   % production uses the Ambaum (2020) formulation via icemodel.vapor.vaporinit.
+   % production uses the Ambaum (2020) formulation via icemodel.vapor.initialize_vapor_model.
    % ci = 611.15 * exp(constants.Ls / (constants.Rv * constants.Tf)) / constants.Rv;
    % cl = 611.21 * exp(constants.Lv / (constants.Rv * constants.Tf)) / constants.Rv;
 

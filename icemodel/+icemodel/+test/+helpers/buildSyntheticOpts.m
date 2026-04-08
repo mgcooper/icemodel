@@ -42,7 +42,7 @@ function opts = buildSyntheticOpts(workspace, smbmodel, simyears, kwargs)
    % pin the THF scheme up front so setopts validation never depends on an
    % ambient user-edited default.
    setopts_args = {'turbulent_flux_scheme', turbulent_flux_scheme};
-   if strcmpi(turbulent_flux_scheme, 'bulk_mo')
+   if strcmpi(turbulent_flux_scheme, 'monin_obukhov')
       if isfinite(kwargs.solver)
          setopts_args(end+1:end+2) = {'solver', kwargs.solver};
       else

@@ -16,10 +16,12 @@ function [k_eff, k_vap] = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, varargin)
    %  the full Calonne (2019) Eq. 5 formulation.
    %
    %  The vapor component k_vap supports two calling conventions:
-   %     nargin=5: k_vap computed internally via icemodel.vapor.vapork(T, f_liq)
+   %     nargin=5: k_vap computed internally via
+   %           icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq)
    %     nargin=6: k_vap provided externally (including explicit 0)
    %
-   % See also: THERMALK, icemodel.vapor.vapork, icemodel.vapor.vapordensity, icemodel.vapor.vapordiffusivity
+   % See also: THERMALK, icemodel.vapor.vapor_thermal_diffusion_coefficient,
+   %  icemodel.vapor.saturation_vapor_density, icemodel.vapor.vapor_diffusivity
    %
    %#codegen
 
@@ -29,7 +31,7 @@ function [k_eff, k_vap] = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, varargin)
    % Compute vapor thermal diffusion coefficient
    switch nargin
       case 5
-         k_vap = icemodel.vapor.vapork(T, f_liq);
+         k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq);
 
       case 6
          % k_vap provided by an external model.

@@ -15,8 +15,8 @@ function [H, dHdT, dLdT, dVdT, k_vap] = TOTALHEAT2(T, f_ice, f_liq, cv_ice, ...
       ./ (1.0 + fcp ^ 2.0 * (Tf - min(T, Tf)) .^ 2.0) .^ 2.0;
 
    % Compute vapor density, its derivative wrt temperature, and k_vap
-   [ro_vap, dVdT] = icemodel.vapor.vapordensity(T, f_liq);
-   k_vap = icemodel.vapor.vapork(T, f_liq, dVdT);
+   [ro_vap, dVdT] = icemodel.vapor.saturation_vapor_density(T, f_liq);
+   k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq, dVdT);
 
    % Compute total enthalpy wrt the reference temperature.
    H = ( ...

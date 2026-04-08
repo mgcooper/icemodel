@@ -8,11 +8,11 @@ function results = validate_thf_cases(make_plots, case_idx)
 % This interactive helper runs the current turbulent-flux validation cases
 % discussed in Bead `icemodel-3sm` using the shared real-case case-builder:
 %   - KANM 2016, bulk_richardson
-%   - KANM 2016, bulk_mo
+%   - KANM 2016, monin_obukhov
 %   - KANM 2015-2016 with 2015 spinup, bulk_richardson
-%   - KANM 2015-2016 with 2015 spinup, bulk_mo
+%   - KANM 2015-2016 with 2015 spinup, monin_obukhov
 %   - KANL 2016, bulk_richardson
-%   - KANL 2016, bulk_mo
+%   - KANL 2016, monin_obukhov
 %
 % The helper forces `solver=1`, `seb_solver=2` for every case so the
 % comparison isolates the turbulent-flux scheme rather than the outer

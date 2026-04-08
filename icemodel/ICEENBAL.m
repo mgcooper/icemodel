@@ -19,7 +19,7 @@ function [T_ice, f_ice, f_liq, k_eff, ok, iter, a1, err] = ICEENBAL(T_sfc, ...
    f_liq_max = f_wat .* f_ell_max;
 
    % Compute vapor density [kg m-3]
-   ro_vap = icemodel.vapor.vapordensity(T_ice, f_liq);
+   ro_vap = icemodel.vapor.saturation_vapor_density(T_ice, f_liq);
 
    % Compute enthalpy [J m-3]
    H_old = TOTALHEAT(T_ice, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
@@ -40,10 +40,12 @@ function [T_ice, f_ice, f_liq, k_eff, ok, iter, a1, err] = ICEENBAL(T_sfc, ...
    for iter = 0:maxiter-1
 
       % Update vapor density and derivative [kg m-3, kg m-3 K-1]
-      [ro_vap, dro_vapdT] = icemodel.vapor.vapordensity(T_ice, f_liq);
+      [ro_vap, dro_vapdT] = icemodel.vapor.saturation_vapor_density( ...
+         T_ice, f_liq);
 
       % Update vapor thermal diffusion coefficient [W m-1 K-1]
-      k_vap = icemodel.vapor.vapork(T_ice, f_liq, dro_vapdT);
+      k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient( ...
+         T_ice, f_liq, dro_vapdT);
 
       % Update bulk (effective) thermal conductivity
       k_eff = BULKTHERMALK(T_ice, f_ice, f_liq, ro_ice, k_liq, k_vap);

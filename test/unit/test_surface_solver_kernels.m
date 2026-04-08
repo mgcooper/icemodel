@@ -113,14 +113,14 @@ function test_sebsolve_converges_across_root_finders(testCase)
    end
 end
 
-function test_sebsolve_bulk_mo_converges_with_numeric_derivative(testCase)
+function test_sebsolve_monin_obukhov_converges_with_numeric_derivative(testCase)
    % The new bulk-MO scheme should converge through the shared SEB residual
    % path under the supported solver=1, seb_solver=2 contract.
 
    workspace = testCase.TestData.workspace;
    s = icemodel.test.fixtures.makeSyntheticColumnState(workspace, ...
       'icemodel', solver=1, seb_solver=2, ...
-      turbulent_flux_scheme='bulk_mo', z0_ice=0.02, ...
+      turbulent_flux_scheme='monin_obukhov', z0_ice=0.02, ...
       testname='ice_kernel_bulk_mo');
 
    [Ts, ok] = icemodel.surface.solve_surface_energy_balance( ...
@@ -310,13 +310,13 @@ function test_iceenbal_and_iceebsolve_converge_on_synthetic_column(testCase)
       s.ro_liq / s.ro_ice), 1 + 1e-9);
 end
 
-function test_robin_coupler_supports_bulk_mo_on_synthetic_column(testCase)
+function test_robin_coupler_supports_monin_obukhov_on_synthetic_column(testCase)
    % The Robin coupler should accept the bulk-MO scheme and converge on the
    % synthetic ice state used by the shared solver tests.
 
    workspace = testCase.TestData.workspace;
    s = icemodel.test.fixtures.makeSyntheticColumnState(workspace, ...
-      'icemodel', solver=3, seb_solver=2, turbulent_flux_scheme='bulk_mo', ...
+      'icemodel', solver=3, seb_solver=2, turbulent_flux_scheme='monin_obukhov', ...
       z0_ice=0.02, testname='ice_kernel_robin_bulk_mo');
 
    [Ts, T_rob, f_ice_rob, f_liq_rob, k_eff_rob, ok_rob, n_iters_rob] = ...

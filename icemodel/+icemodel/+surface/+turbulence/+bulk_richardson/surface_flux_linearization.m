@@ -39,8 +39,8 @@ function [Fc, Fp] = surface_flux_linearization(tair, Qsi, Qli, albedo, wspd, ...
       emiss = icemodel.parameterLookup('emiss');
    end
 
-   % Surface saturation vapor pressure and derivative from icemodel.vapor.vappress
-   [es_sfc, des_sfc_dT] = icemodel.vapor.vappress(T_sfc, liqflag);
+   % Surface saturation vapor pressure and derivative from icemodel.vapor.saturation_vapor_pressure
+   [es_sfc, des_sfc_dT] = icemodel.vapor.saturation_vapor_pressure(T_sfc, liqflag);
 
    % Bulk richardson stability function.
    stability = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...

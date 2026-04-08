@@ -61,7 +61,7 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    % Solve for wet bulb
    tppt = nan(size(rh));
    for n = 1:numel(rh)
-      tppt(n) = icemodel.vapor.twetbulb(tair(n), rh(n), psfc(n));
+      tppt(n) = icemodel.vapor.wet_bulb_temperature(tair(n), rh(n), psfc(n));
    end
 
    % The canonical met loader already computes De after all swaps/subsetting.

@@ -1,12 +1,13 @@
-function Tdew = tdewpoint(T, rh, liqflag)
-   %tdewpoint Compute dew point temperature from air temperature and humidity.
+function Tdew = dew_point_temperature(T, rh, liqflag)
+   %dew_point_temperature Compute dew point temperature from air temperature and humidity.
    %
-   %  Tdew = icemodel.vapor.tdewpoint(T, rh)
-   %  Tdew = icemodel.vapor.tdewpoint(T, rh, liqflag)
+   %  Tdew = icemodel.vapor.dew_point_temperature(T, rh)
+   %  Tdew = icemodel.vapor.dew_point_temperature(T, rh, liqflag)
    %
    %  Dew point is the temperature at which air reaches saturation. Uses
    %  Newton iteration on the Rankine-Kirchhoff saturation vapor pressure
-   %  formula (Ambaum 2020 / Romps 2021) via icemodel.vapor.vappress.
+   %  formula (Ambaum 2020 / Romps 2021) via
+   %  icemodel.vapor.saturation_vapor_pressure.
    %
    %  The actual vapor pressure is ea = es(T) * rh/100, and the dew point
    %  solves es(Tdew) = ea via Newton's method.
@@ -20,7 +21,8 @@ function Tdew = tdewpoint(T, rh, liqflag)
    %  Output:
    %     Tdew - Dew point temperature [K]
    %
-   % See also: icemodel.vapor.vappress, icemodel.vapor.twetbulb
+   % See also: icemodel.vapor.saturation_vapor_pressure,
+   %  icemodel.vapor.wet_bulb_temperature
    %
    %#codegen
 
@@ -45,7 +47,8 @@ function Tdew = tdewpoint(T, rh, liqflag)
 
    % Newton iteration (typically converges in 3-5 steps)
    for iter = 1:10
-      [es_guess, des_dT_guess] = icemodel.vapor.vappress(Tdew, liqflag);
+      [es_guess, des_dT_guess] = ...
+         icemodel.vapor.saturation_vapor_pressure(Tdew, liqflag);
       Tdew = Tdew - (es_guess - ea) ./ des_dT_guess;
    end
 end

@@ -13,10 +13,10 @@ function varargout = parameterLookup(varargin)
    %  True physical constants belong in icemodel.physicalConstant.
    %
    %  Canonical vapor coefficients are from Ambaum (2020), computed by
-   %  icemodel.vapor.vaporinit. Buck (1981) coefficients are preserved in
+   %  icemodel.vapor.initialize_vapor_model. Buck (1981) coefficients are preserved in
    %  icemodel.kernels.buckVaporModel.
    %
-   % See also: icemodel.physicalConstant, icemodel.vapor.vaporinit
+   % See also: icemodel.physicalConstant, icemodel.vapor.initialize_vapor_model
    %
    %#codegen
 
@@ -25,10 +25,10 @@ function varargout = parameterLookup(varargin)
    % -----------------------------------------------------------------------
    % Ambaum (2020) / Romps (2021) Rankine-Kirchhoff vapor coefficients
    % -----------------------------------------------------------------------
-   % Computed from physical constants via icemodel.vapor.vaporinit. The formula is:
+   % Computed from physical constants via icemodel.vapor.initialize_vapor_model. The formula is:
    %   es = a * exp(b / T) * T ^ c   [Pa]
 
-   [al_, bl_, cl_, ai_, bi_, ci_] = icemodel.vapor.vaporinit();
+   [al_, bl_, cl_, ai_, bi_, ci_] = icemodel.vapor.initialize_vapor_model();
 
    % Define the parameter struct.
    params = struct( ...

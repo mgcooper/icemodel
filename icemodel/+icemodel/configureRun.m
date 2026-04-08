@@ -100,7 +100,7 @@ function opts = validateTurbulentFluxOptions(opts)
    end
 
    scheme = lower(char(opts.turbulent_flux_scheme));
-   if ~ismember(scheme, {'bulk_richardson', 'bulk_mo'})
+   if ~ismember(scheme, {'bulk_richardson', 'monin_obukhov'})
       error('icemodel:configureRun:unknownTurbulentFluxScheme', ...
          'Unrecognized turbulent flux scheme: %s', opts.turbulent_flux_scheme);
    end
@@ -130,17 +130,17 @@ function opts = validateTurbulentFluxOptions(opts)
       opts.use_forcing_snow_depth_for_thf);
 
    % For MOST, enforce numerical (complex-step) T_sfc solver.
-   if strcmp(scheme, 'bulk_mo')
+   if strcmp(scheme, 'monin_obukhov')
       % if opts.solver ~= 1
       %    opts.solver = 1;
-      %    warning('icemodel:configureRun:bulkMoRequiresSebSolver2', ...
-      %       ['turbulent_flux_scheme=''bulk_mo'' currently requires ' ...
+      %    warning('icemodel:configureRun:moninObukhovRequiresSebSolver2', ...
+      %       ['turbulent_flux_scheme=''monin_obukhov'' currently requires ' ...
       %       'opts.solver = 1.']);
       % end
       if opts.seb_solver ~= 2
          opts.seb_solver = 2;
-         warning('icemodel:configureRun:bulkMoRequiresSebSolver2', ...
-            ['turbulent_flux_scheme=''bulk_mo'' currently requires ' ...
+         warning('icemodel:configureRun:moninObukhovRequiresSebSolver2', ...
+            ['turbulent_flux_scheme=''monin_obukhov'' currently requires ' ...
             'opts.seb_solver = 2.']);
       end
    end

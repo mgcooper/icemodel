@@ -18,8 +18,8 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
 
    % To reinstate vapor-aware conductivity and enthalpy:
    % Note: same update would be required within iterations, see ICEENBAL.
-   % [~, drovdT] = icemodel.vapor.vapordensity(T, f_liq);
-   % k_vap = icemodel.vapor.vapork(T, f_liq, drovdT);
+   % [~, drovdT] = icemodel.vapor.saturation_vapor_density(T, f_liq);
+   % k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq, drovdT);
    % k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
 
    % Initial past Picard iterates for Aitken-acceleration
