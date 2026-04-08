@@ -1,5 +1,5 @@
-function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
-      De, br_coefs, time, snow_depth] = METINIT(opts, fileiter)
+function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
+      snow_depth] = METINIT(opts, fileiter)
    %METINIT Load and expand the meteorological forcing vectors.
    %
    %  [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, De, br_coefs, time] ...
@@ -16,9 +16,7 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    %  psfc   - surface pressure [Pa]
    %  rain   - rainfall-rate placeholder [kg m^-2 s^-1]
    %  tppt   - precipitation wet-bulb temperature [K]
-   %  De     - aerodynamic exchange coefficient from exchange_coefficients [m s^-1]
    %  time   - forcing timestamps [datetime]
-   %  br_coefs - bulk Richardson stability-coefficient vector from exchange_coefficients [1]
    %  snow_depth - optional forcing snow depth [m]; NaN when unavailable
    %
    %#codegen
@@ -63,10 +61,4 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, ...
    for n = 1:numel(rh)
       tppt(n) = icemodel.vapor.wet_bulb_temperature(tair(n), rh(n), psfc(n));
    end
-
-   % The canonical met loader already computes De after all swaps/subsetting.
-   De = met.De;
-   [~, br_coefs] = ...
-      icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
-      wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
 end

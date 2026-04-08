@@ -1,14 +1,21 @@
 function [De, S123, W1] = exchange_coefficients(wspd, z0_bulk, z_tair, z_wind)
    %EXCHANGE_COEFFICIENTS Compute bulk-Richardson exchange coefficients.
    %
-   % Exchange coefficient:
+   % Notation below roughly follows Liston et al. 1999
+   %
+   % Exchange coefficient [m s-1]:
    %  D_e = k ^ 2 * u / (log(z / z0)) ^ 2
    %      = c_w * u
    %
-   %  where:
+   % where c_w is the drag coefficient [1]:
    %  c_w = k ^ 2 / (log(z / z0)) ^ 2
    %
    % Thus: c_w = D_e / u
+   %
+   %  k = Von Karman constant
+   %  u = wind speed
+   %  z = z_tair = z_wind (assumed equal)
+   %  z0 = roughness length for momentum
    %
    % Stability coefficient:
    %
@@ -18,26 +25,28 @@ function [De, S123, W1] = exchange_coefficients(wspd, z0_bulk, z_tair, z_wind)
    % If Ri > 0 (stable):
    %     S = 1 / (1 + eta/2 * Ri) ^ 2
    %
+   % Eliminate Ri so S can be computed in terms of Ts, Ta:
+   %
    % Define:
    %  T_star = (Ts - Ta) / Ta
    %
    % With some algebra:
-   %  If Ri < 0 (unstable):
+   %  if Ri < 0 (unstable):
    %     S = 1 + S2 / u ^ 2 * T_star / (1 + S3 / u * T_star ^ 0.5)
    %
-   %  If Ri > 0 (stable):
+   %  if Ri > 0 (stable):
    %     S = 1 / (1 + S2 / (2 * u ^ 2) * -T_star) ^ 2
    %
    % Where:
-   %  S1 = psi * eta * c_w * (z_obs / z0_bulk) ^ 0.5
+   %  S1 = psi * eta * c_w * (z_obs / z0_bulk) ^ 0.5  (eq 20)
    %  S2 = eta * g0 * z_obs
    %  S3 = S1 * (g * z_obs) ^ 0.5
    %
-   % Note, from Louis, 1979:
-   %  c_w = a^2                                    (eq 13)
-   %  eta = b                                      (see eq 14)
-   %  psi = c_star                                 (see eq 20)
-   %  S1 = c = c_star * a^2 * b * (z / z0_bulk)^0.5 (eq 20)
+   % Translate to Louis, 1979 notation:
+   %  c_w = a^2                                       (eq 13)
+   %  eta = b                                         (see eq 14)
+   %  psi = c_star                                    (see eq 20)
+   %  S1 = c = c_star * a^2 * b * (z / z0_bulk)^0.5   (eq 20)
    %  S1 = gamma in Liston et al. 1999, eq. A15
    %
    % Note also that eta_star = eta / 2 = 9.4 / 2 = 4.7 is customarily referred
@@ -46,19 +55,28 @@ function [De, S123, W1] = exchange_coefficients(wspd, z0_bulk, z_tair, z_wind)
    %
    %#codegen
 
-   [kappa, gravity] = icemodel.physicalConstant('kappa', 'gravity');
-   [eta, psi] = icemodel.parameterLookup('thf_bulk_richardson_eta', ...
-      'thf_bulk_richardson_psi');
-
+   % Parse the optional z_wind input; set it equal to z_tair if not provided
    if nargin < 4
       z_wind = z_tair;
    end
 
+   % Load physical constants and parameters
+   [k_von_karman, gravity] = icemodel.physicalConstant('kappa', 'gravity');
+   [eta, psi] = icemodel.parameterLookup('thf_bulk_richardson_eta', ...
+      'thf_bulk_richardson_psi');
+
+   % Compute the drag coefficient (a^2 in Louis notation, eq. 13) [1]
+   W1 = (k_von_karman / log(z_tair / z0_bulk)) ^ 2;
+
+   % Compute the aerodynamic exchange coefficient [m s-1]
+   De = W1 .* wspd;
+
+   % Compute the factor needed to allow z_wind != z_tair (derived by mgc)
    z_star = (z_wind ^ 2) / z_tair;
 
-   W1 = (kappa / log(z_tair / z0_bulk)) ^ 2;
-   De = wspd .* W1;
-
+   % These coefficients are used in the stability factor calculation and do
+   % not depend on dynamic forcing. Pre-compute them here for computational
+   % efficiency, to avoid additional operations within the solver.
    S123 = nan(1, 3);
    S123(1) = psi * eta * W1 * sqrt(z_tair / z0_bulk); % gamma Eq. A15
    S123(2) = eta * gravity * z_star;
@@ -66,8 +84,8 @@ function [De, S123, W1] = exchange_coefficients(wspd, z0_bulk, z_tair, z_wind)
 
    % This follows Glen, and can be compared with stability_factor
    %
-   % B1 = 9.4 * gravity * zobs / (Ta * wspd ^ 2) = scoef(2) / (Ta * wspd ^ 2)
-   % B2 = 5.3 * 9.4 * wcoef * sqrt(zobs / z0) * sqrt(gravity * zobs / (Ta * wspd ^ 2));
+   % B1 = 9.4 * gravity * zobs / (Ta * wspd ^ 2) = S123(2) / (Ta * wspd ^ 2)
+   % B2 = 5.3 * 9.4 * W1 * sqrt(zobs / z0) * sqrt(gravity * zobs / (Ta * wspd ^ 2));
    %
    % a1 = 5.3 * 9.4;                                    % [-]
    % z1 = z_obs / z0_bulk;                              % [-]

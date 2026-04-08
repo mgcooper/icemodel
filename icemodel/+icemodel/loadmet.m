@@ -28,17 +28,13 @@ function [met, opts] = loadmet(opts, fileiter) %#codegen
       met = sortrows(met);
    end
 
-    met = addCanonicalSnowDepth(met);
+   met = addCanonicalSnowDepth(met);
 
    % Require the concatenated met data to cover every requested simulation
    % year, whether the source is one multi-year file or one file per year.
    if ~all(ismember(opts.simyears(:), unique(year(met.Time))))
       error('met data do not cover all requested simulation years')
    end
-
-   % Compute the wind transfer coefficient for the processed met data.
-   met.De = icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
-      met.wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
 end
 
 %%

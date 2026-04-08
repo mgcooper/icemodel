@@ -8,8 +8,8 @@ function snow_depth = resolve_forcing_snow_depth(forcing_snow_depth, metstep, ..
    % The current models have no explicit snow thermodynamics yet, so the
    % forcing-based snow-depth hook is optional and THF-only. When the hook is
    % disabled or the requested met step has no finite forcing value, the
-   % returned scalar stays on the current bare-ice fallback (`0.0`).
-
+   % returned scalar stays on the current bare-ice fallback (0.0).
+   %
    %#codegen
 
    snow_depth = 0.0;
