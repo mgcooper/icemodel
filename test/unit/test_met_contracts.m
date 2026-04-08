@@ -58,9 +58,9 @@ function test_loadmet_standardizes_optional_snow_depth_alias(testCase)
    testCase.verifyEqual(met.snow_depth, snow_depth, 'AbsTol', 1e-12);
 end
 
-function test_METINIT_returns_optional_snow_depth_vector(testCase)
-   % METINIT should expose the canonical forcing snow-depth vector so the
-   % model mains can choose whether to use it.
+function test_initforcings_returns_optional_snow_depth_vector(testCase)
+   % icemodel.surface.initialize_surface_forcings should expose the canonical
+   % forcing snow-depth vector so the model mains can choose whether to use it.
 
    workspace = testCase.TestData.workspace;
    snow_depth = 0.05 + zeros(workspace.nsteps, 1);
@@ -74,7 +74,9 @@ function test_METINIT_returns_optional_snow_depth_vector(testCase)
 
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
       workspace, 'skinmodel', 2016);
-   [~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, met_snow_depth] = METINIT(opts);
+
+   [~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, met_snow_depth] = ...
+      icemodel.surface.initialize_surface_forcings(opts);
 
    testCase.verifyEqual(met_snow_depth, snow_depth, 'AbsTol', 1e-12);
 end

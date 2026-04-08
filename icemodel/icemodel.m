@@ -60,9 +60,9 @@ function [ice1, ice2, opts] = icemodel(opts)
       'jumpmax', 'cpl_maxiter', 'cpl_Ts_tol', 'cpl_seb_tol', 'cpl_alpha', ...
       'cpl_aitken', 'cpl_jumpmax');
 
-   % LOAD THE FORCING DATA
+   % INITIALIZE THE FORCING DATA
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, time, forcing_snow_depth] ...
-      = METINIT(opts);
+      = icemodel.surface.initialize_surface_forcings(opts);
 
    % INITIALIZE THE SURFACE TURBULENT EXCHANGE MODEL (bulk Richardson)
    [De, br_coefs] ...
@@ -76,7 +76,7 @@ function [ice1, ice2, opts] = icemodel(opts)
 
    % INITIALIZE THE THERMAL MODEL
    [ice1, ice2, T_sfc, T_ice, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
-      z_nodes, roL, liqflag, JJ, ~, Sp, Fc, Fp, TL, TH, f_ell_min, f_ell_max, ...
+      z_nodes, roL, liqflag, JJ, ~, Sp, ~, ~, TL, TH, f_ell_min, f_ell_max, ...
       f_ice_min, f_liq_res] = ICEINIT(opts, tair, r_eff);
 
    % INITIALIZE TIMESTEPPING

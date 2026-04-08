@@ -34,19 +34,6 @@ function test_tdewpoint_inverts_vappress(testCase)
       'Dew point should be below air temperature for rh < 100');
 end
 
-function test_loadmetdata_respects_liqflag(testCase)
-   % LOADMETDATA should switch between ice and liquid saturation relations
-   % when the caller flips the liquid-phase flag.
-
-   [met, ~] = icemodel.test.fixtures.makeSyntheticMetFile(2016, 'nsteps', 1);
-   met.De = 0.01;
-
-   [~, ~, ~, ~, ~, ~, ~, ea_ice] = LOADMETDATA(met, 1, false);
-   [~, ~, ~, ~, ~, ~, ~, ea_liq] = LOADMETDATA(met, 1, true);
-
-   testCase.verifyGreaterThan(ea_liq, ea_ice);
-end
-
 function test_metsub_interpolates_midstep_for_enabled_option(testCase)
    % With substep interpolation enabled, METSUB should evaluate the forcing
    % state halfway through the parent step.

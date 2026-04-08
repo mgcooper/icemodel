@@ -25,8 +25,8 @@ function [ice1, ice2, opts] = skinmodel(opts)
    chi = 1.0;
 
    % LOAD THE FORCING DATA
-   [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, time, forcing_snow_depth] ...
-      = METINIT(opts);
+   [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, time, forcing_snow_depth] ...
+      = icemodel.surface.initialize_surface_forcings(opts);
 
    % INITIALIZE THE SURFACE TURBULENT EXCHANGE MODEL (bulk Richardson)
    [De, br_coefs] ...

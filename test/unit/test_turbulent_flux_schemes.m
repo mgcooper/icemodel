@@ -37,7 +37,11 @@ function test_forcing_snow_depth_hook_switches_to_snow_roughness(testCase)
    % roughness path without requiring a full snow model.
 
    workspace = testCase.TestData.workspace;
+
+   % Create synthetic snow depth data
    snow_depth = 0.08 + zeros(workspace.nsteps, 1);
+
+   % Create a synthetic met file
    icemodel.test.fixtures.makeSyntheticMetFile(2016, ...
       'sitename', workspace.sitename, ...
       'forcings', workspace.forcings, ...
@@ -46,17 +50,25 @@ function test_forcing_snow_depth_hook_switches_to_snow_roughness(testCase)
       'snow_depth', snow_depth, ...
       'metdir', workspace.metdir);
 
+   % Create synthetic model opts
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
       workspace, 'icemodel', 2016, solver=1, seb_solver=2, ...
       turbulent_flux_scheme='monin_obukhov', ...
       use_forcing_snow_depth_for_thf=true, ...
       z0_ice=0.02, z0_snow_low_density=0.0015, ...
       testname='forcing_snow_depth_hook');
+
+   % Load the met data
    met = icemodel.loadmet(opts);
-   [~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, forcing_snow_depth] = METINIT(opts);
+
+   % Load snow depth via icemodel.surface.initialize_surface_forcings
+   [~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, forcing_snow_depth] = ...
+      icemodel.surface.initialize_surface_forcings(opts);
 
    snow_depth_scalar = icemodel.surface.resolve_forcing_snow_depth( ...
       forcing_snow_depth, 1, opts.use_forcing_snow_depth_for_thf);
+
+   % Set the momentum roughness length
    z0m = icemodel.surface.surface_roughness_length( ...
       snow_depth_scalar, 350.0, opts.z0_ice, ...
       opts.z0_snow_low_density, opts.z0_snow_high_density);
@@ -376,7 +388,7 @@ function test_thf_debug_dump_reuses_diag_contract(testCase)
 
    debug_file = [tempname, '.mat'];
    old_debug_file = getenv('ICEMODEL_DEBUG_THF_FILE');
-   cleanup = onCleanup(@() restoreThfDebugEnv(old_debug_file, debug_file)); %#ok<NASGU>
+   cleanup = onCleanup(@() restoreThfDebugEnv(old_debug_file, debug_file));
    setenv('ICEMODEL_DEBUG_THF_FILE', debug_file);
 
    icemodel.surface.dump_turbulent_heat_flux_debug_state( ...

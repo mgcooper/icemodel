@@ -1,7 +1,8 @@
 function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    %MAKESYNTHETICCOLUMNSTATE Build a resolved synthetic column kernel state.
    %
-   %  state = icemodel.test.fixtures.makeSyntheticColumnState(workspace, "icemodel")
+   % state = icemodel.test.fixtures.makeSyntheticColumnState(...
+   %    workspace, "icemodel")
    %
    % The returned struct contains a benign initialized column, resolved opts,
    % forcing data for one met step, and the physical constants needed by the
@@ -34,14 +35,15 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
       z0_bulk=kwargs.z0_bulk, ...
       z0_ice=kwargs.z0_ice, testname=kwargs.testname, ...
       output_profile='standard');
+
    met = icemodel.loadmet(opts);
 
    % Seed the thermal grain-radius state only for icemodel.
    r_eff = 0;
    if strcmp(smbmodel, 'icemodel')
       ro_ice0 = icemodel.physicalConstant('ro_ice');
-      [~, ~, ~, ~, ~, ~, ~, ~, r_eff] = icemodel.radiation.initialize_spectral_model( ...
-         opts, ro_ice0);
+      [~, ~, ~, ~, ~, ~, ~, ~, r_eff] = ...
+         icemodel.radiation.initialize_spectral_model(opts, ro_ice0);
    end
 
    % Initialize the column state exactly as the model kernel would.
@@ -51,9 +53,11 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
       opts, met.tair, r_eff);
 
    metstep = kwargs.metstep;
+
    % Extract one forcing step and the corresponding transfer coefficients.
-   [tair, swd, lwd, albedo, wspd, psfc, De, ea, forcing_snow_depth] = LOADMETDATA(met, metstep, ...
-      liqflag);
+   [tair, swd, lwd, albedo, wspd, psfc, ea, De, forcing_snow_depth] ...
+      = icemodel.timestepping.getforcings(met, metstep, liqflag, opts);
+
    [~, scoef] = ...
       icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
       wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
@@ -163,9 +167,9 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
 
    % Attach the spectral grid only for tests that exercise that path.
    if kwargs.include_spectral
-      [I0, dz_spect, z_nodes_spect, z_edges_spect, tau_N, ...
-         tau_S, solar_dwavel, ~, ~, qext, g, coalbedo, kabs, kice, ...
-         wavel, radii] = icemodel.radiation.initialize_spectral_model(opts, ro_ice);
+      [I0, dz_spect, z_nodes_spect, z_edges_spect, tau_N, tau_S, ...
+         solar_dwavel, ~, ~, qext, g, coalbedo, kabs, kice, wavel, radii] ...
+         = icemodel.radiation.initialize_spectral_model(opts, ro_ice);
 
       % Recover k_ext for tests that need the initialized coefficients.
       [~, ~, ~, k_ext] = icemodel.radiation.update_extinction_coefficients( ...

@@ -1,10 +1,10 @@
 function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
-      snow_depth] = METINIT(opts, fileiter)
-   %METINIT Load and expand the meteorological forcing vectors.
+      snow_depth] = initialize_surface_forcings(opts, fileiter)
+   %initialize_surface_forcings Load the meteorological forcing vectors.
    %
    %  [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, De, br_coefs, time] ...
-   %     = METINIT(opts)
-   %  ... = METINIT(opts, fileiter)
+   %     = icemodel.surface.initialize_surface_forcings(opts)
+   %  ... = icemodel.surface.initialize_surface_forcings(opts, fileiter)
    %
    % Outputs:
    %  tair   - air temperature [K]
@@ -39,13 +39,15 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
    psfc = met.psfc;
    time = met.Time;
    albedo = met.albedo;
+
+   % Parse optional snow depth
    if isvariable('snow_depth', met)
       snow_depth = met.snow_depth;
    else
       snow_depth = nan(size(tair));
    end
 
-   % Rainfall forcing is still ignored in the core time integration.
+   % Rainfall forcing is ignored in the core time integration.
    % Keep the legacy zero-rain behavior explicit here until rain/snow/ppt
    % forcing support is implemented consistently.
    rain = 0 * tair;
@@ -56,7 +58,7 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
    % `snow_depth`, but it does not imply a full snow-model mass/energy
    % treatment and may remain NaN in existing station datasets.
 
-   % Solve for wet bulb
+   % Solve for wet bulb for use in the advective heat flux calculation.
    tppt = nan(size(rh));
    for n = 1:numel(rh)
       tppt(n) = icemodel.vapor.wet_bulb_temperature(tair(n), rh(n), psfc(n));
