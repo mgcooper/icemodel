@@ -50,7 +50,7 @@ function report = summarize_spectral_density_floor(kwargs)
    % Rebuild the spectral grid once so each timestep reuses the same geometry.
    [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
    [~, dz_spect, z_nodes_spect, ~, tau_N, tau_S, solar_dwavel] ...
-      = EXTCOEFSINIT(opts, ro_ice);
+      = icemodel.radiation.initialize_spectral_model(opts, ro_ice);
    [~, ~, z_nodes_therm, ~] = CVMESH(opts.z0_thermal, opts.dz_thermal);
 
    % Scan all retained timesteps so the report quantifies both how often the
@@ -79,7 +79,7 @@ function report = summarize_spectral_density_floor(kwargs)
       n_steps_with_floor = n_steps_with_floor + 1;
 
       % Compute k_bulk w and w/o the density floor
-      k_bulk_floor = BULKEXTCOEFS(dz_spect, max(raw, 300), tau_N, tau_S, ...
+      k_bulk_floor = icemodel.radiation.bulk_extinction_coefficients(dz_spect, max(raw, 300), tau_N, tau_S, ...
          solar_dwavel);
       k_bulk_raw = computeBulkExactNoFloor(dz_spect, raw, tau_N, tau_S, ...
          solar_dwavel);

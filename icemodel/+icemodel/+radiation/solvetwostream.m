@@ -1,8 +1,8 @@
-function [Qnet, Qup, Qdn] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
-   %SOLVETWOSTREAM Solve Schlatter's two-stream radiative transfer system.
+function [Qnet, Qup, Qdn] = solvetwostream(I0, albedo, k_bulk, z_edges)
+   %solvetwostream Solve Schlatter's two-stream radiative transfer system.
    %
-   %  Qnet = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
-   %  [Qnet, Qup, Qdn] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
+   %  Qnet = icemodel.radiation.solvetwostream(I0, albedo, k_bulk, z_edges)
+   %  [Qnet, Qup, Qdn] = icemodel.radiation.solvetwostream(I0, albedo, k_bulk, z_edges)
    %
    %  Solves the two-stream equations on the staggered spectral grid for the
    %  upward (Qup) and downward (Qdn) diffuse flux profiles, then reconstructs
@@ -13,7 +13,8 @@ function [Qnet, Qup, Qdn] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
    %     I0      - Incident spectral irradiance at the top surface [W m-2]
    %     albedo  - Surface albedo [1]
    %     k_bulk  - Bulk spectral extinction coefficients on the spectral grid
-   %               [m-1], padded by BULKEXTCOEFS or BULKEXTCOEFSLOOKUP
+   %               [m-1], padded by icemodel.radiation.bulk_extinction_coefficients or
+   %               icemodel.radiation.bulk_extinction_coefficients_lookup
    %     z_edges - Spectral control-volume edge depths [m] (M+1 values for M CVs)
    %
    %  Outputs:
@@ -45,8 +46,8 @@ function [Qnet, Qup, Qdn] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
    dz_bottom = z_edges(M+1) - z_edges(M);
    z_edges(M+2) = z_edges(M+1) + dz_bottom;
 
-   % BULKEXTCOEFS is parameterized on the spectral cell thickness, so use the
-   % same top-edge spacing in the upper boundary condition.
+   % bulk_extinction_coefficients is parameterized on the spectral cell thickness,
+   % so use the same top-edge spacing in the upper boundary condition.
    deltaz = z_edges(2) - z_edges(1);
 
    % Initialize the tridiagonal system.
@@ -79,7 +80,7 @@ function [Qnet, Qup, Qdn] = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges)
    x = icemodel.numerics.trisolve(e, f, g, b);
 
    % Reconstruct the up/down fluxes.
-   [Qup, Qdn] = GETUPDOWN(a, r, x, I0, z_edges, M);
+   [Qup, Qdn] = icemodel.radiation.smooth_twostream_fluxes(a, r, x, I0, z_edges, M);
 
    % Compute the net flux at each interface (Schlatter's XYnet). The staggered
    % up/dn have M+2 elements; averaging adjacent pairs gives M+1 interface

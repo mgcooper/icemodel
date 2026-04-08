@@ -1,7 +1,8 @@
-function [qext, g, coalbedo, wavel, dwavel, radii] = GETSCATTERCOEFS(opts)
-   %GETSCATTERCOEFS Load the spectral scattering tables and wavelength grid.
+function [qext, g, coalbedo, wavel, dwavel, radii] = get_scattering_coefficients(opts)
+   %get_scattering_coefficients Load the spectral scattering tables and wavelength grid.
    %
-   %  [qext, g, coalbedo, wavel, dwavel, radii] = GETSCATTERCOEFS(opts)
+   % [qext, g, coalbedo, wavel, dwavel, radii] = ...
+   %    icemodel.radiation.get_scattering_coefficients(opts)
    %
    % The Mie table stores one row block per optical property:
    %   rows 1:nradii                 -> g

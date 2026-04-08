@@ -6,13 +6,12 @@ function [x, ok, iter] = complexstep(f, x0)
    %
    %#codegen
 
-   persistent h dh tol maxiter imag_factor_tol
+   persistent h dh tol maxiter
    if isempty(tol)
       h = 1e-10;
       dh = 1i * h;
       tol = 1e-3;
       maxiter = 100;
-      imag_factor_tol = 100;
    end
 
    ok = false;
@@ -21,8 +20,7 @@ function [x, ok, iter] = complexstep(f, x0)
 
       % The residual contract must stay real on the real axis.
       f_old = f(old);
-      imag_tol = imag_factor_tol * eps(max(1.0, abs(real(f_old))));
-      if abs(imag(f_old)) > imag_tol
+      if abs(imag(f_old)) > imag_tol(f_old)
          error('icemodel:ComplexStepResidualNotReal', ...
             ['complexstep residual must stay real on the real axis; ', ...
             'got imag(f(x)) = %.3e at x = %.15g.'], imag(f_old), old);
@@ -45,4 +43,14 @@ function [x, ok, iter] = complexstep(f, x0)
    end
 
    x = x0; % ok = false
+end
+
+function tol = imag_tol(f_old)
+
+   persistent tol_factor
+   if isempty(tol_factor)
+      tol_factor = 100;
+   end
+
+   tol = tol_factor * eps(max(1.0, abs(real(f_old))));
 end

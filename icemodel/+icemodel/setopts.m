@@ -262,7 +262,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    % The mie scattering coefficients are defined for 35 grain sizes and 118
    % spectral bands. Define those dimensions here, they are used to read in
-   % the data array in GETSCATTERCOEFS. Also set the grain size index.
+   % the data array in icemodel.radiation.get_scattering_coefficients. Also set the grain size index.
    opts.nwavel          = 118;
    opts.nradii          = 35;
    opts.i_grainradius   = 25;       % index 25 = 2.0 mm                    [#]

@@ -9,7 +9,7 @@ This study compares three spectral source-term paths:
      `/Users/mattcooper/MATLAB/projects/icemodel/test/legacy/SPECTRALSOURCETERM_INLINE.m`
 2. `functions`
    - organized exact production path in
-     `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/SPECTRALSOURCETERM.m`
+     `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/icemodel.column.shortwave_source_term.m`
 3. `lookup`
    - same organized production path, but with bulk extinction coefficients
      gathered from a precomputed density lookup table
@@ -24,29 +24,29 @@ The study answers two separate questions:
 
 `opts.lookup_k_bulk` (default `true`) controls whether the production path
 uses the lookup-table approximation or the exact bulk-extinction transform.
-`EXTCOEFSINIT` builds the lookup table when `opts.lookup_k_bulk` is true and
-passes it as `k_bulk_lookup` to `SPECTRALSOURCETERM`, which dispatches on
+`icemodel.radiation.initialize_spectral_model` builds the lookup table when `opts.lookup_k_bulk` is true and
+passes it as `k_bulk_lookup` to `icemodel.column.shortwave_source_term`, which dispatches on
 `isempty(k_bulk_lookup)`.
 
-1. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/EXTCOEFSINIT.m`
+1. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/icemodel.radiation.initialize_spectral_model.m`
    - initializes spectral geometry and optical coefficients
    - builds `k_bulk_lookup` when `opts.lookup_k_bulk` is true
-2. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/SPECTRALSOURCETERM.m`
+2. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/icemodel.column.shortwave_source_term.m`
    - main entrypoint called by `icemodel.m`
    - remaps thermal density to the spectral grid
    - chooses exact or lookup bulk extinction coefficients via `isempty(k_bulk_lookup)`
    - solves the two-stream system
    - reconstructs net spectral flux
    - collapses that flux to the thermal-grid source term and `chi`
-3. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/BULKEXTCOEFS.m`
+3. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/icemodel.radiation.bulk_extinction_coefficients.m`
    - exact bulk-extinction transform
-4. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/BULKEXTCOEFSLOOKUP.m`
+4. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/icemodel.radiation.bulk_extinction_coefficients_lookup.m`
    - lookup bulk-extinction transform
-5. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/SOLVETWOSTREAM.m`
+5. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/icemodel.radiation.solvetwostream.m`
    - two-stream solve on the spectral grid
 6. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/SPECTRALNETFLUX.m`
    - reconstructs net spectral flux from the up/down solution
-7. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/UPDATEEXTCOEFS.m`
+7. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/icemodel.radiation.updateextcoefs.m`
    - rebuilds `tau_N`, `tau_S`, `k_ext` (and optionally `k_bulk_lookup`) for
      one optical grain-radius index; designed for future grain-size evolution
 8. `/Users/mattcooper/MATLAB/projects/icemodel/test/legacy/SPECTRALSOURCETERM_INLINE.m`

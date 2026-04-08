@@ -41,7 +41,7 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
 
          % Build the exact bulk extinction coefficients once for the narrow
          % bulk and two-stream benchmarks below.
-         testCase.k_bulk = BULKEXTCOEFS( ...
+         testCase.k_bulk = icemodel.radiation.bulk_extinction_coefficients( ...
             s.dz_spect, testCase.ro_sno_spect, s.tau_N, s.tau_S, s.solar_dwavel);
 
          % Precompute the lookup used by the fast-path exploratory benchmarks.
@@ -57,7 +57,7 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
             s.albedo, s.I0, s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, ...
             s.dz, testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect);
 
-         [Sc_functions, chi_functions] = SPECTRALSOURCETERM(s.swd, ...
+         [Sc_functions, chi_functions] = icemodel.column.shortwave_source_term(s.swd, ...
             s.albedo, s.I0, s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, ...
             s.dz, testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect, ...
             testCase.z_edges_spect, testCase.k_bulk_lookup_empty);
@@ -84,17 +84,17 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
          batch_size = 32;
 
          % Compute the bulk extinction coefficients and verify they're finite
-         k_bulk_out = BULKEXTCOEFS(s.dz_spect, testCase.ro_sno_spect, ...
+         k_bulk_out = icemodel.radiation.bulk_extinction_coefficients(s.dz_spect, testCase.ro_sno_spect, ...
             s.tau_N, s.tau_S, s.solar_dwavel);
          testCase.assertTrue(all(isfinite(k_bulk_out)));
 
          while testCase.keepMeasuring
             for n = 1:batch_size
-               k_bulk_out = BULKEXTCOEFS(s.dz_spect, testCase.ro_sno_spect, ...
+               k_bulk_out = icemodel.radiation.bulk_extinction_coefficients(s.dz_spect, testCase.ro_sno_spect, ...
                   s.tau_N, s.tau_S, s.solar_dwavel);
             end
             if ~all(isfinite(k_bulk_out))
-               error('BULKEXTCOEFS benchmark produced a non-finite result')
+               error('icemodel.radiation.bulk_extinction_coefficients benchmark produced a non-finite result')
             end
          end
       end
@@ -102,17 +102,17 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
       function testBulkExtCoefsLookup(testCase)
          % Benchmark the approximate lookup-table bulk-extinction path.
          batch_size = 1024;
-         k_bulk_out = BULKEXTCOEFSLOOKUP(testCase.ro_sno_spect, ...
+         k_bulk_out = icemodel.radiation.bulk_extinction_coefficients_lookup(testCase.ro_sno_spect, ...
             testCase.k_bulk_lookup);
          testCase.assertTrue(all(isfinite(k_bulk_out)));
 
          while testCase.keepMeasuring
             for n = 1:batch_size
-               k_bulk_out = BULKEXTCOEFSLOOKUP(testCase.ro_sno_spect, ...
+               k_bulk_out = icemodel.radiation.bulk_extinction_coefficients_lookup(testCase.ro_sno_spect, ...
                   testCase.k_bulk_lookup);
             end
             if ~all(isfinite(k_bulk_out))
-               error(['BULKEXTCOEFSLOOKUP benchmark produced a non-finite ', ...
+               error(['icemodel.radiation.bulk_extinction_coefficients_lookup benchmark produced a non-finite ', ...
                   'result'])
             end
          end
@@ -122,17 +122,17 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
          % Benchmark just the two-stream linear solve on fixed coefficients.
          s = testCase.state;
          batch_size = 384;
-         xynet = SOLVETWOSTREAM(s.I0, s.albedo, ...
+         xynet = icemodel.radiation.solvetwostream(s.I0, s.albedo, ...
             testCase.k_bulk, testCase.z_edges_spect);
          testCase.assertTrue(all(isfinite(xynet)));
 
          while testCase.keepMeasuring
             for n = 1:batch_size
-               xynet = SOLVETWOSTREAM(s.I0, s.albedo, ...
+               xynet = icemodel.radiation.solvetwostream(s.I0, s.albedo, ...
                   testCase.k_bulk, testCase.z_edges_spect);
             end
             if ~all(isfinite(xynet))
-               error('SOLVETWOSTREAM benchmark produced a non-finite result')
+               error('icemodel.radiation.solvetwostream benchmark produced a non-finite result')
             end
          end
       end
@@ -141,11 +141,11 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
          % Benchmark the historical inlined spectral source-term implementation.
          s = testCase.state;
          batch_size = 256;
-         
+
          [Sc_new, chi] = SPECTRALSOURCETERM_INLINE(s.swd, s.albedo, s.I0, ...
             s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ...
             testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect);
-         
+
          testCase.assertTrue(all(isfinite(Sc_new)));
          testCase.assertTrue(isfinite(chi));
 
@@ -166,18 +166,18 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
          % Benchmark the organized exact spectral source-term path.
          s = testCase.state;
          batch_size = 256;
-         
-         [Sc_new, chi] = SPECTRALSOURCETERM(s.swd, s.albedo, ...
+
+         [Sc_new, chi] = icemodel.column.shortwave_source_term(s.swd, s.albedo, ...
             s.I0, s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ...
             testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect, ...
             testCase.z_edges_spect, testCase.k_bulk_lookup_empty);
-         
+
          testCase.assertTrue(all(isfinite(Sc_new)));
          testCase.assertTrue(isfinite(chi));
 
          while testCase.keepMeasuring
             for n = 1:batch_size
-               [Sc_new, chi] = SPECTRALSOURCETERM(s.swd, s.albedo, s.I0, ...
+               [Sc_new, chi] = icemodel.column.shortwave_source_term(s.swd, s.albedo, s.I0, ...
                   s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ...
                   testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect, ...
                   testCase.z_edges_spect, testCase.k_bulk_lookup_empty);
@@ -193,18 +193,18 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
          % Benchmark the shared source-term path with lookup bulk coefficients.
          s = testCase.state;
          batch_size = 256;
-         
-         [Sc_new, chi] = SPECTRALSOURCETERM(s.swd, s.albedo, ...
+
+         [Sc_new, chi] = icemodel.column.shortwave_source_term(s.swd, s.albedo, ...
             s.I0, s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ...
             testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect, ...
             testCase.z_edges_spect, testCase.k_bulk_lookup);
-         
+
          testCase.assertTrue(all(isfinite(Sc_new)));
          testCase.assertTrue(isfinite(chi));
 
          while testCase.keepMeasuring
             for n = 1:batch_size
-               [Sc_new, chi] = SPECTRALSOURCETERM(s.swd, s.albedo, s.I0, ...
+               [Sc_new, chi] = icemodel.column.shortwave_source_term(s.swd, s.albedo, s.I0, ...
                   s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ...
                   testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect, ...
                   testCase.z_edges_spect, testCase.k_bulk_lookup);

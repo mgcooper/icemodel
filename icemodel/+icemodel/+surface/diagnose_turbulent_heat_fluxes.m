@@ -1,5 +1,5 @@
-function [Qe, Qh, diag] = diagnose_turbulent_heat_fluxes(T_sfc, tair, wspd, psfc, ...
-      ea_atm, De, br_coefs, ro_sfc, snow_depth, roL, liqflag, opts)
+function [Qe, Qh, diag] = diagnose_turbulent_heat_fluxes(T_sfc, tair, wspd, ...
+      psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, roL, liqflag, opts)
    %DIAGNOSE_TURBULENT_HEAT_FLUXES Dispatch the configured THF scheme.
    %
    %  [Qe, Qh] = icemodel.surface.diagnose_turbulent_heat_fluxes(...)

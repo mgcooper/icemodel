@@ -1,7 +1,7 @@
 function bulkextcoefs(bulkcoefs)
-   %ICEMODEL.PLOT.BULKEXTCOEFS
+   %icemodel.plot.bulk_extinction_coefficients
    %
-   % Call this from within BULKEXTCOEFS
+   % Call this from within icemodel.radiation.bulk_extinction_coefficients
 
    figure;
    try

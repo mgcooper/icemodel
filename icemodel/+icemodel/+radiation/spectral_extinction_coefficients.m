@@ -1,7 +1,8 @@
-function k_ext = SPECTEXTCOEFS(qext, g, coalbedo, radii, iradius)
-   %SPECTEXTCOEFS Compute spectral extinction coefficients for one grain radius.
+function k_ext = spectral_extinction_coefficients(qext, g, coalbedo, radii, iradius)
+   %spectral_extinction_coefficients Compute spectral extinction coefficients for one grain radius.
    %
-   %  k_ext = SPECTEXTCOEFS(qext, g, coalbedo, radii, iradius)
+   %  k_ext = icemodel.radiation.spectral_extinction_coefficients( ...
+   %     qext, g, coalbedo, radii, iradius)
    %
    % The optical-property tables are loaded once and indexed here by IRADIUS.
    % Integer IRADIUS values select one tabulated grain size directly. A

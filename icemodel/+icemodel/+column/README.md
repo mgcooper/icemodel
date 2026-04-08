@@ -13,3 +13,5 @@ Rules:
 - keep runtime control in `icemodel.timestepping`, not here
 
 Migration status: planned namespace scaffold only; major file moves still open.
+Current migrated entry points:
+- `icemodel.column.shortwave_source_term`

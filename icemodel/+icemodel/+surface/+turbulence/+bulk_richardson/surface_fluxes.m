@@ -1,5 +1,5 @@
-function [Fsfc, Fdot] = surface_fluxes(tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, ...
-      De, T_sfc, Qc, ea_atm, roL, br_coefs, chi, liqflag)
+function [Fsfc, Fdot] = surface_fluxes(tair, Qsi, Qli, albedo, wspd, ppt, ...
+      tppt, psfc, De, T_sfc, Qc, ea_atm, roL, br_coefs, chi, liqflag)
    %SURFACE_FLUXES Evaluate the explicit bulk-Richardson surface residual.
    %
    % The surface flux includes Qc for general use, but note for a

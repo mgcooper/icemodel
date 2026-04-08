@@ -52,14 +52,15 @@ function [radius, U_vap_faces, dm_vap] = VAPORTRANSFER(T, Ts, f_ice, f_liq, ...
    % Note: radius is used for consistency with the spectral model (optically
    % equivalent grain radius). Long-term, the thermal grain radius tracked
    % here and the spectral radius are not identical quantities; coupling them
-   % is future work. See EXTCOEFSINIT, UPDATEEXTCOEFS.
+   % is future work. See icemodel.radiation.initialize_spectral_model,
+   % icemodel.radiation.update_extinction_coefficients.
    %
    % References:
    %   Jordan (1991), "A one-dimensional temperature model for a snow cover:
    %      Technical documentation for SNTHERM.89." CRREL Special Report 91-16.
    %   Patankar (1980), "Numerical Heat Transfer and Fluid Flow." CRC Press.
    %
-   % See also: icemodel.vapor.vapordensity, icemodel.vapor.vapordiffusivity, icemodel.vapor.vappress, BULKTHERMALK, EXTCOEFSINIT
+   % See also: icemodel.vapor.vapordensity, icemodel.vapor.vapordiffusivity, icemodel.vapor.vappress, BULKTHERMALK, icemodel.radiation.initialize_spectral_model
    %
    %#codegen
 

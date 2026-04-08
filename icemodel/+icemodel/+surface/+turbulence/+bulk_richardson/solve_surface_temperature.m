@@ -1,5 +1,5 @@
-function [T_sfc, ok] = solve_surface_temperature(tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, ...
-      De, ea_atm, chi, roL, br_coefs, liqflag, varargin)
+function [T_sfc, ok] = solve_surface_temperature(tair, Qsi, Qli, albedo, ...
+      wspd, ppt, tppt, psfc, De, ea_atm, chi, roL, br_coefs, liqflag, varargin)
    %SOLVE_SURFACE_TEMPERATURE Solve the explicit bulk-Richardson SEB for Ts.
    %
    % This function uses a Newton-Raphson iteration to solve the explicit

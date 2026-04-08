@@ -1,11 +1,11 @@
-function [Sc, chi] = SPECTRALSOURCETERM(Qsi, albedo, I0, dz_spect, tau_N, ...
+function [Sc, chi] = shortwave_source_term(Qsi, albedo, I0, dz_spect, tau_N, ...
       tau_S, solar_dwavel, dz_therm, ro_sno, z_nodes_therm, z_nodes_spect, ...
       z_edges_spect, k_bulk_lookup)
-   %SPECTRALSOURCETERM Solve the spectral shortwave source term.
+   %shortwave_source_term Solve the spectral shortwave source term.
    %
-   % [Sc, chi] = SPECTRALSOURCETERM(Qsi, albedo, I0, dz_spect, tau_N, tau_S, ...
-   %    solar_dwavel, dz_therm, ro_sno, z_nodes_therm, z_nodes_spect, ...
-   %    z_edges_spect, k_bulk_lookup)
+   % [Sc, chi] = icemodel.column.shortwave_source_term(Qsi, albedo, I0, ...
+   %    dz_spect, tau_N, tau_S, solar_dwavel, dz_therm, ro_sno, z_nodes_therm, ...
+   %    z_nodes_spect, z_edges_spect, k_bulk_lookup)
    %
    % The spectral model solves for the net shortwave flux profile on the
    % spectral control-volume grid, then collapses that absorbed-flux profile to
@@ -31,13 +31,15 @@ function [Sc, chi] = SPECTRALSOURCETERM(Qsi, albedo, I0, dz_spect, tau_N, ...
    % Build the bulk extinction coefficients with either the exact transform or
    % the lookup-table shortcut.
    if isempty(k_bulk_lookup)
-      k_bulk = BULKEXTCOEFS(dz_spect, ro_sno_spect, tau_N, tau_S, solar_dwavel);
+      k_bulk = icemodel.radiation.bulk_extinction_coefficients( ...
+         dz_spect, ro_sno_spect, tau_N, tau_S, solar_dwavel);
    else
-      k_bulk = BULKEXTCOEFSLOOKUP(ro_sno_spect, k_bulk_lookup);
+      k_bulk = icemodel.radiation.bulk_extinction_coefficients_lookup( ...
+         ro_sno_spect, k_bulk_lookup);
    end
 
    % Solve the two-stream system for the net flux at each interface.
-   Qnet = SOLVETWOSTREAM(I0, albedo, k_bulk, z_edges_spect);
+   Qnet = icemodel.radiation.solvetwostream(I0, albedo, k_bulk, z_edges_spect);
 
    % Collapse the spectral-grid net flux to the thermal-grid source term and
    % compute the chi partition used by the SEB coupling.
@@ -62,7 +64,7 @@ function [Sc, chi] = spectralNetFluxToSourceTerm(Qsi, I0, albedo, Qnet, ...
    % Aggregate the absorbed spectral flux onto the thermal control volumes.
    % This current collapse assumes the thermal/spectral spacing ratio is fixed
    % and uniform. If the spectral grid becomes nonuniform, revisit this mapping
-   % instead of only changing BULKEXTCOEFS.
+   % instead of only changing icemodel.radiation.bulk_extinction_coefficients.
    n_spect_per_therm = dz_therm(1) / dz_spect(1);
    dQnet_therm = transpose(sum(reshape(dQnet_spect, n_spect_per_therm, []), 1));
    dQnet_therm = [dQnet_therm; zeros((sum(dz_therm) - sum(dz_spect)) ...

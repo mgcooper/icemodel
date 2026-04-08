@@ -1,7 +1,8 @@
-function bulkcoefs = BULKEXTCOEFSLOOKUP(ro_sno, lookup)
-   %BULKEXTCOEFSLOOKUP Approximate bulk extinction from a quantized lookup.
+function bulkcoefs = bulk_extinction_coefficients_lookup(ro_sno, lookup)
+   %bulk_extinction_coefficients_lookup Bulk extinction from a quantized lookup.
    %
-   %  bulkcoefs = BULKEXTCOEFSLOOKUP(ro_sno, lookup)
+   % bulkcoefs = icemodel.radiation.bulk_extinction_coefficients_lookup( ...
+   %    ro_sno, lookup)
    %
    %#codegen
 

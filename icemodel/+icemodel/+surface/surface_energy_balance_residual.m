@@ -17,10 +17,18 @@ function residual = surface_energy_balance_residual(T_sfc, tair, Qsi, Qli, ...
       emiss = icemodel.parameterLookup('emiss');
    end
 
+   % Diagnose all fluxes and compute the residual.
    [Qe, Qh] = icemodel.surface.diagnose_turbulent_heat_fluxes(T_sfc, tair, ...
       wspd, psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, roL, liqflag, ...
       opts);
 
-   residual = chi * (1.0 - albedo) * Qsi + emiss * (Qli - SB * T_sfc ^ 4) ...
-      + Qc + Qh + Qe + QADVECT(ppt, tppt, cv_liq);
+   residual = chi * Qsi * (1.0 - albedo) + emiss * (Qli - SB * T_sfc ^ 4) ...
+      + Qh + Qe + Qc + QADVECT(ppt, tppt, cv_liq);
+
+   % For comparison with ENBAL:
+   % Qle = LONGOUT(T_sfc, emiss, SB);
+   % Qa = QADVECT(ppt, tppt, cv_liq);
+   %
+   % residual = chi * Qsi * (1.0 - albedo) + ...
+   %    emiss * Qli + Qle + Qh + Qe + Qc + Qa;
 end

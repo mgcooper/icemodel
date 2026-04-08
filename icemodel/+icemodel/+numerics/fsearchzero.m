@@ -349,10 +349,8 @@ function [a, b] = fzero_guess_to_bounds(f, x, A, B, varargin)
          dx = 1/50;
       end
 
-      a = x;
       b = x;
       fb = f(b, varargin{:});
-      fa = fb; %#ok<NASGU> % needed for codegen
       while true
 
          dx = sqrttwo * dx;

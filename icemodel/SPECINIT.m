@@ -3,9 +3,9 @@ function [radii, mie, solar_spectrum, kabs, kice] = SPECINIT(opts)
    %
    %  [radii, mie, solar_spectrum, kabs, kice] = SPECINIT(opts)
    %
-   % The active spectral init path now uses GETSCATTERCOEFS, GETSOLAR, and
-   % EXTCOEFSINIT directly. Keep this helper for ad hoc inspection of the raw
-   % spectral input tables.
+   % The active spectral init path now uses icemodel.radiation.get_scattering_coefficients,
+   % icemodel.radiation.get_solar_spectrum, and icemodel.radiation.initialize_spectral_model directly.
+   % Keep this helper for ad hoc inspection of the raw spectral input tables.
    %
    %#codegen
 

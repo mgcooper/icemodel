@@ -4,12 +4,14 @@ function tests = test_spectral_kernels
 end
 
 function setup(testCase)
-   % Build one spectral-enabled column state so the spectral helpers all see
-   % the same controlled geometry and forcing setup.
+   % Build one spectral-enabled column state so the spectral helpers all see the
+   % same controlled geometry and forcing setup.
 
    workspace = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
       configure=true, nsteps=96, dt_seconds=900);
+
    testCase.TestData.workspace = workspace;
+
    testCase.TestData.state = icemodel.test.fixtures.makeSyntheticColumnState( ...
       workspace, 'icemodel', solver=3, metstep=49, include_spectral=true, ...
       testname='spectral_kernel');
@@ -34,13 +36,17 @@ function test_solarrad_distinguishes_day_and_night(testCase)
 end
 
 function test_getscattercoefs_and_getsolar_return_positive_weights(testCase)
-   % The spectral wavel weights and integrated prototype spectrum should
-   % remain positive on a simple monotonic wavel grid.
+   % The spectral wavel weights and integrated prototype spectrum should remain
+   % positive on a simple monotonic wavel grid.
 
    s = testCase.TestData.state;
    solar_data = load(fullfile(s.opts.pathinput, 'spectral', 'solar.mat'));
-   [qext, g, coalbedo, wavel, dwavel, radii] = GETSCATTERCOEFS(s.opts);
-   [I0, solar] = GETSOLAR(solar_data.solar, wavel, dwavel);
+
+   [qext, g, coalbedo, wavel, dwavel, radii] ...
+      = icemodel.radiation.get_scattering_coefficients(s.opts);
+
+   [I0, solar] ...
+      = icemodel.radiation.get_solar_spectrum(solar_data.solar, wavel, dwavel);
 
    testCase.verifyEqual(size(qext), [s.opts.nradii, s.opts.nwavel]);
    testCase.verifyEqual(size(g), [s.opts.nradii, s.opts.nwavel]);
@@ -53,8 +59,8 @@ function test_getscattercoefs_and_getsolar_return_positive_weights(testCase)
 end
 
 function test_getupdown_returns_finite_fluxes(testCase)
-   % GETUPDOWN should reconstruct finite up/down fluxes on a compact hand-built
-   % coefficient profile.
+   % smooth_twostream_fluxes should reconstruct finite up/down fluxes on a
+   % compact hand-built coefficient profile.
 
    bulkcoefs = [1.0; 1.2; 1.4; 1.4; 1.4];
    albedo = 0.5;
@@ -62,7 +68,7 @@ function test_getupdown_returns_finite_fluxes(testCase)
    r = (2.0 * albedo / (1.0 - albedo ^ 2)) * bulkcoefs;
    x = [5; 4; 3; 2];
    z_edges = [0; 0.1; 0.2; 0.3; 0.4];
-   [up, down] = GETUPDOWN(a, r, x, 100, z_edges, 3);
+   [up, down] = icemodel.radiation.smooth_twostream_fluxes(a, r, x, 100, z_edges, 3);
 
    testCase.verifyEqual(numel(up), 5);
    testCase.verifyEqual(numel(down), 5);
@@ -71,12 +77,12 @@ function test_getupdown_returns_finite_fluxes(testCase)
 end
 
 function test_solvetwostream_returns_finite_net_flux_profile(testCase)
-   % SOLVETWOSTREAM should return a finite net-flux profile with the top
-   % boundary reflecting the imposed incoming radiation.
+   % icemodel.radiation.solvetwostream should return a finite net-flux profile
+   % with the top boundary reflecting the imposed incoming radiation.
 
    bulkcoefs = [1.0; 1.2; 1.4; 1.4; 1.4; 1.4];
    z_edges = [0; 0.1; 0.2; 0.3; 0.4];
-   xynet = SOLVETWOSTREAM(100, 0.5, bulkcoefs, z_edges);
+   xynet = icemodel.radiation.solvetwostream(100, 0.5, bulkcoefs, z_edges);
 
    testCase.verifyEqual(numel(xynet), numel(z_edges));
    testCase.verifyTrue(all(isfinite(xynet)));
@@ -84,19 +90,21 @@ function test_solvetwostream_returns_finite_net_flux_profile(testCase)
 end
 
 function test_extcoefsinit_and_spectralsourceterm_return_finite_terms(testCase)
-   % SPECTRALSOURCETERM should keep the spectral source term and chi finite on
-   % the shared synthetic spectral state.
+   % icemodel.column.shortwave_source_term should keep the spectral source term
+   % and chi finite on the shared synthetic spectral state.
 
    s = testCase.TestData.state;
+
    ro_sno = s.ro_ice * s.f_ice + s.ro_liq * s.f_liq + ...
       s.ro_air * (1 - s.f_ice - s.f_liq);
 
    % Use an empty lookup table to follow the exact k_bulk path
    k_lookup_empty = struct([]);
 
-   [Sc_new, chi] = SPECTRALSOURCETERM(s.swd, s.albedo, s.I0, s.dz_spect, ...
-      s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ro_sno, s.z_nodes, ...
-      s.z_nodes_spect, s.z_edges_spect, k_lookup_empty);
+   [Sc_new, chi] = icemodel.column.shortwave_source_term( ...
+      s.swd, s.albedo, s.I0, s.dz_spect, s.tau_N, s.tau_S, ...
+      s.solar_dwavel, s.dz, ro_sno, s.z_nodes, s.z_nodes_spect, ...
+      s.z_edges_spect, k_lookup_empty);
 
    testCase.verifyEqual(size(Sc_new), size(s.Sc));
    testCase.verifyTrue(all(isfinite(Sc_new)));
@@ -105,11 +113,13 @@ function test_extcoefsinit_and_spectralsourceterm_return_finite_terms(testCase)
 end
 
 function test_updateextcoefs_rebuilds_current_k_ext_and_tau(testCase)
-   % UPDATEEXTCOEFS should reproduce the initialized k_ext/tau state for the
-   % configured optical grain-radius index.
+   % update_extinction_coefficients should reproduce the initialized
+   % k_ext/tau state for the configured optical grain-radius index.
 
    s = testCase.TestData.state;
-   [tau_N, tau_S, ~, k_ext] = UPDATEEXTCOEFS(s.qext, s.g, s.coalbedo, ...
+
+   [tau_N, tau_S, ~, k_ext] ...
+      = icemodel.radiation.update_extinction_coefficients(s.qext, s.g, s.coalbedo, ...
       s.kabs, s.kice, s.wavel, s.radii, s.opts.i_grainradius, ...
       s.z_edges_spect, s.dz_spect, s.solar_dwavel, s.ro_ice, false);
 
@@ -119,21 +129,27 @@ function test_updateextcoefs_rebuilds_current_k_ext_and_tau(testCase)
 end
 
 function test_spectextcoefs_interpolates_fractional_radius_index(testCase)
-   % SPECTEXTCOEFS should linearly interpolate the optical tables when a
-   % future grain-size model maps to a fractional table index.
+   % spectral_extinction_coefficients should linearly interpolate the optical
+   % tables when a future grain-size model maps to a fractional table index.
 
    s = testCase.TestData.state;
+
    iradius = 10.5;
-   k_ext = SPECTEXTCOEFS(s.qext, s.g, s.coalbedo, s.radii, iradius);
+
+   k_ext = icemodel.radiation.spectral_extinction_coefficients( ...
+      s.qext, s.g, s.coalbedo, s.radii, iradius);
+
    i0 = floor(iradius);
    i1 = ceil(iradius);
    w1 = iradius - i0;
    w0 = 1.0 - w1;
+
    r_snow = (w0 * s.radii(i0) + w1 * s.radii(i1)) / 1000.0;
    qext = w0 * s.qext(i0, :) + w1 * s.qext(i1, :);
    g = w0 * s.g(i0, :) + w1 * s.g(i1, :);
    coalbedo = w0 * s.coalbedo(i0, :) + w1 * s.coalbedo(i1, :);
    sigma_e = (3.0 / 4.0) * qext / r_snow;
+
    k_ext_expected = sigma_e .* sqrt(coalbedo - coalbedo .* g ...
       + coalbedo .^ 2 .* g);
 
@@ -142,12 +158,15 @@ function test_spectextcoefs_interpolates_fractional_radius_index(testCase)
 end
 
 function test_bulkextcoefs_matches_inline_transform(testCase)
-   % BULKEXTCOEFS should reproduce the exact spectral extinction transform
-   % embedded in the historical inlined spectral source-term implementation.
+   % icemodel.radiation.bulk_extinction_coefficients should reproduce the exact
+   % spectral extinction transform embedded in the historical inlined spectral
+   % source-term implementation.
 
    s = testCase.TestData.state;
+
    ro_sno = s.ro_ice * s.f_ice + s.ro_liq * s.f_liq + ...
       s.ro_air * (1 - s.f_ice - s.f_liq);
+
    ro_sno_spect = max(interp1(s.z_nodes, ro_sno, s.z_nodes_spect, ...
       'nearest', 'extrap'), 300);
 
@@ -156,8 +175,9 @@ function test_bulkextcoefs_matches_inline_transform(testCase)
       (sum(s.solar_dwavel .* exp( ...
       s.tau_N .* ro_sno_spect), 2))) / s.dz_spect(1);
    legacy = [legacy; legacy(end); legacy(end)];
-   helper = BULKEXTCOEFS(s.dz_spect, ro_sno_spect, ...
-      s.tau_N, s.tau_S, s.solar_dwavel);
+
+   helper = icemodel.radiation.bulk_extinction_coefficients( ...
+      s.dz_spect, ro_sno_spect, s.tau_N, s.tau_S, s.solar_dwavel);
 
    testCase.verifyEqual(helper, legacy, 'AbsTol', 1e-12);
 end
@@ -177,7 +197,8 @@ function test_spectralsourceterm_matches_inlined_path(testCase)
       s.I0, s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ro_sno, ...
       s.z_nodes, s.z_nodes_spect);
 
-   [Sc_functions, chi_functions] = SPECTRALSOURCETERM(s.swd, s.albedo, ...
+   [Sc_functions, chi_functions] ...
+      = icemodel.column.shortwave_source_term(s.swd, s.albedo, ...
       s.I0, s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, s.dz, ...
       ro_sno, s.z_nodes, s.z_nodes_spect, s.z_edges_spect, k_lookup_empty);
 
@@ -187,20 +208,27 @@ function test_spectralsourceterm_matches_inlined_path(testCase)
 end
 
 function test_bulkextcoefslookup_stays_close_to_exact_transform(testCase)
-   % BULKEXTCOEFSLOOKUP is approximate, but on the integer-density lookup grid
-   % it should stay close to the exact bulk-extinction profile.
+   % icemodel.radiation.bulk_extinction_coefficients_lookup is approximate, but
+   % on the integer-density lookup grid it should stay close to the exact
+   % bulk-extinction profile.
 
    s = testCase.TestData.state;
+
    ro_sno = s.ro_ice * s.f_ice + s.ro_liq * s.f_liq + ...
       s.ro_air * (1 - s.f_ice - s.f_liq);
+
    ro_sno_spect = max(interp1(s.z_nodes, ro_sno, s.z_nodes_spect, ...
       'nearest', 'extrap'), 300);
+
    lookup = icemodel.makeBulkExtCoefsLookup(s.dz_spect, ...
       s.tau_N, s.tau_S, s.solar_dwavel);
 
-   exact = BULKEXTCOEFS(s.dz_spect, ro_sno_spect, ...
-      s.tau_N, s.tau_S, s.solar_dwavel);
-   approx = BULKEXTCOEFSLOOKUP(ro_sno_spect, lookup);
+   exact = icemodel.radiation.bulk_extinction_coefficients( ...
+      s.dz_spect, ro_sno_spect, s.tau_N, s.tau_S, s.solar_dwavel);
+
+   approx = icemodel.radiation.bulk_extinction_coefficients_lookup( ...
+      ro_sno_spect, lookup);
+
    rel_err = max(abs(approx - exact) ./ max(abs(exact), 1e-12));
 
    testCase.verifyTrue(all(isfinite(approx)));
