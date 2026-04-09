@@ -67,15 +67,15 @@ function test_sfctemp_finds_small_surface_residual(testCase)
 
    s = testCase.TestData.skin;
 
-   Qc = icemodel.surface.conductive_heat_flux(s.k_eff, s.T, s.dz, s.Ts);
-
    % Solve for T_sfc using the analytical Newton-Raphson solver.
+   % Pass s.Ts as the initial guess along with the column state (k_eff, T, dz).
    [Ts, ok] = icemodel.surface.solve_surface_temperature( ...
-      s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, s.tppt, s.psfc, s.De, ...
-      s.ea_atm, s.br_coefs, s.roL, s.liqflag, s.chi, Qc);
+      s.Ts, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, s.tppt, s.psfc, s.De, ...
+      s.ea_atm, s.br_coefs, s.roL, s.liqflag, s.chi, s.k_eff, s.T, s.dz);
 
    % Verify convergence using evaluate_surface_flux, which defines the
    % residual that solve_surface_temperature minimizes.
+   Qc = icemodel.surface.conductive_heat_flux(s.k_eff, s.T, s.dz, Ts);
    Q_sfc = icemodel.surface.turbulence.bulk_richardson.evaluate_surface_flux( ...
       s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, s.tppt, s.psfc, ...
       s.De, Ts, Qc, s.ea_atm, s.roL, s.br_coefs, s.chi, s.liqflag);
@@ -261,8 +261,8 @@ function test_surface_flux_diagnostics_match_energy_balance_residual(testCase)
    % Diagnose fluxes not resolved by diagnose_surface_energy_fluxes
    [~, ~, ~, Qa, Qle] = icemodel.surface.surface_energy_balance_terms( ...
       Ts, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, s.tppt, s.psfc, ...
-      s.De, ea_atm, s.T, s.k_eff, s.dz, s.br_coefs, s.roL, s.liqflag, ...
-      s.chi, s.ro_sfc, s.snow_depth, s.opts);
+      s.De, ea_atm, s.br_coefs, s.roL, s.liqflag, s.chi, s.T, s.k_eff, s.dz, ...
+      s.ro_sfc, s.snow_depth, s.opts);
 
    % Verify the T_sfc solver worked
    testCase.verifyTrue(ok);
@@ -271,8 +271,10 @@ function test_surface_flux_diagnostics_match_energy_balance_residual(testCase)
    testCase.verifyEqual(ea_atm, s.ea_atm, 'RelTol', 1e-12);
 
    % Verify the balance returned by diagnose_surface_energy_fluxes matches ENBAL
-   testCase.verifyEqual(balance, icemodel.surface.evaluate_surface_energy_balance(s.chi, s.albedo, s.swd, ...
-      s.lwd, Qle, Qh, Qe, Qc, Qa, Qm), 'RelTol', 1e-12);
+   Qsn = s.chi * s.swd * (1.0 - s.albedo);
+   Qln = s.emiss * s.lwd + Qle;
+   testCase.verifyEqual(balance, icemodel.surface.evaluate_surface_energy_balance( ...
+      Qsn, Qln, Qh, Qe, Qc, Qa, Qm), 'RelTol', 1e-12);
 
    % Verify the T_sfc solution matches the test case setup value.
    testCase.verifyLessThanOrEqual(Ts, s.Tf + 1e-12);

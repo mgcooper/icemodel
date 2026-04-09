@@ -59,20 +59,21 @@ function test_trisolve_matches_backslash(testCase)
 end
 
 function test_conduct_matches_level_formulas(testCase)
-   % conductive_heat_flux should reproduce the top-boundary and interior
-   % finite-volume forms used elsewhere in the column model.
+   % conductive_heat_flux should return the top-boundary flux and its
+   % T_sfc derivative matching the analytic finite-volume expressions.
 
    k_eff = [2; 4];
    T = [270; 268];
    dz = [0.04; 0.04];
    Ts = 269;
 
-   Qc_top = icemodel.surface.conductive_heat_flux(k_eff, T, dz, Ts, 1);
-   Qc_int = icemodel.surface.conductive_heat_flux(k_eff, T, dz, Ts, 2);
+   [Qc, dQc_dT_sfc] = icemodel.surface.conductive_heat_flux(k_eff, T, dz, Ts);
 
-   testCase.verifyEqual(Qc_top, 2 * (270 - 269) / 0.02, 'AbsTol', 1e-12);
-   testCase.verifyEqual(Qc_int, 3 * (268 - 270) / 0.08 / 2, ...
-      'AbsTol', 1e-12);
+   % Top-boundary flux: k_eff(1) * (T(1) - Ts) / (dz(1)/2)
+   testCase.verifyEqual(Qc, 2 * (270 - 269) / 0.02, 'AbsTol', 1e-12);
+
+   % T_sfc derivative: -k_eff(1) / (dz(1)/2)
+   testCase.verifyEqual(dQc_dT_sfc, -2 / 0.02, 'AbsTol', 1e-12);
 end
 
 function test_inittimesteps_and_newtimestep_follow_solver_contract(testCase)

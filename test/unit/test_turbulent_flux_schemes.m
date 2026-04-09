@@ -342,8 +342,10 @@ function q_surface = surface_flux_bulk_mo(T_sfc, s)
       s.snow_depth, s.roL, s.liqflag, s.opts);
    Qle = LONGOUT(T_sfc, s.emiss, s.SB);
    Qa = icemodel.surface.advective_heat_flux(s.ppt, s.tppt, s.cv_liq);
+   Qsn = s.chi * s.swd * (1.0 - s.albedo);
+   Qln = s.emiss * s.lwd + Qle;
    q_surface = icemodel.surface.evaluate_surface_energy_balance( ...
-      s.chi, s.albedo, s.swd, s.lwd, Qle, Qh, Qe, 0.0, Qa, 0.0);
+      Qsn, Qln, Qh, Qe, 0.0, Qa, 0.0);
 end
 
 function test_vapor_tendency_uses_physical_surface_temperature(testCase)
