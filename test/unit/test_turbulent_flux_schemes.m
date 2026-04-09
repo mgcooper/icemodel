@@ -62,7 +62,7 @@ function test_forcing_snow_depth_hook_switches_to_snow_roughness(testCase)
    met = icemodel.loadmet(opts);
 
    % Load snow depth via icemodel.surface.initialize_surface_forcings
-   [~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, ~, forcing_snow_depth] = ...
+   [~, ~, ~, ~, ~, ~, ~, ~, ~, ~, forcing_snow_depth] = ...
       icemodel.surface.initialize_surface_forcings(opts);
 
    snow_depth_scalar = icemodel.surface.resolve_forcing_snow_depth( ...
@@ -341,8 +341,9 @@ function q_surface = surface_flux_bulk_mo(T_sfc, s)
       s.tair, s.wspd, s.psfc, s.ea_atm, s.De, s.br_coefs, s.ro_sfc, ...
       s.snow_depth, s.roL, s.liqflag, s.opts);
    Qle = LONGOUT(T_sfc, s.emiss, s.SB);
-   Qa = QADVECT(s.ppt, s.tppt, s.cv_liq);
-   q_surface = ENBAL(s.chi, s.albedo, s.swd, s.lwd, Qle, Qh, Qe, 0.0, Qa, 0.0);
+   Qa = icemodel.surface.advective_heat_flux(s.ppt, s.tppt, s.cv_liq);
+   q_surface = icemodel.surface.evaluate_surface_energy_balance( ...
+      s.chi, s.albedo, s.swd, s.lwd, Qle, Qh, Qe, 0.0, Qa, 0.0);
 end
 
 function test_vapor_tendency_uses_physical_surface_temperature(testCase)

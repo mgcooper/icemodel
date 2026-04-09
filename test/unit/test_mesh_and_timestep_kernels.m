@@ -59,16 +59,16 @@ function test_trisolve_matches_backslash(testCase)
 end
 
 function test_conduct_matches_level_formulas(testCase)
-   % CONDUCT should reproduce the top-boundary and interior finite-volume
-   % forms used elsewhere in the column model.
+   % conductive_heat_flux should reproduce the top-boundary and interior
+   % finite-volume forms used elsewhere in the column model.
 
    k_eff = [2; 4];
    T = [270; 268];
    dz = [0.04; 0.04];
    Ts = 269;
 
-   Qc_top = CONDUCT(k_eff, T, dz, Ts, 1);
-   Qc_int = CONDUCT(k_eff, T, dz, Ts, 2);
+   Qc_top = icemodel.surface.conductive_heat_flux(k_eff, T, dz, Ts, 1);
+   Qc_int = icemodel.surface.conductive_heat_flux(k_eff, T, dz, Ts, 2);
 
    testCase.verifyEqual(Qc_top, 2 * (270 - 269) / 0.02, 'AbsTol', 1e-12);
    testCase.verifyEqual(Qc_int, 3 * (268 - 270) / 0.08 / 2, ...
