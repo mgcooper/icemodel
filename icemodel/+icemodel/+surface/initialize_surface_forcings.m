@@ -2,7 +2,7 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
       snow_depth] = initialize_surface_forcings(opts, fileiter)
    %initialize_surface_forcings Load the meteorological forcing vectors.
    %
-   %  [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, De, br_coefs, time] ...
+   %  [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time] ...
    %     = icemodel.surface.initialize_surface_forcings(opts)
    %  ... = icemodel.surface.initialize_surface_forcings(opts, fileiter)
    %
@@ -39,12 +39,10 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
    psfc = met.psfc;
    time = met.Time;
    albedo = met.albedo;
-
-   % Parse optional snow depth
-   if isvariable('snow_depth', met)
+   if ismember('snow_depth', met.Properties.VariableNames)
       snow_depth = met.snow_depth;
    else
-      snow_depth = nan(size(tair));
+      snow_depth = nan(height(met), 1);
    end
 
    % Rainfall forcing is ignored in the core time integration.
@@ -63,4 +61,5 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
    for n = 1:numel(rh)
       tppt(n) = icemodel.vapor.wet_bulb_temperature(tair(n), rh(n), psfc(n));
    end
+
 end
