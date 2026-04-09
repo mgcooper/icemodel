@@ -1,10 +1,12 @@
-function [T_sfc, Qe, Qh, Qc, Qa, Qle, balance, diag_turbulent] = ...
+function [Qe, Qh, Qc, Qa, Qle, balance, diag_turbulent] = ...
       surface_energy_balance_terms(T_sfc, tair, Qsi, Qli, albedo, ...
-      wspd, ppt, tppt, psfc, De, ea_atm, T, k_eff, dz, roL, chi, br_coefs, ...
-      liqflag, ro_sfc, snow_depth, opts)
+      wspd, ppt, tppt, psfc, De, ea_atm, T_ice, k_eff, dz, br_coefs, roL, liqflag, ...
+      chi, ro_sfc, snow_depth, opts)
    %SURFACE_ENERGY_BALANCE_TERMS Evaluate the full SEB term set at T_sfc.
    %
-   %  [T_sfc, Qe, Qh, Qc, Qa, Qle, balance] = ...
+   %  [Qe, Qh, Qc, Qa, Qle, balance] = ...
+   %     icemodel.surface.surface_energy_balance_terms(...)
+   %  [Qe, Qh, Qc, Qa, Qle, balance, diag_turbulent] = ...
    %     icemodel.surface.surface_energy_balance_terms(...)
    %
    % The returned terms are:
@@ -16,8 +18,8 @@ function [T_sfc, Qe, Qh, Qc, Qa, Qle, balance, diag_turbulent] = ...
    %   balance  surface energy-balance residual with Qm=0 [W m^-2]
    %
    % This helper is the canonical "evaluate the surface budget at T_sfc"
-   % contract for the touched SEB stack.
-
+   % contract for the SEB stack.
+   %
    %#codegen
 
    persistent cv_liq emiss SB
@@ -27,7 +29,7 @@ function [T_sfc, Qe, Qh, Qc, Qa, Qle, balance, diag_turbulent] = ...
    end
 
    % Turbulent sensible and latent heat exchange.
-   if nargout > 7
+   if nargout > 6
       [Qe, Qh, diag_turbulent] = ...
          icemodel.surface.diagnose_turbulent_heat_fluxes( ...
          T_sfc, tair, wspd, psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, ...
@@ -41,9 +43,10 @@ function [T_sfc, Qe, Qh, Qc, Qa, Qle, balance, diag_turbulent] = ...
 
    % Surface longwave emission, subsurface conduction, and precipitation heat.
    Qle = LONGOUT(T_sfc, emiss, SB);
-   Qc = CONDUCT(k_eff, T, dz, T_sfc);
-   Qa = QADVECT(ppt, tppt, cv_liq);
+   Qc = icemodel.surface.conductive_heat_flux(k_eff, T_ice, dz, T_sfc);
+   Qa = icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
 
    % The residual is the energy available for melt when Qm is set to zero.
-   balance = ENBAL(chi, albedo, Qsi, Qli, Qle, Qh, Qe, Qc, Qa, 0.0);
+   balance = icemodel.surface.evaluate_surface_energy_balance( ...
+      chi, albedo, Qsi, Qli, Qle, Qh, Qe, Qc, Qa, 0.0);
 end

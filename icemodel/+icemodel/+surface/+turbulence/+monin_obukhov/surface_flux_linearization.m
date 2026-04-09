@@ -77,8 +77,9 @@ function [Q_sfc, diag_thf] = surface_flux(T_sfc, tair, Qsi, Qli, albedo, ...
    Qle = LONGOUT(T_sfc, emiss, SB);
 
    % Precipitation advected heat flux.
-   Qa = QADVECT(ppt, tppt, cv_liq);
+   Qa = icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
 
-   % Net non-conductive heat flux.
-   Q_sfc = ENBAL(chi, albedo, Qsi, Qli, Qle, Qh, Qe, 0.0, Qa, 0.0);
+   % Net non-conductive heat flux (Qc = 0: handled by the Robin interior solve).
+   Q_sfc = icemodel.surface.evaluate_surface_energy_balance( ...
+      chi, albedo, Qsi, Qli, Qle, Qh, Qe, 0.0, Qa, 0.0);
 end

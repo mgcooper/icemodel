@@ -1,5 +1,5 @@
-function [Fc, Fp] = surface_flux_linearization(tair, Qsi, Qli, albedo, wspd, ...
-      ppt, tppt, psfc, De, ea_atm, roL, br_coefs, chi, T_sfc, liqflag)
+function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, albedo, ...
+      wspd, ppt, tppt, psfc, De, ea_atm, br_coefs, roL, liqflag, chi)
    %SURFACE_FLUX_LINEARIZATION Linearize the surface energy balance equation.
    %
    % The linearization is of the form: F = Fc + Fp * T
@@ -28,7 +28,7 @@ function [Fc, Fp] = surface_flux_linearization(tair, Qsi, Qli, albedo, wspd, ...
    % once at the start of the timestep, and on iterations updated as
    % F = Fc + Fp * T_new
    %
-   % See also: icemodel.surface.turbulence.bulk_richardson.surface_fluxes
+   % See also: icemodel.surface.turbulence.bulk_richardson.evaluate_surface_flux
    %
    %#codegen
 
@@ -63,7 +63,7 @@ function [Fc, Fp] = surface_flux_linearization(tair, Qsi, Qli, albedo, wspd, ...
    Fp_Qe = -roL * De * epsilon / psfc * stability * des_sfc_dT;
 
    % Precipitation-advected heat:
-   Fc_Qa = QADVECT(ppt, tppt, cv_liq);
+   Fc_Qa = icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
    Fp_Qa = 0;
 
    % Combine net sw, incoming lw, and precipitation-advected heat:

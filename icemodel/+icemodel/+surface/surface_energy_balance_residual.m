@@ -1,6 +1,6 @@
 function residual = surface_energy_balance_residual(T_sfc, tair, Qsi, Qli, ...
-      albedo, wspd, ppt, tppt, psfc, De, ea_atm, chi, roL, br_coefs, Qc, ...
-      liqflag, ro_sfc, snow_depth, opts)
+      albedo, wspd, ppt, tppt, psfc, De, ea_atm, br_coefs, roL, liqflag, chi, Qc, ...
+      ro_sfc, snow_depth, opts)
    %SURFACE_ENERGY_BALANCE_RESIDUAL Return the SEB residual at T_sfc.
    %
    %  residual = icemodel.surface.surface_energy_balance_residual(...)
@@ -23,11 +23,11 @@ function residual = surface_energy_balance_residual(T_sfc, tair, Qsi, Qli, ...
       opts);
 
    residual = chi * Qsi * (1.0 - albedo) + emiss * (Qli - SB * T_sfc ^ 4) ...
-      + Qh + Qe + Qc + QADVECT(ppt, tppt, cv_liq);
+      + Qh + Qe + Qc + icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
 
-   % For comparison with ENBAL:
+   % For comparison with evaluate_surface_energy_balance:
    % Qle = LONGOUT(T_sfc, emiss, SB);
-   % Qa = QADVECT(ppt, tppt, cv_liq);
+   % Qa = icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
    %
    % residual = chi * Qsi * (1.0 - albedo) + ...
    %    emiss * Qli + Qle + Qh + Qe + Qc + Qa;
