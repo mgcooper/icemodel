@@ -80,6 +80,8 @@ function [Q_sfc, diag_thf] = surface_flux(T_sfc, tair, Qsi, Qli, albedo, ...
    Qa = icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
 
    % Net non-conductive heat flux (Qc = 0: handled by the Robin interior solve).
+   Qsn = chi * Qsi * (1.0 - albedo);
+   Qln = emiss * Qli + Qle;
    Q_sfc = icemodel.surface.evaluate_surface_energy_balance( ...
-      chi, albedo, Qsi, Qli, Qle, Qh, Qe, 0.0, Qa, 0.0);
+      Qsn, Qln, Qh, Qe, 0.0, Qa, 0.0);
 end

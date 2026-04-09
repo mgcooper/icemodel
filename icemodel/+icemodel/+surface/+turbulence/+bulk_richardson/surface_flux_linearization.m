@@ -28,6 +28,13 @@ function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, albedo, ..
    % once at the start of the timestep, and on iterations updated as
    % F = Fc + Fp * T_new
    %
+   % Fc and Fp represent only the non-conductive surface flux linearization.
+   % Conduction enters the Robin boundary-condition system through the top-node
+   % finite-difference equation in GECOEFS via the conductive conductance a1 =
+   % k_eff(1)/(dz(1)/2). In contrast, the Dirichlet solve
+   % (solve_surface_temperature) includes dQc/dT_sfc directly in the
+   % Newton-Raphson Jacobian.
+   %
    % See also: icemodel.surface.turbulence.bulk_richardson.evaluate_surface_flux
    %
    %#codegen
@@ -39,8 +46,9 @@ function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, albedo, ..
       emiss = icemodel.parameterLookup('emiss');
    end
 
-   % Surface saturation vapor pressure and derivative from icemodel.vapor.saturation_vapor_pressure
-   [es_sfc, des_sfc_dT] = icemodel.vapor.saturation_vapor_pressure(T_sfc, liqflag);
+   % Surface saturation vapor pressure and derivative.
+   [es_sfc, des_sfc_dT] = icemodel.vapor.saturation_vapor_pressure( ...
+      T_sfc, liqflag);
 
    % Bulk richardson stability function.
    stability = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
