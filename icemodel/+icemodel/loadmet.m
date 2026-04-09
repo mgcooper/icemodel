@@ -35,6 +35,10 @@ function [met, opts] = loadmet(opts, fileiter) %#codegen
    if ~all(ismember(opts.simyears(:), unique(year(met.Time))))
       error('met data do not cover all requested simulation years')
    end
+   
+   met.De ...
+      = icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
+      met.wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
 end
 
 %%
