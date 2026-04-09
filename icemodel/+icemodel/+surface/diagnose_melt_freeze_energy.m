@@ -20,9 +20,10 @@ function [Qm, Qf] = diagnose_melt_freeze_energy(T_sfc, chi, albedo, Qsi, ...
    %
    %#codegen
 
-   persistent Tf
+   persistent Tf emiss
    if isempty(Tf)
       Tf = icemodel.physicalConstant('Tf');
+      emiss = icemodel.parameterLookup('emiss');
    end
 
    Qm = 0.0;
@@ -30,8 +31,10 @@ function [Qm, Qf] = diagnose_melt_freeze_energy(T_sfc, chi, albedo, Qsi, ...
 
    if T_sfc >= Tf
       % Compute melt energy: the balance at the melt cap with no melt term.
+      Qsn = chi * Qsi * (1.0 - albedo);
+      Qln = emiss * Qli + Qle;
       Qm = icemodel.surface.evaluate_surface_energy_balance( ...
-         chi, albedo, Qsi, Qli, Qle, Qh, Qe, Qc, Qa, 0.0);
+         Qsn, Qln, Qh, Qe, Qc, Qa, 0.0);
    else
       % Compute energy needed to reach melt temp (energy deficit) by
       % re-evaluating the full SEB at Tf. Qc must be recomputed at Tf here.

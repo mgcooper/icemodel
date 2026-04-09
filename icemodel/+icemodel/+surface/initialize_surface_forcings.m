@@ -46,8 +46,12 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
    end
 
    % Rainfall forcing is ignored in the core time integration.
-   % Keep the legacy zero-rain behavior explicit here until rain/snow/ppt
-   % forcing support is implemented consistently.
+   % Keep the zero-rain behavior explicit here until rain/snow/ppt forcing
+   % support is implemented consistently (Jordan 1991 requires special
+   % timestep shortening during accumulation events).
+   % When rain is eventually set from forcing data (typically in m/timestep),
+   % it must be converted to a rate in m s^-1 before being passed to
+   % advective_heat_flux, which expects ppt in m s^-1.
    rain = 0 * tair;
 
    % TODO: support snowfall, and confirm if forcing files are consistent wrt

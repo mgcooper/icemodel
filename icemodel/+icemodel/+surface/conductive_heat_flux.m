@@ -1,31 +1,31 @@
-function Qc = conductive_heat_flux(k_eff, T, dz, T_sfc, level)
-   %CONDUCTIVE_HEAT_FLUX Compute conductive heat flux, positive into the surface.
+function [Qc, dQc_dT_sfc] = conductive_heat_flux(k_eff, T, dz, T_sfc)
+   %CONDUCTIVE_HEAT_FLUX Conductive heat flux into the surface and its derivative.
    %
    %  Qc = icemodel.surface.conductive_heat_flux(k_eff, T, dz, T_sfc)
-   %  Qc = icemodel.surface.conductive_heat_flux(k_eff, T, dz, T_sfc, level)
+   %  [Qc, dQc_dT_sfc] = icemodel.surface.conductive_heat_flux(k_eff, T, dz, T_sfc)
    %
-   % level = 1 (default): conduction across the top half-cell boundary
-   %   Qc = k_eff(1) * (T(1) - T_sfc) / (dz(1) / 2)
+   % Computes the conductive heat flux from ice layer 1 into the surface
+   % across the top half-control-volume boundary:
    %
-   % level = 2: conduction across the interior cell boundary between layers 1 and 2
-   %   Qc = (k_eff(1) + k_eff(2)) / 2 * (T(2) - T(1)) / ((dz(1) + dz(2)) / 2)
+   %   Qc = k_eff(1) * (T(1) - T_sfc) / (dz(1) / 2)   [W m^-2]
    %
-   % Units: [W m-2] = [W m-1 K-1] * [K] / [m]
+   % The partial derivative with respect to T_sfc is constant and negative:
    %
-   % See also: icemodel.surface.solve_surface_energy_balance,
+   %   dQc/dT_sfc = -k_eff(1) / (dz(1) / 2)            [W m^-2 K^-1]
+   %
+   % The derivative is used by solve_surface_temperature to include the Qc
+   % coupling term in the Newton-Raphson Jacobian for the Dirichlet surface
+   % solve. In the Robin path, conduction enters through the top-node
+   % finite-difference equation in GECOEFS rather than through this derivative.
+   %
+   % See also: icemodel.surface.solve_surface_temperature,
    %           icemodel.surface.diagnose_melt_freeze_energy
    %
    %#codegen
 
-   if nargin < 5
-      level = 1;
-   end
+   Qc = k_eff(1) * (T(1) - T_sfc) / (dz(1) / 2);
 
-   if level == 1
-      % Conduction from layer 1 into the surface (across a 1/2 cv)
-      Qc = k_eff(1) * (T(1) - T_sfc) / (dz(1) / 2);
-   elseif level == 2
-      % Conduction from layer 2 into layer 1 (across a full cv)
-      Qc = (k_eff(1) + k_eff(2)) / 2.0 * (T(2) - T(1)) / (dz(1) + dz(2)) / 2.0;
+   if nargout > 1
+      dQc_dT_sfc = -k_eff(1) / (dz(1) / 2);
    end
 end

@@ -14,13 +14,13 @@ function [T_sfc, ok] = solve_surface_energy_balance(T_sfc, tair, Qsi, Qli, ...
    % >2 = experimental.
    %
    % Important programming notes:
-   %  - The outer iterations control the convergence of Ts wrt the lagged
-   %  conductive closure. Thus old is initialized to Ts outside the outer loop.
+   %  - The outer iterations converge T_sfc with respect to the lagged
+   %  conductive closure (k_eff, T_ice). old is initialized to T_sfc outside
+   %  the outer loop and is passed as the initial Newton guess.
    %
-   %  - In solve_surface_temperature or complexstep or any derivative-based
-   %  method, old must be initialized to Ta to avoid divergence during spinup,
-   %  keeping in mind that the conduction passed into
-   %  solve_surface_temperature is computed with old = Ts.
+   %  - solve_surface_temperature starts its Newton-Raphson from the outer
+   %  iterate (old = T_sfc on each call), and evaluates Qc and its derivative
+   %  at each inner step.
    %
    %  - For a "skinmodel", Ts never exceeds Tf when passed into functions, but
    %  within the iterations of solve_surface_temperature and when it comes out
@@ -34,28 +34,25 @@ function [T_sfc, ok] = solve_surface_energy_balance(T_sfc, tair, Qsi, Qli, ...
    tol = 1e-3;
    seb_tol = 1.0;
    maxiter = 100;
-   iterflag = true;
 
-   % Experimental option to suppress outer iterations
+   % Diagnostic option: seb_solver < 0 limits to one outer iteration.
+   % Useful for testing with opts.seb_solver = -1, -2, etc.
    if seb_solver < 0
       maxiter = 1;
       seb_solver = -seb_solver;
-      iterflag = false;
    end
 
    ok_cpl = false;
    T_sfc_old = T_sfc;
    switch seb_solver
 
-      case 1 % Newton-Rhapson - analytical derivative
+      case 1 % Newton-Raphson - analytical derivative
 
          for iter = 1:maxiter
             old = T_sfc;
             [T_sfc, ok] = icemodel.surface.solve_surface_temperature( ...
-               tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, De, ea_atm, ...
-               br_coefs, roL, liqflag, chi, ...
-               icemodel.surface.conductive_heat_flux(k_eff, T_ice, dz, old), ...
-               k_eff, T_ice, dz, iterflag);
+               old, tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, De, ea_atm, ...
+               br_coefs, roL, liqflag, chi, k_eff, T_ice, dz);
 
             if ~ok
                break
