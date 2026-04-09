@@ -189,7 +189,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       % 1 = coupled Dirichlet Ts-T iterations
       % 2 = Robin w/ single Ts-T coupling iteration
       % 3 = Robin w/ strong Ts-T coupling iterations
-      opts.solver          = 2;     % recommended: 3
+      opts.solver          = 1;     % recommended: 3
 
       % surface (SEB) solver (Dirichlet Ts boundary condition when solver = 1)
       opts.seb_solver      = 1;     % recommended: 2 (1=analytic, 2=numeric)
