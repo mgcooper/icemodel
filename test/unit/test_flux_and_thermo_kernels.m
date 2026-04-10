@@ -6,25 +6,28 @@ end
 function test_pressure_decreases_with_elevation(testCase)
    % Pressure should monotonically decrease with elevation in the helper.
 
-   sea_level = PRESSURE(0);
-   summit = PRESSURE(1500);
+   sea_level = icemodel.surface.atmospheric_pressure_from_elevation(0);
+   summit = icemodel.surface.atmospheric_pressure_from_elevation(1500);
 
    testCase.verifyGreaterThan(sea_level, summit);
    testCase.verifyEqual(sea_level, 101300.0, 'AbsTol', 1e-12);
 end
 
 function test_longwave_fluxes_have_expected_signs(testCase)
-   % Longwave-in should remain positive while longwave-out stays negative
-   % under the project sign convention.
+   % Longwave-in should remain positive while net longwave becomes less
+   % negative as incoming longwave increases under the project sign convention.
 
-   SB = icemodel.physicalConstant('SB');
-   Qli_dry = LONGIN(263.15, 150, SB);
-   Qli_moist = LONGIN(263.15, 300, SB);
-   Qle = LONGOUT(263.15, 0.98, SB);
+   Qli_dry = icemodel.surface.incoming_longwave_radiation(263.15, 150);
+   Qli_moist = icemodel.surface.incoming_longwave_radiation(263.15, 300);
+   Qln_out = icemodel.surface.net_longwave_radiation(263.15, 0.0);
+   Qln_dry = icemodel.surface.net_longwave_radiation(263.15, Qli_dry);
+   Qln_moist = icemodel.surface.net_longwave_radiation(263.15, Qli_moist);
 
    testCase.verifyGreaterThan(Qli_dry, 0);
    testCase.verifyGreaterThan(Qli_moist, Qli_dry);
-   testCase.verifyLessThan(Qle, 0);
+   testCase.verifyLessThan(Qln_out, 0);
+   testCase.verifyGreaterThan(Qln_dry, Qln_out);
+   testCase.verifyGreaterThan(Qln_moist, Qln_dry);
 end
 
 function test_turbulent_flux_kernels_follow_sign_convention(testCase)
@@ -181,7 +184,7 @@ function test_vapork_matches_vapordensity_times_diffusivity(testCase)
    testCase.verifyEqual(k_vap_wet, k_vap_wet_manual, 'RelTol', 1e-10);
 end
 
-function test_bulkthermalk_stays_positive_and_responds_to_liquid(testCase)
+function test_bulk_thermal_conductivity_stays_positive_and_responds_to_liquid(testCase)
    % Effective conductivity should stay positive and increase as the same
    % state gains more liquid water.
 
@@ -191,8 +194,8 @@ function test_bulkthermalk_stays_positive_and_responds_to_liquid(testCase)
    f_liq_dry = [0.00; 0.01; 0.02];
    f_liq_wet = [0.05; 0.08; 0.10];
 
-   k_dry = BULKTHERMALK(T, f_ice, f_liq_dry, ro_ice, k_liq);
-   k_wet = BULKTHERMALK(T, f_ice, f_liq_wet, ro_ice, k_liq);
+   k_dry = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq_dry, ro_ice, k_liq);
+   k_wet = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq_wet, ro_ice, k_liq);
 
    testCase.verifyGreaterThan(min(k_dry), 0);
    testCase.verifyGreaterThan(min(k_wet), 0);
@@ -200,8 +203,8 @@ function test_bulkthermalk_stays_positive_and_responds_to_liquid(testCase)
 end
 
 function test_updateState_matches_component_kernels(testCase)
-   % UPDATESTATE should stay consistent with the lower-level thermo helpers
-   % it wraps into one state-update call.
+   % icemodel.column.updatestate should stay consistent with the lower-level
+   % thermo helpers it wraps into one state-update call.
 
    [ro_ice, ro_liq, ro_air, cv_ice, cv_liq, k_liq, roLf, Ls, Rv, Tf] ...
       = icemodel.physicalConstant('ro_ice', 'ro_liq', 'ro_air', ...
@@ -213,16 +216,18 @@ function test_updateState_matches_component_kernels(testCase)
    f_liq = [0.01; 0.02; 0.03];
    f_wat = f_liq + f_ice * ro_ice / ro_liq;
 
-   [H, k_eff, dHdT, dLdT, drovdT, ro_vap] = UPDATESTATE(T, f_ice, ...
-      f_liq, f_wat, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, k_liq, roLf, ...
-      Ls, Rv, Tf, fcp);
+   [H, k_eff, dHdT, dLdT, drovdT, ro_vap] = icemodel.column.updatestate( ...
+      T, f_ice, f_liq, f_wat, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, ...
+      k_liq, roLf, Ls, Rv, Tf, fcp);
 
    [ro_vap_ref, drovdT_ref] = icemodel.vapor.saturation_vapor_density(T, f_liq);
    k_vap_ref = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq, drovdT_ref);
-   k_eff_ref = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, k_vap_ref);
-   H_ref = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, ...
-      Ls * ro_vap_ref, Tf);
-   dLdT_ref = FREEZECURVE(T, ro_ice, ro_liq, fcp, Tf, f_ice, f_liq);
+   k_eff_ref = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, ro_ice, ...
+      k_liq, k_vap_ref);
+   H_ref = icemodel.column.total_enthalpy(T, f_ice, f_liq, cv_ice, cv_liq, ...
+      roLf, Ls * ro_vap_ref, Tf);
+   dLdT_ref = icemodel.column.liquid_fraction_derivative(T, ro_ice, ro_liq, fcp, Tf, ...
+      f_ice, f_liq);
 
    testCase.verifyEqual(ro_vap, ro_vap_ref, 'RelTol', 1e-12);
    testCase.verifyEqual(drovdT, drovdT_ref, 'RelTol', 1e-12);
@@ -311,15 +316,15 @@ function test_atmosphericVaporPressure_matches_direct_contract(testCase)
    testCase.verifyEqual(ea, ea_ref, 'RelTol', 1e-12);
 end
 
-function test_thermalk_positive_and_density_dependent(testCase)
-   % The THERMALK kernel should produce positive conductivity that
+function test_firn_thermal_conductivity_positive_and_density_dependent(testCase)
+   % icemodel.column.firn_thermal_conductivity should produce positive conductivity that
    % increases with ice fraction (density).
 
    T = [255; 265; 270];
    f_ice = [0.95; 0.80; 0.60];
    ro_ice = icemodel.physicalConstant('ro_ice');
 
-   k_sno = THERMALK(T, f_ice, ro_ice);
+   k_sno = icemodel.column.firn_thermal_conductivity(T, f_ice, ro_ice);
 
    testCase.verifyGreaterThan(min(k_sno), 0);
    testCase.verifyGreaterThan(k_sno(1), k_sno(3), ...

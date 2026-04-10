@@ -24,15 +24,46 @@ function teardown(testCase)
       testCase.TestData.workspace);
 end
 
-function test_solarrad_distinguishes_day_and_night(testCase)
-   % SOLARRAD should produce zero at night while remaining positive during
-   % daytime on the same site geometry.
+function test_terrain_adjusted_shortwave_distinguishes_day_and_night(testCase)
+   % terrain_adjusted_shortwave_radiation should produce zero at night while
+   % remaining positive during daytime on the same site geometry.
 
-   Qday = SOLARRAD(180, 45, 0.2, 12, 180, 5, 0.7);
-   Qnight = SOLARRAD(180, 45, 0.2, 0, 180, 5, 0.7);
+   Qday = icemodel.surface.terrain_adjusted_shortwave_radiation( ...
+      180, 45, 0.2, 12, 180, 5, 0.7);
+   Qnight = icemodel.surface.terrain_adjusted_shortwave_radiation( ...
+      180, 45, 0.2, 0, 180, 5, 0.7);
 
    testCase.verifyGreaterThan(Qday, 0);
    testCase.verifyEqual(Qnight, 0, 'AbsTol', 1e-12);
+end
+
+function test_incoming_shortwave_daily_average_matches_hourly_mean(testCase)
+   % The daily shortwave fallback should equal the mean of the hourly
+   % terrain-adjusted samples it wraps.
+
+   J_day_start = 180;
+   step = 1;
+   dt = 86400;
+   xlat = 45;
+   cloud_frac = 0.2;
+   slope_az = 180;
+   terrain_slope = 5;
+   ihrs_day = 24;
+   transmiss = 0.7;
+   Qhourly = zeros(ihrs_day, 1);
+
+   for hour_sample = 1:ihrs_day
+      Qhourly(hour_sample) = ...
+         icemodel.surface.terrain_adjusted_shortwave_radiation( ...
+         J_day_start, xlat, cloud_frac, hour_sample, slope_az, ...
+         terrain_slope, transmiss);
+   end
+
+   Qdaily = icemodel.surface.incoming_shortwave_radiation( ...
+      J_day_start, step, dt, xlat, cloud_frac, slope_az, terrain_slope, ...
+      ihrs_day, transmiss, 12);
+
+   testCase.verifyEqual(Qdaily, mean(Qhourly), 'RelTol', 1e-12);
 end
 
 function test_getscattercoefs_and_getsolar_return_positive_weights(testCase)

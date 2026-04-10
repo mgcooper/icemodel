@@ -59,6 +59,15 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
    % used by the THF roughness selector is standardized separately as
    % `snow_depth`, but it does not imply a full snow-model mass/energy
    % treatment and may remain NaN in existing station datasets.
+   %
+   % Legacy forcing-derivation fallbacks for station datasets that omit
+   % `lwd`, `swd`, or `psfc` now live under `icemodel.surface`:
+   %   incoming_longwave_radiation
+   %   incoming_shortwave_radiation
+   %   terrain_adjusted_shortwave_radiation
+   %   atmospheric_pressure_from_elevation
+   % Wire them in here explicitly if a future forcing workflow needs those
+   % derived series instead of direct measured inputs.
 
    % Solve for wet bulb for use in the advective heat flux calculation.
    tppt = nan(size(rh));
