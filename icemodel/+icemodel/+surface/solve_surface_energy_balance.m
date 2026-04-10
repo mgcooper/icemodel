@@ -14,9 +14,10 @@ function [T_sfc, ok] = solve_surface_energy_balance(T_sfc, tair, Qsi, Qli, ...
    % >2 = experimental.
    %
    % Important programming notes:
-   %  - The outer iterations converge T_sfc with respect to the lagged
-   %  conductive closure (k_eff, T_ice). old is initialized to T_sfc outside
-   %  the outer loop and is passed as the initial Newton guess.
+   %  - The outer iterations provide a shared convergence / fallback wrapper
+   %  across the analytical Newton, complex-step, and derivative-free paths.
+   %  old is initialized to T_sfc outside the outer loop and is passed as
+   %  the initial guess to the selected inner root finder.
    %
    %  - solve_surface_temperature starts its Newton-Raphson from the outer
    %  iterate (old = T_sfc on each call), and evaluates Qc and its derivative
@@ -109,12 +110,12 @@ function [T_sfc, ok] = solve_surface_energy_balance(T_sfc, tair, Qsi, Qli, ...
          k_eff, T_ice, dz, ro_sfc, snow_depth, ok_cpl, opts);
    end
 
-   % Note: the nested residual captures updated conductive-closure terms on
-   % each outer iteration.
+   % Note: the nested residual owns the conductive flux evaluation, so
+   % callers do not need to pass Qc explicitly.
    function f = surface_residual(T_sfc_local)
       f = icemodel.surface.surface_energy_balance_residual(T_sfc_local, tair, ...
-         Qsi, Qli, albedo, wspd, ppt, tppt, psfc, De, ea_atm, br_coefs, roL, liqflag, chi, ...
-         icemodel.surface.conductive_heat_flux(k_eff, T_ice, dz, T_sfc_local), ...
+         Qsi, Qli, albedo, wspd, ppt, tppt, psfc, De, ea_atm, br_coefs, roL, ...
+         liqflag, chi, T_ice, k_eff, dz, ...
          ro_sfc, snow_depth, opts);
    end
 end

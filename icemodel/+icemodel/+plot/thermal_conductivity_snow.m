@@ -15,7 +15,8 @@ function thermal_conductivity_snow(rho_dry, T, reference)
    %  T       - Temperature [K] used by the temperature-dependent options
    %  reference - One or more conductivity references to plot
    %
-   % See also: icemodel.kernels.thermal_conductivity_snow, THERMALK
+   % See also: icemodel.kernels.thermal_conductivity_snow,
+   %  icemodel.column.firn_thermal_conductivity
 
    arguments
       rho_dry {mustBeNumeric} = (50:10:900).'

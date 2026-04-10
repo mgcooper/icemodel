@@ -1,8 +1,8 @@
 function [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
       z_nodes, roL, liqflag, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, ...
-      f_ell_max, f_ice_min, f_liq_res, ro_iwe, ro_wie] = ICEINIT( ...
-      opts, tair, r_eff)
-   %ICEINIT initialize the 1-d ice column
+      f_ell_max, f_ice_min, f_liq_res, ro_iwe, ro_wie] = ...
+      initialize_column_state(opts, tair, r_eff)
+   %INITIALIZE_COLUMN_STATE Initialize the 1-d ice column state.
    %
    %#codegen
 
@@ -76,7 +76,8 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
    end
 
    % THERMAL CONDUCTIVITY (initialization only; f_liq ≈ 0 so k_vap ≈ 0)
-   k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq);
+   k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, ...
+      ro_ice, k_liq);
 
    % SOURCE TERM LINEARIZATION VECTORS
    Sc = zeros(JJ, 1);

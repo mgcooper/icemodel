@@ -1,6 +1,7 @@
-function [T, f_ice, f_liq, f_wat, dFdT] = MELTCURVE(T, f_ice, f_liq, ...
+function [T, f_ice, f_liq, f_wat, dFdT] = liquid_fraction_function(T, ...
+      f_ice, f_liq, ...
       ro_ice, ro_liq, fcp, Tf)
-   %MELTCURVE Liquid fraction-temperature curve (phase fraction function)
+   %LIQUID_FRACTION_FUNCTION Project state onto the liquid-fraction function.
    %
    % Inputs:
    %  T - control volume temperature [K]
@@ -19,7 +20,7 @@ function [T, f_ice, f_liq, f_wat, dFdT] = MELTCURVE(T, f_ice, f_liq, ...
    % df_liq times the ratio of liquid water density to ice density (volume
    % expansion).
    %
-   % See also:
+   % See also: icemodel.column.liquid_fraction_derivative
    %
    %#codegen
 
@@ -37,10 +38,9 @@ function [T, f_ice, f_liq, f_wat, dFdT] = MELTCURVE(T, f_ice, f_liq, ...
    end
 
    if nargout > 4
-      % Differentiate the freezing curve w.r.t temperature, eq 68, Jordan
-      dFdT = 2.0 * fcp ^ 2.0 * T_dep .* f_wat ...
-         ./ (1.0 + fcp ^ 2.0 * T_dep .^ 2.0) .^ 2.0;
-      dFdT = max(dFdT, sqrt(eps));
+      % Differentiate the liquid-fraction function w.r.t temperature.
+      dFdT = icemodel.column.liquid_fraction_derivative(T, ro_ice, ro_liq, ...
+         fcp, Tf, [], [], f_wat);
    end
 end
 
@@ -49,4 +49,3 @@ end
 % df_ell_dT = 2 * T_dep * fcp ^ 2 ./ (1 + (fcp * T_dep) .^ 2) .^ 2;
 % T = Tf - ((1.0 ./ f_ell - 1.0) ./ fcp ^ 2.0) .^ 0.50;
 % T = Tf - sqrt((1 ./ fliq - 1)) ./ fcp
-

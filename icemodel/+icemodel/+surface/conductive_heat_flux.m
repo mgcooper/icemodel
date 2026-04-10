@@ -16,7 +16,8 @@ function [Qc, dQc_dT_sfc] = conductive_heat_flux(k_eff, T, dz, T_sfc)
    % The derivative is used by solve_surface_temperature to include the Qc
    % coupling term in the Newton-Raphson Jacobian for the Dirichlet surface
    % solve. In the Robin path, conduction enters through the top-node
-   % finite-difference equation in GECOEFS rather than through this derivative.
+   % finite-difference equation in `icemodel.column.assemble_enthalpy_system`
+   % rather than through this derivative.
    %
    % See also: icemodel.surface.solve_surface_temperature,
    %           icemodel.surface.diagnose_melt_freeze_energy

@@ -30,10 +30,10 @@ function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, albedo, ..
    %
    % Fc and Fp represent only the non-conductive surface flux linearization.
    % Conduction enters the Robin boundary-condition system through the top-node
-   % finite-difference equation in GECOEFS via the conductive conductance a1 =
-   % k_eff(1)/(dz(1)/2). In contrast, the Dirichlet solve
-   % (solve_surface_temperature) includes dQc/dT_sfc directly in the
-   % Newton-Raphson Jacobian.
+   % finite-difference equation in `icemodel.column.assemble_enthalpy_system`
+   % via the conductive conductance a1 = k_eff(1)/(dz(1)/2). In contrast, the
+   % Dirichlet solve (solve_surface_temperature) includes dQc/dT_sfc directly in
+   % the Newton-Raphson Jacobian.
    %
    % See also: icemodel.surface.turbulence.bulk_richardson.evaluate_surface_flux
    %

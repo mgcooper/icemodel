@@ -63,7 +63,8 @@ function [radius, U_vap_faces, dm_vap] = VAPORTRANSFER(T, Ts, f_ice, f_liq, ...
    %
    % See also: icemodel.vapor.saturation_vapor_density,
    %  icemodel.vapor.vapor_diffusivity,
-   %  icemodel.vapor.saturation_vapor_pressure, BULKTHERMALK,
+   %  icemodel.vapor.saturation_vapor_pressure,
+   %  icemodel.column.bulk_thermal_conductivity,
    %  icemodel.radiation.initialize_spectral_model
    %
    %#codegen

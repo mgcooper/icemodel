@@ -340,10 +340,9 @@ function q_surface = surface_flux_bulk_mo(T_sfc, s)
    [Qe, Qh] = icemodel.surface.diagnose_turbulent_heat_fluxes(T_sfc, ...
       s.tair, s.wspd, s.psfc, s.ea_atm, s.De, s.br_coefs, s.ro_sfc, ...
       s.snow_depth, s.roL, s.liqflag, s.opts);
-   Qle = LONGOUT(T_sfc, s.emiss, s.SB);
    Qa = icemodel.surface.advective_heat_flux(s.ppt, s.tppt, s.cv_liq);
-   Qsn = s.chi * s.swd * (1.0 - s.albedo);
-   Qln = s.emiss * s.lwd + Qle;
+   Qsn = icemodel.surface.net_shortwave_radiation(s.swd, s.albedo, s.chi);
+   Qln = icemodel.surface.net_longwave_radiation(T_sfc, s.lwd);
    q_surface = icemodel.surface.evaluate_surface_energy_balance( ...
       Qsn, Qln, Qh, Qe, 0.0, Qa, 0.0);
 end

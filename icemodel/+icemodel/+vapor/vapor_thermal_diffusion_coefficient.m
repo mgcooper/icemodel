@@ -16,8 +16,8 @@ function k_vap = vapor_thermal_diffusion_coefficient(T, f_liq, varargin)
    %
    %  When dro_vapdT is supplied,
    %  icemodel.vapor.vapor_thermal_diffusion_coefficient reuses it directly so
-   %  callers such as ICEENBAL can avoid a second vapor-density derivative
-   %  evaluation.
+   %  callers such as `icemodel.column.solve_column_enthalpy` can avoid a
+   %  second vapor-density derivative evaluation.
    %
    %  Phase awareness: uses Ls (sublimation) for dry cells and Lv
    %  (vaporization) for wet cells
@@ -26,7 +26,8 @@ function k_vap = vapor_thermal_diffusion_coefficient(T, f_liq, varargin)
    %  icemodel.vapor.saturation_vapor_density.
    %
    % See also: icemodel.vapor.saturation_vapor_density,
-   %  icemodel.vapor.vapor_diffusivity, BULKTHERMALK
+   %  icemodel.vapor.vapor_diffusivity,
+   %  icemodel.column.bulk_thermal_conductivity
    %
    %#codegen
 

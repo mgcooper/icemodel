@@ -76,7 +76,8 @@ function [T, d_liq, d_evp, d_con, f_ice, f_liq, x_err] = SMB(T, d_liq, d_evp, ..
    % d_evp < 0 = evaporation.
 
    % Compute delta f_liq. Note, the only process which affects f_liq between
-   % d_liq assignments here is phase change (ICEENBAL). d_liq < 0 means
+   % d_liq assignments here is phase change
+   % (`icemodel.column.solve_column_enthalpy`). d_liq < 0 means
    % refreezing, d_liq > 0 melt.
    d_liq = d_liq + f_liq - xf_liq;
 

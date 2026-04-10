@@ -1,7 +1,7 @@
-function k_ice = THERMALK(T, f_ice, ro_ice)
-   %THERMALK Compute porous ice thermal conductivity (Calonne 2019 Eq. 5).
+function k_ice = firn_thermal_conductivity(T, f_ice, ro_ice)
+   %FIRN_THERMAL_CONDUCTIVITY Compute porous ice thermal conductivity.
    %
-   %  k_ice = THERMALK(T, f_ice, ro_ice)
+   %  k_ice = firn_thermal_conductivity(T, f_ice, ro_ice)
    %
    %  Computes the temperature-dependent thermal conductivity of snow/firn/ice
    %  using Calonne et al. (2019) Eq. 5, which blends a low-density (snow) and
@@ -37,7 +37,8 @@ function k_ice = THERMALK(T, f_ice, ro_ice)
    %     Porous Ice from 3-D Image-Based Computations." Geophysical Research
    %     Letters, 46(22), 13079-13089.
    %
-   % See also: BULKTHERMALK, icemodel.parameterLookup
+   % See also: icemodel.column.bulk_thermal_conductivity,
+   %  icemodel.parameterLookup
    %
    %#codegen
 

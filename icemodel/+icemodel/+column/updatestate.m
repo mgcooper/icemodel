@@ -1,7 +1,7 @@
 function [H, k_eff, dHdT, dLdT, drovdT, ro_vap, ro_sno, cp_sno] = ...
-      UPDATESTATE(T, f_ice, f_liq, f_wat, ro_ice, ro_liq, ro_air, cv_ice, ...
+      updatestate(T, f_ice, f_liq, f_wat, ro_ice, ro_liq, ro_air, cv_ice, ...
       cv_liq, k_liq, roLf, Ls, Rv, Tf, fcp)
-   %UPDATESTATE Update state variables
+   %UPDATESTATE Update column thermodynamic state variables.
    %
    % Note: These are "intrinsic" volumetric heat capacities and must be
    % multiplied by the constituent volumetric fractions to get the "bulk"
@@ -20,17 +20,19 @@ function [H, k_eff, dHdT, dLdT, drovdT, ro_vap, ro_sno, cp_sno] = ...
    k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq, drovdT);
 
    % Effective thermal conductivity [W m-1 K-1]
-   k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
+   k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, ...
+      ro_ice, k_liq, k_vap);
 
    % Total enthalpy [J m-3]
-   H = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, Ls * ro_vap, Tf);
+   H = icemodel.column.total_enthalpy(T, f_ice, f_liq, cv_ice, cv_liq, roLf, ...
+      Ls * ro_vap, Tf);
 
    % Derivative of enthalpy wrt temperature
    dHdT = cv_ice * f_ice + cv_liq * f_liq;
 
-   % Derivative of liquid water fraction wrt temperature (freezing curve) [K-1]
-   dLdT = 2.0 * fcp ^ 2.0 * (Tf - min(T, Tf)) .* f_wat ...
-      ./ (1.0 + fcp ^ 2.0 * (Tf - min(T, Tf)) .^ 2.0) .^ 2.0;
+   % Derivative of liquid water fraction wrt temperature [K-1]
+   dLdT = icemodel.column.liquid_fraction_derivative(T, ro_ice, ro_liq, ...
+      fcp, Tf, [], [], f_wat);
 
    % Below here is a common alternative formulation, but the convention used
    % throughout the model is to operate on f_liq/ice/air directly.
@@ -48,7 +50,7 @@ function [H, k_eff, dHdT, dLdT, drovdT, ro_vap, ro_sno, cp_sno] = ...
    %    + Ls * (1.0 - f_ice - f_liq) .* drovdT) .* dz / dt;
 
    % Update the general equation coefficients
-   % [aN, aP, aS, b, iM, a1, a2] = GECOEFS(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
+   % [aN, aP, aS, b, iM, a1, a2] = assemble_enthalpy_system(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
    %    Lf, ro_liq, dz, dt, dFdT, drovdT, TL, H, H_old, Sc, k_eff, fn, ...
    %    delz, Ts, JJ, Fc, Fp, solver);
 

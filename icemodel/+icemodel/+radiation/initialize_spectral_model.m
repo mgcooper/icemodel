@@ -18,8 +18,8 @@ function [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, k_bulk_lookup, .
    % The additional optical-property outputs are returned so a future grain-size
    % evolution model can refresh k_ext through icemodel.radiation.update_extinction_coefficients
    % without reloading the Mie tables every timestep. r_eff is the configured
-   % optical grain radius from the Mie lookup table, which ICEINIT expands onto
-   % the thermal mesh.
+   % optical grain radius from the Mie lookup table, which
+   % `icemodel.column.initialize_column_state` expands onto the thermal mesh.
    %
    %#codegen
 

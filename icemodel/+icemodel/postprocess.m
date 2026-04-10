@@ -266,7 +266,8 @@ function [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo)
    f_ice = ice2.f_ice;
 
    % Phase-aware effective conductivity for diagnostics
-   [k_eff, k_vap] = BULKTHERMALK(T_ice, f_ice, f_liq, ro_ice, k_liq);
+   [k_eff, k_vap] = icemodel.column.bulk_thermal_conductivity(T_ice, f_ice, f_liq, ...
+      ro_ice, k_liq);
    ro_sno = ro_ice * f_ice + ro_liq * f_liq + ro_air * (1.0 - f_liq - f_ice);
    cp_sno = (cv_ice * f_ice + cv_liq * f_liq) ./ ro_sno;
 

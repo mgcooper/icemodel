@@ -1,7 +1,7 @@
-function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
+function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(T, f_ice, f_liq, dz, ...
       delz, fn, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, tol, ...
       maxiter, alpha, debug)
-   %SKINSOLVE Solve the 1-dimensional heat conduction equation
+   %SOLVE_COLUMN_TEMPERATURE Solve the 1-dimensional column conduction equation.
    %
    %#codegen
 
@@ -11,16 +11,17 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
    end
 
    % Thermal conductivity without vapor diffusion (skinmodel).
-   k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, 0);
+   k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, ...
+      ro_ice, k_liq, 0);
 
    % Vapor density derivative excluded from enthalpy budget (skinmodel).
    drovdT = 0;
 
    % To reinstate vapor-aware conductivity and enthalpy:
-   % Note: same update would be required within iterations, see ICEENBAL.
+   % Note: same update would be required within iterations, see solve_column_enthalpy.
    % [~, drovdT] = icemodel.vapor.saturation_vapor_density(T, f_liq);
    % k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq, drovdT);
-   % k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
+   % k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
 
    % Initial past Picard iterates for Aitken-acceleration
    % T_1 = nan(size(T));
@@ -83,8 +84,9 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = SKINSOLVE(T, f_ice, f_liq, dz, ...
       % end
 
       % Update thermal conductivity (T-k_eff consistency on final iteration).
-      % To reinstate: k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
-      k_eff = BULKTHERMALK(T, f_ice, f_liq, ro_ice, k_liq, 0);
+      % To reinstate: k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
+      k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, ...
+         ro_ice, k_liq, 0);
    end
 
    if ~ok && debug

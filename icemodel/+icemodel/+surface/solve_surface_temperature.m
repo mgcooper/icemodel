@@ -26,7 +26,8 @@ function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, albedo, 
    % This is the Dirichlet surface solve: Qc and its derivative enter the
    % Newton-Raphson residual and Jacobian directly. In the Robin path,
    % conduction instead enters through the top-node finite-difference
-   % equation in GECOEFS — not as an explicit Jacobian term here.
+   % equation in `icemodel.column.assemble_enthalpy_system` rather than as
+   % an explicit Jacobian term here.
    %
    % T_sfc on input is the outer coupling iterate from
    % solve_surface_energy_balance, used as the initial Newton guess. On
@@ -60,13 +61,16 @@ function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, albedo, 
    EEE = chi * (1.0 - albedo) * Qsi + emiss * Qli + Qa;
    FFF = roL * De;                        % [W m-2]
 
+   % Initial value for dQc_dT_sfc which is constant over iterations.
+   [~, dQc_dT_sfc] = icemodel.surface.conductive_heat_flux( ...
+      k_eff, T_ice, dz, T_sfc);
+
    ok = false;
    old = T_sfc;
    for iter = 1:maxiter
 
-      % Conductive heat flux and its T_sfc derivative at the current iterate.
-      [Qc, dQc_dT_sfc] = icemodel.surface.conductive_heat_flux( ...
-         k_eff, T_ice, dz, old);
+      % Conductive heat flux at the current T_sfc iterate.
+      Qc = icemodel.surface.conductive_heat_flux(k_eff, T_ice, dz, old);
 
       % Surface saturation vapor pressure and its temperature derivative.
       [es_sfc, des_sfc_dT] = icemodel.vapor.saturation_vapor_pressure( ...

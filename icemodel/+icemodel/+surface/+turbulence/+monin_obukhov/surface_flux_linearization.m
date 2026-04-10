@@ -1,6 +1,6 @@
-function [Fc, Fp, diag] = surface_flux_linearization(T_sfc, tair, ...
-      Qsi, Qli, albedo, wspd, ppt, tppt, psfc, De, ea_atm, chi, roL, liqflag, ...
-      ro_sfc, snow_depth, opts)
+function [Fc, Fp, diag] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, ...
+      albedo, wspd, ppt, tppt, psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, ...
+      snow_depth, opts)
    %SURFACE_FLUX_LINEARIZATION Linearize the bulk-MO surface flux.
    %
    %  [Fc, Fp] = ...
@@ -15,7 +15,8 @@ function [Fc, Fp, diag] = surface_flux_linearization(T_sfc, tair, ...
    % local derivative using a complex-step perturbation. It intentionally
    % linearizes only the atmospheric surface flux (shortwave, longwave,
    % sensible, latent, and precipitation advection) so the subsurface
-   % conductive term remains in the ICEENBAL / Robin interior solve.
+   % conductive term remains in the `icemodel.column.solve_column_enthalpy`
+   % Robin interior solve.
    %
    %#codegen
 
@@ -54,10 +55,9 @@ function [Q_sfc, diag_thf] = surface_flux(T_sfc, tair, Qsi, Qli, albedo, ...
    %SURFACE_FLUX Evaluate the non-conductive surface flux at T_sfc.
 
    % Load physical constants and parameters.
-   persistent cv_liq emiss SB
+   persistent cv_liq
    if isempty(cv_liq)
-      [cv_liq, SB] = icemodel.physicalConstant('cv_liq', 'SB');
-      emiss = icemodel.parameterLookup('emiss');
+      cv_liq = icemodel.physicalConstant('cv_liq');
    end
 
    % Sensible and latent heat fluxes.
@@ -73,15 +73,12 @@ function [Q_sfc, diag_thf] = surface_flux(T_sfc, tair, Qsi, Qli, albedo, ...
       diag_thf = struct([]);
    end
 
-   % Emitted longwave.
-   Qle = LONGOUT(T_sfc, emiss, SB);
-
    % Precipitation advected heat flux.
    Qa = icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
 
    % Net non-conductive heat flux (Qc = 0: handled by the Robin interior solve).
-   Qsn = chi * Qsi * (1.0 - albedo);
-   Qln = emiss * Qli + Qle;
+   Qsn = icemodel.surface.net_shortwave_radiation(Qsi, albedo, chi);
+   Qln = icemodel.surface.net_longwave_radiation(T_sfc, Qli);
    Q_sfc = icemodel.surface.evaluate_surface_energy_balance( ...
       Qsn, Qln, Qh, Qe, 0.0, Qa, 0.0);
 end

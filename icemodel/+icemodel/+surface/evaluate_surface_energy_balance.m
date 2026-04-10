@@ -10,8 +10,8 @@ function balance = evaluate_surface_energy_balance(Qsn, Qln, Qh, Qe, Qc, Qa, Qm)
    %   balance = Qsn + Qln + Qh + Qe + Qc + Qa - Qm
    %
    % where the pre-computed net fluxes are:
-   %   Qsn = chi * Qsi * (1 - albedo)    [W m^-2]  net shortwave
-   %   Qln = emiss * Qli + Qle           [W m^-2]  net longwave (Qle < 0)
+   %   Qsn = chi * Qsi * (1 - albedo)           [W m^-2]  net shortwave
+   %   Qln = emiss * Qli - emiss * SB * T_sfc^4 [W m^-2]  net longwave
    %
    % Pass Qm = 0 to obtain the energy available for melt when no melt is
    % assumed (the pre-melt residual). Pass Qm as the diagnosed melt energy to
@@ -20,7 +20,7 @@ function balance = evaluate_surface_energy_balance(Qsn, Qln, Qh, Qe, Qc, Qa, Qm)
    % This is the downstream assembler in the diagnostic SEB chain:
    %   surface_energy_balance_terms -> diagnose_melt_freeze_energy -> here
    %
-   % See also: icemodel.surface.diagnose_surface_energy_fluxes,
+   % See also: icemodel.surface.diagnose_surface_energy_balance,
    %           icemodel.surface.surface_energy_balance_terms,
    %           icemodel.surface.diagnose_melt_freeze_energy
    %

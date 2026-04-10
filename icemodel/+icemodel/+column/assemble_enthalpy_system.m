@@ -1,13 +1,13 @@
-function [aN, aP, aS, b, iM, a1, a2, aP01] = GECOEFS(T, f_ice, f_liq, dHdT, ...
-      dLdT, drovdT, dH, Sc, k_eff, delz, fn, dz, dt, Ts, Ls, Lf, ro_liq, TL, ...
-      JJ, Fc, Fp, bc)
-   %GECOEFS Compute the general equation coefficients
+function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system(T, ...
+      f_ice, f_liq, dHdT, dLdT, drovdT, dH, Sc, k_eff, delz, fn, dz, dt, Ts, ...
+      Ls, Lf, ro_liq, TL, JJ, Fc, Fp, bc)
+   %ASSEMBLE_ENTHALPY_SYSTEM Compute the general equation coefficients.
    %
    %  This function constructs the lower, middle, and upper diagonals of the
    %  A matrix in a form compatible with icemodel.numerics.trisolve.
    %
    %  Note: ro_sno * cp_sno = (cv_ice * f_ice + cv_liq * f_liq)
-   %  See UPDATESTATE (or icemodel.timestepping.updatesubstep) for how ro_sno
+   %  See updatestate (or icemodel.timestepping.updatesubstep) for how ro_sno
    %  and cp_sno are computed.
    %
    %  Subtle point: Pmelt here is identical to SNTHRM:
@@ -27,7 +27,7 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = GECOEFS(T, f_ice, f_liq, dHdT, ...
    %
    % The same result is found using Jordan's definition of Pmelt and gv/gk.
    %
-   % See also: ICEENBAL, icemodel.numerics.trisolve
+   % See also: icemodel.column.solve_column_enthalpy, icemodel.numerics.trisolve
    %
    %#codegen
 

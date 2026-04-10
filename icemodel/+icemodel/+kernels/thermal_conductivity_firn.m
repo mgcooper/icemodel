@@ -44,7 +44,8 @@ function k = thermal_conductivity_firn(T, rho_firn, reference, depth)
    %
    %   van Dusen, M.S. (1929), Thermal conductivity of non-metallic solids.
    %
-   % See also: THERMALK, thermal_conductivity_snow
+   % See also: icemodel.column.firn_thermal_conductivity,
+   %  thermal_conductivity_snow
 
    arguments
       T {mustBeNumeric} = 263.15

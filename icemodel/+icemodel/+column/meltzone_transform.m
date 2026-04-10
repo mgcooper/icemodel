@@ -1,6 +1,6 @@
-function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_iter, f_liq, f_wat, dLdT, ...
-      ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, f_liq_max, i_M, ok, debug)
-   %MZTRANSFORM Liquid fraction change to temperature-enthalpy transformation
+function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
+      dLdT, ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, f_liq_max, i_M, ok, debug)
+   %MELTZONE_TRANSFORM Apply the melt-zone temperature-enthalpy transform.
    %
    % This function uses the change in liquid fraction returned by the numerical
    % solution of the enthalpy equation to update the temperature of nodes
@@ -38,13 +38,14 @@ function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_iter, f_liq, f_wat, dLdT, ...
    %    needed both for the melt-zone skipping check and for the linearized
    %    projection of nodes that exit the melt zone.
    %  - dLdT is the freeze-curve derivative df_liq/dT evaluated at T_iter,
-   %    passed in from ICEENBAL to avoid redundant recomputation.
+   %    passed in from solve_column_enthalpy to avoid redundant recomputation.
    %  - f_liq_min/max are f_liq at T=TL/TH, given the current f_wat, not the
    %    min/max possible f_liq (but f_liq_max = f_wat for an ice model)
    %  - i_M is the melt zone nodes at each inner iteration, f_wat is the
    %    water fraction at the current Picard (outer) iteration.
    %
-   % See also: FREEZECURVE MELTCURVE
+   % See also: icemodel.column.liquid_fraction_derivative,
+   %  icemodel.column.liquid_fraction_function
    %
    %#codegen
 
@@ -175,7 +176,8 @@ function [T, f_ice, f_liq, ok] = MZTRANSFORM(T, T_iter, f_liq, f_wat, dLdT, ...
    end
 
    % Project T/f_ice/f_liq onto the enthalpy-temperature curve (corrector step)
-   [T, f_ice, f_liq] = MELTCURVE(T, f_ice, f_liq, ro_ice, ro_liq, fcp, Tf);
+   [T, f_ice, f_liq] = icemodel.column.liquid_fraction_function(T, f_ice, ...
+      f_liq, ro_ice, ro_liq, fcp, Tf);
 end
 
 function dumpMZTransformFailure(reason, T, T_iter, f_ice, f_liq, ...

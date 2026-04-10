@@ -56,7 +56,7 @@ function varargout = parameterLookup(varargin)
       'Uv_max', 1.0e-6, ...   Max vapor flux for grain growth [kg m-2 s-1]
       ...
       ... ----------------------------------------------------------------
-      ... Calonne (2019) thermal conductivity (THERMALK)
+      ... Calonne (2019) thermal conductivity (icemodel.column.firn_thermal_conductivity)
       ... ----------------------------------------------------------------
       'cal_ki_ref', 2.107, ...      Reference ice conductivity at -3°C [W m-1 K-1]
       'cal_ka_ref', 0.024, ...      Air thermal conductivity at -3°C [W m-1 K-1]

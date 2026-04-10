@@ -1,5 +1,5 @@
-function H = TOTALHEAT(T, f_ice, f_liq, cv_ice, cv_liq, roLf, roLs, Tf)
-   %TOTALHEAT Compute total enthalpy (J/m3)
+function H = total_enthalpy(T, f_ice, f_liq, cv_ice, cv_liq, roLf, roLs, Tf)
+   %TOTAL_ENTHALPY Compute total enthalpy (J/m3).
    %
    %#codegen
 
