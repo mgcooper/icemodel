@@ -28,7 +28,7 @@ function [T_sfc, ok] = solve_surface_energy_balance(T_sfc, tair, Qsi, Qli, ...
    %  of solve_surface_temperature it can exceed Tf.
    %
    %#codegen
-   
+
    debug = opts.debug;
    seb_solver = opts.seb_solver;
 
@@ -110,8 +110,7 @@ function [T_sfc, ok] = solve_surface_energy_balance(T_sfc, tair, Qsi, Qli, ...
          k_eff, T_ice, dz, ro_sfc, snow_depth, ok_cpl, opts);
    end
 
-   % Note: the nested residual owns the conductive flux evaluation, so
-   % callers do not need to pass Qc explicitly.
+   % Nested surface residual function for convenience
    function f = surface_residual(T_sfc_local)
       f = icemodel.surface.surface_energy_balance_residual(T_sfc_local, tair, ...
          Qsi, Qli, albedo, wspd, ppt, tppt, psfc, De, ea_atm, br_coefs, roL, ...

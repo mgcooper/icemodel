@@ -22,7 +22,7 @@ function [d_pevp, pevp] = potential_surface_vapor_tendency(Qe, dt, dz)
    % Note: To budget sublimation, outputs require conversion to ice frac change:
    % d_psbl = d_pevp * (Lv * ro_liq) / (Ls * ro_ice)
    %
-   % See also: ICESUBL
+   % See also: icemodel.surface.apply_surface_vapor_mass_change
    %
    % The combined surface-flux + PEVAP contract lives in
    % icemodel.surface.potential_surface_vapor_tendency(...), which applies

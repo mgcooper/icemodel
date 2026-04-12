@@ -65,7 +65,7 @@ function mesh(Z, dz, growth_factor)
    hold off;
 
 
-   % %% Use this if within CVMESH
+   % %% Use this if within control_volume_mesh
    %
    % x = ones(size(z_node_bc));
    %
