@@ -1,7 +1,10 @@
-function Qe = latent_heat_flux(es_sfc, ea_atm, De, stability, psfc, roL)
+function [Qe, dQe_dT_sfc] = latent_heat_flux(es_sfc, ea_atm, De, stability, ...
+      psfc, roL, des_sfc_dT, dstability_dT_sfc)
    %LATENT_HEAT_FLUX Compute the turbulent latent heat flux.
    %
    %  Qe = icemodel.surface.turbulence.bulk_richardson.latent_heat_flux(...)
+   %  [Qe, dQe_dT_sfc] = ...
+   %     icemodel.surface.turbulence.bulk_richardson.latent_heat_flux(...)
    %
    %  Qe = ro_air * L * De_e * stability * (ea_atm - es_sfc) * epsilon/psfc;
    %  [W m-2] = [kg m-3] * [J kg-1] * [m s-1] * [-] * [Pa] * [Pa-1]
@@ -17,7 +20,11 @@ function Qe = latent_heat_flux(es_sfc, ea_atm, De, stability, psfc, roL)
    %
    % The exchange coefficient De is identical for latent and sensible heat
    % fluxes because the scalar exchange roughness lengths for latent and
-   % sensible heat are assumed equal to the momentum exchange roughness length. 
+   % sensible heat are assumed equal to the momentum exchange roughness length.
+   %
+   % When the derivative is requested, provide the temperature derivatives of
+   % both the surface saturation vapor pressure and the stability factor so
+   % the returned derivative is the full dQe/dT_sfc.
    %
    % See also: icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux
    %
@@ -27,4 +34,9 @@ function Qe = latent_heat_flux(es_sfc, ea_atm, De, stability, psfc, roL)
       epsilon = icemodel.physicalConstant('epsilon');
    end
    Qe = roL * De * stability * (ea_atm - es_sfc) * epsilon / psfc;
+
+   if nargout > 1
+      dQe_dT_sfc = roL * De * epsilon / psfc * ...
+         ((ea_atm - es_sfc) * dstability_dT_sfc - stability * des_sfc_dT);
+   end
 end

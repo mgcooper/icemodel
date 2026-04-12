@@ -62,7 +62,7 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
    %
    % Legacy forcing-derivation fallbacks for station datasets that omit
    % `lwd`, `swd`, or `psfc` now live under `icemodel.surface`:
-   %   incoming_longwave_radiation
+   %   empirical_incoming_longwave_radiation
    %   incoming_shortwave_radiation
    %   terrain_adjusted_shortwave_radiation
    %   atmospheric_pressure_from_elevation

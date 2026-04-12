@@ -20,27 +20,27 @@ function [Fc, Fp, diag] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, ...
    %
    %#codegen
 
-   persistent h
-   if isempty(h)
-      h = 1e-10;
+   % Surface heat flux.
+   if nargout > 2
+      [Q_sfc, diag_thf] = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ...
+         ppt, tppt, psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, ...
+         snow_depth, opts);
+   else
+      Q_sfc = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, tppt, ...
+         psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, snow_depth, opts);
+      diag_thf = struct([]);
    end
 
-   % Surface heat flux.
-   Q_sfc = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, tppt, ...
-      psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, snow_depth, opts);
-
    % Surface heat flux complex-step perturbation.
-   Q_sfc_step = surface_flux(T_sfc + 1i * h, tair, Qsi, Qli, albedo, wspd, ...
+   flux_fn = @(Ts_eval) surface_flux(Ts_eval, tair, Qsi, Qli, albedo, wspd, ...
       ppt, tppt, psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, snow_depth, opts);
 
    % Linearization.
-   Fp = imag(Q_sfc_step) / h;
+   Fp = icemodel.numerics.complex_step_derivative(flux_fn, T_sfc);
    Fc = Q_sfc - Fp * T_sfc;
 
    % Parse outputs.
    if nargout > 2
-      [~, diag_thf] = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, ...
-         tppt, psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, snow_depth, opts);
       diag = struct( ...
          'scheme', 'monin_obukhov', ...
          'q_surface', Q_sfc, ...

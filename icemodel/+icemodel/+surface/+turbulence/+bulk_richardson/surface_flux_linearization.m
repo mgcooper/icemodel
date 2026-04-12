@@ -47,35 +47,37 @@ function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, albedo, ..
    end
 
    % Surface saturation vapor pressure and derivative.
-   [es_sfc, des_sfc_dT] = icemodel.vapor.saturation_vapor_pressure( ...
+   [~, des_sfc_dT] = icemodel.vapor.saturation_vapor_pressure( ...
       T_sfc, liqflag);
 
    % Bulk richardson stability function.
    stability = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
       T_sfc, tair, wspd, br_coefs);
 
+   % Canonical non-conductive surface terms at the current linearization
+   % state. The Robin solve handles conduction in the interior column system.
+   [Qe, Qh] = ...
+      icemodel.surface.turbulence.bulk_richardson.turbulent_heat_flux( ...
+      T_sfc, tair, wspd, psfc, ea_atm, De, br_coefs, roL, liqflag, NaN);
+   Qa = icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
+   Qsn = icemodel.surface.net_shortwave_radiation(Qsi, albedo, chi);
+   [Qln, dQln_dT] = icemodel.surface.net_longwave_radiation(T_sfc, Qli);
+   Q_sfc = icemodel.surface.evaluate_surface_energy_balance( ...
+      Qsn, Qln, Qh, Qe, 0.0, Qa, 0.0);
+
    %%% Linearizations
 
-   % Emitted longwave (note: -Qle = -emiss * SB * T_sfc ^ 4)
-   Fc_Qle = 3 * emiss * SB * T_sfc ^ 4;
-   Fp_Qle = -4 / 3 * Fc_Qle / T_sfc;
+   % Net longwave radiation.
+   Fp_Qln = -4.0 * emiss * SB * T_sfc ^ 3;
 
-   % Sensible heat flux
-   Fc_Qh = cv_air * De * stability * tair;
+   % Sensible heat flux.
    Fp_Qh = -cv_air * De * stability;
 
    % Latent heat flux (linearization of es_sfc around T_sfc)
    % es(T) ≈ es + des_dT * (T - T_sfc) = (es - des_dT * T_sfc) + des_dT * T
-   Fc_Qe = roL * De * epsilon / psfc * stability ...
-      * (ea_atm - es_sfc + des_sfc_dT * T_sfc);
    Fp_Qe = -roL * De * epsilon / psfc * stability * des_sfc_dT;
 
-   % Precipitation-advected heat:
-   Fc_Qa = icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
-   Fp_Qa = 0;
-
-   % Combine net sw, incoming lw, and precipitation-advected heat:
-   Fc = Fc_Qle + Fc_Qh + Fc_Qe + emiss * Qli + chi * Qsi * (1.0 - albedo) ...
-      + Fc_Qa;
-   Fp = Fp_Qle + Fp_Qh + Fp_Qe + Fp_Qa;
+   % Total linearization.
+   Fp = Fp_Qln + Fp_Qh + Fp_Qe;
+   Fc = Q_sfc - Fp * T_sfc;
 end

@@ -2,14 +2,14 @@ function [x, ok, iter] = complexstep(f, x0)
    %COMPLEXSTEP Find a scalar root with a complex-step Newton iteration.
    %
    % The Newton iterate itself remains on the real axis. The complex-step
-   % perturbation is used only to estimate the derivative at a real state.
+   % perturbation is used only to estimate the derivative at a real state
+   % through `icemodel.numerics.complex_step_derivative`.
    %
    %#codegen
 
-   persistent h dh tol maxiter
+   persistent h tol maxiter
    if isempty(tol)
       h = 1e-10;
-      dh = 1i * h;
       tol = 1e-3;
       maxiter = 100;
    end
@@ -28,7 +28,7 @@ function [x, ok, iter] = complexstep(f, x0)
 
       % Estimate the derivative with a complex perturbation and take one
       % real-valued Newton step.
-      dfdx = imag(f(old + dh)) / h;
+      dfdx = icemodel.numerics.complex_step_derivative(f, old, h);
       x = real(old - real(f_old) / dfdx);
 
       if abs(x - old) < tol

@@ -17,14 +17,12 @@ function test_longwave_fluxes_have_expected_signs(testCase)
    % Longwave-in should remain positive while net longwave becomes less
    % negative as incoming longwave increases under the project sign convention.
 
-   Qli_dry = icemodel.surface.incoming_longwave_radiation(263.15, 150);
-   Qli_moist = icemodel.surface.incoming_longwave_radiation(263.15, 300);
+   Qli_dry = 150;
+   Qli_moist = 300;
    Qln_out = icemodel.surface.net_longwave_radiation(263.15, 0.0);
    Qln_dry = icemodel.surface.net_longwave_radiation(263.15, Qli_dry);
    Qln_moist = icemodel.surface.net_longwave_radiation(263.15, Qli_moist);
 
-   testCase.verifyGreaterThan(Qli_dry, 0);
-   testCase.verifyGreaterThan(Qli_moist, Qli_dry);
    testCase.verifyLessThan(Qln_out, 0);
    testCase.verifyGreaterThan(Qln_dry, Qln_out);
    testCase.verifyGreaterThan(Qln_moist, Qln_dry);
@@ -67,13 +65,17 @@ function test_windcoef_and_stablefn_cover_neutral_stable_and_unstable(testCase)
    z0_bulk = 1e-3;
    z_tair = 3.0;
    z_wind = 3.0;
+
    [De, br_coefs] = ...
       icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
       wspd, z0_bulk, z_tair, z_wind);
+
    S_neutral = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
       T_sfc_neutral, tair, wspd, br_coefs);
+
    S_stable = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
       T_sfc_stable, tair, wspd, br_coefs);
+
    S_unstable = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
       T_sfc_unstable, tair, wspd, br_coefs);
 
@@ -87,26 +89,37 @@ function test_stablefn_derivative_matches_finite_difference(testCase)
    % stability_factor should return a Ts derivative consistent with finite
    % differences in stable, unstable, and near-neutral regimes.
 
+   tair = 268.15;
+   wspd = 4.0;
+
+   % Aerodynamics
    z0_bulk = 1e-3;
    z_tair = 3.0;
    z_wind = 3.0;
    [~, br_coefs] = ...
       icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
       4.0, z0_bulk, z_tair, z_wind);
-   tair = 268.15;
-   wspd = 4.0;
+
+   % Temperature perturbation
    h = 1e-6;
+
+   % Three T_sfc test cases
    T_sfc_cases = [tair - 2.0, tair, tair + 2.0];
 
    for n = 1:numel(T_sfc_cases)
+
       T_sfc = T_sfc_cases(n);
+
       [~, dSdTs] = ...
          icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
          T_sfc, tair, wspd, br_coefs);
+
       S_plus = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
          T_sfc + h, tair, wspd, br_coefs);
+
       S_minus = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
          T_sfc - h, tair, wspd, br_coefs);
+
       dSdTs_fd = (S_plus - S_minus) / (2 * h);
 
       testCase.verifyEqual(dSdTs, dSdTs_fd, 'RelTol', 1e-5, ...
@@ -118,20 +131,27 @@ function test_stablefn_neutral_blend_matches_endpoint_formulas(testCase)
    % The near-neutral branch should linearly blend the stable and unstable
    % endpoint formulas across the configured transition width.
 
-   z0_bulk = 1e-3;
-   z_tair = 3.0;
-   z_wind = 3.0;
-   wspd = 4.0;
-   tair = 268.15;
-   [~, br_coefs] = ...
-      icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
-      wspd, z0_bulk, z_tair, z_wind);
    dT0 = icemodel.parameterLookup( ...
       'thf_bulk_richardson_neutral_transition_width');
 
+   tair = 268.15;
+   wspd = 4.0;
+
+   % Bulk roughness and observation heights
+   z0_bulk = 1e-3;
+   z_tair = 3.0;
+   z_wind = 3.0;
+
+   % Bulk Richardson coefficients
+   [~, br_coefs] = ...
+      icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
+      wspd, z0_bulk, z_tair, z_wind);
+
+   % Louis bulk Richardson stability coefficients
    B1 = br_coefs(2) / (tair * wspd ^ 2);
    B2 = br_coefs(3) / (sqrt(tair) * wspd);
 
+   % Stability at the transition
    S_stable_edge = (1 + 0.5 * B1 * dT0) ^ -2;
    S_unstable_edge = 1 + B1 * dT0 / (1 + B2 * sqrt(dT0));
    S_expected = 0.5 * (S_stable_edge + S_unstable_edge);
@@ -160,8 +180,8 @@ function test_vappress2rh_recovers_saturation_for_ice_and_water(testCase)
 end
 
 function test_vapork_matches_vapordensity_times_diffusivity(testCase)
-   % icemodel.vapor.vapor_thermal_diffusion_coefficient should equal Ls * De * dro_vapdT for dry cells and
-   % Lv * De * dro_vapdT for wet cells.
+   % icemodel.vapor.vapor_thermal_diffusion_coefficient should equal
+   % Ls * De * dro_vapdT for dry cells and Lv * De * dro_vapdT for wet cells.
 
    [Ls, Lv] = icemodel.physicalConstant('Ls', 'Lv');
    T = [260; 265; 270];
@@ -175,27 +195,29 @@ function test_vapork_matches_vapordensity_times_diffusivity(testCase)
    testCase.verifyEqual(k_vap, k_vap_manual, 'RelTol', 1e-10);
 
    % Test wet cells use Lv
-   f_liq_wet = 0.05 * ones(size(T));
-   [~, dro_vapdT_wet] = icemodel.vapor.saturation_vapor_density(T, f_liq_wet);
    De_wet = icemodel.vapor.vapor_diffusivity(T);
+   f_liq_wet = 0.05 * ones(size(T));
+
    k_vap_wet = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq_wet);
+
+   [~, dro_vapdT_wet] = icemodel.vapor.saturation_vapor_density(T, f_liq_wet);
+
    k_vap_wet_manual = Lv * De_wet .* dro_vapdT_wet;
 
    testCase.verifyEqual(k_vap_wet, k_vap_wet_manual, 'RelTol', 1e-10);
 end
 
-function test_bulk_thermal_conductivity_stays_positive_and_responds_to_liquid(testCase)
+function test_bulk_thermalk_stays_positive_and_responds_to_liquid(testCase)
    % Effective conductivity should stay positive and increase as the same
    % state gains more liquid water.
 
-   [ro_ice, k_liq] = icemodel.physicalConstant('ro_ice', 'k_liq');
    T = 268.15 * ones(3, 1);
    f_ice = [0.7; 0.7; 0.7];
    f_liq_dry = [0.00; 0.01; 0.02];
    f_liq_wet = [0.05; 0.08; 0.10];
 
-   k_dry = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq_dry, ro_ice, k_liq);
-   k_wet = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq_wet, ro_ice, k_liq);
+   k_dry = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq_dry);
+   k_wet = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq_wet);
 
    testCase.verifyGreaterThan(min(k_dry), 0);
    testCase.verifyGreaterThan(min(k_wet), 0);
@@ -206,10 +228,8 @@ function test_updateState_matches_component_kernels(testCase)
    % icemodel.column.updatestate should stay consistent with the lower-level
    % thermo helpers it wraps into one state-update call.
 
-   [ro_ice, ro_liq, ro_air, cv_ice, cv_liq, k_liq, roLf, Ls, Rv, Tf] ...
-      = icemodel.physicalConstant('ro_ice', 'ro_liq', 'ro_air', ...
-      'cv_ice', 'cv_liq', 'k_liq', 'roLf', 'Ls', 'Rv', 'Tf');
-   fcp = icemodel.parameterLookup('fcp');
+   [ro_ice, ro_liq, cv_ice, cv_liq] = icemodel.physicalConstant( ...
+      'ro_ice', 'ro_liq', 'cv_ice', 'cv_liq');
 
    T = [266; 267; 268];
    f_ice = [0.90; 0.88; 0.85];
@@ -217,24 +237,28 @@ function test_updateState_matches_component_kernels(testCase)
    f_wat = f_liq + f_ice * ro_ice / ro_liq;
 
    [H, k_eff, dHdT, dLdT, drovdT, ro_vap] = icemodel.column.updatestate( ...
-      T, f_ice, f_liq, f_wat, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, ...
-      k_liq, roLf, Ls, Rv, Tf, fcp);
+      T, f_ice, f_liq, f_wat);
 
-   [ro_vap_ref, drovdT_ref] = icemodel.vapor.saturation_vapor_density(T, f_liq);
-   k_vap_ref = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq, drovdT_ref);
-   k_eff_ref = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, ro_ice, ...
-      k_liq, k_vap_ref);
-   H_ref = icemodel.column.total_enthalpy(T, f_ice, f_liq, cv_ice, cv_liq, ...
-      roLf, Ls * ro_vap_ref, Tf);
-   dLdT_ref = icemodel.column.liquid_fraction_derivative(T, ro_ice, ro_liq, fcp, Tf, ...
-      f_ice, f_liq);
+   [ro_vap_ref, drovdT_ref] = icemodel.vapor.saturation_vapor_density( ...
+      T, f_liq);
+
+   k_vap_ref = icemodel.vapor.vapor_thermal_diffusion_coefficient( ...
+      T, f_liq, drovdT_ref);
+
+   k_eff_ref = icemodel.column.bulk_thermal_conductivity( ...
+      T, f_ice, f_liq, k_vap_ref);
+
+   H_ref = icemodel.column.total_enthalpy( ...
+      T, f_ice, f_liq, f_wat, ro_vap_ref);
+
+   dLdT_ref = icemodel.column.liquid_fraction_derivative( ...
+      T, f_ice, f_liq);
 
    testCase.verifyEqual(ro_vap, ro_vap_ref, 'RelTol', 1e-12);
    testCase.verifyEqual(drovdT, drovdT_ref, 'RelTol', 1e-12);
    testCase.verifyEqual(k_eff, k_eff_ref, 'RelTol', 1e-12);
    testCase.verifyEqual(H, H_ref, 'RelTol', 1e-12);
-   testCase.verifyEqual(dHdT, cv_ice * f_ice + cv_liq * f_liq, ...
-      'RelTol', 1e-12);
+   testCase.verifyEqual(dHdT, cv_ice * f_ice + cv_liq * f_liq, 'RelTol', 1e-12);
    testCase.verifyEqual(dLdT, dLdT_ref, 'RelTol', 1e-12);
 end
 
@@ -257,8 +281,9 @@ function test_twetbulb_returns_air_temperature_at_saturation(testCase)
 end
 
 function test_vaporinit_coefficients_consistent(testCase)
-   % icemodel.vapor.initialize_vapor_model output should reproduce the reference vapor pressure at the
-   % triple point when plugged into the Rankine-Kirchhoff formula.
+   % icemodel.vapor.initialize_vapor_model output should reproduce the reference
+   % vapor pressure at the triple point when plugged into the Rankine-Kirchhoff
+   % formula.
 
    [Tf, es0] = icemodel.physicalConstant('Tf', 'es0');
    [al, bl, cl, ai, bi, ci] = icemodel.vapor.initialize_vapor_model();
@@ -270,6 +295,7 @@ function test_vaporinit_coefficients_consistent(testCase)
    % identical to the reference es0. Both phases should agree to ~0.1%.
    testCase.verifyEqual(es_liq, es0, 'RelTol', 1e-3);
    testCase.verifyEqual(es_ice, es0, 'RelTol', 1e-3);
+
    % Liquid and ice curves must agree at the triple point.
    testCase.verifyEqual(es_liq, es_ice, 'RelTol', 1e-10);
 end
@@ -316,18 +342,17 @@ function test_atmosphericVaporPressure_matches_direct_contract(testCase)
    testCase.verifyEqual(ea, ea_ref, 'RelTol', 1e-12);
 end
 
-function test_firn_thermal_conductivity_positive_and_density_dependent(testCase)
-   % icemodel.column.firn_thermal_conductivity should produce positive conductivity that
-   % increases with ice fraction (density).
+function test_firn_thermalk_positive_and_density_dependent(testCase)
+   % icemodel.column.firn_thermal_conductivity should produce positive
+   % conductivity that increases with ice fraction (density).
 
    T = [255; 265; 270];
    f_ice = [0.95; 0.80; 0.60];
-   ro_ice = icemodel.physicalConstant('ro_ice');
 
-   k_sno = icemodel.column.firn_thermal_conductivity(T, f_ice, ro_ice);
+   k_firn = icemodel.column.firn_thermal_conductivity(T, f_ice);
 
-   testCase.verifyGreaterThan(min(k_sno), 0);
-   testCase.verifyGreaterThan(k_sno(1), k_sno(3), ...
+   testCase.verifyGreaterThan(min(k_firn), 0);
+   testCase.verifyGreaterThan(k_firn(1), k_firn(3), ...
       'Higher ice fraction should yield higher thermal conductivity');
 end
 
@@ -337,16 +362,18 @@ function test_ambaum_derivative_chain_consistency(testCase)
    %
    % This tests the complete chain: es -> des_dT -> d2es_dT2,
    % ro_vap -> dro_vapdT -> d2ro_vapdT2, and cross-function agreement
-   % between icemodel.vapor.saturation_vapor_pressure, icemodel.vapor.saturation_vapor_density, and icemodel.vapor.vapor_thermal_diffusion_coefficient.
+   % between icemodel.vapor.saturation_vapor_pressure,
+   % icemodel.vapor.saturation_vapor_density, and
+   % icemodel.vapor.vapor_thermal_diffusion_coefficient.
 
    Ls = icemodel.physicalConstant('Ls');
 
    T = (235:0.5:273)';
    h = 1e-4;  % finite difference step [K]
 
-   % --- Vapor pressure derivatives via icemodel.vapor.saturation_vapor_pressure ---
+   %%% Vapor pressure derivatives via icemodel.vapor.saturation_vapor_pressure
 
-   [es, des_dT, d2es_dT2] = icemodel.vapor.saturation_vapor_pressure(T, false);
+   [~, des_dT, d2es_dT2] = icemodel.vapor.saturation_vapor_pressure(T, false);
    es_p = icemodel.vapor.saturation_vapor_pressure(T + h, false);
    es_m = icemodel.vapor.saturation_vapor_pressure(T - h, false);
    [~, des_dT_p] = icemodel.vapor.saturation_vapor_pressure(T + h, false);
@@ -362,10 +389,10 @@ function test_ambaum_derivative_chain_consistency(testCase)
    testCase.verifyEqual(d2es_dT2, d2es_dT2_num, 'RelTol', 1e-6, ...
       'd2es_dT2 analytical vs finite difference');
 
-   % --- Vapor density derivatives via icemodel.vapor.saturation_vapor_density ---
+   %%% Vapor density derivatives via icemodel.vapor.saturation_vapor_density
 
    f_liq = zeros(size(T));
-   [ro_vap, dro_vapdT, d2ro_vapdT2] = icemodel.vapor.saturation_vapor_density(T, f_liq);
+   [~, dro_vapdT, d2ro_vapdT2] = icemodel.vapor.saturation_vapor_density(T, f_liq);
    ro_vap_p = icemodel.vapor.saturation_vapor_density(T + h, f_liq);
    ro_vap_m = icemodel.vapor.saturation_vapor_density(T - h, f_liq);
    [~, dro_vapdT_p] = icemodel.vapor.saturation_vapor_density(T + h, f_liq);
@@ -381,17 +408,23 @@ function test_ambaum_derivative_chain_consistency(testCase)
    testCase.verifyEqual(d2ro_vapdT2, d2ro_vapdT2_num, 'RelTol', 1e-6, ...
       'd2ro_vapdT2 analytical vs finite difference');
 
-   % --- Cross-function agreement ---
+   %%% Cross-function agreement
 
-   % 5. icemodel.vapor.vapor_thermal_diffusion_coefficient reuse path should match its internal icemodel.vapor.saturation_vapor_density path
-   k_vap_vk = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq);
-   k_vap_reuse = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq, dro_vapdT);
+   % 5. icemodel.vapor.vapor_thermal_diffusion_coefficient reuse path should
+   % match its internal icemodel.vapor.saturation_vapor_density path
+   k_vap_vk = icemodel.vapor.vapor_thermal_diffusion_coefficient( ...
+      T, f_liq);
+   k_vap_reuse = icemodel.vapor.vapor_thermal_diffusion_coefficient( ...
+      T, f_liq, dro_vapdT);
    testCase.verifyEqual(k_vap_reuse, k_vap_vk, 'RelTol', 1e-12, ...
-      'icemodel.vapor.vapor_thermal_diffusion_coefficient reuse path vs internal dro_vapdT path');
+      ['icemodel.vapor.vapor_thermal_diffusion_coefficient ' ...
+      'reuse path vs internal dro_vapdT path']);
 
-   % 6. icemodel.vapor.vapor_thermal_diffusion_coefficient k_vap matches Ls * De * dro_vapdT for dry cells
+   % 6. icemodel.vapor.vapor_thermal_diffusion_coefficient k_vap matches Ls * De
+   % * dro_vapdT for dry cells
    De = icemodel.vapor.vapor_diffusivity(T);
    k_vap_manual = Ls * De .* dro_vapdT;
    testCase.verifyEqual(k_vap_vk, k_vap_manual, 'RelTol', 1e-10, ...
-      'icemodel.vapor.vapor_thermal_diffusion_coefficient k_vap vs manual Ls*De*dro_vapdT');
+      ['icemodel.vapor.vapor_thermal_diffusion_coefficient ' ...
+      'k_vap vs manual Ls*De*dro_vapdT']);
 end

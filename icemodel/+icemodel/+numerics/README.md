@@ -7,6 +7,7 @@ Current contents:
 - `aitkenscalar`
 - `fsearchzero`
 - `complexstep`
+- `complex_step_derivative`
 - `sign_or_one`
 
 Rules:

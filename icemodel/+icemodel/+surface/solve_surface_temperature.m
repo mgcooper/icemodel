@@ -47,30 +47,24 @@ function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, albedo, 
    end
 
    % Physical constants and parameters for the analytical Jacobian.
-   persistent cv_air cv_liq emiss SB epsilon
-   if isempty(cv_air)
-      [cv_air, cv_liq, SB, epsilon] = icemodel.physicalConstant( ...
-         'cv_air', 'cv_liq', 'SB', 'epsilon');
-      emiss = icemodel.parameterLookup('emiss');
+   persistent cv_liq
+   if isempty(cv_liq)
+      cv_liq = icemodel.physicalConstant('cv_liq');
    end
 
-   % Gather T_sfc-independent terms in the SEB equation.
+   %%% Gather T_sfc-independent terms in the SEB equation.
+   Qsn = icemodel.surface.net_shortwave_radiation(Qsi, albedo, chi);
    Qa = icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
-   AAA = cv_air * De;                     % [W m-2 K-1]
-   CCC = epsilon / psfc;                  % [Pa-1] = [m3 J-1]
-   EEE = chi * (1.0 - albedo) * Qsi + emiss * Qli + Qa;
-   FFF = roL * De;                        % [W m-2]
 
-   % Initial value for dQc_dT_sfc which is constant over iterations.
+   % Derivative of conductive heat flux is T_sfc-independent.
    [~, dQc_dT_sfc] = icemodel.surface.conductive_heat_flux( ...
       k_eff, T_ice, dz, T_sfc);
 
    ok = false;
    old = T_sfc;
    for iter = 1:maxiter
-
-      % Conductive heat flux at the current T_sfc iterate.
-      Qc = icemodel.surface.conductive_heat_flux(k_eff, T_ice, dz, old);
+      
+      %%% Compute heat fluxes and Jacobian terms at the current T_sfc iterate.
 
       % Surface saturation vapor pressure and its temperature derivative.
       [es_sfc, des_sfc_dT] = icemodel.vapor.saturation_vapor_pressure( ...
@@ -81,16 +75,29 @@ function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, albedo, 
          icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
          old, tair, wspd, br_coefs);
 
+      % Latent heat flux and its temperature derivative.
+      [Qe, dQe_dT_sfc] = ...
+         icemodel.surface.turbulence.bulk_richardson.latent_heat_flux( ...
+         es_sfc, ea_atm, De, stability, psfc, roL, des_sfc_dT, dstability);
+
+      % Sensible heat flux and its temperature derivative.
+      [Qh, dQh_dT_sfc] = ...
+         icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux( ...
+         old, tair, De, stability, dstability);
+      
+      % Net longwave radiation and its temperature derivative.
+      [Qln, dQln_dTsfc] = icemodel.surface.net_longwave_radiation(old, Qli);
+
+      % Conductive heat flux.
+      Qc = icemodel.surface.conductive_heat_flux(k_eff, T_ice, dz, old);
+
       % Newton-Raphson residual and analytical Jacobian.
-      f = EEE - emiss * SB * old ^ 4 + AAA * (tair - old) * stability ...
-         + FFF * CCC * (ea_atm - es_sfc) * stability + Qc;
+      f = icemodel.surface.evaluate_surface_energy_balance( ...
+         Qsn, Qln, Qh, Qe, Qc, Qa, 0.0);
+      
+      dfdT = dQln_dTsfc + dQh_dT_sfc + dQe_dT_sfc + dQc_dT_sfc;
 
-      dfdT = -4.0 * emiss * SB * old ^ 3 ...
-         + stability * -AAA + AAA * (tair - old) * dstability ...
-         + stability * -FFF * CCC * des_sfc_dT ...
-         + FFF * CCC * (ea_atm - es_sfc) * dstability ...
-         + dQc_dT_sfc;
-
+      % Updated T_sfc iterate.
       T_sfc = old - f / dfdT;
 
       if abs(T_sfc - old) < tol

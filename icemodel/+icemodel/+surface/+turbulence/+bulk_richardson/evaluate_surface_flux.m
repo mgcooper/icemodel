@@ -1,89 +1,39 @@
 function [Q_sfc, dQ_sfc_dTs] = evaluate_surface_flux(tair, Qsi, Qli, ...
-      albedo, wspd, ppt, tppt, psfc, De, T_sfc, Qc, ea_atm, roL, ...
-      br_coefs, chi, liqflag)
+      albedo, wspd, ppt, tppt, psfc, De, T_sfc, ea_atm, roL, br_coefs, ...
+      chi, liqflag, k_eff, T_ice, dz, ro_sfc, snow_depth, opts)
    %EVALUATE_SURFACE_FLUX Evaluate the bulk-Richardson SEB residual and derivative.
    %
    %  [Q_sfc, dQ_sfc_dTs] = ...
    %     icemodel.surface.turbulence.bulk_richardson.evaluate_surface_flux(...)
    %
-   % Evaluates the explicit surface energy balance at T_sfc:
+   % This helper is a numerical-reference wrapper around the canonical
+   % surface-energy-balance residual. It evaluates the bulk-Richardson
+   % surface residual at `T_sfc` and estimates the derivative with a
+   % complex-step perturbation:
    %
-   %   Q_sfc = chi*Qsi*(1-albedo) + emiss*(Qli - SB*T_sfc^4)
-   %           + Qh(T_sfc) + Qe(T_sfc) + Qc + Qa
+   %   dQ_sfc_dTs ≈ imag(Q_sfc(T_sfc + 1i*h)) / h,  h = 1e-10
    %
-   % and returns its numerical derivative using a Newton difference quotient:
+   % The helper exists primarily for derivative-validation tests; the
+   % production Dirichlet solve still uses the analytical Jacobian in
+   % `icemodel.surface.solve_surface_temperature`.
+   % The passed opts struct is copied locally with
+   % `turbulent_flux_scheme = 'bulk_richardson'` so this wrapper always
+   % evaluates the bulk-Richardson residual regardless of the caller's
+   % active scheme setting.
    %
-   %   dQ_sfc_dTs ≈ (Q_sfc(T_sfc + h) - Q_sfc(T_sfc)) / h,  h = 1e-10
-   %
-   % --- Relation to solve_surface_temperature ---
-   %
-   % icemodel.surface.solve_surface_temperature minimizes Q_sfc via
-   % Newton-Raphson using an analytical Jacobian. evaluate_surface_flux
-   % provides an independent numerical evaluation of the same residual and
-   % its derivative, which serves as:
-   %   (1) A validation tool: verify that solve_surface_temperature converged
-   %       to a state where Q_sfc is small (see test_sfctemp_finds_small_residual).
-   %   (2) A derivative check: verify the analytical Jacobian in
-   %       solve_surface_temperature agrees with the numerical one
-   %       (see test_sfcflux_derivative_matches_finite_difference).
-   %
-   % The analytical Jacobian is kept in solve_surface_temperature rather than
-   % delegating to this function's dQ_sfc_dTs for two reasons:
-   %   (a) Efficiency: the analytical form needs one evaluation per Newton step,
-   %       while the numerical form needs two (F(T) and F(T+h)).
-   %   (b) Exactness: the analytical form includes the conduction Jacobian term
-   %       -a1 = -k_eff(1)/(dz(1)/2) when Qc couples back to T_sfc; the
-   %       numerical form here treats Qc as fixed and therefore misses this
-   %       term when Qc is column-state-dependent.
-   %
-   % --- Relation to surface_flux_linearization ---
-   %
-   % bulk_richardson/surface_flux_linearization returns [Fc, Fp] where
-   % Q_sfc ≈ Fc + Fp*T_sfc, using an analytical Taylor expansion. It is used
-   % for the Robin boundary condition coupling and intentionally excludes Qc
-   % (which is handled by the interior subsurface solve).
-   %
-   % evaluate_surface_flux includes Qc and returns [Q_sfc, dQ_sfc_dTs] —
-   % the residual and its raw numerical derivative rather than the linearized
-   % form. The two functions serve distinct solver paths.
-   %
-   % See also: icemodel.surface.solve_surface_temperature,
-   %           icemodel.surface.turbulence.bulk_richardson.surface_flux_linearization,
-   %           icemodel.surface.surface_energy_balance_residual
+   % See also: icemodel.surface.surface_energy_balance_residual,
+   %           icemodel.surface.solve_surface_temperature,
+   %           icemodel.numerics.complex_step_derivative
    %
    %#codegen
 
-   persistent h
-   if isempty(h)
-      h = 1e-10;
-   end
+   opts_eval = opts;
+   opts_eval.turbulent_flux_scheme = 'bulk_richardson';
 
-   Q_sfc = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, tppt, ...
-      psfc, De, Qc, ea_atm, roL, br_coefs, chi, liqflag);
+   residual_fn = @(Ts_eval) icemodel.surface.surface_energy_balance_residual( ...
+      Ts_eval, tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, De, ea_atm, ...
+      br_coefs, roL, liqflag, chi, T_ice, k_eff, dz, ro_sfc, snow_depth, opts_eval);
 
-   dQ_sfc_dTs = (surface_flux(T_sfc + h, tair, Qsi, Qli, albedo, wspd, ppt, ...
-      tppt, psfc, De, Qc, ea_atm, roL, br_coefs, chi, liqflag) - Q_sfc) / h;
-end
-
-function Q_sfc = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, ...
-      tppt, psfc, De, Qc, ea_atm, roL, br_coefs, chi, liqflag)
-   %SURFACE_FLUX Evaluate the non-conductive + conductive SEB residual at T_sfc.
-   %
-   % This is the explicit surface flux evaluated at a fixed Qc. Used by the
-   % public evaluate_surface_flux at two temperatures to form the difference
-   % quotient.
-
-   persistent cv_liq emiss SB
-   if isempty(cv_liq)
-      [cv_liq, SB] = icemodel.physicalConstant('cv_liq', 'SB');
-      emiss = icemodel.parameterLookup('emiss');
-   end
-
-   [Qe, Qh] = ...
-      icemodel.surface.turbulence.bulk_richardson.turbulent_heat_flux( ...
-      T_sfc, tair, wspd, psfc, ea_atm, De, br_coefs, roL, liqflag, NaN);
-   Qa = icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
-
-   Q_sfc = chi * Qsi * (1.0 - albedo) + emiss * (Qli - SB * T_sfc ^ 4) ...
-      + Qc + Qa + Qh + Qe;
+   Q_sfc = residual_fn(T_sfc);
+   dQ_sfc_dTs = icemodel.numerics.complex_step_derivative(residual_fn, T_sfc);
 end
