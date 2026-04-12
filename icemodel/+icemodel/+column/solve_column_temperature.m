@@ -1,9 +1,16 @@
-function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(T, f_ice, f_liq, dz, ...
-      delz, fn, dt, JJ, Ts, k_liq, cv_ice, cv_liq, ro_ice, Ls, tol, ...
-      maxiter, alpha, debug)
+function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(T, ...
+      f_ice, f_liq, dz, delz, fn, dt, Ts, tol, maxiter, alpha, debug)
    %SOLVE_COLUMN_TEMPERATURE Solve the 1-dimensional column conduction equation.
    %
    %#codegen
+
+   persistent cv_ice cv_liq Ls
+   if isempty(cv_ice)
+      [cv_ice, cv_liq, Ls] = icemodel.physicalConstant( ...
+         'cv_ice', 'cv_liq', 'Ls');
+   end
+
+   JJ = numel(T);
 
    % Solver options
    if maxiter == 1
@@ -11,8 +18,7 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(T, f_ice,
    end
 
    % Thermal conductivity without vapor diffusion (skinmodel).
-   k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, ...
-      ro_ice, k_liq, 0);
+   k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, 0);
 
    % Vapor density derivative excluded from enthalpy budget (skinmodel).
    drovdT = 0;
@@ -21,7 +27,7 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(T, f_ice,
    % Note: same update would be required within iterations, see solve_column_enthalpy.
    % [~, drovdT] = icemodel.vapor.saturation_vapor_density(T, f_liq);
    % k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq, drovdT);
-   % k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
+   % k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, k_vap);
 
    % Initial past Picard iterates for Aitken-acceleration
    % T_1 = nan(size(T));
@@ -84,9 +90,10 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(T, f_ice,
       % end
 
       % Update thermal conductivity (T-k_eff consistency on final iteration).
-      % To reinstate: k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, ro_ice, k_liq, k_vap);
-      k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, ...
-         ro_ice, k_liq, 0);
+      k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, 0);
+
+      % To reinstate k_vap:
+      % k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, k_vap);
    end
 
    if ~ok && debug

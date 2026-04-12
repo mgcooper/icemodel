@@ -9,10 +9,9 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
    debug = false;
 
    % LOAD PHYSICAL CONSTANTS AND PARAMETERS
-   [cp_ice, cp_liq, Lf, ro_ice, ro_liq, k_ice, k_liq, Tf, roLs, roLv] ...
+   [cp_ice, ro_ice, ro_liq, k_ice, Tf, roLs, roLv] ...
       = icemodel.physicalConstant( ...
-      'cp_ice','cp_liq','Lf', 'ro_ice','ro_liq', 'k_ice', 'k_liq', ...
-      'Tf', 'roLs','roLv');
+      'cp_ice', 'ro_ice', 'ro_liq', 'k_ice', 'Tf', 'roLs', 'roLv');
 
    [fcp, f_liq_phase_switch_threshold] = icemodel.parameterLookup( ...
       'fcp', 'f_liq_phase_switch_threshold');
@@ -20,7 +19,8 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
    % GENERATE A THERMAL MESH
    dz_therm = opts.dz_thermal;
    z0_therm = opts.z0_thermal;
-   [dz, delz, z_nodes, ~, fn] = CVMESH(z0_therm, dz_therm);
+   [dz, delz, z_nodes, ~, fn] = ...
+      icemodel.column.control_volume_mesh(z0_therm, dz_therm);
 
    % NUMBER OF TIMESTEPS TO INITIALIZE OUTPUTS
    maxiter = numel(tair) / opts.numyears;
@@ -38,10 +38,7 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
    ro_wie = ro_liq / ro_ice;
 
    % LOWER AND UPPER MELT ZONE TEMPERATURE AND WATER (MASS) FRACTION
-   TL = Tf - (2.0 * Lf / (fcp ^ 2.0 * cp_ice)) ^ (1.0 / 3.0); % Eq 120
-   TH = Tf - cp_liq / (Lf * 2.0 * fcp ^ 2.0);
-   f_ell_min = 1 / (1 + (fcp * (Tf - TL)) ^ 2.0);
-   f_ell_max = 1 / (1 + (fcp * (Tf - TH)) ^ 2.0);
+   [TL, TH, f_ell_min, f_ell_max] = icemodel.column.meltzone_bounds();
 
    % INITIALIZE CORE STATE VARIABLES
    if opts.use_restart
@@ -72,12 +69,11 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
       f_liq = g_liq ./ ro_liq;
       f_ice = g_ice ./ ro_ice .* ones(JJ, 1);
       Ts = (min(tair(1), Tf) + T(1)) / 2;
-      r_eff = r_eff / 1000 * ones(JJ, 1); % convert mm->m for VAPORTRANSFER
+      r_eff = r_eff / 1000 * ones(JJ, 1); % convert mm->m for vapor_mass_transfer
    end
 
    % THERMAL CONDUCTIVITY (initialization only; f_liq ≈ 0 so k_vap ≈ 0)
-   k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, ...
-      ro_ice, k_liq);
+   k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq);
 
    % SOURCE TERM LINEARIZATION VECTORS
    Sc = zeros(JJ, 1);

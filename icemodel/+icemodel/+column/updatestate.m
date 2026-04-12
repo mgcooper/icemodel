@@ -1,57 +1,37 @@
 function [H, k_eff, dHdT, dLdT, drovdT, ro_vap, ro_sno, cp_sno] = ...
-      updatestate(T, f_ice, f_liq, f_wat, ro_ice, ro_liq, ro_air, cv_ice, ...
-      cv_liq, k_liq, roLf, Ls, Rv, Tf, fcp)
+      updatestate(T, f_ice, f_liq, f_wat)
    %UPDATESTATE Update column thermodynamic state variables.
    %
-   % Note: These are "intrinsic" volumetric heat capacities and must be
-   % multiplied by the constituent volumetric fractions to get the "bulk"
-   % volumetric heat capacities [J/m3/K]
-   % cv_ice = cp_ice * ro_ice
-   % cv_liq = cp_liq * ro_liq
+   % Note: if this is called within solver iterations, ensure f_wat = f_wat_old
    %
    %#codegen
 
-   % Note: if this is called within solver iterations, ensure f_wat = f_wat_old
-
    % Saturation vapor density and temperature derivative [kg m-3, kg m-3 K-1]
-   [ro_vap, drovdT] = icemodel.vapor.saturation_vapor_density(T, f_liq);
+   [ro_vap, drovdT] = icemodel.vapor.saturation_vapor_density( ...
+      T, f_liq);
 
    % Vapor thermal diffusion coefficient [W m-1 K-1]
-   k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq, drovdT);
+   k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient( ...
+      T, f_liq, drovdT);
 
    % Effective thermal conductivity [W m-1 K-1]
-   k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, ...
-      ro_ice, k_liq, k_vap);
+   k_eff = icemodel.column.bulk_thermal_conductivity( ...
+      T, f_ice, f_liq, k_vap);
 
-   % Total enthalpy [J m-3]
-   H = icemodel.column.total_enthalpy(T, f_ice, f_liq, cv_ice, cv_liq, roLf, ...
-      Ls * ro_vap, Tf);
+   % Total enthalpy and temperature derivative [J m-3] and [J m-3 K-1]
+   [H, dHdT, dLdT] = icemodel.column.total_enthalpy( ...
+      T, f_ice, f_liq, f_wat, ro_vap);
 
-   % Derivative of enthalpy wrt temperature
-   dHdT = cv_ice * f_ice + cv_liq * f_liq;
-
-   % Derivative of liquid water fraction wrt temperature [K-1]
-   dLdT = icemodel.column.liquid_fraction_derivative(T, ro_ice, ro_liq, ...
-      fcp, Tf, [], [], f_wat);
-
-   % Below here is a common alternative formulation, but the convention used
-   % throughout the model is to operate on f_liq/ice/air directly.
-
+   % Optional bulk density (pt) (eq 3) [kg m-3]
    if nargout > 6
-      % Bulk density (pt) (eq 3) [kg m-3]
-      ro_sno = ro_ice * f_ice + ro_liq * f_liq + ro_air * (1.0 - f_liq - f_ice);
-
-      % Bulk mass-specific heat capacity (ct) (eq 55) [J kg-1 K-1]
-      cp_sno = (cv_ice * f_ice + cv_liq * f_liq) ./ ro_sno;
+      ro_sno = icemodel.column.bulk_density( ...
+         f_ice, f_liq);
    end
 
-   % Energy coefficient [W m-2 K-1]
-   % aP0 = (ro_sno .* cp_sno + Lf * ro_liq * dFdT ...
-   %    + Ls * (1.0 - f_ice - f_liq) .* drovdT) .* dz / dt;
-
-   % Update the general equation coefficients
-   % [aN, aP, aS, b, iM, a1, a2] = assemble_enthalpy_system(T, ro_sno, cp_sno, f_liq, f_ice, Ls, ...
-   %    Lf, ro_liq, dz, dt, dFdT, drovdT, TL, H, H_old, Sc, k_eff, fn, ...
-   %    delz, Ts, JJ, Fc, Fp, solver);
+   % Optional bulk mass-specific heat capacity (ct) (eq 55) [J kg-1 K-1]
+   if nargout > 7
+      cp_sno = icemodel.column.bulk_specific_heat_capacity( ...
+         f_ice, f_liq, ro_sno);
+   end
 
 end

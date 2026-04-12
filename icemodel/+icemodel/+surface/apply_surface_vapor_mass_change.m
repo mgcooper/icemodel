@@ -1,6 +1,6 @@
-function [f_ice, f_liq, d_con, xd_sbl] = ICESUBL(f_ice, f_liq, d_con, ...
-      ro_ice, ro_liq, Ls, Lv, d_pevp, wetflag, f_ice_min, f_liq_resid)
-   %ICESUBL Apply potential vapor-driven fraction change at the top layer
+function [f_ice, f_liq, d_con, xd_sbl] = apply_surface_vapor_mass_change( ...
+      f_ice, f_liq, d_con, d_pevp, wetflag, f_ice_min, f_liq_resid)
+   %APPLY_SURFACE_VAPOR_MASS_CHANGE Apply the surface vapor-mass increment.
    %
    % f_ice = fraction of ice by volume in each control volume
    % f_liq = fraction of liquid water by volume in each control volume
@@ -8,8 +8,16 @@ function [f_ice, f_liq, d_con, xd_sbl] = ICESUBL(f_ice, f_liq, d_con, ...
    % d_pevp = potential vapor-driven change in top-layer liquid fraction
    % xd_sbl = vapor-driven ice change which exceeds control-volume limits
    % wetflag = liquid-film flag used for mass partitioning
+   % f_ice_min = minimum retained surface ice fraction before remeshing
+   % f_liq_resid = residual liquid-water fraction per pore volume
    %
    %#codegen
+
+   persistent ro_ice ro_liq Ls Lv
+   if isempty(ro_ice)
+      [ro_ice, ro_liq, Ls, Lv] = icemodel.physicalConstant( ...
+         'ro_ice', 'ro_liq', 'Ls', 'Lv');
+   end
 
    % Compute top-layer liquid water and ice fraction
    f_liq_top = f_liq(1);
@@ -141,7 +149,8 @@ function [f_ice, xd_sbl] = SUBL(d_pevp, f_ice, f_liq, f_ice_min, ro_ice, ...
    if f_ice_top < f_ice_min
 
       if abs(d_psbl) < f_ice_top
-         % some ice sublimates, and the top layer will be combined in ICEMF
+         % some ice sublimates, and the top layer will be combined by the
+         % follow-on merge_thin_layers step
          f_ice(1) = f_ice(1) - abs(d_psbl);
 
       elseif abs(d_psbl) >= f_ice_top

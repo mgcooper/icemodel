@@ -43,18 +43,18 @@ function varargout = postprocess(ice1, ice2, opts, varargin)
    end
 
    % Load physical constants
-   [Tf, ro_liq, Ls, Lf] = icemodel.physicalConstant('Tf', 'ro_liq', 'Ls', 'Lf');
+   Tf = icemodel.physicalConstant('Tf');
 
    % Calculate runoff
    if strcmp('skinmodel', opts.smbmodel)
-      ice1 = SRFRUNOFF(ice1, ro_liq, Ls, Lf, opts.dt);
+      ice1 = icemodel.surface.diagnose_surface_runoff(ice1, opts.dt);
    elseif strcmp('icemodel', opts.smbmodel)
-      ice1 = ICERUNOFF(ice1, ice2, opts);
+      ice1 = icemodel.column.diagnose_column_runoff(ice1, ice2, opts);
    end
 
    % Compute a full state and energy balance
    if ~strcmp(opts.output_profile, 'minimal')
-      [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo);
+      [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo, Tf);
    end
 
    % Convert surface and subsurface ice temperature from Kelvin to Celsius.
@@ -140,8 +140,6 @@ function [ice1, ice2] = subsetOutput(ice1, ice2, ii)
       end
    end
 end
-
-%%
 
 %%
 function ice2 = retimeIce2(ice2, Time)
@@ -247,18 +245,12 @@ function [ice1, ice2] = roundData(ice1, ice2)
 end
 
 %%
-function [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo)
+function [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo, Tf)
 
    % Compute bulk density, heat capacity, thermal conductivity, and a full
    % surface and subsurface energy balance. Don't do this for large simulations
    % if time or disk space is limited, instead compute them after the
    % simulation.
-
-   % Load physical constants and parameters
-   [Tf,cv_ice,cv_liq,ro_ice,ro_liq,ro_air,k_liq] = ...
-      icemodel.physicalConstant('Tf','cv_ice','cv_liq','ro_ice', ...
-      'ro_liq','ro_air','k_liq');
-   [emissSB, emiss] = icemodel.parameterLookup('emissSB', 'emiss');
 
    % Compute bulk density (kg/m3), heat capacity (J/kg/K), thermal K (W/m/K)
    T_ice = ice2.Tice;
@@ -266,10 +258,11 @@ function [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo)
    f_ice = ice2.f_ice;
 
    % Phase-aware effective conductivity for diagnostics
-   [k_eff, k_vap] = icemodel.column.bulk_thermal_conductivity(T_ice, f_ice, f_liq, ...
-      ro_ice, k_liq);
-   ro_sno = ro_ice * f_ice + ro_liq * f_liq + ro_air * (1.0 - f_liq - f_ice);
-   cp_sno = (cv_ice * f_ice + cv_liq * f_liq) ./ ro_sno;
+   [k_eff, k_vap] = icemodel.column.bulk_thermal_conductivity(...
+      T_ice, f_ice, f_liq);
+   ro_sno = icemodel.column.bulk_density(f_ice, f_liq);
+   cp_sno = icemodel.column.bulk_specific_heat_capacity( ...
+      f_ice, f_liq, ro_sno);
 
    % Compute a mesh for plotting
    Z = opts.z0_thermal;
@@ -283,11 +276,13 @@ function [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo)
    ice2.ro_sno = ro_sno;                 % ice density
 
    % Compute the radiative heat fluxes
+   lwu = icemodel.surface.outgoing_longwave_radiation(min(ice1.Tsfc, Tf), Qli);
+
    ice1.albedo = albedo;                        % albedo
    ice1.swd    = swd;                           % shortwave down
    ice1.swu    = swd.*albedo;                   % shortwave up
-   ice1.lwd    = emiss.*lwd;                    % longwave down
-   ice1.lwu    = emissSB.*min(ice1.Tsfc,Tf).^4; % longwave up
+   ice1.lwd    = lwd;                           % longwave down
+   ice1.lwu    = lwu;                           % longwave up
    ice1.swn    = (1-albedo).*swd;               % net shortwave
    ice1.lwn    = ice1.lwd-ice1.lwu;             % net longwave
    ice1.netr   = ice1.swn+ice1.lwn;             % net radiation

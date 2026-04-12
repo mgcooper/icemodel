@@ -1,18 +1,24 @@
-function [T_ice, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
-      solve_column_enthalpy(T_sfc, T_ice, f_ice, f_liq, Fc, Fp, Sc, ~, dz, ...
-      delz, fn, dt, JJ, k_liq, cv_ice, cv_liq, ro_ice, ro_liq, Ls, Lf, roLf, ...
-      Tf, fcp, TL, TH, f_ell_min, f_ell_max, solver, tol, maxiter, ~, ~, ~, ...
-      debug)
+function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = solve_column_enthalpy( ...
+      T_sfc, T, f_ice, f_liq, Fc, Fp, Sc, Sp, dz, delz, fn, dt, solver, ...
+      tol, maxiter, ~, ~, ~, debug)
    %SOLVE_COLUMN_ENTHALPY Solve the column enthalpy balance.
    %
-   % The Sp, use_aitken, and jumpmax inputs are kept in the public contract
-   % so the older thermal-solver option surface remains stable while node-wise
-   % Aitken acceleration stays disabled here.
+   % The alpha, use_aitken, and jumpmax inputs are kept in the function
+   % signature so the older thermal-solver option surface remains stable while
+   % node-wise Aitken acceleration stays disabled here.
    %
    %#codegen
 
+   persistent ro_ice ro_liq
+   if isempty(ro_ice)
+      [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
+   end
+
    % Update the water fraction
-   f_wat = f_liq + f_ice * ro_ice / ro_liq;
+   f_wat = icemodel.water_fraction(f_ice, f_liq);
+
+   % Canonical melt-zone bounds and liquid-fraction limits.
+   [TL, TH, f_ell_min, f_ell_max] = icemodel.column.meltzone_bounds();
 
    % Update the melt-zone boundaries. These are the volumetric liquid
    % fractions at T=TL and T=TH, given the current total water fraction.
@@ -20,15 +26,13 @@ function [T_ice, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
    f_liq_max = f_wat .* f_ell_max;
 
    % Compute vapor density [kg m-3]
-   ro_vap = icemodel.vapor.saturation_vapor_density(T_ice, f_liq);
+   ro_vap = icemodel.vapor.saturation_vapor_density(T, f_liq);
 
    % Compute enthalpy [J m-3]
-   H_old = icemodel.column.total_enthalpy(T_ice, f_ice, f_liq, cv_ice, ...
-      cv_liq, ...
-      roLf, Ls * ro_vap, Tf);
+   H_old = icemodel.column.total_enthalpy(T, f_ice, f_liq, f_wat, ro_vap);
 
    % Store past values
-   T_ice_old = T_ice;
+   T_ice_old = T;
    f_liq_old = f_liq;
 
    % Initialize current values
@@ -44,63 +48,57 @@ function [T_ice, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
 
       % Update vapor density and derivative [kg m-3, kg m-3 K-1]
       [ro_vap, dro_vapdT] = icemodel.vapor.saturation_vapor_density( ...
-         T_ice, f_liq);
+         T, f_liq);
 
       % Update vapor thermal diffusion coefficient [W m-1 K-1]
       k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient( ...
-         T_ice, f_liq, dro_vapdT);
+         T, f_liq, dro_vapdT);
 
       % Update bulk (effective) thermal conductivity
-      k_eff = icemodel.column.bulk_thermal_conductivity(T_ice, f_ice, ...
-         f_liq, ro_ice, ...
-         k_liq, k_vap);
+      k_eff = icemodel.column.bulk_thermal_conductivity( ...
+         T, f_ice, f_liq, k_vap);
 
-      % Update total enthalpy
-      H = icemodel.column.total_enthalpy(T_ice, f_ice, f_liq, cv_ice, ...
-         cv_liq, ...
-         roLf, Ls * ro_vap, Tf);
-
-      % Update the derivative of enthalpy wrt temperature
-      dHdT = cv_ice * f_ice + cv_liq * f_liq;
-      dLdT = icemodel.column.liquid_fraction_derivative(T_ice, ro_ice, ...
-         ro_liq, fcp, Tf, [], [], f_wat);
+      % Update total enthalpy and derivative wrt temperature
+      [H, dHdT, dLdT] = icemodel.column.total_enthalpy( ...
+         T, f_ice, f_liq, f_wat, ro_vap);
 
       % Update the general equation coefficients
       [aN, aP, aS, b, iM, a1, a2] = icemodel.column.assemble_enthalpy_system( ...
-         T_ice, f_ice, f_liq, dHdT, dLdT, dro_vapdT, H - H_old, Sc, k_eff, ...
-         delz, fn, dz, dt, T_sfc, Ls, Lf, ro_liq, TL, JJ, Fc, Fp, solver);
+         T, f_ice, f_liq, dHdT, dLdT, dro_vapdT, H - H_old, Sc, Sp, ...
+         k_eff, delz, fn, dz, dt, TL, TH, T_sfc, Fc, Fp, solver);
 
       % % Check diagonal dominance and condition number
       % icemodel.checkdiags(aP, aN, aS)
 
       % Exit here so the state variables are updated on the final iteration
-      if all(abs(T_ice - T_iter) < tol)
+      if all(abs(T - T_iter) < tol)
          break
       end
 
       % Capture past values
-      T_iter = T_ice;
+      T_iter = T;
 
       % Solve the equation (predictor step)
-      T_ice = icemodel.numerics.trisolve(-aN, aP, -aS, b);
+      T = icemodel.numerics.trisolve(-aN, aP, -aS, b);
 
       % Update the temperature-enthalpy relationship (corrector step)
-      [T_ice, f_ice, f_liq, ok] = icemodel.column.meltzone_transform( ...
-         T_ice, T_iter, f_liq, f_wat, dLdT, ro_ice, ro_liq, Tf, TL, TH, ...
-         fcp, f_liq_min, f_liq_max, iM, ok, debug);
+      [T, f_ice, f_liq, ok] = icemodel.column.meltzone_transform( ...
+         T, T_iter, f_liq, f_wat, dLdT, TL, TH, f_liq_min, f_liq_max, ...
+         iM, ok, debug);
 
       % If failure, return to the main program and shorten the timestep
       if ~ok
          if debug
-            dumpIceEnbalFailure("mztransform_rejected_state", T_ice, T_ice_old, ...
-               T_iter, f_ice, f_liq, f_wat, k_eff, Sc, dt, T_sfc, iM, iter, ...
-               maxiter, aN, aP, aS, b);
+            dumpIceEnbalFailure("mztransform_rejected_state", T, ...
+               T_ice_old, T_iter, f_ice, f_liq, f_wat, k_eff, Sc, dt, ...
+               T_sfc, iM, iter, maxiter, aN, aP, aS, b);
          end
          return
       end
 
       % Mass conservation check
-      assertF(@() all(f_ice + f_liq * ro_liq / ro_ice <= 1 + eps))
+      assertF(@() all(icemodel.water_fraction(f_ice, f_liq) <= ...
+         ro_ice / ro_liq + eps))
 
       % Relaxation and Aitken (not implemented). Proper implementation requires
       % a liquid_fraction_function/meltzone_transform-consistent update of
@@ -121,22 +119,18 @@ function [T_ice, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
    ok = iter < maxiter;
 
    if ~ok && debug
-      dumpIceEnbalFailure("maxiter_nonconvergence", T_ice, T_ice_old, T_iter, ...
-         f_ice, f_liq, f_wat, k_eff, Sc, dt, T_sfc, iM, iter, maxiter, ...
-         aN, aP, aS, b);
+      dumpIceEnbalFailure("maxiter_nonconvergence", T, T_ice_old, ...
+         T_iter, f_ice, f_liq, f_wat, k_eff, Sc, dt, T_sfc, iM, iter, ...
+         maxiter, aN, aP, aS, b);
    end
 
-   % Surface energy balance linearization error [K]
-   % err0 = -(Fc + Fp * Ts) / a1 - (T(1) - Ts);
+   % Surface energy balance linearization error [K].
+   surface_err = icemodel.column.surface_linearization_error( ...
+      T_sfc, T(1), Fc, Fp, a1); %#ok<NASGU>
 
-   % Subsurface energy balance linearization error [K]
-   err = (dt/dz(1) ...
-      * (a2 * (T_ice(2) - T_ice(1)) ...
-      + Fc + Fp * (Fc + a1 * T_ice(1)) / (a1 - Fp) ...
-      + Sc(1) * dz(1)) ...
-      - ro_liq * Lf * (f_liq(1) - f_liq_old(1)) ) ...
-      / (dHdT(1) + Ls * dro_vapdT(1) * (1 - f_ice(1) - f_liq(1)))...
-      - (T_ice(1) - T_ice_old(1));
+   % Subsurface energy balance linearization error [K].
+   err = icemodel.column.subsurface_linearization_error(T, T_ice_old, ...
+      f_ice, f_liq, f_liq_old, dro_vapdT, dHdT, Sc, dz, dt, a2, Fc, Fp, a1);
 end
 
 function dumpIceEnbalFailure(reason, T, T_old, T_iter, f_ice, f_liq, ...

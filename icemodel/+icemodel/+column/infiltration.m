@@ -1,6 +1,6 @@
-function [f_liq, f_ice, T, ok] = INFILTRATION(f_liq, f_ice, T, ro_ice, ...
+function [f_liq, f_ice, T, ok] = infiltration(f_liq, f_ice, T, ro_ice, ...
       ro_liq, Tf, TL, fcp, dz, dt)
-   %INFILTRATION
+   %INFILTRATION Redistribute liquid water between adjacent column layers.
    %
    %#codegen
 
@@ -13,7 +13,7 @@ function [f_liq, f_ice, T, ok] = INFILTRATION(f_liq, f_ice, T, ro_ice, ...
    end
 
    % Calculate fluxes between layers [m/s]
-   q = LIQFLUX(f_liq(1:end-1), f_ice(1:end-1));
+   q = icemodel.column.liquid_flux(f_liq(1:end-1), f_ice(1:end-1));
 
    % If this is inside a sub iteration, scale non-zero surface flux by dt_new
    % bc_N = q_sfc / substep;
@@ -73,7 +73,7 @@ function [f_liq, f_ice, T, ok] = INFILTRATION(f_liq, f_ice, T, ro_ice, ...
       xT = T; xf_liq = f_liq; xf_ice = f_ice;
 
       % Update the water fraction and temperature
-      f_wat = f_liq + f_ice * ro_ice / ro_liq;
+      f_wat = icemodel.water_fraction(f_ice, f_liq);
       T = Tf - sqrt((f_wat ./ f_liq - 1.0)) ./ fcp;
 
       % f_liq = f_wat ./ (1.0 + (fcp * (Tf - min(T, Tf))) .^ 2.0); % f_liq_new

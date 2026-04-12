@@ -1,5 +1,5 @@
-function [h_ice, h_liq, h_air, x_ice, x_liq] = VOLBAL(h_ice, h_liq, h_res, h_tot)
-   %VOLBAL
+function [h_ice, h_liq, h_air, x_ice, x_liq] = enforce_control_volume_balance(h_ice, h_liq, h_res, h_tot)
+   %ENFORCE_CONTROL_VOLUME_BALANCE Enforce the total-volume constraint.
    %#codegen
    % Note: this is not used in the model, it was designed for the
    % thickness-based formulation. It might work as-is for the

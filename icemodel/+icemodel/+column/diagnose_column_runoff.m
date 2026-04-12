@@ -1,5 +1,5 @@
-function ice1 = ICERUNOFF(ice1,ice2,opts)
-   %ICERUNOFF compute runoff from the ice column
+function ice1 = diagnose_column_runoff(ice1, ice2, opts)
+   %DIAGNOSE_COLUMN_RUNOFF Diagnose cumulative runoff from column mass changes.
    %
    %#codegen
 

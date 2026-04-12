@@ -1,7 +1,8 @@
-function [dz, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz, g)
-   %CVMESH Compute cell edges and nodes for control volume mesh
+function [dz, delz, z_node, z_edge, f, z_node_bc] = control_volume_mesh(Z, dz, g)
+   %CONTROL_VOLUME_MESH Compute cell edges and nodes for the column mesh.
    %
-   % [dz, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz) Returns CV
+   % [dz, delz, z_node, z_edge, f, z_node_bc] = control_volume_mesh(Z, dz)
+   % Returns CV
    % thickness (dz), node-to-node distance (delz), node positions (z_node),
    % and edge positions (z_edge) for a domain with upper boundary coordinate
    % z=0, lower boundary coordinate z=Z, and constant CV thickness dz. An
@@ -9,7 +10,8 @@ function [dz, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz, g)
    % the harmonic mean. Control volume nodes are placed midway between faces,
    % following Patankar's "Practice B".
    %
-   % [dz, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz, g) Uses growth
+   % [dz, delz, z_node, z_edge, f, z_node_bc] = control_volume_mesh(Z, dz, g)
+   % Uses growth
    % factor 'g' to construct a mesh with exponentially increasing thickness. If
    % g is not provided, a uniform thickness mesh is returned.
    %
@@ -90,7 +92,8 @@ function [dz, delz, z_node, z_edge, f, z_node_bc] = CVMESH(Z, dz, g)
 
    % Legacy CVSPECTRAL reference
    % This was the earlier fixed-dz spectral mesh builder before the spectral
-   % model was consolidated onto CVMESH. Keep the construction here as a note
+   % model was consolidated onto control_volume_mesh. Keep the construction
+   % here as a note
    % because it documents the old staggered spectral layout explicitly.
    %
    % N = Z / dz;                      % number of nodes [#]
@@ -119,7 +122,7 @@ function z_edge = EXPMESH(Z, dz, g)
    %   (Outputs are the same as in the main function but adapted to the
    %    exponential mesh.)
    %
-   % See also: CVMESH
+   % See also: control_volume_mesh
 
    % The "insert a bottom layer with dz thickness" idea was to simplify
    % remeshing to enable an exponential thermal grid, but the easier approach

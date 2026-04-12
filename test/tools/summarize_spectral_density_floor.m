@@ -50,8 +50,9 @@ function report = summarize_spectral_density_floor(kwargs)
    % Rebuild the spectral grid once so each timestep reuses the same geometry.
    [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
    [~, dz_spect, z_nodes_spect, ~, tau_N, tau_S, solar_dwavel] ...
-      = icemodel.radiation.initialize_spectral_model(opts, ro_ice);
-   [~, ~, z_nodes_therm, ~] = CVMESH(opts.z0_thermal, opts.dz_thermal);
+      = icemodel.radiation.initialize_spectral_model(opts);
+   [~, ~, z_nodes_therm, ~] = ...
+      icemodel.column.control_volume_mesh(opts.z0_thermal, opts.dz_thermal);
 
    % Scan all retained timesteps so the report quantifies both how often the
    % floor triggers and how large the induced bulk-coefficient perturbation is.

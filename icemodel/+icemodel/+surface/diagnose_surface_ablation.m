@@ -1,17 +1,23 @@
-function [surf_mlt, surf_frz, surf_sub, surf_con, surf_rof] = ICEABLATION( ...
-      Qm,Qe,Qf,surf_mlt,surf_frz,surf_rof,surf_sub,surf_con,ro_liq,Lf,Ls,dt, ...
-      opts,dz,ro_ice,f_ice,f_liq)
-   %ICEABLATION Calculate surface melt/freeze, sublimation, and ablation rate
+function [surf_mlt, surf_frz, surf_sub, surf_con, surf_rof] = diagnose_surface_ablation( ...
+      Qm, Qe, Qf, surf_mlt, surf_frz, surf_rof, surf_sub, surf_con, dt, opts)
+   %DIAGNOSE_SURFACE_ABLATION Diagnose cumulative surface ablation terms.
    %
    % note:
    % isubl = -Qe/(Ls*row)*dt [m w.e.]
    % hsubl = isubl*row/roi   [m i.e.]
    % fsubl = hsubl/ht = isubl*row/roi/ht; (see f_ice update in code above)
+   % Inputs are cumulative state variables plus the current timestep fluxes.
+   % Physical constants are owned internally so callers only pass dt and opts.
    %
    % See also:
    %
    %#ok<*INUSD>
    %#codegen
+
+   persistent ro_liq Lf Ls
+   if isempty(ro_liq)
+      [ro_liq, Lf, Ls] = icemodel.physicalConstant('ro_liq', 'Lf', 'Ls');
+   end
 
    % add these back to replicate the original behavior if needed
    % f_ice, f_liq, imelt, isubl
@@ -34,7 +40,7 @@ function [surf_mlt, surf_frz, surf_sub, surf_con, surf_rof] = ICEABLATION( ...
       isubl = - Qe / (Ls * ro_liq) * dt; % [m w.e.]
       surf_sub = surf_sub + isubl;
 
-      % NOTE: this happens in ICEMF instead
+      % NOTE: this happens in budget_surface_mass_balance instead
       %
       % reduce the ice surface by sublimation and melt in the top layer
       %    f_ice(1) = f_ice(1) - isubl*ro_liq/ro_ice/dz(1);

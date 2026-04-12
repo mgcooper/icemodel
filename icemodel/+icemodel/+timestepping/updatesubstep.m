@@ -1,14 +1,15 @@
 function [Ts, T, f_ice, f_liq, dt_sum, dt_new, liqflag, roL, ro_sno, cp_sno] ...
-      = updatesubstep(Ts, T, f_ice, f_liq, dt_FULL_STEP, dt_sum, dt_new, TINY, ...
-      ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs)
+      = updatesubstep(Ts, T, f_ice, f_liq, dt_FULL_STEP, dt_sum, dt_new, ...
+      TINY)
    % Checkpoint the accepted state and allocate time within the full step.
    %
    %#codegen
 
-   persistent f_liq_phase_switch_threshold
+   persistent f_liq_phase_switch_threshold roLv roLs
    if isempty(f_liq_phase_switch_threshold)
       f_liq_phase_switch_threshold = icemodel.parameterLookup( ...
          'f_liq_phase_switch_threshold');
+      [roLv, roLs] = icemodel.physicalConstant('roLv', 'roLs');
    end
 
    % Allocate this substep to the timestep
@@ -37,8 +38,9 @@ function [Ts, T, f_ice, f_liq, dt_sum, dt_new, liqflag, roL, ro_sno, cp_sno] ...
    if nargout > 7
 
       % UPDATE DENSITY, HEAT CAPACITY, DIFFUSION LENGTH SCALE
-      ro_sno = f_ice * ro_ice + f_liq * ro_liq + (1.0 - f_liq - f_ice) * ro_air;
-      cp_sno = (cv_ice * f_ice + cv_liq * f_liq) ./ ro_sno;
+      ro_sno = icemodel.column.bulk_density(f_ice, f_liq);
+      cp_sno = icemodel.column.bulk_specific_heat_capacity( ...
+         f_ice, f_liq, ro_sno);
 
       % zD = sqrt(k_eff(1) * dt / (ro_sno(1) * cp_sno(1)));
       % if zD > dz(1)

@@ -1,6 +1,6 @@
-function [h_resid, h_avail, h_drain, h_ice, h_liq, h_air] = LIQAVAIL( ...
+function [h_resid, h_avail, h_drain, h_ice, h_liq, h_air] = available_liquid_water( ...
       h_ice, h_liq, h_air, T_old, Tf, theta_resid, h_drain, liqflag, h_total)
-   %LIQAVAIL Compute available liquid water.
+   %AVAILABLE_LIQUID_WATER Compute available liquid water in one control volume.
    %
    % Note: This function is not used in the model. If used, it should be called
    % with scalar values, nominally in a loop or for the top layer, but it might

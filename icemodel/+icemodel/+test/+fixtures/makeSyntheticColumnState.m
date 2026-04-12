@@ -41,9 +41,8 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    % Seed the thermal grain-radius state only for icemodel.
    r_eff = 0;
    if strcmp(smbmodel, 'icemodel')
-      ro_ice0 = icemodel.physicalConstant('ro_ice');
       [~, ~, ~, ~, ~, ~, ~, ~, r_eff] = ...
-         icemodel.radiation.initialize_spectral_model(opts, ro_ice0);
+         icemodel.radiation.initialize_spectral_model(opts);
    end
 
    % Initialize the column state exactly as the model kernel would.
@@ -94,7 +93,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    state.f_ice = f_ice;
    state.f_liq = f_liq;
    state.r_eff = r_eff;
-   state.f_wat = f_liq + f_ice * ro_ice / ro_liq;
+   state.f_wat = icemodel.water_fraction(f_ice, f_liq);
    state.k_eff = k_eff;
    state.fn = fn;
    state.dz = dz;
@@ -169,7 +168,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    if kwargs.include_spectral
       [I0, dz_spect, z_nodes_spect, z_edges_spect, tau_N, tau_S, ...
          solar_dwavel, ~, ~, qext, g, coalbedo, kabs, kice, wavel, radii] ...
-         = icemodel.radiation.initialize_spectral_model(opts, ro_ice);
+         = icemodel.radiation.initialize_spectral_model(opts);
 
       % Recover k_ext for tests that need the initialized coefficients.
       [~, ~, ~, k_ext] = icemodel.radiation.update_extinction_coefficients( ...

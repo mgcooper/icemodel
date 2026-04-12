@@ -1,7 +1,6 @@
-function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = COMBINEHEAT( ...
-      T, f_ice, f_liq, Sc, Sp, Tf, TL, cv_ice, cv_liq, Lf, ro_ice, ro_liq, ...
-      fcp, j1, j2, d_liq, dz)
-   %COMBINEHEAT Combine layers conserving mass, enthalpy, and absorbed radiation
+function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = merge_layers( ...
+      T, f_ice, f_liq, Sc, Sp, j1, j2, d_liq, dz)
+   %MERGE_LAYERS Combine two control volumes conserving state and sources.
    %
    % Combine two control volumes by equating the enthalpy of the two control
    % volumes to the enthalpy of their combined mass and solving for the
@@ -9,7 +8,6 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = COMBINEHEAT( ...
    %
    % Inputs
    %  T - control volume temperature.
-   %  Tf - freezing point temperature.
    %  j1 - the layer that is removed
    %  j2 - the combined layer (with conserved values from j1 and j2)
    %  f_liq - liquid fraction, volume of liquid water per cv volume
@@ -32,7 +30,7 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = COMBINEHEAT( ...
    % and the water fraction, f_wat, is the volume of melted ice + liquid water
    % per cv volume:
    %
-   % f_wat = f_liq + f_ice * ro_ice / ro_liq
+   % f_wat = icemodel.water_fraction(f_ice, f_liq)
    %
    % fcp is the "freezing curve parameter" that controls the slope of the
    % f_liq = f(T) relationship in the mushy zone.
@@ -53,6 +51,15 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = COMBINEHEAT( ...
    % Subscript _12 is used for the arithmetic sum of the separate layer quantities
    %
    %#codegen
+
+   persistent Tf TL cv_ice cv_liq Lf ro_ice ro_liq fcp
+   if isempty(Tf)
+      [Tf, cv_ice, cv_liq, Lf, ro_ice, ro_liq] = ...
+         icemodel.physicalConstant( ...
+         'Tf', 'cv_ice', 'cv_liq', 'Lf', 'ro_ice', 'ro_liq');
+      fcp = icemodel.parameterLookup('fcp');
+      [TL, ~] = icemodel.column.meltzone_bounds();
+   end
 
    % Combine absorbed solar radiation [W m-3]
    Sc_C = Sc(j1) + Sc(j2);

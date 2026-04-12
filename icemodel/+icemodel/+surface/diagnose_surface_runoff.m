@@ -1,7 +1,18 @@
-function ice1 = SRFRUNOFF(ice1,ro_liq,Ls,Lf,dt)
-   %SRFRUNOFF compute surface runoff
+function ice1 = diagnose_surface_runoff(ice1, dt)
+   %DIAGNOSE_SURFACE_RUNOFF Diagnose cumulative runoff from surface fluxes.
+   %
+   %  ice1 = diagnose_surface_runoff(ice1, dt)
+   %
+   %  Converts the saved incremental surface latent and melt/freezing fluxes
+   %  into cumulative melt, freeze, sublimation, condensation, and runoff
+   %  series for postprocessed output.
    %
    %#codegen
+
+   persistent ro_liq Ls Lf
+   if isempty(ro_liq)
+      [ro_liq, Ls, Lf] = icemodel.physicalConstant('ro_liq', 'Ls', 'Lf');
+   end
 
    % init arrays
    mlt = zeros(size(ice1.Qe));
@@ -32,8 +43,9 @@ end
 %{
 function rof = SURFRUNOFF(ice1,opts)
 
-   % 14 Oct 2023, This is an old version SURFRUNOFF (not SRFRUNOFF) when
-   melt/freeze/cond were computed in (I think) ICEABLATION and added to ice1 on
+   % 14 Oct 2023, This is an old version SURFRUNOFF when
+   melt/freeze/cond were computed in diagnose_surface_ablation and added to
+   ice1 on
    each timestep. This could be revived to experiment with a simple
    surface-based parameterization of refreezing.
    mlt = ice1.melt;

@@ -1,14 +1,14 @@
 function [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, k_bulk_lookup, ...
-      r_eff, qext, g, coalbedo, kabs, kice, wavel, radii] = initialize_spectral_model( ...
-      opts, ro_ice)
+      r_eff, qext, g, coalbedo, kabs, kice, wavel, radii] = ...
+      initialize_spectral_model(opts)
    %initialize_spectral_model Initialize the spectral geometry and optical coefficients.
    %
    %  [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, ...
-   %     k_bulk_lookup, r_eff] = icemodel.radiation.initialize_spectral_model(opts, ro_ice)
+   %     k_bulk_lookup, r_eff] = icemodel.radiation.initialize_spectral_model(opts)
    %
    %  [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, ...
    %     k_bulk_lookup, r_eff, qext, g, coalbedo, kabs, kice, wavel, ...
-   %     radii] = icemodel.radiation.initialize_spectral_model(opts, ro_ice)
+   %     radii] = icemodel.radiation.initialize_spectral_model(opts)
    %
    % z_nodes are the centers of the spectral control volumes. z_edges includes
    % the top surface of the top grid cell and the bottom surface of the bottom
@@ -23,8 +23,16 @@ function [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, k_bulk_lookup, .
    %
    %#codegen
 
+   persistent ro_ice
+   if isempty(ro_ice)
+      ro_ice = icemodel.physicalConstant('ro_ice');
+   end
+
+   % Cache the intrinsic ice density needed by the optical-depth transform.
+
    % Build the spectral mesh.
-   [dz, ~, z_nodes, z_edges] = CVMESH(opts.z0_spectral, opts.dz_spectral);
+   [dz, ~, z_nodes, z_edges] = ...
+      icemodel.column.control_volume_mesh(opts.z0_spectral, opts.dz_spectral);
 
    % Load the single-scattering property tables and the fixed wavelength grid.
    [qext, g, coalbedo, wavel, dwavel, radii] = ...
@@ -58,7 +66,8 @@ function [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, k_bulk_lookup, .
    % Return the initial optical grain radius [mm] from the lookup table.
    % Note: this is the optically equivalent radius from the Mie tables. It's
    % currently used to initialize the thermal grain radius tracked by
-   % VAPORTRANSFER but these concepts are not identical; coupling them is future
+   % icemodel.column.vapor_mass_transfer, but these concepts are not
+   % identical; coupling them is future
    % work (see icemodel.radiation.update_extinction_coefficients).
    r_eff = radii(opts.i_grainradius);
 end

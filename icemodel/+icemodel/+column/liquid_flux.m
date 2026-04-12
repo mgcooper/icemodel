@@ -1,5 +1,5 @@
-function [q, dq_dtheta] = LIQFLUX(f_liq, f_ice, liqresid, grainsz)
-   %LIQFLUX Compute the liquid water flux between snowpack layers.
+function [q, dq_dtheta] = liquid_flux(f_liq, f_ice, liqresid, grainsz)
+   %LIQUID_FLUX Compute the liquid water flux between snowpack layers.
    %
    % Parameters:
    % -----------

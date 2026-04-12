@@ -228,13 +228,12 @@ function test_updateState_matches_component_kernels(testCase)
    % icemodel.column.updatestate should stay consistent with the lower-level
    % thermo helpers it wraps into one state-update call.
 
-   [ro_ice, ro_liq, cv_ice, cv_liq] = icemodel.physicalConstant( ...
-      'ro_ice', 'ro_liq', 'cv_ice', 'cv_liq');
+   [cv_ice, cv_liq] = icemodel.physicalConstant('cv_ice', 'cv_liq');
 
    T = [266; 267; 268];
    f_ice = [0.90; 0.88; 0.85];
    f_liq = [0.01; 0.02; 0.03];
-   f_wat = f_liq + f_ice * ro_ice / ro_liq;
+   f_wat = icemodel.water_fraction(f_ice, f_liq);
 
    [H, k_eff, dHdT, dLdT, drovdT, ro_vap] = icemodel.column.updatestate( ...
       T, f_ice, f_liq, f_wat);

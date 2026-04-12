@@ -284,7 +284,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    end
    opts.z_relh = opts.z_tair; % humidity observation height       [m]
 
-   % Lag time used by ICERUNOFF, converted from hours to timesteps.
+   % Lag time used by icemodel.column.diagnose_column_runoff, converted from
+   % hours to timesteps.
    opts.tlag = 6 * 3600 / opts.dt;
 
    % Output profile. "minimal" is the lean profile used when wrappers request

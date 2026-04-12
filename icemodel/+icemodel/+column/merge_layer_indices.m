@@ -1,5 +1,5 @@
-function [j1,j2] = LAYERINDS(ji,f_ice)
-   %LAYERINDS compute layer indices to merge
+function [j1, j2] = merge_layer_indices(ji, f_ice)
+   %MERGE_LAYER_INDICES Choose the pair of layers to merge.
    %
    %#codegen
 

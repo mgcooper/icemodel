@@ -1,15 +1,11 @@
 function [T, f_ice, f_liq, f_wat, dFdT] = liquid_fraction_function(T, ...
-      f_ice, f_liq, ...
-      ro_ice, ro_liq, fcp, Tf)
+      f_ice, f_liq, f_wat)
    %LIQUID_FRACTION_FUNCTION Project state onto the liquid-fraction function.
    %
    % Inputs:
    %  T - control volume temperature [K]
    %  f_ice - fraction of frozen water (-) (volumetric ice fraction)
    %  f_liq - fraction of unfrozen water (-) (volumetric liquid water fraction)
-   %  fcp - freezing-curve parameter ("a1" in Jordan, 1991)
-   %  Tf - freezing point temperature [K] (triple point = 273.16)
-   %
    % Mass fraction of liquid water:
    %  f_ell = 1.0 ./ (1.0 + (fcp * T_dep) .^ 2.0);
    %  f_liq = f_wat ./ (1.0 + (fcp * T_dep) .^ 2.0);
@@ -24,11 +20,20 @@ function [T, f_ice, f_liq, f_wat, dFdT] = liquid_fraction_function(T, ...
    %
    %#codegen
 
+   persistent ro_ice ro_liq fcp Tf
+   if isempty(ro_ice)
+      [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
+      fcp = icemodel.parameterLookup('fcp');
+   end
+
    % Compute volumetric fraction of liquid water eq 67, Jordan
    T_dep = Tf - min(T, Tf);
 
    % Ensure f_wat does not exceed maximum capacity by more than eps
-   f_wat = min(f_liq + f_ice * ro_ice / ro_liq, ro_ice / ro_liq); % f_wat_old
+   if nargin < 4 || isempty(f_wat)
+      f_wat = icemodel.water_fraction(f_ice, f_liq);
+   end
+   f_wat = min(f_wat, ro_ice / ro_liq); % f_wat_old
    f_liq = f_wat ./ (1.0 + (fcp * T_dep) .^ 2.0);  % f_liq_new (eq 67, Jordan)
    f_ice = (f_wat - f_liq) * ro_liq / ro_ice; % f_ice_new
 
@@ -39,8 +44,7 @@ function [T, f_ice, f_liq, f_wat, dFdT] = liquid_fraction_function(T, ...
 
    if nargout > 4
       % Differentiate the liquid-fraction function w.r.t temperature.
-      dFdT = icemodel.column.liquid_fraction_derivative(T, ro_ice, ro_liq, ...
-         fcp, Tf, [], [], f_wat);
+      dFdT = icemodel.column.liquid_fraction_derivative(T, [], [], f_wat);
    end
 end
 

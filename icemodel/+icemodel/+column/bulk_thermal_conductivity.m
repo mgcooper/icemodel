@@ -1,9 +1,8 @@
-function [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, ro_ice, ...
-      k_liq, varargin)
+function [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, varargin)
    %BULK_THERMAL_CONDUCTIVITY Compute bulk effective thermal conductivity.
    %
-   %  [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, ro_ice, k_liq)
-   %  [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, ro_ice, k_liq, k_vap)
+   %  [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq)
+   %  [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, k_vap)
    %
    %  Combines three transport mechanisms into a volume-weighted effective
    %  thermal conductivity (denoted gamma or ke in Patankar Eq. 4.9):
@@ -18,9 +17,9 @@ function [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, ro_ice, ...
    %  full Calonne (2019) Eq. 5 formulation.
    %
    %  The vapor component k_vap supports two calling conventions:
-   %     nargin=5: k_vap computed internally via
+   %     nargin=3: k_vap computed internally via
    %           icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq)
-   %     nargin=6: k_vap provided externally (including explicit 0)
+   %     nargin=4: k_vap provided externally (including explicit 0)
    %
    % See also: icemodel.column.firn_thermal_conductivity,
    %  icemodel.vapor.vapor_thermal_diffusion_coefficient,
@@ -28,21 +27,20 @@ function [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, ro_ice, ...
    %
    %#codegen
 
+   persistent k_liq
+   if isempty(k_liq)
+      k_liq = icemodel.physicalConstant('k_liq');
+   end
+
    % Compute dry snow/firn/ice thermal conductivity (Calonne 2019 Eq. 5)
-   k_ice = icemodel.column.firn_thermal_conductivity(T, f_ice, ro_ice);
+   k_ice = icemodel.column.firn_thermal_conductivity(T, f_ice);
 
    % Compute vapor thermal diffusion coefficient
-   switch nargin
-      case 5
-         k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq);
-
-      case 6
-         % k_vap provided by an external model.
-         k_vap = varargin{1};
-
-      otherwise
-         error('bulk_thermal_conductivity:UnrecognizedNumberOfInputs', ...
-            'Unrecognized number of inputs.')
+   if nargin < 4
+      k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq);
+   else
+      % k_vap provided by an external model.
+      k_vap = varargin{1};
    end
 
    % Volume-weighted bulk effective conductivity:

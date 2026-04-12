@@ -4,11 +4,13 @@ function tests = test_mesh_and_timestep_kernels
 end
 
 function test_cvmesh_uniform_and_exponential_layout(testCase)
-   % CVMESH should preserve the requested depth while changing only the
-   % spacing pattern between uniform and exponential layouts.
+   % control_volume_mesh should preserve the requested depth while changing
+   % only the spacing pattern between uniform and exponential layouts.
 
-   [dz_u, ~, ~, z_edge_u, f_u] = CVMESH(1.0, 0.25);
-   [dz_e, ~, ~, z_edge_e] = CVMESH(1.0, 0.10, 1.5);
+   [dz_u, ~, ~, z_edge_u, f_u] = ...
+      icemodel.column.control_volume_mesh(1.0, 0.25);
+   [dz_e, ~, ~, z_edge_e] = ...
+      icemodel.column.control_volume_mesh(1.0, 0.10, 1.5);
 
    testCase.verifyEqual(sum(dz_u), 1.0, 'AbsTol', 1e-12);
    testCase.verifyEqual(z_edge_u(end), 1.0, 'AbsTol', 1e-12);
@@ -29,12 +31,13 @@ function test_interp1_nearest_preserves_expected_spectral_remap(testCase)
 end
 
 function test_layerinds_selects_expected_merge_neighbors(testCase)
-   % LAYERINDS should pick the expected merge partner at the top, over a
-   % zero-thickness layer, and for a nonzero interior layer.
+   % merge_layer_indices should pick the expected merge partner at the top,
+   % over a zero-thickness layer, and for a nonzero interior layer.
 
-   [j1_top, j2_top] = LAYERINDS(1, [0.0; 0.5; 0.4]);
-   [j1_zero, j2_zero] = LAYERINDS(2, [0.4; 0.0; 0.2]);
-   [j1_nonzero, j2_nonzero] = LAYERINDS(2, [0.0; 0.3; 0.5]);
+   [j1_top, j2_top] = icemodel.column.merge_layer_indices(1, [0.0; 0.5; 0.4]);
+   [j1_zero, j2_zero] = icemodel.column.merge_layer_indices(2, [0.4; 0.0; 0.2]);
+   [j1_nonzero, j2_nonzero] = ...
+      icemodel.column.merge_layer_indices(2, [0.0; 0.3; 0.5]);
 
    testCase.verifyEqual([j1_top j2_top], [1 2]);
    testCase.verifyEqual(j1_zero, 2);
@@ -128,9 +131,7 @@ function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
    % Reset and update helpers should restore failed-substep state, then
    % advance the accepted state and diagnostics consistently.
 
-   [ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs] = ...
-      icemodel.physicalConstant('ro_ice', 'ro_liq', 'ro_air', 'cv_ice', ...
-      'cv_liq', 'roLv', 'roLs');
+   roLs = icemodel.physicalConstant('roLs');
    
    [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new] = ...
       icemodel.timestepping.resetsubstep( ...
@@ -138,8 +139,7 @@ function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
 
    [Ts_up, T_up, f_ice_up, f_liq_up, dt_sum, dt_next, liqflag, roL, ...
       ro_sno, cp_sno] = icemodel.timestepping.updatesubstep(Ts, T, f_ice, ...
-      f_liq, 900, 450, 300, 1e-12, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, ...
-      roLv, roLs);
+      f_liq, 900, 450, 300, 1e-12);
 
    testCase.verifyEqual([Ts_up; T_up], [270; 269; 268], 'AbsTol', 0);
    testCase.verifyEqual([f_ice_up; f_liq_up], [0.9; 0.9; 0.01; 0.01], ...
@@ -161,8 +161,8 @@ function test_checksubstep_forces_advance_at_maxsubstep(testCase)
 
    [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok, forced_advance] = ...
       icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
-      [0.01; 0.01], 271, [270; 269], [0.8; 0.8], [0.02; 0.02], 917, 1000, ...
-      150, 450, 900, 1, 10, 1, 2, 1, false, eps, false);
+      [0.01; 0.01], 271, [270; 269], [0.8; 0.8], [0.02; 0.02], 150, 450, ...
+      900, 1, 10, 1, 2, 1, false, eps, false);
 
    testCase.verifyTrue(ok);
    testCase.verifyEqual(Ts, 271);
@@ -182,8 +182,8 @@ function test_checksubstep_clamps_overshot_failure_count(testCase)
 
    [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok, forced_advance] = ...
       icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
-      [0.01; 0.01], 271, [270; 269], [0.8; 0.8], [0.02; 0.02], 917, 1000, ...
-      150, 450, 900, 1, 10, 10, 10, 10, false, eps, false);
+      [0.01; 0.01], 271, [270; 269], [0.8; 0.8], [0.02; 0.02], 150, 450, ...
+      900, 1, 10, 10, 10, 10, false, eps, false);
 
    testCase.verifyTrue(ok);
    testCase.verifyEqual(Ts, 271);
@@ -205,8 +205,8 @@ function test_checksubstep_debug_dump_records_force_advance_context(testCase)
    setenv('ICEMODEL_DEBUG_MAXSUBSTEP_FILE', debug_file);
 
    icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
-      [0.01; 0.01], 271, [270; 269], [0.8; 0.8], [0.02; 0.02], 917, 1000, ...
-      150, 450, 900, 1, 10, 1, 2, 1, true, eps, false, 450, 900);
+      [0.01; 0.01], 271, [270; 269], [0.8; 0.8], [0.02; 0.02], 150, 450, ...
+      900, 1, 10, 1, 2, 1, true, eps, false, 450, 900);
 
    loaded = load(debug_file, 'debug_state');
    debug_state = loaded.debug_state;

@@ -1,5 +1,5 @@
 function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
-      dLdT, ro_ice, ro_liq, Tf, TL, TH, fcp, f_liq_min, f_liq_max, i_M, ok, debug)
+      dLdT, TL, TH, f_liq_min, f_liq_max, iM, ok, debug)
    %MELTZONE_TRANSFORM Apply the melt-zone temperature-enthalpy transform.
    %
    % This function uses the change in liquid fraction returned by the numerical
@@ -49,9 +49,15 @@ function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
    %
    %#codegen
 
+   persistent Tf ro_ice ro_liq fcp
+   if isempty(Tf)
+      [Tf, ro_ice, ro_liq] = icemodel.physicalConstant('Tf', 'ro_ice', 'ro_liq');
+      fcp = icemodel.parameterLookup('fcp');
+   end
+
    % Early exit if the predictor implies a liquid-fraction increase larger
    % than the maximum liquid-fraction-equivalent ice.
-   if any((T(i_M) / ro_liq) > (ro_ice / ro_liq - f_liq(i_M)))
+   if any((T(iM) / ro_liq) > (ro_ice / ro_liq - f_liq(iM)))
       ok = false;
       return
    end
@@ -65,7 +71,7 @@ function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
    % Note that here, T(i_M) = ro_liq * (f_liq_new - f_liq_old), T(~i_M) = T_new
 
    % Update the liquid fraction of melt-zone layers (f_liq = f_liq_old + P/ro)
-   f_liq(i_M) = f_liq(i_M) + T(i_M) / ro_liq; % line 79 of ftemp.f
+   f_liq(iM) = f_liq(iM) + T(iM) / ro_liq; % line 79 of ftemp.f
 
    % This is what the transformation above does:
    %
@@ -81,13 +87,13 @@ function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
    % boundary by more than 5%. Express the same check in the current
    % volumetric-liquid-fraction variables.
    if any( ...
-         (f_liq(i_M) < (1.0 - tol) * f_liq_min(i_M)) | ...
-         (f_liq(i_M) > (1.0 + tol) * f_liq_max(i_M)) ...
+         (f_liq(iM) < (1.0 - tol) * f_liq_min(iM)) | ...
+         (f_liq(iM) > (1.0 + tol) * f_liq_max(iM)) ...
          )
 
       if debug
          dumpMZTransformFailure("pmelt_overshot_melt_zone_bounds", T, T_iter, ...
-            f_ice, f_liq, f_wat, f_liq_min, f_liq_max, i_M);
+            f_ice, f_liq, f_wat, f_liq_min, f_liq_max, iM);
       end
 
       ok = false;
@@ -107,15 +113,15 @@ function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
    % by enough to reject the timestep. These transitions are handled below by
    % projecting the predictor through the local melt-curve slope and then
    % letting the next Picard iteration solve on the correct melt curve branch.
-   i_lo = false(size(i_M));
-   i_hi = false(size(i_M));
-   i_lo(i_M) = f_liq(i_M) < f_liq_min(i_M);
-   i_hi(i_M) = f_liq(i_M) > f_liq_max(i_M);
+   i_lo = false(size(iM));
+   i_hi = false(size(iM));
+   i_lo(iM) = f_liq(iM) < f_liq_min(iM);
+   i_hi(iM) = f_liq(iM) > f_liq_max(iM);
 
    % A melt-zone node may legitimately leave the phase-change interval during
    % the corrector step. For nodes that remain within the melt zone, use the
    % analytic inverse phase function with the new f_liq to update T:
-   i_ok = i_M & ~(i_lo | i_hi);
+   i_ok = iM & ~(i_lo | i_hi);
    if any(i_ok)
       T(i_ok) = Tf - sqrt(f_wat(i_ok) ./ f_liq(i_ok) - 1.0) / fcp; % Eq. 133a
    end
@@ -144,31 +150,31 @@ function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
       % to evaluate an updated slope.
 
       % Compute the linearized temperature update on the melt-zone node subset.
-      T_new = T_iter(i_M) + T(i_M) ./ (ro_liq * dLdT(i_M));
+      T_new = T_iter(iM) + T(iM) ./ (ro_liq * dLdT(iM));
 
       % Update nodes that exited the melt zone onto the frozen branch
-      if any(i_lo(i_M))
-         T(i_lo) = min(T_new(i_lo(i_M)), TL - sqrt_eps);
+      if any(i_lo(iM))
+         T(i_lo) = min(T_new(i_lo(iM)), TL - sqrt_eps);
       end
 
       % Update nodes that exited the melt zone onto the liquid branch
-      if any(i_hi(i_M))
-         T(i_hi) = max(T_new(i_hi(i_M)), TH + sqrt_eps);
+      if any(i_hi(iM))
+         T(i_hi) = max(T_new(i_hi(iM)), TH + sqrt_eps);
       end
    end
 
    % Fully crossing the melt zone in one step is a failure
    if any( ...
-         T_iter(~i_M) < TL & T(~i_M) >= TH) || ...
+         T_iter(~iM) < TL & T(~iM) >= TH) || ...
          any( ...
-         T_iter(~i_M) > TH & T(~i_M) < TL) || ...
+         T_iter(~iM) > TH & T(~iM) < TL) || ...
          any( ...
          iscomplex(T)) || any(~isfinite(T) ...
          )
 
       if debug
          dumpMZTransformFailure("skipped_melt_zone_or_complex", T, T_iter, ...
-            f_ice, f_liq, f_wat, f_liq_min, f_liq_max, i_M);
+            f_ice, f_liq, f_wat, f_liq_min, f_liq_max, iM);
       end
 
       ok  = false;
@@ -177,7 +183,7 @@ function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
 
    % Project T/f_ice/f_liq onto the enthalpy-temperature curve (corrector step)
    [T, f_ice, f_liq] = icemodel.column.liquid_fraction_function(T, f_ice, ...
-      f_liq, ro_ice, ro_liq, fcp, Tf);
+      f_liq, f_wat);
 end
 
 function dumpMZTransformFailure(reason, T, T_iter, f_ice, f_liq, ...
