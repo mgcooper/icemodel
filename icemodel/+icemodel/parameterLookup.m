@@ -126,10 +126,21 @@ function varargout = parameterLookup(varargin)
       );
 
    % Derived values
-   SB = icemodel.physicalConstant('SB');
+   [SB, Tf, Lf, cp_ice, cp_liq] = icemodel.physicalConstant( ...
+      'SB', 'Tf', 'Lf', 'cp_ice', 'cp_liq');
    params.emissSB = params.emiss * SB;
    params.fcpsq = params.fcp ^ 2;
    params.secperday = params.hrsperday * params.secperhr;
+
+   % Canonical mushy-zone bounds for the Jordan phase-fraction curve.
+   %
+   % TL and TH are the lower and upper melt-zone temperature bounds [K].
+   % f_ell_min and f_ell_max are the corresponding liquid mass fractions on
+   % the phase-fraction curve at TL and TH.
+   params.TL = Tf - (2.0 * Lf / (params.fcpsq * cp_ice)) ^ (1.0 / 3.0);
+   params.TH = Tf - cp_liq / (Lf * 2.0 * params.fcpsq);
+   params.f_ell_min = 1.0 / (1.0 + (params.fcp * (Tf - params.TL)) ^ 2.0);
+   params.f_ell_max = 1.0 / (1.0 + (params.fcp * (Tf - params.TH)) ^ 2.0);
 
    % Parse outputs
    if (nargout == 1 && nargin == 0) || (nargin > 0 && strcmp('all', varargin{1}))

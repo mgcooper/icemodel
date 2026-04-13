@@ -15,6 +15,13 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok, n_iters] = ...
    %
    %#codegen
 
+   % Cache zero-valued Robin linearization values, Dirichlet bc used here.
+   persistent Fc Fp
+   if isempty(Fc)
+      Fc = 0.0;
+      Fp = 0.0;
+   end
+
    debug = opts.debug;
 
    % Pre-coupler Ts predictor using checkpoint state.
@@ -44,7 +51,7 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok, n_iters] = ...
       % Inner subsurface solve from checkpoint state using the trial Ts.
       [T_ice, f_ice, f_liq, k_eff, ok_ieb, n_iters] = ...
          icemodel.column.solve_column_enthalpy(T_sfc, xT_ice, xf_ice, ...
-         xf_liq, 0.0, 0.0, Sc, Sp, dz, delz, fn, dt, solver, tol, maxiter, ...
+         xf_liq, Fc, Fp, Sc, Sp, dz, delz, fn, dt, solver, tol, maxiter, ...
          alpha, use_aitken, jumpmax, debug);
 
       if ~ok_ieb

@@ -22,7 +22,7 @@ function [dFdT, f_wat] = liquid_fraction_derivative(T, f_ice, f_liq, f_wat)
 
    if nargin < 4 || isempty(f_wat)
       % In terms of volumetric liquid fraction:
-      f_wat = icemodel.water_fraction(f_ice, f_liq);
+      f_wat = icemodel.column.water_fraction(f_ice, f_liq);
    end
    dFdT = 2.0 * fcp ^ 2 * T_dep .* f_wat ./ (1.0 + fcp ^ 2 * T_dep .^ 2) .^ 2;
    dFdT = max(dFdT, sqrt(eps));

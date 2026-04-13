@@ -7,7 +7,8 @@ function T_sfc = physical_surface_temperature(T_sfc)
    % as an internal iterate; this function enforces the physical constraint
    % before any surface flux evaluation.
    %
-   % See also: MFENERGY, icemodel.surface.solve_surface_energy_balance
+   % See also: icemodel.surface.diagnose_melt_freeze_energy,
+   %           icemodel.surface.solve_surface_energy_balance
    %
    %#codegen
 
@@ -16,7 +17,5 @@ function T_sfc = physical_surface_temperature(T_sfc)
       Tf = icemodel.physicalConstant('Tf');
    end
 
-   if T_sfc > Tf
-      T_sfc = Tf;
-   end
+   T_sfc = min(T_sfc, Tf);
 end

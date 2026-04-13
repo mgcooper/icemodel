@@ -38,7 +38,8 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
    ro_wie = ro_liq / ro_ice;
 
    % LOWER AND UPPER MELT ZONE TEMPERATURE AND WATER (MASS) FRACTION
-   [TL, TH, f_ell_min, f_ell_max] = icemodel.column.meltzone_bounds();
+   [TL, TH, f_ell_min, f_ell_max] = icemodel.parameterLookup( ...
+      'TL', 'TH', 'f_ell_min', 'f_ell_max');
 
    % INITIALIZE CORE STATE VARIABLES
    if opts.use_restart

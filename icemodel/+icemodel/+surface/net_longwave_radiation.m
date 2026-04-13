@@ -24,9 +24,9 @@ function [Qln, dQln_dTsfc] = net_longwave_radiation(T_sfc, Qli)
       emiss = icemodel.parameterLookup('emiss');
    end
 
-   Qln = emiss * (Qli - SB * T_sfc ^ 4);
+   Qln = Qli + icemodel.surface.outgoing_longwave_radiation(T_sfc, Qli);
 
    if nargout > 1
-      dQln_dTsfc = -4.0 * emiss * SB * T_sfc ^ 3;
+      dQln_dTsfc = -4.0 * emiss * SB * T_sfc .^ 3;
    end
 end

@@ -37,6 +37,21 @@ function test_terrain_adjusted_shortwave_distinguishes_day_and_night(testCase)
    testCase.verifyEqual(Qnight, 0, 'AbsTol', 1e-12);
 end
 
+function test_terrain_adjusted_shortwave_accepts_vector_inputs(testCase)
+   % The terrain-adjusted fallback should evaluate elementwise over a vector
+   % of hourly states without collapsing to scalar control flow.
+
+   hours = [0; 6; 12; 18];
+   Qsi = icemodel.surface.terrain_adjusted_shortwave_radiation( ...
+      180 * ones(size(hours)), 45 * ones(size(hours)), 0.2 * ones(size(hours)), ...
+      hours, 180 * ones(size(hours)), 5 * ones(size(hours)), ...
+      0.7 * ones(size(hours)));
+
+   testCase.verifyEqual(size(Qsi), size(hours));
+   testCase.verifyEqual(Qsi(1), 0, 'AbsTol', 1e-12);
+   testCase.verifyGreaterThan(max(Qsi), 0);
+end
+
 function test_incoming_shortwave_daily_average_matches_hourly_mean(testCase)
    % The daily shortwave fallback should equal the mean of the hourly
    % terrain-adjusted samples it wraps.

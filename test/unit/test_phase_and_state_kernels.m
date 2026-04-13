@@ -85,19 +85,18 @@ function test_mztransform_updates_melt_zone_consistently(testCase)
    % fractions.
 
    [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
-   [TL, TH, f_ell_min, f_ell_max] = icemodel.column.meltzone_bounds();
+   [TL, TH] = icemodel.parameterLookup('TL', 'TH');
    fcp = icemodel.parameterLookup('fcp');
 
    T_old = Tf - 0.5;
    f_wat = 0.85;
    f_liq = f_wat / (1 + (fcp * (Tf - T_old)) ^ 2);
-   f_liq_min = f_wat * f_ell_min;
-   f_liq_max = f_wat * f_ell_max;
+   [f_liq_min, f_liq_max] = icemodel.column.meltzone_bounds(f_wat);
    dLdT = icemodel.column.liquid_fraction_derivative(T_old, [], [], f_wat);
 
    [T_new, f_ice_new, f_liq_new, ok] = ...
       icemodel.column.meltzone_transform(ro_liq * 0.002, T_old, f_liq, ...
-      f_wat, dLdT, TL, TH, f_liq_min, f_liq_max, true, true, false);
+      f_wat, dLdT, f_liq_min, f_liq_max, true, true, false);
 
    testCase.verifyTrue(ok);
    testCase.verifyGreaterThan(f_liq_new, f_liq);
@@ -113,20 +112,19 @@ function test_mztransform_allows_melt_zone_exit_to_frozen_branch(testCase)
    % long as the predictor overshoots the melt-zone boundary only slightly.
 
    [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
-   [TL, TH, f_ell_min, f_ell_max] = icemodel.column.meltzone_bounds();
+   [TL, TH] = icemodel.parameterLookup('TL', 'TH');
    fcp = icemodel.parameterLookup('fcp');
 
    T_old = TL + 0.01;
    f_wat = 0.85;
    f_liq = f_wat / (1 + (fcp * (Tf - T_old)) ^ 2);
-   f_liq_min = f_wat * f_ell_min;
-   f_liq_max = f_wat * f_ell_max;
+   [f_liq_min, f_liq_max] = icemodel.column.meltzone_bounds(f_wat);
    d_fliq = 0.97 * f_liq_min - f_liq;
    dLdT = icemodel.column.liquid_fraction_derivative(T_old, [], [], f_wat);
 
    [T_new, f_ice_new, f_liq_new, ok] = ...
       icemodel.column.meltzone_transform(ro_liq * d_fliq, T_old, f_liq, ...
-      f_wat, dLdT, TL, TH, f_liq_min, f_liq_max, true, true, false);
+      f_wat, dLdT, f_liq_min, f_liq_max, true, true, false);
 
    testCase.verifyTrue(ok);
    testCase.verifyLessThan(T_new, TL);
@@ -141,19 +139,18 @@ function test_mztransform_rejects_large_freeze_out_overshoot(testCase)
    % the timestep can be shortened before trusting the transformed predictor.
 
    [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
-   [TL, TH, f_ell_min, f_ell_max] = icemodel.column.meltzone_bounds();
+   [TL, ~] = icemodel.parameterLookup('TL', 'TH');
    fcp = icemodel.parameterLookup('fcp');
 
    T_old = TL + 0.01;
    f_wat = 0.85;
    f_liq = f_wat / (1 + (fcp * (Tf - T_old)) ^ 2);
-   f_liq_min = f_wat * f_ell_min;
-   f_liq_max = f_wat * f_ell_max;
+   [f_liq_min, f_liq_max] = icemodel.column.meltzone_bounds(f_wat);
    d_fliq = -1.5 * f_liq;
    dLdT = icemodel.column.liquid_fraction_derivative(T_old, [], [], f_wat);
 
    [T_new, ~, f_liq_new, ok] = icemodel.column.meltzone_transform( ...
-      ro_liq * d_fliq, T_old, f_liq, f_wat, dLdT, TL, TH, f_liq_min, ...
+      ro_liq * d_fliq, T_old, f_liq, f_wat, dLdT, f_liq_min, ...
       f_liq_max, true, true, false);
 
    testCase.verifyFalse(ok);
@@ -166,14 +163,15 @@ function test_mztransform_rejects_phase_skip(testCase)
    % melt-zone bounds.
 
    [Tf] = icemodel.physicalConstant('Tf');
-   [TL, TH, f_ell_min, f_ell_max] = icemodel.column.meltzone_bounds();
+   [TL, TH] = icemodel.parameterLookup('TL', 'TH');
    fcp = icemodel.parameterLookup('fcp');
    f_wat = 0.85;
    f_liq = f_wat / (1 + (fcp * (Tf - (TL - 1))) ^ 2);
    dLdT = 0;
+   [f_liq_min, f_liq_max] = icemodel.column.meltzone_bounds(f_wat);
 
    [~, ~, ~, ok] = icemodel.column.meltzone_transform(TH + 0.5, TL - 1.0, ...
-      f_liq, f_wat, dLdT, TL, TH, f_wat * f_ell_min, f_wat * f_ell_max, ...
+      f_liq, f_wat, dLdT, f_liq_min, f_liq_max, ...
       false, true, false);
 
    testCase.verifyFalse(ok);
@@ -200,14 +198,12 @@ function test_gecoefs_applies_robin_top_boundary_adjustment(testCase)
    Ts = 269;
    Fc = 10;
    Fp = -5;
-   [TL, TH] = icemodel.column.meltzone_bounds();
-
    [~, aP_dir, ~, b_dir, ~, a1] = icemodel.column.assemble_enthalpy_system( ...
       T, f_ice, f_liq, dHdT, dLdT, drovdT, dH, Sc, zeros(JJ, 1), k_eff, ...
-      delz, fn, dz, dt, TL, TH, Ts, Fc, Fp, 1);
+      delz, fn, dz, dt, Ts, Fc, Fp, 1);
    [~, aP_rob, ~, b_rob] = icemodel.column.assemble_enthalpy_system( ...
       T, f_ice, f_liq, dHdT, dLdT, drovdT, dH, Sc, zeros(JJ, 1), k_eff, ...
-      delz, fn, dz, dt, TL, TH, Ts, Fc, Fp, 2);
+      delz, fn, dz, dt, Ts, Fc, Fp, 2);
 
    testCase.verifyEqual(aP_rob(1) - aP_dir(1), ...
       -a1 - Fp * a1 / (a1 - Fp), ...

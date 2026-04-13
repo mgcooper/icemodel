@@ -33,10 +33,10 @@ function [Qe, dQe_dT_sfc] = latent_heat_flux(es_sfc, ea_atm, De, stability, ...
    if isempty(epsilon)
       epsilon = icemodel.physicalConstant('epsilon');
    end
-   Qe = roL * De * stability * (ea_atm - es_sfc) * epsilon / psfc;
+   Qe = roL .* De .* stability .* (ea_atm - es_sfc) .* epsilon ./ psfc;
 
    if nargout > 1
-      dQe_dT_sfc = roL * De * epsilon / psfc * ...
-         ((ea_atm - es_sfc) * dstability_dT_sfc - stability * des_sfc_dT);
+      dQe_dT_sfc = roL .* De .* epsilon ./ psfc .* ...
+         ((ea_atm - es_sfc) .* dstability_dT_sfc - stability .* des_sfc_dT);
    end
 end

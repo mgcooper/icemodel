@@ -30,7 +30,7 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = merge_layers( ...
    % and the water fraction, f_wat, is the volume of melted ice + liquid water
    % per cv volume:
    %
-   % f_wat = icemodel.water_fraction(f_ice, f_liq)
+   % f_wat = icemodel.column.water_fraction(f_ice, f_liq)
    %
    % fcp is the "freezing curve parameter" that controls the slope of the
    % f_liq = f(T) relationship in the mushy zone.
@@ -52,13 +52,11 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = merge_layers( ...
    %
    %#codegen
 
-   persistent Tf TL cv_ice cv_liq Lf ro_ice ro_liq fcp
+   persistent Tf cv_ice cv_liq Lf ro_ice ro_liq fcp TL
    if isempty(Tf)
-      [Tf, cv_ice, cv_liq, Lf, ro_ice, ro_liq] = ...
-         icemodel.physicalConstant( ...
+      [Tf, cv_ice, cv_liq, Lf, ro_ice, ro_liq] = icemodel.physicalConstant( ...
          'Tf', 'cv_ice', 'cv_liq', 'Lf', 'ro_ice', 'ro_liq');
-      fcp = icemodel.parameterLookup('fcp');
-      [TL, ~] = icemodel.column.meltzone_bounds();
+      [fcp, TL, ~] = icemodel.parameterLookup('fcp', 'TL', 'TH');
    end
 
    % Combine absorbed solar radiation [W m-3]

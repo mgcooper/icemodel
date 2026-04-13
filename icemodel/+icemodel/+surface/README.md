@@ -8,13 +8,15 @@ Public entrypoints:
 - `solve_surface_energy_balance`
 - `surface_energy_balance_residual`
 - `surface_energy_balance_terms`
+- `numerical_surface_flux_linearization`
 - `surface_flux_linearization`
 - `physical_surface_temperature`
 - `apply_surface_vapor_mass_change`
 - `diagnose_surface_ablation`
 - `diagnose_surface_runoff`
-- `incoming_longwave_radiation`
 - `empirical_incoming_longwave_radiation`
+- `outgoing_longwave_radiation`
+- `net_longwave_radiation`
 - `incoming_shortwave_radiation`
 - `terrain_adjusted_shortwave_radiation`
 - `atmospheric_pressure_from_elevation`

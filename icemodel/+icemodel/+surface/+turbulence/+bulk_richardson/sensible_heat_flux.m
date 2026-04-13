@@ -21,10 +21,10 @@ function [Qh, dQh_dT_sfc] = sensible_heat_flux(T_sfc, tair, De, stability, ...
       cv_air = icemodel.physicalConstant('cv_air');
    end
 
-   Qh = cv_air * De * stability * (tair - T_sfc);
+   Qh = cv_air * (De .* stability .* (tair - T_sfc));
 
    if nargout > 1
-      dQh_dT_sfc = cv_air * De * ...
-         ((tair - T_sfc) * dstability_dT_sfc - stability);
+      dQh_dT_sfc = cv_air * ...
+         (De .* ((tair - T_sfc) .* dstability_dT_sfc - stability));
    end
 end

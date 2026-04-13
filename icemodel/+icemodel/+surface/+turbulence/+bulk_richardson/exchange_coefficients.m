@@ -55,6 +55,10 @@ function [De, S123, W1] = exchange_coefficients(wspd, z0_bulk, z_tair, z_wind)
    %
    %#codegen
 
+   % Note: vectorized operations are used to support post-run diagnostics
+   % where z_tair, z_wind, z0_bulk are allowed to vary in time. They remain
+   % scalar-valued for the expected model initialization use-case.
+
    % Parse the optional z_wind input; set it equal to z_tair if not provided
    if nargin < 4
       z_wind = z_tair;
@@ -66,21 +70,25 @@ function [De, S123, W1] = exchange_coefficients(wspd, z0_bulk, z_tair, z_wind)
       'thf_bulk_richardson_psi');
 
    % Compute the drag coefficient (a^2 in Louis notation, eq. 13) [1]
-   W1 = (k_von_karman / log(z_tair / z0_bulk)) ^ 2;
+   W1 = (k_von_karman ./ log(z_tair ./ z0_bulk)) .^ 2;
 
    % Compute the aerodynamic exchange coefficient [m s-1]
    De = W1 .* wspd;
 
    % Compute the factor needed to allow z_wind != z_tair (derived by mgc)
-   z_star = (z_wind ^ 2) / z_tair;
+   z_star = z_wind .^ 2 ./ z_tair;
 
    % These coefficients are used in the stability factor calculation and do
    % not depend on dynamic forcing. Pre-compute them here for computational
    % efficiency, to avoid additional operations within the solver.
-   S123 = nan(1, 3);
-   S123(1) = psi * eta * W1 * sqrt(z_tair / z0_bulk); % gamma Eq. A15
-   S123(2) = eta * gravity * z_star;
-   S123(3) = S123(1) * sqrt(gravity * z_star);
+   S1 = psi * eta .* W1 .* sqrt(z_tair ./ z0_bulk); % gamma Eq. A15
+   S2 = eta * gravity .* z_star;
+   S3 = S1 .* sqrt(gravity * z_star);
+   if isscalar(S1)
+      S123 = [S1, S2, S3];
+   else
+      S123 = [S1(:), S2(:), S3(:)];
+   end
 
    % This follows Glen, and can be compared with stability_factor
    %

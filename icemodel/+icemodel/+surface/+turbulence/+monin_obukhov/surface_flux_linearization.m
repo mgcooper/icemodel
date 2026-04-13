@@ -20,23 +20,17 @@ function [Fc, Fp, diag] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, ...
    %
    %#codegen
 
-   % Surface heat flux.
    if nargout > 2
-      [Q_sfc, diag_thf] = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ...
-         ppt, tppt, psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, ...
-         snow_depth, opts);
+      [~, ~, diag_thf] = ...
+         icemodel.surface.diagnose_turbulent_heat_fluxes(T_sfc, tair, wspd, ...
+         psfc, ea_atm, De, [], ro_sfc, snow_depth, roL, liqflag, opts);
    else
-      Q_sfc = surface_flux(T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, tppt, ...
-         psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, snow_depth, opts);
       diag_thf = struct([]);
    end
 
-   % Surface heat flux complex-step perturbation.
-   flux_fn = @(Ts_eval) surface_flux(Ts_eval, tair, Qsi, Qli, albedo, wspd, ...
-      ppt, tppt, psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, snow_depth, opts);
-
-   % Linearization.
-   Fp = icemodel.numerics.complex_step_derivative(flux_fn, T_sfc);
+   [Q_sfc, Fp] = icemodel.surface.numerical_surface_flux_linearization( ...
+      T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, De, ea_atm, ...
+      [], roL, liqflag, chi, 0.0, 0.0, 1.0, ro_sfc, snow_depth, opts);
    Fc = Q_sfc - Fp * T_sfc;
 
    % Parse outputs.
@@ -47,38 +41,4 @@ function [Fc, Fp, diag] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, ...
          'dq_surface_dTs', Fp, ...
          'thf', diag_thf);
    end
-end
-
-function [Q_sfc, diag_thf] = surface_flux(T_sfc, tair, Qsi, Qli, albedo, ...
-      wspd, ppt, tppt, psfc, De, ea_atm, chi, roL, liqflag, ro_sfc, ...
-      snow_depth, opts)
-   %SURFACE_FLUX Evaluate the non-conductive surface flux at T_sfc.
-
-   % Load physical constants and parameters.
-   persistent cv_liq
-   if isempty(cv_liq)
-      cv_liq = icemodel.physicalConstant('cv_liq');
-   end
-
-   % Sensible and latent heat fluxes.
-   % monin_obukhov does not use br_coefs; pass [] as placeholder for the dispatcher.
-   if nargout > 1
-      [Qe, Qh, diag_thf] = ...
-         icemodel.surface.diagnose_turbulent_heat_fluxes(T_sfc, tair, wspd, ...
-         psfc, ea_atm, De, [], ro_sfc, snow_depth, roL, liqflag, opts);
-   else
-      [Qe, Qh] = icemodel.surface.diagnose_turbulent_heat_fluxes(T_sfc, ...
-         tair, wspd, psfc, ea_atm, De, [], ro_sfc, snow_depth, roL, ...
-         liqflag, opts);
-      diag_thf = struct([]);
-   end
-
-   % Precipitation advected heat flux.
-   Qa = icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
-
-   % Net non-conductive heat flux (Qc = 0: handled by the Robin interior solve).
-   Qsn = icemodel.surface.net_shortwave_radiation(Qsi, albedo, chi);
-   Qln = icemodel.surface.net_longwave_radiation(T_sfc, Qli);
-   Q_sfc = icemodel.surface.evaluate_surface_energy_balance( ...
-      Qsn, Qln, Qh, Qe, 0.0, Qa, 0.0);
 end

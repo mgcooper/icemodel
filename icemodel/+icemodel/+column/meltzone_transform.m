@@ -1,5 +1,5 @@
 function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
-      dLdT, TL, TH, f_liq_min, f_liq_max, iM, ok, debug)
+      dLdT, f_liq_min, f_liq_max, iM, ok, debug)
    %MELTZONE_TRANSFORM Apply the melt-zone temperature-enthalpy transform.
    %
    % This function uses the change in liquid fraction returned by the numerical
@@ -49,10 +49,10 @@ function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
    %
    %#codegen
 
-   persistent Tf ro_ice ro_liq fcp
+   persistent Tf ro_ice ro_liq fcp TL TH
    if isempty(Tf)
       [Tf, ro_ice, ro_liq] = icemodel.physicalConstant('Tf', 'ro_ice', 'ro_liq');
-      fcp = icemodel.parameterLookup('fcp');
+      [fcp, TL, TH] = icemodel.parameterLookup('fcp', 'TL', 'TH');
    end
 
    % Early exit if the predictor implies a liquid-fraction increase larger

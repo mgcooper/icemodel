@@ -59,24 +59,60 @@ function [stability, dstability] = stability_factor(T_sfc, tair, wspd, br_coefs)
    % downstream branch formulas operate on the possibly complex T_sfc value.
    T_sfc_real = real(T_sfc);
 
-   if T_sfc_real < tair - dT0
+   state_size = size(T_sfc + 0 * tair + 0 * wspd);
+   tair_eval = expand_input(tair, state_size);
+   B1_eval = expand_input(B1, state_size);
+   B2_eval = expand_input(B2, state_size);
 
-      [stability, dstability] = stableBranch(T_sfc, tair, B1);
+   stable_mask = T_sfc_real < tair_eval - dT0;
+   unstable_mask = T_sfc_real > tair_eval + dT0;
+   neutral_mask = ~(stable_mask | unstable_mask);
 
-   elseif T_sfc_real > tair + dT0
+   stability = ones(size(T_sfc)) + 0 * T_sfc;
+   if nargout > 1
+      dstability = zeros(size(T_sfc)) + 0 * T_sfc;
+   end
 
-      [stability, dstability] = unstableBranch(T_sfc, tair, B1, B2);
+   if any(stable_mask(:))
+      [stability(stable_mask), stable_deriv] = stableBranch( ...
+         T_sfc(stable_mask), tair_eval(stable_mask), B1_eval(stable_mask));
+      if nargout > 1
+         dstability(stable_mask) = stable_deriv;
+      end
+   end
 
-   else
-      [stability, dstability] = neutralBranch(T_sfc, tair, B1, B2, dT0);
+   if any(unstable_mask(:))
+      [stability(unstable_mask), unstable_deriv] = unstableBranch( ...
+         T_sfc(unstable_mask), tair_eval(unstable_mask), ...
+         B1_eval(unstable_mask), B2_eval(unstable_mask));
+      if nargout > 1
+         dstability(unstable_mask) = unstable_deriv;
+      end
+   end
+
+   if any(neutral_mask(:))
+      [stability(neutral_mask), neutral_deriv] = neutralBranch( ...
+         T_sfc(neutral_mask), tair_eval(neutral_mask), ...
+         B1_eval(neutral_mask), B2_eval(neutral_mask), dT0);
+      if nargout > 1
+         dstability(neutral_mask) = neutral_deriv;
+      end
    end
 end
 
 function [B1, B2] = bulk_stability_terms(tair, wspd, br_coefs)
    %BULK_STABILITY_TERMS Return the bulk-Richardson branch coefficients.
 
-   B1 = br_coefs(2) / (tair * wspd ^ 2);
-   B2 = br_coefs(3) / (sqrt(tair) * wspd);
+   if isvector(br_coefs) && numel(br_coefs) == 3
+      B1_num = br_coefs(2);
+      B2_num = br_coefs(3);
+   else
+      B1_num = reshape(br_coefs(:, 2), size(tair));
+      B2_num = reshape(br_coefs(:, 3), size(tair));
+   end
+
+   B1 = B1_num ./ (tair .* wspd .^ 2);
+   B2 = B2_num ./ (sqrt(tair) .* wspd);
 end
 
 function [S, dSdT] = stableBranch(T_sfc, tair, B1)
@@ -86,10 +122,10 @@ function [S, dSdT] = stableBranch(T_sfc, tair, B1)
    % dSdT = B1 * S ^ 3/2;
 
    B3 = 1 + 0.5 * B1 * (tair - T_sfc);
-   S = B3 ^ -2;
+   S = B3 .^ -2;
 
    if nargout > 1
-      dSdT = B1 * B3 ^ -3;
+      dSdT = B1 .* B3 .^ -3;
    end
 end
 
@@ -104,10 +140,10 @@ function [S, dSdT] = unstableBranch(T_sfc, tair, B1, B2)
    sqrt_dT = sqrt(dT);
    B3 = 1 + B2 * sqrt_dT;
 
-   S = 1 + B1 * dT / B3;
+   S = 1 + B1 .* dT ./ B3;
 
    if nargout > 1
-      dSdT = B1 / B3 - 0.5 * B1 * B2 * sqrt_dT / B3^2;
+      dSdT = B1 ./ B3 - 0.5 * B1 .* B2 .* sqrt_dT ./ B3 .^ 2;
    end
 end
 
@@ -120,10 +156,18 @@ function [S, dSdT] = neutralBranch(T_sfc, tair, B1, B2, dT0)
    S_stable = stableBranch(T_sfc_lo, tair, B1);
    S_unstable = unstableBranch(T_sfc_hi, tair, B1, B2);
 
-   w = (T_sfc - T_sfc_lo) / (T_sfc_hi - T_sfc_lo);
-   S = (1 - w) * S_stable + w * S_unstable;
+   w = (T_sfc - T_sfc_lo) ./ (T_sfc_hi - T_sfc_lo);
+   S = (1 - w) .* S_stable + w .* S_unstable;
 
    if nargout > 1
       dSdT = (S_unstable - S_stable) / (T_sfc_hi - T_sfc_lo);
+   end
+end
+
+function x = expand_input(x, target_size)
+   %EXPAND_INPUT Broadcast scalar branch coefficients over vector states.
+
+   if isscalar(x)
+      x = repmat(x, target_size);
    end
 end

@@ -10,18 +10,16 @@ function Qli = empirical_incoming_longwave_radiation(Tair, ea_atm, emiss)
    % Output:
    %  Qli - incoming longwave radiation [W m^-2]
    %
-   % This is a legacy fallback used when forcing data do not provide
-   % downwelling longwave radiation directly. The formula is kept explicit
-   % here so initialize_surface_forcings can derive `lwd` from raw station
-   % data without reintroducing root-level all-caps helpers. The canonical
-   % SEB helper for absorbed incoming longwave is
-   % `icemodel.surface.incoming_longwave_radiation`.
+   % This is a legacy fallback used when forcing data do not provide downwelling
+   % longwave radiation directly so initialize_surface_forcings can derive `lwd`
+   % from raw station data. The canonical SEB longwave bookkeeping stays in
+   % `icemodel.surface.net_longwave_radiation` and
+   % `icemodel.surface.outgoing_longwave_radiation`.
    %
    %#codegen
 
    persistent SB
    if isempty(SB)
-      % Cache the Stefan-Boltzmann constant across repeated forcing loads.
       SB = icemodel.physicalConstant('SB');
    end
 

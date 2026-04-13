@@ -276,7 +276,7 @@ function [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo, Tf)
    ice2.ro_sno = ro_sno;                 % ice density
 
    % Compute the radiative heat fluxes
-   lwu = icemodel.surface.outgoing_longwave_radiation(min(ice1.Tsfc, Tf), Qli);
+   lwu = -icemodel.surface.outgoing_longwave_radiation(min(ice1.Tsfc, Tf));
 
    ice1.albedo = albedo;                        % albedo
    ice1.swd    = swd;                           % shortwave down

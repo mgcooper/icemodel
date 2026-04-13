@@ -28,6 +28,21 @@ function test_longwave_fluxes_have_expected_signs(testCase)
    testCase.verifyGreaterThan(Qln_moist, Qln_dry);
 end
 
+function test_longwave_helpers_accept_vector_inputs(testCase)
+   % The longwave helpers should preserve elementwise array behavior so
+   % postprocess and diagnostic code can call them on whole output vectors.
+
+   T_sfc = [263.15; 265.15; 267.15];
+   Qli = [180; 220; 260];
+
+   Qout = icemodel.surface.outgoing_longwave_radiation(T_sfc, Qli);
+   Qnet = icemodel.surface.net_longwave_radiation(T_sfc, Qli);
+
+   testCase.verifyEqual(size(Qout), size(T_sfc));
+   testCase.verifyEqual(size(Qnet), size(T_sfc));
+   testCase.verifyEqual(Qnet, Qli + Qout, 'RelTol', 1e-12);
+end
+
 function test_turbulent_flux_kernels_follow_sign_convention(testCase)
    % Positive sensible and latent fluxes should correspond to transfer
    % toward the surface under the standard kernel sign convention.
@@ -165,6 +180,36 @@ function test_stablefn_neutral_blend_matches_endpoint_formulas(testCase)
    testCase.verifyEqual(dSdT_neutral, dSdT_expected, 'RelTol', 1e-12);
 end
 
+function test_bulk_richardson_flux_helpers_accept_vectors(testCase)
+   % The reusable bulk-Richardson helper kernels should diagnose each state
+   % elementwise when called on a vector of independent surface states.
+
+   tair = 268.15 * ones(3, 1);
+   T_sfc = [266.15; 268.15; 270.15];
+   wspd = [4.0; 4.0; 4.0];
+   De = [0.001; 0.001; 0.001];
+   psfc = 90000 * ones(3, 1);
+   ea_atm = [250; 250; 250];
+   roL = icemodel.physicalConstant('roLs') * ones(3, 1);
+   z0_bulk = 1e-3;
+
+   [~, br_coefs] = ...
+      icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
+      wspd(1), z0_bulk, 3.0, 3.0);
+
+   stability = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
+      T_sfc, tair, wspd, br_coefs);
+   es_sfc = icemodel.vapor.saturation_vapor_pressure(T_sfc, false);
+   Qe = icemodel.surface.turbulence.bulk_richardson.latent_heat_flux( ...
+      es_sfc, ea_atm, De, stability, psfc, roL);
+   Qh = icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux( ...
+      T_sfc, tair, De, stability);
+
+   testCase.verifyEqual(size(stability), size(T_sfc));
+   testCase.verifyEqual(size(Qe), size(T_sfc));
+   testCase.verifyEqual(size(Qh), size(T_sfc));
+end
+
 function test_vappress2rh_recovers_saturation_for_ice_and_water(testCase)
    % The RH conversion should map each saturation vapor pressure back to
    % roughly 100 percent for both phase relations.
@@ -233,7 +278,7 @@ function test_updateState_matches_component_kernels(testCase)
    T = [266; 267; 268];
    f_ice = [0.90; 0.88; 0.85];
    f_liq = [0.01; 0.02; 0.03];
-   f_wat = icemodel.water_fraction(f_ice, f_liq);
+   f_wat = icemodel.column.water_fraction(f_ice, f_liq);
 
    [H, k_eff, dHdT, dLdT, drovdT, ro_vap] = icemodel.column.updatestate( ...
       T, f_ice, f_liq, f_wat);
@@ -247,7 +292,7 @@ function test_updateState_matches_component_kernels(testCase)
    k_eff_ref = icemodel.column.bulk_thermal_conductivity( ...
       T, f_ice, f_liq, k_vap_ref);
 
-   H_ref = icemodel.column.total_enthalpy( ...
+   H_ref = icemodel.column.bulk_enthalpy( ...
       T, f_ice, f_liq, f_wat, ro_vap_ref);
 
    dLdT_ref = icemodel.column.liquid_fraction_derivative( ...

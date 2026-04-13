@@ -20,9 +20,9 @@ function [T, f_ice, f_liq, f_wat, dFdT] = liquid_fraction_function(T, ...
    %
    %#codegen
 
-   persistent ro_ice ro_liq fcp Tf
-   if isempty(ro_ice)
-      [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
+   persistent Tf ro_ice ro_liq fcp
+   if isempty(Tf)
+      [Tf, ro_ice, ro_liq] = icemodel.physicalConstant('Tf', 'ro_ice', 'ro_liq');
       fcp = icemodel.parameterLookup('fcp');
    end
 
@@ -31,7 +31,7 @@ function [T, f_ice, f_liq, f_wat, dFdT] = liquid_fraction_function(T, ...
 
    % Ensure f_wat does not exceed maximum capacity by more than eps
    if nargin < 4 || isempty(f_wat)
-      f_wat = icemodel.water_fraction(f_ice, f_liq);
+      f_wat = icemodel.column.water_fraction(f_ice, f_liq);
    end
    f_wat = min(f_wat, ro_ice / ro_liq); % f_wat_old
    f_liq = f_wat ./ (1.0 + (fcp * T_dep) .^ 2.0);  % f_liq_new (eq 67, Jordan)

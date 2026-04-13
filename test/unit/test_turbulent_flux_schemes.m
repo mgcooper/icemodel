@@ -32,6 +32,19 @@ function test_surface_roughness_length_switches_on_snow_depth(testCase)
    testCase.verifyEqual(z0m_snow_high, 5e-4, 'AbsTol', 1e-12);
 end
 
+function test_surface_roughness_length_accepts_vectors(testCase)
+   % The roughness selector should diagnose each state elementwise for
+   % vector surface states used in postprocessing or helper-level tests.
+
+   snow_depth = [0.0; 0.2; 0.2];
+   ro_sfc = [450.0; 350.0; 700.0];
+
+   z0m = icemodel.surface.surface_roughness_length( ...
+      snow_depth, ro_sfc, 0.02, 1e-3, 5e-4);
+
+   testCase.verifyEqual(z0m, [0.02; 1e-3; 5e-4], 'AbsTol', 1e-12);
+end
+
 function test_forcing_snow_depth_hook_switches_to_snow_roughness(testCase)
    % The optional forcing snow-depth hook should switch the bulk-MO
    % roughness path without requiring a full snow model.
@@ -208,6 +221,36 @@ function test_bulk_mo_finite_and_weaker_scalar_exchange_for_rough_ice(testCase)
       diag_vanas.u_star, diag_vanas.z0h, diag_vanas.z0q])));
    testCase.verifyLessThan(abs(Qh_vanas), abs(Qh_liston));
    testCase.verifyLessThan(abs(Qe_vanas), abs(Qe_liston));
+end
+
+function test_bulk_mo_accepts_vector_states(testCase)
+   % The reusable bulk-MO helper should accept a vector of independent
+   % surface states even though the production solver uses it one state at a time.
+
+   opts_vanas = icemodel.test.helpers.buildSyntheticOpts( ...
+      testCase.TestData.workspace, 'icemodel', 2016, solver=1, ...
+      seb_solver=2, turbulent_flux_scheme='monin_obukhov', ...
+      testname='vector_bulk_mo');
+
+   tair = 268.15 * ones(3, 1);
+   T_sfc = [263.15; 264.15; 265.15];
+   wspd = [4.0; 5.0; 6.0];
+   psfc = 90000.0 * ones(3, 1);
+   ea_atm = icemodel.surface.atmospheric_vapor_pressure(tair, 75 * ones(3, 1), false);
+   roLs = icemodel.physicalConstant('roLs');
+   ro_sfc = 650.0 * ones(3, 1);
+   snow_depth = zeros(3, 1);
+   liqflag = false(3, 1);
+
+   [Qe, Qh, diag] = icemodel.surface.turbulence.monin_obukhov.turbulent_heat_flux( ...
+      T_sfc, tair, wspd, psfc, ea_atm, ro_sfc, snow_depth, ...
+      roLs * ones(3, 1), liqflag, opts_vanas);
+
+   testCase.verifyEqual(size(Qe), size(T_sfc));
+   testCase.verifyEqual(size(Qh), size(T_sfc));
+   testCase.verifyEqual(size(diag), size(T_sfc));
+   testCase.verifyTrue(all(isfinite(Qe)));
+   testCase.verifyTrue(all(isfinite(Qh)));
 end
 
 function test_monin_obukhov_respects_surface_phase_switch(testCase)

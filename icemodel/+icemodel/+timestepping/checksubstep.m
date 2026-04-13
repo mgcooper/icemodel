@@ -2,28 +2,40 @@ function [Ts, T, f_ice, f_liq, n_subfail, substep, dt, ok, varargout] = ...
       checksubstep(Ts, T, f_ice, f_liq, xTs, xT, xf_ice, xf_liq, dt_sum, ...
       dt, dt_FULL_STEP, timestep, numsteps, substep, maxsubstep, ...
       n_subfail, debug, eps, ok, varargin)
-   % Check accepted state, retry rejected substeps, and force advance on cap.
-
-   persistent ro_iwe
-   if isempty(ro_iwe)
-      [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
-      ro_iwe = ro_ice / ro_liq;
-   end
+   %CHECKSUBSTEP Accept, retry, or force-advance the current substep.
+   %
+   %  [Ts, T, f_ice, f_liq, n_subfail, substep, dt, ok] = ...
+   %     icemodel.timestepping.checksubstep(...)
+   %
+   % Optional trailing inputs:
+   %  force_advance_streak_dt - current cross-timestep forced-advance streak [s]
+   %  force_advance_limit_dt  - allowed forced-advance streak before error [s]
+   %  model_name              - model name used in force-advance error messages
+   %
+   % Optional trailing outputs:
+   %  forced_advance          - true when maxsubstep forced acceptance occurred
+   %  force_advance_streak_dt - updated streak after accepted-state handling
+   %
+   %#codegen
 
    dt_min = dt_FULL_STEP / maxsubstep;
    forced_advance = false;
    force_advance_streak_dt = NaN;
    force_advance_limit_dt = NaN;
+   model_name = 'icemodel';
    if ~isempty(varargin)
       force_advance_streak_dt = varargin{1};
    end
    if numel(varargin) >= 2
       force_advance_limit_dt = varargin{2};
    end
+   if numel(varargin) >= 3
+      model_name = varargin{3};
+   end
 
    if ok
       % Mass conservation / control volume check
-      assertF(@() all(icemodel.water_fraction(f_ice, f_liq) <= ro_iwe + eps))
+      assertF(@() icemodel.column.assert_max_water(f_ice, f_liq));
    else
       % Preserve the rejected state for optional debug dumps after the
       % timestep reset has updated the accepted retry state.
@@ -60,8 +72,18 @@ function [Ts, T, f_ice, f_liq, n_subfail, substep, dt, ok, varargout] = ...
       end
    end
 
+   if ok && ~isnan(force_advance_streak_dt) && ~isnan(force_advance_limit_dt)
+      force_advance_streak_dt = ...
+         icemodel.timestepping.update_force_advance_guard( ...
+         force_advance_streak_dt, forced_advance, dt, force_advance_limit_dt, ...
+         timestep, numsteps, model_name);
+   end
+
    if nargout >= 9
       varargout{1} = forced_advance;
+   end
+   if nargout >= 10
+      varargout{2} = force_advance_streak_dt;
    end
 end
 

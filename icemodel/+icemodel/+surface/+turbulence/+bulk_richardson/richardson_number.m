@@ -52,7 +52,7 @@ function [Ri, coef] = richardson_number(tsfc, tair, wspd_or_coef, z_tair, z_wind
    end
 
    % Canonical mode (nargin == 4 or 5).
-   coef = g / z_tair * (z_wind ./ wspd) .^ 2;
+   coef = g ./ z_tair .* (z_wind ./ wspd) .^ 2;
    Ri = coef .* (1 - tsfc ./ tair);
 end
 
@@ -64,15 +64,18 @@ function [tsfc, tair, wspd, coef, z_wind] = parseinputs( ...
       Tf = icemodel.physicalConstant('Tf');
    end
 
-   tair = tair(:);
+   % Ensure all values are column vectors.
    tsfc = tsfc(:);
-   if min(tair) < 0
-      tair = tair + Tf;
-   end
-   if min(tsfc) < 0
-      tsfc = tsfc + Tf;
-   end
+   tair = tair(:);
+   z_tair = z_tair(:);
+   z_wind = z_wind(:);
+   wspd_or_coef = wspd_or_coef(:);
 
+   % Ensure temperature is in Kelvin.
+   tair(tair < 0) = tair(tair < 0) + Tf;
+   tsfc(tsfc < 0) = tsfc(tsfc < 0) + Tf;
+
+   % Parse the wind speed vs coefficient input option.
    if numargsin == 3
       % Fast mode: wspd_or_coef is a precomputed coefficient.
       coef = wspd_or_coef;
@@ -82,6 +85,5 @@ function [tsfc, tair, wspd, coef, z_wind] = parseinputs( ...
       if numargsin < 5
          z_wind = z_tair;
       end
-      wspd = wspd(:);
    end
 end

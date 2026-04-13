@@ -9,5 +9,5 @@ function Qsn = net_shortwave_radiation(Qsi, albedo, chi)
    %
    %#codegen
 
-   Qsn = chi * Qsi * (1.0 - albedo);
+   Qsn = chi .* Qsi .* (1.0 - albedo);
 end

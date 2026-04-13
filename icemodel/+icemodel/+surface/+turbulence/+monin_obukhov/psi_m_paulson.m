@@ -11,6 +11,6 @@ function psi = psi_m_paulson(zeta)
       gamma = icemodel.parameterLookup('thf_bulk_dyer_gamma');
    end
 
-   x = (1 - gamma * zeta) ^ 0.25;
-   psi = log(((1 + x) / 2) ^ 2 * (1 + x ^ 2) / 2) - 2 * atan(x) + pi / 2;
+   x = (1 - gamma * zeta) .^ 0.25;
+   psi = log(((1 + x) ./ 2) .^ 2 .* (1 + x .^ 2) ./ 2) - 2 * atan(x) + pi / 2;
 end

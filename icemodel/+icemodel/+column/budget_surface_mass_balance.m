@@ -32,21 +32,33 @@ function [T, f_ice, f_liq, d_liq, d_evp, x_err] = ...
    %   remeshing explicit in the main model flow.
    %
    % See also: icemodel.surface.apply_surface_vapor_mass_change,
-   %  icemodel.column.merge_thin_layers
+   %           icemodel.column.merge_thin_layers
    %
    %#codegen
 
-   % Compute the latest surface mass-balance contributions from the updated
-   % phase state and the prescribed surface vapor tendency.
-   [T, d_liq, d_evp, ~, f_ice, f_liq, x_err] = surface_mass_balance_terms( ...
-      T, d_liq, d_evp, 0, f_ice, f_liq, xf_liq, d_pevp, f_liq_res, ...
-      f_ice_min);
-end
+   persistent TL
+   if isempty(TL)
+      TL = icemodel.parameterLookup('TL');
+   end
 
-function [T, d_liq, d_evp, d_con, f_ice, f_liq, x_err] = ...
-      surface_mass_balance_terms(T, d_liq, d_evp, d_con, f_ice, f_liq, ...
-      xf_liq, d_pevp, f_liq_res, f_ice_min)
-   %SURFACE_MASS_BALANCE_TERMS Compute surface mass-balance term updates.
+   % Update the residual unfrozen water fraction defined by the phase fraction
+   % characteristic function at the lower temperature boundary. This ensures
+   % evap does not reduce f_liq below residual water for melting nodes.
+   if T(1) > TL
+      f_wat_top = icemodel.column.water_fraction(f_ice(1), f_liq(1));
+      f_liq_min = icemodel.column.meltzone_bounds(f_wat_top);
+      f_liq_res = max(f_liq_res, f_liq_min / (1 - f_ice(1)));
+   end
+
+   % Convert residual water mass fraction to volumetric fraction.
+   f_res_top = f_liq_res * (1.0 - f_ice(1));
+
+   % Wetflag controls liquid-film mass partitioning only. Treat only liquid
+   % above the residual-water floor as a mobile surface film. Keep this
+   % separate from the SEB surface saturation flag used for vapor pressure.
+   wetflag = f_liq(1) > f_res_top;
+
+   % Compute surface mass-balance term updates.
    %
    % Positive values of d_liq indicate increasing water fraction:
    % d_liq > 0 = melt.
@@ -55,36 +67,22 @@ function [T, d_liq, d_evp, d_con, f_ice, f_liq, x_err] = ...
    % d_liq < 0 = freeze.
    % d_evp < 0 = evaporation.
 
-   persistent TL f_ell_min
-   if isempty(TL)
-      [TL, ~, f_ell_min] = icemodel.column.meltzone_bounds();
-   end
-
-   % Compute delta f_liq. Note, the only process which affects f_liq between
-   % d_liq assignments here is phase change
-   % (`icemodel.column.solve_column_enthalpy`). d_liq < 0 means
-   % refreezing, d_liq > 0 melt.
+   % Compute delta f_liq.
+   %
+   % Note, the only process which affects f_liq between d_liq assignments here
+   % is phase change (icemodel.column.solve_column_enthalpy).
+   % d_liq < 0 means refreezing, d_liq > 0 melt.
    d_liq = d_liq + f_liq - xf_liq;
 
    % Reset past values for budgeting evap/condensation.
    xf_liq = f_liq;
 
-   % Update the residual unfrozen water fraction defined by the phase fraction
-   % characteristic function at the lower temperature boundary. This ensures
-   % f_liq is not reduced below residual water for melting nodes.
-   if T(1) > TL
-      f_liq_min = icemodel.water_fraction(f_ice(1), f_liq(1)) * f_ell_min;
-      f_liq_res = max(f_liq_res, f_liq_min / (1 - f_ice(1)));
-   end
-
-   % Wetflag controls liquid-film mass partitioning only. Treat only liquid
-   % above the residual-water floor as a mobile surface film. Keep this
-   % separate from the SEB surface saturation flag used for vapor pressure.
-   f_res_top = f_liq_res * (1.0 - f_ice(1));
-   wetflag = f_liq(1) > f_res_top;
+   % Excess condensation tracking disabled - use it to test if it occurrs in
+   % apply_surface_vapor_mass_change. It never did. Retain for future testing.
+   d_con = 0;
 
    % Compute evaporation/condensation/sublimation.
-   [f_ice, f_liq, d_con, x_err] = ...
+   [f_ice, f_liq, ~, x_err] = ...
       icemodel.surface.apply_surface_vapor_mass_change( ...
       f_ice, f_liq, d_con, d_pevp, wetflag, f_ice_min, f_liq_res);
 

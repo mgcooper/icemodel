@@ -10,9 +10,14 @@ function err = subsurface_linearization_error(T, T_old, f_ice, f_liq, ...
    %
    %#codegen
 
-   persistent Lf Ls Lv ro_liq f_liq_phase_switch_threshold
+   persistent Lf Ls Lv ro_liq
    if isempty(Lf)
-      [Lf, Ls, Lv, ro_liq] = icemodel.physicalConstant('Lf', 'Ls', 'Lv', 'ro_liq');
+      [Lf, Ls, Lv, ro_liq] = icemodel.physicalConstant( ...
+         'Lf', 'Ls', 'Lv', 'ro_liq');
+   end
+
+   persistent f_liq_phase_switch_threshold
+   if isempty(f_liq_phase_switch_threshold)
       f_liq_phase_switch_threshold = icemodel.parameterLookup( ...
          'f_liq_phase_switch_threshold');
    end

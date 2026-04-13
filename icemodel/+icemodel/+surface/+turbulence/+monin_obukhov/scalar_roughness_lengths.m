@@ -35,9 +35,11 @@ function [z0h, z0q] = scalar_roughness_lengths(Re, z0m, use_snow_closure)
    % When the roughness Reynolds number collapses to zero, turbulent exchange
    % also collapses. Return a tiny fallback scalar roughness so downstream
    % logarithms remain defined if the diagnostic state is inspected later.
-   if real(Re) <= 0
-      z0h = z0_fallback;
-      z0q = z0_fallback;
+   z0h = z0_fallback + zeros(size(Re));
+   z0q = z0_fallback + zeros(size(Re));
+
+   positive = real(Re) > 0;
+   if ~any(positive(:))
       return
    end
 
@@ -47,26 +49,39 @@ function [z0h, z0q] = scalar_roughness_lengths(Re, z0m, use_snow_closure)
    roughness_Re = max(real(Re), 1e-12);
    log_Re = log(roughness_Re);
 
-   % Snow/firn uses the Andreas piecewise polynomial fits across three
-   % roughness-Reynolds regimes.
-   if use_snow_closure
-      if roughness_Re <= re1
-         idx = 1;
-      elseif roughness_Re < re2
-         idx = 2;
-      else
-         idx = 3;
-      end
+   z0m_eval = z0m + zeros(size(Re));
+   z0h_ice = z0m_eval .* exp(a0 + a1 * log_Re + a2 * log_Re .^ 2);
+   z0q_ice = z0h_ice;
 
-      % Andreas returns distinct scalar roughness lengths for heat and
-      % moisture, both scaled from the momentum roughness.
-      z0h = z0m * exp(ch1(idx) + ch2(idx) * log_Re + ch3(idx) * log_Re ^ 2);
-      z0q = z0m * exp(cq1(idx) + cq2(idx) * log_Re + cq3(idx) * log_Re ^ 2);
+   z0h_snow = z0h_ice;
+   z0q_snow = z0q_ice;
+   low = roughness_Re <= re1;
+   mid = roughness_Re > re1 & roughness_Re < re2;
+   high = roughness_Re >= re2;
+   z0h_snow(low) = z0m_eval(low) .* exp(ch1(1) + ch2(1) * log_Re(low) ...
+      + ch3(1) * log_Re(low) .^ 2);
+   z0q_snow(low) = z0m_eval(low) .* exp(cq1(1) + cq2(1) * log_Re(low) ...
+      + cq3(1) * log_Re(low) .^ 2);
+   z0h_snow(mid) = z0m_eval(mid) .* exp(ch1(2) + ch2(2) * log_Re(mid) ...
+      + ch3(2) * log_Re(mid) .^ 2);
+   z0q_snow(mid) = z0m_eval(mid) .* exp(cq1(2) + cq2(2) * log_Re(mid) ...
+      + cq3(2) * log_Re(mid) .^ 2);
+   z0h_snow(high) = z0m_eval(high) .* exp(ch1(3) + ch2(3) * log_Re(high) ...
+      + ch3(3) * log_Re(high) .^ 2);
+   z0q_snow(high) = z0m_eval(high) .* exp(cq1(3) + cq2(3) * log_Re(high) ...
+      + cq3(3) * log_Re(high) .^ 2);
+
+   if isscalar(use_snow_closure)
+      snow_mask = positive & use_snow_closure;
    else
-      % Rough bare ice uses the Smeets and van den Broeke scalar closure.
-      z0h = z0m * exp(a0 + a1 * log_Re + a2 * log_Re ^ 2);
-      z0q = z0h;
+      snow_mask = positive & use_snow_closure;
    end
+   ice_mask = positive & ~snow_mask;
+
+   z0h(ice_mask) = z0h_ice(ice_mask);
+   z0q(ice_mask) = z0q_ice(ice_mask);
+   z0h(snow_mask) = z0h_snow(snow_mask);
+   z0q(snow_mask) = z0q_snow(snow_mask);
 
    % Enforce a small positive lower bound so later logarithms remain defined.
    z0h = max(z0h, z0_min);

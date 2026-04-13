@@ -35,7 +35,7 @@ function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, albedo, ..
    % Dirichlet solve (solve_surface_temperature) includes dQc/dT_sfc directly in
    % the Newton-Raphson Jacobian.
    %
-   % See also: icemodel.surface.turbulence.bulk_richardson.evaluate_surface_flux
+   % See also: icemodel.surface.numerical_surface_flux_linearization
    %
    %#codegen
 

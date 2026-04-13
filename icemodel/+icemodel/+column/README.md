@@ -28,8 +28,7 @@ Current migrated entry points:
 - `icemodel.column.meltzone_transform`
 - `icemodel.column.liquid_fraction_derivative`
 - `icemodel.column.liquid_fraction_function`
-- `icemodel.column.total_enthalpy`
-- `icemodel.column.total_enthalpy_2`
+- `icemodel.column.bulk_enthalpy`
 - `icemodel.column.updatestate`
 - `icemodel.column.bulk_thermal_conductivity`
 - `icemodel.column.firn_thermal_conductivity`
@@ -44,3 +43,4 @@ Current migrated entry points:
 - `icemodel.column.available_liquid_water`
 - `icemodel.column.control_volume_mesh`
 - `icemodel.column.diagnose_column_runoff`
+- `icemodel.column.water_fraction`

@@ -15,21 +15,16 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = solve_column_enthalpy( ..
    end
 
    % Update the water fraction
-   f_wat = icemodel.water_fraction(f_ice, f_liq);
+   f_wat = icemodel.column.water_fraction(f_ice, f_liq);
 
-   % Canonical melt-zone bounds and liquid-fraction limits.
-   [TL, TH, f_ell_min, f_ell_max] = icemodel.column.meltzone_bounds();
-
-   % Update the melt-zone boundaries. These are the volumetric liquid
-   % fractions at T=TL and T=TH, given the current total water fraction.
-   f_liq_min = f_wat .* f_ell_min;
-   f_liq_max = f_wat .* f_ell_max;
+   % Update the melt-zone volumetric liquid fraction bounds at T=TL and T=TH.
+   [f_liq_min, f_liq_max] = icemodel.column.meltzone_bounds(f_wat);
 
    % Compute vapor density [kg m-3]
    ro_vap = icemodel.vapor.saturation_vapor_density(T, f_liq);
 
    % Compute enthalpy [J m-3]
-   H_old = icemodel.column.total_enthalpy(T, f_ice, f_liq, f_wat, ro_vap);
+   H_old = icemodel.column.bulk_enthalpy(T, f_ice, f_liq, f_wat, ro_vap);
 
    % Store past values
    T_ice_old = T;
@@ -54,18 +49,18 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = solve_column_enthalpy( ..
       k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient( ...
          T, f_liq, dro_vapdT);
 
-      % Update bulk (effective) thermal conductivity
+      % Update bulk thermal conductivity
       k_eff = icemodel.column.bulk_thermal_conductivity( ...
          T, f_ice, f_liq, k_vap);
 
-      % Update total enthalpy and derivative wrt temperature
-      [H, dHdT, dLdT] = icemodel.column.total_enthalpy( ...
-         T, f_ice, f_liq, f_wat, ro_vap);
+      % Update bulk enthalpy and derivative wrt temperature
+      [H, dHdT, dLdT] = icemodel.column.bulk_enthalpy( ...
+         T, f_ice, f_liq, f_wat, ro_vap, dro_vapdT);
 
       % Update the general equation coefficients
       [aN, aP, aS, b, iM, a1, a2] = icemodel.column.assemble_enthalpy_system( ...
          T, f_ice, f_liq, dHdT, dLdT, dro_vapdT, H - H_old, Sc, Sp, ...
-         k_eff, delz, fn, dz, dt, TL, TH, T_sfc, Fc, Fp, solver);
+         k_eff, delz, fn, dz, dt, T_sfc, Fc, Fp, solver);
 
       % % Check diagonal dominance and condition number
       % icemodel.checkdiags(aP, aN, aS)
@@ -83,8 +78,7 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = solve_column_enthalpy( ..
 
       % Update the temperature-enthalpy relationship (corrector step)
       [T, f_ice, f_liq, ok] = icemodel.column.meltzone_transform( ...
-         T, T_iter, f_liq, f_wat, dLdT, TL, TH, f_liq_min, f_liq_max, ...
-         iM, ok, debug);
+         T, T_iter, f_liq, f_wat, dLdT, f_liq_min, f_liq_max, iM, ok, debug);
 
       % If failure, return to the main program and shorten the timestep
       if ~ok
@@ -97,7 +91,7 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = solve_column_enthalpy( ..
       end
 
       % Mass conservation check
-      assertF(@() all(icemodel.water_fraction(f_ice, f_liq) <= ...
+      assertF(@() all(icemodel.column.water_fraction(f_ice, f_liq) <= ...
          ro_ice / ro_liq + eps))
 
       % Relaxation and Aitken (not implemented). Proper implementation requires

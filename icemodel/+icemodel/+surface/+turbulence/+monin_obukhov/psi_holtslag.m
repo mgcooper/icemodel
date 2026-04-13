@@ -13,6 +13,6 @@ function psi = psi_holtslag(zeta)
          'thf_bulk_holtslag_cc', 'thf_bulk_holtslag_dd');
    end
 
-   psi = -(aa * zeta + bb * (zeta - cc / dd) * exp(-dd * zeta) ...
+   psi = -(aa * zeta + bb * (zeta - cc / dd) .* exp(-dd * zeta) ...
       + bb * cc / dd);
 end

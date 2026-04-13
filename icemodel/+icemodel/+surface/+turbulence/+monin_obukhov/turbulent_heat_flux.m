@@ -39,6 +39,13 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
    %
    %#codegen
 
+   if max([numel(T_sfc), numel(tair), numel(wspd), numel(psfc), numel(ea_atm), ...
+         numel(ro_sfc), numel(snow_depth), numel(roL), numel(liqflag)]) > 1
+      [Qe, Qh, diag] = vectorized_turbulent_heat_flux(T_sfc, tair, wspd, ...
+         psfc, ea_atm, ro_sfc, snow_depth, roL, liqflag, opts, nargout);
+      return
+   end
+
    % Load physical constants
    persistent P0 kappa_p ro_air_ref cv_air
    if isempty(P0)
@@ -178,6 +185,73 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
       diag = monin_obukhov_diag(es_sfc, q_air, q_sfc, theta_air, theta_sfc, ...
          ro_atm, nu_air, z0m, z0h, z0q, u_star, L, Re, psi_m0, psi_mz, ...
          psi_h0, psi_hz, psi_q0, psi_qz, n_iter, is_stable);
+   end
+end
+
+function [Qe, Qh, diag] = vectorized_turbulent_heat_flux(T_sfc, tair, wspd, ...
+      psfc, ea_atm, ro_sfc, snow_depth, roL, liqflag, opts, n_outputs)
+   %VECTORIZED_TURBULENT_HEAT_FLUX Evaluate the scalar MO solver elementwise.
+
+   state_size = size(T_sfc);
+   n_states = numel(T_sfc);
+   Qe = NaN(state_size);
+   if n_outputs > 1
+      Qh = NaN(state_size);
+   else
+      Qh = [];
+   end
+   if n_outputs > 2
+      diag = [];
+   end
+
+   tair = expand_input(tair, n_states);
+   wspd = expand_input(wspd, n_states);
+   psfc = expand_input(psfc, n_states);
+   ea_atm = expand_input(ea_atm, n_states);
+   ro_sfc = expand_input(ro_sfc, n_states);
+   snow_depth = expand_input(snow_depth, n_states);
+   roL = expand_input(roL, n_states);
+   liqflag = expand_input(liqflag, n_states);
+
+   T_sfc = T_sfc(:);
+   for ii = 1:n_states
+      if n_outputs > 2
+         [Qe(ii), Qh(ii), diag_i] = ...
+            icemodel.surface.turbulence.monin_obukhov.turbulent_heat_flux( ...
+            T_sfc(ii), tair(ii), wspd(ii), psfc(ii), ea_atm(ii), ...
+            ro_sfc(ii), snow_depth(ii), roL(ii), liqflag(ii), opts);
+         if isempty(diag)
+            diag = repmat(diag_i, state_size);
+         end
+         diag(ii) = diag_i;
+      elseif n_outputs > 1
+         [Qe(ii), Qh(ii)] = ...
+            icemodel.surface.turbulence.monin_obukhov.turbulent_heat_flux( ...
+            T_sfc(ii), tair(ii), wspd(ii), psfc(ii), ea_atm(ii), ...
+            ro_sfc(ii), snow_depth(ii), roL(ii), liqflag(ii), opts);
+      else
+         Qe(ii) = icemodel.surface.turbulence.monin_obukhov.turbulent_heat_flux( ...
+            T_sfc(ii), tair(ii), wspd(ii), psfc(ii), ea_atm(ii), ...
+            ro_sfc(ii), snow_depth(ii), roL(ii), liqflag(ii), opts);
+      end
+   end
+
+   Qe = reshape(Qe, state_size);
+   if n_outputs > 1
+      Qh = reshape(Qh, state_size);
+   end
+   if n_outputs > 2
+      diag = reshape(diag, state_size);
+   end
+end
+
+function x = expand_input(x, n_states)
+   %EXPAND_INPUT Broadcast scalar forcing/state inputs over vector states.
+
+   if isscalar(x)
+      x = repmat(x, n_states, 1);
+   else
+      x = x(:);
    end
 end
 

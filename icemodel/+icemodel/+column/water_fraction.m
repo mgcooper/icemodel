@@ -1,7 +1,7 @@
 function f_wat = water_fraction(f_ice, f_liq)
    %WATER_FRACTION Compute the total volumetric water fraction.
    %
-   %  f_wat = icemodel.water_fraction(f_ice, f_liq)
+   %  f_wat = icemodel.column.water_fraction(f_ice, f_liq)
    %
    % Returns the total water fraction for a control volume, expressed as the
    % sum of liquid-water volume plus the liquid-water-equivalent volume of the

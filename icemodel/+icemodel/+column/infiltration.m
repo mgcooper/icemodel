@@ -1,8 +1,18 @@
-function [f_liq, f_ice, T, ok] = infiltration(f_liq, f_ice, T, ro_ice, ...
-      ro_liq, Tf, TL, fcp, dz, dt)
+function [f_liq, f_ice, T, ok] = infiltration(f_liq, f_ice, T, dz, dt)
    %INFILTRATION Redistribute liquid water between adjacent column layers.
    %
+   % This legacy scaffold redistributes liquid between adjacent column
+   % layers using an explicit flux divergence.
+   %
    %#codegen
+
+   % Load thermodynamic constants and mushy-zone parameters
+   persistent ro_ice ro_liq Tf TL fcp
+   if isempty(ro_ice)
+      [ro_ice, ro_liq, Tf] = icemodel.physicalConstant( ...
+         'ro_ice', 'ro_liq', 'Tf');
+      [TL, fcp] = icemodel.parameterLookup('TL', 'fcp');
+   end
 
    ok = false;
 
@@ -73,7 +83,7 @@ function [f_liq, f_ice, T, ok] = infiltration(f_liq, f_ice, T, ro_ice, ...
       xT = T; xf_liq = f_liq; xf_ice = f_ice;
 
       % Update the water fraction and temperature
-      f_wat = icemodel.water_fraction(f_ice, f_liq);
+      f_wat = icemodel.column.water_fraction(f_ice, f_liq);
       T = Tf - sqrt((f_wat ./ f_liq - 1.0)) ./ fcp;
 
       % f_liq = f_wat ./ (1.0 + (fcp * (Tf - min(T, Tf))) .^ 2.0); % f_liq_new

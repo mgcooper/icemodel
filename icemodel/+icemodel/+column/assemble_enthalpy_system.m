@@ -1,6 +1,6 @@
 function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
-      T_ice, f_ice, f_liq, dHdT, dLdT, drovdT, dH, Sc, ~, k_eff, delz, ...
-      fn, dz, dt, TL, TH, T_sfc, Fc, Fp, bc)
+      T_ice, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, ~, k_eff, delz, ...
+      fn, dz, dt, T_sfc, Fc, Fp, bc)
    %ASSEMBLE_ENTHALPY_SYSTEM Compute the general equation coefficients.
    %
    %  This function constructs the lower, middle, and upper diagonals of the
@@ -35,12 +35,12 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    % but are set when initialized e.g. the gv/gk/dLdT BCs, in other cases they
    % are not used but would be for a frozen soil model.
 
-   persistent Lf Ls Lv ro_liq f_liq_phase_switch_threshold
+   persistent Lf Ls Lv ro_liq f_liq_phase_switch_threshold TL TH
    if isempty(Lf)
       [Lf, Ls, Lv, ro_liq] = icemodel.physicalConstant( ...
          'Lf', 'Ls', 'Lv', 'ro_liq');
-      f_liq_phase_switch_threshold = icemodel.parameterLookup( ...
-         'f_liq_phase_switch_threshold');
+      [f_liq_phase_switch_threshold, TL, TH] = icemodel.parameterLookup( ...
+         'f_liq_phase_switch_threshold', 'TL', 'TH');
    end
 
    % Total number of nodes
@@ -62,7 +62,7 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    if any(wet)
       Lvap(wet) = Lv;
    end
-   aP0 = (dHdT + Lf * ro_liq * dLdT + Lvap .* f_air .* drovdT) .* dz / dt;
+   aP0 = (dHdT + Lf * ro_liq * dFdT + Lvap .* f_air .* drovdT) .* dz / dt;
    gv = ones(JJ, 1);     % Eq 123
    gk = zeros(JJ, 1);    % Eq 123
    LfMZ = zeros(JJ, 1);  % Eq 123, melt-zone latent heat switch
@@ -75,7 +75,7 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    % Cofficients for wet nodes inside the melt zone [W m-2 K-1]
    if sum(iM) > 0
       aP0(iM) = (dHdT(iM) + Lvap(iM) .* f_air(iM) .* drovdT(iM)) .* dz(iM) / dt;
-      gv(iM) = 1 ./ (ro_liq * dLdT(iM)); % Eq 122b
+      gv(iM) = 1 ./ (ro_liq * dFdT(iM)); % Eq 122b
       gk(iM) = T_ice(iM);
       LfMZ(iM) = Lf * dz(iM) / dt;
 
