@@ -41,13 +41,12 @@ function [T, f_ice, f_liq, d_liq, d_evp, x_err] = ...
       TL = icemodel.parameterLookup('TL');
    end
 
-   % Update the residual unfrozen water fraction defined by the phase fraction
-   % characteristic function at the lower temperature boundary. This ensures
+   % Update residual unfrozen liquid fraction per pore volume defined by the
+   % phase fraction function at the lower temperature boundary. This ensures
    % evap does not reduce f_liq below residual water for melting nodes.
    if T(1) > TL
-      f_wat_top = icemodel.column.water_fraction(f_ice(1), f_liq(1));
-      f_liq_min = icemodel.column.meltzone_bounds(f_wat_top);
-      f_liq_res = max(f_liq_res, f_liq_min / (1 - f_ice(1)));
+      f_liq_res = max(f_liq_res, ...
+         icemodel.column.residual_water_fraction(f_ice(1), f_liq(1)));
    end
 
    % Convert residual water mass fraction to volumetric fraction.
