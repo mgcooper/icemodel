@@ -1,5 +1,5 @@
 function [dFdT, f_wat] = liquid_fraction_derivative(T, f_ice, f_liq, f_wat)
-   %LIQUID_FRACTION_DERIVATIVE Differentiate liquid fraction with respect to temperature.
+   %LIQUID_FRACTION_DERIVATIVE Liquid fraction derivative wrt temperature.
    %
    %  [DFDT, F_WAT] = liquid_fraction_derivative(T, F_ICE, F_LIQ)
    %  [DFDT, F_WAT] = liquid_fraction_derivative(..., F_WAT)
@@ -24,6 +24,8 @@ function [dFdT, f_wat] = liquid_fraction_derivative(T, f_ice, f_liq, f_wat)
       % In terms of volumetric liquid fraction:
       f_wat = icemodel.column.water_fraction(f_ice, f_liq);
    end
+
+   % Differentiate the liquid fraction-temperature relationship [K^-1].
    dFdT = 2.0 * fcp ^ 2 * T_dep .* f_wat ./ (1.0 + fcp ^ 2 * T_dep .^ 2) .^ 2;
    dFdT = max(dFdT, sqrt(eps));
 

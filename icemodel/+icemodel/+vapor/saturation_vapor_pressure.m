@@ -1,5 +1,5 @@
 function [es, des_dT, d2es_dT2] = saturation_vapor_pressure(T, liqflag)
-   %saturation_vapor_pressure Compute saturation vapor pressure over liquid or ice.
+   %saturation_vapor_pressure Saturation vapor pressure over liquid or ice.
    %
    %  ES = icemodel.vapor.saturation_vapor_pressure(T, LIQFLAG) computes
    %  saturation vapor pressure using the Ambaum (2020) / Romps (2021)

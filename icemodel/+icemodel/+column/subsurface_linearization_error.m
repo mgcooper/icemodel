@@ -10,23 +10,13 @@ function err = subsurface_linearization_error(T, T_old, f_ice, f_liq, ...
    %
    %#codegen
 
-   persistent Lf Ls Lv ro_liq
+   persistent Lf ro_liq
    if isempty(Lf)
-      [Lf, Ls, Lv, ro_liq] = icemodel.physicalConstant( ...
-         'Lf', 'Ls', 'Lv', 'ro_liq');
+      [Lf, ro_liq] = icemodel.physicalConstant('Lf', 'ro_liq');
    end
 
-   persistent f_liq_phase_switch_threshold
-   if isempty(f_liq_phase_switch_threshold)
-      f_liq_phase_switch_threshold = icemodel.parameterLookup( ...
-         'f_liq_phase_switch_threshold');
-   end
-
-   if f_liq(1) > f_liq_phase_switch_threshold
-      Lv_top = Lv;
-   else
-      Lv_top = Ls;
-   end
+   % Phase-aware latent heat for the top node (scalar).
+   Lv_top = icemodel.vapor.latent_enthalpy_switch(f_liq(1));
 
    err = (dt / dz(1) ...
       * (a2 * (T(2) - T(1)) ...

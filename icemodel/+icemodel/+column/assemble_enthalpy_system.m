@@ -35,12 +35,10 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    % but are set when initialized e.g. the gv/gk/dLdT BCs, in other cases they
    % are not used but would be for a frozen soil model.
 
-   persistent Lf Ls Lv ro_liq f_liq_phase_switch_threshold TL TH
+   persistent Lf ro_liq TL TH
    if isempty(Lf)
-      [Lf, Ls, Lv, ro_liq] = icemodel.physicalConstant( ...
-         'Lf', 'Ls', 'Lv', 'ro_liq');
-      [f_liq_phase_switch_threshold, TL, TH] = icemodel.parameterLookup( ...
-         'f_liq_phase_switch_threshold', 'TL', 'TH');
+      [Lf, ro_liq] = icemodel.physicalConstant('Lf', 'ro_liq');
+      [TL, TH] = icemodel.parameterLookup('TL', 'TH');
    end
 
    % Total number of nodes
@@ -51,18 +49,18 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
 
    % For a soil model, would need indices above the melt zone
    % iH = T > TH;
+   
+   % Phase-aware latent heat: Ls for dry/cold cells, Lv for wet cells.
+   Lv = icemodel.vapor.latent_enthalpy_switch(f_liq, JJ);
 
    % Compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
    g_b_ns = 1 ./ ((1 - fn) ./ [k_eff(1); k_eff] + fn ./ [k_eff; k_eff(JJ)]);
 
-   % Coefficients for frozen nodes outside the melt zone [W m-2 K-1]
+   % Compute the air fraction
    f_air = 1.0 - f_ice - f_liq;
-   Lvap = Ls * ones(JJ, 1);
-   wet = f_liq > f_liq_phase_switch_threshold;
-   if any(wet)
-      Lvap(wet) = Lv;
-   end
-   aP0 = (dHdT + Lf * ro_liq * dFdT + Lvap .* f_air .* drovdT) .* dz / dt;
+   
+   % Coefficients for frozen nodes outside the melt zone [W m-2 K-1]
+   aP0 = (dHdT + Lf * ro_liq * dFdT + Lv .* f_air .* drovdT) .* dz / dt;
    gv = ones(JJ, 1);     % Eq 123
    gk = zeros(JJ, 1);    % Eq 123
    LfMZ = zeros(JJ, 1);  % Eq 123, melt-zone latent heat switch
@@ -74,7 +72,7 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
 
    % Cofficients for wet nodes inside the melt zone [W m-2 K-1]
    if sum(iM) > 0
-      aP0(iM) = (dHdT(iM) + Lvap(iM) .* f_air(iM) .* drovdT(iM)) .* dz(iM) / dt;
+      aP0(iM) = (dHdT(iM) + Lv(iM) .* f_air(iM) .* drovdT(iM)) .* dz(iM) / dt;
       gv(iM) = 1 ./ (ro_liq * dFdT(iM)); % Eq 122b
       gk(iM) = T_ice(iM);
       LfMZ(iM) = Lf * dz(iM) / dt;

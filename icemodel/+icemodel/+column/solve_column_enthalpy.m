@@ -54,12 +54,12 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = solve_column_enthalpy( ..
          T, f_ice, f_liq, k_vap);
 
       % Update bulk enthalpy and derivative wrt temperature
-      [H, dHdT, dLdT] = icemodel.column.bulk_enthalpy( ...
+      [H, dHdT, dFdT] = icemodel.column.bulk_enthalpy( ...
          T, f_ice, f_liq, f_wat, ro_vap, dro_vapdT);
 
       % Update the general equation coefficients
       [aN, aP, aS, b, iM, a1, a2] = icemodel.column.assemble_enthalpy_system( ...
-         T, f_ice, f_liq, dHdT, dLdT, dro_vapdT, H - H_old, Sc, Sp, ...
+         T, f_ice, f_liq, dHdT, dFdT, dro_vapdT, H - H_old, Sc, Sp, ...
          k_eff, delz, fn, dz, dt, T_sfc, Fc, Fp, solver);
 
       % % Check diagonal dominance and condition number
@@ -78,7 +78,7 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = solve_column_enthalpy( ..
 
       % Update the temperature-enthalpy relationship (corrector step)
       [T, f_ice, f_liq, ok] = icemodel.column.meltzone_transform( ...
-         T, T_iter, f_liq, f_wat, dLdT, f_liq_min, f_liq_max, iM, ok, debug);
+         T, T_iter, f_liq, f_wat, dFdT, f_liq_min, f_liq_max, iM, ok, debug);
 
       % If failure, return to the main program and shorten the timestep
       if ~ok
@@ -90,9 +90,8 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = solve_column_enthalpy( ..
          return
       end
 
-      % Mass conservation check
-      assertF(@() all(icemodel.column.water_fraction(f_ice, f_liq) <= ...
-         ro_ice / ro_liq + eps))
+      % Control volume check - max water cannot exceed ro_ice / ro_liq.
+      assertF(@() icemodel.column.assert_max_water(f_ice, f_liq));
 
       % Relaxation and Aitken (not implemented). Proper implementation requires
       % a liquid_fraction_function/meltzone_transform-consistent update of

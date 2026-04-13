@@ -31,16 +31,9 @@ function k_vap = vapor_thermal_diffusion_coefficient(T, f_liq, varargin)
    %
    %#codegen
 
-   persistent Lv Ls f_liq_phase_switch_threshold
-   if isempty(Lv)
-      [Lv, Ls] = icemodel.physicalConstant('Lv', 'Ls');
-      f_liq_phase_switch_threshold = icemodel.parameterLookup( ...
-         'f_liq_phase_switch_threshold');
-   end
-
    if nargin > 3
-      error('vapor_thermal_diffusion_coefficient:UnrecognizedNumberOfInputs', ...
-         'Unrecognized number of inputs.')
+      error('icemodel:vapor:vapor_thermal_diffusion_coefficient:tooManyInputs', ...
+         'Expected 2 or 3 inputs, got %d.', nargin)
    end
 
    % Vapor density derivative [kg m-3 K-1]
@@ -53,12 +46,9 @@ function k_vap = vapor_thermal_diffusion_coefficient(T, f_liq, varargin)
    % Vapor diffusivity [m2 s-1]
    De = icemodel.vapor.vapor_diffusivity(T);
 
-   % Vapor thermal diffusion coefficient [W m-1 K-1]
-   k_vap = Ls * De .* dro_vapdT;
+   % Phase-aware latent heat: Ls for dry/cold cells, Lv for wet cells.
+   Lv = icemodel.vapor.latent_enthalpy_switch(f_liq);
 
-   % Switch to Lv for wet cells
-   wet = f_liq > f_liq_phase_switch_threshold;
-   if any(wet)
-      k_vap(wet) = Lv * De(wet) .* dro_vapdT(wet);
-   end
+   % Vapor thermal diffusion coefficient [W m-1 K-1]
+   k_vap = Lv .* De .* dro_vapdT;
 end
