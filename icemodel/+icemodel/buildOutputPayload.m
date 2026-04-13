@@ -24,6 +24,21 @@ end
 
 function output = normalizeThfDiag(diag)
    %NORMALIZETHFDIAG Map scheme-specific THF diagnostics to stable scalars.
+   %
+   % Standard fields (all schemes):
+   %   thf_es_sfc            - saturation vapor pressure at the surface [Pa]
+   %   thf_stability_factor  - turbulent stability correction factor [-]
+   %   thf_z0m               - momentum roughness length [m]
+   %   thf_z0h               - scalar heat roughness length [m]
+   %   thf_z0q               - scalar moisture roughness length [m]
+   %   thf_u_star            - friction velocity [m s-1]
+   %   thf_L                 - Obukhov length [m] (NaN for bulk-Richardson)
+   %   thf_Re                - roughness Reynolds number [-]
+   %   thf_numiter           - number of THF solver iterations (MO only)
+   %
+   % Bulk-Richardson scalar-exchange experiment fields (NaN for other schemes):
+   %   thf_scalar_exchange_Qh - sensible heat flux with scalar roughness [W m-2]
+   %   thf_scalar_exchange_Qe - latent heat flux with scalar roughness [W m-2]
 
    output = struct( ...
       'thf_es_sfc', NaN, ...
@@ -34,7 +49,9 @@ function output = normalizeThfDiag(diag)
       'thf_u_star', NaN, ...
       'thf_L', NaN, ...
       'thf_Re', NaN, ...
-      'thf_numiter', NaN);
+      'thf_numiter', NaN, ...
+      'thf_scalar_exchange_Qh', NaN, ...
+      'thf_scalar_exchange_Qe', NaN);
 
    if isempty(diag)
       return
@@ -51,6 +68,10 @@ function output = normalizeThfDiag(diag)
    output.thf_Re = getDiagField(diag, 'Re', output.thf_Re);
    output.thf_numiter = getDiagField(diag, 'n_iterations', ...
       output.thf_numiter);
+   output.thf_scalar_exchange_Qh = getDiagField(diag, 'scalar_exchange_Qh', ...
+      output.thf_scalar_exchange_Qh);
+   output.thf_scalar_exchange_Qe = getDiagField(diag, 'scalar_exchange_Qe', ...
+      output.thf_scalar_exchange_Qe);
 end
 
 function value = getDiagField(diag, field_name, default_value)

@@ -4,11 +4,18 @@ function results = run_thf_cases(options)
    %  results = run_thf_cases()
    %  results = run_thf_cases(case_idx=1:4)
    %  results = run_thf_cases(save_results=false)
+   %  results = run_thf_cases(output_profile='diagnostic')
    %
    % Runs all eight THF validation cases (2 sites × 2 year windows × 2
    % schemes) and saves the full run data to
-   %   test/interactive/data/thf_validation_results.mat
-   % for later plotting by plot_thf_cases.
+   %   test/interactive/data/thf_validation_results.mat            (standard)
+   %   test/interactive/data/thf_validation_results_diagnostic.mat (diagnostic)
+   % for later plotting by plot_thf_cases and plot_thf_scalar_comparison.
+   %
+   % output_profile - 'standard' (default) or 'diagnostic'. The diagnostic
+   %   profile adds THF solver internals and the bulk-Richardson scalar-exchange
+   %   experiment fluxes (thf_scalar_exchange_Qh, thf_scalar_exchange_Qe) to
+   %   the output. Required to run plot_thf_scalar_comparison.
    %
    % solver=1 and seb_solver=2 are fixed for every case so comparisons
    % isolate the turbulent-flux scheme rather than the outer coupling mode.
@@ -16,6 +23,8 @@ function results = run_thf_cases(options)
    arguments
       options.case_idx (1,:) double = []
       options.save_results (1,1) logical = true
+      options.output_profile (1,:) char {mustBeMember(options.output_profile, ...
+         {'standard', 'diagnostic'})} = 'standard'
    end
 
    icemodel.config('casename', 'demo');
@@ -34,7 +43,8 @@ function results = run_thf_cases(options)
       c = cases(n);
       fprintf('\n[%d/%d] %s\n', n, numel(cases), c.label);
       [ice1, met, opts, metrics, runtime_seconds] = ...
-         icemodel.test.helpers.runThfValidationCase(c);
+         icemodel.test.helpers.runThfValidationCase(c, ...
+         overrides=struct('output_profile', options.output_profile));
       rows(n) = build_result_row(c, opts, metrics, runtime_seconds);
       run_data{n} = struct('ice1', ice1, 'met', met, 'c', c);
    end
@@ -44,7 +54,11 @@ function results = run_thf_cases(options)
    if ~exist(datadir, 'dir')
       mkdir(datadir);
    end
-   datafile = fullfile(datadir, 'thf_validation_results.mat');
+   if strcmp(options.output_profile, 'diagnostic')
+      datafile = fullfile(datadir, 'thf_validation_results_diagnostic.mat');
+   else
+      datafile = fullfile(datadir, 'thf_validation_results.mat');
+   end
    timestamp = datetime('now');
 
    if options.save_results
