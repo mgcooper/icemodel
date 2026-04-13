@@ -7,7 +7,8 @@ function setup(testCase)
    % Build one synthetic workspace that can drive helper-level and
    % operational turbulent-flux tests.
 
-   testCase.TestData.workspace = icemodel.test.fixtures.makeSyntheticWorkspace( ...
+   testCase.TestData.workspace = ...
+      icemodel.test.fixtures.makeSyntheticWorkspace( ...
       2016, configure=true, nsteps=12, dt_seconds=900);
 end
 
@@ -21,26 +22,38 @@ end
 function test_surface_roughness_length_switches_on_snow_depth(testCase)
    % Snow depth, not bulk density alone, should decide snow versus ice.
 
-   z0m_ice = icemodel.surface.surface_roughness_length(0.0, 450.0, 0.02, 1e-3, 5e-4);
-   z0m_snow_low = icemodel.surface.surface_roughness_length(0.2, 350.0, 0.02, ...
-      1e-3, 5e-4);
-   z0m_snow_high = icemodel.surface.surface_roughness_length(0.2, 700.0, 0.02, ...
-      1e-3, 5e-4);
+   snow_depth = [0.0, 0.2, 0.2];
+   ro_sfc = [450.0, 350.0, 700.0];
+   z0_ice = [0.02, 0.02, 0.02];
+   z0_snow_low_density = [1e-3, 1e-3, 1e-3];
+   z0_snow_high_density = [5e-4, 5e-4, 5e-4];
+
+   z0m_ice = icemodel.surface.surface_roughness_length(snow_depth(1), ...
+      ro_sfc(1), z0_ice(1), z0_snow_low_density(1), z0_snow_high_density(1));
+
+   z0m_snow_low = icemodel.surface.surface_roughness_length(snow_depth(2), ...
+      ro_sfc(2), z0_ice(2), z0_snow_low_density(2), z0_snow_high_density(2));
+
+   z0m_snow_high = icemodel.surface.surface_roughness_length(snow_depth(3), ...
+      ro_sfc(3), z0_ice(3), z0_snow_low_density(3), z0_snow_high_density(3));
 
    testCase.verifyEqual(z0m_ice, 0.02, 'AbsTol', 1e-12);
    testCase.verifyEqual(z0m_snow_low, 1e-3, 'AbsTol', 1e-12);
    testCase.verifyEqual(z0m_snow_high, 5e-4, 'AbsTol', 1e-12);
 end
 
-function test_surface_roughness_length_accepts_vectors(testCase)
-   % The roughness selector should diagnose each state elementwise for
-   % vector surface states used in postprocessing or helper-level tests.
+function test_surface_roughness_length_vector_diags_use_external_loop(testCase)
+   % surface_roughness_length is intentionally scalar. Diagnostic callers
+   % that want a vector of states should loop externally.
 
    snow_depth = [0.0; 0.2; 0.2];
    ro_sfc = [450.0; 350.0; 700.0];
 
-   z0m = icemodel.surface.surface_roughness_length( ...
-      snow_depth, ro_sfc, 0.02, 1e-3, 5e-4);
+   z0m = NaN(size(snow_depth));
+   for n = 1:numel(snow_depth)
+      z0m(n) = icemodel.surface.surface_roughness_length( ...
+         snow_depth(n), ro_sfc(n), 0.02, 1e-3, 5e-4);
+   end
 
    testCase.verifyEqual(z0m, [0.02; 1e-3; 5e-4], 'AbsTol', 1e-12);
 end
@@ -98,12 +111,17 @@ function test_bulk_richardson_dispatch_matches_legacy_flux_kernels(testCase)
    s = icemodel.test.fixtures.makeSyntheticColumnState( ...
       testCase.TestData.workspace, 'icemodel', solver=1, ...
       testname='bulk_richardson_dispatch');
+
    T_sfc = icemodel.surface.physical_surface_temperature(s.Ts);
+
    stability = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
       T_sfc, s.tair, s.wspd, s.br_coefs);
+
    es_sfc = icemodel.vapor.saturation_vapor_pressure(T_sfc, s.liqflag);
+
    Qe_ref = icemodel.surface.turbulence.bulk_richardson.latent_heat_flux( ...
       es_sfc, s.ea_atm, s.De, stability, s.psfc, s.roL);
+
    Qh_ref = icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux( ...
       T_sfc, s.tair, s.De, stability);
 
@@ -124,13 +142,16 @@ function test_bulk_richardson_scalar_exchange_weakens_rough_ice_fluxes(testCase)
       testCase.TestData.workspace, 'icemodel', 2016, solver=1, ...
       z0_bulk=0.05, testname='bulk_richardson_scalar_experiment');
 
+   [roLs, epsilon, cv_air] = icemodel.physicalConstant( ...
+      'roLs', 'epsilon', 'cv_air');
+
    tair = 268.15;
    T_sfc = 263.15;
    wspd = 6.0;
    psfc = 90000.0;
    rh = 75.0;
    ea_atm = icemodel.surface.atmospheric_vapor_pressure(tair, rh, false);
-   [roLs, epsilon] = icemodel.physicalConstant('roLs', 'epsilon');
+
    [De, br_coefs] = ...
       icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
       wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
@@ -138,9 +159,14 @@ function test_bulk_richardson_scalar_exchange_weakens_rough_ice_fluxes(testCase)
    ro_sfc = 650.0;
    snow_depth = 0.0;
    liqflag = false;
+
    [Qe, Qh, diag] = icemodel.surface.diagnose_turbulent_heat_fluxes(T_sfc, ...
       tair, wspd, psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, roLs, ...
       liqflag, opts);
+
+   Qh_expected = cv_air * De * diag.stability_factor * (tair - T_sfc);
+   Qe_expected = roLs * De * diag.stability_factor ...
+      * (epsilon / psfc * (ea_atm - diag.es_sfc));
 
    testCase.verifyTrue(diag.scalar_exchange_active);
    testCase.verifyGreaterThan(diag.scalar_exchange_z_obs, diag.z0m);
@@ -148,11 +174,9 @@ function test_bulk_richardson_scalar_exchange_weakens_rough_ice_fluxes(testCase)
    testCase.verifyLessThan(diag.z0q, diag.z0m);
    testCase.verifyLessThan(diag.scalar_exchange_De_h, De);
    testCase.verifyLessThan(diag.scalar_exchange_De_e, De);
-   cv_air = icemodel.physicalConstant('cv_air');
-   testCase.verifyEqual(Qh, cv_air * De * diag.stability_factor * (tair - T_sfc), ...
-      'RelTol', 1e-12);
-   testCase.verifyEqual(Qe, roLs * De * diag.stability_factor ...
-      * (epsilon / psfc * (ea_atm - diag.es_sfc)), 'RelTol', 1e-12);
+
+   testCase.verifyEqual(Qh, Qh_expected, 'RelTol', 1e-12);
+   testCase.verifyEqual(Qe, Qe_expected, 'RelTol', 1e-12);
    testCase.verifyLessThan(abs(diag.scalar_exchange_Qh), abs(Qh));
    testCase.verifyLessThan(abs(diag.scalar_exchange_Qe), abs(Qe));
 end
@@ -161,13 +185,14 @@ function test_bulk_richardson_scalar_exchange_noop_for_calm_air(testCase)
    % The scalar-exchange experiment should degrade gracefully when the
    % current De contract provides no usable aerodynamic signal.
 
+   roLs = icemodel.physicalConstant('roLs');
+
    tair = 268.15;
    T_sfc = 263.15;
    wspd = 0.0;
    psfc = 90000.0;
    De = 0.0;
    ea_atm = 300.0;
-   roLs = icemodel.physicalConstant('roLs');
    br_coefs = [NaN, NaN, NaN];
    liqflag = false;
    z0_bulk = 0.05;
@@ -190,25 +215,30 @@ function test_bulk_mo_finite_and_weaker_scalar_exchange_for_rough_ice(testCase)
    opts_liston = icemodel.test.helpers.buildSyntheticOpts( ...
       testCase.TestData.workspace, 'icemodel', 2016, solver=1, z0_bulk=0.05, ...
       testname='rough_bulk_richardson');
+
    opts_vanas = icemodel.test.helpers.buildSyntheticOpts( ...
       testCase.TestData.workspace, 'icemodel', 2016, solver=1, ...
       seb_solver=2, turbulent_flux_scheme='monin_obukhov', z0_bulk=0.05, ...
       z0_ice=0.05, testname='rough_bulk_mo');
 
+   roLs = icemodel.physicalConstant('roLs');
+
+   % Setup required forcings
    tair = 268.15;
    T_sfc = 263.15;
    wspd = 6.0;
    psfc = 90000.0;
    rh = 75.0;
    ea_atm = icemodel.surface.atmospheric_vapor_pressure(tair, rh, false);
-   roLs = icemodel.physicalConstant('roLs');
    [De, br_coefs] = ...
       icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
       wspd, 0.05, opts_liston.z_tair, opts_liston.z_wind);
 
+   % Compute turbulent heat fluxes
    ro_sfc = 650.0;
    snow_depth = 0.0;
    liqflag = false;
+
    [Qe_liston, Qh_liston] = icemodel.surface.diagnose_turbulent_heat_fluxes( ...
       T_sfc, tair, wspd, psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, ...
       roLs, liqflag, opts_liston);
@@ -223,34 +253,47 @@ function test_bulk_mo_finite_and_weaker_scalar_exchange_for_rough_ice(testCase)
    testCase.verifyLessThan(abs(Qe_vanas), abs(Qe_liston));
 end
 
-function test_bulk_mo_accepts_vector_states(testCase)
-   % The reusable bulk-MO helper should accept a vector of independent
-   % surface states even though the production solver uses it one state at a time.
+function test_bulk_mo_vector_diagnostics_use_external_loop(testCase)
+   % The bulk-MO solver is intentionally scalar in production. Diagnostic
+   % callers that want a vector of independent states should loop outside
+   % the helper rather than relying on internal broadcasting.
 
    opts_vanas = icemodel.test.helpers.buildSyntheticOpts( ...
       testCase.TestData.workspace, 'icemodel', 2016, solver=1, ...
       seb_solver=2, turbulent_flux_scheme='monin_obukhov', ...
       testname='vector_bulk_mo');
 
+   roLs = icemodel.physicalConstant('roLs');
+
+   % Setup forcings
    tair = 268.15 * ones(3, 1);
    T_sfc = [263.15; 264.15; 265.15];
    wspd = [4.0; 5.0; 6.0];
    psfc = 90000.0 * ones(3, 1);
-   ea_atm = icemodel.surface.atmospheric_vapor_pressure(tair, 75 * ones(3, 1), false);
-   roLs = icemodel.physicalConstant('roLs');
+   ea_atm = icemodel.surface.atmospheric_vapor_pressure( ...
+      tair, 75 * ones(3, 1), false);
+
    ro_sfc = 650.0 * ones(3, 1);
    snow_depth = zeros(3, 1);
    liqflag = false(3, 1);
 
-   [Qe, Qh, diag] = icemodel.surface.turbulence.monin_obukhov.turbulent_heat_flux( ...
-      T_sfc, tair, wspd, psfc, ea_atm, ro_sfc, snow_depth, ...
-      roLs * ones(3, 1), liqflag, opts_vanas);
+   % Compute turbulent heat fluxes
+   Qe = NaN(size(T_sfc));
+   Qh = NaN(size(T_sfc));
+   diag = cell(size(T_sfc));
+   for n = 1:numel(T_sfc)
+      [Qe(n), Qh(n), diag{n}] = ...
+         icemodel.surface.turbulence.monin_obukhov.turbulent_heat_flux( ...
+         T_sfc(n), tair(n), wspd(n), psfc(n), ea_atm(n), ro_sfc(n), ...
+         snow_depth(n), roLs, liqflag(n), opts_vanas);
+   end
 
    testCase.verifyEqual(size(Qe), size(T_sfc));
    testCase.verifyEqual(size(Qh), size(T_sfc));
    testCase.verifyEqual(size(diag), size(T_sfc));
    testCase.verifyTrue(all(isfinite(Qe)));
    testCase.verifyTrue(all(isfinite(Qh)));
+   testCase.verifyTrue(all(cellfun(@(x) isstruct(x) && isfield(x, 'L'), diag)));
 end
 
 function test_monin_obukhov_respects_surface_phase_switch(testCase)
@@ -258,21 +301,24 @@ function test_monin_obukhov_respects_surface_phase_switch(testCase)
    % atmospheric state.
 
    opts_vanas = icemodel.test.helpers.buildSyntheticOpts( ...
-      testCase.TestData.workspace, 'icemodel', 2016, solver=1, ...
-      seb_solver=2, turbulent_flux_scheme='monin_obukhov', testname='phase_bulk_mo');
+      testCase.TestData.workspace, 'icemodel', 2016, solver=1, seb_solver=2, ...
+      turbulent_flux_scheme='monin_obukhov', testname='phase_bulk_mo');
 
+   roLs = icemodel.physicalConstant('roLs');
+
+   % Setup forcings
    tair = 273.15;
    T_sfc = 272.15;
    wspd = 5.0;
    psfc = 90000.0;
    ea_atm = icemodel.surface.atmospheric_vapor_pressure(tair, 90.0, false);
-   roLs = icemodel.physicalConstant('roLs');
    [De, br_coefs] = ...
       icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
       wspd, opts_vanas.z0_bulk, opts_vanas.z_tair, opts_vanas.z_wind);
    ro_sfc = 600.0;
    snow_depth = 0.0;
 
+   % Compute turbulent heat fluxes
    [Qe_ice, ~, diag_ice] = icemodel.surface.diagnose_turbulent_heat_fluxes( ...
       T_sfc, tair, wspd, psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, ...
       roLs, false, opts_vanas);
@@ -306,10 +352,13 @@ function test_monin_obukhov_cold_state_remains_continuous(testCase)
    De = 0.0;
    br_coefs = [];
 
-   [Qe1, Qh1, diag1] = icemodel.surface.diagnose_turbulent_heat_fluxes(T_sfc_1, tair, ...
-      wspd, psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, roL, liqflag, opts_vanas);
-   [Qe2, Qh2, diag2] = icemodel.surface.diagnose_turbulent_heat_fluxes(T_sfc_2, tair, ...
-      wspd, psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, roL, liqflag, opts_vanas);
+   [Qe1, Qh1, diag1] = icemodel.surface.diagnose_turbulent_heat_fluxes( ...
+      T_sfc_1, tair, wspd, psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, ...
+      roL, liqflag, opts_vanas);
+
+   [Qe2, Qh2, diag2] = icemodel.surface.diagnose_turbulent_heat_fluxes( ...
+      T_sfc_2, tair, wspd, psfc, ea_atm, De, br_coefs, ro_sfc, snow_depth, ...
+      roL, liqflag, opts_vanas);
 
    testCase.verifyTrue(all(isfinite([Qe1, Qh1, Qe2, Qh2, diag1.L, diag2.L])));
    testCase.verifyLessThan(abs(Qh2 - Qh1), 1e-2);
@@ -399,6 +448,7 @@ function test_vapor_tendency_uses_physical_surface_temperature(testCase)
       turbulent_flux_scheme='monin_obukhov', z0_ice=0.02, ...
       testname='potential_vapor_tendency');
    Lv = icemodel.physicalConstant('Lv');
+
    Ts_solver = s.Tf + 3.0;
 
    [d_pevp, pevp, Qe, Ts_phys] = ...
@@ -410,6 +460,7 @@ function test_vapor_tendency_uses_physical_surface_temperature(testCase)
       icemodel.surface.physical_surface_temperature(Ts_solver), ...
       s.tair, s.wspd, s.psfc, s.ea_atm, s.De, s.br_coefs, s.ro_sfc, ...
       s.snow_depth, s.roL, s.liqflag, s.opts);
+
    [Qe_uncapped, ~] = icemodel.surface.diagnose_turbulent_heat_fluxes( ...
       Ts_solver, s.tair, s.wspd, s.psfc, s.ea_atm, s.De, s.br_coefs, ...
       s.ro_sfc, s.snow_depth, s.roL, s.liqflag, s.opts);
