@@ -46,20 +46,30 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    end
 
    % Initialize the column state exactly as the model kernel would.
-   [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
-      z_nodes, ro_air_Lv, liqflag, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, ...
-      f_ell_max, f_ice_min, f_liq_res, ro_iwe, ro_wie] = ...
-      icemodel.column.initialize_column_state(opts, met.tair, r_eff);
+   [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, delz, ...
+      z_nodes, f_liq_res] = icemodel.column.initialize_column_state( ...
+      opts, met.tair, r_eff);
+
+   % Initialize the surface state (liqflag, ro_air_Lv, ea_atm, De, br_coefs).
+   [De_all, scoef, liqflag, ro_air_Lv, ea_atm_all] = ...
+      icemodel.surface.initialize_surface_state( ...
+      f_liq, met.wspd, met.tair, met.rh, opts);
+
+   % Derived column quantities not returned by initialize_column_state.
+   JJ = numel(dz);
+   Fc = 1;
+   Fp = 1;
+   [TL, TH, f_ell_min, f_ell_max] = icemodel.parameterLookup( ...
+      'TL', 'TH', 'f_ell_min', 'f_ell_max');
+   f_ice_min = opts.f_ice_min;
 
    metstep = kwargs.metstep;
 
-   % Extract one forcing step and the corresponding transfer coefficients.
-   [tair, swd, lwd, albedo, wspd, psfc, ea, De, forcing_snow_depth] ...
+   % Extract one forcing step.
+   [tair, swd, lwd, albedo, wspd, psfc, ~, ~, forcing_snow_depth] ...
       = icemodel.timestepping.getforcings(met, metstep, liqflag, opts);
-
-   [~, scoef] = ...
-      icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
-      wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
+   De  = De_all(metstep);
+   ea  = ea_atm_all(metstep);
 
    % Carry precipitation fields when the synthetic met fixture defines them.
    if ismember('ppt', met.Properties.VariableNames)
@@ -79,6 +89,10 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
       'SB', 'k_liq', 'ro_ice', 'ro_liq', 'ro_air', 'Ls', 'Lf', 'roLf', ...
       'Rv', 'Tf', 'epsilon', 'roLs', 'roLv');
    [emiss, fcp] = icemodel.parameterLookup('emiss', 'fcp');
+
+   % Derived density ratios (depend on ro_ice/ro_liq from physicalConstant).
+   ro_iwe = ro_ice / ro_liq;
+   ro_wie = ro_liq / ro_ice;
 
    % Package the resolved state so kernel tests can reuse it directly.
    state = struct();

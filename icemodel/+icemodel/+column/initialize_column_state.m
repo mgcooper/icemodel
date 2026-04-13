@@ -1,20 +1,33 @@
-function [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
-      z_nodes, ro_air_Lv, liqflag, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, ...
-      f_ell_max, f_ice_min, f_liq_res, ro_iwe, ro_wie] = ...
-      initialize_column_state(opts, tair, r_eff)
+function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
+      delz, z_nodes, f_liq_res] = initialize_column_state(opts, tair, r_eff)
    %INITIALIZE_COLUMN_STATE Initialize the 1-d ice column state.
+   %
+   %  [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, ...
+   %   dz, delz, z_nodes, f_liq_res] = ...
+   %     icemodel.column.initialize_column_state(opts, tair, r_eff)
+   %
+   %  Returns the minimal set of column-state variables needed by the
+   %  model kernel. Physical constants (TL, TH, Lf, …), thermodynamic
+   %  parameters (f_ell_min, f_ell_max, ro_iwe, …), and surface-state
+   %  variables (liqflag, ro_air_Lv) are intentionally excluded:
+   %
+   %   - Physical constants and parameters: fetch from
+   %     icemodel.physicalConstant / icemodel.parameterLookup where needed.
+   %   - JJ: numel(dz).
+   %   - Fc, Fp: initialized to 1 in the caller (boundary linearization
+   %     scalars that are overwritten on the first solver iteration).
+   %   - liqflag, ro_air_Lv: computed by
+   %     icemodel.surface.initialize_surface_state.
    %
    %#codegen
 
    debug = false;
 
    % LOAD PHYSICAL CONSTANTS AND PARAMETERS
-   [cp_ice, ro_ice, ro_liq, k_ice, Tf, roLs, roLv] ...
-      = icemodel.physicalConstant( ...
-      'cp_ice', 'ro_ice', 'ro_liq', 'k_ice', 'Tf', 'roLs', 'roLv');
+   [cp_ice, ro_ice, ro_liq, k_ice, Tf] ...
+      = icemodel.physicalConstant('cp_ice', 'ro_ice', 'ro_liq', 'k_ice', 'Tf');
 
-   [fcp, f_liq_phase_switch_threshold] = icemodel.parameterLookup( ...
-      'fcp', 'f_liq_phase_switch_threshold');
+   fcp = icemodel.parameterLookup('fcp');
 
    % GENERATE A THERMAL MESH
    dz_therm = opts.dz_thermal;
@@ -34,12 +47,9 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
       ro_ice = ro_glc;
       ro_liq = ro_glc;
    end
-   ro_iwe = ro_ice / ro_liq;
-   ro_wie = ro_liq / ro_ice;
 
-   % LOWER AND UPPER MELT ZONE TEMPERATURE AND WATER (MASS) FRACTION
-   [TL, TH, f_ell_min, f_ell_max] = icemodel.parameterLookup( ...
-      'TL', 'TH', 'f_ell_min', 'f_ell_max');
+   % Lower melt-zone temperature bound (needed for initial T profile only)
+   [TL] = icemodel.parameterLookup('TL');
 
    % INITIALIZE CORE STATE VARIABLES
    if opts.use_restart
@@ -80,22 +90,8 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
    Sc = zeros(JJ, 1);
    Sp = zeros(JJ, 1);
 
-   % BOUNDARY FLUX LINEARIZATION SCALARS
-   Fc = 1;
-   Fp = 1;
-
-   % STATE VARIABLES AND PARAMETERS NEEDED ON THE FIRST ITERATION
-   f_ice_min = opts.f_ice_min;
+   % RESIDUAL LIQUID-WATER FRACTION (per opts; may be updated during run)
    f_liq_res = opts.f_liq_resid;
-
-   % SEB flag used for vapor-pressure phase selection
-   liqflag = f_liq(1) > f_liq_phase_switch_threshold;
-   if liqflag
-      ro_air_Lv = roLv;
-   else
-      ro_air_Lv = roLs;
-   end
-   % zD = sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
 
    % INITIALIZE THE OUTPUT STRUCTURES
    for n = 1:numel(opts.vars1) % ice1 = 1-d data
