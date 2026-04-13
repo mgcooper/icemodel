@@ -1,5 +1,5 @@
 function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, albedo, ...
-      wspd, ppt, tppt, psfc, De, ea_atm, br_coefs, roL, liqflag, chi)
+      wspd, ppt, tppt, psfc, De, ea_atm, br_coefs, ro_air_Lv, liqflag, chi)
    %SURFACE_FLUX_LINEARIZATION Linearize the surface energy balance equation.
    %
    % The linearization is of the form: F = Fc + Fp * T
@@ -35,7 +35,7 @@ function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, albedo, ..
    % Dirichlet solve (solve_surface_temperature) includes dQc/dT_sfc directly in
    % the Newton-Raphson Jacobian.
    %
-   % See also: icemodel.surface.numerical_surface_flux_linearization
+   % See also: icemodel.surface.numerical_surface_flux
    %
    %#codegen
 
@@ -58,7 +58,7 @@ function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, albedo, ..
    % state. The Robin solve handles conduction in the interior column system.
    [Qe, Qh] = ...
       icemodel.surface.turbulence.bulk_richardson.turbulent_heat_flux( ...
-      T_sfc, tair, wspd, psfc, ea_atm, De, br_coefs, roL, liqflag, NaN);
+      T_sfc, tair, wspd, psfc, ea_atm, De, br_coefs, ro_air_Lv, liqflag, NaN);
    Qa = icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
    Qsn = icemodel.surface.net_shortwave_radiation(Qsi, albedo, chi);
    [Qln, dQln_dT] = icemodel.surface.net_longwave_radiation(T_sfc, Qli);
@@ -68,14 +68,14 @@ function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, albedo, ..
    %%% Linearizations
 
    % Net longwave radiation.
-   Fp_Qln = -4.0 * emiss * SB * T_sfc ^ 3;
+   Fp_Qln = dQln_dT;
 
    % Sensible heat flux.
    Fp_Qh = -cv_air * De * stability;
 
    % Latent heat flux (linearization of es_sfc around T_sfc)
    % es(T) ≈ es + des_dT * (T - T_sfc) = (es - des_dT * T_sfc) + des_dT * T
-   Fp_Qe = -roL * De * epsilon / psfc * stability * des_sfc_dT;
+   Fp_Qe = -ro_air_Lv * De * epsilon / psfc * stability * des_sfc_dT;
 
    % Total linearization.
    Fp = Fp_Qln + Fp_Qh + Fp_Qe;
