@@ -47,7 +47,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
 
    % Initialize the column state exactly as the model kernel would.
    [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
-      z_nodes, roL, liqflag, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, ...
+      z_nodes, ro_air_Lv, liqflag, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, ...
       f_ell_max, f_ice_min, f_liq_res, ro_iwe, ro_wie] = ...
       icemodel.column.initialize_column_state(opts, met.tair, r_eff);
 
@@ -117,7 +117,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    state.ro_iwe = ro_iwe;
    state.ro_wie = ro_wie;
    state.liqflag = liqflag;
-   state.roL = roL;
+   state.ro_air_Lv = ro_air_Lv;
 
    state.tair = tair;
    state.swd = swd;

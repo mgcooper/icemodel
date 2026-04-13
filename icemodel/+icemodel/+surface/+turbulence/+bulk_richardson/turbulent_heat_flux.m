@@ -1,5 +1,5 @@
 function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, ...
-      wspd, psfc, ea_atm, De, br_coefs, roL, liqflag, z0_bulk)
+      wspd, psfc, ea_atm, De, br_coefs, ro_air_Lv, liqflag, z0_bulk)
    %TURBULENT_HEAT_FLUX Evaluate the bulk-Richardson THF scheme.
    %
    %  [Qe, Qh] = ...
@@ -22,7 +22,7 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, ...
 
    % Latent heat flux at the surface.
    Qe = icemodel.surface.turbulence.bulk_richardson.latent_heat_flux( ...
-      es_sfc, ea_atm, De, stability, psfc, roL);
+      es_sfc, ea_atm, De, stability, psfc, ro_air_Lv);
 
    % Sensible heat flux at the surface. Keep as an optional second output for
    % callers like potential_surface_vapor_tendency that only require Qe.
@@ -34,17 +34,17 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, ...
    % Diagnostics for callers that request it.
    if nargout > 2
       diag = bulk_richardson_diag(T_sfc, es_sfc, tair, wspd, psfc, De, ...
-         ea_atm, stability, roL, z0_bulk);
+         ea_atm, stability, ro_air_Lv, z0_bulk);
    end
 end
 
 function diag = bulk_richardson_diag(T_sfc, es_sfc, tair, wspd, psfc, De, ...
-      ea_atm, stability, roL, z0_bulk)
+      ea_atm, stability, ro_air_Lv, z0_bulk)
    %BULK_RICHARDSON_DIAG Assemble optional diagnostics for test/debug use.
 
    diag_scalar = ...
       icemodel.surface.turbulence.bulk_richardson.scalar_exchange_diagnostics( ...
-      T_sfc, es_sfc, tair, wspd, psfc, De, ea_atm, stability, roL, z0_bulk);
+      T_sfc, es_sfc, tair, wspd, psfc, De, ea_atm, stability, ro_air_Lv, z0_bulk);
 
    diag = struct( ...
       'scheme', 'bulk_richardson', ...

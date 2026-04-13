@@ -54,12 +54,12 @@ function test_turbulent_flux_kernels_follow_sign_convention(testCase)
    es_sfc = 300;
    ea_atm = 350;
    psfc = 78000;
-   roL = 2.5e9;
+   ro_air_Lv = 2.5e9;
 
    Qh = icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux( ...
       T_sfc, tair, De, stability);
    Qe = icemodel.surface.turbulence.bulk_richardson.latent_heat_flux( ...
-      es_sfc, ea_atm, De, stability, psfc, roL);
+      es_sfc, ea_atm, De, stability, psfc, ro_air_Lv);
 
    testCase.verifyGreaterThan(Qh, 0);
    testCase.verifyGreaterThan(Qe, 0);
@@ -190,7 +190,7 @@ function test_bulk_richardson_flux_helpers_accept_vectors(testCase)
    De = [0.001; 0.001; 0.001];
    psfc = 90000 * ones(3, 1);
    ea_atm = [250; 250; 250];
-   roL = icemodel.physicalConstant('roLs') * ones(3, 1);
+   ro_air_Lv = icemodel.physicalConstant('roLs') * ones(3, 1);
    z0_bulk = 1e-3;
 
    [~, br_coefs] = ...
@@ -201,7 +201,7 @@ function test_bulk_richardson_flux_helpers_accept_vectors(testCase)
       T_sfc, tair, wspd, br_coefs);
    es_sfc = icemodel.vapor.saturation_vapor_pressure(T_sfc, false);
    Qe = icemodel.surface.turbulence.bulk_richardson.latent_heat_flux( ...
-      es_sfc, ea_atm, De, stability, psfc, roL);
+      es_sfc, ea_atm, De, stability, psfc, ro_air_Lv);
    Qh = icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux( ...
       T_sfc, tair, De, stability);
 

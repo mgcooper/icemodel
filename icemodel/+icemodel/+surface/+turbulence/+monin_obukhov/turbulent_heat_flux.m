@@ -1,5 +1,5 @@
 function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
-      psfc, ea_atm, ro_sfc, snow_depth, roL, liqflag, opts)
+      psfc, ea_atm, ro_sfc, snow_depth, ro_air_Lv, liqflag, opts)
    %TURBULENT_HEAT_FLUX Evaluate the Monin-Obukhov THF scheme.
    %
    %  [Qe, Qh] = ...
@@ -31,7 +31,7 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
    % Smeets and van den Broeke (2008) over rough bare ice. Stable profile
    % corrections use Holtslag and de Bruin; unstable corrections use the
    % Paulson/Dyer forms. Surface vapor pressure remains phase-aware through
-   % the existing liqflag/roL contract.
+   % the existing liqflag/ro_air_Lv contract.
    %
    % The implementation follows van As et al., 2005:
    %     van As et al., 2005, The Summer Surface Energy Balance of the High
@@ -70,7 +70,7 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
    ro_atm = icemodel.vapor.moist_air_density(psfc, ea_atm, tair);
    nu_air = icemodel.kernels.air_kinematic_viscosity(tair, ro_atm);
    cp_air = cv_air / ro_air_ref;
-   Le_air = roL / ro_air_ref;
+   Lv_air = ro_air_Lv / ro_air_ref;
 
    q_air = icemodel.vapor.specific_humidity_from_vapor_pressure(ea_atm, psfc);
    q_sfc = icemodel.vapor.specific_humidity_from_vapor_pressure(es_sfc, psfc);
@@ -150,7 +150,7 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
       % is the local moist-air density, so using ro_atm here is more consistent
       % than assuming the fixed reference density used by the older
       % bulk-Richardson path.
-      Qe = ro_atm * Le_air * u_star * q_star;
+      Qe = ro_atm * Lv_air * u_star * q_star;
       if nargout > 1
          Qh = ro_atm * cp_air * u_star * theta_star;
       end

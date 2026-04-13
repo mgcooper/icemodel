@@ -23,7 +23,7 @@ function [f_ice, f_liq, d_con, xd_sbl] = apply_surface_vapor_mass_change( ...
    f_liq_top = f_liq(1);
    f_ice_top = f_ice(1);
 
-   % Compute top-layer residual water fraction
+   % Compute top-layer residual water fraction per pore volume
    f_res = f_liq_resid * (1.0 - f_ice_top);
 
    % Clarify the CV budget. Note for glacier ice or any medium w/"closed" pores,
@@ -50,7 +50,7 @@ function [f_ice, f_liq, d_con, xd_sbl] = apply_surface_vapor_mass_change( ...
       if d_pevp < 0 % evaporation
 
          if f_liq_top < f_res % f_liq_top - f_res < 0
-            % only residual water exists, send d_pevp to SUBL
+            % only residual water exists, send d_pevp to sublimation
             xd_evp = d_pevp;
 
             %fprintf('metstep = %d, f_liq(1) < f_res\n',metstep)
@@ -67,9 +67,9 @@ function [f_ice, f_liq, d_con, xd_sbl] = apply_surface_vapor_mass_change( ...
             xd_evp = d_pevp - d_aevp; % remaining energy goes to sublimation
          end
 
-         % Send energy demand not satisfied by evaporation to SUBL
-         [f_ice, xd_sbl] = SUBL(xd_evp, f_ice, f_liq, f_ice_min, ro_ice, ...
-            ro_liq, Lv, Ls);
+         % Send energy demand not satisfied by evaporation to sublimation
+         [f_ice, xd_sbl] = sublimation(xd_evp, f_ice, f_liq, f_ice_min, ...
+            ro_ice, ro_liq, Lv, Ls);
 
       elseif d_pevp > 0 % condensation
 
@@ -87,14 +87,14 @@ function [f_ice, f_liq, d_con, xd_sbl] = apply_surface_vapor_mass_change( ...
       end
 
    else % dry/cold ice: sublimation or direct deposition to ice
-      [f_ice, xd_sbl] = SUBL(d_pevp, f_ice, f_liq, f_ice_min, ro_ice, ...
-         ro_liq, Lv, Ls);
+      [f_ice, xd_sbl] = sublimation(d_pevp, f_ice, f_liq, f_ice_min, ...
+         ro_ice, ro_liq, Lv, Ls);
    end
 end
 
 %% Vapor exchange with the ice phase
-function [f_ice, xd_sbl] = SUBL(d_pevp, f_ice, f_liq, f_ice_min, ro_ice, ...
-      ro_liq, Lv, Ls)
+function [f_ice, xd_sbl] = sublimation(d_pevp, f_ice, f_liq, f_ice_min, ...
+      ro_ice, ro_liq, Lv, Ls)
 
    xd_sbl = 0;
    f_liq_top = f_liq(1);
@@ -106,14 +106,14 @@ function [f_ice, xd_sbl] = SUBL(d_pevp, f_ice, f_liq, f_ice_min, ro_ice, ...
    % Therefore:
    % d_psbl = d_pevp * (Lv * ro_liq) / (Ls * ro_ice)
 
-   % Note: in icemodel, roL is set to roLv or roLs depending on liqflag, so Qe
-   % is already computed wrt to them. That way evap/subl are computed using the
-   % same formula: e = Qe / roL * dt / dz.
+   % Note: in icemodel, ro_air_Lv is set to ro_air * Lv or ro_air * Ls depending
+   % on liqflag, so Qe is already computed wrt to them. That way evap/subl are
+   % computed using the same formula: e = Qe / ro_air_Lv * dt / dz.
    %
    % The conversion here conserves heat when the surface latent heat flux, Qe,
    % cannot be satisfied by evaporation alone (all available water evaporates),
    % and the remainder is allocated to sublimation of ice using the conversion:
-   % d_sbl = xd_evp * roLv / roLs
+   % d_sbl = xd_evp * Lv * ro_liq / (Ls * ro_ice)
 
    % Convert potential evap to potential subl in ice frac-equivalent thickness
    d_psbl = d_pevp * (Lv * ro_liq) / (Ls * ro_ice);

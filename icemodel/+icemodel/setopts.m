@@ -191,7 +191,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.solver          = 1;     % recommended: 3
 
       % surface (SEB) solver (Dirichlet Ts boundary condition when solver = 1)
-      opts.seb_solver      = 1;     % recommended: 2 (1=analytic, 2=numeric)
+      opts.seb_solver      = 2;     % recommended: 2 (1=analytic, 2=numeric)
       opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
 
       opts.maxiter         = 100;   % thermal solver max iterations

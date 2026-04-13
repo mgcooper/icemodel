@@ -1,6 +1,6 @@
-function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, albedo, ...
-      wspd, ppt, tppt, psfc, De, ea_atm, br_coefs, roL, liqflag, chi, k_eff, ...
-      T_ice, dz)
+function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, ...
+      albedo, wspd, ppt, tppt, psfc, De, ea_atm, br_coefs, ro_air_Lv, ...
+      liqflag, chi, k_eff, T_ice, dz)
    %SOLVE_SURFACE_TEMPERATURE Solve the explicit bulk-Richardson SEB for Ts.
    %
    %  [T_sfc, ok] = icemodel.surface.solve_surface_temperature(T_sfc, tair, ...)
@@ -63,7 +63,7 @@ function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, albedo, 
    ok = false;
    old = T_sfc;
    for iter = 1:maxiter
-      
+
       %%% Compute heat fluxes and Jacobian terms at the current T_sfc iterate.
 
       % Surface saturation vapor pressure and its temperature derivative.
@@ -78,13 +78,13 @@ function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, albedo, 
       % Latent heat flux and its temperature derivative.
       [Qe, dQe_dT_sfc] = ...
          icemodel.surface.turbulence.bulk_richardson.latent_heat_flux( ...
-         es_sfc, ea_atm, De, stability, psfc, roL, des_sfc_dT, dstability);
+         es_sfc, ea_atm, De, stability, psfc, ro_air_Lv, des_sfc_dT, dstability);
 
       % Sensible heat flux and its temperature derivative.
       [Qh, dQh_dT_sfc] = ...
          icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux( ...
          old, tair, De, stability, dstability);
-      
+
       % Net longwave radiation and its temperature derivative.
       [Qln, dQln_dTsfc] = icemodel.surface.net_longwave_radiation(old, Qli);
 
@@ -94,7 +94,7 @@ function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, albedo, 
       % Newton-Raphson residual and analytical Jacobian.
       f = icemodel.surface.evaluate_surface_energy_balance( ...
          Qsn, Qln, Qh, Qe, Qc, Qa, 0.0);
-      
+
       dfdT = dQln_dTsfc + dQh_dT_sfc + dQe_dT_sfc + dQc_dT_sfc;
 
       % Updated T_sfc iterate.

@@ -1,6 +1,6 @@
 function [Qm, Qf] = diagnose_melt_freeze_energy(T_sfc, Qsn, Qln, Qh, Qe, ...
       Qc, Qa, tair, Qsi, Qli, albedo, wspd, psfc, ppt, tppt, De, ea_atm, chi, ...
-      br_coefs, roL, T, k_eff, dz, ro_sfc, snow_depth, opts)
+      br_coefs, ro_air_Lv, T, k_eff, dz, ro_sfc, snow_depth, opts)
    %DIAGNOSE_MELT_FREEZE_ENERGY Diagnose surplus/deficit energy relative to Tf.
    %
    %  [Qm, Qf] = icemodel.surface.diagnose_melt_freeze_energy(...)
@@ -20,9 +20,10 @@ function [Qm, Qf] = diagnose_melt_freeze_energy(T_sfc, Qsn, Qln, Qh, Qe, ...
    %
    %#codegen
 
-   persistent Tf
+   persistent Tf liqflag
    if isempty(Tf)
       Tf = icemodel.physicalConstant('Tf');
+      liqflag = true;
    end
 
    Qm = 0.0;
@@ -36,7 +37,7 @@ function [Qm, Qf] = diagnose_melt_freeze_energy(T_sfc, Qsn, Qln, Qh, Qe, ...
       % Compute energy needed to reach melt temp (energy deficit) by
       % re-evaluating the full SEB at Tf.
       Qf = -(icemodel.surface.surface_energy_balance_residual(Tf, tair, Qsi, ...
-         Qli, albedo, wspd, ppt, tppt, psfc, De, ea_atm, br_coefs, roL, true, ...
-         chi, T, k_eff, dz, ro_sfc, snow_depth, opts));
+         Qli, albedo, wspd, ppt, tppt, psfc, De, ea_atm, br_coefs, ro_air_Lv, ...
+         liqflag, chi, T, k_eff, dz, ro_sfc, snow_depth, opts));
    end
 end

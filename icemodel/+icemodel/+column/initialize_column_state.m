@@ -1,5 +1,5 @@
 function [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
-      z_nodes, roL, liqflag, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, ...
+      z_nodes, ro_air_Lv, liqflag, JJ, Sc, Sp, Fc, Fp, TL, TH, f_ell_min, ...
       f_ell_max, f_ice_min, f_liq_res, ro_iwe, ro_wie] = ...
       initialize_column_state(opts, tair, r_eff)
    %INITIALIZE_COLUMN_STATE Initialize the 1-d ice column state.
@@ -88,12 +88,12 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, r_eff, k_eff, fn, dz, delz, ...
    f_ice_min = opts.f_ice_min;
    f_liq_res = opts.f_liq_resid;
 
-   % SEB flag used for  for vapor-pressure phase selection
+   % SEB flag used for vapor-pressure phase selection
    liqflag = f_liq(1) > f_liq_phase_switch_threshold;
    if liqflag
-      roL = roLv;
+      ro_air_Lv = roLv;
    else
-      roL = roLs;
+      ro_air_Lv = roLs;
    end
    % zD = sqrt(k_eff(1)*dt/(ro_sno(1)*cp_sno(1)));
 
