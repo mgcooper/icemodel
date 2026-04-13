@@ -46,7 +46,7 @@ function [T, f_ice, f_liq, d_liq, d_evp, x_err] = ...
    % evap does not reduce f_liq below residual water for melting nodes.
    if T(1) > TL
       f_liq_res = max(f_liq_res, ...
-         icemodel.column.residual_water_fraction(f_ice(1), f_liq(1)));
+         icemodel.column.residual_water_pore_fraction(f_ice(1), f_liq(1)));
    end
 
    % Convert residual water mass fraction to volumetric fraction.
