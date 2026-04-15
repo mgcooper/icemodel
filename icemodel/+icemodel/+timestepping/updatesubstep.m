@@ -1,6 +1,20 @@
-function [Ts, T, f_ice, f_liq, dt_sum, dt_new, liqflag, ro_air_Lv, varargout] ...
-      = updatesubstep(Ts, T, f_ice, f_liq, dt_FULL_STEP, dt_sum, dt_new, TINY)
+function [Ts, T, f_ice, f_liq, dt_sum, dt_new, ...
+      liqflag, ro_air_Lv, ro_sfc, f_res_por] = updatesubstep(Ts, T, f_ice, ...
+      f_liq, dt_FULL_STEP, dt_sum, dt_new, TINY, snow_depth, opts)
    % Checkpoint the accepted state and allocate time within the full step.
+   %
+   %  [Ts, T, f_ice, f_liq, dt_sum, dt_new] = updatesubstep(...)
+   %  [..., liqflag, ro_air_Lv] = updatesubstep(...)
+   %  [..., liqflag, ro_air_Lv, ro_sfc] = updatesubstep(...)
+   %  [..., liqflag, ro_air_Lv, ro_sfc, f_res_por] = ...
+   %     updatesubstep(..., snow_depth, opts)
+   %
+   % State outputs (7-10) are derived from the accepted substep state and are
+   % used as the initial values for the next substep:
+   %   liqflag   - surface phase flag (true when top layer has enough liquid)
+   %   ro_air_Lv - ro_air * latent heat for surface turbulent flux [J m-3]
+   %   ro_sfc    - surface bulk density [kg m-3]
+   %   f_res_por - residual pore water fraction; depends on snow_depth and opts
    %
    %#codegen
 
@@ -21,7 +35,7 @@ function [Ts, T, f_ice, f_liq, dt_sum, dt_new, liqflag, ro_air_Lv, varargout] ..
       dt_new = dt_FULL_STEP - dt_sum; % dt_new = max(dt - dt_sum, dt_min);
    end
 
-   if nargout > 5
+   if nargout > 6
 
       % Top node contains enough liquid water to use the liquid-phase curve.
       liqflag = f_liq(1) > f_liq_phase_switch_threshold;
@@ -34,28 +48,15 @@ function [Ts, T, f_ice, f_liq, dt_sum, dt_new, liqflag, ro_air_Lv, varargout] ..
       end
    end
 
-   % Legacy option to return updated state.
-   if nargout > 7
-      % Bulk density and specific heat capacity.
-      ro_sno = icemodel.column.bulk_density(f_ice, f_liq);
-      cp_sno = icemodel.column.bulk_specific_heat_capacity( ...
-         f_ice, f_liq, ro_sno);
+   if nargout > 8
+      ro_sfc = icemodel.surface.surface_bulk_density(f_ice(1), f_liq(1));
    end
 
-   % To activate this, need k_eff and dt. But
    if nargout > 9
-      % Diffusion length scale
-      % zD = sqrt(k_eff(1) * dt / (ro_sno(1) * cp_sno(1)));
-      % if zD > dz(1)
-      %  % placeholder
-      % end
-   end
-
-   switch nargout
-      case 8
-         varargout{1} = ro_sno;
-      case 9
-         varargout{1} = ro_sno;
-         varargout{2} = cp_sno;
+      if snow_depth > 0
+         f_res_por = opts.f_res_pore_snow;
+      else
+         f_res_por = opts.f_res_pore_ice;
+      end
    end
 end

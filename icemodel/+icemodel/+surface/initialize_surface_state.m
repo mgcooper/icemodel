@@ -1,9 +1,11 @@
-function [De, br_coefs, liqflag, ro_air_Lv, ea_atm] = initialize_surface_state( ...
-      f_liq, wspd, tair, rh, opts)
+function [De, br_coefs, liqflag, ro_air_Lv, ea_atm, ro_sfc] = ...
+      initialize_surface_state(f_liq, f_ice, wspd, tair, rh, opts)
    %INITIALIZE_SURFACE_STATE Initialize the surface state for the SEB solver.
    %
    %  [De, br_coefs, liqflag, ro_air_Lv, ea_atm] = ...
-   %     icemodel.surface.initialize_surface_state(f_liq, wspd, tair, rh, opts)
+   %     icemodel.surface.initialize_surface_state(f_liq, f_ice, wspd, tair, rh, opts)
+   %  [De, br_coefs, liqflag, ro_air_Lv, ea_atm, ro_sfc] = ...
+   %     icemodel.surface.initialize_surface_state(f_liq, f_ice, wspd, tair, rh, opts)
    %
    %  Initializes all surface-state quantities derived from forcing data
    %  rather than the ice-column profile:
@@ -21,16 +23,18 @@ function [De, br_coefs, liqflag, ro_air_Lv, ea_atm] = initialize_surface_state( 
    %               step [Pa], computed using tair > Tf as the phase selector
    %               (WMO convention: RH data are referenced to liquid water
    %               for T > 0 °C and to ice for T < 0 °C)
+   %  ro_sfc     — initial surface bulk density [kg m-3]; updated each substep
+   %               by icemodel.timestepping.updatesubstep
    %
    %  Centralizing these initializations ensures that:
    %   (a) the exchange-coefficient loop over the full wspd vector runs once;
-   %   (b) ea_atm uses the physically correct tair-based phase flag rather
-   %       than the surface liqflag, which is a boundary-condition quantity;
+   %   (b) ea_atm uses the physically correct tair-based phase flag;
    %   (c) icemodel, skinmodel, and the test fixtures share one canonical
    %       initialization path.
    %
    %  Inputs:
    %    f_liq   — initial volumetric liquid-water fraction profile [JJ × 1]
+   %    f_ice   — initial volumetric ice fraction profile [JJ × 1]
    %    wspd    — wind-speed forcing for all timesteps [N × 1], m s-1
    %    tair    — air-temperature forcing for all timesteps [N × 1], K
    %    rh      — relative humidity forcing for all timesteps [N × 1], %
@@ -43,10 +47,9 @@ function [De, br_coefs, liqflag, ro_air_Lv, ea_atm] = initialize_surface_state( 
    %
    %#codegen
 
-   persistent Tf f_liq_phase_switch_threshold roLs roLv
+   persistent Tf roLs roLv f_liq_phase_switch_threshold
    if isempty(Tf)
-      Tf = icemodel.physicalConstant('Tf');
-      [roLs, roLv] = icemodel.physicalConstant('roLs', 'roLv');
+      [Tf, roLs, roLv] = icemodel.physicalConstant('Tf', 'roLs', 'roLv');
       f_liq_phase_switch_threshold = icemodel.parameterLookup( ...
          'f_liq_phase_switch_threshold');
    end
@@ -65,8 +68,8 @@ function [De, br_coefs, liqflag, ro_air_Lv, ea_atm] = initialize_surface_state( 
    end
 
    % Pre-compute atmospheric vapor pressure for every forcing step.
-   % Use tair > Tf as the phase selector: WMO RH data are referenced to
-   % liquid water for T > 0 °C and to ice for T < 0 °C, independent of
-   % the surface phase state.
-   ea_atm = icemodel.surface.atmospheric_vapor_pressure(tair, rh, tair > Tf);
+   ea_atm = icemodel.surface.atmospheric_vapor_pressure(tair, rh);
+
+   % Bootstrap surface bulk density from the initial surface layer.
+   ro_sfc = icemodel.surface.surface_bulk_density(f_ice(1), f_liq(1));
 end
