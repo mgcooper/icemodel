@@ -9,11 +9,6 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = solve_column_enthalpy( ..
    %
    %#codegen
 
-   persistent ro_ice ro_liq
-   if isempty(ro_ice)
-      [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
-   end
-
    % Update the water fraction
    f_wat = icemodel.column.water_fraction(f_ice, f_liq);
 
@@ -117,13 +112,16 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = solve_column_enthalpy( ..
          maxiter, aN, aP, aS, b);
    end
 
-   % Surface energy balance linearization error [K].
-   surface_err = icemodel.column.surface_linearization_error( ...
-      T_sfc, T(1), Fc, Fp, a1); %#ok<NASGU>
-
    % Subsurface energy balance linearization error [K].
-   err = icemodel.column.subsurface_linearization_error(T, T_ice_old, ...
-      f_ice, f_liq, f_liq_old, dro_vapdT, dHdT, Sc, dz, dt, a2, Fc, Fp, a1);
+   if nargout > 7
+      err = icemodel.column.subsurface_linearization_error(T, T_ice_old, ...
+         f_ice, f_liq, f_liq_old, dro_vapdT, dHdT, Sc, dz, dt, a2, Fc, Fp, a1);
+   end
+
+   % Surface energy balance linearization error [K]. Currently disabled, retain
+   % for reference.
+   % surface_err = icemodel.column.surface_linearization_error( ...
+   %    T_sfc, T(1), Fc, Fp, a1); %#ok<NASGU>
 end
 
 function dumpIceEnbalFailure(reason, T, T_old, T_iter, f_ice, f_liq, ...

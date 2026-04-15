@@ -6,18 +6,10 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
    %   dz, delz, z_nodes, f_liq_res] = ...
    %     icemodel.column.initialize_column_state(opts, tair, r_eff)
    %
-   %  Returns the minimal set of column-state variables needed by the
-   %  model kernel. Physical constants (TL, TH, Lf, …), thermodynamic
-   %  parameters (f_ell_min, f_ell_max, ro_iwe, …), and surface-state
-   %  variables (liqflag, ro_air_Lv) are intentionally excluded:
-   %
-   %   - Physical constants and parameters: fetch from
-   %     icemodel.physicalConstant / icemodel.parameterLookup where needed.
-   %   - JJ: numel(dz).
-   %   - Fc, Fp: initialized to 1 in the caller (boundary linearization
-   %     scalars that are overwritten on the first solver iteration).
-   %   - liqflag, ro_air_Lv: computed by
-   %     icemodel.surface.initialize_surface_state.
+   %  Returns the minimal set of column-state variables needed by the model
+   %  kernel. Physical constants (TL, TH, Lf, …), and thermodynamic parameters
+   %  (f_ell_min, f_ell_max, ro_iwe, …) are fetched from
+   %  icemodel.physicalConstant / icemodel.parameterLookup where needed.
    %
    %#codegen
 
@@ -30,10 +22,8 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
    fcp = icemodel.parameterLookup('fcp');
 
    % GENERATE A THERMAL MESH
-   dz_therm = opts.dz_thermal;
-   z0_therm = opts.z0_thermal;
    [dz, delz, z_nodes, ~, fn] = ...
-      icemodel.column.control_volume_mesh(z0_therm, dz_therm);
+      icemodel.column.control_volume_mesh(opts.z0_thermal, opts.dz_thermal);
 
    % NUMBER OF TIMESTEPS TO INITIALIZE OUTPUTS
    maxiter = numel(tair) / opts.numyears;
@@ -49,7 +39,7 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
    end
 
    % Lower melt-zone temperature bound (needed for initial T profile only)
-   [TL] = icemodel.parameterLookup('TL');
+   TL = icemodel.parameterLookup('TL');
 
    % INITIALIZE CORE STATE VARIABLES
    if opts.use_restart
@@ -90,8 +80,8 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
    Sc = zeros(JJ, 1);
    Sp = zeros(JJ, 1);
 
-   % RESIDUAL LIQUID-WATER FRACTION (per opts; may be updated during run)
-   f_liq_res = opts.f_liq_resid;
+   % RESIDUAL LIQUID-WATER FRACTION (initialized to snow, overridden per substep)
+   f_liq_res = opts.f_res_pore_snow;
 
    % INITIALIZE THE OUTPUT STRUCTURES
    for n = 1:numel(opts.vars1) % ice1 = 1-d data

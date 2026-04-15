@@ -49,7 +49,7 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
 
    % For a soil model, would need indices above the melt zone
    % iH = T > TH;
-   
+
    % Phase-aware latent heat: Ls for dry/cold cells, Lv for wet cells.
    Lv = icemodel.vapor.latent_enthalpy_switch(f_liq, JJ);
 
@@ -58,7 +58,7 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
 
    % Compute the air fraction
    f_air = 1.0 - f_ice - f_liq;
-   
+
    % Coefficients for frozen nodes outside the melt zone [W m-2 K-1]
    aP0 = (dHdT + Lf * ro_liq * dFdT + Lv .* f_air .* drovdT) .* dz / dt;
    gv = ones(JJ, 1);     % Eq 123
@@ -112,7 +112,7 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
 
    % Account for the upper boundary condition
    switch bc
-      case 1
+      case {0, 1}
          % Dirichlet: Ts = known
          bc_N = a1 * T_sfc;
       case {2, 3}
