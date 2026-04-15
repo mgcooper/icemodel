@@ -1,5 +1,5 @@
-function [up, dn] = smooth_twostream_fluxes(a, r, x, I0, z_edges, M)
-   %smooth_twostream_fluxes Reconstruct and smooth the up/down flux profiles from the two-stream solve.
+function [up, dn] = smoothtwostream(a, r, x, I0, z_edges, M)
+   %smoothtwostream Smooth the up/down flux profiles from the two-stream solve.
    %
    % Compute up/down flux at each depth from the two-stream solution vector x
    %

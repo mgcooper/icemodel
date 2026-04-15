@@ -1,5 +1,7 @@
-function k_ext = spectral_extinction_coefficients(qext, g, coalbedo, radii, iradius)
-   %spectral_extinction_coefficients Compute spectral extinction coefficients for one grain radius.
+function k_ext = spectral_extinction_coefficients( ...
+      qext, g, coalbedo, radii, iradius)
+   %spectral_extinction_coefficients Compute spectral extinction coefficients
+   %for one grain radius.
    %
    %  k_ext = icemodel.radiation.spectral_extinction_coefficients( ...
    %     qext, g, coalbedo, radii, iradius)

@@ -1,12 +1,13 @@
 function [tau_N, tau_S, k_bulk_lookup, k_ext] = update_extinction_coefficients( ...
       qext, g, coalbedo, kabs, kice, wavel, radii, iradius, z_edges_spect, ...
-      dz_spect, solar_dwavel, ro_ice, use_lookup)
-   %update_extinction_coefficients Update spectral extinction coefficients for one grain radius.
+      dz_spect, solar_dwavel, use_lookup)
+   %update_extinction_coefficients Update spectral extinction coefficients for
+   %one grain radius.
    %
    % [tau_N, tau_S, k_bulk_lookup, k_ext] = ...
    %    icemodel.radiation.update_extinction_coefficients(qext, g, coalbedo, ...
    %    kabs, kice, wavel, radii, iradius, z_edges_spect, dz_spect, ...
-   %    solar_dwavel, ro_ice, use_lookup)
+   %    solar_dwavel, use_lookup)
    %
    % This helper computes k_ext for the requested optical grain-radius index,
    % or interpolated index, applies the optional impurity scaling, then
@@ -21,6 +22,11 @@ function [tau_N, tau_S, k_bulk_lookup, k_ext] = update_extinction_coefficients( 
    % transform.
    %
    %#codegen
+
+   persistent ro_ice
+   if isempty(ro_ice)
+      ro_ice = icemodel.physicalConstant('ro_ice');
+   end
 
    % Compute the spectral extinction coefficients.
    k_ext = icemodel.radiation.spectral_extinction_coefficients( ...
@@ -41,7 +47,7 @@ function [tau_N, tau_S, k_bulk_lookup, k_ext] = update_extinction_coefficients( 
 
    % Build the bulk-extinction lookup table when requested.
    if use_lookup
-      k_bulk_lookup = icemodel.makeBulkExtCoefsLookup( ...
+      k_bulk_lookup = icemodel.radiation.make_bulk_extinction_lookup( ...
          dz_spect, tau_N, tau_S, solar_dwavel);
    else
       k_bulk_lookup = struct([]);
