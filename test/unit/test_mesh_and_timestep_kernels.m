@@ -137,8 +137,8 @@ function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
       icemodel.timestepping.resetsubstep( ...
       270, [269; 268], [0.9; 0.9], [0.01; 0.01], 900, 2, 9, 0, 450);
 
-   [Ts_up, T_up, f_ice_up, f_liq_up, dt_sum, dt_next, liqflag, ro_air_Lv, ...
-      ro_sno, cp_sno] = icemodel.timestepping.updatesubstep(Ts, T, f_ice, ...
+   [Ts_up, T_up, f_ice_up, f_liq_up, dt_sum, dt_next, liqflag, ro_air_Lv] ...
+      = icemodel.timestepping.updatesubstep(Ts, T, f_ice, ...
       f_liq, 900, 450, 300, 1e-12);
 
    testCase.verifyEqual([Ts_up; T_up], [270; 269; 268], 'AbsTol', 0);
@@ -151,8 +151,6 @@ function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
    testCase.verifyEqual(dt_next, 150, 'AbsTol', 1e-12);
    testCase.verifyFalse(liqflag);
    testCase.verifyEqual(ro_air_Lv, roLs, 'AbsTol', 0);
-   testCase.verifyTrue(all(isfinite(ro_sno)));
-   testCase.verifyTrue(all(isfinite(cp_sno)));
 end
 
 function test_checksubstep_forces_advance_at_maxsubstep(testCase)

@@ -47,13 +47,13 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
 
    % Initialize the column state exactly as the model kernel would.
    [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, delz, ...
-      z_nodes, f_liq_res] = icemodel.column.initialize_column_state( ...
+      z_nodes, f_res_por] = icemodel.column.initialize_column_state( ...
       opts, met.tair, r_eff);
 
-   % Initialize the surface state (liqflag, ro_air_Lv, ea_atm, De, br_coefs).
+   % Initialize the surface state (liqflag, ro_air_Lv, ea_atm, De, br_coefs, ro_sfc).
    [De_all, scoef, liqflag, ro_air_Lv, ea_atm_all] = ...
       icemodel.surface.initialize_surface_state( ...
-      f_liq, met.wspd, met.tair, met.rh, opts);
+      f_liq, f_ice, met.wspd, met.tair, met.rh, opts);
 
    % Derived column quantities not returned by initialize_column_state.
    JJ = numel(dz);
@@ -127,7 +127,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    state.f_ell_min = f_ell_min;
    state.f_ell_max = f_ell_max;
    state.f_ice_min = f_ice_min;
-   state.f_liq_res = f_liq_res;
+   state.f_res_por = f_res_por;
    state.ro_iwe = ro_iwe;
    state.ro_wie = ro_wie;
    state.liqflag = liqflag;
@@ -187,7 +187,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
       % Recover k_ext for tests that need the initialized coefficients.
       [~, ~, ~, k_ext] = icemodel.radiation.update_extinction_coefficients( ...
          qext, g, coalbedo, kabs, kice, wavel, radii, opts.i_grainradius, ...
-         z_edges_spect, dz_spect, solar_dwavel, ro_ice, false);
+         z_edges_spect, dz_spect, solar_dwavel, false);
 
       state.I0 = I0;
       state.dz_spect = dz_spect;
