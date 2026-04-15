@@ -53,7 +53,7 @@ function opts = resetopts(opts, varargin)
 
    % Re-apply solver-dependent coupling defaults unless explicitly overridden.
    if ismember('solver', names) && ~ismember('cpl_maxiter', names)
-      if opts.solver == 2
+      if ismember(opts.solver, [0, 2])  % single-sweep modes (Dirichlet-0 and Robin-2)
          opts.cpl_maxiter = 1;
       else
          opts.cpl_maxiter = 100;
