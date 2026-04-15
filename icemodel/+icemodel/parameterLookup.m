@@ -13,8 +13,8 @@ function varargout = parameterLookup(varargin)
    %  True physical constants belong in icemodel.physicalConstant.
    %
    %  Canonical vapor coefficients are from Ambaum (2020), computed by
-   %  icemodel.vapor.initialize_vapor_model. Buck (1981) coefficients are preserved in
-   %  icemodel.kernels.buckVaporModel.
+   %  icemodel.vapor.initialize_vapor_model. Buck (1981) coefficients are
+   %  preserved in icemodel.kernels.buckVaporModel.
    %
    % See also: icemodel.physicalConstant, icemodel.vapor.initialize_vapor_model
    %
@@ -22,10 +22,23 @@ function varargout = parameterLookup(varargin)
 
    narginchk(0, Inf);
 
+   persistent params
+   if ~isempty(params)
+      if (nargout == 1 && nargin == 0) || (nargin > 0 && strcmp('all', varargin{1}))
+         varargout{1} = params;
+         return
+      end
+      for n = 1:nargin
+         varargout{n} = params.(varargin{n});
+      end
+      return
+   end
+
    % -----------------------------------------------------------------------
    % Ambaum (2020) / Romps (2021) Rankine-Kirchhoff vapor coefficients
    % -----------------------------------------------------------------------
-   % Computed from physical constants via icemodel.vapor.initialize_vapor_model. The formula is:
+   % Computed from physical constants via icemodel.vapor.initialize_vapor_model.
+   % The formula is:
    %   es = a * exp(b / T) * T ^ c   [Pa]
 
    [al_, bl_, cl_, ai_, bi_, ci_] = icemodel.vapor.initialize_vapor_model();
@@ -128,6 +141,7 @@ function varargout = parameterLookup(varargin)
    % Derived values
    [SB, Tf, Lf, cp_ice, cp_liq] = icemodel.physicalConstant( ...
       'SB', 'Tf', 'Lf', 'cp_ice', 'cp_liq');
+
    params.emissSB = params.emiss * SB;
    params.fcpsq = params.fcp ^ 2;
    params.secperday = params.hrsperday * params.secperhr;
