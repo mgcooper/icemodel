@@ -35,14 +35,15 @@ function test_tdewpoint_inverts_vappress(testCase)
 end
 
 function test_metsub_interpolates_midstep_for_enabled_option(testCase)
-   % With substep interpolation enabled, METSUB should evaluate the forcing
-   % state halfway through the parent step.
+   % With substep interpolation enabled, getsubstepforcings should evaluate
+   % the forcing state halfway through the parent step.
 
    opts.met_substep_interp = true;
    Tf = icemodel.physicalConstant('Tf');
 
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, ea] = ...
-      METSUB(opts, 1, 1800, 3600, true, Tf, [270; 272], [100; 200], ...
+      icemodel.timestepping.getsubstepforcings( ...
+      opts, 1, 1800, 3600, true, Tf, [270; 272], [100; 200], ...
       [220; 260], [0.60; 0.70], [3; 5], [70; 90], [78000; 79000], ...
       [0; 2], [268; 269], [0.01; 0.02]);
 
@@ -60,14 +61,15 @@ function test_metsub_interpolates_midstep_for_enabled_option(testCase)
 end
 
 function test_metsub_returns_step_value_when_interp_disabled(testCase)
-   % With interpolation disabled, METSUB should hold the parent-step value
-   % and still compute a consistent vapor pressure from that state.
+   % With interpolation disabled, getsubstepforcings should hold the
+   % parent-step value and still compute a consistent vapor pressure.
 
    opts.met_substep_interp = false;
    Tf = icemodel.physicalConstant('Tf');
 
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, ea] = ...
-      METSUB(opts, 1, 1800, 3600, false, Tf, [270; 272], [100; 200], ...
+      icemodel.timestepping.getsubstepforcings( ...
+      opts, 1, 1800, 3600, false, Tf, [270; 272], [100; 200], ...
       [220; 260], [0.60; 0.70], [3; 5], [70; 90], [78000; 79000], ...
       [0; 2], [268; 269], [0.01; 0.02]);
 

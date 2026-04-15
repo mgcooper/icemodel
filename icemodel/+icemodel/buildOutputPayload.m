@@ -1,6 +1,6 @@
 function [data1, data2] = buildOutputPayload(opts, surface_state, ...
       subsurface_state, thf_diag)
-   %BUILDOUTPUTPAYLOAD Return SAVEOUTPUT cell payloads in OPTS order.
+   %BUILDOUTPUTPAYLOAD Return icemodel.updateoutputs cell arrays in OPTS order.
    %
    %  [data1, data2] = icemodel.buildOutputPayload(opts, surface_state, ...
    %     subsurface_state)

@@ -31,8 +31,9 @@ function opts = configureRun(opts)
       opts.pathuserdata = icemodel.getpath('userdata');
    end
 
-   % WRITEOUTPUT appends ['ice1_' opts.casename '.mat'] and saves the file in
-   % a subfolder of opts.pathoutput for each year e.g. opts.pathoutput/2016.
+   % icemodel.writeoutput appends ['ice1_' opts.casename '.mat'] and
+   % saves the file in a subfolder of opts.pathoutput for each year, e.g.
+   % opts.pathoutput/2016.
    %
    % For grid runs, opts.casename and opts.metfname are set outside this
    % function in the wrapper that loops over grid-cell IDs. Core icemodel only
@@ -48,7 +49,7 @@ function opts = configureRun(opts)
          opts.sitename, opts.smbmodel, opts.userdata, [], opts.testname);
    end
 
-   % Create the casename. WRITEOUTPUT appends this to the base filenames.
+   % Create the casename. icemodel.writeoutput appends this to base filenames.
    % For grid runs, the wrapper overwrites this with the grid-cell ID.
    if ~isfield(opts, 'casename') || isempty(opts.casename)
       opts.casename = icemodel.setcase(opts.forcings, opts.userdata, opts.uservars);
@@ -131,12 +132,6 @@ function opts = validateTurbulentFluxOptions(opts)
 
    % For MOST, enforce numerical (complex-step) T_sfc solver.
    if strcmp(scheme, 'monin_obukhov')
-      % if opts.solver ~= 1
-      %    opts.solver = 1;
-      %    warning('icemodel:configureRun:moninObukhovRequiresSebSolver2', ...
-      %       ['turbulent_flux_scheme=''monin_obukhov'' currently requires ' ...
-      %       'opts.solver = 1.']);
-      % end
       if opts.seb_solver ~= 2
          opts.seb_solver = 2;
          warning('icemodel:configureRun:moninObukhovRequiresSebSolver2', ...
@@ -155,8 +150,8 @@ function [vars1, vars2] = defaultOutputVariables(opts)
    % Two important programming notes:
    %
    % 1) The order in which the output variables are set must match the order in
-   % which the data are stored in the cell arrays passed to SAVEOUTPUT from the
-   % model main functions.
+   % which the data are stored in the cell arrays passed to
+   % icemodel.updateoutput from the model main functions.
    %
    % 2) If new variables are added, icemodel.postprocess must be reviewed to
    % ensure correct
