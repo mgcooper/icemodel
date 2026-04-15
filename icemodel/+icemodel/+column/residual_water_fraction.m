@@ -1,34 +1,35 @@
-function f_liq_min = residual_water_fraction(f_ice, f_liq)
-   %RESIDUAL_WATER_FRACTION Minimum residual liquid fraction (volumetric).
+function [f_res, f_liq_min] = residual_water_fraction(f_ice, f_liq, f_res_por)
+   %RESIDUAL_WATER_FRACTION Volumetric residual-water floor for control volumes.
    %
-   %  f_liq_min = icemodel.column.residual_water_fraction(f_ice, f_liq)
+   %  [f_res, f_liq_min] = icemodel.column.residual_water_fraction( ...
+   %     f_ice, f_liq, f_res_por)
    %
-   % Returns the minimum residual unfrozen liquid fraction in volumetric units
-   % [m³_liq m³_CV⁻¹] — the same reference frame as f_liq — for each control
-   % volume, defined by the Jordan (1991) phase-fraction characteristic curve
-   % evaluated at the lower melt-zone temperature boundary TL:
+   % Returns the volumetric residual-water floor f_res — the minimum liquid
+   % fraction that must be retained — as the maximum of two contributions:
    %
-   %   f_wat     = f_liq + f_ice * ro_ice / ro_liq   (total water fraction)
-   %   f_liq_min = f_wat * f_ell_min                 (meltzone_bounds)
+   %   1. Capillary: f_res_por .* (1 - f_ice)
+   %        Capillary/hydraulic irreducible saturation scaled to CV volume.
+   %        f_res_por is the per-pore-volume parameter (opts.f_res_pore_ice,
+   %        opts.f_res_pore_snow, or opts.f_res_pore_firn). This contribution
+   %        dominates for ice and snow where Jordan's minimum is near zero.
    %
-   % This is the volumetric companion to
-   % icemodel.column.residual_water_pore_fraction, which returns the same
-   % quantity normalized to pore volume. The two are related by:
+   %   2. Jordan: f_liq_min = meltzone_bounds(water_fraction(f_ice, f_liq))
+   %        Thermodynamic minimum from Jordan's (1991) phase-fraction curve
+   %        evaluated at the lower melt-zone boundary TL. Near-zero for Jp=0
+   %        (ice/snow) but non-negligible for soils or well-saturated firn.
    %
-   %   f_liq_min_vol  = f_liq_min                           (this function)
-   %   f_liq_min_pore = f_liq_min / (1 - f_ice)             (pore-fraction)
-   %
-   % Use the pore-fraction form for comparisons against opts.f_liq_resid (which
-   % is pore-volume referenced following Jordan 1991).  Use this volumetric form
-   % when the result needs to be compared or combined directly with f_liq (e.g.,
-   % in infiltration models or as a floor condition on f_liq itself).
+   %   f_res = max(f_res_por .* (1 - f_ice), f_liq_min)
    %
    % Inputs
-   %   f_ice  - Volumetric ice fraction [-], scalar or any array.
-   %   f_liq  - Volumetric liquid-water fraction [-], same shape as f_ice.
+   %   f_ice     - Volumetric ice fraction [-], scalar or any array.
+   %   f_liq     - Volumetric liquid-water fraction [-], same shape as f_ice.
+   %   f_res_por - Capillary residual per pore volume [-], scalar or same shape.
+   %               Pass opts.f_res_pore_ice, opts.f_res_pore_snow, or
+   %               opts.f_res_pore_firn depending on the surface type.
    %
-   % Output
-   %   f_liq_min - Minimum volumetric liquid fraction [-], same shape as inputs.
+   % Outputs
+   %   f_res     - Volumetric residual-water floor [-], same shape as f_ice.
+   %   f_liq_min - Jordan thermodynamic minimum (volumetric) [-]; diagnostic.
    %
    % See also: icemodel.column.residual_water_pore_fraction,
    %           icemodel.column.water_fraction,
@@ -38,4 +39,5 @@ function f_liq_min = residual_water_fraction(f_ice, f_liq)
 
    f_wat     = icemodel.column.water_fraction(f_ice, f_liq);
    f_liq_min = icemodel.column.meltzone_bounds(f_wat);
+   f_res     = max(f_res_por .* (1 - f_ice), f_liq_min);
 end

@@ -1,4 +1,4 @@
-function [q, dq_dtheta] = liquid_flux(f_liq, f_ice, liqresid, grainsz)
+function [q, dq_dtheta] = liquid_flux(f_liq, f_ice, f_res_por, grainsz)
    %LIQUID_FLUX Compute the liquid water flux between snowpack layers.
    %
    % Parameters:
@@ -12,7 +12,7 @@ function [q, dq_dtheta] = liquid_flux(f_liq, f_ice, liqresid, grainsz)
    % dt : scalar
    %     Time step (in seconds).
    %
-   % liqresid : scalar (optional)
+   % f_res_por : scalar (optional) (commonly referred to as liqresid)
    %     Residual water volume per pore volume. Default is 0.02.
    %
    % grainsz : scalar (optional)
@@ -36,7 +36,7 @@ function [q, dq_dtheta] = liquid_flux(f_liq, f_ice, liqresid, grainsz)
    % saturated hydraulic conductivity and relative saturation.
    %
    % The following analogues with Colbeck 1972 are used in this function:
-   % liqresid  - residual water volume / pore volume [-] (Swi)
+   % f_res_por - residual water volume / pore volume [-] (Swi)
    % f_por     - pore fraction [-]                       (phi)
    % f_res     - residual water fraction [-]
    % liqsat    - water saturation [-]                    (Sw)
@@ -56,7 +56,7 @@ function [q, dq_dtheta] = liquid_flux(f_liq, f_ice, liqresid, grainsz)
 
    % Parse inputs
    if nargin < 3
-      liqresid = 0.07;
+      f_res_por = 0.04;
    end
 
    if nargin < 4
@@ -72,7 +72,7 @@ function [q, dq_dtheta] = liquid_flux(f_liq, f_ice, liqresid, grainsz)
 
    % Compute pore and residual water fractions
    f_por = 1.0 - f_ice;
-   f_res = liqresid * f_por;
+   f_res = f_res_por * f_por;
 
    % Compute saturated hydraulic conductivity (Colbeck 1972)
    if method == 1
@@ -128,7 +128,7 @@ function [q, dq_dtheta] = liquid_flux(f_liq, f_ice, liqresid, grainsz)
 end
 
 % For reference, in terms of CV thicknesses:
-% Swi = liqresid  = f_res/f_por  = h_res/h_por = h_res/(h_tot-h_ice)
+% Swi = f_res_por = f_res/f_por  = h_res/h_por = h_res/(h_tot-h_ice)
 % Sw  = liqsat    = f_liq/f_por  = h_liq/h_por = h_liq/(h_tot-h_ice)
 % phi = porosity  = f_por        = h_por/h_tot = (h_tot-h_ice)/h_tot
 %

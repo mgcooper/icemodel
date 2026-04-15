@@ -1,8 +1,11 @@
-function [f_liq, f_ice, T, ok] = infiltration(f_liq, f_ice, T, dz, dt)
+function [f_liq, f_ice, T, ok] = infiltration(f_liq, f_ice, T, dz, dt, f_res_por)
    %INFILTRATION Redistribute liquid water between adjacent column layers.
    %
    % This legacy scaffold redistributes liquid between adjacent column
    % layers using an explicit flux divergence.
+   %
+   % f_res_por - capillary residual per pore volume [-] (opts.f_res_pore_ice,
+   %             opts.f_res_pore_snow, or opts.f_res_pore_firn)
    %
    %#codegen
 
@@ -23,7 +26,7 @@ function [f_liq, f_ice, T, ok] = infiltration(f_liq, f_ice, T, dz, dt)
    end
 
    % Calculate fluxes between layers [m/s]
-   q = icemodel.column.liquid_flux(f_liq(1:end-1), f_ice(1:end-1));
+   q = icemodel.column.liquid_flux(f_liq(1:end-1), f_ice(1:end-1), f_res_por);
 
    % If this is inside a sub iteration, scale non-zero surface flux by dt_new
    % bc_N = q_sfc / substep;
@@ -41,9 +44,10 @@ function [f_liq, f_ice, T, ok] = infiltration(f_liq, f_ice, T, dz, dt)
    % Compute net liquid water flux for each layer d(f_liq) = d/dz q(z) * dt [-]
    df_liq = (q(1:end-1) - q(2:end)) ./ dz * dt;
 
-   % Limit drainage and infill to available water / capacity
+   % Limit drainage and infill to available water / capacity.
+   % f_res is the volumetric capillary floor; uses f_res_por (per pore) × f_por.
    f_por = 1.0 - f_ice;
-   f_res = 0.07 .* f_por;
+   f_res = f_res_por .* f_por;
    for n = 1:numel(df_liq)
       if df_liq(n) == 0
          continue

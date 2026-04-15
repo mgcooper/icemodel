@@ -1,17 +1,29 @@
-function [f_ice, f_liq, d_con, xd_sbl] = apply_surface_vapor_mass_change( ...
-      f_ice, f_liq, d_con, d_pevp, wetflag, f_ice_min, f_liq_resid)
+function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
+      f_ice, f_liq, d_rof, d_pevp, f_ice_min, f_res_por)
    %APPLY_SURFACE_VAPOR_MASS_CHANGE Apply the surface vapor-mass increment.
    %
-   % f_ice = fraction of ice by volume in each control volume
-   % f_liq = fraction of liquid water by volume in each control volume
-   % d_con = condensation which exceeds control volume available porosity
-   % d_pevp = potential vapor-driven change in top-layer liquid fraction
-   % xd_sbl = vapor-driven ice change which exceeds control-volume limits
-   % wetflag = liquid-film flag used for mass partitioning
+   % f_ice     = fraction of ice by volume in each control volume
+   % f_liq     = fraction of liquid water by volume in each control volume
+   % d_rof     = condensation which exceeds control volume available porosity
+   % d_pevp    = potential vapor-driven change in top-layer liquid fraction
+   % d_sbl_err = vapor-driven ice change which exceeds control-volume limits
    % f_ice_min = minimum retained surface ice fraction before remeshing
-   % f_liq_resid = residual liquid-water fraction per pore volume
+   % f_res_por = residual liquid-water fraction per pore volume [-]
    %
    %#codegen
+
+   % Clarify the CV budget for a future refactor that accounts for f_bub. For
+   % glacier ice or any medium w/closed pores, "availableCapacity" is a misnomer
+   % if f_por is defined as 1-f_ice since it does not account for f_bub.
+   %
+   % Canonical definitions for snow:
+   %
+   % f_por = 1 - f_ice;          % total porosity
+   % f_res = max(f_res_por*f_por, f_liq_min)  % volumetric residual floor
+   % f_air = 1 - f_ice - f_liq;  % air fraction
+   % f_ava = f_por - f_res;      % "availableCapacity" but should exclude f_bub
+   % f_sat = f_liq - f_res;      % "availableWater"
+   % S_rel = f_sat / f_ava;      % "relativeSaturation"
 
    persistent ro_ice ro_liq Ls Lv
    if isempty(ro_ice)
@@ -19,28 +31,22 @@ function [f_ice, f_liq, d_con, xd_sbl] = apply_surface_vapor_mass_change( ...
          'ro_ice', 'ro_liq', 'Ls', 'Lv');
    end
 
-   % Compute top-layer liquid water and ice fraction
-   f_liq_top = f_liq(1);
-   f_ice_top = f_ice(1);
+   % Option to check if f_liq_top ever falls below f_res.
+   debug = false;
 
-   % Compute top-layer residual water fraction per pore volume
-   f_res = f_liq_resid * (1.0 - f_ice_top);
+   % Compute the volumetric residual-water floor and wet-surface flag.
+   % The floor is max(capillary, Jordan thermodynamic minimum).
+   f_res = icemodel.column.residual_water_fraction(f_ice, f_liq, f_res_por);
 
-   % Clarify the CV budget. Note for glacier ice or any medium w/"closed" pores,
-   % "availableCapacity" is a misnomer, it should be "potentialCapacity", and
-   % "availableCapacity" is actually the airFraction, or "availablePorosity",
-   % and should be adjusted for f_bub.
-   %
-   % f_por = 1 - f_ice;             % porosityFraction
-   % f_res = f_liq_resid * f_por;   % residualWaterFraction
-   % f_air = 1 - f_ice - f_liq;     % airFraction or availablePorosity
-   % f_ava = f_por - f_res;         % availableCapacity or potentialCapacity
-   % f_sat = f_liq - f_res;         % availableWater
-   % S_rel = f_sat / f_ava;         % relativeSaturation
+   % Liquid-film flag.
+   wetflag = f_liq > f_res;
 
-   % Initialize variables
-   xd_evp = 0;
-   xd_sbl = 0;
+   % Retain initial top-layer fractions.
+   f_liq_top = f_liq;
+   f_ice_top = f_ice;
+
+   % Initialize potential deposition that cannot be satisfied by the cv budget.
+   d_sbl_err = 0;
 
    % If a liquid film is present, partition vapor exchange through the liquid
    % reservoir first. Otherwise route it directly to the ice phase so dry/cold
@@ -51,92 +57,128 @@ function [f_ice, f_liq, d_con, xd_sbl] = apply_surface_vapor_mass_change( ...
 
          if f_liq_top < f_res % f_liq_top - f_res < 0
             % only residual water exists, send d_pevp to sublimation
-            xd_evp = d_pevp;
 
-            %fprintf('metstep = %d, f_liq(1) < f_res\n',metstep)
+            if debug == true
+               fprintf('metstep = %d, f_liq(1) < f_res\n', metstep)
+            end
 
          elseif abs(d_pevp) <= (f_liq_top - f_res) % availWater >= evap
-            % some water evaporates
-            % d_aevp = d_pevp;
-            f_liq(1) = f_liq(1) - abs(d_pevp); % d_aevp = d_pevp, xd_evp = 0
+            % some water evaporates, d_pevp fully satisfied
+            d_aevp = d_pevp;
+            d_pevp = 0;
 
+            f_liq = f_liq - abs(d_aevp);
          else
             % all available water evaporates, residual water remains
             d_aevp = -(f_liq_top - f_res);
-            f_liq(1) = f_res;
-            xd_evp = d_pevp - d_aevp; % remaining energy goes to sublimation
+            d_pevp = d_pevp - d_aevp; % send remaining d_pevp to sublimation
+
+            f_liq = f_res;
          end
 
          % Send energy demand not satisfied by evaporation to sublimation
-         [f_ice, xd_sbl] = sublimation(xd_evp, f_ice, f_liq, f_ice_min, ...
+         [f_ice, d_sbl_err] = sublimation(d_pevp, f_ice, f_liq, f_ice_min, ...
             ro_ice, ro_liq, Lv, Ls);
 
       elseif d_pevp > 0 % condensation
 
-         d_aevp = ro_ice / ro_liq * (1.0 - f_ice_top) - f_liq_top;
-         if d_pevp <= d_aevp
+         % Compute the capacity for condensation. This is the air fraction
+         % converted to liquid-water-equivalent fraction assuming the air
+         % fraction is ice, to account for the expansion that would occur if the
+         % air fraction filled with water and later refroze, to prevent
+         % the cv budget from exceeding 1.0.
+         d_aevp_max = ro_ice / ro_liq * (1.0 - f_ice_top) - f_liq_top;
+
+         if d_pevp <= d_aevp_max
             % all condensation stored
-            f_liq(1) = f_liq(1) + d_pevp;  % d_aevp = d_pevp, xd_evp = 0
+            d_aevp = d_pevp; % d_pevp = 0
+
+            f_liq = f_liq + d_aevp;
 
          else
             % some condensation stored, some converts to runoff
-            f_liq(1) = f_liq(1) + d_aevp;
-            d_con(1) = d_con(1) + (d_pevp - d_aevp); % xd_evp = d_pevp - d_aevp
-            % fprintf('condensation exceeds porosity: %.6f\n', (d_pevp - d_aevp))
+            d_aevp = d_aevp_max;
+
+            f_liq = f_liq + d_aevp;
+
+            % Update d_pevp. This is "extra" condensation that converts to
+            % runoff. In practice this never occurs hence debug is disabled.
+            d_pevp = d_pevp - d_aevp_max;
+            d_rof = d_rof + d_pevp;
+
+            if debug == true
+               fprintf( ...
+                  'condensation exceeds porosity: %.6f\n', d_pevp)
+            end
          end
       end
 
    else % dry/cold ice: sublimation or direct deposition to ice
-      [f_ice, xd_sbl] = sublimation(d_pevp, f_ice, f_liq, f_ice_min, ...
+      [f_ice, d_sbl_err] = sublimation(d_pevp, f_ice, f_liq, f_ice_min, ...
          ro_ice, ro_liq, Lv, Ls);
+   end
+
+   if debug == true && d_sbl_err > 0
+      fprintf('unsatisfied sublimation: %.6f\n', d_sbl_err)
    end
 end
 
 %% Vapor exchange with the ice phase
-function [f_ice, xd_sbl] = sublimation(d_pevp, f_ice, f_liq, f_ice_min, ...
+function [f_ice, d_sbl_err] = sublimation(d_pevp, f_ice, f_liq, f_ice_min, ...
       ro_ice, ro_liq, Lv, Ls)
-
-   xd_sbl = 0;
-   f_liq_top = f_liq(1);
-   f_ice_top = f_ice(1);
-
+   %SUBLIMATION Convert potential evaporation to sublimation.
+   %
    % Convert potential evaporation to potential sublimation:
+   %
    % d_pevp = Qe / (Lv * ro_liq) * dt_new / dz_therm;
-   % d_psbl  = Qe / (Ls * ro_ice) * dt_new / dz_therm;
+   % d_psbl = Qe / (Ls * ro_ice) * dt_new / dz_therm;
+   %
    % Therefore:
+   %
    % d_psbl = d_pevp * (Lv * ro_liq) / (Ls * ro_ice)
-
+   %
    % Note: in icemodel, ro_air_Lv is set to ro_air * Lv or ro_air * Ls depending
    % on liqflag, so Qe is already computed wrt to them. That way evap/subl are
    % computed using the same formula: e = Qe / ro_air_Lv * dt / dz.
    %
    % The conversion here conserves heat when the surface latent heat flux, Qe,
    % cannot be satisfied by evaporation alone (all available water evaporates),
-   % and the remainder is allocated to sublimation of ice using the conversion:
-   % d_sbl = xd_evp * Lv * ro_liq / (Ls * ro_ice)
+   % and the remainder is allocated to sublimation of ice by sending the excess
+   % d_pevp from the evaporation branch to this function.
+
+   % Unlike the excess condensation case which is sent to runoff, "excess"
+   % deposition cannot be satisfied by the control volume budget and is assigned
+   % to d_sbl_err. Initialize this value to 0.
+   d_sbl_err = 0;
+
+   % Early return if there's no energy for sublimation.
+   if d_pevp == 0
+      return
+   end
 
    % Convert potential evap to potential subl in ice frac-equivalent thickness
    d_psbl = d_pevp * (Lv * ro_liq) / (Ls * ro_ice);
 
-   % Budget deposition
-   if d_psbl == 0
-      return
+   % Retain initial values for the top layer f_ice/liq.
+   f_liq_top = f_liq;
+   f_ice_top = f_ice;
+   f_air_top = 1.0 - f_liq_top - f_ice_top;
 
-   elseif d_psbl > 0 % deposition to ice
-      f_air_top = 1.0 - f_liq_top - f_ice_top;
+   % Budget deposition
+   if d_psbl > 0
 
       if f_air_top <= 0
          % no pore/air space remains for new ice
-         xd_sbl = d_psbl;
+         d_sbl_err = d_psbl;
 
       elseif d_psbl <= f_air_top
          % all deposition can be stored as new ice
-         f_ice(1) = f_ice(1) + d_psbl;
+         f_ice = f_ice + d_psbl;
 
       else
          % fill the remaining air space and return the unsatisfied remainder
-         f_ice(1) = f_ice(1) + f_air_top;
-         xd_sbl = d_psbl - f_air_top;
+         f_ice = f_ice + f_air_top;
+         d_sbl_err = d_psbl - f_air_top;
       end
       return
    end
@@ -151,25 +193,25 @@ function [f_ice, xd_sbl] = sublimation(d_pevp, f_ice, f_liq, f_ice_min, ...
       if abs(d_psbl) < f_ice_top
          % some ice sublimates, and the top layer will be combined by the
          % follow-on merge_thin_layers step
-         f_ice(1) = f_ice(1) - abs(d_psbl);
+         f_ice = f_ice - abs(d_psbl);
 
       elseif abs(d_psbl) >= f_ice_top
          % all ice sublimates (d_asbl = f_ice(1))
-         f_ice(1) = 0.0;
+         f_ice = 0.0;
 
          % sublimation which cannot be satisfied
-         xd_sbl = d_psbl + f_ice_top;
+         d_sbl_err = d_psbl + f_ice_top;
       end
 
    elseif abs(d_psbl) < (f_ice_top - f_ice_min)
       % some ice sublimates (d_asbl = d_psbl)
-      f_ice(1) = f_ice(1) - abs(d_psbl);
+      f_ice = f_ice - abs(d_psbl);
 
    elseif abs(d_psbl) >= (f_ice_top - f_ice_min)
       % all ice sublimates (d_asbl = -(fi - f_ice_min))
-      f_ice(1) = f_ice_min; % keep minimum ice thickness
+      f_ice = f_ice_min; % keep minimum ice thickness
 
       % sublimation which cannot be satisfied
-      xd_sbl = d_psbl + f_ice_top - f_ice_min;
+      d_sbl_err = d_psbl + f_ice_top - f_ice_min;
    end
 end
