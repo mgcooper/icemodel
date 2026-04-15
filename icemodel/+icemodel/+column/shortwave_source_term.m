@@ -3,19 +3,58 @@ function [Sc, chi] = shortwave_source_term(Qsi, albedo, I0, dz_spect, tau_N, ...
       z_edges_spect, k_bulk_lookup)
    %shortwave_source_term Solve the spectral shortwave source term.
    %
-   % [Sc, chi] = icemodel.column.shortwave_source_term(Qsi, albedo, I0, ...
-   %    dz_spect, tau_N, tau_S, solar_dwavel, dz_therm, ro_sno, z_nodes_therm, ...
-   %    z_nodes_spect, z_edges_spect, k_bulk_lookup)
+   % [Sc, chi] = icemodel.column.shortwave_source_term(Qsi, albedo, ...
+   %    I0, dz_spect, tau_N, tau_S, solar_dwavel, dz_therm, ro_sno, ...
+   %    z_nodes_therm, z_nodes_spect, z_edges_spect, k_bulk_lookup)
    %
    % The spectral model solves for the net shortwave flux profile on the
-   % spectral control-volume grid, then collapses that absorbed-flux profile to
-   % the thermal grid used by the enthalpy solver.
+   % spectral control-volume grid, then collapses that absorbed-flux profile
+   % to the thermal grid used by the enthalpy solver.
    %
    % If the K_BULK_LOOKUP argument is an empty struct, it switches the
    % bulk-extinction step from the density lookup approximation to the exact
    % solution. All other parts of the spectral solve remain shared.
    %
-   %#codegen
+   % Notes
+   %
+   % The two-stream solution gives the total upflux (X) and downflux (Y) from
+   % the respective boundary to each layer interface. Qnet (XYnet in Schlatter)
+   % is the net flux formed from those interface fluxes, and dQ = d/dz(Qnet) is
+   % the absorbed flux.
+   %
+   %   Y↓(1)  X↑(1)    Xnet = X↑(2)-X↑(1), Ynet = Y↓(1)-Y↓(2)
+   %   ____________
+   %   ____________    Qnet = Xnet - Ynet = (X↑(2)-X↑(1))-(Y↓(1)-Y↓(2))
+   %   Y↓(2)  X↑(2)
+   %
+   % Rescaling to forcing Qsi:
+   %
+   % For the prototype spectrum, the depth-integrated absorbed flux is:
+   % (1) -sum(dQ) = (1 - albedo) * I0
+   %
+   % but the absorbed source term for the model timestep should satisfy:
+   % (2) -sum(dQ) = (1 - albedo) * Qsi
+   %
+   % so multiply (1) by Qsi / I0:
+   % (3) (1 - albedo) * I0 * Qsi / I0 = (1 - albedo) * Qsi
+   %
+   % and rescale the absorbed spectral profile by Qsi / I0 when constructing Sc:
+   %
+   % (4) Sc = Qsi / I0 .* -dQ ./ dz
+   %
+   % if I0 were the actual incoming solar at each timestep, it would be:
+   % (5) Sc = -dQ ./ dz
+   %
+   % To assign a portion of the incoming radiation, chi, to surface heating, and
+   % the rest to subsurface layers, Sc need to be adjusted for the surface
+   % portion, hence the implementation:
+   %
+   % Sc = (1.0 - chi) * Qsi / I0 * -dQ_therm ./ dz_therm;
+   %
+   % The surface portion is allocated in the SEB. Note that Qnet and dQnet are
+   % not adjusted for chi in this routine.
+   %
+   % #codegen
 
    % Dark/no-sun early exit.
    if Qsi < 1e-3
@@ -29,14 +68,9 @@ function [Sc, chi] = shortwave_source_term(Qsi, albedo, I0, dz_spect, tau_N, ...
       'nearest', 'extrap');
 
    % Build the bulk extinction coefficients with either the exact transform or
-   % the lookup-table shortcut.
-   if isempty(k_bulk_lookup)
-      k_bulk = icemodel.radiation.bulk_extinction_coefficients( ...
-         dz_spect, ro_sno_spect, tau_N, tau_S, solar_dwavel);
-   else
-      k_bulk = icemodel.radiation.bulk_extinction_coefficients_lookup( ...
-         ro_sno_spect, k_bulk_lookup);
-   end
+   % the lookup-table shortcut (dispatch is handled inside the function).
+   k_bulk = icemodel.radiation.bulk_extinction_coefficients( ...
+      dz_spect, ro_sno_spect, tau_N, tau_S, solar_dwavel, k_bulk_lookup);
 
    % Solve the two-stream system for the net flux at each interface.
    Qnet = icemodel.radiation.solvetwostream(I0, albedo, k_bulk, z_edges_spect);
@@ -82,44 +116,3 @@ function [Sc, chi] = spectralNetFluxToSourceTerm(Qsi, I0, albedo, Qnet, ...
    % timestep shortwave forcing Qsi here.
    Sc = (1.0 - chi) * Qsi / I0 * -dQnet_therm ./ dz_therm;
 end
-
-%--------------------------------------------------------------------------
-% Notes
-%
-% The two-stream solution gives the total upflux (X) and downflux (Y) from
-% the respective boundary to each layer interface. Qnet (XYnet in Schlatter) is
-% the net flux formed from those interface fluxes, and dQ = d/dz(Qnet) is the
-% absorbed flux.
-%
-%   Y↓(1)  X↑(1)    Xnet = X↑(2)-X↑(1), Ynet = Y↓(1)-Y↓(2)
-%   ____________
-%   ____________    Qnet = Xnet - Ynet = (X↑(2)-X↑(1))-(Y↓(1)-Y↓(2))
-%   Y↓(2)  X↑(2)
-%
-% Rescaling to forcing Qsi:
-%
-% For the prototype spectrum, the depth-integrated absorbed flux is:
-% (1) -sum(dQ) = (1 - albedo) * I0
-%
-% but the absorbed source term for the model timestep should satisfy:
-% (2) -sum(dQ) = (1 - albedo) * Qsi
-%
-% so multiply (1) by Qsi / I0:
-% (3) (1 - albedo) * I0 * Qsi / I0 = (1 - albedo) * Qsi
-%
-% and rescale the absorbed spectral profile by Qsi / I0 when constructing Sc:
-%
-% (4) Sc = Qsi / I0 .* -dQ ./ dz
-%
-% if I0 were the actual incoming solar at each timestep, it would be:
-% (5) Sc = -dQ ./ dz
-%
-% To assign a portion of the incoming radiation, chi, to surface heating, and
-% the rest to subsurface layers, Sc need to be adjusted for the surface portion,
-% hence the implementation:
-%
-% Sc = (1.0 - chi) * Qsi / I0 * -dQ_therm ./ dz_therm;
-%
-% The surface portion is allocated in the SEB. Note that Qnet and dQnet are not
-% adjusted for chi in this routine.
-%--------------------------------------------------------------------------

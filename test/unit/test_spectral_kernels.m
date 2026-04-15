@@ -88,8 +88,10 @@ function test_getscattercoefs_and_getsolar_return_positive_weights(testCase)
    s = testCase.TestData.state;
    solar_data = load(fullfile(s.opts.pathinput, 'spectral', 'solar.mat'));
 
-   [qext, g, coalbedo, wavel, dwavel, radii] ...
-      = icemodel.radiation.get_scattering_coefficients(s.opts);
+   [radii, mie_table, ~, ~, ~] = ...
+      icemodel.radiation.load_spectral_tables(s.opts);
+   [qext, g, coalbedo, wavel, dwavel] = ...
+      icemodel.radiation.get_scattering_coefficients(mie_table, s.opts);
 
    [I0, solar] ...
       = icemodel.radiation.get_solar_spectrum(solar_data.solar, wavel, dwavel);
@@ -104,8 +106,8 @@ function test_getscattercoefs_and_getsolar_return_positive_weights(testCase)
    testCase.verifyGreaterThan(I0, 0);
 end
 
-function test_getupdown_returns_finite_fluxes(testCase)
-   % smooth_twostream_fluxes should reconstruct finite up/down fluxes on a
+function test_smoothtwostream_returns_finite_fluxes(testCase)
+   % smoothtwostream should reconstruct finite up/down fluxes on a
    % compact hand-built coefficient profile.
 
    bulkcoefs = [1.0; 1.2; 1.4; 1.4; 1.4];
@@ -114,7 +116,8 @@ function test_getupdown_returns_finite_fluxes(testCase)
    r = (2.0 * albedo / (1.0 - albedo ^ 2)) * bulkcoefs;
    x = [5; 4; 3; 2];
    z_edges = [0; 0.1; 0.2; 0.3; 0.4];
-   [up, down] = icemodel.radiation.smooth_twostream_fluxes(a, r, x, 100, z_edges, 3);
+
+   [up, down] = icemodel.radiation.smoothtwostream(a, r, x, 100, z_edges, 3);
 
    testCase.verifyEqual(numel(up), 5);
    testCase.verifyEqual(numel(down), 5);
@@ -128,6 +131,7 @@ function test_solvetwostream_returns_finite_net_flux_profile(testCase)
 
    bulkcoefs = [1.0; 1.2; 1.4; 1.4; 1.4; 1.4];
    z_edges = [0; 0.1; 0.2; 0.3; 0.4];
+
    xynet = icemodel.radiation.solvetwostream(100, 0.5, bulkcoefs, z_edges);
 
    testCase.verifyEqual(numel(xynet), numel(z_edges));
@@ -165,9 +169,9 @@ function test_updateextcoefs_rebuilds_current_k_ext_and_tau(testCase)
    s = testCase.TestData.state;
 
    [tau_N, tau_S, ~, k_ext] ...
-      = icemodel.radiation.update_extinction_coefficients(s.qext, s.g, s.coalbedo, ...
-      s.kabs, s.kice, s.wavel, s.radii, s.opts.i_grainradius, ...
-      s.z_edges_spect, s.dz_spect, s.solar_dwavel, s.ro_ice, false);
+      = icemodel.radiation.update_extinction_coefficients( ...
+      s.qext, s.g, s.coalbedo, s.kabs, s.kice, s.wavel, s.radii, ...
+      s.opts.i_grainradius, s.z_edges_spect, s.dz_spect, s.solar_dwavel, false);
 
    testCase.verifyEqual(k_ext, s.k_ext, 'AbsTol', 1e-12);
    testCase.verifyEqual(tau_N, s.tau_N, 'AbsTol', 1e-12);
@@ -254,9 +258,8 @@ function test_spectralsourceterm_matches_inlined_path(testCase)
 end
 
 function test_bulkextcoefslookup_stays_close_to_exact_transform(testCase)
-   % icemodel.radiation.bulk_extinction_coefficients_lookup is approximate, but
-   % on the integer-density lookup grid it should stay close to the exact
-   % bulk-extinction profile.
+   % The lookup path is approximate, but on the integer-density lookup grid
+   % it should stay close to the exact bulk-extinction profile.
 
    s = testCase.TestData.state;
 
@@ -266,14 +269,14 @@ function test_bulkextcoefslookup_stays_close_to_exact_transform(testCase)
    ro_sno_spect = max(interp1(s.z_nodes, ro_sno, s.z_nodes_spect, ...
       'nearest', 'extrap'), 300);
 
-   lookup = icemodel.makeBulkExtCoefsLookup(s.dz_spect, ...
+   lookup = icemodel.radiation.make_bulk_extinction_lookup(s.dz_spect, ...
       s.tau_N, s.tau_S, s.solar_dwavel);
 
    exact = icemodel.radiation.bulk_extinction_coefficients( ...
       s.dz_spect, ro_sno_spect, s.tau_N, s.tau_S, s.solar_dwavel);
 
-   approx = icemodel.radiation.bulk_extinction_coefficients_lookup( ...
-      ro_sno_spect, lookup);
+   approx = icemodel.radiation.bulk_extinction_coefficients( ...
+      s.dz_spect, ro_sno_spect, s.tau_N, s.tau_S, s.solar_dwavel, lookup);
 
    rel_err = max(abs(approx - exact) ./ max(abs(exact), 1e-12));
 

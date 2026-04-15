@@ -13,8 +13,7 @@ function [Qnet, Qup, Qdn] = solvetwostream(I0, albedo, k_bulk, z_edges)
    %     I0      - Incident spectral irradiance at the top surface [W m-2]
    %     albedo  - Surface albedo [1]
    %     k_bulk  - Bulk spectral extinction coefficients on the spectral grid
-   %               [m-1], padded by icemodel.radiation.bulk_extinction_coefficients or
-   %               icemodel.radiation.bulk_extinction_coefficients_lookup
+   %               [m-1], as returned by icemodel.radiation.bulk_extinction_coefficients
    %     z_edges - Spectral control-volume edge depths [m] (M+1 values for M CVs)
    %
    %  Outputs:
@@ -80,7 +79,7 @@ function [Qnet, Qup, Qdn] = solvetwostream(I0, albedo, k_bulk, z_edges)
    x = icemodel.numerics.trisolve(e, f, g, b);
 
    % Reconstruct the up/down fluxes.
-   [Qup, Qdn] = icemodel.radiation.smooth_twostream_fluxes(a, r, x, I0, z_edges, M);
+   [Qup, Qdn] = icemodel.radiation.smoothtwostream(a, r, x, I0, z_edges, M);
 
    % Compute the net flux at each interface (Schlatter's XYnet). The staggered
    % up/dn have M+2 elements; averaging adjacent pairs gives M+1 interface
