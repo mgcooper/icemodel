@@ -20,7 +20,7 @@ function [Q_sfc, dQ_sfc_dTs] = numerical_surface_flux(T_sfc, tair, Qsi, ...
    % See also: icemodel.surface.surface_energy_balance_residual,
    %           icemodel.surface.surface_flux_linearization,
    %           icemodel.surface.solve_surface_temperature,
-   %           icemodel.numerics.complex_step_derivative
+   %           icemodel.numerics.complexstep_derivative
    %
    %#codegen
 
@@ -30,5 +30,5 @@ function [Q_sfc, dQ_sfc_dTs] = numerical_surface_flux(T_sfc, tair, Qsi, ...
       liqflag, chi, T_ice, k_eff, dz, ro_sfc, snow_depth, opts);
 
    Q_sfc = residual_fn(T_sfc);
-   dQ_sfc_dTs = icemodel.numerics.complex_step_derivative(residual_fn, T_sfc);
+   dQ_sfc_dTs = icemodel.numerics.complexstep_derivative(residual_fn, T_sfc);
 end

@@ -160,8 +160,8 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
       % fixed-point loop iterates the roughness, profile corrections, and
       % stability length together until the stability state is self-consistent.
       L_prev = L;
-      L = icemodel.kernels.monin_obukhov_length(u_star, theta_air, q_air, ...
-         theta_star, q_star);
+      L = icemodel.surface.turbulence.monin_obukhov.monin_obukhov_length( ...
+         u_star, theta_air, q_air, theta_star, q_star);
 
       % Converge on a relative change in |L| rather than an absolute threshold.
       % This avoids temperature-sensitive jumps where one call stops after N

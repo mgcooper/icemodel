@@ -7,7 +7,7 @@ function L = monin_obukhov_length(u_star, theta_air, q_air, theta_star, q_star)
    % humidity form used by the bulk-MO scheme:
    %   theta_v  = theta * (1 + c_q q)
    %   theta_v* = theta* * (1 + c_q q*)
-
+   %
    %#codegen
 
    persistent epsilon kappa gravity

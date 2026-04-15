@@ -3,7 +3,7 @@ function [x, ok, iter] = complexstep(f, x0)
    %
    % The Newton iterate itself remains on the real axis. The complex-step
    % perturbation is used only to estimate the derivative at a real state
-   % through `icemodel.numerics.complex_step_derivative`.
+   % through `icemodel.numerics.complexstep_derivative`.
    %
    %#codegen
 
@@ -28,7 +28,7 @@ function [x, ok, iter] = complexstep(f, x0)
 
       % Estimate the derivative with a complex perturbation and take one
       % real-valued Newton step.
-      dfdx = icemodel.numerics.complex_step_derivative(f, old, h);
+      dfdx = icemodel.numerics.complexstep_derivative(f, old, h);
       x = real(old - real(f_old) / dfdx);
 
       if abs(x - old) < tol
