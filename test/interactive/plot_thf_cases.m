@@ -29,6 +29,7 @@ function plot_thf_cases(options)
    arguments
       options.datafile (1,:) char = ''
       options.group_idx (1,:) double = []
+      options.save_figs (1,:) logical = true
    end
 
    % Default data file resolved at runtime (mfilename not valid in arguments block).
@@ -65,7 +66,10 @@ function plot_thf_cases(options)
 
       % --- Figure 1: scatter comparison ---
       fig_sc = plot_scatter_comparison(gdata, gtitle);
-      saveas(fig_sc, fullfile(figdir, [gname '_scatter.png']));
+
+      if options.save_figs
+         saveas(fig_sc, fullfile(figdir, [gname '_scatter.png']));
+      end
 
       % --- Figure 2: enbal timeseries comparison ---
       % Pass grouptitle so enbal renders a 2-line title without sgtitle overlap.
@@ -73,7 +77,10 @@ function plot_thf_cases(options)
       icemodel.plot.enbal(ice1a, met_obs, ice1b, ...
          'labels', {'Bulk-Richardson', 'Monin-Obukhov'}, ...
          'grouptitle', gtitle);
-      saveas(gcf, fullfile(figdir, [gname '_timeseries.png']));
+
+      if options.save_figs
+         saveas(gcf, fullfile(figdir, [gname '_timeseries.png']));
+      end
    end
 end
 

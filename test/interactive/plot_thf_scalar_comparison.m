@@ -2,7 +2,7 @@ function plot_thf_scalar_comparison(options)
    %PLOT_THF_SCALAR_COMPARISON Three-way THF comparison: BR, scalar-exchange, MO.
    %
    %  plot_thf_scalar_comparison()
-   %  plot_thf_scalar_comparison(datafile='/path/to/thf_validation_results_diagnostic.mat')
+   %  plot_thf_scalar_comparison(datafile='/path/to/thf_validation_results.mat')
    %  plot_thf_scalar_comparison(group_idx=1:2)
    %
    % Loads results saved by run_thf_cases(output_profile='diagnostic') and
@@ -24,25 +24,26 @@ function plot_thf_scalar_comparison(options)
    % materially alters the fluxes relative to the production scheme. The MO
    % scheme appears in the time-series panels for context.
    %
-   % Prerequisite: run run_thf_cases(output_profile='diagnostic') first.
+   % Prerequisite: run run_thf_cases() first (diagnostic profile is the default).
    %
    % See also: run_thf_cases, plot_thf_cases, validate_thf_cases
 
    arguments
       options.datafile (1,:) char = ''
       options.group_idx (1,:) double = []
+      options.save_figs (1,:) logical = true
    end
 
    % Default data file.
    if isempty(options.datafile)
       options.datafile = fullfile(fileparts(mfilename('fullpath')), 'data', ...
-         'thf_validation_results_diagnostic.mat');
+         'thf_validation_results.mat');
    end
 
    if ~isfile(options.datafile)
       error('plot_thf_scalar_comparison:missingFile', ...
          ['Data file not found:\n  %s\n' ...
-         'Run run_thf_cases(output_profile=''diagnostic'') first.'], ...
+         'Run run_thf_cases() first (diagnostic profile is the default).'], ...
          options.datafile);
    end
 
@@ -72,9 +73,12 @@ function plot_thf_scalar_comparison(options)
       gtitle = strrep(gname, '_', ' ');
 
       fig = plot_group(gdata, gtitle);
-      fname = fullfile(figdir, [gname '_scalar_comparison.png']);
-      saveas(fig, fname);
-      fprintf('Saved: %s\n', fname);
+
+      if options.save_figs
+         fname = fullfile(figdir, [gname '_scalar_comparison.png']);
+         saveas(fig, fname);
+         fprintf('Saved: %s\n', fname);
+      end
    end
 end
 
@@ -83,10 +87,16 @@ end
 % =========================================================================
 
 function fig = plot_group(gdata, gtitle)
-   %PLOT_GROUP One figure: 2×2 panel for one site/year group.
+   %PLOT_GROUP One figure: 3×2 panel for one site/year group.
+   %
+   % Row 1: SHF and LHF 7-day moving-mean time series (3 schemes).
+   % Row 2: SHF and LHF scatter — Bulk-Richardson vs Scalar exchange.
+   % Row 3: SHF and LHF scatter — Bulk-Richardson vs Monin-Obukhov.
+   % Y-axis labels on scatter panels identify the comparison scheme; no
+   % individual panel titles so the layout stays uncluttered.
 
    % Color scheme (consistent with plot_thf_cases where overlapping).
-   C_br     = [0.07 0.58 0.55];   % teal  — bulk-Richardson production
+   C_br     = [0.07 0.58 0.55];   % teal   — bulk-Richardson production
    C_scalar = [0.50 0.20 0.70];   % purple — scalar-exchange experiment
    C_mo     = [0.85 0.50 0.10];   % amber  — Monin-Obukhov
 
@@ -114,10 +124,17 @@ function fig = plot_group(gdata, gtitle)
    lhf_br     = daily_mean(d_br.ice1, 'lhf');
    shf_scalar = daily_mean(d_br.ice1, 'thf_scalar_exchange_Qh');
    lhf_scalar = daily_mean(d_br.ice1, 'thf_scalar_exchange_Qe');
+   if ~isempty(d_mo)
+      shf_mo = daily_mean(d_mo.ice1, 'shf');
+      lhf_mo = daily_mean(d_mo.ice1, 'lhf');
+   else
+      shf_mo = struct('Time', NaT(0,1), 'val', zeros(0,1));
+      lhf_mo = shf_mo;
+   end
 
    fig = figure('Name', [gtitle ' — scalar comparison'], ...
-      'Position', [80 80 1400 900]);
-   tl = tiledlayout(2, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
+      'Position', [80 80 1400 1200]);
+   tl = tiledlayout(3, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
    title(tl, [gtitle ' — scalar-exchange comparison'], 'FontWeight', 'bold');
 
    % -----------------------------------------------------------------------
@@ -129,8 +146,7 @@ function fig = plot_group(gdata, gtitle)
       '-',  'Color', C_br,     'LineWidth', 1.8, 'DisplayName', 'Bulk-Richardson');
    plot(ax, shf_scalar.Time, movmean(shf_scalar.val, 7, 'omitnan'), ...
       '--', 'Color', C_scalar, 'LineWidth', 1.5, 'DisplayName', 'Scalar exchange');
-   if ~isempty(d_mo)
-      shf_mo = daily_mean(d_mo.ice1, 'shf');
+   if ~isempty(shf_mo.Time)
       plot(ax, shf_mo.Time, movmean(shf_mo.val, 7, 'omitnan'), ...
          ':', 'Color', C_mo, 'LineWidth', 1.5, 'DisplayName', 'Monin-Obukhov');
    end
@@ -147,8 +163,7 @@ function fig = plot_group(gdata, gtitle)
       '-',  'Color', C_br,     'LineWidth', 1.8, 'DisplayName', 'Bulk-Richardson');
    plot(ax, lhf_scalar.Time, movmean(lhf_scalar.val, 7, 'omitnan'), ...
       '--', 'Color', C_scalar, 'LineWidth', 1.5, 'DisplayName', 'Scalar exchange');
-   if ~isempty(d_mo)
-      lhf_mo = daily_mean(d_mo.ice1, 'lhf');
+   if ~isempty(lhf_mo.Time)
       plot(ax, lhf_mo.Time, movmean(lhf_mo.val, 7, 'omitnan'), ...
          ':', 'Color', C_mo, 'LineWidth', 1.5, 'DisplayName', 'Monin-Obukhov');
    end
@@ -157,20 +172,32 @@ function fig = plot_group(gdata, gtitle)
    legend(ax, 'Location', 'best', 'FontSize', 11, 'Box', 'off');
 
    % -----------------------------------------------------------------------
-   % (2,1) SHF scatter: BR vs scalar-exchange
+   % (2,1) SHF scatter: Bulk-Richardson vs Scalar exchange
    % -----------------------------------------------------------------------
    ax = nexttile(tl, 3);
    scatter_with_fit(ax, shf_br.val, shf_scalar.val, C_scalar, ...
-      'Bulk-Richardson SHF (W m^{-2})', 'Scalar exchange SHF (W m^{-2})', ...
-      'SHF: BR vs scalar-exchange');
+      'Bulk-Richardson SHF (W m^{-2})', 'Scalar exchange SHF (W m^{-2})');
 
    % -----------------------------------------------------------------------
-   % (2,2) LHF scatter: BR vs scalar-exchange
+   % (2,2) LHF scatter: Bulk-Richardson vs Scalar exchange
    % -----------------------------------------------------------------------
    ax = nexttile(tl, 4);
    scatter_with_fit(ax, lhf_br.val, lhf_scalar.val, C_scalar, ...
-      'Bulk-Richardson LHF (W m^{-2})', 'Scalar exchange LHF (W m^{-2})', ...
-      'LHF: BR vs scalar-exchange');
+      'Bulk-Richardson LHF (W m^{-2})', 'Scalar exchange LHF (W m^{-2})');
+
+   % -----------------------------------------------------------------------
+   % (3,1) SHF scatter: Bulk-Richardson vs Monin-Obukhov
+   % -----------------------------------------------------------------------
+   ax = nexttile(tl, 5);
+   scatter_with_fit(ax, shf_br.val, shf_mo.val, C_mo, ...
+      'Bulk-Richardson SHF (W m^{-2})', 'Monin-Obukhov SHF (W m^{-2})');
+
+   % -----------------------------------------------------------------------
+   % (3,2) LHF scatter: Bulk-Richardson vs Monin-Obukhov
+   % -----------------------------------------------------------------------
+   ax = nexttile(tl, 6);
+   scatter_with_fit(ax, lhf_br.val, lhf_mo.val, C_mo, ...
+      'Bulk-Richardson LHF (W m^{-2})', 'Monin-Obukhov LHF (W m^{-2})');
 end
 
 % =========================================================================
@@ -188,8 +215,11 @@ function tt = daily_mean(ice1, varname)
    tt = struct('Time', d.Time, 'val', d.(varname));
 end
 
-function scatter_with_fit(ax, x, y, col, xlab, ylab, ptitle)
+function scatter_with_fit(ax, x, y, col, xlab, ylab)
    %SCATTER_WITH_FIT Scatter + 1:1 line + best-fit line + R².
+   %
+   % The scheme identity is communicated through the y-axis label (ylab) rather
+   % than a panel title, so callers pass no title argument.
 
    keep = isfinite(x) & isfinite(y);
    x = x(keep);
@@ -198,7 +228,6 @@ function scatter_with_fit(ax, x, y, col, xlab, ylab, ptitle)
    hold(ax, 'on');
 
    if numel(x) < 2
-      title(ax, ptitle);
       xlabel(ax, xlab); ylabel(ax, ylab);
       return
    end
@@ -223,6 +252,5 @@ function scatter_with_fit(ax, x, y, col, xlab, ylab, ptitle)
 
    xlim(ax, lims); ylim(ax, lims);
    xlabel(ax, xlab); ylabel(ax, ylab);
-   title(ax, ptitle);
    legend(ax, 'Location', 'southeast', 'FontSize', 10, 'Box', 'off');
 end

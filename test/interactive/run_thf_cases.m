@@ -4,15 +4,14 @@ function results = run_thf_cases(options)
    %  results = run_thf_cases()
    %  results = run_thf_cases(case_idx=1:4)
    %  results = run_thf_cases(save_results=false)
-   %  results = run_thf_cases(output_profile='diagnostic')
+   %  results = run_thf_cases(output_profile='standard')
    %
    % Runs all eight THF validation cases (2 sites × 2 year windows × 2
    % schemes) and saves the full run data to
-   %   test/interactive/data/thf_validation_results.mat            (standard)
-   %   test/interactive/data/thf_validation_results_diagnostic.mat (diagnostic)
+   %   test/interactive/data/thf_validation_results.mat
    % for later plotting by plot_thf_cases and plot_thf_scalar_comparison.
    %
-   % output_profile - 'standard' (default) or 'diagnostic'. The diagnostic
+   % output_profile - 'diagnostic' (default) or 'standard'. The diagnostic
    %   profile adds THF solver internals and the bulk-Richardson scalar-exchange
    %   experiment fluxes (thf_scalar_exchange_Qh, thf_scalar_exchange_Qe) to
    %   the output. Required to run plot_thf_scalar_comparison.
@@ -24,7 +23,7 @@ function results = run_thf_cases(options)
       options.case_idx (1,:) double = []
       options.save_results (1,1) logical = true
       options.output_profile (1,:) char {mustBeMember(options.output_profile, ...
-         {'standard', 'diagnostic'})} = 'standard'
+         {'standard', 'diagnostic'})} = 'diagnostic'
    end
 
    icemodel.config('casename', 'demo');
@@ -54,11 +53,7 @@ function results = run_thf_cases(options)
    if ~exist(datadir, 'dir')
       mkdir(datadir);
    end
-   if strcmp(options.output_profile, 'diagnostic')
-      datafile = fullfile(datadir, 'thf_validation_results_diagnostic.mat');
-   else
-      datafile = fullfile(datadir, 'thf_validation_results.mat');
-   end
+   datafile = fullfile(datadir, 'thf_validation_results.mat');
    timestamp = datetime('now');
 
    if options.save_results
