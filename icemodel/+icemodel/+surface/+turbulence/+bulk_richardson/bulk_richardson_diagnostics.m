@@ -13,6 +13,10 @@ function diag = bulk_richardson_diagnostics(T_sfc, es_sfc, tair, wspd, ...
    % lengths for heat (z0h) and moisture (z0q) via the Andreas (2002)
    % parameterization.
    %
+   % De_h (the production neutral exchange coefficient) is reconstructed
+   % internally from H_h and cv_atm: De_h = H_h / cv_atm, since
+   % H_h = cv_atm * De_h by construction.
+   %
    % --------------------------------------------------------------------------
    % SCALAR-EXCHANGE EXPERIMENT
    % --------------------------------------------------------------------------
@@ -25,21 +29,21 @@ function diag = bulk_richardson_diagnostics(T_sfc, es_sfc, tair, wspd, ...
    % Re:
    %
    %   Re = u_* z0m / nu_air                 (roughness Reynolds number)
-   %   u_* = sqrt(De * U)                    (friction velocity, neutral approx)
+   %   u_* = sqrt(De_h * U)                  (friction velocity, neutral approx)
    %   [z0h, z0q] = scalar_roughness_lengths(z0m, Re)  (Andreas 2002)
    %
    %   De_h = U kappa^2 / (ln(z_obs/z0m) * ln(z_obs/z0h))
    %   De_e = U kappa^2 / (ln(z_obs/z0m) * ln(z_obs/z0q))
    %
    % where z_obs is the implied observation height from the neutral coefficient:
-   %   ln(z_obs/z0m) = kappa / sqrt(Cd),   Cd = De / U
+   %   ln(z_obs/z0m) = kappa / sqrt(Cd),   Cd = De_h / U
    %
    % In the aerodynamically rough regime (Re > 2.5) Andreas z0h and z0q are
-   % significantly smaller than z0m (0.1–0.5× z0m), so De_h < De and De_e < De
+   % significantly smaller than z0m (0.1-0.5x z0m), so De_h < De and De_e < De
    % thus the scalar-exchange scheme predicts weaker scalar fluxes than the
    % production BR scheme. In the aerodynamically smooth regime (Re < 0.135)
    % z0h and z0q exceed z0m, reversing the sign of the correction. For typical
-   % glacier conditions (z0m ~ 1–3 mm, u* ~ 0.1–0.5 m/s), Re ~ 7–100, placing
+   % glacier conditions (z0m ~ 1-3 mm, u* ~ 0.1-0.5 m/s), Re ~ 7-100, placing
    % most timesteps in the rough regime and explaining the systematic offset
    % toward smaller |Qe| and |Qh| relative to the production BR scheme.
    %
@@ -59,10 +63,11 @@ function diag = bulk_richardson_diagnostics(T_sfc, es_sfc, tair, wspd, ...
    %    tair       - air temperature [K]
    %    wspd       - wind speed [m s-1]
    %    psfc       - surface air pressure [Pa]
-   %    De         - bulk exchange coefficient [m s-1]
    %    ea_atm     - atmospheric vapor pressure [Pa]
+   %    H_h        - sensible heat transport prefactor [W m-2 K-1]
+   %    cv_atm     - volumetric heat capacity of moist air [J m-3 K-1]
+   %    hv_atm     - volumetric latent enthalpy of moist air [J m-3]
    %    stability  - Louis/Liston stability factor [-]
-   %    ro_air_Lv  - air density × latent heat [J m-3]
    %    z0_bulk    - aerodynamic (momentum) roughness length [m]
    %
    %  Output:
@@ -74,20 +79,23 @@ function diag = bulk_richardson_diagnostics(T_sfc, es_sfc, tair, wspd, ...
    %      z0h                     - scalar heat roughness (Andreas 2002) [m]
    %      z0q                     - scalar moisture roughness (Andreas 2002) [m]
    %      u_star                  - friction velocity (neutral approx) [m s-1]
-   %      L                       - Monin-Obukhov length [m] (NaN; BR does not converge L)
+   %      L                       - Monin-Obukhov length [m] (NaN; BR does
+   %                                not converge L)
    %      Re                      - roughness Reynolds number [-]
-   %      scalar_exchange_active  - true if Andreas roughness lengths were applied
+   %      scalar_exchange_active  - true if Andreas roughness lengths applied
    %      scalar_exchange_z_obs   - implied observation height [m]
    %      scalar_exchange_De_h    - heat exchange coefficient [m s-1]
    %      scalar_exchange_De_e    - moisture exchange coefficient [m s-1]
-   %      scalar_exchange_Qh      - sensible heat flux (scalar exchange) [W m-2]
-   %      scalar_exchange_Qe      - latent heat flux (scalar exchange) [W m-2]
+   %      scalar_exchange_Qh      - sensible heat flux (scalar exchange)
+   %                                [W m-2]
+   %      scalar_exchange_Qe      - latent heat flux (scalar exchange)
+   %                                [W m-2]
    %
    % References:
-   %   Andreas, E. L., 2002: Parameterizing scalar transfer over snow and ice:
-   %     a review. J. Hydrometeor., 3, 417–432.
-   %   Louis, J.-F., 1979: A parametric model of vertical eddy fluxes in the
-   %     atmosphere. Boundary-Layer Meteorol., 17, 187–202.
+   %   Andreas, E. L., 2002: Parameterizing scalar transfer over snow and
+   %     ice: a review. J. Hydrometeor., 3, 417-432.
+   %   Louis, J.-F., 1979: A parametric model of vertical eddy fluxes in
+   %     the atmosphere. Boundary-Layer Meteorol., 17, 187-202.
    %
    % See also:
    %   icemodel.surface.turbulence.bulk_richardson.turbulent_heat_flux

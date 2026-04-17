@@ -91,13 +91,12 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok, n_iters] = ...
          break
       end
 
-      % Aitken acceleration with relaxation-fallback
+      % Aitken acceleration w/ relaxation-fallback (on failure or ~cpl_aitken).
       Ts_0 = Ts;
       Ts = icemodel.surface.physical_surface_temperature( ...
          icemodel.numerics.aitkenscalar(Ts_2, Ts_1, Ts_0, ...
          (1.0 - cpl_alpha) * Ts_old + cpl_alpha * Ts, ... % relaxation
-         cpl_jumpmax, cpl_aitken) ...
-         );
+         cpl_jumpmax, cpl_aitken));
       Ts_2 = Ts_1;
       Ts_1 = Ts_0;
 

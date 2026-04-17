@@ -6,32 +6,18 @@ function [Qe, dQe_dT_sfc] = latent_heat_flux(es_sfc, ea_atm, De, stability, ...
    %  [Qe, dQe_dT_sfc] = ...
    %     icemodel.surface.turbulence.bulk_richardson.latent_heat_flux(...)
    %
-   %  Qe = ro_air * L * De_e * stability * (ea_atm - es_sfc) * epsilon/psfc;
-   %  [W m-2] = [kg m-3] * [J kg-1] * [m s-1] * [-] * [Pa] * [Pa-1]
+   %  Qe = H_e * stability * (ea_atm - es_sfc);
+   %  [W m-2] = [W m-2 Pa-1] * [-] * [Pa]
    %
-   % epsilon = Rd/Rv where Rd = 287 J/K/kg is the gas constant for dry air and
-   % Rv = 461.5 J/kg/K is the gas constant for water vapor. psfc is atmospheric
-   % pressure, ea_atm is atmospheric (2-m) vapor pressure, and es_sfc is surface
-   % saturation vapor pressure.
-   %
-   % In this implementation, ro_air_Lv is either ro_air * Ls or ro_air * Lv
-   % depending on the surface liquid water state, updated each timestep in
-   % icemodel.timestepping.updatesubstep. The density used is the fixed
-   % reference air density ro_air (a constant). A more physics-consistent
-   % alternative would be to use the local moist-air density, as the
-   % monin_obukhov scheme already does via icemodel.vapor.moist_air_density;
-   % that path divides the precomputed ro_air_Lv by ro_air_ref to recover the
-   % specific latent heat and then multiplies by the local ro_atm. If a
-   % moist-air correction is desired for the bulk-Richardson path, the same
-   % approach could be applied here.
-   %
-   % The exchange coefficient De is identical for latent and sensible heat
-   % fluxes because the scalar exchange roughness lengths for latent and
-   % sensible heat are assumed equal to the momentum exchange roughness length.
+   % where H_e = hv_atm * De_e = ro_atm * L * De * epsilon / psfc is the
+   % latent heat transport prefactor precomputed at each substep. This uses
+   % the local moist-air density ro_atm rather than the dry-air reference
+   % density, giving a physically consistent moist-air correction.
    %
    % When the derivative is requested, provide the temperature derivatives of
-   % both the surface saturation vapor pressure and the stability factor so
-   % the returned derivative is the full dQe/dT_sfc.
+   % both the surface saturation vapor pressure and the stability factor so the
+   % returned derivative is the full dQe/dT_sfc used in the newton solve rather
+   % than only the fixed-stability partial used in the linearization.
    %
    % See also: icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux
    %

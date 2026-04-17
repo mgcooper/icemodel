@@ -6,12 +6,16 @@ function [Qh, dQh_dT_sfc] = sensible_heat_flux(T_sfc, tair, De, stability, ...
    %  [Qh, dQh_dT_sfc] = ...
    %     icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux(...)
    %
-   % Qh = ro_air * Cp_air * De_h * stability * (Ta - Ts);
-   % [W m-2] = [kg m-3] * [J kg-1 K-1] * [m s-1] * [-] * [K]
+   % Qh = H_h * stability * (Ta - Ts);
+   % [W m-2] = [W m-2 K-1] * [-] * [K]
+   %
+   % where H_h = cv_atm * De = ro_atm * cp_air * De is the sensible heat
+   % transport prefactor precomputed at model initialization.
    %
    % When the derivative is requested, provide the temperature derivative of
    % the stability factor as the fifth input so the returned derivative is
-   % the full dQh/dT_sfc rather than only the fixed-stability partial.
+   % the full dQh/dT_sfc used in the newton solve rather than only the
+   % fixed-stability partial used in the linearization.
    %
    % See also: icemodel.surface.turbulence.bulk_richardson.latent_heat_flux
    %

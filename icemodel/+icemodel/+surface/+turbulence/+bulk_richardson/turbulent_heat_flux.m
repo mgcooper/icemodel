@@ -7,9 +7,13 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, psfc, ...
    %  [Qe, Qh, diag] = ...
    %     icemodel.surface.turbulence.bulk_richardson.turbulent_heat_flux(...)
    %
-   % This is the existing bulk-Richardson surface-transfer scheme used by the
-   % production SEB path. The formulation uses one aerodynamic roughness, one
-   % exchange coefficient, and the Louis/Liston stability factor.
+   % This is the bulk-Richardson surface-transfer scheme used by the production
+   % SEB path. The formulation uses one aerodynamic roughness, one exchange
+   % coefficient, and the Louis/Liston stability factor. H_h and H_e are the
+   % precomputed sensible and latent heat transport prefactors.
+   %
+   % cv_atm and hv_atm are only needed for the optional diagnostic
+   % output (nargout > 2).
    %
    %#codegen
 

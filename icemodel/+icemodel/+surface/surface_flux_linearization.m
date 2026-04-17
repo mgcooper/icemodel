@@ -10,6 +10,10 @@ function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, albedo, ..
    % linearization, while `monin_obukhov` uses a dedicated numerical
    % linearization of the nonlinear atmospheric surface-flux closure.
    %
+   % H_h  — sensible heat transport prefactor [W m-2 K-1] = cv_atm * De_h
+   % H_e  — latent heat transport prefactor [W m-2 Pa-1] = hv_atm * De_e
+   % cv_atm, hv_atm, ro_atm, nu_air — for MO scheme (precomputed per timestep)
+   %
    % See also: icemodel.surface.numerical_surface_flux
    %
    %#codegen

@@ -24,10 +24,11 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(T, ...
    drovdT = 0;
 
    % To reinstate vapor-aware conductivity and enthalpy:
-   % Note: same update would be required within iterations, see solve_column_enthalpy.
    % [~, drovdT] = icemodel.vapor.saturation_vapor_density(T, f_liq);
    % k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq, drovdT);
    % k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, k_vap);
+   %
+   % Note: same update is required within iterations, see solve_column_enthalpy.
 
    % Initial past Picard iterates for Aitken-acceleration
    % T_1 = nan(size(T));

@@ -3,12 +3,19 @@ function [Qe, Qh, diag] = diagnose_turbulent_heat_fluxes(T_sfc, tair, wspd, ...
    %DIAGNOSE_TURBULENT_HEAT_FLUXES Dispatch the configured THF scheme.
    %
    %  [Qe, Qh] = icemodel.surface.diagnose_turbulent_heat_fluxes(...)
-   %  [Qe, Qh, diag] = icemodel.surface.diagnose_turbulent_heat_fluxes(...)
+   %  [Qe, Qh, diag] = ...
+   %     icemodel.surface.diagnose_turbulent_heat_fluxes(...)
    %
-   % The production contract requires callers to provide the resolved surface
-   % state and opts struct. Optional diagnostics are constructed only when the
-   % third output is requested, primarily for the test suite or interactive
-   % debugging / inspection.
+   % The production contract requires callers to provide the resolved
+   % surface state and opts struct. Optional diagnostics are constructed
+   % only when the third output is requested, primarily for the test
+   % suite or interactive debugging / inspection.
+   %
+   % For the bulk_richardson scheme: H_h and H_e are the precomputed
+   % sensible and latent heat transport prefactors.
+   %
+   % For the monin_obukhov scheme: cv_atm, hv_atm, ro_atm, and nu_air
+   % are the precomputed moist-air thermodynamic quantities.
    %
    %#codegen
 

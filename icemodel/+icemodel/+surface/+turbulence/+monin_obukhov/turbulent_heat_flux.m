@@ -8,7 +8,8 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
    %     icemodel.surface.turbulence.monin_obukhov.turbulent_heat_flux(...)
    %
    % This function implements the glacier-oriented bulk Monin-Obukhov
-   % turbulent-flux closure used by the `monin_obukhov` scheme (van As et al. 2005).
+   % turbulent-flux closure used by the `monin_obukhov` scheme.
+   %
    % The governing pieces are:
    %
    %  1. Momentum exchange
@@ -24,18 +25,21 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
    %     L = u_*^2 theta_v / (kappa g theta_v*)
    %
    %  4. Fluxes
-   %     Qh = rho_atm c_p u_* theta_*
-   %     Qe = rho_atm L_v/s u_* q_*
+   %     Qh = cv_atm * u_* theta_*
+   %     Qe = hv_atm * u_* q_*
    %
    % The scalar roughness lengths use Andreas (2002) over snow/firn and
    % Smeets and van den Broeke (2008) over rough bare ice. Stable profile
    % corrections use Holtslag and de Bruin; unstable corrections use the
    % Paulson/Dyer forms. Surface vapor pressure remains phase-aware through
-   % the existing liqflag/ro_air_Lv contract.
+   % the existing liqflag contract.
    %
-   % The implementation follows van As et al., 2005:
-   %     van As et al., 2005, The Summer Surface Energy Balance of the High
-   %     Antarctic Plateau, Boundary-Layer Meteorology.
+   % cv_atm, hv_atm, ro_atm, nu_air are precomputed at model initialization
+   % (per forcing timestep) and passed in; they are constant for the full
+   % meteorological timestep and need not be recomputed per inner iteration.
+   %
+   % The implementation follows van As et al., 2005: The Summer Surface Energy
+   % Balance of the High Antarctic Plateau, Boundary-Layer Meteorology.
    %
    %#codegen
 
@@ -61,11 +65,9 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
    z0m = icemodel.surface.surface_roughness_length(snow_depth, ro_sfc, ...
       opts.z0_ice, opts.z0_snow_low_density, opts.z0_snow_high_density);
 
-   % Atmospheric and surface thermodynamic state. The repo stores air heat
-   % capacity and latent energies in volumetric form elsewhere in the SEB
-   % stack, so divide by a reference air density to recover the specific
-   % quantities c_p [J kg^-1 K^-1] and L_v/s [J kg^-1] needed by the classic
-   % flux formulas rho_atm * c_p * u_* * theta_* & rho_atm * L_v/s * u_* * q_*.
+   % Atmospheric and surface thermodynamic state. cv_atm and hv_atm are
+   % precomputed at model initialization and passed in; they are constant for
+   % this timestep and need not be recomputed per call or per inner iteration.
    es_sfc = icemodel.vapor.saturation_vapor_pressure(T_sfc, liqflag);
    ro_atm = icemodel.vapor.moist_air_density(psfc, ea_atm, tair);
    nu_air = icemodel.kernels.air_kinematic_viscosity(tair, ro_atm);

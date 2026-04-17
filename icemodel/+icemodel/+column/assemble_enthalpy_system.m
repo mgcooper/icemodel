@@ -6,6 +6,9 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    %  This function constructs the lower, middle, and upper diagonals of the
    %  A matrix in a form compatible with icemodel.numerics.trisolve.
    %
+   %  The suppressed linearization factor Sp is retained in the input signature
+   %  for generality.
+   %
    %  Note: ro_sno * cp_sno = (cv_ice * f_ice + cv_liq * f_liq)
    %  See updatestate (or icemodel.timestepping.updatesubstep) for how ro_sno
    %  and cp_sno are computed.

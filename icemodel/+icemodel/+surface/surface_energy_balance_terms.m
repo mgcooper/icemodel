@@ -19,6 +19,7 @@ function [Qe, Qh, Qc, Qa, Qsn, Qln] = surface_energy_balance_terms(T_sfc, ...
    %
    %#codegen
 
+   % Pass cv_liq to advective_heat_flux. TODO: For snowfall, pass snow density.
    persistent cv_liq
    if isempty(cv_liq)
       cv_liq = icemodel.physicalConstant('cv_liq');

@@ -3,7 +3,7 @@ function [T_sfc, ok] = solve_surface_energy_balance(T_sfc, tair, Qsi, Qli, ...
       chi, T_ice, k_eff, dz, ro_sfc, snow_depth, opts)
    %SOLVE_SURFACE_ENERGY_BALANCE Solve the nonlinear surface energy balance.
    %
-   %  [T_sfc, ok] = icemodel.surface.solve_surface_energy_balance(...)
+   %  [T_sfc, ok] = icemodel.surface.solve_surface_energy_balance(T_sfc, ...)
    %
    % Solver options:
    %  0 = derivative-free, slower but more robust, used as a fall back.
@@ -13,17 +13,17 @@ function [T_sfc, ok] = solve_surface_energy_balance(T_sfc, tair, Qsi, Qli, ...
    %      explicitly in the model.
    % >2 = experimental.
    %
-   % Important programming notes:
+   % Programming notes:
    %  - The outer iterations provide a shared convergence / fallback wrapper
    %  across the analytical Newton, complex-step, and derivative-free paths.
    %  old is initialized to T_sfc outside the outer loop and is passed as
    %  the initial guess to the selected inner root finder.
    %
    %  - solve_surface_temperature starts its Newton-Raphson from the outer
-   %  iterate (old = T_sfc on each call), and evaluates Qc and its derivative
-   %  at each inner step.
+   %  iterate (old = T_sfc on each call), and evaluates the seb and its full
+   %  derivative wrt T_sfc at each inner step.
    %
-   %  - For a "skinmodel", Ts never exceeds Tf when passed into functions, but
+   %  - For a "skinmodel", Tsfc never exceeds Tf when passed into functions, but
    %  within the iterations of solve_surface_temperature and when it comes out
    %  of solve_surface_temperature it can exceed Tf.
    %

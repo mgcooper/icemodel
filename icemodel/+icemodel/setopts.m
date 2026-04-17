@@ -164,26 +164,26 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %---------------------------------------------------------
 
    %%% General model settings
-   opts.n_spinup_years  =  0;       % number of leading simulation years used only for spinup
-   opts.use_init        =  false;   % reserved for later generic initialization support
-   opts.initfile        =  '';      % reserved generic initialization source
-   opts.use_restart     =  false;   % load an exact year-boundary restart state?
-   opts.restartfile     =  '';      % restart state file used when use_restart=true
-   opts.saverestart     =  false;   % save a restart state at each year boundary
+   opts.n_spinup_years  = 0;        % number of leading simulation years used only for spinup
+   opts.use_init        = false;    % reserved for later generic initialization support
+   opts.initfile        = '';       % reserved generic initialization source
+   opts.use_restart     = false;    % load an exact year-boundary restart state?
+   opts.restartfile     = '';       % restart state file used when use_restart=true
+   opts.saverestart     = false;    % save a restart state at each year boundary
 
    %%% Debug mode — enable via resetopts(opts, 'debug', true)
-   opts.debug           =  false;   % enable solver diagnostic dumps
-   opts.debug_path      =  '';      % override for debug output folder
+   opts.debug           = false;    % enable solver diagnostic dumps
+   opts.debug_path      = '';       % override for debug output folder
 
    %%% Model parameters and related options
-   opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
-   opts.ro_ice_init     =  900.0;   % initial ice density               [kg/m3]
+   opts.use_ro_glc      = false;    % use same density for liquid/solid ice?
+   opts.ro_ice_init     = 900.0;    % initial ice density               [kg/m3]
    opts.T_ice_init      = -8.0;     % initial ice temperature           [C]
    %
    % Capillary residual liquid water per pore volume fractions [-].
-   opts.f_res_pore_ice  =  0.02;
-   opts.f_res_pore_snow =  0.04;
-   opts.f_res_pore_firn =  0.02;
+   opts.f_res_pore_ice  = 0.02;
+   opts.f_res_pore_snow = 0.04;
+   opts.f_res_pore_firn = 0.02;
 
    %%% Timestepping / mesh options
    opts.calendar_type   = 'noleap'; %
@@ -324,7 +324,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
          opts.z_wind = 2.0;
    end
 
-   % Assume z_relh = z_tair. This option is not currently used in production.
+   % Assume z_relh = z_tair. This option is used in the monin-obukhov thf scheme.
    opts.z_relh = opts.z_tair;
 
    % Lag time used by icemodel.column.diagnose_column_runoff, converted from

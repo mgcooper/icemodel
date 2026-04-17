@@ -23,6 +23,9 @@ function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, ...
    %
    % where dQc/dT_sfc = -k_eff(1) / (dz(1) / 2) is constant.
    %
+   % H_h and H_e are the precomputed sensible and latent heat transport
+   % prefactors from initialize_surface_state / updatesubstep.
+   %
    % This is the Dirichlet surface solve: Qc and its derivative enter the
    % Newton-Raphson residual and Jacobian directly. In the Robin path,
    % conduction instead enters through the top-node finite-difference
@@ -46,7 +49,7 @@ function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, ...
       maxiter = 100;
    end
 
-   % Physical constants and parameters for the analytical Jacobian.
+   % Pass cv_liq to advective_heat_flux. TODO: For snowfall, pass snow density.
    persistent cv_liq
    if isempty(cv_liq)
       cv_liq = icemodel.physicalConstant('cv_liq');
