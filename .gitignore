@@ -7,6 +7,8 @@ test/artifacts/
 test/backups/
 test/baselines/profiler/
 test/benchmarks/profiler/
+test/interactive/data/
+test/interactive/figures/
 icemodel/dependencies/requirements.mat
 
 # vscode

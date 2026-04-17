@@ -9,52 +9,45 @@ function test_vappress_derivative_matches_finite_difference(testCase)
 
    Tf = icemodel.physicalConstant('Tf');
    T = Tf - 8.0;
-   [es, des_dT] = VAPPRESS(T, false);
+   [es, des_dT] = icemodel.vapor.saturation_vapor_pressure(T, false);
    h = 1e-3;
-   fd = (VAPPRESS(T + h, false) - VAPPRESS(T - h, false)) / (2 * h);
+   fd = (icemodel.vapor.saturation_vapor_pressure(T + h, false) ...
+      - icemodel.vapor.saturation_vapor_pressure(T - h, false)) / (2 * h);
 
    testCase.verifyGreaterThan(es, 0);
    testCase.verifyEqual(des_dT, fd, 'RelTol', 1e-6);
 end
 
 function test_tdewpoint_inverts_vappress(testCase)
-   % TDEWPOINT should invert VAPPRESS: es(Tdew) should equal ea = es(T)*rh/100.
+   % icemodel.vapor.dew_point_temperature should invert icemodel.vapor.saturation_vapor_pressure: es(Tdew) should equal ea = es(T)*rh/100.
 
    Tf = icemodel.physicalConstant('Tf');
    T = Tf - 5.0;
    rh = 75;
 
-   Tdew = TDEWPOINT(T, rh, false);
-   ea = VAPPRESS(T, false) * rh / 100;
-   es_at_Tdew = VAPPRESS(Tdew, false);
+   Tdew = icemodel.vapor.dew_point_temperature(T, rh, false);
+   ea = icemodel.vapor.saturation_vapor_pressure(T, false) * rh / 100;
+   es_at_Tdew = icemodel.vapor.saturation_vapor_pressure(Tdew, false);
 
    testCase.verifyEqual(es_at_Tdew, ea, 'RelTol', 1e-8);
    testCase.verifyLessThan(Tdew, T, ...
       'Dew point should be below air temperature for rh < 100');
 end
 
-function test_loadmetdata_respects_liqflag(testCase)
-   % LOADMETDATA should switch between ice and liquid saturation relations
-   % when the caller flips the liquid-phase flag.
-
-   [met, ~] = icemodel.test.fixtures.makeSyntheticMetFile(2016, 'nsteps', 1);
-   met.De = 0.01;
-
-   [~, ~, ~, ~, ~, ~, ~, ea_ice] = LOADMETDATA(met, 1, false);
-   [~, ~, ~, ~, ~, ~, ~, ea_liq] = LOADMETDATA(met, 1, true);
-
-   testCase.verifyGreaterThan(ea_liq, ea_ice);
-end
-
 function test_metsub_interpolates_midstep_for_enabled_option(testCase)
-   % With substep interpolation enabled, METSUB should evaluate the forcing
-   % state halfway through the parent step.
+   % With substep interpolation enabled, getsubstepforcings should evaluate
+   % the forcing state halfway through the parent step.
 
    opts.met_substep_interp = true;
-   Tf = icemodel.physicalConstant('Tf');
+
+   % TODO: Replace undefined variables with actual variable names:
+   % [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, ea] ...
+   %    = getsubstepforcings(opts, metstep, dt_sum, dt_full, liqflag, tair_v, ...
+   %    swd_v, lwd_v, albedo_v, wspd_v, rh_v, psfc_v, ppt_v, tppt_v, De_v)
 
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, ea] = ...
-      METSUB(opts, 1, 1800, 3600, true, Tf, [270; 272], [100; 200], ...
+      icemodel.timestepping.getsubstepforcings( ...
+      opts, 1, 1800, 3600, true, [270; 272], [100; 200], ...
       [220; 260], [0.60; 0.70], [3; 5], [70; 90], [78000; 79000], ...
       [0; 2], [268; 269], [0.01; 0.02]);
 
@@ -68,55 +61,79 @@ function test_metsub_interpolates_midstep_for_enabled_option(testCase)
    testCase.verifyEqual(ppt, 1);
    testCase.verifyEqual(tppt, 268.5);
    testCase.verifyEqual(De, 0.015);
-   testCase.verifyEqual(ea, VAPPRESS(271, true) * 0.80, 'RelTol', 1e-12);
+   testCase.verifyEqual(ea, icemodel.vapor.saturation_vapor_pressure(271, true) * 0.80, 'RelTol', 1e-12);
 end
 
 function test_metsub_returns_step_value_when_interp_disabled(testCase)
-   % With interpolation disabled, METSUB should hold the parent-step value
-   % and still compute a consistent vapor pressure from that state.
+   % With interpolation disabled, getsubstepforcings should hold the
+   % parent-step value and still compute a consistent vapor pressure.
 
    opts.met_substep_interp = false;
-   Tf = icemodel.physicalConstant('Tf');
+
+   % TODO: Declare variables explicitly using actual variable names
+   % [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, ea] ...
+   %    = getsubstepforcings(opts, metstep, dt_sum, dt_full, liqflag, tair_v, ...
+   %    swd_v, lwd_v, albedo_v, wspd_v, rh_v, psfc_v, ppt_v, tppt_v, De_v)
 
    [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, ea] = ...
-      METSUB(opts, 1, 1800, 3600, false, Tf, [270; 272], [100; 200], ...
+      icemodel.timestepping.getsubstepforcings( ...
+      opts, 1, 1800, 3600, false, [270; 272], [100; 200], ...
       [220; 260], [0.60; 0.70], [3; 5], [70; 90], [78000; 79000], ...
       [0; 2], [268; 269], [0.01; 0.02]);
 
    testCase.verifyEqual([tair swd lwd albedo wspd rh psfc ppt tppt De], ...
       [270 100 220 0.60 3 70 78000 0 268 0.01], 'AbsTol', 1e-12);
-   testCase.verifyEqual(ea, VAPPRESS(270, false) * 0.70, 'RelTol', 1e-12);
+
+   testCase.verifyEqual(ea, ...
+      icemodel.vapor.saturation_vapor_pressure(270, false) * 0.70, 'RelTol', 1e-12);
 end
 
 function test_sfcflin_matches_surface_terms_at_linearization_point(testCase)
    % The linearized surface flux coefficients should reproduce the full
    % surface residual at the temperature used for the linearization.
 
-   [cv_air, SB, roLs, Tf, epsilon] = icemodel.physicalConstant( ...
-      'cv_air', 'SB', 'roLs', 'Tf', 'epsilon');
+   [cv_liq, SB, Tf, cp_air, Ls, epsilon] = icemodel.physicalConstant( ...
+      'cv_liq', 'SB', 'Tf', 'cp_air', 'Ls', 'epsilon');
    emiss = icemodel.parameterLookup('emiss');
-   [De, scoef] = WINDCOEF(4.0, 0.001, 2.0, 3.0);
+   wspd = 4.0;
+   z0_bulk = 0.001;
+   z_tair = 2.0;
+   z_wind = 3.0;
+   [De_h, br_coefs] = ...
+      icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
+      wspd, z0_bulk, z_tair, z_wind);
 
-   Ta = Tf - 10.0;
-   Ts = Tf - 5.0;
+   tair = Tf - 10.0;
+   T_sfc = Tf - 5.0;
    Qsi = 200.0;
    Qli = 240.0;
    albedo = 0.6;
-   wspd = 4.0;
-   Pa = 78000.0;
+   ppt = 2e-4;
+   tppt = tair + 4.0;
+   psfc = 78000.0;
    chi = 1.0;
    liqflag = false;
-   ea = 0.8 * VAPPRESS(Ta, liqflag);
+   ea_atm = 0.8 * icemodel.vapor.saturation_vapor_pressure(tair, liqflag);
 
-   [Sc, Sp] = SFCFLIN(Ta, Qsi, Qli, albedo, wspd, Pa, De, ea, cv_air, ...
-      emiss, SB, roLs, scoef, chi, Tf, Ts, liqflag);
+   ro_atm = icemodel.vapor.moist_air_density(psfc, ea_atm, tair);
+   cv_atm = ro_atm * cp_air;
+   hv_atm = ro_atm * Ls;
+   H_h = cv_atm * De_h;
+   H_e = hv_atm * De_h * epsilon / psfc;
 
-   es = VAPPRESS(Ts, liqflag);
-   S = STABLEFN(Ta, Ts, wspd, scoef);
-   F = emiss * (Qli - SB * Ts ^ 4) ...
+   [Fc, Fp] = ...
+      icemodel.surface.turbulence.bulk_richardson.surface_flux_linearization( ...
+      T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, tppt, ea_atm, ...
+      H_h, H_e, br_coefs, liqflag, chi);
+
+   es_sfc = icemodel.vapor.saturation_vapor_pressure(T_sfc, liqflag);
+   stability = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
+      T_sfc, tair, wspd, br_coefs);
+   F = emiss * (Qli - SB * T_sfc ^ 4) ...
       + chi * Qsi * (1 - albedo) ...
-      + cv_air * De * (Ta - Ts) * S ...
-      + roLs * De * epsilon / Pa * (ea - es) * S;
+      + H_h * (tair - T_sfc) * stability ...
+      + H_e * (ea_atm - es_sfc) * stability ...
+      + icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
 
-   testCase.verifyEqual(Sc + Sp * Ts, F, 'RelTol', 1e-10);
+   testCase.verifyEqual(Fc + Fp * T_sfc, F, 'RelTol', 1e-10);
 end

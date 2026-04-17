@@ -28,14 +28,17 @@ function [met, opts] = loadmet(opts, fileiter) %#codegen
       met = sortrows(met);
    end
 
+   met = addCanonicalSnowDepth(met);
+
    % Require the concatenated met data to cover every requested simulation
    % year, whether the source is one multi-year file or one file per year.
    if ~all(ismember(opts.simyears(:), unique(year(met.Time))))
       error('met data do not cover all requested simulation years')
    end
-
-   % Compute the wind transfer coefficient for the processed met data.
-   met.De = WINDCOEF(met.wspd, opts.z_0, opts.z_tair, opts.z_wind);
+   
+   met.De ...
+      = icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
+      met.wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
 end
 
 %%
@@ -65,6 +68,33 @@ function met = prepareMetData(met, opts)
    met = met(ismember(year(met.Time), opts.simyears), :);
 
    met.Time.TimeZone = 'UTC';
+end
+
+%%
+function met = addCanonicalSnowDepth(met)
+   %ADDCANONICALSNOWDEPTH Standardize optional forcing snow-depth aliases.
+
+   if isvariable('snow_depth', met)
+      snow_depth = met.snow_depth;
+   else
+      snow_depth = nan(height(met), 1);
+   end
+
+   aliases = {'snowd', 'snow'};
+   for n = 1:numel(aliases)
+      alias = aliases{n};
+      if ~isvariable(alias, met)
+         continue
+      end
+      values = met.(alias);
+      replace = ~isfinite(snow_depth) & isfinite(values);
+      snow_depth(replace) = values(replace);
+   end
+
+   if isvariable('snow_depth', met) || any(cellfun(@(v) isvariable(v, met), aliases))
+      snow_depth(~isfinite(snow_depth)) = nan;
+      met.snow_depth = snow_depth;
+   end
 end
 
 %%

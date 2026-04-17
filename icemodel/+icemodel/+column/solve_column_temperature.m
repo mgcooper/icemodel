@@ -1,0 +1,131 @@
+function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(Ts, ...
+      T, f_ice, f_liq, dz, delz, fn, dt, tol, maxiter, alpha, debug)
+   %SOLVE_COLUMN_TEMPERATURE Solve the 1-dimensional column conduction equation.
+   %
+   %#codegen
+
+   persistent cv_ice cv_liq Ls
+   if isempty(cv_ice)
+      [cv_ice, cv_liq, Ls] = icemodel.physicalConstant( ...
+         'cv_ice', 'cv_liq', 'Ls');
+   end
+
+   % Top and bottom node indices
+   N = 1;
+   S = numel(T);
+
+   % Solver options
+   if maxiter == 1
+      alpha = 1;
+   end
+
+   % Thermal conductivity without vapor diffusion (skinmodel).
+   k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, 0);
+
+   % Vapor density derivative excluded from enthalpy budget (skinmodel).
+   drovdT = 0;
+
+   % To reinstate vapor-aware conductivity and enthalpy:
+   % [~, drovdT] = icemodel.vapor.saturation_vapor_density(T, f_liq);
+   % k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq, drovdT);
+   % k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, k_vap);
+   %
+   % Note: same update is required within iterations, see solve_column_enthalpy.
+
+   % Initial past Picard iterates for Aitken-acceleration
+   % T_1 = nan(size(T));
+   % T_2 = nan(size(T));
+
+   % Iterate to solve the nonlinear heat equation (p. 47)
+   ok = false;
+   for iter = 1:maxiter
+
+      % Capture current T iterate
+      T_iter = T;
+
+      % Compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
+      g_ns = [k_eff(N); k_eff(N:S); k_eff(S)];
+      gb_ns = 1.0 ./ ( (1.0 - fn) ./ g_ns(N:S+1) + fn ./ g_ns(N+1:S+2));
+
+      % Compute the enthalpy coefficient for each c.v. for the current timestep
+      aP0 = (cv_ice * f_ice + cv_liq * f_liq ...
+         + Ls * (1 - f_liq - f_ice) .* drovdT) .* dz / dt;
+
+      % Compute the aN and aS coefficients
+      aN = gb_ns(N:S)     ./ delz(N:S);
+      aS = gb_ns(N+1:S+1) ./ delz(N+1:S+1);
+
+      % Account for the boundary conditions.
+      bc_N = aN(N) * Ts;
+      bc_S = 0.0;
+      aS(S) = 0.0;
+
+      % Compute the aP coefficient and solution vector b
+      aP = aN(N:S) + aS(N:S) + aP0(N:S);
+      b = aP0(N:S) .* T(N:S);
+
+      % Account for Dirichlet upper and Neumann lower boundary conditions
+      b(N) = b(N) + bc_N;
+      b(S) = b(S) + bc_S;
+
+      % Solve the equation
+      T = icemodel.numerics.trisolve(-aN, aP, -aS, b);
+
+      % Prep for next iteration
+      if all(abs(T - T_iter) < tol)
+         ok = true;
+         break
+      end
+
+      % Apply relaxation
+      T = alpha * T + (1 - alpha) * T_iter;
+
+      % Aitken acceleration (node-by-node) with relaxed value as fallback.
+      % if use_aitken
+      %    T_0 = T;
+      %    for mm = 1:numel(T)
+      %       T(mm) = icemodel.numerics.aitkenscalar(T_2(mm), T_1(mm), ...
+      %          T_0(mm), T(mm), ...
+      %          jumpmax);
+      %    end
+      %    T_2 = T_1;
+      %    T_1 = T_0;
+      % end
+
+      % Update thermal conductivity (T-k_eff consistency on final iteration).
+      k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, 0);
+
+      % To reinstate k_vap:
+      % k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, k_vap);
+   end
+
+   if ~ok && debug
+      dumpSkinSolveFailure(T, f_ice, f_liq, k_eff, dz, delz, dt, Ts, iter, ...
+         maxiter);
+   end
+end
+
+function dumpSkinSolveFailure(T, f_ice, f_liq, k_eff, dz, delz, dt, Ts, ...
+      iter, maxiter)
+   %DUMPSKINSOLVEFAILURE Save skin conduction solver diagnostics on demand.
+
+   debug_file = getenv('ICEMODEL_DEBUG_SKINSOLVE_FILE');
+   if isempty(debug_file)
+      return
+   end
+
+   debug_state = struct();
+   debug_state.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
+   debug_state.T = T;
+   debug_state.f_ice = f_ice;
+   debug_state.f_liq = f_liq;
+   debug_state.k_eff = k_eff;
+   debug_state.dz = dz;
+   debug_state.delz = delz;
+   debug_state.dt = dt;
+   debug_state.Ts = Ts;
+   debug_state.iter = iter;
+   debug_state.maxiter = maxiter;
+
+   save(debug_file, 'debug_state');
+end

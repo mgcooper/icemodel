@@ -6,7 +6,7 @@ function report = audit_formal_substep_failures(kwargs)
    %  report = audit_formal_substep_failures(output_file="/tmp/substep_audit.mat")
    %
    % Use this when you want to identify which formal cases emit the
-   % CHECKSUBSTEP dt-min/maxsubstep diagnostics without rebuilding baselines.
+   % check_substep dt-min/maxsubstep diagnostics without rebuilding baselines.
 
    arguments
       kwargs.tier (1, :) string ...
@@ -35,7 +35,7 @@ function report = audit_formal_substep_failures(kwargs)
       error('no formal regression cases matched the requested filters')
    end
 
-   % Probe each case independently and record whether CHECKSUBSTEP emitted
+   % Probe each case independently and record whether checksubstep emitted
    % either the dt-min warning or the forced-advance maxsubstep fallback.
    rows = repmat(struct( ...
       'case_id', "", ...
@@ -107,7 +107,7 @@ function report = audit_formal_substep_failures(kwargs)
 end
 
 function excerpt = extractIssueExcerpt(txt)
-   %EXTRACTISSUEEXCERPT Keep only the CHECKSUBSTEP-related lines.
+   %EXTRACTISSUEEXCERPT Keep only the checksubstep-related lines.
 
    lines = string(splitlines(string(txt)));
    keep = contains(lines, 'timestep = ') | ...
