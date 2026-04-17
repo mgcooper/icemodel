@@ -1,6 +1,6 @@
-function [Fc, Fp, diag] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, ...
-      albedo, wspd, ppt, tppt, psfc, De, ea_atm, chi, ro_air_Lv, liqflag, ...
-      ro_sfc, snow_depth, opts)
+function [Fc, Fp, diag] = surface_flux_linearization(T_sfc, tair, Qsi, ...
+      Qli, albedo, wspd, ppt, tppt, psfc, ea_atm, ro_atm, cv_atm, ...
+      nu_air, H_h, H_e, hv_atm, liqflag, chi, ro_sfc, snow_depth, opts)
    %SURFACE_FLUX_LINEARIZATION Linearize the bulk-MO surface flux.
    %
    %  [Fc, Fp] = ...
@@ -18,20 +18,35 @@ function [Fc, Fp, diag] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, ...
    % conductive term remains in the `icemodel.column.solve_column_enthalpy`
    % Robin interior solve.
    %
+   % cv_atm, hv_atm, ro_atm, nu_air are precomputed per forcing timestep and
+   % passed in; they are constant across inner solver iterations.
+   %
    %#codegen
+
+   % Set bulk-Richardson stability coefficients empty for Monin-Obukhov scheme.
+   % Set T_ice, k_eff, dz to dummy values to ignore the conduction term.
+   persistent br_coefs T_ice k_eff dz
+   if isempty(br_coefs)
+      br_coefs = [];
+      T_ice = 0.0;
+      k_eff = 0.0;
+      dz = 1.0;
+   end
 
    if nargout > 2
       [~, ~, diag_thf] = ...
-         icemodel.surface.diagnose_turbulent_heat_fluxes(T_sfc, tair, wspd, ...
-         psfc, ea_atm, De, [], ro_sfc, snow_depth, ro_air_Lv, liqflag, opts);
+         icemodel.surface.diagnose_turbulent_heat_fluxes(T_sfc, ...
+         tair, wspd, psfc, ea_atm, ro_atm, cv_atm, nu_air, H_h, ...
+         H_e, hv_atm, br_coefs, liqflag, ro_sfc, snow_depth, opts);
    else
       diag_thf = struct([]);
    end
 
    % Fp = dQ_sfc_dT_sfc
-   [Q_sfc, Fp] = icemodel.surface.numerical_surface_flux( ...
-      T_sfc, tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, De, ea_atm, ...
-      [], ro_air_Lv, liqflag, chi, 0.0, 0.0, 1.0, ro_sfc, snow_depth, opts);
+   [Q_sfc, Fp] = icemodel.surface.numerical_surface_flux(T_sfc, ...
+      tair, Qsi, Qli, albedo, wspd, ppt, tppt, psfc, ea_atm, ...
+      ro_atm, cv_atm, nu_air, H_h, H_e, hv_atm, br_coefs, liqflag, ...
+      chi, T_ice, k_eff, dz, ro_sfc, snow_depth, opts);
 
    Fc = Q_sfc - Fp * T_sfc;
 

@@ -1,4 +1,4 @@
-function [Qh, dQh_dT_sfc] = sensible_heat_flux(T_sfc, tair, De, stability, ...
+function [Qh, dQh_dT_sfc] = sensible_heat_flux(T_sfc, tair, H_h, stability, ...
       dstability_dT_sfc)
    %SENSIBLE_HEAT_FLUX Compute the turbulent sensible heat flux.
    %
@@ -20,15 +20,10 @@ function [Qh, dQh_dT_sfc] = sensible_heat_flux(T_sfc, tair, De, stability, ...
    % See also: icemodel.surface.turbulence.bulk_richardson.latent_heat_flux
    %
    %#codegen
-   persistent cv_air
-   if isempty(cv_air)
-      cv_air = icemodel.physicalConstant('cv_air');
-   end
 
-   Qh = cv_air * (De .* stability .* (tair - T_sfc));
+   Qh = H_h .* stability .* (tair - T_sfc);
 
    if nargout > 1
-      dQh_dT_sfc = cv_air * ...
-         (De .* ((tair - T_sfc) .* dstability_dT_sfc - stability));
+      dQh_dT_sfc = H_h .* (dstability_dT_sfc .* (tair - T_sfc) - stability);
    end
 end

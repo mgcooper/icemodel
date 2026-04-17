@@ -1,5 +1,6 @@
 function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
-      psfc, ea_atm, ro_sfc, snow_depth, ro_air_Lv, liqflag, opts)
+      psfc, ea_atm, ro_sfc, snow_depth, cv_atm, hv_atm, ro_atm, ...
+      nu_air, liqflag, opts)
    %TURBULENT_HEAT_FLUX Evaluate the Monin-Obukhov THF scheme.
    %
    %  [Qe, Qh] = ...
@@ -44,10 +45,9 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
    %#codegen
 
    % Load physical constants
-   persistent P0 kappa_p ro_air_ref cv_air
+   persistent P0 kappa kappa_p
    if isempty(P0)
-      [P0, kappa_p, ro_air_ref, cv_air] = icemodel.physicalConstant( ...
-         'P0', 'kappa_p', 'ro_air', 'cv_air');
+      [P0, kappa, kappa_p] = icemodel.physicalConstant('P0', 'kappa', 'kappa_p');
    end
 
    % Load parameters
@@ -69,10 +69,6 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
    % precomputed at model initialization and passed in; they are constant for
    % this timestep and need not be recomputed per call or per inner iteration.
    es_sfc = icemodel.vapor.saturation_vapor_pressure(T_sfc, liqflag);
-   ro_atm = icemodel.vapor.moist_air_density(psfc, ea_atm, tair);
-   nu_air = icemodel.kernels.air_kinematic_viscosity(tair, ro_atm);
-   cp_air = cv_air / ro_air_ref;
-   Lv_air = ro_air_Lv / ro_air_ref;
 
    q_air = icemodel.vapor.specific_humidity_from_vapor_pressure(ea_atm, psfc);
    q_sfc = icemodel.vapor.specific_humidity_from_vapor_pressure(es_sfc, psfc);
@@ -86,9 +82,9 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
       Qe = 0.0;
       Qh = 0.0;
       if nargout > 2
-         diag = monin_obukhov_diag(es_sfc, q_air, q_air, theta_air, theta_sfc, ...
-            ro_atm, nu_air, z0m, NaN, NaN, 0.0, NaN, 0.0, 0, 0, 0, 0, 0, ...
-            0, 0, real(theta_air) >= real(theta_sfc));
+         diag = monin_obukhov_diag(es_sfc, q_air, q_air, theta_air, ...
+            theta_sfc, ro_atm, nu_air, z0m, NaN, NaN, 0.0, NaN, 0.0, ...
+            0, 0, 0, 0, 0, 0, 0, real(theta_air) >= real(theta_sfc));
       end
       return
    end
@@ -117,7 +113,7 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
 
       % Initial momentum exchange scale (friction velocity) from observed wind
       % speed and the current momentum roughness and stability corrections.
-      u_star = turbulent_exchange_scale(wspd, z_u, z0m, psi_mz, psi_m0);
+      u_star = turbulent_exchange_scale(wspd, z_u, z0m, psi_mz, psi_m0, kappa);
 
       % Roughness Reynolds number from u_*.
       Re = u_star * z0m / nu_air;
@@ -133,7 +129,7 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
          L, z0m, z_u, z0h, z_t, z0q, z_q, is_stable);
 
       % Recompute u_* and Re using updated profile corrections.
-      u_star = turbulent_exchange_scale(wspd, z_u, z0m, psi_mz, psi_m0);
+      u_star = turbulent_exchange_scale(wspd, z_u, z0m, psi_mz, psi_m0, kappa);
       Re = u_star * z0m / nu_air;
 
       % Recompute scalar roughness lengths from updated Re.
@@ -144,17 +140,15 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
       % The scalar transfer relations define theta_* and q_* once the scalar
       % roughness lengths and profile corrections are known.
       theta_star = turbulent_exchange_scale(theta_air - theta_sfc, ...
-         z_t, z0h, psi_hz, psi_h0);
+         z_t, z0h, psi_hz, psi_h0, kappa);
       q_star = turbulent_exchange_scale(q_air - q_sfc, ...
-         z_q, z0q, psi_qz, psi_q0);
+         z_q, z0q, psi_qz, psi_q0, kappa);
 
-      % Convert the exchange scales to sensible and latent heat fluxes. ro_atm
-      % is the local moist-air density, so using ro_atm here is more consistent
-      % than assuming the fixed reference density used by the older
-      % bulk-Richardson path.
-      Qe = ro_atm * Lv_air * u_star * q_star;
+      % Convert the exchange scales to latent and sensible heat fluxes using
+      % the precomputed moist-air latent enthalpy and volumetric heat capacity.
+      Qe = hv_atm * u_star * q_star;
       if nargout > 1
-         Qh = ro_atm * cp_air * u_star * theta_star;
+         Qh = cv_atm * u_star * theta_star;
       end
 
       % Update the Monin-Obukhov stability length from the current exchange
@@ -184,7 +178,7 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, ...
 end
 
 function exchange_star = turbulent_exchange_scale(delta_value, z_obs, ...
-      z0_exchange, psi_exchange_z, psi_exchange_0)
+      z0_exchange, psi_exchange_z, psi_exchange_0, kappa)
    %TURBULENT_EXCHANGE_SCALE Return u_*, theta_*, or q_* from the MO relation.
    %
    % This helper evaluates the generic Monin-Obukhov exchange relation:
@@ -205,11 +199,6 @@ function exchange_star = turbulent_exchange_scale(delta_value, z_obs, ...
    %
    % For momentum, delta_wind = wspd(z_u) - wspd_sfc with wspd_sfc = 0. For
    % scalars, delta is either theta_air - theta_sfc or q_air - q_sfc.
-
-   persistent kappa
-   if isempty(kappa)
-      kappa = icemodel.physicalConstant('kappa');
-   end
 
    denom = log(z_obs / z0_exchange) - psi_exchange_z + psi_exchange_0;
    if abs(denom) < 1e-12

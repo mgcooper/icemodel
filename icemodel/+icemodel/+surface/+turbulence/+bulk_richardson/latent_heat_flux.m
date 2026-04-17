@@ -1,5 +1,5 @@
-function [Qe, dQe_dT_sfc] = latent_heat_flux(es_sfc, ea_atm, De, stability, ...
-      psfc, ro_air_Lv, des_sfc_dT, dstability_dT_sfc)
+function [Qe, dQe_dT_sfc] = latent_heat_flux(es_sfc, ea_atm, H_e, stability, ...
+      des_sfc_dT, dstability_dT_sfc)
    %LATENT_HEAT_FLUX Compute the turbulent latent heat flux.
    %
    %  Qe = icemodel.surface.turbulence.bulk_richardson.latent_heat_flux(...)
@@ -22,14 +22,11 @@ function [Qe, dQe_dT_sfc] = latent_heat_flux(es_sfc, ea_atm, De, stability, ...
    % See also: icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux
    %
    %#codegen
-   persistent epsilon
-   if isempty(epsilon)
-      epsilon = icemodel.physicalConstant('epsilon');
-   end
-   Qe = ro_air_Lv .* De .* stability .* (ea_atm - es_sfc) .* epsilon ./ psfc;
+
+   Qe = H_e .* stability .* (ea_atm - es_sfc);
 
    if nargout > 1
-      dQe_dT_sfc = ro_air_Lv .* De .* epsilon ./ psfc .* ...
+      dQe_dT_sfc = H_e .* ...
          ((ea_atm - es_sfc) .* dstability_dT_sfc - stability .* des_sfc_dT);
    end
 end

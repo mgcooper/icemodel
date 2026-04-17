@@ -1,5 +1,5 @@
-function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, albedo, ...
-      wspd, ppt, tppt, psfc, De, ea_atm, br_coefs, ro_air_Lv, liqflag, chi)
+function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, ...
+      albedo, wspd, ppt, tppt, ea_atm, H_h, H_e, br_coefs, liqflag, chi)
    %SURFACE_FLUX_LINEARIZATION Linearize the surface energy balance equation.
    %
    % The linearization is of the form: F = Fc + Fp * T
@@ -35,30 +35,38 @@ function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, albedo, ..
    % Dirichlet solve (solve_surface_temperature) includes dQc/dT_sfc directly in
    % the Newton-Raphson Jacobian.
    %
+   % H_h  — sensible heat transport prefactor [W m-2 K-1] = cv_atm * De
+   % H_e  — latent heat transport prefactor [W m-2 Pa-1] = hv_atm * De_e
+   %
    % See also: icemodel.surface.numerical_surface_flux
    %
    %#codegen
 
-   persistent cv_air cv_liq emiss SB epsilon
-   if isempty(cv_air)
-      [cv_air, cv_liq, SB, epsilon] = icemodel.physicalConstant( ...
-         'cv_air', 'cv_liq', 'SB', 'epsilon');
-      emiss = icemodel.parameterLookup('emiss');
+   % Pass cv_liq to advective_heat_flux. TODO: For snowfall, pass snow density.
+   persistent cv_liq
+   if isempty(cv_liq)
+      cv_liq = icemodel.physicalConstant('cv_liq');
    end
 
    % Surface saturation vapor pressure and derivative.
-   [~, des_sfc_dT] = icemodel.vapor.saturation_vapor_pressure( ...
+   [es_sfc, des_sfc_dT] = icemodel.vapor.saturation_vapor_pressure( ...
       T_sfc, liqflag);
 
    % Bulk richardson stability function.
-   stability = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
+   stability = ...
+      icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
       T_sfc, tair, wspd, br_coefs);
+
+   % Turbulent heat fluxes via leaf functions (no diagnostics needed).
+   Qe = ...
+      icemodel.surface.turbulence.bulk_richardson.latent_heat_flux( ...
+      es_sfc, ea_atm, H_e, stability);
+   Qh = ...
+      icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux( ...
+      T_sfc, tair, H_h, stability);
 
    % Canonical non-conductive surface terms at the current linearization
    % state. The Robin solve handles conduction in the interior column system.
-   [Qe, Qh] = ...
-      icemodel.surface.turbulence.bulk_richardson.turbulent_heat_flux( ...
-      T_sfc, tair, wspd, psfc, ea_atm, De, br_coefs, ro_air_Lv, liqflag, NaN);
    Qa = icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
    Qsn = icemodel.surface.net_shortwave_radiation(Qsi, albedo, chi);
    [Qln, dQln_dT] = icemodel.surface.net_longwave_radiation(T_sfc, Qli);
@@ -70,12 +78,12 @@ function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, albedo, ..
    % Net longwave radiation.
    Fp_Qln = dQln_dT;
 
-   % Sensible heat flux.
-   Fp_Qh = -cv_air * De * stability;
+   % Sensible heat flux: H_h already absorbs cv_atm = ro_atm * cp_air
+   Fp_Qh = -H_h * stability;
 
-   % Latent heat flux (linearization of es_sfc around T_sfc)
-   % es(T) ≈ es + des_dT * (T - T_sfc) = (es - des_dT * T_sfc) + des_dT * T
-   Fp_Qe = -ro_air_Lv * De * epsilon / psfc * stability * des_sfc_dT;
+   % Latent heat flux (linearization of es_sfc around T_sfc):
+   % H_e already absorbs hv_atm * De * epsilon / psfc
+   Fp_Qe = -H_e * stability * des_sfc_dT;
 
    % Total linearization.
    Fp = Fp_Qln + Fp_Qh + Fp_Qe;

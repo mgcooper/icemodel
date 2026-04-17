@@ -1,4 +1,4 @@
-function [De, S123, W1] = exchange_coefficients(wspd, z0_bulk, z_tair, z_wind)
+function [De_h, S123, W1] = exchange_coefficients(wspd, z0_bulk, z_tair, z_wind)
    %EXCHANGE_COEFFICIENTS Compute bulk-Richardson exchange coefficients.
    %
    % Notation below roughly follows Liston et al. 1999
@@ -72,8 +72,8 @@ function [De, S123, W1] = exchange_coefficients(wspd, z0_bulk, z_tair, z_wind)
    % Compute the drag coefficient (a^2 in Louis notation, eq. 13) [1]
    W1 = (k_von_karman ./ log(z_tair ./ z0_bulk)) .^ 2;
 
-   % Compute the aerodynamic exchange coefficient [m s-1]
-   De = W1 .* wspd;
+   % Compute the aerodynamic exchange coefficient for sensible heat [m s-1]
+   De_h = W1 .* wspd;
 
    % Compute the factor needed to allow z_wind != z_tair (derived by mgc)
    z_star = z_wind .^ 2 ./ z_tair;
