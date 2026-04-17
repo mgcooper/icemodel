@@ -50,10 +50,11 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
       z_nodes, f_res_por] = icemodel.column.initialize_column_state( ...
       opts, met.tair, r_eff);
 
-   % Initialize the surface state (liqflag, ro_air_Lv, ea_atm, De, br_coefs, ro_sfc).
-   [De_all, scoef, liqflag, ro_air_Lv, ea_atm_all] = ...
-      icemodel.surface.initialize_surface_state( ...
-      f_liq, f_ice, met.wspd, met.tair, met.rh, opts);
+   % Initialize the forcing-derived surface arrays.
+   [ea_atm_all, ro_atm_all, cv_atm_all, nu_air_all, H_h_all, ...
+      De_e_all, scoef] = ...
+      icemodel.surface.initialize_surface_state(opts, ...
+      f_ice(1), f_liq(1), met.tair, met.wspd, met.rh, met.psfc);
 
    % Derived column quantities not returned by initialize_column_state.
    JJ = numel(dz);
@@ -65,11 +66,20 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
 
    metstep = kwargs.metstep;
 
+   % Derive surface running state at the fixture's metstep.
+   [liqflag, ~, hv_atm, H_e, ~] = ...
+      icemodel.surface.update_surface_state( ...
+      f_ice(1), f_liq(1), ro_atm_all(metstep), ...
+      De_e_all(metstep), 0, opts);
+
    % Extract one forcing step.
    [tair, swd, lwd, albedo, wspd, psfc, ~, ~, forcing_snow_depth] ...
       = icemodel.timestepping.getforcings(met, metstep, liqflag, opts);
-   De  = De_all(metstep);
-   ea  = ea_atm_all(metstep);
+   ea        = ea_atm_all(metstep);
+   ro_atm_t  = ro_atm_all(metstep);
+   nu_air_t  = nu_air_all(metstep);
+   cv_atm_t  = cv_atm_all(metstep);
+   H_h_t     = H_h_all(metstep);
 
    % Carry precipitation fields when the synthetic met fixture defines them.
    if ismember('ppt', met.Properties.VariableNames)
@@ -131,7 +141,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    state.ro_iwe = ro_iwe;
    state.ro_wie = ro_wie;
    state.liqflag = liqflag;
-   state.ro_air_Lv = ro_air_Lv;
+   state.hv_atm = hv_atm;
 
    state.tair = tair;
    state.swd = swd;
@@ -141,10 +151,14 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    state.ppt = ppt;
    state.tppt = tppt;
    state.psfc = psfc;
-   state.De = De;
    state.ea_atm = ea;
    state.br_coefs = scoef;
    state.chi = 1.0;
+   state.H_h = H_h_t;
+   state.H_e = H_e;
+   state.cv_atm = cv_atm_t;
+   state.ro_atm = ro_atm_t;
+   state.nu_air = nu_air_t;
 
    state.cv_air = cv_air;
    state.cv_liq = cv_liq;

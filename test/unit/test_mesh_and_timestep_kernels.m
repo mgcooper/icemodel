@@ -129,16 +129,20 @@ end
 
 function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
    % Reset and update helpers should restore failed-substep state, then
-   % advance the accepted state and diagnostics consistently.
+   % advance the accepted state and time bookkeeping consistently.
 
-   roLs = icemodel.physicalConstant('roLs');
-   
+   Ls = icemodel.physicalConstant('Ls');
+   ro_atm_val = 1.2;
+   De_e_val = 1e-5;
+   substep_opts = struct( ...
+      'f_res_pore_snow', 0.07, 'f_res_pore_ice', 0.01);
+
    [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new] = ...
       icemodel.timestepping.resetsubstep( ...
       270, [269; 268], [0.9; 0.9], [0.01; 0.01], 900, 2, 9, 0, 450);
 
-   [Ts_up, T_up, f_ice_up, f_liq_up, dt_sum, dt_next, liqflag, ro_air_Lv] ...
-      = icemodel.timestepping.updatesubstep(Ts, T, f_ice, ...
+   [Ts_up, T_up, f_ice_up, f_liq_up, dt_sum, dt_next] = ...
+      icemodel.timestepping.updatesubstep(Ts, T, f_ice, ...
       f_liq, 900, 450, 300, 1e-12);
 
    testCase.verifyEqual([Ts_up; T_up], [270; 269; 268], 'AbsTol', 0);
@@ -149,8 +153,15 @@ function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
    testCase.verifyEqual(dt_new, 300, 'AbsTol', 1e-12);
    testCase.verifyEqual(dt_sum, 750, 'AbsTol', 1e-12);
    testCase.verifyEqual(dt_next, 150, 'AbsTol', 1e-12);
+
+   % Surface running state is now derived by update_surface_state.
+   [liqflag, ~, hv_atm_val, H_e, ~] = ...
+      icemodel.surface.update_surface_state( ...
+      f_ice(1), f_liq(1), ro_atm_val, De_e_val, 0, substep_opts);
+
    testCase.verifyFalse(liqflag);
-   testCase.verifyEqual(ro_air_Lv, roLs, 'AbsTol', 0);
+   testCase.verifyEqual(hv_atm_val, ro_atm_val * Ls, 'AbsTol', 0);
+   testCase.verifyEqual(H_e, hv_atm_val * De_e_val, 'AbsTol', 0);
 end
 
 function test_checksubstep_forces_advance_at_maxsubstep(testCase)

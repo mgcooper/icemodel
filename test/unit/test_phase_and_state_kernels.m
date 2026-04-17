@@ -3,7 +3,7 @@ function tests = test_phase_and_state_kernels
    tests = functiontests(localfunctions);
 end
 
-function test_liquid_fraction_function_and_derivative_are_self_consistent(testCase)
+function test_liquid_fraction_function_and_deriv_are_self_consistent(testCase)
    % icemodel.column.liquid_fraction_function and
    % icemodel.column.liquid_fraction_derivative should agree when applied
    % to the same melt-zone state.

@@ -49,23 +49,22 @@ function test_turbulent_flux_kernels_follow_sign_convention(testCase)
 
    T_sfc = 268;
    tair = 270;
-   De = 1e-3;
+   H_h = 1.2;
    stability = 1.2;
    es_sfc = 300;
    ea_atm = 350;
-   psfc = 78000;
-   ro_air_Lv = 2.5e9;
+   H_e = 0.032;
 
    Qh = icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux( ...
-      T_sfc, tair, De, stability);
+      T_sfc, tair, H_h, stability);
    Qe = icemodel.surface.turbulence.bulk_richardson.latent_heat_flux( ...
-      es_sfc, ea_atm, De, stability, psfc, ro_air_Lv);
+      es_sfc, ea_atm, H_e, stability);
 
    testCase.verifyGreaterThan(Qh, 0);
    testCase.verifyGreaterThan(Qe, 0);
    testCase.verifyEqual( ...
       icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux( ...
-      tair, tair, De, 1.0), 0, 'AbsTol', 1e-12);
+      tair, tair, H_h, 1.0), 0, 'AbsTol', 1e-12);
 end
 
 function test_windcoef_and_stablefn_cover_neutral_stable_and_unstable(testCase)
@@ -187,23 +186,27 @@ function test_bulk_richardson_flux_helpers_accept_vectors(testCase)
    tair = 268.15 * ones(3, 1);
    T_sfc = [266.15; 268.15; 270.15];
    wspd = [4.0; 4.0; 4.0];
-   De = [0.001; 0.001; 0.001];
-   psfc = 90000 * ones(3, 1);
    ea_atm = [250; 250; 250];
-   ro_air_Lv = icemodel.physicalConstant('roLs') * ones(3, 1);
    z0_bulk = 1e-3;
+   psfc = 90000;
+   ro_atm = 1.2;
 
-   [~, br_coefs] = ...
+   [De_h, br_coefs] = ...
       icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
       wspd(1), z0_bulk, 3.0, 3.0);
+
+   [cp_air, Ls, epsilon] = icemodel.physicalConstant( ...
+      'cp_air', 'Ls', 'epsilon');
+   H_h = ro_atm * cp_air * De_h;
+   H_e = ro_atm * Ls * De_h * epsilon / psfc;
 
    stability = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
       T_sfc, tair, wspd, br_coefs);
    es_sfc = icemodel.vapor.saturation_vapor_pressure(T_sfc, false);
    Qe = icemodel.surface.turbulence.bulk_richardson.latent_heat_flux( ...
-      es_sfc, ea_atm, De, stability, psfc, ro_air_Lv);
+      es_sfc, ea_atm, H_e, stability);
    Qh = icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux( ...
-      T_sfc, tair, De, stability);
+      T_sfc, tair, H_h, stability);
 
    testCase.verifyEqual(size(stability), size(T_sfc));
    testCase.verifyEqual(size(Qe), size(T_sfc));

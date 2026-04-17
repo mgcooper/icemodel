@@ -11,15 +11,17 @@ function test_dry_deposition_adds_ice(testCase)
    f_liq = 0.0;
    d_con = 0.0;
    d_pevp = 1e-4;
+   f_ice_min = 0.1;
+   f_res_por = 0.02;
 
-   [f_ice_new, f_liq_new, d_con_new, x_vap] = ...
+   [f_ice_new, f_liq_new, d_con_new, d_sbl_err] = ...
       icemodel.surface.apply_surface_vapor_mass_change( ...
-      f_ice, f_liq, d_con, d_pevp, false, 0.1, 0.02);
+      f_ice, f_liq, d_con, d_pevp, f_ice_min, f_res_por);
 
    testCase.verifyGreaterThan(f_ice_new(1), f_ice(1));
    testCase.verifyEqual(f_liq_new(1), f_liq(1), 'AbsTol', 0);
    testCase.verifyEqual(d_con_new(1), 0, 'AbsTol', 0);
-   testCase.verifyEqual(x_vap, 0, 'AbsTol', 0);
+   testCase.verifyEqual(d_sbl_err, 0, 'AbsTol', 0);
 end
 
 function test_wet_condensation_stays_liquid(testCase)
@@ -30,15 +32,17 @@ function test_wet_condensation_stays_liquid(testCase)
    f_liq = 0.05;
    d_con = 0.0;
    d_pevp = 1e-4;
+   f_ice_min = 0.1;
+   f_res_por = 0.02;
 
-   [f_ice_new, f_liq_new, d_con_new, x_vap] = ...
+   [f_ice_new, f_liq_new, d_con_new, d_sbl_err] = ...
       icemodel.surface.apply_surface_vapor_mass_change( ...
-      f_ice, f_liq, d_con, d_pevp, true, 0.1, 0.02);
+      f_ice, f_liq, d_con, d_pevp, f_ice_min, f_res_por);
 
    testCase.verifyEqual(f_ice_new(1), f_ice(1), 'AbsTol', 0);
    testCase.verifyGreaterThan(f_liq_new(1), f_liq(1));
    testCase.verifyEqual(d_con_new(1), 0, 'AbsTol', 0);
-   testCase.verifyEqual(x_vap, 0, 'AbsTol', 0);
+   testCase.verifyEqual(d_sbl_err, 0, 'AbsTol', 0);
 end
 
 function test_dry_sublimation_removes_ice(testCase)
@@ -49,9 +53,11 @@ function test_dry_sublimation_removes_ice(testCase)
    f_liq = 0.0;
    d_con = 0.0;
    d_pevp = -1e-4;
+   f_ice_min = 0.1;
+   f_res_por = 0.02;
 
    [f_ice_new, f_liq_new] = icemodel.surface.apply_surface_vapor_mass_change( ...
-      f_ice, f_liq, d_con, d_pevp, false, 0.1, 0.02);
+      f_ice, f_liq, d_con, d_pevp, f_ice_min, f_res_por);
 
    testCase.verifyLessThan(f_ice_new(1), f_ice(1));
    testCase.verifyEqual(f_liq_new(1), f_liq(1), 'AbsTol', 0);
