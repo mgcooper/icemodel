@@ -44,8 +44,9 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
       [TL, TH] = icemodel.parameterLookup('TL', 'TH');
    end
 
-   % Total number of nodes
-   JJ = numel(T_ice);
+   % Top and bottom node indices.
+   N = 1;
+   S = numel(T_ice);
 
    % Melt zone indices
    iM = TL <= T_ice & T_ice <= TH;
@@ -54,21 +55,21 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    % iH = T > TH;
 
    % Phase-aware latent heat: Ls for dry/cold cells, Lv for wet cells.
-   Lv = icemodel.vapor.latent_enthalpy_switch(f_liq, JJ);
+   Lv = icemodel.vapor.latent_enthalpy_switch(f_liq, S);
 
    % Compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
-   g_b_ns = 1 ./ ((1 - fn) ./ [k_eff(1); k_eff] + fn ./ [k_eff; k_eff(JJ)]);
+   g_b_ns = 1 ./ ((1 - fn) ./ [k_eff(N); k_eff] + fn ./ [k_eff; k_eff(S)]);
 
    % Compute the air fraction
    f_air = 1.0 - f_ice - f_liq;
 
    % Coefficients for frozen nodes outside the melt zone [W m-2 K-1]
    aP0 = (dHdT + Lf * ro_liq * dFdT + Lv .* f_air .* drovdT) .* dz / dt;
-   gv = ones(JJ, 1);     % Eq 123
-   gk = zeros(JJ, 1);    % Eq 123
-   LfMZ = zeros(JJ, 1);  % Eq 123, melt-zone latent heat switch
+   gv = ones(S, 1);     % Eq 123
+   gk = zeros(S, 1);    % Eq 123
+   LfMZ = zeros(S, 1);  % Eq 123, melt-zone latent heat switch
 
-   aP01 = aP0(1);
+   aP01 = aP0(N);
 
    % % If using g_liq instead of f_liq in the definition of dLdT as in SNTHERM:
    % aP0 = (dHdT + Lf * ro_sno .* dLdT + Ls * f_air .* drovdT)
@@ -93,21 +94,21 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    %  % dLdT(iH) = 0.0;
    % end
 
-   % Adjust gv/gk in terms of N/P/S. Set gkN(1) = 0 and gkS(JJ+1) = 0 to account
-   % for the upper left and lower right off-diagonal BCs. Set gvS(JJ+1) = 0 to
+   % Adjust gv/gk in terms of N/P/S. Set gkN(1) = 0 and gkS(S+1) = 0 to account
+   % for the upper left and lower right off-diagonal BCs. Set gvS(S+1) = 0 to
    % account for the zero-flux lower BC. Set gvN(1) = 1 to account for the
    % non-zero upper BC (for both Dirichlet and Robin).
-   gvN = vertcat(1, gv(1:JJ-1));
-   gvS = vertcat(gv(2:JJ), 0);
-   gkN = vertcat(0, gk(1:JJ-1));
-   gkS = vertcat(gk(2:JJ), 0);
+   gvN = vertcat(1,           gv(N:S-1));
+   gvS = vertcat(gv(N+1:S),   0        );
+   gkN = vertcat(0,           gk(N:S-1));
+   gkS = vertcat(gk(N+1:S),   0);
    % gkP = gk;
    % gvP = gv;
 
    % Compute the aN and aS conductances [W m-2 K-1]. Note that delz(1) &
    % delz(end) are 1/2 CVs.
-   aN = g_b_ns(1:JJ)   ./ delz(1:JJ);
-   aS = g_b_ns(2:JJ+1) ./ delz(2:JJ+1);
+   aN = g_b_ns(N:S)     ./ delz(N:S);
+   aS = g_b_ns(N+1:S+1) ./ delz(N+1:S+1);
 
    % Keep the upper left and right conductances
    a1 = aN(1); % Note: astar = a1 / (a1 - Fp);
@@ -121,28 +122,28 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
       case {2, 3}
          % Robin: qB = f(Ts)
          bc_N = a1 * Fc / (a1 - Fp);
-         aN(1) = 0.0;
+         aN(N) = 0.0;
       case 4
          % Neumann: qB = known
          % bc_N = qN;
-         % aN(1) = 0.0;
+         % aN(N) = 0.0;
    end
 
    % Account for the lower boundary condition
-   aS(JJ) = 0.0;                       % Neumann: dT/dz = 0.0
-   bc_S = aS(JJ) * 0.0;                % Neumann: dT/dz = 0.0
+   aS(S) = 0.0;                       % Neumann: dT/dz = 0.0
+   bc_S = aS(S) * 0.0;                % Neumann: dT/dz = 0.0
 
    % Compute the aP coefficient and solution vector b
    aP = aN + aS + aP0; % -Sp.*dz;
    b = aP0 .* T_ice + Sc .* dz - dH .* dz / dt; % [W m-2]
 
    % Modify b to account for boundary conditions
-   b(1) = b(1) + bc_N;
-   b(JJ) = b(JJ) + bc_S;
+   b(N) = b(N) + bc_N;
+   b(S) = b(S) + bc_S;
 
    % Robin (both types) and Neumann:
    if bc > 1
-      aP(1) = aP(1) - Fp * a1 / (a1 - Fp);
+      aP(N) = aP(N) - Fp * a1 / (a1 - Fp);
    end
 
    % Apply the melt zone (enthalpy) transformation (Eq. 128/29)
