@@ -45,37 +45,57 @@ function verifyRestartRun(testCase, smbmodel, solver)
 
    simyears = [2015 2016];
 
+   % Build opts for full run
    opts_full = buildOpts(testCase, smbmodel, simyears, ...
       run_tag="full", solver=solver, n_spinup_years=1);
-   [ice1_full, ice2_full, opts_full] = icemodel.test.helpers.runSmbModel(opts_full);
 
+   % Run the model
+   [ice1_full, ice2_full, opts_full] = ...
+      icemodel.test.helpers.runSmbModel(opts_full);
+
+   % Build opts for seed run
    opts_seed = buildOpts(testCase, smbmodel, 2015, ...
       run_tag="seed", solver=solver, saverestart=true);
+
+   % Run the model
    [~, ~, opts_seed] = icemodel.test.helpers.runSmbModel(opts_seed);
+
+   % Load the restart file
    restart_file = icemodel.restartfile(opts_seed, 2015);
    testCase.verifyTrue(exist(restart_file, 'file') == 2, ...
       'expected a saved restart file after the seed run');
+
    restart = load(restart_file, 'restart');
    testCase.verifyTrue(isfield(restart.restart, 'opts'), ...
       'expected restart file to preserve resolved opts metadata');
+   testCase.verifyFalse(isfield(restart.restart, 'hv_atm'), ...
+      'surface running state should not be saved in restart files');
    if smbmodel == "icemodel"
       testCase.verifyTrue(isfield(restart.restart, 'r_eff'), ...
          'expected icemodel restart file to preserve r_eff');
    end
 
+   % Resume the run
    opts_resume = buildOpts(testCase, smbmodel, 2016, ...
-      run_tag="resume", solver=solver, use_restart=true, restartfile=restart_file);
-   [ice1_restart, ice2_restart, opts_restart] = icemodel.test.helpers.runSmbModel(opts_resume);
+      run_tag="resume", solver=solver, use_restart=true, ...
+      restartfile=restart_file);
+
+   [ice1_restart, ice2_restart, opts_restart] = ...
+      icemodel.test.helpers.runSmbModel(opts_resume);
 
    [ice1_full_pp, ice2_full_pp] = icemodel.postprocess( ...
       ice1_full, ice2_full, opts_full, opts_full.output_years);
    [ice1_restart_pp, ice2_restart_pp] = icemodel.postprocess( ...
       ice1_restart, ice2_restart, opts_restart, opts_restart.output_years);
 
-   icemodel.test.verify.verifyEqualNested(testCase, ice1_full, ice1_restart, 1e-12);
-   icemodel.test.verify.verifyEqualNested(testCase, ice2_full, ice2_restart, 1e-12);
-   icemodel.test.verify.verifyEqualNested(testCase, ice1_full_pp, ice1_restart_pp, 1e-12);
-   icemodel.test.verify.verifyEqualNested(testCase, ice2_full_pp, ice2_restart_pp, 1e-12);
+   icemodel.test.verify.verifyEqualNested(testCase, ...
+      ice1_full, ice1_restart, 1e-12);
+   icemodel.test.verify.verifyEqualNested(testCase, ...
+      ice2_full, ice2_restart, 1e-12);
+   icemodel.test.verify.verifyEqualNested(testCase, ...
+      ice1_full_pp, ice1_restart_pp, 1e-12);
+   icemodel.test.verify.verifyEqualNested(testCase, ...
+      ice2_full_pp, ice2_restart_pp, 1e-12);
 end
 
 function opts = buildOpts(testCase, smbmodel, simyears, kwargs)
@@ -94,7 +114,8 @@ function opts = buildOpts(testCase, smbmodel, simyears, kwargs)
    end
 
    opts = icemodel.setopts(char(smbmodel), 'kanm', simyears, ...
-      'kanm', 'kanm', 'albedo', char(kwargs.run_tag), false, false);
+      'kanm', 'kanm', 'albedo', char(kwargs.run_tag), false, false, ...
+      'turbulent_flux_scheme', 'bulk_richardson');
 
    % Override the workspace roots so the restart run stays isolated inside
    % the synthetic test workspace.

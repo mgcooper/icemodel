@@ -11,7 +11,7 @@ function es = saturationVaporPressure(T, liqflag)
    %  This file is the canonical reference implementation for the Romps/Ambaum
    %  saturation vapor pressure formula. Paper-specific notation (cvl, cvi) is
    %  retained for traceability. Production code uses the Rankine-Kirchhoff
-   %  coefficients derived in VAPORINIT from these same expressions.
+   %  coefficients derived in icemodel.vapor.initialize_vapor_model from these same expressions.
    %
    %  References:
    %     Ambaum (2020), "Accurate, simple equation for saturated vapour
@@ -21,7 +21,7 @@ function es = saturationVaporPressure(T, liqflag)
    %        thermodynamics." QJRMS, 147(741), 3493-3497.
    %        DOI: 10.1002/qj.4154
    %
-   % See also: VAPORINIT, icemodel.kernels.latentEnthalpyWater
+   % See also: icemodel.vapor.initialize_vapor_model, icemodel.kernels.latentEnthalpyWater
 
    % Regarding optimal values, Romps optimized cvl, cvi, and Rv simultaneously,
    % finding one set of values that minimize errors in sum over liquid and ice

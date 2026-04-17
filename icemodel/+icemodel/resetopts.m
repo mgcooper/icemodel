@@ -44,9 +44,16 @@ function opts = resetopts(opts, varargin)
       opts.tlag = 6 * 3600 / opts.dt;
    end
 
+   % Keep RH observation height coupled to temperature height unless the
+   % caller explicitly overrides z_relh in the same reset call.
+   if ismember('z_tair', names) && ~ismember('z_relh', names) ...
+         && isfield(opts, 'z_relh')
+      opts.z_relh = opts.z_tair;
+   end
+
    % Re-apply solver-dependent coupling defaults unless explicitly overridden.
    if ismember('solver', names) && ~ismember('cpl_maxiter', names)
-      if opts.solver == 2
+      if ismember(opts.solver, [0, 2])  % single-sweep modes (Dirichlet-0 and Robin-2)
          opts.cpl_maxiter = 1;
       else
          opts.cpl_maxiter = 100;

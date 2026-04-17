@@ -55,10 +55,22 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %
    % Optional name/value overrides
    %
-   %  Any field already present in the returned OPTS struct can be overridden
-   %  by passing trailing name/value pairs. This is intended for solver,
-   %  timestep, and test configuration overrides after the standard run inputs
-   %  have been defined by the positional arguments.
+   %  Any field in the returned OPTS struct can be overridden by passing
+   %  trailing name/value pairs to setopts, or by calling icemodel.resetopts
+   %  on the struct before passing it to icemodel or skinmodel. These are the
+   %  only two entry points for user-defined parameter values.
+   %
+   %  The OPTS struct is the complete and authoritative list of user-settable
+   %  model parameters. Any parameter not represented in OPTS is fixed at its
+   %  canonical value inside icemodel.parameterLookup and cannot be varied
+   %  without editing that file directly.
+   %
+   %  Fields initialized to [] below are user-settable parameters whose
+   %  physics-based defaults live in parameterLookup. Leaving them empty
+   %  instructs configureRun to fill them from parameterLookup at run time.
+   %  Setting a non-empty value (via name/value override or resetopts) bypasses
+   %  the lookup and uses the supplied value instead. This is the intended
+   %  mechanism for sensitivity analyses and site-specific calibration.
    %
    % Outputs
    %
@@ -67,8 +79,9 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % Boundary-condition / coupling notes (icemodel):
    %
    %  "Partitioned" here means the surface SEB and subsurface enthalpy
-   %  equations are solved in separate solver blocks (SEBSOLVE/SFCFLIN and
-   %  ICEENBAL), not as one monolithic nonlinear system.
+   %  equations are solved in separate solver blocks
+   %  (solve_surface_energy_balance/surface_flux_linearization and
+   %  solve_column_enthalpy), not as one monolithic nonlinear system.
    %
    %  "Coupled" here means the two blocks exchange boundary information across
    %  the surface/subsurface interface. "Weakly coupled" means that exchange is
@@ -76,26 +89,34 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  surface and subsurface blocks are iterated together within the same
    %  substep until the interface state is mutually consistent.
    %
-   %  solver = 1 (Dirichlet with iterated lagged closure):
-   %   - Solve the nonlinear SEB for Ts once per substep (SEBSOLVE).
-   %   - During that solve, inner iterations use an analytic Newton-Raphson,
-   %     numeric "complex step", or derivative-free (Brent's) method, set by
-   %     opts.seb_solver (see SEBSOLVE for details).
-   %   - Outer fixed-point iterations repeatedly update the conductive closure
-   %     using the latest Ts iterate, while the subsurface top-node state
-   %     (temperature and conductance) remains lagged from the previous accepted
-   %     substep state.
-   %   - Use the converged Ts as the upper boundary condition of the subsurface
-   %     enthalpy solver (ICEENBAL) for that substep.
-   %   - Classification: partitioned, lagged, weakly coupled across the
-   %     surface/subsurface interface. The outer iterations inside SEBSOLVE
-   %     strongly converge Ts against a lagged conductive closure, but they do
-   %     not iterate Ts and the current subsurface state together within the
-   %     same substep.
+   %  solver = 0 (Dirichlet single-sweep):
+   %   - Same algorithm as solver = 1 but with cpl_maxiter forced to 1,
+   %     so only one Ts-T coupling pass is performed per substep. Intended
+   %     as a lightweight diagnostic mode that exercises the Dirichlet code
+   %     path without the inner convergence loop cost. Equivalent behaviour
+   %     to solver = 2 but via the Dirichlet coupler rather than Robin.
+   %   - Classification: partitioned, weakly coupled (single Dirichlet sweep
+   %     per substep, no interface convergence iterations).
+   %
+   %  solver = 1 (coupled Dirichlet Ts-T iterations):
+   %   - Solve the nonlinear SEB for a trial Ts
+   %     (icemodel.surface.solve_surface_energy_balance).
+   %   - Use that Ts as the upper boundary condition of the subsurface
+   %     enthalpy solver (`icemodel.column.solve_column_enthalpy`), then repeat
+   %     the surface/subsurface exchange until Ts and the accepted updated-state
+   %     SEB residual are mutually consistent within the same substep.
+   %   - During each solve_surface_energy_balance call, inner surface
+   %     iterations use an analytic Newton-Raphson, numeric "complex step", or
+   %     derivative-free (Brent's) method, set by opts.seb_solver (see
+   %     solve_surface_energy_balance for details).
+   %   - Classification: partitioned and strongly coupled at substep scale
+   %     through iterative block/Picard Dirichlet coupling, not monolithic
+   %     Newton over the full surface-subsurface state.
    %
    %  solver = 2 (Robin with single sweep):
-   %   - Use a linearized SEB boundary condition (SFCFLIN) in the subsurface
-   %     enthalpy solver (ICEENBAL).
+   %   - Use a linearized SEB boundary condition
+   %     (surface_flux_linearization) in the subsurface enthalpy solver
+   %     (`icemodel.column.solve_column_enthalpy`).
    %   - After each accepted substep, diagnose Ts from the updated top-node
    %     state and refresh the SEB linearization for the next substep.
    %   - No inner Ts-T convergence loop within a substep (single coupling
@@ -108,8 +129,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %
    %  solver = 3 (Robin with strong Ts-T coupling iterations):
    %   - Within each substep, perform outer fixed-point coupling iterations
-   %     between the SEB linearization and subsurface enthalpy solve until
-   %     Ts and SEB residual converge (with relaxation/Aitken acceleration).
+   %     between the SEB linearization and subsurface enthalpy solve until Ts
+   %     and SEB residual converge (with relaxation/Aitken acceleration).
    %   - Typically slower than solver = 2; cost depends on cpl_Ts_tol,
    %     cpl_maxiter, relaxation, and timestep adaptation.
    %   - Classification: partitioned, strongly coupled at substep scale
@@ -142,48 +163,103 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %------------------------- optional settings / parameters
    %---------------------------------------------------------
 
-   % general model settings
-   opts.n_spinup_years  =  0;       % number of leading simulation years used only for spinup
-   opts.use_init        =  false;   % reserved for later generic initialization support
-   opts.initfile        =  '';      % reserved generic initialization source
-   opts.use_restart     =  false;   % load an exact year-boundary restart state?
-   opts.restartfile     =  '';      % restart state file used when use_restart=true
-   opts.saverestart     =  false;   % save a restart state at each year boundary
-   opts.kabs_user       =  true;    % use user-defined ice absorptivity?
-   opts.use_ro_glc      =  false;   % use same density for liquid/solid ice?
-   opts.calendar_type   =  'noleap';
+   %%% General model settings
+   opts.n_spinup_years  = 0;        % number of leading simulation years used only for spinup
+   opts.use_init        = false;    % reserved for later generic initialization support
+   opts.initfile        = '';       % reserved generic initialization source
+   opts.use_restart     = false;    % load an exact year-boundary restart state?
+   opts.restartfile     = '';       % restart state file used when use_restart=true
+   opts.saverestart     = false;    % save a restart state at each year boundary
 
-   % debug mode — enable via resetopts(opts, 'debug', true)
-   opts.debug           =  false;   % enable solver diagnostic dumps
-   opts.debug_path      =  '';      % override for debug output folder
+   %%% Debug mode — enable via resetopts(opts, 'debug', true)
+   opts.debug           = false;    % enable solver diagnostic dumps
+   opts.debug_path      = '';       % override for debug output folder
 
-   % model parameters
-   opts.z_0             =  0.001;   % Surface aero. roughness length    [m]
-   opts.ro_ice_init     =  900.0;   % initial ice density               [kg/m3]
+   %%% Model parameters and related options
+   opts.use_ro_glc      = false;    % use same density for liquid/solid ice?
+   opts.ro_ice_init     = 900.0;    % initial ice density               [kg/m3]
    opts.T_ice_init      = -8.0;     % initial ice temperature           [C]
-   opts.f_liq_resid     =  0.02;    % residual pore water fraction      [-]
+   %
+   % Capillary residual liquid water per pore volume fractions [-].
+   opts.f_res_pore_ice  = 0.02;
+   opts.f_res_pore_snow = 0.04;
+   opts.f_res_pore_firn = 0.02;
 
-   % solver, timestepping, and mesh options
+   %%% Timestepping / mesh options
+   opts.calendar_type   = 'noleap'; %
+   opts.dt              = 900;      % timestep: 3600 or (recommended) 900  [s]
+   opts.dz_thermal      = 0.04;     % dz for thermal heat transfer         [m]
+   opts.dz_spectral     = 0.002;    % dz for radiative heat transfer       [m]
+   opts.z0_thermal      = 20;       % domain thickness for heat transfer   [m]
+   opts.z0_spectral     = 8;        % domain thickness for rad transfer    [m]
+   opts.f_ice_min       = 0.1;      % minimum ice fraction (remeshing threshold)
+   opts.mesh_type       = 1;        % recommended: 1 (Patankar practice "B")
+
+   %%% Surface turbulent-heat-flux scheme.
+   %
+   % Default = 'bulk_richardson'. 'monin_obukhov' is opt-in via resetopts;
+   % its runtime guard is enforced in configureRun.
+   opts.turbulent_flux_scheme = 'bulk_richardson';
+   %
+   % Roughness lengths default to parameterLookup values via configureRun if
+   % left empty. Override via resetopts for site-specific or sensitivity runs.
+   opts.z0_bulk                = [];
+   opts.z0_ice                 = [];
+   opts.z0_snow_low_density    = [];
+   opts.z0_snow_high_density   = [];
+   %
+   % Observation heights for the turbulent-flux scheme. Known forcing-dependent
+   % defaults are set below after the solver block; Override via resetopts for
+   % forcing-specific runs that are not resolved below.
+   opts.z_tair = [];   % air temperature observation height [m]
+   opts.z_wind = [];   % wind speed observation height      [m]
+   opts.z_relh = [];   % relative humidity obs height       [m] (= z_tair)
+   %
+   % Temporary patch to use forcing snow depth to set roughness lengths until
+   % the production snow model is implemented.
+   opts.use_forcing_snow_depth_for_thf = false;
+
+   %%% Radiative transfer scheme.
+   %
+   opts.radiative_transfer_scheme = 'two_stream_schlatter_brandt_warren';
+   %
+   % The mie coefficients are defined for 118 spectral bands and 35 grain sizes.
+   % Define these dimensions for icemodel.radiation.get_scattering_coefficients
+   % to read in the data array. Also set the grain size index.
+   opts.nwavel          = 118;
+   opts.nradii          = 35;
+   opts.i_grainradius   = 25; % [#] index 25 = 2.0 mm
+   %
+   % Option to use a lookup-table to compute bulk extinction coefficients.
+   opts.lookup_k_bulk   = true;
+   %
+   % Option to use a user-defined ice absorptivity spectrum. If true, the model
+   % uses the spectrum shipped with the repo from Cooper et al., 2021.
+   opts.kabs_user       = true;
+
+   %%% Solver options. See function doc for info about each solver mode.
    if strcmp(smbmodel, 'icemodel')
 
-      % Solver options. See function doc for info about each solver mode.
-
-      % main solver mode (surface-subsurface coupler)
-      % 1 = Dirichlet w/ lagged Ts-T closure iterations
+      % Main solver mode (surface-subsurface coupler)
+      % 0 = Dirichlet w/ single Ts-T coupling iteration
+      % 1 = Dirichlet w/ strong Ts-T coupling iterations
       % 2 = Robin w/ single Ts-T coupling iteration
       % 3 = Robin w/ strong Ts-T coupling iterations
       opts.solver          = 3;     % recommended: 3
 
-      % surface (SEB) solver (Dirichlet Ts boundary condition when solver = 1)
+      % Surface (SEB) solver mode. Only relevant for Dirichlet boundary
+      % condition (solver = 1). For 'monin_obukhov' thf scheme, seb_solver = 2
+      % (numerical Jacobian) is enforced via configureRun.
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
-      opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
 
+      % Subsurface (column) solver options
       opts.maxiter         = 100;   % thermal solver max iterations
       opts.tol             = 1e-2;  % thermal solver convergence tolerance [K]
       opts.alpha           = 1.0;   % thermal solver relaxation factor (rec: 1.0)
       opts.use_aitken      = false; % thermal solver aitken-acceleration flag
       opts.jumpmax         = 5.0;   % thermal solver acceleration guess tolerance [K]
 
+      % Surface-subsurface coupler options
       opts.cpl_maxiter     = 100;   % coupler Ts convergence max iterations
       opts.cpl_Ts_tol      = 1e-2;  % coupler Ts convergence tolerance [K]
       opts.cpl_seb_tol     = 1.0;   % coupler SEB convergence tolerance [W m-2]
@@ -191,92 +267,81 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.cpl_aitken      = true;  % coupler Ts aitken-acceleration flag
       opts.cpl_jumpmax     = 5.0;   % coupler Ts acceleration guess tolerance [K]
 
-      % Timestepping / mesh options
-      opts.dt              = 900;   % timestep (3600 or (recommended) 900) [s]
-      opts.dz_thermal      = 0.04;  % dz for thermal heat transfer         [m]
-      opts.dz_spectral     = 0.002; % dz for radiative heat transfer       [m]
-      opts.z0_thermal      = 20;    % domain thickness for heat transfer   [m]
-      opts.z0_spectral     = 8;     % domain thickness for rad transfer    [m]
-      opts.lookup_k_bulk   = true;  % use lookup-table bulk extinction     [-]
-      opts.f_ice_min       = 0.1;   % layer combination threshold (ice fraction)
-
    elseif strcmp(smbmodel, 'skinmodel')
 
-      % Solver options. See function doc for info about each solver mode.
-
-      % main solver mode (surface-subsurface coupler)
-      % 1 = Dirichlet w/ lagged Ts-T closure iterations
-      % 2 = Robin w/ single Ts-T coupling iteration
-      % 3 = Robin w/ strong Ts-T coupling iterations
+      % Main solver mode (surface-subsurface coupler)
       opts.solver          = 1;     % required: 1 (2/3 not implemented)
 
-      % surface (SEB) solver (Dirichlet Ts boundary condition when solver = 1)
+      % Surface (SEB) solver mode
       opts.seb_solver      = 1;     % recommended: 1 (1=analytic, 2=numeric)
-      opts.conduct_type    = 1;     % recommended: 1 (Patankar practice "B")
 
+      % Subsurface (column) solver options
       opts.maxiter         = 100;   % thermal solver max iterations
       opts.tol             = 1e-2;  % thermal solver convergence tolerance [K]
       opts.alpha           = 1.8;   % thermal solver relaxation factor (rec: 1.8)
       opts.use_aitken      = true;  % thermal solver aitken-acceleration flag (rec: true)
       opts.jumpmax         = 5.0;   % thermal solver acceleration guess tolerance [K]
 
+      % Surface-subsurface coupler options
       opts.cpl_maxiter     = 100;   % coupler Ts convergence max iterations
       opts.cpl_Ts_tol      = 1e-2;  % coupler Ts convergence tolerance [K]
       opts.cpl_seb_tol     = 1.0;   % coupler SEB convergence tolerance [W m-2]
       opts.cpl_alpha       = 1.8;   % coupler Ts relaxation factor (rec: 1.8)
       opts.cpl_aitken      = true;  % coupler Ts aitken-acceleration flag (rec: true)
       opts.cpl_jumpmax     = 5.0;   % coupler Ts acceleration guess tolerance [K]
-
-      % Timestepping / mesh options
-      opts.dt              = 900;   % timestep (3600 or (recommended) 900) [s]
-      opts.dz_thermal      = 0.04;  % dz for thermal heat transfer         [m]
-      opts.dz_spectral     = 0.002; % dz for radiative heat transfer       [m]
-      opts.z0_thermal      = 12;    % domain thickness for heat transfer   [m]
-      opts.z0_spectral     = 4;     % domain thickness for rad transfer    [m]
-      opts.f_ice_min       = 0.1;   % layer combination threshold (ice fraction)
    else
       error('unrecognized surface mass balance model name SMBMODEL')
    end
 
-   % Set cpl_maxiter=1 for solver=2 to force one-sweep Ts-T coupling.
-   if opts.solver == 2
+   % Set cpl_maxiter=1 for single-sweep Ts-T coupling.
+   if ismember(opts.solver, [0 2])
       opts.cpl_maxiter = 1;
    end
 
-   % The mie scattering coefficients are defined for 35 grain sizes and 118
-   % spectral bands. Define those dimensions here, they are used to read in
-   % the data array in GETSCATTERCOEFS. Also set the grain size index.
-   opts.nwavel          = 118;
-   opts.nradii          = 35;
-   opts.i_grainradius   = 25;       % index 25 = 2.0 mm                    [#]
+   % Forcing-dependent observation heights for the turbulent-flux scheme.
+   switch forcings
+      case 'mar'
+         opts.z_tair = 2.0;
+         opts.z_wind = 10.0;
 
-   % Define the height of the air temperature and wind observations        [m]
-   if strcmp(forcings, 'mar')
+      case 'kanl'
+         % Check GEUS/PROMICE metadata, 2.5 and 3.0 may be appropriate.
+         opts.z_tair = 2.0;
+         opts.z_wind = 2.0;
 
-      opts.z_tair = 2.0;
-      opts.z_wind = 10.0;
+      case 'kanm'
+         % Check GEUS/PROMICE metadata, 2.5 and 3.0 may be appropriate.
+         opts.z_tair = 2.0;
+         opts.z_wind = 2.0;
 
-   elseif any(strcmp(forcings, {'kanl', 'kanm'}))
+      case 'merra'
+         opts.z_tair = 2.0;
+         opts.z_wind = 2.0;
 
-      opts.z_tair =  2.0; % 2.5
-      opts.z_wind =  2.0; % 3.0
-
-   else
-      % USER DEFINED
-      opts.z_tair =  2.0;
-      opts.z_wind =  3.0;
+      otherwise
+         % Assume standard heights for other forcings.
+         opts.z_tair = 2.0;
+         opts.z_wind = 2.0;
    end
 
-   % Lag time used by ICERUNOFF, converted from hours to timesteps.
+   % Assume z_relh = z_tair. This option is used in the monin-obukhov thf scheme.
+   opts.z_relh = opts.z_tair;
+
+   % Lag time used by icemodel.column.diagnose_column_runoff, converted from
+   % hours to timesteps.
    opts.tlag = 6 * 3600 / opts.dt;
 
    % Output profile. "minimal" is the lean profile used when wrappers request
-   % reduced grid-style output; "standard" is the full point-run profile.
+   % reduced grid-style output; "standard" is the full point-run profile; and
+   % "diagnostic" extends the point-run profile with solver/THF debugging
+   % scalars.
    opts.output_profile = 'standard';
 
    %------------------------- End of user-defined model options
    %--------------------------------------------------------------
 
+   % Initialize run-time contracts. If external callers modify opts via
+   % resetopts, contracts are re-enforced by configureRun at model run-time.
    opts = icemodel.resetopts(opts, varargin{:});
    opts = icemodel.configureRun(opts);
 end

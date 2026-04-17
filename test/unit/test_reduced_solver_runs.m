@@ -38,9 +38,11 @@ end
 function test_icemodel_reduced_runs_stay_bounded_across_solver_modes(testCase)
    % Run the icemodel across all supported solver modes to make sure the
    % reduced synthetic case remains finite and bounded in each branch.
+   % Modes: 0 = Dirichlet single-sweep, 1 = Dirichlet iterative,
+   %        2 = Robin single-sweep, 3 = Robin iterative.
 
    workspace = testCase.TestData.workspace;
-   for solver = 1:3
+   for solver = [0, 1, 2, 3]
       opts = icemodel.test.helpers.buildSyntheticOpts( ...
          workspace, 'icemodel', 2016, ...
          solver=solver, testname=['ice_unit_s' int2str(solver)]);

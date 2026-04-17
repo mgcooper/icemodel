@@ -1,0 +1,22 @@
+function [dt_sum, n_subfail, ok_seb, ok_ieb, d_liq, d_evp, d_lyr] = ...
+      newtimestep(f_liq, solver)
+   %NEWTIMESTEP Initialize per-full-step accumulators and solver status flags.
+   %
+   % See also icemodel.timestepping.nexttimestep
+   %
+   %#codegen
+
+   ok_seb = false;         % assume seb failed
+   ok_ieb = false;         % assume ice-eb sub-step failed
+   d_liq = 0.0 * f_liq;    % reset the change in liq water content
+   d_evp = 0.0 * f_liq;    % reset the evaporation change in water content
+   d_lyr = 0.0 * f_liq;    % reset the layer change
+   dt_sum = 0.0;
+   n_subfail = 0;          % keep track of failed substeps
+
+   % For non-Dirichlet bc, set ok_seb true so dt control advances
+   % See icemodel.timestepping.nexttimestep.
+   if solver > 1
+      ok_seb = true;
+   end
+end

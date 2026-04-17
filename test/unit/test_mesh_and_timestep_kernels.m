@@ -4,11 +4,13 @@ function tests = test_mesh_and_timestep_kernels
 end
 
 function test_cvmesh_uniform_and_exponential_layout(testCase)
-   % CVMESH should preserve the requested depth while changing only the
-   % spacing pattern between uniform and exponential layouts.
+   % control_volume_mesh should preserve the requested depth while changing
+   % only the spacing pattern between uniform and exponential layouts.
 
-   [dz_u, ~, ~, z_edge_u, f_u] = CVMESH(1.0, 0.25);
-   [dz_e, ~, ~, z_edge_e] = CVMESH(1.0, 0.10, 1.5);
+   [dz_u, ~, ~, z_edge_u, f_u] = ...
+      icemodel.column.control_volume_mesh(1.0, 0.25);
+   [dz_e, ~, ~, z_edge_e] = ...
+      icemodel.column.control_volume_mesh(1.0, 0.10, 1.5);
 
    testCase.verifyEqual(sum(dz_u), 1.0, 'AbsTol', 1e-12);
    testCase.verifyEqual(z_edge_u(end), 1.0, 'AbsTol', 1e-12);
@@ -29,12 +31,13 @@ function test_interp1_nearest_preserves_expected_spectral_remap(testCase)
 end
 
 function test_layerinds_selects_expected_merge_neighbors(testCase)
-   % LAYERINDS should pick the expected merge partner at the top, over a
-   % zero-thickness layer, and for a nonzero interior layer.
+   % merge_layer_indices should pick the expected merge partner at the top,
+   % over a zero-thickness layer, and for a nonzero interior layer.
 
-   [j1_top, j2_top] = LAYERINDS(1, [0.0; 0.5; 0.4]);
-   [j1_zero, j2_zero] = LAYERINDS(2, [0.4; 0.0; 0.2]);
-   [j1_nonzero, j2_nonzero] = LAYERINDS(2, [0.0; 0.3; 0.5]);
+   [j1_top, j2_top] = icemodel.column.merge_layer_indices(1, [0.0; 0.5; 0.4]);
+   [j1_zero, j2_zero] = icemodel.column.merge_layer_indices(2, [0.4; 0.0; 0.2]);
+   [j1_nonzero, j2_nonzero] = ...
+      icemodel.column.merge_layer_indices(2, [0.0; 0.3; 0.5]);
 
    testCase.verifyEqual([j1_top j2_top], [1 2]);
    testCase.verifyEqual(j1_zero, 2);
@@ -53,26 +56,27 @@ function test_trisolve_matches_backslash(testCase)
    rhs = [2; 6; 2];
    A = [4 -1 0; -1 4 -1; 0 -1 4];
 
-   x = TRISOLVE(low, mid, upp, rhs);
+   x = icemodel.numerics.trisolve(low, mid, upp, rhs);
 
    testCase.verifyEqual(x, A \ rhs, 'AbsTol', 1e-12);
 end
 
 function test_conduct_matches_level_formulas(testCase)
-   % CONDUCT should reproduce the top-boundary and interior finite-volume
-   % forms used elsewhere in the column model.
+   % conductive_heat_flux should return the top-boundary flux and its
+   % T_sfc derivative matching the analytic finite-volume expressions.
 
    k_eff = [2; 4];
    T = [270; 268];
    dz = [0.04; 0.04];
    Ts = 269;
 
-   Qc_top = CONDUCT(k_eff, T, dz, Ts, 1);
-   Qc_int = CONDUCT(k_eff, T, dz, Ts, 2);
+   [Qc, dQc_dT_sfc] = icemodel.surface.conductive_heat_flux(k_eff, T, dz, Ts);
 
-   testCase.verifyEqual(Qc_top, 2 * (270 - 269) / 0.02, 'AbsTol', 1e-12);
-   testCase.verifyEqual(Qc_int, 3 * (268 - 270) / 0.08 / 2, ...
-      'AbsTol', 1e-12);
+   % Top-boundary flux: k_eff(1) * (T(1) - Ts) / (dz(1)/2)
+   testCase.verifyEqual(Qc, 2 * (270 - 269) / 0.02, 'AbsTol', 1e-12);
+
+   % T_sfc derivative: -k_eff(1) / (dz(1)/2)
+   testCase.verifyEqual(dQc_dT_sfc, -2 / 0.02, 'AbsTol', 1e-12);
 end
 
 function test_inittimesteps_and_newtimestep_follow_solver_contract(testCase)
@@ -84,9 +88,14 @@ function test_inittimesteps_and_newtimestep_follow_solver_contract(testCase)
    Time = transpose(datetime(2015, 1, 1) + minutes(15) * (0:7));
 
    [metstep, substep, numsteps, maxsubstep, dt_new, dt_full, numyears, ...
-      numspinup, simyears] = INITTIMESTEPS(opts, Time);
-   [dt_sum, n_subfail, ok_seb_1, ok_ieb_1] = NEWTIMESTEP(zeros(3, 1), 1);
-   [~, ~, ok_seb_2, ok_ieb_2] = NEWTIMESTEP(zeros(3, 1), 2);
+      numspinup, simyears] = icemodel.timestepping.initialize_timesteps( ...
+      opts, Time);
+   
+   [dt_sum, n_subfail, ok_seb_1, ok_ieb_1] = ...
+      icemodel.timestepping.newtimestep(zeros(3, 1), 1);
+   
+   [~, ~, ok_seb_2, ok_ieb_2] = icemodel.timestepping.newtimestep( ...
+      zeros(3, 1), 2);
 
    testCase.verifyEqual([metstep substep numsteps maxsubstep], [1 1 4 900]);
    testCase.verifyEqual([dt_new dt_full numyears numspinup], [900 900 2 1]);
@@ -99,13 +108,16 @@ function test_inittimesteps_and_newtimestep_follow_solver_contract(testCase)
    testCase.verifyFalse(ok_ieb_2);
 end
 
-function test_nextstep_adapts_substep_divisor(testCase)
-   % NEXTSTEP should shrink or grow the substep divisor based on the recent
+function test_nexttimestep_adapts_substep_divisor(testCase)
+   % nexttimestep should shrink or grow the substep divisor based on the recent
    % convergence history and hard failures.
 
-   [~, substep_fast, dt_fast] = NEXTSTEP(1, 3, 900, 9, true, 0, 1);
-   [~, substep_slow, dt_slow] = NEXTSTEP(1, 3, 900, 9, true, 2, 15);
-   [~, substep_fail, dt_fail] = NEXTSTEP(1, 3, 900, 9, false, 0, 0);
+   [~, substep_fast, dt_fast] = icemodel.timestepping.nexttimestep(1, 3, 900, 9, ...
+      true, 0, 1);
+   [~, substep_slow, dt_slow] = icemodel.timestepping.nexttimestep(1, 3, 900, 9, ...
+      true, 2, 15);
+   [~, substep_fail, dt_fail] = icemodel.timestepping.nexttimestep(1, 3, 900, 9, ...
+      false, 0, 0);
 
    testCase.verifyLessThan(substep_fast, 3);
    testCase.verifyGreaterThan(substep_slow, 3);
@@ -117,17 +129,21 @@ end
 
 function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
    % Reset and update helpers should restore failed-substep state, then
-   % advance the accepted state and diagnostics consistently.
+   % advance the accepted state and time bookkeeping consistently.
 
-   [ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs] = ...
-      icemodel.physicalConstant('ro_ice', 'ro_liq', 'ro_air', 'cv_ice', ...
-      'cv_liq', 'roLv', 'roLs');
-   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new] = RESETSUBSTEP( ...
+   Ls = icemodel.physicalConstant('Ls');
+   ro_atm_val = 1.2;
+   De_e_val = 1e-5;
+   substep_opts = struct( ...
+      'f_res_pore_snow', 0.07, 'f_res_pore_ice', 0.01);
+
+   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new] = ...
+      icemodel.timestepping.resetsubstep( ...
       270, [269; 268], [0.9; 0.9], [0.01; 0.01], 900, 2, 9, 0, 450);
 
-   [Ts_up, T_up, f_ice_up, f_liq_up, dt_sum, dt_next, liqflag, roL, ...
-      ro_sno, cp_sno] = UPDATESUBSTEP(Ts, T, f_ice, f_liq, 900, 450, 300, ...
-      1e-12, ro_ice, ro_liq, ro_air, cv_ice, cv_liq, roLv, roLs);
+   [Ts_up, T_up, f_ice_up, f_liq_up, dt_sum, dt_next] = ...
+      icemodel.timestepping.updatesubstep(Ts, T, f_ice, ...
+      f_liq, 900, 450, 300, 1e-12);
 
    testCase.verifyEqual([Ts_up; T_up], [270; 269; 268], 'AbsTol', 0);
    testCase.verifyEqual([f_ice_up; f_liq_up], [0.9; 0.9; 0.01; 0.01], ...
@@ -137,20 +153,25 @@ function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
    testCase.verifyEqual(dt_new, 300, 'AbsTol', 1e-12);
    testCase.verifyEqual(dt_sum, 750, 'AbsTol', 1e-12);
    testCase.verifyEqual(dt_next, 150, 'AbsTol', 1e-12);
+
+   % Surface running state is now derived by update_surface_state.
+   [liqflag, ~, hv_atm_val, H_e, ~] = ...
+      icemodel.surface.update_surface_state( ...
+      f_ice(1), f_liq(1), ro_atm_val, De_e_val, 0, substep_opts);
+
    testCase.verifyFalse(liqflag);
-   testCase.verifyEqual(roL, roLs, 'AbsTol', 0);
-   testCase.verifyTrue(all(isfinite(ro_sno)));
-   testCase.verifyTrue(all(isfinite(cp_sno)));
+   testCase.verifyEqual(hv_atm_val, ro_atm_val * Ls, 'AbsTol', 0);
+   testCase.verifyEqual(H_e, hv_atm_val * De_e_val, 'AbsTol', 0);
 end
 
 function test_checksubstep_forces_advance_at_maxsubstep(testCase)
-   % Once the max-substep limit is reached, CHECKSUBSTEP should force the
+   % Once the max-substep limit is reached, checksubstep should force the
    % accepted state forward instead of stalling the timestep.
 
-   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok] = CHECKSUBSTEP( ...
-      270, [269; 268], [0.9; 0.9], [0.01; 0.01], 271, [270; 269], ...
-      [0.8; 0.8], [0.02; 0.02], 917, 1000, 150, 450, 900, 1, 10, 1, 2, 1, ...
-      false, eps, false);
+   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok, forced_advance] = ...
+      icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
+      [0.01; 0.01], 271, [270; 269], [0.8; 0.8], [0.02; 0.02], 150, 450, ...
+      900, 1, 10, 1, 2, 1, false, eps, false);
 
    testCase.verifyTrue(ok);
    testCase.verifyEqual(Ts, 271);
@@ -160,17 +181,18 @@ function test_checksubstep_forces_advance_at_maxsubstep(testCase)
    testCase.verifyEqual(n_subfail, 2);
    testCase.verifyEqual(substep, 2);
    testCase.verifyEqual(dt_new, 450, 'AbsTol', 1e-12);
+   testCase.verifyTrue(forced_advance);
 end
 
 function test_checksubstep_clamps_overshot_failure_count(testCase)
-   % Even if a caller enters CHECKSUBSTEP with an already-overshot failure
+   % Even if a caller enters checksubstep with an already-overshot failure
    % count, the timestep controller should clamp to the accepted dt_min state
    % and force advance instead of stalling forever at dt_min.
 
-   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok] = CHECKSUBSTEP( ...
-      270, [269; 268], [0.9; 0.9], [0.01; 0.01], 271, [270; 269], ...
-      [0.8; 0.8], [0.02; 0.02], 917, 1000, 150, 450, 900, 1, 10, 10, 10, ...
-      10, false, eps, false);
+   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok, forced_advance] = ...
+      icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
+      [0.01; 0.01], 271, [270; 269], [0.8; 0.8], [0.02; 0.02], 150, 450, ...
+      900, 1, 10, 10, 10, 10, false, eps, false);
 
    testCase.verifyTrue(ok);
    testCase.verifyEqual(Ts, 271);
@@ -180,4 +202,56 @@ function test_checksubstep_clamps_overshot_failure_count(testCase)
    testCase.verifyEqual(n_subfail, 10);
    testCase.verifyEqual(substep, 10);
    testCase.verifyEqual(dt_new, 90, 'AbsTol', 1e-12);
+   testCase.verifyTrue(forced_advance);
+end
+
+function test_checksubstep_debug_dump_records_force_advance_context(testCase)
+   % The maxsubstep debug dump should record whether the current failure
+   % triggered force advance and the projected cross-timestep streak.
+
+   debug_file = [tempname '.mat'];
+   cleanup = onCleanup(@() cleanupDebugFile(debug_file)); %#ok<NASGU>
+   setenv('ICEMODEL_DEBUG_MAXSUBSTEP_FILE', debug_file);
+
+   icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
+      [0.01; 0.01], 271, [270; 269], [0.8; 0.8], [0.02; 0.02], 150, 450, ...
+      900, 1, 10, 1, 2, 1, true, eps, false, 450, 900);
+
+   loaded = load(debug_file, 'debug_state');
+   debug_state = loaded.debug_state;
+
+   testCase.verifyTrue(debug_state.forced_advance);
+   testCase.verifyEqual(debug_state.force_advance_streak_dt, 900, ...
+      'AbsTol', 1e-12);
+   testCase.verifyEqual(debug_state.force_advance_limit_dt, 900, ...
+      'AbsTol', 1e-12);
+end
+
+function test_force_advance_guard_resets_after_recovery(testCase)
+   % A successful accepted substep should clear any prior force-advance
+   % streak so transient recoveries do not poison later timesteps.
+
+   streak_dt = icemodel.timestepping.update_force_advance_guard(300, true, 300, ...
+      900, 2, 10, 'icemodel');
+   streak_dt = icemodel.timestepping.update_force_advance_guard(streak_dt, false, ...
+      300, 900, 2, 10, 'icemodel');
+
+   testCase.verifyEqual(streak_dt, 0, 'AbsTol', 0);
+end
+
+function test_force_advance_guard_errors_after_full_timestep(testCase)
+   % Persistent force advance beyond one full forcing step should fail fast
+   % instead of allowing a long broken run to limp onward.
+
+   testCase.verifyError(@() icemodel.timestepping.update_force_advance_guard(900, ...
+      true, 1, 900, 2, 10, 'icemodel'), 'icemodel:ForceAdvanceStreakExceeded');
+end
+
+function cleanupDebugFile(debug_file)
+   %CLEANUPDEBUGFILE Restore the debug env var and remove the temp MAT file.
+
+   setenv('ICEMODEL_DEBUG_MAXSUBSTEP_FILE', '');
+   if exist(debug_file, 'file') == 2
+      delete(debug_file);
+   end
 end

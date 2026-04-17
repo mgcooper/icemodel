@@ -9,13 +9,14 @@ function [Le, Ls] = latentEnthalpyWater(T)
    %  Ambaum (2020) formulation. Paper-specific notation (cvv, cvl, cvs) is
    %  retained here for direct traceability to the published equations.
    %  Production code uses icemodel-centric names (cp_ice, cp_liq, cpv_l,
-   %  cpv_i) via VAPORINIT.
+   %  cpv_i) via icemodel.vapor.initialize_vapor_model.
    %
    %  Note on temperature dependence: Le(T) and Ls(T) are linear in T,
    %  reflecting the Kirchhoff relation dL/dT = cpv - cp_phase. The
    %  Rankine-Kirchhoff saturation vapor pressure formula es = a*exp(b/T)*T^c
    %  absorbs this temperature dependence into the coefficients a, b, c. As a
-   %  result, production code (VAPPRESS, VAPORHEAT, etc.) correctly treats L as
+   %  result, production code (icemodel.vapor.saturation_vapor_pressure,
+   %  VAPORHEAT, etc.) correctly treats L as
    %  constant at the reference value (Lv0 = 2.501e6, Ls0 = 2.834e6 J/kg) —
    %  the L(T) effect is already encoded in the Rankine-Kirchhoff exponents.
    %
@@ -27,7 +28,7 @@ function [Le, Ls] = latentEnthalpyWater(T)
    %        thermodynamics." QJRMS, 147(741), 3493-3497.
    %        DOI: 10.1002/qj.4154
    %
-   % See also: VAPORINIT, icemodel.kernels.saturationVaporPressure
+   % See also: icemodel.vapor.initialize_vapor_model, icemodel.kernels.saturationVaporPressure
 
    % -----------------------------------------------------------------------
    % Constants following Romps (2021)
@@ -69,7 +70,7 @@ function Le = latentHeatVaporization(T, E0v, Rv, cvv, cvl, T0)
    %   cpv_l = 2040 [J/kg/K] — optimal vapor cp over liquid
    %   cpv_i = 1885 [J/kg/K] — optimal vapor cp over ice
    %
-   % In icemodel production code (VAPORINIT), cp_liq and cp_ice refer to the
+   % In icemodel production code (icemodel.vapor.initialize_vapor_model), cp_liq and cp_ice refer to the
    % measurement-consensus values at 0C (4218, 2093), not the Ambaum fitting
    % values (4220, 2097). The difference is negligible.
    %

@@ -36,6 +36,51 @@ function test_loadmet_concatenates_years_and_computes_exchange(testCase)
    testCase.verifyGreaterThan(min(met.De), 0);
 end
 
+function test_loadmet_standardizes_optional_snow_depth_alias(testCase)
+   % LOADMET should expose one canonical snow_depth series when forcing
+   % files carry a supported alias such as snowd.
+
+   workspace = testCase.TestData.workspace;
+   snow_depth = linspace(0, 0.12, workspace.nsteps)';
+   icemodel.test.fixtures.makeSyntheticMetFile(2016, ...
+      'sitename', workspace.sitename, ...
+      'forcings', workspace.forcings, ...
+      'nsteps', workspace.nsteps, ...
+      'dt_seconds', workspace.dt_seconds, ...
+      'snow_depth', snow_depth, ...
+      'metdir', workspace.metdir);
+
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016);
+   met = icemodel.loadmet(opts);
+
+   testCase.verifyTrue(isvariable('snow_depth', met));
+   testCase.verifyEqual(met.snow_depth, snow_depth, 'AbsTol', 1e-12);
+end
+
+function test_initforcings_returns_optional_snow_depth_vector(testCase)
+   % icemodel.surface.initialize_surface_forcings should expose the canonical
+   % forcing snow-depth vector so the model mains can choose whether to use it.
+
+   workspace = testCase.TestData.workspace;
+   snow_depth = 0.05 + zeros(workspace.nsteps, 1);
+   icemodel.test.fixtures.makeSyntheticMetFile(2016, ...
+      'sitename', workspace.sitename, ...
+      'forcings', workspace.forcings, ...
+      'nsteps', workspace.nsteps, ...
+      'dt_seconds', workspace.dt_seconds, ...
+      'snow_depth', snow_depth, ...
+      'metdir', workspace.metdir);
+
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016);
+
+   [~, ~, ~, ~, ~, ~, ~, ~, ~, ~, met_snow_depth] = ...
+      icemodel.surface.initialize_surface_forcings(opts);
+
+   testCase.verifyEqual(met_snow_depth, snow_depth, 'AbsTol', 1e-12);
+end
+
 function test_loadmet_swaps_inline_modis_from_metfile(testCase)
    % Inline MODIS-style data embedded in the met file should override the
    % requested output variable when userdata is selected.
@@ -144,6 +189,41 @@ function test_loadresults_defaults_to_output_years(testCase)
    [ice1, ~, met] = icemodel.loadresults(opts);
 
    testCase.verifyEqual(unique(year(ice1.Time))', 2016);
+   testCase.verifyEqual(unique(year(met.Time))', 2016);
+end
+
+function test_loadresults_preserves_diagnostic_output_profile_fields(testCase)
+   % Saved diagnostic-profile outputs should reload with the accepted
+   % solver/THF debugging scalars intact.
+
+   workspace = testCase.TestData.workspace;
+   pathoutput = fullfile(workspace.outputdir, 'kanm', 'icemodel', ...
+      'loadresults_diagnostic');
+   if exist(pathoutput, 'dir') ~= 7
+      mkdir(pathoutput);
+   end
+   if exist(fullfile(pathoutput, '2016'), 'dir') ~= 7
+      mkdir(fullfile(pathoutput, '2016'));
+   end
+
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'icemodel', 2016, saveflag=true, ...
+      output_profile='diagnostic', solver=1, seb_solver=2, ...
+      turbulent_flux_scheme='monin_obukhov', z0_ice=0.02, ...
+      pathoutput=pathoutput, testname='loadresults_diagnostic');
+   [~, ~, opts] = icemodel.test.helpers.runSmbModel(opts);
+
+   [ice1, ~, met] = icemodel.loadresults(opts);
+
+   testCase.verifyTrue(all(ismember( ...
+      {'n_subfail', 'ea_atm', 'br_coefs_gamma', 'br_coefs_b1_num', ...
+      'br_coefs_b2_num', 'hv_atm', 'ro_sfc', ...
+      'thf_es_sfc', 'thf_z0m', 'thf_z0h', 'thf_z0q', 'thf_u_star', ...
+      'thf_L', 'thf_Re', 'thf_numiter'}, ice1.Properties.VariableNames)));
+   testCase.verifyTrue(all(isfinite(ice1.ro_sfc)));
+   testCase.verifyTrue(all(isfinite(ice1.thf_u_star)));
+   testCase.verifyTrue(all(isfinite(ice1.thf_L)));
+   testCase.verifyTrue(all(isfinite(ice1.thf_numiter)));
    testCase.verifyEqual(unique(year(met.Time))', 2016);
 end
 

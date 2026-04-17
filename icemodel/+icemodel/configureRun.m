@@ -7,6 +7,8 @@ function opts = configureRun(opts)
    % are empty, while preserving caller-supplied values for fields such as
    % PATHINPUT, PATHOUTPUT, CASENAME, METFNAME, VARS1, and VARS2.
 
+   opts = validateTurbulentFluxOptions(opts);
+
    if ~isfield(opts, 'pathdata') || isempty(opts.pathdata)
       opts.pathdata = icemodel.getpath('data');
    end
@@ -29,8 +31,9 @@ function opts = configureRun(opts)
       opts.pathuserdata = icemodel.getpath('userdata');
    end
 
-   % WRITEOUTPUT appends ['ice1_' opts.casename '.mat'] and saves the file in
-   % a subfolder of opts.pathoutput for each year e.g. opts.pathoutput/2016.
+   % icemodel.writeoutput appends ['ice1_' opts.casename '.mat'] and
+   % saves the file in a subfolder of opts.pathoutput for each year, e.g.
+   % opts.pathoutput/2016.
    %
    % For grid runs, opts.casename and opts.metfname are set outside this
    % function in the wrapper that loops over grid-cell IDs. Core icemodel only
@@ -46,7 +49,7 @@ function opts = configureRun(opts)
          opts.sitename, opts.smbmodel, opts.userdata, [], opts.testname);
    end
 
-   % Create the casename. WRITEOUTPUT appends this to the base filenames.
+   % Create the casename. icemodel.writeoutput appends this to base filenames.
    % For grid runs, the wrapper overwrites this with the grid-cell ID.
    if ~isfield(opts, 'casename') || isempty(opts.casename)
       opts.casename = icemodel.setcase(opts.forcings, opts.userdata, opts.uservars);
@@ -84,17 +87,71 @@ function opts = configureRun(opts)
    end
 end
 
+function opts = validateTurbulentFluxOptions(opts)
+   %VALIDATETURBULENTFLUXOPTIONS Validate the turbulent-flux option surface.
+
+   [z0_bulk_default, z0_ice_default, z0_snow_low_default, ...
+      z0_snow_high_default] = icemodel.parameterLookup( ...
+      'thf_z0_bulk', 'thf_z0_ice', 'thf_z0_snow_low_density', ...
+      'thf_z0_snow_high_density');
+
+   if ~isfield(opts, 'turbulent_flux_scheme') ...
+         || isempty(opts.turbulent_flux_scheme)
+      opts.turbulent_flux_scheme = 'bulk_richardson';
+   end
+
+   scheme = lower(char(opts.turbulent_flux_scheme));
+   if ~ismember(scheme, {'bulk_richardson', 'monin_obukhov'})
+      error('icemodel:configureRun:unknownTurbulentFluxScheme', ...
+         'Unrecognized turbulent flux scheme: %s', opts.turbulent_flux_scheme);
+   end
+   opts.turbulent_flux_scheme = scheme;
+
+   if ~isfield(opts, 'z_relh') || isempty(opts.z_relh)
+      opts.z_relh = opts.z_tair;
+   end
+
+   if ~isfield(opts, 'z0_bulk') || isempty(opts.z0_bulk)
+      opts.z0_bulk = z0_bulk_default;
+   end
+   if ~isfield(opts, 'z0_ice') || isempty(opts.z0_ice)
+      opts.z0_ice = z0_ice_default;
+   end
+   if ~isfield(opts, 'z0_snow_low_density') || isempty(opts.z0_snow_low_density)
+      opts.z0_snow_low_density = z0_snow_low_default;
+   end
+   if ~isfield(opts, 'z0_snow_high_density') || isempty(opts.z0_snow_high_density)
+      opts.z0_snow_high_density = z0_snow_high_default;
+   end
+   if ~isfield(opts, 'use_forcing_snow_depth_for_thf') ...
+         || isempty(opts.use_forcing_snow_depth_for_thf)
+      opts.use_forcing_snow_depth_for_thf = false;
+   end
+   opts.use_forcing_snow_depth_for_thf = logical( ...
+      opts.use_forcing_snow_depth_for_thf);
+
+   % For MOST, enforce numerical (complex-step) T_sfc solver.
+   if strcmp(scheme, 'monin_obukhov')
+      if opts.seb_solver ~= 2
+         opts.seb_solver = 2;
+         warning('icemodel:configureRun:moninObukhovRequiresSebSolver2', ...
+            ['turbulent_flux_scheme=''monin_obukhov'' currently requires ' ...
+            'opts.seb_solver = 2.']);
+      end
+   end
+end
+
 function [vars1, vars2] = defaultOutputVariables(opts)
    % ice1.vars1 = Surface (1-d) data
    % ice2.vars2 = Subsurface (2-d) data
    %
-   % Supported output profiles are "standard" and "minimal".
+   % Supported output profiles are "standard", "minimal", and "diagnostic".
    %
    % Two important programming notes:
    %
    % 1) The order in which the output variables are set must match the order in
-   % which the data are stored in the cell arrays passed to SAVEOUTPUT from the
-   % model main functions.
+   % which the data are stored in the cell arrays passed to
+   % icemodel.updateoutput from the model main functions.
    %
    % 2) If new variables are added, icemodel.postprocess must be reviewed to
    % ensure correct
@@ -119,6 +176,23 @@ function [vars1, vars2] = defaultOutputVariables(opts)
          vars1 = ...
             {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
             'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter'};
+
+         if strcmp(opts.smbmodel, 'skinmodel')
+            vars2 = {'Tice', 'f_ice', 'f_liq'};
+         else
+            vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp', 'df_lyr', ...
+               'Sc', 'r_eff'};
+         end
+
+      case 'diagnostic'
+         vars1 = ...
+            {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
+            'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter', ...
+            'n_subfail', 'ea_atm', 'br_coefs_gamma', 'br_coefs_b1_num', ...
+            'br_coefs_b2_num', 'hv_atm', 'ro_sfc', ...
+            'thf_es_sfc', 'thf_stability_factor', 'thf_z0m', 'thf_z0h', ...
+            'thf_z0q', 'thf_u_star', 'thf_L', 'thf_Re', 'thf_numiter', ...
+            'thf_scalar_exchange_Qh', 'thf_scalar_exchange_Qe'};
 
          if strcmp(opts.smbmodel, 'skinmodel')
             vars2 = {'Tice', 'f_ice', 'f_liq'};
@@ -168,6 +242,7 @@ function opts = configureDebugPaths(opts)
       'ICEMODEL_DEBUG_ICEENBAL_FILE',    'debug_iceenbal.mat'; ...
       'ICEMODEL_DEBUG_MZTRANSFORM_FILE', 'debug_mztransform.mat'; ...
       'ICEMODEL_DEBUG_SEBSOLVE_FILE',    'debug_sebsolve.mat'; ...
+      'ICEMODEL_DEBUG_THF_FILE',         'debug_thf.mat'; ...
       'ICEMODEL_DEBUG_SKINSOLVE_FILE',   'debug_skinsolve.mat'; ...
       'ICEMODEL_DEBUG_ICEEBSOLVE_FILE',  'debug_iceebsolve.mat'; ...
       'ICEMODEL_DEBUG_SKINEBSOLVE_FILE', 'debug_skinebsolve.mat'; ...
