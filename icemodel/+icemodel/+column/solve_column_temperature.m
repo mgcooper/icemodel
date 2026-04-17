@@ -1,5 +1,5 @@
-function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(T, ...
-      f_ice, f_liq, dz, delz, fn, dt, Ts, tol, maxiter, alpha, debug)
+function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(Ts, ...
+      T, f_ice, f_liq, dz, delz, fn, dt, tol, maxiter, alpha, debug)
    %SOLVE_COLUMN_TEMPERATURE Solve the 1-dimensional column conduction equation.
    %
    %#codegen
@@ -10,7 +10,9 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(T, ...
          'cv_ice', 'cv_liq', 'Ls');
    end
 
-   JJ = numel(T);
+   % Top and bottom node indices
+   N = 1;
+   S = numel(T);
 
    % Solver options
    if maxiter == 1
@@ -42,29 +44,29 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(T, ...
       T_iter = T;
 
       % Compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
-      g_ns = [k_eff(1); k_eff(1:JJ); k_eff(JJ)];
-      gb_ns = 1.0 ./ ( (1.0 - fn) ./ g_ns(1:JJ+1) + fn ./ g_ns(2:JJ+2));
+      g_ns = [k_eff(N); k_eff(N:S); k_eff(S)];
+      gb_ns = 1.0 ./ ( (1.0 - fn) ./ g_ns(N:S+1) + fn ./ g_ns(N+1:S+2));
 
       % Compute the enthalpy coefficient for each c.v. for the current timestep
       aP0 = (cv_ice * f_ice + cv_liq * f_liq ...
          + Ls * (1 - f_liq - f_ice) .* drovdT) .* dz / dt;
 
       % Compute the aN and aS coefficients
-      aN = gb_ns(1:JJ)   ./ delz(1:JJ);
-      aS = gb_ns(2:JJ+1) ./ delz(2:JJ+1);
+      aN = gb_ns(N:S)     ./ delz(N:S);
+      aS = gb_ns(N+1:S+1) ./ delz(N+1:S+1);
 
       % Account for the boundary conditions.
-      bc_N = aN(1) * Ts;
+      bc_N = aN(N) * Ts;
       bc_S = 0.0;
-      aS(JJ) = 0.0;
+      aS(S) = 0.0;
 
       % Compute the aP coefficient and solution vector b
-      aP = aN(1:JJ) + aS(1:JJ) + aP0(1:JJ);
-      b = aP0(1:JJ) .* T(1:JJ);
+      aP = aN(N:S) + aS(N:S) + aP0(N:S);
+      b = aP0(N:S) .* T(N:S);
 
       % Account for Dirichlet upper and Neumann lower boundary conditions
-      b(1) = b(1) + bc_N;
-      b(JJ) = b(JJ) + bc_S;
+      b(N) = b(N) + bc_N;
+      b(S) = b(S) + bc_S;
 
       % Solve the equation
       T = icemodel.numerics.trisolve(-aN, aP, -aS, b);

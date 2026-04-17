@@ -28,6 +28,6 @@ function nu_air = air_kinematic_viscosity(Ta, ro_atm)
    S = 110.4;
    c = 1.458e-6;
 
-   mu_air = c * Ta ^ (3/2) / (Ta + S);
-   nu_air = mu_air / ro_atm;
+   mu_air = c * Ta .^ (3/2) ./ (Ta + S);
+   nu_air = mu_air ./ ro_atm;
 end

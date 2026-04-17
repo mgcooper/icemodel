@@ -12,5 +12,5 @@ function ro_atm = moist_air_density(Pa, ea, Ta)
       [Rd, Rv] = icemodel.physicalConstant('Rd', 'Rv');
    end
 
-   ro_atm = (Pa - ea) / (Rd * Ta) + ea / (Rv * Ta);
+   ro_atm = (Pa - ea) ./ (Rd .* Ta) + ea ./ (Rv .* Ta);
 end
