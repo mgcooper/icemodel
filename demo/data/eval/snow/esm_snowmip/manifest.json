@@ -1,0 +1,71 @@
+{
+  "dataset_family": "esm_snowmip",
+  "source_doi": "10.1594/PANGAEA.897575",
+  "source_url": "https://doi.org/10.1594/PANGAEA.897575",
+  "source_version": "ESM-SnowMIP_all.zip (2019-01-23)",
+  "retrieval_date": "17-Apr-2026",
+  "cases": [
+    {
+      "case_id": "cdp",
+      "case_type": "esm_site",
+      "tier": "smoke",
+      "site_id": "cdp",
+      "site_name": "Col de Porte",
+      "forcing_file": "cdp/forcing.mat",
+      "evaluation_file": "cdp/evaluation.mat",
+      "reference_file": "cdp/reference.mat",
+      "native_timestep": "hourly",
+      "comparison_window": {
+        "start": "01-Oct-2005",
+        "end": "01-Jul-2006"
+      },
+      "comparison_variables": [
+        "snow_depth_m",
+        "swe_kg_m2",
+        "surface_temp_C",
+        "soil_temp_1_C",
+        "soil_temp_2_C",
+        "soil_temp_3_C"
+      ],
+      "observation_variables": {
+        "snow_depth_m": "snd_auto|snd_man",
+        "swe_kg_m2": "snw_auto|snw_man",
+        "surface_temp_C": "ts",
+        "soil_depths_m": [
+          0.10000000149011612,
+          0.20000000298023224,
+          0.5
+        ]
+      },
+      "notes": "Forcing albedo is interpolated from observed albedo and falls back to snow/ground constants where observations are missing. The smoke reference duplicates the staged observations by design."
+    },
+    {
+      "case_id": "wfj",
+      "case_type": "esm_site",
+      "tier": "smoke",
+      "site_id": "wfj",
+      "site_name": "Weissfluhjoch",
+      "forcing_file": "wfj/forcing.mat",
+      "evaluation_file": "wfj/evaluation.mat",
+      "reference_file": "wfj/reference.mat",
+      "native_timestep": "hourly",
+      "comparison_window": {
+        "start": "01-Oct-2000",
+        "end": "01-Jul-2001"
+      },
+      "comparison_variables": [
+        "snow_depth_m",
+        "swe_kg_m2",
+        "surface_temp_C",
+        "soil_temp_1_C"
+      ],
+      "observation_variables": {
+        "snow_depth_m": "snd_auto|snd_man",
+        "swe_kg_m2": "snw_auto|snw_man",
+        "surface_temp_C": "ts",
+        "soil_depths_m": 0.0099999997764825821
+      },
+      "notes": "Forcing albedo is interpolated from observed albedo and falls back to snow/ground constants where observations are missing. The smoke reference duplicates the staged observations by design."
+    }
+  ]
+}

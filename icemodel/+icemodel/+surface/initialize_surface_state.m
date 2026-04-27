@@ -1,10 +1,9 @@
 function [ea_atm, ro_atm, cv_atm, nu_air, H_h, De_e, br_coefs] ...
-      = initialize_surface_state(opts, f_ice, f_liq, tair, wspd, rh, psfc)
+      = initialize_surface_state(opts, tair, wspd, rh, psfc)
    %INITIALIZE_SURFACE_STATE Precompute forcing-derived surface arrays.
    %
    %  [ea_atm, ro_atm, cv_atm, nu_air, H_h, De_e, br_coefs] = ...
-   %     icemodel.surface.initialize_surface_state(opts, ...
-   %     f_ice, f_liq, tair, wspd, rh, psfc)
+   %     icemodel.surface.initialize_surface_state(opts, tair, wspd, rh, psfc)
    %
    %  Precomputes all surface-state quantities that are pure functions
    %  of the meteorological forcing and model geometry. These arrays
@@ -28,10 +27,6 @@ function [ea_atm, ro_atm, cv_atm, nu_air, H_h, De_e, br_coefs] ...
    %
    %  Inputs:
    %    opts  — model options struct (uses z0_bulk, z_tair, z_wind)
-   %    f_ice — initial volumetric ice fraction at the surface
-   %            (scalar; unused, reserved for future use)
-   %    f_liq — initial volumetric liquid-water fraction at the
-   %            surface (scalar; unused, reserved for future use)
    %    tair  — air-temperature forcing [N x 1], K
    %    wspd  — wind-speed forcing [N x 1], m s-1
    %    rh    — relative humidity forcing [N x 1], %

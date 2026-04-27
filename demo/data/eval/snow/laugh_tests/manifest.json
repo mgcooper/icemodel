@@ -1,0 +1,31 @@
+{
+  "dataset_family": "laugh_tests",
+  "source_doi": "",
+  "source_url": "https://github.com/KyleKlenk/Laugh-Tests",
+  "source_version": "m2_mac_Sept23 validation bundle",
+  "retrieval_date": "17-Apr-2026",
+  "cases": {
+    "case_id": "colbeck1976",
+    "case_type": "synthetic_process",
+    "tier": "smoke",
+    "site_id": "colbeck1976",
+    "site_name": "Colbeck 1976 synthetic snow infiltration benchmark",
+    "forcing_file": "colbeck1976/forcing.mat",
+    "evaluation_file": "colbeck1976/evaluation.mat",
+    "reference_file": "colbeck1976/reference.mat",
+    "native_timestep": "1 minute output / sub-hour forcing",
+    "comparison_window": {
+      "start": "1990-01-01 00:01:00",
+      "end": "1990-01-01 10:00:00"
+    },
+    "comparison_variables": [
+      "snow_liquid_water_storage_m",
+      "bottom_outflow_mps"
+    ],
+    "observation_variables": {
+      "snow_liquid_water_storage_m": "derived from mLayerVolFracLiq * mLayerDepth in snow layers",
+      "bottom_outflow_mps": "scalarRainPlusMelt"
+    },
+    "notes": "The staged target is derived from the frozen SUMMA validation outputs bundled in Laugh-Tests, not from the full upstream repo layout. A true wetting-front target is intentionally not staged yet because these frozen SUMMA outputs already contain liquid water throughout the snow column from the first saved step, so a threshold-based wetting-front diagnostic is not trustworthy."
+  }
+}

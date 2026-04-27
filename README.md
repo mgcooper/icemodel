@@ -262,9 +262,9 @@ Warren S G and Brandt R E 2008 *Optical constants of ice from the ultraviolet to
 - Runs on Windows 10, tested on R2017a.
 <!-- - Runs in Octave on MacOS Sonoma (Intel silicon), using Octave version 9.2. -->
 
-*Note that the main program `icemodel/icemodel.m` and core IceModel functions (UPPERCASE filenames in `icemodel/`), are written in a minimalist matlab style: all functions are compatible with code generation, all numerical methods employ custom hand-written solvers, and there are no toolbox dependencies or modern matlab conveniences such as `arguments` input parsers.
+*Note that the main program `icemodel/icemodel.m` and core +icemodel namespace functions (i.e., functions called in the `icemodel.m` call stack) are written in a minimalist matlab style: all functions are compatible with code generation, all numerical methods employ custom hand-written solvers, and there are no toolbox dependencies or modern matlab conveniences such as `arguments` input parsers.
 
-Exceptions to this style include namespace functions (e.g. `icemodel/+icemodel`), which by convention are helper functions not required by the numerical model. The `demo.m` script uses a modern matlab approach including name=value syntax (requires >=R2021a). The `arguments` parser used in `icemodel.run.point` requires >=R2019b. For users running pre-R2019b, see `demo/demo_pre_R2019.m`.
+Exceptions to this style include non-core-physics namespace functions (e.g. `icemodel/+icemodel/+helpers`), which by convention are helper functions not required by the numerical model. The `demo.m` script uses a modern matlab approach including name=value syntax (requires >=R2021a). The `arguments` parser used in `icemodel.run.point` requires >=R2019b. For users running pre-R2019b, see `demo/demo_pre_R2019.m`.
 
 If you encounter incompatibilities, please [open an issue](https://github.com/mgcooper/icemodel/issues).
 
