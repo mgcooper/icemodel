@@ -4,7 +4,8 @@ function results = run_snow_verification_suite(kwargs)
    %  results = run_snow_verification_suite()
    %  results = run_snow_verification_suite(tier="full", make_plots=false)
    %  results = run_snow_verification_suite(plot_visible="on")
-   %  results = run_snow_verification_suite(candidate_provider=@runSnowCase)
+   %  results = run_snow_verification_suite(run_icemodel=true)
+   %  results = run_snow_verification_suite(candidate_provider=@myProvider)
    %  results = run_snow_verification_suite(cases=["cdp", "wfj"])
    %
    % This runner is the verification-suite entry point used by agents and
@@ -21,9 +22,14 @@ function results = run_snow_verification_suite(kwargs)
       kwargs.make_plots (1, 1) logical = true
       kwargs.save_plots (1, 1) logical = true
       kwargs.plot_visible (1, 1) string = "off"
+      kwargs.run_icemodel (1, 1) logical = false
       kwargs.candidate_provider = []
       kwargs.evaluation_data_root (1, 1) string = ""
       kwargs.artifact_root (1, 1) string = ""
+   end
+
+   if kwargs.run_icemodel && ~isempty(kwargs.candidate_provider)
+      error('run_icemodel and candidate_provider are mutually exclusive')
    end
 
    % Install the same test/demo config used by unit tests so fresh-clone runs
@@ -70,7 +76,17 @@ function results = run_snow_verification_suite(kwargs)
       % Agents can pass a candidate provider that receives the resolved case
       % manifest row and returns a candidate bundle with the same format as the
       % staged reference. With no provider, comparecase uses the smoke reference.
-      if isempty(kwargs.candidate_provider)
+      if kwargs.run_icemodel
+         candidate = icemodel.verification.runIcemodelSnowCandidate(cases(i));
+         case_result = icemodel.verification.comparecase( ...
+            cases(i).case_id, ...
+            "evaluation_data_root", kwargs.evaluation_data_root, ...
+            "artifact_dir", run_dir, ...
+            "make_plot", kwargs.make_plots, ...
+            "save_plot", kwargs.save_plots, ...
+            "plot_visible", kwargs.plot_visible, ...
+            "candidate", candidate);
+      elseif isempty(kwargs.candidate_provider)
          case_result = icemodel.verification.comparecase( ...
             cases(i).case_id, ...
             "evaluation_data_root", kwargs.evaluation_data_root, ...

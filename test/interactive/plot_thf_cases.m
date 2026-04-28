@@ -118,9 +118,10 @@ function fig = plot_scatter_comparison(run_data, gtitle)
       ax = nexttile(tl);
       hold(ax, 'on');
 
-      all_vals = [];
-      h_fit = gobjects(n_runs, 1);
-      leg_strs = cell(n_runs, 1);
+      obs_series = cell(n_runs, 1);
+      model_series = cell(n_runs, 1);
+      colors = zeros(n_runs, 3);
+      names = strings(n_runs, 1);
       n_valid = 0;
 
       for irun = 1:n_runs
@@ -138,41 +139,27 @@ function fig = plot_scatter_comparison(run_data, gtitle)
             continue
          end
          n_valid = n_valid + 1;
-
-         all_vals = [all_vals; obs; mdl]; %#ok<AGROW>
-
-         % Point cloud.
-         scatter(ax, obs, mdl, 18, pr.color, 'filled', 'MarkerFaceAlpha', 0.30);
-
-         % Best-fit line and R².
-         r2 = corr(obs, mdl) ^ 2;
-         cf = polyfit(obs, mdl, 1);
-         x_fit = linspace(min(obs), max(obs), 200)';
-         y_fit = polyval(cf, x_fit);
-
-         %
-         h_fit(n_valid) = plot(ax, x_fit, y_fit, '-', ...
-            'Color', pr.color, 'LineWidth', 2.0);
-         leg_strs{n_valid} = sprintf('%s  R²=%.2f', pr.name, r2);
+         obs_series{n_valid} = obs;
+         model_series{n_valid} = mdl;
+         colors(n_valid, :) = pr.color;
+         names(n_valid) = pr.name;
       end
 
-      % 1:1 reference line.
-      if ~isempty(all_vals)
-         lims = [min(all_vals), max(all_vals)];
-         h11 = plot(ax, lims, lims, 'k--', 'LineWidth', 1.0);
-         xlim(ax, lims); ylim(ax, lims);
-      else
-         h11 = gobjects(1);
+      if n_valid > 0
+         icemodel.plot.scatterplot( ...
+            obs_series(1:n_valid), model_series(1:n_valid), ...
+            axes=ax, ...
+            display_name=names(1:n_valid), ...
+            colors=colors(1:n_valid, :), ...
+            x_label="Observations", ...
+            y_label="icemodel", ...
+            marker_size=18, ...
+            marker_face_alpha=0.30, ...
+            line_width=2.0, ...
+            legend_location="northwest");
       end
 
-      xlabel(ax, 'Observations'); ylabel(ax, 'icemodel');
       title(ax, panel_titles{vi});
-
-      % Legend: only the valid scheme entries + 1:1.
-      h_leg = [h_fit(1:n_valid); h11];
-      s_leg = [leg_strs(1:n_valid); {'1:1'}];
-      legend( ...
-         h_leg, s_leg, 'Location', 'northwest', 'FontSize', 14, 'Box', 'off');
    end
 end
 

@@ -22,14 +22,15 @@ function manifest = makeFamilyManifest(dataset_family, source_doi, source_url, .
    %  staged manifest files.
 
    % Keep family manifest fields in one canonical order for stable JSON output.
-   names = { ...
-      'dataset_family'
-      'source_doi'
-      'source_url'
-      'source_version'
-      'retrieval_date'
-      'cases'};
+   names = icemodel.verification.setup.familyManifestFieldNames();
    values = {dataset_family, source_doi, source_url, source_version, ...
       retrieval_date, cases};
+
+   % Match makeCaseManifestEntry: fail early if the schema and values diverge
+   % instead of writing a malformed or partially shifted JSON manifest.
+   if numel(values) ~= numel(names)
+      error('family manifest expects %d values', numel(names))
+   end
+
    manifest = cell2struct(values, names, 2);
 end

@@ -9,7 +9,7 @@ It is separate from the formal regression and performance suites.
 Use the top-level functions for ordinary verification runs:
 
 - `icemodel.verification.listcases` lists staged cases from committed manifests.
-- `icemodel.verification.loadCaseManifest` resolves one case manifest and its artifact paths.
+- `icemodel.verification.loadmanifest` resolves one case manifest and its artifact paths.
 - `icemodel.verification.comparecase` compares staged targets with a candidate or smoke reference.
 - `icemodel.verification.plotcase` plots staged targets, references, or candidate comparisons.
 
@@ -18,6 +18,7 @@ not import raw upstream data or mutate the staged dataset tree.
 
 ## Candidate Contract
 
+Candidates are model simulations to be compared with verification targets.
 `comparecase` accepts an in-memory `candidate` bundle or a `candidate_file`.
 `run_snow_verification_suite` can also receive a `candidate_provider` function
 handle. The provider receives one resolved case manifest row from `listcases`
@@ -28,31 +29,53 @@ reference:
 - Laugh-Tests process cases use `format="experiment_bundle"` with named
   experiment timetables.
 
-This lets an agent run a synthetic or real snow-model adapter against the
+This lets a developer run a synthetic or real snow-model adapter against the
 committed targets without changing the staged data.
+
+Use `run_snow_verification_suite(run_icemodel=true)` when the candidate should
+come from `icemodel(opts)`. Until production snow physics exists, that route
+uses `icemodel.verification.runIcemodelSnowCandidate`, which activates an
+explicit verification-only synthetic snow hook inside `icemodel`. Developers
+should keep the runner and comparison functions unchanged unless development
+is required, replace the synthetic stand-in with real snow-model outputs, and
+map those `ice1`/`ice2` outputs through
+`icemodel.verification.candidateFromIcemodelOutput`.
+
+Metrics and scatter plots compare only finite paired samples after target and
+candidate timetables are synchronized on common timestamps. Missing target data
+are not treated as zero and do not contribute to bias, RMSE, correlation, peak
+timing, or fitted-line diagnostics.
 
 ## Plotting Contract
 
 Plotting uses three independent controls:
 
-- `make_plots` creates comparison figures.
-- `save_plots` exports comparison PNGs under the run artifact folder.
-- `plot_visible` controls MATLAB figure visibility.
+- `make_plots` creates comparison figures (`true` / `false`).
+- `save_plots` exports comparison PNGs to the run artifact folder (`true` / `false`).
+- `plot_visible` controls MATLAB figure visibility (`on` or `off`).
 
-The runner defaults are agent-safe: plots are generated, saved, hidden, and then
-closed. For live visual review, run:
+The runner defaults are command-line safe: plots are generated, saved, hidden, and
+then closed. For live (interactive) visual review, run:
 
 ```matlab
 results = run_snow_verification_suite(plot_visible="on");
 ```
 
+Comparison figures include the time-series overlay plus target-versus-candidate
+scatter figures with a 1:1 reference line and fitted linear trend. Scatter
+figures are separate from the time-series figure and are only produced for
+time-series site cases, not the current Colbeck experiment bundle. The scatter
+are generated with `icemodel.plot.scatterplot`. The timeseries plots are generated
+with `icemodel.plot.timeseries`.
+
 ## Setup Workflow
 
 Setup and refresh tooling lives under `icemodel.verification.setup`:
 
-- `importEsmSnowmip` stages curated ESM-SnowMIP site windows.
+- `importEsmSnowmip` stages curated ESM-SnowMIP site data for select time windows.
 - `importLaughTests` stages selected Laugh-Tests synthetic process cases.
-- `prepareCaseRoot`, `writeManifest`, `makeFamilyManifest`, `makeCaseManifestEntry`, and `metadataStruct` are setup helpers used by the importers.
+- `prepareCaseRoot`, `writeManifest`, `makeFamilyManifest`, `makeCaseManifestEntry`,
+   and `metadataStruct` are setup helpers used by the importers.
 
 The setup functions are intentionally separate because they create or overwrite
 MAT artifacts and manifests. Use `overwrite=true` only when deliberately

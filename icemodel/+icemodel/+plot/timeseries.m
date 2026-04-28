@@ -34,11 +34,12 @@ function h = timeseries(time, values, kwargs)
    n_series = size(values, 2);
    display_name = normalizeNames(kwargs.display_name, n_series);
    h = gobjects(n_series, 1);
-   hold_was_on = ishold(kwargs.axes);
+
+   washeld = ishold(kwargs.axes);
    hold(kwargs.axes, 'on')
 
-   for i = 1:n_series
-      series = values(:, i);
+   for n = 1:n_series
+      series = values(:, n);
       plot_args = cell(1, 8);
       plot_args(1:4) = {'LineStyle', kwargs.line_style, ...
          'LineWidth', kwargs.line_width};
@@ -47,15 +48,15 @@ function h = timeseries(time, values, kwargs)
          plot_args(n_args + (1:2)) = {'Color', kwargs.color};
          n_args = n_args + 2;
       end
-      if display_name(i) ~= ""
-         plot_args(n_args + (1:2)) = {'DisplayName', char(display_name(i))};
+      if display_name(n) ~= ""
+         plot_args(n_args + (1:2)) = {'DisplayName', char(display_name(n))};
          n_args = n_args + 2;
       end
-      h(i) = plot(kwargs.axes, time, series, plot_args{1:n_args});
-      addSparseMarkers(kwargs.axes, time, series, kwargs, display_name(i));
+      h(n) = plot(kwargs.axes, time, series, plot_args{1:n_args});
+      addSparseMarkers(kwargs.axes, time, series, kwargs, display_name(n));
    end
 
-   if ~hold_was_on
+   if ~washeld
       hold(kwargs.axes, 'off')
    end
 end
@@ -99,10 +100,11 @@ function marker_style = resolveMarkerStyle(series, requested_style)
       return
    end
 
-    prev_finite = [false; finite_mask(1:end-1)];
-    next_finite = [finite_mask(2:end); false];
-    isolated_mask = finite_mask & ~prev_finite & ~next_finite;
+   prev_finite = [false; finite_mask(1:end-1)];
+   next_finite = [finite_mask(2:end); false];
+   isolated_mask = finite_mask & ~prev_finite & ~next_finite;
    finite_fraction = n_finite / numel(series);
+
    if any(isolated_mask) || finite_fraction <= 0.25
       marker_style = ".";
    else

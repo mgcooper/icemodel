@@ -72,7 +72,8 @@ function result = comparecase(case_id, kwargs)
 
    % Artifact writing is optional so the same function can serve interactive
    % checks and batch smoke-suite runs.
-   [artifact_dir, metrics_path, figure_path] = deal("", "", "");
+   [artifact_dir, metrics_path, figure_path, scatter_figure_path] = ...
+      deal("", "", "", "");
    if ~isblanktext(kwargs.artifact_dir)
       artifact_dir = fullfile(kwargs.artifact_dir, case_id);
       icemodel.helpers.ensureDirExists(artifact_dir);
@@ -83,12 +84,15 @@ function result = comparecase(case_id, kwargs)
       save(fullfile(artifact_dir, "result.mat"), 'metrics', 'aligned', 'manifest');
    end
 
-   % Plotting has two independent policies. make_plot controls whether a figure
-   % is created, save_plot controls PNG export, and plot_visible controls
-   % whether the figure remains open for interactive review.
+   % Plotting has two independent policies. make_plot controls whether figures
+   % are created, save_plot controls PNG export, and plot_visible controls
+   % whether figures remain open for interactive review.
    if kwargs.make_plot
       if kwargs.save_plot && ~isblanktext(artifact_dir)
          figure_path = fullfile(artifact_dir, "comparison.png");
+         if targets.format == "timeseries"
+            scatter_figure_path = fullfile(artifact_dir, "scatter.png");
+         end
       end
 
       should_make_visible_plot = kwargs.plot_visible ~= "off";
@@ -109,6 +113,27 @@ function result = comparecase(case_id, kwargs)
             close(f)
          end
       end
+
+      % Scatter plots are useful for site time series, but the current Colbeck
+      % process benchmark is better reviewed as time-series/process panels until
+      % analytical profile or flux targets are staged explicitly.
+      should_make_saved_scatter = kwargs.save_plot ...
+         && ~isblanktext(scatter_figure_path);
+      if targets.format == "timeseries" ...
+            && (should_make_visible_plot || should_make_saved_scatter)
+
+         f = icemodel.verification.plotscatter( ...
+            case_id, ...
+            "evaluation_data_root", kwargs.evaluation_data_root, ...
+            "icemodel_config_casename", kwargs.icemodel_config_casename, ...
+            "candidate", candidate, ...
+            "visible", kwargs.plot_visible, ...
+            "output_file", scatter_figure_path);
+
+         if kwargs.plot_visible == "off"
+            close(f)
+         end
+      end
    end
 
    % Return paths even when blank so callers do not need field-existence checks.
@@ -118,7 +143,8 @@ function result = comparecase(case_id, kwargs)
       'metrics', metrics, ...
       'artifact_dir', artifact_dir, ...
       'metrics_path', metrics_path, ...
-      'figure_path', figure_path);
+      'figure_path', figure_path, ...
+      'scatter_figure_path', scatter_figure_path);
 end
 
 function [metrics, aligned] = compareTimeseriesBundle(target_tt, candidate_tt, ...

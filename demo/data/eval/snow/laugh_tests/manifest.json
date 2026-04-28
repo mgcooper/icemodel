@@ -3,7 +3,7 @@
   "source_doi": "",
   "source_url": "https://github.com/KyleKlenk/Laugh-Tests",
   "source_version": "m2_mac_Sept23 validation bundle",
-  "retrieval_date": "17-Apr-2026",
+  "retrieval_date": "27-Apr-2026",
   "cases": {
     "case_id": "colbeck1976",
     "case_type": "synthetic_process",
@@ -26,6 +26,6 @@
       "snow_liquid_water_storage_m": "derived from mLayerVolFracLiq * mLayerDepth in snow layers",
       "bottom_outflow_mps": "scalarRainPlusMelt"
     },
-    "notes": "The staged target is derived from the frozen SUMMA validation outputs bundled in Laugh-Tests, not from the full upstream repo layout. A true wetting-front target is intentionally not staged yet because these frozen SUMMA outputs already contain liquid water throughout the snow column from the first saved step, so a threshold-based wetting-front diagnostic is not trustworthy."
+    "notes": "The staged target is derived from the frozen SUMMA validation outputs bundled in KyleKlenk/Laugh-Tests. The original CH-Earth/laughTests notebooks establish comparability to the Colbeck analytical solution by computing analytical liquid-water profiles and outflow fluxes, not by deriving a wetting front from SUMMA output thresholds. A true wetting-front target is intentionally not staged yet because the current smoke artifact imports only frozen SUMMA scalar diagnostics."
   }
 }

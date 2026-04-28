@@ -43,8 +43,8 @@ function f = plotcase(case_id, kwargs)
       kwargs.output_file (1, 1) string = ""
    end
 
-   % Resolve the manifest and load both staged bundles up front. The selected
-   % source below controls which bundle is plotted.
+   % Resolve the manifest and load the target and reference bundles. The
+   % selected source below controls which bundle is plotted.
    manifest = icemodel.verification.loadmanifest(case_id, ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
       "icemodel_config_casename", kwargs.icemodel_config_casename);
@@ -111,15 +111,17 @@ function plotTimeseriesBundle(f, primary_tt, secondary, variable_names, ...
       labels, manifest)
    %PLOTTIMESERIESBUNDLE Plot one timetable bundle in stacked panels.
 
+   setFigureSize(f, 1200, max(620, 150 * numel(variable_names)));
+
    % One row per variable keeps site plots comparable across ESM-SnowMIP cases.
    tl = tiledlayout(f, numel(variable_names), 1, ...
       'TileSpacing', 'compact', 'Padding', 'compact');
    title(tl, sprintf('%s (%s)', manifest.case_id, manifest.dataset_family), ...
-      'Interpreter', 'none')
+      'Interpreter', 'none', 'FontSize', 14, 'FontWeight', 'normal')
 
-   for i = 1:numel(variable_names)
+   for n = 1:numel(variable_names)
       ax = nexttile(tl);
-      varname = variable_names(i);
+      varname = variable_names(n);
       if ~ismember(varname, primary_tt.Properties.VariableNames)
          continue
       end
@@ -132,8 +134,10 @@ function plotTimeseriesBundle(f, primary_tt, secondary, variable_names, ...
 
       % Overlay candidate/reference data only when a secondary bundle exists and
       % contains the same variable.
-      if ~isempty(secondary) ...
-            && ismember(varname, secondary.data.Properties.VariableNames)
+      add_secondary = ~isempty(secondary) ...
+         && ismember(varname, secondary.data.Properties.VariableNames);
+
+      if add_secondary
          icemodel.plot.timeseries(secondary.data.Time, ...
             secondary.data.(varname), axes=ax, display_name=labels(2), ...
             line_style='--', color=[0 0.45 0.74], line_width=1.0);
@@ -141,8 +145,9 @@ function plotTimeseriesBundle(f, primary_tt, secondary, variable_names, ...
 
       ylabel(ax, strrep(varname, '_', '\_'))
       grid(ax, 'on')
-      if i == 1
-         legend(ax, 'Location', 'best')
+      formatAxes(ax);
+      if n == 1
+         legend(ax, 'Location', 'best', 'FontSize', 12, 'Box', 'on')
       end
    end
 end
@@ -154,17 +159,21 @@ function plotExperimentBundle(f, primary, secondary, variable_names, ...
    % Experiment bundles use rows for experiments and columns for variables so
    % process-case differences are visible at a glance.
    [exp_names, exp_values] = deal(fieldnames(primary), struct2cell(primary));
+
+   setFigureSize(f, 1180, max(760, 230 * numel(exp_names)));
+
+   % Create the tiled layout and add a title.
    tl = tiledlayout(f, numel(exp_names), numel(variable_names), ...
       'TileSpacing', 'compact', 'Padding', 'compact');
    title(tl, sprintf('%s (%s)', manifest.case_id, manifest.dataset_family), ...
-      'Interpreter', 'none')
+      'Interpreter', 'none', 'FontSize', 14, 'FontWeight', 'normal')
 
    % Validate secondary experiment names before plotting to avoid silently
    % comparing the wrong experiment rows.
    if ~isempty(secondary)
       [secondary_names, secondary_values] = deal( ...
-         fieldnames(secondary.experiments), ...
-         struct2cell(secondary.experiments));
+         fieldnames(secondary.experiments), struct2cell(secondary.experiments));
+
       if ~isequal(exp_names, secondary_names)
          error('candidate experiment names do not match target experiment names')
       end
@@ -173,11 +182,12 @@ function plotExperimentBundle(f, primary, secondary, variable_names, ...
    end
 
    % Fill the experiment-by-variable grid in the same order used by comparecase.
-   for i = 1:numel(exp_names)
-      tt_primary = exp_values{i};
-      for j = 1:numel(variable_names)
+   for n = 1:numel(exp_names)
+      tt_primary = exp_values{n};
+
+      for m = 1:numel(variable_names)
          ax = nexttile(tl);
-         varname = variable_names(j);
+         varname = variable_names(m);
 
          if ismember(varname, tt_primary.Properties.VariableNames)
             icemodel.plot.timeseries(tt_primary.Time, tt_primary.(varname), ...
@@ -186,7 +196,7 @@ function plotExperimentBundle(f, primary, secondary, variable_names, ...
          end
 
          if ~isempty(secondary_values)
-            tt_secondary = secondary_values{i};
+            tt_secondary = secondary_values{n};
 
             if ismember(varname, tt_secondary.Properties.VariableNames)
                icemodel.plot.timeseries(tt_secondary.Time, ...
@@ -195,16 +205,36 @@ function plotExperimentBundle(f, primary, secondary, variable_names, ...
             end
          end
 
-         if i == 1
-            title(ax, strrep(varname, '_', '\_'))
+         if n == 1
+            title(ax, strrep(varname, '_', '\_'), ...
+               'FontSize', 14, 'FontWeight', 'bold')
          end
-         if j == 1
-            ylabel(ax, strrep(exp_names{i}, '_', '\_'))
+         if m == 1
+            ylabel(ax, strrep(exp_names{n}, '_', '\_'))
          end
-         if i == 1 && j == 1
-            legend(ax, 'Location', 'best')
+         if n == 1 && m == 1
+            legend(ax, 'Location', 'best', 'FontSize', 12, 'Box', 'on')
          end
          grid(ax, 'on')
+         formatAxes(ax);
       end
    end
+end
+
+function setFigureSize(f, width, height)
+   %SETFIGURESIZE Use stable pixel sizes for exported verification figures.
+
+   f.Units = 'pixels';
+   f.Position(3:4) = [width height];
+end
+
+function formatAxes(ax)
+   %FORMATAXES Apply compact typography without making labels unreadable.
+
+   ax.FontSize = 14;
+   ax.LineWidth = 0.8;
+   ax.XLabel.FontSize = 14;
+   ax.YLabel.FontSize = 14;
+   ax.Title.FontSize = 14;
+   ax.Title.FontWeight = 'bold';
 end

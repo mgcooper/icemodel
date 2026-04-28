@@ -96,9 +96,9 @@ function fig = plot_group(gdata, gtitle)
    % individual panel titles so the layout stays uncluttered.
 
    % Color scheme (consistent with plot_thf_cases where overlapping).
-   C_br     = [0.07 0.58 0.55];   % teal   — bulk-Richardson production
-   C_scalar = [0.50 0.20 0.70];   % purple — scalar-exchange experiment
-   C_mo     = [0.85 0.50 0.10];   % amber  — Monin-Obukhov
+   C_br = [0.07 0.58 0.55];   % teal   — bulk-Richardson production
+   C_sc = [0.50 0.20 0.70];   % purple — scalar-exchange experiment
+   C_mo = [0.85 0.50 0.10];   % amber  — Monin-Obukhov
 
    % Separate bulk_richardson and monin_obukhov runs.
    d_br = [];
@@ -120,10 +120,10 @@ function fig = plot_group(gdata, gtitle)
    end
 
    % Extract daily-mean timetables.
-   shf_br     = daily_mean(d_br.ice1, 'shf');
-   lhf_br     = daily_mean(d_br.ice1, 'lhf');
-   shf_scalar = daily_mean(d_br.ice1, 'thf_scalar_exchange_Qh');
-   lhf_scalar = daily_mean(d_br.ice1, 'thf_scalar_exchange_Qe');
+   shf_br = daily_mean(d_br.ice1, 'shf');
+   lhf_br = daily_mean(d_br.ice1, 'lhf');
+   shf_sc = daily_mean(d_br.ice1, 'thf_scalar_exchange_Qh');
+   lhf_sc = daily_mean(d_br.ice1, 'thf_scalar_exchange_Qe');
    if ~isempty(d_mo)
       shf_mo = daily_mean(d_mo.ice1, 'shf');
       lhf_mo = daily_mean(d_mo.ice1, 'lhf');
@@ -142,10 +142,10 @@ function fig = plot_group(gdata, gtitle)
    % -----------------------------------------------------------------------
    ax = nexttile(tl, 1);
    hold(ax, 'on');
-   plot(ax, shf_br.Time,     movmean(shf_br.val,     7, 'omitnan'), ...
-      '-',  'Color', C_br,     'LineWidth', 1.8, 'DisplayName', 'Bulk-Richardson');
-   plot(ax, shf_scalar.Time, movmean(shf_scalar.val, 7, 'omitnan'), ...
-      '--', 'Color', C_scalar, 'LineWidth', 1.5, 'DisplayName', 'Scalar exchange');
+   plot(ax, shf_br.Time, movmean(shf_br.val, 7, 'omitnan'), ...
+      '-', 'Color', C_br, 'LineWidth', 1.8, 'DisplayName', 'Bulk-Richardson');
+   plot(ax, shf_sc.Time, movmean(shf_sc.val, 7, 'omitnan'), ...
+      '--', 'Color', C_sc, 'LineWidth', 1.5, 'DisplayName', 'Scalar exchange');
    if ~isempty(shf_mo.Time)
       plot(ax, shf_mo.Time, movmean(shf_mo.val, 7, 'omitnan'), ...
          ':', 'Color', C_mo, 'LineWidth', 1.5, 'DisplayName', 'Monin-Obukhov');
@@ -159,10 +159,10 @@ function fig = plot_group(gdata, gtitle)
    % -----------------------------------------------------------------------
    ax = nexttile(tl, 2);
    hold(ax, 'on');
-   plot(ax, lhf_br.Time,     movmean(lhf_br.val,     7, 'omitnan'), ...
-      '-',  'Color', C_br,     'LineWidth', 1.8, 'DisplayName', 'Bulk-Richardson');
-   plot(ax, lhf_scalar.Time, movmean(lhf_scalar.val, 7, 'omitnan'), ...
-      '--', 'Color', C_scalar, 'LineWidth', 1.5, 'DisplayName', 'Scalar exchange');
+   plot(ax, lhf_br.Time, movmean(lhf_br.val, 7, 'omitnan'), ...
+      '-', 'Color', C_br, 'LineWidth', 1.8, 'DisplayName', 'Bulk-Richardson');
+   plot(ax, lhf_sc.Time, movmean(lhf_sc.val, 7, 'omitnan'), ...
+      '--', 'Color', C_sc, 'LineWidth', 1.5, 'DisplayName', 'Scalar exchange');
    if ~isempty(lhf_mo.Time)
       plot(ax, lhf_mo.Time, movmean(lhf_mo.val, 7, 'omitnan'), ...
          ':', 'Color', C_mo, 'LineWidth', 1.5, 'DisplayName', 'Monin-Obukhov');
@@ -175,14 +175,14 @@ function fig = plot_group(gdata, gtitle)
    % (2,1) SHF scatter: Bulk-Richardson vs Scalar exchange
    % -----------------------------------------------------------------------
    ax = nexttile(tl, 3);
-   scatter_with_fit(ax, shf_br.val, shf_scalar.val, C_scalar, ...
+   scatter_with_fit(ax, shf_br.val, shf_sc.val, C_sc, ...
       'Bulk-Richardson SHF (W m^{-2})', 'Scalar exchange SHF (W m^{-2})');
 
    % -----------------------------------------------------------------------
    % (2,2) LHF scatter: Bulk-Richardson vs Scalar exchange
    % -----------------------------------------------------------------------
    ax = nexttile(tl, 4);
-   scatter_with_fit(ax, lhf_br.val, lhf_scalar.val, C_scalar, ...
+   scatter_with_fit(ax, lhf_br.val, lhf_sc.val, C_sc, ...
       'Bulk-Richardson LHF (W m^{-2})', 'Scalar exchange LHF (W m^{-2})');
 
    % -----------------------------------------------------------------------
@@ -221,36 +221,15 @@ function scatter_with_fit(ax, x, y, col, xlab, ylab)
    % The scheme identity is communicated through the y-axis label (ylab) rather
    % than a panel title, so callers pass no title argument.
 
-   keep = isfinite(x) & isfinite(y);
-   x = x(keep);
-   y = y(keep);
-
-   hold(ax, 'on');
-
-   if numel(x) < 2
-      xlabel(ax, xlab); ylabel(ax, ylab);
-      return
-   end
-
-   scatter(ax, x, y, 14, col, 'filled', 'MarkerFaceAlpha', 0.25);
-
-   % 1:1 reference
-   lims = [min([x; y]), max([x; y])];
-   plot(ax, lims, lims, 'k--', 'LineWidth', 1.0, 'DisplayName', '1:1');
-
-   % Best-fit line
-   cf = polyfit(x, y, 1);
-   xf = linspace(lims(1), lims(2), 200)';
-   r2 = corr(x, y) ^ 2;
-   plot(ax, xf, polyval(cf, xf), '-', 'Color', col, 'LineWidth', 2.0, ...
-      'DisplayName', sprintf('fit  R²=%.3f', r2));
-
-   % Bias annotation
-   bias = mean(y - x);
-   text(ax, 0.05, 0.93, sprintf('bias = %+.2f W m^{-2}', bias), ...
-      'Units', 'normalized', 'FontSize', 11);
-
-   xlim(ax, lims); ylim(ax, lims);
-   xlabel(ax, xlab); ylabel(ax, ylab);
-   legend(ax, 'Location', 'southeast', 'FontSize', 10, 'Box', 'off');
+   icemodel.plot.scatterplot(x, y, ...
+      axes=ax, ...
+      colors=col, ...
+      display_name="fit", ...
+      x_label=string(xlab), ...
+      y_label=string(ylab), ...
+      marker_size=14, ...
+      marker_face_alpha=0.25, ...
+      line_width=2.0, ...
+      legend_location="southeast", ...
+      show_bias=true);
 end

@@ -13,8 +13,8 @@ function entry = makeCaseManifestEntry(values)
    %  Setup helper used by dataset importers to make manifest schemas explicit
    %  and shared across verification families.
 
-   % Get the canonical case manifest field names from the local schema helper.
-   names = caseManifestFieldNames();
+   % Get the canonical case manifest field names.
+   names = icemodel.verification.setup.caseManifestFieldNames();
 
    % Fail early if an importer adds or removes a field without updating the
    % shared schema. This prevents silent per-family manifest drift.
@@ -24,23 +24,4 @@ function entry = makeCaseManifestEntry(values)
 
    % Build the manifest entry in the canonical field order.
    entry = cell2struct(values(:), names, 1);
-end
-
-function names = caseManifestFieldNames()
-   %CASEMANIFESTFIELDNAMES Return the canonical manifest-case field names.
-
-   names = [ ...
-      "case_id"
-      "case_type"
-      "tier"
-      "site_id"
-      "site_name"
-      "forcing_file"
-      "evaluation_file"
-      "reference_file"
-      "native_timestep"
-      "comparison_window"
-      "comparison_variables"
-      "observation_variables"
-      "notes"];
 end

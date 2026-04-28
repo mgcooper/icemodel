@@ -35,7 +35,7 @@ function manifest = importLaughTests(laugh_tests_source_dir, kwargs)
 
    % Name the source family and runnable case once. dataset_family is the
    % staged source folder/manifest family; case_id is the benchmark case inside
-   % that family.
+   % that family (currently only "colbeck1976").
    dataset_family = "laugh_tests";
    case_id = kwargs.case_id;
 
@@ -73,13 +73,14 @@ function manifest = importLaughTests(laugh_tests_source_dir, kwargs)
             case_id, strjoin(valid_cases, ', '))
    end
 
-   % prepareCaseRoot owns the overwrite guard. From here down, this importer
-   % can write the resolved output files directly without repeating per-file
-   % existence checks.
+   % prepareCaseRoot owns the overwrite guard. If overwrite is false and
+   % existing artifacts are found, prepareCaseRoot issues an error to avoid
+   % overwriting them. Otherwise, control returns to this program and continues.
    icemodel.verification.setup.prepareCaseRoot(case_root, kwargs.overwrite);
 
-   % Build case-specific artifacts. The builder choice above is intentionally
-   % explicit so future Laugh-Tests cases can document their own source paths.
+   % Build case-specific artifacts. The builder choice in the switch-case above
+   % is intentionally explicit to enable custom builders for future supported
+   % Laugh-Tests cases.
    [forcing, targets, reference, case_values] = buildArtifacts( ...
       laugh_tests_source_dir);
 
@@ -88,8 +89,7 @@ function manifest = importLaughTests(laugh_tests_source_dir, kwargs)
    save(evaluation_output_file, 'targets');
    save(reference_output_file, 'reference');
 
-   % Keep provenance values explicit instead of burying constants in the
-   % makeFamilyManifest call.
+   % Keep data provenance values explicit.
    source_doi = "";
    source_url = "https://github.com/KyleKlenk/Laugh-Tests";
    source_version = "m2_mac_Sept23 validation bundle";
@@ -130,9 +130,12 @@ function [forcing, targets, reference, case_values] = buildColbeckArtifacts( ...
    ppt = readOneVariable(forcing_file, 'pptrate') ./ 1000;
    rh = icemodel.vapor.relative_humidity_from_specific_humidity(qair, psfc, tair);
 
-   % Laugh-Tests does not provide these as forcing channels. Fixed albedo and
-   % missing snow depth are explicit setup placeholders, not model assumptions.
-   albedo = 0.85 + zeros(size(tair));
+   % Laugh-Tests does not provide albedo or snow depth as forcing channels.
+   % Colbeck SWRadAtm is zero throughout the case, so the albedo value is a
+   % schema placeholder. Use the Colbeck SUMMA albedoMax parameter (0.84) so
+   % the placeholder remains traceable to upstream configuration if a future
+   % model path reads it.
+   albedo = 0.84 + zeros(size(tair));
    snow_depth = nan(size(tair));
 
    % Store forcing as a timetable artifact so future model adapters can consume
@@ -144,7 +147,9 @@ function [forcing, targets, reference, case_values] = buildColbeckArtifacts( ...
       'format', 'timeseries', ...
       'data', forcing_tt, ...
       'metadata', icemodel.verification.setup.metadataStruct({ ...
-      'albedo_policy', 'constant 0.85 placeholder'}));
+      'albedo_policy', ['constant 0.84 from Colbeck SUMMA albedoMax; ' ...
+      'SWRadAtm is zero so albedo is not an active process forcing']
+      'snow_depth_policy', 'NaN placeholder because Laugh-Tests provides no snow-depth forcing channel'}));
 
    % Build one experiment timetable for each frozen SUMMA validation output.
    exp_ids = ["exp1"; "exp2"; "exp3"];
@@ -157,16 +162,23 @@ function [forcing, targets, reference, case_values] = buildColbeckArtifacts( ...
    end
    experiments = cell2struct(experiment_rows, cellstr(exp_ids), 1);
 
-   % Document the intentional diagnostic scope. These frozen SUMMA outputs are
-   % useful process targets, but they are not an analytical wetting-front target.
+   % Document the intentional diagnostic scope. Both Laugh-Tests repos include
+   % notebooks that compare Colbeck analytical solutions with SUMMA output, but
+   % this staged smoke case currently imports only frozen SUMMA output scalars.
+   % A Colbeck/SUMMA/IceModel wetting-front figure needs the analytical profile
+   % or flux solution imported as a separate target, not a threshold inferred
+   % from the SUMMA output alone.
    targets_note = ['Wetting-front depth is intentionally omitted from the ' ...
-      'staged benchmark until a true analytical front target is imported.'];
+      'staged benchmark until the upstream analytical Colbeck solution is ' ...
+      'imported alongside the frozen SUMMA output.'];
    case_note_text = ['The staged target is derived from the frozen SUMMA ' ...
-      'validation outputs bundled in Laugh-Tests, not from the full ' ...
-      'upstream repo layout. A true wetting-front target is intentionally ' ...
-      'not staged yet because these frozen SUMMA outputs already contain ' ...
-      'liquid water throughout the snow column from the first saved step, ' ...
-      'so a threshold-based wetting-front diagnostic is not trustworthy.'];
+      'validation outputs bundled in KyleKlenk/Laugh-Tests. The original ' ...
+      'CH-Earth/laughTests notebooks establish comparability to the Colbeck ' ...
+      'analytical solution by computing analytical liquid-water profiles and ' ...
+      'outflow fluxes, not by deriving a wetting front from SUMMA output ' ...
+      'thresholds. A true wetting-front target is intentionally not staged ' ...
+      'yet because the current smoke artifact imports only frozen SUMMA ' ...
+      'scalar diagnostics.'];
 
    % Targets and references intentionally share the same experiment timetables
    % for the smoke lane; future model output can replace only the candidate.

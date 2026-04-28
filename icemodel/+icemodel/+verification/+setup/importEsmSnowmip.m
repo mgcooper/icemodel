@@ -53,7 +53,7 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %   <snow_data_root>/esm_snowmip
    family_root = fullfile(snow_data_root, dataset_family);
    icemodel.helpers.ensureDirExists(family_root);
-   
+
    % Resolve the path to the dataset family manifest
    %   <snow_data_root>/esm_snowmip/manifest.json
    manifest_file = fullfile(family_root, "manifest.json");
@@ -90,8 +90,7 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
          case_values);
    end
 
-   % Keep provenance values explicit instead of burying constants in the
-   % makeFamilyManifest call.
+   % Keep data provenance values explicit.
    source_doi = "10.1594/PANGAEA.897575";
    source_url = "https://doi.org/10.1594/PANGAEA.897575";
    source_version = "ESM-SnowMIP_all.zip (2019-01-23)";
@@ -109,7 +108,9 @@ function specs = defaultSpecs()
    %DEFAULTSPECS Return curated ESM-SnowMIP smoke-case definitions.
 
    % Each spec is the site-specific setup contract: source files, comparison
-   % window, display name, and variables retained for smoke verification.
+   % window, display name, and variables retained for smoke verification. This
+   % list stays local because these fields are owned only by this importer and
+   % are not part of the public manifest schema.
    specs = struct( ...
       'case_id', {"cdp", "wfj"}, ...
       'site_id', {"cdp", "wfj"}, ...
@@ -121,8 +122,8 @@ function specs = defaultSpecs()
       'window_end', {datetime(2006, 7, 1, 0, 0, 0, 'TimeZone', 'UTC'), ...
       datetime(2001, 7, 1, 0, 0, 0, 'TimeZone', 'UTC')}, ...
       'comparison_variables', {["snow_depth_m", "swe_kg_m2", "surface_temp_C", ...
-         "soil_temp_1_C", "soil_temp_2_C", "soil_temp_3_C"], ...
-         ["snow_depth_m", "swe_kg_m2", "surface_temp_C", "soil_temp_1_C"]});
+      "soil_temp_1_C", "soil_temp_2_C", "soil_temp_3_C"], ...
+      ["snow_depth_m", "swe_kg_m2", "surface_temp_C", "soil_temp_1_C"]});
 end
 
 function specs = selectSpecs(all_specs, case_ids)
@@ -157,9 +158,9 @@ function [forcing, targets, reference, case_values] = buildEsmArtifacts( ...
 
    % Resolve the requested smoke-season time window before reading variables so
    % every forcing and target channel is subset with the same index.
-   time = readNetcdfTime(metfile, 'time');
-   idx = time >= spec.window_start & time <= spec.window_end;
-   time = time(idx);
+   Time = readNetcdfTime(metfile, 'time');
+   idx = Time >= spec.window_start & Time <= spec.window_end;
+   Time = Time(idx);
 
    % Load the source forcing vectors once, then subset the chosen smoke season.
    tair = double(ncread(metfile, 'Tair'));
@@ -191,12 +192,13 @@ function [forcing, targets, reference, case_values] = buildEsmArtifacts( ...
       qair(idx), psfc(idx), tair(idx));
    ppt = (rainf(idx) + snowf(idx)) ./ 1000;
 
-   % Store forcing with the same artifact variable name used by Laugh-Tests.
-   Time = time(:);
+   % Create a forcing timetable using icemodel-native variable names.
    forcing_tt = timetable(Time, tair(idx), swdown(idx), lwdown(idx), albedo, ...
       wind(idx), rh, psfc(idx), ppt, snow_depth, ...
       'VariableNames', {'tair', 'swd', 'lwd', 'albedo', 'wspd', 'rh', ...
       'psfc', 'ppt', 'snow_depth'});
+
+   % Package into a struct.
    forcing = struct( ...
       'format', 'timeseries', ...
       'data', forcing_tt, ...
@@ -278,6 +280,7 @@ function time = readNetcdfTime(pathname, varname)
    tref = datetime(extractAfter(units, 'hours since '), ...
       'InputFormat', 'yyyy-MM-dd HH:mm:ss.S', 'TimeZone', 'UTC');
    time = tref + hours(raw);
+   time = time(:);
 end
 
 function values = readObs(pathname, varname)
