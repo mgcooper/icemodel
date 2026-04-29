@@ -83,6 +83,23 @@ function varargout = parameterLookup(varargin)
       'cal_c_kT_exp', 0.0057, ...   Temperature-dependent ice k exponent [K-1]
       ...
       ... ----------------------------------------------------------------
+      ... Snow infiltration constitutive law (Colbeck 1972 / Shimizu 1970 /
+      ... Clark et al. 2017 / Clark et al. 2021). Empirical coefficients used
+      ... by icemodel.column.saturated_hydraulic_conductivity,
+      ... icemodel.column.liquid_flux, and icemodel.column.infiltration.
+      ... ----------------------------------------------------------------
+      'col_k0', 3.4975e-7, ...      Colbeck 1972 saturated hydraulic conductivity prefactor [m s-1]
+      'col_a_phi', 15.9, ...        Colbeck 1972 porosity exponent [1]
+      'shi_k0', 0.077, ...          Shimizu 1970 permeability prefactor [1]
+      'shi_a_wat', 7.8, ...         Shimizu 1970 water-fraction exponent [1]
+      'shi_n_a', 15.68, ...         van Genuchten n shape parameter slope [1]
+      'shi_n_b', 0.46, ...          van Genuchten n shape parameter exponent [m-1]
+      'mu_water_ref', 1.753e-3, ... Reference dynamic viscosity of water at 0 deg C [kg m-1 s-1]
+      'm_exp', 3, ...               Mualem exponent for snow (Clark 2017 Eq. 7, Clark 2021 Table 4) [1]
+      'f_res_pore', 0.07, ...       Capillary residual saturation per pore volume (Colbeck 1976) [1]
+      'cfl_safety', 0.5, ...        CFL safety factor for explicit infiltration substepping [1]
+      ...
+      ... ----------------------------------------------------------------
       ... Surface parameters
       ... ----------------------------------------------------------------
       'emiss', 0.98, ...            Surface emissivity for ice [1]
