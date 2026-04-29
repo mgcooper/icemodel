@@ -2,6 +2,7 @@
 data/input/*
 data/eval/*
 data/output/*
+data/verification/**
 !data/.gitkeep
 !data/eval/
 !data/eval/.gitkeep
@@ -15,6 +16,14 @@ data/output/*
 !data/input/userdata/.gitkeep
 !data/output/
 !data/output/.gitkeep
+!data/verification/
+!data/verification/.gitkeep
+!data/verification/snow/
+!data/verification/snow/.gitkeep
+!data/verification/snow/esm_snowmip/
+!data/verification/snow/esm_snowmip/.gitkeep
+!data/verification/snow/laugh_tests/
+!data/verification/snow/laugh_tests/.gitkeep
 demo/data/output/
 test/artifacts/
 test/backups/
