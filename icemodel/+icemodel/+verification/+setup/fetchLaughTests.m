@@ -66,11 +66,10 @@ function source_dir = fetchLaughTests(kwargs)
       kwargs.silent   (1, 1) logical = false
    end
 
-   % Resolve the project-root cache as the default location. Project
-   % root is found by walking up from this file's location, which is
-   % robust against the caller's current working directory.
-   repo_root = repoRoot();
-   default_cache = string(fullfile(repo_root, 'data', 'verification', ...
+   % Resolve the default cache directory under the canonical data
+   % root (<repo>/data/) returned by icemodel.getpath('data').
+   data_root = icemodel.getpath('data');
+   default_cache = string(fullfile(data_root, 'verification', ...
       'snow', 'laugh_tests'));
 
    user_supplied = kwargs.cache_dir ~= "";
@@ -94,8 +93,10 @@ function source_dir = fetchLaughTests(kwargs)
    % AND the user did not pass cache_dir explicitly AND a sibling
    % ../Laugh-Tests directory has a complete checkout, prefer that.
    % This preserves Matt's existing workflow without requiring a
-   % data/verification migration today.
+   % data/verification migration today. The repo root is data_root's
+   % parent (data_root = <repo>/data).
    if ~ok && ~user_supplied
+      repo_root = fileparts(data_root);
       sibling = string(fullfile(repo_root, '..', 'Laugh-Tests'));
       if exist(sibling, 'dir') == 7
          [ok_sibling, missing_sibling] = checkLaughTestsCheckout( ...
@@ -147,31 +148,6 @@ function source_dir = fetchLaughTests(kwargs)
    end
 
    source_dir = string(cache_dir);
-end
-
-function root = repoRoot()
-   %REPOROOT Resolve the icemodel project root.
-   %
-   %  Walks up from this file's path until a directory containing
-   %  the canonical project marker (the inner 'icemodel' source
-   %  directory) is found. This is robust against MATLAB's package-
-   %  path resolution, which sometimes elides intermediate package
-   %  directories from mfilename('fullpath').
-   here = fileparts(mfilename('fullpath'));
-   root = here;
-   while ~isempty(root)
-      if exist(fullfile(root, 'icemodel', '+icemodel'), 'dir') == 7
-         return
-      end
-      parent = fileparts(root);
-      if strcmp(parent, root)
-         break
-      end
-      root = parent;
-   end
-   error('icemodel:verification:fetchLaughTests:noRepoRoot', ...
-      'unable to resolve icemodel project root from %s', ...
-      fileparts(mfilename('fullpath')));
 end
 
 function [ok, missing] = checkLaughTestsCheckout(cache_dir, required)

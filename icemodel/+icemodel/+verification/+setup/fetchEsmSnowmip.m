@@ -66,13 +66,13 @@ function source_dir = fetchEsmSnowmip(kwargs)
       kwargs.silent   (1, 1) logical = false
    end
 
-   % Resolve the default cache directory. Project root is found by
-   % walking up from this file's location (icemodel/+icemodel/...
-   % +setup/fetchEsmSnowmip.m), which is robust against the caller's
-   % current working directory.
+   % Resolve the default cache directory. icemodel.getpath('data')
+   % returns the canonical top-level data root (<repo>/data/), which
+   % the verification source-cache layout extends under
+   % data/verification/snow/<dataset_family>/.
    if kwargs.cache_dir == ""
-      cache_dir = string(fullfile(repoRoot(), 'data', 'verification', ...
-         'snow', 'esm_snowmip'));
+      cache_dir = string(fullfile(icemodel.getpath('data'), ...
+         'verification', 'snow', 'esm_snowmip'));
    else
       cache_dir = kwargs.cache_dir;
    end
@@ -160,27 +160,3 @@ function source_dir = fetchEsmSnowmip(kwargs)
    source_dir = string(cache_dir);
 end
 
-function root = repoRoot()
-   %REPOROOT Resolve the icemodel project root.
-   %
-   %  Walks up from this file's path until a directory containing
-   %  the canonical project marker (the inner 'icemodel' source
-   %  directory) is found. This is robust against MATLAB's package-
-   %  path resolution and against the caller's current working
-   %  directory.
-   here = fileparts(mfilename('fullpath'));
-   root = here;
-   while ~isempty(root)
-      if exist(fullfile(root, 'icemodel', '+icemodel'), 'dir') == 7
-         return
-      end
-      parent = fileparts(root);
-      if strcmp(parent, root)
-         break
-      end
-      root = parent;
-   end
-   error('icemodel:verification:fetchEsmSnowmip:noRepoRoot', ...
-      'unable to resolve icemodel project root from %s', ...
-      fileparts(mfilename('fullpath')));
-end
