@@ -32,6 +32,30 @@ function results = run_snow_verification_suite(kwargs)
       error('run_icemodel and candidate_provider are mutually exclusive')
    end
 
+   % Print a clear banner when the synthetic-candidate path is engaged
+   % so the metrics that follow cannot be misread as real model output.
+   % The Colbeck verification path is excluded from this banner because
+   % it produces real numerical / analytical IceModel candidates via
+   % icemodel.column.infiltration and does not route through the
+   % synthetic-snow hook. Retirement of the synthetic hook is tracked
+   % under icemodel-tk6.7.
+   if kwargs.run_icemodel
+      fprintf('\n');
+      fprintf('=== SYNTHETIC-CANDIDATE PATH ENGAGED ===\n');
+      fprintf('  run_icemodel=true routes ESM-SnowMIP cases (cdp, wfj)\n');
+      fprintf('  through icemodel.verification.syntheticSnowModelRun,\n');
+      fprintf('  which perturbs the staged targets by:\n');
+      fprintf('    snow_depth_offset_m   = +0.02 (m)\n');
+      fprintf('    swe_scale             = x 1.05\n');
+      fprintf('    surface_temp_offset_C = +0.25 (K)\n');
+      fprintf('    liquid_water_scale    = x 1.05\n');
+      fprintf('  The candidate metrics that follow are NOT real model\n');
+      fprintf('  output until production snow physics retires this hook.\n');
+      fprintf('  Colbeck cases use real IceModel candidates and are\n');
+      fprintf('  unaffected by these perturbations.\n');
+      fprintf('=========================================\n\n');
+   end
+
    % Install the same test/demo config used by unit tests so fresh-clone runs
    % resolve the committed demo/data verification assets.
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>

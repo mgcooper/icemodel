@@ -3,11 +3,25 @@ function [ice1, ice2, opts] = syntheticSnowModelRun(opts)
    %
    %  [ice1, ice2, opts] = icemodel.verification.syntheticSnowModelRun(opts)
    %
-   % This verification-only model stand-in lets the suite exercise the real
-   % icemodel(opts) call and ICE1/ICE2 adapter before production snow physics is
-   % implemented. It reads the same staged forcing and target artifacts used by
-   % the verification suite, perturbs target snow variables, and stores the
-   % result as icemodel output fields.
+   % This verification-only model stand-in lets the suite exercise the
+   % icemodel(opts) call path and the ICE1/ICE2 adapter before production
+   % snow physics is implemented. It reads the same staged forcing and
+   % target artifacts used by the verification suite, perturbs target
+   % snow variables by the offsets / scales in opts.verification_*, and
+   % stores the result as icemodel output fields.
+   %
+   % WARNING - this is NOT a real snow-model run
+   % -------------------------------------------
+   % The output is a deliberate +5 % / +0.25 K / +2 cm perturbation of
+   % the staged targets, NOT an icemodel-physics output. Use this path
+   % only to validate the verification adapter / runner end-to-end.
+   % When run_snow_verification_suite('run_icemodel', true) prints
+   % a +5 % storage bias against staged targets, that bias IS the
+   % synthetic perturbation, not a model error.
+   %
+   % Retirement of this hook is tracked under icemodel-tk6.7. The
+   % Colbeck verification path uses real icemodel.column.infiltration
+   % outputs and does not route through this stand-in.
 
    manifest = opts.verification_case_manifest;
 
@@ -17,6 +31,15 @@ function [ice1, ice2, opts] = syntheticSnowModelRun(opts)
    forcing = loadVerificationForcing(manifest.forcing_path);
    targets = icemodel.verification.helpers.loadArtifact( ...
       manifest.evaluation_path, "targets");
+
+   % Multi-source schema fallback: when an evaluation.mat carries
+   % multiple target sources keyed at the top level (e.g. colbeck1976
+   % carries numerical_summa and analytical_clark2017), pick the
+   % default numerical_summa source for the synthetic perturbation
+   % path. compareSolutions handles the multi-source comparison.
+   if ~isfield(targets, 'format') && isfield(targets, 'numerical_summa')
+      targets = targets.numerical_summa;
+   end
 
    switch targets.format
       case "timeseries"

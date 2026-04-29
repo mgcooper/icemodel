@@ -7,10 +7,29 @@ function candidate = runIcemodelSnowCandidate(case_manifest, kwargs)
    % calls the normal icemodel entry point, receives ICE1/ICE2, then converts
    % those outputs into the same candidate bundle consumed by comparecase.
    %
+   % WARNING - synthetic-candidate path
+   % ----------------------------------
    % Until production snow physics exists, icemodel is run with an explicit
-   % verification synthetic-snow hook that perturbs the staged targets. That
-   % proves the execution and comparison path now, without forcing placeholder
-   % snow logic into the core solver.
+   % verification synthetic-snow hook (icemodel.verification.syntheticSnowModelRun)
+   % that perturbs the staged targets. The hook applies these hard-coded
+   % offsets / scales by default:
+   %
+   %     snow_depth_offset_m   = 0.02   (+2 cm)
+   %     swe_scale             = 1.05   (+5 %)
+   %     surface_temp_offset_C = 0.25   (+0.25 K)
+   %     liquid_water_scale    = 1.05   (+5 %)
+   %
+   % The resulting candidate bundle is NOT a real model output. The +5 %
+   % storage / SWE biases visible in the suite metrics are the synthetic
+   % perturbation, not a model error. This bridge proves the execution and
+   % comparison path now, without forcing placeholder snow logic into the
+   % core solver. Retirement of the synthetic-snow hook is tracked under
+   % icemodel-tk6.7.
+   %
+   % The Colbeck verification path (icemodel.verification.colbeck.runCase /
+   % compareSolutions) does NOT use this synthetic-candidate path; it
+   % produces real numerical and analytical IceModel candidates from the
+   % first-class infiltration kernel.
 
    arguments
       case_manifest (1, 1) struct
@@ -44,6 +63,14 @@ function simyears = caseSimulationYears(case_manifest)
 
    targets = icemodel.verification.helpers.loadArtifact( ...
       case_manifest.evaluation_path, "targets");
+
+   % Some cases stage multiple target sources keyed under one
+   % evaluation.mat (e.g. colbeck1976 carries numerical_summa and
+   % analytical_clark2017). Pick the default numerical_summa source
+   % so the format dispatch below sees the inner experiment_bundle.
+   if ~isfield(targets, 'format') && isfield(targets, 'numerical_summa')
+      targets = targets.numerical_summa;
+   end
 
    switch targets.format
       case "timeseries"
