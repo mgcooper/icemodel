@@ -3,7 +3,7 @@
   "source_doi": "",
   "source_url": "https://github.com/KyleKlenk/Laugh-Tests",
   "source_version": "m2_mac_Sept23 validation bundle",
-  "retrieval_date": "27-Apr-2026",
+  "retrieval_date": "29-Apr-2026",
   "cases": {
     "case_id": "colbeck1976",
     "case_type": "synthetic_process",
@@ -26,6 +26,6 @@
       "snow_liquid_water_storage_m": "derived from mLayerVolFracLiq * mLayerDepth in snow layers",
       "bottom_outflow_mps": "scalarRainPlusMelt"
     },
-    "notes": "The staged target is derived from the frozen SUMMA validation outputs bundled in KyleKlenk/Laugh-Tests. The original CH-Earth/laughTests notebooks establish comparability to the Colbeck analytical solution by computing analytical liquid-water profiles and outflow fluxes, not by deriving a wetting front from SUMMA output thresholds. A true wetting-front target is intentionally not staged yet because the current smoke artifact imports only frozen SUMMA scalar diagnostics."
+    "notes": "Single canonical Colbeck 1976 case. The staged evaluation.mat carries two target sources keyed numerical_summa and analytical_clark2017. The numerical_summa bundle is derived from the frozen SUMMA validation outputs in KyleKlenk/Laugh-Tests. The analytical_clark2017 bundle is the closed-form Clark 2017 wetting-front / kinematic-wave solution from icemodel.verification.colbeck.analyticalSolution."
   }
 }

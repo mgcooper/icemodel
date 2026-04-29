@@ -211,6 +211,20 @@ function test_comparecase_skips_scatter_for_colbeck_bundle(testCase)
    testCase.verifyEqual(result.scatter_figure_path, "");
 end
 
+function test_colbeck_evaluation_carries_two_target_sources(testCase)
+   % The unified Colbeck evaluation.mat carries both numerical_summa and
+   % analytical_clark2017 target bundles.
+
+   manifest = icemodel.verification.loadmanifest("colbeck1976");
+   targets = icemodel.verification.helpers.loadArtifact( ...
+      manifest.evaluation_path, "targets");
+
+   testCase.verifyTrue(isfield(targets, 'numerical_summa'));
+   testCase.verifyTrue(isfield(targets, 'analytical_clark2017'));
+   testCase.verifyTrue(isfield(targets.numerical_summa, 'experiments'));
+   testCase.verifyTrue(isfield(targets.analytical_clark2017, 'experiments'));
+end
+
 function test_plot_timeseries_shows_sparse_points_with_markers(testCase)
    % Sparse observation series should remain visible on a dense time axis.
 

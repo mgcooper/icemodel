@@ -53,6 +53,15 @@ function result = comparecase(case_id, kwargs)
    % staged smoke reference is used so the suite runs before a snow model exists.
    targets = icemodel.verification.helpers.loadArtifact( ...
       manifest.evaluation_path, "targets");
+
+   % Some cases stage multiple target sources keyed under one evaluation.mat
+   % (e.g. colbeck1976 carries numerical_summa and analytical_clark2017).
+   % comparecase consumes one bundle at a time; pick the default
+   % numerical_summa source. Use compareSolutions for the multi-axis driver.
+   if ~isfield(targets, 'format') && isfield(targets, 'numerical_summa')
+      targets = targets.numerical_summa;
+   end
+
    candidate = icemodel.verification.helpers.resolveCandidateBundle(manifest, ...
       "candidate", kwargs.candidate, "candidate_file", kwargs.candidate_file);
 

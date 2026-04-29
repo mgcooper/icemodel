@@ -33,9 +33,9 @@ function manifest = importLaughTests(laugh_tests_source_dir, kwargs)
       kwargs.overwrite (1, 1) logical = false
    end
 
-   % Name the source family and runnable case once. dataset_family is the
-   % staged source folder/manifest family; case_id is the benchmark case inside
-   % that family (currently only "colbeck1976").
+   % Name the source family and runnable case once. dataset_family is the staged
+   % source folder/manifest family; case_id is the benchmark case inside that
+   % family (currently only "colbeck1976").
    dataset_family = "laugh_tests";
    case_id = kwargs.case_id;
 
@@ -132,9 +132,9 @@ function [forcing, targets, reference, case_values] = buildColbeckArtifacts( ...
 
    % Laugh-Tests does not provide albedo or snow depth as forcing channels.
    % Colbeck SWRadAtm is zero throughout the case, so the albedo value is a
-   % schema placeholder. Use the Colbeck SUMMA albedoMax parameter (0.84) so
-   % the placeholder remains traceable to upstream configuration if a future
-   % model path reads it.
+   % schema placeholder. Use the Colbeck SUMMA albedoMax parameter (0.84) so the
+   % placeholder remains traceable to upstream configuration if a future model
+   % path reads it.
    albedo = 0.84 + zeros(size(tair));
    snow_depth = nan(size(tair));
 
@@ -162,31 +162,39 @@ function [forcing, targets, reference, case_values] = buildColbeckArtifacts( ...
    end
    experiments = cell2struct(experiment_rows, cellstr(exp_ids), 1);
 
-   % Document the intentional diagnostic scope. Both Laugh-Tests repos include
-   % notebooks that compare Colbeck analytical solutions with SUMMA output, but
-   % this staged smoke case currently imports only frozen SUMMA output scalars.
-   % A Colbeck/SUMMA/IceModel wetting-front figure needs the analytical profile
-   % or flux solution imported as a separate target, not a threshold inferred
-   % from the SUMMA output alone.
-   targets_note = ['Wetting-front depth is intentionally omitted from the ' ...
-      'staged benchmark until the upstream analytical Colbeck solution is ' ...
-      'imported alongside the frozen SUMMA output.'];
-   case_note_text = ['The staged target is derived from the frozen SUMMA ' ...
-      'validation outputs bundled in KyleKlenk/Laugh-Tests. The original ' ...
-      'CH-Earth/laughTests notebooks establish comparability to the Colbeck ' ...
-      'analytical solution by computing analytical liquid-water profiles and ' ...
-      'outflow fluxes, not by deriving a wetting front from SUMMA output ' ...
-      'thresholds. A true wetting-front target is intentionally not staged ' ...
-      'yet because the current smoke artifact imports only frozen SUMMA ' ...
-      'scalar diagnostics.'];
+   case_note_text = ['Single canonical Colbeck 1976 case. The staged ' ...
+      'evaluation.mat carries two target sources keyed numerical_summa and ' ...
+      'analytical_clark2017. The numerical_summa bundle is derived from the ' ...
+      'frozen SUMMA validation outputs in KyleKlenk/Laugh-Tests. The ' ...
+      'analytical_clark2017 bundle is the closed-form Clark 2017 wetting-' ...
+      'front / kinematic-wave solution from ' ...
+      'icemodel.verification.colbeck.analyticalSolution.'];
 
-   % Targets and references intentionally share the same experiment timetables
-   % for the smoke lane; future model output can replace only the candidate.
+   % Build the analytical (Clark 2017) experiment bundle alongside the
+   % SUMMA-derived bundle. Both share the same per-experiment timetable schema
+   % so the comparison driver treats them uniformly.
+   def = icemodel.verification.colbeck.caseDefinition();
+   analytical_rows = cell(numel(exp_ids), 1);
+   for i = 1:numel(exp_ids)
+      analytical_rows{i} = analyticalExperimentTimetable(exp_ids(i), def);
+   end
+   analytical_experiments = cell2struct(analytical_rows, ...
+      cellstr(exp_ids), 1);
+
+   % Two target sources keyed under one canonical evaluation.mat.
    targets = struct( ...
-      'format', 'experiment_bundle', ...
+      'numerical_summa', struct( ...
+      'format',      'experiment_bundle', ...
       'experiments', experiments, ...
-      'metadata', icemodel.verification.setup.metadataStruct({ ...
-      'notes', targets_note}));
+      'metadata',    icemodel.verification.setup.metadataStruct({ ...
+      'source',           'frozen_summa_validation_output'
+      'validation_bundle', 'm2_mac_Sept23'})), ...
+      'analytical_clark2017', struct( ...
+      'format',      'experiment_bundle', ...
+      'experiments', analytical_experiments, ...
+      'metadata',    icemodel.verification.setup.metadataStruct({ ...
+      'source', 'icemodel.verification.colbeck.analyticalSolution'
+      'method', 'Clark 2017 wetting-front / kinematic-wave'})));
 
    reference = struct( ...
       'format', 'experiment_bundle', ...
@@ -196,8 +204,8 @@ function [forcing, targets, reference, case_values] = buildColbeckArtifacts( ...
       'validation_bundle', 'm2_mac_Sept23'}));
 
    % Build the same canonical manifest value list used by ESM-SnowMIP import.
-   % The second value is case_type: this is a synthetic process benchmark, not
-   % a site-validation case and not a dataset-family id.
+   % The second value is case_type: this is a synthetic process benchmark, not a
+   % site-validation case and not a dataset-family id.
    observation_variables = icemodel.verification.setup.metadataStruct({ ...
       'snow_liquid_water_storage_m', ...
       'derived from mLayerVolFracLiq * mLayerDepth in snow layers'
@@ -218,6 +226,15 @@ function [forcing, targets, reference, case_values] = buildColbeckArtifacts( ...
       case_note_text};
 end
 
+function tt = analyticalExperimentTimetable(experiment_name, def)
+   %ANALYTICALEXPERIMENTTIMETABLE Wrap analyticalSolution for one experiment.
+   sol = icemodel.verification.colbeck.analyticalSolution( ...
+      experiment_name, def);
+   tt = timetable(sol.time_datetime, ...
+      sol.snow_liquid_water_storage_m, sol.bottom_outflow_mps, ...
+      'VariableNames', {'snow_liquid_water_storage_m', 'bottom_outflow_mps'});
+end
+
 function tt = buildColbeckExperiment(pathname)
    %BUILDCOLBECKEXPERIMENT Derive scalar diagnostics from one Colbeck run.
    %
@@ -234,7 +251,9 @@ function tt = buildColbeckExperiment(pathname)
    outflow = squeeze(double(ncread(pathname, 'scalarRainPlusMelt')));
 
    % Integrate liquid-water storage only through snow layers at each output
-   % time. Soil layers are excluded by the interface-height mask.
+   % time. SUMMA convention: z=0 at soil surface, snow layer interfaces are
+   % negative (above ground), soil interfaces are positive. Snow layers are
+   % therefore those with mid-height < 0.
    ntime = numel(time);
    snow_liquid_water_storage_m = zeros(ntime, 1);
    for k = 1:ntime
@@ -243,7 +262,7 @@ function tt = buildColbeckExperiment(pathname)
       interfaces = iface(:, k);
 
       mid_height = 0.5 * (interfaces(1:end-1) + interfaces(2:end));
-      snow_mask = layer_depth > 0 & mid_height > 0;
+      snow_mask = layer_depth > 0 & mid_height < 0;
       if ~any(snow_mask)
          continue
       end

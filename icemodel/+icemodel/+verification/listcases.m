@@ -65,6 +65,8 @@ function cases = listcases(kwargs)
    end
 
    % Sort by case id so runner and test output are stable across filesystems.
+   % All families share one canonical case-entry schema, so vertcat works
+   % without harmonization.
    cases = vertcat(selected_family_cases{1:n_families});
    [~, order] = sort([cases.case_id]);
    cases = cases(order);

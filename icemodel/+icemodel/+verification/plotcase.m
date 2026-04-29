@@ -50,6 +50,10 @@ function f = plotcase(case_id, kwargs)
       "icemodel_config_casename", kwargs.icemodel_config_casename);
    targets = icemodel.verification.helpers.loadArtifact( ...
       manifest.evaluation_path, "targets");
+   if ~isfield(targets, 'format') && isfield(targets, 'numerical_summa')
+      % Multi-source schema (e.g. colbeck1976): default to numerical_summa.
+      targets = targets.numerical_summa;
+   end
    reference = icemodel.verification.helpers.loadArtifact( ...
       manifest.reference_path, "reference");
 
