@@ -22,17 +22,26 @@ function case_ids = caseid(dataset_family)
 
    validateDatasetFamily(dataset_family)
 
-   % Keep each dataset family explicit so adding cases remains reviewable.
+   % Keep each dataset family explicit so adding cases remains
+   % reviewable. The ESM-SnowMIP roster is sourced from the canonical
+   % site catalog (icemodel.verification.namelists.snowmipsite) so
+   % adding a new site only requires updating the catalog.
    switch dataset_family
       case "all"
-         case_ids = ["cdp"; "wfj"; "colbeck1976"];
+         case_ids = [esmSnowmipCaseIds(); "colbeck1976"];
 
       case "esm_snowmip"
-         case_ids = ["cdp"; "wfj"];
+         case_ids = esmSnowmipCaseIds();
 
       case "laugh_tests"
          case_ids = "colbeck1976";
    end
+end
+
+function ids = esmSnowmipCaseIds()
+   %ESMSNOWMIPCASEIDS Lift the ESM-SnowMIP site list from the catalog.
+   info = icemodel.verification.namelists.snowmipsite();
+   ids = reshape([info.sitename], [], 1);
 end
 
 function validateDatasetFamily(dataset_family)

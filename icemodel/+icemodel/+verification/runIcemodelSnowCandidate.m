@@ -37,11 +37,35 @@ function candidate = runIcemodelSnowCandidate(case_manifest, kwargs)
       kwargs.swe_scale (1, 1) double = 1.05
       kwargs.surface_temp_offset_C (1, 1) double = 0.25
       kwargs.liquid_water_scale (1, 1) double = 1.05
+      kwargs.startdate = NaT('TimeZone', 'UTC')
+      kwargs.enddate   = NaT('TimeZone', 'UTC')
    end
 
+   % Configure the icemodel run options.
+   smbmodel = 'icemodel';
+   sitename = 'verification';
    simyears = caseSimulationYears(case_manifest);
-   opts = icemodel.setopts('icemodel', 'verification', simyears, 'kanm', ...
-      [], [], case_manifest.case_id, false, false);
+   forcings = 'kanm';
+   userdata = [];
+   uservars = [];
+   testname = case_manifest.case_id;
+   saveflag = false;
+   backupflag = false;
+
+   opts = icemodel.setopts(smbmodel, sitename, simyears, forcings, ...
+      userdata, uservars, testname, saveflag, backupflag);
+
+   % Optional explicit time-window override. When set, opts.startdate /
+   % opts.enddate narrow the loaded met to a specific datetime window
+   % (icemodel.loadmet handles the subsetting). Useful for targeted evaluation
+   % periods like one snow season; year-granularity simyears handling continues
+   % to work as the default.
+   if ~isnat(kwargs.startdate)
+      opts.startdate = kwargs.startdate;
+   end
+   if ~isnat(kwargs.enddate)
+      opts.enddate = kwargs.enddate;
+   end
 
    % These fields are deliberately not part of setopts. They are a narrow
    % verification-only request consumed by icemodel.verification.* and ignored

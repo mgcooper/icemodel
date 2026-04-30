@@ -251,15 +251,17 @@ function test_plot_timeseries_shows_sparse_points_with_markers(testCase)
 end
 
 function ids = expectedCaseIds()
-   %EXPECTEDCASEIDS Canonical curated smoke-case catalog.
+   %EXPECTEDCASEIDS Canonical case catalog: 10 ESM-SnowMIP sites + Colbeck.
 
-   ids = ["cdp"; "wfj"; "colbeck1976"];
+   ids = ["cdp"; "oas"; "obs"; "ojp"; "rme"; "sap"; "snb"; "sod"; ...
+      "swa"; "wfj"; "colbeck1976"];
 end
 
 function ids = expectedEsmCaseIds()
-   %EXPECTEDESMCASEIDS ESM-SnowMIP cases in the committed smoke subset.
+   %EXPECTEDESMCASEIDS All 10 ESM-SnowMIP reference sites.
 
-   ids = ["cdp"; "wfj"];
+   ids = ["cdp"; "oas"; "obs"; "ojp"; "rme"; "sap"; "snb"; "sod"; ...
+      "swa"; "wfj"];
 end
 
 function names = expectedDatasetFamilies()
@@ -277,7 +279,7 @@ end
 function tiers = expectedTiers()
    %EXPECTEDTIERS Public runner tiers supported by the smoke harness.
 
-   tiers = ["smoke"; "full"];
+   tiers = ["smoke"; "full"; "custom"];
 end
 
 function fields = expectedFamilyManifestFields()
