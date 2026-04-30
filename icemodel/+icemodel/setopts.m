@@ -407,6 +407,16 @@ function opts = initopts(smbmodel, sitename, simyears, forcings, ...
    opts.saveopts = saveflag;
    opts.backupflag = backupflag;
 
+   % Optional explicit time-window bounds. When set (via name/value override or
+   % icemodel.resetopts), icemodel.loadmet subsets the loaded met data to
+   % [startdate, enddate] in addition to the year-granularity simyears subset.
+   % The defaults are NaT so the canonical year-only behaviour is preserved when
+   % these are not set. Used by the verification suite to evaluate against
+   % targeted windows (e.g. one snow season) without inventing new calendar /
+   % hydrologic-year policy.
+   opts.startdate = NaT('TimeZone', 'UTC');
+   opts.enddate   = NaT('TimeZone', 'UTC');
+
    % Set defaults for values set in icemodel.configureRun
    opts.pathdata = [];
    opts.pathinput = [];

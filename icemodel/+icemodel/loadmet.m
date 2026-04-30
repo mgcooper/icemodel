@@ -68,6 +68,18 @@ function met = prepareMetData(met, opts)
    met = met(ismember(year(met.Time), opts.simyears), :);
 
    met.Time.TimeZone = 'UTC';
+
+   % Optional explicit datetime-window override. When opts.startdate
+   % and/or opts.enddate are set, narrow the met data to the
+   % requested window in addition to the year-granularity simyears
+   % subset above. Either bound may be left as NaT to disable that
+   % side of the window.
+   if isfield(opts, 'startdate') && ~isnat(opts.startdate)
+      met = met(met.Time >= opts.startdate, :);
+   end
+   if isfield(opts, 'enddate') && ~isnat(opts.enddate)
+      met = met(met.Time <= opts.enddate, :);
+   end
 end
 
 %%
