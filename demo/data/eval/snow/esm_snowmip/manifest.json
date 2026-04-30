@@ -2,8 +2,8 @@
   "dataset_family": "esm_snowmip",
   "source_doi": "10.1594/PANGAEA.897575",
   "source_url": "https://doi.org/10.1594/PANGAEA.897575",
-  "source_version": "ESM-SnowMIP_all.zip (2019-01-23)",
-  "retrieval_date": "17-Apr-2026",
+  "source_version": "ESM-SnowMIP_all.zip",
+  "retrieval_date": "29-Apr-2026",
   "cases": [
     {
       "case_id": "cdp",
@@ -16,8 +16,8 @@
       "reference_file": "cdp/reference.mat",
       "native_timestep": "hourly",
       "comparison_window": {
-        "start": "01-Oct-2005",
-        "end": "01-Jul-2006"
+        "start": "01-Oct-1995",
+        "end": "30-Sep-1996 23:00:00"
       },
       "comparison_variables": [
         "snow_depth_m",
@@ -28,16 +28,270 @@
         "soil_temp_3_C"
       ],
       "observation_variables": {
-        "snow_depth_m": "snd_auto|snd_man",
-        "swe_kg_m2": "snw_auto|snw_man",
-        "surface_temp_C": "ts",
+        "snow_depth_source": "snd_auto with snd_man fallback",
+        "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": [
           0.10000000149011612,
           0.20000000298023224,
           0.5
         ]
       },
-      "notes": "Forcing albedo is interpolated from observed albedo and falls back to snow/ground constants where observations are missing. The smoke reference duplicates the staged observations by design."
+      "notes": "ESM-SnowMIP Col de Porte reference site (France, cdp). Tier=smoke."
+    },
+    {
+      "case_id": "oas",
+      "case_type": "esm_site",
+      "tier": "smoke",
+      "site_id": "oas",
+      "site_name": "Old Aspen",
+      "forcing_file": "oas/forcing.mat",
+      "evaluation_file": "oas/evaluation.mat",
+      "reference_file": "oas/reference.mat",
+      "native_timestep": "hourly",
+      "comparison_window": {
+        "start": "01-Oct-1998",
+        "end": "30-Sep-1999 23:00:00"
+      },
+      "comparison_variables": [
+        "snow_depth_m",
+        "swe_kg_m2",
+        "surface_temp_C",
+        "soil_temp_1_C",
+        "soil_temp_2_C",
+        "soil_temp_3_C"
+      ],
+      "observation_variables": {
+        "snow_depth_source": "snd_auto with snd_man fallback",
+        "swe_source": "snw_auto with snw_man fallback when available",
+        "soil_depths_m": [
+          0.10000000149011612,
+          0.20000000298023224,
+          0.5
+        ]
+      },
+      "notes": "ESM-SnowMIP Old Aspen reference site (Saskatchewan, Canada, oas). Tier=smoke."
+    },
+    {
+      "case_id": "obs",
+      "case_type": "esm_site",
+      "tier": "smoke",
+      "site_id": "obs",
+      "site_name": "Old Black Spruce",
+      "forcing_file": "obs/forcing.mat",
+      "evaluation_file": "obs/evaluation.mat",
+      "reference_file": "obs/reference.mat",
+      "native_timestep": "hourly",
+      "comparison_window": {
+        "start": "01-Oct-1998",
+        "end": "30-Sep-1999 23:00:00"
+      },
+      "comparison_variables": [
+        "snow_depth_m",
+        "swe_kg_m2",
+        "surface_temp_C",
+        "soil_temp_1_C",
+        "soil_temp_2_C",
+        "soil_temp_3_C",
+        "soil_temp_4_C"
+      ],
+      "observation_variables": {
+        "snow_depth_source": "snd_auto with snd_man fallback",
+        "swe_source": "snw_auto with snw_man fallback when available",
+        "soil_depths_m": [
+          0.10000000149011612,
+          0.20000000298023224,
+          0.5,
+          1
+        ]
+      },
+      "notes": "ESM-SnowMIP Old Black Spruce reference site (Saskatchewan, Canada, obs). Tier=smoke."
+    },
+    {
+      "case_id": "ojp",
+      "case_type": "esm_site",
+      "tier": "smoke",
+      "site_id": "ojp",
+      "site_name": "Old Jack Pine",
+      "forcing_file": "ojp/forcing.mat",
+      "evaluation_file": "ojp/evaluation.mat",
+      "reference_file": "ojp/reference.mat",
+      "native_timestep": "hourly",
+      "comparison_window": {
+        "start": "01-Oct-1998",
+        "end": "30-Sep-1999 23:00:00"
+      },
+      "comparison_variables": [
+        "snow_depth_m",
+        "swe_kg_m2",
+        "surface_temp_C",
+        "soil_temp_1_C",
+        "soil_temp_2_C",
+        "soil_temp_3_C",
+        "soil_temp_4_C"
+      ],
+      "observation_variables": {
+        "snow_depth_source": "snd_auto with snd_man fallback",
+        "swe_source": "snw_auto with snw_man fallback when available",
+        "soil_depths_m": [
+          0.10000000149011612,
+          0.20000000298023224,
+          0.5,
+          1
+        ]
+      },
+      "notes": "ESM-SnowMIP Old Jack Pine reference site (Saskatchewan, Canada, ojp). Tier=smoke."
+    },
+    {
+      "case_id": "rme",
+      "case_type": "esm_site",
+      "tier": "smoke",
+      "site_id": "rme",
+      "site_name": "Reynolds Mountain East",
+      "forcing_file": "rme/forcing.mat",
+      "evaluation_file": "rme/evaluation.mat",
+      "reference_file": "rme/reference.mat",
+      "native_timestep": "hourly",
+      "comparison_window": {
+        "start": "01-Oct-1989",
+        "end": "30-Sep-1990 23:00:00"
+      },
+      "comparison_variables": [
+        "snow_depth_m",
+        "swe_kg_m2",
+        "surface_temp_C",
+        "soil_temp_1_C"
+      ],
+      "observation_variables": {
+        "snow_depth_source": "snd_auto with snd_man fallback",
+        "swe_source": "snw_auto with snw_man fallback when available",
+        "soil_depths_m": 0.30000001192092896
+      },
+      "notes": "ESM-SnowMIP Reynolds Mountain East reference site (Idaho, USA, rme). Tier=smoke."
+    },
+    {
+      "case_id": "sap",
+      "case_type": "esm_site",
+      "tier": "smoke",
+      "site_id": "sap",
+      "site_name": "Sapporo",
+      "forcing_file": "sap/forcing.mat",
+      "evaluation_file": "sap/evaluation.mat",
+      "reference_file": "sap/reference.mat",
+      "native_timestep": "hourly",
+      "comparison_window": {
+        "start": "01-Oct-2006",
+        "end": "30-Sep-2007 23:00:00"
+      },
+      "comparison_variables": [
+        "snow_depth_m",
+        "swe_kg_m2",
+        "surface_temp_C"
+      ],
+      "observation_variables": {
+        "snow_depth_source": "snd_auto with snd_man fallback",
+        "swe_source": "snw_auto with snw_man fallback when available",
+        "soil_depths_m": []
+      },
+      "notes": "ESM-SnowMIP Sapporo reference site (Hokkaido, Japan, sap). Tier=smoke."
+    },
+    {
+      "case_id": "snb",
+      "case_type": "esm_site",
+      "tier": "smoke",
+      "site_id": "snb",
+      "site_name": "Senator Beck",
+      "forcing_file": "snb/forcing.mat",
+      "evaluation_file": "snb/evaluation.mat",
+      "reference_file": "snb/reference.mat",
+      "native_timestep": "hourly",
+      "comparison_window": {
+        "start": "01-Oct-2006",
+        "end": "30-Sep-2007 23:00:00"
+      },
+      "comparison_variables": [
+        "snow_depth_m",
+        "swe_kg_m2",
+        "surface_temp_C",
+        "soil_temp_1_C",
+        "soil_temp_2_C",
+        "soil_temp_3_C"
+      ],
+      "observation_variables": {
+        "snow_depth_source": "snd_auto with snd_man fallback",
+        "swe_source": "snw_auto with snw_man fallback when available",
+        "soil_depths_m": [
+          0.10000000149011612,
+          0.20000000298023224,
+          0.25
+        ]
+      },
+      "notes": "ESM-SnowMIP Senator Beck reference site (Colorado, USA, snb). Tier=smoke."
+    },
+    {
+      "case_id": "sod",
+      "case_type": "esm_site",
+      "tier": "smoke",
+      "site_id": "sod",
+      "site_name": "Sodankyla",
+      "forcing_file": "sod/forcing.mat",
+      "evaluation_file": "sod/evaluation.mat",
+      "reference_file": "sod/reference.mat",
+      "native_timestep": "hourly",
+      "comparison_window": {
+        "start": "01-Oct-2008",
+        "end": "30-Sep-2009 23:00:00"
+      },
+      "comparison_variables": [
+        "snow_depth_m",
+        "swe_kg_m2",
+        "surface_temp_C",
+        "soil_temp_1_C",
+        "soil_temp_2_C",
+        "soil_temp_3_C"
+      ],
+      "observation_variables": {
+        "snow_depth_source": "snd_auto with snd_man fallback",
+        "swe_source": "snw_auto with snw_man fallback when available",
+        "soil_depths_m": [
+          0.10000000149011612,
+          0.20000000298023224,
+          0.5
+        ]
+      },
+      "notes": "ESM-SnowMIP Sodankyla reference site (Finland, sod). Tier=smoke."
+    },
+    {
+      "case_id": "swa",
+      "case_type": "esm_site",
+      "tier": "smoke",
+      "site_id": "swa",
+      "site_name": "Swamp Angel",
+      "forcing_file": "swa/forcing.mat",
+      "evaluation_file": "swa/evaluation.mat",
+      "reference_file": "swa/reference.mat",
+      "native_timestep": "hourly",
+      "comparison_window": {
+        "start": "01-Oct-2006",
+        "end": "30-Sep-2007 23:00:00"
+      },
+      "comparison_variables": [
+        "snow_depth_m",
+        "swe_kg_m2",
+        "surface_temp_C",
+        "soil_temp_1_C",
+        "soil_temp_2_C",
+        "soil_temp_3_C"
+      ],
+      "observation_variables": {
+        "snow_depth_source": "snd_auto with snd_man fallback",
+        "swe_source": "snw_auto with snw_man fallback when available",
+        "soil_depths_m": [
+          0.10000000149011612,
+          0.20000000298023224,
+          0.40000000596046448
+        ]
+      },
+      "notes": "ESM-SnowMIP Swamp Angel reference site (Colorado, USA, swa). Tier=smoke."
     },
     {
       "case_id": "wfj",
@@ -50,8 +304,8 @@
       "reference_file": "wfj/reference.mat",
       "native_timestep": "hourly",
       "comparison_window": {
-        "start": "01-Oct-2000",
-        "end": "01-Jul-2001"
+        "start": "01-Oct-1997",
+        "end": "30-Sep-1998 23:00:00"
       },
       "comparison_variables": [
         "snow_depth_m",
@@ -60,12 +314,11 @@
         "soil_temp_1_C"
       ],
       "observation_variables": {
-        "snow_depth_m": "snd_auto|snd_man",
-        "swe_kg_m2": "snw_auto|snw_man",
-        "surface_temp_C": "ts",
+        "snow_depth_source": "snd_auto with snd_man fallback",
+        "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": 0.0099999997764825821
       },
-      "notes": "Forcing albedo is interpolated from observed albedo and falls back to snow/ground constants where observations are missing. The smoke reference duplicates the staged observations by design."
+      "notes": "ESM-SnowMIP Weissfluhjoch reference site (Switzerland, wfj). Tier=smoke."
     }
   ]
 }
