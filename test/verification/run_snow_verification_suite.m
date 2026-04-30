@@ -26,6 +26,8 @@ function results = run_snow_verification_suite(kwargs)
       kwargs.candidate_provider = []
       kwargs.evaluation_data_root (1, 1) string = ""
       kwargs.artifact_root (1, 1) string = ""
+      kwargs.startdate = NaT('TimeZone', 'UTC')
+      kwargs.enddate   = NaT('TimeZone', 'UTC')
    end
 
    if kwargs.run_icemodel && ~isempty(kwargs.candidate_provider)
@@ -96,12 +98,13 @@ function results = run_snow_verification_suite(kwargs)
    case_results = cell(numel(cases), 1);
    summary_rows = cell(numel(cases), 1);
    for i = 1:numel(cases)
-      
+
       % Agents can pass a candidate provider that receives the resolved case
       % manifest row and returns a candidate bundle with the same format as the
       % staged reference. With no provider, comparecase uses the smoke reference.
       if kwargs.run_icemodel
-         candidate = icemodel.verification.runIcemodelSnowCandidate(cases(i));
+         candidate = icemodel.verification.runIcemodelSnowCandidate(cases(i), ...
+            startdate=kwargs.startdate, enddate=kwargs.enddate);
          case_result = icemodel.verification.comparecase( ...
             cases(i).case_id, ...
             "evaluation_data_root", kwargs.evaluation_data_root, ...
@@ -132,7 +135,7 @@ function results = run_snow_verification_suite(kwargs)
             "plot_visible", kwargs.plot_visible, ...
             "candidate", candidate);
       end
- 
+
       case_results{i} = case_result;
       metrics = case_result.metrics;
       metrics.case_id = repmat(cases(i).case_id, height(metrics), 1);
@@ -144,12 +147,23 @@ function results = run_snow_verification_suite(kwargs)
    % Persist both a human-readable CSV and the richer MATLAB result bundle.
    writetable(summary, fullfile(run_dir, 'summary.csv'));
    save(fullfile(run_dir, 'summary.mat'), 'summary', 'case_results');
+
+   % Concise markdown report tying metrics, per-case figures, and
+   % artifact links into a single document. Agents and developers
+   % open this file as the primary entry point after a run.
+   report_path = icemodel.verification.helpers.writeRunReport( ...
+      run_dir, summary, case_results, cases, ...
+      run_name=string(run_name), ...
+      run_icemodel=kwargs.run_icemodel, ...
+      plotted=(kwargs.make_plots && kwargs.save_plots));
+
    results = struct( ...
       'run_name', run_name, ...
       'artifact_dir', run_dir, ...
       'summary', summary, ...
       'case_results', {case_results}, ...
-      'cases', {cases});
+      'cases', {cases}, ...
+      'report_path', report_path);
    clear cleanup
 end
 
