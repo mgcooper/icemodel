@@ -68,13 +68,71 @@ time-series site cases, not the current Colbeck experiment bundle. The scatter
 are generated with `icemodel.plot.scatterplot`. The timeseries plots are generated
 with `icemodel.plot.timeseries`.
 
+## Time-window policy
+
+Two layers of time control:
+
+1. **icemodel side** (`icemodel.setopts`): `simyears` selects which
+   calendar years are loaded by `loadmet`. Optional `startdate` and
+   `enddate` kwargs (or `opts.startdate`/`opts.enddate`) further
+   subset the loaded met to a specific datetime window in addition
+   to the year-granularity simyears subset. Both default to NaT
+   (= no window override). This is how the verification suite runs
+   icemodel against a targeted evaluation window (e.g. one snow
+   season) without inventing calendar / hydrologic-year policy.
+
+2. **verification side** (`importEsmSnowmip` tier):
+   - `tier="smoke"` (default): one representative snow year per site,
+     e.g. `[YYYY-10-01, YYYY+1-09-30]` for the second full year.
+   - `tier="full"`: full insitu range for the site.
+   - `tier="custom"`: requires explicit `startdate` and `enddate`
+     kwargs.
+
+`run_snow_verification_suite` accepts `startdate` / `enddate` kwargs
+which are forwarded into `runIcemodelSnowCandidate` (and thus into
+`opts.startdate` / `opts.enddate`) when `run_icemodel=true`. This
+lets developers target a specific window without re-staging.
+
+## ESM-SnowMIP sites
+
+10 reference sites are staged from the upstream PANGAEA bundle
+(`https://doi.org/10.1594/PANGAEA.897575`):
+
+| code | name                  | location              | insitu years |
+|------|-----------------------|-----------------------|--------------|
+| cdp  | Col de Porte          | France                | 1994-2014    |
+| oas  | Old Aspen             | Saskatchewan, Canada  | 1997-2010    |
+| obs  | Old Black Spruce      | Saskatchewan, Canada  | 1997-2010    |
+| ojp  | Old Jack Pine         | Saskatchewan, Canada  | 1997-2010    |
+| rme  | Reynolds Mountain East| Idaho, USA            | 1988-2008    |
+| sap  | Sapporo               | Hokkaido, Japan       | 2005-2015    |
+| snb  | Senator Beck          | Colorado, USA         | 2005-2015    |
+| sod  | Sodankylä             | Finland               | 2007-2014    |
+| swa  | Swamp Angel           | Colorado, USA         | 2005-2015    |
+| wfj  | Weissfluhjoch         | Switzerland           | 1996-2016    |
+
+Sites differ in available observation channels: boreal forest sites
+(`oas`, `obs`, `ojp`) report `snd_gap_auto` rather than `snd_auto`;
+some sites lack `tsl` (no soil-temp obs) or `albs` (no observed
+albedo). The builders auto-detect these and the importer derives a
+per-site `comparison_variables` list so `comparecase` does not
+emit `not_applicable` rows for variables the site never observed.
+
 ## Setup Workflow
 
 Setup and refresh tooling lives under `icemodel.verification.setup`:
 
 - `fetchEsmSnowmip` resolves / verifies the local ESM-SnowMIP source cache.
 - `fetchLaughTests` resolves / verifies the local Laugh-Tests checkout.
-- `importEsmSnowmip` stages curated ESM-SnowMIP site data for select time windows.
+- `buildEsmSnowmipForcing(site, ...)` converts ESM-SnowMIP NetCDF
+  files to icemodel-native forcing (timetable). Reusable for
+  staging *and* for any future on-the-fly icemodel run.
+- `buildEsmSnowmipObservations(site, ...)` converts ESM-SnowMIP obs
+  NetCDF files to verification-target observation timetables.
+- `importEsmSnowmip` stages all 10 ESM-SnowMIP site cases via the
+  builders. Supports `tier="smoke"` (one representative snow year
+  per site), `tier="full"` (full insitu range), or `tier="custom"`
+  with explicit `startdate` / `enddate`.
 - `importLaughTests` stages selected Laugh-Tests synthetic process cases.
 - `prepareCaseRoot`, `writeManifest`, `makeFamilyManifest`, `makeCaseManifestEntry`,
    and `metadataStruct` are setup helpers used by the importers.
@@ -87,14 +145,14 @@ refreshing staged setup data.
 
 Generated / staged smoke artifacts (committed):
 
-```
+```sh
 demo/data/eval/snow/<dataset_family>/<case_id>/{forcing,evaluation,reference}.mat
 demo/data/eval/snow/<dataset_family>/manifest.json
 ```
 
 Local raw source cache (gitignored under `data/verification/**`):
 
-```
+```sh
 data/verification/snow/esm_snowmip/    # cdp + wfj NetCDFs
 data/verification/snow/laugh_tests/    # Laugh-Tests checkout
 ```
@@ -116,9 +174,10 @@ either error with a stable error id or return the partial path.
 ## Support Namespaces
 
 - `helpers` contains normal workflow helpers for path discovery, manifest reads,
-  artifact loading, candidate resolution, and metric schema definition.
+  artifact loading, candidate resolution, metric schema definition, and the
+  per-run markdown report writer (`writeRunReport`).
 - `namelists` contains canonical selector lists for dataset families, case ids,
-  case types, and tiers.
+  case types, tiers, and the ESM-SnowMIP site catalog (`snowmipsite`).
 - `validators` contains argument-block validators that consume the namelists.
 
 ## Data Contract
@@ -141,7 +200,8 @@ functions resolve those paths to absolute paths at read time.
 Two evaluation.mat shapes are supported:
 
 1. **Single-bundle** (default for ESM-SnowMIP cdp / wfj):
-   ```
+
+   ```text
    targets.format       = "timeseries" | "experiment_bundle"
    targets.data         (timeseries case)
    targets.experiments  (experiment_bundle case)
@@ -149,10 +209,12 @@ Two evaluation.mat shapes are supported:
 
 2. **Multi-source** (Colbeck 1976 case): the same evaluation.mat carries
    two reference bundles keyed by source:
-   ```
+
+   ```matlab
    targets.numerical_summa.experiments.exp{1,2,3}     (frozen SUMMA)
    targets.analytical_clark2017.experiments.exp{1,2,3} (Clark 2017)
    ```
+
    Generic `comparecase` and `plotcase` callers auto-pick `numerical_summa`
    when the loaded targets struct has no top-level `format` field. The
    case-specific 4-way driver is `icemodel.verification.colbeck.compareSolutions`.
@@ -163,15 +225,26 @@ Two evaluation.mat shapes are supported:
 output (ICE1 / ICE2 timetables / structs) into the candidate bundle consumed by
 `comparecase`. Currently supported mappings:
 
-| Verification variable     | Source field    | Derivation                              |
-|---------------------------|-----------------|-----------------------------------------|
-| `snow_depth_m`            | `ice1.snow_depth` | direct                                  |
-| `swe_kg_m2`               | derived         | `snow_depth_m * snow_density_kg_m3`     |
-| `surface_temp_C`          | derived         | `Tsfc - Tf` (Tf from physicalConstant)  |
-| `bottom_outflow_mps`      | derived         | runoff/outflow proxy from ice2          |
-| `snow_liquid_water_storage_m` | derived     | column-integrated f_liq*dz over snow    |
+| Verification variable         | Source field      | Derivation                              |
+|-------------------------------|-------------------|-----------------------------------------|
+| `snow_depth_m`                | `ice1.snow_depth` | direct                                  |
+| `swe_kg_m2`                   | derived           | `snow_depth_m * snow_density_kg_m3`     |
+| `surface_temp_C`              | derived           | `Tsfc - Tf` (Tf from physicalConstant)  |
+| `bottom_outflow_mps`          | derived           | runoff/outflow proxy from ice2          |
+| `snow_liquid_water_storage_m` | derived           | column-integrated f_liq*dz over snow    |
 
-Future snow-model agents who need additional verification variables (cold
+The forcing side of the verification adapter runs in the opposite
+direction: `buildEsmSnowmipForcing(site, ...)` converts ESM-SnowMIP
+NetCDF channels (Tair, SWdown, LWdown, Wind, Psurf, Qair, Rainf,
+Snowf, plus obs sdepth/albs) into icemodel's native forcing
+timetable (tair, swd, lwd, albedo, wspd, rh, psfc, ppt,
+snow_depth). The conversion uses
+`icemodel.vapor.relative_humidity_from_specific_humidity` for
+humidity and `icemodel.physicalConstant('ro_liq')` for the
+mass-flux to volumetric-flux conversion of Rainf+Snowf, so all
+quantity conversions go through canonical icemodel kernels.
+
+Future snow-model developers who need additional verification variables (cold
 content, density profile, f_ice/f_liq snapshots) should extend the adapter and
 update this table; do not bury new mappings inside individual cases.
 
@@ -191,16 +264,16 @@ of this hook is tracked under `icemodel-tk6.7`.
 computes the following metrics on aligned finite pairs (`isfinite(target) &
 isfinite(candidate)`):
 
-| Metric                    | Variable types        | Description                            |
-|---------------------------|-----------------------|----------------------------------------|
-| `bias`                    | continuous, sparse    | `mean(candidate - target)`             |
-| `rmse`                    | continuous, sparse    | `sqrt(mean((candidate - target).^2))`  |
-| `correlation`             | continuous            | Pearson correlation; `NaN` when std=0  |
-| `peak_target`             | continuous            | `max(target)` over the comparison window |
-| `peak_candidate`          | continuous            | `max(candidate)` over the same window  |
-| `peak_error`              | continuous            | `peak_candidate - peak_target`         |
-| `peak_time_error_hours`   | continuous            | offset between candidate and target peak times |
-| `melt_out_time_error_hours` | snow_depth / swe    | offset between candidate and target return-to-near-zero times |
+| Metric                      | Variable types        | Description                              |
+|-----------------------------|-----------------------|------------------------------------------|
+| `bias`                      | continuous, sparse    | `mean(candidate - target)`               |
+| `rmse`                      | continuous, sparse    | `sqrt(mean((candidate - target).^2))`    |
+| `correlation`               | continuous            | Pearson correlation; `NaN` when std=0    |
+| `peak_target`               | continuous            | `max(target)` over the comparison window |
+| `peak_candidate`            | continuous            | `max(candidate)` over the same window    |
+| `peak_error`                | continuous            | `peak_candidate - peak_target`           |
+| `peak_time_error_hours`     | continuous            | offset between candidate and target peak times |
+| `melt_out_time_error_hours` | snow_depth / swe      | offset between candidate and target return-to-near-zero times |
 
 `status` is `"ok"` when at least one finite pair exists, `"not_applicable"` when
 no finite pairs are available (e.g. the candidate omits a variable, or all
