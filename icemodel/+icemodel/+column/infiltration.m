@@ -13,11 +13,11 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
    %
    %  The kernel is the canonical icemodel infiltration entry point. Both the
    %  snow verification driver (Colbeck 1976 / Clark 2017) and any future
-   %  production caller share this code path. There are no magic numbers in the
-   %  body: empirical coefficients come from icemodel.parameterLookup, physical
-   %  constants from icemodel.physicalConstant, the saturated hydraulic
-   %  conductivity from icemodel.column.saturated_hydraulic_conductivity, and
-   %  the thermal conductivity from icemodel.column.firn_thermal_conductivity.
+   %  production caller share this code path. Empirical coefficients come from
+   %  icemodel.parameterLookup, physical constants from
+   %  icemodel.physicalConstant, the saturated hydraulic conductivity from
+   %  icemodel.column.saturated_hydraulic_conductivity, and the thermal
+   %  conductivity from icemodel.column.firn_thermal_conductivity.
    %
    %  Parameters:
    %  -----------
@@ -108,54 +108,56 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
          'Tf', 'Lf', 'ro_ice', 'ro_liq', 'cp_ice');
    end
 
-   % Ice-to-liquid water-equivalent ratio (used for the f_liq upper- bound clip
+   % Ice-to-liquid water-equivalent ratio (used for the f_liq upper-bound clip
    % below: f_liq cannot exceed (ro_ice/ro_liq) * (1 - f_ice), which is the
    % available pore volume converted to liquid- water equivalent).
    ro_iwe = ro_ice / ro_liq;
+
+   % Unpack optional keyword-args
+   grainsz = kwargs.grainsz;
+   k_sat_method = kwargs.k_sat_method;
+   permeability = kwargs.permeability;
 
    % --- Pore / residual / capacity ----------------------------------------
    % Pore fraction and residual liquid fraction per layer. availCap is the
    % per-layer available pore capacity for liquid water above the capillary
    % residual floor; eps avoids division-by-zero in fully ice layers (f_ice==1).
-   f_por        = 1.0 - f_ice;
-   f_res_layers = f_res_pore .* f_por;
-   availCap     = max(eps, f_por - f_res_layers);
+   f_por = 1.0 - f_ice;
+   f_res = f_res_pore .* f_por;
+   availCap = max(eps, f_por - f_res);
 
    % --- CFL substep count -------------------------------------------------
    % Saturated hydraulic conductivity per layer (column-shaped) from the
    % dispatched closure scheme. k_sat_max bounds the per-layer values for the
    % CFL estimate.
-   k_sat_layers = icemodel.column.saturated_hydraulic_conductivity( ...
-      f_ice, f_liq, ...
-      method=kwargs.k_sat_method, ...
-      grainsz=kwargs.grainsz, ...
-      permeability=kwargs.permeability);
-   k_sat_max = max(k_sat_layers);
+   k_sat = icemodel.column.saturated_hydraulic_conductivity( ...
+      f_ice, f_liq, method=k_sat_method, grainsz=grainsz, permeability=permeability);
+   k_sat_max = max(k_sat);
 
    % Relative saturation per layer, clipped to [0, 1]. This is used to estimate
    % the column-state characteristic speed which dominates the CFL bound during
    % recession (when no inflow is feeding the steady-state shock).
-   S_layers = max(0, (f_liq - f_res_layers) ./ availCap);
-   S_layers = min(1, S_layers);
-   c_state = m_exp .* k_sat_layers .* S_layers .^ (m_exp - 1) ./ availCap;
-   c_state_max = max(c_state);
+   S = (f_liq - f_res) ./ availCap;
+   S = min(1, max(0, S));
+   c = m_exp .* k_sat .* S .^ (m_exp - 1) ./ availCap;
+   c_max = max(c);
 
    % Inflow-driven steady-state characteristic speed at S_inf = (q_top /
    % k_sat_max)^(1/m_exp). Dominates during rain phases.
    if k_sat_max > 0 && q_top > 0
-      S_inf    = min(1, (q_top / k_sat_max) ^ (1 / m_exp));
-      c_inflow = m_exp * k_sat_max * S_inf ^ (m_exp - 1) / max(availCap);
+      S_inflow = min(1, (q_top / k_sat_max) ^ (1 / m_exp));
+      c_inflow = m_exp * k_sat_max * S_inflow ^ (m_exp - 1) / max(availCap);
    else
-      S_inf    = 0;
+      S_inflow = 0;
       c_inflow = 0;
    end
 
    % CFL bound: take the larger of the two characteristic speeds and choose a
    % substep size such that the wave moves at most cfl_safety cells per substep.
-   c_max         = max(c_state_max, c_inflow);
+   c_max = max(c_max, c_inflow);
    dt_sub_target = cfl_safety * dz / max(c_max, eps);
-   n_sub         = max(1, ceil(dt / dt_sub_target));
-   dt_sub        = dt / n_sub;
+   n_sub = max(1, ceil(dt / dt_sub_target));
+   dt_sub = dt / n_sub;
 
    % --- Liquid mass substep loop -----------------------------------------
    inflow_total  = 0;
@@ -166,17 +168,13 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
       % Calculate fluxes between layers [m/s]. liquid_flux returns one flux
       % value per layer, computed at the layer's own state; this is the upwind
       % interface flux carried out the bottom of each layer.
-      q_internal = icemodel.column.liquid_flux(f_liq, f_ice, ...
-         k_sat_method=kwargs.k_sat_method, ...
-         grainsz=kwargs.grainsz, ...
-         permeability=kwargs.permeability);
+      q = icemodel.column.liquid_flux(f_liq, f_ice, ...
+         k_sat_method=k_sat_method, grainsz=grainsz, permeability=permeability);
 
       % Boundary conditions:
-      %   bc_N = q_top                 surface inflow (precipitation /
-      %                                surface meltwater)
-      %   bc_S = q_internal(end)       free-drainage at the bottom
-      %                                interface (q_bot = upstream q
-      %                                from the bottom layer)
+      %   bc_N = q_top        surface inflow (precipitation / surface meltwater)
+      %   bc_S = q(end)       free-drainage at the bottom interface
+      %                       (q_bot = upstream q from the bottom layer)
       %
       % After the BCs are appended to q:
       %
@@ -194,8 +192,8 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
       %
       % ----- q(N+1) = flux across the bottom interface = free-drainage
       bc_N  = q_top;
-      bc_S  = q_internal(end);
-      q_int = [bc_N; q_internal];        % length N+1
+      bc_S  = q(end);
+      q_int = [bc_N; q];        % length N+1
       q_bot = bc_S;
 
       % Compute net liquid water flux for each layer
@@ -218,7 +216,7 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
       % layers at the capillary residual produce zero outgoing flux and the
       % lower bound is rarely exercised in practice.
       %
-      % Note: the original infiltration kernel used a two-pass per- layer
+      % Note: the original infiltration kernel used a two-pass per-layer
       % pre-clamp (drainage clamped to f_liq - f_res, plus a downward rebalance
       % against the receiver layer's max_infill capacity). With proper CFL
       % substepping (cfl_safety < 1) the wave moves less than one cell per
@@ -226,10 +224,10 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
       % cases, so the simpler post-clip suffices and the verification metrics
       % agree with SUMMA at sub-mm RMSE.
       f_liq = max(0, f_liq);
-      f_air_capacity = ro_iwe * (1 - f_ice) - f_liq;
+      f_air_capacity = ro_iwe * f_por - f_liq;
       neg = f_air_capacity < 0;
       if any(neg)
-         f_liq(neg) = ro_iwe * (1 - f_ice(neg));
+         f_liq(neg) = ro_iwe * f_por(neg);
       end
 
       % Cumulative mass-balance accumulators (for diagnostics; the timestep
@@ -294,7 +292,7 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
       'n_sub',         n_sub, ...
       'dt_sub',        dt_sub, ...
       'k_sat_max',     k_sat_max, ...
-      'S_inf',         S_inf, ...
+      'S_inflow',      S_inflow, ...
       'c_max',         c_max, ...
       'inflow_total',  inflow_total, ...
       'outflow_total', outflow_total);

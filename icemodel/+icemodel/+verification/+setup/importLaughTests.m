@@ -154,11 +154,11 @@ function [forcing, targets, reference, case_values] = buildColbeckArtifacts( ...
    % Build one experiment timetable for each frozen SUMMA validation output.
    exp_ids = ["exp1"; "exp2"; "exp3"];
    experiment_rows = cell(numel(exp_ids), 1);
-   for i = 1:numel(exp_ids)
-      exp_id = exp_ids(i);
+   for n = 1:numel(exp_ids)
+      exp_id = exp_ids(n);
       experiment_file = fullfile(validation_root, ...
          sprintf('colbeck1976-%s_G1-1_timestep.nc', exp_id));
-      experiment_rows{i} = buildColbeckExperiment(experiment_file);
+      experiment_rows{n} = buildColbeckExperiment(experiment_file);
    end
    experiments = cell2struct(experiment_rows, cellstr(exp_ids), 1);
 
@@ -175,8 +175,8 @@ function [forcing, targets, reference, case_values] = buildColbeckArtifacts( ...
    % so the comparison driver treats them uniformly.
    def = icemodel.verification.colbeck.caseDefinition();
    analytical_rows = cell(numel(exp_ids), 1);
-   for i = 1:numel(exp_ids)
-      analytical_rows{i} = analyticalExperimentTimetable(exp_ids(i), def);
+   for n = 1:numel(exp_ids)
+      analytical_rows{n} = analyticalExperimentTimetable(exp_ids(n), def);
    end
    analytical_experiments = cell2struct(analytical_rows, ...
       cellstr(exp_ids), 1);
