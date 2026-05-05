@@ -3,7 +3,6 @@ function cases = listcases(kwargs)
    %
    %  cases = icemodel.verification.listcases()
    %  cases = icemodel.verification.listcases(dataset_family="esm_snowmip")
-   %  cases = icemodel.verification.listcases(tier="smoke")
    %
    % Inputs
    %  evaluation_data_root       Base evaluation-data root. When blank, the
@@ -12,8 +11,6 @@ function cases = listcases(kwargs)
    %                             evaluation-data root without mutating config.
    %  dataset_family             Optional family filter, for example
    %                             "esm_snowmip" or "laugh_tests".
-   %  tier                       Optional suite tier filter, for example
-   %                             "smoke".
    %
    % Outputs
    %  cases   Struct array of resolved case manifest entries. File paths are
@@ -28,8 +25,6 @@ function cases = listcases(kwargs)
       kwargs.icemodel_config_casename (1, 1) string = "test"
       kwargs.dataset_family (1, 1) string ...
          {icemodel.verification.validators.mustBeDatasetFamilyFilter} = ""
-      kwargs.tier (1, 1) string ...
-         {icemodel.verification.validators.mustBeTierFilter} = ""
    end
 
    % Discover family manifests first; all later filters operate on manifest
@@ -48,7 +43,7 @@ function cases = listcases(kwargs)
          continue
       end
 
-      group = resolveFamilyCases(family, kwargs.tier);
+      group = resolveFamilyCases(family);
       if isempty(group)
          continue
       end
@@ -79,32 +74,15 @@ function tf = skipFamily(family, dataset_family)
       family.dataset_family ~= dataset_family;
 end
 
-function cases = resolveFamilyCases(family, tier)
-   %RESOLVEFAMILYCASES Resolve and filter one family's case entries.
+function cases = resolveFamilyCases(family)
+   %RESOLVEFAMILYCASES Resolve one family's case entries.
 
-   % Preallocate with a resolved row so later path fields exist consistently.
    entries = reshape(family.cases, [], 1);
    resolved_rows = repmat(resolveCase(entries(1), family), numel(entries), 1);
-   n_rows = 0;
-
-   % Apply the tier filter after resolving family metadata so returned rows all
-   % have the same schema regardless of filtering.
    for i = 1:numel(entries)
-      resolved = resolveCase(entries(i), family);
-      if ~isblanktext(tier) && resolved.tier ~= tier
-         continue
-      end
-
-      n_rows = n_rows + 1;
-      resolved_rows(n_rows) = resolved;
+      resolved_rows(i) = resolveCase(entries(i), family);
    end
-
-   % Preserve MATLAB's empty-struct convention for no selected rows.
-   if n_rows == 0
-      cases = struct([]);
-   else
-      cases = resolved_rows(1:n_rows);
-   end
+   cases = resolved_rows;
 end
 
 function resolved = resolveCase(entry, family)

@@ -1,42 +1,50 @@
 function results = run_snow_verification_suite(kwargs)
-   %RUN_SNOW_VERIFICATION_SUITE Run the broader snow-verification smoke lane.
+   %RUN_SNOW_VERIFICATION_SUITE Run the snow-verification suite.
    %
    %  results = run_snow_verification_suite()
-   %  results = run_snow_verification_suite(tier="full", make_plots=true)
+   %  results = run_snow_verification_suite(cases=["cdp", "wfj"])
+   %  results = run_snow_verification_suite(make_plots=true)
    %  results = run_snow_verification_suite(plot_visible="on")
    %  results = run_snow_verification_suite(run_icemodel=true)
    %  results = run_snow_verification_suite(candidate_provider=@myProvider)
-   %  results = run_snow_verification_suite(cases=["cdp", "wfj"])
    %  results = run_snow_verification_suite(write_artifacts=true)
+   %  results = run_snow_verification_suite( ...
+   %     cases="wfj", startdate="1997-10-01", enddate="1998-09-30")
    %
    % This runner is the verification-suite entry point used by agents and
    % interactive development. It reads staged data and writes artifacts; it
    % does not import or refresh setup data.
    %
+   % Default behaviour
+   %   With no arguments, runs Col de Porte (cdp) over its
+   %   default_smoke_window. CDP is the most canonical / widely-cited
+   %   ESM-SnowMIP snow verification site (Menard 2019 ESSD), and a single
+   %   site / single year keeps interactive runs fast. Override via cases=
+   %   to select other sites and / or startdate / enddate to narrow the
+   %   comparison window.
+   %
    % Artifact policy (opt-in)
-   % ------------------------
-   % Defaults are tuned for interactive development: no figures created, no
-   % artifacts written. The runner returns a result struct (summary table +
-   % per-case results) so agents and developers can inspect metrics without
-   % producing on-disk side effects.
+   %   Defaults are tuned for interactive development: no figures created,
+   %   no artifacts written. The runner returns a result struct (summary
+   %   table + per-case results) so agents and developers can inspect
+   %   metrics without producing on-disk side effects.
    %
-   %   make_plots       = false   create comparison/scatter figures?
-   %   save_plots       = false   export those figures as PNG?
-   %   write_artifacts  = false   write summary.csv / summary.mat / report.md
-   %                              and per-case metrics.csv / result.mat?
-   %   plot_visible     = "off"   figure visibility ("on" implies make_plots=true)
+   %     make_plots       = false   create comparison/scatter figures?
+   %     save_plots       = false   export those figures as PNG?
+   %     write_artifacts  = false   write summary.csv / summary.mat /
+   %                                report.md and per-case
+   %                                metrics.csv / result.mat?
+   %     plot_visible     = "off"   figure visibility
+   %                                ("on" implies make_plots=true)
    %
-   % Pass write_artifacts=true (or any of the plotting flags) to opt in to
-   % the persisted-snapshot workflow. The runner only creates the
-   % <test>/artifacts/snow-verification/<run_name>/ directory when at least
-   % one artifact would be written.
+   %   Pass write_artifacts=true (or any of the plotting flags) to opt
+   %   in to the persisted-snapshot workflow. The runner only creates the
+   %   <test>/artifacts/snow-verification/<run_name>/ directory when at
+   %   least one artifact would be written.
 
    arguments
-      kwargs.tier (1, 1) string ...
-         {icemodel.verification.validators.mustBeTierName} ...
-         = "smoke"
       kwargs.cases (1, :) string ...
-         {icemodel.verification.validators.mustBeCaseIdSubset} = strings(0, 1)
+         {icemodel.verification.validators.mustBeCaseIdSubset} = "cdp"
       kwargs.run_name (1, 1) string = ""
       kwargs.make_plots (1, 1) logical = false
       kwargs.save_plots (1, 1) logical = false
@@ -52,6 +60,20 @@ function results = run_snow_verification_suite(kwargs)
 
    if kwargs.run_icemodel && ~isempty(kwargs.candidate_provider)
       error('run_icemodel and candidate_provider are mutually exclusive')
+   end
+
+   % Resolve the runtime comparison window. With no explicit dates and a
+   % single ESM-SnowMIP site, default to that site's default_smoke_window
+   % so interactive runs match the staged smoke fixture without the
+   % caller having to know per-site dates. With multiple cases or
+   % non-ESM-SnowMIP cases (e.g. colbeck1976), let comparecase use the
+   % staged window directly.
+   if isnat(kwargs.startdate) && isnat(kwargs.enddate) ...
+         && isscalar(kwargs.cases) ...
+         && ismember(kwargs.cases, ...
+         icemodel.verification.namelists.snowmipsite())
+      [kwargs.startdate, kwargs.enddate] = ...
+         icemodel.verification.helpers.default_smoke_window(kwargs.cases);
    end
 
    % Visible plots imply we want to create the figure.
@@ -120,17 +142,16 @@ function results = run_snow_verification_suite(kwargs)
    % Select cases through the public catalog entry point so the runner stays
    % dataset-family agnostic.
    cases = icemodel.verification.listcases( ...
-      "evaluation_data_root", kwargs.evaluation_data_root, ...
-      "tier", selectTier(kwargs.tier));
+      "evaluation_data_root", kwargs.evaluation_data_root);
    if isempty(cases)
-      error('no snow-verification cases available for tier %s', kwargs.tier)
+      error('no snow-verification cases available')
    end
 
-   % Apply the optional explicit case filter after tier selection.
-   if ~isempty(kwargs.cases)
-      keep = ismember([cases.case_id], kwargs.cases);
-      cases = cases(keep);
-   end
+   % Apply the explicit case filter (defaults to "cdp" when caller did not
+   % override). Callers wanting "all staged cases" pass case_ids matching
+   % every case in the catalog.
+   keep = ismember([cases.case_id], kwargs.cases);
+   cases = cases(keep);
    if isempty(cases)
       error('requested snow-verification cases were not found')
    end
@@ -197,19 +218,4 @@ function results = run_snow_verification_suite(kwargs)
       'cases', {cases}, ...
       'report_path', report_path);
    clear cleanup
-end
-
-function tier = selectTier(requested)
-   %SELECTTIER Map the runner tier selector onto the current case catalog.
-
-   % The "full" tier currently means no tier filter. Future full-data imports
-   % can add explicit full cases without changing the runner call contract.
-   switch requested
-      case "smoke"
-         tier = "smoke";
-      case "full"
-         tier = "";
-      otherwise
-         error('unsupported snow-verification tier: %s', requested)
-   end
 end

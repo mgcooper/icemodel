@@ -80,28 +80,30 @@ with `icemodel.plot.timeseries`.
 
 ## Time-window policy
 
-Two layers of time control:
+Selection is by `case_ids` and optional `startdate` / `enddate`. The
+tier abstraction (smoke / full / custom) is gone; selection is
+explicit and the same vocabulary applies at both staging and runtime:
 
-1. **icemodel side** (`icemodel.setopts`): `simyears` selects which
-   calendar years are loaded by `loadmet`. Optional `startdate` and
-   `enddate` kwargs (or `opts.startdate`/`opts.enddate`) further
-   subset the loaded met to a specific datetime window in addition
-   to the year-granularity simyears subset. Both default to NaT
-   (= no window override). This is how the verification suite runs
-   icemodel against a targeted evaluation window (e.g. one snow
-   season) without inventing calendar / hydrologic-year policy.
+- **Staging** (`importEsmSnowmip`): with no explicit window, each
+  requested site is staged using its
+  `icemodel.verification.helpers.default_smoke_window` (one snow
+  water year, second insitu year, `[YYYY-10-01, YYYY+1-09-30]` UTC).
+  Pass `startdate` / `enddate` kwargs to stage a different window.
+- **Runtime** (`run_snow_verification_suite`): with no explicit
+  window and a single ESM-SnowMIP case, the runner narrows to that
+  site's `default_smoke_window`. Pass `startdate` / `enddate` to
+  override; the staged window remains the upper bound.
+- **Default suite call**: `run_snow_verification_suite()` (no args)
+  runs Col de Porte (cdp) over its smoke window. CDP is the most
+  canonical / widely-cited ESM-SnowMIP snow verification site
+  (Menard 2019 ESSD); single-site / single-year keeps interactive
+  runs fast.
 
-2. **verification side** (`importEsmSnowmip` tier):
-   - `tier="smoke"` (default): one representative snow year per site,
-     e.g. `[YYYY-10-01, YYYY+1-09-30]` for the second full year.
-   - `tier="full"`: full insitu range for the site.
-   - `tier="custom"`: requires explicit `startdate` and `enddate`
-     kwargs.
-
-`run_snow_verification_suite` accepts `startdate` / `enddate` kwargs
-which are forwarded into `runIcemodelSnowCandidate` (and thus into
-`opts.startdate` / `opts.enddate`) when `run_icemodel=true`. This
-lets developers target a specific window without re-staging.
+When the staged window is wider than the runtime window, comparecase
+subsets the staged target on the fly via `opts.startdate` /
+`opts.enddate` — no re-staging required. See the open architectural
+assessment "Custom-date staging vs on-the-fly subsetting" below for
+the reasoning behind this contract.
 
 ## ESM-SnowMIP sites
 
@@ -140,9 +142,9 @@ Setup and refresh tooling lives under `icemodel.verification.setup`:
 - `buildEsmSnowmipObservations(site, ...)` converts ESM-SnowMIP obs
   NetCDF files to verification-target observation timetables.
 - `importEsmSnowmip` stages all 10 ESM-SnowMIP site cases via the
-  builders. Supports `tier="smoke"` (one representative snow year
-  per site), `tier="full"` (full insitu range), or `tier="custom"`
-  with explicit `startdate` / `enddate`.
+  builders. With no explicit window, each site uses its
+  `default_smoke_window`; pass `startdate` / `enddate` to stage a
+  different window.
 - `importLaughTests` stages selected Laugh-Tests synthetic process cases.
 - `prepareCaseRoot`, `writeManifest`, `makeFamilyManifest`, `makeCaseManifestEntry`,
    and `metadataStruct` are setup helpers used by the importers.
@@ -187,10 +189,10 @@ either error with a stable error id or return the partial path.
   artifact loading, candidate resolution, metric schema definition, and the
   per-run markdown report writer (`writeRunReport`).
 - `namelists` contains canonical selector lists for dataset families, case ids,
-  case types, tiers, the ESM-SnowMIP site-name namelist (`snowmipsite`), the
-  richer ESM-SnowMIP catalog (`snowmipcatalog`), and the Laugh-Tests case-id
-  namelist (`laughtests`). `caseid` dispatches uniformly across families using
-  these per-family namelists.
+  case types, the ESM-SnowMIP site-name namelist (`snowmipsite`), the richer
+  ESM-SnowMIP catalog (`snowmipcatalog`), and the Laugh-Tests case-id namelist
+  (`laughtests`). `caseid` dispatches uniformly across families using these
+  per-family namelists.
 - `validators` contains argument-block validators that consume the namelists,
   including `mustBeSnowmipSite` for per-site builders.
 
@@ -355,31 +357,29 @@ with the five integrations above, in a dedicated bead. The current
 verification-driven implementation is a sufficient bridge and should
 be extended rather than replaced.
 
-### Custom-date staging vs on-the-fly subsetting
+### Staging window vs on-the-fly subsetting
 
-`importEsmSnowmip(tier="custom", startdate=..., enddate=...)` re-stages
-the per-site forcing/observation MAT artifacts for an arbitrary
-window. This couples staging to specific debugging windows, which is
-poor design when an agent wants to run "1996-12 through 1997-03" to
-investigate one event.
+`importEsmSnowmip(case_ids=..., startdate=..., enddate=...)` stages
+per-site forcing/observation MAT artifacts for the requested window.
+By default, each site is staged at its `default_smoke_window` — one
+snow water year. Wider windows are staged only when explicitly
+requested.
 
-Recommendation: stage one full-period forcing/observation MAT per
-site (the existing `tier="full"` artifact). Agents and developers
-that want a narrow window subset the staged timetable on the fly via
-`opts.startdate` / `opts.enddate` (already implemented in
-`icemodel.loadmet`). The `tier="custom"` import path becomes
-unnecessary and should be retired in a follow-up. This needs:
+The retired tier vocabulary (smoke / full / custom) coupled staging
+to fixed window choices; the explicit `case_ids` + optional
+`startdate` / `enddate` contract removes that coupling. Agents and
+developers that want a narrow window inside a wider staged range
+subset on the fly via `opts.startdate` / `opts.enddate` (already
+implemented in `icemodel.loadmet`).
 
-- `comparecase` / `plotcase` to subset the staged target by
+Open work (tracked under `icemodel-fx1`):
+
+- `comparecase` / `plotcase` should subset the staged target by
   `opts.startdate` / `opts.enddate` (or a `comparison_window` kwarg)
   before computing metrics.
 - `runIcemodelSnowCandidate` / `run_snow_verification_suite` already
   forward `startdate` / `enddate` to `opts`, so the icemodel side is
   already on-the-fly.
-
-The cost of the change is one tier removal plus a window-aware
-`comparecase` path; the benefit is no re-staging required for
-per-event debugging.
 
 ### Hourly forcing interpolated to 15 min at runtime
 

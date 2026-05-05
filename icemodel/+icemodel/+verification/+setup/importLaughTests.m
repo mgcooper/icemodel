@@ -213,7 +213,6 @@ function [forcing, targets, reference, case_values] = buildColbeckArtifacts( ...
    case_values = { ...
       'colbeck1976'
       'synthetic_process'
-      'smoke'
       'colbeck1976'
       'Colbeck 1976 synthetic snow infiltration benchmark'
       fullfile('colbeck1976', 'forcing.mat')

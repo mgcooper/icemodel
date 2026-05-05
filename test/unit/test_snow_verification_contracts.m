@@ -38,8 +38,6 @@ function test_verification_namelists_expose_curated_selectors(testCase)
       expectedDatasetFamilies());
    testCase.verifyEqual(icemodel.verification.namelists.casetype(), ...
       expectedCaseTypes());
-   testCase.verifyEqual(icemodel.verification.namelists.tier(), ...
-      expectedTiers());
    testCase.verifyEqual(icemodel.verification.namelists.caseid(), ...
       expectedCaseIds());
    testCase.verifyEqual( ...
@@ -325,12 +323,6 @@ function names = expectedCaseTypes()
    %EXPECTEDCASETYPES Verification case types used by manifests and runners.
 
    names = ["esm_site"; "synthetic_process"];
-end
-
-function tiers = expectedTiers()
-   %EXPECTEDTIERS Public runner tiers supported by the smoke harness.
-
-   tiers = ["smoke"; "full"; "custom"];
 end
 
 function fields = expectedFamilyManifestFields()

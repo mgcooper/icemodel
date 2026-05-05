@@ -14,7 +14,6 @@ function names = caseManifestFieldNames()
    names = [ ...
       "case_id"
       "case_type"
-      "tier"
       "site_id"
       "site_name"
       "forcing_file"

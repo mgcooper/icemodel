@@ -74,18 +74,17 @@ function report_path = writeRunReport(run_dir, case_results, cases, kwargs)
 
    % --- Per-case headline summary -------------------------------------
    fprintf(fid, "## Per-case headline\n\n");
-   fprintf(fid, "| Case | Family | Tier | Window | Variables | OK | NA |\n");
-   fprintf(fid, "|------|--------|------|--------|-----------|----|----|\n");
+   fprintf(fid, "| Case | Family | Window | Variables | OK | NA |\n");
+   fprintf(fid, "|------|--------|--------|-----------|----|----|\n");
    for i = 1:numel(case_results)
       cr = case_results{i};
       m = cr.metrics;
       ok = nnz(m.status == "ok");
       na = nnz(m.status == "not_applicable");
       family = caseFamily(cases, cr.case_id);
-      tier = caseTier(cases, cr.case_id);
       window = caseWindow(cases, cr.case_id);
-      fprintf(fid, "| %s | %s | %s | %s | %d | %d | %d |\n", ...
-         cr.case_id, family, tier, window, height(m), ok, na);
+      fprintf(fid, "| %s | %s | %s | %d | %d | %d |\n", ...
+         cr.case_id, family, window, height(m), ok, na);
    end
    fprintf(fid, "\n");
 
@@ -157,16 +156,6 @@ function family = caseFamily(cases, case_id)
       family = string(c.dataset_family);
    else
       family = "?";
-   end
-end
-
-function tier = caseTier(cases, case_id)
-   match = string({cases.case_id}) == string(case_id);
-   if any(match)
-      c = cases(find(match, 1));
-      tier = string(c.tier);
-   else
-      tier = "?";
    end
 end
 

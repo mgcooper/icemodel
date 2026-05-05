@@ -3,9 +3,9 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %
    %  manifest = icemodel.verification.setup.importEsmSnowmip(source_dir)
    %  manifest = icemodel.verification.setup.importEsmSnowmip(source_dir, ...
-   %     overwrite=true, tier="full", case_ids=["cdp","sod"])
+   %     overwrite=true, case_ids=["cdp","sod"])
    %  manifest = icemodel.verification.setup.importEsmSnowmip(source_dir, ...
-   %     tier="custom", startdate="2005-10-01", enddate="2006-07-01")
+   %     case_ids="cdp", startdate="2005-10-01", enddate="2006-07-01")
    %
    %  Stages the requested ESM-SnowMIP site cases under
    %  demo/data/eval/snow/esm_snowmip/<sitename>/. All 10 reference sites are
@@ -13,6 +13,15 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %  the reusable builders buildEsmSnowmipForcing / buildEsmSnowmipObservations
    %  so the same conversion path is used for staging and for any future
    %  on-the-fly icemodel run.
+   %
+   %  Window resolution
+   %    - With no startdate / enddate, each site uses its
+   %      icemodel.verification.helpers.default_smoke_window (one snow
+   %      water year). This is the canonical default-staged fixture.
+   %    - With explicit startdate and enddate, that single window is
+   %      applied to every site listed in case_ids. Per-site staging
+   %      is the natural unit of the importer; multi-window staging
+   %      should be done by repeated calls.
    %
    %  Inputs
    %    source_dir : string
@@ -27,15 +36,12 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %        Config casename when evaluation_data_root is blank.
    %    case_ids : string vector (default all 10 ESM-SnowMIP sites)
    %        Site case ids to stage.
-   %    tier : "smoke" | "full" | "custom" (default "smoke")
-   %        Window selector. "smoke" stages a single representative
-   %        snow year per site (cheap, agent feedback loop). "full"
-   %        stages every full snow year in the site's coverage.
-   %        "custom" requires startdate / enddate kwargs.
    %    startdate : datetime / string ("" default)
-   %        Custom-tier window start. Only used when tier="custom".
+   %        Optional explicit window start. When omitted, each site
+   %        uses default_smoke_window.
    %    enddate : datetime / string ("" default)
-   %        Custom-tier window end.
+   %        Optional explicit window end. Required when startdate is
+   %        provided.
    %    overwrite : logical (default false)
    %        Refresh staged setup artifacts when true.
    %
@@ -54,7 +60,8 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %  icemodel.verification.setup.buildEsmSnowmipForcing,
    %  icemodel.verification.setup.buildEsmSnowmipObservations,
    %  icemodel.verification.namelists.snowmipsite,
-   %  icemodel.verification.namelists.snowmipcatalog
+   %  icemodel.verification.namelists.snowmipcatalog,
+   %  icemodel.verification.helpers.default_smoke_window
 
    arguments
       source_dir (1, :) string
@@ -62,8 +69,6 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       kwargs.icemodel_config_casename (1, 1) string = "test"
       kwargs.case_ids (1, :) string = ...
          icemodel.verification.namelists.snowmipsite()
-      kwargs.tier (1, 1) string {mustBeMember(kwargs.tier, ...
-         ["smoke", "full", "custom"])} = "smoke"
       kwargs.startdate = ""
       kwargs.enddate   = ""
       kwargs.overwrite (1, 1) logical = false
@@ -76,14 +81,17 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       error('unsupported ESM-SnowMIP case ids: %s', strjoin(bad, ', '));
    end
 
-   % Custom-tier requires explicit start / end dates. The constraint is
-   % checked here so site iteration cannot accidentally produce
-   % zero-row staged artifacts when one date is missing.
-   if kwargs.tier == "custom"
-      if strcmp(string(kwargs.startdate), "") || strcmp(string(kwargs.enddate), "")
-         error('tier=custom requires explicit startdate and enddate kwargs');
-      end
+   % Explicit windows must be paired. Either both bounds are given (the
+   % staged window is shared by every requested site), or both are blank
+   % (each site falls back to its default_smoke_window). Mixing is an
+   % error rather than a silent half-window.
+   has_startdate = ~strcmp(string(kwargs.startdate), "");
+   has_enddate   = ~strcmp(string(kwargs.enddate),   "");
+   if has_startdate ~= has_enddate
+      error(['icemodel:verification:importEsmSnowmip:halfWindow ' ...
+         'startdate and enddate must be provided together']);
    end
+   use_explicit_window = has_startdate && has_enddate;
 
    % Confirm the source-cache layout is complete before the per-site loop.
    % fetch is the single source of truth for "are the upstream files
@@ -114,9 +122,15 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       sitename = case_ids(i);
       info = icemodel.verification.namelists.snowmipcatalog(sitename);
 
-      % Resolve the requested time window per the selected tier.
-      [window_start, window_end] = resolveTierWindow( ...
-         kwargs.tier, info, kwargs.startdate, kwargs.enddate);
+      % Resolve the staged time window. Explicit kwargs override the
+      % per-site default smoke window.
+      if use_explicit_window
+         window_start = icemodel.verification.setup.ensureUtc(kwargs.startdate);
+         window_end   = icemodel.verification.setup.ensureUtc(kwargs.enddate);
+      else
+         [window_start, window_end] = ...
+            icemodel.verification.helpers.default_smoke_window(sitename);
+      end
 
       % Resolve the per-site case root and the three staged-artifact paths.
       case_root = fullfile(family_root, sitename);
@@ -173,13 +187,10 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       save(evaluation_output_file, 'targets');
       save(reference_output_file, 'reference');
 
-      % Choose comparison variables from what's actually present and
-      % usable in the obs timetable. A variable that exists as a
-      % column but contains no finite samples (e.g. 'ts' on Sodankyla
-      % where the upstream data is all -9999 sentinels) is dropped so
-      % comparecase does not emit "no_overlap" for never-observed
-      % variables, while sites that DO observe surface temperature
-      % keep it as a comparison variable.
+      % Choose comparison variables from what's actually present in the
+      % staged obs timetable. The obs builder decides which canonical
+      % columns to stage based on upstream channel availability, so a
+      % simple presence check is sufficient here.
       comparison_variables = obsComparisonVariables(obs_tt);
 
       % Provenance for the staged observations. The richer obs_meta
@@ -195,7 +206,6 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       case_values = { ...
          char(sitename)
          'esm_site'
-         char(kwargs.tier)
          char(sitename)
          char(info.long_name)
          char(fullfile(sitename, "forcing.mat"))
@@ -206,7 +216,7 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
          'end',   char(string(window_end)))
          cellstr(comparison_variables)
          observation_variables
-         char(siteCaseNote(info, kwargs.tier))};
+         char(siteCaseNote(info))};
 
       case_entries{i} = icemodel.verification.setup.makeCaseManifestEntry( ...
          case_values);
@@ -228,38 +238,6 @@ end
 % Local helpers
 % =====================================================================
 
-function [window_start, window_end] = resolveTierWindow( ...
-      tier, info, custom_start, custom_end)
-   %RESOLVETIERWINDOW Decide the staged time window per tier.
-
-   % insitu_window in the catalog is [start_year, end_year] inclusive.
-   insitu_start = info.insitu_window(1);
-   insitu_end = info.insitu_window(2);
-
-   switch tier
-      case "smoke"
-         % Single representative snow-season year. Pick the second
-         % full year of the site coverage so the window starts after
-         % any spin-up gaps in the upstream files.
-         smoke_year = insitu_start + 1;
-         window_start = datetime(smoke_year, ...
-            10, 1, 0, 0, 0, 'TimeZone', 'UTC');
-         window_end = datetime(smoke_year + 1, ...
-            9, 30, 23, 0, 0, 'TimeZone', 'UTC');
-
-      case "full"
-         % Full available range as advertised by the catalog.
-         window_start = datetime(insitu_start, ...
-            10, 1,  0, 0, 0, 'TimeZone', 'UTC');
-         window_end   = datetime(insitu_end,  ...
-            9, 30, 23, 0, 0, 'TimeZone', 'UTC');
-
-      case "custom"
-         window_start = ensureUtc(custom_start);
-         window_end = ensureUtc(custom_end);
-   end
-end
-
 function vars = obsComparisonVariables(obs_tt)
    %OBSCOMPARISONVARIABLES Pick comparison variables from staged obs.
    %
@@ -280,17 +258,9 @@ function vars = obsComparisonVariables(obs_tt)
    vars = [canonical(ismember(canonical, present)); sort(soil)];
 end
 
-function note = siteCaseNote(info, tier)
+function note = siteCaseNote(info)
    %SITECASENOTE Short manifest note describing the staged case.
    note = sprintf( ...
-      'ESM-SnowMIP %s reference site (%s, %s). Tier=%s.', ...
-      info.long_name, info.location, info.sitename, tier);
-end
-
-function t = ensureUtc(t)
-   if isstring(t) || ischar(t)
-      t = datetime(t, 'TimeZone', 'UTC');
-   elseif isdatetime(t) && isempty(t.TimeZone)
-      t.TimeZone = 'UTC';
-   end
+      'ESM-SnowMIP %s reference site (%s, %s).', ...
+      info.long_name, info.location, info.sitename);
 end

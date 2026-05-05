@@ -3,12 +3,11 @@
   "source_doi": "10.1594/PANGAEA.897575",
   "source_url": "https://doi.org/10.1594/PANGAEA.897575",
   "source_version": "ESM-SnowMIP_all.zip",
-  "retrieval_date": "30-Apr-2026",
+  "retrieval_date": "05-May-2026",
   "cases": [
     {
       "case_id": "cdp",
       "case_type": "esm_site",
-      "tier": "smoke",
       "site_id": "cdp",
       "site_name": "Col de Porte",
       "forcing_file": "cdp/forcing.mat",
@@ -36,12 +35,11 @@
           0.5
         ]
       },
-      "notes": "ESM-SnowMIP Col de Porte reference site (France, cdp). Tier=smoke."
+      "notes": "ESM-SnowMIP Col de Porte reference site (France, cdp)."
     },
     {
       "case_id": "oas",
       "case_type": "esm_site",
-      "tier": "smoke",
       "site_id": "oas",
       "site_name": "Old Aspen",
       "forcing_file": "oas/forcing.mat",
@@ -69,12 +67,11 @@
           0.5
         ]
       },
-      "notes": "ESM-SnowMIP Old Aspen reference site (Saskatchewan, Canada, oas). Tier=smoke."
+      "notes": "ESM-SnowMIP Old Aspen reference site (Saskatchewan, Canada, oas)."
     },
     {
       "case_id": "obs",
       "case_type": "esm_site",
-      "tier": "smoke",
       "site_id": "obs",
       "site_name": "Old Black Spruce",
       "forcing_file": "obs/forcing.mat",
@@ -104,12 +101,11 @@
           1
         ]
       },
-      "notes": "ESM-SnowMIP Old Black Spruce reference site (Saskatchewan, Canada, obs). Tier=smoke."
+      "notes": "ESM-SnowMIP Old Black Spruce reference site (Saskatchewan, Canada, obs)."
     },
     {
       "case_id": "ojp",
       "case_type": "esm_site",
-      "tier": "smoke",
       "site_id": "ojp",
       "site_name": "Old Jack Pine",
       "forcing_file": "ojp/forcing.mat",
@@ -139,12 +135,11 @@
           1
         ]
       },
-      "notes": "ESM-SnowMIP Old Jack Pine reference site (Saskatchewan, Canada, ojp). Tier=smoke."
+      "notes": "ESM-SnowMIP Old Jack Pine reference site (Saskatchewan, Canada, ojp)."
     },
     {
       "case_id": "rme",
       "case_type": "esm_site",
-      "tier": "smoke",
       "site_id": "rme",
       "site_name": "Reynolds Mountain East",
       "forcing_file": "rme/forcing.mat",
@@ -166,12 +161,11 @@
         "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": 0.30000001192092896
       },
-      "notes": "ESM-SnowMIP Reynolds Mountain East reference site (Idaho, USA, rme). Tier=smoke."
+      "notes": "ESM-SnowMIP Reynolds Mountain East reference site (Idaho, USA, rme)."
     },
     {
       "case_id": "sap",
       "case_type": "esm_site",
-      "tier": "smoke",
       "site_id": "sap",
       "site_name": "Sapporo",
       "forcing_file": "sap/forcing.mat",
@@ -192,12 +186,11 @@
         "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": []
       },
-      "notes": "ESM-SnowMIP Sapporo reference site (Hokkaido, Japan, sap). Tier=smoke."
+      "notes": "ESM-SnowMIP Sapporo reference site (Hokkaido, Japan, sap)."
     },
     {
       "case_id": "snb",
       "case_type": "esm_site",
-      "tier": "smoke",
       "site_id": "snb",
       "site_name": "Senator Beck",
       "forcing_file": "snb/forcing.mat",
@@ -225,12 +218,11 @@
           0.25
         ]
       },
-      "notes": "ESM-SnowMIP Senator Beck reference site (Colorado, USA, snb). Tier=smoke."
+      "notes": "ESM-SnowMIP Senator Beck reference site (Colorado, USA, snb)."
     },
     {
       "case_id": "sod",
       "case_type": "esm_site",
-      "tier": "smoke",
       "site_id": "sod",
       "site_name": "Sodankyla",
       "forcing_file": "sod/forcing.mat",
@@ -257,12 +249,11 @@
           0.5
         ]
       },
-      "notes": "ESM-SnowMIP Sodankyla reference site (Finland, sod). Tier=smoke."
+      "notes": "ESM-SnowMIP Sodankyla reference site (Finland, sod)."
     },
     {
       "case_id": "swa",
       "case_type": "esm_site",
-      "tier": "smoke",
       "site_id": "swa",
       "site_name": "Swamp Angel",
       "forcing_file": "swa/forcing.mat",
@@ -290,12 +281,11 @@
           0.40000000596046448
         ]
       },
-      "notes": "ESM-SnowMIP Swamp Angel reference site (Colorado, USA, swa). Tier=smoke."
+      "notes": "ESM-SnowMIP Swamp Angel reference site (Colorado, USA, swa)."
     },
     {
       "case_id": "wfj",
       "case_type": "esm_site",
-      "tier": "smoke",
       "site_id": "wfj",
       "site_name": "Weissfluhjoch",
       "forcing_file": "wfj/forcing.mat",
@@ -317,7 +307,7 @@
         "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": 0.0099999997764825821
       },
-      "notes": "ESM-SnowMIP Weissfluhjoch reference site (Switzerland, wfj). Tier=smoke."
+      "notes": "ESM-SnowMIP Weissfluhjoch reference site (Switzerland, wfj)."
     }
   ]
 }

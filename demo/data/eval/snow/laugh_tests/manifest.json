@@ -3,11 +3,10 @@
   "source_doi": "",
   "source_url": "https://github.com/KyleKlenk/Laugh-Tests",
   "source_version": "m2_mac_Sept23 validation bundle",
-  "retrieval_date": "29-Apr-2026",
+  "retrieval_date": "05-May-2026",
   "cases": {
     "case_id": "colbeck1976",
     "case_type": "synthetic_process",
-    "tier": "smoke",
     "site_id": "colbeck1976",
     "site_name": "Colbeck 1976 synthetic snow infiltration benchmark",
     "forcing_file": "colbeck1976/forcing.mat",
