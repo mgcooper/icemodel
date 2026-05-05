@@ -24,6 +24,7 @@ function [names, defaults] = metricRowSchema()
       "peak_candidate"
       "peak_error"
       "peak_time_error_hours"
+      "snow_onset_time_error_hours"
       "melt_out_time_error_hours"];
 
    % Defaults represent a structurally valid row before any comparison occurs.
@@ -32,6 +33,7 @@ function [names, defaults] = metricRowSchema()
       ""
       "ok"
       uint64(0)
+      NaN
       NaN
       NaN
       NaN

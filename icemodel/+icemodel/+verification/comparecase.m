@@ -266,14 +266,25 @@ function [row, sync_tt] = compareOneVariable(target_tt, candidate_tt, ...
    row.peak_time_error_hours = hours(sync_tt.Time(idx_candidate) - ...
       sync_tt.Time(idx_target));
 
-   % Snow-depth and SWE series get one additional timing metric: when the
-   % post-peak series first returns to a near-zero melt-out threshold.
+   % Snow-depth and SWE series get two additional timing diagnostics: when
+   % the series first rises above an onset threshold (snow accumulation
+   % start), and when the post-peak series first returns below the same
+   % threshold (melt-out). Both errors are signed (candidate - target) in
+   % hours; an unobserved onset / melt-out leaves the metric as NaN.
    if any(varname == ["snow_depth_m", "swe_kg_m2"])
       threshold = meltThreshold(varname);
-      target_time = firstBelowThreshold(sync_tt.target, sync_tt.Time, threshold);
-      candidate_time = firstBelowThreshold(sync_tt.candidate, sync_tt.Time, threshold);
-      if ~isnat(target_time) && ~isnat(candidate_time)
-         row.melt_out_time_error_hours = hours(candidate_time - target_time);
+      onset_target = firstAboveThreshold(sync_tt.target, sync_tt.Time, threshold);
+      onset_candidate = firstAboveThreshold(sync_tt.candidate, sync_tt.Time, threshold);
+      if ~isnat(onset_target) && ~isnat(onset_candidate)
+         row.snow_onset_time_error_hours = hours(onset_candidate - onset_target);
+      end
+
+      melt_target = firstBelowThresholdAfterPeak(sync_tt.target, ...
+         sync_tt.Time, threshold);
+      melt_candidate = firstBelowThresholdAfterPeak(sync_tt.candidate, ...
+         sync_tt.Time, threshold);
+      if ~isnat(melt_target) && ~isnat(melt_candidate)
+         row.melt_out_time_error_hours = hours(melt_candidate - melt_target);
       end
    end
 end
@@ -298,8 +309,9 @@ function threshold = meltThreshold(varname)
    end
 end
 
-function t = firstBelowThreshold(values, time, threshold)
-   %FIRSTBELOWTHRESHOLD Return the first post-peak time below threshold.
+function t = firstBelowThresholdAfterPeak(values, time, threshold)
+   %FIRSTBELOWTHRESHOLDAFTERPEAK Return the first post-peak time below threshold.
+   % This is the canonical melt-out diagnostic.
 
    t = NaT;
    if isempty(values)
@@ -312,4 +324,19 @@ function t = firstBelowThreshold(values, time, threshold)
       return
    end
    t = time(peak_idx + idx - 1);
+end
+
+function t = firstAboveThreshold(values, time, threshold)
+   %FIRSTABOVETHRESHOLD Return the first time the series rises above threshold.
+   % This is the canonical snow-onset diagnostic.
+
+   t = NaT;
+   if isempty(values)
+      return
+   end
+   idx = find(values > threshold, 1, 'first');
+   if isempty(idx)
+      return
+   end
+   t = time(idx);
 end

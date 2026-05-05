@@ -1,10 +1,10 @@
-function report_path = writeRunReport(run_dir, summary, case_results, cases, kwargs)
+function report_path = writeRunReport(run_dir, case_results, cases, kwargs)
    %WRITERUNREPORT Write a concise markdown report for a verification run.
    %
    %  report_path = icemodel.verification.helpers.writeRunReport(...
-   %     run_dir, summary, case_results, cases)
+   %     run_dir, case_results, cases)
    %  report_path = icemodel.verification.helpers.writeRunReport(...
-   %     run_dir, summary, case_results, cases, run_icemodel=true)
+   %     run_dir, case_results, cases, run_icemodel=true)
    %
    %  Produces a single human-readable report at <run_dir>/report.md
    %  that ties the run's case-level metrics, comparison figures, and
@@ -16,9 +16,11 @@ function report_path = writeRunReport(run_dir, summary, case_results, cases, kwa
    %
    %  Inputs
    %    run_dir       Run artifact directory.
-   %    summary       Concatenated metric table written by the runner.
    %    case_results  Cell array of per-case result structs from
-   %                  icemodel.verification.comparecase.
+   %                  icemodel.verification.comparecase. Each carries
+   %                  a metric table; the report iterates over them
+   %                  directly so the long-format summary table held
+   %                  by the runner does not need to be passed in.
    %    cases         Resolved case manifest array from listcases.
    %
    %  Name-value
@@ -36,7 +38,6 @@ function report_path = writeRunReport(run_dir, summary, case_results, cases, kwa
 
    arguments
       run_dir       (1, 1) string
-      summary       table
       case_results  cell
       cases         struct
       kwargs.run_name     (1, 1) string = ""
@@ -101,11 +102,11 @@ function report_path = writeRunReport(run_dir, summary, case_results, cases, kwa
          fprintf(fid, "_no metrics_\n\n");
          continue
       end
-      fprintf(fid, "| Variable | Status | n | Bias | RMSE | Corr | Peak Err | Peak ΔT (h) | Melt-out ΔT (h) |\n");
-      fprintf(fid, "|----------|--------|---|------|------|------|----------|-------------|------------------|\n");
+      fprintf(fid, "| Variable | Status | n | Bias | RMSE | Corr | Peak Err | Peak ΔT (h) | Onset ΔT (h) | Melt-out ΔT (h) |\n");
+      fprintf(fid, "|----------|--------|---|------|------|------|----------|-------------|--------------|------------------|\n");
       for k = 1:height(m)
          row = m(k, :);
-         fprintf(fid, "| %s | %s | %d | %s | %s | %s | %s | %s | %s |\n", ...
+         fprintf(fid, "| %s | %s | %d | %s | %s | %s | %s | %s | %s | %s |\n", ...
             string(getOr(row, 'variable', '')), ...
             string(row.status), ...
             row.n, ...
@@ -114,6 +115,7 @@ function report_path = writeRunReport(run_dir, summary, case_results, cases, kwa
             fmtNum(getOr(row, 'correlation', NaN)), ...
             fmtNum(getOr(row, 'peak_error', NaN)), ...
             fmtNum(getOr(row, 'peak_time_error_hours', NaN)), ...
+            fmtNum(getOr(row, 'snow_onset_time_error_hours', NaN)), ...
             fmtNum(getOr(row, 'melt_out_time_error_hours', NaN)));
       end
       fprintf(fid, "\n");

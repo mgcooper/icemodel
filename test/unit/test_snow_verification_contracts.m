@@ -45,6 +45,57 @@ function test_verification_namelists_expose_curated_selectors(testCase)
    testCase.verifyEqual( ...
       icemodel.verification.namelists.caseid("esm_snowmip"), ...
       expectedEsmCaseIds());
+
+   % Family-specific namelists used by case-id resolution and arg validation.
+   testCase.verifyEqual(icemodel.verification.namelists.snowmipsite(), ...
+      expectedEsmCaseIds());
+   testCase.verifyEqual(icemodel.verification.namelists.laughtests(), ...
+      "colbeck1976");
+
+   % The richer site catalog is keyed by the same site-name namelist.
+   catalog = icemodel.verification.namelists.snowmipcatalog();
+   testCase.verifyEqual(string({catalog.sitename})', expectedEsmCaseIds());
+   info_cdp = icemodel.verification.namelists.snowmipcatalog("cdp");
+   testCase.verifyEqual(info_cdp.long_name, "Col de Porte");
+end
+
+function test_each_site_stages_expected_comparison_variables(testCase)
+   % Per-site staged comparison_variables must include the canonical snow
+   % column for every ESM-SnowMIP site, and surface_temp_C for sites whose
+   % upstream obs files contain a usable surface-temperature channel.
+   % This is the self-verification that catches regressions in the obs
+   % builder / manifest schema when one site silently loses a variable.
+
+   for sitename = expectedEsmCaseIds()'
+      manifest = icemodel.verification.loadmanifest(sitename);
+      vars = string(manifest.comparison_variables);
+
+      % Every site stages snow depth; this is the most basic sanity check.
+      testCase.verifyTrue(ismember("snow_depth_m", vars), ...
+         sprintf('snow_depth_m missing for %s', sitename));
+   end
+
+   % Surface temperature is observed at WFJ (Weissfluhjoch). Losing it from
+   % comparison_variables is the original regression revision-request-5
+   % flagged. Pin it explicitly here; sites without a usable 'ts' channel
+   % (e.g. sod) are expected to drop the variable and are excluded.
+   wfj = icemodel.verification.loadmanifest("wfj");
+   testCase.verifyTrue(ismember("surface_temp_C", ...
+      string(wfj.comparison_variables)), ...
+      'WFJ must stage surface_temp_C as a comparison variable');
+end
+
+function test_forcing_includes_rainf_snowf_passthrough(testCase)
+   % Site forcing files must include rainf/snowf channels so future
+   % rain/snow-aware downstream consumers can use them directly.
+
+   manifest = icemodel.verification.loadmanifest("cdp");
+   forcing = icemodel.verification.helpers.loadArtifact( ...
+      manifest.forcing_path, "forcing");
+   names = string(forcing.data.Properties.VariableNames);
+   testCase.verifyTrue(ismember("rainf", names));
+   testCase.verifyTrue(ismember("snowf", names));
+   testCase.verifyTrue(ismember("ppt", names));
 end
 
 function test_manifest_schema_helpers_are_setup_owned(testCase)

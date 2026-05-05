@@ -41,11 +41,17 @@ function candidate = runIcemodelSnowCandidate(case_manifest, kwargs)
       kwargs.enddate   = NaT('TimeZone', 'UTC')
    end
 
-   % Configure the icemodel run options.
+   % Configure the icemodel run options. Both sitename and forcings are
+   % placeholder labels: the synthetic-snow hook (icemodel.verification.
+   % syntheticSnowModelRun) intercepts the run before any met file is
+   % loaded, so neither label drives forcing-file resolution. Use
+   % "verification" for both so opts metadata is honest about the
+   % synthetic origin and so no real-site label (kanm, kanl, etc.) can
+   % be misread downstream as the source of these candidate metrics.
    smbmodel = 'icemodel';
    sitename = 'verification';
    simyears = caseSimulationYears(case_manifest);
-   forcings = 'kanm';
+   forcings = sitename;
    userdata = [];
    uservars = [];
    testname = case_manifest.case_id;
