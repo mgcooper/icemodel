@@ -16,8 +16,14 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  SITENAME - a string scalar indicating the site name which is used to
    %  locate the forcing data file and create the output file names.
    %
-   %  SIMYEARS - a numeric scalar or vector of 4-digit years e.g. 2016, also
-   %  used to locate the correct forcing data file.
+   %  SIMYEARS - a numeric scalar or vector of 4-digit years e.g. 2016. Used
+   %  to locate the correct forcing data file. May be passed as `[]` when
+   %  STARTDATE and ENDDATE are provided via name/value overrides; in that
+   %  case configureRun derives SIMYEARS from the window. When both SIMYEARS
+   %  and STARTDATE/ENDDATE are provided, they must be compatible (the
+   %  window must fall within the SIMYEARS span); incompatible pairs raise
+   %  an error. STARTDATE/ENDDATE remain authoritative for the actual
+   %  loaded met subset.
    %
    %  FORCINGS - a string scalar indicating the forcing data. Standard values
    %  include the climate-model forcings "mar", "merra", and "racmo", plus

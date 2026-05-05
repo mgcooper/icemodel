@@ -326,44 +326,46 @@ they can evolve alongside the suite.
 
 ### startdate / enddate as a first-class IceModel option
 
-`icemodel.setopts` and `icemodel.loadmet` already accept optional
-`startdate` / `enddate` kwargs that subset the loaded met to a
-specific datetime window in addition to the year-granularity
-`simyears` subset. Both default to `NaT('TimeZone', 'UTC')` (no
-subsetting), so the canonical year-only behaviour is preserved when
-they are not set.
+`startdate` / `enddate` are now first-class run-window specifiers
+across the icemodel runtime. The decision matrix in
+`icemodel.configureRun` (canonicalizeWindow):
 
-This was added under the verification work and is not yet integrated
-with `icemodel.configureRun`. To make `startdate` / `enddate` a
-fully first-class general model option we would need:
+| `simyears`     | `startdate`/`enddate` | Behaviour                                                                         |
+| -------------- | --------------------- | --------------------------------------------------------------------------------- |
+| provided       | not provided          | as before; year-granularity contract                                              |
+| not provided   | provided              | derive simyears from years touched by the window                                  |
+| both, compat.  | both, compat.         | both preserved; window is authoritative for met subset, simyears for met-naming   |
+| both, incompat | both, incompat        | error (`icemodel:configureRun:windowOutsideSimyears`)                             |
+| neither        | neither               | error (`icemodel:configureRun:noWindow`)                                          |
 
-1. **`configureRun` validation**: confirm that when both bounds are
-   set, they fall inside `min(simyears)`–`max(simyears)`, and that
-   `startdate < enddate`. Today an invalid window silently produces
-   a zero-row met after the simyears subset.
-2. **Restart compatibility**: `use_restart` saves at year boundaries.
-   A windowed run that does not start on a year boundary needs a
-   policy decision on whether the restart state still applies. Most
-   naturally, restart files would be tagged with the window start
-   so non-aligned restarts error out.
-3. **Output-year filtering**: `opts.output_years` determines which
-   simulation years get retained in `ice1` post-processing. Today
-   this is independent of `startdate`/`enddate`; for a windowed run
-   the natural behaviour is to intersect with the window.
-4. **Spinup interaction**: `n_spinup_years` strips leading years
-   from the retained output. With a partial-year start, "year 1"
-   is not well-defined; spinup either becomes a duration in days
-   or the call errors when both are set.
-5. **Demo runs**: a normal demo run with custom dates would call
-   `setopts(..., 'startdate', "2016-06-01", 'enddate', "2016-08-31")`
-   and downstream paths (output, restart) need to encode the window
-   in their naming so windowed runs do not collide with full-year
-   runs of the same simyears.
+Notes on the integrations:
 
-Recommendation: promote `startdate`/`enddate` to first-class options
-with the five integrations above, in a dedicated bead. The current
-verification-driven implementation is a sufficient bridge and should
-be extended rather than replaced.
+- **Validation**: configureRun owns the canonicalization step.
+  Half-windows error (`halfWindow`); inverted windows error
+  (`invalidWindow`). Compatibility checks fail loudly rather than
+  silently producing zero-row met.
+- **Restart compatibility**: `use_restart=true` requires `startdate`
+  to fall on a calendar-year boundary
+  (`icemodel:configureRun:restartWindowNotAligned`). Non-aligned
+  restart logic is deferred until there is a concrete need.
+- **Output-year filtering**: `opts.output_years` continues to derive
+  from `simyears(n_spinup_years+1:end)`. The strict full-year contract
+  has been relaxed: spinup years can include partial-year leading
+  windows without erroring. Users who want output_years to reflect
+  the window can pass it explicitly via `resetopts`.
+- **Spinup interaction**: no longer enforces year-boundary alignment.
+  `n_spinup_years` simply strips leading retained simyears from
+  `output_years`; whether those simyears are partial is the caller's
+  decision.
+- **Demo runs**: `setopts(..., simyears=[], 'startdate', "2016-06-01",
+  'enddate', "2016-08-31")` derives `simyears = 2016` automatically.
+  Output paths still use sitename/smbmodel/testname; the window
+  itself is not encoded in the path. Callers who want to distinguish
+  windowed and full-year runs of the same simyears must use distinct
+  testnames.
+
+Test coverage is in `test_run_contracts` under `test_window_*` and
+`test_use_restart_with_misaligned_window_errors`.
 
 ### Staging window vs on-the-fly subsetting
 
