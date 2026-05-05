@@ -18,20 +18,28 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    %     Wind   [m s-1]             -> wspd       [m s-1]
    %     Psurf  [Pa]                -> psfc       [Pa]
    %     Qair   [kg kg-1] + Psurf   -> rh         [1]
-   %     Rainf + Snowf [kg m-2 s-1] -> ppt        [m s-1]
+   %     Rainf [kg m-2 s-1]         -> rainf      [m s-1]   (mass / ro_liq)
+   %     Snowf [kg m-2 s-1]         -> snowf      [m s-1]   (mass / ro_liq)
+   %     Rainf + Snowf              -> ppt        [m s-1]   (rainf + snowf)
    %     obs sdepth (snd_auto/man)  -> snow_depth [m]
    %     obs albs                   -> albedo     [1]
    %
-   % Notes on variable conversions:
-   % Qair converts to rh via icemodel.vapor.relative_humidity_from_specific_humidity
-   % albedo is filled with 0.85 over snow / 0.45 over bare ground
-   % rainf + snowf = ppt, divided by ro_liq to get m/s.
+   %  Notes on variable conversions
+   %    Qair converts to rh via
+   %    icemodel.vapor.relative_humidity_from_specific_humidity. rainf / snowf
+   %    are stored both as their own forcing channels (so a downstream model can
+   %    consume rain and snow precipitation separately when available) and
+   %    summed into ppt for the legacy single-channel consumers. Mass flux [kg
+   %    m-2 s-1] is divided by the canonical liquid-water density to obtain
+   %    volumetric flux [m s-1]. Albedo is filled with snow / bare-ground
+   %    constants where observations are missing; this is a placeholder until
+   %    the diagnostic / prognostic albedo kernel lands.
    %
    %  Inputs
    %    sitename : string
    %        ESM-SnowMIP site code (e.g. "cdp"). See
-   %        icemodel.verification.namelists.snowmipsite for the full
-   %        catalog.
+   %        icemodel.verification.namelists.snowmipcatalog for the full
+   %        catalog and snowmipsite for the bare site-name namelist.
    %
    %  Name-value
    %    source_dir : string (default data/verification/snow/esm_snowmip)
@@ -50,11 +58,17 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    %    forcing : timetable
    %        icemodel-native forcing in hourly UTC samples. Columns
    %        match the schema produced by the existing met builders:
-   %        tair, swd, lwd, albedo, wspd, rh, psfc, ppt, snow_depth.
+   %        tair, swd, lwd, albedo, wspd, rh, psfc, ppt, rainf, snowf,
+   %        snow_depth.
    %    metadata : struct
    %        Provenance: source files, row count, time bounds, the
    %        physicalConstant ro_liq used to convert mass flux to
    %        volumetric flux, and notes on the albedo policy.
+   %
+   %  Role
+   %    Reusable per-site forcing builder. Called by importEsmSnowmip
+   %    during staging and by any future on-the-fly icemodel run that
+   %    needs to consume the upstream NetCDF directly.
    %
    %  References
    %    Menard, C. B. et al. (2019). Meteorological and evaluation
@@ -66,26 +80,23 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    %
    % See also: icemodel.verification.setup.importEsmSnowmip,
    %  icemodel.verification.setup.fetchEsmSnowmip,
+   %  icemodel.verification.setup.readNetcdfTime,
+   %  icemodel.verification.setup.readObsChannel,
+   %  icemodel.verification.setup.readBestSnowDepth,
    %  icemodel.vapor.relative_humidity_from_specific_humidity,
    %  icemodel.physicalConstant
 
    arguments
-      sitename (1, 1) string
-      kwargs.source_dir (1, 1) string = ""
+      sitename (1, 1) string ...
+         {icemodel.verification.validators.mustBeSnowmipSite}
+      kwargs.source_dir (1, 1) string = defaultSourceDir()
       kwargs.met_kind   (1, 1) string {mustBeMember(kwargs.met_kind, ...
          ["insitu", "gswp3c"])} = "insitu"
       kwargs.startdate  = ""
       kwargs.enddate    = ""
    end
 
-   % Resolve the source directory. Defaults to the gitignored cache
-   % under <repo>/data/verification/snow/esm_snowmip/ via getpath.
-   if kwargs.source_dir == ""
-      source_dir = string(fullfile(icemodel.getpath('data'), ...
-         'verification', 'snow', 'esm_snowmip'));
-   else
-      source_dir = kwargs.source_dir;
-   end
+   source_dir = kwargs.source_dir;
 
    % Locate the per-site met and obs files. Match the canonical naming
    % convention used by the upstream PANGAEA bundle:
@@ -96,8 +107,8 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    metfile = locateUnique(source_dir, met_pattern);
    obsfile = locateUnique(source_dir, obs_pattern);
 
-   % --- Read the source forcing channels --------------------------------
-   met_time = readNetcdfTime(metfile, 'time');
+   % --- Read the source forcing channels -------------------------------
+   met_time = icemodel.verification.setup.readNetcdfTime(metfile, 'time');
    tair     = double(ncread(metfile, 'Tair'));      % [K]
    swdown   = double(ncread(metfile, 'SWdown'));    % [W m-2]
    lwdown   = double(ncread(metfile, 'LWdown'));    % [W m-2]
@@ -108,18 +119,18 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    snowf    = double(ncread(metfile, 'Snowf'));     % [kg m-2 s-1]
 
    % --- Read observation channels needed for forcing -------------------
-   % Only fields that feed forcing are read here (snow_depth and
-   % albedo). Comparison observations are read in the obs builder.
-   %
    % ESM-SnowMIP sites are heterogeneous: boreal forest sites
    % (oas, obs, ojp) report snd_gap_auto / snd_gap1_auto in the
    % canopy gap rather than snd_auto; some sites lack albs entirely.
-   % readBestSnowDepth and optionalObs hide that variability so the
-   % rest of the builder can stay site-agnostic.
-   obs_time  = readNetcdfTime(obsfile, 'time');
-   snd_auto  = readBestSnowDepth(obsfile);
-   snd_man   = optionalObs(obsfile, 'snd_man', numel(obs_time));
-   albs      = optionalObs(obsfile, 'albs',    numel(obs_time));
+   % readBestSnowDepth and readObsChannel(optional=true) hide that
+   % variability so the rest of the builder can stay site-agnostic.
+   obs_time  = icemodel.verification.setup.readNetcdfTime(obsfile, 'time');
+   [snd_auto, snow_depth_source] = ...
+      icemodel.verification.setup.readBestSnowDepth(obsfile);
+   snd_man = icemodel.verification.setup.readObsChannel(obsfile, "snd_man", ...
+      optional=true, ntime=numel(obs_time));
+   albs = icemodel.verification.setup.readObsChannel(obsfile, "albs", ...
+      optional=true, ntime=numel(obs_time));
 
    % If met and obs grids differ, align observations to met time. This
    % handles edge cases where ESM-SnowMIP obs records start one hour
@@ -131,12 +142,14 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    end
 
    % --- Apply optional time-window subsetting --------------------------
-   idx = trueMask(numel(met_time));
+   idx = true(numel(met_time), 1);
    if ~strcmp(string(kwargs.startdate), "")
-      idx = idx & met_time >= ensureUtc(kwargs.startdate);
+      idx = idx & met_time >= ...
+         icemodel.verification.setup.ensureUtc(kwargs.startdate);
    end
    if ~strcmp(string(kwargs.enddate), "")
-      idx = idx & met_time <= ensureUtc(kwargs.enddate);
+      idx = idx & met_time <= ...
+         icemodel.verification.setup.ensureUtc(kwargs.enddate);
    end
    if ~any(idx)
       error('icemodel:verification:buildEsmSnowmipForcing:emptyWindow', ...
@@ -150,14 +163,17 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    rh = icemodel.vapor.relative_humidity_from_specific_humidity( ...
       qair(idx), psfc(idx), tair(idx));
 
-   % Total precipitation flux: rain + snow. Mass flux [kg m-2 s-1] is
-   % converted to volumetric flux [m s-1] via division by liquid water
-   % density, which icemodel exposes through physicalConstant.
+   % Precipitation: rain and snow stored separately and as a sum (ppt).
+   % Mass flux [kg m-2 s-1] -> volumetric flux [m s-1] via division by
+   % liquid-water density, which icemodel exposes through physicalConstant.
    ro_liq = icemodel.physicalConstant('ro_liq');
-   ppt = (rainf(idx) + snowf(idx)) / ro_liq;
+   rainf = rainf(idx) / ro_liq;
+   snowf = snowf(idx) / ro_liq;
+   ppt = rainf + snowf;
 
    % Snow depth: prefer automatic gauge, fall back to manual.
-   snow_depth = preferPrimary(snd_auto(idx), snd_man(idx));
+   snow_depth = icemodel.verification.setup.preferPrimary( ...
+      snd_auto(idx), snd_man(idx));
 
    % Albedo: build a continuous series from observed daily albedo with
    % snow / bare-ground constants where observations are missing.
@@ -166,30 +182,42 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    % --- Assemble the forcing timetable ---------------------------------
    Time = met_time(idx);
    forcing = timetable(Time, tair(idx), swdown(idx), lwdown(idx), albedo, ...
-      wind(idx), rh, psfc(idx), ppt, snow_depth, ...
+      wind(idx), rh, psfc(idx), ppt, rainf, snowf, snow_depth, ...
       'VariableNames', {'tair', 'swd', 'lwd', 'albedo', 'wspd', ...
-      'rh', 'psfc', 'ppt', 'snow_depth'});
+      'rh', 'psfc', 'ppt', 'rainf', 'snowf', 'snow_depth'});
    forcing.Time.TimeZone = 'UTC';
 
    % Provenance metadata describing how the forcing was produced.
    metadata = struct( ...
-      'sitename',         sitename, ...
-      'met_kind',         kwargs.met_kind, ...
-      'met_file',         string(metfile), ...
-      'obs_file',         string(obsfile), ...
-      'n_rows',           height(forcing), ...
-      'window_start',     forcing.Time(1), ...
-      'window_end',       forcing.Time(end), ...
-      'ro_liq_kg_per_m3', ro_liq, ...
-      'humidity_kernel',  "icemodel.vapor.relative_humidity_from_specific_humidity", ...
-      'albedo_policy',    "observed daily albedo + snow/ground fallback");
+      'sitename',          sitename, ...
+      'met_kind',          kwargs.met_kind, ...
+      'met_file',          string(metfile), ...
+      'obs_file',          string(obsfile), ...
+      'n_rows',            height(forcing), ...
+      'window_start',      forcing.Time(1), ...
+      'window_end',        forcing.Time(end), ...
+      'ro_liq_kg_per_m3',  ro_liq, ...
+      'humidity_kernel',   "icemodel.vapor.relative_humidity_from_specific_humidity", ...
+      'snow_depth_source', snow_depth_source, ...
+      'albedo_policy',     "observed daily albedo + snow/ground fallback", ...
+      'precip_policy',     "rainf and snowf stored separately; ppt = rainf + snowf");
 end
 
 % =====================================================================
 % Local helpers
 % =====================================================================
 
+function pathname = defaultSourceDir()
+   %DEFAULTSOURCEDIR Default ESM-SnowMIP source-cache directory.
+   %
+   % Mirrors fetchEsmSnowmip's default cache layout:
+   %   <repo>/data/verification/snow/esm_snowmip/
+   pathname = string(fullfile(icemodel.getpath('data'), ...
+      'verification', 'snow', 'esm_snowmip'));
+end
+
 function pathname = locateUnique(source_dir, pattern)
+   %LOCATEUNIQUE Glob-match a file in source_dir; error on miss / ambiguity.
    matches = dir(fullfile(source_dir, pattern));
    if isempty(matches)
       error('icemodel:verification:buildEsmSnowmipForcing:fileNotFound', ...
@@ -203,62 +231,15 @@ function pathname = locateUnique(source_dir, pattern)
    pathname = fullfile(matches.folder, matches.name);
 end
 
-function time = readNetcdfTime(pathname, varname)
-   raw = double(ncread(pathname, varname));
-   units = string(ncreadatt(pathname, varname, 'units'));
-   tref = datetime(extractAfter(units, 'hours since '), ...
-      'InputFormat', 'yyyy-MM-dd HH:mm:ss.S', 'TimeZone', 'UTC');
-   time = tref + hours(raw);
-   time = time(:);
-end
-
-function values = readObs(pathname, varname)
-   values = double(ncread(pathname, varname));
-   values(values <= -900) = NaN;
-end
-
-function values = optionalObs(pathname, varname, ntime)
-   info = ncinfo(pathname);
-   if any(string({info.Variables.Name}) == varname)
-      values = readObs(pathname, varname);
-   else
-      values = nan(ntime, 1);
-   end
-end
-
-function values = readBestSnowDepth(pathname)
-   %READBESTSNOWDEPTH Site-aware snow-depth selector.
-   %
-   % ESM-SnowMIP boreal forest sites (oas, obs, ojp) report
-   % snd_gap_auto / snd_gap1_auto in the canopy gap rather than
-   % snd_auto. We prefer in this order:
-   %   snd_auto > snd_gap_auto > snd_gap1_auto > snd_man
-   % so the resulting series is the most representative open-area
-   % snow-depth time series available for the site.
-   info = ncinfo(pathname);
-   names = string({info.Variables.Name});
-   candidates = ["snd_auto", "snd_gap_auto", "snd_gap1_auto", "snd_man"];
-   for c = candidates
-      if any(names == c)
-         values = readObs(pathname, char(c));
-         return
-      end
-   end
-   error('icemodel:verification:buildEsmSnowmipForcing:noSnowDepth', ...
-      'no usable snow-depth channel in %s', pathname);
-end
-
-function merged = preferPrimary(primary, fallback)
-   merged = primary;
-   replace = ~isfinite(merged) & isfinite(fallback);
-   merged(replace) = fallback(replace);
-end
-
 function albedo = buildAlbedo(raw_albedo, snow_depth)
+   %BUILDALBEDO Continuous albedo with snow / bare-ground fallback.
+   %
    % Filter raw observed albedo to the [0, 1] range, then linearly
    % interpolate gaps. Persistent gaps fall back to snow / bare-ground
    % constants so the staged forcing is continuous (icemodel does not
-   % currently model albedo evolution from state).
+   % currently model albedo evolution from state). The diagnostic /
+   % prognostic albedo kernel (icemodel-0gt.2) will replace this
+   % placeholder once it lands.
    albedo = raw_albedo;
    albedo(albedo < 0 | albedo > 1) = NaN;
    albedo = fillmissing(albedo, 'linear', 'EndValues', 'nearest');
@@ -269,8 +250,7 @@ function albedo = buildAlbedo(raw_albedo, snow_depth)
 end
 
 function [a, b, c] = alignToMetTime(met_time, obs_time, a_in, b_in, c_in)
-   % Fast path: same length and uniformly offset by an integer hour.
-   % Otherwise, fall back to nearest-time matching with NaN fill.
+   %ALIGNTOMETTIME Align obs samples to met times by exact-match lookup.
    N = numel(met_time);
    a = nan(N, 1);
    b = nan(N, 1);
@@ -279,16 +259,4 @@ function [a, b, c] = alignToMetTime(met_time, obs_time, a_in, b_in, c_in)
    a(hit) = a_in(locs(hit));
    b(hit) = b_in(locs(hit));
    c(hit) = c_in(locs(hit));
-end
-
-function mask = trueMask(n)
-   mask = true(n, 1);
-end
-
-function t = ensureUtc(t)
-   if isstring(t) || ischar(t)
-      t = datetime(t, 'TimeZone', 'UTC');
-   elseif isdatetime(t) && isempty(t.TimeZone)
-      t.TimeZone = 'UTC';
-   end
 end

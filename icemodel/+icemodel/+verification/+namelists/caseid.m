@@ -14,7 +14,10 @@ function case_ids = caseid(dataset_family)
    % Role
    %  Canonical runnable-case list shared by setup importers, validators, and
    %  normal verification workflow filters. This selector is keyed by
-   %  dataset_family, not by case_type.
+   %  dataset_family, not by case_type. Family-specific case ids are sourced
+   %  from each family's dedicated namelist (snowmipsite for "esm_snowmip",
+   %  laughtests for "laugh_tests") so adding cases requires only updating
+   %  the family namelist.
 
    arguments
       dataset_family (1, 1) string = "all"
@@ -22,26 +25,20 @@ function case_ids = caseid(dataset_family)
 
    validateDatasetFamily(dataset_family)
 
-   % Keep each dataset family explicit so adding cases remains
-   % reviewable. The ESM-SnowMIP roster is sourced from the canonical
-   % site catalog (icemodel.verification.namelists.snowmipsite) so
-   % adding a new site only requires updating the catalog.
+   % Dispatch by dataset family. Each family's case-id list is owned by its
+   % namelist function; this dispatcher just concatenates them.
    switch dataset_family
       case "all"
-         case_ids = [esmSnowmipCaseIds(); "colbeck1976"];
+         case_ids = [ ...
+            icemodel.verification.namelists.snowmipsite(); ...
+            icemodel.verification.namelists.laughtests()];
 
       case "esm_snowmip"
-         case_ids = esmSnowmipCaseIds();
+         case_ids = icemodel.verification.namelists.snowmipsite();
 
       case "laugh_tests"
-         case_ids = "colbeck1976";
+         case_ids = icemodel.verification.namelists.laughtests();
    end
-end
-
-function ids = esmSnowmipCaseIds()
-   %ESMSNOWMIPCASEIDS Lift the ESM-SnowMIP site list from the catalog.
-   info = icemodel.verification.namelists.snowmipsite();
-   ids = reshape([info.sitename], [], 1);
 end
 
 function validateDatasetFamily(dataset_family)

@@ -42,17 +42,26 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %  Returns
    %    manifest : struct  Family manifest also written to manifest.json.
    %
+   %  Role
+   %    Setup/update tooling. This function creates or refreshes staged data
+   %    under demo/data/eval/snow and is not part of normal verification runs.
+   %    Layout / file-presence guarantees come from
+   %    icemodel.verification.setup.fetchEsmSnowmip; downstream from that
+   %    point this importer can write the resolved output files directly
+   %    without repeating per-file existence checks.
+   %
    % See also: icemodel.verification.setup.fetchEsmSnowmip,
    %  icemodel.verification.setup.buildEsmSnowmipForcing,
    %  icemodel.verification.setup.buildEsmSnowmipObservations,
-   %  icemodel.verification.namelists.snowmipsite
+   %  icemodel.verification.namelists.snowmipsite,
+   %  icemodel.verification.namelists.snowmipcatalog
 
    arguments
       source_dir (1, :) string
       kwargs.evaluation_data_root (1, 1) string = ""
       kwargs.icemodel_config_casename (1, 1) string = "test"
       kwargs.case_ids (1, :) string = ...
-         icemodel.verification.namelists.caseid("esm_snowmip")
+         icemodel.verification.namelists.snowmipsite()
       kwargs.tier (1, 1) string {mustBeMember(kwargs.tier, ...
          ["smoke", "full", "custom"])} = "smoke"
       kwargs.startdate = ""
@@ -60,10 +69,9 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       kwargs.overwrite (1, 1) logical = false
    end
 
-   % Validate the requested case ids against the canonical site catalog.
-   valid_ids = icemodel.verification.namelists.caseid("esm_snowmip");
+   % Validate the requested case ids against the canonical sitename namelist.
    case_ids = reshape(kwargs.case_ids, 1, []);
-   bad = setdiff(case_ids, valid_ids);
+   bad = setdiff(case_ids, icemodel.verification.namelists.snowmipsite());
    if ~isempty(bad)
       error('unsupported ESM-SnowMIP case ids: %s', strjoin(bad, ', '));
    end
@@ -77,33 +85,53 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       end
    end
 
-   % Resolve and prepare the dataset-family root.
+   % Confirm the source-cache layout is complete before the per-site loop.
+   % fetch is the single source of truth for "are the upstream files
+   % present and readable?", so the importer does not repeat that check.
+   icemodel.verification.setup.fetchEsmSnowmip( ...
+      cache_dir=string(source_dir), sitenames=case_ids);
+
+   % Name the source family and runnable cases once. dataset_family is the
+   % staged source folder/manifest family; case_ids are the site cases inside
+   % that family.
    dataset_family = "esm_snowmip";
+
+   % Resolve the path to the dataset family sub-folder
+   %   <snow_data_root>/esm_snowmip
    snow_data_root = icemodel.verification.helpers.snowDataRoot( ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
       "icemodel_config_casename", kwargs.icemodel_config_casename);
    family_root = fullfile(snow_data_root, dataset_family);
    icemodel.helpers.ensureDirExists(family_root);
+
+   % Resolve the path to the dataset family manifest
+   %   <snow_data_root>/esm_snowmip/manifest.json
    manifest_file = fullfile(family_root, "manifest.json");
 
    % Stage each requested case.
    case_entries = cell(numel(case_ids), 1);
    for i = 1:numel(case_ids)
       sitename = case_ids(i);
-      info = icemodel.verification.namelists.snowmipsite(sitename);
+      info = icemodel.verification.namelists.snowmipcatalog(sitename);
 
       % Resolve the requested time window per the selected tier.
       [window_start, window_end] = resolveTierWindow( ...
          kwargs.tier, info, kwargs.startdate, kwargs.enddate);
 
+      % Resolve the per-site case root and the three staged-artifact paths.
       case_root = fullfile(family_root, sitename);
       forcing_output_file    = fullfile(case_root, "forcing.mat");
       evaluation_output_file = fullfile(case_root, "evaluation.mat");
       reference_output_file  = fullfile(case_root, "reference.mat");
 
+      % prepareCaseRoot owns the overwrite guard. From here down, this
+      % importer can write the resolved output files directly without
+      % repeating per-file existence checks.
       icemodel.verification.setup.prepareCaseRoot(case_root, kwargs.overwrite);
 
-      % Build forcing and observations through the reusable builders.
+      % Build forcing and observations through the reusable builders. Both
+      % builders share NetCDF / time-window / channel-selection logic via
+      % the local readers in this setup namespace.
       [forcing_tt, forcing_meta] = ...
          icemodel.verification.setup.buildEsmSnowmipForcing( ...
          sitename, source_dir=source_dir, ...
@@ -145,12 +173,19 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       save(evaluation_output_file, 'targets');
       save(reference_output_file, 'reference');
 
-      % Choose comparison variables from what's actually present in
-      % the obs timetable (some sites lack soil temperature / surface
-      % temperature). This avoids comparecase emitting "not_applicable"
-      % rows for variables that were never observed at the site.
+      % Choose comparison variables from what's actually present and
+      % usable in the obs timetable. A variable that exists as a
+      % column but contains no finite samples (e.g. 'ts' on Sodankyla
+      % where the upstream data is all -9999 sentinels) is dropped so
+      % comparecase does not emit "no_overlap" for never-observed
+      % variables, while sites that DO observe surface temperature
+      % keep it as a comparison variable.
       comparison_variables = obsComparisonVariables(obs_tt);
 
+      % Provenance for the staged observations. The richer obs_meta
+      % carries snow_depth / SWE source channels and soil-temperature
+      % depths; these are reduced to a metadataStruct so the manifest
+      % entry stays JSON-friendly.
       observation_variables = ...
          icemodel.verification.setup.metadataStruct({ ...
          'snow_depth_source', obs_meta.snow_depth_source
@@ -197,7 +232,7 @@ function [window_start, window_end] = resolveTierWindow( ...
       tier, info, custom_start, custom_end)
    %RESOLVETIERWINDOW Decide the staged time window per tier.
 
-   % insitu_window in the namelist is [start_year, end_year] inclusive.
+   % insitu_window in the catalog is [start_year, end_year] inclusive.
    insitu_start = info.insitu_window(1);
    insitu_end = info.insitu_window(2);
 
@@ -213,7 +248,7 @@ function [window_start, window_end] = resolveTierWindow( ...
             9, 30, 23, 0, 0, 'TimeZone', 'UTC');
 
       case "full"
-         % Full available range as advertised by the namelist.
+         % Full available range as advertised by the catalog.
          window_start = datetime(insitu_start, ...
             10, 1,  0, 0, 0, 'TimeZone', 'UTC');
          window_end   = datetime(insitu_end,  ...
@@ -228,15 +263,21 @@ end
 function vars = obsComparisonVariables(obs_tt)
    %OBSCOMPARISONVARIABLES Pick comparison variables from staged obs.
    %
-   % Returns a string column with the canonical ordering: snow_depth_m,
-   % swe_kg_m2, surface_temp_C, soil_temp_<k>_C. Variables absent from
-   % the staged timetable are dropped so comparecase does not emit
-   % "not_applicable" rows for never-observed variables.
+   % Returns a string column with the canonical ordering:
+   %   snow_depth_m, swe_kg_m2, surface_temp_C, soil_temp_<k>_C
+   %
+   % A canonical variable is included when its column exists in the
+   % staged obs timetable. The obs builder
+   % (buildEsmSnowmipObservations) decides which canonical columns to
+   % stage based on upstream NetCDF channel availability, so a simple
+   % presence check is sufficient here. Sparseness within the staged
+   % window is preserved on the comparison axis (plotcase renders
+   % sparse markers); never-observed variables are absent and never
+   % appear as comparison rows.
    present = string(obs_tt.Properties.VariableNames);
    canonical = ["snow_depth_m"; "swe_kg_m2"; "surface_temp_C"];
-   soil = present(startsWith(present, "soil_temp_"));
-   ordered = [canonical(ismember(canonical, present)); sort(soil(:))];
-   vars = ordered;
+   soil = reshape(present(startsWith(present, "soil_temp_")), [], 1);
+   vars = [canonical(ismember(canonical, present)); sort(soil)];
 end
 
 function note = siteCaseNote(info, tier)

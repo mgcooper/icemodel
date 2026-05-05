@@ -3,7 +3,7 @@
   "source_doi": "10.1594/PANGAEA.897575",
   "source_url": "https://doi.org/10.1594/PANGAEA.897575",
   "source_version": "ESM-SnowMIP_all.zip",
-  "retrieval_date": "29-Apr-2026",
+  "retrieval_date": "30-Apr-2026",
   "cases": [
     {
       "case_id": "cdp",
@@ -28,7 +28,7 @@
         "soil_temp_3_C"
       ],
       "observation_variables": {
-        "snow_depth_source": "snd_auto with snd_man fallback",
+        "snow_depth_source": "snd_auto",
         "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": [
           0.10000000149011612,
@@ -61,7 +61,7 @@
         "soil_temp_3_C"
       ],
       "observation_variables": {
-        "snow_depth_source": "snd_auto with snd_man fallback",
+        "snow_depth_source": "snd_gap_auto",
         "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": [
           0.10000000149011612,
@@ -95,7 +95,7 @@
         "soil_temp_4_C"
       ],
       "observation_variables": {
-        "snow_depth_source": "snd_auto with snd_man fallback",
+        "snow_depth_source": "snd_gap1_auto",
         "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": [
           0.10000000149011612,
@@ -130,7 +130,7 @@
         "soil_temp_4_C"
       ],
       "observation_variables": {
-        "snow_depth_source": "snd_auto with snd_man fallback",
+        "snow_depth_source": "snd_gap_auto",
         "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": [
           0.10000000149011612,
@@ -162,7 +162,7 @@
         "soil_temp_1_C"
       ],
       "observation_variables": {
-        "snow_depth_source": "snd_auto with snd_man fallback",
+        "snow_depth_source": "snd_auto",
         "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": 0.30000001192092896
       },
@@ -188,7 +188,7 @@
         "surface_temp_C"
       ],
       "observation_variables": {
-        "snow_depth_source": "snd_auto with snd_man fallback",
+        "snow_depth_source": "snd_auto",
         "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": []
       },
@@ -217,7 +217,7 @@
         "soil_temp_3_C"
       ],
       "observation_variables": {
-        "snow_depth_source": "snd_auto with snd_man fallback",
+        "snow_depth_source": "snd_auto",
         "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": [
           0.10000000149011612,
@@ -244,13 +244,12 @@
       "comparison_variables": [
         "snow_depth_m",
         "swe_kg_m2",
-        "surface_temp_C",
         "soil_temp_1_C",
         "soil_temp_2_C",
         "soil_temp_3_C"
       ],
       "observation_variables": {
-        "snow_depth_source": "snd_auto with snd_man fallback",
+        "snow_depth_source": "snd_auto",
         "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": [
           0.10000000149011612,
@@ -283,7 +282,7 @@
         "soil_temp_3_C"
       ],
       "observation_variables": {
-        "snow_depth_source": "snd_auto with snd_man fallback",
+        "snow_depth_source": "snd_auto",
         "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": [
           0.10000000149011612,
@@ -314,7 +313,7 @@
         "soil_temp_1_C"
       ],
       "observation_variables": {
-        "snow_depth_source": "snd_auto with snd_man fallback",
+        "snow_depth_source": "snd_auto",
         "swe_source": "snw_auto with snw_man fallback when available",
         "soil_depths_m": 0.0099999997764825821
       },

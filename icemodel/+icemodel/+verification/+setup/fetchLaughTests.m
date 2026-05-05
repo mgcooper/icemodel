@@ -45,6 +45,11 @@ function source_dir = fetchLaughTests(kwargs)
    %      auto-detected and returned. The user may set kwargs.cache_dir
    %      explicitly to disable this fallback.
    %
+   %  Role
+   %    Validator. The fetch helper guarantees the cache directory
+   %    exists and that every required Laugh-Tests file is present,
+   %    so importLaughTests does not have to repeat per-file checks.
+   %
    %  Name-value
    %    cache_dir : string (default data/verification/snow/laugh_tests)
    %        Local Laugh-Tests checkout directory.
@@ -61,30 +66,16 @@ function source_dir = fetchLaughTests(kwargs)
    %  icemodel.verification.setup.fetchEsmSnowmip
 
    arguments
-      kwargs.cache_dir (1, 1) string = ""
+      kwargs.cache_dir (1, 1) string = defaultCacheDir()
       kwargs.strict   (1, 1) logical = true
       kwargs.silent   (1, 1) logical = false
    end
 
-   % Resolve the default cache directory under the canonical data
-   % root (<repo>/data/) returned by icemodel.getpath('data').
-   data_root = icemodel.getpath('data');
-   default_cache = string(fullfile(data_root, 'verification', ...
-      'snow', 'laugh_tests'));
-
-   user_supplied = kwargs.cache_dir ~= "";
-   if user_supplied
-      cache_dir = kwargs.cache_dir;
-   else
-      cache_dir = default_cache;
-   end
+   cache_dir = kwargs.cache_dir;
+   user_supplied = ~strcmp(cache_dir, defaultCacheDir());
 
    % Required files (Colbeck case).
-   required = string([ ...
-      "test_cases/input_data/colbeck1976/colbeck1976_forcing.nc"; ...
-      "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp1_G1-1_timestep.nc"; ...
-      "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp2_G1-1_timestep.nc"; ...
-      "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp3_G1-1_timestep.nc"]);
+   required = colbeckRequiredFiles();
 
    % Probe the requested cache for completeness first.
    [ok, missing] = checkLaughTestsCheckout(cache_dir, required);
@@ -93,9 +84,9 @@ function source_dir = fetchLaughTests(kwargs)
    % AND the user did not pass cache_dir explicitly AND a sibling
    % ../Laugh-Tests directory has a complete checkout, prefer that.
    % This preserves Matt's existing workflow without requiring a
-   % data/verification migration today. The repo root is data_root's
-   % parent (data_root = <repo>/data).
+   % data/verification migration today.
    if ~ok && ~user_supplied
+      data_root = icemodel.getpath('data');
       repo_root = fileparts(data_root);
       sibling = string(fullfile(repo_root, '..', 'Laugh-Tests'));
       if exist(sibling, 'dir') == 7
@@ -105,9 +96,8 @@ function source_dir = fetchLaughTests(kwargs)
             source_dir = sibling;
             return
          else
-            % Fall through to the default cache message below; the
-            % sibling checkout exists but is incomplete, which is
-            % surfaced under the same retrieval banner.
+            % Sibling exists but is incomplete; fall through with
+            % the sibling path so the retrieval banner names it.
             cache_dir = sibling;
             missing = missing_sibling;
          end
@@ -148,6 +138,25 @@ function source_dir = fetchLaughTests(kwargs)
    end
 
    source_dir = string(cache_dir);
+end
+
+% =====================================================================
+% Local helpers
+% =====================================================================
+
+function pathname = defaultCacheDir()
+   %DEFAULTCACHEDIR Canonical Laugh-Tests source-cache directory.
+   pathname = string(fullfile(icemodel.getpath('data'), ...
+      'verification', 'snow', 'laugh_tests'));
+end
+
+function required = colbeckRequiredFiles()
+   %COLBECKREQUIREDFILES Files needed by importLaughTests for colbeck1976.
+   required = string([ ...
+      "test_cases/input_data/colbeck1976/colbeck1976_forcing.nc"; ...
+      "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp1_G1-1_timestep.nc"; ...
+      "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp2_G1-1_timestep.nc"; ...
+      "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp3_G1-1_timestep.nc"]);
 end
 
 function [ok, missing] = checkLaughTestsCheckout(cache_dir, required)

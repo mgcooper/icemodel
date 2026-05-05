@@ -7,17 +7,15 @@ function source_dir = fetchEsmSnowmip(kwargs)
    %
    %  Resolves the local source-cache directory holding the ESM-SnowMIP
    %  meteorological / observation NetCDF files used by
-   %  icemodel.verification.setup.importEsmSnowmip to stage the cdp /
-   %  wfj smoke verification artifacts. By default the cache lives at
+   %  icemodel.verification.setup.importEsmSnowmip to stage the per-site
+   %  verification artifacts. By default the cache lives at
    %  data/verification/snow/esm_snowmip/ (gitignored) and is populated
    %  by the user / developer following the retrieval instructions
    %  printed when files are missing.
    %
-   %  Files expected:
-   %    met_insitu_cdp_1994_2014.nc    (Col de Porte forcing)
-   %    obs_insitu_cdp_1994_2014.nc    (Col de Porte observations)
-   %    met_insitu_wfj_1996_2016.nc    (Weissfluhjoch forcing)
-   %    obs_insitu_wfj_1996_2016.nc    (Weissfluhjoch observations)
+   %  Expected files (per site, all 10 ESM-SnowMIP reference sites):
+   %    met_insitu_<sitename>_<years>.nc    (forcing)
+   %    obs_insitu_<sitename>_<years>.nc    (observations)
    %
    %  Source: Menard et al. 2019, "Meteorological and evaluation
    %  datasets for snow modelling at 10 reference sites: description
@@ -27,86 +25,85 @@ function source_dir = fetchEsmSnowmip(kwargs)
    %  Data DOI: https://doi.org/10.1594/PANGAEA.897575
    %
    %  Behaviour
-   %    - If all four files exist in cache_dir and are valid NetCDFs,
-   %      returns the cache directory path so the caller can pass it
-   %      to icemodel.verification.setup.importEsmSnowmip(source_dir).
-   %    - If any file is missing or unreadable, prints actionable
-   %      retrieval instructions (DOI, URL, expected filename, target
-   %      path, optional manual-download workflow) and either errors
-   %      (kwargs.strict=true, default) or returns the partial cache
-   %      directory (kwargs.strict=false) so callers can decide how
-   %      to handle the missing-data state.
+   %    - For each site in the canonical namelist, glob-match one met
+   %      and one obs NetCDF and confirm both are well-formed.
+   %    - On success, return the cache directory so the caller can
+   %      pass it to icemodel.verification.setup.importEsmSnowmip.
+   %    - On any missing or unreadable file, print actionable
+   %      retrieval instructions (DOI, URL, expected pattern) and
+   %      either error (kwargs.strict=true, default) or return the
+   %      partial cache directory (kwargs.strict=false).
    %    - Does NOT attempt automatic download. The PANGAEA dataset
    %      access surface is not stable for unattended fetch and may
    %      require user registration / acceptance of terms; making the
    %      retrieval step explicit is preferable to a silent failure
    %      mode in CI.
    %
+   %  Role
+   %    Validator. The fetch helper guarantees the cache directory
+   %    exists and that every site's met/obs file pair is present and
+   %    readable, so downstream importers / builders can assume the
+   %    layout is correct without repeating per-file checks.
+   %
    %  Name-value
    %    cache_dir : string (default data/verification/snow/esm_snowmip)
    %        Local source-cache directory.
+   %    sitenames : string vector (default all 10 ESM-SnowMIP sites)
+   %        Restrict the validation to a subset (used by builders that
+   %        only need one site).
    %    strict : logical (default true)
    %        Error when any expected file is missing or unreadable.
-   %        Set false to obtain the path with a warning instead.
    %    silent : logical (default false)
    %        Suppress the retrieval-instructions printout when files
-   %        are missing. Use only in tests; user-facing calls should
-   %        leave the actionable message visible.
+   %        are missing.
    %
    %  Returns
    %    source_dir : string
    %        Absolute path to the cache directory.
    %
    % See also: icemodel.verification.setup.importEsmSnowmip,
-   %  icemodel.verification.setup.importLaughTests
+   %  icemodel.verification.setup.fetchLaughTests,
+   %  icemodel.verification.namelists.snowmipsite
 
    arguments
-      kwargs.cache_dir (1, 1) string = ""
+      kwargs.cache_dir (1, 1) string = defaultCacheDir()
+      kwargs.sitenames (1, :) string = ...
+         icemodel.verification.namelists.snowmipsite()
       kwargs.strict   (1, 1) logical = true
       kwargs.silent   (1, 1) logical = false
    end
 
-   % Resolve the default cache directory. icemodel.getpath('data')
-   % returns the canonical top-level data root (<repo>/data/), which
-   % the verification source-cache layout extends under
-   % data/verification/snow/<dataset_family>/.
-   if kwargs.cache_dir == ""
-      cache_dir = string(fullfile(icemodel.getpath('data'), ...
-         'verification', 'snow', 'esm_snowmip'));
-   else
-      cache_dir = kwargs.cache_dir;
-   end
+   cache_dir = kwargs.cache_dir;
 
-   % Expected files. Sourced from defaultSpecs() in importEsmSnowmip:
-   % each ESM-SnowMIP smoke-case site needs one met (forcing) NetCDF
-   % and one obs (evaluation) NetCDF.
-   expected = struct( ...
-      'site',     {"cdp",                          "cdp",                          "wfj",                          "wfj"}, ...
-      'role',     {"met",                          "obs",                          "met",                          "obs"}, ...
-      'filename', {"met_insitu_cdp_1994_2014.nc",  "obs_insitu_cdp_1994_2014.nc",  "met_insitu_wfj_1996_2016.nc",  "obs_insitu_wfj_1996_2016.nc"});
+   % Ensure the cache directory exists so users following the retrieval
+   % banner can drop files into a path that is already there.
+   icemodel.helpers.ensureDirExists(cache_dir);
 
-   % Ensure the cache directory exists before checking files. The
-   % check is non-destructive: if the directory does not exist yet,
-   % it is created, but no files are written.
-   if exist(cache_dir, 'dir') ~= 7
-      icemodel.helpers.ensureDirExists(cache_dir);
-   end
-
-   % Per-file presence + readability check. ncinfo is the cheapest
-   % way to confirm the NetCDF file is well-formed without loading
-   % the bulk of its data.
+   % Per-site presence + readability check. Each ESM-SnowMIP site
+   % needs one met (forcing) and one obs (evaluation) NetCDF; both are
+   % located by glob match against the canonical PANGAEA naming
+   % pattern so year-stamped filenames do not need to be hard-coded.
    missing  = strings(0, 1);
    broken   = strings(0, 1);
-   for i = 1:numel(expected)
-      pathname = fullfile(cache_dir, expected(i).filename);
-      if exist(pathname, 'file') ~= 2
-         missing(end + 1, 1) = expected(i).filename; %#ok<AGROW>
-         continue
+   for i = 1:numel(kwargs.sitenames)
+      sitename = kwargs.sitenames(i);
+      [ok_met, status_met, name_met] = checkSiteFile(cache_dir, ...
+         sprintf('met_insitu_%s_*.nc', sitename));
+      [ok_obs, status_obs, name_obs] = checkSiteFile(cache_dir, ...
+         sprintf('obs_insitu_%s_*.nc', sitename));
+      if ~ok_met
+         if status_met == "missing"
+            missing(end + 1, 1) = sprintf('met_insitu_%s_*.nc', sitename); %#ok<AGROW>
+         else
+            broken(end + 1, 1) = name_met; %#ok<AGROW>
+         end
       end
-      try
-         ncinfo(pathname);
-      catch
-         broken(end + 1, 1) = expected(i).filename; %#ok<AGROW>
+      if ~ok_obs
+         if status_obs == "missing"
+            missing(end + 1, 1) = sprintf('obs_insitu_%s_*.nc', sitename); %#ok<AGROW>
+         else
+            broken(end + 1, 1) = name_obs; %#ok<AGROW>
+         end
       end
    end
 
@@ -124,7 +121,7 @@ function source_dir = fetchEsmSnowmip(kwargs)
       fprintf('=== ESM-SnowMIP source cache incomplete ===\n');
       fprintf('Cache directory: %s\n', cache_dir);
       if ~isempty(missing)
-         fprintf('Missing files:\n');
+         fprintf('Missing file patterns:\n');
          for j = 1:numel(missing)
             fprintf('  - %s\n', missing(j));
          end
@@ -139,9 +136,9 @@ function source_dir = fetchEsmSnowmip(kwargs)
       fprintf('  Reference: Menard et al. 2019, ESSD\n');
       fprintf('             https://doi.org/10.5194/essd-11-865-2019\n');
       fprintf('  Data DOI:  https://doi.org/10.1594/PANGAEA.897575\n');
-      fprintf('  Manual workflow: download the four files above from the\n');
-      fprintf('  PANGAEA dataset and place them in the cache directory.\n');
-      fprintf('  Filenames must match exactly.\n');
+      fprintf('  Bundle:    "All ESM-SnowMIP netCDF files in one zip" on PANGAEA.\n');
+      fprintf('  Manual workflow: download the zip and extract met_insitu_*.nc\n');
+      fprintf('  and obs_insitu_*.nc into the cache directory.\n');
       fprintf('\nAfter retrieval, re-run:\n');
       fprintf('  icemodel.verification.setup.fetchEsmSnowmip()\n');
       fprintf('  icemodel.verification.setup.importEsmSnowmip(source_dir, overwrite=true)\n');
@@ -160,3 +157,35 @@ function source_dir = fetchEsmSnowmip(kwargs)
    source_dir = string(cache_dir);
 end
 
+% =====================================================================
+% Local helpers
+% =====================================================================
+
+function pathname = defaultCacheDir()
+   %DEFAULTCACHEDIR Canonical ESM-SnowMIP source-cache directory.
+   %
+   % icemodel.getpath('data') returns the canonical top-level data root
+   % (<repo>/data/), which the verification source-cache layout extends
+   % under data/verification/snow/<dataset_family>/.
+   pathname = string(fullfile(icemodel.getpath('data'), ...
+      'verification', 'snow', 'esm_snowmip'));
+end
+
+function [ok, status, name] = checkSiteFile(cache_dir, pattern)
+   %CHECKSITEFILE Glob-match one NetCDF file and confirm it is readable.
+
+   matches = dir(fullfile(cache_dir, pattern));
+   if isempty(matches)
+      ok = false; status = "missing"; name = "";
+      return
+   end
+   % Use the first match (the upstream bundle has a single file per
+   % site; ambiguous matches are surfaced by the importer).
+   name = string(matches(1).name);
+   try
+      ncinfo(fullfile(matches(1).folder, matches(1).name));
+      ok = true; status = "ok";
+   catch
+      ok = false; status = "broken";
+   end
+end
