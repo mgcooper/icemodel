@@ -132,15 +132,15 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
             icemodel.verification.helpers.default_smoke_window(sitename);
       end
 
-      % Resolve the per-site case root and the three staged-artifact paths.
+      % Resolve the per-site case root and the two staged-artifact paths.
+      % Forcing is staged separately under the standard icemodel input
+      % layout (data/input/met/) so production setopts/configureRun/
+      % loadmet resolve it without verification-only branches.
       case_root = fullfile(family_root, sitename);
-      forcing_output_file    = fullfile(case_root, "forcing.mat");
       evaluation_output_file = fullfile(case_root, "evaluation.mat");
       reference_output_file  = fullfile(case_root, "reference.mat");
 
-      % prepareCaseRoot owns the overwrite guard. From here down, this
-      % importer can write the resolved output files directly without
-      % repeating per-file existence checks.
+      % prepareCaseRoot owns the overwrite guard for the eval folder.
       icemodel.verification.setup.prepareCaseRoot(case_root, kwargs.overwrite);
 
       % Build forcing and observations through the reusable builders. Both
@@ -156,14 +156,13 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
          sitename, source_dir=source_dir, ...
          startdate=window_start, enddate=window_end);
 
-      % Pack the artifacts in the common verification schema. forcing
-      % and observation timetables are wrapped in struct envelopes
-      % carrying provenance metadata so downstream consumers do not
-      % need to know which builder produced them.
-      forcing = struct( ...
-         'format',   'timeseries', ...
-         'data',     forcing_tt, ...
-         'metadata', forcing_meta);
+      % Stage forcing as standard icemodel met files: one calendar-year
+      % file per simyear under <ICEMODEL_INPUT_PATH>/met/, named per
+      % createMetFileNames convention (met_<site>_<forcings>_<year>_<dt>.mat).
+      % Saved as the bare 'met' timetable (not a struct envelope) so the
+      % normal loadmet path consumes it without special-casing.
+      writeStandardMetFiles(forcing_tt, sitename, ...
+         kwargs.icemodel_config_casename); %#ok<*NASGU>
 
       targets = struct( ...
          'format',   'timeseries', ...
@@ -183,9 +182,13 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
          'reference so the staged harness can run before a ' ...
          'snow model exists.']}));
 
-      save(forcing_output_file, 'forcing');
       save(evaluation_output_file, 'targets');
       save(reference_output_file, 'reference');
+
+      % forcing_meta is provenance only; it is no longer persisted in a
+      % verification-only forcing.mat envelope but the importer keeps the
+      % builder return value to surface its diagnostics if needed.
+      clear forcing_meta
 
       % Choose comparison variables from what's actually present in the
       % staged obs timetable. The obs builder decides which canonical
@@ -208,7 +211,6 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
          'esm_site'
          char(sitename)
          char(info.long_name)
-         char(fullfile(sitename, "forcing.mat"))
          char(fullfile(sitename, "evaluation.mat"))
          char(fullfile(sitename, "reference.mat"))
          'hourly'
@@ -263,4 +265,35 @@ function note = siteCaseNote(info)
    note = sprintf( ...
       'ESM-SnowMIP %s reference site (%s, %s).', ...
       info.long_name, info.location, info.sitename);
+end
+
+function writeStandardMetFiles(forcing_tt, sitename, config_casename)
+   %WRITESTANDARDMETFILES Stage hourly per-simyear met files under input/met/.
+   %
+   % Splits the staged window's forcing timetable into one calendar-year
+   % file per simyear, in the standard icemodel met-file format
+   % (variable named 'met'). Filenames follow createMetFileNames
+   % convention so configureRun + loadmet resolve them without
+   % verification-only branches:
+   %
+   %   <ICEMODEL_INPUT_PATH>/met/met_<sitename>_<sitename>_<year>_1hr.mat
+   %
+   % The forcings label equals the sitename for verification cases (no
+   % climate-model swap). Existing files are overwritten unconditionally
+   % when this function is called; the importer's overwrite guard fires
+   % earlier at prepareCaseRoot.
+
+   input_root = icemodel.verification.helpers.inputDataRoot( ...
+      "icemodel_config_casename", config_casename);
+   met_dir = fullfile(input_root, 'met');
+   icemodel.helpers.ensureDirExists(met_dir);
+
+   simyears = unique(year(forcing_tt.Time));
+   for k = 1:numel(simyears)
+      simyear = simyears(k);
+      met = forcing_tt(year(forcing_tt.Time) == simyear, :); %#ok<NASGU>
+      filename = sprintf('met_%s_%s_%d_1hr.mat', ...
+         char(sitename), char(sitename), simyear);
+      save(fullfile(met_dir, filename), 'met');
+   end
 end

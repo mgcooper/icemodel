@@ -158,14 +158,19 @@ refreshing staged setup data.
 Generated / staged smoke artifacts (committed):
 
 ```sh
-demo/data/eval/snow/<dataset_family>/<case_id>/{forcing,evaluation,reference}.mat
+# Forcing follows the standard icemodel input layout so configureRun +
+# createMetFileNames + loadmet resolve it without verification-only branches.
+demo/data/input/met/met_<case_id>_<case_id>_<year>_1hr.mat
+
+# Observation targets and reference bundles stay in the eval tree.
+demo/data/eval/snow/<dataset_family>/<case_id>/{evaluation,reference}.mat
 demo/data/eval/snow/<dataset_family>/manifest.json
 ```
 
 Local raw source cache (gitignored under `data/verification/**`):
 
 ```sh
-data/verification/snow/esm_snowmip/    # cdp + wfj NetCDFs
+data/verification/snow/esm_snowmip/    # 10-site PANGAEA NetCDFs
 data/verification/snow/laugh_tests/    # Laugh-Tests checkout
 ```
 
@@ -185,9 +190,12 @@ either error with a stable error id or return the partial path.
 
 ## Support Namespaces
 
-- `helpers` contains normal workflow helpers for path discovery, manifest reads,
-  artifact loading, candidate resolution, metric schema definition, and the
-  per-run markdown report writer (`writeRunReport`).
+- `helpers` contains normal workflow helpers for path discovery (`evaluationDataRoot`,
+  `inputDataRoot`, `snowDataRoot`), manifest reads, artifact loading, candidate
+  resolution, metric schema definition, the per-run markdown report writer
+  (`writeRunReport`), the per-site default window (`default_smoke_window`), and
+  the standard-contract opts builder (`caseSetopts`) used by
+  `runIcemodelSnowCandidate`.
 - `namelists` contains canonical selector lists for dataset families, case ids,
   case types, the ESM-SnowMIP site-name namelist (`snowmipsite`), the richer
   ESM-SnowMIP catalog (`snowmipcatalog`), and the Laugh-Tests case-id namelist

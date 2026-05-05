@@ -54,11 +54,12 @@ function manifest = importLaughTests(laugh_tests_source_dir, kwargs)
    % Resolve the exact staged paths produced by this importer. Keeping these
    % paths explicit makes it clear what the setup pass writes:
    %   <snow_data_root>/laugh_tests/manifest.json
-   %   <snow_data_root>/laugh_tests/colbeck1976/forcing.mat
    %   <snow_data_root>/laugh_tests/colbeck1976/evaluation.mat
    %   <snow_data_root>/laugh_tests/colbeck1976/reference.mat
+   %
+   % Forcing for Colbeck is constructed analytically from caseDefinition
+   % at runtime; there is no staged forcing.mat artifact.
    manifest_file = fullfile(family_root, "manifest.json");
-   forcing_output_file = fullfile(case_root, "forcing.mat");
    evaluation_output_file = fullfile(case_root, "evaluation.mat");
    reference_output_file = fullfile(case_root, "reference.mat");
 
@@ -80,12 +81,13 @@ function manifest = importLaughTests(laugh_tests_source_dir, kwargs)
 
    % Build case-specific artifacts. The builder choice in the switch-case above
    % is intentionally explicit to enable custom builders for future supported
-   % Laugh-Tests cases.
-   [forcing, targets, reference, case_values] = buildArtifacts( ...
+   % Laugh-Tests cases. The builder may return a forcing struct for
+   % diagnostic use, but it is not persisted; the Colbeck verification path
+   % constructs forcing from caseDefinition at runtime.
+   [~, targets, reference, case_values] = buildArtifacts( ...
       laugh_tests_source_dir);
 
-   % Write the three case artifacts named in the manifest entry.
-   save(forcing_output_file, 'forcing');
+   % Write the case artifacts named in the manifest entry.
    save(evaluation_output_file, 'targets');
    save(reference_output_file, 'reference');
 
@@ -215,7 +217,6 @@ function [forcing, targets, reference, case_values] = buildColbeckArtifacts( ...
       'synthetic_process'
       'colbeck1976'
       'Colbeck 1976 synthetic snow infiltration benchmark'
-      fullfile('colbeck1976', 'forcing.mat')
       fullfile('colbeck1976', 'evaluation.mat')
       fullfile('colbeck1976', 'reference.mat')
       '1 minute output / sub-hour forcing'

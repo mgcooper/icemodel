@@ -100,8 +100,10 @@ function resolved = resolveCase(entry, family)
 
    % Resolve relative artifact paths at read time so manifests stay portable
    % inside demo/data while workflow functions receive absolute paths.
-   resolved.forcing_path = resolveCasePath(family.family_root, entry, ...
-      'forcing_file');
+   % Forcing is no longer carried in the manifest; verification cases
+   % resolve forcing through the standard icemodel chain (setopts +
+   % configureRun + createMetFileNames + loadmet) using case_id as the
+   % sitename / forcings labels. See helpers/caseSetopts.m.
    resolved.evaluation_path = resolveCasePath(family.family_root, entry, ...
       'evaluation_file');
    resolved.reference_path = resolveCasePath(family.family_root, entry, ...

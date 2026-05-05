@@ -87,10 +87,15 @@ function test_forcing_includes_rainf_snowf_passthrough(testCase)
    % Site forcing files must include rainf/snowf channels so future
    % rain/snow-aware downstream consumers can use them directly.
 
+   % Resolve the staged met file via the standard chain (createMetFileNames)
+   % using the same opts a runIcemodelSnowCandidate run would build.
    manifest = icemodel.verification.loadmanifest("cdp");
-   forcing = icemodel.verification.helpers.loadArtifact( ...
-      manifest.forcing_path, "forcing");
-   names = string(forcing.data.Properties.VariableNames);
+   opts = icemodel.verification.helpers.caseSetopts(manifest);
+   met_files = opts.metfname;
+   testCase.assertNotEmpty(met_files);
+
+   loaded = load(met_files{1}, 'met');
+   names = string(loaded.met.Properties.VariableNames);
    testCase.verifyTrue(ismember("rainf", names));
    testCase.verifyTrue(ismember("snowf", names));
    testCase.verifyTrue(ismember("ppt", names));
@@ -109,12 +114,15 @@ end
 
 function test_loadmanifest_resolves_demo_data_paths(testCase)
    % LOADMANIFEST should resolve case files under the demo/data tree.
+   % Forcing is no longer in the manifest — it is staged under
+   % demo/data/input/met/ via the standard icemodel naming convention,
+   % so checks below cover only evaluation / reference paths.
 
    manifest = icemodel.verification.loadmanifest("cdp");
 
    testCase.verifyEqual(manifest.dataset_family, "esm_snowmip");
    testCase.verifyEqual(manifest.case_type, "esm_site");
-   testCase.verifyTrue(contains(manifest.forcing_path, ...
+   testCase.verifyTrue(contains(manifest.evaluation_path, ...
       fullfile("demo", "data", "eval", "snow", "esm_snowmip", "cdp")));
    testCase.verifyTrue(exist(manifest.evaluation_path, 'file') == 2);
 end

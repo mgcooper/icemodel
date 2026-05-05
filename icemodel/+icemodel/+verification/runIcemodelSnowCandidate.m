@@ -2,10 +2,21 @@ function candidate = runIcemodelSnowCandidate(case_manifest, kwargs)
    %RUNICEMODELSNOWCANDIDATE Run icemodel and return a verification candidate.
    %
    %  candidate = icemodel.verification.runIcemodelSnowCandidate(case_manifest)
+   %  candidate = icemodel.verification.runIcemodelSnowCandidate(case_manifest, ...
+   %     startdate=..., enddate=...)
    %
    % This is the bridge agents should use while developing the snow model. It
    % calls the normal icemodel entry point, receives ICE1/ICE2, then converts
    % those outputs into the same candidate bundle consumed by comparecase.
+   %
+   % The function constructs opts via icemodel.verification.helpers.caseSetopts
+   % using the case_id as both sitename and forcings, so the standard chain
+   % (configureRun + createMetFileNames + loadmet) resolves the staged met
+   % file at <ICEMODEL_INPUT_PATH>/met/met_<case>_<case>_<year>_1hr.mat
+   % without verification-only branches. This is the same scaffolding the
+   % regression and perf suites use; once the snow model is operational the
+   % synthetic-snow hook below retires and this function becomes a thin
+   % wrapper around icemodel(opts).
    %
    % WARNING - synthetic-candidate path
    % ----------------------------------
@@ -41,41 +52,19 @@ function candidate = runIcemodelSnowCandidate(case_manifest, kwargs)
       kwargs.enddate   = NaT('TimeZone', 'UTC')
    end
 
-   % Configure the icemodel run options. Both sitename and forcings are
-   % placeholder labels: the synthetic-snow hook (icemodel.verification.
-   % syntheticSnowModelRun) intercepts the run before any met file is
-   % loaded, so neither label drives forcing-file resolution. Use
-   % "verification" for both so opts metadata is honest about the
-   % synthetic origin and so no real-site label (kanm, kanl, etc.) can
-   % be misread downstream as the source of these candidate metrics.
-   smbmodel = 'icemodel';
-   sitename = 'verification';
-   simyears = caseSimulationYears(case_manifest);
-   forcings = sitename;
-   userdata = [];
-   uservars = [];
-   testname = case_manifest.case_id;
-   saveflag = false;
-   backupflag = false;
+   % Build standard model options. caseSetopts uses case_id as sitename
+   % and forcings, derives simyears from the comparison window, and
+   % populates opts.startdate / opts.enddate so the standard loadmet
+   % path resolves the staged met file and subsets to the comparison
+   % window.
+   opts = icemodel.verification.helpers.caseSetopts(case_manifest, ...
+      startdate=kwargs.startdate, enddate=kwargs.enddate);
 
-   opts = icemodel.setopts(smbmodel, sitename, simyears, forcings, ...
-      userdata, uservars, testname, saveflag, backupflag);
-
-   % Optional explicit time-window override. When set, opts.startdate /
-   % opts.enddate narrow the loaded met to a specific datetime window
-   % (icemodel.loadmet handles the subsetting). Useful for targeted evaluation
-   % periods like one snow season; year-granularity simyears handling continues
-   % to work as the default.
-   if ~isnat(kwargs.startdate)
-      opts.startdate = kwargs.startdate;
-   end
-   if ~isnat(kwargs.enddate)
-      opts.enddate = kwargs.enddate;
-   end
-
-   % These fields are deliberately not part of setopts. They are a narrow
-   % verification-only request consumed by icemodel.verification.* and ignored
-   % by normal model configuration.
+   % Activate the synthetic-snow hook. These fields are deliberately not
+   % part of setopts: they are a narrow verification-only request consumed
+   % by icemodel.verification.syntheticSnowModelRun and ignored by normal
+   % model configuration. They retire together with the hook itself once
+   % production snow physics lands.
    opts.verification_synthetic_snow = true;
    opts.verification_case_manifest = case_manifest;
    opts.verification_snow_depth_offset_m = kwargs.snow_depth_offset_m;
@@ -86,32 +75,4 @@ function candidate = runIcemodelSnowCandidate(case_manifest, kwargs)
    [ice1, ice2, opts] = icemodel(opts);
    candidate = icemodel.verification.candidateFromIcemodelOutput( ...
       ice1, ice2, opts, case_manifest);
-end
-
-function simyears = caseSimulationYears(case_manifest)
-   %CASESIMULATIONYEARS Infer icemodel simulation years from staged targets.
-
-   targets = icemodel.verification.helpers.loadArtifact( ...
-      case_manifest.evaluation_path, "targets");
-
-   % Some cases stage multiple target sources keyed under one
-   % evaluation.mat (e.g. colbeck1976 carries numerical_summa and
-   % analytical_clark2017). Pick the default numerical_summa source
-   % so the format dispatch below sees the inner experiment_bundle.
-   if ~isfield(targets, 'format') && isfield(targets, 'numerical_summa')
-      targets = targets.numerical_summa;
-   end
-
-   switch targets.format
-      case "timeseries"
-         time = targets.data.Properties.RowTimes;
-      case "experiment_bundle"
-         experiment_names = fieldnames(targets.experiments);
-         first_experiment = targets.experiments.(experiment_names{1});
-         time = first_experiment.Properties.RowTimes;
-      otherwise
-         error('unsupported verification target format: %s', targets.format)
-   end
-
-   simyears = unique(year(time));
 end

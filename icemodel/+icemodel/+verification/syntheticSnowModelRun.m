@@ -25,10 +25,11 @@ function [ice1, ice2, opts] = syntheticSnowModelRun(opts)
 
    manifest = opts.verification_case_manifest;
 
-   % Load the forcing artifact so the verification run is tied to the case's
-   % staged inputs now, even though this temporary stand-in uses targets to
-   % synthesize model-like outputs.
-   forcing = loadVerificationForcing(manifest.forcing_path);
+   % Stand-in candidates are derived directly from the staged targets;
+   % no forcing read is needed. (Once production snow physics replaces
+   % this hook, the standard icemodel chain loads forcing through
+   % setopts + configureRun + loadmet using the case_id as both
+   % sitename and forcings.)
    targets = icemodel.verification.helpers.loadArtifact( ...
       manifest.evaluation_path, "targets");
 
@@ -43,10 +44,10 @@ function [ice1, ice2, opts] = syntheticSnowModelRun(opts)
 
    switch targets.format
       case "timeseries"
-         [ice1, ice2] = timeseriesCandidateOutput(targets.data, forcing, opts);
+         [ice1, ice2] = timeseriesCandidateOutput(targets.data, opts);
       case "experiment_bundle"
          [ice1, ice2] = experimentBundleCandidateOutput( ...
-            targets.experiments, forcing, opts);
+            targets.experiments, opts);
       otherwise
          error('unsupported verification target format: %s', targets.format)
    end
@@ -54,23 +55,7 @@ function [ice1, ice2, opts] = syntheticSnowModelRun(opts)
    opts.verification_candidate_source = "synthetic_snow_model_run";
 end
 
-function forcing = loadVerificationForcing(pathname)
-   %LOADVERIFICATIONFORCING Normalize staged forcing MAT-file shapes.
-
-   contents = load(pathname);
-   names = string(fieldnames(contents));
-
-   if any(names == "met")
-      forcing = struct("format", "timeseries", "data", contents.met);
-   elseif any(names == "forcing")
-      forcing = contents.forcing;
-   else
-      error('verification forcing file does not contain met or forcing: %s', ...
-         pathname)
-   end
-end
-
-function [ice1, ice2] = timeseriesCandidateOutput(targets, forcing, opts)
+function [ice1, ice2] = timeseriesCandidateOutput(targets, opts)
    %TIMESERIESCANDIDATEOUTPUT Build ICE1/ICE2 for ESM-SnowMIP site cases.
 
    data = targets;
@@ -91,7 +76,6 @@ function [ice1, ice2] = timeseriesCandidateOutput(targets, forcing, opts)
 
    ice1 = struct();
    ice1.Time = data.Properties.RowTimes;
-   ice1.verification_forcing_time = forcing.data.Properties.RowTimes;
    ice1.verification_format = "timeseries";
 
    % Store both verification-native names and core-adjacent names where they
@@ -116,8 +100,7 @@ function [ice1, ice2] = timeseriesCandidateOutput(targets, forcing, opts)
    ice2.verification_format = "timeseries";
 end
 
-function [ice1, ice2] = experimentBundleCandidateOutput(experiments, ...
-      forcing, opts)
+function [ice1, ice2] = experimentBundleCandidateOutput(experiments, opts)
    %EXPERIMENTBUNDLECANDIDATEOUTPUT Build ICE1/ICE2 for process benchmarks.
 
    experiment_names = fieldnames(experiments);
@@ -139,8 +122,7 @@ function [ice1, ice2] = experimentBundleCandidateOutput(experiments, ...
 
    ice1 = struct( ...
       "verification_format", "experiment_bundle", ...
-      "verification_experiments", candidate_experiments, ...
-      "verification_forcing_time", forcing.data.Properties.RowTimes);
+      "verification_experiments", candidate_experiments);
    ice2 = struct("verification_format", "experiment_bundle");
 end
 

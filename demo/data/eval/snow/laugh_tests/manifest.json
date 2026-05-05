@@ -9,7 +9,6 @@
     "case_type": "synthetic_process",
     "site_id": "colbeck1976",
     "site_name": "Colbeck 1976 synthetic snow infiltration benchmark",
-    "forcing_file": "colbeck1976/forcing.mat",
     "evaluation_file": "colbeck1976/evaluation.mat",
     "reference_file": "colbeck1976/reference.mat",
     "native_timestep": "1 minute output / sub-hour forcing",
