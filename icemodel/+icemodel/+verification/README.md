@@ -48,17 +48,27 @@ timing, or fitted-line diagnostics.
 
 ## Plotting Contract
 
-Plotting uses three independent controls:
+Plotting and artifact writing are opt-in for `run_snow_verification_suite`:
 
-- `make_plots` creates comparison figures (`true` / `false`).
-- `save_plots` exports comparison PNGs to the run artifact folder (`true` / `false`).
-- `plot_visible` controls MATLAB figure visibility (`on` or `off`).
+- `make_plots` creates comparison figures (default `false`).
+- `save_plots` exports comparison PNGs to the run artifact folder (default `false`).
+- `plot_visible` controls MATLAB figure visibility (default `"off"`).
+- `write_artifacts` writes `summary.csv` / `summary.mat` / `report.md` and
+  per-case `metrics.csv` / `result.mat` (default `false`).
 
-The runner defaults are command-line safe: plots are generated, saved, hidden, and
-then closed. For live (interactive) visual review, run:
+In the default (interactive-development) mode the runner writes nothing to
+disk, returns the result struct, and does not even create the run-artifact
+directory. The runner promotes flags transitively: `plot_visible="on"` implies
+`make_plots=true`; `save_plots=true` implies `make_plots=true` and
+`write_artifacts=true`. Pass `write_artifacts=true` to opt in to the
+persisted-snapshot workflow regardless of plotting:
 
 ```matlab
-results = run_snow_verification_suite(plot_visible="on");
+% Interactive figure, no on-disk artifacts:
+results = run_snow_verification_suite(plot_visible="on", save_plots=false);
+
+% Persisted snapshot:
+results = run_snow_verification_suite(write_artifacts=true, save_plots=true);
 ```
 
 Comparison figures include the time-series overlay plus target-versus-candidate
@@ -177,8 +187,12 @@ either error with a stable error id or return the partial path.
   artifact loading, candidate resolution, metric schema definition, and the
   per-run markdown report writer (`writeRunReport`).
 - `namelists` contains canonical selector lists for dataset families, case ids,
-  case types, tiers, and the ESM-SnowMIP site catalog (`snowmipsite`).
-- `validators` contains argument-block validators that consume the namelists.
+  case types, tiers, the ESM-SnowMIP site-name namelist (`snowmipsite`), the
+  richer ESM-SnowMIP catalog (`snowmipcatalog`), and the Laugh-Tests case-id
+  namelist (`laughtests`). `caseid` dispatches uniformly across families using
+  these per-family namelists.
+- `validators` contains argument-block validators that consume the namelists,
+  including `mustBeSnowmipSite` for per-site builders.
 
 ## Data Contract
 
@@ -285,3 +299,107 @@ table with these same metrics plus `axis_role` (`"formal"` or `"diagnostic"`)
 and `target_source` / `candidate_source` columns identifying which pair the
 row evaluates. Per-variable RMSE tolerances drive the formal PASS/FAIL summary
 (default storage 5 mm, outflow 5e-7 m/s).
+
+`comparecase` also reports two snow-season timing diagnostics on
+`snow_depth_m` and `swe_kg_m2` series: `snow_onset_time_error_hours`
+(first-rise above the variable's threshold) and
+`melt_out_time_error_hours` (post-peak first-return below the same
+threshold). Peak SWE timing and magnitude are already captured by the
+`peak_*` columns above. Together these cover the snow-season diagnostics
+listed in the original full-tier plan.
+
+## Open Architectural Assessments
+
+These are written assessments of long-term design questions exposed by
+the verification work. They are referenced from beads but live here so
+they can evolve alongside the suite.
+
+### startdate / enddate as a first-class IceModel option
+
+`icemodel.setopts` and `icemodel.loadmet` already accept optional
+`startdate` / `enddate` kwargs that subset the loaded met to a
+specific datetime window in addition to the year-granularity
+`simyears` subset. Both default to `NaT('TimeZone', 'UTC')` (no
+subsetting), so the canonical year-only behaviour is preserved when
+they are not set.
+
+This was added under the verification work and is not yet integrated
+with `icemodel.configureRun`. To make `startdate` / `enddate` a
+fully first-class general model option we would need:
+
+1. **`configureRun` validation**: confirm that when both bounds are
+   set, they fall inside `min(simyears)`–`max(simyears)`, and that
+   `startdate < enddate`. Today an invalid window silently produces
+   a zero-row met after the simyears subset.
+2. **Restart compatibility**: `use_restart` saves at year boundaries.
+   A windowed run that does not start on a year boundary needs a
+   policy decision on whether the restart state still applies. Most
+   naturally, restart files would be tagged with the window start
+   so non-aligned restarts error out.
+3. **Output-year filtering**: `opts.output_years` determines which
+   simulation years get retained in `ice1` post-processing. Today
+   this is independent of `startdate`/`enddate`; for a windowed run
+   the natural behaviour is to intersect with the window.
+4. **Spinup interaction**: `n_spinup_years` strips leading years
+   from the retained output. With a partial-year start, "year 1"
+   is not well-defined; spinup either becomes a duration in days
+   or the call errors when both are set.
+5. **Demo runs**: a normal demo run with custom dates would call
+   `setopts(..., 'startdate', "2016-06-01", 'enddate', "2016-08-31")`
+   and downstream paths (output, restart) need to encode the window
+   in their naming so windowed runs do not collide with full-year
+   runs of the same simyears.
+
+Recommendation: promote `startdate`/`enddate` to first-class options
+with the five integrations above, in a dedicated bead. The current
+verification-driven implementation is a sufficient bridge and should
+be extended rather than replaced.
+
+### Custom-date staging vs on-the-fly subsetting
+
+`importEsmSnowmip(tier="custom", startdate=..., enddate=...)` re-stages
+the per-site forcing/observation MAT artifacts for an arbitrary
+window. This couples staging to specific debugging windows, which is
+poor design when an agent wants to run "1996-12 through 1997-03" to
+investigate one event.
+
+Recommendation: stage one full-period forcing/observation MAT per
+site (the existing `tier="full"` artifact). Agents and developers
+that want a narrow window subset the staged timetable on the fly via
+`opts.startdate` / `opts.enddate` (already implemented in
+`icemodel.loadmet`). The `tier="custom"` import path becomes
+unnecessary and should be retired in a follow-up. This needs:
+
+- `comparecase` / `plotcase` to subset the staged target by
+  `opts.startdate` / `opts.enddate` (or a `comparison_window` kwarg)
+  before computing metrics.
+- `runIcemodelSnowCandidate` / `run_snow_verification_suite` already
+  forward `startdate` / `enddate` to `opts`, so the icemodel side is
+  already on-the-fly.
+
+The cost of the change is one tier removal plus a window-aware
+`comparecase` path; the benefit is no re-staging required for
+per-event debugging.
+
+### Hourly forcing interpolated to 15 min at runtime
+
+IceModel runs much better at 15-min timestep than 1 hr. ESM-SnowMIP
+provides forcing at 1 hr; historically the project has cached 15-min
+forcings produced by linear interpolation from hourly. Caching the
+interpolated copy duplicates the source and forces a re-cache when
+the hourly file changes.
+
+Recommendation: stage the hourly forcing (one source of truth) and
+interpolate to the requested `opts.dt` at model run time, inside
+`icemodel.loadmet` or a dedicated `icemodel.surface.resampleForcing`
+helper. Linear interpolation is appropriate for tair, swd, lwd, wspd,
+rh, psfc; precipitation requires conservative resampling (rate
+preservation, not point interpolation) so total accumulation is
+preserved across the resample. Albedo and snow_depth interpolate
+linearly without conservation concerns.
+
+This change touches `icemodel.loadmet` and the existing 15-min cache
+generators in the sibling `runoff` project. It belongs to the
+forcing-builder framework epic (`icemodel-fkg`) since the same
+resample logic should serve both ESM-SnowMIP staging and the
+project's broader forcing builder.
