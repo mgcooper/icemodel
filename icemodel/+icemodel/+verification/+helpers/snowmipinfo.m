@@ -1,8 +1,8 @@
-function info = snowmipcatalog(sitename)
-   %SNOWMIPCATALOG Canonical ESM-SnowMIP site catalog (richer than the namelist).
+function info = snowmipinfo(sitename)
+   %SNOWMIPINFO Canonical ESM-SnowMIP site catalog (richer than the namelist).
    %
-   %  info = icemodel.verification.namelists.snowmipcatalog()
-   %  info = icemodel.verification.namelists.snowmipcatalog("cdp")
+   %  info = icemodel.verification.helpers.snowmipinfo()
+   %  info = icemodel.verification.helpers.snowmipinfo("cdp")
    %
    %  Returns the canonical ESM-SnowMIP site catalog. With no arguments,
    %  returns a struct array covering all 10 reference sites; with one
@@ -68,7 +68,7 @@ function info = snowmipcatalog(sitename)
    match = string({catalog.sitename}) == sitename;
    if ~any(match)
       valid = strjoin([catalog.sitename], ', ');
-      error('icemodel:verification:snowmipcatalog:unknown', ...
+      error('icemodel:verification:snowmipinfo:unknown', ...
          'unknown ESM-SnowMIP sitename %s. Valid: %s', sitename, valid);
    end
    info = catalog(match);
