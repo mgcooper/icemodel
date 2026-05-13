@@ -7,16 +7,16 @@ function opts = configureRun(opts)
    % are empty, while preserving caller-supplied values for fields such as
    % PATHINPUT, PATHOUTPUT, CASENAME, METFNAME, VARS1, and VARS2.
    %
-   % Time-window canonicalization
+   % Time-window configuration
    %   The run window can be specified by SIMYEARS (year-granularity) or by
-   %   STARTDATE / ENDDATE (datetime window) or by both compatibly. This
+   %   STARTDATE / ENDDATE (datetime window) or by both if compatible. This
    %   function fills in whichever is missing, validates the pair, and
    %   normalizes OPTS.SIMYEARS / OPTS.NUMYEARS so downstream code sees one
-   %   canonical specifier. STARTDATE / ENDDATE remain authoritative for
+   %   time window specifier. STARTDATE / ENDDATE are authoritative for
    %   the actual loaded met subset; SIMYEARS drives per-year met-file
    %   naming.
 
-   opts = canonicalizeWindow(opts);
+   opts = configureTimeWindow(opts);
 
    opts = validateTurbulentFluxOptions(opts);
 
@@ -50,14 +50,18 @@ function opts = configureRun(opts)
    % function in the wrapper that loops over grid-cell IDs. Core icemodel only
    % provides the canonical base output folder; any legacy extra subfoldering
    % for gridded workflows belongs in the wrapper, not here.
+   window_args = runWindowArgs(opts);
+
    if ~isfield(opts, 'pathoutput') || isempty(opts.pathoutput)
       opts.pathoutput = icemodel.getpath('output', ...
-         opts.sitename, opts.smbmodel, '', [], opts.testname);
+         opts.sitename, opts.smbmodel, '', [], opts.testname, ...
+         window_args{:});
    end
 
    if ~isfield(opts, 'pathrestart') || isempty(opts.pathrestart)
       opts.pathrestart = icemodel.getpath('restart', ...
-         opts.sitename, opts.smbmodel, opts.userdata, [], opts.testname);
+         opts.sitename, opts.smbmodel, opts.userdata, [], opts.testname, ...
+         window_args{:});
    end
 
    % Create the casename. icemodel.writeoutput appends this to base filenames.
@@ -264,8 +268,24 @@ function opts = configureDebugPaths(opts)
    end
 end
 
-function opts = canonicalizeWindow(opts)
-   %CANONICALIZEWINDOW Reconcile SIMYEARS and STARTDATE/ENDDATE.
+function args = runWindowArgs(opts)
+   %RUNWINDOWARGS Return {startdate, enddate} when a window is set, else {}.
+
+   args = {};
+   if ~isfield(opts, 'startdate') || ~isfield(opts, 'enddate')
+      return
+   end
+   if isempty(opts.startdate) || isempty(opts.enddate)
+      return
+   end
+   if any(isnat([opts.startdate; opts.enddate]))
+      return
+   end
+   args = {opts.startdate, opts.enddate};
+end
+
+function opts = configureTimeWindow(opts)
+   %CONFIGURETIMEWINDOW Reconcile SIMYEARS and STARTDATE/ENDDATE.
    %
    % Decision matrix:
    %   simyears alone:           ok; window stays NaT/NaT
@@ -307,7 +327,7 @@ function opts = canonicalizeWindow(opts)
       missing = setdiff(window_years, opts.simyears);
       if ~isempty(missing)
          error('icemodel:configureRun:windowOutsideSimyears', ...
-            ['STARTDATE/ENDDATE window touches calendar year(s) %s ' ...
+            ['STARTDATE/ENDDATE window includes calendar year(s) %s ' ...
             'that are not in SIMYEARS=%s. Either widen SIMYEARS or ' ...
             'narrow the window.'], ...
             mat2str(missing), mat2str(opts.simyears));

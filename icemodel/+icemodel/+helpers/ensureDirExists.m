@@ -9,7 +9,7 @@ function pathname = ensureDirExists(pathname)
       pathname (1, :) string
    end
 
-   if exist(pathname, 'dir') ~= 7
+   if ~isfolder(pathname)
       mkdir(pathname);
    end
 end

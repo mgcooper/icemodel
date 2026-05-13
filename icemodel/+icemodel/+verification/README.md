@@ -80,9 +80,8 @@ with `icemodel.plot.timeseries`.
 
 ## Time-window policy
 
-Selection is by `case_ids` and optional `startdate` / `enddate`. The
-tier abstraction (smoke / full / custom) is gone; selection is
-explicit and the same vocabulary applies at both staging and runtime:
+Selection is by `case_ids` and optional `startdate` / `enddate`.
+The same vocabulary applies at both staging and runtime:
 
 - **Staging** (`importEsmSnowmip`): with no explicit window, each
   requested site is staged using its
@@ -101,9 +100,7 @@ explicit and the same vocabulary applies at both staging and runtime:
 
 When the staged window is wider than the runtime window, comparecase
 subsets the staged target on the fly via `opts.startdate` /
-`opts.enddate` — no re-staging required. See the open architectural
-assessment "Custom-date staging vs on-the-fly subsetting" below for
-the reasoning behind this contract.
+`opts.enddate` — no re-staging required.
 
 ## ESM-SnowMIP sites
 
@@ -160,7 +157,8 @@ Generated / staged smoke artifacts (committed):
 ```sh
 # Forcing follows the standard icemodel input layout so configureRun +
 # createMetFileNames + loadmet resolve it without verification-only branches.
-demo/data/input/met/met_<case_id>_<case_id>_<year>_1hr.mat
+# Multi-year staged windows produce a single window-stamped file:
+demo/data/input/met/met_<case_id>_<case_id>_<YYYYMMDD>_<YYYYMMDD>_1hr.mat
 
 # Observation targets and reference bundles stay in the eval tree.
 demo/data/eval/snow/<dataset_family>/<case_id>/{evaluation,reference}.mat
@@ -197,10 +195,11 @@ either error with a stable error id or return the partial path.
   the standard-contract opts builder (`caseSetopts`) used by
   `runIcemodelSnowCandidate`.
 - `namelists` contains canonical selector lists for dataset families, case ids,
-  case types, the ESM-SnowMIP site-name namelist (`snowmipsite`), the richer
-  ESM-SnowMIP catalog (`snowmipcatalog`), and the Laugh-Tests case-id namelist
-  (`laughtests`). `caseid` dispatches uniformly across families using these
-  per-family namelists.
+  case types, the ESM-SnowMIP site-name namelist (`snowmipsite`), and the
+  Laugh-Tests case-id namelist (`laughtests`). `caseid` dispatches uniformly
+  across families using these per-family namelists. The richer per-site
+  ESM-SnowMIP catalog query helper lives at
+  `icemodel.verification.helpers.snowmipinfo`.
 - `validators` contains argument-block validators that consume the namelists,
   including `mustBeSnowmipSite` for per-site builders.
 
@@ -315,101 +314,4 @@ row evaluates. Per-variable RMSE tolerances drive the formal PASS/FAIL summary
 (first-rise above the variable's threshold) and
 `melt_out_time_error_hours` (post-peak first-return below the same
 threshold). Peak SWE timing and magnitude are already captured by the
-`peak_*` columns above. Together these cover the snow-season diagnostics
-listed in the original full-tier plan.
-
-## Open Architectural Assessments
-
-These are written assessments of long-term design questions exposed by
-the verification work. They are referenced from beads but live here so
-they can evolve alongside the suite.
-
-### startdate / enddate as a first-class IceModel option
-
-`startdate` / `enddate` are now first-class run-window specifiers
-across the icemodel runtime. The decision matrix in
-`icemodel.configureRun` (canonicalizeWindow):
-
-| `simyears`     | `startdate`/`enddate` | Behaviour                                                                         |
-| -------------- | --------------------- | --------------------------------------------------------------------------------- |
-| provided       | not provided          | as before; year-granularity contract                                              |
-| not provided   | provided              | derive simyears from years touched by the window                                  |
-| both, compat.  | both, compat.         | both preserved; window is authoritative for met subset, simyears for met-naming   |
-| both, incompat | both, incompat        | error (`icemodel:configureRun:windowOutsideSimyears`)                             |
-| neither        | neither               | error (`icemodel:configureRun:noWindow`)                                          |
-
-Notes on the integrations:
-
-- **Validation**: configureRun owns the canonicalization step.
-  Half-windows error (`halfWindow`); inverted windows error
-  (`invalidWindow`). Compatibility checks fail loudly rather than
-  silently producing zero-row met.
-- **Restart compatibility**: `use_restart=true` requires `startdate`
-  to fall on a calendar-year boundary
-  (`icemodel:configureRun:restartWindowNotAligned`). Non-aligned
-  restart logic is deferred until there is a concrete need.
-- **Output-year filtering**: `opts.output_years` continues to derive
-  from `simyears(n_spinup_years+1:end)`. The strict full-year contract
-  has been relaxed: spinup years can include partial-year leading
-  windows without erroring. Users who want output_years to reflect
-  the window can pass it explicitly via `resetopts`.
-- **Spinup interaction**: no longer enforces year-boundary alignment.
-  `n_spinup_years` simply strips leading retained simyears from
-  `output_years`; whether those simyears are partial is the caller's
-  decision.
-- **Demo runs**: `setopts(..., simyears=[], 'startdate', "2016-06-01",
-  'enddate', "2016-08-31")` derives `simyears = 2016` automatically.
-  Output paths still use sitename/smbmodel/testname; the window
-  itself is not encoded in the path. Callers who want to distinguish
-  windowed and full-year runs of the same simyears must use distinct
-  testnames.
-
-Test coverage is in `test_run_contracts` under `test_window_*` and
-`test_use_restart_with_misaligned_window_errors`.
-
-### Staging window vs on-the-fly subsetting
-
-`importEsmSnowmip(case_ids=..., startdate=..., enddate=...)` stages
-per-site forcing/observation MAT artifacts for the requested window.
-By default, each site is staged at its `default_smoke_window` — one
-snow water year. Wider windows are staged only when explicitly
-requested.
-
-The retired tier vocabulary (smoke / full / custom) coupled staging
-to fixed window choices; the explicit `case_ids` + optional
-`startdate` / `enddate` contract removes that coupling. Agents and
-developers that want a narrow window inside a wider staged range
-subset on the fly via `opts.startdate` / `opts.enddate` (already
-implemented in `icemodel.loadmet`).
-
-Open work (tracked under `icemodel-fx1`):
-
-- `comparecase` / `plotcase` should subset the staged target by
-  `opts.startdate` / `opts.enddate` (or a `comparison_window` kwarg)
-  before computing metrics.
-- `runIcemodelSnowCandidate` / `run_snow_verification_suite` already
-  forward `startdate` / `enddate` to `opts`, so the icemodel side is
-  already on-the-fly.
-
-### Hourly forcing interpolated to 15 min at runtime
-
-IceModel runs much better at 15-min timestep than 1 hr. ESM-SnowMIP
-provides forcing at 1 hr; historically the project has cached 15-min
-forcings produced by linear interpolation from hourly. Caching the
-interpolated copy duplicates the source and forces a re-cache when
-the hourly file changes.
-
-Recommendation: stage the hourly forcing (one source of truth) and
-interpolate to the requested `opts.dt` at model run time, inside
-`icemodel.loadmet` or a dedicated `icemodel.surface.resampleForcing`
-helper. Linear interpolation is appropriate for tair, swd, lwd, wspd,
-rh, psfc; precipitation requires conservative resampling (rate
-preservation, not point interpolation) so total accumulation is
-preserved across the resample. Albedo and snow_depth interpolate
-linearly without conservation concerns.
-
-This change touches `icemodel.loadmet` and the existing 15-min cache
-generators in the sibling `runoff` project. It belongs to the
-forcing-builder framework epic (`icemodel-fkg`) since the same
-resample logic should serve both ESM-SnowMIP staging and the
-project's broader forcing builder.
+`peak_*` columns above.

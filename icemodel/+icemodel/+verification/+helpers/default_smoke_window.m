@@ -26,7 +26,7 @@ function [window_start, window_end] = default_smoke_window(sitename)
    %    window_end   : datetime (TimeZone='UTC')  Sep 30 23:00 of the
    %                                              following year.
    %
-   % See also: icemodel.verification.namelists.snowmipcatalog,
+   % See also: icemodel.verification.helpers.snowmipinfo,
    %  icemodel.verification.setup.importEsmSnowmip,
    %  run_snow_verification_suite
 
@@ -35,7 +35,7 @@ function [window_start, window_end] = default_smoke_window(sitename)
          {icemodel.verification.validators.mustBeSnowmipSite} = "cdp"
    end
 
-   info = icemodel.verification.namelists.snowmipcatalog(sitename);
+   info = icemodel.verification.helpers.snowmipinfo(sitename);
    smoke_year = info.insitu_window(1) + 1;
    window_start = datetime(smoke_year, ...
       10, 1, 0, 0, 0, 'TimeZone', 'UTC');

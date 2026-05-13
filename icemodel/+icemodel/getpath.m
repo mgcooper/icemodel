@@ -12,6 +12,8 @@ function pathlist = getpath(pathtype, sitename, smbmodel, userdata, simyears, va
    %  pathlist = icemodel.getpath('output', sitename, smbmodel, userdata)
    %  pathlist = icemodel.getpath('output', sitename, smbmodel, userdata, ...
    %     simyears, testname)
+   %  pathlist = icemodel.getpath('output', sitename, smbmodel, userdata, ...
+   %     simyears, testname, startdate, enddate)
    %
    % This is the canonical path getter used by configureRun and by downstream
    % workflows that need stable path derivation without re-creating the
@@ -52,7 +54,9 @@ function pathlist = getpath(pathtype, sitename, smbmodel, userdata, simyears, va
          pathlist = appendParts(resolveUserdataPath(), varargin);
 
       case 'output'
-         parts = [{resolveOutputPath(), sitename, smbmodel, userdata}, varargin];
+         [window, varargin] = extractWindowTag(varargin);
+         parts = [{resolveOutputPath(), sitename, smbmodel, userdata}, ...
+            varargin, {window}];
          parts = parts(~cellfun(omitpart, parts));
 
          if isempty(simyears)
@@ -62,13 +66,32 @@ function pathlist = getpath(pathtype, sitename, smbmodel, userdata, simyears, va
          end
 
       case 'restart'
-         parts = [{resolveOutputPath(), sitename, smbmodel}, varargin, {'restart'}];
+         [window, varargin] = extractWindowTag(varargin);
+         parts = [{resolveOutputPath(), sitename, smbmodel}, varargin, ...
+            {window, 'restart'}];
          parts = parts(~cellfun(omitpart, parts));
          pathlist = fullfile(parts{:});
 
       otherwise
          error('unrecognized pathtype: %s', pathtype)
    end
+end
+
+function [tag, rest] = extractWindowTag(args)
+   %EXTRACTWINDOWTAG Peel trailing datetime pair into a YYYYMMDD-YYYYMMDD tag.
+
+   tag = '';
+   rest = args;
+   if numel(args) < 2
+      return
+   end
+   tail2 = args(end-1:end);
+   if ~all(cellfun(@(v) isa(v, 'datetime') && isscalar(v) && ~isnat(v), tail2))
+      return
+   end
+   tag = char(sprintf('%s-%s', ...
+      string(tail2{1}, 'yyyyMMdd'), string(tail2{2}, 'yyyyMMdd')));
+   rest = args(1:end-2);
 end
 
 function pathlist = appendParts(pathname, parts)

@@ -11,14 +11,14 @@ function candidate = candidateFromIcemodelOutput(ice1, ice2, opts, case_manifest
 
    arguments
       ice1 (1, 1) struct
-      ice2 (1, 1) struct %#ok<INUSA>
+      ice2 (1, 1) struct
       opts (1, 1) struct
       case_manifest (1, 1) struct
    end
 
    switch case_manifest.case_type
       case "esm_site"
-         candidate = timeseriesCandidateFromIce1(ice1, opts, case_manifest);
+         candidate = timeseriesCandidateFromIce1(ice1, ice2, opts, case_manifest);
       case "synthetic_process"
          candidate = experimentBundleCandidateFromIce1(ice1, opts);
       otherwise
@@ -27,7 +27,7 @@ function candidate = candidateFromIcemodelOutput(ice1, ice2, opts, case_manifest
    end
 end
 
-function candidate = timeseriesCandidateFromIce1(ice1, opts, case_manifest)
+function candidate = timeseriesCandidateFromIce1(ice1, ice2, opts, case_manifest)
    %TIMESERIESCANDIDATEFROMICE1 Map ICE1 fields to ESM verification targets.
 
    if ~isfield(ice1, "Time")
@@ -37,8 +37,7 @@ function candidate = timeseriesCandidateFromIce1(ice1, opts, case_manifest)
    variable_names = case_manifest.comparison_variables;
    data = timetable('RowTimes', ice1.Time);
 
-   for i = 1:numel(variable_names)
-      name = variable_names(i);
+   for name = variable_names(:)'
       if isfield(ice1, name)
          data.(name) = ice1.(name);
       elseif name == "snow_depth_m" && isfield(ice1, "snow_depth")
@@ -54,6 +53,15 @@ function candidate = timeseriesCandidateFromIce1(ice1, opts, case_manifest)
       elseif name == "surface_temp_C" && isfield(ice1, "Tsfc")
          Tf = icemodel.physicalConstant('Tf');
          data.surface_temp_C = ice1.Tsfc - Tf;
+      else
+         soil_tok = regexp(char(name), '^soil_temp_(\d+)_C$', 'tokens', 'once');
+         if ~isempty(soil_tok)
+            values = soilTempFromIce2(ice2, opts, case_manifest, ...
+               str2double(soil_tok{1}));
+            if ~isempty(values)
+               data.(name) = values;
+            end
+         end
       end
    end
 
@@ -75,6 +83,32 @@ function candidate = experimentBundleCandidateFromIce1(ice1, opts)
       "format", "experiment_bundle", ...
       "experiments", ice1.verification_experiments, ...
       "metadata", metadata(opts, "icemodel_output"));
+end
+
+function values = soilTempFromIce2(ice2, opts, case_manifest, k)
+   %SOILTEMPFROMICE2 Sample column T at the k-th manifested soil depth.
+   %
+   % Returns Celsius column-T at depth manifest.observation_variables
+   % .soil_depths_m(k), or [] if the depth/grid is unavailable. icemodel
+   % does not model a separate soil layer; the column temperature is
+   % sampled at the requested depth using opts.dz_thermal spacing.
+
+   values = [];
+   if ~isfield(ice2, 'T') || isempty(ice2.T)
+      return
+   end
+   obsvars = case_manifest.observation_variables;
+   if ~isstruct(obsvars) || ~isfield(obsvars, 'soil_depths_m')
+      return
+   end
+   depths = obsvars.soil_depths_m;
+   if k < 1 || k > numel(depths)
+      return
+   end
+   dz = opts.dz_thermal;
+   zidx = max(1, min(size(ice2.T, 1), round(depths(k) / dz) + 1));
+   Tf = icemodel.physicalConstant('Tf');
+   values = ice2.T(zidx, :)' - Tf;
 end
 
 function info = metadata(opts, source)

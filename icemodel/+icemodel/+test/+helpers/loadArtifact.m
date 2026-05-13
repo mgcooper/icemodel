@@ -48,7 +48,7 @@ function [data, meta] = loadArtifact(kind, kwargs)
          baseline_tag=kwargs.baseline_tag, run_name=kwargs.run_name));
    end
 
-   if exist(pathname, 'file') ~= 2
+   if ~isfile(pathname)
       error('icemodel:test:artifactNotFound', ...
          'Artifact file not found: %s', pathname)
    end

@@ -26,10 +26,7 @@ function [ice1, ice2, opts] = syntheticSnowModelRun(opts)
    manifest = opts.verification_case_manifest;
 
    % Stand-in candidates are derived directly from the staged targets;
-   % no forcing read is needed. (Once production snow physics replaces
-   % this hook, the standard icemodel chain loads forcing through
-   % setopts + configureRun + loadmet using the case_id as both
-   % sitename and forcings.)
+   % no forcing read is needed.
    targets = icemodel.verification.helpers.loadArtifact( ...
       manifest.evaluation_path, "targets");
 
@@ -80,8 +77,7 @@ function [ice1, ice2] = timeseriesCandidateOutput(targets, opts)
 
    % Store both verification-native names and core-adjacent names where they
    % exist today. The adapter prefers native snow names and falls back to Tsfc.
-   for i = 1:numel(variable_names)
-      name = variable_names(i);
+   for name = variable_names(:)'
       ice1.(name) = data.(name);
    end
    if any(variable_names == "surface_temp_C")
@@ -106,8 +102,8 @@ function [ice1, ice2] = experimentBundleCandidateOutput(experiments, opts)
    experiment_names = fieldnames(experiments);
    candidate_experiments = experiments;
 
-   for i = 1:numel(experiment_names)
-      name = experiment_names{i};
+   for n = 1:numel(experiment_names)
+      name = experiment_names{n};
       data = candidate_experiments.(name);
       variable_names = string(data.Properties.VariableNames);
 
@@ -128,6 +124,5 @@ end
 
 function values = nonnegativeFinite(values)
    %NONNEGATIVEFINITE Clamp finite negative values while preserving NaNs.
-
    values(isfinite(values) & values < 0) = 0;
 end

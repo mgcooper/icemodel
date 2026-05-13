@@ -126,9 +126,7 @@ function solution = analyticalSolution(experiment_name, def)
    solution.parameters = params;
 end
 
-% =============================================================================
-% Ripe snow: Colbeck 1972 / Clark 2017 Eqs. 5-9 closed-form solution.
-% =============================================================================
+%% Ripe snow: Colbeck 1972 / Clark 2017 Eqs. 5-9 closed-form solution.
 function [storage, q_bot, params] = ripe_solution( ...
       time_seconds, q_top, rain_window, total_depth, ...
       f_ice_0, f_liq_0, f_res_pore, m_exp, permeability)
@@ -146,6 +144,9 @@ function [storage, q_bot, params] = ripe_solution( ...
       f_ice_0, f_liq_0, method="darcy", permeability=permeability);
    k_sat = k_sat(1);
 
+   % S_inf is the relative saturation at infinity (the asymptotic equilibrium
+   % saturation that balances q_top through the constitutive law). f_liq_inf and
+   % c_inf below carry the same "at infinity / asymptotic equilibrium" meaning.
    S_inf = (q_top / k_sat) ^ (1 / m_exp);
    f_liq_inf = f_res + S_inf * avail;
 
@@ -164,9 +165,8 @@ function [storage, q_bot, params] = ripe_solution( ...
    q_bot = zeros(n, 1);
    for k = 1:n
       [storage(k), q_bot(k)] = sample_ripe(time_seconds(k), q_top, ...
-         rain_window, t_arrival, t_drain_start, ...
-         f_liq_0, f_liq_inf, total_depth, c_inf, k_sat, ...
-         f_res, avail, m_exp);
+         rain_window, t_arrival, t_drain_start, f_liq_0, f_liq_inf, ...
+         total_depth, c_inf, k_sat, avail, m_exp);
    end
 
    params = struct( ...
@@ -185,7 +185,7 @@ end
 
 function [storage, q_bot] = sample_ripe(t, q_top, rain_window, ...
       t_arrival, t_drain_start, f_liq_0, f_liq_inf, total_depth, ...
-      c_inf, k_sat, f_res, avail, m_exp)
+      c_inf, k_sat, avail, m_exp)
 
    if t <= 0
       storage = f_liq_0 * total_depth;
@@ -245,9 +245,7 @@ function [storage, q_bot] = sample_ripe(t, q_top, rain_window, ...
    storage = max(0, storage_at_drain_start - drained);
 end
 
-% =============================================================================
-% Cold snow: Clark 2017 wetting-front advance with phase-change uptake.
-% =============================================================================
+%% Cold snow: Clark 2017 wetting-front advance with phase-change uptake.
 function [storage, q_bot, params] = cold_solution( ...
       time_seconds, q_top, rain_window, total_depth, ...
       f_ice_0, f_liq_0, T_0, f_res_pore, m_exp, ...
@@ -451,8 +449,7 @@ function q = q_at_f_liq(f_liq, k_sat, f_res, avail, m_exp)
    q = k_sat * S ^ m_exp;
 end
 
-% =============================================================================
-% Cold partial-duration: kinematic-wave PDE on a fine grid.
+%% Cold partial-duration: kinematic-wave PDE on a fine grid.
 %
 % Solves the same constitutive law as the production kernel (q = k_sat * S^m_exp
 % with thermal-saturation uptake at the wetting front) using an explicit upwind
@@ -464,7 +461,7 @@ end
 % Independence from the production kernel: this function uses only explicit FV
 % upwind on f_liq with an in-place refreezing step against local cold content,
 % so changes to icemodel.column.infiltration cannot mask issues caught here.
-% =============================================================================
+
 function [storage, q_bot] = cold_partial_duration_pde( ...
       time_seconds, q_top, rain_window, total_depth, f_ice_0, T_0, ...
       f_res_pore, m_exp, Tf, Lf, ro_ice, ro_liq, cp_ice, permeability)

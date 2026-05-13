@@ -41,23 +41,24 @@ function cases = normalizeCaseEntries(cases)
    text_fields = ["case_id"; "case_type"; "site_id"; "site_name"; ...
       "evaluation_file"; "reference_file"; ...
       "native_timestep"; "notes"];
-   for i = 1:numel(cases)
-      for j = 1:numel(text_fields)
-         fieldname = text_fields(j);
-         if isfield(cases(i), fieldname)
-            cases(i).(fieldname) = string(cases(i).(fieldname));
+   for icase = 1:numel(cases)
+      for jfield = 1:numel(text_fields)
+         fieldname = text_fields(jfield);
+         if isfield(cases(icase), fieldname)
+            cases(icase).(fieldname) = string(cases(icase).(fieldname));
          end
       end
 
-      if isfield(cases(i), "comparison_variables")
-         cases(i).comparison_variables = string(cases(i).comparison_variables);
+      if isfield(cases(icase), "comparison_variables")
+         cases(icase).comparison_variables = ...
+            string(cases(icase).comparison_variables);
       end
 
-      if isfield(cases(i), "comparison_window")
-         cases(i).comparison_window.start = ...
-            string(cases(i).comparison_window.start);
-         cases(i).comparison_window.end = ...
-            string(cases(i).comparison_window.end);
+      if isfield(cases(icase), "comparison_window")
+         cases(icase).comparison_window.start = ...
+            string(cases(icase).comparison_window.start);
+         cases(icase).comparison_window.end = ...
+            string(cases(icase).comparison_window.end);
       end
    end
 end

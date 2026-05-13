@@ -10,7 +10,7 @@ function sitenames = snowmipsite()
    %  Canonical site-name list for the "esm_snowmip" dataset family. This is
    %  the namelist consumed by argument validation and by case-id resolution.
    %  For the richer site catalog (display name, location, time-window
-   %  metadata), use icemodel.verification.namelists.snowmipcatalog.
+   %  metadata), use icemodel.verification.helpers.snowmipinfo.
 
    % Order is alphabetical so namelists / case-id lists are stable across
    % releases.

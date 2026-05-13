@@ -51,9 +51,9 @@ function test_verification_namelists_expose_curated_selectors(testCase)
       "colbeck1976");
 
    % The richer site catalog is keyed by the same site-name namelist.
-   catalog = icemodel.verification.namelists.snowmipcatalog();
+   catalog = icemodel.verification.helpers.snowmipinfo();
    testCase.verifyEqual(string({catalog.sitename})', expectedEsmCaseIds());
-   info_cdp = icemodel.verification.namelists.snowmipcatalog("cdp");
+   info_cdp = icemodel.verification.helpers.snowmipinfo("cdp");
    testCase.verifyEqual(info_cdp.long_name, "Col de Porte");
 end
 
@@ -225,6 +225,31 @@ function test_candidate_adapter_derives_swe_from_depth_and_density(testCase)
    testCase.verifyEqual(candidate.data.swe_kg_m2, ...
       snow_depth_m .* snow_density_kg_m3);
    testCase.verifyEqual(candidate.data.surface_temp_C, surface_temp_K - Tf);
+end
+
+function test_candidate_adapter_samples_soil_temp_from_ice2(testCase)
+   % soil_temp_<k>_C must be sampled from ice2.T at the manifested depth.
+
+   time = datetime(2000, 1, 1, 0, 0, 0) + hours(0:2);
+   T_column = [273.15 273.05 273.25; ...
+               272.15 272.10 272.20; ...
+               271.15 271.20 271.30];
+   ice1 = struct("Time", time(:), "Tsfc", T_column(1, :)');
+   ice2 = struct("T", T_column);
+   opts = struct("smbmodel", "icemodel", "sitename", "wfj", ...
+      "simyears", 2000, "dz_thermal", 0.04);
+   manifest = struct( ...
+      "case_type", "esm_site", ...
+      "comparison_variables", "soil_temp_1_C", ...
+      "observation_variables", struct("soil_depths_m", 0.01));
+
+   candidate = icemodel.verification.candidateFromIcemodelOutput( ...
+      ice1, ice2, opts, manifest);
+
+   Tf = icemodel.physicalConstant('Tf');
+   testCase.verifyTrue(ismember("soil_temp_1_C", ...
+      candidate.data.Properties.VariableNames));
+   testCase.verifyEqual(candidate.data.soil_temp_1_C, T_column(1, :)' - Tf);
 end
 
 function test_plotcase_writes_figure_without_candidate(testCase)

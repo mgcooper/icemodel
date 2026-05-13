@@ -9,7 +9,8 @@ function opts = caseSetopts(case_manifest, kwargs)
    %  the manifest's case_id as both sitename and forcings, and the years
    %  touched by manifest.comparison_window as simyears. The standard chain
    %  (configureRun + createMetFileNames + loadmet) then resolves the staged
-   %  met files at <ICEMODEL_INPUT_PATH>/met/met_<case>_<case>_<year>_<dt>.mat
+   %  multi-year met file
+   %  <ICEMODEL_INPUT_PATH>/met/met_<case>_<case>_<YYYYMMDD>_<YYYYMMDD>_<dt>.mat
    %  with no special-case bypass.
    %
    %  Inputs
@@ -29,30 +30,39 @@ function opts = caseSetopts(case_manifest, kwargs)
    %                   staged calendar-year met file.
    %
    % See also: icemodel.setopts, icemodel.createMetFileNames,
-   %  icemodel.verification.runIcemodelSnowCandidate
+   %  icemodel.verification.runIcemodelSnowCandidate,
+   %  icemodel.test.helpers.setModelOptsForCase (regression-suite analogue)
 
    arguments
       case_manifest (1, 1) struct
-      kwargs.smbmodel  (1, 1) string = "icemodel"
-      kwargs.testname  (1, 1) string = "verification"
-      kwargs.dt        (1, 1) double = nativeTimestepToSeconds(case_manifest)
+      kwargs.smbmodel (1, 1) string = "icemodel"
+      kwargs.testname (1, 1) string = "verification"
+      kwargs.dt (1, 1) double = nativeTimestepToSeconds(case_manifest)
       kwargs.startdate = NaT('TimeZone', 'UTC')
-      kwargs.enddate   = NaT('TimeZone', 'UTC')
+      kwargs.enddate = NaT('TimeZone', 'UTC')
    end
 
-   case_id = string(case_manifest.case_id);
    [window_start, window_end] = resolveWindow(case_manifest, ...
       kwargs.startdate, kwargs.enddate);
 
-   % Years touched by the comparison window become simyears. Standard
-   % loadmet (per icemodel.loadmet) loads each calendar-year met file
-   % under simyears and concatenates; opts.startdate / opts.enddate then
-   % subset that concatenated met to the actual comparison window.
+   % Define inputs to icemodel.setopts. simyears spans the calendar years in the
+   % comparison window; loadmet then loads each calendar-year met file under
+   % simyears and concatenates, and opts.startdate / opts.enddate subset the
+   % result to the actual window.
+   smbmodel = char(kwargs.smbmodel);
+   sitename = char(string(case_manifest.case_id));
    simyears = unique(year([window_start; window_end]))';
+   forcings = sitename;
+   userdata = [];
+   uservars = [];
+   testname = char(kwargs.testname);
+   saveflag = false;
+   backupflag = false;
+   dt_seconds = kwargs.dt;
 
-   opts = icemodel.setopts(char(kwargs.smbmodel), char(case_id), simyears, ...
-      char(case_id), [], [], char(kwargs.testname), false, false, ...
-      'dt', kwargs.dt, ...
+   opts = icemodel.setopts(smbmodel, sitename, simyears, forcings, ...
+      userdata, uservars, testname, saveflag, backupflag, ...
+      'dt', dt_seconds, ...
       'startdate', window_start, ...
       'enddate', window_end);
 end
@@ -72,7 +82,7 @@ function dt_seconds = nativeTimestepToSeconds(case_manifest)
       otherwise
          % Default to hourly. The verification suite stages ESM-SnowMIP
          % met at native hourly resolution; runtime resampling to 15-min
-         % is a future architectural change tracked separately.
+         % is a future architectural change.
          dt_seconds = 3600;
    end
 end
@@ -83,7 +93,7 @@ function [window_start, window_end] = resolveWindow(manifest, ...
 
    if ~isnat(startdate) && ~isnat(enddate)
       window_start = icemodel.verification.setup.ensureUtc(startdate);
-      window_end   = icemodel.verification.setup.ensureUtc(enddate);
+      window_end = icemodel.verification.setup.ensureUtc(enddate);
       return
    end
 
@@ -91,6 +101,6 @@ function [window_start, window_end] = resolveWindow(manifest, ...
    % the canonical default.
    window_start = icemodel.verification.setup.ensureUtc( ...
       manifest.comparison_window.start);
-   window_end   = icemodel.verification.setup.ensureUtc( ...
+   window_end = icemodel.verification.setup.ensureUtc( ...
       manifest.comparison_window.end);
 end

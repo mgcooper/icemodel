@@ -76,15 +76,19 @@ function report_path = writeRunReport(run_dir, case_results, cases, kwargs)
    fprintf(fid, "## Per-case headline\n\n");
    fprintf(fid, "| Case | Family | Window | Variables | OK | NA |\n");
    fprintf(fid, "|------|--------|--------|-----------|----|----|\n");
-   for i = 1:numel(case_results)
-      cr = case_results{i};
-      m = cr.metrics;
-      ok = nnz(m.status == "ok");
-      na = nnz(m.status == "not_applicable");
-      family = caseFamily(cases, cr.case_id);
-      window = caseWindow(cases, cr.case_id);
+
+   for n = 1:numel(case_results)
+      results = case_results{n};
+      metrics = results.metrics;
+
+      family = caseFamily(cases, results.case_id);
+      window = caseWindow(cases, results.case_id);
+
+      ok = nnz(metrics.status == "ok");
+      na = nnz(metrics.status == "not_applicable");
+
       fprintf(fid, "| %s | %s | %s | %d | %d | %d |\n", ...
-         cr.case_id, family, window, height(m), ok, na);
+         results.case_id, family, window, height(metrics), ok, na);
    end
    fprintf(fid, "\n");
 
@@ -93,18 +97,18 @@ function report_path = writeRunReport(run_dir, case_results, cases, kwargs)
    fprintf(fid, "Bias = mean(candidate - target). RMSE / correlation are ");
    fprintf(fid, "evaluated on aligned finite pairs. Peak / melt-out timing ");
    fprintf(fid, "errors are signed offsets in hours.\n\n");
-   for i = 1:numel(case_results)
-      cr = case_results{i};
-      fprintf(fid, "### `%s`\n\n", cr.case_id);
-      m = cr.metrics;
-      if isempty(m)
+   for n = 1:numel(case_results)
+      results = case_results{n};
+      fprintf(fid, "### `%s`\n\n", results.case_id);
+      metrics = results.metrics;
+      if isempty(metrics)
          fprintf(fid, "_no metrics_\n\n");
          continue
       end
       fprintf(fid, "| Variable | Status | n | Bias | RMSE | Corr | Peak Err | Peak ΔT (h) | Onset ΔT (h) | Melt-out ΔT (h) |\n");
       fprintf(fid, "|----------|--------|---|------|------|------|----------|-------------|--------------|------------------|\n");
-      for k = 1:height(m)
-         row = m(k, :);
+      for m = 1:height(metrics)
+         row = metrics(m, :);
          fprintf(fid, "| %s | %s | %d | %s | %s | %s | %s | %s | %s | %s |\n", ...
             string(getOr(row, 'variable', '')), ...
             string(row.status), ...
@@ -120,7 +124,7 @@ function report_path = writeRunReport(run_dir, case_results, cases, kwargs)
       fprintf(fid, "\n");
 
       if kwargs.plotted
-         fig_paths = collectFigurePaths(run_dir, cr.case_id);
+         fig_paths = collectFigurePaths(run_dir, results.case_id);
          if ~isempty(fig_paths)
             fprintf(fid, "**Figures:**\n\n");
             for p = fig_paths(:)'
@@ -135,20 +139,17 @@ function report_path = writeRunReport(run_dir, case_results, cases, kwargs)
    fprintf(fid, "## Artifacts\n\n");
    fprintf(fid, "- `summary.csv` (long-format metric table)\n");
    fprintf(fid, "- `summary.mat` (`summary` + per-case `case_results` cell array)\n");
-   for i = 1:numel(case_results)
-      cr = case_results{i};
-      if ~isblanktext(cr.metrics_path)
-         [~, base, ext] = fileparts(char(cr.metrics_path));
-         fprintf(fid, "- `%s/%s%s`\n", cr.case_id, base, ext);
+   for n = 1:numel(case_results)
+      results = case_results{n};
+      if ~isblanktext(results.metrics_path)
+         [~, base, ext] = fileparts(char(results.metrics_path));
+         fprintf(fid, "- `%s/%s%s`\n", results.case_id, base, ext);
       end
    end
    fprintf(fid, "\n");
 end
 
-% =====================================================================
-% Local helpers
-% =====================================================================
-
+%% Local helpers
 function family = caseFamily(cases, case_id)
    match = string({cases.case_id}) == string(case_id);
    if any(match)
@@ -176,7 +177,7 @@ end
 
 function paths = collectFigurePaths(run_dir, case_id)
    case_dir = fullfile(run_dir, char(case_id));
-   if exist(case_dir, 'dir') ~= 7
+   if ~isfolder(case_dir)
       paths = strings(0, 1);
       return
    end

@@ -21,14 +21,14 @@ function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, ou
          baseline_tag=baseline_tag, simyear=simyear);
    end
 
-   if exist(char(output_file), 'file') == 2 && ~overwrite
+   if isfile(char(output_file)) && ~overwrite
       error('release %s baseline already exists: %s', kind, char(output_file))
    end
 
    % Copy from the current rolling baseline bundle, not from a rerun.
    source_file = icemodel.test.helpers.baselineFilePath(kind, ...
       smbmodel=smbmodel, simyear=simyear);
-   if exist(char(source_file), 'file') ~= 2
+   if ~isfile(char(source_file))
       error('rolling %s baseline is missing: %s', kind, char(source_file))
    end
 
@@ -98,12 +98,12 @@ function copyProfilerArtifacts(source_file, output_file)
    %COPYPROFILERARTIFACTS Copy the profiler sidecar folder for a snapshot.
 
    src_profdir = icemodel.test.helpers.baselineProfilerDir(source_file);
-   if exist(src_profdir, 'dir') ~= 7
+   if ~isfolder(src_profdir)
       return
    end
 
    dst_profdir = icemodel.test.helpers.baselineProfilerDir(output_file);
-   if exist(dst_profdir, 'dir') == 7
+   if isfolder(dst_profdir)
       rmdir(dst_profdir, 's');
    end
    copyfile(src_profdir, dst_profdir);

@@ -6,6 +6,9 @@ function opts = setModelOptsForCase(c, kwargs)
    %
    % Uses the requested model defaults for the case, then applies the explicit
    % case-specific reset(s) needed by the formal matrix.
+   %
+   % See also: icemodel.verification.helpers.caseSetopts (verification-suite
+   %  analogue keyed on case manifests)
    arguments
       c
       kwargs.include_spinup (1, 1) logical = true

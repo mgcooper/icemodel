@@ -29,16 +29,16 @@ function cases = listcases(kwargs)
 
    % Discover family manifests first; all later filters operate on manifest
    % contents so the function stays independent of any hard-coded case list.
-   files = icemodel.verification.helpers.familyManifestFiles( ...
+   manifest_files = icemodel.verification.helpers.familyManifestFiles( ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
       "icemodel_config_casename", kwargs.icemodel_config_casename);
 
    % Read each family manifest, apply optional filters, and keep only families
    % that contribute at least one case.
-   selected_family_cases = cell(numel(files), 1);
+   selected_family_cases = cell(numel(manifest_files), 1);
    n_families = 0;
-   for i = 1:numel(files)
-      family = icemodel.verification.helpers.readFamilyManifest(files(i));
+   for this_file = manifest_files(:)'
+      family = icemodel.verification.helpers.readFamilyManifest(this_file);
       if skipFamily(family, kwargs.dataset_family)
          continue
       end
@@ -76,11 +76,22 @@ end
 
 function cases = resolveFamilyCases(family)
    %RESOLVEFAMILYCASES Resolve one family's case entries.
+   %
+   % family.cases may arrive as a scalar struct (single-case families
+   % such as laugh_tests/colbeck1976) or as a struct array. reshape(...,
+   % [], 1) handles both, but the scalar branch is called out so the
+   % preallocation step below stays explicit about returning a 1x1
+   % column even when only one case exists.
 
    entries = reshape(family.cases, [], 1);
+   if isscalar(entries)
+      cases = resolveCase(entries, family);
+      return
+   end
+
    resolved_rows = repmat(resolveCase(entries(1), family), numel(entries), 1);
-   for i = 1:numel(entries)
-      resolved_rows(i) = resolveCase(entries(i), family);
+   for n = 1:numel(entries)
+      resolved_rows(n) = resolveCase(entries(n), family);
    end
    cases = resolved_rows;
 end
@@ -100,10 +111,6 @@ function resolved = resolveCase(entry, family)
 
    % Resolve relative artifact paths at read time so manifests stay portable
    % inside demo/data while workflow functions receive absolute paths.
-   % Forcing is no longer carried in the manifest; verification cases
-   % resolve forcing through the standard icemodel chain (setopts +
-   % configureRun + createMetFileNames + loadmet) using case_id as the
-   % sitename / forcings labels. See helpers/caseSetopts.m.
    resolved.evaluation_path = resolveCasePath(family.family_root, entry, ...
       'evaluation_file');
    resolved.reference_path = resolveCasePath(family.family_root, entry, ...

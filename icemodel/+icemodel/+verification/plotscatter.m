@@ -76,10 +76,10 @@ end
 function plotOneVariable(ax, target_tt, candidate_tt, varname)
    %PLOTONEVARIABLE Plot one finite paired scatter comparison.
 
-   if ~ismember(varname, target_tt.Properties.VariableNames) ...
-         || ~ismember(varname, candidate_tt.Properties.VariableNames)
-      title(ax, strrep(varname + " scatter", '_', '\_'))
-      axis(ax, 'off')
+   missing_target = ~ismember(varname, target_tt.Properties.VariableNames);
+   missing_candidate = ~ismember(varname, candidate_tt.Properties.VariableNames);
+   if missing_target || missing_candidate
+      noDataPanel(ax, varname, missing_target, missing_candidate)
       return
    end
 
@@ -100,6 +100,32 @@ function plotOneVariable(ax, target_tt, candidate_tt, varname)
    title(ax, strrep(varname + " scatter", '_', '\_'), ...
       'FontSize', 12, 'FontWeight', 'bold')
    formatAxes(ax);
+end
+
+function noDataPanel(ax, varname, missing_target, missing_candidate)
+   %NODATAPANEL Render a visible "no data" tile and warn loudly.
+   %
+   % Replaces the prior silent axis-off behavior so missing variables
+   % surface in both the figure and the command window.
+
+   if missing_target && missing_candidate
+      reason = 'target and candidate';
+   elseif missing_target
+      reason = 'target';
+   else
+      reason = 'candidate';
+   end
+   warning('icemodel:verification:plotscatter:noData', ...
+      '%s scatter unavailable: %s missing', varname, reason);
+
+   title(ax, strrep(varname + " scatter", '_', '\_'), ...
+      'FontSize', 12, 'FontWeight', 'bold')
+   text(ax, 0.5, 0.5, sprintf('no data\n(missing: %s)', reason), ...
+      'Units', 'normalized', 'HorizontalAlignment', 'center', ...
+      'VerticalAlignment', 'middle', 'FontSize', 11, 'Color', [0.4 0.4 0.4])
+   ax.XTick = [];
+   ax.YTick = [];
+   ax.Box = 'on';
 end
 
 function setFigureSize(f, width, height)

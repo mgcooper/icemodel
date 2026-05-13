@@ -168,7 +168,7 @@ function Data = loadExternalUserdata(opts, thisyear, mettime)
 
    userfile = [opts.sitename '_' opts.userdata '_' int2str(thisyear) '.mat'];
    filepath = fullfile(opts.pathuserdata, userfile);
-   if exist(filepath, 'file') ~= 2
+   if ~isfile(filepath)
       error('\n userdata file does not exist: \n\n %s \n', filepath);
    end
 

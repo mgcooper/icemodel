@@ -160,7 +160,8 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    % Accumulate the measured sample/activity rows for the saved artifact.
    [sample_rows, activity_rows, case_rows, case_opts] = deal(struct([]));
    [r_sample, r_activity, r_case] = deal(0);
-   failed_cases = strings(0, 1);
+   failed_cases = strings(height(cases), 1);
+   n_failed = 0;
 
    % Run the per-case performance experiment and compare to baseline.
    for icase = 1:height(cases)
@@ -267,9 +268,11 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       case_opts(r_case).opts = icemodel.test.helpers.setModelOptsForCase(c);
 
       if ~passed_perf
-         failed_cases(end+1, 1) = string(c.case_id); %#ok<AGROW>
+         n_failed = n_failed + 1;
+         failed_cases(n_failed, 1) = string(c.case_id);
       end
    end
+   failed_cases = failed_cases(1:n_failed, 1);
 
    % Build the saved artifact tables for this concrete formal model.
    sample_detail = struct2table(sample_rows);

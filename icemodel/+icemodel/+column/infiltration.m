@@ -53,7 +53,7 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
    %      Updated column state.
    %  diag : struct
    %      Substepping and mass-balance diagnostics:
-   %        n_sub, dt_sub, k_sat_max, S_inf, c_max,
+   %        n_sub, dt_sub, k_sat_max, S_inflow, c_max,
    %        inflow_total [m], outflow_total [m].
    %
    %  Variable analogues with Colbeck 1972:
@@ -67,10 +67,10 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
    %  -----
    %  Free-drainage bottom boundary (q_bot = q_internal(end)). The CFL bound on
    %  the substep size uses the larger of two characteristic speeds: (1)
-   %  inflow-driven steady-state c_inflow at S_inf = (q_top /
+   %  inflow-driven steady-state c_inflow at S_inflow = (q_top /
    %  k_sat_max)^(1/m_exp), which dominates during rain; and (2) c_state_max
    %  evaluated against the current per-layer S, which dominates during
-   %  recession (when q_top -> 0 and S_inf -> 0). Refreezing and explicit
+   %  recession (when q_top -> 0 and S_inflow -> 0). Refreezing and explicit
    %  conduction each run once per main step, after the liquid update.
    %
    % See also: icemodel.column.liquid_flux,
@@ -142,7 +142,7 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
    c = m_exp .* k_sat .* S .^ (m_exp - 1) ./ availCap;
    c_max = max(c);
 
-   % Inflow-driven steady-state characteristic speed at S_inf = (q_top /
+   % Inflow-driven steady-state characteristic speed at S_inflow = (q_top /
    % k_sat_max)^(1/m_exp). Dominates during rain phases.
    if k_sat_max > 0 && q_top > 0
       S_inflow = min(1, (q_top / k_sat_max) ^ (1 / m_exp));

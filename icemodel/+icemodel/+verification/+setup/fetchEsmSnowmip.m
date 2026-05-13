@@ -79,33 +79,11 @@ function source_dir = fetchEsmSnowmip(kwargs)
    % banner can drop files into a path that is already there.
    icemodel.helpers.ensureDirExists(cache_dir);
 
-   % Per-site presence + readability check. Each ESM-SnowMIP site
-   % needs one met (forcing) and one obs (evaluation) NetCDF; both are
-   % located by glob match against the canonical PANGAEA naming
-   % pattern so year-stamped filenames do not need to be hard-coded.
-   missing  = strings(0, 1);
-   broken   = strings(0, 1);
-   for i = 1:numel(kwargs.sitenames)
-      sitename = kwargs.sitenames(i);
-      [ok_met, status_met, name_met] = checkSiteFile(cache_dir, ...
-         sprintf('met_insitu_%s_*.nc', sitename));
-      [ok_obs, status_obs, name_obs] = checkSiteFile(cache_dir, ...
-         sprintf('obs_insitu_%s_*.nc', sitename));
-      if ~ok_met
-         if status_met == "missing"
-            missing(end + 1, 1) = sprintf('met_insitu_%s_*.nc', sitename); %#ok<AGROW>
-         else
-            broken(end + 1, 1) = name_met; %#ok<AGROW>
-         end
-      end
-      if ~ok_obs
-         if status_obs == "missing"
-            missing(end + 1, 1) = sprintf('obs_insitu_%s_*.nc', sitename); %#ok<AGROW>
-         else
-            broken(end + 1, 1) = name_obs; %#ok<AGROW>
-         end
-      end
-   end
+   % Per-site presence + readability check. Each ESM-SnowMIP site needs one met
+   % (forcing) and one obs (evaluation) NetCDF; both are located by glob match
+   % against the canonical PANGAEA naming pattern so year-stamped filenames do
+   % not need to be hard-coded.
+   [missing, broken] = missingOrBrokenFiles(cache_dir, kwargs.sitenames);
 
    ok = isempty(missing) && isempty(broken);
    if ok
@@ -114,7 +92,7 @@ function source_dir = fetchEsmSnowmip(kwargs)
    end
 
    % Print actionable retrieval instructions when files are missing
-   % or broken. Keep the message stable so future agents can grep
+   % or broken. The banner format is stable so developers can grep
    % for it and so it cannot be confused with a regular error.
    if ~kwargs.silent
       fprintf('\n');
@@ -127,7 +105,7 @@ function source_dir = fetchEsmSnowmip(kwargs)
          end
       end
       if ~isempty(broken)
-         fprintf('Unreadable NetCDF files (likely partial download):\n');
+         fprintf('Unreadable NetCDF files (partial download):\n');
          for j = 1:numel(broken)
             fprintf('  - %s\n', broken(j));
          end
@@ -157,10 +135,7 @@ function source_dir = fetchEsmSnowmip(kwargs)
    source_dir = string(cache_dir);
 end
 
-% =====================================================================
-% Local helpers
-% =====================================================================
-
+%% Local helpers
 function pathname = defaultCacheDir()
    %DEFAULTCACHEDIR Canonical ESM-SnowMIP source-cache directory.
    %
@@ -171,21 +146,45 @@ function pathname = defaultCacheDir()
       'verification', 'snow', 'esm_snowmip'));
 end
 
-function [ok, status, name] = checkSiteFile(cache_dir, pattern)
-   %CHECKSITEFILE Glob-match one NetCDF file and confirm it is readable.
+function [missing, broken] = missingOrBrokenFiles(cache_dir, sitenames)
+   %MISSINGORBROKENFILES Collect missing-pattern / unreadable-file lists.
+   %
+   % Each site contributes one met and one obs expected pattern. The
+   % return arrays are preallocated to the worst case (2 * n_sites) so
+   % no growth in the loop, then trimmed.
 
-   matches = dir(fullfile(cache_dir, pattern));
-   if isempty(matches)
-      ok = false; status = "missing"; name = "";
-      return
+   sitenames = reshape(sitenames, 1, []);
+   n_sites = numel(sitenames);
+   n_max = 2 * n_sites;
+   missing = strings(n_max, 1);
+   broken  = strings(n_max, 1);
+   n_missing = 0;
+   n_broken  = 0;
+
+   patterns = strings(n_max, 1);
+   for k = 1:n_sites
+      patterns(2 * k - 1) = sprintf('met_insitu_%s_*.nc', sitenames(k));
+      patterns(2 * k)     = sprintf('obs_insitu_%s_*.nc', sitenames(k));
    end
-   % Use the first match (the upstream bundle has a single file per
-   % site; ambiguous matches are surfaced by the importer).
-   name = string(matches(1).name);
-   try
-      ncinfo(fullfile(matches(1).folder, matches(1).name));
-      ok = true; status = "ok";
-   catch
-      ok = false; status = "broken";
+
+   for k = 1:n_max
+      pattern = patterns(k);
+      matches = dir(fullfile(cache_dir, pattern));
+      if isempty(matches)
+         n_missing = n_missing + 1;
+         missing(n_missing) = pattern;
+         continue
+      end
+      % Use the first match (the upstream bundle has a single file per
+      % site; ambiguous matches are surfaced by the importer).
+      try
+         ncinfo(fullfile(matches(1).folder, matches(1).name));
+      catch
+         n_broken = n_broken + 1;
+         broken(n_broken) = string(matches(1).name);
+      end
    end
+
+   missing = missing(1:n_missing);
+   broken  = broken(1:n_broken);
 end

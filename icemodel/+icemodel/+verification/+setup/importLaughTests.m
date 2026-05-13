@@ -256,10 +256,10 @@ function tt = buildColbeckExperiment(pathname)
    % therefore those with mid-height < 0.
    ntime = numel(time);
    snow_liquid_water_storage_m = zeros(ntime, 1);
-   for k = 1:ntime
-      layer_depth = depth(:, k);
-      layer_liq = liq(:, k);
-      interfaces = iface(:, k);
+   for n = 1:ntime
+      layer_depth = depth(:, n);
+      layer_liq = liq(:, n);
+      interfaces = iface(:, n);
 
       mid_height = 0.5 * (interfaces(1:end-1) + interfaces(2:end));
       snow_mask = layer_depth > 0 & mid_height < 0;
@@ -267,7 +267,7 @@ function tt = buildColbeckExperiment(pathname)
          continue
       end
 
-      snow_liquid_water_storage_m(k) = ...
+      snow_liquid_water_storage_m(n) = ...
          sum(layer_liq(snow_mask) .* layer_depth(snow_mask));
    end
 

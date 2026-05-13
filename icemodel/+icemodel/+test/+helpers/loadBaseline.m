@@ -71,7 +71,7 @@ function [baseline, meta] = loadOneFile(kind, pathname, simyear)
 
    meta = struct();
 
-   if exist(pathname, 'file') ~= 2
+   if ~isfile(pathname)
       baseline = table();
       return
    end
@@ -157,7 +157,7 @@ function baseline = loadAllModels(kind, baseline_type, baseline_tag, simyear)
       baseline_tag=baseline_tag, simyear=simyear), ...
       models, 'UniformOutput', false);
 
-   exists = cellfun(@(p) exist(char(p), 'file') == 2, pathnames);
+   exists = cellfun(@(p) isfile(char(p)), pathnames);
    if ~any(exists)
       baseline = table();
       return

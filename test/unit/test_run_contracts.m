@@ -312,6 +312,20 @@ function test_half_window_errors(testCase)
       'icemodel:configureRun:halfWindow');
 end
 
+function test_output_path_encodes_window(testCase)
+   % When STARTDATE/ENDDATE are set, the default pathoutput should encode
+   % the window as a YYYYMMDD-YYYYMMDD segment so windowed runs do not
+   % overwrite year-only output folders.
+
+   opts = icemodel.setopts('icemodel', 'kanm', [], 'kanm', ...
+      [], [], 'window-test', false, false, ...
+      'startdate', datetime(1995, 10, 1, 0, 0, 0, 'TimeZone', 'UTC'), ...
+      'enddate',   datetime(1996, 9, 30, 0, 0, 0, 'TimeZone', 'UTC'));
+
+   testCase.verifySubstring(opts.pathoutput, '19951001-19960930');
+   testCase.verifySubstring(opts.pathrestart, '19951001-19960930');
+end
+
 function test_use_restart_with_misaligned_window_errors(testCase)
    % use_restart=true requires STARTDATE on a calendar-year boundary to
    % avoid partial-year restart logic. Mid-year STARTDATE is rejected

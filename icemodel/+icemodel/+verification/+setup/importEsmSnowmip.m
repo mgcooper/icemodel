@@ -60,33 +60,29 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %  icemodel.verification.setup.buildEsmSnowmipForcing,
    %  icemodel.verification.setup.buildEsmSnowmipObservations,
    %  icemodel.verification.namelists.snowmipsite,
-   %  icemodel.verification.namelists.snowmipcatalog,
+   %  icemodel.verification.helpers.snowmipinfo,
    %  icemodel.verification.helpers.default_smoke_window
 
    arguments
       source_dir (1, :) string
       kwargs.evaluation_data_root (1, 1) string = ""
       kwargs.icemodel_config_casename (1, 1) string = "test"
-      kwargs.case_ids (1, :) string = ...
+      kwargs.case_ids (1, :) string ...
+         {icemodel.verification.validators.mustBeSnowmipSite} = ...
          icemodel.verification.namelists.snowmipsite()
       kwargs.startdate = ""
-      kwargs.enddate   = ""
+      kwargs.enddate = ""
       kwargs.overwrite (1, 1) logical = false
    end
 
-   % Validate the requested case ids against the canonical sitename namelist.
    case_ids = reshape(kwargs.case_ids, 1, []);
-   bad = setdiff(case_ids, icemodel.verification.namelists.snowmipsite());
-   if ~isempty(bad)
-      error('unsupported ESM-SnowMIP case ids: %s', strjoin(bad, ', '));
-   end
 
    % Explicit windows must be paired. Either both bounds are given (the
    % staged window is shared by every requested site), or both are blank
    % (each site falls back to its default_smoke_window). Mixing is an
    % error rather than a silent half-window.
    has_startdate = ~strcmp(string(kwargs.startdate), "");
-   has_enddate   = ~strcmp(string(kwargs.enddate),   "");
+   has_enddate = ~strcmp(string(kwargs.enddate), "");
    if has_startdate ~= has_enddate
       error(['icemodel:verification:importEsmSnowmip:halfWindow ' ...
          'startdate and enddate must be provided together']);
@@ -118,15 +114,15 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
 
    % Stage each requested case.
    case_entries = cell(numel(case_ids), 1);
-   for i = 1:numel(case_ids)
-      sitename = case_ids(i);
-      info = icemodel.verification.namelists.snowmipcatalog(sitename);
+   for n = 1:numel(case_ids)
+      sitename = case_ids(n);
+      info = icemodel.verification.helpers.snowmipinfo(sitename);
 
       % Resolve the staged time window. Explicit kwargs override the
       % per-site default smoke window.
       if use_explicit_window
          window_start = icemodel.verification.setup.ensureUtc(kwargs.startdate);
-         window_end   = icemodel.verification.setup.ensureUtc(kwargs.enddate);
+         window_end = icemodel.verification.setup.ensureUtc(kwargs.enddate);
       else
          [window_start, window_end] = ...
             icemodel.verification.helpers.default_smoke_window(sitename);
@@ -138,7 +134,7 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       % loadmet resolve it without verification-only branches.
       case_root = fullfile(family_root, sitename);
       evaluation_output_file = fullfile(case_root, "evaluation.mat");
-      reference_output_file  = fullfile(case_root, "reference.mat");
+      reference_output_file = fullfile(case_root, "reference.mat");
 
       % prepareCaseRoot owns the overwrite guard for the eval folder.
       icemodel.verification.setup.prepareCaseRoot(case_root, kwargs.overwrite);
@@ -146,7 +142,7 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       % Build forcing and observations through the reusable builders. Both
       % builders share NetCDF / time-window / channel-selection logic via
       % the local readers in this setup namespace.
-      [forcing_tt, forcing_meta] = ...
+      [forcing_tt, ~] = ...
          icemodel.verification.setup.buildEsmSnowmipForcing( ...
          sitename, source_dir=source_dir, ...
          startdate=window_start, enddate=window_end);
@@ -156,17 +152,17 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
          sitename, source_dir=source_dir, ...
          startdate=window_start, enddate=window_end);
 
-      % Stage forcing as standard icemodel met files: one calendar-year
-      % file per simyear under <ICEMODEL_INPUT_PATH>/met/, named per
-      % createMetFileNames convention (met_<site>_<forcings>_<year>_<dt>.mat).
+      % Stage forcing as a single multi-year met file under
+      % <ICEMODEL_INPUT_PATH>/met/, named per createMetFileNames
+      % convention (met_<site>_<forcings>_<YYYYMMDD>_<YYYYMMDD>_<dt>.mat).
       % Saved as the bare 'met' timetable (not a struct envelope) so the
       % normal loadmet path consumes it without special-casing.
-      writeStandardMetFiles(forcing_tt, sitename, ...
-         kwargs.icemodel_config_casename); %#ok<*NASGU>
+      writeMetFiles(forcing_tt, sitename, ...
+         kwargs.icemodel_config_casename);
 
       targets = struct( ...
-         'format',   'timeseries', ...
-         'data',     obs_tt, ...
+         'format', 'timeseries', ...
+         'data', obs_tt, ...
          'metadata', obs_meta);
 
       % Until production snow physics exists, the smoke reference
@@ -174,8 +170,8 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       % can run on a fresh clone (synthetic-snow hook still applies
       % when run_snow_verification_suite('run_icemodel', true)).
       reference = struct( ...
-         'format',   'timeseries', ...
-         'data',     obs_tt, ...
+         'format', 'timeseries', ...
+         'data', obs_tt, ...
          'metadata', icemodel.verification.setup.metadataStruct({ ...
          'reference_kind', 'smoke_observed_reference'
          'notes', ['Observed series duplicated as the initial smoke ' ...
@@ -184,11 +180,6 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
 
       save(evaluation_output_file, 'targets');
       save(reference_output_file, 'reference');
-
-      % forcing_meta is provenance only; it is no longer persisted in a
-      % verification-only forcing.mat envelope but the importer keeps the
-      % builder return value to surface its diagnostics if needed.
-      clear forcing_meta
 
       % Choose comparison variables from what's actually present in the
       % staged obs timetable. The obs builder decides which canonical
@@ -203,8 +194,8 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       observation_variables = ...
          icemodel.verification.setup.metadataStruct({ ...
          'snow_depth_source', obs_meta.snow_depth_source
-         'swe_source',        obs_meta.swe_source
-         'soil_depths_m',     obs_meta.soil_depths_m});
+         'swe_source', obs_meta.swe_source
+         'soil_depths_m', obs_meta.soil_depths_m});
 
       case_values = { ...
          char(sitename)
@@ -215,12 +206,12 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
          char(fullfile(sitename, "reference.mat"))
          'hourly'
          struct('start', char(string(window_start)), ...
-         'end',   char(string(window_end)))
+         'end', char(string(window_end)))
          cellstr(comparison_variables)
          observation_variables
          char(siteCaseNote(info))};
 
-      case_entries{i} = icemodel.verification.setup.makeCaseManifestEntry( ...
+      case_entries{n} = icemodel.verification.setup.makeCaseManifestEntry( ...
          case_values);
    end
 
@@ -236,10 +227,7 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    icemodel.verification.setup.writeManifest(manifest_file, manifest);
 end
 
-% =====================================================================
-% Local helpers
-% =====================================================================
-
+%% Local helpers
 function vars = obsComparisonVariables(obs_tt)
    %OBSCOMPARISONVARIABLES Pick comparison variables from staged obs.
    %
@@ -267,16 +255,15 @@ function note = siteCaseNote(info)
       info.long_name, info.location, info.sitename);
 end
 
-function writeStandardMetFiles(forcing_tt, sitename, config_casename)
-   %WRITESTANDARDMETFILES Stage hourly per-simyear met files under input/met/.
+function writeMetFiles(forcing_tt, sitename, config_casename)
+   %WRITEMETFILES Stage one multi-year met file under input/met/.
    %
-   % Splits the staged window's forcing timetable into one calendar-year
-   % file per simyear, in the standard icemodel met-file format
-   % (variable named 'met'). Filenames follow createMetFileNames
-   % convention so configureRun + loadmet resolve them without
-   % verification-only branches:
+   % Saves the staged forcing timetable as a single multi-year met file
+   % in the standard icemodel met-file format (variable named 'met').
+   % Filename follows the createMetFileNames window form so configureRun
+   % + loadmet resolve it without verification-only branches:
    %
-   %   <ICEMODEL_INPUT_PATH>/met/met_<sitename>_<sitename>_<year>_1hr.mat
+   %   <ICEMODEL_INPUT_PATH>/met/met_<sitename>_<sitename>_<YYYYMMDD>_<YYYYMMDD>_1hr.mat
    %
    % The forcings label equals the sitename for verification cases (no
    % climate-model swap). Existing files are overwritten unconditionally
@@ -288,12 +275,10 @@ function writeStandardMetFiles(forcing_tt, sitename, config_casename)
    met_dir = fullfile(input_root, 'met');
    icemodel.helpers.ensureDirExists(met_dir);
 
-   simyears = unique(year(forcing_tt.Time));
-   for k = 1:numel(simyears)
-      simyear = simyears(k);
-      met = forcing_tt(year(forcing_tt.Time) == simyear, :); %#ok<NASGU>
-      filename = sprintf('met_%s_%s_%d_1hr.mat', ...
-         char(sitename), char(sitename), simyear);
-      save(fullfile(met_dir, filename), 'met');
-   end
+   met = forcing_tt;
+   start_stamp = char(forcing_tt.Time(1), 'yyyyMMdd');
+   end_stamp = char(forcing_tt.Time(end), 'yyyyMMdd');
+   filename = sprintf('met_%s_%s_%s_%s_1hr.mat', ...
+      char(sitename), char(sitename), start_stamp, end_stamp);
+   save(fullfile(met_dir, filename), 'met');
 end

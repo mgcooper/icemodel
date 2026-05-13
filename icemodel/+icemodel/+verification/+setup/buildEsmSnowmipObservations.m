@@ -82,8 +82,13 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
 
    % Discover which channels the upstream file provides. Canonical
    % comparison columns are added only when the matching upstream
-   % channel(s) exist (e.g. sod lacks 'ts' so surface_temp_C is omitted;
-   % sap lacks 'tsl' so no soil_temp_<k>_C columns are added).
+   % channel(s) exist. ESM-SnowMIP sites are heterogeneous:
+   %   - boreal forest sites (oas, obs, ojp) report snd_gap_auto in the
+   %     canopy gap rather than snd_auto;
+   %   - sap lacks tsl, so no soil_temp_<k>_C columns are added;
+   %   - rme and sod lack albs (no observed albedo channel);
+   %   - sap lacks the sdepth dimension entirely;
+   %   - sod lacks ts, so surface_temp_C is omitted.
    info = ncinfo(obsfile);
    channels = string({info.Variables.Name});
    has_snow_depth = any(ismember(channels, ...
@@ -171,44 +176,62 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
    Time = obs_time(idx);
 
    % --- Assemble the staged timetable --------------------------------
-   % Build canonical columns first so downstream consumers see the
-   % expected ordering, then append site-specific channels.
-   variable_names  = strings(0, 1);
-   variable_values = {};
+   % Build canonical columns first so downstream code sees the expected
+   % ordering, then append site-specific channels. Count the present channels
+   % first and preallocate the variable_names / values vectors.
+   tsl_window = tsl(:, idx);
+   n_soil = size(tsl_window, 1);
+   n_variants = 0;
+   for c = variant_names
+      if isfield(snd_variants, c)
+         n_variants = n_variants + 1;
+      end
+   end
+   n_cols = double(has_snow_depth) + double(has_swe) + double(has_ts) ...
+      + n_soil + n_variants + double(has_albs);
+
+   variable_names  = strings(n_cols, 1);
+   variable_values = cell(n_cols, 1);
+   col = 0;
 
    if has_snow_depth
-      variable_names(end + 1, 1) = "snow_depth_m";
-      variable_values{end + 1} = snd_best(idx);
+      col = col + 1;
+      variable_names(col) = "snow_depth_m";
+      variable_values{col} = snd_best(idx);
    end
    if has_swe
-      variable_names(end + 1, 1) = "swe_kg_m2";
-      variable_values{end + 1} = swe_kg_m2(idx);
+      col = col + 1;
+      variable_names(col) = "swe_kg_m2";
+      variable_values{col} = swe_kg_m2(idx);
    end
    if has_ts
-      variable_names(end + 1, 1) = "surface_temp_C";
-      variable_values{end + 1} = ts(idx);
+      col = col + 1;
+      variable_names(col) = "surface_temp_C";
+      variable_values{col} = ts(idx);
    end
 
-   tsl_window = tsl(:, idx);
-   for k = 1:size(tsl_window, 1)
-      variable_names(end + 1, 1) = "soil_temp_" + string(k) + "_C"; %#ok<AGROW>
-      variable_values{end + 1}   = tsl_window(k, :)';                %#ok<AGROW>
+   for n = 1:n_soil
+      col = col + 1;
+      variable_names(col) = "soil_temp_" + string(n) + "_C";
+      variable_values{col} = tsl_window(n, :)';
    end
 
    % All snow-depth variants the upstream file actually has.
    for c = variant_names
       if isfield(snd_variants, c)
-         variable_names(end + 1, 1) = c + "_m";   %#ok<AGROW>
-         variable_values{end + 1} = snd_variants.(c)(idx); %#ok<AGROW>
+         col = col + 1;
+         variable_names(col) = c + "_m";
+         variable_values{col} = snd_variants.(c)(idx);
       end
    end
 
    if has_albs
-      variable_names(end + 1, 1) = "albedo";
-      variable_values{end + 1}   = albs(idx);
+      col = col + 1;
+      variable_names(col) = "albedo";
+      variable_values{col} = albs(idx);
    end
 
-   if isempty(variable_names)
+   if n_cols == 0
       error('icemodel:verification:buildEsmSnowmipObservations:noChannels', ...
          'no recognised obs channels in %s', obsfile);
    end
@@ -218,14 +241,14 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
    observations.Time.TimeZone = 'UTC';
 
    metadata = struct( ...
-      'sitename',          sitename, ...
-      'obs_file',          string(obsfile), ...
-      'n_rows',            height(observations), ...
-      'window_start',      observations.Time(1), ...
-      'window_end',        observations.Time(end), ...
-      'soil_depths_m',     sdepth(:), ...
+      'sitename', sitename, ...
+      'obs_file', string(obsfile), ...
+      'n_rows', height(observations), ...
+      'window_start', observations.Time(1), ...
+      'window_end', observations.Time(end), ...
+      'soil_depths_m', sdepth(:), ...
       'snow_depth_source', snow_depth_source, ...
-      'swe_source',        "snw_auto with snw_man fallback when available");
+      'swe_source', "snw_auto with snw_man fallback when available");
 end
 
 function pathname = defaultSourceDir()

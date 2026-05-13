@@ -62,6 +62,30 @@ Rationale:
 - Organize reusable functions into the relevant namespaces instead of leaving them at arbitrary top level.
 - When moving or renaming a function, update all call sites, tests, and docs/comments that describe the public entry point.
 
+## Array growth and existence checks
+
+- `%#ok<AGROW>` is not allowed. Preallocate the output or compute its
+  size before the loop. If a growing pattern is unavoidable, restructure
+  the algorithm so the size is known up front (e.g. count matches first,
+  then allocate, then fill).
+- `%#ok<...>` lint suppressions of any kind (DATST, ASGLU, NASGU, etc.)
+  are not allowed in new code. Refactor the code to remove the
+  underlying warning rather than silencing it.
+- Use `isfolder(p)` and `isfile(p)` instead of `exist(p, 'dir') == 7`
+  and `exist(p, 'file') == 2`. The numeric `exist` codes are an
+  artifact of an older API; the boolean predicates read more clearly
+  and avoid the magic numbers 2 and 7.
+
+## File renames and moves
+
+- Use `git mv` when renaming or moving any tracked file, including
+  function files. Do not delete the old file and create a new one — git
+  loses the rename history and reviewers see two unrelated changes.
+- After `git mv`, edit content in place. MATLAB requires the function
+  declaration to match the filename, so a rename almost always needs a
+  follow-up edit to the function-line, the docstring, and any internal
+  error identifiers.
+
 ## Documentation and comments
 
 - Add docstrings when creating new functions and comment on all code.

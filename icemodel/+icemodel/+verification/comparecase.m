@@ -167,9 +167,9 @@ function [metrics, aligned] = compareTimeseriesBundle(target_tt, candidate_tt, .
 
    % Compare variables independently so missing-variable status is reported per
    % variable instead of aborting the whole case.
-   for i = 1:n_vars
-      [rows(i), aligned_cells{i}] = compareOneVariable(target_tt, candidate_tt, ...
-         variable_names(i), "");
+   for n = 1:n_vars
+      [rows(n), aligned_cells{n}] = compareOneVariable(target_tt, candidate_tt, ...
+         variable_names(n), "");
    end
 
    metrics = struct2table(rows);
@@ -199,15 +199,15 @@ function [metrics, aligned] = compareExperimentBundle(targets, candidates, ...
 
    % Keep the nested loop explicit so the metric table order matches the
    % plotted experiment grid and remains easy to inspect.
-   for i = 1:numel(target_names)
+   for n = 1:numel(target_names)
       sync_rows = cell(numel(variable_names), 1);
-      for j = 1:numel(variable_names)
+      for m = 1:numel(variable_names)
          row_idx = row_idx + 1;
-         [rows(row_idx), sync_rows{j}] = compareOneVariable( ...
-            target_values{i}, candidate_values{i}, variable_names(j), ...
-            target_names{i});
+         [rows(row_idx), sync_rows{m}] = compareOneVariable( ...
+            target_values{n}, candidate_values{n}, variable_names(m), ...
+            target_names{n});
       end
-      aligned_groups{i} = cell2struct(sync_rows, variable_names, 1);
+      aligned_groups{n} = cell2struct(sync_rows, variable_names, 1);
    end
 
    metrics = struct2table(rows);

@@ -95,7 +95,7 @@ function rootdir = resolveRootdir(rootdir_in, parentdir)
    end
 
    if ~isempty(parentdir)
-      if exist(parentdir, 'dir') ~= 7
+      if ~isfolder(parentdir)
          mkdir(parentdir);
       end
       rootdir = tempname(parentdir);

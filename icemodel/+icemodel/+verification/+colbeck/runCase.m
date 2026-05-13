@@ -44,8 +44,7 @@ function candidate = runCase(case_manifest, kwargs)
 
    experiments = struct();
    solver_meta = struct();
-   for i = 1:numel(kwargs.experiment_names)
-      name = kwargs.experiment_names(i);
+   for name = kwargs.experiment_names(:)'
       switch kwargs.kind
          case "numerical"
             [tt, meta] = run_numerical(name, def);
@@ -82,9 +81,7 @@ function candidate = runCase(case_manifest, kwargs)
       'metadata',    metadata);
 end
 
-% =====================================================================
-% Numerical branch: time loop calling icemodel.column.infiltration.
-% =====================================================================
+%% Numerical branch: time loop calling icemodel.column.infiltration.
 function [tt, meta] = run_numerical(experiment_name, def)
 
    % Resolve the named experiment from the case definition.
@@ -146,7 +143,7 @@ function [tt, meta] = run_numerical(experiment_name, def)
 
    % Package the per-step diagnostics as a timetable matching the staged target
    % schema.
-   time_seconds  = (1:n_steps).' * dt;
+   time_seconds = (1:n_steps).' * dt;
    time_datetime = datetime(1990, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') ...
       + seconds(time_seconds);
    tt = timetable(time_datetime, storage, q_bot, ...
@@ -164,9 +161,7 @@ function [tt, meta] = run_numerical(experiment_name, def)
       'permeability_m2', permeability);
 end
 
-% =====================================================================
-% Analytical branch: wrap analyticalSolution into the bundle schema.
-% =====================================================================
+%% Analytical branch: wrap analyticalSolution into the bundle schema.
 function [tt, meta] = run_analytical(experiment_name, def)
    sol = icemodel.verification.colbeck.analyticalSolution( ...
       experiment_name, def);

@@ -16,9 +16,9 @@ function source_dir = fetchLaughTests(kwargs)
    %    1. cloning the upstream repository into the cache dir, e.g.
    %         git clone https://github.com/KyleKlenk/Laugh-Tests \
    %              data/verification/snow/laugh_tests
-   %    2. or pointing kwargs.cache_dir at an existing local checkout
-   %       (Matt's machine has a co-located ../Laugh-Tests checkout
-   %       used by the original development pass).
+   %    2. or pointing kwargs.cache_dir at an existing local checkout.
+   %       If a sibling Laugh-Tests checkout exists at the project
+   %       root parent directory, it is auto-detected (see below).
    %
    %  Files required by importLaughTests (Colbeck case):
    %    test_cases/input_data/colbeck1976/colbeck1976_forcing.nc
@@ -37,11 +37,10 @@ function source_dir = fetchLaughTests(kwargs)
    %      retrieval instructions (clone URL, expected paths) and
    %      either errors (strict=true, default) or returns the
    %      partial path with a warning (strict=false).
-   %    - As a convenience for Matt's existing workflow, if the
-   %      default cache_dir is empty AND a sibling ../Laugh-Tests
-   %      checkout exists at the icemodel project root parent
-   %      directory (e.g. ~/MATLAB/projects/Laugh-Tests when
-   %      icemodel lives at ~/MATLAB/projects/icemodel), it is
+   %    - As a convenience, if the default cache_dir is empty AND a
+   %      sibling ../Laugh-Tests checkout exists at the icemodel
+   %      project root parent directory (e.g. ~/MATLAB/projects/Laugh-Tests
+   %      when icemodel lives at ~/MATLAB/projects/icemodel), it is
    %      auto-detected and returned. The user may set kwargs.cache_dir
    %      explicitly to disable this fallback.
    %
@@ -83,13 +82,13 @@ function source_dir = fetchLaughTests(kwargs)
    % Sibling-checkout fallback: if the default cache is incomplete
    % AND the user did not pass cache_dir explicitly AND a sibling
    % ../Laugh-Tests directory has a complete checkout, prefer that.
-   % This preserves Matt's existing workflow without requiring a
+   % This preserves the sibling-checkout workflow without requiring a
    % data/verification migration today.
    if ~ok && ~user_supplied
       data_root = icemodel.getpath('data');
       repo_root = fileparts(data_root);
       sibling = string(fullfile(repo_root, '..', 'Laugh-Tests'));
-      if exist(sibling, 'dir') == 7
+      if isfolder(sibling)
          [ok_sibling, missing_sibling] = checkLaughTestsCheckout( ...
             sibling, required);
          if ok_sibling
@@ -140,10 +139,7 @@ function source_dir = fetchLaughTests(kwargs)
    source_dir = string(cache_dir);
 end
 
-% =====================================================================
-% Local helpers
-% =====================================================================
-
+%% Local helpers
 function pathname = defaultCacheDir()
    %DEFAULTCACHEDIR Canonical Laugh-Tests source-cache directory.
    pathname = string(fullfile(icemodel.getpath('data'), ...
@@ -162,17 +158,13 @@ end
 function [ok, missing] = checkLaughTestsCheckout(cache_dir, required)
    %CHECKLAUGHTESTSCHECKOUT Per-file presence check for a Laugh-Tests dir.
 
-   missing = strings(0, 1);
-   if exist(cache_dir, 'dir') ~= 7
+   if ~isfolder(cache_dir)
       missing = required;
       ok = false;
       return
    end
-   for i = 1:numel(required)
-      pathname = fullfile(cache_dir, required(i));
-      if exist(pathname, 'file') ~= 2
-         missing(end + 1, 1) = required(i); %#ok<AGROW>
-      end
-   end
+
+   exists = arrayfun(@(p) isfile(fullfile(cache_dir, p)), required);
+   missing = required(~exists);
    ok = isempty(missing);
 end

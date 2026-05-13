@@ -14,7 +14,7 @@ function archiveManagedBaseline(pathname, kind)
    end
 
    pathname = char(pathname);
-   if exist(pathname, 'file') ~= 2
+   if ~isfile(pathname)
       return
    end
 
@@ -23,7 +23,7 @@ function archiveManagedBaseline(pathname, kind)
       'Format', 'yyyyMMdd-HHmmss'));
    archivedir = fullfile(icemodel.getpath('test'), 'baselines', 'archive', ...
       char(kind), char(timestamp));
-   if exist(archivedir, 'dir') ~= 7
+   if ~isfolder(archivedir)
       mkdir(archivedir);
    end
 
@@ -32,7 +32,7 @@ function archiveManagedBaseline(pathname, kind)
 
    % Carry the profiler sidecar folder along with the baseline MAT file.
    src_profdir = icemodel.test.helpers.baselineProfilerDir(pathname);
-   if exist(src_profdir, 'dir') == 7
+   if isfolder(src_profdir)
       copyfile(src_profdir, fullfile(archivedir, [filename '_profiler']));
    end
 end
