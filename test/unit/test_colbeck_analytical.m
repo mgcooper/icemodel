@@ -12,8 +12,8 @@ end
 
 function test_exp1_steady_saturation_below_one(testCase)
    sol = icemodel.verification.colbeck.analyticalSolution("exp1");
-   verifyLessThan(testCase, sol.parameters.S_inf, 1);
-   verifyGreaterThan(testCase, sol.parameters.S_inf, 0);
+   verifyLessThan(testCase, sol.parameters.S_steady, 1);
+   verifyGreaterThan(testCase, sol.parameters.S_steady, 0);
    verifyGreaterThan(testCase, sol.parameters.c_shock_m_per_s, 0);
 end
 

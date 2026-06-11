@@ -13,8 +13,8 @@ function solution = analyticalSolution(experiment_name, def)
    %  Methods
    %    Ripe snow (exp1):
    %       Isothermal kinematic-wave solution. A Rankine-Hugoniot shock advances
-   %       at speed c_shock = (q_top - q(f_liq_0)) / (f_liq_inf - f_liq_0) until
-   %       it reaches the column bottom; then storage plateaus at f_liq_inf *
+   %       at speed c_shock = (q_top - q(f_liq_0)) / (f_liq_steady - f_liq_0) until
+   %       it reaches the column bottom; then storage plateaus at f_liq_steady *
    %       total_depth until rain shuts off. After shutoff a centered
    %       rarefaction at the top carries monotone-decreasing saturations to the
    %       bottom.
@@ -144,29 +144,31 @@ function [storage, q_bot, params] = ripe_solution( ...
       f_ice_0, f_liq_0, method="darcy", permeability=permeability);
    k_sat = k_sat(1);
 
-   % S_inf is the relative saturation at infinity (the asymptotic equilibrium
-   % saturation that balances q_top through the constitutive law). f_liq_inf and
-   % c_inf below carry the same "at infinity / asymptotic equilibrium" meaning.
-   S_inf = (q_top / k_sat) ^ (1 / m_exp);
-   f_liq_inf = f_res + S_inf * avail;
+   % S_steady is the inflow-driven steady-state saturation: the asymptotic
+   % equilibrium saturation that balances q_top through the constitutive
+   % law. f_liq_steady is the corresponding liquid fraction, c_steady the
+   % corresponding characteristic wave speed. Same quantity as S_steady /
+   % c_steady in icemodel.column.infiltration.
+   S_steady = (q_top / k_sat) ^ (1 / m_exp);
+   f_liq_steady = f_res + S_steady * avail;
 
    % Rankine-Hugoniot shock speed; q at f_liq_0 is zero by design (residual).
    q_at_0 = q_at_f_liq(f_liq_0, k_sat, f_res, avail, m_exp);
-   c_shock = (q_top - q_at_0) / max(f_liq_inf - f_liq_0, eps);
+   c_shock = (q_top - q_at_0) / max(f_liq_steady - f_liq_0, eps);
 
    % Time when the shock reaches z = total_depth, and when the leading edge of
    % the post-rain rarefaction reaches the bottom.
    t_arrival = total_depth / c_shock;
-   c_inf = m_exp * k_sat * S_inf ^ (m_exp - 1) / avail;
-   t_drain_start = rain_window + total_depth / c_inf;
+   c_steady = m_exp * k_sat * S_steady ^ (m_exp - 1) / avail;
+   t_drain_start = rain_window + total_depth / c_steady;
 
    n = numel(time_seconds);
    storage = zeros(n, 1);
    q_bot = zeros(n, 1);
    for k = 1:n
       [storage(k), q_bot(k)] = sample_ripe(time_seconds(k), q_top, ...
-         rain_window, t_arrival, t_drain_start, f_liq_0, f_liq_inf, ...
-         total_depth, c_inf, k_sat, avail, m_exp);
+         rain_window, t_arrival, t_drain_start, f_liq_0, f_liq_steady, ...
+         total_depth, c_steady, k_sat, avail, m_exp);
    end
 
    params = struct( ...
@@ -175,17 +177,17 @@ function [storage, q_bot, params] = ripe_solution( ...
       'f_por',          f_por, ...
       'f_res',          f_res, ...
       'f_liq_0',        f_liq_0, ...
-      'f_liq_inf',      f_liq_inf, ...
-      'S_inf',          S_inf, ...
+      'f_liq_steady',      f_liq_steady, ...
+      'S_steady',          S_steady, ...
       'c_shock_m_per_s',c_shock, ...
-      'c_inf_m_per_s',  c_inf, ...
+      'c_steady_m_per_s',  c_steady, ...
       't_arrival_s',    t_arrival, ...
       't_drain_start_s',t_drain_start);
 end
 
 function [storage, q_bot] = sample_ripe(t, q_top, rain_window, ...
-      t_arrival, t_drain_start, f_liq_0, f_liq_inf, total_depth, ...
-      c_inf, k_sat, avail, m_exp)
+      t_arrival, t_drain_start, f_liq_0, f_liq_steady, total_depth, ...
+      c_steady, k_sat, avail, m_exp)
 
    if t <= 0
       storage = f_liq_0 * total_depth;
@@ -196,10 +198,10 @@ function [storage, q_bot] = sample_ripe(t, q_top, rain_window, ...
    if t <= rain_window
       if t < t_arrival
          z_front = total_depth * (t / t_arrival);
-         storage = f_liq_0 * total_depth + (f_liq_inf - f_liq_0) * z_front;
+         storage = f_liq_0 * total_depth + (f_liq_steady - f_liq_0) * z_front;
          q_bot = 0;
       else
-         storage = f_liq_inf * total_depth;
+         storage = f_liq_steady * total_depth;
          q_bot = q_top;
       end
       return
@@ -207,14 +209,14 @@ function [storage, q_bot] = sample_ripe(t, q_top, rain_window, ...
 
    if t < t_drain_start
       tau = t - rain_window;
-      storage = f_liq_inf * total_depth - q_top * tau;
+      storage = f_liq_steady * total_depth - q_top * tau;
       q_bot = q_top;
       return
    end
 
    % Recession via the characteristic that arrives at the bottom at t.
    c_at_bot = total_depth / (t - rain_window);
-   if c_at_bot >= c_inf
+   if c_at_bot >= c_steady
       S_star = (q_top / k_sat) ^ (1 / m_exp);
    else
       S_star = max(0, c_at_bot * avail / (m_exp * k_sat)) ^ (1 / (m_exp - 1));
@@ -240,7 +242,7 @@ function [storage, q_bot] = sample_ripe(t, q_top, rain_window, ...
       end
       drained = trapz(s, qs);
    end
-   storage_at_drain_start = f_liq_inf * total_depth ...
+   storage_at_drain_start = f_liq_steady * total_depth ...
       - q_top * (t_drain_start - rain_window);
    storage = max(0, storage_at_drain_start - drained);
 end
@@ -284,8 +286,8 @@ function [storage, q_bot, params] = cold_solution( ...
    inflow_total_at_rain_end = q_top * rain_window;
 
    % Recession parameters once the wetted region is mature.
-   c_inf = m_exp * k_sat_w * S_w ^ (m_exp - 1) / avail_w;
-   t_drain_start = min(rain_window, t_arrival) + total_depth / c_inf;
+   c_steady = m_exp * k_sat_w * S_w ^ (m_exp - 1) / avail_w;
+   t_drain_start = min(rain_window, t_arrival) + total_depth / c_steady;
 
    n = numel(time_seconds);
    storage = zeros(n, 1);
@@ -293,7 +295,7 @@ function [storage, q_bot, params] = cold_solution( ...
    for k = 1:n
       [storage(k), q_bot(k)] = sample_cold(time_seconds(k), q_top, ...
          rain_window, t_arrival, t_drain_start, f_liq_0, f_liq_w, ...
-         total_depth, c_w, c_inf, k_sat_w, f_res_w, avail_w, m_exp, ...
+         total_depth, c_w, c_steady, k_sat_w, f_res_w, avail_w, m_exp, ...
          f_frz, inflow_total_at_rain_end);
    end
 
@@ -307,15 +309,15 @@ function [storage, q_bot, params] = cold_solution( ...
       'f_liq_w',         f_liq_w, ...
       'S_w',             S_w, ...
       'c_w_m_per_s',     c_w, ...
-      'c_inf_m_per_s',   c_inf, ...
+      'c_steady_m_per_s',   c_steady, ...
       't_arrival_s',     t_arrival, ...
       't_drain_start_s', t_drain_start);
 end
 
 function [storage, q_bot] = sample_cold(t, q_top, rain_window, ...
       t_arrival, t_drain_start, f_liq_0, f_liq_w, total_depth, ...
-      c_w, c_inf, k_sat_w, f_res, avail, m_exp, f_frz, ...
-      inflow_total_at_rain_end) %#ok<INUSL>
+      c_w, c_steady, k_sat_w, f_res, avail, m_exp, f_frz, ...
+      inflow_total_at_rain_end)
 
    if t <= 0
       storage = f_liq_0 * total_depth;
@@ -374,7 +376,7 @@ function [storage, q_bot] = sample_cold(t, q_top, rain_window, ...
    % wetting front arrives, so there is no f_liq_w plateau phase. Recession
    % starts immediately at t_full.
    if t_full <= rain_window
-      t_drain_start_eff = t_off_recession + total_depth / c_inf;
+      t_drain_start_eff = t_off_recession + total_depth / c_steady;
    else
       t_drain_start_eff = t_off_recession;
    end
@@ -412,7 +414,7 @@ function [storage, q_bot] = sample_cold(t, q_top, rain_window, ...
 
    % Recession via the characteristic that arrives at the bottom at t.
    c_at_bot = total_depth / (t - t_off_recession);
-   if c_at_bot >= c_inf
+   if c_at_bot >= c_steady
       S_star = (q_top / k_sat_w) ^ (1 / m_exp);
    else
       S_star = max(0, c_at_bot * avail / (m_exp * k_sat_w)) ^ (1 / (m_exp - 1));
