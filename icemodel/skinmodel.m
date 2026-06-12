@@ -39,8 +39,7 @@ function [ice1, ice2, opts] = skinmodel(opts)
 
    % INITIALIZE THE SURFACE STATE
    [ea_atm, ro_atm, cv_atm, nu_air, H_h, De_e, br_coefs] ...
-      = icemodel.surface.initialize_surface_state(opts, ...
-      f_ice(1), f_liq(1), tair, wspd, rh, psfc);
+      = icemodel.surface.initialize_surface_state(opts, tair, wspd, rh, psfc);
 
    % INITIALIZE TIMESTEPPING
    [metstep, substep, numsteps, ...

@@ -6,6 +6,17 @@ function opts = configureRun(opts)
    % This function is idempotent. It fills required derived fields when they
    % are empty, while preserving caller-supplied values for fields such as
    % PATHINPUT, PATHOUTPUT, CASENAME, METFNAME, VARS1, and VARS2.
+   %
+   % Time-window configuration
+   %   The run window can be specified by SIMYEARS (year-granularity) or by
+   %   STARTDATE / ENDDATE (datetime window) or by both if compatible. This
+   %   function fills in whichever is missing, validates the pair, and
+   %   normalizes OPTS.SIMYEARS / OPTS.NUMYEARS so downstream code sees one
+   %   time window specifier. STARTDATE / ENDDATE are authoritative for
+   %   the actual loaded met subset; SIMYEARS drives per-year met-file
+   %   naming.
+
+   opts = configureTimeWindow(opts);
 
    opts = validateTurbulentFluxOptions(opts);
 
@@ -39,14 +50,18 @@ function opts = configureRun(opts)
    % function in the wrapper that loops over grid-cell IDs. Core icemodel only
    % provides the canonical base output folder; any legacy extra subfoldering
    % for gridded workflows belongs in the wrapper, not here.
+   window_args = runWindowArgs(opts);
+
    if ~isfield(opts, 'pathoutput') || isempty(opts.pathoutput)
       opts.pathoutput = icemodel.getpath('output', ...
-         opts.sitename, opts.smbmodel, '', [], opts.testname);
+         opts.sitename, opts.smbmodel, '', [], opts.testname, ...
+         window_args{:});
    end
 
    if ~isfield(opts, 'pathrestart') || isempty(opts.pathrestart)
       opts.pathrestart = icemodel.getpath('restart', ...
-         opts.sitename, opts.smbmodel, opts.userdata, [], opts.testname);
+         opts.sitename, opts.smbmodel, opts.userdata, [], opts.testname, ...
+         window_args{:});
    end
 
    % Create the casename. icemodel.writeoutput appends this to base filenames.
@@ -250,5 +265,94 @@ function opts = configureDebugPaths(opts)
       };
    for k = 1:size(debug_files, 1)
       setenv(debug_files{k, 1}, fullfile(debug_root, debug_files{k, 2}));
+   end
+end
+
+function args = runWindowArgs(opts)
+   %RUNWINDOWARGS Return {startdate, enddate} when a window is set, else {}.
+
+   args = {};
+   if ~isfield(opts, 'startdate') || ~isfield(opts, 'enddate')
+      return
+   end
+   if isempty(opts.startdate) || isempty(opts.enddate)
+      return
+   end
+   if any(isnat([opts.startdate; opts.enddate]))
+      return
+   end
+   args = {opts.startdate, opts.enddate};
+end
+
+function opts = configureTimeWindow(opts)
+   %CONFIGURETIMEWINDOW Reconcile SIMYEARS and STARTDATE/ENDDATE.
+   %
+   % Decision matrix:
+   %   simyears alone:           ok; window stays NaT/NaT
+   %   startdate/enddate alone:  derive simyears from years touched
+   %   both, compatible:         keep both; STARTDATE/ENDDATE authoritative
+   %                             for the loaded subset, SIMYEARS for met
+   %                             filenames
+   %   both, incompatible:       error (window outside SIMYEARS span)
+   %   neither:                  error (must specify one)
+
+   has_simyears = isfield(opts, 'simyears') && ~isempty(opts.simyears);
+   has_startdate = isfield(opts, 'startdate') && ~isnat(opts.startdate);
+   has_enddate   = isfield(opts, 'enddate')   && ~isnat(opts.enddate);
+
+   if has_startdate ~= has_enddate
+      error('icemodel:configureRun:halfWindow', ...
+         'STARTDATE and ENDDATE must be provided together');
+   end
+   has_window = has_startdate && has_enddate;
+
+   if ~has_simyears && ~has_window
+      error('icemodel:configureRun:noWindow', ...
+         'must specify SIMYEARS or STARTDATE/ENDDATE (or both)');
+   end
+
+   if has_window
+      if opts.startdate >= opts.enddate
+         error('icemodel:configureRun:invalidWindow', ...
+            'STARTDATE must be earlier than ENDDATE');
+      end
+      window_years = unique(year([opts.startdate; opts.enddate]))';
+   end
+
+   if has_simyears && has_window
+      % Compatibility check: every calendar year touched by the window
+      % must be in simyears. Extra simyears beyond the window are
+      % allowed (the user may want spinup years that fall outside the
+      % comparison window).
+      missing = setdiff(window_years, opts.simyears);
+      if ~isempty(missing)
+         error('icemodel:configureRun:windowOutsideSimyears', ...
+            ['STARTDATE/ENDDATE window includes calendar year(s) %s ' ...
+            'that are not in SIMYEARS=%s. Either widen SIMYEARS or ' ...
+            'narrow the window.'], ...
+            mat2str(missing), mat2str(opts.simyears));
+      end
+   elseif ~has_simyears
+      % Window-only: derive simyears from the years touched by the window.
+      opts.simyears = window_years;
+   end
+
+   % Normalize derived fields. opts.numyears mirrors numel(simyears).
+   opts.simyears = reshape(opts.simyears, 1, []);
+   opts.numyears = numel(opts.simyears);
+
+   % Restart compatibility: when use_restart is on and the user has
+   % asked for a windowed run, require the window to start on a calendar
+   % year boundary. This keeps the existing year-aligned restart files
+   % addressable without inventing partial-year restart logic.
+   if has_window && isfield(opts, 'use_restart') && opts.use_restart
+      tref = datetime(year(opts.startdate), 1, 1, 0, 0, 0, ...
+         'TimeZone', opts.startdate.TimeZone);
+      if opts.startdate ~= tref
+         error('icemodel:configureRun:restartWindowNotAligned', ...
+            ['use_restart=true requires STARTDATE to fall on a ' ...
+            'calendar-year boundary; got STARTDATE=%s'], ...
+            string(opts.startdate));
+      end
    end
 end

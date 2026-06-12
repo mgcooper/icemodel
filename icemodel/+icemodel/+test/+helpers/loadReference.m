@@ -45,7 +45,7 @@ function ref = loadRunoff(pathname, simyear)
          'UniformOutput', false);
       ref = vertcat(refs{:});
    else
-      if exist(pathname, 'file') ~= 2
+      if ~isfile(pathname)
          error('icemodel:test:referenceNotFound', ...
             'Reference file not found: %s', pathname)
       end

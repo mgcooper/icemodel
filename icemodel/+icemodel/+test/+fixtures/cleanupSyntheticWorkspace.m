@@ -12,7 +12,7 @@ function cleanupSyntheticWorkspace(workspace)
    end
 
    % Remove the temporary workspace tree after the caller has finished.
-   if isfield(workspace, 'rootdir') && exist(workspace.rootdir, 'dir') == 7
+   if isfield(workspace, 'rootdir') && isfolder(workspace.rootdir)
       rmdir(workspace.rootdir, 's');
    end
 end

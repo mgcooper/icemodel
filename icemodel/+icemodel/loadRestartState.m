@@ -13,7 +13,7 @@ function restart = loadRestartState(opts)
    end
 
    filepath = char(opts.restartfile);
-   if exist(filepath, 'file') ~= 2
+   if ~isfile(filepath)
       error('restart file does not exist: %s', filepath)
    end
 

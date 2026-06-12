@@ -239,3 +239,103 @@ function test_configureRun_builds_default_restart_path(testCase)
    testCase.verifyEqual(opts.pathrestart, fullfile( ...
       workspace.outputdir, 'kanm', 'skinmodel', 'restartcase', 'restart'));
 end
+
+function test_window_only_setopts_derives_simyears(testCase)
+   % SETOPTS should accept simyears=[] when STARTDATE/ENDDATE are
+   % provided and configureRun should derive simyears from the window.
+
+   opts = icemodel.setopts('icemodel', 'kanm', [], 'kanm', ...
+      [], [], 'window-test', false, false, ...
+      'startdate', datetime(2016, 6, 1, 0, 0, 0, 'TimeZone', 'UTC'), ...
+      'enddate',   datetime(2016, 8, 31, 23, 0, 0, 'TimeZone', 'UTC'));
+
+   testCase.verifyEqual(opts.simyears, 2016);
+   testCase.verifyEqual(opts.numyears, 1);
+end
+
+function test_window_spanning_two_years_derives_both(testCase)
+   % A water-year window touching two calendar years should derive both
+   % as simyears so loadmet picks up the matching per-year met files.
+
+   opts = icemodel.setopts('icemodel', 'kanm', [], 'kanm', ...
+      [], [], 'window-test', false, false, ...
+      'startdate', datetime(2015, 10, 1, 0, 0, 0, 'TimeZone', 'UTC'), ...
+      'enddate',   datetime(2016, 9, 30, 23, 0, 0, 'TimeZone', 'UTC'));
+
+   testCase.verifyEqual(opts.simyears, [2015 2016]);
+end
+
+function test_compatible_simyears_and_window_keeps_both(testCase)
+   % When the caller passes both compatible specifiers, both are
+   % preserved; STARTDATE/ENDDATE remain authoritative for met
+   % subsetting and SIMYEARS still drives per-year met-file naming.
+
+   opts = icemodel.setopts('icemodel', 'kanm', [2015 2016], 'kanm', ...
+      [], [], 'window-test', false, false, ...
+      'startdate', datetime(2015, 12, 1, 0, 0, 0, 'TimeZone', 'UTC'), ...
+      'enddate',   datetime(2016, 3, 1, 0, 0, 0, 'TimeZone', 'UTC'));
+
+   testCase.verifyEqual(opts.simyears, [2015 2016]);
+   testCase.verifyEqual(opts.startdate, ...
+      datetime(2015, 12, 1, 0, 0, 0, 'TimeZone', 'UTC'));
+end
+
+function test_incompatible_simyears_and_window_errors(testCase)
+   % A window that touches calendar years not covered by SIMYEARS is a
+   % caller error; the canonicalization step refuses to silently widen
+   % SIMYEARS or trim the window.
+
+   testCase.verifyError(@() icemodel.setopts( ...
+      'icemodel', 'kanm', [2015 2016], 'kanm', ...
+      [], [], 'window-test', false, false, ...
+      'startdate', datetime(2020, 1, 1, 0, 0, 0, 'TimeZone', 'UTC'), ...
+      'enddate',   datetime(2020, 12, 31, 0, 0, 0, 'TimeZone', 'UTC')), ...
+      'icemodel:configureRun:windowOutsideSimyears');
+end
+
+function test_no_window_or_simyears_errors(testCase)
+   % Neither specifier is a contract violation; setopts must raise the
+   % canonical no-window error rather than producing a zero-year run.
+
+   testCase.verifyError(@() icemodel.setopts( ...
+      'icemodel', 'kanm', [], 'kanm'), ...
+      'icemodel:configureRun:noWindow');
+end
+
+function test_half_window_errors(testCase)
+   % STARTDATE without ENDDATE (or vice versa) is a contract violation.
+
+   testCase.verifyError(@() icemodel.setopts( ...
+      'icemodel', 'kanm', 2016, 'kanm', ...
+      [], [], 'window-test', false, false, ...
+      'startdate', datetime(2016, 6, 1, 0, 0, 0, 'TimeZone', 'UTC')), ...
+      'icemodel:configureRun:halfWindow');
+end
+
+function test_output_path_encodes_window(testCase)
+   % When STARTDATE/ENDDATE are set, the default pathoutput should encode
+   % the window as a YYYYMMDD-YYYYMMDD segment so windowed runs do not
+   % overwrite year-only output folders.
+
+   opts = icemodel.setopts('icemodel', 'kanm', [], 'kanm', ...
+      [], [], 'window-test', false, false, ...
+      'startdate', datetime(1995, 10, 1, 0, 0, 0, 'TimeZone', 'UTC'), ...
+      'enddate',   datetime(1996, 9, 30, 0, 0, 0, 'TimeZone', 'UTC'));
+
+   testCase.verifySubstring(opts.pathoutput, '19951001-19960930');
+   testCase.verifySubstring(opts.pathrestart, '19951001-19960930');
+end
+
+function test_use_restart_with_misaligned_window_errors(testCase)
+   % use_restart=true requires STARTDATE on a calendar-year boundary to
+   % avoid partial-year restart logic. Mid-year STARTDATE is rejected
+   % with a clear error.
+
+   testCase.verifyError(@() icemodel.setopts( ...
+      'icemodel', 'kanm', [], 'kanm', ...
+      [], [], 'window-test', false, false, ...
+      'use_restart', true, ...
+      'startdate', datetime(2016, 6, 1, 0, 0, 0, 'TimeZone', 'UTC'), ...
+      'enddate',   datetime(2016, 8, 31, 23, 0, 0, 'TimeZone', 'UTC')), ...
+      'icemodel:configureRun:restartWindowNotAligned');
+end

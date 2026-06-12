@@ -68,6 +68,18 @@ function met = prepareMetData(met, opts)
    met = met(ismember(year(met.Time), opts.simyears), :);
 
    met.Time.TimeZone = 'UTC';
+
+   % Optional explicit datetime-window override. When opts.startdate
+   % and/or opts.enddate are set, narrow the met data to the
+   % requested window in addition to the year-granularity simyears
+   % subset above. Either bound may be left as NaT to disable that
+   % side of the window.
+   if isfield(opts, 'startdate') && ~isnat(opts.startdate)
+      met = met(met.Time >= opts.startdate, :);
+   end
+   if isfield(opts, 'enddate') && ~isnat(opts.enddate)
+      met = met(met.Time <= opts.enddate, :);
+   end
 end
 
 %%
@@ -156,7 +168,7 @@ function Data = loadExternalUserdata(opts, thisyear, mettime)
 
    userfile = [opts.sitename '_' opts.userdata '_' int2str(thisyear) '.mat'];
    filepath = fullfile(opts.pathuserdata, userfile);
-   if exist(filepath, 'file') ~= 2
+   if ~isfile(filepath)
       error('\n userdata file does not exist: \n\n %s \n', filepath);
    end
 

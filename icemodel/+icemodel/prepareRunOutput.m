@@ -13,7 +13,7 @@ function opts = prepareRunOutput(opts)
       % Create folders for each simulation year in output/ if they don't exist.
       icemodel.mkfolders(opts);
    elseif isfield(opts, 'saveopts') && opts.saveopts ...
-         && ~(exist(fullfile(opts.pathoutput, 'opts'), 'dir') == 7)
+         && ~isfolder(fullfile(opts.pathoutput, 'opts'))
       mkdir(fullfile(opts.pathoutput, 'opts'));
    end
 
@@ -22,7 +22,7 @@ function opts = prepareRunOutput(opts)
    end
 
    if isfield(opts, 'saverestart') && opts.saverestart ...
-         && exist(opts.pathrestart, 'dir') ~= 7
+         && ~isfolder(opts.pathrestart)
       mkdir(opts.pathrestart);
    end
 end

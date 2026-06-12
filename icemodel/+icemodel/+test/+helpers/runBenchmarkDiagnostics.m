@@ -117,7 +117,7 @@ function [BenchmarkBaseline, meta, source_file] = loadBenchmarkBaselineFromPerf(
       candidate = icemodel.test.helpers.baselineFilePath("perf", ...
          smbmodel=models(i), baseline_type=baseline_type, ...
          baseline_tag=baseline_tag, simyear=simyear);
-      if exist(char(candidate), 'file') ~= 2
+      if ~isfile(char(candidate))
          continue
       end
 

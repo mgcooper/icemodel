@@ -20,7 +20,7 @@ function [metstep, substep, numsteps, maxsubstep, dt_new, dt_FULL_STEP, ...
    maxsubstep = opts.dt; % allow 1 sec dt min
    minsubstep = 1;
 
-   dt_min = dt_FULL_STEP / maxsubstep;
+   % dt_min = dt_FULL_STEP / maxsubstep; % keep for reference
    dt_new = dt_FULL_STEP / minsubstep;
 
    % Compute the number of leading spinup years. The forcing years in

@@ -42,6 +42,15 @@ function [ice1, ice2, opts] = icemodel(opts)
    opts = icemodel.configureRun(opts);
    opts = icemodel.prepareRunOutput(opts);
 
+   % Verification can ask icemodel to return snow-model-like outputs before
+   % the production snow physics exists. Keep the bypass explicit and owned by
+   % the verification namespace so the normal solver path remains unchanged.
+   if isfield(opts, 'verification_synthetic_snow') ...
+         && opts.verification_synthetic_snow
+      [ice1, ice2, opts] = icemodel.verification.syntheticSnowModelRun(opts);
+      return
+   end
+
    TINY = 1e-8;
 
    % UNPACK SOLVER OPTS
@@ -69,8 +78,7 @@ function [ice1, ice2, opts] = icemodel(opts)
 
    % INITIALIZE THE SURFACE STATE
    [ea_atm, ro_atm, cv_atm, nu_air, H_h, De_e, br_coefs] ...
-      = icemodel.surface.initialize_surface_state(opts, ...
-      f_ice(1), f_liq(1), tair, wspd, rh, psfc);
+      = icemodel.surface.initialize_surface_state(opts, tair, wspd, rh, psfc);
 
    % INITIALIZE TIMESTEPPING
    [metstep, substep, numsteps, ...

@@ -16,14 +16,19 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  SITENAME - a string scalar indicating the site name which is used to
    %  locate the forcing data file and create the output file names.
    %
-   %  SIMYEARS - a numeric scalar or vector of 4-digit years e.g. 2016, also
-   %  used to locate the correct forcing data file.
+   %  SIMYEARS - a numeric scalar or vector of 4-digit years e.g. 2016. Used
+   %  to locate the correct forcing data file. May be passed as `[]` when
+   %  STARTDATE and ENDDATE are provided via name/value overrides; in that
+   %  case configureRun derives SIMYEARS from the window. When both SIMYEARS
+   %  and STARTDATE/ENDDATE are provided, they must be compatible (the
+   %  window must fall within the SIMYEARS span); incompatible pairs raise
+   %  an error. STARTDATE/ENDDATE dictate the actual loaded met subset.
    %
    %  FORCINGS - a string scalar indicating the forcing data. Standard values
    %  include the climate-model forcings "mar", "merra", and "racmo", plus
-   %  supported self-forced station runs such as "kanm" and "kanl". Users who
-   %  wish to add new forcing files can update the icemodel.namelists
-   %  definitions used throughout the repository.
+   %  supported met station runs such as "kanm" and "kanl". Users who wish to
+   %  add new forcing files can update the icemodel.namelists definitions used
+   %  throughout the repository.
    %
    %  USERDATA - (optional) a string scalar indicating the alternative forcing
    %  data to be used in place of the forcing data in the forcing met file.
@@ -179,11 +184,6 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts.use_ro_glc      = false;    % use same density for liquid/solid ice?
    opts.ro_ice_init     = 900.0;    % initial ice density               [kg/m3]
    opts.T_ice_init      = -8.0;     % initial ice temperature           [C]
-   %
-   % Capillary residual liquid water per pore volume fractions [-].
-   opts.f_res_pore_ice  = 0.02;
-   opts.f_res_pore_snow = 0.04;
-   opts.f_res_pore_firn = 0.02;
 
    %%% Timestepping / mesh options
    opts.calendar_type   = 'noleap'; %
@@ -236,6 +236,18 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % Option to use a user-defined ice absorptivity spectrum. If true, the model
    % uses the spectrum shipped with the repo from Cooper et al., 2021.
    opts.kabs_user       = true;
+
+   %%% Snow / firn liquid-flux closure
+   % Saturated hydraulic conductivity (k_sat) method. Options:
+   %   'colbeck1972' (default; density-only closure)
+   %   'shimizu1970' (grain-size + f_wat, state-dependent)
+   %   'darcy'       (caller-pinned permeability)
+   opts.k_sat_method = 'colbeck1972';
+   %
+   % Capillary residual liquid water per pore volume fractions [-].
+   opts.f_res_pore_ice  = 0.02;
+   opts.f_res_pore_snow = 0.04;
+   opts.f_res_pore_firn = 0.02;
 
    %%% Solver options. See function doc for info about each solver mode.
    if strcmp(smbmodel, 'icemodel')
@@ -406,6 +418,16 @@ function opts = initopts(smbmodel, sitename, simyears, forcings, ...
    opts.testname = testname;
    opts.saveopts = saveflag;
    opts.backupflag = backupflag;
+
+   % Optional explicit time-window bounds. When set (via name/value override or
+   % icemodel.resetopts), icemodel.loadmet subsets the loaded met data to
+   % [startdate, enddate] in addition to the year-granularity simyears subset.
+   % The defaults are NaT so the canonical year-only behaviour is preserved when
+   % these are not set. Used by the verification suite to evaluate against
+   % targeted windows (e.g. one snow season) without inventing new calendar /
+   % hydrologic-year policy.
+   opts.startdate = NaT('TimeZone', 'UTC');
+   opts.enddate   = NaT('TimeZone', 'UTC');
 
    % Set defaults for values set in icemodel.configureRun
    opts.pathdata = [];

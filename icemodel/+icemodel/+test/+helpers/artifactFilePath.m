@@ -175,7 +175,7 @@ function pathname = findInDir(dirpath, filename)
    %FINDINDIR Find a file in a directory, trying exact match then glob.
 
    exact = fullfile(dirpath, filename);
-   if exist(exact, 'file') == 2
+   if isfile(exact)
       pathname = exact;
       return
    end

@@ -20,7 +20,7 @@ function [profile_summary, profile_meta, profile_artifacts] = ...
 
    % Replace any previous managed profile bundle for this baseline target.
    profdir = icemodel.test.helpers.baselineProfilerDir(output_file);
-   if exist(profdir, 'dir') == 7
+   if isfolder(profdir)
       rmdir(profdir, 's');
    end
    mkdir(profdir);
@@ -103,7 +103,7 @@ function html_entry = resolveProfileHtmlEntry(profdir)
    %RESOLVEPROFILEHTMLENTRY Locate the main profiler HTML entrypoint.
 
    html_entry = fullfile(profdir, 'file0.html');
-   if exist(html_entry, 'file') == 2
+   if isfile(html_entry)
       return
    end
 

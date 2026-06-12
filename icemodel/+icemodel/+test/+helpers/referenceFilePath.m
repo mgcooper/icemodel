@@ -27,7 +27,7 @@ function pathname = resolveRunoffPath(refdir, simyear)
 
    % Try the combined file first.
    pathname = fullfile(refdir, 'runoff_reference.mat');
-   if exist(pathname, 'file') == 2
+   if isfile(pathname)
       return
    end
 
@@ -35,7 +35,7 @@ function pathname = resolveRunoffPath(refdir, simyear)
    if ~isempty(simyear)
       pathname = fullfile(refdir, ...
          sprintf('runoff_reference_%d.mat', simyear));
-      if exist(pathname, 'file') == 2
+      if isfile(pathname)
          return
       end
    end

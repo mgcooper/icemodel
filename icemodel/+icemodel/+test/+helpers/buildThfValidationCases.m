@@ -21,22 +21,29 @@ function cases = buildThfValidationCases(kwargs)
    schemes = lower(string(kwargs.schemes));
    spinup_sites = lower(string(kwargs.spinup_sites));
 
-   cases = repmat(initCase(), 0, 1);
+   % Upper bound: each site contributes one case per scheme, plus an
+   % optional spinup case per scheme when the site is in spinup_sites.
+   max_cases = numel(sites) * numel(schemes) * 2;
+   cases = repmat(initCase(), max_cases, 1);
+   n = 0;
    for i_site = 1:numel(sites)
       site = sites(i_site);
 
       for i_scheme = 1:numel(schemes)
          scheme = schemes(i_scheme);
-         cases(end+1, 1) = makeCase(site, 2016, 0, scheme); %#ok<AGROW>
+         n = n + 1;
+         cases(n, 1) = makeCase(site, 2016, 0, scheme);
       end
 
       if any(spinup_sites == site)
          for i_scheme = 1:numel(schemes)
             scheme = schemes(i_scheme);
-            cases(end+1, 1) = makeCase(site, [2015 2016], 1, scheme); %#ok<AGROW>
+            n = n + 1;
+            cases(n, 1) = makeCase(site, [2015 2016], 1, scheme);
          end
       end
    end
+   cases = cases(1:n, 1);
 end
 
 function c = initCase()
