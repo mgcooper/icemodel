@@ -90,7 +90,7 @@ function test_forcing_includes_rainf_snowf_passthrough(testCase)
    % Resolve the staged met file via the standard chain (createMetFileNames)
    % using the same opts a runIcemodelSnowCandidate run would build.
    manifest = icemodel.verification.loadmanifest("cdp");
-   opts = icemodel.verification.helpers.caseSetopts(manifest);
+   opts = icemodel.test.helpers.setModelOptsForCase(manifest);
    met_files = opts.metfname;
    testCase.assertNotEmpty(met_files);
 

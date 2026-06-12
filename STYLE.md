@@ -62,6 +62,24 @@ Rationale:
 - Organize reusable functions into the relevant namespaces instead of leaving them at arbitrary top level.
 - When moving or renaming a function, update all call sites, tests, and docs/comments that describe the public entry point.
 
+## Sandbox new physics in production namespaces
+
+When developing a new feature that touches core `icemodel.m` physics,
+prefer adding the new kernels under the relevant namespace
+(`+icemodel/+column/`, `+icemodel/+vapor/`, etc.) or as opt-in code
+paths inside existing functions guarded by `opts` flags that nothing
+currently sets. Do not wire the new code into `icemodel.m` until the
+physics is verified and the wiring is itself the deliverable.
+
+This keeps the production solver and regression baselines stable
+while the repo accumulates physics surface that future features can
+target. Verification kernels and analytical references can ship
+before the model that uses them. Later wiring becomes a focused PR
+of its own rather than a hidden side effect of the physics work.
+
+When in doubt, file the "wire into `icemodel.m`" work as a separate
+issue and stop at the namespace-only deliverable.
+
 ## Array growth and existence checks
 
 - `%#ok<AGROW>` is not allowed. Preallocate the output or compute its

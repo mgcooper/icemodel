@@ -192,8 +192,10 @@ either error with a stable error id or return the partial path.
   `inputDataRoot`, `snowDataRoot`), manifest reads, artifact loading, candidate
   resolution, metric schema definition, the per-run markdown report writer
   (`writeRunReport`), the per-site default window (`default_smoke_window`), and
-  the standard-contract opts builder (`caseSetopts`) used by
-  `runIcemodelSnowCandidate`.
+  per-site default window (`default_smoke_window`). The standard-contract
+  opts builder used by `runIcemodelSnowCandidate` is
+  `icemodel.test.helpers.setModelOptsForCase`, which accepts both formal-case
+  rows and verification manifests via input dispatch.
 - `namelists` contains canonical selector lists for dataset families, case ids,
   case types, the ESM-SnowMIP site-name namelist (`snowmipsite`), and the
   Laugh-Tests case-id namelist (`laughtests`). `caseid` dispatches uniformly

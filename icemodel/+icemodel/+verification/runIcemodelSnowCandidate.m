@@ -9,7 +9,7 @@ function candidate = runIcemodelSnowCandidate(case_manifest, kwargs)
    % calls the normal icemodel entry point, receives ICE1/ICE2, then converts
    % those outputs into the same candidate bundle consumed by comparecase.
    %
-   % The function constructs opts via icemodel.verification.helpers.caseSetopts
+   % The function constructs opts via icemodel.test.helpers.setModelOptsForCase
    % using the case_id as both sitename and forcings, so the standard chain
    % (configureRun + createMetFileNames + loadmet) resolves the staged met
    % file at <ICEMODEL_INPUT_PATH>/met/met_<case>_<case>_<year>_1hr.mat
@@ -52,12 +52,12 @@ function candidate = runIcemodelSnowCandidate(case_manifest, kwargs)
       kwargs.enddate   = NaT('TimeZone', 'UTC')
    end
 
-   % Build standard model options. caseSetopts uses case_id as sitename
-   % and forcings, derives simyears from the comparison window, and
-   % populates opts.startdate / opts.enddate so the standard loadmet
-   % path resolves the staged met file and subsets to the comparison
-   % window.
-   opts = icemodel.verification.helpers.caseSetopts(case_manifest, ...
+   % Build standard model options. setModelOptsForCase detects the
+   % verification manifest shape, uses case_id as sitename and forcings,
+   % derives simyears from the comparison window, and populates
+   % opts.startdate / opts.enddate so the standard loadmet path resolves
+   % the staged met file and subsets to the comparison window.
+   opts = icemodel.test.helpers.setModelOptsForCase(case_manifest, ...
       startdate=kwargs.startdate, enddate=kwargs.enddate);
 
    % Activate the synthetic-snow hook. These fields are deliberately not
