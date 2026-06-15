@@ -72,6 +72,18 @@ differ between projects.
 - MATLAB requires the function declaration to match the filename, so a rename needs
   a follow-up edit to the function line, the docstring, and any error identifiers —
   in addition to the `git mv`.
+- Close every function with an explicit `end`.
+
+## Formatting
+
+- Wrap code and comments at roughly 80 columns; continue long lines with `...`.
+  (Indentation width is project-specific — see `STYLE.local.md`.)
+
+## Testing
+
+- Name the variable holding the actual result `returned`, and compare it against a
+  variable named `expected` — e.g. `testCase.verifyEqual(returned, expected)`. This
+  keeps test bodies uniform and the intent of each assertion obvious.
 
 ## Linting
 
@@ -83,3 +95,13 @@ differ between projects.
 - Prefer `isfolder(p)` / `isfile(p)` over `exist(p,'dir')==7` / `exist(p,'file')==2`;
   the boolean predicates read more clearly and avoid the magic numbers.
 - Where available, lint with `codeIssues` and treat a clean result as the bar.
+
+## Running MATLAB
+
+- Never launch the MATLAB desktop GUI to run code. Prefer an already-open MATLAB
+  session when one is available; otherwise run headless from a shell with
+  `matlab -nodisplay -nosplash -batch "<expr>"` — `-batch` runs the expression
+  non-interactively and exits.
+- `matlab` is often not on `$PATH`; invoke the binary inside the install
+  (e.g. `/Applications/MATLAB_R<release>.app/bin/matlab`). The exact path is
+  machine-specific — record it in `STYLE.local.md` if useful.
