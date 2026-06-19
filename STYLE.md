@@ -1,134 +1,107 @@
 # Code Style
 
-## Function naming protocol
+Project-agnostic engineering conventions. This file is **canonical and shared**
+across projects; language-specific conventions are appended below it (e.g. from
+`STYLE.matlab.md`), and project-specific conventions live in `STYLE.local.md`.
+Match the surrounding code first; these are the defaults.
 
- Default:
+## Reuse and structure
 
-- Prefer MATLAB-style all-lowercase, single-word function names when the name is short and readable.
-- Use this for names of four syllables or fewer.
-- Examples: loadcases, plotcase, getforcings, concatoutput.
+- Do not repeat logic. If logic is shared, define one helper and call it — do not
+  copy-paste or leave shared contract logic as inline blocks.
+- Before adding a helper, check the codebase for an existing equivalent.
+- Organize reusable code into the relevant module/package, not at an arbitrary top
+  level. Keep only small, file-local glue (parsing, formatting, or one-off
+  table/display helpers) local.
+- When moving or renaming something, update every call site, test, and doc/comment
+  that refers to it in the same change.
 
-Core physics namespaces:
+## Linter discipline
 
-- Use snake_case for longer descriptive functions in:
-  +icemodel/+column
-  +icemodel/+couplers
-  +icemodel/+surface
-  +icemodel/+vapor
-  +icemodel/+kernels
-  +icemodel/+radiation
-- Short core-physics names may still be all-lowercase one word if readable.
-- Examples: solve_surface_temperature, evaluate_surface_energy_balance, solvetwostream.
+- Do not silence linter or static-analysis warnings with inline suppression
+  comments. Refactor the code to remove the underlying warning instead.
 
-Non-core-physics namespaces:
+## Version control hygiene
 
-- Use all-lowercase one word for short names.
-- Use camelCase for longer names where single-word lowercase becomes hard to read.
-- This includes helper, verification, I/O, plotting, setup, utility, and support namespaces.
-- Short, punchy five-syllable exceptions may remain one word when this preserves local consistency, e.g. `getsubstepforcings` next to `getforcings`.
-- Examples: snowDataRoot, loadcases, plotcase.
+- Use your VCS's rename (e.g. `git mv`) when moving or renaming tracked files, so
+  history is preserved and reviewers see a rename rather than a delete plus add.
 
-Tests:
+## Comments and documentation
 
-- Do not infer global naming rules from the test/ folder.
-- Existing test-suite files may use snake_case because long descriptive test entry points are already deeply embedded.
-- The +test namespace follows the preferred lowercase/camelCase convention.
-- New non-test namespaces should not copy test/ snake_case unless they are core physics or long descriptive test-suite entry points.
+Comment discipline is **strict and non-negotiable** — a hard requirement, not a
+preference.
 
-Rationale:
+- **Never write uncommented code.** Every new function gets a docstring/header, and
+  every block of code gets an explanatory comment that says *why*, not just *what*.
+  Do not skip a comment because the code looks trivial, simple, obvious, or
+  self-explanatory — that is not an exception. Uncommented code is incomplete and
+  must not be submitted.
+- **Never remove existing comments.** A comment may be removed *only* when the code it
+  documents is itself removed. It is never acceptable to delete, trim, shorten,
+  summarize away, or "clean up" comments — not for brevity, not for tidiness, and not
+  because a comment seems obvious or redundant.
+- **Edit existing comments only for accuracy.** When you change code, update the
+  affected comments and docstrings so they stay correct, preserving the information
+  they carry. Never leave a comment describing behavior that no longer exists, and
+  never silently drop the detail a comment held.
+- Group operations logically.
 
-- Variable names are commonly lowercase or snake_case.
-- camelCase in non-core helper/utility functions improves visual distinction between functions and variables, e.g.
-  snow_data_root = icemodel.verification.helpers.snowDataRoot().
+# MATLAB conventions
 
-## Variable prefixes
+Canonical MATLAB-specific conventions, shared across MATLAB projects. These extend
+the language-agnostic rules above. Opinionated, project-varying choices —
+function-name casing, indentation width, variable casing, package layout, and any
+kernel/architecture rules — belong in `STYLE.local.md`, since they legitimately
+differ between projects.
 
-- `f_` for fractions.
-- `d_` for deltas/increments.
-- `x`-prefixed variables for checkpoint/prior-substep state.
-- `cpl_` for coupler options/diagnostics.
-- `seb_` for surface-energy-balance options/diagnostics.
-- `ok` / `ok_*` for success flags.
-- `n_` for counts.
-- `use_` for boolean feature toggles.
+## Function naming
 
-## Function files and reuse
+- Prefer MATLAB-style short, punchy, all-lowercase single-word names when the name is
+  short and readable (roughly four syllables or fewer) — e.g. `loadcases`, `plotcase`,
+  `getforcings`, `concatoutput`.
+- Use `camelCase` when a single lowercase word becomes hard to read — e.g.
+  `snowDataRoot`.
+- Avoid `snake_case` for function names **unless** a project deliberately adopts it for
+  a large or complex subsystem where long camelCase becomes unreadable; document any
+  such exception in that project's `STYLE.local.md`.
 
-- Do not repeat logic across functions; if logic is shared, define one helper and call it.
-- Define canonical contract/helper methods as their own function files.
-- Do not leave shared contract logic as local subfunctions or inline blocks.
-- Local subfunctions are acceptable only for truly file-local glue such as small parsing helpers, formatting helpers, and one-off local table/display helpers.
-- Before adding a new helper, check the existing `+icemodel` namespace for an equivalent function.
-- Organize reusable functions into the relevant namespaces instead of leaving them at arbitrary top level.
-- When moving or renaming a function, update all call sites, tests, and docs/comments that describe the public entry point.
+## Files and functions
 
-## Sandbox new physics in production namespaces
+- One primary function per file, with the file named for it. Local/sub-functions
+  live in the same file.
+- MATLAB requires the function declaration to match the filename, so a rename needs
+  a follow-up edit to the function line, the docstring, and any error identifiers —
+  in addition to the `git mv`.
+- Close every function with an explicit `end`.
 
-When developing a new feature that touches core `icemodel.m` physics,
-prefer adding the new kernels under the relevant namespace
-(`+icemodel/+column/`, `+icemodel/+vapor/`, etc.) or as opt-in code
-paths inside existing functions guarded by `opts` flags that nothing
-currently sets. Do not wire the new code into `icemodel.m` until the
-physics is verified and the wiring is itself the deliverable.
+## Formatting
 
-This keeps the production solver and regression baselines stable
-while the repo accumulates physics surface that future features can
-target. Verification kernels and analytical references can ship
-before the model that uses them. Later wiring becomes a focused PR
-of its own rather than a hidden side effect of the physics work.
+- Wrap code and comments at roughly 80 columns; continue long lines with `...`.
+  (Indentation width is project-specific — see `STYLE.local.md`.)
 
-When in doubt, file the "wire into `icemodel.m`" work as a separate
-issue and stop at the namespace-only deliverable.
+## Testing
 
-## Array growth and existence checks
+- Name the variable holding the actual result `returned`, and compare it against a
+  variable named `expected` — e.g. `testCase.verifyEqual(returned, expected)`. This
+  keeps test bodies uniform and the intent of each assertion obvious.
 
-- `%#ok<AGROW>` is not allowed. Preallocate the output or compute its
-  size before the loop. If a growing pattern is unavoidable, restructure
-  the algorithm so the size is known up front (e.g. count matches first,
-  then allocate, then fill).
-- `%#ok<...>` lint suppressions of any kind (DATST, ASGLU, NASGU, etc.)
-  are not allowed in new code. Refactor the code to remove the
-  underlying warning rather than silencing it.
-- Use `isfolder(p)` and `isfile(p)` instead of `exist(p, 'dir') == 7`
-  and `exist(p, 'file') == 2`. The numeric `exist` codes are an
-  artifact of an older API; the boolean predicates read more clearly
-  and avoid the magic numbers 2 and 7.
+## Linting
 
-## File renames and moves
+- No `%#ok<...>` suppressions (AGROW, DATST, ASGLU, NASGU, etc.) in new code —
+  refactor to remove the underlying warning rather than silencing it.
+- `%#ok<AGROW>` specifically: preallocate the output, or compute its size before the
+  loop. If a growing pattern seems unavoidable, restructure so the size is known up
+  front (count matches first, then allocate, then fill).
+- Prefer `isfolder(p)` / `isfile(p)` over `exist(p,'dir')==7` / `exist(p,'file')==2`;
+  the boolean predicates read more clearly and avoid the magic numbers.
+- Where available, lint with `codeIssues` and treat a clean result as the bar.
 
-- Use `git mv` when renaming or moving any tracked file, including
-  function files. Do not delete the old file and create a new one — git
-  loses the rename history and reviewers see two unrelated changes.
-- After `git mv`, edit content in place. MATLAB requires the function
-  declaration to match the filename, so a rename almost always needs a
-  follow-up edit to the function-line, the docstring, and any internal
-  error identifiers.
+## Running MATLAB
 
-## Documentation and comments
-
-- Add docstrings when creating new functions and comment on all code.
-- If an existing function is edited materially, update or add its docstring.
-- Group operations logically when writing new code.
-- Preserve information in existing comments while ensuring accuracy; if a comment is stale, update it rather than deleting it casually.
-
-## Kernel conventions
-
-- Keep core numerical kernels minimalist, without argument blocks or strict input parsing. Enforce contracts at the model/helper boundary instead.
-- Argument blocks are acceptable in namespace functions and test-suite code.
-- Use reusable validators under `+validators` instead of hard-coded member lists when the choices are part of a stable repo contract.
-- Helper layers such as namespaced loaders, postprocessing, config functions, and setup functions may still use old-style parsing when that better matches surrounding code.
-- Maintain codegen compatibility in kernel functions.
-- Preserve established input/output ordering and naming. For example, use `T`, `f_ice`, `f_liq`, then related state/diagnostics.
-- Surface namespace functions follow a preferred ordering schema:
-  1. state variables (`T_sfc`, `T_ice`, `f_ice`, `f_liq`)
-  2. source terms and grid (`Sc`, `Sp`, `dz`, `delz`, `fn`)
-  3. timestep (`dt`)
-  4. primary forcings (`tair`, `swd`, `lwd`, `albedo`, `wspd`, etc.)
-  5. derived atmospheric variables (`ea_atm`, `ro_atm`, `cv_atm`, `nu_air`)
-  6. transport prefactors (`H_h`, `H_e`, `hv_atm`)
-  7. surface state (`br_coefs`, `liqflag`, `chi`)
-  8. conduction terms (`T_ice`, `k_eff`, `dz`) in SEB-level functions
-  9. surface properties (`ro_sfc`, `snow_depth`)
-  10. solver options, then `opts` last
-- This surface ordering schema is not enforced repo-wide; other namespaces may differ.
-- When editing kernels, keep the code shape close to surrounding kernels unless there is a strong reason to refactor more broadly.
+- Never launch the MATLAB desktop GUI to run code. Prefer an already-open MATLAB
+  session when one is available; otherwise run headless from a shell with
+  `matlab -nodisplay -nosplash -batch "<expr>"` — `-batch` runs the expression
+  non-interactively and exits.
+- `matlab` is often not on `$PATH`; invoke the binary inside the install
+  (e.g. `/Applications/MATLAB_R<release>.app/bin/matlab`). The exact path is
+  machine-specific — record it in `STYLE.local.md` if useful.
