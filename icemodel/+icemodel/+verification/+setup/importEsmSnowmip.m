@@ -258,27 +258,17 @@ end
 function writeMetFiles(forcing_tt, sitename, config_casename)
    %WRITEMETFILES Stage one multi-year met file under input/met/.
    %
-   % Saves the staged forcing timetable as a single multi-year met file
-   % in the standard icemodel met-file format (variable named 'met').
-   % Filename follows the createMetFileNames window form so configureRun
-   % + loadmet resolve it without verification-only branches:
-   %
-   %   <ICEMODEL_INPUT_PATH>/met/met_<sitename>_<sitename>_<YYYYMMDD>_<YYYYMMDD>_1hr.mat
-   %
-   % The forcings label equals the sitename for verification cases (no
-   % climate-model swap). Existing files are overwritten unconditionally
-   % when this function is called; the importer's overwrite guard fires
-   % earlier at prepareCaseRoot.
+   % Delegates met-file naming, validation, and saving to the shared
+   % icemodel.forcing.helpers.writemet (window form,
+   % met_<sitename>_<sitename>_<YYYYMMDD>_<YYYYMMDD>_1hr.mat, variable
+   % named 'met'), so configureRun + loadmet resolve the file without
+   % verification-only branches. The forcings label equals the sitename
+   % for verification cases (no climate-model swap). Existing files are
+   % overwritten unconditionally when this function is called; the
+   % importer's overwrite guard fires earlier at prepareCaseRoot.
 
    input_root = icemodel.verification.helpers.inputDataRoot( ...
       "icemodel_config_casename", config_casename);
-   met_dir = fullfile(input_root, 'met');
-   icemodel.helpers.ensureDirExists(met_dir);
-
-   met = forcing_tt;
-   start_stamp = char(forcing_tt.Time(1), 'yyyyMMdd');
-   end_stamp = char(forcing_tt.Time(end), 'yyyyMMdd');
-   filename = sprintf('met_%s_%s_%s_%s_1hr.mat', ...
-      char(sitename), char(sitename), start_stamp, end_stamp);
-   save(fullfile(met_dir, filename), 'met');
+   icemodel.forcing.helpers.writemet(forcing_tt, sitename, sitename, ...
+      outdir=fullfile(input_root, 'met'), naming="window");
 end
