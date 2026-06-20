@@ -1,0 +1,229 @@
+{
+  "dataset_family": "promice",
+  "source_doi": "",
+  "source_url": "https://promice.org",
+  "source_version": "colocated[promice+mar+merra+racmo]",
+  "retrieval_date": "19-Jun-2026",
+  "cases": [
+    {
+      "case_id": "kanl",
+      "case_type": "firn_observational",
+      "site_id": "KAN_L",
+      "site_name": "KAN-L",
+      "site_location": {
+        "lat_wgs84": 67.0955,
+        "lon_wgs84": -49.9513,
+        "x_epsg3413": -216931.31246626662,
+        "y_epsg3413": -2.5040481250081896E+6,
+        "elev_m": 673.20001220703125
+      },
+      "evaluation_file": "kanl/evaluation.mat",
+      "reference_file": "kanl/reference.mat",
+      "native_timestep": "daily",
+      "comparison_window": {
+        "start": "01-Jan-2012",
+        "end": "31-Dec-2015 23:00:00"
+      },
+      "comparison_variables": [
+        "ablation",
+        "snow_depth",
+        "tsfc",
+        "tice1",
+        "tice2",
+        "tice3",
+        "tice4",
+        "tice5",
+        "tice6",
+        "tice7",
+        "tice8"
+      ],
+      "observation_variables": {
+        "subsurface_temperature": "tice1..tice8 (string thermistors)",
+        "surface_ablation": "ablation [m, positive down]",
+        "snow_depth": "snow_depth [m]"
+      },
+      "colocated_forcing": {
+        "promice": {
+          "kind": "station_met_and_eval",
+          "met_files": "met_kanl_promice_20120101_20151231_1hr.mat",
+          "data_files": [
+            "kanl_promice_2012.mat",
+            "kanl_promice_2013.mat",
+            "kanl_promice_2014.mat",
+            "kanl_promice_2015.mat"
+          ],
+          "ablation_recipe": "kanl legacy service windows + generic reset removal"
+        },
+        "mar": {
+          "kind": "point_met",
+          "met_files": "met_kanl_mar_20120101_20151231_1hr.mat",
+          "sample_method": "nearest"
+        },
+        "merra": {
+          "kind": "point_met",
+          "met_files": "met_kanl_merra_20120101_20151231_1hr.mat",
+          "sample_method": "nearest"
+        },
+        "racmo": {
+          "kind": "point_data_smb_eval",
+          "data_files": [
+            "kanl_racmo_2012.mat",
+            "kanl_racmo_2013.mat",
+            "kanl_racmo_2014.mat",
+            "kanl_racmo_2015.mat"
+          ],
+          "sample_method": "nearest",
+          "note": "SMB/eval Data only; RACMO is not a met source."
+        }
+      },
+      "notes": "Lower ablation zone (~670 m); curated KAN_L service-window recipe."
+    },
+    {
+      "case_id": "kanm",
+      "case_type": "firn_observational",
+      "site_id": "KAN_M",
+      "site_name": "KAN-M",
+      "site_location": {
+        "lat_wgs84": 67.067,
+        "lon_wgs84": -48.8355,
+        "x_epsg3413": -168343.13674421073,
+        "y_epsg3413": -2.5109996639953689E+6,
+        "elev_m": 1272.4000244140625
+      },
+      "evaluation_file": "kanm/evaluation.mat",
+      "reference_file": "kanm/reference.mat",
+      "native_timestep": "daily",
+      "comparison_window": {
+        "start": "01-Jan-2012",
+        "end": "31-Dec-2015 23:00:00"
+      },
+      "comparison_variables": [
+        "ablation",
+        "snow_depth",
+        "tsfc",
+        "tice1",
+        "tice2",
+        "tice3",
+        "tice4",
+        "tice5",
+        "tice6",
+        "tice7",
+        "tice8"
+      ],
+      "observation_variables": {
+        "subsurface_temperature": "tice1..tice8 (string thermistors)",
+        "surface_ablation": "ablation [m, positive down]",
+        "snow_depth": "snow_depth [m]"
+      },
+      "colocated_forcing": {
+        "promice": {
+          "kind": "station_met_and_eval",
+          "met_files": "met_kanm_promice_20120101_20151231_1hr.mat",
+          "data_files": [
+            "kanm_promice_2012.mat",
+            "kanm_promice_2013.mat",
+            "kanm_promice_2014.mat",
+            "kanm_promice_2015.mat"
+          ],
+          "ablation_recipe": "kanm legacy service windows + generic reset removal"
+        },
+        "mar": {
+          "kind": "point_met",
+          "met_files": "met_kanm_mar_20120101_20151231_1hr.mat",
+          "sample_method": "nearest"
+        },
+        "merra": {
+          "kind": "point_met",
+          "met_files": "met_kanm_merra_20120101_20151231_1hr.mat",
+          "sample_method": "nearest"
+        },
+        "racmo": {
+          "kind": "point_data_smb_eval",
+          "data_files": [
+            "kanm_racmo_2012.mat",
+            "kanm_racmo_2013.mat",
+            "kanm_racmo_2014.mat",
+            "kanm_racmo_2015.mat"
+          ],
+          "sample_method": "nearest",
+          "note": "SMB/eval Data only; RACMO is not a met source."
+        }
+      },
+      "notes": "Lower percolation/firn zone (~1270 m); curated KAN_M service-window recipe."
+    },
+    {
+      "case_id": "kanu",
+      "case_type": "firn_observational",
+      "site_id": "KAN_U",
+      "site_name": "KAN-U",
+      "site_location": {
+        "lat_wgs84": 67.0003,
+        "lon_wgs84": -47.0253,
+        "x_epsg3413": -89205.400928864212,
+        "y_epsg3413": -2.5225714951599678E+6,
+        "elev_m": 1837
+      },
+      "evaluation_file": "kanu/evaluation.mat",
+      "reference_file": "kanu/reference.mat",
+      "native_timestep": "daily",
+      "comparison_window": {
+        "start": "01-Jan-2012",
+        "end": "31-Dec-2015 23:00:00"
+      },
+      "comparison_variables": [
+        "ablation",
+        "snow_depth",
+        "tsfc",
+        "tice1",
+        "tice2",
+        "tice3",
+        "tice4",
+        "tice5",
+        "tice6",
+        "tice7",
+        "tice8"
+      ],
+      "observation_variables": {
+        "subsurface_temperature": "tice1..tice8 (string thermistors)",
+        "surface_ablation": "ablation [m, positive down]",
+        "snow_depth": "snow_depth [m]"
+      },
+      "colocated_forcing": {
+        "promice": {
+          "kind": "station_met_and_eval",
+          "met_files": "met_kanu_promice_20120101_20151231_1hr.mat",
+          "data_files": [
+            "kanu_promice_2012.mat",
+            "kanu_promice_2013.mat",
+            "kanu_promice_2014.mat",
+            "kanu_promice_2015.mat"
+          ],
+          "ablation_recipe": "generic reset removal only"
+        },
+        "mar": {
+          "kind": "point_met",
+          "met_files": "met_kanu_mar_20120101_20151231_1hr.mat",
+          "sample_method": "nearest"
+        },
+        "merra": {
+          "kind": "point_met",
+          "met_files": "met_kanu_merra_20120101_20151231_1hr.mat",
+          "sample_method": "nearest"
+        },
+        "racmo": {
+          "kind": "point_data_smb_eval",
+          "data_files": [
+            "kanu_racmo_2012.mat",
+            "kanu_racmo_2013.mat",
+            "kanu_racmo_2014.mat",
+            "kanu_racmo_2015.mat"
+          ],
+          "sample_method": "nearest",
+          "note": "SMB/eval Data only; RACMO is not a met source."
+        }
+      },
+      "notes": "Upper percolation/dry-snow margin (~1840 m); generic ablation recipe."
+    }
+  ],
+  "skipped": []
+}
