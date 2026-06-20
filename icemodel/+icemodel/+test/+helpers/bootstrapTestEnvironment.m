@@ -24,6 +24,12 @@ function [rootdir, input_path, output_path, eval_path, cleanup] = ...
    % artifact, profiler, and archive directories stay off the MATLAB path.
    addCodeFolders(icemodel.getpath('test'))
 
+   % Put the exactremap toolbox on the path so the conservative
+   % (area-weighted) remap tests RUN instead of self-skipping. Resolved from
+   % the sibling exactremap dev repo; a clean no-op when it is absent (the
+   % affected tests then skip cleanly, as before).
+   ensureExactremap(rootdir)
+
    % Return a no-op cleanup by default so callers can always keep one handle
    % alive even when path/config installation is disabled.
    cleanup = onCleanup(@() []);
@@ -59,6 +65,27 @@ function restoreConfig(names, values)
 
    for n = 1:numel(names)
       setenv(names(n), values{n});
+   end
+end
+
+function ensureExactremap(rootdir)
+   %ENSUREEXACTREMAP Put the exactremap toolbox on the path if not already.
+   % exactremap supplies the conservative (overlap-area-weighted) polygon
+   % remap used by icemodel.forcing.helpers.remapPolygon. It lives in a
+   % sibling dev repo (projects/exactremap, https://github.com/mgcooper/
+   % exactremap), kept off the icemodel repo. When it is already on the path
+   % (e.g. activated by the user's startup.m) this is a no-op; when the dev
+   % repo is missing this returns quietly and the remap tests skip cleanly.
+
+   if ~isempty(which('exactremap'))
+      return
+   end
+
+   % projects/icemodel/.. -> projects/, then projects/exactremap/toolbox.
+   projects_root = fileparts(rootdir);
+   tbdir = fullfile(projects_root, 'exactremap', 'toolbox');
+   if isfolder(tbdir)
+      addpath(genpath(tbdir))
    end
 end
 

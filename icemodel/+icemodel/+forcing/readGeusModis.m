@@ -51,21 +51,35 @@ function [albedo, Time] = readGeusModis(filename, location, method, kwargs)
    LON = double(ncread(filename, 'lon'));
    LAT = double(ncread(filename, 'lat'));
 
-   % Project the GEUS 5 km grid to polar stereographic, where it is regular
-   % (the 5 km posting is uniform in projected metres), so both the point
-   % nearest-cell search and the polygon conservative remap operate on a
-   % well-behaved metric grid. A point [lat lon] is projected to the same
-   % frame; a polygon is already in EPSG:3413 metres.
-   proj = icemodel.forcing.helpers.psnProjection();
-   [X, Y] = projfwd(proj, LAT, LON);
+   % Project the GEUS 5 km grid into its NATIVE polar-stereographic frame
+   % (central meridian 39W, true scale 70N, sphere), where the 5 km posting
+   % is axis-aligned and uniform, then rebuild EXACTLY regular axes via
+   % linspace so the conservative remap sees a perfectly regular grid. The
+   % EPSG:3413 reprojection (psnProjection, central meridian 45W) is ROTATED
+   % and non-uniform here, which trips exactremap's regular-grid check; the
+   % native frame is the GEUS analogue of the MAR Xnat/Ynat axes. The tiny
+   % linspace correction (sub-metre over a ~5.15 km cell) keeps the nearest-
+   % cell search and overlap geometry faithful to the true cell centres.
+   geus = icemodel.forcing.helpers.geusModisProjection();
+   [Xp, Yp] = mfwdtran(geus, LAT, LON);
+   xax = linspace(mean(Xp(1, :)), mean(Xp(end, :)), size(Xp, 1)).';
+   yax = linspace(mean(Yp(:, 1)), mean(Yp(:, end)), size(Yp, 2));
+   [X, Y] = ndgrid(xax, yax);
 
    if isnumeric(location)
       assert(isequal(size(location), [1 2]), ...
          'point location must be [lat lon]')
-      [xq, yq] = projfwd(proj, location(1), location(2));
+      [xq, yq] = mfwdtran(geus, location(1), location(2));
       query = [xq, yq];
    else
-      query = location;   % polyshape in EPSG:3413 metres
+      % Polygon vertices arrive in EPSG:3413 metres; map them into the GEUS
+      % native frame (3413 metres -> lon/lat -> native metres) so the polygon
+      % and the grid share the regular frame the remap operates in.
+      proj = icemodel.forcing.helpers.psnProjection();
+      [vlat, vlon] = projinv(proj, location.Vertices(:, 1), ...
+         location.Vertices(:, 2));
+      [qx, qy] = mfwdtran(geus, vlat, vlon);
+      query = polyshape(qx, qy);
    end
 
    % Map the target onto a grid hyperslab + collapse rule, reusing the

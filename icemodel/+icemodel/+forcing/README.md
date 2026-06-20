@@ -23,9 +23,11 @@ Windows/years are arbitrary within the source archive; calendars derive
 from the files present.
 
 Dependency: conservative polygon remap requires the `exactremap` toolbox on
-the path (`https://github.com/mgcooper/exactremap`); point builds and
-`remap="equal"` do not. The dependency-resolution pass
-(`icemodel.internal.installRequiredFiles`) will add it permanently.
+the path (`https://github.com/mgcooper/exactremap`, checked out as the
+sibling dev repo `projects/exactremap`); point builds and `remap="equal"` do
+not. The test bootstrap
+(`icemodel.test.helpers.bootstrapTestEnvironment`) adds the sibling dev repo
+automatically so the conservative-remap tests run.
 
 ## Conservative polygon remap (per source)
 
