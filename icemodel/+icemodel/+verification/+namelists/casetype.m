@@ -12,5 +12,8 @@ function case_types = casetype()
    %  verification case is this?", for example field site or synthetic process.
 
    % Keep this explicit so adding a new group is a deliberate schema change.
-   case_types = ["esm_site"; "synthetic_process"];
+   % "firn_observational" is the soft-gated firn evaluation case type (reports
+   % diagnostic metrics, no hard PASS/FAIL tolerance); "firn_analytical" is
+   % deferred with the Meyer-Hewitt namespace and is intentionally absent.
+   case_types = ["esm_site"; "synthetic_process"; "firn_observational"];
 end

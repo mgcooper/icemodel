@@ -60,11 +60,39 @@ function cases = listcases(kwargs)
    end
 
    % Sort by case id so runner and test output are stable across filesystems.
-   % All families share one canonical case-entry schema, so vertcat works
-   % without harmonization.
-   cases = vertcat(selected_family_cases{1:n_families});
+   % Snow (esm_snowmip/laugh_tests) and firn (promice/sumup) families carry
+   % different case-entry schemas - the firn schema adds site_location and
+   % colocated_forcing - so harmonize the field set to a common union before
+   % vertcat, filling family-absent fields with []. This keeps the snow lane
+   % byte-identical while letting the firn families be enumerated alongside.
+   groups = selected_family_cases(1:n_families);
+   groups = harmonizeCaseFields(groups);
+   cases = vertcat(groups{:});
    [~, order] = sort([cases.case_id]);
    cases = cases(order);
+end
+
+function groups = harmonizeCaseFields(groups)
+   %HARMONIZECASEFIELDS Give every case group the same field set for vertcat.
+   %
+   % Collects the union of field names across all family groups (preserving
+   % first-seen order), then adds any missing field as [] to each struct so
+   % vertcat across heterogeneous family schemas succeeds.
+
+   all_fields = strings(0, 1);
+   for k = 1:numel(groups)
+      all_fields = union(all_fields, string(fieldnames(groups{k})), 'stable');
+   end
+
+   for k = 1:numel(groups)
+      group = groups{k};
+      missing = setdiff(all_fields, string(fieldnames(group)), 'stable');
+      for f = reshape(missing, 1, [])
+         [group.(f)] = deal([]);
+      end
+      % Reorder fields to the common union so vertcat sees identical order.
+      groups{k} = orderfields(group, cellstr(all_fields));
+   end
 end
 
 function tf = skipFamily(family, dataset_family)

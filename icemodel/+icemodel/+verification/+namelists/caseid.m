@@ -44,8 +44,11 @@ end
 function validateDatasetFamily(dataset_family)
    %VALIDATEDATASETFAMILY Validate the requested source-family selector.
 
-   % The only supported selectors are "all" plus the dataset-family namelist.
-   valid = ["all"; icemodel.verification.namelists.datasetfamily()];
+   % caseid enumerates runnable SNOW cases only. The firn families (promice,
+   % sumup) are soft-gated, manifest-enumerated evaluation cases discovered by
+   % listcases, not runnable case-id lists, so they are intentionally excluded
+   % from the caseid dispatcher even though datasetfamily() lists them.
+   valid = ["all"; "esm_snowmip"; "laugh_tests"];
    if ~ismember(dataset_family, valid)
       error('unsupported snow-verification dataset family: %s', dataset_family)
    end

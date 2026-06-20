@@ -348,14 +348,18 @@ end
 
 function names = expectedDatasetFamilies()
    %EXPECTEDDATASETFAMILIES Dataset families currently staged for verification.
+   % snow/: esm_snowmip, laugh_tests. firn/: promice, sumup (sumup is the
+   % data-gated SUMup family; the filter accepts it ahead of staged data).
 
-   names = ["esm_snowmip"; "laugh_tests"];
+   names = ["esm_snowmip"; "laugh_tests"; "promice"; "sumup"];
 end
 
 function names = expectedCaseTypes()
    %EXPECTEDCASETYPES Verification case types used by manifests and runners.
+   % firn_observational is the soft-gated firn evaluation case type; the
+   % firn_analytical type is deferred with the Meyer-Hewitt namespace.
 
-   names = ["esm_site"; "synthetic_process"];
+   names = ["esm_site"; "synthetic_process"; "firn_observational"];
 end
 
 function fields = expectedFamilyManifestFields()

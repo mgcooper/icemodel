@@ -79,6 +79,14 @@ function result = comparecase(case_id, kwargs)
          error('unsupported verification target format: %s', targets.format)
    end
 
+   % Acceptance-gate mode is keyed by case_type, not by family. comparecase
+   % itself only emits diagnostic metrics (per-variable status + bias/RMSE);
+   % the hard PASS/FAIL tolerance gate lives in colbeck.compareSolutions for
+   % synthetic_process verification cases. firn_observational and esm_site are
+   % SOFT (diagnostic only) - they report metrics and never hard-fail here, so
+   % a missing or noisy firn observation lane cannot break the suite.
+   gate_mode = acceptanceGateMode(manifest);
+
    % Artifact writing is optional so the same function can serve interactive
    % checks and batch smoke-suite runs.
    [artifact_dir, metrics_path, figure_path, scatter_figure_path] = ...
@@ -150,10 +158,31 @@ function result = comparecase(case_id, kwargs)
       'case_id', case_id, ...
       'manifest', manifest, ...
       'metrics', metrics, ...
+      'gate_mode', gate_mode, ...
       'artifact_dir', artifact_dir, ...
       'metrics_path', metrics_path, ...
       'figure_path', figure_path, ...
       'scatter_figure_path', scatter_figure_path);
+end
+
+function gate_mode = acceptanceGateMode(manifest)
+   %ACCEPTANCEGATEMODE Classify a case's acceptance gate by case_type.
+   %
+   % "hard"        synthetic_process - formal RMSE tolerances apply (Colbeck;
+   %               gated in colbeck.compareSolutions, not here).
+   % "soft"        esm_site / firn_observational - diagnostic metrics only,
+   %               no hard PASS/FAIL. This is the firn observational contract:
+   %               report bias/RMSE/correlation, never gate the suite.
+   case_type = "";
+   if isfield(manifest, "case_type")
+      case_type = string(manifest.case_type);
+   end
+   switch case_type
+      case "synthetic_process"
+         gate_mode = "hard";
+      otherwise
+         gate_mode = "soft";
+   end
 end
 
 function [metrics, aligned] = compareTimeseriesBundle(target_tt, candidate_tt, ...

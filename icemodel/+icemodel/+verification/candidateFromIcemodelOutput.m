@@ -19,12 +19,88 @@ function candidate = candidateFromIcemodelOutput(ice1, ice2, opts, case_manifest
    switch case_manifest.case_type
       case "esm_site"
          candidate = timeseriesCandidateFromIce1(ice1, ice2, opts, case_manifest);
+      case "firn_observational"
+         candidate = firnCandidateFromIce1(ice1, ice2, opts, case_manifest);
       case "synthetic_process"
          candidate = experimentBundleCandidateFromIce1(ice1, opts);
       otherwise
          error('unsupported verification case type: %s', ...
             case_manifest.case_type)
    end
+end
+
+function candidate = firnCandidateFromIce1(ice1, ice2, opts, case_manifest)
+   %FIRNCANDIDATEFROMICE1 Map ICE1/ICE2 fields to firn verification targets.
+   %
+   % Firn-observational cases compare against PROMICE station Data. The
+   % comparison axes the staged manifests declare are the surface-energy /
+   % ablation series (ablation, snow_depth, tsfc) plus the subsurface
+   % thermistor profile (tice1..tice8 = T(z,t) sampled at thermistor depths)
+   % and, when staged, density rho(z,t) and accumulation/SMB. Variables are
+   % mapped only as far as the staged cases require; porosity / saturation /
+   % runoff are deferred with the firn physics.
+
+   if ~isfield(ice1, "Time")
+      error('icemodel output ice1 must contain Time for firn verification')
+   end
+
+   variable_names = string(case_manifest.comparison_variables);
+   data = timetable('RowTimes', ice1.Time);
+   Tf = icemodel.physicalConstant('Tf');
+
+   for name = variable_names(:)'
+      tice_tok = regexp(char(name), '^tice(\d+)$', 'tokens', 'once');
+      if isfield(ice1, name)
+         % Direct passthrough when the model already emits the named series.
+         data.(name) = ice1.(name);
+      elseif name == "tsfc" && isfield(ice1, "Tsfc")
+         % Surface temperature: icemodel stores Kelvin Tsfc; firn obs is
+         % degrees C (PROMICE tsfc). Convert once here.
+         data.tsfc = ice1.Tsfc - Tf;
+      elseif name == "snow_depth" && isfield(ice1, "snow_depth_m")
+         data.snow_depth = ice1.snow_depth_m;
+      elseif ~isempty(tice_tok)
+         % Subsurface thermistor: sample the column T(z,t) at the k-th
+         % staged thermistor depth and convert to degrees C.
+         values = ticeFromIce2(ice2, opts, case_manifest, ...
+            str2double(tice_tok{1}));
+         if ~isempty(values)
+            data.(name) = values;
+         end
+      end
+   end
+
+   candidate = struct( ...
+      "format", "timeseries", ...
+      "data", data, ...
+      "metadata", metadata(opts, "icemodel_output"));
+end
+
+function values = ticeFromIce2(ice2, opts, case_manifest, k)
+   %TICEFROMICE2 Sample column T at the k-th manifested thermistor depth.
+   %
+   % Returns Celsius column-T at depth manifest.observation_variables
+   % .thermistor_depths_m(k), or [] when the depth/grid is unavailable.
+   % Mirrors soilTempFromIce2 (esm_site soil temps) for the firn thermistor
+   % string. When the manifest does not record explicit depths, the function
+   % returns [] so the variable is reported as missing rather than fabricated.
+
+   values = [];
+   if ~isfield(ice2, 'T') || isempty(ice2.T)
+      return
+   end
+   obsvars = case_manifest.observation_variables;
+   if ~isstruct(obsvars) || ~isfield(obsvars, 'thermistor_depths_m')
+      return
+   end
+   depths = obsvars.thermistor_depths_m;
+   if k < 1 || k > numel(depths)
+      return
+   end
+   dz = opts.dz_thermal;
+   zidx = max(1, min(size(ice2.T, 1), round(depths(k) / dz) + 1));
+   Tf = icemodel.physicalConstant('Tf');
+   values = ice2.T(zidx, :)' - Tf;
 end
 
 function candidate = timeseriesCandidateFromIce1(ice1, ice2, opts, case_manifest)
