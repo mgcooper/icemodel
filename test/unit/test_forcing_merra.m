@@ -169,6 +169,23 @@ function test_data2met_from_merra_data(testCase)
    testCase.verifyEqual(varnames(1:numel(required)), required);
 end
 
+function test_data2met_precip_unit_harmonized(testCase)
+   % data2met converts the MERRA precipitation channel from the mWE/h Data
+   % convention to the canonical m s-1 met rate (value / 3600) and records
+   % "m s-1" in VariableUnits.
+
+   Data = testCase.TestData.Data;
+   met = icemodel.forcing.data2met(Data);
+
+   [~, ~, pptunit] = icemodel.forcing.helpers.metvariables();
+   units = string(met.Properties.VariableUnits);
+   names = string(met.Properties.VariableNames);
+   testCase.verifyEqual(units(names == "ppt"), pptunit);
+
+   % Numeric harmonization: met ppt is the Data mWE/h rate divided by 3600.
+   testCase.verifyEqual(met.ppt, Data.ppt / 3600, 'AbsTol', 1e-15);
+end
+
 function test_derivable_radiation_not_stored(testCase)
    % swu/netr are canonically derivable (icemodel.processmet) and must NOT
    % be carried in the Data output; the native net fluxes swn/lwn stay.

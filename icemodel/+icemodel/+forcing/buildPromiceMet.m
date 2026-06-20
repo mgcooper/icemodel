@@ -65,8 +65,11 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    % Standard QA/QC: gap fill + physical clamps.
    [met, checks] = icemodel.forcing.helpers.metchecks(met);
 
+   % ppt unit is the canonical water-equivalent rate m s-1 (PROMICE has no
+   % precipitation sensor so the channel is zero, but the label is kept
+   % consistent with the gridded met builders and the metvariables contract).
    met.Properties.VariableUnits = {'K', 'W/m2', 'W/m2', '-', 'm/s', ...
-      '%', 'Pa', 'm', 'degrees', 'K', '-', 'W/m2', 'W/m2'};
+      '%', 'Pa', 'm s-1', 'degrees', 'K', '-', 'W/m2', 'W/m2'};
 
    metadata = source_meta;
    metadata.checks = checks;

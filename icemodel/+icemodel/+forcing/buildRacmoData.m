@@ -105,6 +105,12 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    proj = icemodel.forcing.helpers.psnProjection();
    [X, Y] = projfwd(proj, LAT, LON);
 
+   % Preserve the original request before it is mapped into projected /
+   % rotated coordinates below; the MODIS channel re-resolves it on the GEUS
+   % grid (a point stays [lat lon], a polygon stays EPSG:3413), so a polygon
+   % build gets the area-weighted catchment MODIS mean, not the nearest cell.
+   location0 = location;
+
    % Conservative polygon remap runs in RACMO's NATIVE rotated-pole frame
    % (the FGRN11 rlon/rlat grid is regular there; reprojecting to EPSG:3413
    % is curvilinear). exactremap's rotated-pole support handles the rotation
@@ -188,11 +194,14 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    Data.albedo = albedo;
    units(end+1) = "-";
 
-   % Optional GEUS MODIS daily albedo at the site (nearest cell), matching
-   % the legacy saveRacmoData MODIS channel.
+   % Optional GEUS MODIS daily albedo, resolved at the SAME location and
+   % aggregation as the RACMO channels: nearest/natural for a point,
+   % conservative (or equal) catchment mean for a polygon. This generalizes
+   % the legacy saveRacmoData MODIS channel (which took the nearest cell even
+   % for catchments) to the area-weighted ROI mean for polygons.
    if kwargs.modis_dir ~= ""
-      Data.modis = modisChannel(kwargs.modis_dir, years, site_lat, ...
-         site_lon, Data.Time);
+      Data.modis = modisChannel(kwargs.modis_dir, years, location0, ...
+         kwargs.method, kwargs.remap, Data.Time);
       units(end+1) = "reflectivity";
    end
 
@@ -383,8 +392,12 @@ function gm = racmoGridMapping(filename)
       ncreadatt(filename, 'rotated_pole', 'grid_north_pole_longitude'));
 end
 
-function modis = modisChannel(modis_dir, years, lat, lon, Time)
-   %MODISCHANNEL GEUS MODIS daily albedo at the site, interpolated hourly.
+function modis = modisChannel(modis_dir, years, location, method, remap, Time)
+   %MODISCHANNEL GEUS MODIS daily albedo at the location, interpolated hourly.
+   % LOCATION is the original request (a [lat lon] point or an EPSG:3413
+   % polyshape); readGeusModis maps it onto the GEUS 5 km grid with the same
+   % nearest/natural (point) or conservative/equal (polygon) selection as the
+   % RACMO channels, so a catchment build gets the area-weighted ROI mean.
    modis = nan(numel(Time), 1);
    for yyyy = years
       match = dir(fullfile(modis_dir, sprintf('*_%d_*.nc', yyyy)));
@@ -394,7 +407,8 @@ function modis = modisChannel(modis_dir, years, lat, lon, Time)
             yyyy, modis_dir, numel(match))
       end
       [albedo, Tdaily] = icemodel.forcing.readGeusModis( ...
-         string(fullfile(match.folder, match.name)), lat, lon);
+         string(fullfile(match.folder, match.name)), location, method, ...
+         remap=remap);
       inyear = year(Time) == yyyy;
       modis(inyear) = icemodel.forcing.helpers.dailyToHourly( ...
          albedo, Tdaily, Time(inyear));

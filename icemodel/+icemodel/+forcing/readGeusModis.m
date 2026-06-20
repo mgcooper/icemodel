@@ -1,44 +1,90 @@
-function [albedo, Time] = readGeusModis(filename, lat, lon)
-   %READGEUSMODIS Read the GEUS MODIS daily albedo at a point.
+function [albedo, Time] = readGeusModis(filename, location, method, kwargs)
+   %READGEUSMODIS Read the GEUS MODIS daily albedo at a point or polygon.
    %
-   %  [albedo, Time] = icemodel.forcing.readGeusModis(filename, lat, lon)
+   %  [albedo, Time] = icemodel.forcing.readGeusModis(filename, [lat lon])
+   %  [albedo, Time] = icemodel.forcing.readGeusModis(filename, polygon)
+   %  [albedo, Time] = ... readGeusModis(_, method, remap=...)
    %
    % Reads the daily MODIS-derived surface albedo (fraction) from one
    % GEUS Greenland reflectivity file (Greenland_Reflectivity_<YYYY>_
-   % 5km_C6.nc) at the grid cell nearest the requested point.
+   % 5km_C6.nc) at a point or averaged over a polygon (catchment), using
+   % the same cell-selection / remap machinery as the gridded-source
+   % builders (icemodel.forcing.helpers.gridLocation):
+   %
+   %  - location = [lat lon] (point, degrees): the grid cell nearest the
+   %    point (method "nearest", default) or a natural-neighbour blend of
+   %    the surrounding cells at the point (method "natural").
+   %  - location = polyshape (vertices in EPSG:3413 metres): the MODIS
+   %    cells are averaged over the polygon. remap="conservative" (default)
+   %    is the exact overlap-area-weighted catchment mean via the exactremap
+   %    toolbox (helpers.remapPolygon), matching the legacy readGeusModis
+   %    ALBavgInPoly ROI mean and the conservative remap used for every other
+   %    gridded channel; remap="equal" is a plain in-polygon cell-centre
+   %    mean. The remap runs in the GEUS 5 km polar-stereographic frame (the
+   %    grid is regular there).
    %
    % Inputs
    %  filename - GEUS reflectivity NetCDF for one year
-   %  lat, lon - point location [degrees]
+   %  location - [lat lon] point (degrees) or polyshape (EPSG:3413 metres)
+   %  method   - point sampling "nearest" (default) | "natural"
+   %
+   % Name-value
+   %  remap - polygon aggregation "conservative" (default) | "equal"
    %
    % Outputs
-   %  albedo - daily albedo series at the nearest cell [-]
+   %  albedo - daily albedo series at the target [-]
    %  Time   - UTC daily datetime axis (Jan 1 of the file year onward)
    %
    % See also: icemodel.forcing.buildMarData,
+   %  icemodel.forcing.helpers.gridLocation,
    %  icemodel.forcing.helpers.dailyToHourly
 
    arguments
       filename (1, 1) string
-      lat (1, 1) double
-      lon (1, 1) double
+      location
+      method (1, 1) string {mustBeMember(method, ...
+         ["nearest", "natural"])} = "nearest"
+      kwargs.remap (1, 1) string {mustBeMember(kwargs.remap, ...
+         ["equal", "conservative"])} = "conservative"
    end
 
    LON = double(ncread(filename, 'lon'));
    LAT = double(ncread(filename, 'lat'));
 
-   % Nearest cell by projected distance (the 5 km grid is regular in
-   % polar stereographic space).
+   % Project the GEUS 5 km grid to polar stereographic, where it is regular
+   % (the 5 km posting is uniform in projected metres), so both the point
+   % nearest-cell search and the polygon conservative remap operate on a
+   % well-behaved metric grid. A point [lat lon] is projected to the same
+   % frame; a polygon is already in EPSG:3413 metres.
    proj = icemodel.forcing.helpers.psnProjection();
    [X, Y] = projfwd(proj, LAT, LON);
-   [xq, yq] = projfwd(proj, lat, lon);
-   [~, idx] = min(hypot(X(:) - xq, Y(:) - yq));
-   [i, j] = ind2sub(size(X), idx);
+
+   if isnumeric(location)
+      assert(isequal(size(location), [1 2]), ...
+         'point location must be [lat lon]')
+      [xq, yq] = projfwd(proj, location(1), location(2));
+      query = [xq, yq];
+   else
+      query = location;   % polyshape in EPSG:3413 metres
+   end
+
+   % Map the target onto a grid hyperslab + collapse rule, reusing the
+   % shared selection logic so the MODIS channel honours the same
+   % point/polygon and nearest/natural/conservative/equal options as the
+   % other gridded channels.
+   [start, count, collapse] = icemodel.forcing.helpers.gridLocation( ...
+      X, Y, query, method, remap=kwargs.remap);
 
    info = ncinfo(filename, 'albedo');
    ndays = info.Size(end);
-   albedo = squeeze(double(ncread(filename, 'albedo', [i j 1], ...
-      [1 1 ndays])));
+
+   % Read the bounding hyperslab over the two grid dimensions, all days, and
+   % flatten the cells column-major (cells x time) so the gridLocation
+   % collapse handle reduces it to the target series exactly as it does for
+   % the MAR / RACMO / MERRA channels.
+   block = double(ncread(filename, 'albedo', [start 1], [count ndays]));
+   block = reshape(block, prod(count), ndays);
+   albedo = collapse(block);
 
    tok = regexp(filename, '_(\d{4})_', 'tokens', 'once');
    assert(~isempty(tok), ...

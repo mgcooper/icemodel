@@ -43,4 +43,21 @@ function validatemet(met)
             'required variable %s has no finite samples', varname);
       end
    end
+
+   % Precipitation-rate unit. When the met timetable records VariableUnits,
+   % the ppt channel must carry the canonical water-equivalent rate (m s-1;
+   % see icemodel.forcing.helpers.metvariables) so every source agrees. A met
+   % file with no VariableUnits is accepted (legacy artifacts predate the
+   % metadata), but a ppt unit that is set and wrong is rejected.
+   units = string(met.Properties.VariableUnits);
+   if ~isempty(units)
+      [~, ~, pptunit] = icemodel.forcing.helpers.metvariables();
+      pptidx = varnames == "ppt";
+      if any(pptidx) && strlength(units(pptidx)) > 0 ...
+            && units(pptidx) ~= pptunit
+         error('icemodel:forcing:validatemet:pptUnit', ...
+            'ppt unit must be the canonical "%s", got "%s"', ...
+            pptunit, units(pptidx));
+      end
+   end
 end

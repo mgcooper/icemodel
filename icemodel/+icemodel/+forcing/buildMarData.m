@@ -109,8 +109,12 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
       parts{n} = extractOneYear(files(n), hourly_vars, daily_vars, ...
          start, count, collapse);
       if kwargs.modis_dir ~= ""
+         % MODIS albedo at the SAME location/aggregation as every other
+         % gridded channel: nearest/natural for a point, conservative (or
+         % equal) catchment mean for a polygon - not the nearest single
+         % MODIS cell. readGeusModis runs gridLocation on the GEUS 5 km grid.
          parts{n}.modis = modisChannel(kwargs.modis_dir, years(n), ...
-            site.lat, site.lon, parts{n}.Time);
+            location, kwargs.method, kwargs.remap, parts{n}.Time);
       end
    end
    Data = vertcat(parts{:});
@@ -125,6 +129,13 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
 
    [Data, checks] = icemodel.forcing.helpers.metchecks(Data, ...
       fillgaps=kwargs.fillgaps);
+
+   % Per-variable units (consistency with RACMO/PROMICE, which set
+   % VariableUnits). Mass fluxes are mWE/h rates (cumulative sums need the
+   % timestep in hours); the precipitation channels convert to the canonical
+   % m s-1 only at the met boundary (icemodel.forcing.data2met).
+   Data.Properties.VariableUnits = marVariableUnits( ...
+      string(Data.Properties.VariableNames));
 
    % Userdata CustomProperties.
    Data = addprop(Data, ...
@@ -244,8 +255,13 @@ function part = extractOneYear(filename, hourly_vars, daily_vars, ...
    end
 end
 
-function modis = modisChannel(modis_dir, yyyy, lat, lon, Time)
+function modis = modisChannel(modis_dir, yyyy, location, method, remap, Time)
    %MODISCHANNEL Daily GEUS MODIS albedo interpolated to the time axis.
+   % LOCATION is the original request (a [lat lon] point or an EPSG:3413
+   % polyshape); readGeusModis maps it onto the GEUS 5 km grid with the same
+   % point (nearest/natural) or polygon (conservative/equal) selection as the
+   % other gridded channels, so a catchment build gets the area-weighted ROI
+   % MODIS mean rather than the single nearest cell.
    match = dir(fullfile(modis_dir, sprintf('*_%d_*.nc', yyyy)));
    if numel(match) ~= 1
       error('icemodel:forcing:buildMarData:modisNotFound', ...
@@ -253,6 +269,27 @@ function modis = modisChannel(modis_dir, yyyy, lat, lon, Time)
          yyyy, modis_dir, numel(match))
    end
    [albedo, Tdaily] = icemodel.forcing.readGeusModis( ...
-      string(fullfile(match.folder, match.name)), lat, lon);
+      string(fullfile(match.folder, match.name)), location, method, ...
+      remap=remap);
    modis = icemodel.forcing.helpers.dailyToHourly(albedo, Tdaily, Time);
+end
+
+function units = marVariableUnits(names)
+   %MARVARIABLEUNITS Standard-unit strings for the MAR Data columns.
+   % Maps each output channel to its standard unit (the readMar3p11 target
+   % units, plus the builder-derived wspd/wdir/rh). Mass fluxes are mWE/h
+   % rates. Unknown columns are left as an empty string.
+   unitmap = struct( ...
+      'tair', "K", 'swd', "W m-2", 'lwd', "W m-2", 'albedo', "-", ...
+      'snow', "mWE/h", 'rain', "mWE/h", 'melt', "mWE/h", ...
+      'runoff', "mWE/h", 'smb', "mWE/h", 'shf', "W m-2", 'lhf', "W m-2", ...
+      'snowd', "m", 'cfrac', "-", 'tsfc', "K", 'psfc', "Pa", ...
+      'wspd', "m s-1", 'wdir', "degrees", 'rh', "%", 'modis', "-");
+   units = strings(1, numel(names));
+   for k = 1:numel(names)
+      if isfield(unitmap, names(k))
+         units(k) = unitmap.(names(k));
+      end
+   end
+   units = cellstr(units);
 end

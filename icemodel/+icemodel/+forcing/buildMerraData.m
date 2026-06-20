@@ -147,6 +147,12 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
       validmask = merraIceMask(inventory.glc.files(1), size(X));
    end
 
+   % Preserve the original request before it is mapped into projected /
+   % geographic coordinates below; the MODIS channel re-resolves it on the
+   % GEUS grid (a point stays [lat lon], a polygon stays EPSG:3413), so a
+   % polygon build gets the area-weighted catchment MODIS mean.
+   location0 = location;
+
    % Conservative polygon remap runs in MERRA's NATIVE geographic grid
    % (regular lon/lat) with exactremap UseGeoCoords=true, which computes
    % true ellipsoidal overlap areas - the correct conservative weighting for
@@ -199,16 +205,26 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
       Data.shum, Data.psfc, Data.tair);
    Data = removevars(Data, {'shum', 'uwind', 'vwind'});
 
-   % Optional GEUS MODIS albedo channel (point locations).
+   % Optional GEUS MODIS albedo channel, resolved at the SAME location and
+   % aggregation as the MERRA channels: nearest/natural for a point,
+   % conservative (or equal) catchment mean for a polygon (area-weighted ROI
+   % mean), not the nearest single MODIS cell.
    site_lat = icemodel.forcing.helpers.slabMean(LAT, start, count, inslab);
    site_lon = icemodel.forcing.helpers.slabMean(LON, start, count, inslab);
    if kwargs.modis_dir ~= ""
       Data.modis = modisChannel(kwargs.modis_dir, years, ...
-         site_lat, site_lon, Data.Time);
+         location0, kwargs.method, kwargs.remap, Data.Time);
    end
 
    [Data, checks] = icemodel.forcing.helpers.metchecks(Data, ...
       fillgaps=kwargs.fillgaps);
+
+   % Per-variable units (consistency with RACMO/PROMICE, which set
+   % VariableUnits). Mass fluxes are mWE/h rates; the precipitation channels
+   % convert to the canonical m s-1 only at the met boundary
+   % (icemodel.forcing.data2met). swe is a store (kg m-2), not a rate.
+   Data.Properties.VariableUnits = merraVariableUnits( ...
+      string(Data.Properties.VariableNames));
 
    % Userdata CustomProperties (MERRA carries no terrain height in
    % these collections; Elev is NaN).
@@ -282,6 +298,27 @@ function [block, stamps] = readChannelSeries(coll, ncname, start, count)
    stamps = reshape((coll.dates + offsets)', [], 1);
 end
 
+function units = merraVariableUnits(names)
+   %MERRAVARIABLEUNITS Standard-unit strings for the MERRA-2 Data columns.
+   % Maps each output channel to its standard unit (the readMerra2 target
+   % units, plus the builder-derived wspd/wdir/rh). Mass fluxes are mWE/h
+   % rates; swe (SNOMAS_GL) is a store in kg m-2. Unknown columns are left as
+   % an empty string.
+   unitmap = struct( ...
+      'tair', "K", 'swd', "W m-2", 'swn', "W m-2", 'lwd', "W m-2", ...
+      'lwn', "W m-2", 'psfc', "Pa", 'shf', "W m-2", 'lhf', "W m-2", ...
+      'ppt', "mWE/h", 'snowf', "mWE/h", 'evap', "mWE/h", ...
+      'runoff', "mWE/h", 'albedo', "-", 'snowd', "m", 'swe', "kg m-2", ...
+      'wspd', "m s-1", 'wdir', "degrees", 'rh', "%", 'modis', "-");
+   units = strings(1, numel(names));
+   for k = 1:numel(names)
+      if isfield(unitmap, names(k))
+         units(k) = unitmap.(names(k));
+      end
+   end
+   units = cellstr(units);
+end
+
 function mask = merraIceMask(glcfile, gridsize)
    %MERRAICEMASK Static land-ice mask from MERRA-2 glacier-tile validity.
    %
@@ -292,8 +329,12 @@ function mask = merraIceMask(glcfile, gridsize)
    mask = reshape(isfinite(v) & v < 1e14, gridsize);
 end
 
-function modis = modisChannel(modis_dir, years, lat, lon, Time)
+function modis = modisChannel(modis_dir, years, location, method, remap, Time)
    %MODISCHANNEL GEUS MODIS daily albedo interpolated to the time axis.
+   % LOCATION is the original request (a [lat lon] point or an EPSG:3413
+   % polyshape); readGeusModis maps it onto the GEUS 5 km grid with the same
+   % nearest/natural (point) or conservative/equal (polygon) selection as the
+   % MERRA channels, so a catchment build gets the area-weighted ROI mean.
    modis = nan(numel(Time), 1);
    for yyyy = years
       match = dir(fullfile(modis_dir, sprintf('*_%d_*.nc', yyyy)));
@@ -303,7 +344,8 @@ function modis = modisChannel(modis_dir, years, lat, lon, Time)
             yyyy, modis_dir, numel(match))
       end
       [albedo, Tdaily] = icemodel.forcing.readGeusModis( ...
-         string(fullfile(match.folder, match.name)), lat, lon);
+         string(fullfile(match.folder, match.name)), location, method, ...
+         remap=remap);
       inyear = year(Time) == yyyy;
       modis(inyear) = icemodel.forcing.helpers.dailyToHourly( ...
          albedo, Tdaily, Time(inyear));
