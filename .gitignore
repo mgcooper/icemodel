@@ -24,6 +24,10 @@ data/verification/**
 !data/verification/snow/esm_snowmip/.gitkeep
 !data/verification/snow/laugh_tests/
 !data/verification/snow/laugh_tests/.gitkeep
+!data/verification/firn/
+!data/verification/firn/.gitkeep
+!data/verification/firn/sumup/
+!data/verification/firn/sumup/.gitkeep
 demo/data/output/
 test/artifacts/
 test/backups/
