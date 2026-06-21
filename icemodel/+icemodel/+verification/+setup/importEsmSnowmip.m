@@ -203,7 +203,8 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
          'esm_site'
          char(sitename)
          char(info.long_name)
-         'seasonal_snow'
+         'land'
+         {'seasonal_snow'}
          char(fullfile(sitename, "evaluation.mat"))
          char(fullfile(sitename, "reference.mat"))
          'hourly'

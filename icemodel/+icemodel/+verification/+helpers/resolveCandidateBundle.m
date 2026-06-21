@@ -45,6 +45,17 @@ function candidate = resolveCandidateBundle(manifest, kwargs)
    end
 
    % With no supplied model output, compare against the staged smoke reference.
-   candidate = icemodel.verification.helpers.loadArtifact( ...
-      manifest.reference_path, "reference");
+   % Metadata-only firn cases carry no bundled reference.mat: the co-located RCM
+   % reference (RACMO Data) is reconstituted on demand from the staged per-year
+   % userdata files the manifest declares. Snow/Colbeck cases still load the
+   % committed reference.mat bundle.
+   if isfield(manifest, 'reference_path') ...
+         && strlength(string(manifest.reference_path)) > 0 ...
+         && exist(manifest.reference_path, 'file') == 2
+      candidate = icemodel.verification.helpers.loadArtifact( ...
+         manifest.reference_path, "reference");
+   else
+      candidate = icemodel.verification.helpers.loadColocatedData( ...
+         manifest, "racmo");
+   end
 end

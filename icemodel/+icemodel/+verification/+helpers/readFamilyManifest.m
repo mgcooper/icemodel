@@ -39,7 +39,7 @@ function cases = normalizeCaseEntries(cases)
    %NORMALIZECASEENTRIES Convert JSON-decoded case text fields to strings.
 
    text_fields = ["case_id"; "case_type"; "site_id"; "site_name"; ...
-      "evaluation_file"; "reference_file"; ...
+      "surface_zone"; "evaluation_file"; "reference_file"; ...
       "native_timestep"; "notes"];
    for icase = 1:numel(cases)
       for jfield = 1:numel(text_fields)
@@ -49,16 +49,28 @@ function cases = normalizeCaseEntries(cases)
          end
       end
 
-      if isfield(cases(icase), "comparison_variables")
-         cases(icase).comparison_variables = ...
-            string(cases(icase).comparison_variables);
+      % String-array fields. comparison_variables is shared by both schemas;
+      % eval_target / forcing_sources / eval_sources are the metadata-only firn
+      % descriptors. jsondecode renders a single-element array as a scalar char
+      % and a multi-element array as a cellstr, so coerce both to a string array.
+      array_fields = ["comparison_variables", "eval_target", ...
+         "forcing_sources", "eval_sources"];
+      for jfield = 1:numel(array_fields)
+         fieldname = array_fields(jfield);
+         if isfield(cases(icase), fieldname)
+            cases(icase).(fieldname) = string(cases(icase).(fieldname));
+         end
       end
 
-      if isfield(cases(icase), "comparison_window")
-         cases(icase).comparison_window.start = ...
-            string(cases(icase).comparison_window.start);
-         cases(icase).comparison_window.end = ...
-            string(cases(icase).comparison_window.end);
+      % Window fields. The snow schema names it comparison_window; the
+      % metadata-only firn schema names it period. Both carry {start, end}.
+      for window_field = ["comparison_window", "period"]
+         if isfield(cases(icase), window_field)
+            cases(icase).(window_field).start = ...
+               string(cases(icase).(window_field).start);
+            cases(icase).(window_field).end = ...
+               string(cases(icase).(window_field).end);
+         end
       end
    end
 end

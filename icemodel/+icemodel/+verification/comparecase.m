@@ -51,8 +51,19 @@ function result = comparecase(case_id, kwargs)
 
    % Load the target and candidate bundles. With no candidate supplied, the
    % staged smoke reference is used so the suite runs before a snow model exists.
-   targets = icemodel.verification.helpers.loadArtifact( ...
-      manifest.evaluation_path, "targets");
+   % Metadata-only firn cases carry no bundled evaluation.mat: the eval target
+   % (PROMICE observed Data) is reconstituted on demand from the staged per-year
+   % userdata files the manifest declares. Snow/Colbeck cases still load the
+   % committed evaluation.mat bundle.
+   if isfield(manifest, 'evaluation_path') ...
+         && strlength(string(manifest.evaluation_path)) > 0 ...
+         && exist(manifest.evaluation_path, 'file') == 2
+      targets = icemodel.verification.helpers.loadArtifact( ...
+         manifest.evaluation_path, "targets");
+   else
+      targets = icemodel.verification.helpers.loadColocatedData( ...
+         manifest, "promice");
+   end
 
    % Some cases stage multiple target sources keyed under one evaluation.mat
    % (e.g. colbeck1976 carries numerical_summa and analytical_clark2017).

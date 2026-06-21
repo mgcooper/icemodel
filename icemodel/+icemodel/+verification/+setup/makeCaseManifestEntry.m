@@ -25,8 +25,9 @@ function entry = makeCaseManifestEntry(values)
    % Build the manifest entry in the canonical field order.
    entry = cell2struct(values(:), names, 1);
 
-   % Validate surface_zone against the canonical vocabulary. An empty value
-   % ("") is permitted for cases where the surface regime is not meaningful
-   % (e.g. analytical Laugh-Tests benchmarks).
+   % Validate the surface_zone and eval_target descriptors against the canonical
+   % vocabularies. Empty values are permitted where the regime/capability is not
+   % meaningful (e.g. analytical Laugh-Tests benchmarks).
    icemodel.verification.setup.validateSurfaceZone(entry.surface_zone);
+   icemodel.verification.setup.validateEvalTarget(entry.eval_target);
 end

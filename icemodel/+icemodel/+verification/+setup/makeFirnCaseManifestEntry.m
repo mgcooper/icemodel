@@ -8,14 +8,14 @@ function entry = makeFirnCaseManifestEntry(values)
    %           order (icemodel.verification.setup.firnCaseManifestFieldNames).
    %
    % Outputs
-   %  entry    Struct with the canonical firn case-manifest schema.
+   %  entry    Struct with the canonical metadata-only firn case-manifest schema.
    %
    % Role
-   %  Setup helper used by the firn staging driver to make the firn case
-   %  schema explicit. It mirrors makeCaseManifestEntry but binds the
-   %  firn-only field set (site_location, colocated_forcing) so a driver
-   %  that adds or drops a field fails early rather than writing a shifted
-   %  JSON manifest.
+   %  Setup helper used by the firn staging driver to make the metadata-only firn
+   %  case schema explicit. A driver that adds or drops a field fails early here
+   %  rather than writing a shifted JSON manifest. The entry records WHICH
+   %  forcing/eval sources are available (by id) and the colocation regime; it
+   %  does NOT bundle evaluation.mat/reference.mat data.
    %
    % See also: icemodel.verification.setup.makeCaseManifestEntry,
    %  icemodel.verification.setup.firnCaseManifestFieldNames
@@ -28,7 +28,9 @@ function entry = makeFirnCaseManifestEntry(values)
 
    entry = cell2struct(values(:), names, 1);
 
-   % Validate surface_zone against the canonical vocabulary. An empty value
-   % ("") is permitted for cases where the surface regime is not meaningful.
+   % Validate the two case descriptors against the canonical vocabularies. An
+   % empty surface_zone ("") / eval_target is permitted where the regime or
+   % capability is not meaningful.
    icemodel.verification.setup.validateSurfaceZone(entry.surface_zone);
+   icemodel.verification.setup.validateEvalTarget(entry.eval_target);
 end

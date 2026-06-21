@@ -61,8 +61,9 @@ function cases = listcases(kwargs)
 
    % Sort by case id so runner and test output are stable across filesystems.
    % Snow (esm_snowmip/laugh_tests) and firn (promice/sumup) families carry
-   % different case-entry schemas - the firn schema adds site_location and
-   % colocated_forcing - so harmonize the field set to a common union before
+   % different case-entry schemas - the metadata-only firn schema adds
+   % site_location, period, forcing_sources/eval_sources, and colocation - so
+   % harmonize the field set to a common union before
    % vertcat, filling family-absent fields with []. This keeps the snow lane
    % byte-identical while letting the firn families be enumerated alongside.
    groups = selected_family_cases(1:n_families);

@@ -14,9 +14,12 @@ function manifest = importSumup(source_dir, kwargs)
    %      buildSumupForcing (SUMup points carry no station met);
    %    - records whether the point is within a co-location threshold of a
    %      PROMICE anchor (helpers.sumupColocation, default 7.5 km EPSG:3413);
-   %    - writes evaluation.mat (SUMup observations as targets) + reference.mat
-   %      (co-located RACMO Data) + a family manifest.json with
-   %      case_type="firn_observational".
+   %    - writes a METADATA-ONLY family manifest.json
+   %      (case_type="firn_observational"). The SUMup observation profiles are
+   %      staged once as a per-case observations.mat obs bundle (not rebuilt);
+   %      the co-located MAR met + RACMO Data are staged as individual files and
+   %      recorded in the manifest colocation record by source id - no bundled
+   %      evaluation.mat/reference.mat colocation copy is written.
    %
    %  Data-gated: SUMup is access-gated (NASA Earthdata, NSIDC G02288). With
    %  no populated cache, fetchSumup(strict=true) errors with the retrieval
@@ -180,7 +183,19 @@ function manifest = importSumup(source_dir, kwargs)
          racmo_files = icemodel.forcing.helpers.writeuserdata( ...
             forcing.racmo_data, alias, "racmo", outdir=userdata_outdir);
 
-         colocated = struct( ...
+         % SUMup observation profiles are staged as a per-case obs bundle (NOT
+         % rebuilt here; staged_kind=observations_only). It is referenced from
+         % the colocation record as the sumup_obs eval source, alongside the
+         % co-located MAR met and RACMO Data legs.
+         targets = struct('format', 'firn_profile_bundle', ...
+            'data', observations, 'metadata', obs_meta);
+         obs_file = "observations.mat";
+         save(fullfile(case_root, obs_file), 'targets');
+
+         colocation = struct( ...
+            'sumup', struct('kind', 'firn_profile_obs', ...
+               'obs_file', char(fullfile(alias, obs_file)), ...
+               'note', 'SUMup observation profiles (staged, not rebuilt).'), ...
             'mar', struct('kind', 'point_met', ...
                'met_files', relpaths(mar_files, met_outdir), ...
                'sample_method', 'nearest'), ...
@@ -188,21 +203,8 @@ function manifest = importSumup(source_dir, kwargs)
                'data_files', relpaths(racmo_files, userdata_outdir), ...
                'sample_method', 'nearest', ...
                'note', 'SMB/eval Data only; RACMO is not a met source.'), ...
-            'colocation', colocationRecord(is_coloc, anchor, dist_km, ...
+            'anchor', colocationRecord(is_coloc, anchor, dist_km, ...
                kwargs.colocation_threshold_km));
-
-         % --- Evaluation (SUMup obs) + reference (RACMO Data) artifacts. ---
-         targets = struct('format', 'firn_profile_bundle', ...
-            'data', observations, 'metadata', obs_meta);
-         reference = struct('format', 'timeseries', ...
-            'data', forcing.racmo_data, ...
-            'metadata', icemodel.verification.setup.metadataStruct({ ...
-            'reference_kind', 'colocated_rcm'
-            'reference_source', 'RACMO2.3p3 FGRN11 (point extraction)'
-            'note', 'SMB/eval Data only; RACMO carries no met channels.'}));
-
-         save(fullfile(case_root, "evaluation.mat"), 'targets');
-         save(fullfile(case_root, "reference.mat"), 'reference');
 
          comparison_vars = sumupComparisonVariables(observations);
          obs_vars = icemodel.verification.setup.metadataStruct({ ...
@@ -210,23 +212,26 @@ function manifest = importSumup(source_dir, kwargs)
             'subsurface_temperature', 'SUMup subsurface temperature T(z,t)'
             'accumulation', 'SMB / accumulation records'});
 
+         [zone, target] = sumupZoneAndTarget(is_coloc, anchor);
+
          case_values = { ...
             char(alias)
             'firn_observational'
             char(case_id)
             char(case_id)
-            char(surfaceZoneForSumup(is_coloc, anchor))
+            char(zone)
+            cellstr(target)
             site_location
-            char(fullfile(alias, "evaluation.mat"))
-            char(fullfile(alias, "reference.mat"))
-            'irregular'
             struct('start', char(string(window_start)), ...
             'end', char(string(window_end)))
+            cellstr("mar")
+            cellstr(["sumup_obs", "racmo"])
             cellstr(comparison_vars)
             obs_vars
-            colocated
+            colocation
+            'irregular'
             sprintf(['SUMup firn point%s; MAR met + RACMO Data ' ...
-            'co-located bundle.'], colocationNote(is_coloc, anchor))};
+            'co-located (metadata-only).'], colocationNote(is_coloc, anchor))};
 
          case_entries{end+1} = ...
             icemodel.verification.setup.makeFirnCaseManifestEntry(case_values); %#ok<AGROW>
@@ -324,20 +329,24 @@ function note = colocationNote(is_coloc, anchor)
    end
 end
 
-function zone = surfaceZoneForSumup(is_coloc, anchor)
-   %SURFACEZONEFORSUMUP Resolve a SUMup case surface_zone.
+function [zone, target] = sumupZoneAndTarget(is_coloc, anchor)
+   %SUMUPZONEANDTARGET Resolve a SUMup case surface_zone + eval_target.
    %
-   % SUMup points are not staged yet; the case-manifest surface_zone field is
-   % supported but left unset ("") here. When a SUMup point co-locates with a
-   % curated PROMICE anchor the zone could be inherited from
-   % promicesiteinfo(anchor.site).zone, but until SUMup staging is wired this
-   % returns "" so the schema is satisfied without guessing a regime.
+   % When a SUMup point co-locates with a curated PROMICE anchor, the
+   % glaciological zone and capability descriptor are inherited from
+   % promicesiteinfo(anchor.site) (the single source of truth). Otherwise both
+   % are left empty ("" / string(0,1)) so the schema is satisfied without
+   % guessing a regime.
    zone = "";
+   target = strings(0, 1);
    if is_coloc && ~isempty(anchor)
       try
-         zone = icemodel.verification.helpers.promicesiteinfo(anchor.site).zone;
+         info = icemodel.verification.helpers.promicesiteinfo(anchor.site);
+         zone = info.surface_zone;
+         target = string(info.eval_target);
       catch
          zone = "";
+         target = strings(0, 1);
       end
    end
 end
