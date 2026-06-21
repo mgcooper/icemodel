@@ -120,6 +120,35 @@ function test_each_firn_case_carries_valid_surface_zone(testCase)
    end
 end
 
+function test_each_firn_case_carries_valid_permafrost_zone(testCase)
+   % Every promice firn case carries a permafrost_zone (ORTHOGONAL to
+   % surface_zone) single-sourced from promicesiteinfo and validating against the
+   % canonical namelist. The KAN anchors sit on the ice sheet (not permafrost
+   % ground) so all three are "none".
+
+   allowed = icemodel.verification.namelists.permafrostzone();
+   testCase.verifyTrue(ismember("none", allowed));
+   testCase.verifyTrue(ismember("continuous", allowed));
+   % permafrost_zone is NOT a surface_zone value (orthogonal vocabularies).
+   testCase.verifyFalse(ismember("continuous", ...
+      icemodel.verification.namelists.surfacezone()));
+
+   for id = testCase.TestData.expected_firn_ids'
+      manifest = icemodel.verification.loadmanifest(id);
+      testCase.verifyTrue(isfield(manifest, 'permafrost_zone'), ...
+         sprintf('%s missing permafrost_zone field', id));
+      pfz = string(manifest.permafrost_zone);
+      testCase.verifyTrue(ismember(pfz, allowed), ...
+         sprintf('%s permafrost_zone "%s" not in namelist', id, pfz));
+      testCase.verifyEqual(pfz, "none", ...
+         sprintf('%s (KAN ice-sheet anchor) permafrost_zone should be none', id));
+      % The manifest must agree with the single source of truth.
+      testCase.verifyEqual(pfz, string( ...
+         icemodel.verification.helpers.promicesiteinfo( ...
+         manifest.site_id).permafrost_zone));
+   end
+end
+
 function test_each_firn_case_carries_valid_eval_target(testCase)
    % Every promice firn case must carry an eval_target string array single-
    % sourced from promicesiteinfo and validating against the eval_target

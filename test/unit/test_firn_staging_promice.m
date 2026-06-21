@@ -83,6 +83,13 @@ function test_colocated_bundle_and_manifest_resolve(testCase)
    testCase.verifyTrue(ismember(string(c.surface_zone), ...
       icemodel.verification.namelists.surfacezone()));
 
+   % permafrost_zone is single-sourced from promicesiteinfo: KAN_M is an
+   % ice-sheet anchor (not permafrost ground) so it is "none" and validates
+   % against the canonical permafrost namelist.
+   testCase.verifyEqual(string(c.permafrost_zone), "none");
+   testCase.verifyTrue(ismember(string(c.permafrost_zone), ...
+      icemodel.verification.namelists.permafrostzone()));
+
    % eval_target: KAN_M exercises seasonal snow + bare ice.
    testCase.verifyEqual(sort(string(c.eval_target(:))), ...
       sort(["bare_ice"; "seasonal_snow"]));

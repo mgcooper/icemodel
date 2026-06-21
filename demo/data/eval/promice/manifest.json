@@ -16,6 +16,7 @@
         "seasonal_snow",
         "bare_ice"
       ],
+      "permafrost_zone": "none",
       "site_location": {
         "lat_wgs84": 67.096950868291529,
         "lon_wgs84": -49.947077120638447,
@@ -126,6 +127,7 @@
         "seasonal_snow",
         "bare_ice"
       ],
+      "permafrost_zone": "none",
       "site_location": {
         "lat_wgs84": 67.067095734019745,
         "lon_wgs84": -48.837346104065588,
@@ -236,6 +238,7 @@
         "seasonal_snow",
         "firn"
       ],
+      "permafrost_zone": "none",
       "site_location": {
         "lat_wgs84": 67.000458407658314,
         "lon_wgs84": -47.02720909947265,

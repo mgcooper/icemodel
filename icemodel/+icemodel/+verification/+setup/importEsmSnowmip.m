@@ -205,6 +205,7 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
          char(info.long_name)
          'land'
          {'seasonal_snow'}
+         char(snowmipPermafrostZone(sitename))
          char(fullfile(sitename, "evaluation.mat"))
          char(fullfile(sitename, "reference.mat"))
          'hourly'
@@ -231,6 +232,22 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
 end
 
 %% Local helpers
+function pfz = snowmipPermafrostZone(sitename)
+   %SNOWMIPPERMAFROSTZONE Brown et al. (1997) permafrost extent per SnowMIP site.
+   %
+   % Hard-coded results of sampling the Brown circum-arctic permafrost map at each
+   % ESM-SnowMIP site (test/interactive/classify_site_facies.m). All ten sites are
+   % off-ice land surfaces; Sodankyla (boreal Lapland) is discontinuous, the rest
+   % fall in the isolated-permafrost / sporadic margin. Vocabulary:
+   % icemodel.verification.namelists.permafrostzone.
+   switch lower(string(sitename))
+      case "sod"
+         pfz = "discontinuous";
+      otherwise
+         pfz = "isolated";
+   end
+end
+
 function vars = obsComparisonVariables(obs_tt)
    %OBSCOMPARISONVARIABLES Pick comparison variables from staged obs.
    %

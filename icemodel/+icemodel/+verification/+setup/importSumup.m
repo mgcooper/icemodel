@@ -212,7 +212,7 @@ function manifest = importSumup(source_dir, kwargs)
             'subsurface_temperature', 'SUMup subsurface temperature T(z,t)'
             'accumulation', 'SMB / accumulation records'});
 
-         [zone, target] = sumupZoneAndTarget(is_coloc, anchor);
+         [zone, target, pfz] = sumupZoneAndTarget(is_coloc, anchor);
 
          case_values = { ...
             char(alias)
@@ -221,6 +221,7 @@ function manifest = importSumup(source_dir, kwargs)
             char(case_id)
             char(zone)
             cellstr(target)
+            char(pfz)
             site_location
             struct('start', char(string(window_start)), ...
             'end', char(string(window_end)))
@@ -329,24 +330,27 @@ function note = colocationNote(is_coloc, anchor)
    end
 end
 
-function [zone, target] = sumupZoneAndTarget(is_coloc, anchor)
-   %SUMUPZONEANDTARGET Resolve a SUMup case surface_zone + eval_target.
+function [zone, target, pfz] = sumupZoneAndTarget(is_coloc, anchor)
+   %SUMUPZONEANDTARGET Resolve a SUMup case surface_zone/eval_target/permafrost.
    %
    % When a SUMup point co-locates with a curated PROMICE anchor, the
-   % glaciological zone and capability descriptor are inherited from
-   % promicesiteinfo(anchor.site) (the single source of truth). Otherwise both
-   % are left empty ("" / string(0,1)) so the schema is satisfied without
-   % guessing a regime.
+   % glaciological zone, capability descriptor, and permafrost zone are inherited
+   % from promicesiteinfo(anchor.site) (the single source of truth). Otherwise all
+   % are left empty ("" / string(0,1)) so the schema is satisfied without guessing
+   % a regime.
    zone = "";
    target = strings(0, 1);
+   pfz = "";
    if is_coloc && ~isempty(anchor)
       try
          info = icemodel.verification.helpers.promicesiteinfo(anchor.site);
          zone = info.surface_zone;
          target = string(info.eval_target);
+         pfz = info.permafrost_zone;
       catch
          zone = "";
          target = strings(0, 1);
+         pfz = "";
       end
    end
 end

@@ -104,6 +104,32 @@ function test_each_esm_case_carries_land_zone_seasonal_snow_target(testCase)
    end
 end
 
+function test_each_esm_case_carries_valid_permafrost_zone(testCase)
+   % Every ESM-SnowMIP case is an off-ice land site and carries a permafrost_zone
+   % (ORTHOGONAL to surface_zone) sampled from Brown et al. (1997): Sodankyla
+   % (boreal Lapland) is discontinuous, the remaining sites fall in the isolated
+   % margin. The value must validate against the canonical namelist.
+
+   allowed = icemodel.verification.namelists.permafrostzone();
+   testCase.verifyTrue(ismember("none", allowed));
+   testCase.verifyTrue(ismember("isolated", allowed));
+
+   for sitename = expectedEsmCaseIds()'
+      manifest = icemodel.verification.loadmanifest(sitename);
+      testCase.verifyTrue(isfield(manifest, 'permafrost_zone'), ...
+         sprintf('%s missing permafrost_zone field', sitename));
+      pfz = string(manifest.permafrost_zone);
+      testCase.verifyTrue(ismember(pfz, allowed), ...
+         sprintf('%s permafrost_zone "%s" not in namelist', sitename, pfz));
+      expected = "isolated";
+      if string(sitename) == "sod"
+         expected = "discontinuous";
+      end
+      testCase.verifyEqual(pfz, expected, ...
+         sprintf('%s permafrost_zone mismatch', sitename));
+   end
+end
+
 function test_forcing_includes_rainf_snowf_passthrough(testCase)
    % Site forcing files must include rainf/snowf channels so future
    % rain/snow-aware downstream consumers can use them directly.

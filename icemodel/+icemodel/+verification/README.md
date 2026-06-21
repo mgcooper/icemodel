@@ -230,14 +230,26 @@ icemodel.verification.setup.importPromiceSites( ...
    overwrite=true);
 ```
 
-`surface_zone` is the glaciological zone ONLY (`ablation`/`percolation`/
-`wet_snow`/`dry_snow`/`accumulation`/`land`/`tundra`/`unknown`); the separate
-`eval_target` descriptor names the model capability a case exercises
-(`seasonal_snow`/`bare_ice`/`firn`/`ablation`). Both are single-sourced from
-`promicesiteinfo(site).surface_zone` / `.eval_target`. The KAN anchors are
-AUTHORITATIVE (KAN_L/M=`ablation`, KAN_U=`percolation`); the ~30 non-KAN
-stations get a **first-pass** zone from AWS_sites_metadata.csv `location_type` +
-`altitude_installation` (flagged `classification="first_pass"` for review).
+Each case carries THREE orthogonal descriptors, all single-sourced from
+`promicesiteinfo(site)`:
+
+- `surface_zone` is the glaciological zone ONLY (`ablation`/`percolation`/
+  `wet_snow`/`dry_snow`/`accumulation`/`land`/`tundra`/`unknown`).
+- `eval_target` names the model capability a case exercises
+  (`seasonal_snow`/`bare_ice`/`firn`/`ablation`).
+- `permafrost_zone` is the permafrost EXTENT class of the GROUND, ORTHOGONAL to
+  `surface_zone` (`continuous`/`discontinuous`/`sporadic`/`isolated`/`none`/
+  `unknown`): off-ice land/tundra sites carry the Brown et al. (1997) extent,
+  ice-sheet/glacier sites carry `none`.
+
+The KAN anchors are AUTHORITATIVE (KAN_L/M=`ablation`, KAN_U=`percolation`). The
+non-KAN PROMICE stations now carry **authoritative** `surface_zone` +
+`permafrost_zone` values HARD-CODED from a data-driven analysis
+(`test/interactive/classify_site_facies.m`): MODIS MOD10A1 albedo-facies bare-ice
+fraction (primary surface_zone signal; reproduces the KAN anchors) and the Brown
+permafrost map (permafrost_zone). Only sites no dataset could resolve (ZAC_*, no
+coordinates) remain `unknown`; uncataloged station ids fall back to the legacy
+elevation-band heuristic flagged `classification="first_pass"`.
 
 ## Support Namespaces
 

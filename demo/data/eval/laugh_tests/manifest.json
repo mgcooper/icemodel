@@ -11,6 +11,7 @@
     "site_name": "Colbeck 1976 synthetic snow infiltration benchmark",
     "surface_zone": "",
     "eval_target": [],
+    "permafrost_zone": "",
     "evaluation_file": "colbeck1976/evaluation.mat",
     "reference_file": "colbeck1976/reference.mat",
     "native_timestep": "1 minute output / sub-hour forcing",
