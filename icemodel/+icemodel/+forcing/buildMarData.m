@@ -109,10 +109,9 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
       parts{n} = extractOneYear(files(n), hourly_vars, daily_vars, ...
          start, count, collapse);
       if kwargs.modis_dir ~= ""
-         % MODIS albedo at the SAME location/aggregation as every other
-         % gridded channel: nearest/natural for a point, conservative (or
-         % equal) catchment mean for a polygon - not the nearest single
-         % MODIS cell. readGeusModis runs gridLocation on the GEUS 5 km grid.
+         % MODIS albedo at the requested location: nearest/natural for a
+         % point, conservative (or equal) catchment mean for a polygon.
+         % readGeusModis runs gridLocation on the GEUS 5 km grid.
          parts{n}.modis = modisChannel(kwargs.modis_dir, years(n), ...
             location, kwargs.method, kwargs.remap, parts{n}.Time);
       end
@@ -130,10 +129,9 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    [Data, checks] = icemodel.forcing.helpers.metchecks(Data, ...
       fillgaps=kwargs.fillgaps);
 
-   % Per-variable units (consistency with RACMO/PROMICE, which set
-   % VariableUnits). Mass fluxes are mWE/h rates (cumulative sums need the
-   % timestep in hours); the precipitation channels convert to the canonical
-   % m s-1 only at the met boundary (icemodel.forcing.data2met).
+   % Per-variable units. Mass fluxes are mWE/h rates (cumulative sums need
+   % the timestep in hours); the precipitation channels convert to the
+   % canonical m s-1 only at the met boundary (icemodel.forcing.data2met).
    Data.Properties.VariableUnits = marVariableUnits( ...
       string(Data.Properties.VariableNames));
 

@@ -205,10 +205,9 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
       Data.shum, Data.psfc, Data.tair);
    Data = removevars(Data, {'shum', 'uwind', 'vwind'});
 
-   % Optional GEUS MODIS albedo channel, resolved at the SAME location and
-   % aggregation as the MERRA channels: nearest/natural for a point,
-   % conservative (or equal) catchment mean for a polygon (area-weighted ROI
-   % mean), not the nearest single MODIS cell.
+   % Optional GEUS MODIS albedo channel at the requested location:
+   % nearest/natural for a point, conservative (or equal) catchment mean
+   % (area-weighted ROI mean) for a polygon.
    site_lat = icemodel.forcing.helpers.slabMean(LAT, start, count, inslab);
    site_lon = icemodel.forcing.helpers.slabMean(LON, start, count, inslab);
    if kwargs.modis_dir ~= ""
@@ -219,9 +218,8 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    [Data, checks] = icemodel.forcing.helpers.metchecks(Data, ...
       fillgaps=kwargs.fillgaps);
 
-   % Per-variable units (consistency with RACMO/PROMICE, which set
-   % VariableUnits). Mass fluxes are mWE/h rates; the precipitation channels
-   % convert to the canonical m s-1 only at the met boundary
+   % Per-variable units. Mass fluxes are mWE/h rates; the precipitation
+   % channels convert to the canonical m s-1 only at the met boundary
    % (icemodel.forcing.data2met). swe is a store (kg m-2), not a rate.
    Data.Properties.VariableUnits = merraVariableUnits( ...
       string(Data.Properties.VariableNames));
