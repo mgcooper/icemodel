@@ -193,6 +193,44 @@ When the source cache is incomplete, the fetch helpers print actionable
 retrieval instructions (DOI, URL, expected filenames, target paths) and
 either error with a stable error id or return the partial path.
 
+### PROMICE co-located firn staging (`importPromiceSites`)
+
+`importPromiceSites` stages a co-located PROMICE + MAR + MERRA-2 met +
+RACMO Data bundle anchored on each PROMICE AWS site. The per-leg windows are
+**decoupled**: PROMICE met/eval and the MAR/MERRA met legs use the requested
+study window (default `2009-2022`) intersected with each source's on-disk
+availability, while the RACMO Data leg uses its own coverage (FGRN11 surface
+~2012-2015, subsurface ~2012-2018) independently. A leg with no on-disk
+overlap is skipped-with-reason (recorded at `colocated_forcing.<model>`), and a
+requested-vs-actual coverage table is printed at the start of every run. Each
+leg's actual staged window is recorded at `colocated_forcing.<model>.window`.
+
+The `output_root` kwarg is the explicit committed-vs-research switch: eval
+artifacts go to `<output_root>/eval`, forcing/Data to `<output_root>/input`.
+
+```matlab
+% Committed CI fixtures: the KAN_L/M/U transect, 2009-2022, into demo/data
+% (this is what is committed under demo/data/eval/promice/).
+icemodel.verification.setup.importPromiceSites( ...
+   sites=["KAN_L","KAN_M","KAN_U"], ...
+   startdate="2009-01-01", enddate="2022-12-31", ...
+   output_root=icemodel.internal.fullpath("demo","data"), ...
+   overwrite=true);
+
+% Full research set, ON DEMAND: ALL stations found under
+% data/verification/promice/hour, all available years, into the GITIGNORED
+% repo-root data/ (data/eval + data/input). With no `sites` the driver
+% defaults to the full station list. This is the single one-call command:
+icemodel.verification.setup.importPromiceSites( ...
+   output_root=icemodel.internal.fullpath("data"), ...
+   overwrite=true);
+```
+
+Non-KAN stations take `surface_zone` from the AWS_sites_metadata.csv
+`location_type` field (`tundra` maps to `tundra`; everything else, including
+the coarse `ice sheet`, is recorded as `unknown` rather than guessed); the KAN
+anchors are single-sourced from `promicesiteinfo(site).zone`.
+
 ## Support Namespaces
 
 - `helpers` contains normal workflow helpers for path discovery (`evaluationDataRoot`,

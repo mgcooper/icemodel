@@ -20,7 +20,9 @@ function surface_zones = surfacezone()
 
    % Keep this explicit so adding a new zone is a deliberate schema change.
    % Ordered from low to high on a Greenland elevation transect, then the
-   % seasonal/dry-snow regimes used by the snow families.
+   % seasonal/dry-snow regimes used by the snow families, then "tundra" and
+   % "unknown" for non-curated PROMICE stations whose AWS location_type is
+   % off-ice or carries no firn-zone classification.
    surface_zones = [ ...
       "bare_ice"
       "ablation"
@@ -30,5 +32,7 @@ function surface_zones = surfacezone()
       "lower_percolation"
       "accumulation"
       "dry_snow"
-      "seasonal_snow"];
+      "seasonal_snow"
+      "tundra"
+      "unknown"];
 end

@@ -9,10 +9,13 @@ data/verification/**
 !data/input/
 !data/input/.gitkeep
 !data/input/met/
+data/input/met/*
 !data/input/met/.gitkeep
 !data/input/spectral/
+data/input/spectral/*
 !data/input/spectral/.gitkeep
 !data/input/userdata/
+data/input/userdata/*
 !data/input/userdata/.gitkeep
 !data/output/
 !data/output/.gitkeep

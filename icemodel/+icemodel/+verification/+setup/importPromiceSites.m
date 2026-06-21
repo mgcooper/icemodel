@@ -30,13 +30,23 @@ function manifest = importPromiceSites(kwargs)
    %      * reference.mat  : RACMO Data as the co-located RCM reference
    %      * per-site manifest.json fragment, rolled into the family manifest
    %
-   %  Window resolution
-   %    The default comparison window is the intersection of the model
-   %    archives staged here. The binding constraint is the RACMO surface
-   %    archive (FGRN11 2012-2015 on S03); MAR (1980-2019), MERRA-2
-   %    (>=2012), and the PROMICE record all span it. With no startdate /
-   %    enddate the default firn window 2012-01-01 .. 2015-12-31 is used;
-   %    explicit bounds override it for every requested site.
+   %  Window resolution (per-leg, DECOUPLED)
+   %    The requested study window defaults to 2009-01-01 .. 2022-12-31.
+   %    Each leg is staged over the requested window intersected with that
+   %    source's ON-DISK availability, probed live by
+   %    icemodel.verification.setup.promiceSourceCoverage:
+   %      * PROMICE met + eval : requested window (full station record spans it)
+   %      * MAR met            : requested window cap MAR years on disk
+   %      * MERRA-2 met        : requested window cap MERRA-2 years on disk
+   %      * RACMO Data         : its OWN coverage (FGRN11 surface ~2012-2015,
+   %                             subsurface ~2012-2018), INDEPENDENT of the met
+   %                             window. RACMO is never clamped to the met span.
+   %    A leg with zero overlap is skipped-with-reason (recorded in the
+   %    manifest), never fabricated. Each leg's actual staged window is
+   %    recorded at colocated_forcing.<model>.window. A per-source coverage
+   %    table (requested vs actual, with the missing years) is printed at the
+   %    start of every run. Explicit startdate/enddate override the default
+   %    study window for the met/eval legs; RACMO keeps its own coverage.
    %
    %  Site coordinates
    %    Each site's lat/lon is read live from the v3 NetCDF metadata
@@ -45,15 +55,25 @@ function manifest = importPromiceSites(kwargs)
    %    extractions sample at that [lat lon].
    %
    %  Name-value
-   %    sites : string vector (default the curated anchor catalog,
-   %        icemodel.verification.helpers.promicesiteinfo). Any v3 PROMICE
-   %        station id is accepted; uncurated sites use the generic
-   %        ablation recipe and are staged when their NetCDF + the RCM
-   %        coverage exist.
+   %    sites : string vector. Default is ALL PROMICE stations found under
+   %        the source product (data/verification/promice/hour/*.nc). Pass an
+   %        explicit list (e.g. ["KAN_L","KAN_M","KAN_U"]) to stage a subset.
+   %        Any station id is accepted; uncurated sites use the generic
+   %        ablation recipe and are staged when their NetCDF exists.
    %    models : string vector subset of ["promice","mar","merra","racmo"]
    %        (default all four). Drop a model to stage a partial bundle.
-   %    startdate, enddate : datetime / string. Explicit comparison window;
-   %        both or neither. When omitted, the default firn window is used.
+   %    startdate, enddate : datetime / string. Explicit study window for the
+   %        met/eval legs; both or neither. When omitted, the default study
+   %        window 2009-01-01 .. 2022-12-31 is used. RACMO ignores this and
+   %        always uses its own on-disk coverage.
+   %    output_root : base output root. When set, the committed-vs-research
+   %        routing is explicit: evaluation artifacts go to <output_root>/eval
+   %        and forcing/Data to <output_root>/input. Use
+   %        icemodel.internal.fullpath("demo","data") for the committed CI
+   %        fixtures (demo/data/eval + demo/data/input) and
+   %        icemodel.internal.fullpath("data") for the gitignored research set
+   %        (data/eval + data/input). When unset, evaluation_data_root /
+   %        input_data_root (or the active config) resolve the roots.
    %    promice_dir, mar_dir, merra_dir, racmo_dir, modis_dir : raw-source
    %        directories for each model (default the gitignored caches /
    %        the S03 reference layouts encoded in each builder).
@@ -86,8 +106,7 @@ function manifest = importPromiceSites(kwargs)
    %  icemodel.forcing.buildRacmoData
 
    arguments
-      kwargs.sites (1, :) string = ...
-         string({icemodel.verification.helpers.promicesiteinfo().site})
+      kwargs.sites (1, :) string = strings(1, 0)
       kwargs.models (1, :) string {mustBeMember(kwargs.models, ...
          ["promice", "mar", "merra", "racmo"])} = ...
          ["promice", "mar", "merra", "racmo"]
@@ -98,6 +117,7 @@ function manifest = importPromiceSites(kwargs)
       kwargs.merra_dir (1, 1) string = ""
       kwargs.racmo_dir (1, 1) string = ""
       kwargs.modis_dir (1, 1) string = ""
+      kwargs.output_root (1, 1) string = ""
       kwargs.evaluation_data_root (1, 1) string = ""
       kwargs.input_data_root (1, 1) string = ""
       kwargs.icemodel_config_casename (1, 1) string = "test"
@@ -106,12 +126,24 @@ function manifest = importPromiceSites(kwargs)
       kwargs.skip_missing (1, 1) logical = true
    end
 
-   sites = reshape(kwargs.sites, 1, []);
    models = reshape(kwargs.models, 1, []);
 
-   % Resolve the comparison window. Explicit bounds must be paired (mixing
-   % is an error, never a silent half-window). The default is the RACMO-
-   % bound firn window (see header / Decision Log).
+   % Site list. With no explicit sites, default to ALL PROMICE stations found
+   % under the source product (the full research set). An explicit list stages
+   % a subset (e.g. the committed KAN fixtures).
+   if isempty(kwargs.sites)
+      sites = discoverStations(kwargs.promice_dir);
+   else
+      sites = reshape(kwargs.sites, 1, []);
+   end
+
+   % Load the AWS site metadata once (location_type / project) so non-KAN
+   % stations can resolve a surface_zone without re-reading per site.
+   aws_sites = readAwsSitesMetadata(kwargs.promice_dir);
+
+   % Resolve the study window for the met/eval legs. Explicit bounds must be
+   % paired (mixing is an error, never a silent half-window). The default is
+   % the 2009-2022 study window; RACMO is decoupled and uses its own coverage.
    has_startdate = ~strcmp(string(kwargs.startdate), "");
    has_enddate = ~strcmp(string(kwargs.enddate), "");
    if has_startdate ~= has_enddate
@@ -122,25 +154,38 @@ function manifest = importPromiceSites(kwargs)
       window_start = icemodel.verification.setup.ensureUtc(kwargs.startdate);
       window_end = icemodel.verification.setup.ensureUtc(kwargs.enddate);
    else
-      window_start = icemodel.verification.setup.ensureUtc("2012-01-01");
-      window_end = icemodel.verification.setup.ensureUtc("2015-12-31 23:00:00");
+      window_start = icemodel.verification.setup.ensureUtc("2009-01-01");
+      window_end = icemodel.verification.setup.ensureUtc("2022-12-31 23:00:00");
    end
-   years = year(window_start):year(window_end);
 
-   % Resolve the promice family root and its manifest.
+   % Probe each gridded source's on-disk coverage and DECOUPLE the per-leg
+   % windows: MAR/MERRA met use the requested window capped to their on-disk
+   % years; RACMO Data uses its own coverage independent of the met window.
+   coverage = icemodel.verification.setup.promiceSourceCoverage(models, ...
+      struct('mar', kwargs.mar_dir, 'merra', kwargs.merra_dir, ...
+      'racmo', kwargs.racmo_dir));
+
+   % Per-leg windows and the years each gridded builder is allowed to read.
+   leg = resolveLegWindows(models, coverage, window_start, window_end);
+
+   % Print the requested-vs-actual coverage table (honest gaps reporting).
+   icemodel.verification.setup.reportPromiceCoverage(coverage, ...
+      [year(window_start), year(window_end)], legReportWindows(leg, models));
+
+   % Resolve the eval/input roots. output_root, when set, routes eval to
+   % <output_root>/eval and forcing/Data to <output_root>/input (the explicit
+   % committed-vs-research switch); otherwise the per-root kwargs / config win.
+   [evaluation_data_root, input_root] = resolveRoots(kwargs);
+
    dataset_family = "promice";
-   evaluation_data_root = icemodel.verification.helpers.evaluationDataRoot( ...
-      "evaluation_data_root", kwargs.evaluation_data_root, ...
-      "icemodel_config_casename", kwargs.icemodel_config_casename);
    family_root = fullfile(evaluation_data_root, dataset_family);
    icemodel.helpers.ensureDirExists(family_root);
    manifest_file = fullfile(family_root, "manifest.json");
 
-   input_root = icemodel.verification.helpers.inputDataRoot( ...
-      "input_data_root", kwargs.input_data_root, ...
-      "icemodel_config_casename", kwargs.icemodel_config_casename);
    met_outdir = fullfile(input_root, 'met');
    userdata_outdir = fullfile(input_root, 'userdata');
+   icemodel.helpers.ensureDirExists(met_outdir);
+   icemodel.helpers.ensureDirExists(userdata_outdir);
 
    proj = icemodel.forcing.helpers.psnProjection();
 
@@ -180,6 +225,7 @@ function manifest = importPromiceSites(kwargs)
          promice_data = [];
 
          if ismember("promice", models)
+            % PROMICE met + eval over the full requested study window.
             promice_met = icemodel.forcing.buildPromiceMet(site, ...
                source_dir=kwargs.promice_dir, ...
                startdate=window_start, enddate=window_end);
@@ -197,48 +243,65 @@ function manifest = importPromiceSites(kwargs)
                'kind', 'station_met_and_eval', ...
                'met_files', relpaths(promice_met_files, met_outdir), ...
                'data_files', relpaths(promice_data_files, userdata_outdir), ...
-               'ablation_source', promice_meta.ablation_source);
+               'ablation_source', promice_meta.ablation_source, ...
+               'window', windowStruct(window_start, window_end));
          end
 
          if ismember("mar", models)
-            mar_met = icemodel.forcing.buildMarMet(point, years, ...
-               source_dir=kwargs.mar_dir, modis_dir=kwargs.modis_dir, ...
-               method="nearest", dt_out=kwargs.dt_out);
-            mar_met = windowSubset(mar_met, window_start, window_end);
-            mar_met_files = icemodel.forcing.helpers.writemet( ...
-               mar_met, alias, "mar", outdir=met_outdir, naming="window");
-            colocated.mar = struct( ...
-               'kind', 'point_met', ...
-               'met_files', relpaths(mar_met_files, met_outdir), ...
-               'sample_method', 'nearest');
+            if leg.mar.staged
+               mar_met = icemodel.forcing.buildMarMet(point, leg.mar.years, ...
+                  source_dir=kwargs.mar_dir, modis_dir=kwargs.modis_dir, ...
+                  method="nearest", dt_out=kwargs.dt_out);
+               mar_met = windowSubset(mar_met, leg.mar.start, leg.mar.end);
+               mar_met_files = icemodel.forcing.helpers.writemet( ...
+                  mar_met, alias, "mar", outdir=met_outdir, naming="window");
+               colocated.mar = struct( ...
+                  'kind', 'point_met', ...
+                  'met_files', relpaths(mar_met_files, met_outdir), ...
+                  'sample_method', 'nearest', ...
+                  'window', windowStruct(leg.mar.start, leg.mar.end));
+            else
+               colocated.mar = skippedLeg('point_met', leg.mar.reason);
+            end
          end
 
          if ismember("merra", models)
-            merra_met = icemodel.forcing.buildMerraMet(point, years, ...
-               source_dir=kwargs.merra_dir, modis_dir=kwargs.modis_dir, ...
-               method="nearest", dt_out=kwargs.dt_out);
-            merra_met = windowSubset(merra_met, window_start, window_end);
-            merra_met_files = icemodel.forcing.helpers.writemet( ...
-               merra_met, alias, "merra", outdir=met_outdir, naming="window");
-            colocated.merra = struct( ...
-               'kind', 'point_met', ...
-               'met_files', relpaths(merra_met_files, met_outdir), ...
-               'sample_method', 'nearest');
+            if leg.merra.staged
+               merra_met = icemodel.forcing.buildMerraMet(point, leg.merra.years, ...
+                  source_dir=kwargs.merra_dir, modis_dir=kwargs.modis_dir, ...
+                  method="nearest", dt_out=kwargs.dt_out);
+               merra_met = windowSubset(merra_met, leg.merra.start, leg.merra.end);
+               merra_met_files = icemodel.forcing.helpers.writemet( ...
+                  merra_met, alias, "merra", outdir=met_outdir, naming="window");
+               colocated.merra = struct( ...
+                  'kind', 'point_met', ...
+                  'met_files', relpaths(merra_met_files, met_outdir), ...
+                  'sample_method', 'nearest', ...
+                  'window', windowStruct(leg.merra.start, leg.merra.end));
+            else
+               colocated.merra = skippedLeg('point_met', leg.merra.reason);
+            end
          end
 
          racmo_data = [];
          if ismember("racmo", models)
-            [racmo_data, ~] = icemodel.forcing.buildRacmoData(point, years, ...
-               source_dir=kwargs.racmo_dir, modis_dir=kwargs.modis_dir, ...
-               method="nearest", dt="1hr");
-            racmo_data = windowSubset(racmo_data, window_start, window_end);
-            racmo_data_files = icemodel.forcing.helpers.writeuserdata( ...
-               racmo_data, alias, "racmo", outdir=userdata_outdir);
-            colocated.racmo = struct( ...
-               'kind', 'point_data_smb_eval', ...
-               'data_files', relpaths(racmo_data_files, userdata_outdir), ...
-               'sample_method', 'nearest', ...
-               'note', 'SMB/eval Data only; RACMO is not a met source.');
+            if leg.racmo.staged
+               % RACMO uses its OWN coverage, decoupled from the met window.
+               [racmo_data, ~] = icemodel.forcing.buildRacmoData(point, ...
+                  leg.racmo.years, source_dir=kwargs.racmo_dir, ...
+                  modis_dir=kwargs.modis_dir, method="nearest", dt="1hr");
+               racmo_data = windowSubset(racmo_data, leg.racmo.start, leg.racmo.end);
+               racmo_data_files = icemodel.forcing.helpers.writeuserdata( ...
+                  racmo_data, alias, "racmo", outdir=userdata_outdir);
+               colocated.racmo = struct( ...
+                  'kind', 'point_data_smb_eval', ...
+                  'data_files', relpaths(racmo_data_files, userdata_outdir), ...
+                  'sample_method', 'nearest', ...
+                  'window', windowStruct(leg.racmo.start, leg.racmo.end), ...
+                  'note', 'SMB/eval Data only; RACMO is not a met source.');
+            else
+               colocated.racmo = skippedLeg('point_data_smb_eval', leg.racmo.reason);
+            end
          end
 
          % --- Evaluation + reference artifacts for the verification suite. ---
@@ -260,15 +323,18 @@ function manifest = importPromiceSites(kwargs)
             anchor = icemodel.verification.helpers.promicesiteinfo(site);
             site_name = anchor.long_name;
             site_note = anchor.note;
-            % surface_zone is single-sourced from the curated catalog so the
-            % manifest never drifts from promicesiteinfo (kanl=lower_ablation,
-            % kanm=upper_ablation, kanu=lower_percolation).
+            % KAN sites: surface_zone single-sourced from the curated catalog
+            % so the manifest never drifts from promicesiteinfo (kanl=
+            % lower_ablation, kanm=upper_ablation, kanu=lower_percolation).
             surface_zone = anchor.zone;
          catch
+            % Non-curated stations: surface_zone from the AWS site metadata
+            % location_type field (ice sheet / tundra / ...), normalized to the
+            % canonical vocabulary; "unknown" when the CSV carries no usable
+            % zone for this station.
             site_name = site;
             site_note = "Uncurated PROMICE station.";
-            % Uncurated stations have no catalog zone; omit it rather than guess.
-            surface_zone = "";
+            surface_zone = surfaceZoneFromAws(aws_sites, site);
          end
 
          case_values = { ...
@@ -322,6 +388,186 @@ function manifest = importPromiceSites(kwargs)
 end
 
 %% Local helpers
+function sites = discoverStations(promice_dir)
+   %DISCOVERSTATIONS Full station list from the on-disk hourly NetCDF product.
+   %
+   % Resolves every <STATION>_hour.nc under the PROMICE product so a no-site
+   % call stages the full research set. Mirrors readPromiceAws source-dir
+   % resolution (the directory holding hour/ or the directory itself).
+   source_dir = promice_dir;
+   if source_dir == ""
+      source_dir = string(fullfile(icemodel.internal.fullpath('data'), ...
+         'verification', 'promice'));
+   end
+   if isfolder(fullfile(source_dir, 'hour'))
+      source_dir = fullfile(source_dir, 'hour');
+   end
+   files = dir(fullfile(source_dir, '*_hour.nc'));
+   if isempty(files)
+      error('icemodel:verification:importPromiceSites:noStations', ...
+         'no <STATION>_hour.nc files found under %s', source_dir)
+   end
+   sites = reshape(string(erase({files.name}, "_hour.nc")), 1, []);
+end
+
+function aws = readAwsSitesMetadata(promice_dir)
+   %READAWSSITESMETADATA Read AWS_sites_metadata.csv (or empty on absence).
+   source_dir = promice_dir;
+   if source_dir == ""
+      source_dir = string(fullfile(icemodel.internal.fullpath('data'), ...
+         'verification', 'promice'));
+   end
+   if isfolder(fullfile(source_dir, 'hour')) ...
+         && ~isfile(fullfile(source_dir, 'AWS_sites_metadata.csv'))
+      % readPromiceAws accepts the hour/ dir; the CSV sits one level up.
+   end
+   csv = fullfile(source_dir, 'AWS_sites_metadata.csv');
+   if ~isfile(csv)
+      csv = fullfile(fileparts(char(source_dir)), 'AWS_sites_metadata.csv');
+   end
+   if ~isfile(csv)
+      aws = table();
+      return
+   end
+   aws = readtable(csv, 'TextType', 'string');
+end
+
+function zone = surfaceZoneFromAws(aws_sites, site)
+   %SURFACEZONEFROMAWS Map the AWS location_type to a canonical surface_zone.
+   %
+   % The AWS_sites_metadata.csv location_type field is coarse (e.g. "ice
+   % sheet", "tundra"); it does NOT resolve a firn zone. "tundra" maps to the
+   % canonical "tundra"; everything else (incl. "ice sheet", which carries no
+   % elevation-zone detail) is recorded as "unknown" rather than guessed.
+   zone = "unknown";
+   if isempty(aws_sites) || ~ismember('site_id', aws_sites.Properties.VariableNames)
+      return
+   end
+   match = string(aws_sites.site_id) == string(site);
+   if ~any(match) || ~ismember('location_type', aws_sites.Properties.VariableNames)
+      return
+   end
+   loctype = lower(strtrim(string(aws_sites.location_type(find(match, 1)))));
+   switch loctype
+      case "tundra"
+         zone = "tundra";
+      otherwise
+         zone = "unknown";
+   end
+end
+
+function leg = resolveLegWindows(models, coverage, window_start, window_end)
+   %RESOLVELEGWINDOWS Decouple each gridded leg's window from the met window.
+   %
+   % MAR/MERRA: requested window intersected with their on-disk years.
+   % RACMO:     its OWN coverage, INDEPENDENT of the requested window.
+   % A leg with zero overlap is marked not-staged with a reason.
+   leg = struct();
+   req_years = year(window_start):year(window_end);
+
+   if ismember("mar", models)
+      leg.mar = capLeg(coverage.mar, req_years, window_start, window_end, "MAR");
+   end
+   if ismember("merra", models)
+      leg.merra = capLeg(coverage.merra, req_years, window_start, window_end, ...
+         "MERRA-2");
+   end
+   if ismember("racmo", models)
+      % RACMO is decoupled: stage its full on-disk coverage, ignoring the
+      % requested met window entirely.
+      leg.racmo = ownLeg(coverage.racmo, "RACMO");
+   end
+end
+
+function L = capLeg(cov, req_years, window_start, window_end, label)
+   %CAPLEG Met leg: requested window intersected with on-disk years.
+   if isempty(cov.years)
+      L = struct('staged', false, 'years', [], 'start', NaT, 'end', NaT, ...
+         'reason', sprintf('%s absent (%s)', label, cov.reason));
+      return
+   end
+   years = intersect(req_years, cov.years);
+   if isempty(years)
+      L = struct('staged', false, 'years', [], 'start', NaT, 'end', NaT, ...
+         'reason', sprintf('%s on-disk %d-%d has no overlap with requested %d-%d', ...
+         label, cov.year_min, cov.year_max, req_years(1), req_years(end)));
+      return
+   end
+   % Clamp the window to the contiguous span the builders can read. The met
+   % builders read whole calendar years, so the staged window starts no
+   % earlier than max(requested start, first available year) and ends no
+   % later than min(requested end, last available year).
+   y0 = max(year(window_start), min(years));
+   y1 = min(year(window_end), max(years));
+   t1 = max(window_start, icemodel.verification.setup.ensureUtc( ...
+      sprintf('%d-01-01', y0)));
+   t2 = min(window_end, icemodel.verification.setup.ensureUtc( ...
+      sprintf('%d-12-31 23:00:00', y1)));
+   L = struct('staged', true, 'years', years(years >= y0 & years <= y1), ...
+      'start', t1, 'end', t2, 'reason', "");
+end
+
+function L = ownLeg(cov, label)
+   %OWNLEG RACMO leg: its full on-disk coverage, decoupled from the met window.
+   if isempty(cov.years)
+      L = struct('staged', false, 'years', [], 'start', NaT, 'end', NaT, ...
+         'reason', sprintf('%s absent (%s)', label, cov.reason));
+      return
+   end
+   t1 = icemodel.verification.setup.ensureUtc( ...
+      sprintf('%d-01-01', cov.year_min));
+   t2 = icemodel.verification.setup.ensureUtc( ...
+      sprintf('%d-12-31 23:00:00', cov.year_max));
+   L = struct('staged', true, 'years', cov.years, 'start', t1, 'end', t2, ...
+      'reason', "");
+end
+
+function w = legReportWindows(leg, models)
+   %LEGREPORTWINDOWS Flatten the per-leg windows for the coverage report.
+   w = struct();
+   for m = ["promice", "mar", "merra", "racmo"]
+      if m == "promice" || ~ismember(m, models)
+         continue
+      end
+      L = leg.(m);
+      if L.staged
+         w.(char(m)) = struct('start', L.start, 'end', L.end);
+      else
+         w.(char(m)) = sprintf('skipped: %s', L.reason);
+      end
+   end
+end
+
+function w = windowStruct(t1, t2)
+   %WINDOWSTRUCT JSON-friendly window record for the manifest.
+   w = struct('start', char(string(t1)), 'end', char(string(t2)));
+end
+
+function leg = skippedLeg(kind, reason)
+   %SKIPPEDLEG Manifest entry for a leg with no on-disk coverage.
+   leg = struct('kind', kind, 'staged', false, ...
+      'reason', char(string(reason)));
+end
+
+function [eval_root, input_root] = resolveRoots(kwargs)
+   %RESOLVEROOTS Resolve eval/input roots, honoring output_root when set.
+   %
+   % output_root is the explicit committed-vs-research switch: eval ->
+   % <output_root>/eval, input -> <output_root>/input. When unset, the
+   % per-root kwargs (or the active config) resolve each root independently.
+   if kwargs.output_root ~= ""
+      eval_root = fullfile(kwargs.output_root, 'eval');
+      input_root = fullfile(kwargs.output_root, 'input');
+      return
+   end
+   eval_root = icemodel.verification.helpers.evaluationDataRoot( ...
+      "evaluation_data_root", kwargs.evaluation_data_root, ...
+      "icemodel_config_casename", kwargs.icemodel_config_casename);
+   input_root = icemodel.verification.helpers.inputDataRoot( ...
+      "input_data_root", kwargs.input_data_root, ...
+      "icemodel_config_casename", kwargs.icemodel_config_casename);
+end
+
 function tt = windowSubset(tt, t1, t2)
    %WINDOWSUBSET Clamp a timetable to [t1, t2] on a UTC-aware axis.
    %
