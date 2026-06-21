@@ -149,13 +149,23 @@ function test_buildMerraData_statistical_agreement_with_legacy(testCase)
 end
 
 function test_buildMerraData_mass_flux_units(testCase)
-   % Mass fluxes are mWE/h rates with plausible ablation-zone totals.
+   % Diagnostic mass fluxes stay mWE/h rates with plausible ablation-zone
+   % totals; precipitation is the canonical m s-1 rate (its hourly sum times
+   % 3600 is the annual water-equivalent depth).
 
    Data = testCase.TestData.Data;
    testCase.verifyGreaterThan(sum(Data.runoff), 0.05);
    testCase.verifyLessThan(sum(Data.runoff), 10);
-   testCase.verifyGreaterThan(sum(Data.ppt), 0.05);
-   testCase.verifyLessThan(sum(Data.ppt), 5);
+
+   % Precipitation is now m s-1, so the annual depth is sum(ppt) * 3600 [m].
+   annual_depth = sum(Data.ppt) * 3600;
+   testCase.verifyGreaterThan(annual_depth, 0.05);
+   testCase.verifyLessThan(annual_depth, 5);
+
+   iu = strcmp(Data.Properties.VariableNames, 'ppt');
+   testCase.verifyEqual(Data.Properties.VariableUnits{iu}, 'm s-1');
+   ir = strcmp(Data.Properties.VariableNames, 'runoff');
+   testCase.verifyEqual(Data.Properties.VariableUnits{ir}, 'mWE/h');
 end
 
 function test_data2met_from_merra_data(testCase)
@@ -170,8 +180,8 @@ function test_data2met_from_merra_data(testCase)
 end
 
 function test_data2met_precip_unit_harmonized(testCase)
-   % data2met converts the MERRA precipitation channel from the mWE/h Data
-   % convention to the canonical m s-1 met rate (value / 3600) and records
+   % The MERRA precipitation channel is already the canonical m s-1 rate from
+   % buildMerraData, so data2met carries it through unchanged and records
    % "m s-1" in VariableUnits.
 
    Data = testCase.TestData.Data;
@@ -182,8 +192,8 @@ function test_data2met_precip_unit_harmonized(testCase)
    names = string(met.Properties.VariableNames);
    testCase.verifyEqual(units(names == "ppt"), pptunit);
 
-   % Numeric harmonization: met ppt is the Data mWE/h rate divided by 3600.
-   testCase.verifyEqual(met.ppt, Data.ppt / 3600, 'AbsTol', 1e-15);
+   % The met ppt equals the Data ppt (both m s-1; no boundary conversion).
+   testCase.verifyEqual(met.ppt, Data.ppt, 'AbsTol', 1e-15);
 end
 
 function test_derivable_radiation_not_stored(testCase)

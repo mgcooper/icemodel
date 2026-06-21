@@ -19,12 +19,13 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    %    NATIVE MAR projection (a regular 15 km grid); the polygon is mapped
    %    from EPSG:3413 into native coordinates via the shipped LON/LAT.
    %
-   % Channels (standard units; daily MAR channels interpolated hourly):
+   % Channels (canonical units; daily MAR channels interpolated hourly):
    %  hourly: tair [K], shum [kg/kg] (dropped after rh derivation), swd,
-   %  lwd, shf, lhf [W m-2], albedo [-], snow, rain, melt, runoff, smb
-   %  [mWE/h]; daily: snowd [m], cfrac [-], tsfc [K], psfc [Pa]; derived:
-   %  wspd [m s-1], wdir [deg] (from UUH/VVH), rh [%] (icemodel.vapor
-   %  kernel); optional: modis [-] (GEUS MODIS daily albedo).
+   %  lwd, shf, lhf [W m-2], albedo [-], snow, rain [m s-1, the canonical
+   %  water-equivalent precipitation rate], melt, runoff, smb [mWE/h];
+   %  daily: snowd [m], cfrac [-], tsfc [K], psfc [Pa]; derived: wspd
+   %  [m s-1], wdir [deg] (from UUH/VVH), rh [%] (icemodel.vapor kernel);
+   %  optional: modis [-] (GEUS MODIS daily albedo).
    %
    % Inputs
    %  location - [lat lon] point or polyshape (see above)
@@ -126,13 +127,21 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
       Data.shum, Data.psfc, Data.tair);
    Data = removevars(Data, {'shum', 'uwind', 'vwind'});
 
+   % Precipitation to the canonical water-equivalent rate m s-1. MAR posts
+   % snow/rain as mWE/h (an hourly water-equivalent depth rate), so dividing
+   % by 3600 s/h yields m s-1. The diagnostic mass fluxes (melt/runoff/smb)
+   % keep their natural mWE/h rate.
+   for ch = ["snow", "rain"]
+      Data.(ch) = Data.(ch) / 3600;
+   end
+
    [Data, checks] = icemodel.forcing.helpers.metchecks(Data, ...
       fillgaps=kwargs.fillgaps);
 
-   % Per-variable units. Mass fluxes are mWE/h rates (cumulative sums need
-   % the timestep in hours); the precipitation channels convert to the
-   % canonical m s-1 only at the met boundary (icemodel.forcing.data2met).
-   Data.Properties.VariableUnits = marVariableUnits( ...
+   % Per-variable units from the shared canonical map. Precipitation is m s-1
+   % (converted above); the diagnostic mass fluxes are mWE/h rates (cumulative
+   % sums need the timestep in hours).
+   Data.Properties.VariableUnits = icemodel.forcing.helpers.variableUnits( ...
       string(Data.Properties.VariableNames));
 
    % Userdata CustomProperties.
@@ -272,22 +281,3 @@ function modis = modisChannel(modis_dir, yyyy, location, method, remap, Time)
    modis = icemodel.forcing.helpers.dailyToHourly(albedo, Tdaily, Time);
 end
 
-function units = marVariableUnits(names)
-   %MARVARIABLEUNITS Standard-unit strings for the MAR Data columns.
-   % Maps each output channel to its standard unit (the readMar3p11 target
-   % units, plus the builder-derived wspd/wdir/rh). Mass fluxes are mWE/h
-   % rates. Unknown columns are left as an empty string.
-   unitmap = struct( ...
-      'tair', "K", 'swd', "W m-2", 'lwd', "W m-2", 'albedo', "-", ...
-      'snow', "mWE/h", 'rain', "mWE/h", 'melt', "mWE/h", ...
-      'runoff', "mWE/h", 'smb', "mWE/h", 'shf', "W m-2", 'lhf', "W m-2", ...
-      'snowd', "m", 'cfrac', "-", 'tsfc', "K", 'psfc', "Pa", ...
-      'wspd', "m s-1", 'wdir', "degrees", 'rh', "%", 'modis', "-");
-   units = strings(1, numel(names));
-   for k = 1:numel(names)
-      if isfield(unitmap, names(k))
-         units(k) = unitmap.(names(k));
-      end
-   end
-   units = cellstr(units);
-end

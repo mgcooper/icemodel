@@ -22,9 +22,11 @@ function [required, optional, pptunit] = metvariables()
    % RATE in metres per second, the unit icemodel.surface.advective_heat_flux
    % consumes directly. This is timestep-independent, so it is consistent
    % across every source and sampling interval. ESM-SnowMIP already produces
-   % m s-1 (mass flux / ro_liq); the gridded sources (MAR/MERRA/RACMO) carry
-   % their precipitation in mWE/h on the Data side and convert to m s-1 in
-   % icemodel.forcing.data2met when assembling the met file.
+   % m s-1 (mass flux / ro_liq); the gridded sources (MAR/MERRA/RACMO) emit
+   % their precipitation channels directly in m s-1 from the Data builders
+   % (the source mWE/h posting is converted inside the builder), so the unit
+   % is uniform across every source. The shared canonical unit map
+   % icemodel.forcing.helpers.variableUnits records m s-1 for them.
    %
    % The optional set covers source-specific diagnostics the builders
    % pass through when available (rain/snow precipitation split, melt,

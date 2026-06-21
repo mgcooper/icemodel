@@ -68,8 +68,9 @@ function test_buildMarMet_self_consistent_with_raw_netcdf(testCase)
    filename = metadata.source_files(1);
 
    % tair/swd are carried through unchanged; the precipitation channel (snow)
-   % is converted from the MAR mWE/h Data rate to the canonical m s-1 met rate
-   % in data2met (/3600), so it matches the raw NetCDF only after that scaling.
+   % is converted from the MAR mWE/h source rate to the canonical m s-1 rate
+   % inside buildMarData (/3600), so it matches the raw NetCDF only after that
+   % scaling.
    pptscale = struct('tair', 1, 'swd', 1, 'snow', 1/3600);
    for pair = {["tair", "TTH"], ["swd", "SWDH"], ["snow", "SFH"]}
       outname = pair{1}(1);
@@ -160,9 +161,9 @@ end
 
 function test_buildMarMet_precip_unit_harmonized(testCase)
    % The met precipitation channel carries the canonical m s-1 rate (the MAR
-   % snow + rain mWE/h channels divided by 3600), labelled in VariableUnits,
-   % so MAR met agrees with the ESM-SnowMIP m s-1 convention. The
-   % ppt = snow + rain identity survives (both sides scale identically).
+   % snow + rain channels emitted in m s-1 by buildMarData), labelled in
+   % VariableUnits, so MAR met agrees with the ESM-SnowMIP m s-1 convention.
+   % The ppt = snow + rain identity holds.
 
    met = testCase.TestData.met;
    [~, ~, pptunit] = icemodel.forcing.helpers.metvariables();

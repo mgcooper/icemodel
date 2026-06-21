@@ -163,4 +163,12 @@ function test_buildRacmoData_mass_flux_units(testCase)
    testCase.verifyLessThan(annual_runoff, 10);
    iu = strcmp(Data.Properties.VariableNames, 'runoff');
    testCase.verifyEqual(Data.Properties.VariableUnits{iu}, 'mWE/h');
+
+   % Precipitation is the canonical m s-1 rate; its annual depth (sum x 3600)
+   % is within ablation-zone bounds.
+   ip = strcmp(Data.Properties.VariableNames, 'precip');
+   testCase.verifyEqual(Data.Properties.VariableUnits{ip}, 'm s-1');
+   annual_precip = sum(Data.precip) * 3600;
+   testCase.verifyGreaterThan(annual_precip, 0.01);
+   testCase.verifyLessThan(annual_precip, 5);
 end

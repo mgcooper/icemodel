@@ -15,7 +15,8 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    %    rad (hourly): SWGDN -> swd, SWGNT -> swn, LWGAB -> lwd,
    %        LWGNT -> lwn [W m-2]
    %    flx (hourly): HFLUX -> shf, EFLUX -> lhf [W m-2],
-   %        PRECTOTCORR -> ppt, PRECSNO -> snowf, EVAP -> evap [mWE/h]
+   %        PRECTOTCORR -> ppt, PRECSNO -> snowf [m s-1, the canonical
+   %        water-equivalent precipitation rate], EVAP -> evap [mWE/h]
    %    glc (3-hourly): RUNOFF -> runoff [mWE/h], SNICEALB -> albedo,
    %        SNOWDP_GL -> snowd [m], SNOMAS_GL -> swe [kg m-2]
    %
@@ -215,13 +216,21 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
          location0, kwargs.method, kwargs.remap, Data.Time);
    end
 
+   % Precipitation to the canonical water-equivalent rate m s-1. MERRA mass
+   % fluxes arrive as mWE/h, so dividing by 3600 s/h yields m s-1 for the
+   % precipitation channels (ppt, snowf). The diagnostic mass fluxes
+   % (evap/runoff) keep their natural mWE/h rate; swe is a store (kg m-2).
+   for ch = ["ppt", "snowf"]
+      Data.(ch) = Data.(ch) / 3600;
+   end
+
    [Data, checks] = icemodel.forcing.helpers.metchecks(Data, ...
       fillgaps=kwargs.fillgaps);
 
-   % Per-variable units. Mass fluxes are mWE/h rates; the precipitation
-   % channels convert to the canonical m s-1 only at the met boundary
-   % (icemodel.forcing.data2met). swe is a store (kg m-2), not a rate.
-   Data.Properties.VariableUnits = merraVariableUnits( ...
+   % Per-variable units from the shared canonical map. Precipitation is m s-1
+   % (converted above); the diagnostic mass fluxes are mWE/h rates and swe is
+   % a kg m-2 store.
+   Data.Properties.VariableUnits = icemodel.forcing.helpers.variableUnits( ...
       string(Data.Properties.VariableNames));
 
    % Userdata CustomProperties (MERRA carries no terrain height in
@@ -252,7 +261,7 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
       'lat', site_lat, 'lon', site_lon, ...
       'humidity_kernel', ...
       "icemodel.vapor.relative_humidity_from_specific_humidity", ...
-      'mass_flux_units', "mWE/h (rate)", ...
+      'mass_flux_units', "precip m s-1; diagnostic fluxes mWE/h (rate)", ...
       'checks', checks);
 end
 
@@ -294,27 +303,6 @@ function [block, stamps] = readChannelSeries(coll, ncname, start, count)
    step = 24 / n_per_day;
    offsets = hours(step/2:step:24);
    stamps = reshape((coll.dates + offsets)', [], 1);
-end
-
-function units = merraVariableUnits(names)
-   %MERRAVARIABLEUNITS Standard-unit strings for the MERRA-2 Data columns.
-   % Maps each output channel to its standard unit (the readMerra2 target
-   % units, plus the builder-derived wspd/wdir/rh). Mass fluxes are mWE/h
-   % rates; swe (SNOMAS_GL) is a store in kg m-2. Unknown columns are left as
-   % an empty string.
-   unitmap = struct( ...
-      'tair', "K", 'swd', "W m-2", 'swn', "W m-2", 'lwd', "W m-2", ...
-      'lwn', "W m-2", 'psfc', "Pa", 'shf', "W m-2", 'lhf', "W m-2", ...
-      'ppt', "mWE/h", 'snowf', "mWE/h", 'evap', "mWE/h", ...
-      'runoff', "mWE/h", 'albedo', "-", 'snowd', "m", 'swe', "kg m-2", ...
-      'wspd', "m s-1", 'wdir', "degrees", 'rh', "%", 'modis', "-");
-   units = strings(1, numel(names));
-   for k = 1:numel(names)
-      if isfield(unitmap, names(k))
-         units(k) = unitmap.(names(k));
-      end
-   end
-   units = cellstr(units);
 end
 
 function mask = merraIceMask(glcfile, gridsize)

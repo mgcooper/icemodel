@@ -64,6 +64,41 @@ function test_metfilename_roundtrip_with_createMetFileNames(testCase)
    testCase.verifyEqual(char(actual), expected{1});
 end
 
+%% variableUnits
+
+function test_variableUnits_canonical_and_precip_rate(testCase)
+   % The shared map labels precipitation channels with the canonical m s-1
+   % rate, diagnostic mass fluxes with mWE/h, fluxes with W m-2, and the
+   % tice string with K, in the order requested.
+
+   names = ["tair", "swd", "ppt", "snow", "rain", "snowf", "rainf", ...
+      "precip", "runoff", "melt", "smb", "evap", "swe", "albedo", ...
+      "wspd", "psfc", "rh", "tice1", "tice8", "snow_depth", "ablation"];
+   units = string(icemodel.forcing.helpers.variableUnits(names));
+
+   precip = ["ppt", "snow", "rain", "snowf", "rainf", "precip"];
+   testCase.verifyTrue(all(units(ismember(names, precip)) == "m s-1"));
+
+   massflux = ["runoff", "melt", "smb", "evap"];
+   testCase.verifyTrue(all(units(ismember(names, massflux)) == "mWE/h"));
+
+   testCase.verifyEqual(units(names == "tair"), "K");
+   testCase.verifyEqual(units(names == "swd"), "W m-2");
+   testCase.verifyEqual(units(names == "swe"), "kg m-2");
+   testCase.verifyEqual(units(names == "wspd"), "m s-1");
+   testCase.verifyEqual(units(names == "tice1"), "K");
+   testCase.verifyEqual(units(names == "tice8"), "K");
+   testCase.verifyEqual(units(names == "snow_depth"), "m");
+end
+
+function test_variableUnits_errors_on_unmapped_channel(testCase)
+   % An emitted channel missing from the map must error, not ship unlabeled.
+
+   testCase.verifyError(@() icemodel.forcing.helpers.variableUnits( ...
+      ["tair", "not_a_real_channel"]), ...
+      'icemodel:forcing:variableUnits:unmappedChannel');
+end
+
 %% windFromComponents
 
 function test_windFromComponents_cardinal_directions(testCase)

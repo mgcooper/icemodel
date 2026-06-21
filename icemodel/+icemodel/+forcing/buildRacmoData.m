@@ -16,9 +16,10 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    % Channels (file prefix -> output, standard units):
    %    swsd -> swd, lwsd -> lwd, swsn -> swn, lwsn -> lwn   [W m-2]
    %    senf -> shf, latf -> lhf                             [W m-2]
-   %    precip -> precip, snowmelt -> melt, runoff -> runoff,
-   %    smb -> smb, refreeze -> refreeze, subl -> subl,
-   %    sndiv -> sndiv, meltin -> meltin                     [mWE/h]
+   %    precip -> precip   [m s-1, the canonical water-equivalent precip rate]
+   %    snowmelt -> melt, runoff -> runoff, smb -> smb,
+   %    refreeze -> refreeze, subl -> subl, sndiv -> sndiv,
+   %    meltin -> meltin                                     [mWE/h]
    % Derived:  albedo [-] = 1 - swn/swd (RACMO ships no albedo variable).
    % Optional: modis [-] (GEUS MODIS daily albedo, when modis_dir is given).
    %
@@ -29,7 +30,9 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    %
    % Mass fluxes convert from kg m-2 s-1 to meters water equivalent per
    % hour (x 3600 / 1000); they are rates, so cumulative sums must
-   % multiply by the timestep in hours (1 for dt="1hr", 3 for "3hr").
+   % multiply by the timestep in hours (1 for dt="1hr", 3 for "3hr"). The
+   % precipitation channel (precip) is then carried in the canonical m s-1
+   % water-equivalent rate; the diagnostic mass fluxes keep mWE/h.
    %
    % Legacy: reimplements runoff/functions/saveRacmoData.m (the original
    % retained, unchanged, as the legacy reference workflow).
@@ -148,16 +151,14 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    % Read each available channel at the hyperslab and collapse to the
    % target (single cell or weighted polygon average).
    Data = timetable(Time);
-   units = strings(1, size(channels, 1));
    for n = 1:size(channels, 1)
       if ~found(n)
          continue
       end
-      [series, units(n)] = readChannel(files(n), channels{n, 1}, ...
+      series = readChannel(files(n), channels{n, 1}, ...
          start, count, collapse, keep);
       Data.(channels{n, 2}) = series;
    end
-   units = units(found);
 
    % Interpolate to hourly (legacy behavior) unless native requested.
    % The full-year hourly axis extends past the last 3-hourly posting
@@ -192,7 +193,6 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    albedo = 1 - Data.swn ./ Data.swd;
    albedo(~(Data.swd >= swdown_floor)) = NaN;   % also catches swd == 0 / NaN
    Data.albedo = albedo;
-   units(end+1) = "-";
 
    % Optional GEUS MODIS daily albedo, resolved at the SAME location and
    % aggregation as the RACMO channels: nearest/natural for a point,
@@ -202,10 +202,16 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    if kwargs.modis_dir ~= ""
       Data.modis = modisChannel(kwargs.modis_dir, years, location0, ...
          kwargs.method, kwargs.remap, Data.Time);
-      units(end+1) = "reflectivity";
    end
 
-   Data.Properties.VariableUnits = cellstr(units);
+   % Precipitation to the canonical water-equivalent rate m s-1. RACMO posts
+   % precip as mWE/h, so dividing by 3600 s/h yields m s-1. The diagnostic
+   % mass fluxes (melt/runoff/smb/refreeze/subl/sndiv/meltin) keep mWE/h.
+   Data.precip = Data.precip / 3600;
+
+   % Per-variable units from the shared canonical map.
+   Data.Properties.VariableUnits = icemodel.forcing.helpers.variableUnits( ...
+      string(Data.Properties.VariableNames));
 
    % QA/QC: gap-fill + physical clamps. The legacy saveRacmoData ran
    % metchecks as its final step; here it also clamps the derived albedo to
@@ -237,7 +243,8 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
       'n_cells', prod(count), ...
       'lat', site_lat, 'lon', site_lon, ...
       'dt', kwargs.dt, ...
-      'mass_flux_units', "mWE/h (rate; cumulative sums need dt hours)", ...
+      'mass_flux_units', ...
+      "precip m s-1; diagnostic fluxes mWE/h (rate; cumulative sums need dt hours)", ...
       'checks', checks);
 end
 
@@ -256,19 +263,17 @@ function [files, found] = locateRacmoFiles(source_dir, prefixes)
    end
 end
 
-function [series, unit] = readChannel(filename, prefix, start, count, ...
-      collapse, keep)
+function series = readChannel(filename, prefix, start, count, collapse, keep)
    %READCHANNEL Read one RACMO variable (standard units), collapse, subset.
    % The hyperslab read + unit conversion is delegated to the shared reader
    % icemodel.forcing.readRacmo2p3; COLLAPSE (from gridLocation) then reduces
    % the cells-by-time block to the target series (nearest cell,
    % natural-neighbour point, or polygon mean), and KEEP subsets to the
    % requested years.
-   [data, unit] = icemodel.forcing.readRacmo2p3(filename, prefix, ...
+   data = icemodel.forcing.readRacmo2p3(filename, prefix, ...
       start=start, count=count);
    series = collapse(data);
    series = series(keep);
-   unit = string(unit);
 end
 
 function elev = readElevation(source_dir, start, count, inslab)
