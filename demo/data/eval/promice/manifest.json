@@ -4,13 +4,18 @@
   "source_url": "https://promice.org",
   "source_version": "colocated[promice+mar+merra+racmo]",
   "retrieval_date": "21-Jun-2026",
+  "schema": "metadata_only",
   "cases": [
     {
       "case_id": "kanl",
       "case_type": "firn_observational",
       "site_id": "KAN_L",
       "site_name": "KAN-L",
-      "surface_zone": "lower_ablation",
+      "surface_zone": "ablation",
+      "eval_target": [
+        "seasonal_snow",
+        "bare_ice"
+      ],
       "site_location": {
         "lat_wgs84": 67.096950868291529,
         "lon_wgs84": -49.947077120638447,
@@ -18,13 +23,19 @@
         "y_epsg3413": -2.5039013503936823E+6,
         "elev_m": 667.74607640585248
       },
-      "evaluation_file": "kanl/evaluation.mat",
-      "reference_file": "kanl/reference.mat",
-      "native_timestep": "daily",
-      "comparison_window": {
+      "period": {
         "start": "01-Jan-2009",
         "end": "31-Dec-2022"
       },
+      "forcing_sources": [
+        "promice",
+        "mar",
+        "merra"
+      ],
+      "eval_sources": [
+        "promice_obs",
+        "racmo"
+      ],
       "comparison_variables": [
         "ablation",
         "snow_depth",
@@ -43,7 +54,7 @@
         "surface_ablation": "ablation [m, positive down]",
         "snow_depth": "snow_depth [m]"
       },
-      "colocated_forcing": {
+      "colocation": {
         "promice": {
           "kind": "station_met_and_eval",
           "met_files": "met_kanl_promice_20090101_20221231_1hr.mat",
@@ -63,7 +74,6 @@
             "kanl_promice_2021.mat",
             "kanl_promice_2022.mat"
           ],
-          "ablation_source": "L3 z_ice_surf",
           "window": {
             "start": "01-Jan-2009",
             "end": "31-Dec-2022"
@@ -103,14 +113,19 @@
           "note": "SMB/eval Data only; RACMO is not a met source."
         }
       },
-      "notes": "Lower ablation zone (~670 m); curated KAN_L service-window recipe."
+      "native_timestep": "daily",
+      "notes": "Lower ablation zone (~670 m); curated KAN_L recipe. KAN anchor."
     },
     {
       "case_id": "kanm",
       "case_type": "firn_observational",
       "site_id": "KAN_M",
       "site_name": "KAN-M",
-      "surface_zone": "upper_ablation",
+      "surface_zone": "ablation",
+      "eval_target": [
+        "seasonal_snow",
+        "bare_ice"
+      ],
       "site_location": {
         "lat_wgs84": 67.067095734019745,
         "lon_wgs84": -48.837346104065588,
@@ -118,13 +133,19 @@
         "y_epsg3413": -2.5109834822118757E+6,
         "elev_m": 1268.9033288544692
       },
-      "evaluation_file": "kanm/evaluation.mat",
-      "reference_file": "kanm/reference.mat",
-      "native_timestep": "daily",
-      "comparison_window": {
+      "period": {
         "start": "01-Jan-2009",
         "end": "31-Dec-2022"
       },
+      "forcing_sources": [
+        "promice",
+        "mar",
+        "merra"
+      ],
+      "eval_sources": [
+        "promice_obs",
+        "racmo"
+      ],
       "comparison_variables": [
         "ablation",
         "snow_depth",
@@ -143,7 +164,7 @@
         "surface_ablation": "ablation [m, positive down]",
         "snow_depth": "snow_depth [m]"
       },
-      "colocated_forcing": {
+      "colocation": {
         "promice": {
           "kind": "station_met_and_eval",
           "met_files": "met_kanm_promice_20090101_20221231_1hr.mat",
@@ -163,7 +184,6 @@
             "kanm_promice_2021.mat",
             "kanm_promice_2022.mat"
           ],
-          "ablation_source": "L3 z_ice_surf",
           "window": {
             "start": "01-Jan-2009",
             "end": "31-Dec-2022"
@@ -203,14 +223,19 @@
           "note": "SMB/eval Data only; RACMO is not a met source."
         }
       },
-      "notes": "Upper ablation zone / bare ice (~1270 m); curated KAN_M service-window recipe."
+      "native_timestep": "daily",
+      "notes": "Upper ablation zone / bare ice (~1270 m); curated KAN_M recipe."
     },
     {
       "case_id": "kanu",
       "case_type": "firn_observational",
       "site_id": "KAN_U",
       "site_name": "KAN-U",
-      "surface_zone": "lower_percolation",
+      "surface_zone": "percolation",
+      "eval_target": [
+        "seasonal_snow",
+        "firn"
+      ],
       "site_location": {
         "lat_wgs84": 67.000458407658314,
         "lon_wgs84": -47.02720909947265,
@@ -218,13 +243,19 @@
         "y_epsg3413": -2.5225506903707683E+6,
         "elev_m": 1840.0789269495797
       },
-      "evaluation_file": "kanu/evaluation.mat",
-      "reference_file": "kanu/reference.mat",
-      "native_timestep": "daily",
-      "comparison_window": {
-        "start": "01-Jan-2009",
+      "period": {
+        "start": "04-Apr-2009",
         "end": "31-Dec-2022"
       },
+      "forcing_sources": [
+        "promice",
+        "mar",
+        "merra"
+      ],
+      "eval_sources": [
+        "promice_obs",
+        "racmo"
+      ],
       "comparison_variables": [
         "ablation",
         "snow_depth",
@@ -243,7 +274,7 @@
         "surface_ablation": "ablation [m, positive down]",
         "snow_depth": "snow_depth [m]"
       },
-      "colocated_forcing": {
+      "colocation": {
         "promice": {
           "kind": "station_met_and_eval",
           "met_files": "met_kanu_promice_20090404_20221231_1hr.mat",
@@ -263,9 +294,8 @@
             "kanu_promice_2021.mat",
             "kanu_promice_2022.mat"
           ],
-          "ablation_source": "L3 z_surf_combined",
           "window": {
-            "start": "01-Jan-2009",
+            "start": "04-Apr-2009",
             "end": "31-Dec-2022"
           }
         },
@@ -303,7 +333,8 @@
           "note": "SMB/eval Data only; RACMO is not a met source."
         }
       },
-      "notes": "Lower percolation zone (~1840 m); generic ablation recipe."
+      "native_timestep": "daily",
+      "notes": "Lower percolation zone (~1840 m); generic recipe. KAN anchor."
     }
   ],
   "skipped": []
