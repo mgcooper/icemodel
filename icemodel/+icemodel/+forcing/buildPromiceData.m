@@ -67,11 +67,22 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
       source_dir=kwargs.source_dir, timescale="hourly", ...
       startdate=kwargs.startdate, enddate=kwargs.enddate);
 
-   % Derived net fluxes.
-   aws.swn = aws.swd - aws.swu;
-   aws.lwn = aws.lwd - aws.lwu;
-   aws.netr = aws.swn + aws.lwn;
-   aws.thf = aws.shf + aws.lhf;
+   % Derived net fluxes. Sparse stations may ship no radiation or turbulent-
+   % flux channels, so each derived term is computed only when its inputs are
+   % present (a missing input drops the derived channel rather than erroring).
+   has = @(v) ismember(v, string(aws.Properties.VariableNames));
+   if has("swd") && has("swu")
+      aws.swn = aws.swd - aws.swu;
+   end
+   if has("lwd") && has("lwu")
+      aws.lwn = aws.lwd - aws.lwu;
+   end
+   if has("swn") && has("lwn")
+      aws.netr = aws.swn + aws.lwn;
+   end
+   if has("shf") && has("lhf")
+      aws.thf = aws.shf + aws.lhf;
+   end
 
    % Snow depth: the QC'd L3 snow_height channel, read directly.
    aws.snow_depth = aws.snow_height;
