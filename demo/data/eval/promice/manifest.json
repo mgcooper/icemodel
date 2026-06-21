@@ -3,7 +3,7 @@
   "source_doi": "",
   "source_url": "https://promice.org",
   "source_version": "colocated[promice+mar+merra+racmo]",
-  "retrieval_date": "19-Jun-2026",
+  "retrieval_date": "21-Jun-2026",
   "cases": [
     {
       "case_id": "kanl",
@@ -12,18 +12,18 @@
       "site_name": "KAN-L",
       "surface_zone": "lower_ablation",
       "site_location": {
-        "lat_wgs84": 67.0955,
-        "lon_wgs84": -49.9513,
-        "x_epsg3413": -216931.31246626662,
-        "y_epsg3413": -2.5040481250081896E+6,
-        "elev_m": 673.20001220703125
+        "lat_wgs84": 67.096950868291529,
+        "lon_wgs84": -49.947077120638447,
+        "x_epsg3413": -216732.66778461527,
+        "y_epsg3413": -2.5039013503936823E+6,
+        "elev_m": 667.74607640585248
       },
       "evaluation_file": "kanl/evaluation.mat",
       "reference_file": "kanl/reference.mat",
       "native_timestep": "daily",
       "comparison_window": {
-        "start": "01-Jan-2012",
-        "end": "31-Dec-2015 23:00:00"
+        "start": "01-Jan-2009",
+        "end": "31-Dec-2022"
       },
       "comparison_variables": [
         "ablation",
@@ -46,24 +46,46 @@
       "colocated_forcing": {
         "promice": {
           "kind": "station_met_and_eval",
-          "met_files": "met_kanl_promice_20120101_20151231_1hr.mat",
+          "met_files": "met_kanl_promice_20090101_20221231_1hr.mat",
           "data_files": [
+            "kanl_promice_2009.mat",
+            "kanl_promice_2010.mat",
+            "kanl_promice_2011.mat",
             "kanl_promice_2012.mat",
             "kanl_promice_2013.mat",
             "kanl_promice_2014.mat",
-            "kanl_promice_2015.mat"
+            "kanl_promice_2015.mat",
+            "kanl_promice_2016.mat",
+            "kanl_promice_2017.mat",
+            "kanl_promice_2018.mat",
+            "kanl_promice_2019.mat",
+            "kanl_promice_2020.mat",
+            "kanl_promice_2021.mat",
+            "kanl_promice_2022.mat"
           ],
-          "ablation_recipe": "kanl legacy service windows + generic reset removal"
+          "ablation_source": "L3 z_ice_surf",
+          "window": {
+            "start": "01-Jan-2009",
+            "end": "31-Dec-2022"
+          }
         },
         "mar": {
           "kind": "point_met",
-          "met_files": "met_kanl_mar_20120101_20151231_1hr.mat",
-          "sample_method": "nearest"
+          "met_files": "met_kanl_mar_20090101_20191231_1hr.mat",
+          "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2009",
+            "end": "31-Dec-2019 23:00:00"
+          }
         },
         "merra": {
           "kind": "point_met",
-          "met_files": "met_kanl_merra_20120101_20151231_1hr.mat",
-          "sample_method": "nearest"
+          "met_files": "met_kanl_merra_20120101_20181231_1hr.mat",
+          "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2012",
+            "end": "31-Dec-2018 23:00:00"
+          }
         },
         "racmo": {
           "kind": "point_data_smb_eval",
@@ -74,6 +96,10 @@
             "kanl_racmo_2015.mat"
           ],
           "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2012",
+            "end": "31-Dec-2015 23:00:00"
+          },
           "note": "SMB/eval Data only; RACMO is not a met source."
         }
       },
@@ -86,18 +112,18 @@
       "site_name": "KAN-M",
       "surface_zone": "upper_ablation",
       "site_location": {
-        "lat_wgs84": 67.067,
-        "lon_wgs84": -48.8355,
-        "x_epsg3413": -168343.13674421073,
-        "y_epsg3413": -2.5109996639953689E+6,
-        "elev_m": 1272.4000244140625
+        "lat_wgs84": 67.067095734019745,
+        "lon_wgs84": -48.837346104065588,
+        "x_epsg3413": -168423.32107893252,
+        "y_epsg3413": -2.5109834822118757E+6,
+        "elev_m": 1268.9033288544692
       },
       "evaluation_file": "kanm/evaluation.mat",
       "reference_file": "kanm/reference.mat",
       "native_timestep": "daily",
       "comparison_window": {
-        "start": "01-Jan-2012",
-        "end": "31-Dec-2015 23:00:00"
+        "start": "01-Jan-2009",
+        "end": "31-Dec-2022"
       },
       "comparison_variables": [
         "ablation",
@@ -120,24 +146,46 @@
       "colocated_forcing": {
         "promice": {
           "kind": "station_met_and_eval",
-          "met_files": "met_kanm_promice_20120101_20151231_1hr.mat",
+          "met_files": "met_kanm_promice_20090101_20221231_1hr.mat",
           "data_files": [
+            "kanm_promice_2009.mat",
+            "kanm_promice_2010.mat",
+            "kanm_promice_2011.mat",
             "kanm_promice_2012.mat",
             "kanm_promice_2013.mat",
             "kanm_promice_2014.mat",
-            "kanm_promice_2015.mat"
+            "kanm_promice_2015.mat",
+            "kanm_promice_2016.mat",
+            "kanm_promice_2017.mat",
+            "kanm_promice_2018.mat",
+            "kanm_promice_2019.mat",
+            "kanm_promice_2020.mat",
+            "kanm_promice_2021.mat",
+            "kanm_promice_2022.mat"
           ],
-          "ablation_recipe": "kanm legacy service windows + generic reset removal"
+          "ablation_source": "L3 z_ice_surf",
+          "window": {
+            "start": "01-Jan-2009",
+            "end": "31-Dec-2022"
+          }
         },
         "mar": {
           "kind": "point_met",
-          "met_files": "met_kanm_mar_20120101_20151231_1hr.mat",
-          "sample_method": "nearest"
+          "met_files": "met_kanm_mar_20090101_20191231_1hr.mat",
+          "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2009",
+            "end": "31-Dec-2019 23:00:00"
+          }
         },
         "merra": {
           "kind": "point_met",
-          "met_files": "met_kanm_merra_20120101_20151231_1hr.mat",
-          "sample_method": "nearest"
+          "met_files": "met_kanm_merra_20120101_20181231_1hr.mat",
+          "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2012",
+            "end": "31-Dec-2018 23:00:00"
+          }
         },
         "racmo": {
           "kind": "point_data_smb_eval",
@@ -148,10 +196,14 @@
             "kanm_racmo_2015.mat"
           ],
           "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2012",
+            "end": "31-Dec-2015 23:00:00"
+          },
           "note": "SMB/eval Data only; RACMO is not a met source."
         }
       },
-      "notes": "Lower percolation/firn zone (~1270 m); curated KAN_M service-window recipe."
+      "notes": "Upper ablation zone / bare ice (~1270 m); curated KAN_M service-window recipe."
     },
     {
       "case_id": "kanu",
@@ -160,18 +212,18 @@
       "site_name": "KAN-U",
       "surface_zone": "lower_percolation",
       "site_location": {
-        "lat_wgs84": 67.0003,
-        "lon_wgs84": -47.0253,
-        "x_epsg3413": -89205.400928864212,
-        "y_epsg3413": -2.5225714951599678E+6,
-        "elev_m": 1837
+        "lat_wgs84": 67.000458407658314,
+        "lon_wgs84": -47.02720909947265,
+        "x_epsg3413": -89288.821989512624,
+        "y_epsg3413": -2.5225506903707683E+6,
+        "elev_m": 1840.0789269495797
       },
       "evaluation_file": "kanu/evaluation.mat",
       "reference_file": "kanu/reference.mat",
       "native_timestep": "daily",
       "comparison_window": {
-        "start": "01-Jan-2012",
-        "end": "31-Dec-2015 23:00:00"
+        "start": "01-Jan-2009",
+        "end": "31-Dec-2022"
       },
       "comparison_variables": [
         "ablation",
@@ -194,24 +246,46 @@
       "colocated_forcing": {
         "promice": {
           "kind": "station_met_and_eval",
-          "met_files": "met_kanu_promice_20120101_20151231_1hr.mat",
+          "met_files": "met_kanu_promice_20090404_20221231_1hr.mat",
           "data_files": [
+            "kanu_promice_2009.mat",
+            "kanu_promice_2010.mat",
+            "kanu_promice_2011.mat",
             "kanu_promice_2012.mat",
             "kanu_promice_2013.mat",
             "kanu_promice_2014.mat",
-            "kanu_promice_2015.mat"
+            "kanu_promice_2015.mat",
+            "kanu_promice_2016.mat",
+            "kanu_promice_2017.mat",
+            "kanu_promice_2018.mat",
+            "kanu_promice_2019.mat",
+            "kanu_promice_2020.mat",
+            "kanu_promice_2021.mat",
+            "kanu_promice_2022.mat"
           ],
-          "ablation_recipe": "generic reset removal only"
+          "ablation_source": "L3 z_surf_combined",
+          "window": {
+            "start": "01-Jan-2009",
+            "end": "31-Dec-2022"
+          }
         },
         "mar": {
           "kind": "point_met",
-          "met_files": "met_kanu_mar_20120101_20151231_1hr.mat",
-          "sample_method": "nearest"
+          "met_files": "met_kanu_mar_20090101_20191231_1hr.mat",
+          "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2009",
+            "end": "31-Dec-2019 23:00:00"
+          }
         },
         "merra": {
           "kind": "point_met",
-          "met_files": "met_kanu_merra_20120101_20151231_1hr.mat",
-          "sample_method": "nearest"
+          "met_files": "met_kanu_merra_20120101_20181231_1hr.mat",
+          "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2012",
+            "end": "31-Dec-2018 23:00:00"
+          }
         },
         "racmo": {
           "kind": "point_data_smb_eval",
@@ -222,10 +296,14 @@
             "kanu_racmo_2015.mat"
           ],
           "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2012",
+            "end": "31-Dec-2015 23:00:00"
+          },
           "note": "SMB/eval Data only; RACMO is not a met source."
         }
       },
-      "notes": "Upper percolation/dry-snow margin (~1840 m); generic ablation recipe."
+      "notes": "Lower percolation zone (~1840 m); generic ablation recipe."
     }
   ],
   "skipped": []
