@@ -5,34 +5,37 @@ function surface_zones = surfacezone()
    %
    % Outputs
    %  surface_zones   Supported manifest surface_zone values. These record the
-   %                  physical surface regime of a verification case as per-case
-   %                  metadata. The regime was formerly encoded by the eval-data
-   %                  directory layout (snow/ vs firn/); the taxonomy is now
-   %                  dataset-family-flat and the regime lives here instead.
+   %                  glaciological substrate REGIME of a verification case as
+   %                  per-case metadata - the physical zone the case sits in, not
+   %                  the model capability the case exercises (that descriptor is
+   %                  eval_target; see icemodel.verification.namelists.evaltarget).
    %
    % Role
    %  Canonical surface-zone vocabulary shared by the setup importers (which
-   %  stamp surface_zone onto case manifests) and validators. The single source
-   %  of truth for a PROMICE anchor's zone is
-   %  icemodel.verification.helpers.promicesiteinfo(site).zone, which uses this
-   %  vocabulary. An empty surface_zone ("") is permitted for analytical cases
-   %  where the regime is not meaningful (e.g. the Laugh-Tests Colbeck benchmark).
+   %  stamp surface_zone onto case manifests) and validators. surface_zone is
+   %  the glaciological zone ONLY: where on a Greenland (or off-ice) transect
+   %  the case sits. It deliberately does NOT carry capability descriptors such
+   %  as "bare_ice" or "seasonal_snow" - those are eval_target values. The single
+   %  source of truth for a PROMICE anchor's zone is
+   %  icemodel.verification.helpers.promicesiteinfo(site).surface_zone, which uses
+   %  this vocabulary. An empty surface_zone ("") is permitted for analytical
+   %  cases where the regime is not meaningful (e.g. the Laugh-Tests Colbeck
+   %  benchmark).
+   %
+   % See also: icemodel.verification.namelists.evaltarget,
+   %  icemodel.verification.helpers.promicesiteinfo
 
    % Keep this explicit so adding a new zone is a deliberate schema change.
-   % Ordered from low to high on a Greenland elevation transect, then the
-   % seasonal/dry-snow regimes used by the snow families, then "tundra" and
-   % "unknown" for non-curated PROMICE stations whose AWS location_type is
-   % off-ice or carries no firn-zone classification.
+   % Ordered low-to-high on a Greenland ice-sheet transect (ablation through
+   % accumulation), then the off-ice regimes (land, tundra) and "unknown" for
+   % non-curated PROMICE stations whose zone is not yet classified.
    surface_zones = [ ...
-      "bare_ice"
       "ablation"
-      "lower_ablation"
-      "upper_ablation"
       "percolation"
-      "lower_percolation"
-      "accumulation"
+      "wet_snow"
       "dry_snow"
-      "seasonal_snow"
+      "accumulation"
+      "land"
       "tundra"
       "unknown"];
 end
