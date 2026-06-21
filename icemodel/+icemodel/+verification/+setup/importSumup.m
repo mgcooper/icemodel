@@ -54,6 +54,18 @@ function manifest = importSumup(source_dir, kwargs)
    %    Setup/update tooling. Creates or refreshes staged data under
    %    demo/data/eval/sumup and is not part of normal verification runs.
    %
+   %  TODO (open decision - colocation bundle architecture): the SUMup
+   %    observation parser (buildSumupObservations) now reads the real 2025
+   %    Greenland files end-to-end, but the co-located RCM forcing legs
+   %    (buildSumupForcing: MAR met + RACMO Data) and the final eval-case
+   %    bundle structure are NOT finalized. The "colocation bundled-vs-metadata"
+   %    architecture - whether each SUMup case ships its own forcing bundle or
+   %    references the co-located PROMICE anchor's forcing via metadata - is an
+   %    open decision. Until it is resolved, stage SUMup OBSERVATIONS + the
+   %    co-location metadata only (see the obs-only staging path); do not wire
+   %    the forcing legs through this driver. The minimal observation-only set
+   %    lives under the gitignored data/eval/sumup/.
+   %
    % See also: icemodel.verification.setup.fetchSumup,
    %  icemodel.verification.setup.buildSumupObservations,
    %  icemodel.verification.setup.buildSumupForcing,

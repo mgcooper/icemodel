@@ -6,10 +6,10 @@ function source_dir = fetchSumup(kwargs)
    %     cache_dir="/some/other/path", strict=true)
    %
    %  Resolves the local source-cache directory holding the SUMup firn
-   %  observation files (density, accumulation/SMB, subsurface temperature)
-   %  used by icemodel.verification.setup.importSumup to stage the per-point
-   %  firn verification artifacts. By default the cache lives at
-   %  data/verification/sumup/ (gitignored) and is populated by the
+   %  observation files (density, SMB, subsurface temperature) used by
+   %  icemodel.verification.setup.importSumup to stage the per-point firn
+   %  verification artifacts. By default the cache lives at
+   %  data/verification/sumup/ (committed in this repo) and is populated by the
    %  user / developer following the retrieval instructions printed when
    %  files are missing.
    %
@@ -18,18 +18,18 @@ function source_dir = fetchSumup(kwargs)
    %  sourcing is required. FirnCover compaction strain is NOT in SUMup and
    %  is out of scope.
    %
-   %  Expected files (SUMup 2024 release; CSV or NetCDF accepted):
-   %    SUMup_*_density_*.{nc,csv}        firn/snow density profiles
-   %    SUMup_*_accumulation_*.{nc,csv}   SMB / accumulation
-   %    SUMup_*_temperature_*.{nc,csv}    subsurface temperature
-   %  Globbing is intentionally loose because the release file names carry a
-   %  year/version stamp and the user may keep CSV or NetCDF.
+   %  Expected files (SUMup 2025 release; NetCDF, per ice sheet):
+   %    SUMup_2025_density_greenland.nc       firn/snow density profiles
+   %    SUMup_2025_SMB_greenland.nc           surface mass balance
+   %    SUMup_2025_temperature_greenland.nc   subsurface temperature
+   %  Antarctic counterparts (*_antarctica.nc) ship in the same release but are
+   %  out of scope here. Globbing remains loose (per variable, *.nc/*.csv) so a
+   %  future release stamp or a CSV export still satisfies the cache check.
    %
-   %  Source: SUMup 2024 release, NSIDC G02288.
+   %  Source: SUMup 2025 release, Arctic Data Center / NSIDC G02288.
    %    DOI:        https://doi.org/10.18739/A2M61BR5M
-   %    Sub-DOIs:   density       10.18739/A2JH3D23R
-   %                accumulation  10.18739/A2DR2P790
    %    NSIDC:      https://nsidc.org/data/g02288
+   %    Contact:    Baptiste Vandecrux (bav@geus.dk)
    %
    %  Behaviour
    %    - For each required SUMup variable (density, accumulation,
@@ -53,8 +53,12 @@ function source_dir = fetchSumup(kwargs)
    %  Name-value
    %    cache_dir : string (default data/verification/sumup)
    %        Local source-cache directory.
-   %    variables : string vector (default density/accumulation/temperature)
+   %    variables : string vector (default density/SMB/temperature)
    %        Required SUMup variable groups to verify.
+   %    region : string (default "greenland")
+   %        Ice-sheet region tag used to scope the per-variable glob to the
+   %        Greenland files (the SUMup release ships *_greenland.nc and
+   %        *_antarctica.nc per variable).
    %    strict : logical (default true)
    %        Error when any required variable file is missing.
    %    silent : logical (default false)
@@ -71,7 +75,8 @@ function source_dir = fetchSumup(kwargs)
    arguments
       kwargs.cache_dir (1, 1) string = defaultCacheDir()
       kwargs.variables (1, :) string = ...
-         ["density", "accumulation", "temperature"]
+         ["density", "SMB", "temperature"]
+      kwargs.region   (1, 1) string = "greenland"
       kwargs.strict   (1, 1) logical = true
       kwargs.silent   (1, 1) logical = false
    end
@@ -83,8 +88,8 @@ function source_dir = fetchSumup(kwargs)
    icemodel.helpers.ensureDirExists(cache_dir);
 
    % Per-variable presence check. Each SUMup variable group needs at least one
-   % CSV or NetCDF file matching the release naming pattern.
-   missing = missingVariableFiles(cache_dir, kwargs.variables);
+   % CSV or NetCDF file matching the release naming pattern for the region.
+   missing = missingVariableFiles(cache_dir, kwargs.variables, kwargs.region);
 
    ok = isempty(missing);
    if ok
@@ -103,17 +108,16 @@ function source_dir = fetchSumup(kwargs)
       for j = 1:numel(missing)
          fprintf('  - %s\n', missing(j));
       end
-      fprintf('\nRetrieval (NASA Earthdata, access-gated):\n');
-      fprintf('  Dataset:   SUMup 2024 release, NSIDC G02288\n');
+      fprintf('\nRetrieval (Arctic Data Center / NSIDC G02288):\n');
+      fprintf('  Dataset:   SUMup 2025 release\n');
       fprintf('  Data DOI:  https://doi.org/10.18739/A2M61BR5M\n');
-      fprintf('  Sub-DOIs:  density      10.18739/A2JH3D23R\n');
-      fprintf('             accumulation 10.18739/A2DR2P790\n');
       fprintf('  NSIDC:     https://nsidc.org/data/g02288\n');
-      fprintf('  Login:     requires a (free) NASA Earthdata Login.\n');
-      fprintf('             Register at https://urs.earthdata.nasa.gov/\n');
-      fprintf('  Manual workflow: log in, download the density / accumulation\n');
-      fprintf('  / temperature CSV or NetCDF files, and place them into the\n');
-      fprintf('  cache directory above.\n');
+      fprintf('  Files:     SUMup_2025_density_greenland.nc\n');
+      fprintf('             SUMup_2025_SMB_greenland.nc\n');
+      fprintf('             SUMup_2025_temperature_greenland.nc\n');
+      fprintf('  Manual workflow: download the density / SMB / temperature\n');
+      fprintf('  NetCDF files for the region and place them into the cache\n');
+      fprintf('  directory above.\n');
       fprintf('\nAfter retrieval, re-run:\n');
       fprintf('  icemodel.verification.setup.fetchSumup()\n');
       fprintf('  icemodel.verification.setup.importSumup(source_dir, overwrite=true)\n');
@@ -142,25 +146,27 @@ function pathname = defaultCacheDir()
       'verification', 'sumup'));
 end
 
-function missing = missingVariableFiles(cache_dir, variables)
+function missing = missingVariableFiles(cache_dir, variables, region)
    %MISSINGVARIABLEFILES Collect the SUMup variable groups with no cache file.
    %
-   % Each required variable contributes one expected glob pattern. A variable
+   % Each required variable contributes one expected glob pattern keyed by the
+   % variable name and the region tag (e.g. *density*greenland*.nc). A variable
    % is satisfied by any matching CSV or NetCDF file. The return array is
    % preallocated to the worst case (one per variable) then trimmed.
 
    variables = reshape(variables, 1, []);
+   region = char(region);
    n_vars = numel(variables);
    missing = strings(n_vars, 1);
    n_missing = 0;
 
    for k = 1:n_vars
-      v = variables(k);
-      nc = dir(fullfile(cache_dir, sprintf('*%s*.nc', v)));
-      csv = dir(fullfile(cache_dir, sprintf('*%s*.csv', v)));
+      v = char(variables(k));
+      nc = dir(fullfile(cache_dir, sprintf('*%s*%s*.nc', v, region)));
+      csv = dir(fullfile(cache_dir, sprintf('*%s*%s*.csv', v, region)));
       if isempty(nc) && isempty(csv)
          n_missing = n_missing + 1;
-         missing(n_missing) = sprintf('*%s*.{nc,csv}', v);
+         missing(n_missing) = sprintf('*%s*%s*.{nc,csv}', v, region);
       end
    end
 
