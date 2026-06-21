@@ -19,7 +19,7 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    %    ulr -> lwu [W m-2]             albedo -> albedo [-]
    %    cc [%] -> cfrac [-]            t_surf [C] -> tsfc [K]
    %    dshf_u -> shf, dlhf_u -> lhf [W m-2]
-   %    rainfall_cor_u [mm] -> rainfall [mm per timestep]
+   %    rainfall_cor_u [mm] -> rainf [mm per timestep]
    %
    % Evaluation channels (the QC'd L3 surface vars, read not derived):
    %    snow_height -> snow_height [m]   (snow surface rel. ice surface)
@@ -94,7 +94,7 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
       'tsfc',      't_surf',         ''
       'shf',       'dshf_u',         ''
       'lhf',       'dlhf_u',         ''
-      'rainfall',  'rainfall_cor_u', ''
+      'rainf',     'rainfall_cor_u', ''
       'snow_height',     'snow_height',     ''
       'z_ice_surf',      'z_ice_surf',      ''
       'z_surf_combined', 'z_surf_combined', ''
