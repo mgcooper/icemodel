@@ -18,10 +18,9 @@ function [albedo, Time] = readGeusModis(filename, location, method, kwargs)
    %    cells are averaged over the polygon. remap="conservative" (default)
    %    is the exact overlap-area-weighted catchment mean via the exactremap
    %    toolbox (helpers.remapPolygon), matching the legacy readGeusModis
-   %    ALBavgInPoly ROI mean and the conservative remap used for every other
-   %    gridded channel; remap="equal" is a plain in-polygon cell-centre
-   %    mean. The remap runs in the GEUS 5 km polar-stereographic frame (the
-   %    grid is regular there).
+   %    ALBavgInPoly ROI mean; remap="equal" is a plain in-polygon
+   %    cell-centre mean. The remap runs in the GEUS 5 km polar-stereographic
+   %    frame (the grid is regular there).
    %
    % Inputs
    %  filename - GEUS reflectivity NetCDF for one year
@@ -51,17 +50,14 @@ function [albedo, Time] = readGeusModis(filename, location, method, kwargs)
    LON = double(ncread(filename, 'lon'));
    LAT = double(ncread(filename, 'lat'));
 
-   % Project the GEUS 5 km grid into its NATIVE polar-stereographic frame
-   % (central meridian 39W, true scale 70N, sphere), where the 5 km posting
-   % is axis-aligned and uniform, then rebuild EXACTLY regular axes via
-   % linspace so the conservative remap sees a perfectly regular grid. The
-   % EPSG:3413 reprojection (psnProjection, central meridian 45W) is ROTATED
-   % and non-uniform here, which trips exactremap's regular-grid check; the
-   % native frame is the GEUS analogue of the MAR Xnat/Ynat axes. The tiny
-   % linspace correction (sub-metre over a ~5.15 km cell) keeps the nearest-
-   % cell search and overlap geometry faithful to the true cell centres.
+   % Project the GEUS 5 km grid into its native polar-stereographic frame
+   % (sphere, true scale 71N, central meridian 39W; see geusModisProjection),
+   % where the 5 km posting is axis-aligned and uniform, then rebuild exactly
+   % regular axes via linspace (a sub-metre correction over the 5 km cell) so
+   % the conservative remap operates on a perfectly regular grid - the GEUS
+   % analogue of the MAR Xnat/Ynat axes.
    geus = icemodel.forcing.helpers.geusModisProjection();
-   [Xp, Yp] = mfwdtran(geus, LAT, LON);
+   [Xp, Yp] = projfwd(geus, LAT, LON);
    xax = linspace(mean(Xp(1, :)), mean(Xp(end, :)), size(Xp, 1)).';
    yax = linspace(mean(Yp(:, 1)), mean(Yp(:, end)), size(Yp, 2));
    [X, Y] = ndgrid(xax, yax);
@@ -69,7 +65,7 @@ function [albedo, Time] = readGeusModis(filename, location, method, kwargs)
    if isnumeric(location)
       assert(isequal(size(location), [1 2]), ...
          'point location must be [lat lon]')
-      [xq, yq] = mfwdtran(geus, location(1), location(2));
+      [xq, yq] = projfwd(geus, location(1), location(2));
       query = [xq, yq];
    else
       % Polygon vertices arrive in EPSG:3413 metres; map them into the GEUS
@@ -78,7 +74,7 @@ function [albedo, Time] = readGeusModis(filename, location, method, kwargs)
       proj = icemodel.forcing.helpers.psnProjection();
       [vlat, vlon] = projinv(proj, location.Vertices(:, 1), ...
          location.Vertices(:, 2));
-      [qx, qy] = mfwdtran(geus, vlat, vlon);
+      [qx, qy] = projfwd(geus, vlat, vlon);
       query = polyshape(qx, qy);
    end
 

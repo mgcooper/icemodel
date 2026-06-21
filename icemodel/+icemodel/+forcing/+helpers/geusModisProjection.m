@@ -1,32 +1,36 @@
-function mstruct = geusModisProjection()
+function proj = geusModisProjection()
    %GEUSMODISPROJECTION Native polar-stereographic projection of the GEUS grid.
    %
-   %  mstruct = icemodel.forcing.helpers.geusModisProjection()
+   %  proj = icemodel.forcing.helpers.geusModisProjection()
    %
-   % Returns the map projection in which the GEUS Greenland reflectivity
-   % (MODIS albedo) 5 km grid is REGULAR, as a map projection structure
-   % (mstruct) usable with mfwdtran / minvtran.
+   % Returns the projection in which the GEUS Greenland reflectivity (MODIS
+   % albedo) 5 km grid is regular, as a projcrs usable with projfwd / projinv.
    %
-   % The Greenland_Reflectivity_<YYYY>_5km_C6.nc files carry only 2-D
-   % lon/lat coordinate grids (no native x/y coordinate vectors and no CRS
-   % attributes). The grid is the GIMP/MODIS Greenland polar stereographic
-   % posting: a sphere (radius 6378137 m), central meridian 39W, latitude of
-   % true scale 70N. Reprojecting the lon/lat to this frame yields an
-   % axis-aligned uniform ~5.15 km grid (off-axis residual < 0.3 m), whereas
-   % reprojecting to EPSG:3413 (psnProjection, central meridian 45W) yields a
-   % ROTATED, non-uniform grid that fails exactremap's regular-grid check.
-   %
-   % Determined empirically (2026-06-19) by sweeping the stereographic
-   % parameters for the projection that minimises off-axis variation: the
-   % lon/lat roundtrip through this mstruct closes to ~1e-13 deg in latitude,
-   % confirming it is the genuine native frame, not an approximation.
+   % The Greenland_Reflectivity_<YYYY>_5km_C6.nc files carry only 2-D lon/lat
+   % coordinate grids (no native x/y vectors, no CRS attributes). The posting
+   % is documented in the accompanying MapProjektion.txt: Polar Stereographic
+   % on a sphere (radius 6 370 000 m), latitude of true scale 71N, central
+   % meridian 39W, on a 301 x 561 grid of 5 km cells. There is no standard
+   % EPSG code for this frame, so it is built from a WKT string.
    %
    % See also: icemodel.forcing.readGeusModis,
-   %  icemodel.forcing.helpers.psnProjection, mfwdtran, minvtran
+   %  icemodel.forcing.helpers.psnProjection, projfwd, projinv
 
-   mstruct = defaultm('stereo');
-   mstruct.origin = [90 -39 0];     % north pole, central meridian 39W
-   mstruct.geoid = [6378137 0];     % sphere, radius 6378137 m (eccentricity 0)
-   mstruct.mapparallels = 70;       % latitude of true scale 70N
-   mstruct = defaultm(mstruct);
+   wkt = [ ...
+      'PROJCRS["GEUS Greenland Reflectivity 5km PS",' ...
+      'BASEGEOGCRS["Sphere",' ...
+      'DATUM["Sphere",ELLIPSOID["Sphere",6370000,0,LENGTHUNIT["metre",1]]],' ...
+      'PRIMEM["Greenwich",0,ANGLEUNIT["degree",0.0174532925199433]]],' ...
+      'CONVERSION["Polar Stereographic",' ...
+      'METHOD["Polar Stereographic (variant B)",ID["EPSG",9829]],' ...
+      'PARAMETER["Latitude of standard parallel",71,' ...
+      'ANGLEUNIT["degree",0.0174532925199433],ID["EPSG",8832]],' ...
+      'PARAMETER["Longitude of origin",-39,' ...
+      'ANGLEUNIT["degree",0.0174532925199433],ID["EPSG",8833]],' ...
+      'PARAMETER["False easting",0,LENGTHUNIT["metre",1],ID["EPSG",8806]],' ...
+      'PARAMETER["False northing",0,LENGTHUNIT["metre",1],ID["EPSG",8807]]],' ...
+      'CS[Cartesian,2],' ...
+      'AXIS["easting (X)",north,ORDER[1],LENGTHUNIT["metre",1]],' ...
+      'AXIS["northing (Y)",north,ORDER[2],LENGTHUNIT["metre",1]]]'];
+   proj = projcrs(wkt);
 end
