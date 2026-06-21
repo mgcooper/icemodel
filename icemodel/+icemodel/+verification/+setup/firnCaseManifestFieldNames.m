@@ -25,6 +25,10 @@ function names = firnCaseManifestFieldNames()
    %    site_name             display name
    %    surface_zone          glaciological zone (namelists.surfacezone)
    %    eval_target           capability descriptor array (namelists.evaltarget)
+   %    permafrost_zone       permafrost extent class, ORTHOGONAL to surface_zone
+   %                          (namelists.permafrostzone): off-ice land/tundra
+   %                          sites carry the Brown et al. (1997) extent, ice-sheet
+   %                          /glacier sites carry "none".
    %    site_location         WGS84 + EPSG:3413 projected coordinates
    %    period                {start, end} the case's evaluation window
    %    forcing_sources       string array of available forcing source ids
@@ -50,6 +54,7 @@ function names = firnCaseManifestFieldNames()
       "site_name"
       "surface_zone"
       "eval_target"
+      "permafrost_zone"
       "site_location"
       "period"
       "forcing_sources"

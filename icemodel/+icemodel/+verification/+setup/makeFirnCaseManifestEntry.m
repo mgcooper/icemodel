@@ -33,4 +33,5 @@ function entry = makeFirnCaseManifestEntry(values)
    % capability is not meaningful.
    icemodel.verification.setup.validateSurfaceZone(entry.surface_zone);
    icemodel.verification.setup.validateEvalTarget(entry.eval_target);
+   icemodel.verification.setup.validatePermafrostZone(entry.permafrost_zone);
 end

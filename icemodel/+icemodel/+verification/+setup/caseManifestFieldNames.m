@@ -18,6 +18,7 @@ function names = caseManifestFieldNames()
       "site_name"
       "surface_zone"
       "eval_target"
+      "permafrost_zone"
       "evaluation_file"
       "reference_file"
       "native_timestep"

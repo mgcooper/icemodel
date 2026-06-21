@@ -30,4 +30,5 @@ function entry = makeCaseManifestEntry(values)
    % meaningful (e.g. analytical Laugh-Tests benchmarks).
    icemodel.verification.setup.validateSurfaceZone(entry.surface_zone);
    icemodel.verification.setup.validateEvalTarget(entry.eval_target);
+   icemodel.verification.setup.validatePermafrostZone(entry.permafrost_zone);
 end
