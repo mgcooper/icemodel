@@ -195,25 +195,29 @@ either error with a stable error id or return the partial path.
 
 ### PROMICE co-located firn staging (`importPromiceSites`)
 
-`importPromiceSites` stages a co-located PROMICE + MAR + MERRA-2 met +
-RACMO Data bundle anchored on each PROMICE AWS site. The per-leg windows are
-**decoupled**: PROMICE met/eval and the MAR/MERRA met legs use the requested
-study window (default `2009-2022`) intersected with each source's on-disk
-availability, while the RACMO Data leg uses its own coverage (FGRN11 surface
-~2012-2015, subsurface ~2012-2018) independently. A leg with no on-disk
-overlap is skipped-with-reason (recorded at `colocated_forcing.<model>`), and a
+`importPromiceSites` stages PROMICE + MAR + MERRA-2 met + RACMO Data anchored on
+each PROMICE AWS site, writing **metadata-only** case manifests (colocation is
+recorded by source id, NOT bundled into evaluation.mat/reference.mat; the data
+lives in individual `met_<site>_<source>_<window>.mat` / per-year userdata files
+via the standard naming convention). The per-leg windows are **decoupled**:
+PROMICE met/eval defaults to **all available years for each station** (read live
+from the L3 record, including partial years) and is **never gated by RCM
+coverage**; the MAR/MERRA met legs use the PROMICE window intersected with each
+source's on-disk availability, while the RACMO Data leg uses its own coverage
+(FGRN11 surface ~2012-2015, subsurface ~2012-2018) independently. A leg with no
+on-disk overlap is skipped-with-reason (recorded at `colocation.<model>`), and a
 requested-vs-actual coverage table is printed at the start of every run. Each
-leg's actual staged window is recorded at `colocated_forcing.<model>.window`.
+leg's actual staged window is recorded at `colocation.<model>.window`.
 
 The `output_root` kwarg is the explicit committed-vs-research switch: eval
-artifacts go to `<output_root>/eval`, forcing/Data to `<output_root>/input`.
+manifest goes to `<output_root>/eval`, forcing/Data to `<output_root>/input`.
 
 ```matlab
-% Committed CI fixtures: the KAN_L/M/U transect, 2009-2022, into demo/data
-% (this is what is committed under demo/data/eval/promice/).
+% Committed CI fixtures: the KAN_L/M/U transect into demo/data (this is what is
+% committed under demo/data/eval/promice/). Omit startdate/enddate to use each
+% station's full available record; pass them only to restrict the window.
 icemodel.verification.setup.importPromiceSites( ...
    sites=["KAN_L","KAN_M","KAN_U"], ...
-   startdate="2009-01-01", enddate="2022-12-31", ...
    output_root=icemodel.internal.fullpath("demo","data"), ...
    overwrite=true);
 
@@ -226,10 +230,14 @@ icemodel.verification.setup.importPromiceSites( ...
    overwrite=true);
 ```
 
-Non-KAN stations take `surface_zone` from the AWS_sites_metadata.csv
-`location_type` field (`tundra` maps to `tundra`; everything else, including
-the coarse `ice sheet`, is recorded as `unknown` rather than guessed); the KAN
-anchors are single-sourced from `promicesiteinfo(site).zone`.
+`surface_zone` is the glaciological zone ONLY (`ablation`/`percolation`/
+`wet_snow`/`dry_snow`/`accumulation`/`land`/`tundra`/`unknown`); the separate
+`eval_target` descriptor names the model capability a case exercises
+(`seasonal_snow`/`bare_ice`/`firn`/`ablation`). Both are single-sourced from
+`promicesiteinfo(site).surface_zone` / `.eval_target`. The KAN anchors are
+AUTHORITATIVE (KAN_L/M=`ablation`, KAN_U=`percolation`); the ~30 non-KAN
+stations get a **first-pass** zone from AWS_sites_metadata.csv `location_type` +
+`altitude_installation` (flagged `classification="first_pass"` for review).
 
 ## Support Namespaces
 
