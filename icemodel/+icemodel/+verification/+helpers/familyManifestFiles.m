@@ -12,8 +12,7 @@ function files = familyManifestFiles(kwargs)
    %                             evaluation-data root without mutating config.
    %
    % Outputs
-   %  files   Sorted string column of `eval/<snow|firn>/<family>/manifest.json`
-   %          paths.
+   %  files   Sorted string column of `eval/<family>/manifest.json` paths.
    %
    % Role
    %  Operational helper used by listcases to discover staged verification
@@ -24,22 +23,17 @@ function files = familyManifestFiles(kwargs)
       kwargs.icemodel_config_casename (1, 1) string = "test"
    end
 
-   % Resolve both verification roots; dataset-family subfolders are discovered
-   % dynamically under each so new families do not need code changes here. The
-   % snow root holds esm_snowmip / laugh_tests; the firn root holds the
-   % co-located firn families (promice, sumup).
-   snow_data_root = icemodel.verification.helpers.snowDataRoot( ...
-      "evaluation_data_root", kwargs.evaluation_data_root, ...
-      "icemodel_config_casename", kwargs.icemodel_config_casename);
-   firn_data_root = icemodel.verification.helpers.firnDataRoot( ...
+   % Resolve the single evaluation-data root; dataset-family subfolders are
+   % discovered dynamically beneath it so new families need no code change
+   % here. The taxonomy is family-flat (esm_snowmip, laugh_tests, promice,
+   % sumup) with no intermediate snow/ or firn/ process-split level.
+   evaluation_data_root = icemodel.verification.helpers.evaluationDataRoot( ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
       "icemodel_config_casename", kwargs.icemodel_config_casename);
 
-   % Find one manifest per family under each root. The wildcard is intentionally
+   % Find one manifest per family under the root. The wildcard is intentionally
    % one level deep because case folders live below the family folder.
-   entries = [ ...
-      dir(fullfile(snow_data_root, "*", "manifest.json")); ...
-      dir(fullfile(firn_data_root, "*", "manifest.json"))];
+   entries = dir(fullfile(evaluation_data_root, "*", "manifest.json"));
    if isempty(entries)
       files = strings(0, 1);
       return

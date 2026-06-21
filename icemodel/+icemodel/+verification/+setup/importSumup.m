@@ -6,7 +6,7 @@ function manifest = importSumup(source_dir, kwargs)
    %     points=[lat lon; ...], overwrite=true)
    %
    %  Stages SUMup firn observation cases under
-   %  demo/data/eval/firn/sumup/<case_id>/, mirroring importPromiceSites'
+   %  demo/data/eval/sumup/<case_id>/, mirroring importPromiceSites'
    %  structure. For each selected SUMup point it:
    %    - reads the nearest SUMup firn observations (density / subsurface
    %      temperature / accumulation) via buildSumupObservations;
@@ -27,7 +27,7 @@ function manifest = importSumup(source_dir, kwargs)
    %
    %  Inputs
    %    source_dir : string  SUMup cache dir (see fetchSumup). When blank, the
-   %                 default data/verification/firn/sumup is used.
+   %                 default data/verification/sumup is used.
    %
    %  Name-value
    %    points : Nx2 double  [lat lon] WGS84 points to stage. Default: the
@@ -52,7 +52,7 @@ function manifest = importSumup(source_dir, kwargs)
    %
    %  Role
    %    Setup/update tooling. Creates or refreshes staged data under
-   %    demo/data/eval/firn/sumup and is not part of normal verification runs.
+   %    demo/data/eval/sumup and is not part of normal verification runs.
    %
    % See also: icemodel.verification.setup.fetchSumup,
    %  icemodel.verification.setup.buildSumupObservations,
@@ -109,12 +109,12 @@ function manifest = importSumup(source_dir, kwargs)
    end
    years = kwargs.years;
 
-   % Resolve the firn/sumup family root + the input layout.
+   % Resolve the sumup family root + the input layout.
    dataset_family = "sumup";
-   firn_data_root = icemodel.verification.helpers.firnDataRoot( ...
+   evaluation_data_root = icemodel.verification.helpers.evaluationDataRoot( ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
       "icemodel_config_casename", kwargs.icemodel_config_casename);
-   family_root = fullfile(firn_data_root, dataset_family);
+   family_root = fullfile(evaluation_data_root, dataset_family);
    icemodel.helpers.ensureDirExists(family_root);
    manifest_file = fullfile(family_root, "manifest.json");
 
@@ -203,6 +203,7 @@ function manifest = importSumup(source_dir, kwargs)
             'firn_observational'
             char(case_id)
             char(case_id)
+            char(surfaceZoneForSumup(is_coloc, anchor))
             site_location
             char(fullfile(alias, "evaluation.mat"))
             char(fullfile(alias, "reference.mat"))
@@ -256,22 +257,22 @@ function cache_dir = resolveCacheDir(source_dir)
       cache_dir = source_dir;
    else
       cache_dir = string(fullfile(icemodel.getpath('data'), ...
-         'verification', 'firn', 'sumup'));
+         'verification', 'sumup'));
    end
 end
 
 function points = defaultAnchorPoints()
-   %DEFAULTANCHORPOINTS PROMICE anchor [lat lon] from the firn/promice manifest.
+   %DEFAULTANCHORPOINTS PROMICE anchor [lat lon] from the promice manifest.
    %
    % SUMup is a point collection with no curated default site list, so the
    % default points are the committed PROMICE anchors - this stages SUMup
-   % cases that co-locate with the existing firn/promice bundles. Returns an
+   % cases that co-locate with the existing promice bundles. Returns an
    % empty 0x2 when no promice manifest is present (the caller then errors with
    % an explicit no-points message rather than fabricating points).
    points = zeros(0, 2);
-   firn_root = icemodel.verification.helpers.firnDataRoot( ...
+   eval_root = icemodel.verification.helpers.evaluationDataRoot( ...
       "icemodel_config_casename", "test");
-   manifest_file = fullfile(firn_root, "promice", "manifest.json");
+   manifest_file = fullfile(eval_root, "promice", "manifest.json");
    if exist(manifest_file, 'file') ~= 2
       return
    end
@@ -308,6 +309,24 @@ function note = colocationNote(is_coloc, anchor)
       note = sprintf(' co-located with PROMICE %s', anchor.site);
    else
       note = '';
+   end
+end
+
+function zone = surfaceZoneForSumup(is_coloc, anchor)
+   %SURFACEZONEFORSUMUP Resolve a SUMup case surface_zone.
+   %
+   % SUMup points are not staged yet; the case-manifest surface_zone field is
+   % supported but left unset ("") here. When a SUMup point co-locates with a
+   % curated PROMICE anchor the zone could be inherited from
+   % promicesiteinfo(anchor.site).zone, but until SUMup staging is wired this
+   % returns "" so the schema is satisfied without guessing a regime.
+   zone = "";
+   if is_coloc && ~isempty(anchor)
+      try
+         zone = icemodel.verification.helpers.promicesiteinfo(anchor.site).zone;
+      catch
+         zone = "";
+      end
    end
 end
 

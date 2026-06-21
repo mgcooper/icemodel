@@ -4,7 +4,7 @@ function manifest = readFamilyManifest(pathname)
    %  manifest = icemodel.verification.helpers.readFamilyManifest(pathname)
    %
    % Inputs
-   %  pathname   Path to `eval/snow/<family>/manifest.json`.
+   %  pathname   Path to `eval/<family>/manifest.json`.
    %
    % Outputs
    %  manifest   Decoded family manifest with `manifest_path` and `family_root`

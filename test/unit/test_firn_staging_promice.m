@@ -76,6 +76,12 @@ function test_colocated_bundle_and_manifest_resolve(testCase)
    testCase.verifyEqual(string(c.case_type), "firn_observational");
    testCase.verifyEqual(string(c.site_id), "KAN_M");
 
+   % surface_zone is single-sourced from promicesiteinfo (KAN_M is the upper
+   % ablation zone) and must validate against the canonical namelist.
+   testCase.verifyEqual(string(c.surface_zone), "upper_ablation");
+   testCase.verifyTrue(ismember(string(c.surface_zone), ...
+      icemodel.verification.namelists.surfacezone()));
+
    % Site location: WGS84 + EPSG:3413 recorded.
    testCase.verifyEqual(c.site_location.lat_wgs84, 67.067, 'AbsTol', 1e-2);
    testCase.verifyTrue(isfinite(c.site_location.x_epsg3413));
@@ -98,7 +104,7 @@ function test_staged_files_exist_on_disk(testCase)
 
    met_dir = fullfile(testCase.TestData.input_root, 'met');
    ud_dir = fullfile(testCase.TestData.input_root, 'userdata');
-   eval_dir = fullfile(testCase.TestData.eval_root, 'firn', 'promice', 'kanm');
+   eval_dir = fullfile(testCase.TestData.eval_root, 'promice', 'kanm');
 
    testCase.verifyNotEmpty(dir(fullfile(met_dir, 'met_kanm_promice_*.mat')));
    testCase.verifyNotEmpty(dir(fullfile(met_dir, 'met_kanm_mar_*.mat')));
@@ -109,7 +115,7 @@ function test_staged_files_exist_on_disk(testCase)
    testCase.verifyTrue(isfile(fullfile(eval_dir, 'evaluation.mat')));
    testCase.verifyTrue(isfile(fullfile(eval_dir, 'reference.mat')));
    testCase.verifyTrue(isfile(fullfile(testCase.TestData.eval_root, ...
-      'firn', 'promice', 'manifest.json')));
+      'promice', 'manifest.json')));
 end
 
 function test_evaluation_and_reference_artifacts_load(testCase)
@@ -117,7 +123,7 @@ function test_evaluation_and_reference_artifacts_load(testCase)
    % round-trip and carry the expected timeseries payloads.
 
    stageKanm(testCase, "2013-06-01", "2013-06-30");
-   eval_dir = fullfile(testCase.TestData.eval_root, 'firn', 'promice', 'kanm');
+   eval_dir = fullfile(testCase.TestData.eval_root, 'promice', 'kanm');
 
    ev = load(fullfile(eval_dir, 'evaluation.mat'), 'targets');
    testCase.verifyEqual(string(ev.targets.format), "timeseries");
@@ -134,7 +140,7 @@ function test_manifest_json_is_valid(testCase)
    % case schema fields.
 
    stageKanm(testCase, "2013-06-01", "2013-06-30");
-   manifest_file = fullfile(testCase.TestData.eval_root, 'firn', ...
+   manifest_file = fullfile(testCase.TestData.eval_root, ...
       'promice', 'manifest.json');
 
    decoded = jsondecode(fileread(manifest_file));
@@ -165,7 +171,7 @@ function test_data_gated_site_is_skipped_not_fabricated(testCase)
    testCase.verifyEqual(string(manifest.skipped(1).site), "ZZZ_NOPE");
    testCase.verifyTrue(strlength(manifest.skipped(1).reason) > 0);
    testCase.verifyFalse(isfolder(fullfile(testCase.TestData.eval_root, ...
-      'firn', 'promice', 'zzznope')));
+      'promice', 'zzznope')));
 end
 
 %% Local helpers

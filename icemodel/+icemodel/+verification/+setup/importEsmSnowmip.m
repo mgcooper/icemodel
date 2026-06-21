@@ -8,7 +8,7 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %     case_ids="cdp", startdate="2005-10-01", enddate="2006-07-01")
    %
    %  Stages the requested ESM-SnowMIP site cases under
-   %  demo/data/eval/snow/esm_snowmip/<sitename>/. All 10 reference sites are
+   %  demo/data/eval/esm_snowmip/<sitename>/. All 10 reference sites are
    %  supported; the per-site forcing and observation artifacts are produced by
    %  the reusable builders buildEsmSnowmipForcing / buildEsmSnowmipObservations
    %  so the same conversion path is used for staging and for any future
@@ -50,7 +50,8 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %
    %  Role
    %    Setup/update tooling. This function creates or refreshes staged data
-   %    under demo/data/eval/snow and is not part of normal verification runs.
+   %    under demo/data/eval/esm_snowmip and is not part of normal verification
+   %    runs.
    %    Layout / file-presence guarantees come from
    %    icemodel.verification.setup.fetchEsmSnowmip; downstream from that
    %    point this importer can write the resolved output files directly
@@ -101,15 +102,15 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    dataset_family = "esm_snowmip";
 
    % Resolve the path to the dataset family sub-folder
-   %   <snow_data_root>/esm_snowmip
-   snow_data_root = icemodel.verification.helpers.snowDataRoot( ...
+   %   <evaluation_data_root>/esm_snowmip
+   evaluation_data_root = icemodel.verification.helpers.evaluationDataRoot( ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
       "icemodel_config_casename", kwargs.icemodel_config_casename);
-   family_root = fullfile(snow_data_root, dataset_family);
+   family_root = fullfile(evaluation_data_root, dataset_family);
    icemodel.helpers.ensureDirExists(family_root);
 
    % Resolve the path to the dataset family manifest
-   %   <snow_data_root>/esm_snowmip/manifest.json
+   %   <evaluation_data_root>/esm_snowmip/manifest.json
    manifest_file = fullfile(family_root, "manifest.json");
 
    % Stage each requested case.
@@ -202,6 +203,7 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
          'esm_site'
          char(sitename)
          char(info.long_name)
+         'seasonal_snow'
          char(fullfile(sitename, "evaluation.mat"))
          char(fullfile(sitename, "reference.mat"))
          'hourly'

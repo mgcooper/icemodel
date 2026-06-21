@@ -16,6 +16,7 @@ function names = caseManifestFieldNames()
       "case_type"
       "site_id"
       "site_name"
+      "surface_zone"
       "evaluation_file"
       "reference_file"
       "native_timestep"

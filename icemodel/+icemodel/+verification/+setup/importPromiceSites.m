@@ -9,7 +9,7 @@ function manifest = importPromiceSites(kwargs)
    %
    %  Stages a co-located, multi-model forcing/Data bundle anchored on each
    %  requested PROMICE automatic-weather-station site, under
-   %  demo/data/eval/firn/promice/<site>/. PROMICE sites anchor the firn
+   %  demo/data/eval/promice/<site>/. PROMICE sites anchor the firn
    %  evaluation: downstream firn-model work swaps each model's albedo into
    %  the PROMICE met and runs the firn model at the PROMICE point, comparing
    %  against the RCMs and the station observations. This driver therefore
@@ -25,7 +25,7 @@ function manifest = importPromiceSites(kwargs)
    %      * RACMO Data at the point    (buildRacmoData   -> writeuserdata)
    %        (RACMO carries no met channels and is never a met source.)
    %
-   %    Evaluation artifacts (firn family root, demo/data/eval/firn/promice/):
+   %    Evaluation artifacts (promice family root, demo/data/eval/promice/):
    %      * evaluation.mat : PROMICE observed Data as comparison targets
    %      * reference.mat  : RACMO Data as the co-located RCM reference
    %      * per-site manifest.json fragment, rolled into the family manifest
@@ -75,12 +75,12 @@ function manifest = importPromiceSites(kwargs)
    %
    %  Role
    %    Setup/update tooling. Creates or refreshes staged data under
-   %    demo/data/eval/firn and the standard icemodel input layout; not part
+   %    demo/data/eval/promice and the standard icemodel input layout; not part
    %    of normal verification runs.
    %
    % See also: icemodel.verification.setup.importEsmSnowmip,
    %  icemodel.verification.helpers.promicesiteinfo,
-   %  icemodel.verification.helpers.firnDataRoot,
+   %  icemodel.verification.helpers.evaluationDataRoot,
    %  icemodel.forcing.buildPromiceMet, icemodel.forcing.buildPromiceData,
    %  icemodel.forcing.buildMarMet, icemodel.forcing.buildMerraMet,
    %  icemodel.forcing.buildRacmoData
@@ -127,12 +127,12 @@ function manifest = importPromiceSites(kwargs)
    end
    years = year(window_start):year(window_end);
 
-   % Resolve the firn/promice family root and its manifest.
+   % Resolve the promice family root and its manifest.
    dataset_family = "promice";
-   firn_data_root = icemodel.verification.helpers.firnDataRoot( ...
+   evaluation_data_root = icemodel.verification.helpers.evaluationDataRoot( ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
       "icemodel_config_casename", kwargs.icemodel_config_casename);
-   family_root = fullfile(firn_data_root, dataset_family);
+   family_root = fullfile(evaluation_data_root, dataset_family);
    icemodel.helpers.ensureDirExists(family_root);
    manifest_file = fullfile(family_root, "manifest.json");
 
@@ -260,9 +260,15 @@ function manifest = importPromiceSites(kwargs)
             anchor = icemodel.verification.helpers.promicesiteinfo(site);
             site_name = anchor.long_name;
             site_note = anchor.note;
+            % surface_zone is single-sourced from the curated catalog so the
+            % manifest never drifts from promicesiteinfo (kanl=lower_ablation,
+            % kanm=upper_ablation, kanu=lower_percolation).
+            surface_zone = anchor.zone;
          catch
             site_name = site;
             site_note = "Uncurated PROMICE station (generic ablation recipe).";
+            % Uncurated stations have no catalog zone; omit it rather than guess.
+            surface_zone = "";
          end
 
          case_values = { ...
@@ -270,6 +276,7 @@ function manifest = importPromiceSites(kwargs)
             'firn_observational'
             char(site)
             char(site_name)
+            char(surface_zone)
             site_location
             char(fullfile(alias, "evaluation.mat"))
             char(fullfile(alias, "reference.mat"))

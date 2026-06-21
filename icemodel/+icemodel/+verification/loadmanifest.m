@@ -33,10 +33,10 @@ function manifest = loadmanifest(case_id, kwargs)
 
    % Give a path-aware error when no staged manifests are available.
    if isempty(cases)
-      snow_data_root = icemodel.verification.helpers.snowDataRoot( ...
+      evaluation_data_root = icemodel.verification.helpers.evaluationDataRoot( ...
          "evaluation_data_root", kwargs.evaluation_data_root, ...
          "icemodel_config_casename", kwargs.icemodel_config_casename);
-      error('no snow-verification cases found under %s', snow_data_root)
+      error('no verification cases found under %s', evaluation_data_root)
    end
 
    % Match case ids case-insensitively for interactive convenience while still

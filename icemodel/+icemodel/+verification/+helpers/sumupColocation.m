@@ -90,19 +90,19 @@ end
 
 %% Local helpers
 function anchors = anchorsFromPromiceManifest(evaluation_data_root, casename)
-   %ANCHORSFROMPROMICEMANIFEST Read anchor coords from the firn/promice manifest.
+   %ANCHORSFROMPROMICEMANIFEST Read anchor coords from the promice manifest.
    %
    % The PROMICE anchor coordinates are not stored in a static list; the
    % staging driver records them (x_epsg3413/y_epsg3413) in the committed
-   % firn/promice manifest. Read them from there so the co-location reference
+   % promice manifest. Read them from there so the co-location reference
    % never drifts from the staged anchors. Returns [] when no manifest exists.
 
    anchors = struct('site', {}, 'x_epsg3413', {}, 'y_epsg3413', {});
 
-   firn_root = icemodel.verification.helpers.firnDataRoot( ...
+   eval_root = icemodel.verification.helpers.evaluationDataRoot( ...
       "evaluation_data_root", evaluation_data_root, ...
       "icemodel_config_casename", casename);
-   manifest_file = fullfile(firn_root, "promice", "manifest.json");
+   manifest_file = fullfile(eval_root, "promice", "manifest.json");
    if exist(manifest_file, 'file') ~= 2
       return
    end

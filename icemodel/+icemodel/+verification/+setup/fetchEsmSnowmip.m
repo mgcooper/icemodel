@@ -9,7 +9,7 @@ function source_dir = fetchEsmSnowmip(kwargs)
    %  meteorological / observation NetCDF files used by
    %  icemodel.verification.setup.importEsmSnowmip to stage the per-site
    %  verification artifacts. By default the cache lives at
-   %  data/verification/snow/esm_snowmip/ (gitignored) and is populated
+   %  data/verification/esm_snowmip/ (gitignored) and is populated
    %  by the user / developer following the retrieval instructions
    %  printed when files are missing.
    %
@@ -46,7 +46,7 @@ function source_dir = fetchEsmSnowmip(kwargs)
    %    layout is correct without repeating per-file checks.
    %
    %  Name-value
-   %    cache_dir : string (default data/verification/snow/esm_snowmip)
+   %    cache_dir : string (default data/verification/esm_snowmip)
    %        Local source-cache directory.
    %    sitenames : string vector (default all 10 ESM-SnowMIP sites)
    %        Restrict the validation to a subset (used by builders that
@@ -141,9 +141,9 @@ function pathname = defaultCacheDir()
    %
    % icemodel.getpath('data') returns the canonical top-level data root
    % (<repo>/data/), which the verification source-cache layout extends
-   % under data/verification/snow/<dataset_family>/.
+   % under data/verification/<dataset_family>/ (family-flat taxonomy).
    pathname = string(fullfile(icemodel.getpath('data'), ...
-      'verification', 'snow', 'esm_snowmip'));
+      'verification', 'esm_snowmip'));
 end
 
 function [missing, broken] = missingOrBrokenFiles(cache_dir, sitenames)

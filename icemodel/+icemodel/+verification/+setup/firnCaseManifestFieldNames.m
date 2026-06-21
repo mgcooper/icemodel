@@ -25,6 +25,7 @@ function names = firnCaseManifestFieldNames()
       "case_type"
       "site_id"
       "site_name"
+      "surface_zone"
       "site_location"
       "evaluation_file"
       "reference_file"

@@ -27,4 +27,8 @@ function entry = makeFirnCaseManifestEntry(values)
    end
 
    entry = cell2struct(values(:), names, 1);
+
+   % Validate surface_zone against the canonical vocabulary. An empty value
+   % ("") is permitted for cases where the surface regime is not meaningful.
+   icemodel.verification.setup.validateSurfaceZone(entry.surface_zone);
 end

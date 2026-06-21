@@ -18,16 +18,14 @@ data/verification/**
 !data/output/.gitkeep
 !data/verification/
 !data/verification/.gitkeep
-!data/verification/snow/
-!data/verification/snow/.gitkeep
-!data/verification/snow/esm_snowmip/
-!data/verification/snow/esm_snowmip/.gitkeep
-!data/verification/snow/laugh_tests/
-!data/verification/snow/laugh_tests/.gitkeep
-!data/verification/firn/
-!data/verification/firn/.gitkeep
-!data/verification/firn/sumup/
-!data/verification/firn/sumup/.gitkeep
+!data/verification/esm_snowmip/
+!data/verification/esm_snowmip/.gitkeep
+!data/verification/laugh_tests/
+!data/verification/laugh_tests/.gitkeep
+!data/verification/promice/
+!data/verification/promice/.gitkeep
+!data/verification/sumup/
+!data/verification/sumup/.gitkeep
 demo/data/output/
 test/artifacts/
 test/backups/
@@ -44,6 +42,10 @@ icemodel/dependencies/requirements.mat
 *~
 .DS_Store
 Desktop.ini
+
+# Un-ignore icemodel source files caught by a global "*Zone*" ignore rule
+# (case-insensitive on macOS, so surfacezone.m / validateSurfaceZone.m match).
+!icemodel/**/*[Zz]one*.m
 
 # Thumbnail cache files
 ._*

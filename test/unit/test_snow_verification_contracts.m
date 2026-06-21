@@ -83,6 +83,22 @@ function test_each_site_stages_expected_comparison_variables(testCase)
       'WFJ must stage surface_temp_C as a comparison variable');
 end
 
+function test_each_esm_case_carries_seasonal_snow_surface_zone(testCase)
+   % Every ESM-SnowMIP case must carry surface_zone="seasonal_snow" and that
+   % value must validate against the canonical surface-zone namelist. The
+   % regime now lives in per-case metadata (family-flat taxonomy) rather than
+   % the eval-data directory layout.
+
+   allowed = icemodel.verification.namelists.surfacezone();
+   testCase.verifyTrue(ismember("seasonal_snow", allowed));
+
+   for sitename = expectedEsmCaseIds()'
+      manifest = icemodel.verification.loadmanifest(sitename);
+      testCase.verifyEqual(string(manifest.surface_zone), "seasonal_snow", ...
+         sprintf('%s surface_zone is not seasonal_snow', sitename));
+   end
+end
+
 function test_forcing_includes_rainf_snowf_passthrough(testCase)
    % Site forcing files must include rainf/snowf channels so future
    % rain/snow-aware downstream consumers can use them directly.
@@ -123,7 +139,7 @@ function test_loadmanifest_resolves_demo_data_paths(testCase)
    testCase.verifyEqual(manifest.dataset_family, "esm_snowmip");
    testCase.verifyEqual(manifest.case_type, "esm_site");
    testCase.verifyTrue(contains(manifest.evaluation_path, ...
-      fullfile("demo", "data", "eval", "snow", "esm_snowmip", "cdp")));
+      fullfile("demo", "data", "eval", "esm_snowmip", "cdp")));
    testCase.verifyTrue(exist(manifest.evaluation_path, 'file') == 2);
 end
 

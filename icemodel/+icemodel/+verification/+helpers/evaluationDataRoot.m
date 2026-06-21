@@ -14,12 +14,14 @@ function root = evaluationDataRoot(kwargs)
    %                             evaluation-data root without mutating config.
    %
    % Outputs
-   %  root   Base evaluation-data root. Verification-specific subfolders such
-   %         as `snow/` are appended by callers.
+   %  root   Base evaluation-data root. Dataset-family subfolders such as
+   %         `esm_snowmip/` or `promice/` are appended by callers as the next
+   %         path segment. The taxonomy is dataset-family-flat: there is no
+   %         intermediate `snow/` or `firn/` process-split level.
    %
    % Role
    %  Operational path helper shared by setup and normal workflow functions.
-   %  It owns only base eval-root resolution, not verification subfolders.
+   %  It owns base eval-root resolution; callers append the family folder.
 
    arguments
       kwargs.evaluation_data_root (1, 1) string = ""

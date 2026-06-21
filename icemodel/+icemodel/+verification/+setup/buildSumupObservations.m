@@ -26,7 +26,7 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
    %    point : [lat lon]  WGS84 site coordinates.
    %
    %  Name-value
-   %    source_dir : string (default data/verification/firn/sumup)
+   %    source_dir : string (default data/verification/sumup)
    %    radius_km  : double (default 7.5)  point-selection radius
    %    startdate  : datetime or "" (default "")
    %    enddate    : datetime or "" (default "")
@@ -105,7 +105,7 @@ function cache_dir = resolveCacheDir(source_dir)
       cache_dir = source_dir;
    else
       cache_dir = string(fullfile(icemodel.getpath('data'), ...
-         'verification', 'firn', 'sumup'));
+         'verification', 'sumup'));
    end
 end
 

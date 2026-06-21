@@ -42,7 +42,7 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    %        catalog and snowmipsite for the bare site-name namelist.
    %
    %  Name-value
-   %    source_dir : string (default data/verification/snow/esm_snowmip)
+   %    source_dir : string (default data/verification/esm_snowmip)
    %        Directory containing met_<kind>_<sitename>_*.nc and
    %        obs_insitu_<sitename>_*.nc files.
    %    met_kind : string (default "insitu")
@@ -208,9 +208,9 @@ function pathname = defaultSourceDir()
    %DEFAULTSOURCEDIR Default ESM-SnowMIP source-cache directory.
    %
    % Mirrors fetchEsmSnowmip's default cache layout:
-   %   <repo>/data/verification/snow/esm_snowmip/
+   %   <repo>/data/verification/esm_snowmip/
    pathname = string(fullfile(icemodel.getpath('data'), ...
-      'verification', 'snow', 'esm_snowmip'));
+      'verification', 'esm_snowmip'));
 end
 
 function pathname = locateUnique(source_dir, pattern)

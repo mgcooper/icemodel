@@ -10,12 +10,12 @@ function source_dir = fetchLaughTests(kwargs)
    %  Colbeck 1976 smoke verification artifacts.
    %
    %  Default cache directory:
-   %    data/verification/snow/laugh_tests/
+   %    data/verification/laugh_tests/
    %
    %  This is a gitignored cache. Populate it by either:
    %    1. cloning the upstream repository into the cache dir, e.g.
    %         git clone https://github.com/KyleKlenk/Laugh-Tests \
-   %              data/verification/snow/laugh_tests
+   %              data/verification/laugh_tests
    %    2. or pointing kwargs.cache_dir at an existing local checkout.
    %       If a sibling Laugh-Tests checkout exists at the project
    %       root parent directory, it is auto-detected (see below).
@@ -50,7 +50,7 @@ function source_dir = fetchLaughTests(kwargs)
    %    so importLaughTests does not have to repeat per-file checks.
    %
    %  Name-value
-   %    cache_dir : string (default data/verification/snow/laugh_tests)
+   %    cache_dir : string (default data/verification/laugh_tests)
    %        Local Laugh-Tests checkout directory.
    %    strict : logical (default true)
    %        Error when the checkout is missing or incomplete.
@@ -143,7 +143,7 @@ end
 function pathname = defaultCacheDir()
    %DEFAULTCACHEDIR Canonical Laugh-Tests source-cache directory.
    pathname = string(fullfile(icemodel.getpath('data'), ...
-      'verification', 'snow', 'laugh_tests'));
+      'verification', 'laugh_tests'));
 end
 
 function required = colbeckRequiredFiles()

@@ -10,6 +10,7 @@
       "case_type": "firn_observational",
       "site_id": "KAN_L",
       "site_name": "KAN-L",
+      "surface_zone": "lower_ablation",
       "site_location": {
         "lat_wgs84": 67.0955,
         "lon_wgs84": -49.9513,
@@ -83,6 +84,7 @@
       "case_type": "firn_observational",
       "site_id": "KAN_M",
       "site_name": "KAN-M",
+      "surface_zone": "upper_ablation",
       "site_location": {
         "lat_wgs84": 67.067,
         "lon_wgs84": -48.8355,
@@ -156,6 +158,7 @@
       "case_type": "firn_observational",
       "site_id": "KAN_U",
       "site_name": "KAN-U",
+      "surface_zone": "lower_percolation",
       "site_location": {
         "lat_wgs84": 67.0003,
         "lon_wgs84": -47.0253,

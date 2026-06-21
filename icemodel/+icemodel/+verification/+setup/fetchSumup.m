@@ -9,7 +9,7 @@ function source_dir = fetchSumup(kwargs)
    %  observation files (density, accumulation/SMB, subsurface temperature)
    %  used by icemodel.verification.setup.importSumup to stage the per-point
    %  firn verification artifacts. By default the cache lives at
-   %  data/verification/firn/sumup/ (gitignored) and is populated by the
+   %  data/verification/sumup/ (gitignored) and is populated by the
    %  user / developer following the retrieval instructions printed when
    %  files are missing.
    %
@@ -51,7 +51,7 @@ function source_dir = fetchSumup(kwargs)
    %    repeating per-file checks. This mirrors fetchEsmSnowmip.
    %
    %  Name-value
-   %    cache_dir : string (default data/verification/firn/sumup)
+   %    cache_dir : string (default data/verification/sumup)
    %        Local source-cache directory.
    %    variables : string vector (default density/accumulation/temperature)
    %        Required SUMup variable groups to verify.
@@ -136,10 +136,10 @@ function pathname = defaultCacheDir()
    %
    % icemodel.getpath('data') returns the canonical top-level data root
    % (<repo>/data/), which the verification source-cache layout extends under
-   % data/verification/firn/<dataset_family>/ - the firn-side counterpart of
-   % the data/verification/snow/<dataset_family>/ layout used by ESM-SnowMIP.
+   % data/verification/<dataset_family>/ (family-flat taxonomy; the same
+   % layout used by ESM-SnowMIP and the other families).
    pathname = string(fullfile(icemodel.getpath('data'), ...
-      'verification', 'firn', 'sumup'));
+      'verification', 'sumup'));
 end
 
 function missing = missingVariableFiles(cache_dir, variables)

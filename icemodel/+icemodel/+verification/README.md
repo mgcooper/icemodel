@@ -13,8 +13,9 @@ Use the top-level functions for ordinary verification runs:
 - `icemodel.verification.comparecase` compares staged targets with a candidate or smoke reference.
 - `icemodel.verification.plotcase` plots staged targets, references, or candidate comparisons.
 
-These functions read staged data under `demo/data/eval/snow` by default. They do
-not import raw upstream data or mutate the staged dataset tree.
+These functions read staged data under `demo/data/eval/<dataset_family>` by
+default (family-flat taxonomy). They do not import raw upstream data or mutate
+the staged dataset tree.
 
 ## Candidate Contract
 
@@ -160,16 +161,22 @@ Generated / staged smoke artifacts (committed):
 # Multi-year staged windows produce a single window-stamped file:
 demo/data/input/met/met_<case_id>_<case_id>_<YYYYMMDD>_<YYYYMMDD>_1hr.mat
 
-# Observation targets and reference bundles stay in the eval tree.
-demo/data/eval/snow/<dataset_family>/<case_id>/{evaluation,reference}.mat
-demo/data/eval/snow/<dataset_family>/manifest.json
+# Observation targets and reference bundles stay in the eval tree. The
+# taxonomy is dataset-family-flat: families live directly under eval/ with no
+# intermediate snow/ or firn/ level (the physical regime is recorded per case
+# in the surface_zone manifest field instead).
+demo/data/eval/<dataset_family>/<case_id>/{evaluation,reference}.mat
+demo/data/eval/<dataset_family>/manifest.json
 ```
 
-Local raw source cache (gitignored under `data/verification/**`):
+Local raw source cache (gitignored under `data/verification/**`, same
+family-flat layout):
 
 ```sh
-data/verification/snow/esm_snowmip/    # 10-site PANGAEA NetCDFs
-data/verification/snow/laugh_tests/    # Laugh-Tests checkout
+data/verification/esm_snowmip/    # 10-site PANGAEA NetCDFs
+data/verification/laugh_tests/    # Laugh-Tests checkout
+data/verification/promice/        # PROMICE/GEUS AWS + co-located RCM sources
+data/verification/sumup/          # SUMup firn profiles (access-gated)
 ```
 
 Caller pattern:
@@ -189,7 +196,7 @@ either error with a stable error id or return the partial path.
 ## Support Namespaces
 
 - `helpers` contains normal workflow helpers for path discovery (`evaluationDataRoot`,
-  `inputDataRoot`, `snowDataRoot`), manifest reads, artifact loading, candidate
+  `inputDataRoot`), manifest reads, artifact loading, candidate
   resolution, metric schema definition, the per-run markdown report writer
   (`writeRunReport`), the per-site default window (`default_smoke_window`), and
   per-site default window (`default_smoke_window`). The standard-contract
@@ -197,8 +204,9 @@ either error with a stable error id or return the partial path.
   `icemodel.test.helpers.setModelOptsForCase`, which accepts both formal-case
   rows and verification manifests via input dispatch.
 - `namelists` contains canonical selector lists for dataset families, case ids,
-  case types, the ESM-SnowMIP site-name namelist (`snowmipsite`), and the
-  Laugh-Tests case-id namelist (`laughtests`). `caseid` dispatches uniformly
+  case types, surface zones (`surfacezone`, the per-case physical-regime
+  vocabulary stamped onto case manifests), the ESM-SnowMIP site-name namelist
+  (`snowmipsite`), and the Laugh-Tests case-id namelist (`laughtests`). `caseid` dispatches uniformly
   across families using these per-family namelists. The richer per-site
   ESM-SnowMIP catalog query helper lives at
   `icemodel.verification.helpers.snowmipinfo`.
@@ -209,7 +217,7 @@ either error with a stable error id or return the partial path.
 
 Each dataset family has one `manifest.json` under:
 
-`demo/data/eval/snow/<dataset_family>/manifest.json`
+`demo/data/eval/<dataset_family>/manifest.json`
 
 Each case folder stores:
 

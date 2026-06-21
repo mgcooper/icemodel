@@ -20,7 +20,8 @@ function manifest = importLaughTests(laugh_tests_source_dir, kwargs)
    %
    % Role
    %  Setup/update tooling. This function creates or refreshes staged data
-   %  under demo/data/eval/snow and is not part of normal verification runs.
+   %  under demo/data/eval/laugh_tests and is not part of normal verification
+   %  runs.
    %
    % See also icemodel.verification.setup.importEsmSnowmip
 
@@ -39,16 +40,16 @@ function manifest = importLaughTests(laugh_tests_source_dir, kwargs)
    dataset_family = "laugh_tests";
    case_id = kwargs.case_id;
 
-   % Resolve the path to the snow evaluation data folder
-   snow_data_root = icemodel.verification.helpers.snowDataRoot( ...
+   % Resolve the path to the evaluation data folder
+   evaluation_data_root = icemodel.verification.helpers.evaluationDataRoot( ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
       "icemodel_config_casename", kwargs.icemodel_config_casename);
 
    % Resolve the path to the dataset family sub-folder
-   family_root = fullfile(snow_data_root, dataset_family);
+   family_root = fullfile(evaluation_data_root, dataset_family);
 
    % Resolve the path to the case id folder sub-folder
-   %   <snow_data_root>/laugh_tests/colbeck1976
+   %   <evaluation_data_root>/laugh_tests/colbeck1976
    case_root = fullfile(family_root, case_id);
 
    % Resolve the exact staged paths produced by this importer. Keeping these
@@ -217,6 +218,7 @@ function [forcing, targets, reference, case_values] = buildColbeckArtifacts( ...
       'synthetic_process'
       'colbeck1976'
       'Colbeck 1976 synthetic snow infiltration benchmark'
+      ''
       fullfile('colbeck1976', 'evaluation.mat')
       fullfile('colbeck1976', 'reference.mat')
       '1 minute output / sub-hour forcing'

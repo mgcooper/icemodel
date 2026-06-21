@@ -2,7 +2,7 @@ function tests = test_firn_verification_contracts
    %TEST_FIRN_VERIFICATION_CONTRACTS Verify the firn-evaluation contracts.
    %
    % Exercises the firn_observational lane end to end against the committed
-   % co-located PROMICE firn cases under demo/data/eval/firn/promice/:
+   % co-located PROMICE firn cases under demo/data/eval/promice/:
    %   - listcases enumerates the firn family alongside the snow families;
    %   - each firn manifest's case_type validates against the namelist;
    %   - the candidate adapter resolves the declared comparison variables;
@@ -89,6 +89,30 @@ function test_each_firn_case_type_validates(testCase)
       testCase.verifyTrue(ismember(string(manifest.case_type), case_types), ...
          sprintf('%s case_type not in namelist', id));
       testCase.verifyEqual(string(manifest.dataset_family), "promice");
+   end
+end
+
+function test_each_firn_case_carries_valid_surface_zone(testCase)
+   % Every promice firn case must carry a surface_zone single-sourced from
+   % promicesiteinfo and validating against the canonical namelist. The KAN
+   % transect zones are pinned: kanl=lower_ablation, kanm=upper_ablation,
+   % kanu=lower_percolation.
+
+   allowed = icemodel.verification.namelists.surfacezone();
+   expected = struct('kanl', "lower_ablation", ...
+      'kanm', "upper_ablation", 'kanu', "lower_percolation");
+
+   for id = testCase.TestData.expected_firn_ids'
+      manifest = icemodel.verification.loadmanifest(id);
+      zone = string(manifest.surface_zone);
+      testCase.verifyTrue(ismember(zone, allowed), ...
+         sprintf('%s surface_zone "%s" not in namelist', id, zone));
+      testCase.verifyEqual(zone, expected.(char(id)), ...
+         sprintf('%s surface_zone mismatch', id));
+      % The manifest must agree with the single source of truth.
+      testCase.verifyEqual(zone, ...
+         string(icemodel.verification.helpers.promicesiteinfo( ...
+         manifest.site_id).zone));
    end
 end
 
