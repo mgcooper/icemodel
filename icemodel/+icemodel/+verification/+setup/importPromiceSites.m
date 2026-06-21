@@ -152,7 +152,7 @@ function manifest = importPromiceSites(kwargs)
       alias = lower(erase(site, "_"));
 
       try
-         % Read the station metadata (lat/lon live from the v3 NetCDF) over
+         % Read the station metadata (lat/lon live from the L3 NetCDF) over
          % the requested window. This is also the first gate: a missing
          % station file or empty window throws here, before any staging.
          [~, aws_meta] = icemodel.forcing.readPromiceAws(site, ...
@@ -197,7 +197,7 @@ function manifest = importPromiceSites(kwargs)
                'kind', 'station_met_and_eval', ...
                'met_files', relpaths(promice_met_files, met_outdir), ...
                'data_files', relpaths(promice_data_files, userdata_outdir), ...
-               'ablation_recipe', promice_meta.ablation_recipe);
+               'ablation_source', promice_meta.ablation_source);
          end
 
          if ismember("mar", models)
@@ -266,7 +266,7 @@ function manifest = importPromiceSites(kwargs)
             surface_zone = anchor.zone;
          catch
             site_name = site;
-            site_note = "Uncurated PROMICE station (generic ablation recipe).";
+            site_note = "Uncurated PROMICE station.";
             % Uncurated stations have no catalog zone; omit it rather than guess.
             surface_zone = "";
          end
@@ -376,10 +376,10 @@ function [targets, obs_vars, comparison_vars] = evaluationTargets(promice_data)
 
    targets = struct('format', 'timeseries', 'data', promice_data, ...
       'metadata', icemodel.verification.setup.metadataStruct({ ...
-      'observation_source', 'PROMICE v3 AWS'
-      'snow_depth_method', ...
-      'September-median boom-height reference minus boom height, clamped >= 0'
-      'ablation_method', 'despiked transducer record, station-recipe corrected'}));
+      'observation_source', 'pypromice L3 AWS'
+      'snow_depth_method', 'L3 snow_height channel (read, not derived)'
+      'ablation_method', ...
+      'L3 ice-surface height (z_ice_surf / z_surf_combined), read not derived'}));
 
    obs_vars = icemodel.verification.setup.metadataStruct({ ...
       'subsurface_temperature', 'tice1..tice8 (string thermistors)'
