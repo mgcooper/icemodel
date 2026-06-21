@@ -83,19 +83,24 @@ function test_each_site_stages_expected_comparison_variables(testCase)
       'WFJ must stage surface_temp_C as a comparison variable');
 end
 
-function test_each_esm_case_carries_seasonal_snow_surface_zone(testCase)
-   % Every ESM-SnowMIP case must carry surface_zone="seasonal_snow" and that
-   % value must validate against the canonical surface-zone namelist. The
-   % regime now lives in per-case metadata (family-flat taxonomy) rather than
-   % the eval-data directory layout.
+function test_each_esm_case_carries_land_zone_seasonal_snow_target(testCase)
+   % Every ESM-SnowMIP case is an off-ice seasonal snowpack at a land site:
+   % surface_zone="land" (glaciological zone) and eval_target=["seasonal_snow"]
+   % (the capability the case exercises). seasonal_snow is NOT a zone - it moved
+   % to the eval_target descriptor.
 
-   allowed = icemodel.verification.namelists.surfacezone();
-   testCase.verifyTrue(ismember("seasonal_snow", allowed));
+   zones = icemodel.verification.namelists.surfacezone();
+   targets = icemodel.verification.namelists.evaltarget();
+   testCase.verifyTrue(ismember("land", zones));
+   testCase.verifyFalse(ismember("seasonal_snow", zones));
+   testCase.verifyTrue(ismember("seasonal_snow", targets));
 
    for sitename = expectedEsmCaseIds()'
       manifest = icemodel.verification.loadmanifest(sitename);
-      testCase.verifyEqual(string(manifest.surface_zone), "seasonal_snow", ...
-         sprintf('%s surface_zone is not seasonal_snow', sitename));
+      testCase.verifyEqual(string(manifest.surface_zone), "land", ...
+         sprintf('%s surface_zone is not land', sitename));
+      testCase.verifyEqual(string(manifest.eval_target), "seasonal_snow", ...
+         sprintf('%s eval_target is not seasonal_snow', sitename));
    end
 end
 

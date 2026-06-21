@@ -94,13 +94,17 @@ end
 
 function test_each_firn_case_carries_valid_surface_zone(testCase)
    % Every promice firn case must carry a surface_zone single-sourced from
-   % promicesiteinfo and validating against the canonical namelist. The KAN
-   % transect zones are pinned: kanl=lower_ablation, kanm=upper_ablation,
-   % kanu=lower_percolation.
+   % promicesiteinfo and validating against the canonical (glaciological-zone-
+   % only) namelist. The KAN transect zones are pinned: kanl=ablation,
+   % kanm=ablation, kanu=percolation. bare_ice / seasonal_snow are NOT zones.
 
    allowed = icemodel.verification.namelists.surfacezone();
-   expected = struct('kanl', "lower_ablation", ...
-      'kanm', "upper_ablation", 'kanu', "lower_percolation");
+   expected = struct('kanl', "ablation", ...
+      'kanm', "ablation", 'kanu', "percolation");
+
+   % The zone namelist must NOT carry capability descriptors.
+   testCase.verifyFalse(ismember("bare_ice", allowed));
+   testCase.verifyFalse(ismember("seasonal_snow", allowed));
 
    for id = testCase.TestData.expected_firn_ids'
       manifest = icemodel.verification.loadmanifest(id);
@@ -112,7 +116,68 @@ function test_each_firn_case_carries_valid_surface_zone(testCase)
       % The manifest must agree with the single source of truth.
       testCase.verifyEqual(zone, ...
          string(icemodel.verification.helpers.promicesiteinfo( ...
-         manifest.site_id).zone));
+         manifest.site_id).surface_zone));
+   end
+end
+
+function test_each_firn_case_carries_valid_eval_target(testCase)
+   % Every promice firn case must carry an eval_target string array single-
+   % sourced from promicesiteinfo and validating against the eval_target
+   % namelist. KAN pins: kanl/kanm=["seasonal_snow","bare_ice"],
+   % kanu=["seasonal_snow","firn"].
+
+   allowed = icemodel.verification.namelists.evaltarget();
+   expected = struct( ...
+      'kanl', ["seasonal_snow"; "bare_ice"], ...
+      'kanm', ["seasonal_snow"; "bare_ice"], ...
+      'kanu', ["seasonal_snow"; "firn"]);
+
+   for id = testCase.TestData.expected_firn_ids'
+      manifest = icemodel.verification.loadmanifest(id);
+      target = string(manifest.eval_target);
+      testCase.verifyTrue(all(ismember(target, allowed)), ...
+         sprintf('%s eval_target not in namelist', id));
+      testCase.verifyEqual(sort(target(:)), sort(expected.(char(id))(:)), ...
+         sprintf('%s eval_target mismatch', id));
+      % The manifest must agree with the single source of truth.
+      testCase.verifyEqual(sort(target(:)), sort(string( ...
+         icemodel.verification.helpers.promicesiteinfo( ...
+         manifest.site_id).eval_target(:))));
+   end
+end
+
+function test_manifest_is_metadata_only(testCase)
+   % The firn manifest is METADATA-ONLY: it records WHICH forcing/eval sources
+   % are available (by id) and the colocation regime, NOT a bundled
+   % evaluation.mat/reference.mat data copy. No per-case bundle file is staged.
+
+   needed = icemodel.verification.setup.firnCaseManifestFieldNames();
+   family_root = fileparts(icemodel.verification.loadmanifest("kanl").manifest_path);
+
+   for id = testCase.TestData.expected_firn_ids'
+      manifest = icemodel.verification.loadmanifest(id);
+
+      % Metadata-only schema fields present.
+      for f = ["period", "forcing_sources", "eval_sources", "colocation"]
+         testCase.verifyTrue(isfield(manifest, f), ...
+            sprintf('%s missing metadata-only field %s', id, f));
+      end
+      testCase.verifyTrue(all(ismember(needed, string(fieldnames(manifest)))), ...
+         sprintf('%s manifest missing a canonical firn field', id));
+
+      % Source ids recorded by name (not bundled data).
+      testCase.verifyTrue(all(ismember(["promice", "mar", "merra"], ...
+         string(manifest.forcing_sources))), ...
+         sprintf('%s forcing_sources incomplete', id));
+      testCase.verifyTrue(all(ismember(["promice_obs", "racmo"], ...
+         string(manifest.eval_sources))), ...
+         sprintf('%s eval_sources incomplete', id));
+
+      % NO bundled evaluation.mat / reference.mat colocation copy on disk.
+      testCase.verifyFalse(isfile(fullfile(family_root, id, "evaluation.mat")), ...
+         sprintf('%s still carries a bundled evaluation.mat', id));
+      testCase.verifyFalse(isfile(fullfile(family_root, id, "reference.mat")), ...
+         sprintf('%s still carries a bundled reference.mat', id));
    end
 end
 
@@ -207,10 +272,11 @@ function test_comparecase_soft_gate_no_hard_fail(testCase)
       'firn soft gate produced an unexpected (hard) status');
 end
 
-function test_colocated_bundle_resolves_on_disk(testCase)
-   % The co-located multi-model bundle each firn manifest declares
-   % (promice/mar/merra met + promice/racmo Data) must resolve on disk under
-   % the standard icemodel input layout.
+function test_colocated_files_resolve_on_disk(testCase)
+   % The individual forcing/Data files each metadata-only firn manifest declares
+   % (promice/mar/merra met + promice/racmo Data) must resolve on disk under the
+   % standard icemodel input layout. Colocation is recorded as metadata
+   % (manifest.colocation) pointing at these individual files, NOT a bundle.
 
    input_root = icemodel.verification.helpers.inputDataRoot();
    met_dir = fullfile(input_root, 'met');
@@ -218,18 +284,12 @@ function test_colocated_bundle_resolves_on_disk(testCase)
 
    for id = testCase.TestData.expected_firn_ids'
       manifest = icemodel.verification.loadmanifest(id);
-      cf = manifest.colocated_forcing;
+      cf = manifest.colocation;
 
-      % Evaluation + reference artifacts resolve.
-      testCase.verifyTrue(exist(manifest.evaluation_path, 'file') == 2, ...
-         sprintf('%s evaluation.mat missing', id));
-      testCase.verifyTrue(exist(manifest.reference_path, 'file') == 2, ...
-         sprintf('%s reference.mat missing', id));
-
-      % All four model legs are recorded.
+      % All four model legs are recorded as colocation metadata.
       testCase.verifyTrue(all(isfield(cf, ...
          {'promice', 'mar', 'merra', 'racmo'})), ...
-         sprintf('%s colocated_forcing missing a model leg', id));
+         sprintf('%s colocation missing a model leg', id));
 
       % Met files (promice/mar/merra) resolve under met/.
       verifyFilesResolve(testCase, met_dir, cf.promice.met_files, id, "promice met");

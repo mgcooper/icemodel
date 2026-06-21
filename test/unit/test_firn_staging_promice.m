@@ -77,19 +77,29 @@ function test_colocated_bundle_and_manifest_resolve(testCase)
    testCase.verifyEqual(string(c.case_type), "firn_observational");
    testCase.verifyEqual(string(c.site_id), "KAN_M");
 
-   % surface_zone is single-sourced from promicesiteinfo (KAN_M is the upper
+   % surface_zone is single-sourced from promicesiteinfo (KAN_M is in the
    % ablation zone) and must validate against the canonical namelist.
-   testCase.verifyEqual(string(c.surface_zone), "upper_ablation");
+   testCase.verifyEqual(string(c.surface_zone), "ablation");
    testCase.verifyTrue(ismember(string(c.surface_zone), ...
       icemodel.verification.namelists.surfacezone()));
+
+   % eval_target: KAN_M exercises seasonal snow + bare ice.
+   testCase.verifyEqual(sort(string(c.eval_target(:))), ...
+      sort(["bare_ice"; "seasonal_snow"]));
+
+   % Metadata-only source records (ids, not bundled data).
+   testCase.verifyTrue(all(ismember(["promice", "mar", "merra"], ...
+      string(c.forcing_sources))));
+   testCase.verifyTrue(all(ismember(["promice_obs", "racmo"], ...
+      string(c.eval_sources))));
 
    % Site location: WGS84 + EPSG:3413 recorded.
    testCase.verifyEqual(c.site_location.lat_wgs84, 67.067, 'AbsTol', 1e-2);
    testCase.verifyTrue(isfinite(c.site_location.x_epsg3413));
    testCase.verifyTrue(isfinite(c.site_location.y_epsg3413));
 
-   % Co-located forcing: all four models present with the right kinds.
-   cf = c.colocated_forcing;
+   % Colocation metadata: all four model legs present with the right kinds.
+   cf = c.colocation;
    testCase.verifyTrue(all(isfield(cf, {'promice', 'mar', 'merra', 'racmo'})));
    testCase.verifyEqual(string(cf.racmo.kind), "point_data_smb_eval");
    testCase.verifyTrue(~isempty(cf.promice.met_files));
@@ -99,7 +109,8 @@ function test_colocated_bundle_and_manifest_resolve(testCase)
 end
 
 function test_staged_files_exist_on_disk(testCase)
-   % The bundle's met / userdata / eval files must be written to disk.
+   % The individual met / userdata files must be written to disk. Colocation is
+   % metadata-only: NO per-case evaluation.mat / reference.mat bundle is staged.
 
    stageKanm(testCase, "2013-06-01", "2013-06-30");
 
@@ -113,27 +124,35 @@ function test_staged_files_exist_on_disk(testCase)
    testCase.verifyNotEmpty(dir(fullfile(ud_dir, 'kanm_promice_*.mat')));
    testCase.verifyNotEmpty(dir(fullfile(ud_dir, 'kanm_racmo_*.mat')));
 
-   testCase.verifyTrue(isfile(fullfile(eval_dir, 'evaluation.mat')));
-   testCase.verifyTrue(isfile(fullfile(eval_dir, 'reference.mat')));
+   % No bundled colocation data copy.
+   testCase.verifyFalse(isfile(fullfile(eval_dir, 'evaluation.mat')));
+   testCase.verifyFalse(isfile(fullfile(eval_dir, 'reference.mat')));
+
    testCase.verifyTrue(isfile(fullfile(testCase.TestData.eval_root, ...
       'promice', 'manifest.json')));
 end
 
-function test_evaluation_and_reference_artifacts_load(testCase)
-   % evaluation.mat (PROMICE targets) and reference.mat (RACMO reference)
-   % round-trip and carry the expected timeseries payloads.
+function test_colocated_data_reconstitutes_from_individual_files(testCase)
+   % The eval target (PROMICE obs) and the RCM reference (RACMO Data) must
+   % reconstitute on demand from the individual per-year userdata files the
+   % metadata-only manifest declares - no committed bundle needed.
 
-   stageKanm(testCase, "2013-06-01", "2013-06-30");
-   eval_dir = fullfile(testCase.TestData.eval_root, 'promice', 'kanm');
+   manifest = stageKanm(testCase, "2013-06-01", "2013-06-30");
+   c = manifest.cases(1);
+   c.manifest_path = fullfile(testCase.TestData.eval_root, 'promice', ...
+      'manifest.json');
 
-   ev = load(fullfile(eval_dir, 'evaluation.mat'), 'targets');
-   testCase.verifyEqual(string(ev.targets.format), "timeseries");
-   testCase.verifyTrue(istimetable(ev.targets.data));
+   promice = icemodel.verification.helpers.loadColocatedData(c, "promice", ...
+      input_data_root=testCase.TestData.input_root);
+   testCase.verifyEqual(string(promice.format), "timeseries");
+   testCase.verifyTrue(istimetable(promice.data));
+   testCase.verifyGreaterThan(height(promice.data), 0);
 
-   rf = load(fullfile(eval_dir, 'reference.mat'), 'reference');
-   testCase.verifyEqual(string(rf.reference.metadata.reference_kind), ...
-      "colocated_rcm");
-   testCase.verifyTrue(istimetable(rf.reference.data));
+   racmo = icemodel.verification.helpers.loadColocatedData(c, "racmo", ...
+      input_data_root=testCase.TestData.input_root);
+   testCase.verifyEqual(string(racmo.format), "timeseries");
+   testCase.verifyTrue(istimetable(racmo.data));
+   testCase.verifyGreaterThan(height(racmo.data), 0);
 end
 
 function test_manifest_json_is_valid(testCase)
