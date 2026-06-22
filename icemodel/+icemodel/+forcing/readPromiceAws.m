@@ -11,6 +11,12 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    % names, units, levels, and physical ranges follow the product variable
    % dictionary (data/verification/promice/AWS_variables.csv).
    %
+   % This is NOT limited to the legacy met subset: every L3 channel useful
+   % for snow/firn/ice model forcing and evaluation is mapped to a canonical
+   % icemodel name (one name per channel). Housekeeping/diagnostic channels
+   % (battery voltage, fan current, raw per-timestep GPS lat/lon, radiation-
+   % sensor temperature) are intentionally not mapped.
+   %
    % Forcing channels (NetCDF -> output, with the unit change applied):
    %    t_u [degC] -> tair [K]         p_u [hPa] -> psfc [Pa]
    %    rh_u [%] -> rh [%]             wspd_u -> wspd [m s-1]
@@ -20,6 +26,14 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    %    cc [%] -> cfrac [-]            t_surf [C] -> tsfc [K]
    %    dshf_u -> shf, dlhf_u -> lhf [W m-2]
    %    rainfall_cor_u [mm] -> rainf [mm per timestep]
+   %    qh_u -> shum [kg/kg]           (specific humidity)
+   %    rh_u_wrt_ice_or_water -> rh_ice [%] (RH wrt ice/water; correct
+   %       subfreezing humidity for sublimation/condensation)
+   %    wspd_x_u -> uwind, wspd_y_u -> vwind [m s-1] (wind components)
+   %    dsr_cor -> swd_cor, usr_cor -> swu_cor [W m-2] (tilt/bias-corrected
+   %       shortwave; preferred over raw dsr/usr for SEB evaluation)
+   %    tilt_x -> tilt_x, tilt_y -> tilt_y, rot -> rot [deg] (platform tilt
+   %       and azimuth; the radiation-correction geometry)
    %
    % Evaluation channels (the QC'd L3 surface vars, read not derived):
    %    snow_height -> snow_height [m]   (snow surface rel. ice surface)
@@ -30,6 +44,9 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    %    z_stake_cor (fallback z_stake) -> stake_height [m]
    %    t_i_1..t_i_N [degC] -> tice1..ticeN [K], clamped to the dictionary
    %       physical range (-80..1 C) per sensor
+   %    d_t_i_1..d_t_i_N [m] -> dtice1..dticeN (thermistor depths, so the
+   %       tice string can be interpreted vertically)
+   %    t_i_10m [degC] -> tice10m [K] (10 m firn temperature benchmark)
    %    alt -> elev [m] (smoothed postprocessed GPS altitude)
    %
    % The upper-boom channels (the dictionary "all" / "_u" set) are used so
@@ -83,10 +100,16 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
       'tair',      't_u',            ''
       'psfc',      'p_u',            ''
       'rh',        'rh_u',           ''
+      'rh_ice',    'rh_u_wrt_ice_or_water', ''
+      'shum',      'qh_u',           ''
       'wspd',      'wspd_u',         ''
       'wdir',      'wdir_u',         ''
+      'uwind',     'wspd_x_u',       ''
+      'vwind',     'wspd_y_u',       ''
       'swd',       'dsr',            ''
       'swu',       'usr',            ''
+      'swd_cor',   'dsr_cor',        ''
+      'swu_cor',   'usr_cor',        ''
       'lwd',       'dlr',            ''
       'lwu',       'ulr',            ''
       'albedo',    'albedo',         ''
@@ -101,6 +124,9 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
       'boom_height',     'z_boom_cor_u',    'z_boom_u'
       'transducer_depth','z_pt_cor',        'z_pt'
       'stake_height',    'z_stake_cor',     'z_stake'
+      'tilt_x',          'tilt_x',          ''
+      'tilt_y',          'tilt_y',          ''
+      'rot',             'rot',             ''
       'elev',            'alt',             'gps_alt'
       };
 
@@ -149,6 +175,18 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
       v = double(ncread(filename, sprintf('t_i_%d', nice)));
       v(v < icerange(1) | v > icerange(2)) = NaN;
       aws.(sprintf('tice%d', nice)) = v + Tf;
+      % Thermistor depth d_t_i_N [m] -> dticeN, so the tice string can be
+      % interpreted vertically (sensors settle as the surface changes).
+      if ismember(sprintf('d_t_i_%d', nice), available)
+         aws.(sprintf('dtice%d', nice)) = ...
+            double(ncread(filename, sprintf('d_t_i_%d', nice)));
+      end
+   end
+
+   % 10 m subsurface (firn) temperature t_i_10m [degC] -> tice10m [K]: the
+   % standard firn thermal-state benchmark.
+   if ismember('t_i_10m', available)
+      aws.tice10m = double(ncread(filename, 't_i_10m')) + Tf;
    end
 
    % Optional window subset.
