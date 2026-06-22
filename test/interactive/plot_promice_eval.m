@@ -159,21 +159,53 @@ function summary = plot_promice_eval(options)
          surf = nan(height(Data), 1); surflbl = 'surface height [m]';
       end
       hold(ax2, 'on')
-      plot(ax2, t, surf, '-', 'Color', [0 0.3 0.7], 'LineWidth', 1.0)
-      % Overplot gap-bridged samples (flag==1) in red so non-observational
-      % segments are visually distinct and excludable from model comparison.
+      % Each legend handle carries an explicit DisplayName and the legend auto-
+      % collects only named handles, so no unnamed handle leaks a blank entry.
+      plot(ax2, t, surf, '-', 'Color', [0 0.3 0.7], 'LineWidth', 1.0, ...
+         'DisplayName', 'full series (cumulative comparison)')
+      % Overplot only genuinely gap-bridged samples (flag==1) in red so the
+      % interpolated, non-observational stretches are visually distinct. Per the
+      % readme the cumulative TREND is preserved through gaps; only per-timestep
+      % RATE diagnostics should exclude these samples.
       if hasChan(Data, "surface_height_flag")
          gap = Data.surface_height_flag == 1;
          sg = surf; sg(~gap) = NaN;
-         plot(ax2, t, sg, '.', 'Color', [0.85 0.1 0.1], 'MarkerSize', 4)
-         legend(ax2, {'observed', 'gap-bridged (flag=1)'}, ...
-            'Location', 'best', 'Interpreter', 'none')
+         plot(ax2, t, sg, '.', 'Color', [0.85 0.1 0.1], 'MarkerSize', 4, ...
+            'DisplayName', 'gap-bridged (exclude from RATE diagnostics)')
       end
-      yline(ax2, 0, ':', 'Color', [0.5 0.5 0.5])
+      % Overplot station-transition windows (flag==1) so an expected AWS-handover
+      % step is visually distinct from a gap.
+      if hasChan(Data, "station_transition_flag")
+         tr = Data.station_transition_flag == 1;
+         if any(tr)
+            st = surf; st(~tr) = NaN;
+            plot(ax2, t, st, 'o', 'Color', [0.1 0.6 0.1], 'MarkerSize', 4, ...
+               'DisplayName', 'station transition')
+         end
+      end
+      % Mark detected step-shifts: hollow magenta for unambiguous (correctable),
+      % grey x for ambiguous (flagged, NOT corrected).
+      if hasChan(Data, "step_detected_flag")
+         unamb = Data.step_correctable_flag == 1;
+         amb = Data.step_detected_flag == 1 & ~unamb;
+         if any(unamb)
+            su = surf; su(~unamb) = NaN;
+            plot(ax2, t, su, 's', 'Color', [0.8 0.1 0.8], 'MarkerSize', 7, ...
+               'LineWidth', 1.2, 'DisplayName', 'step: unambiguous (correctable)')
+         end
+         if any(amb)
+            sa = surf; sa(~amb) = NaN;
+            plot(ax2, t, sa, 'x', 'Color', [0.4 0.4 0.4], 'MarkerSize', 5, ...
+               'DisplayName', 'step: ambiguous (flagged)')
+         end
+      end
+      % The zero reference is a guide, not a legend entry.
+      yline(ax2, 0, ':', 'Color', [0.5 0.5 0.5], 'HandleVisibility', 'off')
       hold(ax2, 'off')
       ylabel(ax2, surflbl)
       title(ax2, sprintf('(b) surface height  [source: %s]', ...
          meta.surface_source), 'Interpreter', 'none')
+      legend(ax2, 'Location', 'best', 'Interpreter', 'none')
       grid(ax2, 'on')
 
       % --- (c) tice10m (primary) + depth-tagged thermistor string ---------
@@ -181,27 +213,29 @@ function summary = plot_promice_eval(options)
       have = tice_names(ismember(tice_names, ...
          string(Data.Properties.VariableNames)));
       hold(ax3, 'on')
+      % Plot the depth-tagged string as thin grey diagnostic lines, each with its
+      % own DisplayName so the legend stays aligned (no positional mismatch that
+      % leaks a blank "data1" entry).
       for k = 1:numel(have)
          % Kelvin -> degC for readability (channels stored in kelvin).
          plot(ax3, t, Data.(have{k}) - 273.15, '-', 'LineWidth', 0.6, ...
-            'Color', [0.6 0.6 0.6])
+            'Color', [0.6 0.6 0.6], 'DisplayName', have{k})
       end
-      legentries = have;
+      % tice10m is the PRIMARY channel: draw it LAST as a thick black line so it
+      % sits on top and is unambiguously emphasized over the grey string.
       if hasChan(Data, "tice10m")
          plot(ax3, t, Data.tice10m - 273.15, '-', 'Color', [0 0 0], ...
-            'LineWidth', 1.6)
-         legentries = [{'tice10m (PRIMARY)'}, have];
+            'LineWidth', 2.0, 'DisplayName', 'tice10m (PRIMARY)')
       end
-      yline(ax3, 0, ':', 'Color', [0.5 0.5 0.5])
+      yline(ax3, 0, ':', 'Color', [0.5 0.5 0.5], 'HandleVisibility', 'off')
       hold(ax3, 'off')
       ylabel(ax3, 'ice temperature [degC]')
       xlabel(ax3, 'time (UTC)')
       title(ax3, ['(c) subsurface temperature: tice10m (primary) + ' ...
          'depth-tagged string (shallow->deep)'])
-      if ~isempty(legentries)
-         legend(ax3, legentries, 'Location', 'eastoutside', ...
-            'Interpreter', 'none')
-      end
+      % Auto-collect named handles; legend order follows plot order, so the
+      % grey string is listed then tice10m, each against its own line.
+      legend(ax3, 'Location', 'eastoutside', 'Interpreter', 'none')
       grid(ax3, 'on')
 
       if options.save_figs
@@ -373,8 +407,9 @@ function flags = buildFlags(row, frequency)
    if row.surf_source == "none (no L3 surface-height channel)"
       f(end+1) = "SURF_MISSING";
    end
-   % A large gap-bridged share means much of the surface series is not a
-   % direct observation (exclude those segments before model comparison).
+   % A large gap-bridged share means much of the surface series is slope-
+   % interpolated: the cumulative trend is still usable, but RATE-based
+   % diagnostics should exclude those segments.
    if ~isnan(row.gap_pct) && row.gap_pct > 25
       f(end+1) = "GAP_HEAVY(>25%)";
    end
@@ -479,7 +514,7 @@ function writeMarkdown(summary, mdfile, frequency, source_dir)
       "SNOW_HIGH",        "snow_depth max > 5 m (suspect)"
       "NO_SURFACE",       "no finite surface-height samples (ablation or surface_height)"
       "SURF_MISSING",     "no L3 surface-height channel at all"
-      "GAP_HEAVY(>25%)",  "> 25% of surface-height samples gap-bridged (flag=1)"
+      "GAP_HEAVY(>25%)",  "> 25% of surface-height samples gap-bridged (flag=1); cumulative trend still usable, exclude only from RATE diagnostics"
       "ABL_NET_RISE",     "ablation site net-rose > 0.5 m (station transition / data issue)"
       "ACC_NET_LOWER",    "accumulation site net-lowered > 0.5 m (suspect)"
       "NO_TICE",          "no subsurface temperature (no thermistor string and no tice10m)"
