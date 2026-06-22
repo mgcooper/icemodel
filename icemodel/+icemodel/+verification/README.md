@@ -239,17 +239,27 @@ Each case carries THREE orthogonal descriptors, all single-sourced from
   (`seasonal_snow`/`bare_ice`/`firn`/`ablation`).
 - `permafrost_zone` is the permafrost EXTENT class of the GROUND, ORTHOGONAL to
   `surface_zone` (`continuous`/`discontinuous`/`sporadic`/`isolated`/`none`/
-  `unknown`): off-ice land/tundra sites carry the Brown et al. (1997) extent,
+  `unknown`): off-ice land/tundra sites carry the Obu et al. (2019) extent,
   ice-sheet/glacier sites carry `none`.
 
 The KAN anchors are AUTHORITATIVE (KAN_L/M=`ablation`, KAN_U=`percolation`). The
-non-KAN PROMICE stations now carry **authoritative** `surface_zone` +
-`permafrost_zone` values HARD-CODED from a data-driven analysis
-(`test/interactive/classify_site_facies.m`): MODIS MOD10A1 albedo-facies bare-ice
-fraction (primary surface_zone signal; reproduces the KAN anchors) and the Brown
-permafrost map (permafrost_zone). Only sites no dataset could resolve (ZAC_*, no
-coordinates) remain `unknown`; uncataloged station ids fall back to the legacy
-elevation-band heuristic flagged `classification="first_pass"`.
+non-KAN PROMICE stations and the ESM-SnowMIP sites carry **authoritative**
+`surface_zone` + `permafrost_zone` values HARD-CODED from a data-driven analysis
+(`test/interactive/classify_site_facies.m`):
+
+- `surface_zone` (ablation vs accumulation): MODIS end-of-summer **Bare Ice
+  Extent** 2000-2018 frequency (ablation when bare ice in a majority of years;
+  reproduces the KAN anchors KAN_L/M f_bare=1.00). Within the accumulation area
+  the firn facies is refined: `dry_snow` for cold high interior (elev >= 2500 m,
+  no bare ice), `percolation` where a **SUMup_2025** GrIS density profile lies
+  within 15 km (firn observed), else `accumulation` (facies unresolved).
+- `permafrost_zone`: **Obu et al. (2019)** permafrost-zone map, point-in-polygon
+  on lon/lat (off-ice sites; ice-sheet/glacier -> `none`). Replaces the v1 Brown
+  et al. (1997) source.
+
+Only sites no dataset could resolve (ZAC_*, no coordinates) remain `unknown`;
+uncataloged station ids fall back to the legacy elevation-band heuristic flagged
+`classification="first_pass"`.
 
 ## Support Namespaces
 
