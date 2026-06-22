@@ -10,23 +10,28 @@ function summary = plot_promice_eval(options)
    % Builds the PROMICE evaluation Data timetable
    % (icemodel.forcing.buildPromiceData) for each requested station and
    % produces one diagnostic figure per station with three stacked panels
-   % over the newly-migrated pypromice Level-3 product (the QC'd L3 surface
-   % and ice-temperature channels, read not derived):
+   % over the pypromice Level-3 product (the QC'd L3 surface and
+   % ice-temperature channels, read not derived). The surface panels are
+   % SITE-TYPE aware (buildPromiceData branches on z_ice_surf presence):
    %
-   %   (a) Snow depth [m] from the L3 snow_height channel. Should be >= 0,
-   %       seasonal (winter peak, late-summer ~0), and O(0.1-1 m). Persistent
-   %       negatives or multi-metre spikes are suspect.
+   %   (a) ABLATION sites: snow depth [m] from the clamped L3 snow_height
+   %       channel (>= 0, seasonal, O(0.1-1 m)). ACCUMULATION sites: this
+   %       panel is the net surface_height [m, positive up] from
+   %       z_surf_combined, since they ship no true snow-over-ice depth.
    %
-   %   (b) Cumulative ablation [m, positive down] from the L3 ice-surface
-   %       height (z_ice_surf), or z_surf_combined for accumulation-zone
-   %       stations that ship no z_ice_surf. The source channel is annotated
-   %       on the panel and recorded in the sanity table. Ablation should
-   %       step up each melt season and stay flat through winter.
+   %   (b) ABLATION sites: cumulative ablation [m, positive down] from
+   %       z_ice_surf (step up each melt season, flat through winter).
+   %       ACCUMULATION sites: the same surface_height series with the
+   %       GAP-BRIDGED segments (surface_height_flag==1) overplotted in red so
+   %       interpolated, non-observational stretches are visually distinct and
+   %       can be excluded from model comparison. The source channel is
+   %       annotated and recorded in the sanity table.
    %
-   %   (c) The subsurface ice-temperature string tice1..ticeN [degC] as a
-   %       line set (shallow -> deep). Shallow sensors swing with the seasonal
-   %       cycle; deeper sensors damp and lag; all sit below ~0 degC after the
-   %       dictionary [-80, 1] C clamp applied in readPromiceAws.
+   %   (c) Subsurface temperature: the standardized 10 m channel tice10m
+   %       [degC] as a heavy line (the PRIMARY evaluation channel) overlaid on
+   %       the depth-tagged thermistor string tice1..ticeN [degC] (shallow ->
+   %       deep), all below ~0 degC after the dictionary [-80, 1] C clamp and
+   %       the surfaced-thermistor discard in readPromiceAws.
    %
    % This is a verification/diagnostics tool for the firn evaluation-data
    % work: the migrated L3 eval channels (snow depth, ablation, the tice
@@ -127,43 +132,75 @@ function summary = plot_promice_eval(options)
       title(tl, sprintf('PROMICE evaluation channels - %s (%s)', ...
          upper(site), options.frequency), 'Interpreter', 'none');
 
-      % --- (a) Snow depth (L3 snow_height) --------------------------------
+      is_ablation = isfield(meta, 'site_surface_type') ...
+         && string(meta.site_surface_type) == "ablation";
+
+      % --- (a) snow depth (ablation) or surface height (accumulation) -----
       ax1 = nexttile(tl);
-      if hasChan(Data, "snow_depth")
+      if is_ablation && hasChan(Data, "snow_depth")
          plot(ax1, t, Data.snow_depth, '-', 'LineWidth', 1.0)
+         ylabel(ax1, 'snow depth [m]')
+         title(ax1, '(a) snow depth (ablation site, L3 snow\_height, clamped >= 0)')
+      elseif hasChan(Data, "surface_height")
+         plot(ax1, t, Data.surface_height, '-', 'LineWidth', 1.0)
+         ylabel(ax1, 'surface height [m, +up]')
+         title(ax1, '(a) net surface height (accumulation site, L3 z\_surf\_combined)')
       end
       yline(ax1, 0, ':', 'Color', [0.5 0.5 0.5])
-      ylabel(ax1, 'snow depth [m]')
-      title(ax1, '(a) snow depth (L3 snow\_height)')
       grid(ax1, 'on')
 
-      % --- (b) Cumulative ablation (L3 surface height) --------------------
+      % --- (b) surface-height channel with gap-bridged segments flagged ---
       ax2 = nexttile(tl);
-      if hasChan(Data, "ablation")
-         plot(ax2, t, Data.ablation, '-', 'LineWidth', 1.0)
+      if is_ablation && hasChan(Data, "ablation")
+         surf = Data.ablation; surflbl = 'cumulative ablation [m, +down]';
+      elseif hasChan(Data, "surface_height")
+         surf = Data.surface_height; surflbl = 'surface height [m, +up]';
+      else
+         surf = nan(height(Data), 1); surflbl = 'surface height [m]';
+      end
+      hold(ax2, 'on')
+      plot(ax2, t, surf, '-', 'Color', [0 0.3 0.7], 'LineWidth', 1.0)
+      % Overplot gap-bridged samples (flag==1) in red so non-observational
+      % segments are visually distinct and excludable from model comparison.
+      if hasChan(Data, "surface_height_flag")
+         gap = Data.surface_height_flag == 1;
+         sg = surf; sg(~gap) = NaN;
+         plot(ax2, t, sg, '.', 'Color', [0.85 0.1 0.1], 'MarkerSize', 4)
+         legend(ax2, {'observed', 'gap-bridged (flag=1)'}, ...
+            'Location', 'best', 'Interpreter', 'none')
       end
       yline(ax2, 0, ':', 'Color', [0.5 0.5 0.5])
-      ylabel(ax2, 'cumulative ablation [m, +down]')
-      title(ax2, sprintf('(b) cumulative ablation  [source: %s]', ...
-         meta.ablation_source), 'Interpreter', 'none')
+      hold(ax2, 'off')
+      ylabel(ax2, surflbl)
+      title(ax2, sprintf('(b) surface height  [source: %s]', ...
+         meta.surface_source), 'Interpreter', 'none')
       grid(ax2, 'on')
 
-      % --- (c) Subsurface ice-temperature string --------------------------
+      % --- (c) tice10m (primary) + depth-tagged thermistor string ---------
       ax3 = nexttile(tl);
       have = tice_names(ismember(tice_names, ...
          string(Data.Properties.VariableNames)));
       hold(ax3, 'on')
       for k = 1:numel(have)
          % Kelvin -> degC for readability (channels stored in kelvin).
-         plot(ax3, t, Data.(have{k}) - 273.15, '-', 'LineWidth', 0.7)
+         plot(ax3, t, Data.(have{k}) - 273.15, '-', 'LineWidth', 0.6, ...
+            'Color', [0.6 0.6 0.6])
+      end
+      legentries = have;
+      if hasChan(Data, "tice10m")
+         plot(ax3, t, Data.tice10m - 273.15, '-', 'Color', [0 0 0], ...
+            'LineWidth', 1.6)
+         legentries = [{'tice10m (PRIMARY)'}, have];
       end
       yline(ax3, 0, ':', 'Color', [0.5 0.5 0.5])
       hold(ax3, 'off')
       ylabel(ax3, 'ice temperature [degC]')
       xlabel(ax3, 'time (UTC)')
-      title(ax3, '(c) subsurface temperature string tice1..ticeN (shallow->deep)')
-      if ~isempty(have)
-         legend(ax3, have, 'Location', 'eastoutside', 'Interpreter', 'none')
+      title(ax3, ['(c) subsurface temperature: tice10m (primary) + ' ...
+         'depth-tagged string (shallow->deep)'])
+      if ~isempty(legentries)
+         legend(ax3, legentries, 'Location', 'eastoutside', ...
+            'Interpreter', 'none')
       end
       grid(ax3, 'on')
 
@@ -208,12 +245,17 @@ end
 
 function row = sanityRow(site, Data, meta, tice_names, frequency)
    %SANITYROW One-row sanity table for a built station.
-   sd = colFinite(Data, "snow_depth");
-   ab = colFinite(Data, "ablation");
-   have = tice_names(ismember(tice_names, ...
-      string(Data.Properties.VariableNames)));
+   site_type = "unknown";
+   if isfield(meta, 'site_surface_type')
+      site_type = string(meta.site_surface_type);
+   end
+   surf_source = "n/a";
+   if isfield(meta, 'surface_source')
+      surf_source = string(meta.surface_source);
+   end
 
-   % Snow depth metrics.
+   % Snow depth metrics (ablation sites only; accumulation sites carry none).
+   sd = colFinite(Data, "snow_depth");
    if isempty(sd)
       sd_med = NaN; sd_max = NaN; sd_neg = NaN;
    else
@@ -221,18 +263,36 @@ function row = sanityRow(site, Data, meta, tice_names, frequency)
       sd_neg = nnz(sd < -0.02);   % tolerate sub-cm noise around zero
    end
 
-   % Ablation metrics: total surface lowering and a coarse monotonicity
-   % fraction (share of steps that do not move upward, i.e. surface lowering
-   % or flat). Accumulation-dominated sites legitimately fail monotonicity.
-   if isempty(ab)
+   % Surface metrics on the site-type channel: ablation (positive down) for
+   % ablation sites, surface_height (positive up) for accumulation sites. The
+   % "mono" fraction is the share of steps not moving against the expected
+   % sign (lowering for ablation; rising for accumulation).
+   if site_type == "ablation"
+      surfv = colFinite(Data, "ablation");
+   else
+      surfv = colFinite(Data, "surface_height");
+   end
+   if isempty(surfv)
       ab_total = NaN; ab_mono = NaN;
    else
-      ab_total = ab(end) - ab(1);
-      d = diff(ab);
+      ab_total = surfv(end) - surfv(1);
+      d = diff(surfv);
       ab_mono = nnz(d >= -1e-6) / max(numel(d), 1);
    end
 
-   % tice metrics after the [-80, 1] C clamp.
+   % Gap-bridged sample share on the surface channel.
+   gf = colFinite(Data, "surface_height_flag");
+   if isempty(gf)
+      gap_pct = NaN;
+   else
+      gap_pct = 100 * nnz(gf == 1) / numel(gf);
+   end
+
+   % tice metrics after the [-80, 1] C clamp and surfaced-thermistor discard.
+   have = tice_names(ismember(tice_names, ...
+      string(Data.Properties.VariableNames)));
+   has_tice10m = ismember("tice10m", string(Data.Properties.VariableNames)) ...
+      && any(isfinite(Data.tice10m));
    tv = [];
    for k = 1:numel(have)
       tv = [tv; colFinite(Data, have{k}) - 273.15]; %#ok<AGROW>
@@ -250,16 +310,17 @@ function row = sanityRow(site, Data, meta, tice_names, frequency)
    span_days = days(Data.Time(end) - Data.Time(1));
 
    row = table( ...
-      string(upper(site)), ...
+      string(upper(site)), site_type, ...
       string(Data.Time(1)), string(Data.Time(end)), ...
       round(span_days), height(Data), ...
       round(sd_med, 2), round(sd_max, 2), sd_neg, ...
-      round(ab_total, 2), round(ab_mono, 2), string(meta.ablation_source), ...
-      numel(have), round(ti_min, 1), round(ti_max, 1), round(100 * ti_warm, 1), ...
-      "", ...
-      'VariableNames', {'station', 'start', 'stop', 'span_d', 'nrows', ...
-      'sd_med', 'sd_max', 'sd_neg', 'abl_total', 'abl_mono', 'abl_source', ...
-      'n_tice', 'tice_min', 'tice_max', 'tice_warmpct', 'flags'});
+      round(ab_total, 2), round(ab_mono, 2), surf_source, round(gap_pct, 1), ...
+      numel(have), has_tice10m, round(ti_min, 1), round(ti_max, 1), ...
+      round(100 * ti_warm, 1), "", ...
+      'VariableNames', {'station', 'site_type', 'start', 'stop', 'span_d', ...
+      'nrows', 'sd_med', 'sd_max', 'sd_neg', 'surf_total', 'surf_mono', ...
+      'surf_source', 'gap_pct', 'n_tice', 'has_tice10m', 'tice_min', ...
+      'tice_max', 'tice_warmpct', 'flags'});
 
    row.flags = buildFlags(row, frequency);
 end
@@ -268,13 +329,14 @@ function row = failedRow(site, ME)
    %FAILEDROW Placeholder row for a station the builder could not build.
    nanr = @() NaN;
    row = table( ...
-      string(upper(site)), missing, missing, nanr(), nanr(), ...
-      nanr(), nanr(), nanr(), nanr(), nanr(), "(build failed)", ...
-      nanr(), nanr(), nanr(), nanr(), ...
+      string(upper(site)), "unknown", missing, missing, nanr(), nanr(), ...
+      nanr(), nanr(), nanr(), nanr(), nanr(), "(build failed)", nanr(), ...
+      nanr(), false, nanr(), nanr(), nanr(), ...
       string("FAIL: " + regexprep(ME.message, '\s+', ' ')), ...
-      'VariableNames', {'station', 'start', 'stop', 'span_d', 'nrows', ...
-      'sd_med', 'sd_max', 'sd_neg', 'abl_total', 'abl_mono', 'abl_source', ...
-      'n_tice', 'tice_min', 'tice_max', 'tice_warmpct', 'flags'});
+      'VariableNames', {'station', 'site_type', 'start', 'stop', 'span_d', ...
+      'nrows', 'sd_med', 'sd_max', 'sd_neg', 'surf_total', 'surf_mono', ...
+      'surf_source', 'gap_pct', 'n_tice', 'has_tice10m', 'tice_min', ...
+      'tice_max', 'tice_warmpct', 'flags'});
 end
 
 function flags = buildFlags(row, frequency)
@@ -291,36 +353,45 @@ function flags = buildFlags(row, frequency)
       f(end+1) = "SPARSE";
    end
 
-   % Snow depth. Sub-cm negatives are tolerated in sd_neg; only flag when a
-   % nontrivial number of samples sit persistently below the surface.
-   if isnan(row.sd_med)
-      f(end+1) = "NO_SNOWDEPTH";
-   elseif row.sd_neg > 50
-      f(end+1) = "SNOW_NEG";
-   end
-   if ~isnan(row.sd_max) && row.sd_max > 5
-      f(end+1) = "SNOW_HIGH";
+   % Snow depth (ablation sites only; NO_SNOWDEPTH on accumulation sites is
+   % EXPECTED, not a defect, so it is not flagged there).
+   if row.site_type == "ablation"
+      if isnan(row.sd_med)
+         f(end+1) = "NO_SNOWDEPTH";
+      elseif row.sd_neg > 50
+         f(end+1) = "SNOW_NEG";
+      end
+      if ~isnan(row.sd_max) && row.sd_max > 5
+         f(end+1) = "SNOW_HIGH";
+      end
    end
 
-   % Ablation.
-   if isnan(row.abl_total)
-      f(end+1) = "NO_ABLATION";
+   % Surface-height channel.
+   if isnan(row.surf_total)
+      f(end+1) = "NO_SURFACE";
    end
-   if row.abl_source == "L3 z_surf_combined"
-      f(end+1) = "ABL_ZSURF";          % accumulation site, fallback source
-   elseif row.abl_source == "none (no L3 surface-height channel)"
-      f(end+1) = "ABL_MISSING";
+   if row.surf_source == "none (no L3 surface-height channel)"
+      f(end+1) = "SURF_MISSING";
    end
-   % Net accumulation (negative total ablation) is fine on accumulation
-   % sites but worth flagging for the user's eye.
-   if ~isnan(row.abl_total) && row.abl_total < -0.5
-      f(end+1) = "ABL_NET_ACCUM";
+   % A large gap-bridged share means much of the surface series is not a
+   % direct observation (exclude those segments before model comparison).
+   if ~isnan(row.gap_pct) && row.gap_pct > 25
+      f(end+1) = "GAP_HEAVY(>25%)";
+   end
+   % Net ablation sign sanity: an ablation site that NET rises, or an
+   % accumulation site that NET lowers, is worth the user's eye.
+   if row.site_type == "ablation" && ~isnan(row.surf_total) ...
+         && row.surf_total < -0.5
+      f(end+1) = "ABL_NET_RISE";
+   elseif row.site_type == "accumulation" && ~isnan(row.surf_total) ...
+         && row.surf_total < -0.5
+      f(end+1) = "ACC_NET_LOWER";
    end
 
    % tice string. The clamp ceiling is +1 C, so isolated near-melt touches at
    % the ceiling are normal; flag only when warm samples are a meaningful
    % SHARE of the string (a persistently-warm/biased thermistor record).
-   if row.n_tice == 0
+   if row.n_tice == 0 && ~row.has_tice10m
       f(end+1) = "NO_TICE";
    end
    if ~isnan(row.tice_warmpct) && row.tice_warmpct > 2
@@ -347,12 +418,13 @@ end
 
 function printSummary(row)
    %PRINTSUMMARY Compact per-station console line backing the eyeball check.
-   fprintf(['  %-8s span %5sd  n=%-6s  sd[med %5s max %5s neg %4s]  ' ...
-      'abl[tot %6s src %-18s]  tice[%2s %5s..%5sC warm%%%5s]  %s\n'], ...
-      row.station, num(row.span_d), num(row.nrows), ...
-      num(row.sd_med), num(row.sd_max), num(row.sd_neg), ...
-      num(row.abl_total), char(row.abl_source), num(row.n_tice), ...
-      num(row.tice_min), num(row.tice_max), num(row.tice_warmpct), row.flags);
+   fprintf(['  %-8s %-12s span %5sd  n=%-6s  sd[med %5s neg %4s]  ' ...
+      'surf[tot %6s gap%%%5s src %-18s]  tice[%2s %5s..%5sC warm%%%5s]  %s\n'], ...
+      row.station, char(row.site_type), num(row.span_d), num(row.nrows), ...
+      num(row.sd_med), num(row.sd_neg), ...
+      num(row.surf_total), num(row.gap_pct), char(row.surf_source), ...
+      num(row.n_tice), num(row.tice_min), num(row.tice_max), ...
+      num(row.tice_warmpct), row.flags);
 end
 
 function printTable(summary)
@@ -402,14 +474,15 @@ function writeMarkdown(summary, mdfile, frequency, source_dir)
    legend = [
       "SHORT(<1yr)",      "record spans < 1 year"
       "SPARSE",           "row count < 50% of nominal cadence coverage"
-      "NO_SNOWDEPTH",     "no finite snow_depth (L3 snow_height) samples"
+      "NO_SNOWDEPTH",     "ablation site with no finite snow_depth samples"
       "SNOW_NEG",         "> 50 snow_depth samples persistently < -2 cm"
       "SNOW_HIGH",        "snow_depth max > 5 m (suspect)"
-      "NO_ABLATION",      "no finite ablation samples"
-      "ABL_ZSURF",        "ablation from z_surf_combined (accumulation site)"
-      "ABL_MISSING",      "no L3 surface-height channel for ablation"
-      "ABL_NET_ACCUM",    "net negative ablation (surface raised > 0.5 m)"
-      "NO_TICE",          "no subsurface temperature sensors"
+      "NO_SURFACE",       "no finite surface-height samples (ablation or surface_height)"
+      "SURF_MISSING",     "no L3 surface-height channel at all"
+      "GAP_HEAVY(>25%)",  "> 25% of surface-height samples gap-bridged (flag=1)"
+      "ABL_NET_RISE",     "ablation site net-rose > 0.5 m (station transition / data issue)"
+      "ACC_NET_LOWER",    "accumulation site net-lowered > 0.5 m (suspect)"
+      "NO_TICE",          "no subsurface temperature (no thermistor string and no tice10m)"
       "TICE_WARM(>2%>0.5C)", "> 2% of tice samples above 0.5 C (warm bias)"];
    for i = 1:size(legend, 1)
       fprintf(fid, '- `%s`: %s\n', legend(i, 1), legend(i, 2));
