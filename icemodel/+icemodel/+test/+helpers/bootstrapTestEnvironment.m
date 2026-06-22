@@ -24,17 +24,14 @@ function [rootdir, input_path, output_path, eval_path, cleanup] = ...
    % artifact, profiler, and archive directories stay off the MATLAB path.
    addCodeFolders(icemodel.getpath('test'))
 
-   % Put the exactremap toolbox on the path so the conservative
-   % (area-weighted) remap tests RUN instead of self-skipping. Resolved from
-   % the sibling exactremap dev repo; a clean no-op when it is absent (the
-   % affected tests then skip cleanly, as before).
-   ensureExactremap(rootdir)
-
-   % Put the activelayer toolbox (and the matfunclib helpers it depends on) on
-   % the path so icemodel.verification reads the Obu permafrost zones through
-   % activelayer.readobuzones instead of duplicating shaperead logic. Resolved
-   % from the sibling dev repos; a clean no-op when they are absent.
-   ensureActivelayer(rootdir)
+   % Wire the external dev-repo dependencies (exactremap, activelayer, and the
+   % matfunclib helpers activelayer needs) through the single central config
+   % function so they are never bootstrapped from arbitrary locations. This
+   % lets the conservative (area-weighted) remap tests and the Obu
+   % permafrost-zone analysis RUN instead of self-skipping. Each dependency is
+   % a clean no-op when already on the path or absent (the affected tests then
+   % skip cleanly, as before).
+   icemodel.dependencies();
 
    % Return a no-op cleanup by default so callers can always keep one handle
    % alive even when path/config installation is disabled.
@@ -71,54 +68,6 @@ function restoreConfig(names, values)
 
    for n = 1:numel(names)
       setenv(names(n), values{n});
-   end
-end
-
-function ensureExactremap(rootdir)
-   %ENSUREEXACTREMAP Put the exactremap toolbox on the path if not already.
-   % exactremap supplies the conservative (overlap-area-weighted) polygon
-   % remap used by icemodel.forcing.helpers.remapPolygon. It lives in a
-   % sibling dev repo (projects/exactremap, https://github.com/mgcooper/
-   % exactremap), kept off the icemodel repo. When it is already on the path
-   % (e.g. activated by the user's startup.m) this is a no-op; when the dev
-   % repo is missing this returns quietly and the remap tests skip cleanly.
-
-   if ~isempty(which('exactremap'))
-      return
-   end
-
-   % projects/icemodel/.. -> projects/, then projects/exactremap/toolbox.
-   projects_root = fileparts(rootdir);
-   tbdir = fullfile(projects_root, 'exactremap', 'toolbox');
-   if isfolder(tbdir)
-      addpath(genpath(tbdir))
-   end
-end
-
-function ensureActivelayer(rootdir)
-   %ENSUREACTIVELAYER Put activelayer + matfunclib on the path if not already.
-   % activelayer.readobuzones reads the Obu (UiO PEX) permafrost-zones
-   % shapefile; it depends on shared helpers from matfunclib
-   % (parseFileName, dealout, mustBePolygonOrFile). Both live in sibling dev
-   % repos (projects/activelayer, projects/matfunclib), kept off the icemodel
-   % repo. When activelayer.readobuzones already resolves (e.g. activated by
-   % the user's startup.m) this is a no-op; when a dev repo is missing this
-   % returns quietly and the Obu-dependent analysis tools skip cleanly.
-
-   if ~isempty(which('activelayer.readobuzones'))
-      return
-   end
-
-   % projects/icemodel/.. -> projects/, then the sibling toolbox trees.
-   % matfunclib goes on first so activelayer's helper dependencies resolve.
-   projects_root = fileparts(rootdir);
-   mfdir = fullfile(projects_root, 'matfunclib');
-   if isfolder(mfdir)
-      addpath(genpath(mfdir))
-   end
-   tbdir = fullfile(projects_root, 'activelayer', 'toolbox');
-   if isfolder(tbdir)
-      addpath(genpath(tbdir))
    end
 end
 

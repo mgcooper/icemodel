@@ -4,6 +4,14 @@ Forcing and evaluation-data builders for icemodel. Each gridded/AWS source has
 a `read*` (raw -> canonical channels), a `build*Met` (met-contract timetable),
 and a `build*Data` (evaluation/userdata timetable) function.
 
+The conservative (area-weighted) polygon remap in
+`icemodel.forcing.helpers.remapPolygon` needs the external
+[`exactremap`](https://github.com/mgcooper/exactremap) dev repo on the path. It
+is wired by `icemodel.dependencies` (called by the test bootstrap); set
+`ICEMODEL_EXACTREMAP` (or `ICEMODEL_PROJECTS_ROOT`) to use a non-default
+location. When `exactremap` is absent the conservative-remap tests skip cleanly.
+See the repo README "Optional external dependencies".
+
 ## PROMICE / GC-Net AWS evaluation data
 
 `readPromiceAws` reads a pypromice Level-3 station NetCDF into canonical

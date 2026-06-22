@@ -297,6 +297,39 @@ setup()
 
 Installation should only take a few seconds. If you encounter any issues, please [open an issue](https://github.com/mgcooper/icemodel/issues).
 
+### Optional external dependencies
+
+Running the model and the snow-verification workflow needs nothing beyond this
+repo. A few auxiliary workflows (building gridded-climate forcings, and the
+permafrost-zone site classification used by `icemodel.verification`) call out to
+external dev-repo toolboxes that are intentionally kept *out* of this repo:
+
+| Repo | Used by | Path added |
+| --- | --- | --- |
+| [`exactremap`](https://github.com/mgcooper/exactremap) | conservative (area-weighted) polygon remap in `icemodel.forcing.helpers.remapPolygon` | `exactremap/toolbox` |
+| [`activelayer`](https://github.com/mgcooper/activelayer) | Obu (UiO PEX) permafrost-zone reader `activelayer.readobuzones` used by site classification | `activelayer/toolbox` |
+| [`matfunclib`](https://github.com/mgcooper/matfunclib) | shared helpers `activelayer` depends on (`parseFileName`, `dealout`, ...) | `matfunclib` |
+
+These are wired by the single central function `icemodel.dependencies`, which
+the test bootstrap calls automatically. It resolves each repo root in this
+order, and is a clean no-op when a dependency is already on the path or absent:
+
+1. A dependency-specific environment variable:
+   `ICEMODEL_EXACTREMAP`, `ICEMODEL_ACTIVELAYER`, `ICEMODEL_MATFUNCLIB`.
+2. A shared projects-root variable `ICEMODEL_PROJECTS_ROOT`, joined with the
+   repo name (e.g. `$ICEMODEL_PROJECTS_ROOT/exactremap`).
+3. The sibling `projects/` layout (the parent folder of this repo).
+
+To use a non-default location, clone the repos and either set the env vars or
+clone them next to this repo. To add them to the path yourself:
+
+```matlab
+icemodel.dependencies()           % no-op for anything already on the path
+icemodel.dependencies(require=true)  % error if any dependency is missing
+```
+
+`matfunclib` must be on the path for `activelayer` to load.
+
 ## Contribute
 
 If you find a bug, have a question, or want to contribute, feel free to open an [issue](https://github.com/mgcooper/icemodel/issues) or start a [discussion](https://github.com/mgcooper/icemodel/discussions).

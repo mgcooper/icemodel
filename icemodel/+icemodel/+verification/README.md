@@ -257,6 +257,16 @@ non-KAN PROMICE stations and the ESM-SnowMIP sites carry **authoritative**
   on lon/lat (off-ice sites; ice-sheet/glacier -> `none`). Replaces the v1 Brown
   et al. (1997) source.
 
+> The Obu zone polygons are read through `activelayer.readobuzones`, which lives
+> in the external [`activelayer`](https://github.com/mgcooper/activelayer) dev
+> repo and depends on shared helpers from
+> [`matfunclib`](https://github.com/mgcooper/matfunclib). Both are placed on the
+> path by `icemodel.dependencies` (called automatically by the test bootstrap);
+> set `ICEMODEL_ACTIVELAYER` / `ICEMODEL_MATFUNCLIB` (or `ICEMODEL_PROJECTS_ROOT`)
+> to use non-default locations. When these repos are absent the Obu-dependent
+> classification skips cleanly. See the repo README "Optional external
+> dependencies" section.
+
 All cataloged sites now resolve. ZAC_A/L/U (A.P. Olsen / Zackenberg GlacioBasis
 transect, NE Greenland) carry no installation coordinates in the CSV; their
 lon/lat are sourced from the per-station L3 NetCDF global `latitude`/`longitude`
