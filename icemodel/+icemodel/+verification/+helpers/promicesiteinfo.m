@@ -65,10 +65,13 @@ function info = promicesiteinfo(site)
    %    not falsely read 0):
    %      f_bare >= 0.50           -> ablation     (bare ice in a majority of years)
    %    In the accumulation area (f_bare < 0.50) the firn facies is refined with
-   %    elevation + SUMup density co-location:
-   %      elev >= 2500 m & f_bare==0          -> dry_snow    (cold high interior)
+   %    SUMup density co-location:
    %      SUMup_2025 density profile <= 15 km -> percolation (firn observed)
    %      otherwise                           -> accumulation (facies unresolved)
+   %    (A former elev >= 2500 m & f_bare==0 -> dry_snow branch was removed: the
+   %    elevation cutoff did not generalize, so the three former dry_snow sites
+   %    EGP/NAE/SDM collapse to accumulation. "dry_snow" stays in the surfacezone
+   %    vocabulary but is currently unused.)
    %    This method REPRODUCES the KAN anchors: KAN_L f_bare=1.00 -> ablation,
    %    KAN_M 1.00 -> ablation. KAN_U f_bare=0.00 reads snow-covered at the surface
    %    every year and the surface signal alone would call it accumulation; it is
@@ -155,7 +158,7 @@ function catalog = buildCatalog(models)
      "CEN",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.0 km, firn observed; elev 1872 m)."
      "CP1",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.3 km, firn observed; elev 1951 m)."
      "DY2",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.2 km, firn observed; elev 2113 m)."
-     "EGP",    "dry_snow",      "sf", "none",            false, "Dry-snow interior (MODIS bare-ice freq=0.00, elev 2663 m >= 2500)."
+     "EGP",    "accumulation",  "sf", "none",            false, "Accumulation interior (MODIS bare-ice freq=0.00, elev 2663 m; high-interior site, no SUMup firn co-location)."
      "FRE",    "ablation",      "si", "none",            false, "Marginal local glacier -> ablation."
      "HUM",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.1 km, firn observed; elev 1967 m)."
      "JAR",    "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
@@ -166,7 +169,7 @@ function catalog = buildCatalog(models)
      "LYN_L",  "ablation",      "si", "none",            false, "Marginal local glacier -> ablation."
      "LYN_T",  "ablation",      "si", "none",            false, "Marginal local glacier -> ablation."
      "MIT",    "ablation",      "si", "none",            false, "Marginal local glacier -> ablation."
-     "NAE",    "dry_snow",      "sf", "none",            false, "Dry-snow interior (MODIS bare-ice freq=0.00, elev 2624 m >= 2500)."
+     "NAE",    "accumulation",  "sf", "none",            false, "Accumulation interior (MODIS bare-ice freq=0.00, elev 2624 m; high-interior site, no SUMup firn co-location)."
      "NAU",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.2 km, firn observed; elev 2335 m < 2500)."
      "NEM",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.1 km, firn observed; elev 2451 m < 2500)."
      "NSE",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.1 km, firn observed; elev 2375 m < 2500)."
@@ -185,7 +188,7 @@ function catalog = buildCatalog(models)
      "SCO_L",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
      "SCO_U",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
      "SDL",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.0 km, firn observed; elev 2459 m < 2500)."
-     "SDM",    "dry_snow",      "sf", "none",            false, "Dry-snow interior (MODIS bare-ice freq=0.00, elev 2879 m >= 2500)."
+     "SDM",    "accumulation",  "sf", "none",            false, "Accumulation interior (MODIS bare-ice freq=0.00, elev 2879 m; high-interior site, no SUMup firn co-location)."
      "SER_B",  "land",          "",   "discontinuous",   false, "Off-ice bedrock; Obu EXTENT discontinuous."
      "SWC",    "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=0.84)."
      "TAS_A",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=0.95)."

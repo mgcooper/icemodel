@@ -61,8 +61,7 @@ function T = classify_site_facies(varargin)
    %     /DATA/latitude,/DATA/longitude carry ~2M firn/snow density measurement
    %     points. Within the accumulation area (not bare ice), a SUMup density
    %     profile co-located within ~15 km is direct EVIDENCE of firn presence ->
-   %     percolation/firn facies. Very high, cold, dry sites (elev >= 2500 m, no
-   %     bare ice) -> dry_snow. Otherwise we leave the honest coarse value
+   %     percolation/firn facies. Otherwise we leave the honest coarse value
    %     "accumulation" (the surface data cannot resolve percolation vs dry snow).
    %
    %  surface_zone LOGIC
@@ -72,9 +71,11 @@ function T = classify_site_facies(varargin)
    %    local glacier                          -> ablation (marginal).
    %    ice sheet -> by MODIS f_bare:
    %        f_bare >= 0.50                      -> ablation     (frequently bare).
-   %        f_bare <  0.50 & elev >= 2500 & f==0-> dry_snow     (cold high interior).
    %        f_bare <  0.50 & SUMup within 15 km -> percolation  (firn observed).
    %        f_bare <  0.50 otherwise            -> accumulation (honest coarse).
+   %    (A former elev >= 2500 m & f_bare==0 -> dry_snow branch was removed: the
+   %     hard elevation cutoff did not generalize. dry_snow is now never emitted;
+   %     accumulation-area facies is percolation via SUMup density else accumulation.)
    %      MODIS no-data at the cell -> fall back to elevation band, flagged.
    %
    %  permafrost_zone is ORTHOGONAL to surface_zone: ice-sheet/glacier sites get
@@ -97,7 +98,6 @@ function T = classify_site_facies(varargin)
    p.addParameter("write_review", true, @(x) islogical(x) || isnumeric(x));
    p.addParameter("sumup_radius_km", 15, @isnumeric);
    p.addParameter("ablation_freq", 0.50, @isnumeric);
-   p.addParameter("dry_snow_elev", 2500, @isnumeric);
    p.parse(varargin{:});
    opts = p.Results;
 
@@ -389,11 +389,7 @@ function [zone, target, pfz, note] = assign(s, fbare, nyr, skm, ext, opts)
    end
 
    % accumulation area at the surface: refine the firn facies
-   if isfinite(s.elev) && s.elev >= opts.dry_snow_elev && fbare == 0
-      zone = "dry_snow"; target = seasonal_firn;
-      note = sprintf("ice sheet, freq=%.2f, elev=%.0f m >= %.0f, no bare ice -> dry_snow", ...
-         fbare, s.elev, opts.dry_snow_elev);
-   elseif skm <= opts.sumup_radius_km
+   if skm <= opts.sumup_radius_km
       zone = "percolation"; target = seasonal_firn;
       note = sprintf("ice sheet, freq=%.2f, SUMup density %.1f km <= %.0f km -> percolation (firn observed)", ...
          fbare, skm, opts.sumup_radius_km);
@@ -446,7 +442,7 @@ function writeReview(T, path, opts)
    fprintf(fid, "Derived by `test/interactive/classify_site_facies.m` from:\n");
    fprintf(fid, "- MODIS end-of-summer **Bare Ice Extent** 2000-2018 (ablation vs accumulation; ablation when bare-ice freq >= %.2f),\n", opts.ablation_freq);
    fprintf(fid, "- **SUMup_2025** GrIS density profiles (firn evidence within %.0f km),\n", opts.sumup_radius_km);
-   fprintf(fid, "- **Obu et al. (2019)** permafrost zones (off-ice permafrost_zone; dry_snow when elev >= %.0f m and no bare ice).\n\n", opts.dry_snow_elev);
+   fprintf(fid, "- **Obu et al. (2019)** permafrost zones (off-ice permafrost_zone).\n\n");
    fprintf(fid, "KAN_L/M/U are USER-AUTHORITATIVE anchors and pin over the method.\n\n");
    fprintf(fid, "| site | lat | lon | elev | loc_type | bare_ice_freq | n_yr | sumup_firn | sumup_km | obu_extent | surface_zone | eval_target | permafrost | note |\n");
    fprintf(fid, "|------|-----|-----|------|----------|---------------|------|-----------|----------|------------|--------------|-------------|------------|------|\n");
