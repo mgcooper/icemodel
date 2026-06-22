@@ -175,6 +175,98 @@ function test_buildPromiceData_accumulation_site_uses_surface_height(testCase)
    testCase.verifyLessThan(max(abs(sh)), 15);      % plausible magnitude
 end
 
+function test_buildPromiceData_gap_flag_from_sensors_not_just_z_nan(testCase)
+   % The improved gap flag is sensor-derived: it must catch slope-bridged
+   % samples (all surface sensors NaN but z finite) that the old z-NaN-only
+   % heuristic missed. MIT has thousands of such samples, so the new
+   % gap-flagged count must EXCEED the bare z-NaN count.
+
+   [Data, metadata] = icemodel.forcing.buildPromiceData("MIT", ...
+      source_dir=testCase.TestData.source_dir, frequency="hourly");
+
+   % Reconstruct the bare z-NaN count from the raw reader for the comparison.
+   aws = icemodel.forcing.readPromiceAws("MIT", ...
+      source_dir=testCase.TestData.source_dir);
+   z_nan_only = nnz(~isfinite(aws.z_ice_surf));
+
+   names = string(Data.Properties.VariableNames);
+   testCase.verifyTrue(ismember("surface_height_flag", names));
+   % The sensor-derived gap count must strictly exceed the z-NaN-only count
+   % (slope-bridged segments are now flagged too).
+   testCase.verifyGreaterThan(metadata.gap_flagged_samples, z_nan_only);
+end
+
+function test_buildPromiceData_gap_flag_does_not_overlay_observations(testCase)
+   % A gap-flagged sample must coincide with all underlying surface sensors
+   % being NaN (no direct observation), so the red gap markers never overlay a
+   % genuinely-observed sample.
+
+   Data = icemodel.forcing.buildPromiceData("MIT", ...
+      source_dir=testCase.TestData.source_dir, frequency="hourly");
+   aws = icemodel.forcing.readPromiceAws("MIT", ...
+      source_dir=testCase.TestData.source_dir);
+
+   sensor_names = intersect(["transducer_depth", "boom_height", ...
+      "stake_height"], string(aws.Properties.VariableNames), 'stable');
+   sensors = cell2mat(arrayfun(@(v) aws.(v), sensor_names, ...
+      'UniformOutput', false));
+   all_sensors_nan = all(~isfinite(sensors), 2);
+
+   % Interior gap samples (z finite) must have all sensors NaN: no observed
+   % sensor reading hides under a gap flag.
+   gap = Data.surface_height_flag == 1;
+   z_finite = isfinite(aws.z_ice_surf);
+   interior_gap = gap & z_finite;
+   testCase.verifyTrue(all(all_sensors_nan(interior_gap)), ...
+      'a gap flag overlays a sample with a finite surface sensor');
+end
+
+function test_buildPromiceData_stages_station_transition_flag(testCase)
+   % The station-transition flag channel is staged on every site (0/1). With no
+   % per-station handover dates in the staged product it is all-zero, but the
+   % composing-station provenance (multistation) is recorded for the consumer.
+
+   [Data, metadata] = icemodel.forcing.buildPromiceData("KAN_L", ...
+      source_dir=testCase.TestData.source_dir, frequency="daily");
+
+   names = string(Data.Properties.VariableNames);
+   testCase.verifyTrue(ismember("station_transition_flag", names));
+   stf = Data.station_transition_flag(isfinite(Data.station_transition_flag));
+   testCase.verifyTrue(all(stf == 0 | stf == 1));
+   testCase.verifyTrue(isfield(metadata, 'composing_stations'));
+   testCase.verifyTrue(isfield(metadata, 'is_multistation'));
+end
+
+function test_buildPromiceData_stages_step_flags_unaltered(testCase)
+   % The de-stepping DETECTION is staged (step_detected/correctable + signed
+   % magnitude) but the staged ablation series itself is UNALTERED: it must
+   % still equal the raw -(z - z(start)) lowering, proving correction is not
+   % baked into the staged data.
+
+   [Data, metadata] = icemodel.forcing.buildPromiceData("MIT", ...
+      source_dir=testCase.TestData.source_dir, frequency="hourly");
+
+   names = string(Data.Properties.VariableNames);
+   testCase.verifyTrue(all(ismember(["step_detected_flag", ...
+      "step_correctable_flag", "step_magnitude"], names)));
+
+   % MIT carries unambiguous (correctable) steps (~5.9 m installation jumps).
+   testCase.verifyGreaterThan(metadata.steps_correctable, 0);
+
+   % Staged ablation is faithful: equals the raw lowering, NOT de-stepped.
+   aws = icemodel.forcing.readPromiceAws("MIT", ...
+      source_dir=testCase.TestData.source_dir);
+   z = aws.z_ice_surf;
+   raw_ablation = -(z - z(find(isfinite(z), 1)));
+   testCase.verifyEqual(Data.ablation, raw_ablation, 'AbsTol', 1e-9);
+
+   % The raw series still carries the ~11.9 m of bogus installation jump, so it
+   % overshoots the de-stepped magnitude (the correction is NOT in the staged
+   % data).
+   ab = raw_ablation(isfinite(raw_ablation));
+   testCase.verifyGreaterThan(max(ab), 40);   % raw includes the bogus jump
+end
+
 function test_buildPromiceData_units_from_shared_map(testCase)
    % The Data output carries the shared canonical units (ablation/snow_depth
    % in m, tice in K).
