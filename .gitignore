@@ -38,6 +38,9 @@ test/interactive/data/
 test/interactive/figures/
 icemodel/dependencies/requirements.mat
 
+# CF Standard Name Table cache (fetched by icemodel.netcdf.defaults.cfStandardNames)
+.cache/
+
 # vscode
 .vscode
 

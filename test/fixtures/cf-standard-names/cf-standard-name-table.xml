@@ -1,0 +1,140 @@
+<?xml version="1.0"?>
+<standard_name_table>
+  <version_number>94</version_number>
+  <last_modified>icemodel-fixture (subset of official table)</last_modified>
+  <institution>Subset fixture for icemodel offline CF validation</institution>
+  <entry id="air_temperature">
+    <canonical_units>K</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="cloud_area_fraction">
+    <canonical_units>1</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="depth">
+    <canonical_units>m</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="eastward_wind">
+    <canonical_units>m s-1</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="height_above_mean_sea_level">
+    <canonical_units>m</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="land_ice_surface_specific_mass_balance_rate">
+    <canonical_units>m s-1</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="land_ice_temperature">
+    <canonical_units>K</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="northward_wind">
+    <canonical_units>m s-1</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="precipitation_flux">
+    <canonical_units>kg m-2 s-1</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="rainfall_flux">
+    <canonical_units>kg m-2 s-1</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="relative_humidity">
+    <canonical_units>1</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="snowfall_flux">
+    <canonical_units>kg m-2 s-1</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="specific_humidity">
+    <canonical_units>1</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_air_pressure">
+    <canonical_units>Pa</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_albedo">
+    <canonical_units>1</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_downward_heat_flux_in_air">
+    <canonical_units>W m-2</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_downward_latent_heat_flux">
+    <canonical_units>W m-2</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_downward_sensible_heat_flux">
+    <canonical_units>W m-2</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_downwelling_longwave_flux_in_air">
+    <canonical_units>W m-2</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_downwelling_shortwave_flux_in_air">
+    <canonical_units>W m-2</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_net_downward_longwave_flux">
+    <canonical_units>W m-2</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_net_downward_radiative_flux">
+    <canonical_units>W m-2</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_net_downward_shortwave_flux">
+    <canonical_units>W m-2</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_runoff_flux">
+    <canonical_units>kg m-2 s-1</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_snow_and_ice_melt_flux">
+    <canonical_units>kg m-2 s-1</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_snow_and_ice_refreezing_flux">
+    <canonical_units>kg m-2 s-1</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_snow_thickness">
+    <canonical_units>m</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_temperature">
+    <canonical_units>K</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_upwelling_longwave_flux_in_air">
+    <canonical_units>W m-2</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="surface_upwelling_shortwave_flux_in_air">
+    <canonical_units>W m-2</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="wind_from_direction">
+    <canonical_units>degree</canonical_units>
+    <description></description>
+  </entry>
+  <entry id="wind_speed">
+    <canonical_units>m s-1</canonical_units>
+    <description></description>
+  </entry>
+  <alias id="surface_snow_and_ice_sublimation_flux">
+    <entry_id>tendency_of_atmosphere_mass_content_of_water_vapor_due_to_sublimation_of_surface_snow_and_ice</entry_id>
+  </alias>
+  <alias id="water_evaporation_flux">
+    <entry_id>water_evapotranspiration_flux</entry_id>
+  </alias>
+</standard_name_table>
