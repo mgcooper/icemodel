@@ -146,7 +146,6 @@ function manifest = importSumup(source_dir, kwargs)
 
    for n = 1:n_points
       point = points(n, :);
-      [case_id, alias] = resolveCaseId(kwargs.case_ids, n);
 
       try
          [x3413, y3413] = projfwd(proj, point(1), point(2));
@@ -157,6 +156,14 @@ function manifest = importSumup(source_dir, kwargs)
             threshold_km=kwargs.colocation_threshold_km, ...
             evaluation_data_root=kwargs.evaluation_data_root, ...
             icemodel_config_casename=kwargs.icemodel_config_casename);
+
+         % Resolve the case id / on-disk dir / site labels. case_id and the
+         % case dir are the SAME compact id (no redundant family prefix - the
+         % family folder is already `sumup`); a KAN-co-located case inherits
+         % the anchor's compact id so the SUMup case_id matches the PROMICE
+         % convention (kanl/kanm/kanu, site_id KAN_L/M/U).
+         [case_id, alias, site_id, site_name] = ...
+            resolveCaseId(kwargs.case_ids, n, is_coloc, anchor);
 
          site_location = struct( ...
             'lat_wgs84', point(1), 'lon_wgs84', point(2), ...
@@ -215,10 +222,10 @@ function manifest = importSumup(source_dir, kwargs)
          [zone, target, pfz] = sumupZoneAndTarget(is_coloc, anchor);
 
          case_values = { ...
-            char(alias)
+            char(case_id)
             'firn_observational'
-            char(case_id)
-            char(case_id)
+            char(site_id)
+            char(site_name)
             char(zone)
             cellstr(target)
             char(pfz)
@@ -301,14 +308,30 @@ function points = defaultAnchorPoints()
    end
 end
 
-function [case_id, alias] = resolveCaseId(case_ids, n)
-   %RESOLVECASEID Resolve the n-th case id, defaulting to sumup_NN.
+function [case_id, alias, site_id, site_name] = ...
+      resolveCaseId(case_ids, n, is_coloc, anchor)
+   %RESOLVECASEID Resolve the n-th case id, dir, and site labels.
+   %
+   % The case_id and the on-disk case dir (alias) are the SAME compact id; the
+   % family folder is already `sumup`, so NO `sumup` prefix is added. An
+   % explicit case_ids(n) wins. Otherwise a KAN-co-located point inherits the
+   % anchor's compact id (KAN_L -> kanl) and PROMICE-style site labels so SUMup
+   % case_ids match the PROMICE convention; a non-co-located point falls back
+   % to a numbered sumupNN id.
    if numel(case_ids) >= n && strlength(case_ids(n)) > 0
-      case_id = case_ids(n);
+      case_id = lower(erase(case_ids(n), "_"));
+      site_id = case_ids(n);
+      site_name = case_ids(n);
+   elseif is_coloc && ~isempty(anchor)
+      site_id = string(anchor.site);                 % e.g. "KAN_L"
+      case_id = lower(erase(site_id, "_"));           % e.g. "kanl"
+      site_name = replace(site_id, "_", "-");         % e.g. "KAN-L"
    else
-      case_id = sprintf("sumup_%02d", n);
+      case_id = sprintf("sumup%02d", n);
+      site_id = case_id;
+      site_name = case_id;
    end
-   alias = lower(erase(case_id, "_"));
+   alias = case_id;
 end
 
 function rec = colocationRecord(is_coloc, anchor, dist_km, threshold_km)

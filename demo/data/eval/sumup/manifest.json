@@ -6,10 +6,10 @@
   "retrieval_date": "21-Jun-2026",
   "cases": [
     {
-      "case_id": "sumupkanl",
+      "case_id": "kanl",
       "case_type": "firn_observational",
-      "site_id": "sumup_kanl",
-      "site_name": "sumup_kanl",
+      "site_id": "KAN_L",
+      "site_name": "KAN-L",
       "surface_zone": "ablation",
       "eval_target": [
         "seasonal_snow",
@@ -42,12 +42,12 @@
         "density": "firn/snow density profile (depth, density, error)",
         "subsurface_temperature": "SUMup subsurface temperature T(z,t)",
         "accumulation": "SMB / accumulation records",
-        "obs_file": "sumupkanl/observations.mat"
+        "obs_file": "kanl/observations.mat"
       },
       "colocation": {
         "sumup": {
           "kind": "firn_profile_obs",
-          "obs_file": "sumupkanl/observations.mat",
+          "obs_file": "kanl/observations.mat",
           "note": "SUMup observation profiles (committed minimal fixture)."
         },
         "anchor": {
@@ -61,10 +61,10 @@
       "notes": "SUMup firn point co-located with PROMICE KAN_L (metadata-only; committed minimal fixture)."
     },
     {
-      "case_id": "sumupkanm",
+      "case_id": "kanm",
       "case_type": "firn_observational",
-      "site_id": "sumup_kanm",
-      "site_name": "sumup_kanm",
+      "site_id": "KAN_M",
+      "site_name": "KAN-M",
       "surface_zone": "ablation",
       "eval_target": [
         "seasonal_snow",
@@ -97,12 +97,12 @@
         "density": "firn/snow density profile (depth, density, error)",
         "subsurface_temperature": "SUMup subsurface temperature T(z,t)",
         "accumulation": "SMB / accumulation records",
-        "obs_file": "sumupkanm/observations.mat"
+        "obs_file": "kanm/observations.mat"
       },
       "colocation": {
         "sumup": {
           "kind": "firn_profile_obs",
-          "obs_file": "sumupkanm/observations.mat",
+          "obs_file": "kanm/observations.mat",
           "note": "SUMup observation profiles (committed minimal fixture)."
         },
         "anchor": {
@@ -116,10 +116,10 @@
       "notes": "SUMup firn point co-located with PROMICE KAN_M (metadata-only; committed minimal fixture)."
     },
     {
-      "case_id": "sumupkanu",
+      "case_id": "kanu",
       "case_type": "firn_observational",
-      "site_id": "sumup_kanu",
-      "site_name": "sumup_kanu",
+      "site_id": "KAN_U",
+      "site_name": "KAN-U",
       "surface_zone": "percolation",
       "eval_target": [
         "seasonal_snow",
@@ -153,12 +153,12 @@
         "density": "firn/snow density profile (depth, density, error)",
         "subsurface_temperature": "SUMup subsurface temperature T(z,t)",
         "accumulation": "SMB / accumulation records",
-        "obs_file": "sumupkanu/observations.mat"
+        "obs_file": "kanu/observations.mat"
       },
       "colocation": {
         "sumup": {
           "kind": "firn_profile_obs",
-          "obs_file": "sumupkanu/observations.mat",
+          "obs_file": "kanu/observations.mat",
           "note": "SUMup observation profiles (committed minimal fixture)."
         },
         "anchor": {

@@ -280,7 +280,12 @@ KAN_U=`percolation`).
 
 The 3 KAN-co-located SUMup cases are a **committed minimal fixture** under
 `demo/data/eval/sumup/` (small density/temperature/SMB profile tables in each
-`sumupkan*/observations.mat` + `manifest.json`). The FULL SUMup staging stays
+`kan*/observations.mat` + `manifest.json`). The case ids and on-disk case dirs
+match the PROMICE convention (`kanl`/`kanm`/`kanu`, no redundant `sumup` prefix -
+the family folder is already `sumup`), and the observation bundle is named
+`observations.mat` consistently in the file tree and the manifest references.
+The SUMup family shares those compact ids with PROMICE, so disambiguate with
+`loadmanifest("kanl", dataset_family="sumup")`. The FULL SUMup staging stays
 on-demand to the gitignored repo-root `data/eval/sumup/`. The candidate adapter
 (`candidateFromIcemodelOutput`) maps the SUMup profile-bundle comparison
 variables (`density`, `subsurface_temperature`) to a `firn_profile_bundle`

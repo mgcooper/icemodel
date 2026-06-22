@@ -3,6 +3,8 @@ function manifest = loadmanifest(case_id, kwargs)
    %
    %  manifest = icemodel.verification.loadmanifest("cdp")
    %  manifest = icemodel.verification.loadmanifest("colbeck1976")
+   %  manifest = icemodel.verification.loadmanifest("kanl", ...
+   %     dataset_family="sumup")
    %
    % Inputs
    %  case_id                    Case id to resolve from the staged manifests.
@@ -10,6 +12,12 @@ function manifest = loadmanifest(case_id, kwargs)
    %                             path is resolved from icemodel.config.
    %  icemodel_config_casename   Config casename used to resolve the default
    %                             evaluation-data root without mutating config.
+   %  dataset_family             Optional family filter to disambiguate case
+   %                             ids shared across families. The firn families
+   %                             promice and sumup both publish kanl/kanm/kanu
+   %                             (distinguished only by family folder), so a
+   %                             bare loadmanifest("kanl") returns the first
+   %                             match; pass dataset_family to select one.
    %
    % Outputs
    %  manifest   One resolved case-entry struct with family provenance and
@@ -23,13 +31,16 @@ function manifest = loadmanifest(case_id, kwargs)
       case_id (1, :) string
       kwargs.evaluation_data_root (1, 1) string = ""
       kwargs.icemodel_config_casename (1, 1) string = "test"
+      kwargs.dataset_family (1, 1) string = ""
    end
 
    % Reuse listcases so manifest path resolution and filtering live in one
-   % operational path.
+   % operational path. An optional dataset_family narrows the search to one
+   % family so the shared firn case ids (kanl/kanm/kanu) resolve unambiguously.
    cases = icemodel.verification.listcases( ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
-      "icemodel_config_casename", kwargs.icemodel_config_casename);
+      "icemodel_config_casename", kwargs.icemodel_config_casename, ...
+      "dataset_family", kwargs.dataset_family);
 
    % Give a path-aware error when no staged manifests are available.
    if isempty(cases)

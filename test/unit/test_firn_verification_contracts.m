@@ -38,7 +38,10 @@ function setupOnce(testCase)
 
    % The committed SUMup minimal fixture: 3 KAN-co-located firn_observational
    % cases. The suite is only meaningful when they enumerate, so require them.
-   testCase.TestData.expected_sumup_ids = ["sumupkanl"; "sumupkanm"; "sumupkanu"];
+   % SUMup cases share the compact KAN ids with PROMICE (the family folder
+   % is the namespace; no redundant sumup prefix). Resolve them with the
+   % dataset_family filter to disambiguate from the PROMICE kanl/kanm/kanu.
+   testCase.TestData.expected_sumup_ids = ["kanl"; "kanm"; "kanu"];
    sumup_cases = icemodel.verification.listcases(dataset_family="sumup");
    testCase.assertNotEmpty(sumup_cases, ...
       'no staged sumup firn cases enumerated; committed fixture missing');
@@ -349,7 +352,7 @@ function test_sumup_cases_are_firn_observational(testCase)
 
    case_types = icemodel.verification.namelists.casetype();
    for id = testCase.TestData.expected_sumup_ids'
-      manifest = icemodel.verification.loadmanifest(id);
+      manifest = icemodel.verification.loadmanifest(id, dataset_family="sumup");
       testCase.verifyEqual(string(manifest.case_type), "firn_observational", ...
          sprintf('%s is not firn_observational', id));
       testCase.verifyTrue(ismember(string(manifest.case_type), case_types), ...
@@ -369,12 +372,12 @@ function test_sumup_cases_inherit_kan_zone_and_target(testCase)
    pfz_ok = icemodel.verification.namelists.permafrostzone();
 
    expected = struct( ...
-      'sumupkanl', struct('site', "KAN_L", 'zone', "ablation"), ...
-      'sumupkanm', struct('site', "KAN_M", 'zone', "ablation"), ...
-      'sumupkanu', struct('site', "KAN_U", 'zone', "percolation"));
+      'kanl', struct('site', "KAN_L", 'zone', "ablation"), ...
+      'kanm', struct('site', "KAN_M", 'zone', "ablation"), ...
+      'kanu', struct('site', "KAN_U", 'zone', "percolation"));
 
    for id = testCase.TestData.expected_sumup_ids'
-      manifest = icemodel.verification.loadmanifest(id);
+      manifest = icemodel.verification.loadmanifest(id, dataset_family="sumup");
       exp = expected.(char(id));
       anchor = icemodel.verification.helpers.promicesiteinfo(exp.site);
 
@@ -426,7 +429,7 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
    % cases declare profile-bundle axes, NOT the PROMICE thermistor series, so
    % the candidate is a firn_profile_bundle.
 
-   manifest = icemodel.verification.loadmanifest("sumupkanu");
+   manifest = icemodel.verification.loadmanifest("kanu", dataset_family="sumup");
    vars = string(manifest.comparison_variables);
    testCase.assertTrue(ismember("density", vars));
    testCase.assertTrue(ismember("subsurface_temperature", vars));
