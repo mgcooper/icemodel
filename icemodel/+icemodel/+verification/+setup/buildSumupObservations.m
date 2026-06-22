@@ -15,12 +15,31 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
    %  observation builder used by importSumup during staging.
    %
    %  Output target schema (verification timeseries / profile bundle):
-   %    observations.format   = "firn_profile_bundle"
-   %    observations.density            profile table (depth, density, error)
-   %    observations.subsurface_temperature  T(z,t) records
-   %    observations.accumulation       SMB / accumulation records
+   %    observations.format   = "subsurface_profile_bundle"
+   %    observations.density            depth-indexed profile TABLE
+   %                                    (depth, density, error, datetime)
+   %    observations.subsurface_temperature  datetime-indexed TIMETABLE T(z,t)
+   %    observations.accumulation       period-indexed TABLE with start_date /
+   %                                    end_date datetimes
    %  Each sub-bundle is present only when the corresponding SUMup variable
    %  file is in the cache and has a record within radius_km of the point.
+   %
+   %  The bundle struct is a WRAPPER for three heterogeneous profile tables
+   %  (density rho(z), subsurface temperature T(z,t), accumulation/SMB), not a
+   %  storage choice; the three tables carry different indexing axes (depth,
+   %  time, period) and cannot share one table. The generic name
+   %  "subsurface_profile_bundle" (not "firn_profile_bundle") covers ablation
+   %  sites too, where the bare-ice/seasonal-snow column is not firn.
+   %
+   %  TIME AXIS. SUMup stores a numeric `timestamp` (days since 1900-01-01).
+   %  This builder converts it to real UTC datetimes:
+   %    - subsurface_temperature is a time series, returned as a TIMETABLE
+   %      indexed by the measurement datetime (row time `Time`);
+   %    - density is a depth profile, returned as a TABLE with an added
+   %      `datetime` column carrying the profile timestamp;
+   %    - accumulation is a period observation, returned as a TABLE with
+   %      `start_date` / `end_date` converted to datetimes (the integer
+   %      days-since-1900 columns are replaced in place).
    %
    %  Inputs
    %    point : [lat lon]  WGS84 site coordinates.
@@ -84,7 +103,7 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
       point, kwargs.radius_km, kwargs.startdate, kwargs.enddate);
 
    observations = struct( ...
-      'format', 'firn_profile_bundle', ...
+      'format', 'subsurface_profile_bundle', ...
       'density', density, ...
       'subsurface_temperature', temperature, ...
       'accumulation', accumulation);
@@ -178,12 +197,17 @@ function tbl = readSumupNetcdf(file, variable)
       tbl.(name) = double(v(:));
    end
 
-   % Resolve name_key -> name (core / location label) from /METADATA.
+   % Resolve name_key -> name (core / location label) from /METADATA. The
+   % /METADATA/name char matrix is fixed-width: each name is padded to the
+   % column width with trailing NUL (char 0) and/or space. Strip both so the
+   % name is the bare label (e.g. "s5", not "s5" + 31 pad chars). deblank
+   % removes trailing whitespace; char(0) is removed explicitly first.
    meta_keys = double(ncread(file, '/METADATA/name_key'));
    meta_names = string(ncread(file, '/METADATA/name')');
+   meta_names = strtrim(erase(meta_names, char(0)));
    [tf, loc] = ismember(tbl.name_key, meta_keys);
    names = strings(height(tbl), 1);
-   names(tf) = strtrim(meta_names(loc(tf)));
+   names(tf) = meta_names(loc(tf));
    tbl.name = names;
 end
 
@@ -219,6 +243,33 @@ function [record, note] = selectNearest(tbl, point, radius_km, ...
       return
    end
    record = tbl(keep, :);
+
+   % Attach real UTC datetimes from the SUMup days-since-1900 integers, and
+   % shape each variable to its natural index axis (see header). Temperature is
+   % a time series -> datetime-indexed timetable; density is a depth profile ->
+   % table + profile datetime column; accumulation is a period observation ->
+   % table with start_date/end_date as datetimes.
+   record = attachDatetimes(record, variable);
+
    note = sprintf('%d SUMup %s record(s) within %.1f km of %d profile(s)', ...
       nnz(keep), variable, radius_km, numel(unique(record.name_key)));
+end
+
+function record = attachDatetimes(record, variable)
+   %ATTACHDATETIMES Convert SUMup days-since-1900 integers to UTC datetimes.
+   epoch = datetime(1900, 1, 1, 'TimeZone', 'UTC');
+   switch lower(char(variable))
+      case "temperature"
+         % Subsurface temperature is a time series: index by measurement time.
+         t = epoch + days(record.timestamp);
+         record.timestamp = [];
+         record = table2timetable(record, 'RowTimes', t);
+      case "density"
+         % Depth profile: keep the table, add the profile datetime column.
+         record.datetime = epoch + days(record.timestamp);
+      case "smb"
+         % Period observation: replace the integer span with datetimes.
+         record.start_date = epoch + days(record.start_date);
+         record.end_date = epoch + days(record.end_date);
+   end
 end

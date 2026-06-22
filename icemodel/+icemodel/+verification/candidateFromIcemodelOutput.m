@@ -96,13 +96,13 @@ function candidate = firnProfileCandidateFromIce2(ice1, ice2, opts, case_manifes
    % density depending on the run). Map only the axes the staged case declares;
    % an axis whose source column is unavailable is left out so it is reported as
    % a missing-candidate diagnostic (soft gate), never fabricated. The candidate
-   % format is "firn_profile_bundle", matching the observation target so the
-   % soft firn comparison can align them by depth.
+   % format is "subsurface_profile_bundle", matching the observation target so
+   % the soft firn comparison can align them by depth.
 
    variable_names = string(case_manifest.comparison_variables);
    Tf = icemodel.physicalConstant('Tf');
 
-   bundle = struct('format', 'firn_profile_bundle');
+   bundle = struct('format', 'subsurface_profile_bundle');
 
    % Build the depth axis from the column node spacing when available.
    if isfield(opts, 'dz_thermal') && ~isempty(opts.dz_thermal)
@@ -131,7 +131,7 @@ function candidate = firnProfileCandidateFromIce2(ice1, ice2, opts, case_manifes
    end
 
    candidate = struct( ...
-      "format", "firn_profile_bundle", ...
+      "format", "subsurface_profile_bundle", ...
       "data", bundle, ...
       "metadata", metadata(opts, "icemodel_output"));
 end

@@ -194,7 +194,7 @@ function manifest = importSumup(source_dir, kwargs)
          % rebuilt here; staged_kind=observations_only). It is referenced from
          % the colocation record as the sumup_obs eval source, alongside the
          % co-located MAR met and RACMO Data legs.
-         targets = struct('format', 'firn_profile_bundle', ...
+         targets = struct('format', 'subsurface_profile_bundle', ...
             'data', observations, 'metadata', obs_meta);
          obs_file = "observations.mat";
          save(fullfile(case_root, obs_file), 'targets');

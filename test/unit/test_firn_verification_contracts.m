@@ -427,7 +427,7 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
    % variables (density rho(z), subsurface_temperature T(z,t)) from synthetic
    % icemodel column state, only as far as the staged cases declare. SUMup
    % cases declare profile-bundle axes, NOT the PROMICE thermistor series, so
-   % the candidate is a firn_profile_bundle.
+   % the candidate is a subsurface_profile_bundle.
 
    manifest = icemodel.verification.loadmanifest("kanu", dataset_family="sumup");
    vars = string(manifest.comparison_variables);
@@ -453,7 +453,7 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
       ice1, ice2, opts, adapter_manifest);
 
    % The SUMup case yields a profile bundle, not a timeseries.
-   testCase.verifyEqual(string(candidate.format), "firn_profile_bundle");
+   testCase.verifyEqual(string(candidate.format), "subsurface_profile_bundle");
    Tf = icemodel.physicalConstant('Tf');
 
    % Density profile rho(z) resolves with a depth axis.

@@ -52,13 +52,15 @@ function test_density_profile_parsed(testCase)
       testCase.TestData.point, ...
       source_dir=string(testCase.TestData.cache), radius_km=7.5);
 
-   testCase.verifyEqual(obs.format, 'firn_profile_bundle');
+   testCase.verifyEqual(obs.format, 'subsurface_profile_bundle');
    testCase.verifyTrue(istable(obs.density));
    testCase.verifyGreaterThan(height(obs.density), 0);
 
+   % Density is a depth profile TABLE carrying a real profile datetime column.
    needed = ["density", "start_depth", "stop_depth", "midpoint", ...
-      "error", "latitude", "longitude", "name_key", "name"];
+      "error", "latitude", "longitude", "name_key", "name", "datetime"];
    present = string(obs.density.Properties.VariableNames);
+   testCase.verifyTrue(isdatetime(obs.density.datetime));
    for v = needed
       testCase.verifyTrue(ismember(v, present), ...
          sprintf('density profile missing column %s', v));
@@ -79,13 +81,20 @@ function test_temperature_and_smb_parsed(testCase)
       testCase.TestData.point, ...
       source_dir=string(testCase.TestData.cache), radius_km=7.5);
 
-   testCase.verifyTrue(istable(obs.subsurface_temperature));
+   % Subsurface temperature is a datetime-indexed TIMETABLE (a time series).
+   testCase.verifyTrue(istimetable(obs.subsurface_temperature));
+   testCase.verifyTrue(isdatetime(obs.subsurface_temperature.Time));
    tvars = string(obs.subsurface_temperature.Properties.VariableNames);
    testCase.verifyTrue(ismember("temperature", tvars));
    testCase.verifyTrue(ismember("depth", tvars));
+   % The raw days-since-1900 timestamp column is consumed into Time.
+   testCase.verifyFalse(ismember("timestamp", tvars));
 
+   % Accumulation is a period TABLE with real start_date/end_date datetimes.
    testCase.verifyTrue(istable(obs.accumulation));
    svars = string(obs.accumulation.Properties.VariableNames);
    testCase.verifyTrue(ismember("smb", svars));
    testCase.verifyTrue(ismember("start_date", svars));
+   testCase.verifyTrue(isdatetime(obs.accumulation.start_date));
+   testCase.verifyTrue(isdatetime(obs.accumulation.end_date));
 end

@@ -288,7 +288,7 @@ The SUMup family shares those compact ids with PROMICE, so disambiguate with
 `loadmanifest("kanl", dataset_family="sumup")`. The FULL SUMup staging stays
 on-demand to the gitignored repo-root `data/eval/sumup/`. The candidate adapter
 (`candidateFromIcemodelOutput`) maps the SUMup profile-bundle comparison
-variables (`density`, `subsurface_temperature`) to a `firn_profile_bundle`
+variables (`density`, `subsurface_temperature`) to a `subsurface_profile_bundle`
 candidate; behavior stays soft (diagnostic, no hard gate).
 
 ## Support Namespaces

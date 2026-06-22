@@ -21,7 +21,7 @@
         "lon_wgs84": -49.947077120638447,
         "x_epsg3413": -216732.66778461527,
         "y_epsg3413": -2.5039013503936823E+6,
-        "elev_m": null
+        "elev_m": []
       },
       "period": {
         "start": "01-Jan-2012",
@@ -48,7 +48,31 @@
         "sumup": {
           "kind": "firn_profile_obs",
           "obs_file": "kanl/observations.mat",
-          "note": "SUMup observation profiles (committed minimal fixture)."
+          "note": "SUMup observation profiles (committed minimal demo fixture).",
+          "demo_subset": {
+            "rule": "(1) single nearest profile per channel (minimum EPSG:3413 distance of the profile mean location to the case point); (2) first max_rows rows of that profile in native record order",
+            "max_rows": 500,
+            "point_lat_wgs84": 67.096950868291529,
+            "point_lon_wgs84": -49.947077120638447,
+            "channels": [
+              {
+                "channel": "subsurface_temperature",
+                "name_key": 1142,
+                "name": "KAN_L",
+                "n_rows": 500,
+                "datetime_start": "02-Sep-2008",
+                "datetime_end": "03-Nov-2008"
+              },
+              {
+                "channel": "accumulation",
+                "name_key": 427022,
+                "name": "KAN_L",
+                "n_rows": 500,
+                "datetime_start": "29-May-2009",
+                "datetime_end": "05-Jul-2014"
+              }
+            ]
+          }
         },
         "anchor": {
           "is_colocated": true,
@@ -76,7 +100,7 @@
         "lon_wgs84": -48.837346104065588,
         "x_epsg3413": -168423.32107893252,
         "y_epsg3413": -2.5109834822118757E+6,
-        "elev_m": null
+        "elev_m": []
       },
       "period": {
         "start": "01-Jan-2012",
@@ -103,7 +127,31 @@
         "sumup": {
           "kind": "firn_profile_obs",
           "obs_file": "kanm/observations.mat",
-          "note": "SUMup observation profiles (committed minimal fixture)."
+          "note": "SUMup observation profiles (committed minimal demo fixture).",
+          "demo_subset": {
+            "rule": "(1) single nearest profile per channel (minimum EPSG:3413 distance of the profile mean location to the case point); (2) first max_rows rows of that profile in native record order",
+            "max_rows": 500,
+            "point_lat_wgs84": 67.067095734019745,
+            "point_lon_wgs84": -48.837346104065588,
+            "channels": [
+              {
+                "channel": "subsurface_temperature",
+                "name_key": 1143,
+                "name": "KAN_M",
+                "n_rows": 500,
+                "datetime_start": "21-May-2010",
+                "datetime_end": "24-Jul-2010"
+              },
+              {
+                "channel": "accumulation",
+                "name_key": 427023,
+                "name": "KAN_M",
+                "n_rows": 500,
+                "datetime_start": "02-Aug-2009",
+                "datetime_end": "16-Aug-2023"
+              }
+            ]
+          }
         },
         "anchor": {
           "is_colocated": true,
@@ -131,7 +179,7 @@
         "lon_wgs84": -47.02720909947265,
         "x_epsg3413": -89288.821989512624,
         "y_epsg3413": -2.5225506903707683E+6,
-        "elev_m": null
+        "elev_m": []
       },
       "period": {
         "start": "01-Jan-2012",
@@ -159,7 +207,39 @@
         "sumup": {
           "kind": "firn_profile_obs",
           "obs_file": "kanu/observations.mat",
-          "note": "SUMup observation profiles (committed minimal fixture)."
+          "note": "SUMup observation profiles (committed minimal demo fixture).",
+          "demo_subset": {
+            "rule": "(1) single nearest profile per channel (minimum EPSG:3413 distance of the profile mean location to the case point); (2) first max_rows rows of that profile in native record order",
+            "max_rows": 500,
+            "point_lat_wgs84": 67.000458407658314,
+            "point_lon_wgs84": -47.02720909947265,
+            "channels": [
+              {
+                "channel": "density",
+                "name_key": 662,
+                "name": "NA",
+                "n_rows": 162,
+                "datetime_start": "28-Apr-2016",
+                "datetime_end": "28-Apr-2016"
+              },
+              {
+                "channel": "subsurface_temperature",
+                "name_key": 1145,
+                "name": "KAN_U",
+                "n_rows": 500,
+                "datetime_start": "05-Apr-2009",
+                "datetime_end": "15-Jun-2009"
+              },
+              {
+                "channel": "accumulation",
+                "name_key": 426884,
+                "name": "KANU Pit 01 2015",
+                "n_rows": 1,
+                "datetime_start": "15-Sep-2014",
+                "datetime_end": "04-May-2015"
+              }
+            ]
+          }
         },
         "anchor": {
           "is_colocated": true,
