@@ -13,20 +13,52 @@ Everything below is governed by the product readme
 (`data/verification/promice/AWS_data_readme.pdf`) and the variable dictionary
 (`AWS_variables.csv`). Read those before changing the builders.
 
-### Time convention (model-vs-observation alignment)
+### Time convention (the one canonical rule)
+
+**Canonical convention (single source of truth): a forcing/eval hourly value
+represents the interval `[t, t+dt)` and is LABELLED AT THE INTERVAL-START `t`.**
+This matches PROMICE ("the timestamp of the hourly averages indicate the start
+of the averaged hour") and the model's own `[t, t+dt)` implicit integration. The
+convention is applied **at the builder, where the source stamping is known** —
+it is NOT special-cased downstream.
 
 The L3 **hourly timestamp is the START of the averaged hour** (readme,
 "Temporal averaging"). The NetCDF encodes it as integer hours since a station
 epoch, so `epoch + hours(t)` reproduces the bin-START stamp exactly;
 `readPromiceAws` snaps with `dateshift('start','hour')` defensively (idempotent,
-not a re-bin) and returns a UTC axis.
+not a re-bin) and returns a UTC axis. `buildPromiceMet` / `buildPromiceData`
+inherit this axis unchanged. icemodel's met/Data axis is this **same bin-START
+hourly grid (UTC)**: the timestepping loop treats a met row's `Time` as the
+forcing valid AT that timestamp and integrates forward over `[t, t+dt)`, so a
+START-of-hour averaged forcing is the correct mean to drive that step and **no
+half-hour recentring is applied or needed**.
 
-icemodel's met/Data axis is this **same bin-START hourly grid (UTC)**. The
-timestepping loop treats a met row's `Time` as the forcing valid AT that
-timestamp and integrates forward over `[t, t+dt)`; a START-of-hour averaged
-forcing is the correct mean to drive that step, so **no half-hour recentring is
-applied or needed**. When comparing a simulation to these observations, align
-on the START-of-hour stamp — do not recentre to the hour middle.
+#### Comparison protocol (cumulative/flux vs instantaneous state)
+
+Align simulation to observation **on the START-of-hour stamp** — do not recentre
+to the hour middle. Two cases, by quantity type:
+
+- **Cumulative / flux quantities** (ablation, accumulation, SMB, energy fluxes,
+  any per-interval mean): the model's per-interval output is itself the mean/
+  total over `[t, t+dt)`, so it aligns **exactly** to the same interval label as
+  the observation. No offset.
+- **Instantaneous STATE** (e.g. temperature): the model uses implicit
+  backward-Euler, so the solved state is the **end-of-interval** value (valid at
+  `t+dt`) while it is stored against the interval-start label `t`. This is a
+  sub-`dt` labelling offset: at hourly resolution it is **negligible** (one
+  hour against a multi-day-to-seasonal subsurface thermal signal) and is **not
+  corrected**. Document, do not special-case.
+
+#### Other forcing sources (native stamping vs this convention)
+
+The gridded met builders carry their native stamping; only PROMICE is snapped:
+
+- **MAR** (`readMar3p11`): yearly files start `Jan 1 00:00 UTC`; the hourly axis
+  is `t0 + (0:23)h` per day — **interval-start, matching this convention**.
+- **MERRA-2** (`readMerra2`): `tavg1` hourly bins are stamped at the **bin
+  CENTER** (`:30`), kept native by `merraTime`. This is a half-hour offset from
+  the interval-start convention; it is small at hourly resolution and currently
+  left native (noted, not silently shifted).
 
 ### Ablation vs accumulation channel semantics (the core rule)
 
@@ -72,18 +104,33 @@ stays flagged). **Comparison code must exclude `surface_height_flag == 1`
 samples** before scoring the surface-height channel. Data are FLAGGED, never
 deleted. `metadata.gap_flagged_samples` records the count.
 
-### Thermistors (subsurface temperature)
+### Thermistors (subsurface temperature) and the tice10m comparison protocol
 
-- `tice10m` [K] is the **PRIMARY** subsurface-temperature evaluation channel:
-  the standardized 10 m firn temperature GEUS depth-interpolates (`t_i_10m`).
-  Prefer it for site-to-site model comparison.
+- `tice10m` [K] is the **PRIMARY** subsurface-temperature evaluation channel.
+  It is GEUS's **standardized 10 m-BELOW-the-EVOLVING-SURFACE** temperature: GEUS
+  builds it by tracking each thermistor's **time-dependent depth below the
+  current surface** (`d_t_i_*`, which changes as the surface ablates or
+  accumulates), discarding surfaced thermistors, and depth-interpolating the
+  surviving subsurface string to 10 m below the **current** surface at each time
+  step (`t_i_10m`). It is therefore a **moving (Lagrangian) 10 m depth**, not a
+  fixed 10 m from installation.
+
+  **Model sampling protocol:** the model must be sampled at **10 m below its OWN
+  current surface** — a moving Lagrangian depth at ablation sites, where the
+  surface lowers over time — **NOT** at a fixed 10 m from the start of the run.
+  Sampling a fixed installation-referenced 10 m at an ablation site compares
+  different physical material as the surface drops and is wrong. Track the
+  model's current surface and sample 10 m beneath it to match `tice10m`.
+
 - `tice1..ticeN` [K] is the depth-tagged raw string (`t_i_1..N`), each with a
   companion `dtice1..dticeN` [m] depth (`d_t_i_*`, positive = below surface).
   `readPromiceAws` clamps each to the dictionary range `[-80, 1] C` and
   **discards surfaced thermistors** (`d_t_i_N <= 0`, sensor at/above the
   surface as ablation-site firn melts out) per the readme. Use the depth tag to
   place each sensor vertically; a NaN tice sample is either out-of-range,
-  surfaced, or simply missing.
+  surfaced, or simply missing. The raw string is **secondary / diagnostic**: to
+  compare it the model must be sampled at each sensor's time-dependent depth
+  `d_t_i_N`, so prefer `tice10m` as the standardized primary channel.
 
 ### Specific humidity (shum)
 

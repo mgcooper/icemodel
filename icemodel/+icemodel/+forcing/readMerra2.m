@@ -105,6 +105,13 @@ end
 function Time = merraTime(filename)
    %MERRATIME UTC bin-center datetime axis from the MERRA-2 'time' variable.
    % MERRA-2 stores time as "minutes since <yyyy-mm-dd hh:mm:ss>".
+   %
+   % NATIVE STAMPING vs the icemodel forcing time convention: tavg1 hourly bins
+   % are stamped at the bin CENTER (:30), kept native here. The icemodel
+   % convention labels an interval at its START t (the [t, t+dt) integration;
+   % see icemodel/+icemodel/+forcing/README.md "Time convention"). This is a
+   % half-hour offset, small at hourly resolution; it is left native (noted, not
+   % silently shifted) rather than special-cased.
    t = double(ncread(filename, 'time'));
    t_units = ncreadatt(filename, 'time', 'units');
    tok = regexp(t_units, 'minutes since (\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})', ...

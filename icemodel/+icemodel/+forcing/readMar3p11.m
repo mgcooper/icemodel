@@ -95,7 +95,10 @@ function [data, units, Time] = readMar3p11(filename, varname, kwargs)
    end
 
    % Time axis: yearly files start Jan 1 00:00 UTC; hourly variables have
-   % 24 samples per day, daily variables one.
+   % 24 samples per day, daily variables one. The hourly axis t0+(0:23)h is
+   % INTERVAL-START stamped, matching the icemodel forcing time convention (the
+   % [t, t+dt) label = interval start; see icemodel/+icemodel/+forcing/
+   % README.md "Time convention"). No shift is applied.
    yyyy = marFileYear(filename);
    ndays = dims(end);
    ntime = size(data, 2);

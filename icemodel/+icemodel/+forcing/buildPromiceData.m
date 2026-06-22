@@ -47,6 +47,18 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    % icemodel.forcing.readPromiceAws) plus tice10m, the PRIMARY standardized
    % 10 m subsurface-temperature evaluation channel.
    %
+   % tice10m COMPARISON PROTOCOL (the primary subsurface channel). tice10m is
+   % GEUS's standardized 10 m-BELOW-the-EVOLVING-SURFACE temperature: GEUS
+   % tracks each thermistor's time-dependent depth below the CURRENT surface
+   % (d_t_i_*), discards surfaced thermistors, and depth-interpolates the
+   % surviving string to 10 m below the current surface at each time step. It is
+   % a MOVING (Lagrangian) 10 m depth, not a fixed 10 m from installation. To
+   % compare, the model must be sampled at 10 m BELOW ITS OWN CURRENT SURFACE -
+   % a moving Lagrangian depth at ablation sites where the surface lowers - NOT
+   % at a fixed 10 m from the run start. tice10m is the PRIMARY subsurface
+   % comparison channel; the raw tice1..N string needs the per-sensor d_t_i_N
+   % depths to place each reading and is SECONDARY / diagnostic.
+   %
    % Gap policy: observational channels are NOT gap-filled (missing data
    % stays missing so evaluations are honest); the physical-range clamps of
    % metchecks are still applied. The surface-height channel additionally
