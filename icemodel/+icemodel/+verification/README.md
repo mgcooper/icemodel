@@ -257,9 +257,34 @@ non-KAN PROMICE stations and the ESM-SnowMIP sites carry **authoritative**
   on lon/lat (off-ice sites; ice-sheet/glacier -> `none`). Replaces the v1 Brown
   et al. (1997) source.
 
-Only sites no dataset could resolve (ZAC_*, no coordinates) remain `unknown`;
-uncataloged station ids fall back to the legacy elevation-band heuristic flagged
+All cataloged sites now resolve. ZAC_A/L/U (A.P. Olsen / Zackenberg GlacioBasis
+transect, NE Greenland) carry no installation coordinates in the CSV; their
+lon/lat are sourced from the per-station L3 NetCDF global `latitude`/`longitude`
+attributes (the same coordinates `readPromiceAws` reads), classifying them as
+local-glacier AWS -> `ablation`, `permafrost_zone=none` (on glacier ice).
+Uncataloged station ids fall back to the legacy elevation-band heuristic flagged
 `classification="first_pass"`.
+
+### SUMup metadata-only firn cases (`importSumup`)
+
+`importSumup` stages SUMup_2025 firn observation profiles (density `rho(z)`,
+subsurface temperature `T(z,t)`, accumulation/SMB) as first-class
+**metadata-only** `firn_observational` cases under the `sumup` dataset family,
+enumerated by `listcases`/`loadmanifest` alongside `promice` and the snow
+families. A SUMup case is a manifest (`case_id`, `case_type="firn_observational"`,
+`site`, `surface_zone`, `eval_target`, `permafrost_zone`, `period`,
+`comparison_variables`, an observation-bundle reference, and the colocation
+record) - NOT a bundled forcing artifact. KAN-co-located SUMup cases inherit the
+anchor classification from `promicesiteinfo` (KAN_L/M=`ablation`,
+KAN_U=`percolation`).
+
+The 3 KAN-co-located SUMup cases are a **committed minimal fixture** under
+`demo/data/eval/sumup/` (small density/temperature/SMB profile tables in each
+`sumupkan*/observations.mat` + `manifest.json`). The FULL SUMup staging stays
+on-demand to the gitignored repo-root `data/eval/sumup/`. The candidate adapter
+(`candidateFromIcemodelOutput`) maps the SUMup profile-bundle comparison
+variables (`density`, `subsurface_temperature`) to a `firn_profile_bundle`
+candidate; behavior stays soft (diagnostic, no hard gate).
 
 ## Support Namespaces
 

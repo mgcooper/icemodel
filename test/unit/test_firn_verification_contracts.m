@@ -35,6 +35,14 @@ function setupOnce(testCase)
    testCase.assertNotEmpty(firn_cases, ...
       'no staged promice firn cases enumerated; M2a firn tree missing');
    testCase.TestData.firn_cases = firn_cases;
+
+   % The committed SUMup minimal fixture: 3 KAN-co-located firn_observational
+   % cases. The suite is only meaningful when they enumerate, so require them.
+   testCase.TestData.expected_sumup_ids = ["sumupkanl"; "sumupkanm"; "sumupkanu"];
+   sumup_cases = icemodel.verification.listcases(dataset_family="sumup");
+   testCase.assertNotEmpty(sumup_cases, ...
+      'no staged sumup firn cases enumerated; committed fixture missing');
+   testCase.TestData.sumup_cases = sumup_cases;
 end
 
 function teardownOnce(testCase)
@@ -70,6 +78,10 @@ function test_listcases_enumerates_firn_family_alongside_snow(testCase)
    % Firn cases enumerate alongside the snow lane.
    testCase.verifyTrue(all(ismember(testCase.TestData.expected_firn_ids, ids)), ...
       'firn promice cases not enumerated by unfiltered listcases');
+
+   % The SUMup firn family enumerates alongside promice and the snow lane.
+   testCase.verifyTrue(all(ismember(testCase.TestData.expected_sumup_ids, ids)), ...
+      'sumup firn cases not enumerated by unfiltered listcases');
 
    % The snow lane is still present (regression guard for the harmonized
    % heterogeneous-schema vertcat).
@@ -329,6 +341,125 @@ function test_colocated_files_resolve_on_disk(testCase)
       verifyFilesResolve(testCase, ud_dir, cf.promice.data_files, id, "promice data");
       verifyFilesResolve(testCase, ud_dir, cf.racmo.data_files, id, "racmo data");
    end
+end
+
+function test_sumup_cases_are_firn_observational(testCase)
+   % Every committed SUMup case is a metadata-only firn_observational case
+   % (soft gate), in the sumup family, with a valid case_type.
+
+   case_types = icemodel.verification.namelists.casetype();
+   for id = testCase.TestData.expected_sumup_ids'
+      manifest = icemodel.verification.loadmanifest(id);
+      testCase.verifyEqual(string(manifest.case_type), "firn_observational", ...
+         sprintf('%s is not firn_observational', id));
+      testCase.verifyTrue(ismember(string(manifest.case_type), case_types), ...
+         sprintf('%s case_type not in namelist', id));
+      testCase.verifyEqual(string(manifest.dataset_family), "sumup");
+   end
+end
+
+function test_sumup_cases_inherit_kan_zone_and_target(testCase)
+   % The KAN-co-located SUMup cases inherit the anchor classification from
+   % promicesiteinfo (the single source of truth): kanl/kanm=ablation +
+   % [seasonal_snow,bare_ice]; kanu=percolation + [seasonal_snow,firn]. All
+   % three carry permafrost_zone=none (KAN ice-sheet anchors).
+
+   zone_ok = icemodel.verification.namelists.surfacezone();
+   target_ok = icemodel.verification.namelists.evaltarget();
+   pfz_ok = icemodel.verification.namelists.permafrostzone();
+
+   expected = struct( ...
+      'sumupkanl', struct('site', "KAN_L", 'zone', "ablation"), ...
+      'sumupkanm', struct('site', "KAN_M", 'zone', "ablation"), ...
+      'sumupkanu', struct('site', "KAN_U", 'zone', "percolation"));
+
+   for id = testCase.TestData.expected_sumup_ids'
+      manifest = icemodel.verification.loadmanifest(id);
+      exp = expected.(char(id));
+      anchor = icemodel.verification.helpers.promicesiteinfo(exp.site);
+
+      zone = string(manifest.surface_zone);
+      testCase.verifyTrue(ismember(zone, zone_ok), ...
+         sprintf('%s surface_zone "%s" not in namelist', id, zone));
+      testCase.verifyEqual(zone, exp.zone, ...
+         sprintf('%s surface_zone mismatch', id));
+      testCase.verifyEqual(zone, string(anchor.surface_zone), ...
+         sprintf('%s surface_zone does not match anchor %s', id, exp.site));
+
+      target = string(manifest.eval_target);
+      testCase.verifyTrue(all(ismember(target, target_ok)), ...
+         sprintf('%s eval_target not in namelist', id));
+      testCase.verifyEqual(sort(target(:)), sort(string(anchor.eval_target(:))), ...
+         sprintf('%s eval_target does not match anchor %s', id, exp.site));
+
+      pfz = string(manifest.permafrost_zone);
+      testCase.verifyTrue(ismember(pfz, pfz_ok), ...
+         sprintf('%s permafrost_zone "%s" not in namelist', id, pfz));
+      testCase.verifyEqual(pfz, "none", ...
+         sprintf('%s (KAN ice-sheet anchor) permafrost_zone should be none', id));
+   end
+end
+
+function test_sumup_obs_files_resolve_on_disk(testCase)
+   % Each committed SUMup case must reference an observation profile bundle
+   % (colocation.sumup.obs_file) that resolves on disk, and listcases must
+   % surface it as the case evaluation_path.
+
+   for case_entry = reshape(testCase.TestData.sumup_cases, 1, [])
+      id = case_entry.case_id;
+      testCase.verifyTrue(isfield(case_entry.colocation, 'sumup'), ...
+         sprintf('%s missing sumup colocation leg', id));
+      testCase.verifyNotEmpty(case_entry.colocation.sumup.obs_file, ...
+         sprintf('%s declares no obs_file', id));
+      testCase.verifyTrue(strlength(case_entry.evaluation_path) > 0, ...
+         sprintf('%s evaluation_path not resolved from obs_file', id));
+      testCase.verifyTrue(isfile(case_entry.evaluation_path), ...
+         sprintf('%s obs bundle missing on disk: %s', id, ...
+         case_entry.evaluation_path));
+   end
+end
+
+function test_sumup_candidate_adapter_maps_profile_variables(testCase)
+   % The firn candidate adapter must map the SUMup profile-bundle comparison
+   % variables (density rho(z), subsurface_temperature T(z,t)) from synthetic
+   % icemodel column state, only as far as the staged cases declare. SUMup
+   % cases declare profile-bundle axes, NOT the PROMICE thermistor series, so
+   % the candidate is a firn_profile_bundle.
+
+   manifest = icemodel.verification.loadmanifest("sumupkanu");
+   vars = string(manifest.comparison_variables);
+   testCase.assertTrue(ismember("density", vars));
+   testCase.assertTrue(ismember("subsurface_temperature", vars));
+
+   nz = 40;
+   n = 6;
+   time = (datetime(2013, 6, 1) + hours(0:n - 1))';
+   ice1 = struct("Time", time, "accumulation", linspace(0, 0.2, n)');
+   ice2 = struct( ...
+      "T", 263.15 + repmat((0:nz - 1)' * 0.05, 1, n), ...
+      "ro_sno", 350 + (0:nz - 1)' * 5);
+   opts = struct("smbmodel", "icemodel", "sitename", "kanu", ...
+      "simyears", 2013, "dz_thermal", 0.04);
+
+   adapter_manifest = struct( ...
+      "case_type", "firn_observational", ...
+      "comparison_variables", vars, ...
+      "observation_variables", manifest.observation_variables);
+
+   candidate = icemodel.verification.candidateFromIcemodelOutput( ...
+      ice1, ice2, opts, adapter_manifest);
+
+   % The SUMup case yields a profile bundle, not a timeseries.
+   testCase.verifyEqual(string(candidate.format), "firn_profile_bundle");
+   Tf = icemodel.physicalConstant('Tf');
+
+   % Density profile rho(z) resolves with a depth axis.
+   testCase.verifyTrue(isfield(candidate.data, 'density'));
+   testCase.verifyEqual(candidate.data.density.value, ice2.ro_sno);
+
+   % Subsurface temperature profile T(z,t) resolves in degrees C.
+   testCase.verifyTrue(isfield(candidate.data, 'subsurface_temperature'));
+   testCase.verifyEqual(candidate.data.subsurface_temperature, ice2.T - Tf);
 end
 
 %% Local helpers

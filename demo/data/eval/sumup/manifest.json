@@ -1,0 +1,179 @@
+{
+  "dataset_family": "sumup",
+  "source_doi": "10.18739/A2M61BR5M",
+  "source_url": "https://nsidc.org/data/g02288",
+  "source_version": "SUMup_2025_greenland[KAN-colocated]",
+  "retrieval_date": "21-Jun-2026",
+  "cases": [
+    {
+      "case_id": "sumupkanl",
+      "case_type": "firn_observational",
+      "site_id": "sumup_kanl",
+      "site_name": "sumup_kanl",
+      "surface_zone": "ablation",
+      "eval_target": [
+        "seasonal_snow",
+        "bare_ice"
+      ],
+      "permafrost_zone": "none",
+      "site_location": {
+        "lat_wgs84": 67.096950868291529,
+        "lon_wgs84": -49.947077120638447,
+        "x_epsg3413": -216732.66778461527,
+        "y_epsg3413": -2.5039013503936823E+6,
+        "elev_m": null
+      },
+      "period": {
+        "start": "01-Jan-2012",
+        "end": "31-Dec-2015"
+      },
+      "forcing_sources": [
+        "mar"
+      ],
+      "eval_sources": [
+        "sumup_obs",
+        "racmo"
+      ],
+      "comparison_variables": [
+        "subsurface_temperature",
+        "accumulation"
+      ],
+      "observation_variables": {
+        "density": "firn/snow density profile (depth, density, error)",
+        "subsurface_temperature": "SUMup subsurface temperature T(z,t)",
+        "accumulation": "SMB / accumulation records",
+        "obs_file": "sumupkanl/observations.mat"
+      },
+      "colocation": {
+        "sumup": {
+          "kind": "firn_profile_obs",
+          "obs_file": "sumupkanl/observations.mat",
+          "note": "SUMup observation profiles (committed minimal fixture)."
+        },
+        "anchor": {
+          "is_colocated": true,
+          "threshold_km": 7.5,
+          "nearest_anchor": "KAN_L",
+          "distance_km": 0
+        }
+      },
+      "native_timestep": "irregular",
+      "notes": "SUMup firn point co-located with PROMICE KAN_L (metadata-only; committed minimal fixture)."
+    },
+    {
+      "case_id": "sumupkanm",
+      "case_type": "firn_observational",
+      "site_id": "sumup_kanm",
+      "site_name": "sumup_kanm",
+      "surface_zone": "ablation",
+      "eval_target": [
+        "seasonal_snow",
+        "bare_ice"
+      ],
+      "permafrost_zone": "none",
+      "site_location": {
+        "lat_wgs84": 67.067095734019745,
+        "lon_wgs84": -48.837346104065588,
+        "x_epsg3413": -168423.32107893252,
+        "y_epsg3413": -2.5109834822118757E+6,
+        "elev_m": null
+      },
+      "period": {
+        "start": "01-Jan-2012",
+        "end": "31-Dec-2015"
+      },
+      "forcing_sources": [
+        "mar"
+      ],
+      "eval_sources": [
+        "sumup_obs",
+        "racmo"
+      ],
+      "comparison_variables": [
+        "subsurface_temperature",
+        "accumulation"
+      ],
+      "observation_variables": {
+        "density": "firn/snow density profile (depth, density, error)",
+        "subsurface_temperature": "SUMup subsurface temperature T(z,t)",
+        "accumulation": "SMB / accumulation records",
+        "obs_file": "sumupkanm/observations.mat"
+      },
+      "colocation": {
+        "sumup": {
+          "kind": "firn_profile_obs",
+          "obs_file": "sumupkanm/observations.mat",
+          "note": "SUMup observation profiles (committed minimal fixture)."
+        },
+        "anchor": {
+          "is_colocated": true,
+          "threshold_km": 7.5,
+          "nearest_anchor": "KAN_M",
+          "distance_km": 0
+        }
+      },
+      "native_timestep": "irregular",
+      "notes": "SUMup firn point co-located with PROMICE KAN_M (metadata-only; committed minimal fixture)."
+    },
+    {
+      "case_id": "sumupkanu",
+      "case_type": "firn_observational",
+      "site_id": "sumup_kanu",
+      "site_name": "sumup_kanu",
+      "surface_zone": "percolation",
+      "eval_target": [
+        "seasonal_snow",
+        "firn"
+      ],
+      "permafrost_zone": "none",
+      "site_location": {
+        "lat_wgs84": 67.000458407658314,
+        "lon_wgs84": -47.02720909947265,
+        "x_epsg3413": -89288.821989512624,
+        "y_epsg3413": -2.5225506903707683E+6,
+        "elev_m": null
+      },
+      "period": {
+        "start": "01-Jan-2012",
+        "end": "31-Dec-2015"
+      },
+      "forcing_sources": [
+        "mar"
+      ],
+      "eval_sources": [
+        "sumup_obs",
+        "racmo"
+      ],
+      "comparison_variables": [
+        "density",
+        "subsurface_temperature",
+        "accumulation"
+      ],
+      "observation_variables": {
+        "density": "firn/snow density profile (depth, density, error)",
+        "subsurface_temperature": "SUMup subsurface temperature T(z,t)",
+        "accumulation": "SMB / accumulation records",
+        "obs_file": "sumupkanu/observations.mat"
+      },
+      "colocation": {
+        "sumup": {
+          "kind": "firn_profile_obs",
+          "obs_file": "sumupkanu/observations.mat",
+          "note": "SUMup observation profiles (committed minimal fixture)."
+        },
+        "anchor": {
+          "is_colocated": true,
+          "threshold_km": 7.5,
+          "nearest_anchor": "KAN_U",
+          "distance_km": 0
+        }
+      },
+      "native_timestep": "irregular",
+      "notes": "SUMup firn point co-located with PROMICE KAN_U (metadata-only; committed minimal fixture)."
+    }
+  ],
+  "staged_kind": "observations_only",
+  "colocation_threshold_km": 7.5,
+  "skipped": [],
+  "note": "Metadata-only firn_observational cases. The 3 KAN-colocated cases here are a COMMITTED minimal fixture (small density/temperature/SMB profiles). The full SUMup staging is on-demand to gitignored data/eval/sumup."
+}

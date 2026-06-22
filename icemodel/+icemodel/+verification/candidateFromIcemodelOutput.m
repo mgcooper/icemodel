@@ -45,6 +45,17 @@ function candidate = firnCandidateFromIce1(ice1, ice2, opts, case_manifest)
    end
 
    variable_names = string(case_manifest.comparison_variables);
+
+   % SUMup firn-observational cases declare profile-bundle comparison axes
+   % (density rho(z), subsurface_temperature T(z,t), accumulation) rather than
+   % the PROMICE thermistor/ablation timeseries. Dispatch on the declared axes:
+   % a case that asks for the profile-bundle variables gets a profile-bundle
+   % candidate; the PROMICE thermistor timeseries stays the default firn path.
+   if any(ismember(variable_names, ["density", "subsurface_temperature"]))
+      candidate = firnProfileCandidateFromIce2(ice1, ice2, opts, case_manifest);
+      return
+   end
+
    data = timetable('RowTimes', ice1.Time);
    Tf = icemodel.physicalConstant('Tf');
 
@@ -74,6 +85,80 @@ function candidate = firnCandidateFromIce1(ice1, ice2, opts, case_manifest)
       "format", "timeseries", ...
       "data", data, ...
       "metadata", metadata(opts, "icemodel_output"));
+end
+
+function candidate = firnProfileCandidateFromIce2(ice1, ice2, opts, case_manifest)
+   %FIRNPROFILECANDIDATEFROMICE2 Map ICE2 column state to SUMup firn profiles.
+   %
+   % SUMup firn cases compare against firn observation profiles: a density
+   % profile rho(z) and a subsurface temperature profile T(z,t). icemodel
+   % carries these as column state in ice2 (T = column temperature [K], f_liq /
+   % density depending on the run). Map only the axes the staged case declares;
+   % an axis whose source column is unavailable is left out so it is reported as
+   % a missing-candidate diagnostic (soft gate), never fabricated. The candidate
+   % format is "firn_profile_bundle", matching the observation target so the
+   % soft firn comparison can align them by depth.
+
+   variable_names = string(case_manifest.comparison_variables);
+   Tf = icemodel.physicalConstant('Tf');
+
+   bundle = struct('format', 'firn_profile_bundle');
+
+   % Build the depth axis from the column node spacing when available.
+   if isfield(opts, 'dz_thermal') && ~isempty(opts.dz_thermal)
+      dz = opts.dz_thermal;
+   else
+      dz = NaN;
+   end
+
+   if ismember("density", variable_names)
+      rho = columnProfile(ice2, "ro_sno", "density");
+      if ~isempty(rho)
+         bundle.density = depthProfileTable(rho, dz);
+      end
+   end
+
+   if ismember("subsurface_temperature", variable_names)
+      if isfield(ice2, 'T') && ~isempty(ice2.T)
+         % Column temperature T(z,t) in degrees C, depth-indexed.
+         bundle.subsurface_temperature = ice2.T - Tf;
+         bundle.depth = depthAxis(size(ice2.T, 1), dz);
+      end
+   end
+
+   if ismember("accumulation", variable_names) && isfield(ice1, "accumulation")
+      bundle.accumulation = ice1.accumulation;
+   end
+
+   candidate = struct( ...
+      "format", "firn_profile_bundle", ...
+      "data", bundle, ...
+      "metadata", metadata(opts, "icemodel_output"));
+end
+
+function values = columnProfile(ice2, primary, fallback)
+   %COLUMNPROFILE Return a column-state field by primary or fallback name.
+   values = [];
+   if isfield(ice2, primary) && ~isempty(ice2.(primary))
+      values = ice2.(primary);
+   elseif isfield(ice2, fallback) && ~isempty(ice2.(fallback))
+      values = ice2.(fallback);
+   end
+end
+
+function tbl = depthProfileTable(values, dz)
+   %DEPTHPROFILETABLE Pair a column profile with its depth axis as a table.
+   z = depthAxis(size(values, 1), dz);
+   tbl = table(z, values(:, 1), 'VariableNames', {'depth', 'value'});
+end
+
+function z = depthAxis(nz, dz)
+   %DEPTHAXIS Node-center depth axis for an nz-node column at spacing dz.
+   if isnan(dz)
+      z = (0:nz - 1)';
+   else
+      z = (0:nz - 1)' * dz;
+   end
 end
 
 function values = ticeFromIce2(ice2, opts, case_manifest, k)

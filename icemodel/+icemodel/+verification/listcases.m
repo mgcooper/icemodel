@@ -139,11 +139,35 @@ function resolved = resolveCase(entry, family)
    resolved.family_root = family.family_root;
 
    % Resolve relative artifact paths at read time so manifests stay portable
-   % inside demo/data while workflow functions receive absolute paths.
+   % inside demo/data while workflow functions receive absolute paths. The
+   % metadata-only firn families (promice/sumup) do not ship a bundled
+   % evaluation_file; SUMup instead references a committed observation profile
+   % bundle via colocation.sumup.obs_file, so resolve that to evaluation_path
+   % when no evaluation_file is declared.
    resolved.evaluation_path = resolveCasePath(family.family_root, entry, ...
       'evaluation_file');
+   if strlength(resolved.evaluation_path) == 0
+      resolved.evaluation_path = resolveObsFile(family.family_root, entry);
+   end
    resolved.reference_path = resolveCasePath(family.family_root, entry, ...
       'reference_file');
+end
+
+function pathname = resolveObsFile(family_root, entry)
+   %RESOLVEOBSFILE Resolve a SUMup case observation-bundle path.
+   %
+   % SUMup firn cases reference their committed observation profile bundle via
+   % colocation.sumup.obs_file (a family-root-relative path). Resolve it to an
+   % absolute path so workflow code receives the obs bundle the same way other
+   % families receive evaluation_file.
+
+   pathname = "";
+   if isfield(entry, 'colocation') && isstruct(entry.colocation) ...
+         && isfield(entry.colocation, 'sumup') ...
+         && isstruct(entry.colocation.sumup) ...
+         && isfield(entry.colocation.sumup, 'obs_file')
+      pathname = fullfile(family_root, string(entry.colocation.sumup.obs_file));
+   end
 end
 
 function pathname = resolveCasePath(family_root, entry, fieldname)
