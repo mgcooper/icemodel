@@ -33,14 +33,24 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    %                 ablation channel and is NOT relabeled as one. No ablation
    %                 or snow_depth channel is fabricated for these sites.
    %
-   % GAP FLAG: surface-height change ACROSS DATA GAPS is not a direct
-   % observation (the readme bridges gaps by manual slope). A companion
-   % per-sample flag channel, surface_height_flag (0 = direct observation,
-   % 1 = gap-bridged / interpolated), marks samples whose underlying L3
-   % surface sensor is missing so model-vs-observation comparison can EXCLUDE
-   % gap-bridged segments. Data are FLAGGED, never deleted. The flag attaches
-   % to whichever surface-height-derived channel the site carries (ablation
-   % at ablation sites, surface_height at accumulation sites).
+   % SURFACE FLAGS (we flag, never silently fix): companion per-sample flag
+   % channels attach to whichever surface-height-derived channel the site carries
+   % (ablation at ablation sites, surface_height at accumulation sites). Data are
+   % FLAGGED, never deleted, and the staged values are the raw GEUS series.
+   %  - surface_height_flag (0/1): gap-bridged mask derived from the underlying
+   %    L3 sensors (a sample is gap-bridged when the surface value is finite but
+   %    every surface-ranging sensor is NaN -> slope-interpolated, not measured;
+   %    see icemodel.forcing.helpers.surfaceFlags). Per the readme the cumulative
+   %    TREND is preserved through gaps; only per-timestep RATE diagnostics should
+   %    exclude flag==1 samples (cumulative/visual comparison uses the full
+   %    series).
+   %  - station_transition_flag (0/1): marks station-handover windows (a step,
+   %    not a NaN, so the gap flag never sees it). Inert without staged
+   %    per-station dates; metadata.is_multistation records the merge fact.
+   %  - step_detected_flag / step_correctable_flag / step_magnitude: the staged
+   %    de-stepping DETECTION (icemodel.forcing.destepSurface in detect mode).
+   %    The CORRECTION is opt-in at analysis time (default: unambiguous only),
+   %    never baked into the staged data.
    %
    % Ice temperatures: tice1..ticeN from the L3 t_i_* string (surfaced
    % thermistors discarded, clamped to the dictionary physical range in
@@ -80,10 +90,15 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    %             tice1..ticeN, tice10m [K]. Surface-height channels are
    %             site-type dependent: ABLATION sites carry ablation +
    %             snow_depth [m]; ACCUMULATION sites carry surface_height [m].
-   %             Either carries surface_height_flag (0/1 gap-bridged mask).
-   %  metadata - provenance: source file, station, site_surface_type,
-   %             surface channel + source, gap-flag counts, snow-depth
-   %             negative count, QA/QC gap counts
+   %             Either carries the surface flag channels: surface_height_flag
+   %             (0/1 gap-bridged mask), station_transition_flag (0/1 handover
+   %             window), step_detected_flag / step_correctable_flag (0/1) and
+   %             step_magnitude [m] (the staged de-stepping detection).
+   %  metadata - provenance: source file, station, site_surface_type, surface
+   %             channel + source, gap-flag counts, station-transition counts,
+   %             composing_stations / is_multistation, steps_detected /
+   %             steps_correctable / step_record, snow-depth negative count,
+   %             QA/QC gap counts
    %
    % See also: icemodel.forcing.readPromiceAws,
    %  icemodel.forcing.buildPromiceMet,
@@ -127,6 +142,33 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    awsnames0 = string(aws.Properties.VariableNames);
    is_ablation = ismember("z_ice_surf", awsnames0);
 
+   % The underlying L3 surface-ranging sensors (transducer/boom/stake) used to
+   % derive the gap flag from FIRST PRINCIPLES: a sample is gap-bridged (slope-
+   % interpolated, not measured) when every one of these is NaN yet the surface
+   % series is finite. Whichever are present on this station are gathered into a
+   % matrix for surfaceFlags (z_ice_surf is re-computed by GEUS from z_pt_cor,
+   % the transducer, falling back to the stake sonic ranger; the boom adds the
+   % accumulation-site surface ranging).
+   sensor_names = intersect(["transducer_depth", "boom_height", ...
+      "stake_height"], awsnames0, 'stable');
+   if isempty(sensor_names)
+      sensors = [];
+   else
+      sensors = cell2mat(arrayfun(@(v) aws.(v), sensor_names, ...
+         'UniformOutput', false));
+   end
+
+   % Known station-handover times for the station-transition flag. The staged
+   % product carries only a SITE-level install date (AWS_sites_metadata.csv), not
+   % per-composing-station dates, so authoritative handover times are not
+   % available here; transition_times stays empty and the flag is all-zero. The
+   % FACT that a site merges multiple stations is recorded in metadata so a
+   % consumer expects a transition (its TIME is recovered by destepSurface as a
+   % coincident step). composing_stations comes from the curated catalog.
+   info = icemodel.verification.helpers.promicesiteinfo(site);
+   composing_stations = info.stations;
+   transition_times = datetime.empty(0, 1);
+
    surface_meta = struct();
    if is_ablation
       surface_meta.site_surface_type = "ablation";
@@ -134,10 +176,8 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
       % Cumulative ice-surface ablation from the QC'd L3 ice-surface height.
       % z_ice_surf is the ice surface relative to installation (decreases as
       % the surface lowers); ablation = -(z - z(start)) is positive downward,
-      % zeroed at the first finite sample of the window. The gap flag marks
-      % samples whose underlying z_ice_surf is missing (gap-bridged).
+      % zeroed at the first finite sample of the window.
       [aws.ablation, ~] = surfaceLowering(aws.z_ice_surf);
-      aws.surface_height_flag = gapFlag(aws.z_ice_surf);
       surface_meta.surface_channel = "ablation";
       surface_meta.surface_source = "L3 z_ice_surf";
 
@@ -149,7 +189,16 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
       aws.snow_depth = sd;
       surface_meta.snow_depth_source = "L3 snow_height (clamped >= 0)";
 
-      surf_channels = ["ablation", "snow_depth", "surface_height_flag"];
+      % Flags derived from the underlying sensors + the ablation series. The
+      % step flags are detected on the ablation channel (a +down series).
+      sflags = icemodel.forcing.helpers.surfaceFlags(aws.z_ice_surf, sensors, ...
+         aws.Time, transition_times=transition_times);
+      [~, step_record, step_flags] = icemodel.forcing.destepSurface( ...
+         aws.Time, aws.ablation, mode="detect", ...
+         transition_times=transition_times, season="ablation");
+      surf_channels = ["ablation", "snow_depth", "surface_height_flag", ...
+         "station_transition_flag", "step_detected_flag", ...
+         "step_correctable_flag", "step_magnitude"];
    else
       surface_meta.site_surface_type = "accumulation";
 
@@ -165,19 +214,53 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
          else
             aws.surface_height = z - z(first);
          end
-         aws.surface_height_flag = gapFlag(z);
+         sflags = icemodel.forcing.helpers.surfaceFlags(z, sensors, aws.Time, ...
+            transition_times=transition_times);
+         [~, step_record, step_flags] = icemodel.forcing.destepSurface( ...
+            aws.Time, aws.surface_height, mode="detect", ...
+            transition_times=transition_times, season="accumulation");
          surface_meta.surface_channel = "surface_height";
          surface_meta.surface_source = "L3 z_surf_combined";
       else
          aws.surface_height = nan(height(aws), 1);
-         aws.surface_height_flag = ones(height(aws), 1);
+         sflags = struct('gap', ones(height(aws), 1), ...
+            'station_transition', zeros(height(aws), 1));
+         [~, step_record, step_flags] = icemodel.forcing.destepSurface( ...
+            aws.Time, aws.surface_height, mode="detect", season="accumulation");
          surface_meta.surface_channel = "surface_height";
          surface_meta.surface_source = "none (no L3 surface-height channel)";
       end
       surface_meta.snow_depth_source = "n/a (accumulation site: no snow_height)";
-      surf_channels = ["surface_height", "surface_height_flag"];
+      surf_channels = ["surface_height", "surface_height_flag", ...
+         "station_transition_flag", "step_detected_flag", ...
+         "step_correctable_flag", "step_magnitude"];
    end
+
+   % Attach the per-sample flag channels (faithful masks; we modify no GEUS
+   % data). surface_height_flag is the gap-bridged mask (now sensor-derived);
+   % station_transition_flag marks station-handover windows; the step_* channels
+   % are the staged de-stepping detection (step_detected/correctable + signed
+   % magnitude), so the staged .mat is faithful and de-stepping is applied opt-in
+   % at analysis time via icemodel.forcing.destepSurface.
+   aws.surface_height_flag = sflags.gap;
+   aws.station_transition_flag = sflags.station_transition;
+   aws.step_detected_flag = step_flags.step_detected;
+   aws.step_correctable_flag = step_flags.step_correctable;
+   aws.step_magnitude = step_flags.step_magnitude;
+
    surface_meta.gap_flagged_samples = nnz(aws.surface_height_flag == 1);
+   surface_meta.station_transition_samples = ...
+      nnz(aws.station_transition_flag == 1);
+   surface_meta.composing_stations = composing_stations;
+   surface_meta.is_multistation = numel(composing_stations) > 1;
+   surface_meta.steps_detected = numel(step_record);
+   if isempty(step_record)
+      surface_meta.steps_correctable = 0;
+   else
+      surface_meta.steps_correctable = ...
+         nnz([step_record.classification] == "unambiguous");
+   end
+   surface_meta.step_record = step_record;
 
    % Order the output channels (the ice-temperature string is variable
    % length). Thermistor channels with no finite samples (sensors absent on
@@ -201,12 +284,26 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
       fillgaps=false);
 
    if kwargs.frequency == "daily"
-      % Daily means for the physical channels; the gap flag aggregates by MAX
-      % so a day touched by any gap-bridged hour stays flagged (a mean would
-      % blur the 0/1 mask into a meaningless fraction).
-      flag = retime(Data(:, "surface_height_flag"), 'daily', 'max');
+      % Daily means for the physical channels; the 0/1 flag channels aggregate
+      % by MAX so a day touched by any flagged hour stays flagged (a mean would
+      % blur the binary mask into a meaningless fraction). step_magnitude keeps
+      % the day's largest-magnitude signed jump (max over |.|), so the daily
+      % series still reports the size of any step that day.
+      flag_channels = intersect(["surface_height_flag", ...
+         "station_transition_flag", "step_detected_flag", ...
+         "step_correctable_flag"], string(Data.Properties.VariableNames));
+      flags_daily = retime(Data(:, cellstr(flag_channels)), 'daily', 'max');
+      if ismember("step_magnitude", string(Data.Properties.VariableNames))
+         mag_daily = retime(Data(:, "step_magnitude"), 'daily', ...
+            @(x) maxAbs(x));
+      end
       Data = retime(Data, 'daily', 'mean');
-      Data.surface_height_flag = flag.surface_height_flag;
+      for fc = flag_channels
+         Data.(fc) = flags_daily.(fc);
+      end
+      if ismember("step_magnitude", string(Data.Properties.VariableNames))
+         Data.step_magnitude = mag_daily.step_magnitude;
+      end
    end
 
    % Per-variable units from the shared canonical map.
@@ -241,12 +338,46 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
       metadata.snow_depth_negatives = surface_meta.snow_depth_negatives;
    end
    metadata.gap_flagged_samples = surface_meta.gap_flagged_samples;
+   metadata.station_transition_samples = ...
+      surface_meta.station_transition_samples;
+   metadata.composing_stations = surface_meta.composing_stations;
+   metadata.is_multistation = surface_meta.is_multistation;
+   metadata.steps_detected = surface_meta.steps_detected;
+   metadata.steps_correctable = surface_meta.steps_correctable;
+   metadata.step_record = surface_meta.step_record;
+   % Flagging philosophy: we preserve the authoritative GEUS series and ATTACH
+   % per-sample flags; we never silently edit data. The gap-bridged surface
+   % height keeps a valid CUMULATIVE/visual trend (readme: "the surface height
+   % trend over the entire period should be unaffected by the gaps"); only per-
+   % timestep RATE diagnostics through a gap are unreliable, so RATE-based
+   % scoring flags/excludes surface_height_flag==1 segments while cumulative and
+   % visual comparison use the FULL series. station_transition_flag marks known
+   % AWS-handover windows. The step_* channels stage de-stepping DETECTION only;
+   % the de-stepping CORRECTION is opt-in at analysis time via
+   % icemodel.forcing.destepSurface (default: correct UNAMBIGUOUS steps only).
    metadata.gap_policy = ["no gap fill (observational); clamps applied; " ...
-      "surface_height_flag=1 marks gap-bridged surface-height samples " ...
-      "(exclude before model comparison)"];
+      "surface_height_flag=1 marks gap-bridged samples (RATE-based " ...
+      "diagnostics exclude them; cumulative/visual comparison uses the full " ...
+      "series). station_transition_flag marks AWS-handover windows. step_* " ...
+      "channels stage de-stepping DETECTION; correction is opt-in via " ...
+      "icemodel.forcing.destepSurface (default: unambiguous steps only)."];
 end
 
 %% Local functions
+function m = maxAbs(x)
+   %MAXABS The signed value of largest magnitude in x (0 if x is empty/all-NaN).
+   %
+   % Used to aggregate the signed step_magnitude channel to daily resolution: a
+   % day's step is summarised by its largest-magnitude jump, keeping the sign.
+   x = x(isfinite(x));
+   if isempty(x)
+      m = 0;
+   else
+      [~, i] = max(abs(x));
+      m = x(i);
+   end
+end
+
 function [lowering, source] = surfaceLowering(z)
    %SURFACELOWERING Cumulative surface lowering from an L3 ice-surface height.
    %
@@ -260,16 +391,4 @@ function [lowering, source] = surfaceLowering(z)
    else
       lowering = -(z - z(first));
    end
-end
-
-function flag = gapFlag(z)
-   %GAPFLAG Per-sample quality flag for a surface-height series.
-   %
-   % 0 = direct observation (the underlying L3 surface sensor reports a finite
-   % value at this sample); 1 = gap-bridged (the sensor is missing here, so a
-   % surface-height change spanning this sample is interpolated/slope-bridged,
-   % not a direct observation per the product readme). Leading/trailing NaNs
-   % before the first / after the last finite sample are also flagged 1. The
-   % flag is returned for the full series so it aligns with the timetable.
-   flag = double(~isfinite(z));
 end
