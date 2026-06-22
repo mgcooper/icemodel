@@ -488,15 +488,22 @@ function writeMarkdown(summary, mdfile, frequency, source_dir)
    fprintf(fid, '- source_dir: %s\n', source_dir);
    fprintf(fid, '- stations: %d\n\n', height(summary));
 
-   cols = summary.Properties.VariableNames;
-   fprintf(fid, '| %s |\n', strjoin(cols, ' | '));
-   fprintf(fid, '|%s|\n', repmat(' --- |', 1, numel(cols)));
-   for i = 1:height(summary)
-      cells = strings(1, numel(cols));
-      for c = 1:numel(cols)
-         cells(c) = cellString(summary.(cols{c})(i));
-      end
-      fprintf(fid, '| %s |\n', strjoin(cells, ' | '));
+   % The full sanity table is 18 columns wide and overflows a narrow editor
+   % pane, so it is split into three themed sub-tables that share the station
+   % key. Each renders within a normal window width.
+   groups = { ...
+      "Record & site", ...
+         {"station", "site_type", "start", "stop", "span_d", "nrows"}; ...
+      "Surface & snow", ...
+         {"station", "sd_med", "sd_max", "sd_neg", "surf_total", ...
+         "surf_mono", "surf_source", "gap_pct"}; ...
+      "Subsurface temperature & flags", ...
+         {"station", "n_tice", "has_tice10m", "tice_min", "tice_max", ...
+         "tice_warmpct", "flags"}};
+   for g = 1:size(groups, 1)
+      fprintf(fid, '### %s\n\n', groups{g, 1});
+      writeMarkdownTable(fid, summary, groups{g, 2});
+      fprintf(fid, '\n');
    end
 
    flagged = summary(summary.flags ~= "ok", :);
@@ -521,6 +528,23 @@ function writeMarkdown(summary, mdfile, frequency, source_dir)
       "TICE_WARM(>2%>0.5C)", "> 2% of tice samples above 0.5 C (warm bias)"];
    for i = 1:size(legend, 1)
       fprintf(fid, '- `%s`: %s\n', legend(i, 1), legend(i, 2));
+   end
+end
+
+function writeMarkdownTable(fid, summary, cols)
+   %WRITEMARKDOWNTABLE Render one markdown table for a column subset.
+   %  Builds a header, a GitHub/VS-Code-compatible separator row (one ' --- '
+   %  per column with no trailing pipe), then one row per station.
+   cols = string(cols);
+   fprintf(fid, '| %s |\n', strjoin(cols, ' | '));
+   sep = strjoin(repmat("---", 1, numel(cols)), ' | ');
+   fprintf(fid, '| %s |\n', sep);
+   for i = 1:height(summary)
+      cells = strings(1, numel(cols));
+      for c = 1:numel(cols)
+         cells(c) = cellString(summary.(char(cols(c)))(i));
+      end
+      fprintf(fid, '| %s |\n', strjoin(cells, ' | '));
    end
 end
 
