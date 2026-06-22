@@ -105,10 +105,12 @@ function info = promicesiteinfo(site)
    %    activelayer.readobuzones' parsing); an off-ice site outside all permafrost
    %    polygons -> "none" (permafrost-free ground).
    %
-   %    NOTE: the staged activelayer.readobuzones reader could not be invoked on
-   %    this machine (missing helpers parseFileName/dealout/activate); the SAME Obu
-   %    shapefile is read directly with shaperead applying that reader's exact
-   %    EXTENT->zone mapping. Replaces the v1 Brown et al. (1997) source.
+   %    NOTE: the Obu shapefile is read through activelayer.readobuzones (the
+   %    production reader; variant="wgs"), not shaperead directly. The analysis
+   %    tool test/interactive/classify_site_facies.m derives these values via
+   %    that reader; activelayer + its matfunclib helper dependencies are placed
+   %    on the path by icemodel.test.helpers.bootstrapTestEnvironment. Replaces
+   %    the v1 Brown et al. (1997) source.
    %
    %  ZAC_A/L/U (A.P. Olsen / Zackenberg GlacioBasis transect, NE Greenland)
    %  carry no installation coordinates in AWS_sites_metadata.csv; their lon/lat

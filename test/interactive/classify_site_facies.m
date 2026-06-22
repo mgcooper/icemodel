@@ -48,13 +48,14 @@ function T = classify_site_facies(varargin)
    %     site directly on lon/lat (the WGS variant needs no projection). On-ice
    %     ice-sheet sites sit on ice, not permafrost ground -> "none".
    %
-   %     NOTE on activelayer.readobuzones: that reader's parsing of the EXTENT
-   %     field is reused here, but the reader itself could NOT be called on this
-   %     machine - it depends on helpers absent from the staged toolbox copy
-   %     (parseFileName, dealout, activate, mustBePolygonOrFile). Rather than fall
-   %     back to Brown, we read the SAME Obu shapefile directly with shaperead and
-   %     apply readobuzones' exact EXTENT->zone mapping, fixing the data path to
-   %     /Volumes/S03/DATA/interface/permafrost/obu/UiO_PEX_PERZONES_5.
+   %     The Obu shapefile is read through activelayer.readobuzones (the
+   %     production reader), invoked with variant="wgs" to load the WGS84 lon/lat
+   %     geometry and asshapefile/asgeostruct=true to return the raw geostruct
+   %     for the point-in-polygon query. activelayer + its matfunclib helper
+   %     dependencies are placed on the path by
+   %     icemodel.test.helpers.bootstrapTestEnvironment (the readers earlier
+   %     "failed" only because matfunclib was off the path). EXTENT->zone mapping
+   %     (Cont/Discon/Spora/Isol) matches readobuzones' parsing exactly.
    %
    %  3. SUMup_2025 GrIS density profiles (FIRN facies within accumulation):
    %       data/verification/sumup/SUMup_2025_density_greenland.nc
@@ -349,11 +350,25 @@ end
 
 %% ----------------------------------------------------------------- Obu zones
 function b = openObu(S03)
-   f = fullfile(S03, "DATA", "interface", "permafrost", "obu", ...
-      "UiO_PEX_PERZONES_5", "wgs", ...
-      "UiO_PEX_PERZONES_5.0_20181128_2000_2016_NH.shp");
-   assert(isfile(f), "Obu zones shapefile not found: %s", f);
-   b.S = shaperead(f);
+   %OPENOBU Read the Obu (UiO PEX) permafrost zones via activelayer.readobuzones.
+   %
+   % Reads the WGS84 lon/lat variant of the UiO PEX permafrost-zones shapefile
+   % through the activelayer toolbox reader (the production Obu reader), instead
+   % of duplicating shaperead. readobuzones(variant="wgs", asshapefile=true,
+   % asgeostruct=true) returns the raw geostruct (X/Y/BoundingBox/EXTENT) that
+   % the point-in-polygon query in sampleObu needs. activelayer + matfunclib are
+   % placed on the path by icemodel.test.helpers.bootstrapTestEnvironment.
+   pn = fullfile(S03, "DATA", "interface", "permafrost", "obu", ...
+      "UiO_PEX_PERZONES_5");
+   fn = "UiO_PEX_PERZONES_5.0_20181128_2000_2016_NH.shp";
+   assert(isfile(fullfile(pn, "wgs", fn)), ...
+      "Obu zones shapefile not found: %s", fullfile(pn, "wgs", fn));
+   assert(~isempty(which("activelayer.readobuzones")), ...
+      ["activelayer.readobuzones not on path; run " ...
+       "icemodel.test.helpers.bootstrapTestEnvironment to add " ...
+       "projects/activelayer/toolbox + projects/matfunclib."]);
+   b.S = activelayer.readobuzones(pathname=char(pn), filename=char(fn), ...
+      variant="wgs", asshapefile=true, asgeostruct=true);
    b.ext = strings(numel(b.S), 1);
    for j = 1:numel(b.S)
       b.ext(j) = string(b.S(j).EXTENT);

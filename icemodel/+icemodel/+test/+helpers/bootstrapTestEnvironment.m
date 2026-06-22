@@ -30,6 +30,12 @@ function [rootdir, input_path, output_path, eval_path, cleanup] = ...
    % affected tests then skip cleanly, as before).
    ensureExactremap(rootdir)
 
+   % Put the activelayer toolbox (and the matfunclib helpers it depends on) on
+   % the path so icemodel.verification reads the Obu permafrost zones through
+   % activelayer.readobuzones instead of duplicating shaperead logic. Resolved
+   % from the sibling dev repos; a clean no-op when they are absent.
+   ensureActivelayer(rootdir)
+
    % Return a no-op cleanup by default so callers can always keep one handle
    % alive even when path/config installation is disabled.
    cleanup = onCleanup(@() []);
@@ -84,6 +90,33 @@ function ensureExactremap(rootdir)
    % projects/icemodel/.. -> projects/, then projects/exactremap/toolbox.
    projects_root = fileparts(rootdir);
    tbdir = fullfile(projects_root, 'exactremap', 'toolbox');
+   if isfolder(tbdir)
+      addpath(genpath(tbdir))
+   end
+end
+
+function ensureActivelayer(rootdir)
+   %ENSUREACTIVELAYER Put activelayer + matfunclib on the path if not already.
+   % activelayer.readobuzones reads the Obu (UiO PEX) permafrost-zones
+   % shapefile; it depends on shared helpers from matfunclib
+   % (parseFileName, dealout, mustBePolygonOrFile). Both live in sibling dev
+   % repos (projects/activelayer, projects/matfunclib), kept off the icemodel
+   % repo. When activelayer.readobuzones already resolves (e.g. activated by
+   % the user's startup.m) this is a no-op; when a dev repo is missing this
+   % returns quietly and the Obu-dependent analysis tools skip cleanly.
+
+   if ~isempty(which('activelayer.readobuzones'))
+      return
+   end
+
+   % projects/icemodel/.. -> projects/, then the sibling toolbox trees.
+   % matfunclib goes on first so activelayer's helper dependencies resolve.
+   projects_root = fileparts(rootdir);
+   mfdir = fullfile(projects_root, 'matfunclib');
+   if isfolder(mfdir)
+      addpath(genpath(mfdir))
+   end
+   tbdir = fullfile(projects_root, 'activelayer', 'toolbox');
    if isfolder(tbdir)
       addpath(genpath(tbdir))
    end
