@@ -99,6 +99,128 @@ function test_variableUnits_errors_on_unmapped_channel(testCase)
       'icemodel:forcing:variableUnits:unmappedChannel');
 end
 
+function test_variableUnits_wraps_single_source(testCase)
+   % variableUnits is a thin wrapper: its unit must equal the unit field of
+   % the single canonical source for every core channel, with no duplicated
+   % list of its own.
+
+   names = ["tair", "swd", "lwd", "albedo", "wspd", "rh", "psfc", "ppt", ...
+      "tsfc", "shf", "lhf", "swe", "tice1", "dtice1"];
+   vu = string(icemodel.forcing.helpers.variableUnits(names));
+   info = icemodel.netcdf.defaults.variable(names);
+   testCase.verifyEqual(vu, string({info.unit}));
+end
+
+%% single canonical variable-metadata source
+
+function test_variable_consistent_triplet_for_core_channels(testCase)
+   % The single source returns a consistent {standard_name, long_name, unit}
+   % for the core forcing/eval channels.
+
+   info = icemodel.netcdf.defaults.variable("tair");
+   testCase.verifyEqual(info.standard_name, 'air_temperature');
+   testCase.verifyEqual(info.unit, 'K');
+   testCase.verifyTrue(info.is_cf);
+
+   info = icemodel.netcdf.defaults.variable("swd");
+   testCase.verifyEqual(info.standard_name, ...
+      'surface_downwelling_shortwave_flux_in_air');
+   testCase.verifyEqual(info.unit, 'W m-2');
+
+   info = icemodel.netcdf.defaults.variable("ppt");
+   testCase.verifyEqual(info.unit, 'm s-1');
+   testCase.verifyEqual(info.standard_name, 'precipitation_flux');
+end
+
+function test_variable_pattern_channels(testCase)
+   % Indexed tice/dtice string channels resolve by pattern.
+
+   info = icemodel.netcdf.defaults.variable(["tice1", "tice12", "dtice3"]);
+   testCase.verifyEqual(string({info.unit}), ["K", "K", "m"]);
+   testCase.verifyEqual(info(1).standard_name, 'land_ice_temperature');
+   testCase.verifyEqual(info(3).standard_name, 'depth');
+end
+
+function test_variable_marks_non_cf_channels(testCase)
+   % Channels with no official CF name are marked is_cf=false, standard ''.
+
+   info = icemodel.netcdf.defaults.variable(["swe", "modis", "rh_ice"]);
+   testCase.verifyEqual(string({info.standard_name}), ["", "", ""]);
+   testCase.verifyFalse(any([info.is_cf]));
+end
+
+function test_variable_validatecf_passes_for_all_cf_names(testCase)
+   % Every standard_name we claim as CF must be in the official table
+   % (validated programmatically against the cached/fixture CF table).
+
+   map = icemodel.netcdf.defaults.variables();
+   names = string(map.keys());
+   names = names(:)';
+   testCase.verifyWarningFree(@() ...
+      icemodel.netcdf.defaults.variable(names, validatecf=true));
+end
+
+function test_variable_errors_on_unknown_channel(testCase)
+   testCase.verifyError(@() ...
+      icemodel.netcdf.defaults.variable("not_a_real_channel"), ...
+      'icemodel:netcdf:variable:unknownChannel');
+end
+
+%% CF standard-name table
+
+function test_cfStandardNames_fixture_parses(testCase)
+   % The committed CF fixture parses to a string set containing the core
+   % standard names the canonical map uses.
+
+   repo_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+   fixture = fullfile(repo_root, "test", "fixtures", ...
+      "cf-standard-names", "cf-standard-name-table.xml");
+   testCase.assumeTrue(isfile(fixture), 'CF fixture missing');
+
+   names = icemodel.netcdf.defaults.cfStandardNames(file=fixture);
+   testCase.verifyClass(names, 'string');
+   testCase.verifyTrue(all(ismember( ...
+      ["air_temperature", "surface_temperature", "precipitation_flux", ...
+      "land_ice_temperature"], names)));
+end
+
+%% stampMetadata embedding
+
+function test_stampMetadata_embeds_all_three(testCase)
+   % Stamping a timetable sets VariableUnits, VariableDescriptions, and the
+   % StandardNames custom property, aligned to the variable order.
+
+   Time = (datetime(2016, 1, 1):hours(1):datetime(2016, 1, 1, 2, 0, 0))';
+   tt = timetable(Time, [1;2;3], [4;5;6], 'VariableNames', {'tair', 'swd'});
+   tt = icemodel.forcing.helpers.stampMetadata(tt);
+
+   testCase.verifyEqual(string(tt.Properties.VariableUnits), ...
+      ["K", "W m-2"]);
+   testCase.verifyEqual(string(tt.Properties.VariableDescriptions(1)), ...
+      "near-surface air temperature");
+   testCase.verifyEqual(tt.Properties.CustomProperties.StandardNames, ...
+      ["air_temperature", "surface_downwelling_shortwave_flux_in_air"]);
+end
+
+function test_data2met_carries_embedded_metadata(testCase)
+   % A met timetable built by data2met carries the embedded properties from
+   % the single source (units, descriptions, and CF standard names).
+
+   met = makeSyntheticMet(datetime(2016, 1, 1), 24);
+   met = icemodel.forcing.data2met(met, validate=false);
+
+   names = string(met.Properties.VariableNames);
+   testCase.verifyEqual(string(met.Properties.VariableUnits), ...
+      string(icemodel.forcing.helpers.variableUnits(names)));
+   testCase.verifyTrue(isprop(met.Properties.CustomProperties, ...
+      "StandardNames"));
+   testCase.verifyEqual( ...
+      numel(met.Properties.CustomProperties.StandardNames), numel(names));
+   testCase.verifyEqual( ...
+      met.Properties.CustomProperties.StandardNames(names == "tair"), ...
+      "air_temperature");
+end
+
 %% windFromComponents
 
 function test_windFromComponents_cardinal_directions(testCase)

@@ -70,11 +70,11 @@ function met = data2met(Data, kwargs)
       varnames(~ismember(varnames, required))];
    met = met(:, cellstr(ordered));
 
-   % Self-describing units from the shared canonical map (precipitation in the
-   % canonical m s-1 rate, including the derived ppt; every other surviving
-   % channel labelled to its one canonical unit).
-   met.Properties.VariableUnits = icemodel.forcing.helpers.variableUnits( ...
-      string(met.Properties.VariableNames));
+   % Self-describing metadata from the single canonical source: unit,
+   % long_name (VariableDescriptions), and CF standard_name (StandardNames
+   % custom property). Precipitation channels carry the canonical m s-1 rate
+   % (including the derived ppt); every surviving channel is labelled.
+   met = icemodel.forcing.helpers.stampMetadata(met);
 
    if kwargs.validate
       icemodel.forcing.helpers.validatemet(met)
