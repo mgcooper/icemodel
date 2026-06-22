@@ -105,13 +105,24 @@ function test_buildPromiceData_reads_l3_evaluation_channels(testCase)
       startdate=datetime(2009, 1, 1), ...
       enddate=datetime(2022, 12, 31, 23, 0, 0));
 
+   testCase.verifyEqual(string(metadata.site_surface_type), "ablation");
+   testCase.verifyEqual(string(metadata.surface_channel), "ablation");
+   testCase.verifyEqual(string(metadata.surface_source), "L3 z_ice_surf");
    testCase.verifyEqual(string(metadata.ablation_source), "L3 z_ice_surf");
-   testCase.verifyEqual(string(metadata.snow_depth_source), "L3 snow_height");
+   testCase.verifyTrue(startsWith(string(metadata.snow_depth_source), ...
+      "L3 snow_height"));
 
-   % Snow depth: non-negative (bare-ice ablation site stays near zero).
+   % Snow depth: clamped strictly non-negative per the readme (bare-ice
+   % ablation site stays near zero).
    sd = Data.snow_depth(isfinite(Data.snow_depth));
    testCase.verifyGreaterThan(numel(sd), 1000);
-   testCase.verifyTrue(all(sd >= -0.01));
+   testCase.verifyTrue(all(sd >= 0));
+
+   % Gap flag present and binary on the surface-height-derived channel.
+   testCase.verifyTrue(ismember("surface_height_flag", ...
+      string(Data.Properties.VariableNames)));
+   fl = Data.surface_height_flag(isfinite(Data.surface_height_flag));
+   testCase.verifyTrue(all(fl == 0 | fl == 1));
 
    % Ablation: cumulative surface lowering, positive-down, monotone-ish, with
    % a physically plausible multi-year magnitude (KAN_L lowers ~57 m over the
@@ -137,21 +148,31 @@ function test_buildPromiceData_reads_l3_evaluation_channels(testCase)
    testCase.verifyEqual(numel(Data.Properties.CustomProperties.ScalarUnits), 6);
 end
 
-function test_buildPromiceData_accumulation_site_uses_combined(testCase)
-   % An accumulation-zone station with no z_ice_surf (KAN_U) falls back to
-   % z_surf_combined for ablation; the result reflects net accumulation
-   % (surface rises -> negative ablation) with no inflated magnitude.
+function test_buildPromiceData_accumulation_site_uses_surface_height(testCase)
+   % An accumulation-zone station with no z_ice_surf (KAN_U) emits a
+   % surface_height channel from z_surf_combined (NET accumulation, positive
+   % up), NOT an ablation or snow_depth channel. The gap flag rides along.
 
    [Data, metadata] = icemodel.forcing.buildPromiceData("KAN_U", ...
       source_dir=testCase.TestData.source_dir, frequency="daily", ...
       startdate=datetime(2009, 1, 1), ...
       enddate=datetime(2022, 12, 31, 23, 0, 0));
 
-   testCase.verifyEqual(string(metadata.ablation_source), ...
+   testCase.verifyEqual(string(metadata.site_surface_type), "accumulation");
+   testCase.verifyEqual(string(metadata.surface_channel), "surface_height");
+   testCase.verifyEqual(string(metadata.surface_source), ...
       "L3 z_surf_combined");
-   ab = Data.ablation(isfinite(Data.ablation));
-   testCase.verifyLessThan(min(ab), 0);            % surface rose
-   testCase.verifyLessThan(max(abs(ab)), 15);      % plausible magnitude
+
+   names = string(Data.Properties.VariableNames);
+   testCase.verifyTrue(ismember("surface_height", names));
+   testCase.verifyTrue(ismember("surface_height_flag", names));
+   % No ablation / snow_depth fabricated for an accumulation site.
+   testCase.verifyFalse(ismember("ablation", names));
+   testCase.verifyFalse(ismember("snow_depth", names));
+
+   sh = Data.surface_height(isfinite(Data.surface_height));
+   testCase.verifyGreaterThan(max(sh), 0);         % surface rose (accumulation)
+   testCase.verifyLessThan(max(abs(sh)), 15);      % plausible magnitude
 end
 
 function test_buildPromiceData_units_from_shared_map(testCase)
@@ -166,8 +187,45 @@ function test_buildPromiceData_units_from_shared_map(testCase)
    units = string(Data.Properties.VariableUnits);
    testCase.verifyEqual(units(names == "ablation"), "m");
    testCase.verifyEqual(units(names == "snow_depth"), "m");
+   testCase.verifyEqual(units(names == "surface_height_flag"), "1");
    testCase.verifyEqual(units(names == "tice1"), "K");
+   if ismember("tice10m", names)
+      testCase.verifyEqual(units(names == "tice10m"), "K");
+   end
    testCase.verifyEqual(units(names == "tair"), "K");
+end
+
+function test_readPromiceAws_shum_kg_per_kg(testCase)
+   % qh_u is g/kg in the L3 product (mislabeled kg/kg); the reader converts
+   % to kg/kg so shum matches the MAR/MERRA vapor-kernel convention.
+
+   aws = icemodel.forcing.readPromiceAws("KAN_M", ...
+      source_dir=testCase.TestData.source_dir, ...
+      startdate=datetime(2015, 6, 1), enddate=datetime(2015, 7, 1));
+   s = aws.shum(isfinite(aws.shum));
+   testCase.verifyNotEmpty(s);
+   % kg/kg specific humidity over ice/firn is O(1e-3); g/kg would be O(1).
+   testCase.verifyLessThan(median(s), 0.05);
+   testCase.verifyGreaterThan(median(s), 1e-5);
+end
+
+function test_readPromiceAws_discards_surfaced_thermistors(testCase)
+   % A surfaced thermistor (depth <= 0) is discarded: no tice sample survives
+   % where its depth tag is at/above the surface.
+
+   aws = icemodel.forcing.readPromiceAws("KAN_L", ...
+      source_dir=testCase.TestData.source_dir);
+   names = string(aws.Properties.VariableNames);
+   tice = names(startsWith(names, "tice") & names ~= "tice10m");
+   for tv = tice
+      dv = "d" + tv;
+      if ~ismember(dv, names); continue; end
+      surfaced = aws.(dv) <= 0;
+      testCase.verifyTrue(all(isnan(aws.(tv)(surfaced))), ...
+         sprintf('%s retained a surfaced sample', tv));
+   end
+   % tice10m, the primary subsurface channel, is present.
+   testCase.verifyTrue(ismember("tice10m", names));
 end
 
 function test_buildPromiceData_writes_userdata(testCase)
