@@ -26,7 +26,8 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    %    cc [%] -> cfrac [-]            t_surf [C] -> tsfc [K]
    %    dshf_u -> shf, dlhf_u -> lhf [W m-2]
    %    rainfall_cor_u [mm] -> rainf [mm per timestep]
-   %    qh_u -> shum [kg/kg]           (specific humidity)
+   %    qh_u [g/kg] -> shum [kg/kg]    (specific humidity, /1000; the L3
+   %       label "kg/kg" is wrong, the values are g/kg)
    %    rh_u_wrt_ice_or_water -> rh_ice [%] (RH wrt ice/water; correct
    %       subfreezing humidity for sublimation/condensation)
    %    wspd_x_u -> uwind, wspd_y_u -> vwind [m s-1] (wind components)
@@ -43,10 +44,16 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    %    z_pt_cor (fallback z_pt) -> transducer_depth [m]
    %    z_stake_cor (fallback z_stake) -> stake_height [m]
    %    t_i_1..t_i_N [degC] -> tice1..ticeN [K], clamped to the dictionary
-   %       physical range (-80..1 C) per sensor
-   %    d_t_i_1..d_t_i_N [m] -> dtice1..dticeN (thermistor depths, so the
-   %       tice string can be interpreted vertically)
-   %    t_i_10m [degC] -> tice10m [K] (10 m firn temperature benchmark)
+   %       physical range (-80..1 C) per sensor, with SURFACED thermistors
+   %       (depth <= 0) discarded so only subsurface readings survive
+   %    d_t_i_1..d_t_i_N [m] -> dtice1..dticeN (thermistor depths below the
+   %       surface, positive down, so the tice string can be interpreted
+   %       vertically and the surfaced-sensor discard applied)
+   %    t_i_10m [degC] -> tice10m [K] (PRIMARY subsurface-temperature
+   %       evaluation channel: the standardized 10 m firn temperature,
+   %       depth-interpolated by GEUS. Prefer tice10m for site-to-site model
+   %       comparison; the raw depth-tagged tice string is the per-sensor
+   %       diagnostic)
    %    alt -> elev [m] (smoothed postprocessed GPS altitude)
    %
    % The upper-boom channels (the dictionary "all" / "_u" set) are used so
@@ -86,8 +93,20 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
 
    filename = locateStationFile(site, kwargs.source_dir, kwargs.timescale);
 
-   % Time axis: pypromice L3 files encode the bin-start stamp as hours (or
-   % days) since a station-specific epoch carried in the time:units attribute.
+   % TIME CONVENTION (governs all model-vs-observation alignment downstream):
+   % the pypromice L3 hourly timestamp is the START of the averaged hour (see
+   % the product readme, "Temporal averaging": "the timestamp of the hourly
+   % averages indicate the start of the averaged hour"). The file encodes it
+   % as integer hours (0,1,2,...) since a station epoch in the time:units
+   % attribute, so epoch+hours(t) reproduces the bin-START stamp exactly; the
+   % dateshift('start','hour') below is an idempotent snap that guards against
+   % sub-hour epoch jitter, not a re-binning. icemodel's met/Data axis is this
+   % same bin-START hourly grid (UTC). icemodel.loadmet / the timestepping
+   % loop treat a met row's Time as the forcing valid AT that timestamp and
+   % integrate forward over [t, t+dt); a START-of-hour averaged forcing is the
+   % correct mean to drive the [t, t+1h) step, so no half-hour shift is needed
+   % and none is applied. When comparing a simulation to these observations,
+   % align on this START-of-hour stamp (do not recentre to the hour middle).
    Time = readTimeAxis(filename, kwargs.timescale);
 
    info = ncinfo(filename);
@@ -164,23 +183,44 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    if ismember('cfrac', string(aws.Properties.VariableNames))
       aws.cfrac = aws.cfrac / 100;                % percent -> fraction
    end
+   if ismember('shum', string(aws.Properties.VariableNames))
+      % qh_u is specific humidity reported in g/kg: the L3 magnitudes are
+      % O(0.1..6) (e.g. KAN_M median 1.68 g/kg), implausible for kg/kg. The
+      % product dictionary (AWS_variables.csv) and the NetCDF units attribute
+      % both LABEL it "kg/kg" but the values are g/kg (the dictionary lo/hi
+      % 0..100 is the g/kg range, confirming the label is wrong). Convert to
+      % kg/kg so shum matches the MAR/MERRA convention consumed by the vapor
+      % kernel (icemodel.vapor.relative_humidity_from_specific_humidity).
+      aws.shum = aws.shum / 1000;                 % g/kg -> kg/kg
+   end
 
    % Ice-temperature string: t_i_1..t_i_N [degC] -> tice1..ticeN [K], clamped
    % to the dictionary physical range (-80..1 C) before the K offset, so out-
-   % of-range thermistor spikes never reach the evaluation axis.
+   % of-range thermistor spikes never reach the evaluation axis. The raw
+   % string is depth-tagged via d_t_i_N [m] (time-dependent depth BELOW the
+   % surface, positive downward) and a SURFACED thermistor (depth <= 0, the
+   % sensor at/above the surface as the firn melts out at ablation sites) is
+   % discarded per the product readme: its tice sample is set NaN so only
+   % genuine subsurface temperatures reach the evaluation axis. (GEUS already
+   % discards most surfaced readings upstream, so the depth gate is defensive,
+   % but it is enforced here so the icemodel channel is self-consistently
+   % depth-clean regardless of source vintage.) Where a depth tag is NaN the
+   % temperature is kept (still a subsurface reading; the depth is merely
+   % unestimated) and dticeN carries NaN for that sample.
    icerange = [-80, 1];   % [degC], from AWS_variables.csv (t_i_*)
    nice = 0;
    while ismember(sprintf('t_i_%d', nice + 1), available)
       nice = nice + 1;
       v = double(ncread(filename, sprintf('t_i_%d', nice)));
       v(v < icerange(1) | v > icerange(2)) = NaN;
-      aws.(sprintf('tice%d', nice)) = v + Tf;
       % Thermistor depth d_t_i_N [m] -> dticeN, so the tice string can be
       % interpreted vertically (sensors settle as the surface changes).
       if ismember(sprintf('d_t_i_%d', nice), available)
-         aws.(sprintf('dtice%d', nice)) = ...
-            double(ncread(filename, sprintf('d_t_i_%d', nice)));
+         depth = double(ncread(filename, sprintf('d_t_i_%d', nice)));
+         v(depth <= 0) = NaN;   % discard surfaced thermistors
+         aws.(sprintf('dtice%d', nice)) = depth;
       end
+      aws.(sprintf('tice%d', nice)) = v + Tf;
    end
 
    % 10 m subsurface (firn) temperature t_i_10m [degC] -> tice10m [K]: the
