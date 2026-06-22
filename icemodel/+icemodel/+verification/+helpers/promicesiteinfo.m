@@ -29,6 +29,21 @@ function info = promicesiteinfo(site)
    %    site            canonical PROMICE station id ("KAN_M")
    %    alias           compact lowercase alias used in filenames ("kanm")
    %    long_name       display-friendly name
+   %    site_type       PROMICE/GC-Net AWS readme Table 1 "Site type"
+   %                    (Ablation/Accumulation/Bedrock). This is the
+   %                    AUTHORITATIVE surface-height-channel discriminator:
+   %                    Ablation sites ship z_ice_surf + snow_height; the
+   %                    others ship only z_surf_combined. buildPromiceData
+   %                    branches on z_ice_surf presence, which agrees with
+   %                    this field. NOTE site_type (data-product class) and
+   %                    surface_zone (glaciological facies) are distinct:
+   %                    KAN_U is site_type=Accumulation (no z_ice_surf) but
+   %                    surface_zone=percolation (firn-core truth).
+   %    stations        string array of the composing AWS for the site (readme
+   %                    Table 1 / AWS_sites_metadata.csv `stations`). A site
+   %                    merges multiple AWS over time, so a station transition
+   %                    can produce an expected step-shift in the surface or
+   %                    subsurface series (e.g. CEN ~2021, MIT early).
    %    surface_zone    glaciological zone (see above)
    %    eval_target     capability descriptor string array (see above)
    %    permafrost_zone permafrost extent class (see above)
@@ -214,6 +229,9 @@ function catalog = buildCatalog(models)
      "ZAC_U",  "ablation",      "si", "none",            false, "A.P. Olsen / Zackenberg local glacier (NE Greenland, 74.64N -21.46E, 862 m); GlacioBasis AWS. coords from L3 nc latitude/longitude attr. Marginal local glacier -> ablation. On glacier ice -> permafrost_zone none (Obu EXTENT at point continuous)."
    };
 
+   typemap = siteTypeMap();
+   stationmap = stationsMap();
+
    n = size(rows, 1);
    catalog = repmat(emptyEntry(), 1, n);
    for k = 1:n
@@ -226,6 +244,8 @@ function catalog = buildCatalog(models)
          'site',           site, ...
          'alias',          lower(erase(site, "_")), ...
          'long_name',      replace(site, "_", "-"), ...
+         'site_type',      lookupSiteType(typemap, site), ...
+         'stations',       lookupStations(stationmap, site), ...
          'surface_zone',   rows{k, 2}, ...
          'eval_target',    evalTarget(rows{k, 3}), ...
          'permafrost_zone',rows{k, 4}, ...
@@ -233,6 +253,72 @@ function catalog = buildCatalog(models)
          'has_recipe',     rows{k, 5}, ...
          'models',         models, ...
          'note',           rows{k, 6});
+   end
+end
+
+function st = lookupSiteType(typemap, site)
+   %LOOKUPSITETYPE Readme Table 1 "Site type" for a site, "unknown" if absent.
+   if isKey(typemap, site)
+      st = typemap(site);
+   else
+      st = "unknown";
+   end
+end
+
+function s = lookupStations(stationmap, site)
+   %LOOKUPSTATIONS Composing AWS for a site (from AWS_sites_metadata.csv).
+   if isKey(stationmap, site)
+      s = stationmap{site};
+   else
+      s = site;   % single-station fallback (site == station)
+   end
+end
+
+function typemap = siteTypeMap()
+   %SITETYPEMAP Readme Table 1 "Site type" (Ablation/Accumulation/Bedrock).
+   %
+   % Transcribed verbatim from the PROMICE/GC-Net AWS readme Table 1
+   % (data/verification/promice/AWS_data_readme.pdf). This is the data-product
+   % site class and the authoritative surface-height-channel discriminator
+   % (Ablation -> z_ice_surf + snow_height; Accumulation/Bedrock ->
+   % z_surf_combined only).
+   pairs = {
+     "CEN","Accumulation"; "CP1","Accumulation"; "DY2","Accumulation"
+     "EGP","Accumulation"; "FRE","Ablation";     "HUM","Accumulation"
+     "JAR","Ablation";     "KAN_B","Bedrock";    "KAN_L","Ablation"
+     "KAN_M","Ablation";   "KAN_T","Ablation";   "KAN_U","Accumulation"
+     "KPC_L","Ablation";   "KPC_U","Ablation";   "LYN_L","Ablation"
+     "LYN_T","Ablation";   "MIT","Ablation";     "NAE","Accumulation"
+     "NAU","Accumulation"; "NEM","Accumulation"; "NSE","Accumulation"
+     "NUK_B","Bedrock";    "NUK_K","Ablation";   "NUK_L","Ablation"
+     "NUK_N","Ablation";   "NUK_U","Ablation";   "QAS_A","Ablation"
+     "QAS_L","Ablation";   "QAS_M","Ablation";   "QAS_U","Ablation"
+     "RED_L","Ablation";   "SCO_L","Ablation";   "SCO_U","Ablation"
+     "SDL","Accumulation"; "SDM","Accumulation"; "SER_B","Bedrock"
+     "SWC","Ablation";     "TAS_A","Ablation";   "TAS_L","Ablation"
+     "TAS_U","Ablation";   "THU_L","Ablation";   "THU_L2","Ablation"
+     "THU_U","Ablation";   "TUN","Accumulation"; "UPE_L","Ablation"
+     "UPE_U","Ablation";   "WEG_B","Bedrock";    "WEG_L","Ablation"
+     "ZAC_A","Ablation";   "ZAC_L","Ablation";   "ZAC_U","Ablation"
+   };
+   typemap = dictionary(string(pairs(:, 1)), string(pairs(:, 2)));
+end
+
+function stationmap = stationsMap()
+   %STATIONSMAP site_id -> composing-AWS string array, from the sites CSV.
+   stationmap = configureDictionary("string", "cell");
+   csv = locateAwsCsv();
+   if csv == "" || ~isfile(csv)
+      return
+   end
+   T = readtable(csv, 'TextType', 'string');
+   if ~all(ismember({'site_id', 'stations'}, T.Properties.VariableNames))
+      return
+   end
+   for r = 1:height(T)
+      sid = string(T.site_id(r));
+      stns = strsplit(strtrim(string(T.stations(r))));
+      stationmap(sid) = {string(stns)};
    end
 end
 
@@ -275,6 +361,8 @@ function entry = firstPassEntry(site, models)
    entry.site = site;
    entry.alias = lower(erase(site, "_"));
    entry.long_name = replace(site, "_", "-");
+   entry.site_type = lookupSiteType(siteTypeMap(), site);
+   entry.stations = lookupStations(stationsMap(), site);
    entry.surface_zone = zone;
    entry.eval_target = target;
    entry.permafrost_zone = pfz;
@@ -319,6 +407,7 @@ end
 function entry = emptyEntry()
    %EMPTYENTRY One catalog entry with the canonical field order.
    entry = struct('site', "", 'alias', "", 'long_name', "", ...
+      'site_type', "", 'stations', strings(1, 0), ...
       'surface_zone', "", 'eval_target', strings(0, 1), ...
       'permafrost_zone', "", 'classification', "", 'has_recipe', false, ...
       'models', strings(1, 0), 'note', "");
