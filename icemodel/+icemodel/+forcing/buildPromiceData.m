@@ -70,6 +70,8 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    % Derived net fluxes. Sparse stations may ship no radiation or turbulent-
    % flux channels, so each derived term is computed only when its inputs are
    % present (a missing input drops the derived channel rather than erroring).
+   % has() is re-bound after channels are added so terms that build on a
+   % derived channel (netr on swn/lwn) see it.
    has = @(v) ismember(v, string(aws.Properties.VariableNames));
    if has("swd") && has("swu")
       aws.swn = aws.swd - aws.swu;
@@ -77,6 +79,7 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    if has("lwd") && has("lwu")
       aws.lwn = aws.lwd - aws.lwu;
    end
+   has = @(v) ismember(v, string(aws.Properties.VariableNames));
    if has("swn") && has("lwn")
       aws.netr = aws.swn + aws.lwn;
    end
