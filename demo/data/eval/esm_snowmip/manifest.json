@@ -14,7 +14,7 @@
       "eval_target": [
         "seasonal_snow"
       ],
-      "permafrost_zone": "isolated",
+      "permafrost_zone": "none",
       "evaluation_file": "cdp/evaluation.mat",
       "reference_file": "cdp/reference.mat",
       "native_timestep": "hourly",
@@ -50,7 +50,7 @@
       "eval_target": [
         "seasonal_snow"
       ],
-      "permafrost_zone": "isolated",
+      "permafrost_zone": "none",
       "evaluation_file": "oas/evaluation.mat",
       "reference_file": "oas/reference.mat",
       "native_timestep": "hourly",
@@ -86,7 +86,7 @@
       "eval_target": [
         "seasonal_snow"
       ],
-      "permafrost_zone": "isolated",
+      "permafrost_zone": "none",
       "evaluation_file": "obs/evaluation.mat",
       "reference_file": "obs/reference.mat",
       "native_timestep": "hourly",
@@ -162,7 +162,7 @@
       "eval_target": [
         "seasonal_snow"
       ],
-      "permafrost_zone": "isolated",
+      "permafrost_zone": "none",
       "evaluation_file": "rme/evaluation.mat",
       "reference_file": "rme/reference.mat",
       "native_timestep": "hourly",
@@ -192,7 +192,7 @@
       "eval_target": [
         "seasonal_snow"
       ],
-      "permafrost_zone": "isolated",
+      "permafrost_zone": "none",
       "evaluation_file": "sap/evaluation.mat",
       "reference_file": "sap/reference.mat",
       "native_timestep": "hourly",
@@ -221,7 +221,7 @@
       "eval_target": [
         "seasonal_snow"
       ],
-      "permafrost_zone": "isolated",
+      "permafrost_zone": "discontinuous",
       "evaluation_file": "snb/evaluation.mat",
       "reference_file": "snb/reference.mat",
       "native_timestep": "hourly",
@@ -257,7 +257,7 @@
       "eval_target": [
         "seasonal_snow"
       ],
-      "permafrost_zone": "discontinuous",
+      "permafrost_zone": "continuous",
       "evaluation_file": "sod/evaluation.mat",
       "reference_file": "sod/reference.mat",
       "native_timestep": "hourly",
@@ -292,7 +292,7 @@
       "eval_target": [
         "seasonal_snow"
       ],
-      "permafrost_zone": "isolated",
+      "permafrost_zone": "sporadic",
       "evaluation_file": "swa/evaluation.mat",
       "reference_file": "swa/reference.mat",
       "native_timestep": "hourly",
@@ -328,7 +328,7 @@
       "eval_target": [
         "seasonal_snow"
       ],
-      "permafrost_zone": "isolated",
+      "permafrost_zone": "sporadic",
       "evaluation_file": "wfj/evaluation.mat",
       "reference_file": "wfj/reference.mat",
       "native_timestep": "hourly",

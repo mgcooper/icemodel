@@ -106,13 +106,21 @@ end
 
 function test_each_esm_case_carries_valid_permafrost_zone(testCase)
    % Every ESM-SnowMIP case is an off-ice land site and carries a permafrost_zone
-   % (ORTHOGONAL to surface_zone) sampled from Brown et al. (1997): Sodankyla
-   % (boreal Lapland) is discontinuous, the remaining sites fall in the isolated
-   % margin. The value must validate against the canonical namelist.
+   % (ORTHOGONAL to surface_zone) sampled by point-in-polygon from the Obu et al.
+   % (2019) permafrost-zone map: Sodankyla (boreal Lapland) is continuous, Senator
+   % Beck (Colorado alpine) discontinuous, Swamp Angel / Weissfluhjoch sporadic,
+   % Old Jack Pine isolated, and the remaining lower/mid-latitude sites fall
+   % outside any permafrost polygon -> none. The value must validate against the
+   % canonical namelist.
 
    allowed = icemodel.verification.namelists.permafrostzone();
    testCase.verifyTrue(ismember("none", allowed));
    testCase.verifyTrue(ismember("isolated", allowed));
+
+   expectedByName = struct( ...
+      'sod', "continuous", 'snb', "discontinuous", ...
+      'swa', "sporadic",   'wfj', "sporadic", ...
+      'ojp', "isolated");
 
    for sitename = expectedEsmCaseIds()'
       manifest = icemodel.verification.loadmanifest(sitename);
@@ -121,9 +129,11 @@ function test_each_esm_case_carries_valid_permafrost_zone(testCase)
       pfz = string(manifest.permafrost_zone);
       testCase.verifyTrue(ismember(pfz, allowed), ...
          sprintf('%s permafrost_zone "%s" not in namelist', sitename, pfz));
-      expected = "isolated";
-      if string(sitename) == "sod"
-         expected = "discontinuous";
+      key = char(lower(string(sitename)));
+      if isfield(expectedByName, key)
+         expected = expectedByName.(key);
+      else
+         expected = "none";
       end
       testCase.verifyEqual(pfz, expected, ...
          sprintf('%s permafrost_zone mismatch', sitename));

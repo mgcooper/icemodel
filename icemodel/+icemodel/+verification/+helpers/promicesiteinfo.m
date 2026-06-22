@@ -55,32 +55,42 @@ function info = promicesiteinfo(site)
    %  requires /Volumes/S03); its results are baked in here so the committed
    %  catalog has NO S03 runtime dependency. Re-run that tool to refresh.
    %
-   %  surface_zone (PRIMARY signal: MODIS MOD10A1 albedo facies, ISMIP6 1 km grid,
-   %    /Volumes/S03/DATA/greenland/snowlines/MOD10A1_albedo_classify_<YR>.nc):
-   %    Per-site multi-year bare-ice fraction f_bare = N(class=bare-ice) /
-   %    N(class in {bare-ice, snow}) over the 92-slice melt-season composites.
-   %      f_bare >= 0.40           -> ablation     (frequently snow-free)
-   %      0.10 <= f_bare < 0.40    -> percolation  (mixed bare-ice / snow margin)
-   %      f_bare <  0.10, elev<2500-> accumulation (snow all season; MODIS surface
-   %                                                 albedo CANNOT see subsurface
-   %                                                 percolation, so percolation is
-   %                                                 NOT separable from accum here)
-   %      f_bare <  0.10, elev>=2500 -> dry_snow   (cold high interior)
-   %    This method REPRODUCES the KAN anchors: KAN_L f_bare=0.91 -> ablation,
-   %    KAN_M 0.67 -> ablation. KAN_U f_bare=0.02 reads "snow" at the surface and
-   %    the method alone would call it "accumulation"; it is the lower PERCOLATION
-   %    zone by firn-core ground truth, so KAN_U is PINNED to the user-authoritative
-   %    "percolation" (a known limit of surface remote sensing, not a method error).
+   %  surface_zone (PRIMARY signal: MODIS end-of-summer BARE-ICE EXTENT 2000-2018,
+   %    /Volumes/S03/DATA/greenland/racmo2p3/annual/
+   %      MODIS_Bare_Ice_Extent_2000-2018.nc, binary 0/1 annual mask on the native
+   %    RACMO2.3p2 FGRN055 ~1 km grid). The end-of-summer snowline ~ the ELA, so
+   %    this is the proper ablation-vs-accumulation discriminator. Per site we take
+   %    the bare-ice FREQUENCY f_bare = N(year bare)/N(valid years), max over a 3x3
+   %    native-cell window (so a margin site whose nearest cell lands off-ice does
+   %    not falsely read 0):
+   %      f_bare >= 0.50           -> ablation     (bare ice in a majority of years)
+   %    In the accumulation area (f_bare < 0.50) the firn facies is refined with
+   %    elevation + SUMup density co-location:
+   %      elev >= 2500 m & f_bare==0          -> dry_snow    (cold high interior)
+   %      SUMup_2025 density profile <= 15 km -> percolation (firn observed)
+   %      otherwise                           -> accumulation (facies unresolved)
+   %    This method REPRODUCES the KAN anchors: KAN_L f_bare=1.00 -> ablation,
+   %    KAN_M 1.00 -> ablation. KAN_U f_bare=0.00 reads snow-covered at the surface
+   %    every year and the surface signal alone would call it accumulation; it is
+   %    the lower PERCOLATION zone by firn-core ground truth (SUMup density 0.2 km),
+   %    so KAN_U is PINNED to the user-authoritative "percolation" (consistent with
+   %    the SUMup firn evidence; surface remote sensing cannot see subsurface melt).
    %    location_type tundra -> tundra ; bedrock/not-Greenland -> land ; local
-   %    glacier -> ablation (marginal). MERRA-2 SMB (51x112 ~50 km grid) is too
-   %    coarse to resolve the SW ablation margin (positive at KAN_L/M) so it is a
-   %    diagnostic ONLY and never used. The 510x1400 ELAmask.mat carries no
-   %    georeferencing and is unused.
+   %    glacier -> ablation (marginal).
    %
-   %  permafrost_zone (Brown et al. 1997 circum-arctic permafrost, EXTENT code,
-   %    /Volumes/S03/DATA/interface/GIS/Brown_Permafrost_Map/*.shp, Lambert
-   %    Azimuthal Equal Area). Off-ice sites only; ice-sheet/glacier -> "none".
-   %      C->continuous  D->discontinuous  S->sporadic  I->isolated.
+   %  permafrost_zone (Obu et al. 2019 ESA GlobPermafrost / UiO PEX permafrost
+   %    zones, EXTENT field, WGS84 polygons, /Volumes/S03/DATA/interface/permafrost/
+   %    obu/UiO_PEX_PERZONES_5/wgs/UiO_PEX_PERZONES_5.0_20181128_2000_2016_NH.shp).
+   %    Off-ice sites only; ice-sheet/glacier -> "none". Point-in-polygon on
+   %    lon/lat; EXTENT Cont/Discon/Spora/Isol ->
+   %    continuous/discontinuous/sporadic/isolated (matching
+   %    activelayer.readobuzones' parsing); an off-ice site outside all permafrost
+   %    polygons -> "none" (permafrost-free ground).
+   %
+   %    NOTE: the staged activelayer.readobuzones reader could not be invoked on
+   %    this machine (missing helpers parseFileName/dealout/activate); the SAME Obu
+   %    shapefile is read directly with shaperead applying that reader's exact
+   %    EXTENT->zone mapping. Replaces the v1 Brown et al. (1997) source.
    %
    %  Remaining "unknown": ZAC_A/L/U carry no coordinates in
    %  AWS_sites_metadata.csv, so no dataset could be sampled.
@@ -139,57 +149,57 @@ function catalog = buildCatalog(models)
    % Order: KAN transect first (anchors), then the rest alphabetically.
    rows = {
    % site      surf_zone        et    pfz                recipe note
-     "KAN_L",  "ablation",      "si", "none",            true,  "Lower ablation zone (~679 m); curated KAN_L recipe. KAN anchor. MODIS f_bare=0.91."
-     "KAN_M",  "ablation",      "si", "none",            true,  "Upper ablation / bare ice (~1272 m); curated KAN_M recipe. KAN anchor. MODIS f_bare=0.67."
-     "KAN_U",  "percolation",   "sf", "none",            false, "Lower percolation zone (~1845 m); KAN anchor. MODIS reads snow (f_bare=0.02); percolation by firn-core ground truth."
-     "CEN",    "accumulation",  "sf", "none",            false, "Accumulation (MODIS f_bare=0.00, snow all season)."
-     "CP1",    "accumulation",  "sf", "none",            false, "Accumulation (MODIS f_bare=0.00)."
-     "DY2",    "accumulation",  "sf", "none",            false, "Accumulation (MODIS f_bare=0.02)."
-     "EGP",    "dry_snow",      "sf", "none",            false, "Dry-snow interior (MODIS f_bare=0.00, elev 2663 m)."
-     "FRE",    "ablation",      "si", "none",            false, "Marginal local glacier -> ablation (MODIS f_bare=0.70)."
-     "HUM",    "accumulation",  "sf", "none",            false, "Accumulation (MODIS f_bare=0.00)."
-     "JAR",    "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.70)."
-     "KAN_B",  "tundra",        "",   "continuous",      false, "Off-ice tundra; Brown EXTENT continuous."
-     "KAN_T",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.92)."
-     "KPC_L",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.68)."
-     "KPC_U",  "accumulation",  "sf", "none",            false, "Accumulation (MODIS f_bare=0.09)."
-     "LYN_L",  "ablation",      "si", "none",            false, "Marginal local glacier -> ablation (MODIS f_bare=0.58)."
-     "LYN_T",  "ablation",      "si", "none",            false, "Marginal local glacier -> ablation (MODIS f_bare=0.75)."
-     "MIT",    "ablation",      "si", "none",            false, "Marginal local glacier -> ablation (MODIS f_bare=0.70)."
-     "NAE",    "dry_snow",      "sf", "none",            false, "Dry-snow interior (MODIS f_bare=0.00, elev 2624 m)."
-     "NAU",    "accumulation",  "sf", "none",            false, "Accumulation (MODIS f_bare=0.00)."
-     "NEM",    "accumulation",  "sf", "none",            false, "Accumulation (MODIS f_bare=0.00)."
-     "NSE",    "accumulation",  "sf", "none",            false, "Accumulation (MODIS f_bare=0.00)."
-     "NUK_B",  "tundra",        "",   "isolated",        false, "Off-ice tundra; Brown EXTENT isolated."
-     "NUK_K",  "ablation",      "si", "none",            false, "Marginal local glacier -> ablation (MODIS f_bare=0.81)."
-     "NUK_L",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.90)."
-     "NUK_N",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.83)."
-     "NUK_P",  "tundra",        "",   "isolated",        false, "Off-ice tundra; Brown EXTENT isolated."
-     "NUK_U",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.75)."
-     "ORO",    "land",          "",   "sporadic",        false, "Off-ice (not Greenland); Brown EXTENT sporadic (nearest, low conf)."
-     "QAS_A",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.48)."
-     "QAS_L",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.78)."
-     "QAS_M",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.73)."
-     "QAS_U",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.55)."
-     "RED_L",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.53)."
-     "SCO_L",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.94)."
-     "SCO_U",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.76)."
-     "SDL",    "accumulation",  "sf", "none",            false, "Accumulation (MODIS f_bare=0.00)."
-     "SDM",    "dry_snow",      "sf", "none",            false, "Dry-snow interior (MODIS f_bare=0.00, elev 2879 m)."
-     "SER_B",  "land",          "",   "discontinuous",   false, "Off-ice bedrock; Brown EXTENT discontinuous."
-     "SWC",    "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.43)."
-     "TAS_A",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.51)."
-     "TAS_L",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.83)."
-     "TAS_U",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.70)."
-     "THU_L",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.54)."
-     "THU_L2", "percolation",   "sf", "none",            false, "Percolation margin (MODIS f_bare=0.38, mixed)."
-     "THU_U",  "percolation",   "sf", "none",            false, "Percolation margin (MODIS f_bare=0.24, mixed)."
-     "TUN",    "accumulation",  "sf", "none",            false, "Accumulation (MODIS f_bare=0.00)."
-     "UPE_L",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.75)."
-     "UPE_U",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.60)."
-     "UWN",    "land",          "",   "sporadic",        false, "Off-ice (not Greenland); Brown EXTENT sporadic."
-     "WEG_B",  "tundra",        "",   "continuous",      false, "Off-ice tundra; Brown EXTENT continuous."
-     "WEG_L",  "ablation",      "si", "none",            false, "Ablation (MODIS f_bare=0.55)."
+     "KAN_L",  "ablation",      "si", "none",            true,  "Lower ablation zone (~679 m); curated KAN_L recipe. KAN anchor. MODIS bare-ice freq=1.00."
+     "KAN_M",  "ablation",      "si", "none",            true,  "Upper ablation / bare ice (~1272 m); curated KAN_M recipe. KAN anchor. MODIS bare-ice freq=1.00."
+     "KAN_U",  "percolation",   "sf", "none",            false, "Lower percolation zone (~1845 m); KAN anchor. MODIS bare-ice freq=0.00 (snow-covered surface); percolation by firn-core truth, consistent with SUMup density 0.2 km."
+     "CEN",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.0 km, firn observed; elev 1872 m)."
+     "CP1",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.3 km, firn observed; elev 1951 m)."
+     "DY2",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.2 km, firn observed; elev 2113 m)."
+     "EGP",    "dry_snow",      "sf", "none",            false, "Dry-snow interior (MODIS bare-ice freq=0.00, elev 2663 m >= 2500)."
+     "FRE",    "ablation",      "si", "none",            false, "Marginal local glacier -> ablation."
+     "HUM",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.1 km, firn observed; elev 1967 m)."
+     "JAR",    "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
+     "KAN_B",  "tundra",        "",   "continuous",      false, "Off-ice tundra; Obu EXTENT continuous."
+     "KAN_T",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00, window-max recovered margin signal)."
+     "KPC_L",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
+     "KPC_U",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=0.68)."
+     "LYN_L",  "ablation",      "si", "none",            false, "Marginal local glacier -> ablation."
+     "LYN_T",  "ablation",      "si", "none",            false, "Marginal local glacier -> ablation."
+     "MIT",    "ablation",      "si", "none",            false, "Marginal local glacier -> ablation."
+     "NAE",    "dry_snow",      "sf", "none",            false, "Dry-snow interior (MODIS bare-ice freq=0.00, elev 2624 m >= 2500)."
+     "NAU",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.2 km, firn observed; elev 2335 m < 2500)."
+     "NEM",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.1 km, firn observed; elev 2451 m < 2500)."
+     "NSE",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.1 km, firn observed; elev 2375 m < 2500)."
+     "NUK_B",  "tundra",        "",   "discontinuous",   false, "Off-ice tundra; Obu EXTENT discontinuous."
+     "NUK_K",  "ablation",      "si", "none",            false, "Marginal local glacier -> ablation."
+     "NUK_L",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
+     "NUK_N",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
+     "NUK_P",  "tundra",        "",   "sporadic",        false, "Off-ice tundra; Obu EXTENT sporadic."
+     "NUK_U",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
+     "ORO",    "land",          "",   "none",            false, "Off-ice (not Greenland); outside Obu permafrost polygons -> none."
+     "QAS_A",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=0.68)."
+     "QAS_L",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
+     "QAS_M",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=0.95)."
+     "QAS_U",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=0.68)."
+     "RED_L",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00, window-max recovered margin signal)."
+     "SCO_L",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
+     "SCO_U",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
+     "SDL",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.0 km, firn observed; elev 2459 m < 2500)."
+     "SDM",    "dry_snow",      "sf", "none",            false, "Dry-snow interior (MODIS bare-ice freq=0.00, elev 2879 m >= 2500)."
+     "SER_B",  "land",          "",   "discontinuous",   false, "Off-ice bedrock; Obu EXTENT discontinuous."
+     "SWC",    "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=0.84)."
+     "TAS_A",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=0.95)."
+     "TAS_L",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
+     "TAS_U",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
+     "THU_L",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
+     "THU_L2", "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
+     "THU_U",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
+     "TUN",    "percolation",   "sf", "none",            false, "Percolation (MODIS bare-ice freq=0.00; SUMup density 0.1 km, firn observed; elev 2076 m)."
+     "UPE_L",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=1.00)."
+     "UPE_U",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=0.95)."
+     "UWN",    "land",          "",   "isolated",        false, "Off-ice (not Greenland); Obu EXTENT isolated."
+     "WEG_B",  "tundra",        "",   "continuous",      false, "Off-ice tundra; Obu EXTENT continuous."
+     "WEG_L",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=0.95)."
      "ZAC_A",  "unknown",       "",   "unknown",         false, "No coordinates in metadata; unresolved."
      "ZAC_L",  "unknown",       "",   "unknown",         false, "No coordinates in metadata; unresolved."
      "ZAC_U",  "unknown",       "",   "unknown",         false, "No coordinates in metadata; unresolved."

@@ -233,18 +233,25 @@ end
 
 %% Local helpers
 function pfz = snowmipPermafrostZone(sitename)
-   %SNOWMIPPERMAFROSTZONE Brown et al. (1997) permafrost extent per SnowMIP site.
+   %SNOWMIPPERMAFROSTZONE Obu et al. (2019) permafrost extent per SnowMIP site.
    %
-   % Hard-coded results of sampling the Brown circum-arctic permafrost map at each
-   % ESM-SnowMIP site (test/interactive/classify_site_facies.m). All ten sites are
-   % off-ice land surfaces; Sodankyla (boreal Lapland) is discontinuous, the rest
-   % fall in the isolated-permafrost / sporadic margin. Vocabulary:
-   % icemodel.verification.namelists.permafrostzone.
+   % Hard-coded results of a point-in-polygon test of the Obu et al. (2019) ESA
+   % GlobPermafrost / UiO PEX permafrost-zone map at each ESM-SnowMIP site
+   % (test/interactive/classify_site_facies.m). All ten sites are off-ice land
+   % surfaces. Sites outside any permafrost polygon -> "none". Vocabulary:
+   % icemodel.verification.namelists.permafrostzone. Replaces the v1 Brown et al.
+   % (1997) source.
    switch lower(string(sitename))
-      case "sod"
+      case "sod"   % Sodankyla, boreal Lapland
+         pfz = "continuous";
+      case "snb"   % Senator Beck, Colorado alpine
          pfz = "discontinuous";
-      otherwise
+      case {"swa", "wfj"}  % Swamp Angel (CO), Weissfluhjoch (Alps)
+         pfz = "sporadic";
+      case "ojp"   % Old Jack Pine, boreal Saskatchewan
          pfz = "isolated";
+      otherwise    % cdp, oas, obs, rme, sap: outside Obu permafrost polygons
+         pfz = "none";
    end
 end
 
