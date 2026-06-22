@@ -9,10 +9,21 @@ function results = compare_ablation_vs_legacy(options)
    %  icemodel.forcing.buildPromiceData (reads the L3 z_ice_surf channel with
    %  site-type branching + gap flags) against the LEGACY pre-refactor staged
    %  ablation artifacts at KAN_L and KAN_M
-   %  (demo/data/eval/kan{l,m}_ablation_daily.mat). The NEW eval builder now
-   %  fills the GOF-reference role that bead icemodel-dz2.2 originally assigned
-   %  to those staged artifacts, so this check quantifies how well the new
-   %  builder reproduces the legacy reference.
+   %  (test/assets/legacy_ablation/kan{l,m}_ablation_daily.mat). The NEW eval
+   %  builder now fills the GOF-reference role that bead icemodel-dz2.2
+   %  originally assigned to those staged artifacts, so this check quantifies
+   %  how well the new builder reproduces the legacy reference, and whether a
+   %  historical model-data evaluation would change if the obs reference were
+   %  swapped from the legacy series to the new one.
+   %
+   %  Two comparisons are produced for each site:
+   %    1. FULL-RECORD overlap (the legacy 2009-2018 span), as before.
+   %    2. Targeted MELT-SEASON WINDOWS (2015/2016, Jun-Oct and Jul-Oct), the
+   %       windows over which historical KAN_L/KAN_M model evaluations were run.
+   %       Each window rebaselines BOTH series to their value at the window
+   %       start t1 (the legacy plotPromice(...,'refstart',t1) convention:
+   %       subtract the t1 value so both series start at 0 at t1), then reports
+   %       how much a GOF metric would shift if the obs reference changed.
    %
    %  This is NOT part of the formal unit suite. It depends on the committed
    %  PROMICE L3 cache (data/verification/promice/day) and the staged legacy
@@ -26,7 +37,7 @@ function results = compare_ablation_vs_legacy(options)
    %  Options:
    %    sites     which sites to compare (default ["kanl","kanm"])
    %    legacy_root  dir holding the legacy *_ablation_daily.mat artifacts
-   %                 (default demo/data/eval under the repo root)
+   %                 (default test/assets/legacy_ablation under the repo root)
    %    figdir    output figure dir (default test/interactive/figures)
    %    savefigs  write png overlays (default true)
    %
@@ -42,7 +53,8 @@ function results = compare_ablation_vs_legacy(options)
 
    repo_root = repoRoot();
    if options.legacy_root == ""
-      options.legacy_root = fullfile(repo_root, "demo", "data", "eval");
+      options.legacy_root = fullfile(repo_root, "test", "assets", ...
+         "legacy_ablation");
    end
    if options.figdir == ""
       options.figdir = fullfile(repo_root, "test", "interactive", "figures");
@@ -51,19 +63,34 @@ function results = compare_ablation_vs_legacy(options)
       mkdir(options.figdir);
    end
 
+   % Targeted melt-season evaluation windows (naive, year/month/day). Each is
+   % rebaselined to the first valid sample at or after the window start.
+   windows = meltSeasonWindows();
+
    results = struct();
    for s = options.sites
-      results.(s) = compareSite(s, options);
+      results.(s) = compareSite(s, windows, options);
    end
    reportResults(results);
 end
 
+%% ----------------------------------------------------------------- windows
+function w = meltSeasonWindows()
+   %MELTSEASONWINDOWS Targeted historical-evaluation windows (naive datetimes).
+   w = struct( ...
+      "name", {"2015_jun_oct", "2015_jul_oct", "2016_jun_oct", "2016_jul_oct"}, ...
+      "t1",   {datetime(2015,6,1), datetime(2015,7,1), ...
+               datetime(2016,6,1), datetime(2016,7,1)}, ...
+      "t2",   {datetime(2015,10,1), datetime(2015,10,1), ...
+               datetime(2016,10,1), datetime(2016,10,1)});
+end
+
 %% ----------------------------------------------------------------- per site
-function r = compareSite(site, options)
+function r = compareSite(site, windows, options)
    %COMPARESITE NEW buildPromiceData ablation vs the legacy daily artifact.
 
    r = struct("skipped", true, "reason", "", "stats", struct(), ...
-      "figure", "");
+      "figure", "", "windows", struct([]));
 
    % --- legacy staged ablation (cumulative, daily, positive down). ---
    legacy_file = fullfile(options.legacy_root, site + "_ablation_daily.mat");
@@ -105,6 +132,7 @@ function r = compareSite(site, options)
    new_day = dateshift(new_t, "start", "day");
    [tf, loc] = ismember(legacy_day, new_day);
    common_t = legacy_t(tf);
+   common_day = legacy_day(tf);
    la = legacy_a(tf);
    na = new_a(loc(tf));
    gap = new_gap(loc(tf));
@@ -113,38 +141,90 @@ function r = compareSite(site, options)
       return
    end
 
-   % --- rebaseline both to the common-window start (relative to install). ---
-   la = la - firstFinite(la);
-   na = na - firstFinite(na);
-
-   % --- difference stats on direct-observation days only. ---
-   valid = ~isnan(la) & ~isnan(na) & ~gap;
-   d = na(valid) - la(valid);                % new minus legacy
-
    r.skipped = false;
-   r.stats.window_start = common_t(1);
-   r.stats.window_end = common_t(end);
-   r.stats.n_days = numel(common_t);
-   r.stats.n_valid = nnz(valid);
-   r.stats.n_gap_excluded = nnz(gap & ~isnan(la) & ~isnan(na));
-   r.stats.bias = mean(d, "omitnan");
-   r.stats.rmse = sqrt(mean(d.^2, "omitnan"));
-   r.stats.corr = corr(na(valid), la(valid), "rows", "complete");
-   r.stats.total_ablation_new = na(find(valid, 1, "last"));
-   r.stats.total_ablation_legacy = la(find(valid, 1, "last"));
-   r.stats.total_ablation_diff = ...
-      r.stats.total_ablation_new - r.stats.total_ablation_legacy;
-   [r.stats.max_abs_diff, imax] = max(abs(d));
-   vt = common_t(valid);
-   r.stats.max_abs_diff_date = vt(imax);
+
+   % --- (1) FULL-RECORD comparison (rebaselined to the overlap start). ---
+   r.stats = windowStats(common_t, ...
+      la - firstFinite(la), na - firstFinite(na), gap);
 
    if options.savefigs
-      r.figure = makeFigure(site, common_t, la, na, gap, r.stats, options.figdir);
+      r.figure = makeFigure(site, common_t, ...
+         la - firstFinite(la), na - firstFinite(na), gap, r.stats, ...
+         options.figdir, "full", "full overlap (2009-2018)");
+   end
+
+   % --- (2) targeted melt-season windows (rebaselined to window start t1). --
+   for k = 1:numel(windows)
+      sel = common_day >= windows(k).t1 & common_day <= windows(k).t2;
+      wt = common_t(sel);
+      lw = la(sel);
+      nw = na(sel);
+      gw = gap(sel);
+      ws = windowStats(wt, lw - firstFinite(lw), nw - firstFinite(nw), gw);
+      ws.name = windows(k).name;
+      ws.t1 = windows(k).t1;
+      ws.t2 = windows(k).t2;
+      if isempty(r.windows)
+         r.windows = ws;
+      else
+         r.windows(end+1) = ws;
+      end
+      if options.savefigs && ws.n_valid >= 5
+         makeFigure(site, wt, lw - firstFinite(lw), nw - firstFinite(nw), ...
+            gw, ws, options.figdir, windows(k).name, ...
+            sprintf("%s -> %s", string(windows(k).t1, "dd-MMM-uuuu"), ...
+            string(windows(k).t2, "dd-MMM-uuuu")));
+      end
    end
 end
 
+%% ----------------------------------------------------------- window stats
+function s = windowStats(t, la, na, gap)
+   %WINDOWSTATS Agreement stats for one rebaselined window (new vs legacy).
+   %  la, na are already rebaselined (start at 0 at window start). The stats
+   %  use direct-observation days only (drop NaN and gap-bridged samples).
+   s = struct();
+   valid = ~isnan(la) & ~isnan(na) & ~gap;
+   d = na(valid) - la(valid);                % new minus legacy
+
+   s.window_start = firstOr(t, NaT);
+   s.window_end = lastOr(t, NaT);
+   s.n_days = numel(t);
+   s.n_valid = nnz(valid);
+   s.n_gap_excluded = nnz(gap & ~isnan(la) & ~isnan(na));
+   if s.n_valid == 0
+      [s.bias, s.rmse, s.corr] = deal(NaN);
+      [s.total_ablation_new, s.total_ablation_legacy] = deal(NaN);
+      [s.total_ablation_diff, s.total_ablation_relpct] = deal(NaN);
+      [s.max_abs_diff, s.max_abs_diff_date] = deal(NaN, NaT);
+      return
+   end
+   s.bias = mean(d, "omitnan");
+   s.rmse = sqrt(mean(d.^2, "omitnan"));
+   if s.n_valid >= 2
+      s.corr = corr(na(valid), la(valid), "rows", "complete");
+   else
+      s.corr = NaN;
+   end
+   s.total_ablation_new = na(find(valid, 1, "last"));
+   s.total_ablation_legacy = la(find(valid, 1, "last"));
+   s.total_ablation_diff = s.total_ablation_new - s.total_ablation_legacy;
+   % Relative shift of the window total ablation reference (new vs legacy):
+   % this is how much a normalized GOF (e.g. NSE/relative bias) would move if
+   % the obs reference were swapped from legacy to new over this window.
+   if abs(s.total_ablation_legacy) > eps
+      s.total_ablation_relpct = ...
+         100 * s.total_ablation_diff / s.total_ablation_legacy;
+   else
+      s.total_ablation_relpct = NaN;
+   end
+   [s.max_abs_diff, imax] = max(abs(d));
+   vt = t(valid);
+   s.max_abs_diff_date = vt(imax);
+end
+
 %% ------------------------------------------------------------------ figure
-function figpath = makeFigure(site, t, la, na, gap, stats, figdir)
+function figpath = makeFigure(site, t, la, na, gap, stats, figdir, tag, span_lbl)
    %MAKEFIGURE Overlay (top) + difference (bottom); save png.
    f = figure("Visible", "off", "Position", [100 100 1000 700]);
 
@@ -157,20 +237,23 @@ function figpath = makeFigure(site, t, la, na, gap, stats, figdir)
    end
    grid on; legend("Location", "northwest");
    ylabel("cumulative ablation [m, +down]");
-   title(sprintf("%s ablation: new vs legacy (rebaselined to window start)", ...
-      upper(site)));
+   title(sprintf("%s ablation: new vs legacy, rebaselined to start (%s)", ...
+      upper(site), span_lbl), "Interpreter", "none");
 
    subplot(2, 1, 2);
    d = na - la;
    plot(t, d, "-", "LineWidth", 1.0); grid on; hold on
    yline(stats.bias, "--", "bias", "LabelHorizontalAlignment", "left");
    ylabel("new - legacy [m]"); xlabel("time");
-   ttl = sprintf("bias=%.3f m  RMSE=%.3f m  r=%.4f  total_diff=%.3f m  n=%d (gap-excl %d)", ...
-      stats.bias, stats.rmse, stats.corr, stats.total_ablation_diff, ...
-      stats.n_valid, stats.n_gap_excluded);
+   ttl = sprintf(['bias=%.3f m  RMSE=%.3f m  r=%.4f  total new=%.3f ' ...
+      'legacy=%.3f diff=%.3f m (%.1f%%)  n=%d (gap-excl %d)'], ...
+      stats.bias, stats.rmse, stats.corr, stats.total_ablation_new, ...
+      stats.total_ablation_legacy, stats.total_ablation_diff, ...
+      relpct(stats), stats.n_valid, stats.n_gap_excluded);
    title(ttl, "Interpreter", "none");
 
-   figpath = fullfile(figdir, sprintf("ablation_vs_legacy_%s.png", site));
+   figpath = fullfile(figdir, sprintf("ablation_vs_legacy_%s_%s.png", ...
+      site, tag));
    exportgraphics(f, figpath, "Resolution", 150);
    close(f);
 end
@@ -194,13 +277,32 @@ function v0 = firstFinite(v)
    end
 end
 
+function v = firstOr(x, default)
+   %FIRSTOR First element of x, or default when x is empty.
+   if isempty(x); v = default; else; v = x(1); end
+end
+
+function v = lastOr(x, default)
+   %LASTOR Last element of x, or default when x is empty.
+   if isempty(x); v = default; else; v = x(end); end
+end
+
+function p = relpct(stats)
+   %RELPCT Relative total-ablation difference percent (NaN-safe field access).
+   if isfield(stats, "total_ablation_relpct")
+      p = stats.total_ablation_relpct;
+   else
+      p = NaN;
+   end
+end
+
 function root = repoRoot()
    %REPOROOT Repo root from this file: test/interactive/<file>.m -> up two.
    root = fileparts(fileparts(fileparts(mfilename("fullpath"))));
 end
 
 function reportResults(results)
-   %REPORTRESULTS One-line summary per site.
+   %REPORTRESULTS Full-record summary + per-window table per site.
    fprintf("\n--- new PROMICE ablation vs legacy staged ablation ---\n");
    fn = fieldnames(results);
    for k = 1:numel(fn)
@@ -209,11 +311,29 @@ function reportResults(results)
          fprintf("  %-5s SKIP  (%s)\n", fn{k}, r.reason);
       else
          s = r.stats;
-         msg = sprintf("  %-5s n=%d (gap-excl %d)  bias=%.3f m  RMSE=%.3f m  r=%.4f  total_new=%.3f legacy=%.3f diff=%.3f m\n", ...
+         fprintf(['  %-5s FULL  n=%d (gap-excl %d)  bias=%.3f m  RMSE=%.3f m' ...
+            '  r=%.4f  total new=%.3f legacy=%.3f diff=%.3f m (%.1f%%)\n'], ...
             fn{k}, s.n_valid, s.n_gap_excluded, s.bias, s.rmse, s.corr, ...
             s.total_ablation_new, s.total_ablation_legacy, ...
-            s.total_ablation_diff);
-         fprintf("%s", msg);
+            s.total_ablation_diff, relpct(s));
+      end
+   end
+
+   % Per-window table (the historical-evaluation question).
+   fprintf("\n--- melt-season windows (rebaselined to window start) ---\n");
+   fprintf("%-6s %-13s %5s %5s %7s %7s %7s %8s %8s %8s %7s\n", ...
+      "site", "window", "n", "gapx", "bias", "RMSE", "r", ...
+      "tot_new", "tot_leg", "diff", "rel%");
+   for k = 1:numel(fn)
+      r = results.(fn{k});
+      if r.skipped || isempty(r.windows); continue; end
+      for j = 1:numel(r.windows)
+         w = r.windows(j);
+         fprintf(['%-6s %-13s %5d %5d %7.3f %7.3f %7.4f %8.3f %8.3f ' ...
+            '%8.3f %7.1f\n'], fn{k}, w.name, w.n_valid, w.n_gap_excluded, ...
+            w.bias, w.rmse, w.corr, w.total_ablation_new, ...
+            w.total_ablation_legacy, w.total_ablation_diff, ...
+            relpct(w));
       end
    end
    fprintf("\n");
