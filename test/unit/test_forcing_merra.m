@@ -4,12 +4,12 @@ function tests = test_forcing_merra
    % Reads the MERRA-2 daily collection files from the raw-source
    % directory (S03 layout or local cache); skips cleanly when absent.
    %
-   % Note on swd: the legacy ak4_merra artifacts derived downwelling
-   % shortwave as SWGNT / (1 - SNICEALB), mixing the cell net flux with
-   % the snow/ice tile albedo, which inflates swd (legacy 2013 annual
-   % mean 203 W m-2). The builder uses the raw SWGDN downwelling
-   % channel instead; the comparison gate is correlation-only for swd
-   % and the bias is documented in the owning ExecPlan (2026-06-12).
+   % Note on swd: the builder uses the raw SWGDN downwelling channel rather
+   % than the legacy SWGNT/(1-SNICEALB) derivation (which mixed the cell net
+   % flux with the snow/ice tile albedo and inflated swd). The new-vs-legacy
+   % ak4_merra statistical comparison is a user-facing script, not part of this
+   % formal suite: see test/interactive/compare_forcing_vs_legacy.m. Documented
+   % in the owning ExecPlan (2026-06-12).
    tests = functiontests(localfunctions);
 end
 
@@ -116,36 +116,6 @@ function test_buildMerraData_calendar_from_files(testCase)
       [67.1556, -49.9226], 1999, ...
       source_dir=testCase.TestData.source_dir), ...
       'icemodel:forcing:buildMerraData:yearNotInArchive');
-end
-
-function test_buildMerraData_statistical_agreement_with_legacy(testCase)
-   % Statistical agreement with the legacy ak4_merra artifact (nearest
-   % cell vs the legacy catchment-interpolated point; rh additionally
-   % carries the vapor-kernel change; swd the SWGDN decision - see the
-   % file header note).
-
-   legacy_file = ['/Users/mattcooper/MATLAB/projects/runoff/data/' ...
-      'icemodel/input/userdata/ak4_merra_2013.mat'];
-   testCase.assumeTrue(isfile(legacy_file), 'legacy ak4 artifact not found');
-
-   Data = testCase.TestData.Data;
-   legacy = load(legacy_file, 'Data').('Data');
-   t_new = Data.Time;
-   t_new.TimeZone = '';
-   [tf, loc] = ismember(t_new, legacy.Time);
-   testCase.verifyEqual(sum(tf), 8760);
-
-   r = @(v) corr(Data.(v)(tf), legacy.(v)(loc(tf)), 'rows', 'complete');
-   testCase.verifyGreaterThan(r("tair"), 0.999);
-   testCase.verifyGreaterThan(r("psfc"), 0.999);
-   testCase.verifyGreaterThan(r("runoff"), 0.99);
-   testCase.verifyGreaterThan(r("ppt"), 0.98);
-   testCase.verifyGreaterThan(r("albedo"), 0.99);
-   testCase.verifyGreaterThan(r("swd"), 0.95);
-   testCase.verifyGreaterThan(r("rh"), 0.75);
-
-   bias = mean(Data.tair(tf) - legacy.tair(loc(tf)), 'omitnan');
-   testCase.verifyLessThan(abs(bias), 1);
 end
 
 function test_buildMerraData_mass_flux_units(testCase)

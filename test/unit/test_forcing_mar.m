@@ -4,16 +4,13 @@ function tests = test_forcing_mar
    % Reads MAR v3.11 yearly NetCDF from the raw-source directory (S03
    % external drive layout or local cache); skips cleanly when absent.
    %
-   % Note on the legacy comparison: the legacy ak4 artifacts cannot be
-   % reproduced cell-exactly. Their cell selection came from ncrowcol's
-   % independent row/column nearest-match on a curvilinear grid (the
-   % stored Lat/Lon metadata are mutually inconsistent), and no single
-   % cell of the current MAR archive reproduces the stored series
-   % (best whole-year match deviates 6.4 K in tair). The gates here are
-   % therefore (a) exact self-consistency of the builder against the
-   % raw NetCDF at the selected cell, and (b) statistical agreement
-   % with the legacy artifact at the one-cell-offset scale. Recorded in
-   % the owning ExecPlan (2026-06-12).
+   % The durable gates here are (a) the met contract on a full hourly axis
+   % and (b) exact self-consistency of the builder against the raw NetCDF at
+   % the selected cell. The new-vs-legacy ak4 statistical comparison (the
+   % legacy artifacts cannot be reproduced cell-exactly) is a user-facing
+   % script, not part of this formal suite: see
+   % test/interactive/compare_forcing_vs_legacy.m. Recorded in the owning
+   % ExecPlan (2026-06-12).
    tests = functiontests(localfunctions);
 end
 
@@ -111,31 +108,6 @@ function test_buildMarData_polygon_average(testCase)
    testCase.verifyEqual(height(Dc), height(Data));
    testCase.verifyTrue(all(isfinite(Dc.tair)));
    testCase.verifyLessThan(abs(mean(Dc.tair - Data.tair)), 5);
-end
-
-function test_buildMarMet_statistical_agreement_with_legacy(testCase)
-   % Statistical agreement with the legacy ak4 artifact (one-cell
-   % offset scale; see file header note).
-
-   legacy_file = ['/Users/mattcooper/MATLAB/projects/runoff/data/' ...
-      'icemodel/input/met/met_ak4_mar_2009_1hr.mat'];
-   testCase.assumeTrue(isfile(legacy_file), 'legacy ak4 artifact not found');
-
-   met = testCase.TestData.met;
-   legacy = load(legacy_file, 'met').('met');
-   t_new = met.Time;
-   t_new.TimeZone = '';
-   [tf, loc] = ismember(t_new, legacy.Time);
-   testCase.verifyEqual(sum(tf), 8760);
-
-   r = @(v) corr(met.(v)(tf), legacy.(v)(loc(tf)), 'rows', 'complete');
-   bias = @(v) mean(met.(v)(tf) - legacy.(v)(loc(tf)), 'omitnan');
-
-   testCase.verifyGreaterThan(r("tair"), 0.98);
-   testCase.verifyGreaterThan(r("lwd"), 0.95);
-   testCase.verifyGreaterThan(r("psfc"), 0.95);
-   testCase.verifyLessThan(abs(bias("tair")), 2);
-   testCase.verifyLessThan(abs(bias("swd")), 5);
 end
 
 function test_buildMarMet_modis_channel(testCase)
