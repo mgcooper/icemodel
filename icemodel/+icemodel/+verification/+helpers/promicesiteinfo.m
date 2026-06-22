@@ -95,8 +95,14 @@ function info = promicesiteinfo(site)
    %    shapefile is read directly with shaperead applying that reader's exact
    %    EXTENT->zone mapping. Replaces the v1 Brown et al. (1997) source.
    %
-   %  Remaining "unknown": ZAC_A/L/U carry no coordinates in
-   %  AWS_sites_metadata.csv, so no dataset could be sampled.
+   %  ZAC_A/L/U (A.P. Olsen / Zackenberg GlacioBasis transect, NE Greenland)
+   %  carry no installation coordinates in AWS_sites_metadata.csv; their lon/lat
+   %  are sourced from the per-station L3 NetCDF global latitude/longitude
+   %  attributes (data/verification/promice/hour/ZAC_*_hour.nc, the same
+   %  coordinates readPromiceAws reads). They are local-glacier AWS -> ablation;
+   %  on glacier ice so permafrost_zone=none (the surrounding Zackenberg tundra
+   %  is continuous permafrost, but the sites sit on ice). No site now remains
+   %  "unknown".
    %  ===========================================================================
    %
    %  Role
@@ -203,9 +209,9 @@ function catalog = buildCatalog(models)
      "UWN",    "land",          "",   "isolated",        false, "Off-ice (not Greenland); Obu EXTENT isolated."
      "WEG_B",  "tundra",        "",   "continuous",      false, "Off-ice tundra; Obu EXTENT continuous."
      "WEG_L",  "ablation",      "si", "none",            false, "Ablation (MODIS bare-ice freq=0.95)."
-     "ZAC_A",  "unknown",       "",   "unknown",         false, "No coordinates in metadata; unresolved."
-     "ZAC_L",  "unknown",       "",   "unknown",         false, "No coordinates in metadata; unresolved."
-     "ZAC_U",  "unknown",       "",   "unknown",         false, "No coordinates in metadata; unresolved."
+     "ZAC_A",  "ablation",      "si", "none",            false, "A.P. Olsen / Zackenberg local glacier (NE Greenland, 74.65N -21.65E, 1481 m); GlacioBasis AWS. coords from L3 nc latitude/longitude attr (CSV installation blank). Marginal local glacier -> ablation. On glacier ice -> permafrost_zone none (surrounding tundra is continuous permafrost)."
+     "ZAC_L",  "ablation",      "si", "none",            false, "A.P. Olsen / Zackenberg local glacier (NE Greenland, 74.62N -21.37E, 629 m); GlacioBasis AWS. coords from L3 nc latitude/longitude attr. Marginal local glacier -> ablation. On glacier ice -> permafrost_zone none (Obu EXTENT at point continuous)."
+     "ZAC_U",  "ablation",      "si", "none",            false, "A.P. Olsen / Zackenberg local glacier (NE Greenland, 74.64N -21.46E, 862 m); GlacioBasis AWS. coords from L3 nc latitude/longitude attr. Marginal local glacier -> ablation. On glacier ice -> permafrost_zone none (Obu EXTENT at point continuous)."
    };
 
    n = size(rows, 1);

@@ -201,11 +201,35 @@ function sites = readSiteList(csv)
    sites = struct("site", {}, "lat", {}, "lon", {}, "elev", {}, ...
       "location_type", {}, "kind", {});
    for n = 1:height(Tp)
+      site = string(Tp.site_id(n));
+      lat = todouble(Tp.latitude_installation(n));
+      lon = todouble(Tp.longitude_installation(n));
+      elev = todouble(Tp.altitude_installation(n));
+
+      % Some stations (e.g. the ZAC GlacioBasis transect) carry no
+      % latitude_installation/longitude_installation in the CSV. Source the
+      % site lon/lat from the per-station L3 NetCDF (global latitude/longitude
+      % attributes that readPromiceAws also reads) before falling back to the
+      % CSV last-valid coordinates, so these sites still classify.
+      if ~isfinite(lat) || ~isfinite(lon)
+         [lat_nc, lon_nc, elev_nc] = ncCoords(site);
+         if isfinite(lat_nc) && isfinite(lon_nc)
+            lat = lat_nc; lon = lon_nc;
+            if ~isfinite(elev), elev = elev_nc; end
+         else
+            lat = todouble(Tp.latitude_last_valid(n));
+            lon = todouble(Tp.longitude_last_valid(n));
+            if ~isfinite(elev)
+               elev = todouble(Tp.altitude_last_valid(n));
+            end
+         end
+      end
+
       sites(end+1) = struct( ...
-         "site", string(Tp.site_id(n)), ...
-         "lat", todouble(Tp.latitude_installation(n)), ...
-         "lon", todouble(Tp.longitude_installation(n)), ...
-         "elev", todouble(Tp.altitude_installation(n)), ...
+         "site", site, ...
+         "lat", lat, ...
+         "lon", lon, ...
+         "elev", elev, ...
          "location_type", lower(strtrim(string(Tp.location_type(n)))), ...
          "kind", "promice"); %#ok<AGROW>
    end
@@ -222,6 +246,53 @@ function sites = readSiteList(csv)
       sites(end+1) = struct("site", upper(string(sc)), "lat", ll(1), ...
          "lon", ll(2), "elev", NaN, "location_type", "snowmip_land", ...
          "kind", "snowmip"); %#ok<AGROW>
+   end
+end
+
+function [lat, lon, elev] = ncCoords(site)
+   %NCCOORDS Read a station's lon/lat/elev from its per-station L3 NetCDF.
+   %
+   % The PROMICE/GC-Net L3 hourly files carry global latitude/longitude (and,
+   % when present, altitude) attributes - the same coordinates readPromiceAws
+   % reads. This recovers coordinates for stations whose CSV installation
+   % coordinates are blank. Returns NaNs when the file or attributes are absent.
+   lat = NaN; lon = NaN; elev = NaN;
+   ncfile = string(fullfile(icemodel.internal.fullpath("data"), ...
+      "verification", "promice", "hour", site + "_hour.nc"));
+   if ~isfile(ncfile)
+      return
+   end
+   info = ncinfo(char(ncfile));
+   attrs = string({info.Attributes.Name});
+   if ismember("latitude", attrs)
+      lat = scalarAttr(ncreadatt(char(ncfile), "/", "latitude"));
+   end
+   if ismember("longitude", attrs)
+      lon = scalarAttr(ncreadatt(char(ncfile), "/", "longitude"));
+   end
+   for ealt = ["altitude", "elevation"]
+      if ismember(ealt, attrs)
+         elev = scalarAttr(ncreadatt(char(ncfile), "/", char(ealt)));
+         break
+      end
+   end
+end
+
+function v = scalarAttr(x)
+   %SCALARATTR Reduce a NetCDF attribute to one finite scalar (or NaN).
+   %
+   % L3 files store the global latitude/longitude as CHAR strings, so parse
+   % char attributes with str2double rather than casting their ASCII codes.
+   if ischar(x) || isstring(x)
+      v = str2double(string(x));
+      return
+   end
+   x = double(x(:));
+   x = x(isfinite(x));
+   if isempty(x)
+      v = NaN;
+   else
+      v = x(1);
    end
 end
 
