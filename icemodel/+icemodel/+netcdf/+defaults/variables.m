@@ -77,6 +77,8 @@ function map = variables()
    'snowd',            'surface_snow_thickness', 'snow depth',                'm'
    'snow_depth',       'surface_snow_thickness', 'snow depth',                'm'
    'ablation',         '', 'surface ablation (lowering) height',              'm'
+   'surface_height',   '', 'net surface-height change relative to window start (accumulation sites; positive up)', 'm'
+   'surface_height_flag', '', 'quality flag for the surface-height channel (0=direct observation, 1=gap-bridged/interpolated)', '1'
    'boom_height',      '', 'AWS boom height above the surface',               'm'
    'stake_height',     '', 'ablation-stake height above the surface',         'm'
    'transducer_depth', '', 'sonic-ranger / transducer depth to the surface',  'm'
