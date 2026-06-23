@@ -78,15 +78,21 @@ function test_rebuild_esm_snowmip_smoke_sites(testCase)
    verifyEqual(testCase, manifest.dataset_family, "esm_snowmip");
 
    for case_id = ["cdp", "wfj"]
-      eval_path = fullfile(eval_root, 'snow', 'esm_snowmip', ...
-         char(case_id), 'evaluation.mat');
-      verifyTrue(testCase, exist(eval_path, 'file') == 2, ...
-         sprintf('%s evaluation.mat missing after rebuild', case_id));
-      loaded = load(eval_path, 'targets');
+      case_dir = fullfile(eval_root, 'snow', 'esm_snowmip', char(case_id));
+      obs_path = fullfile(case_dir, 'observations.mat');
+      verifyTrue(testCase, exist(obs_path, 'file') == 2, ...
+         sprintf('%s observations.mat missing after rebuild', case_id));
+      loaded = load(obs_path, 'targets');
       verifyEqual(testCase, loaded.targets.format, 'timeseries');
       verifyTrue(testCase, ...
          istimetable(loaded.targets.data) || ...
          isstruct(loaded.targets.data));
+
+      % Metadata-only: the redundant smoke reference.mat is no longer written.
+      verifyTrue(testCase, ...
+         exist(fullfile(case_dir, 'reference.mat'), 'file') == 0, ...
+         sprintf('%s reference.mat should not be written (metadata-only)', ...
+         case_id));
    end
 end
 

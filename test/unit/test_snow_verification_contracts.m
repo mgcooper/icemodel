@@ -184,16 +184,26 @@ function test_loadmanifest_resolves_demo_data_paths(testCase)
    testCase.verifyTrue(exist(manifest.evaluation_path, 'file') == 2);
 end
 
-function test_comparecase_smoke_reference_writes_metrics(testCase)
-   % COMPARECASE should run from the committed smoke reference artifacts.
+function test_comparecase_metadata_only_writes_soft_metrics(testCase)
+   % COMPARECASE on a metadata-only esm_site case must run from the committed
+   % observations.mat obs bundle and report SOFT diagnostic metrics. With no
+   % bundled reference.mat smoke copy and no model candidate supplied, the
+   % default candidate is empty, so every comparison variable is reported as
+   % missing_candidate_variable - a per-variable diagnostic, never a hard fail.
 
    result = icemodel.verification.comparecase("cdp", ...
       "artifact_dir", testCase.TestData.tmpdir, ...
       "make_plot", false);
 
-   testCase.verifyEqual(unique(result.metrics.status), "ok");
+   testCase.verifyEqual(string(result.gate_mode), "soft");
    testCase.verifyTrue(exist(result.metrics_path, 'file') == 2);
    testCase.verifyGreaterThan(height(result.metrics), 0);
+
+   % The soft lane only emits the diagnostic status vocabulary; no hard marker.
+   allowed = ["ok"; "missing_target_variable"; ...
+      "missing_candidate_variable"; "no_overlap"];
+   testCase.verifyTrue(all(ismember(string(result.metrics.status), allowed)), ...
+      'esm soft gate produced an unexpected (hard) status');
 end
 
 function test_comparecase_handles_colbeck_bundle(testCase)
