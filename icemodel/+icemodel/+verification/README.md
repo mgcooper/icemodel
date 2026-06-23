@@ -151,6 +151,26 @@ The setup functions are intentionally separate because they create or overwrite
 MAT artifacts and manifests. Use `overwrite=true` only when deliberately
 refreshing staged setup data.
 
+### Fixture release-with-assets tooling
+
+The heavy committed demo fixture `.mat` data can be moved out of version control
+into a versioned GitHub release asset that is fetched/verified on demand, keeping
+only the lean manifests + a fetcher committed:
+
+- `fixtureFileList` is the single source of truth for the bundled fixture-data
+  set (the `.mat` data only; `manifest.json` / `.gitkeep` stay committed).
+- `packFixtures(version)` bundles that set into a gitignored
+  `release-staging/icemodel-fixtures-<version>.tar.gz` + `.MANIFEST.json`
+  (per-file SHA-256), reporting the committed-vs-asset saving.
+- `fetchFixtures(version, ...)` verifies the on-disk fixtures against the bundle
+  manifest, optionally extracts a local archive, and prints download
+  instructions when missing (mirrors `fetchSumup`); it never auto-downloads.
+
+`fetchFixtures` is wired into `icemodel.test.helpers.bootstrapTestEnvironment` as
+a non-breaking no-op fallback. The committed fixtures stay in place until the
+user performs the one-time flip. Full workflow + the exact `gh`/`git` commands
+and the migration plan live in `README_FIXTURES.md` (tracked as `icemodel-1ps.17`).
+
 ### Source-cache layout
 
 Generated / staged smoke artifacts (committed):

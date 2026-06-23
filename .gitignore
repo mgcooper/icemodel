@@ -30,6 +30,31 @@ data/input/userdata/*
 !data/verification/sumup/
 !data/verification/sumup/.gitkeep
 demo/data/output/
+
+# Release-with-assets fixture bundle staging. packFixtures writes the versioned
+# archive + MANIFEST.json here; it is a build artifact and must never be
+# committed (the bundle is uploaded as a GitHub release asset instead).
+release-staging/
+
+# --- Demo fixture data: release-asset flip (currently OFF) ---------------------
+# The heavy committed demo fixture .mat data (demo/data/eval/**/*.mat,
+# demo/data/input/met/*.mat, demo/data/input/userdata/*.mat, ~119 MB) is bundled
+# by icemodel.verification.setup.packFixtures and provisioned by fetchFixtures.
+# To FLIP to the release-asset strategy (icemodel-1ps.17), uncomment the block
+# below. It ignores the fixture .mat DATA while KEEPING the lean reviewable
+# companions committed (per-family manifest.json and the .gitkeep placeholders),
+# so the directory structure and manifests stay in the repo and fetchFixtures
+# fills in the data on demand. Until then this block stays commented so offline
+# CI keeps loading the committed fixtures unchanged.
+# demo/data/eval/**/*.mat
+# demo/data/input/met/*.mat
+# demo/data/input/userdata/*.mat
+# !demo/data/eval/**/manifest.json
+# !demo/data/eval/**/.gitkeep
+# !demo/data/input/met/.gitkeep
+# !demo/data/input/userdata/.gitkeep
+# -------------------------------------------------------------------------------
+
 test/artifacts/
 test/backups/
 test/baselines/profiler/
