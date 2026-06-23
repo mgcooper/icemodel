@@ -338,6 +338,103 @@
       },
       "native_timestep": "daily",
       "notes": "Lower percolation zone (~1840 m); generic recipe. KAN anchor."
+    },
+    {
+      "case_id": "egp",
+      "case_type": "firn_observational",
+      "site_id": "EGP",
+      "site_name": "EGP",
+      "surface_zone": "accumulation",
+      "eval_target": [
+        "seasonal_snow",
+        "firn"
+      ],
+      "permafrost_zone": "none",
+      "site_location": {
+        "lat_wgs84": 75.62151864466415,
+        "lon_wgs84": -35.973961899732814,
+        "x_epsg3413": 245597.36584112883,
+        "y_epsg3413": -1.5460929424099096E+6,
+        "elev_m": 2663.8860204839912
+      },
+      "period": {
+        "start": "01-Jan-2015",
+        "end": "31-Dec-2016"
+      },
+      "forcing_sources": [
+        "promice",
+        "mar",
+        "merra"
+      ],
+      "eval_sources": [
+        "promice_obs",
+        "racmo"
+      ],
+      "comparison_variables": [
+        "tsfc",
+        "tice1",
+        "tice2",
+        "tice3",
+        "tice4",
+        "tice5",
+        "tice6",
+        "tice7",
+        "tice8"
+      ],
+      "observation_variables": {
+        "subsurface_temperature": "tice1..tice8 (string thermistors)",
+        "surface_ablation": "ablation [m, positive down]",
+        "snow_depth": "snow_depth [m]"
+      },
+      "colocation": {
+        "promice": {
+          "kind": "station_met_and_eval",
+          "met_files": "met_egp_promice_20150101_20161231_1hr.mat",
+          "data_files": [
+            "egp_promice_2015.mat",
+            "egp_promice_2016.mat"
+          ],
+          "window": {
+            "start": "01-Jan-2015",
+            "end": "31-Dec-2016"
+          }
+        },
+        "mar": {
+          "kind": "point_met",
+          "met_files": "met_egp_mar_20150101_20161231_1hr.mat",
+          "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2015",
+            "end": "31-Dec-2016"
+          }
+        },
+        "merra": {
+          "kind": "point_met",
+          "met_files": "met_egp_merra_20150101_20161231_1hr.mat",
+          "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2015",
+            "end": "31-Dec-2016"
+          }
+        },
+        "racmo": {
+          "kind": "point_data_smb_eval",
+          "data_files": [
+            "egp_racmo_2012.mat",
+            "egp_racmo_2013.mat",
+            "egp_racmo_2014.mat",
+            "egp_racmo_2015.mat"
+          ],
+          "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2012",
+            "end": "31-Dec-2015 23:00:00"
+          },
+          "note": "SMB/eval Data only; RACMO is not a met source."
+        }
+      },
+      "native_timestep": "daily",
+      "notes": "Accumulation interior (MODIS bare-ice freq=0.00, elev 2663 m; high-interior site, no SUMup firn co-location)."
     }
   ],
   "skipped": []
