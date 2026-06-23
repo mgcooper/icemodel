@@ -172,10 +172,14 @@ end
 
 function pathname = resolveCasePath(family_root, entry, fieldname)
    %RESOLVECASEPATH Resolve one optional relative manifest path.
+   %
+   % An absent field or an empty relative path resolves to "" (no bundle).
+   % The metadata-only families leave reference_file empty (esm_snowmip) or
+   % omit it entirely (promice/sumup); both must yield "" rather than the
+   % bare family_root so downstream existence checks fall through cleanly.
 
-   if isfield(entry, fieldname)
+   pathname = "";
+   if isfield(entry, fieldname) && strlength(string(entry.(fieldname))) > 0
       pathname = fullfile(family_root, entry.(fieldname));
-   else
-      pathname = "";
    end
 end

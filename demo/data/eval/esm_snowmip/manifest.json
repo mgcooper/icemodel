@@ -15,8 +15,8 @@
         "seasonal_snow"
       ],
       "permafrost_zone": "none",
-      "evaluation_file": "cdp/evaluation.mat",
-      "reference_file": "cdp/reference.mat",
+      "evaluation_file": "cdp/observations.mat",
+      "reference_file": "",
       "native_timestep": "hourly",
       "comparison_window": {
         "start": "01-Oct-1995",
@@ -37,7 +37,8 @@
           0.10000000149011612,
           0.20000000298023224,
           0.5
-        ]
+        ],
+        "obs_file": "cdp/observations.mat"
       },
       "notes": "ESM-SnowMIP Col de Porte reference site (France, cdp)."
     },
@@ -51,8 +52,8 @@
         "seasonal_snow"
       ],
       "permafrost_zone": "none",
-      "evaluation_file": "oas/evaluation.mat",
-      "reference_file": "oas/reference.mat",
+      "evaluation_file": "oas/observations.mat",
+      "reference_file": "",
       "native_timestep": "hourly",
       "comparison_window": {
         "start": "01-Oct-1998",
@@ -73,7 +74,8 @@
           0.10000000149011612,
           0.20000000298023224,
           0.5
-        ]
+        ],
+        "obs_file": "oas/observations.mat"
       },
       "notes": "ESM-SnowMIP Old Aspen reference site (Saskatchewan, Canada, oas)."
     },
@@ -87,8 +89,8 @@
         "seasonal_snow"
       ],
       "permafrost_zone": "none",
-      "evaluation_file": "obs/evaluation.mat",
-      "reference_file": "obs/reference.mat",
+      "evaluation_file": "obs/observations.mat",
+      "reference_file": "",
       "native_timestep": "hourly",
       "comparison_window": {
         "start": "01-Oct-1998",
@@ -111,7 +113,8 @@
           0.20000000298023224,
           0.5,
           1
-        ]
+        ],
+        "obs_file": "obs/observations.mat"
       },
       "notes": "ESM-SnowMIP Old Black Spruce reference site (Saskatchewan, Canada, obs)."
     },
@@ -125,8 +128,8 @@
         "seasonal_snow"
       ],
       "permafrost_zone": "isolated",
-      "evaluation_file": "ojp/evaluation.mat",
-      "reference_file": "ojp/reference.mat",
+      "evaluation_file": "ojp/observations.mat",
+      "reference_file": "",
       "native_timestep": "hourly",
       "comparison_window": {
         "start": "01-Oct-1998",
@@ -149,7 +152,8 @@
           0.20000000298023224,
           0.5,
           1
-        ]
+        ],
+        "obs_file": "ojp/observations.mat"
       },
       "notes": "ESM-SnowMIP Old Jack Pine reference site (Saskatchewan, Canada, ojp)."
     },
@@ -163,8 +167,8 @@
         "seasonal_snow"
       ],
       "permafrost_zone": "none",
-      "evaluation_file": "rme/evaluation.mat",
-      "reference_file": "rme/reference.mat",
+      "evaluation_file": "rme/observations.mat",
+      "reference_file": "",
       "native_timestep": "hourly",
       "comparison_window": {
         "start": "01-Oct-1989",
@@ -179,7 +183,8 @@
       "observation_variables": {
         "snow_depth_source": "snd_auto",
         "swe_source": "snw_auto with snw_man fallback when available",
-        "soil_depths_m": 0.30000001192092896
+        "soil_depths_m": 0.30000001192092896,
+        "obs_file": "rme/observations.mat"
       },
       "notes": "ESM-SnowMIP Reynolds Mountain East reference site (Idaho, USA, rme)."
     },
@@ -193,8 +198,8 @@
         "seasonal_snow"
       ],
       "permafrost_zone": "none",
-      "evaluation_file": "sap/evaluation.mat",
-      "reference_file": "sap/reference.mat",
+      "evaluation_file": "sap/observations.mat",
+      "reference_file": "",
       "native_timestep": "hourly",
       "comparison_window": {
         "start": "01-Oct-2006",
@@ -208,7 +213,8 @@
       "observation_variables": {
         "snow_depth_source": "snd_auto",
         "swe_source": "snw_auto with snw_man fallback when available",
-        "soil_depths_m": []
+        "soil_depths_m": [],
+        "obs_file": "sap/observations.mat"
       },
       "notes": "ESM-SnowMIP Sapporo reference site (Hokkaido, Japan, sap)."
     },
@@ -222,8 +228,8 @@
         "seasonal_snow"
       ],
       "permafrost_zone": "discontinuous",
-      "evaluation_file": "snb/evaluation.mat",
-      "reference_file": "snb/reference.mat",
+      "evaluation_file": "snb/observations.mat",
+      "reference_file": "",
       "native_timestep": "hourly",
       "comparison_window": {
         "start": "01-Oct-2006",
@@ -244,7 +250,8 @@
           0.10000000149011612,
           0.20000000298023224,
           0.25
-        ]
+        ],
+        "obs_file": "snb/observations.mat"
       },
       "notes": "ESM-SnowMIP Senator Beck reference site (Colorado, USA, snb)."
     },
@@ -258,8 +265,8 @@
         "seasonal_snow"
       ],
       "permafrost_zone": "continuous",
-      "evaluation_file": "sod/evaluation.mat",
-      "reference_file": "sod/reference.mat",
+      "evaluation_file": "sod/observations.mat",
+      "reference_file": "",
       "native_timestep": "hourly",
       "comparison_window": {
         "start": "01-Oct-2008",
@@ -279,7 +286,8 @@
           0.10000000149011612,
           0.20000000298023224,
           0.5
-        ]
+        ],
+        "obs_file": "sod/observations.mat"
       },
       "notes": "ESM-SnowMIP Sodankyla reference site (Finland, sod)."
     },
@@ -293,8 +301,8 @@
         "seasonal_snow"
       ],
       "permafrost_zone": "sporadic",
-      "evaluation_file": "swa/evaluation.mat",
-      "reference_file": "swa/reference.mat",
+      "evaluation_file": "swa/observations.mat",
+      "reference_file": "",
       "native_timestep": "hourly",
       "comparison_window": {
         "start": "01-Oct-2006",
@@ -315,7 +323,8 @@
           0.10000000149011612,
           0.20000000298023224,
           0.40000000596046448
-        ]
+        ],
+        "obs_file": "swa/observations.mat"
       },
       "notes": "ESM-SnowMIP Swamp Angel reference site (Colorado, USA, swa)."
     },
@@ -329,8 +338,8 @@
         "seasonal_snow"
       ],
       "permafrost_zone": "sporadic",
-      "evaluation_file": "wfj/evaluation.mat",
-      "reference_file": "wfj/reference.mat",
+      "evaluation_file": "wfj/observations.mat",
+      "reference_file": "",
       "native_timestep": "hourly",
       "comparison_window": {
         "start": "01-Oct-1997",
@@ -345,7 +354,8 @@
       "observation_variables": {
         "snow_depth_source": "snd_auto",
         "swe_source": "snw_auto with snw_man fallback when available",
-        "soil_depths_m": 0.0099999997764825821
+        "soil_depths_m": 0.0099999997764825821,
+        "obs_file": "wfj/observations.mat"
       },
       "notes": "ESM-SnowMIP Weissfluhjoch reference site (Switzerland, wfj)."
     }

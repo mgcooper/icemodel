@@ -129,13 +129,15 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
             icemodel.verification.helpers.default_smoke_window(sitename);
       end
 
-      % Resolve the per-site case root and the two staged-artifact paths.
-      % Forcing is staged separately under the standard icemodel input
-      % layout (data/input/met/) so production setopts/configureRun/
-      % loadmet resolve it without verification-only branches.
+      % Resolve the per-site case root and the staged obs-bundle path.
+      % esm_snowmip is METADATA-ONLY (mirroring sumup): the staged
+      % observations are the referenced obs file, NOT a bundled
+      % evaluation.mat + a redundant reference.mat smoke copy. Forcing is
+      % staged separately under the standard icemodel input layout
+      % (data/input/met/) so production setopts/configureRun/loadmet
+      % resolve it without verification-only branches.
       case_root = fullfile(family_root, sitename);
-      evaluation_output_file = fullfile(case_root, "evaluation.mat");
-      reference_output_file = fullfile(case_root, "reference.mat");
+      observations_output_file = fullfile(case_root, "observations.mat");
 
       % prepareCaseRoot owns the overwrite guard for the eval folder.
       icemodel.verification.setup.prepareCaseRoot(case_root, kwargs.overwrite);
@@ -166,21 +168,14 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
          'data', obs_tt, ...
          'metadata', obs_meta);
 
-      % Until production snow physics exists, the smoke reference
-      % duplicates the staged observations so comparecase / plotcase
-      % can run on a fresh clone (synthetic-snow hook still applies
-      % when run_snow_verification_suite('run_icemodel', true)).
-      reference = struct( ...
-         'format', 'timeseries', ...
-         'data', obs_tt, ...
-         'metadata', icemodel.verification.setup.metadataStruct({ ...
-         'reference_kind', 'smoke_observed_reference'
-         'notes', ['Observed series duplicated as the initial smoke ' ...
-         'reference so the staged harness can run before a ' ...
-         'snow model exists.']}));
-
-      save(evaluation_output_file, 'targets');
-      save(reference_output_file, 'reference');
+      % Stage the observations as the single committed obs bundle. No
+      % bundled reference.mat is written: the old smoke reference was a
+      % byte-redundant copy of these observations with a placeholder
+      % metadata stub. comparecase resolves the eval target from this
+      % obs bundle and, with no model candidate, reports soft diagnostic
+      % metrics (the synthetic-snow hook still applies when
+      % run_snow_verification_suite('run_icemodel', true)).
+      save(observations_output_file, 'targets');
 
       % Choose comparison variables from what's actually present in the
       % staged obs timetable. The obs builder decides which canonical
@@ -196,8 +191,13 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
          icemodel.verification.setup.metadataStruct({ ...
          'snow_depth_source', obs_meta.snow_depth_source
          'swe_source', obs_meta.swe_source
-         'soil_depths_m', obs_meta.soil_depths_m});
+         'soil_depths_m', obs_meta.soil_depths_m
+         'obs_file', char(fullfile(sitename, "observations.mat"))});
 
+      % Metadata-only schema: evaluation_file references the committed
+      % observations.mat obs bundle; reference_file is empty (no bundled
+      % smoke reference). The analytical laugh_tests family keeps its real
+      % reference_file - only the esm observational smoke copy is dropped.
       case_values = { ...
          char(sitename)
          'esm_site'
@@ -206,8 +206,8 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
          'land'
          {'seasonal_snow'}
          char(snowmipPermafrostZone(sitename))
-         char(fullfile(sitename, "evaluation.mat"))
-         char(fullfile(sitename, "reference.mat"))
+         char(fullfile(sitename, "observations.mat"))
+         ''
          'hourly'
          struct('start', char(string(window_start)), ...
          'end', char(string(window_end)))
