@@ -128,6 +128,46 @@ function test_import_driver_obs_staged_when_forcing_throws(testCase)
    testCase.verifyEqual(string(c.colocation.sumup.kind), "firn_profile_obs");
 end
 
+function test_import_driver_stages_forcing_legs_when_present(testCase)
+   % The GREEN full-driver path: with real MAR + RACMO sources present, the
+   % co-located forcing legs stage (staged=true with a met/Data file), not just
+   % the obs. Data-gated on the S03 reference layout (and the SUMup cache), so it
+   % runs where the raw RCM archives are mounted and self-skips elsewhere.
+
+   assumeCachePresent(testCase);
+   mar_dir = "/Volumes/S03/DATA/greenland/mar3p11/RUH2";
+   racmo_dir = "/Volumes/S03/DATA/greenland/racmo2p3/subsurface";
+   testCase.assumeTrue(isfolder(mar_dir) && isfolder(racmo_dir), ...
+      'MAR/RACMO reference archives not mounted; skipping green-path test.');
+
+   tmp = tempname;
+   mkdir(tmp);
+   testCase.addTeardown(@() rmdir(tmp, 's'));
+   eval_root = fullfile(tmp, 'eval');
+   input_root = fullfile(tmp, 'input');
+   mkdir(eval_root);
+   mkdir(fullfile(input_root, 'met'));
+   mkdir(fullfile(input_root, 'userdata'));
+
+   manifest = icemodel.verification.setup.importSumup( ...
+      string(testCase.TestData.cache), ...
+      points=testCase.TestData.point, case_ids="kanu", years=2012, ...
+      mar_dir=mar_dir, racmo_dir=racmo_dir, ...
+      evaluation_data_root=eval_root, input_data_root=input_root, ...
+      overwrite=true);
+
+   c = manifest.cases(1);
+   % The forcing legs staged (the green path). A STAGED leg carries its file
+   % list (met_files / data_files); only a SKIPPED leg carries staged=false.
+   testCase.verifyTrue(isfield(c.colocation.mar, 'met_files') ...
+      && ~isempty(c.colocation.mar.met_files));
+   testCase.verifyTrue(isfield(c.colocation.racmo, 'data_files') ...
+      && ~isempty(c.colocation.racmo.data_files));
+   testCase.verifyTrue(ismember("mar", string(c.forcing_sources)));
+   testCase.verifyNotEmpty(dir(fullfile(input_root, 'met', '*mar*.mat')));
+   testCase.verifyNotEmpty(dir(fullfile(input_root, 'userdata', '*racmo*.mat')));
+end
+
 function test_temperature_and_smb_parsed(testCase)
    % Subsurface-temperature and SMB groups parse into tables with their value
    % and depth/time channels.
