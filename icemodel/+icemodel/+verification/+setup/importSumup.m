@@ -38,17 +38,33 @@ function manifest = importSumup(source_dir, kwargs)
    %             manifest (so SUMup cases co-locate with the anchors).
    %    case_ids : string vector  case ids for each point (default sumup_NN).
    %    years : numeric vector  forcing years (default 2012:2015, the RACMO-
-   %            bound firn window shared with importPromiceSites).
-   %    startdate / enddate : datetime or "" comparison-window clamp.
+   %            bound firn window for the co-located MAR/RACMO legs).
+   %    startdate / enddate : OPTIONAL comparison-window clamp; pass both or
+   %            neither. The DEFAULT (omitted) is ALL AVAILABLE: no clamp, each
+   %            point stages its full on-disk SUMup record and the manifest
+   %            period records "" / "" (mirrors the PROMICE all-available
+   %            default). There is no buried 2012-2015 comparison window.
    %    radius_km : double (default 7.5)  SUMup point-selection radius.
    %    colocation_threshold_km : double (default 7.5)  PROMICE-anchor
    %            co-location threshold (see helpers.sumupColocation).
    %    mar_dir / racmo_dir / modis_dir : string source dirs for the builders.
    %    evaluation_data_root / input_data_root / icemodel_config_casename :
-   %            staging roots (mirror importPromiceSites).
-   %    overwrite : logical (default false)
+   %            staging roots (mirror importPromiceSites). DEFAULT is SAFE: the
+   %            roots resolve to the configured per-case RESEARCH root, NOT the
+   %            committed demo/data/eval tree, unless a root pointing at
+   %            demo/data is explicitly passed.
+   %    overwrite : logical (default false)  refresh a requested point's own
+   %            staged case folder; other cases are never touched.
+   %    overwrite_family : logical (default false)  force a FULL rewrite of the
+   %            family manifest from the requested points alone. DEFAULT MERGE.
    %    skip_missing : logical (default true)  record data-gated points in
    %            manifest.skipped rather than aborting.
+   %
+   %  Incremental staging (MERGE by default)
+   %    Staging a point ADDS or UPDATES only that case in the sumup family
+   %    manifest and PRESERVES every other committed case + files byte for byte
+   %    (icemodel.verification.setup.writeFamilyManifestMerge, shared with
+   %    importPromiceSites). overwrite_family=true rebuilds the family root.
    %
    %  Returns
    %    manifest : struct  family manifest also written to manifest.json.
@@ -91,6 +107,7 @@ function manifest = importSumup(source_dir, kwargs)
       kwargs.input_data_root (1, 1) string = ""
       kwargs.icemodel_config_casename (1, 1) string = "test"
       kwargs.overwrite (1, 1) logical = false
+      kwargs.overwrite_family (1, 1) logical = false
       kwargs.skip_missing (1, 1) logical = true
    end
 
@@ -118,9 +135,17 @@ function manifest = importSumup(source_dir, kwargs)
    if has_start && has_end
       window_start = icemodel.verification.setup.ensureUtc(kwargs.startdate);
       window_end = icemodel.verification.setup.ensureUtc(kwargs.enddate);
+      obs_start = window_start;
+      obs_end = window_end;
    else
-      window_start = icemodel.verification.setup.ensureUtc("2012-01-01");
-      window_end = icemodel.verification.setup.ensureUtc("2015-12-31 23:00:00");
+      % DEFAULT (omitted) is ALL AVAILABLE: no comparison clamp, so each SUMup
+      % point stages its full on-disk observation record (mirrors the PROMICE
+      % RR1 all-available-years default). The obs/forcing builders treat ""
+      % (and NaT) as unbounded; the manifest period records "" / "" too.
+      window_start = NaT;
+      window_end = NaT;
+      obs_start = "";
+      obs_end = "";
    end
    years = kwargs.years;
 
@@ -143,6 +168,7 @@ function manifest = importSumup(source_dir, kwargs)
 
    case_entries = {};
    skipped = struct('site', {}, 'reason', {});
+   requested_ids = strings(1, 0);
 
    for n = 1:n_points
       point = points(n, :);
@@ -164,6 +190,7 @@ function manifest = importSumup(source_dir, kwargs)
          % convention (kanl/kanm/kanu, site_id KAN_L/M/U).
          [case_id, alias, site_id, site_name] = ...
             resolveCaseId(kwargs.case_ids, n, is_coloc, anchor);
+         requested_ids(end + 1) = string(case_id); %#ok<AGROW>
 
          site_location = struct( ...
             'lat_wgs84', point(1), 'lon_wgs84', point(2), ...
@@ -176,14 +203,14 @@ function manifest = importSumup(source_dir, kwargs)
          [observations, obs_meta] = ...
             icemodel.verification.setup.buildSumupObservations(point, ...
             source_dir=source_dir, radius_km=kwargs.radius_km, ...
-            startdate=window_start, enddate=window_end);
+            startdate=obs_start, enddate=obs_end);
 
          % --- Co-located MAR met + RACMO Data. ---
          [forcing, ~] = ...
             icemodel.verification.setup.buildSumupForcing(point, years, ...
             mar_dir=kwargs.mar_dir, racmo_dir=kwargs.racmo_dir, ...
             modis_dir=kwargs.modis_dir, ...
-            window_start=window_start, window_end=window_end);
+            window_start=obs_start, window_end=obs_end);
 
          mar_files = icemodel.forcing.helpers.writemet( ...
             forcing.mar_met, alias, "mar", outdir=met_outdir, naming="window");
@@ -230,8 +257,8 @@ function manifest = importSumup(source_dir, kwargs)
             cellstr(target)
             char(pfz)
             site_location
-            struct('start', char(string(window_start)), ...
-            'end', char(string(window_end)))
+            struct('start', periodStr(window_start, obs_start), ...
+            'end', periodStr(window_end, obs_end))
             cellstr("mar")
             cellstr(["sumup_obs", "racmo"])
             cellstr(comparison_vars)
@@ -272,7 +299,12 @@ function manifest = importSumup(source_dir, kwargs)
       retrieval_date, cases);
    manifest.skipped = skipped;
 
-   icemodel.verification.setup.writeManifest(manifest_file, manifest);
+   % MERGE by default: add/update only the requested points' cases, preserving
+   % every other committed SUMup case + files untouched (shared helper with
+   % importPromiceSites). overwrite_family forces a full rewrite.
+   manifest = icemodel.verification.setup.writeFamilyManifestMerge( ...
+      manifest_file, manifest, requested_ids=requested_ids, ...
+      overwrite_family=kwargs.overwrite_family);
 end
 
 %% Local helpers
@@ -395,4 +427,13 @@ function rel = relpaths(filenames, base)
    base = string(base);
    rel = erase(filenames, base + filesep);
    rel = reshape(rel, 1, []);
+end
+
+function s = periodStr(window_bound, obs_bound)
+   %PERIODSTR Manifest period string: "" when the window is unbounded.
+   if strcmp(string(obs_bound), "") || isnat(window_bound)
+      s = '';
+   else
+      s = char(string(window_bound));
+   end
 end

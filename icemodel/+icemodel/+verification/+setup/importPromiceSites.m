@@ -60,19 +60,41 @@ function manifest = importPromiceSites(kwargs)
    %        explicit list (e.g. ["KAN_L","KAN_M","KAN_U"]) to stage a subset.
    %    models : string vector subset of ["promice","mar","merra","racmo"]
    %        (default all four). Drop a model to stage a partial bundle.
-   %    startdate, enddate : datetime / string. Explicit PROMICE met/eval window;
-   %        both or neither. When omitted, each station's FULL available record
-   %        is used. RACMO ignores this and always uses its own on-disk coverage.
-   %    output_root : base output root. When set, the committed-vs-research
-   %        routing is explicit: eval manifest goes to <output_root>/eval and
-   %        forcing/Data to <output_root>/input.
+   %    startdate, enddate : datetime / string. OPTIONAL explicit PROMICE
+   %        met/eval window; pass both or neither. The DEFAULT (omitted) is ALL
+   %        AVAILABLE YEARS per station, read live from the L3 record (RR1) -
+   %        there is no hidden 2009-2022 study window. RACMO ignores this and
+   %        always uses its own on-disk coverage.
+   %    output_root : base output root selecting WHICH eval tree is written.
+   %        When set, eval manifest goes to <output_root>/eval and forcing/Data
+   %        to <output_root>/input. The two real targets are:
+   %          * COMMITTED demo fixtures : <repo>/demo/data/eval (+ .../input).
+   %            Reviewed, version-controlled; only write here on purpose.
+   %          * RESEARCH root (gitignored): <repo>/data/eval (+ .../input).
+   %            The full research set; safe to churn.
+   %        DEFAULT is SAFE: when output_root is unset the roots resolve via
+   %        evaluation_data_root/input_data_root/icemodel_config_casename (the
+   %        configured per-case research roots), NOT the committed demo tree -
+   %        so "stage site X" never writes the committed fixtures unless an
+   %        output_root/evaluation_data_root pointing at demo/data is passed.
    %    promice_dir, mar_dir, merra_dir, racmo_dir, modis_dir : raw-source
    %        directories for each model.
    %    evaluation_data_root, input_data_root, icemodel_config_casename :
    %        root resolution when output_root is unset.
    %    dt_out : optional met output timestep ("15m") for the gridded builders.
-   %    overwrite : logical (default false). Refresh staged artifacts.
+   %    overwrite : logical (default false). Refresh a REQUESTED site's own
+   %        staged case folder. Other sites are never touched (see merge below).
+   %    overwrite_family : logical (default false). Force a FULL rewrite of the
+   %        family manifest from the requested sites alone, discarding other
+   %        committed cases. The DEFAULT is MERGE.
    %    skip_missing : logical (default true). Record skip reasons and continue.
+   %
+   %  Incremental staging (MERGE by default)
+   %    Staging one site ADDS or UPDATES only that site's case entry in the
+   %    family manifest and PRESERVES every other site's committed case + files
+   %    byte for byte (icemodel.verification.setup.writeFamilyManifestMerge).
+   %    Re-staging the same site updates exactly its entry (idempotent). Set
+   %    overwrite_family=true only to deliberately rebuild the family root.
    %
    %  Returns
    %    manifest : struct  Family manifest also written to manifest.json.
@@ -106,6 +128,7 @@ function manifest = importPromiceSites(kwargs)
       kwargs.icemodel_config_casename (1, 1) string = "test"
       kwargs.dt_out (1, 1) string = ""
       kwargs.overwrite (1, 1) logical = false
+      kwargs.overwrite_family (1, 1) logical = false
       kwargs.skip_missing (1, 1) logical = true
    end
 
@@ -347,15 +370,28 @@ function manifest = importPromiceSites(kwargs)
    source_version = sprintf("colocated[%s]", strjoin(models, "+"));
    retrieval_date = string(datetime('today'));
 
+   if isempty(case_entries)
+      cases = struct([]);
+   else
+      cases = vertcat(case_entries{:});
+   end
    manifest = icemodel.verification.setup.makeFamilyManifest( ...
       dataset_family, source_doi, source_url, source_version, ...
-      retrieval_date, vertcat(case_entries{:}));
+      retrieval_date, cases);
 
    % Attach the data-gated sites so a refresh records exactly what was not
    % staged and why (never fabricate a case for a missing site).
    manifest.skipped = skipped;
 
-   icemodel.verification.setup.writeManifest(manifest_file, manifest);
+   % MERGE by default: add/update only the requested sites' cases and preserve
+   % every other committed case entry (and files) untouched. The requested-id
+   % set is each requested site's compact alias, so a re-stage updates exactly
+   % that case (idempotent) and a stale skip for a now-staged site clears.
+   % overwrite_family forces a full rewrite of the family root.
+   requested_ids = lower(erase(sites, "_"));
+   manifest = icemodel.verification.setup.writeFamilyManifestMerge( ...
+      manifest_file, manifest, requested_ids=requested_ids, ...
+      overwrite_family=kwargs.overwrite_family);
 end
 
 %% Local helpers

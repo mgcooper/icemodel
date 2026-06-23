@@ -211,6 +211,25 @@ leg's actual staged window is recorded at `colocation.<model>.window`.
 
 The `output_root` kwarg is the explicit committed-vs-research switch: eval
 manifest goes to `<output_root>/eval`, forcing/Data to `<output_root>/input`.
+`output_root=<repo>/demo/data` targets the **committed** demo fixtures
+(reviewed, version-controlled); `output_root=<repo>/data` (or the unset default,
+which resolves to the configured per-case research root) targets the
+**gitignored research** tree. The default never writes the committed demo tree
+unless `output_root`/`evaluation_data_root` is pointed at `demo/data` on purpose.
+
+**Incremental staging (MERGE by default).** Staging one site **adds or updates
+only that site's case entry** in the family `manifest.json` and **preserves
+every other site's committed case + staged files byte for byte** (shared helper
+`icemodel.verification.setup.writeFamilyManifestMerge`, used by both
+`importPromiceSites` and `importSumup`). The existing manifest at the target
+root is read, the requested sites' cases replace/append (matched by `case_id`),
+and untouched cases re-encode identically (raw decode, no field reordering);
+hand-added family fields like `schema: "metadata_only"` survive. Re-staging the
+same site updates exactly its entry (idempotent), and a stale `skipped[]` entry
+for a now-staged site clears while other sites' skips are preserved. So adding
+DY2/EGP into the family root that already holds the KAN fixtures never churns or
+drops them. Pass `overwrite_family=true` only to deliberately rebuild the entire
+family root from the requested sites alone.
 
 ```matlab
 % Committed CI fixtures: the KAN_L/M/U transect into demo/data (this is what is
