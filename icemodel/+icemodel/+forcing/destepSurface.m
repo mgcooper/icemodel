@@ -60,6 +60,10 @@ function [corrected, record, flags] = destepSurface(t, surf, kwargs)
    %                     "unambiguous"        (DEFAULT) correct unambiguous steps
    %                     "all"                correct unambiguous AND ambiguous
    %                     "censor_ambiguous"   correct unambiguous, NaN ambiguous
+   %  gap_flag         : per-sample 0/1 gap-bridged mask (from surfaceFlags);
+   %                     gap-bridged samples are excluded from candidate scoring
+   %                     so an interpolation artifact is never read as a step.
+   %                     Default []: all finite samples are usable.
    %  transition_times : datetime array of known station-transition times ([])
    %  max_rate         : max plausible |surface rate| [m/day] (default 0.6;
    %                     covers extreme bare-ice melt ~0.1-0.2 m/day with margin)
@@ -136,8 +140,9 @@ function [corrected, record, flags] = destepSurface(t, surf, kwargs)
    end
 
    % Pass 1 (vectorized over adjacent finite pairs): score every jump against
-   % the three evidence lines, so the candidate count is known before allocating
-   % the record (no growing-array pattern). k0/k1 index the pre/post samples.
+   % the four evidence lines (magnitude gate, implausible, transition, season),
+   % so the candidate count is known before allocating the record (no
+   % growing-array pattern). k0/k1 index the pre/post samples.
    k0 = finite_idx(1:end - 1);
    k1 = finite_idx(2:end);
    d = surf(k1) - surf(k0);
