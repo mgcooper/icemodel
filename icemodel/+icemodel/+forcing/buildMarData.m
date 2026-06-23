@@ -78,8 +78,10 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
 
    source_dir = kwargs.source_dir;
    if source_dir == ""
-      source_dir = string(fullfile(icemodel.getpath('data'), ...
-         'forcing', 'mar'));
+      source_dir = string(getenv("ICEMODEL_MAR_DIR"));
+      if source_dir == ""
+         source_dir = "/Volumes/S03/DATA/greenland/mar3p11/RUH2";
+      end
    end
    if ~isfolder(source_dir)
       error('icemodel:forcing:buildMarData:sourceNotFound', ...

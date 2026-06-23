@@ -70,8 +70,10 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
 
    source_dir = kwargs.source_dir;
    if source_dir == ""
-      source_dir = string(fullfile(icemodel.getpath('data'), ...
-         'forcing', 'merra2'));
+      source_dir = string(getenv("ICEMODEL_MERRA_DIR"));
+      if source_dir == ""
+         source_dir = "/Volumes/S03/DATA/merra2/1hrly/ncfiles";
+      end
    end
    if ~isfolder(source_dir)
       error('icemodel:forcing:buildMerraData:sourceNotFound', ...

@@ -79,8 +79,10 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
 
    source_dir = kwargs.source_dir;
    if source_dir == ""
-      source_dir = string(fullfile(icemodel.getpath('data'), ...
-         'forcing', 'racmo'));
+      source_dir = string(getenv("ICEMODEL_RACMO_DIR"));
+      if source_dir == ""
+         source_dir = "/Volumes/S03/DATA/greenland/racmo2p3/surface";
+      end
    end
    if ~isfolder(source_dir)
       error('icemodel:forcing:buildRacmoData:sourceNotFound', ...

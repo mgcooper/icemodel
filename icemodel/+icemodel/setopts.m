@@ -320,14 +320,18 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
          opts.z_wind = 10.0;
 
       case 'kanl'
-         % Check GEUS/PROMICE metadata, 2.5 and 3.0 may be appropriate.
-         opts.z_tair = 2.0;
-         opts.z_wind = 2.0;
+         % PROMICE/GC-Net single-boom nominal install height (matches the
+         % generic 'promice' path). Time-varying z_boom_cor_u is the eventual
+         % source (bead icemodel-1ps.16).
+         opts.z_tair = 2.6;
+         opts.z_wind = 2.6;
 
       case 'kanm'
-         % Check GEUS/PROMICE metadata, 2.5 and 3.0 may be appropriate.
-         opts.z_tair = 2.0;
-         opts.z_wind = 2.0;
+         % PROMICE/GC-Net single-boom nominal install height (matches the
+         % generic 'promice' path). Time-varying z_boom_cor_u is the eventual
+         % source (bead icemodel-1ps.16).
+         opts.z_tair = 2.6;
+         opts.z_wind = 2.6;
 
       case 'merra'
          opts.z_tair = 2.0;
