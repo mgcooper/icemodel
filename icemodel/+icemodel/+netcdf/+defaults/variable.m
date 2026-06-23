@@ -39,13 +39,18 @@ function info = variable(name, kwargs)
 
    if kwargs.validatecf
       cf = icemodel.netcdf.defaults.cfStandardNames();
-      bad = strings(1, 0);
+      % Preallocate to the worst case (every name invalid), then trim, so the
+      % collected list never grows inside the loop.
+      bad = strings(1, numel(info));
+      n_bad = 0;
       for k = 1:numel(info)
          sn = string(info(k).standard_name);
          if strlength(sn) > 0 && info(k).is_cf && ~any(cf == sn)
-            bad(end + 1) = sn; %#ok<AGROW>
+            n_bad = n_bad + 1;
+            bad(n_bad) = sn;
          end
       end
+      bad = bad(1:n_bad);
       if ~isempty(bad)
          error('icemodel:netcdf:variable:nonCfStandardName', ...
             'standard_name(s) not in the official CF table: %s', ...
