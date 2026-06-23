@@ -327,18 +327,30 @@ Each dataset family has one `manifest.json` under:
 
 `demo/data/eval/<dataset_family>/manifest.json`
 
-Each case folder stores:
+The per-case folder layout is split by `case_type`:
 
-- `forcing.mat`
-- `evaluation.mat`
-- `reference.mat`
+- **Analytical families** (`laugh_tests`; `synthetic_process`) bundle a computed
+  reference: each case folder stores `evaluation.mat` (the staged targets) and
+  `reference.mat` (the analytical / frozen-SUMMA solution the case is gated
+  against). This is the reference, not a smoke copy, so it is KEPT.
+- **Observational families** (`esm_snowmip`/`esm_site`, `promice`/`sumup`/
+  `firn_observational`) are METADATA-ONLY: the case folder stores one
+  `observations.mat` obs bundle (the referenced observation file) and the
+  manifest records which forcing/eval sources are available. No bundled
+  `reference.mat` smoke copy is written — the default candidate, with no model
+  output supplied, falls through to the soft diagnostic lane. Forcing always
+  lives separately under `data/input/met/` (standard icemodel naming), never in
+  the eval folder.
 
 Manifests keep case paths relative to the dataset-family folder. Normal workflow
-functions resolve those paths to absolute paths at read time.
+functions resolve those paths to absolute paths at read time. For esm_snowmip the
+`observations.mat` bundle is referenced from `evaluation_file` (and
+`observation_variables.obs_file`); `reference_file` is empty.
 
 ### Target schema variants
 
-Two evaluation.mat shapes are supported:
+Two staged-target shapes are supported (`evaluation.mat` for the analytical
+families, `observations.mat` for the observational families):
 
 1. **Single-bundle** (default for ESM-SnowMIP cdp / wfj):
 
