@@ -50,8 +50,9 @@ function manifest = loadmanifest(case_id, kwargs)
       error('no verification cases found under %s', evaluation_data_root)
    end
 
-   % Match case ids case-insensitively for interactive convenience while still
-   % returning the canonical manifest case id.
+   % Match the requested case id against the canonical manifest case ids and
+   % return the first match (ids are the compact lowercase aliases the
+   % importers write, e.g. kanl/kanm).
    ids = [cases.case_id];
    idx = find(ids == case_id, 1);
    if isempty(idx)

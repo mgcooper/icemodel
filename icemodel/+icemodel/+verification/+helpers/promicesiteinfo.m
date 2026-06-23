@@ -23,7 +23,8 @@ function info = promicesiteinfo(site)
    %                   vocabulary: continuous/discontinuous/sporadic/isolated/
    %                   none/unknown). Ice-sheet/glacier sites sit on ice, not
    %                   permafrost ground, so they carry "none"; off-ice land/
-   %                   tundra sites carry the Brown et al. (1997) extent class.
+   %                   tundra sites carry the Obu et al. (2019) extent class
+   %                   (see the CLASSIFICATION PROVENANCE block below).
    %
    %  Each entry has fields:
    %    site            canonical PROMICE station id ("KAN_M")
@@ -381,7 +382,8 @@ function [zone, target, pfz] = firstPassZone(loctype, elev)
    %
    % Legacy elevation-band heuristic retained ONLY as a fallback for uncataloged
    % stations. NOT authoritative. permafrost_zone is left "unknown" (off-ice) or
-   % "none" (on-ice) since the heuristic cannot sample Brown.
+   % "none" (on-ice) since the heuristic cannot sample the Obu et al. (2019)
+   % permafrost map (only the curated catalog above carries the Obu extent).
    seasonal_ice = ["seasonal_snow"; "bare_ice"];
    seasonal_firn = ["seasonal_snow"; "firn"];
 
