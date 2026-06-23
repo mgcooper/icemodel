@@ -71,6 +71,63 @@ function test_density_profile_parsed(testCase)
    testCase.verifyTrue(contains(meta.density_note, "within 7.5 km"));
 end
 
+function test_import_driver_obs_staged_when_forcing_throws(testCase)
+   % importSumup driver guard: the SUMup observations are the PRIMARY target, so
+   % a throwing buildSumupForcing (here forced by a non-existent MAR/RACMO source
+   % dir) must degrade to SKIPPED forcing legs, NOT a skipped SUMup point. The
+   % obs case still stages (observations.mat + a manifest entry) with mar/racmo
+   % recorded as skipped legs. Exercises the per-leg try/catch guard added to
+   % importSumup so the obs are never blocked by a forcing failure.
+
+   assumeCachePresent(testCase);
+
+   % Private eval / input roots so the committed demo tree is untouched.
+   tmp = tempname;
+   mkdir(tmp);
+   testCase.addTeardown(@() rmdir(tmp, 's'));
+   eval_root = fullfile(tmp, 'eval');
+   input_root = fullfile(tmp, 'input');
+   mkdir(eval_root);
+   mkdir(fullfile(input_root, 'met'));
+   mkdir(fullfile(input_root, 'userdata'));
+
+   % Bogus RCM source dirs so buildSumupForcing throws (source not found); the
+   % obs cache is real so the observation leg succeeds.
+   bogus = fullfile(tmp, 'no_such_rcm_source');
+
+   manifest = icemodel.verification.setup.importSumup( ...
+      string(testCase.TestData.cache), ...
+      points=testCase.TestData.point, case_ids="kanu", ...
+      mar_dir=bogus, racmo_dir=bogus, ...
+      evaluation_data_root=eval_root, input_data_root=input_root, ...
+      overwrite=true);
+
+   % The point is NOT skipped: it stages as a case despite the forcing failure.
+   testCase.verifyEqual(numel(manifest.cases), 1);
+   c = manifest.cases(1);
+   testCase.verifyEqual(string(c.case_id), "kanu");
+   testCase.verifyEqual(string(c.case_type), "firn_observational");
+
+   % The observations bundle is staged on disk.
+   obs_file = fullfile(eval_root, 'sumup', 'kanu', 'observations.mat');
+   testCase.verifyTrue(isfile(obs_file));
+
+   % sumup_obs is recorded as an eval source; the failed forcing legs are NOT.
+   testCase.verifyTrue(ismember("sumup_obs", string(c.eval_sources)));
+   testCase.verifyFalse(ismember("mar", string(c.forcing_sources)));
+   testCase.verifyFalse(ismember("racmo", string(c.eval_sources)));
+
+   % The colocation record marks mar/racmo as skipped (staged=false) legs.
+   testCase.verifyTrue(isfield(c.colocation, 'mar'));
+   testCase.verifyFalse(logical(c.colocation.mar.staged));
+   testCase.verifyTrue(isfield(c.colocation, 'racmo'));
+   testCase.verifyFalse(logical(c.colocation.racmo.staged));
+
+   % The SUMup observation leg is still recorded.
+   testCase.verifyTrue(isfield(c.colocation, 'sumup'));
+   testCase.verifyEqual(string(c.colocation.sumup.kind), "firn_profile_obs");
+end
+
 function test_temperature_and_smb_parsed(testCase)
    % Subsurface-temperature and SMB groups parse into tables with their value
    % and depth/time channels.
