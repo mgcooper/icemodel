@@ -47,7 +47,7 @@ function test_rebuild_laugh_tests_colbeck1976(testCase)
       ~isempty(manifest.cases));
 
    % Evaluation.mat carries both target sources keyed at the top level.
-   eval_path = fullfile(eval_root, 'snow', 'laugh_tests', ...
+   eval_path = fullfile(eval_root, 'laugh_tests', ...
       'colbeck1976', 'evaluation.mat');
    verifyTrue(testCase, exist(eval_path, 'file') == 2);
    loaded = load(eval_path, 'targets');
@@ -78,7 +78,7 @@ function test_rebuild_esm_snowmip_smoke_sites(testCase)
    verifyEqual(testCase, manifest.dataset_family, "esm_snowmip");
 
    for case_id = ["cdp", "wfj"]
-      case_dir = fullfile(eval_root, 'snow', 'esm_snowmip', char(case_id));
+      case_dir = fullfile(eval_root, 'esm_snowmip', char(case_id));
       obs_path = fullfile(case_dir, 'observations.mat');
       verifyTrue(testCase, exist(obs_path, 'file') == 2, ...
          sprintf('%s observations.mat missing after rebuild', case_id));

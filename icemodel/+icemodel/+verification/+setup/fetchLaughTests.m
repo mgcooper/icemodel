@@ -85,7 +85,7 @@ function source_dir = fetchLaughTests(kwargs)
    % This preserves the sibling-checkout workflow without requiring a
    % data/verification migration today.
    if ~ok && ~user_supplied
-      data_root = icemodel.getpath('data');
+      data_root = icemodel.internal.fullpath('data');
       repo_root = fileparts(data_root);
       sibling = string(fullfile(repo_root, '..', 'Laugh-Tests'));
       if isfolder(sibling)
@@ -142,7 +142,10 @@ end
 %% Local helpers
 function pathname = defaultCacheDir()
    %DEFAULTCACHEDIR Canonical Laugh-Tests source-cache directory.
-   pathname = string(fullfile(icemodel.getpath('data'), ...
+   % Repo-root developer resource (gitignored), independent of the active
+   % ICEMODEL_DATA_PATH config - use icemodel.internal.fullpath('data'), not
+   % icemodel.getpath('data') (which points at demo/data under the demo casename).
+   pathname = string(fullfile(icemodel.internal.fullpath('data'), ...
       'verification', 'laugh_tests'));
 end
 

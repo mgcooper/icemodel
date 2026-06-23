@@ -139,10 +139,12 @@ end
 function pathname = defaultCacheDir()
    %DEFAULTCACHEDIR Canonical ESM-SnowMIP source-cache directory.
    %
-   % icemodel.getpath('data') returns the canonical top-level data root
-   % (<repo>/data/), which the verification source-cache layout extends
-   % under data/verification/<dataset_family>/ (family-flat taxonomy).
-   pathname = string(fullfile(icemodel.getpath('data'), ...
+   % The gitignored raw source cache is a repo-root developer resource at
+   % <repo>/data/verification/<dataset_family>/, independent of the active
+   % ICEMODEL_DATA_PATH config. Use icemodel.internal.fullpath('data') (the
+   % repo-local data root) NOT icemodel.getpath('data') (which follows the
+   % config and points at demo/data under the demo/test casename).
+   pathname = string(fullfile(icemodel.internal.fullpath('data'), ...
       'verification', 'esm_snowmip'));
 end
 
