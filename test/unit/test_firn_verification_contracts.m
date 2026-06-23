@@ -28,8 +28,12 @@ function setupOnce(testCase)
    icemodel.helpers.ensureDirExists(testCase.TestData.tmpdir);
 
    % The staged PROMICE firn anchors. These are committed (M2a); the suite is
-   % only meaningful when they enumerate, so require them explicitly.
+   % only meaningful when they enumerate, so require them explicitly. The KAN
+   % transect (kanl/kanm/kanu) is joined by the firn-accumulation demo fixture
+   % egp (accumulation/dry-firn, 2015-2016) staged for CI firn-zone coverage
+   % beyond the KAN ablation/percolation anchors.
    testCase.TestData.expected_firn_ids = ["kanl"; "kanm"; "kanu"];
+   testCase.TestData.expected_accum_firn_ids = "egp";
 
    firn_cases = icemodel.verification.listcases(dataset_family="promice");
    testCase.assertNotEmpty(firn_cases, ...
@@ -42,6 +46,7 @@ function setupOnce(testCase)
    % is the namespace; no redundant sumup prefix). Resolve them with the
    % dataset_family filter to disambiguate from the PROMICE kanl/kanm/kanu.
    testCase.TestData.expected_sumup_ids = ["kanl"; "kanm"; "kanu"];
+   testCase.TestData.expected_accum_sumup_ids = "egp";
    sumup_cases = icemodel.verification.listcases(dataset_family="sumup");
    testCase.assertNotEmpty(sumup_cases, ...
       'no staged sumup firn cases enumerated; committed fixture missing');
@@ -463,6 +468,135 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
    % Subsurface temperature profile T(z,t) resolves in degrees C.
    testCase.verifyTrue(isfield(candidate.data, 'subsurface_temperature'));
    testCase.verifyEqual(candidate.data.subsurface_temperature, ice2.T - Tf);
+end
+
+function test_committed_accum_firn_fixtures_enumerate(testCase)
+   % The firn-accumulation demo fixture (egp, dry-firn) must enumerate alongside
+   % the KAN transect in BOTH the promice and sumup families, so CI carries
+   % firn-zone dry-firn coverage beyond the KAN ablation/percolation anchors.
+
+   promice_ids = [icemodel.verification.listcases(dataset_family="promice").case_id];
+   testCase.verifyTrue(all(ismember( ...
+      testCase.TestData.expected_accum_firn_ids, promice_ids)), ...
+      'firn-accumulation promice fixture (egp) not enumerated');
+
+   sumup_ids = [icemodel.verification.listcases(dataset_family="sumup").case_id];
+   testCase.verifyTrue(all(ismember( ...
+      testCase.TestData.expected_accum_sumup_ids, sumup_ids)), ...
+      'firn-accumulation sumup fixture (egp) not enumerated');
+end
+
+function test_all_committed_promice_fixtures_validate(testCase)
+   % DATA-DRIVEN contract: EVERY committed promice firn fixture (KAN transect +
+   % the egp accumulation fixture) must validate against the canonical
+   % namelists AND agree with promicesiteinfo (the single source of truth) for
+   % case_type / surface_zone / eval_target / permafrost_zone. This enumerates
+   % the fixtures rather than hard-coding KAN-specific values, so new committed
+   % firn-accumulation cases are validated automatically.
+
+   case_types = icemodel.verification.namelists.casetype();
+   zone_ok = icemodel.verification.namelists.surfacezone();
+   target_ok = icemodel.verification.namelists.evaltarget();
+   pfz_ok = icemodel.verification.namelists.permafrostzone();
+
+   for case_entry = reshape(testCase.TestData.firn_cases, 1, [])
+      id = string(case_entry.case_id);
+      manifest = icemodel.verification.loadmanifest(id, dataset_family="promice");
+      anchor = icemodel.verification.helpers.promicesiteinfo(manifest.site_id);
+
+      testCase.verifyEqual(string(manifest.case_type), "firn_observational", ...
+         sprintf('%s case_type', id));
+      testCase.verifyTrue(ismember(string(manifest.case_type), case_types), ...
+         sprintf('%s case_type not in namelist', id));
+
+      zone = string(manifest.surface_zone);
+      testCase.verifyTrue(ismember(zone, zone_ok), ...
+         sprintf('%s surface_zone "%s" not in namelist', id, zone));
+      testCase.verifyEqual(zone, string(anchor.surface_zone), ...
+         sprintf('%s surface_zone disagrees with promicesiteinfo', id));
+
+      target = string(manifest.eval_target);
+      testCase.verifyTrue(all(ismember(target, target_ok)), ...
+         sprintf('%s eval_target not in namelist', id));
+      testCase.verifyEqual(sort(target(:)), sort(string(anchor.eval_target(:))), ...
+         sprintf('%s eval_target disagrees with promicesiteinfo', id));
+
+      pfz = string(manifest.permafrost_zone);
+      testCase.verifyTrue(ismember(pfz, pfz_ok), ...
+         sprintf('%s permafrost_zone "%s" not in namelist', id, pfz));
+      testCase.verifyEqual(pfz, string(anchor.permafrost_zone), ...
+         sprintf('%s permafrost_zone disagrees with promicesiteinfo', id));
+   end
+end
+
+function test_accum_firn_fixtures_soft_gate_no_hard_fail(testCase)
+   % comparecase on the firn-accumulation fixture (egp) must report a SOFT
+   % diagnostic gate with no hard PASS/FAIL, mirroring the KAN soft-gate
+   % contract. This guards that the new committed cases run end to end.
+
+   allowed = ["ok"; "missing_target_variable"; ...
+      "missing_candidate_variable"; "no_overlap"];
+   for id = testCase.TestData.expected_accum_firn_ids'
+      result = icemodel.verification.comparecase(id, ...
+         "artifact_dir", testCase.TestData.tmpdir, "make_plot", false);
+      testCase.verifyEqual(string(result.gate_mode), "soft", ...
+         sprintf('%s is not soft-gated', id));
+      testCase.verifyGreaterThan(height(result.metrics), 0, ...
+         sprintf('%s produced no metrics', id));
+      testCase.verifyTrue(all(ismember(string(result.metrics.status), allowed)), ...
+         sprintf('%s soft gate produced an unexpected (hard) status', id));
+   end
+end
+
+function test_accum_firn_colocation_files_resolve_on_disk(testCase)
+   % The individual forcing/Data files each firn-accumulation fixture declares
+   % (promice/mar/merra met + promice/racmo Data) must resolve on disk under the
+   % standard icemodel input layout, exactly as the KAN fixtures do.
+
+   input_root = icemodel.verification.helpers.inputDataRoot();
+   met_dir = fullfile(input_root, 'met');
+   ud_dir = fullfile(input_root, 'userdata');
+
+   for id = testCase.TestData.expected_accum_firn_ids'
+      manifest = icemodel.verification.loadmanifest(id, dataset_family="promice");
+      cf = manifest.colocation;
+      verifyFilesResolve(testCase, met_dir, cf.promice.met_files, id, "promice met");
+      verifyFilesResolve(testCase, met_dir, cf.mar.met_files, id, "mar met");
+      verifyFilesResolve(testCase, met_dir, cf.merra.met_files, id, "merra met");
+      verifyFilesResolve(testCase, ud_dir, cf.promice.data_files, id, "promice data");
+      verifyFilesResolve(testCase, ud_dir, cf.racmo.data_files, id, "racmo data");
+   end
+end
+
+function test_all_committed_sumup_fixtures_resolve(testCase)
+   % DATA-DRIVEN contract: every committed sumup fixture (KAN + egp) must be
+   % a firn_observational case whose obs bundle resolves on disk and whose
+   % anchor classification agrees with promicesiteinfo.
+
+   case_types = icemodel.verification.namelists.casetype();
+   for case_entry = reshape(testCase.TestData.sumup_cases, 1, [])
+      id = string(case_entry.case_id);
+      manifest = icemodel.verification.loadmanifest(id, dataset_family="sumup");
+      testCase.verifyEqual(string(manifest.case_type), "firn_observational", ...
+         sprintf('%s sumup case_type', id));
+      testCase.verifyTrue(ismember(string(manifest.case_type), case_types), ...
+         sprintf('%s sumup case_type not in namelist', id));
+
+      % obs bundle resolves (evaluation_path comes from colocation.sumup.obs_file).
+      testCase.verifyTrue(strlength(case_entry.evaluation_path) > 0, ...
+         sprintf('%s sumup evaluation_path empty', id));
+      testCase.verifyTrue(isfile(case_entry.evaluation_path), ...
+         sprintf('%s sumup obs bundle missing: %s', id, ...
+         case_entry.evaluation_path));
+
+      % Anchor classification (when co-located) matches promicesiteinfo.
+      anchor = icemodel.verification.helpers.promicesiteinfo(manifest.site_id);
+      if strlength(string(manifest.surface_zone)) > 0
+         testCase.verifyEqual(string(manifest.surface_zone), ...
+            string(anchor.surface_zone), ...
+            sprintf('%s sumup surface_zone disagrees with anchor', id));
+      end
+   end
 end
 
 %% Local helpers
