@@ -180,7 +180,9 @@ end
 
 function test_data_gated_site_is_skipped_not_fabricated(testCase)
    % A nonexistent station id must be recorded in manifest.skipped with a
-   % reason and must NOT create a fabricated case folder.
+   % reason and must NOT create a fabricated case folder. Under merge, any
+   % previously staged cases are preserved, so assert the gated site itself is
+   % skipped and never fabricated rather than that the manifest is empty.
 
    manifest = icemodel.verification.setup.importPromiceSites( ...
       sites="ZZZ_NOPE", ...
@@ -193,12 +195,60 @@ function test_data_gated_site_is_skipped_not_fabricated(testCase)
       input_data_root=testCase.TestData.input_root, ...
       icemodel_config_casename="", overwrite=true);
 
-   testCase.verifyEqual(numel(manifest.cases), 0);
-   testCase.verifyEqual(numel(manifest.skipped), 1);
-   testCase.verifyEqual(string(manifest.skipped(1).site), "ZZZ_NOPE");
-   testCase.verifyTrue(strlength(manifest.skipped(1).reason) > 0);
+   % No fabricated case for the gated site.
+   case_ids = string(arrayfun(@(c) string(c.case_id), manifest.cases));
+   testCase.verifyFalse(ismember("zzznope", case_ids));
+
+   % The gated site is recorded in skipped with a reason.
+   skip_sites = string(arrayfun(@(s) string(s.site), manifest.skipped));
+   testCase.verifyTrue(ismember("ZZZ_NOPE", skip_sites));
+   idx = find(skip_sites == "ZZZ_NOPE", 1);
+   testCase.verifyTrue(strlength(manifest.skipped(idx).reason) > 0);
+
    testCase.verifyFalse(isfolder(fullfile(testCase.TestData.eval_root, ...
       'promice', 'zzznope')));
+end
+
+function test_staging_second_site_does_not_churn_first(testCase)
+   % Staging a SECOND site into a family root that already holds a FIRST site
+   % must ADD the second case and leave the first site's case entry + its
+   % staged files byte for byte unchanged (the KAN no-churn guarantee). This is
+   % the file-level counterpart to test_firn_manifest_merge.
+
+   % Stage KAN_L first (a short window keeps it fast).
+   stageSite(testCase, "KAN_L", "2013-06-01", "2013-06-30");
+
+   manifest_file = fullfile(testCase.TestData.eval_root, 'promice', ...
+      'manifest.json');
+   kanl_manifest_before = fileread(manifest_file);
+
+   met_dir = fullfile(testCase.TestData.input_root, 'met');
+   ud_dir = fullfile(testCase.TestData.input_root, 'userdata');
+   kanl_met = dir(fullfile(met_dir, 'met_kanl_*'));
+   kanl_ud = dir(fullfile(ud_dir, 'kanl_*'));
+   testCase.assertNotEmpty(kanl_met);
+   before = fileFingerprints([kanl_met; kanl_ud], {met_dir, ud_dir});
+
+   % Snapshot the KAN_L case JSON region from the merged manifest.
+   m_before = jsondecode(kanl_manifest_before);
+   kanl_case_before = encodeCaseById(m_before, "kanl");
+
+   % Stage KAN_M into the SAME roots (merge, default).
+   stageSite(testCase, "KAN_M", "2013-06-01", "2013-06-30");
+
+   m_after = jsondecode(fileread(manifest_file));
+   ids = string(arrayfun(@(c) string(c.case_id), m_after.cases));
+   testCase.verifyTrue(all(ismember(["kanl", "kanm"], ids)));
+
+   % KAN_L case entry is byte-identical after KAN_M was added.
+   testCase.verifyEqual(encodeCaseById(m_after, "kanl"), kanl_case_before, ...
+      'KAN_L case churned when KAN_M was staged');
+
+   % KAN_L's staged files are byte-identical (size + content hash).
+   after = fileFingerprints([dir(fullfile(met_dir, 'met_kanl_*')); ...
+      dir(fullfile(ud_dir, 'kanl_*'))], {met_dir, ud_dir});
+   testCase.verifyEqual(after, before, ...
+      'KAN_L staged files churned when KAN_M was staged');
 end
 
 %% Local helpers
@@ -214,6 +264,40 @@ function manifest = stageKanm(testCase, startdate, enddate)
       evaluation_data_root=testCase.TestData.eval_root, ...
       input_data_root=testCase.TestData.input_root, ...
       icemodel_config_casename="", overwrite=true);
+end
+
+function manifest = stageSite(testCase, site, startdate, enddate)
+   %STAGESITE Stage one site's bundle into the private test roots (merge).
+   manifest = icemodel.verification.setup.importPromiceSites( ...
+      sites=site, ...
+      promice_dir=testCase.TestData.promice, ...
+      mar_dir=testCase.TestData.mar, ...
+      merra_dir=testCase.TestData.merra, ...
+      racmo_dir=testCase.TestData.racmo, ...
+      startdate=startdate, enddate=enddate, ...
+      evaluation_data_root=testCase.TestData.eval_root, ...
+      input_data_root=testCase.TestData.input_root, ...
+      icemodel_config_casename="", overwrite=true);
+end
+
+function fp = fileFingerprints(entries, ~)
+   %FILEFINGERPRINTS Map each file to {bytes, checksum} for a churn comparison.
+   fp = struct();
+   for k = 1:numel(entries)
+      e = entries(k);
+      f = fullfile(e.folder, e.name);
+      key = matlab.lang.makeValidName(e.name);
+      fid = fopen(f, 'r');
+      raw = fread(fid, Inf, '*uint8');
+      fclose(fid);
+      fp.(key) = struct('bytes', e.bytes, 'sum', sum(double(raw)));
+   end
+end
+
+function s = encodeCaseById(manifest, case_id)
+   %ENCODECASEBYID Stable JSON encoding of the case with the given id.
+   ids = string(arrayfun(@(c) string(c.case_id), manifest.cases));
+   s = jsonencode(manifest.cases(ids == case_id), PrettyPrint=true);
 end
 
 function path = firstWithData(candidates, hasdata)
