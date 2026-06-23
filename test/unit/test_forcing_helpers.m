@@ -503,8 +503,8 @@ end
 %% writeuserdata
 
 function test_writeuserdata_per_year_with_metadata(testCase)
-   % Data files split per year, keep the Data variable name, and carry
-   % the location CustomProperties.
+   % Default naming="yearly": Data files split per year, keep the Data variable
+   % name, and carry the location CustomProperties.
 
    Data = makeSyntheticData(datetime(2015, 12, 31), 48);
 
@@ -517,6 +517,28 @@ function test_writeuserdata_per_year_with_metadata(testCase)
 
    loaded = load(filenames(1), 'Data');
    testCase.verifyEqual(unique(year(loaded.Data.Time)), 2015);
+   testCase.verifyEqual(loaded.Data.Properties.CustomProperties.Lat, 67.0);
+end
+
+function test_writeuserdata_window_is_full_period(testCase)
+   % naming="window": ONE full-period file named
+   % <site>_<source>_<YYYYMMDD>_<YYYYMMDD>.mat that preserves the entire span
+   % (not split per year) and keeps the location CustomProperties.
+
+   Data = makeSyntheticData(datetime(2015, 12, 31), 48);
+
+   filenames = icemodel.forcing.helpers.writeuserdata(Data, "tst", "src", ...
+      outdir=testCase.TestData.outdir, naming="window");
+
+   testCase.verifyEqual(numel(filenames), 1);
+   expected = sprintf('tst_src_%s_%s.mat', ...
+      char(min(Data.Time), 'yyyyMMdd'), char(max(Data.Time), 'yyyyMMdd'));
+   testCase.verifyTrue(endsWith(filenames(1), expected));
+
+   loaded = load(filenames(1), 'Data');
+   % Full span retained in the single file (both calendar years present).
+   testCase.verifyEqual(unique(year(loaded.Data.Time))', [2015, 2016]);
+   testCase.verifyEqual(height(loaded.Data), height(Data));
    testCase.verifyEqual(loaded.Data.Properties.CustomProperties.Lat, 67.0);
 end
 

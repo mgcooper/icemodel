@@ -166,8 +166,7 @@ end
 %%
 function Data = loadExternalUserdata(opts, thisyear, mettime)
 
-   userfile = [opts.sitename '_' opts.userdata '_' int2str(thisyear) '.mat'];
-   filepath = fullfile(opts.pathuserdata, userfile);
+   filepath = resolveUserdataFile(opts, thisyear);
    if ~isfile(filepath)
       error('\n userdata file does not exist: \n\n %s \n', filepath);
    end
@@ -179,6 +178,35 @@ function Data = loadExternalUserdata(opts, thisyear, mettime)
    Data = Data.Data;
    Data.Time.TimeZone = mettime.TimeZone;
    Data = retime(Data, mettime, 'linear');
+end
+
+%%
+function filepath = resolveUserdataFile(opts, thisyear)
+   %RESOLVEUSERDATAFILE Locate the userdata file covering THISYEAR.
+   % Prefers a full-period window file <site>_<source>_<YYYYMMDD>_<YYYYMMDD>.mat
+   % whose encoded period brackets the year (the writeuserdata naming="window"
+   % form); falls back to the legacy per-year <site>_<source>_<YYYY>.mat. The
+   % per-year load loop retimes whichever file to that year's met axis, so a
+   % single full-period file serves every run year.
+
+   base = [opts.sitename '_' char(opts.userdata)];
+   d = dir(fullfile(opts.pathuserdata, [base '_*_*.mat']));
+   for n = 1:numel(d)
+      tok = regexp(d(n).name, ...
+         ['^' regexptranslate('escape', base) '_(\d{8})_(\d{8})\.mat$'], ...
+         'tokens', 'once');
+      if isempty(tok)
+         continue
+      end
+      y1 = str2double(tok{1}(1:4));
+      y2 = str2double(tok{2}(1:4));
+      if thisyear >= y1 && thisyear <= y2
+         filepath = fullfile(opts.pathuserdata, d(n).name);
+         return
+      end
+   end
+   filepath = fullfile(opts.pathuserdata, ...
+      [base '_' int2str(thisyear) '.mat']);
 end
 
 %%

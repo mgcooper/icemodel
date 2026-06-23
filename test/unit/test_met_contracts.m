@@ -126,6 +126,35 @@ function test_loadmet_swaps_external_userdata_file(testCase)
    testCase.verifyEqual(met_swap.albedo, userdata_values, 'AbsTol', 1e-12);
 end
 
+function test_loadmet_swaps_external_userdata_window_file(testCase)
+   % A full-period WINDOW userdata file (writeuserdata naming="window":
+   % <site>_<source>_<YYYYMMDD>_<YYYYMMDD>.mat) is resolved and used for a run
+   % year its encoded period brackets - the loader prefers it over a per-year
+   % file and retimes the full-period Data onto the run-year met axis.
+
+   workspace = testCase.TestData.workspace;
+   opts_base = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016);
+   met_base = icemodel.loadmet(opts_base);
+
+   userdata_values = min(max(met_base.albedo - 0.08, 0.05), 0.95);
+   % Window Data spans 2015-2017 and contains the 2016 met timestamps so the
+   % linear retime recovers the values exactly at the run year.
+   t = [met_base.Time(1) - calmonths(6); met_base.Time; ...
+      met_base.Time(end) + calmonths(6)];
+   v = [userdata_values(1); userdata_values; userdata_values(end)];
+   Data = timetable(v, 'RowTimes', t, 'VariableNames', {'modis'});
+   fname = sprintf('%s_modis_%s_%s.mat', workspace.sitename, ...
+      char(min(t), 'yyyyMMdd'), char(max(t), 'yyyyMMdd'));
+   save(fullfile(workspace.userdatadir, fname), 'Data');
+
+   opts_swap = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016, userdata='modis', uservars='albedo');
+   met_swap = icemodel.loadmet(opts_swap);
+
+   testCase.verifyEqual(met_swap.albedo, userdata_values, 'AbsTol', 1e-12);
+end
+
 function test_loadmet_errors_when_userdata_file_lacks_Data(testCase)
    % Corrupt userdata files should fail loudly instead of silently falling
    % back to the met data.
