@@ -64,6 +64,52 @@ function test_metfilename_roundtrip_with_createMetFileNames(testCase)
    testCase.verifyEqual(char(actual), expected{1});
 end
 
+function test_promice_registered_as_forcing_source(testCase)
+   % "promice" is an accepted forcings name (the generic PROMICE/GC-Net AWS
+   % station-met source) and resolves through createMetFileNames to a
+   % met_<site>_promice file, while the legacy met_<site>_<site> form still
+   % works. The forcings validator accepts it and rejects an unknown name.
+
+   testCase.verifyTrue(ismember("promice", icemodel.namelists.forcings()));
+   testCase.verifyWarningFree( ...
+      @() icemodel.validators.mustBeForcingName("promice"));
+   testCase.verifyError( ...
+      @() icemodel.validators.mustBeForcingName("not_a_forcing"), ...
+      'icemodel:validators:mustBeForcingName');
+
+   % createMetFileNames resolves met_<site>_promice (per-year and window forms).
+   opts = struct('sitename', 'kanm', 'forcings', 'promice', ...
+      'simyears', 2016, 'dt', 3600);
+   names = icemodel.createMetFileNames(opts);
+   testCase.verifyEqual(names{1}, 'met_kanm_promice_2016_1hr.mat');
+
+   opts.startdate = datetime(2015, 10, 1);
+   opts.enddate = datetime(2016, 9, 30);
+   names = icemodel.createMetFileNames(opts);
+   testCase.verifyEqual(names{1}, ...
+      'met_kanm_promice_20151001_20160930_1hr.mat');
+
+   % Legacy met_<site>_<site> is unaffected.
+   legacy = icemodel.createMetFileNames(struct('sitename', 'kanm', ...
+      'forcings', 'kanm', 'simyears', 2016, 'dt', 3600));
+   testCase.verifyEqual(legacy{1}, 'met_kanm_kanm_2016_1hr.mat');
+end
+
+function test_promice_forcings_sets_boom_obs_heights(testCase)
+   % setopts with forcings="promice" sets the single-boom observation heights
+   % (T/RH and wind co-located on the upper boom), distinct from the climate-
+   % model "mar" path (z_wind=10), and z_relh tracks z_tair.
+
+   opts = icemodel.setopts('icemodel', 'kanm', 2015, 'promice');
+   testCase.verifyEqual(opts.forcings, 'promice');
+   testCase.verifyEqual(opts.z_tair, 2.6);
+   testCase.verifyEqual(opts.z_wind, 2.6);
+   testCase.verifyEqual(opts.z_relh, opts.z_tair);
+
+   mar = icemodel.setopts('icemodel', 'kanm', 2015, 'mar');
+   testCase.verifyEqual(mar.z_wind, 10.0);
+end
+
 %% variableUnits
 
 function test_variableUnits_canonical_and_precip_rate(testCase)

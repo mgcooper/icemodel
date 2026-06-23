@@ -26,9 +26,12 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %
    %  FORCINGS - a string scalar indicating the forcing data. Standard values
    %  include the climate-model forcings "mar", "merra", and "racmo", plus
-   %  supported met station runs such as "kanm" and "kanl". Users who wish to
-   %  add new forcing files can update the icemodel.namelists definitions used
-   %  throughout the repository.
+   %  supported met station runs such as "kanm" and "kanl". "promice" is the
+   %  generic PROMICE/GC-Net AWS station-met source (a met_<site>_promice file
+   %  staged by the verification builders), where the site is named by SITENAME;
+   %  the legacy per-station convention (forcings == sitename, met_<site>_<site>)
+   %  is still accepted. Users who wish to add new forcing files can update the
+   %  icemodel.namelists definitions used throughout the repository.
    %
    %  USERDATA - (optional) a string scalar indicating the alternative forcing
    %  data to be used in place of the forcing data in the forcing met file.
@@ -329,6 +332,15 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       case 'merra'
          opts.z_tair = 2.0;
          opts.z_wind = 2.0;
+
+      case 'promice'
+         % PROMICE/GC-Net AWS station met (met_<site>_promice). T/RH and wind
+         % share the single upper boom, so the temperature and wind observation
+         % heights are the same boom height (~2.6 m nominal at installation; the
+         % boom lowers as the surface evolves). Mirrors the kanl/kanm station
+         % path (those ARE PROMICE stations) with the documented boom height.
+         opts.z_tair = 2.6;
+         opts.z_wind = 2.6;
 
       otherwise
          % Assume standard heights for other forcings.
