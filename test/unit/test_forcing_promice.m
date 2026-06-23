@@ -222,9 +222,8 @@ function test_buildPromiceData_gap_flag_does_not_overlay_observations(testCase)
 end
 
 function test_buildPromiceData_stages_station_transition_flag(testCase)
-   % The station-transition flag channel is staged on every site (0/1). With no
-   % per-station handover dates in the staged product it is all-zero, but the
-   % composing-station provenance (multistation) is recorded for the consumer.
+   % The station-transition flag channel is staged on every site (0/1), with the
+   % composing-station provenance (multistation) recorded for the consumer.
 
    [Data, metadata] = icemodel.forcing.buildPromiceData("KAN_L", ...
       source_dir=testCase.TestData.source_dir, frequency="daily");
@@ -235,6 +234,84 @@ function test_buildPromiceData_stages_station_transition_flag(testCase)
    testCase.verifyTrue(all(stf == 0 | stf == 1));
    testCase.verifyTrue(isfield(metadata, 'composing_stations'));
    testCase.verifyTrue(isfield(metadata, 'is_multistation'));
+   testCase.verifyTrue(isfield(metadata, 'station_transition_times'));
+end
+
+function test_buildPromiceData_populates_station_transition_flag(testCase)
+   % For a multi-station site (CEN = CEN2/CEN1/GITS) the per-station install
+   % dates in AWS_stations_metadata.csv populate station_transition_flag: each
+   % WITHIN-RECORD handover (an install strictly after the record start) opens a
+   % flag window, so the flag is NOT all-zero and a window surrounds each
+   % handover date. The founding station's install (== record start) is NOT a
+   % handover; legacy GC-Net names absent from the CSV contribute no date.
+
+   [Data, metadata] = icemodel.forcing.buildPromiceData("CEN", ...
+      source_dir=testCase.TestData.source_dir, frequency="daily");
+
+   testCase.verifyTrue(metadata.is_multistation);
+
+   % CEN has two within-record handovers: CEN1 (2017-07-24), CEN2 (2021-08-12).
+   tt = metadata.station_transition_times;
+   testCase.verifyEqual(numel(tt), 2);
+   testCase.verifyTrue(any(abs(days(tt - ...
+      datetime(2017, 7, 24, 'TimeZone', 'UTC'))) < 1));
+   testCase.verifyTrue(any(abs(days(tt - ...
+      datetime(2021, 8, 12, 'TimeZone', 'UTC'))) < 1));
+
+   % The flag is populated (not all-zero) and binary, with a window around each
+   % handover (default +-14 days -> at least a handful of flagged daily samples).
+   % metadata.station_transition_samples is the count on the underlying hourly
+   % series; the daily Data carries the corresponding daily (max-aggregated)
+   % windows, so both are strictly positive but not numerically equal.
+   stf = Data.station_transition_flag;
+   testCase.verifyTrue(all(stf == 0 | stf == 1));
+   testCase.verifyGreaterThan(metadata.station_transition_samples, 0);
+   testCase.verifyGreaterThan(nnz(stf == 1), 0);
+
+   % Each handover date sits inside a flagged daily sample.
+   for h = tt(:)'
+      [~, near] = min(abs(Data.Time - h));
+      testCase.verifyEqual(stf(near), 1, ...
+         sprintf('no flag window around handover %s', string(h)));
+   end
+
+   % Provenance record: a row per composing station; the founding CEN1/CEN2 v3
+   % ids are in the CSV, the legacy GC-Net "GITS" is not.
+   rec = metadata.station_transition_record;
+   testCase.verifyEqual(numel(rec), numel(metadata.composing_stations));
+   in_csv = [rec.in_csv];
+   testCase.verifyTrue(any(in_csv));    % some composing stations resolved
+   testCase.verifyTrue(any(~in_csv));   % GITS legacy name absent from CSV
+end
+
+function test_buildPromiceData_transition_evidence_wired_to_destep(testCase)
+   % A station-transition handover supplies the 'transition' evidence line to the
+   % de-stepping detector: re-running destepSurface on the staged surface channel
+   % with the staged transition_times reproduces 'transition' evidence on at
+   % least one detected step coincident with a handover, strengthening its
+   % classification. (CEN is accumulation -> surface_height channel.)
+
+   [Data, metadata] = icemodel.forcing.buildPromiceData("CEN", ...
+      source_dir=testCase.TestData.source_dir, frequency="hourly");
+
+   tt = metadata.station_transition_times;
+   testCase.assumeNotEmpty(tt);
+
+   [~, record] = icemodel.forcing.destepSurface(Data.Time, ...
+      Data.surface_height, mode="detect", transition_times=tt, ...
+      season="accumulation");
+
+   % With handover times supplied, at least one detected step near a handover
+   % carries the 'transition' evidence line.
+   has_transition = false;
+   for r = record
+      if any(r.evidence == "transition")
+         has_transition = true;
+         break
+      end
+   end
+   testCase.verifyTrue(has_transition, ...
+      'no detected step gained the station-transition evidence line');
 end
 
 function test_buildPromiceData_stages_step_flags_unaltered(testCase)

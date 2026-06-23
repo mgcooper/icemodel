@@ -45,8 +45,13 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    %    exclude flag==1 samples (cumulative/visual comparison uses the full
    %    series).
    %  - station_transition_flag (0/1): marks station-handover windows (a step,
-   %    not a NaN, so the gap flag never sees it). Inert without staged
-   %    per-station dates; metadata.is_multistation records the merge fact.
+   %    not a NaN, so the gap flag never sees it). Populated from the per-station
+   %    install dates in AWS_stations_metadata.csv (within-record handovers only;
+   %    see icemodel.forcing.helpers.stationTransitionTimes); all-zero when the
+   %    CSV is absent. A detected step coincident with such a window also gains
+   %    the 'station_transition' evidence line in icemodel.forcing.destepSurface.
+   %    metadata.is_multistation records the merge fact; metadata.
+   %    station_transition_times / station_transition_record carry the dates.
    %  - step_detected_flag / step_correctable_flag / step_magnitude: the staged
    %    de-stepping DETECTION (icemodel.forcing.destepSurface in detect mode).
    %    The CORRECTION is opt-in at analysis time (default: unambiguous only),
@@ -158,16 +163,24 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
          'UniformOutput', false));
    end
 
-   % Known station-handover times for the station-transition flag. The staged
-   % product carries only a SITE-level install date (AWS_sites_metadata.csv), not
-   % per-composing-station dates, so authoritative handover times are not
-   % available here; transition_times stays empty and the flag is all-zero. The
-   % FACT that a site merges multiple stations is recorded in metadata so a
-   % consumer expects a transition (its TIME is recovered by destepSurface as a
-   % coincident step). composing_stations comes from the curated catalog.
+   % Known station-handover times for the station-transition flag. The
+   % composing-station NAMES come from the curated catalog; their per-station
+   % install DATES come from AWS_stations_metadata.csv (the GEUS thredds product,
+   % staged alongside the L3 NetCDFs). stationTransitionTimes maps each composing
+   % station to its install date and keeps only WITHIN-RECORD handovers (an
+   % install strictly after the record start; the founding station's install
+   % begins the record, it is not a handover within it). With the CSV present the
+   % flag is now populated; without it transition_times stays empty (all-zero
+   % flag) and the merge FACT is still recorded in metadata so destepSurface can
+   % recover a transition as a coincident step. The window clamp uses the L3
+   % record bounds (source_meta), so an install outside this station's record is
+   % excluded.
    info = icemodel.verification.helpers.promicesiteinfo(site);
    composing_stations = info.stations;
-   transition_times = datetime.empty(0, 1);
+   [transition_times, transition_record] = ...
+      icemodel.forcing.helpers.stationTransitionTimes(composing_stations, ...
+      window_start=source_meta.window_start, ...
+      window_end=source_meta.window_end, source_dir=kwargs.source_dir);
 
    surface_meta = struct();
    if is_ablation
@@ -253,6 +266,8 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
       nnz(aws.station_transition_flag == 1);
    surface_meta.composing_stations = composing_stations;
    surface_meta.is_multistation = numel(composing_stations) > 1;
+   surface_meta.station_transition_times = transition_times;
+   surface_meta.station_transition_record = transition_record;
    surface_meta.steps_detected = numel(step_record);
    if isempty(step_record)
       surface_meta.steps_correctable = 0;
@@ -342,6 +357,8 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
       surface_meta.station_transition_samples;
    metadata.composing_stations = surface_meta.composing_stations;
    metadata.is_multistation = surface_meta.is_multistation;
+   metadata.station_transition_times = surface_meta.station_transition_times;
+   metadata.station_transition_record = surface_meta.station_transition_record;
    metadata.steps_detected = surface_meta.steps_detected;
    metadata.steps_correctable = surface_meta.steps_correctable;
    metadata.step_record = surface_meta.step_record;
