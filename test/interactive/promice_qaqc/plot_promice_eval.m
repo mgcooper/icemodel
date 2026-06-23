@@ -183,22 +183,19 @@ function summary = plot_promice_eval(options)
          tr = Data.station_transition_flag == 1;
          if any(tr)
             st = surf; st(~tr) = NaN;
-            plot(ax2, t, st, 'o', 'Color', [0.1 0.6 0.1], 'MarkerSize', 4, ...
+            plot(ax2, t, st, 's', 'Color', [0.1 0.6 0.1], 'MarkerSize', 5, ...
                'DisplayName', 'station transition')
          end
       end
       % Mark detected step-shifts: hollow magenta square for the few unambiguous
-      % (correctable) steps; a filled orange circle for ambiguous (flagged, NOT
-      % corrected). The circle does not obscure the magenta squares or the red
-      % gap-bridged dots the way the old oversized grey x did.
+      % (correctable) steps; orange dots for ambiguous (flagged, NOT corrected).
       if hasChan(Data, "step_detected_flag")
          unamb = Data.step_correctable_flag == 1;
          amb = Data.step_detected_flag == 1 & ~unamb;
          if any(amb)
             sa = surf; sa(~amb) = NaN;
-            plot(ax2, t, sa, 'o', 'Color', [0.95 0.55 0.0], ...
-               'MarkerFaceColor', [0.95 0.55 0.0], 'MarkerSize', 5, ...
-               'DisplayName', 'step: ambiguous (flagged)')
+            plot(ax2, t, sa, '.', 'Color', [0.95 0.55 0.0], ...
+               'MarkerSize', 10, 'DisplayName', 'step: ambiguous (flagged)')
          end
          if any(unamb)
             su = surf; su(~unamb) = NaN;
