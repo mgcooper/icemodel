@@ -104,6 +104,25 @@ function test_destep_gap_interior_is_not_a_step(testCase)
    testCase.verifyEqual(corrected, surf, 'AbsTol', 1e-12);   % untouched
 end
 
+function test_destep_gap_flagged_sample_is_excluded(testCase)
+   % A sharp jump whose endpoint is gap-bridged (gap_flag==1) is an
+   % interpolation artifact, not a direct-observation step. With gap_flag
+   % supplied the bridged sample is excluded from detection; without it the
+   % same spike would be detected.
+   t = (datetime(2015, 1, 1):days(1):datetime(2015, 1, 10))';
+   surf = (0:9)' * 0.01;          % smooth, plausible daily change
+   surf(6) = surf(6) + 3;         % a +3 m spike landing on one sample
+   gap = zeros(numel(t), 1);
+   gap(6) = 1;                    % that sample is gap-bridged
+
+   [~, rec_no_gap] = icemodel.forcing.destepSurface(t, surf, mode="detect");
+   testCase.verifyNotEmpty(rec_no_gap);  % spike detected without the flag
+
+   [~, rec_gap] = icemodel.forcing.destepSurface(t, surf, mode="detect", ...
+      gap_flag=gap);
+   testCase.verifyEmpty(rec_gap);        % excluded once flagged as bridged
+end
+
 function test_surfaceFlags_gap_from_sensors_not_just_z_nan(testCase)
    % surfaceFlags marks a sample gap-bridged when z is finite but every sensor
    % is NaN (slope-bridged), which the bare z-NaN heuristic misses.

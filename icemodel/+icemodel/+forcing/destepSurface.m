@@ -92,6 +92,7 @@ function [corrected, record, flags] = destepSurface(t, surf, kwargs)
       surf (:, 1) double
       kwargs.mode (1, 1) string {mustBeMember(kwargs.mode, ...
          ["detect", "unambiguous", "all", "censor_ambiguous"])} = "unambiguous"
+      kwargs.gap_flag (:, 1) double = []
       kwargs.transition_times (:, 1) datetime = datetime.empty(0, 1)
       kwargs.max_rate (1, 1) double {mustBePositive} = 0.6
       kwargs.max_step (1, 1) double {mustBePositive} = 1.0
@@ -109,9 +110,17 @@ function [corrected, record, flags] = destepSurface(t, surf, kwargs)
    record = emptyEntry();
    record = record([]);   % 1x0 record with the canonical field order
 
-   % A candidate is a jump between ADJACENT FINITE samples; the slope-bridged
-   % interior of a gap is interpolation, not a discrete step, so it is excluded.
-   finite_idx = find(isfinite(surf));
+   % A candidate is a jump between ADJACENT DIRECT-OBSERVATION samples. A sample
+   % is usable only when it is finite AND not gap-bridged (gap_flag == 0): the
+   % slope-bridged / interpolated surface over a data gap is not a direct
+   % observation (readme), so a "jump" landing on a bridged sample is an
+   % interpolation artifact, not a discrete step. When gap_flag is omitted all
+   % finite samples are usable (back-compatible).
+   usable = isfinite(surf);
+   if ~isempty(kwargs.gap_flag)
+      usable = usable & (kwargs.gap_flag(:) == 0);
+   end
+   finite_idx = find(usable);
    if numel(finite_idx) < 2
       corrected = surf;
       flags = packFlags(step_detected, step_correctable, ...
@@ -157,12 +166,18 @@ function [corrected, record, flags] = destepSurface(t, surf, kwargs)
       end
    end
 
-   % Evidence 4: a melt-signed jump in the non-melt season (Oct..Apr) that also
-   % clears max_step is season-inconsistent (ablation belongs to the melt season;
-   % the max_step gate keeps winter sensor noise from promoting itself).
+   % Evidence 4: a melt-signed jump in the non-melt season (Nov..Apr) is
+   % season-inconsistent (ice ablation requires melt energy, absent in winter),
+   % so a winter surface-lowering step is physically implausible. Now that
+   % gap-bridged samples are excluded, a winter melt-signed jump beyond the rate
+   % bound is strong evidence; it only needs a small absolute floor (winter_floor)
+   % to keep sub-decimetre sensor noise from promoting itself - it no longer
+   % needs to clear the gross max_step ceiling.
+   winter_floor = 0.3;
    mon = month(t(k1));
-   in_winter = mon >= 10 | mon <= 4;
-   season_fired = implausible_fired & in_winter & (sign(d) == melt_sign);
+   in_winter = mon >= 11 | mon <= 4;
+   season_fired = mag_fired & in_winter & (sign(d) == melt_sign) ...
+      & (abs(d) > winter_floor);
 
    % UNAMBIGUOUS = the rate gate fires AND an independent corroborating line
    % (implausible, transition, or season); the rate gate alone -> AMBIGUOUS
