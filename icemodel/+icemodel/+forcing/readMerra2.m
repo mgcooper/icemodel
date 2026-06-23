@@ -103,15 +103,13 @@ end
 
 %% Local functions
 function Time = merraTime(filename)
-   %MERRATIME UTC bin-center datetime axis from the MERRA-2 'time' variable.
-   % MERRA-2 stores time as "minutes since <yyyy-mm-dd hh:mm:ss>".
-   %
-   % NATIVE STAMPING vs the icemodel forcing time convention: tavg1 hourly bins
-   % are stamped at the bin CENTER (:30), kept native here. The icemodel
-   % convention labels an interval at its START t (the [t, t+dt) integration;
-   % see icemodel/+icemodel/+forcing/README.md "Time convention"). This is a
-   % half-hour offset, small at hourly resolution; it is left native (noted, not
-   % silently shifted) rather than special-cased.
+   %MERRATIME UTC interval-START datetime axis from the MERRA-2 'time' variable.
+   % MERRA-2 stores time as "minutes since <yyyy-mm-dd hh:mm:ss>" and posts tavg
+   % samples at the bin CENTER (:30 hourly, 1:30 three-hourly). The icemodel
+   % forcing convention labels an averaged interval at its START t (the
+   % [t, t+dt) integration; see icemodel/+icemodel/+forcing/README.md "Time
+   % convention"), matching readMar3p11. We therefore shift the native bin
+   % centers back by half a step so MERRA aligns with the other sources.
    t = double(ncread(filename, 'time'));
    t_units = ncreadatt(filename, 'time', 'units');
    tok = regexp(t_units, 'minutes since (\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2})', ...
@@ -119,4 +117,7 @@ function Time = merraTime(filename)
    assert(~isempty(tok), 'unexpected MERRA time units: %s', t_units)
    t0 = datetime(tok{1}, 'InputFormat', 'yyyy-MM-dd HH:mm:ss', 'TimeZone', 'UTC');
    Time = t0 + minutes(t);
+   if numel(t) > 1
+      Time = Time - minutes(mode(diff(t))) / 2;   % bin center -> interval start
+   end
 end

@@ -24,9 +24,10 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    % kernel. The derivable radiation terms (swu, lwu, netr) are NOT stored -
    % icemodel.processmet recomputes them on load from swd/albedo/tsfc/lwd.
    % Mass fluxes convert kg m-2 s-1 -> meters water equivalent per hour.
-   % MERRA-2 time-average stamps sit at the bin center (00:30 hourly, 01:30
-   % 3-hourly); everything is interpolated onto the on-the-hour axis, the
-   % legacy convention.
+   % MERRA-2 posts tavg samples at the bin center (00:30 hourly, 01:30
+   % 3-hourly); they are relabeled to the INTERVAL START (the icemodel time
+   % convention) and interpolated onto the on-the-hour axis, so MERRA aligns
+   % with MAR/RACMO/PROMICE rather than carrying a half-step phase error.
    %
    % Legacy: reimplements runoff/functions/saveMerraData.m (the original
    % retained, unchanged, as the legacy reference workflow). Note the legacy
@@ -283,10 +284,11 @@ function [block, stamps] = readChannelSeries(coll, ncname, start, count)
    %READCHANNELSERIES Concatenate one channel's hyperslab over the daily files.
    %
    % Returns the raw cells-by-time block (cells flattened column-major over
-   % the hyperslab, matching gridLocation's collapse) plus the bin-center
-   % timestamps: 24 hourly samples at :30 for tavg1 collections, 8
-   % three-hourly samples at 1:30 for tavg3 (glc). The caller applies the
-   % collapse (nearest / natural / polygon mean).
+   % the hyperslab, matching gridLocation's collapse) plus the INTERVAL-START
+   % timestamps: 24 hourly samples on the hour for tavg1 collections, 8
+   % three-hourly samples at 0/3/6.. for tavg3 (glc), shifted back from the
+   % native bin centers. The caller applies the collapse (nearest / natural /
+   % polygon mean).
    % Per-file hyperslab read + standard-unit conversion + fill-masking is
    % delegated to the shared reader icemodel.forcing.readMerra2 (so mass
    % fluxes arrive already in mWE/h); this loop only concatenates the daily
@@ -303,8 +305,15 @@ function [block, stamps] = readChannelSeries(coll, ncname, start, count)
          start=start, count=count);
    end
 
+   % Stamp each averaged sample at its INTERVAL START, the icemodel forcing
+   % time convention (the [t, t+dt) label is the interval start; see
+   % +forcing/README.md "Time convention", and readMar3p11 which is already
+   % interval-start). MERRA-2 posts tavg samples at the bin CENTRE (00:30
+   % hourly, 01:30 three-hourly), so the start offset is 0:step:24-step, not
+   % the native step/2:step:24 - aligning MERRA with the other sources instead
+   % of carrying a half-step phase error through the interp onto Time.
    step = 24 / n_per_day;
-   offsets = hours(step/2:step:24);
+   offsets = hours(0:step:24 - step);
    stamps = reshape((coll.dates + offsets)', [], 1);
 end
 
