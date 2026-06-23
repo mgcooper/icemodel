@@ -51,7 +51,7 @@ function test_buildMarMet_satisfies_met_contract(testCase)
    met = testCase.TestData.met;
    icemodel.forcing.helpers.validatemet(met)
    testCase.verifyEqual(height(met), 8760);
-   testCase.verifyEqual(met.ppt, met.snow + met.rain, 'AbsTol', 1e-12);
+   testCase.verifyEqual(met.ppt, met.snowf + met.rainf, 'AbsTol', 1e-12);
    testCase.verifyTrue(all(isfinite(met.tair)));
    testCase.verifyGreaterThan(median(met.rh), 40);   % percent scale
 end
@@ -64,12 +64,12 @@ function test_buildMarMet_self_consistent_with_raw_netcdf(testCase)
    metadata = testCase.TestData.metadata;
    filename = metadata.source_files(1);
 
-   % tair/swd are carried through unchanged; the precipitation channel (snow)
+   % tair/swd are carried through unchanged; the precipitation channel (snowf)
    % is converted from the MAR mWE/h source rate to the canonical m s-1 rate
    % inside buildMarData (/3600), so it matches the raw NetCDF only after that
    % scaling.
-   pptscale = struct('tair', 1, 'swd', 1, 'snow', 1/3600);
-   for pair = {["tair", "TTH"], ["swd", "SWDH"], ["snow", "SFH"]}
+   pptscale = struct('tair', 1, 'swd', 1, 'snowf', 1/3600);
+   for pair = {["tair", "TTH"], ["swd", "SWDH"], ["snowf", "SFH"]}
       outname = pair{1}(1);
       marname = pair{1}(2);
       raw = icemodel.forcing.readMar3p11(filename, marname, ...
@@ -142,7 +142,7 @@ function test_buildMarMet_precip_unit_harmonized(testCase)
    units = string(met.Properties.VariableUnits);
    names = string(met.Properties.VariableNames);
    testCase.verifyEqual(units(names == "ppt"), pptunit);
-   testCase.verifyEqual(met.ppt, met.snow + met.rain, 'AbsTol', 1e-15);
+   testCase.verifyEqual(met.ppt, met.snowf + met.rainf, 'AbsTol', 1e-15);
 
    % Ablation-zone annual water-equivalent precipitation is small as a m s-1
    % rate but a physically plausible total when integrated over the hour:

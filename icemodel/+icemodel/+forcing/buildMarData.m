@@ -21,8 +21,8 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    %
    % Channels (canonical units; daily MAR channels interpolated hourly):
    %  hourly: tair [K], shum [kg/kg] (dropped after rh derivation), swd,
-   %  lwd, shf, lhf [W m-2], albedo [-], snow, rain [m s-1, the canonical
-   %  water-equivalent precipitation rate], melt, runoff, smb [mWE/h];
+   %  lwd, shf, lhf [W m-2], albedo [-], snowf, rainf [m s-1, the canonical
+   %  water-equivalent precipitation rates], melt, runoff, smb [mWE/h];
    %  daily: snowd [m], cfrac [-], tsfc [K], psfc [Pa]; derived: wspd
    %  [m s-1], wdir [deg] (from UUH/VVH), rh [%] (icemodel.vapor kernel);
    %  optional: modis [-] (GEUS MODIS daily albedo).
@@ -95,7 +95,7 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    hourly_vars = {
       'tair', 'TTH'  ; 'shum', 'QQH'  ; 'uwind', 'UUH' ; 'vwind', 'VVH'
       'swd',  'SWDH' ; 'lwd',  'LWDH' ; 'albedo', 'ALH'
-      'snow', 'SFH'  ; 'rain', 'RFH'  ; 'melt', 'MEH'  ; 'runoff', 'RUH'
+      'snowf', 'SFH' ; 'rainf', 'RFH' ; 'melt', 'MEH'  ; 'runoff', 'RUH'
       'shf',  'SHFH' ; 'lhf',  'LHFH' ; 'smb',  'SMBH'
       };
    daily_vars = {
@@ -134,10 +134,12 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    Data = removevars(Data, {'shum', 'uwind', 'vwind'});
 
    % Precipitation to the canonical water-equivalent rate m s-1. MAR posts
-   % snow/rain as mWE/h (an hourly water-equivalent depth rate), so dividing
-   % by 3600 s/h yields m s-1. The diagnostic mass fluxes (melt/runoff/smb)
+   % snowfall/rainfall as mWE/h (an hourly water-equivalent depth rate), so
+   % dividing by 3600 s/h yields m s-1. Channels use the canonical snowf/rainf
+   % names (icemodel.forcing.helpers.metvariables optional split; data2met
+   % derives ppt = rainf + snowf). The diagnostic mass fluxes (melt/runoff/smb)
    % keep their natural mWE/h rate.
-   for ch = ["snow", "rain"]
+   for ch = ["snowf", "rainf"]
       Data.(ch) = Data.(ch) / 3600;
    end
 
