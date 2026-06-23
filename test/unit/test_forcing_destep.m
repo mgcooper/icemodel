@@ -155,3 +155,77 @@ function test_surfaceFlags_station_transition_window(testCase)
    testCase.verifyEqual(flags.station_transition, double(inwin));
    testCase.verifyEqual(nnz(flags.gap), 0);   % all observed -> no gap
 end
+
+function test_stationTransitionTimes_handover_vs_founding(testCase)
+   % Within a site record [2010-01-01 .. 2020-01-01] composed of a founding
+   % station (installed at the record start) and a later station (a true
+   % within-record handover), only the later install is a handover: the
+   % founding install begins the record, it is not a handover within it. A
+   % legacy name absent from the CSV contributes no date but is reported.
+
+   src = stageStationsCsv(testCase, ...
+      ["FOUND_A", "2010-01-01"; "HAND_B", "2015-06-01"]);
+
+   [times, record] = icemodel.forcing.helpers.stationTransitionTimes( ...
+      ["FOUND_A", "HAND_B", "LEGACY_GCNET"], ...
+      window_start=datetime(2010, 1, 1, 'TimeZone', 'UTC'), ...
+      window_end=datetime(2020, 1, 1, 'TimeZone', 'UTC'), source_dir=src);
+
+   % Exactly one handover (HAND_B); the founding install is excluded.
+   testCase.verifyEqual(numel(times), 1);
+   testCase.verifyEqual(times, ...
+      datetime(2015, 6, 1, 'TimeZone', 'UTC'));
+
+   % Record carries one entry per composing station in input order.
+   testCase.verifyEqual(numel(record), 3);
+   testCase.verifyTrue(record(1).in_csv);
+   testCase.verifyFalse(record(1).is_handover);   % founding
+   testCase.verifyTrue(record(2).in_csv);
+   testCase.verifyTrue(record(2).is_handover);    % handover
+   testCase.verifyFalse(record(3).in_csv);        % legacy name, not in CSV
+end
+
+function test_stationTransitionTimes_window_clamp(testCase)
+   % An install outside the record window is not a handover: a station whose
+   % install postdates window_end is excluded even though it is in the CSV.
+
+   src = stageStationsCsv(testCase, ...
+      ["FOUND_A", "2010-01-01"; "LATER_C", "2025-01-01"]);
+
+   times = icemodel.forcing.helpers.stationTransitionTimes( ...
+      ["FOUND_A", "LATER_C"], ...
+      window_start=datetime(2010, 1, 1, 'TimeZone', 'UTC'), ...
+      window_end=datetime(2020, 1, 1, 'TimeZone', 'UTC'), source_dir=src);
+
+   testCase.verifyEmpty(times);   % founding excluded; LATER_C past window end
+end
+
+function test_stationTransitionTimes_missing_csv_is_empty(testCase)
+   % With no AWS_stations_metadata.csv staged, the times are empty and every
+   % record entry reports in_csv=false (the merge fact lives elsewhere).
+
+   src = string(tempname);
+   mkdir(src);
+   testCase.addTeardown(@() rmdir(src, 's'));
+
+   [times, record] = icemodel.forcing.helpers.stationTransitionTimes( ...
+      ["FOUND_A", "HAND_B"], source_dir=src);
+
+   testCase.verifyEmpty(times);
+   testCase.verifyEmpty(record);   % no CSV -> early return, empty record
+end
+
+%% Local helpers
+
+function src = stageStationsCsv(testCase, rows)
+   %STAGESTATIONSCSV Write a minimal AWS_stations_metadata.csv to a temp dir.
+   %
+   % ROWS is an Nx2 string array [station_id, date_installation]; the CSV is
+   % written with the two columns stationTransitionTimes requires.
+   src = string(tempname);
+   mkdir(src);
+   testCase.addTeardown(@() rmdir(src, 's'));
+   T = table(rows(:, 1), rows(:, 2), ...
+      'VariableNames', {'station_id', 'date_installation'});
+   writetable(T, fullfile(src, 'AWS_stations_metadata.csv'));
+end

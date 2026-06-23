@@ -553,6 +553,24 @@ function test_psnProjection_matches_legacy_projsipsn(testCase)
    testCase.verifyEqual(y_new, y_old, 'AbsTol', 0.01);
 end
 
+%% modisAlbedoChannel
+
+function test_modisAlbedoChannel_errors_on_missing_file(testCase)
+   % The shared MODIS channel helper requires exactly one GEUS reflectivity
+   % file per year; an empty directory (no match) raises the canonical
+   % fileNotFound error rather than silently returning a NaN column. This is
+   % the single shared implementation behind MAR/MERRA/RACMO's modis channel.
+
+   empty_dir = string(tempname);
+   mkdir(empty_dir);
+   testCase.addTeardown(@() rmdir(empty_dir, 's'));
+
+   Time = (datetime(2009, 1, 1):hours(1):datetime(2009, 1, 1, 5, 0, 0))';
+   testCase.verifyError(@() icemodel.forcing.helpers.modisAlbedoChannel( ...
+      empty_dir, 2009, [67.0 -49.5], "nearest", "conservative", Time), ...
+      'icemodel:forcing:modisAlbedoChannel:fileNotFound');
+end
+
 %% Local fixture helpers
 
 function met = makeSyntheticMet(t0, nsteps)
