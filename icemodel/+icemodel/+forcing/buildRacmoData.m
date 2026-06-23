@@ -42,9 +42,12 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    %  years    - calendar years to keep (subset of the archive span)
    %
    % Name-value
-   %  source_dir : directory with the per-variable RACMO files. Defaults
-   %      to the gitignored cache data/forcing/racmo. Reference layout:
-   %      /Volumes/S03/DATA/greenland/racmo2p3/surface.
+   %  source_dir : directory with the per-variable RACMO files. Resolves
+   %      ICEMODEL_RACMO_DIR, else the reference layout
+   %      /Volumes/S03/DATA/greenland/racmo2p3/subsurface (the full RACMO2.3p3
+   %      FGRN11 run, 2012-2018 - preferred for firn work over the shorter
+   %      2012-2015 .../surface "no_subsurf_en" product). The per-variable
+   %      filename pattern (<var>.RACMO*.nc) matches either product.
    %  modis_dir : directory with GEUS Greenland_Reflectivity_<YYYY>_5km_C6.nc
    %      files; when given, adds a daily MODIS albedo channel at the site.
    %      Reference layout: /Volumes/S03/DATA/greenland/geus/albedo/gris.
@@ -81,14 +84,14 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    if source_dir == ""
       source_dir = string(getenv("ICEMODEL_RACMO_DIR"));
       if source_dir == ""
-         source_dir = "/Volumes/S03/DATA/greenland/racmo2p3/surface";
+         source_dir = "/Volumes/S03/DATA/greenland/racmo2p3/subsurface";
       end
    end
    if ~isfolder(source_dir)
       error('icemodel:forcing:buildRacmoData:sourceNotFound', ...
          ['RACMO source directory not found: %s. Pass source_dir or ' ...
          'stage the per-variable files (reference layout: ' ...
-         '/Volumes/S03/DATA/greenland/racmo2p3/surface).'], source_dir)
+         '/Volumes/S03/DATA/greenland/racmo2p3/subsurface).'], source_dir)
    end
 
    % Channel table: file prefix -> output name.
