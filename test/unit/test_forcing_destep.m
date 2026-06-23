@@ -72,6 +72,60 @@ function test_destep_transition_corroborates_unambiguous(testCase)
    testCase.verifyEqual(corrected(end), 0.04, 'AbsTol', 1e-9);
 end
 
+function test_destep_winter_season_corroborates_unambiguous(testCase)
+   % The SEASON evidence line on its own: a melt-signed surface-lowering jump in
+   % the non-melt season (Nov..Apr) clears the rate gate and the winter_floor but
+   % stays below max_step (so the implausible line does NOT fire) and is far from
+   % any transition. Ice ablation needs melt energy absent in winter, so the
+   % winter melt-signed step is season-inconsistent -> UNAMBIGUOUS by the season
+   % line alone, and corrected by the default mode. The companion melt-season
+   % case (test_destep_flags_ambiguous_step_without_correcting) uses the same
+   % magnitude in July and stays AMBIGUOUS, isolating the season line as the only
+   % difference.
+
+   t = (datetime(2015, 1, 1):hours(1):datetime(2015, 1, 1, 5, 0, 0))';
+   % A +0.5 m winter jump at sample 4: above winter_floor (0.3) and the hourly
+   % rate bound, below max_step (1.0). melt-signed positive for an ablation
+   % (+down) series.
+   surf = [0; 0.01; 0.02; 0.52; 0.53; 0.54];
+
+   [corrected, record, flags] = icemodel.forcing.destepSurface(t, surf, ...
+      season="ablation");
+
+   % Promoted to unambiguous by the season line (not implausible/transition).
+   testCase.verifyEqual(numel(record), 1);
+   testCase.verifyEqual(string(record.classification), "unambiguous");
+   testCase.verifyTrue(record.applied);
+   testCase.verifyTrue(any(record.evidence == "season"));
+   testCase.verifyFalse(any(record.evidence == "implausible"));
+   testCase.verifyFalse(any(record.evidence == "transition"));
+
+   % Leveled: the post-step segment drops by the 0.5 m offset.
+   testCase.verifyEqual(corrected(end), 0.04, 'AbsTol', 1e-9);
+   testCase.verifyEqual(flags.step_correctable(4), 1);
+end
+
+function test_destep_winter_microjump_below_floor_not_promoted(testCase)
+   % A winter melt-signed jump BELOW winter_floor (0.3 m) is sensor noise, not a
+   % season-inconsistent step: the season line must not fire on it. With the jump
+   % below max_step and away from any transition, the only line that can fire is
+   % the rate gate -> AMBIGUOUS (flagged, not corrected). This pins the
+   % winter_floor guard so winter noise never auto-promotes.
+
+   t = (datetime(2015, 1, 1):hours(1):datetime(2015, 1, 1, 5, 0, 0))';
+   % A +0.2 m winter jump: above the hourly rate bound but BELOW winter_floor.
+   surf = [0; 0.01; 0.02; 0.22; 0.23; 0.24];
+
+   [corrected, record, ~] = icemodel.forcing.destepSurface(t, surf, ...
+      season="ablation");
+
+   testCase.verifyEqual(numel(record), 1);
+   testCase.verifyEqual(string(record.classification), "ambiguous");
+   testCase.verifyFalse(record.applied);
+   testCase.verifyFalse(any(record.evidence == "season"));
+   testCase.verifyEqual(corrected, surf, 'AbsTol', 1e-12);   % unchanged
+end
+
 function test_destep_detect_mode_leaves_series_unaltered(testCase)
    % mode="detect" never changes the series (staging-faithful contract): the
    % flags/record are produced but corrected == surf.
