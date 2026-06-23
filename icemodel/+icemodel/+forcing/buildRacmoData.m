@@ -202,8 +202,9 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    % the legacy saveRacmoData MODIS channel (which took the nearest cell even
    % for catchments) to the area-weighted ROI mean for polygons.
    if kwargs.modis_dir ~= ""
-      Data.modis = modisChannel(kwargs.modis_dir, years, location0, ...
-         kwargs.method, kwargs.remap, Data.Time);
+      Data.modis = icemodel.forcing.helpers.modisAlbedoChannel( ...
+         kwargs.modis_dir, years, location0, kwargs.method, kwargs.remap, ...
+         Data.Time);
    end
 
    % Precipitation to the canonical water-equivalent rate m s-1. RACMO posts
@@ -407,27 +408,4 @@ function gm = racmoGridMapping(filename)
       ncreadatt(filename, 'rotated_pole', 'grid_north_pole_latitude'), ...
       'grid_north_pole_longitude', ...
       ncreadatt(filename, 'rotated_pole', 'grid_north_pole_longitude'));
-end
-
-function modis = modisChannel(modis_dir, years, location, method, remap, Time)
-   %MODISCHANNEL GEUS MODIS daily albedo at the location, interpolated hourly.
-   % LOCATION is the original request (a [lat lon] point or an EPSG:3413
-   % polyshape); readGeusModis maps it onto the GEUS 5 km grid with the same
-   % nearest/natural (point) or conservative/equal (polygon) selection as the
-   % RACMO channels, so a catchment build gets the area-weighted ROI mean.
-   modis = nan(numel(Time), 1);
-   for yyyy = years
-      match = dir(fullfile(modis_dir, sprintf('*_%d_*.nc', yyyy)));
-      if numel(match) ~= 1
-         error('icemodel:forcing:buildRacmoData:modisNotFound', ...
-            'expected one MODIS file for %d in %s, found %d', ...
-            yyyy, modis_dir, numel(match))
-      end
-      [albedo, Tdaily] = icemodel.forcing.readGeusModis( ...
-         string(fullfile(match.folder, match.name)), location, method, ...
-         remap=remap);
-      inyear = year(Time) == yyyy;
-      modis(inyear) = icemodel.forcing.helpers.dailyToHourly( ...
-         albedo, Tdaily, Time(inyear));
-   end
 end

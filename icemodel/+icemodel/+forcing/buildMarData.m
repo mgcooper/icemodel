@@ -37,8 +37,9 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    %      layout: /Volumes/S03/DATA/greenland/mar3p11/RUH2.
    %  modis_dir  : directory with GEUS Greenland_Reflectivity_<YYYY>_
    %      5km_C6.nc files; when given, a daily MODIS albedo channel is
-   %      added (point location only). Reference layout:
-   %      /Volumes/S03/DATA/greenland/geus/albedo/gris.
+   %      added at the requested location (point: nearest/natural; polygon:
+   %      conservative/equal catchment mean, same as the gridded channels).
+   %      Reference layout: /Volumes/S03/DATA/greenland/geus/albedo/gris.
    %  fillgaps   : gap-fill through metchecks (default true, the legacy
    %      RCM-Data behavior; MAR output is gap-free in practice)
    %
@@ -111,15 +112,18 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
       end
       parts{n} = extractOneYear(files(n), hourly_vars, daily_vars, ...
          start, count, collapse);
-      if kwargs.modis_dir ~= ""
-         % MODIS albedo at the requested location: nearest/natural for a
-         % point, conservative (or equal) catchment mean for a polygon.
-         % readGeusModis runs gridLocation on the GEUS 5 km grid.
-         parts{n}.modis = modisChannel(kwargs.modis_dir, years(n), ...
-            location, kwargs.method, kwargs.remap, parts{n}.Time);
-      end
    end
    Data = vertcat(parts{:});
+
+   % Optional GEUS MODIS albedo at the requested location: nearest/natural for
+   % a point, conservative (or equal) catchment mean for a polygon (the same
+   % selection as the gridded channels). Added on the assembled axis via the
+   % shared helper so MAR/MERRA/RACMO resolve MODIS identically.
+   if kwargs.modis_dir ~= ""
+      Data.modis = icemodel.forcing.helpers.modisAlbedoChannel( ...
+         kwargs.modis_dir, years, location, kwargs.method, kwargs.remap, ...
+         Data.Time);
+   end
 
    % Derived channels: wind from components, RH from the canonical vapor
    % kernel; the component and humidity inputs then drop out.
@@ -263,23 +267,3 @@ function part = extractOneYear(filename, hourly_vars, daily_vars, ...
          collapse(data), Tdaily, part.Time);
    end
 end
-
-function modis = modisChannel(modis_dir, yyyy, location, method, remap, Time)
-   %MODISCHANNEL Daily GEUS MODIS albedo interpolated to the time axis.
-   % LOCATION is the original request (a [lat lon] point or an EPSG:3413
-   % polyshape); readGeusModis maps it onto the GEUS 5 km grid with the same
-   % point (nearest/natural) or polygon (conservative/equal) selection as the
-   % other gridded channels, so a catchment build gets the area-weighted ROI
-   % MODIS mean rather than the single nearest cell.
-   match = dir(fullfile(modis_dir, sprintf('*_%d_*.nc', yyyy)));
-   if numel(match) ~= 1
-      error('icemodel:forcing:buildMarData:modisNotFound', ...
-         'expected one MODIS file for %d in %s, found %d', ...
-         yyyy, modis_dir, numel(match))
-   end
-   [albedo, Tdaily] = icemodel.forcing.readGeusModis( ...
-      string(fullfile(match.folder, match.name)), location, method, ...
-      remap=remap);
-   modis = icemodel.forcing.helpers.dailyToHourly(albedo, Tdaily, Time);
-end
-
