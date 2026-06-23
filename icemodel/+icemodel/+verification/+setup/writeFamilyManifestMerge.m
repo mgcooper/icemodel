@@ -90,34 +90,39 @@ function manifest = writeFamilyManifestMerge(manifest_file, manifest, kwargs)
    old_skipped = skipCell(existingField(existing, 'skipped'));
 
    % Cases: keep prior cases not superseded by this stage (preserve order),
-   % update in place where a requested id already exists, append the rest.
-   merged_cases = {};
+   % update in place where a requested id already exists, append the rest. The
+   % merged length is the prior count plus the new ids not already present, so
+   % preallocate to that size (no growing in the loop).
    appended = false(1, numel(new_cases));
+   n_appended_new = sum(~ismember(new_ids, old_ids));
+   merged_cases = cell(1, numel(old_cases) + n_appended_new);
+   pos = 0;
    for k = 1:numel(old_cases)
       id = old_ids(k);
       hit = find(new_ids == id, 1);
+      pos = pos + 1;
       if ~isempty(hit)
-         merged_cases{end + 1} = new_cases{hit}; %#ok<AGROW>
+         merged_cases{pos} = new_cases{hit};
          appended(hit) = true;
       else
-         merged_cases{end + 1} = old_cases{k}; %#ok<AGROW>
+         merged_cases{pos} = old_cases{k};
       end
    end
    for k = 1:numel(new_cases)
       if ~appended(k)
-         merged_cases{end + 1} = new_cases{k}; %#ok<AGROW>
+         pos = pos + 1;
+         merged_cases{pos} = new_cases{k};
       end
    end
 
    % skipped: drop prior skips for the requested ids (they were re-evaluated
-   % this stage), keep all other prior skips, add the new skips.
-   merged_skipped = {};
+   % this stage), keep all other prior skips, add the new skips. Mask the prior
+   % skips to keep, then concatenate (no growing in the loop).
+   keep_old = false(1, numel(old_skipped));
    for k = 1:numel(old_skipped)
-      if ~ismember(skipIds(old_skipped(k)), requested)
-         merged_skipped{end + 1} = old_skipped{k}; %#ok<AGROW>
-      end
+      keep_old(k) = ~ismember(skipIds(old_skipped(k)), requested);
    end
-   merged_skipped = [merged_skipped, new_skipped];
+   merged_skipped = [old_skipped(keep_old), new_skipped];
 
    % Family-level fields: take the new manifest's provenance values, but keep
    % any extra fields (e.g. "schema") the existing manifest carried and the new

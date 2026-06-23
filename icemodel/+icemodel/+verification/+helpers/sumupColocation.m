@@ -103,17 +103,21 @@ function anchors = anchorsFromPromiceManifest(evaluation_data_root, casename)
       "evaluation_data_root", evaluation_data_root, ...
       "icemodel_config_casename", casename);
    manifest_file = fullfile(eval_root, "promice", "manifest.json");
-   if exist(manifest_file, 'file') ~= 2
+   if ~isfile(manifest_file)
       return
    end
 
    manifest = jsondecode(fileread(manifest_file));
    cases = manifest.cases;
+   % The case count is known from the decoded manifest, so size the anchor
+   % struct array up front and fill it (no growing in the loop).
+   anchors = repmat(struct('site', "", 'x_epsg3413', NaN, 'y_epsg3413', NaN), ...
+      1, numel(cases));
    for n = 1:numel(cases)
       loc = cases(n).site_location;
-      anchors(end + 1) = struct( ...
+      anchors(n) = struct( ...
          'site', string(cases(n).site_id), ...
          'x_epsg3413', loc.x_epsg3413, ...
-         'y_epsg3413', loc.y_epsg3413); %#ok<AGROW>
+         'y_epsg3413', loc.y_epsg3413);
    end
 end
