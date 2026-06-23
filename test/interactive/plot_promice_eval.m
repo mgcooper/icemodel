@@ -183,20 +183,23 @@ function summary = plot_promice_eval(options)
                'DisplayName', 'station transition')
          end
       end
-      % Mark detected step-shifts: hollow magenta for unambiguous (correctable),
-      % grey x for ambiguous (flagged, NOT corrected).
+      % Mark detected step-shifts: hollow magenta square for the few unambiguous
+      % (correctable) steps; a filled orange circle for ambiguous (flagged, NOT
+      % corrected). The circle does not obscure the magenta squares or the red
+      % gap-bridged dots the way the old oversized grey x did.
       if hasChan(Data, "step_detected_flag")
          unamb = Data.step_correctable_flag == 1;
          amb = Data.step_detected_flag == 1 & ~unamb;
+         if any(amb)
+            sa = surf; sa(~amb) = NaN;
+            plot(ax2, t, sa, 'o', 'Color', [0.95 0.55 0.0], ...
+               'MarkerFaceColor', [0.95 0.55 0.0], 'MarkerSize', 5, ...
+               'DisplayName', 'step: ambiguous (flagged)')
+         end
          if any(unamb)
             su = surf; su(~unamb) = NaN;
             plot(ax2, t, su, 's', 'Color', [0.8 0.1 0.8], 'MarkerSize', 7, ...
-               'LineWidth', 1.2, 'DisplayName', 'step: unambiguous (correctable)')
-         end
-         if any(amb)
-            sa = surf; sa(~amb) = NaN;
-            plot(ax2, t, sa, 'x', 'Color', [0.4 0.4 0.4], 'MarkerSize', 5, ...
-               'DisplayName', 'step: ambiguous (flagged)')
+               'LineWidth', 1.4, 'DisplayName', 'step: unambiguous (correctable)')
          end
       end
       % The zero reference is a guide, not a legend entry.
