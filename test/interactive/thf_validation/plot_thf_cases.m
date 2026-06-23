@@ -17,7 +17,7 @@ function plot_thf_cases(options)
    %     Daily 7-day moving-mean; obs = solid, scheme A = dashed,
    %     scheme B = dotted; one color per variable (van As palette).
    %
-   % Both figures are saved as PNG to test/interactive/figures/.
+   % Both figures are saved as PNG to test/interactive/thf_validation/figures/.
    %
    % group_idx selects which site/year groups to plot (default: all).
    % Groups are sorted alphabetically by 'site_simyears' key, e.g.:

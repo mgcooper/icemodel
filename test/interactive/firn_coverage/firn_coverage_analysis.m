@@ -10,7 +10,8 @@ function [T, mdfile] = firn_coverage_analysis(kwargs)
    %  dimensions a firn-model development effort cares about, then classifies
    %  each site into one or more firn-physics verification regimes and writes a
    %  markdown report. This is a USER-FACING analysis tool; its outputs (table +
-   %  markdown + figures) go to the gitignored test/interactive/figures/ tree.
+   %  markdown + figures) go to this theme's gitignored
+   %  test/interactive/firn_coverage/figures/ subdir.
    %
    %  THIS SCRIPT REQUIRES /Volumes/S03 (mounted) for the GrIS sector mask and
    %  the MAR/MERRA/RACMO coverage probe, plus the staged PROMICE L3 NetCDF and

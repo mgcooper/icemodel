@@ -66,7 +66,7 @@ function info = promicesiteinfo(site)
    %  ---------------------------------------------------------------------------
    %  The surface_zone and permafrost_zone values below are HARD-CODED results of
    %  spatially sampling three reference datasets at each site's installation
-   %  lon/lat. The analysis tool is test/interactive/classify_site_facies.m (which
+   %  lon/lat. The analysis tool is test/interactive/site_classification/classify_site_facies.m (which
    %  requires /Volumes/S03); its results are baked in here so the committed
    %  catalog has NO S03 runtime dependency. Re-run that tool to refresh.
    %
@@ -107,7 +107,7 @@ function info = promicesiteinfo(site)
    %
    %    NOTE: the Obu shapefile is read through activelayer.readobuzones (the
    %    production reader; variant="wgs"), not shaperead directly. The analysis
-   %    tool test/interactive/classify_site_facies.m derives these values via
+   %    tool test/interactive/site_classification/classify_site_facies.m derives these values via
    %    that reader; activelayer + its matfunclib helper dependencies are placed
    %    on the path by icemodel.test.helpers.bootstrapTestEnvironment. Replaces
    %    the v1 Brown et al. (1997) source.
@@ -134,7 +134,7 @@ function info = promicesiteinfo(site)
    %  icemodel.verification.namelists.permafrostzone,
    %  icemodel.forcing.readPromiceAws, icemodel.forcing.buildPromiceData,
    %  icemodel.verification.helpers.snowmipinfo,
-   %  test/interactive/classify_site_facies.m
+   %  test/interactive/site_classification/classify_site_facies.m
 
    arguments
       site (1, 1) string = ""

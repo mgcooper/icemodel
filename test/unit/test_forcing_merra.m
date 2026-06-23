@@ -8,7 +8,7 @@ function tests = test_forcing_merra
    % than the legacy SWGNT/(1-SNICEALB) derivation (which mixed the cell net
    % flux with the snow/ice tile albedo and inflated swd). The new-vs-legacy
    % ak4_merra statistical comparison is a user-facing script, not part of this
-   % formal suite: see test/interactive/compare_forcing_vs_legacy.m. Documented
+   % formal suite: see test/interactive/ablation_comparison/compare_forcing_vs_legacy.m. Documented
    % in the owning ExecPlan (2026-06-12).
    tests = functiontests(localfunctions);
 end

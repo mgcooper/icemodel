@@ -264,7 +264,7 @@ Each case carries THREE orthogonal descriptors, all single-sourced from
 The KAN anchors are AUTHORITATIVE (KAN_L/M=`ablation`, KAN_U=`percolation`). The
 non-KAN PROMICE stations and the ESM-SnowMIP sites carry **authoritative**
 `surface_zone` + `permafrost_zone` values HARD-CODED from a data-driven analysis
-(`test/interactive/classify_site_facies.m`):
+(`test/interactive/site_classification/classify_site_facies.m`):
 
 - `surface_zone` (ablation vs accumulation): MODIS end-of-summer **Bare Ice
   Extent** 2000-2018 frequency (ablation when bare ice in a majority of years;

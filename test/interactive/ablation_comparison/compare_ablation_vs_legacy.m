@@ -27,7 +27,8 @@ function results = compare_ablation_vs_legacy(options)
    %
    %  This is NOT part of the formal unit suite. It depends on the committed
    %  PROMICE L3 cache (data/verification/promice/day) and the staged legacy
-   %  artifacts, and writes figures to the gitignored test/interactive/figures/.
+   %  artifacts, and writes figures to this theme's gitignored
+   %  test/interactive/ablation_comparison/figures/.
    %
    %  Both series are CUMULATIVE surface lowering relative to installation, so
    %  each is rebaselined to its own value at the common-window start before
@@ -38,11 +39,11 @@ function results = compare_ablation_vs_legacy(options)
    %    sites     which sites to compare (default ["kanl","kanm"])
    %    legacy_root  dir holding the legacy *_ablation_daily.mat artifacts
    %                 (default test/assets/legacy_ablation under the repo root)
-   %    figdir    output figure dir (default test/interactive/figures)
+   %    figdir    output figure dir (default this theme's figures/ subdir)
    %    savefigs  write png overlays (default true)
    %
    % See also: icemodel.forcing.buildPromiceData,
-   %  test/interactive/compare_forcing_vs_legacy
+   %  test/interactive/ablation_comparison/compare_forcing_vs_legacy
 
    arguments
       options.sites (1, :) string = ["kanl", "kanm"]
@@ -57,7 +58,9 @@ function results = compare_ablation_vs_legacy(options)
          "legacy_ablation");
    end
    if options.figdir == ""
-      options.figdir = fullfile(repo_root, "test", "interactive", "figures");
+      % Resolve the theme's own figures/ subdir relative to this script
+      % (mfilename is not valid inside the arguments block above).
+      options.figdir = fullfile(fileparts(mfilename("fullpath")), "figures");
    end
    if options.savefigs && ~isfolder(options.figdir)
       mkdir(options.figdir);

@@ -9,7 +9,7 @@ function tests = test_forcing_mar
    % the selected cell. The new-vs-legacy ak4 statistical comparison (the
    % legacy artifacts cannot be reproduced cell-exactly) is a user-facing
    % script, not part of this formal suite: see
-   % test/interactive/compare_forcing_vs_legacy.m. Recorded in the owning
+   % test/interactive/ablation_comparison/compare_forcing_vs_legacy.m. Recorded in the owning
    % ExecPlan (2026-06-12).
    tests = functiontests(localfunctions);
 end

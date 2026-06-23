@@ -169,7 +169,7 @@ de-stepping CORRECTION is applied **opt-in at analysis time** by calling
 `icemodel.forcing.destepSurface(t, surf)`; its **default mode corrects
 UNAMBIGUOUS steps only** (so unambiguous installation jumps — e.g. MIT's two
 ~5.9 m jumps in Aug 2009 — are leveled by default at consumption, while the
-staged data stays unaltered). See `test/interactive/figures/`
+staged data stays unaltered). See `test/interactive/promice_qaqc/figures/`
 `promice_step_screening.md` for the all-site screening table.
 
 ### Thermistors (subsurface temperature) and the tice10m comparison protocol
@@ -224,8 +224,8 @@ corroborated stays AMBIGUOUS (flagged, not corrected).
 
 ### Diagnostics
 
-`test/interactive/plot_promice_eval.m` regenerates per-site figures and the QA
-summary into the gitignored `test/interactive/figures/` (site-type surface
+`test/interactive/promice_qaqc/plot_promice_eval.m` regenerates per-site figures and the QA
+summary into the gitignored `test/interactive/promice_qaqc/figures/` (site-type surface
 channel; surface-height with gap-bridged samples in red, station-transition
 windows in green, detected steps marked unambiguous/ambiguous; `tice10m`
 heavy-black primary over the thermistor string). `promice_site_cause_classification.md`

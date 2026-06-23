@@ -237,7 +237,7 @@ function pfz = snowmipPermafrostZone(sitename)
    %
    % Hard-coded results of a point-in-polygon test of the Obu et al. (2019) ESA
    % GlobPermafrost / UiO PEX permafrost-zone map at each ESM-SnowMIP site
-   % (test/interactive/classify_site_facies.m). All ten sites are off-ice land
+   % (test/interactive/site_classification/classify_site_facies.m). All ten sites are off-ice land
    % surfaces. Sites outside any permafrost polygon -> "none". Vocabulary:
    % icemodel.verification.namelists.permafrostzone. Replaces the v1 Brown et al.
    % (1997) source.

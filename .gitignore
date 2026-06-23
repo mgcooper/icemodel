@@ -34,8 +34,17 @@ test/artifacts/
 test/backups/
 test/baselines/profiler/
 test/benchmarks/profiler/
-test/interactive/data/
-test/interactive/figures/
+# test/interactive is organized into per-theme subfolders. Each theme commits
+# its SCRIPT(s) (*.m) and AUTHORED report(s) (specific .md) but ignores its
+# generated ARTIFACTS: per-theme figures/, outputs/, data/ dirs and any stray
+# PNGs. The committed .m/.md files are exempted by the !patterns below.
+test/interactive/**/figures/
+test/interactive/**/outputs/
+test/interactive/**/data/
+test/interactive/**/*.png
+test/interactive/*.png
+!test/interactive/**/*.m
+!test/interactive/**/*.md
 icemodel/dependencies/requirements.mat
 
 # CF Standard Name Table cache (fetched by icemodel.netcdf.defaults.cfStandardNames)

@@ -44,8 +44,8 @@ function summary = plot_promice_eval(options)
    % directory, flagging stations whose channels look wrong or sparse so the
    % user can prioritise.
    %
-   % Figures (PNG) and the summary markdown are written to
-   % test/interactive/figures/ (gitignored).
+   % Figures (PNG) and the summary markdown are written to this theme's
+   % gitignored test/interactive/promice_qaqc/figures/ subdir.
    %
    % Name-value
    %  sites      : station ids to plot, or "all" (default) to sweep every

@@ -8,7 +8,7 @@ function results = run_thf_cases(options)
    %
    % Runs all eight THF validation cases (2 sites × 2 year windows × 2
    % schemes) and saves the full run data to
-   %   test/interactive/data/thf_validation_results.mat
+   %   test/interactive/thf_validation/data/thf_validation_results.mat
    % for later plotting by plot_thf_cases and plot_thf_scalar_comparison.
    %
    % output_profile - 'diagnostic' (default) or 'standard'. The diagnostic
