@@ -83,38 +83,22 @@ function name = findEnclosingMetFile(opts, metname, forcings, ...
       startdate, enddate, dtstr, exact_name)
    % Locate a staged multi-year met file whose encoded YYYYMMDD-YYYYMMDD
    % period contains the requested run window. Returns '' when no match.
+   % Delegates the glob/parse/bracket to the shared primitive
+   % icemodel.forcing.helpers.findEnclosingWindowFile (also used by
+   % icemodel.loadmet for userdata files).
 
+   name = '';
    if ~isfield(opts, 'pathinput') || isempty(opts.pathinput)
-      name = '';
       return
    end
    met_dir = fullfile(opts.pathinput, 'met');
    if ~isfolder(met_dir)
-      name = '';
       return
    end
    if isfile(fullfile(met_dir, exact_name))
-      name = '';
       return
    end
-
-   pattern = ['met_' metname '_' forcings '_*_*_' dtstr];
-   d = dir(fullfile(met_dir, pattern));
-   tz = startdate.TimeZone;
-   for n = 1:numel(d)
-      tok = regexp(d(n).name, ...
-         ['^met_' regexptranslate('escape', [metname '_' forcings]) ...
-         '_(\d{8})_(\d{8})_'], 'tokens', 'once');
-      if isempty(tok)
-         continue
-      end
-      file_start = datetime(tok{1}, 'InputFormat', 'yyyyMMdd', 'TimeZone', tz);
-      file_end = datetime(tok{2}, 'InputFormat', 'yyyyMMdd', ...
-         'TimeZone', tz) + hours(23);
-      if file_start <= startdate && file_end >= enddate
-         name = d(n).name;
-         return
-      end
-   end
-   name = '';
+   enclosing = icemodel.forcing.helpers.findEnclosingWindowFile(met_dir, ...
+      ['met_' metname '_' forcings], ['_' dtstr], startdate, enddate);
+   name = char(enclosing);
 end

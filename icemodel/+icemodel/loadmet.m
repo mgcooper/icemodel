@@ -166,7 +166,7 @@ end
 %%
 function Data = loadExternalUserdata(opts, thisyear, mettime)
 
-   filepath = resolveUserdataFile(opts, thisyear);
+   filepath = resolveUserdataFile(opts, thisyear, mettime);
    if ~isfile(filepath)
       error('\n userdata file does not exist: \n\n %s \n', filepath);
    end
@@ -181,32 +181,26 @@ function Data = loadExternalUserdata(opts, thisyear, mettime)
 end
 
 %%
-function filepath = resolveUserdataFile(opts, thisyear)
-   %RESOLVEUSERDATAFILE Locate the userdata file covering THISYEAR.
+function filepath = resolveUserdataFile(opts, thisyear, mettime)
+   %RESOLVEUSERDATAFILE Locate the userdata file covering this run year's met.
    % Prefers a full-period window file <site>_<source>_<YYYYMMDD>_<YYYYMMDD>.mat
-   % whose encoded period brackets the year (the writeuserdata naming="window"
-   % form); falls back to the legacy per-year <site>_<source>_<YYYY>.mat. The
-   % per-year load loop retimes whichever file to that year's met axis, so a
-   % single full-period file serves every run year.
+   % whose encoded period brackets the met samples being swapped (the
+   % writeuserdata naming="window" form); falls back to the legacy per-year
+   % <site>_<source>_<YYYY>.mat. The caller retimes whichever file onto METTIME,
+   % so a single full-period file serves every run year. The window lookup is the
+   % shared icemodel.forcing.helpers.findEnclosingWindowFile (same primitive
+   % icemodel.createMetFileNames uses for met files), bracketed by the actual
+   % met time span rather than the whole calendar year.
 
    base = [opts.sitename '_' char(opts.userdata)];
-   d = dir(fullfile(opts.pathuserdata, [base '_*_*.mat']));
-   for n = 1:numel(d)
-      tok = regexp(d(n).name, ...
-         ['^' regexptranslate('escape', base) '_(\d{8})_(\d{8})\.mat$'], ...
-         'tokens', 'once');
-      if isempty(tok)
-         continue
-      end
-      y1 = str2double(tok{1}(1:4));
-      y2 = str2double(tok{2}(1:4));
-      if thisyear >= y1 && thisyear <= y2
-         filepath = fullfile(opts.pathuserdata, d(n).name);
-         return
-      end
+   enclosing = icemodel.forcing.helpers.findEnclosingWindowFile( ...
+      opts.pathuserdata, base, '.mat', min(mettime), max(mettime));
+   if strlength(enclosing) > 0
+      filepath = fullfile(opts.pathuserdata, char(enclosing));
+   else
+      filepath = fullfile(opts.pathuserdata, ...
+         [base '_' int2str(thisyear) '.mat']);
    end
-   filepath = fullfile(opts.pathuserdata, ...
-      [base '_' int2str(thisyear) '.mat']);
 end
 
 %%
