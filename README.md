@@ -330,6 +330,23 @@ icemodel.dependencies(require=true)  % error if any dependency is missing
 
 `matfunclib` must be on the path for `activelayer` to load.
 
+### Gridded raw-data source directories
+
+The gridded-climate forcing builders read large raw source archives that, like
+the dependency repos above, are kept *out* of this repo. Each builder resolves
+its source directory in this order: the explicit `source_dir` kwarg, then a
+builder-specific environment variable, then a machine-specific default path.
+Only the env var is portable; set it to point each builder at the local archive.
+
+| Builder | Environment variable |
+| --- | --- |
+| `icemodel.forcing.buildMarData` (MAR 3.11) | `ICEMODEL_MAR_DIR` |
+| `icemodel.forcing.buildMerraData` (MERRA-2) | `ICEMODEL_MERRA_DIR` |
+| `icemodel.forcing.buildRacmoData` (RACMO FGRN11) | `ICEMODEL_RACMO_DIR` |
+
+These are only needed to *rebuild* gridded forcing from the raw archives; the
+committed demo fixtures and the staged research forcing do not require them.
+
 ## Contribute
 
 If you find a bug, have a question, or want to contribute, feel free to open an [issue](https://github.com/mgcooper/icemodel/issues) or start a [discussion](https://github.com/mgcooper/icemodel/discussions).
