@@ -328,10 +328,10 @@ function [start, count, collapse, inslab, loctype] = ...
    % grid mapping) and to rotated coordinates to bound the read hyperslab.
    % Weights are area-weighted by the shipped true cell areas (gridarea) with
    % off-ice cells (IceMask) inpainted. We use exactremap's 'weights' mode and
-   % apply the weights ourselves because its rotated-pole 'areaavg' path is
-   % currently broken (returns ~0; exactremap-0hv); the weights path is exact
-   % (its rotated-pole geometry test passes to 1e-5) and matches the legacy
-   % runoff approach of computing static remap weights once per polygon.
+   % apply the weights ourselves: the polygon geometry is solved ONCE and reused
+   % across every year's data block (the legacy runoff static-weights pattern).
+   % exactremap-0hv (the earlier rotated-pole 'areaavg' ~0) is fixed, so areaavg
+   % is also correct now; weights mode is retained for the compute-once reuse.
    loctype = "polygon";
 
    rlon = double(ncread(filename, 'rlon'));
@@ -372,9 +372,16 @@ function [start, count, collapse, inslab, loctype] = ...
    % (rlon, rlat) in MESHGRID convention: its grid, the 2-D CellAreas/mask it
    % consumes, and the W it returns are all laid out [numel(rlat) x numel(rlon)]
    % (rlat down rows). The readRacmo2p3 data block, the slab, and slabMean are
-   % NDGRID [numel(rlon) x numel(rlat)] (rlon down rows). So transpose the
-   % cell-area/mask slabs going in, and reorient W back to ndgrid coming out,
-   % so the weights align with the data block and slab indices.
+   % NDGRID [numel(rlon) x numel(rlat)] (rlon down rows). For gridvector axes
+   % this is a pure transpose (no flips), so transpose the cell-area/mask slabs
+   % going in and the returned W back to ndgrid coming out; exactremap now
+   % validates this orientation (rasterTransposed / ambiguousGridOrientation),
+   % so a mismatch errors rather than misaligns. Weights mode is kept (over the
+   % now-fixed exactremap-0hv 'areaavg' path) because it solves the polygon
+   % geometry ONCE and reuses it across every year's data block via the collapse
+   % closure below; a coordinate-list / 'areaavg' swap was tested and does NOT
+   % reproduce this verified weighting (it differs ~4% via the infill/mask path),
+   % so it is not a free simplification - see bead icemodel-1ps.18.
    W = exactremap([], rlon(rows), rlat(cols), Pgeo, 'weights', ...
       'GridMapping', gm, 'CellAreas', cellareas(rows, cols).', ...
       'ValidCellsMask', validmask(rows, cols).', 'InfillMasked', true);
