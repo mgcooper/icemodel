@@ -91,11 +91,15 @@ function summary = plot_promice_eval(options)
       end
    end
 
-   % Resolve the figure output directory relative to this file so the script
-   % is location-independent (mfilename not valid in arguments).
-   figdir = fullfile(fileparts(mfilename('fullpath')), 'figures');
-   if options.save_figs && ~isfolder(figdir)
-      mkdir(figdir)
+   % Resolve output directories relative to this file (location-independent;
+   % mfilename not valid in arguments): images go to figures/, generated
+   % tables (markdown/csv) go to artifacts/.
+   here = fileparts(mfilename('fullpath'));
+   figdir = fullfile(here, 'figures');
+   artdir = fullfile(here, 'artifacts');
+   if options.save_figs
+      if ~isfolder(figdir); mkdir(figdir); end
+      if ~isfolder(artdir); mkdir(artdir); end
    end
 
    % The tice string, shallow to deep, used by panel (c). The L3 string runs
@@ -255,9 +259,9 @@ function summary = plot_promice_eval(options)
    % Print the table and save the markdown sanity summary.
    printTable(summary);
    if options.save_figs
-      writeMarkdown(summary, fullfile(figdir, 'promice_eval_summary.md'), ...
+      writeMarkdown(summary, fullfile(artdir, 'promice_eval_summary.md'), ...
          options.frequency, source_dir);
-      fprintf('\nwrote figures + summary to %s\n', figdir);
+      fprintf('\nwrote figures to %s\nwrote summary to %s\n', figdir, artdir);
    end
 end
 

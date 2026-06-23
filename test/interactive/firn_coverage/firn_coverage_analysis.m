@@ -63,8 +63,9 @@ function [T, mdfile] = firn_coverage_analysis(kwargs)
 
    sites = kwargs.sites;
    here = fileparts(mfilename("fullpath"));
-   figdir = fullfile(here, "figures");
-   icemodel.helpers.ensureDirExists(figdir);
+   % Generated tables go to artifacts/ (figures/ is reserved for images).
+   artdir = fullfile(here, "artifacts");
+   icemodel.helpers.ensureDirExists(artdir);
 
    % ---- Reference dataset handles -------------------------------------------
    sectors = openSectors(fullfile(S03, ...
@@ -89,7 +90,7 @@ function [T, mdfile] = firn_coverage_analysis(kwargs)
 
    mdfile = "";
    if kwargs.write_markdown
-      mdfile = fullfile(figdir, "firn_coverage_analysis.md");
+      mdfile = fullfile(artdir, "firn_coverage_analysis.md");
       writeMarkdown(mdfile, T, cov, kwargs.sumup_radius_km);
       fprintf("\nwrote coverage report: %s\n", mdfile);
    end

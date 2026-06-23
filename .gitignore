@@ -61,9 +61,11 @@ test/baselines/profiler/
 test/benchmarks/profiler/
 # test/interactive is organized into per-theme subfolders. Each theme commits
 # its SCRIPT(s) (*.m) and AUTHORED report(s) (specific .md) but ignores its
-# generated ARTIFACTS: per-theme figures/, outputs/, data/ dirs and any stray
-# PNGs. The committed .m/.md files are exempted by the !patterns below.
+# generated outputs: figures/ holds images, artifacts/ holds generated tables
+# (markdown/csv); outputs/ and data/ are other generated stores. The committed
+# .m/.md files are exempted by the !patterns below.
 test/interactive/**/figures/
+test/interactive/**/artifacts/
 test/interactive/**/outputs/
 test/interactive/**/data/
 test/interactive/**/*.png

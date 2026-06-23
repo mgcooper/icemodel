@@ -186,13 +186,15 @@ function T = classify_site_facies(varargin)
    % ---- Sanity-check the KAN anchors -----------------------------------------
    checkKanAnchors(T);
 
-   % ---- Emit review table ----------------------------------------------------
+   % ---- Emit review table (generated tables go to artifacts/, not figures/) --
    disp(T)
    if opts.write_review
-      writeReview(T, fullfile(here, "figures", "site_facies_classification.md"), opts);
-      writetable(T, fullfile(here, "figures", "site_facies_classification.csv"));
+      artdir = fullfile(here, "artifacts");
+      icemodel.helpers.ensureDirExists(artdir);
+      writeReview(T, fullfile(artdir, "site_facies_classification.md"), opts);
+      writetable(T, fullfile(artdir, "site_facies_classification.csv"));
       fprintf("Review written to %s\n", ...
-         fullfile(here, "figures", "site_facies_classification.md"));
+         fullfile(artdir, "site_facies_classification.md"));
    end
 end
 
