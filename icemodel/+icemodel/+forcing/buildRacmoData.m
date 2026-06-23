@@ -379,9 +379,12 @@ function [start, count, collapse, inslab, loctype] = ...
    % so a mismatch errors rather than misaligns. Weights mode is kept (over the
    % now-fixed exactremap-0hv 'areaavg' path) because it solves the polygon
    % geometry ONCE and reuses it across every year's data block via the collapse
-   % closure below; a coordinate-list / 'areaavg' swap was tested and does NOT
-   % reproduce this verified weighting (it differs ~4% via the infill/mask path),
-   % so it is not a free simplification - see bead icemodel-1ps.18.
+   % closure below. (A coordinate-list 'weights' call computes the IDENTICAL
+   % weights - verified: same sum, bit-identical sorted set - but returns them in
+   % exactremap's reconstructed-grid order, not the input-list order, so it needs
+   % an index remap-back and is no simpler than this transpose. The clean
+   % migration is 'areaavg' on the multi-page V stack, which returns the
+   % aggregate directly with no per-cell weight to reorder - see icemodel-1ps.18.)
    W = exactremap([], rlon(rows), rlat(cols), Pgeo, 'weights', ...
       'GridMapping', gm, 'CellAreas', cellareas(rows, cols).', ...
       'ValidCellsMask', validmask(rows, cols).', 'InfillMasked', true);
