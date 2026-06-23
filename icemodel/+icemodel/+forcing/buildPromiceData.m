@@ -190,7 +190,7 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
       % z_ice_surf is the ice surface relative to installation (decreases as
       % the surface lowers); ablation = -(z - z(start)) is positive downward,
       % zeroed at the first finite sample of the window.
-      [aws.ablation, ~] = surfaceLowering(aws.z_ice_surf);
+      aws.ablation = surfaceLowering(aws.z_ice_surf);
       surface_meta.surface_channel = "ablation";
       surface_meta.surface_source = "L3 z_ice_surf";
 
@@ -395,13 +395,12 @@ function m = maxAbs(x)
    end
 end
 
-function [lowering, source] = surfaceLowering(z)
+function lowering = surfaceLowering(z)
    %SURFACELOWERING Cumulative surface lowering from an L3 ice-surface height.
    %
    % z (z_ice_surf) is the ice surface relative to installation and decreases
    % as the surface lowers, so lowering = -(z - z(first finite)) is positive
    % downward, zeroed at the first finite sample of the window.
-   source = "L3 z_ice_surf";
    first = find(isfinite(z), 1);
    if isempty(first)
       lowering = nan(size(z));
