@@ -251,6 +251,76 @@ function test_staging_second_site_does_not_churn_first(testCase)
       'KAN_L staged files churned when KAN_M was staged');
 end
 
+function test_missing_rcm_legs_still_yield_a_case(testCase)
+   % #15 / RR1 regression: PROMICE met+eval must NEVER be gated by RCM
+   % coverage. A site whose MAR/MERRA/RACMO source dirs are absent (the
+   % builders THROW) must still stage a PROMICE case - the RCM legs degrade
+   % to skipped legs in colocation, and the site is NOT wholesale skipped.
+   % This guards the staging bug where an erroring RCM builder, called inside
+   % the per-site try/catch, skipped the entire site.
+
+   % Resolve PROMICE on its own; this test does not need the RCM sources, so
+   % it must run even when S03 is unmounted (unlike the colocated tests).
+   promice = firstWithData([ ...
+      string(fullfile(icemodel.internal.fullpath('data'), ...
+      'verification', 'promice')), ...
+      "/Volumes/S03/DATA/greenland/geus/aws/l3"], ...
+      @(p) ~isempty(dir(fullfile(p, "hour", "*_hour.nc"))));
+   testCase.assumeTrue(strlength(promice) > 0, ...
+      'PROMICE source not available (no *_hour.nc on disk)');
+
+   % Private roots so nothing committed is touched.
+   tmp = tempname;
+   mkdir(tmp)
+   cleanup = onCleanup(@() rmdir(tmp, 's'));
+   eval_root = fullfile(tmp, 'eval');
+   input_root = fullfile(tmp, 'input');
+   mkdir(eval_root)
+   mkdir(fullfile(input_root, 'met'))
+   mkdir(fullfile(input_root, 'userdata'))
+
+   % Point every RCM dir at a path that cannot exist, forcing each builder to
+   % throw the "source directory not found" error - the exact failure mode
+   % that previously skipped the whole site.
+   missing = fullfile(tmp, 'no_such_rcm_source');
+
+   manifest = icemodel.verification.setup.importPromiceSites( ...
+      sites="KAN_M", ...
+      promice_dir=promice, ...
+      mar_dir=missing, merra_dir=missing, racmo_dir=missing, ...
+      startdate="2013-06-01", enddate="2013-06-30", ...
+      evaluation_data_root=eval_root, input_data_root=input_root, ...
+      icemodel_config_casename="", overwrite=true);
+
+   % The site STAGED as a case (not skipped) despite every RCM leg failing.
+   testCase.verifyEqual(numel(manifest.cases), 1, ...
+      'PROMICE site was wrongly skipped when its RCM legs were absent');
+   c = manifest.cases(1);
+   testCase.verifyEqual(string(c.case_id), "kanm");
+
+   % KAN_M is NOT in skipped - only its RCM legs are.
+   if ~isempty(manifest.skipped)
+      skip_sites = string(arrayfun(@(s) string(s.site), manifest.skipped));
+      testCase.verifyFalse(ismember("KAN_M", skip_sites));
+   end
+
+   % PROMICE leg fully staged: it remains the forcing + eval source.
+   testCase.verifyTrue(ismember("promice", string(c.forcing_sources)));
+   testCase.verifyTrue(ismember("promice_obs", string(c.eval_sources)));
+
+   % Each RCM leg recorded as a skipped leg with a reason, never fabricated.
+   cf = c.colocation;
+   testCase.verifyFalse(cf.mar.staged);
+   testCase.verifyFalse(cf.merra.staged);
+   testCase.verifyFalse(cf.racmo.staged);
+   testCase.verifyGreaterThan(strlength(string(cf.mar.reason)), 0);
+
+   % RCM legs are absent from the forcing/eval source lists (no fabrication).
+   testCase.verifyFalse(ismember("mar", string(c.forcing_sources)));
+   testCase.verifyFalse(ismember("merra", string(c.forcing_sources)));
+   testCase.verifyFalse(ismember("racmo", string(c.eval_sources)));
+end
+
 %% Local helpers
 function manifest = stageKanm(testCase, startdate, enddate)
    %STAGEKANM Stage the KAN_M bundle into the private test roots.

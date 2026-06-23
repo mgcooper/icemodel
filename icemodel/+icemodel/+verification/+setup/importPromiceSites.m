@@ -258,8 +258,8 @@ function manifest = importPromiceSites(kwargs)
 
             colocation.promice = struct( ...
                'kind', 'station_met_and_eval', ...
-               'met_files', relpaths(promice_met_files, met_outdir), ...
-               'data_files', relpaths(promice_data_files, userdata_outdir), ...
+               'met_files', icemodel.verification.setup.relpaths(promice_met_files, met_outdir), ...
+               'data_files', icemodel.verification.setup.relpaths(promice_data_files, userdata_outdir), ...
                'window', windowStruct(promice_start, promice_end));
 
             forcing_sources(end + 1) = "promice"; %#ok<AGROW>
@@ -268,62 +268,82 @@ function manifest = importPromiceSites(kwargs)
             [comparison_vars, obs_vars] = firnComparisonContract(promice_data);
          end
 
+         % RCM legs are INDEPENDENT and OPTIONAL (#15 / RR1): a missing or
+         % erroring MAR/MERRA/RACMO leg is recorded as a skipped leg and the
+         % site's PROMICE met+eval still stages as a case. Each leg's staging
+         % therefore runs under its OWN guard - the coverage probe gates the
+         % expected "no on-disk coverage" case, and the try/catch additionally
+         % catches a builder that throws (e.g. a source dir that vanished
+         % between the probe and the build, or a read error) so the throw
+         % degrades that one leg, never the whole site.
          if ismember("mar", models)
-            if leg.mar.staged
-               mar_met = icemodel.forcing.buildMarMet(point, leg.mar.years, ...
-                  source_dir=kwargs.mar_dir, modis_dir=kwargs.modis_dir, ...
-                  method="nearest", dt_out=kwargs.dt_out);
-               mar_met = windowSubset(mar_met, leg.mar.start, leg.mar.end);
-               mar_met_files = icemodel.forcing.helpers.writemet( ...
-                  mar_met, alias, "mar", outdir=met_outdir, naming="window");
-               colocation.mar = struct( ...
-                  'kind', 'point_met', ...
-                  'met_files', relpaths(mar_met_files, met_outdir), ...
-                  'sample_method', 'nearest', ...
-                  'window', windowStruct(leg.mar.start, leg.mar.end));
-               forcing_sources(end + 1) = "mar"; %#ok<AGROW>
-            else
-               colocation.mar = skippedLeg('point_met', leg.mar.reason);
+            try
+               if leg.mar.staged
+                  mar_met = icemodel.forcing.buildMarMet(point, leg.mar.years, ...
+                     source_dir=kwargs.mar_dir, modis_dir=kwargs.modis_dir, ...
+                     method="nearest", dt_out=kwargs.dt_out);
+                  mar_met = windowSubset(mar_met, leg.mar.start, leg.mar.end);
+                  mar_met_files = icemodel.forcing.helpers.writemet( ...
+                     mar_met, alias, "mar", outdir=met_outdir, naming="window");
+                  colocation.mar = struct( ...
+                     'kind', 'point_met', ...
+                     'met_files', icemodel.verification.setup.relpaths(mar_met_files, met_outdir), ...
+                     'sample_method', 'nearest', ...
+                     'window', windowStruct(leg.mar.start, leg.mar.end));
+                  forcing_sources(end + 1) = "mar"; %#ok<AGROW>
+               else
+                  colocation.mar = skippedLeg('point_met', leg.mar.reason);
+               end
+            catch leg_err
+               colocation.mar = skippedLeg('point_met', leg_err.message);
             end
          end
 
          if ismember("merra", models)
-            if leg.merra.staged
-               merra_met = icemodel.forcing.buildMerraMet(point, leg.merra.years, ...
-                  source_dir=kwargs.merra_dir, modis_dir=kwargs.modis_dir, ...
-                  method="nearest", dt_out=kwargs.dt_out);
-               merra_met = windowSubset(merra_met, leg.merra.start, leg.merra.end);
-               merra_met_files = icemodel.forcing.helpers.writemet( ...
-                  merra_met, alias, "merra", outdir=met_outdir, naming="window");
-               colocation.merra = struct( ...
-                  'kind', 'point_met', ...
-                  'met_files', relpaths(merra_met_files, met_outdir), ...
-                  'sample_method', 'nearest', ...
-                  'window', windowStruct(leg.merra.start, leg.merra.end));
-               forcing_sources(end + 1) = "merra"; %#ok<AGROW>
-            else
-               colocation.merra = skippedLeg('point_met', leg.merra.reason);
+            try
+               if leg.merra.staged
+                  merra_met = icemodel.forcing.buildMerraMet(point, leg.merra.years, ...
+                     source_dir=kwargs.merra_dir, modis_dir=kwargs.modis_dir, ...
+                     method="nearest", dt_out=kwargs.dt_out);
+                  merra_met = windowSubset(merra_met, leg.merra.start, leg.merra.end);
+                  merra_met_files = icemodel.forcing.helpers.writemet( ...
+                     merra_met, alias, "merra", outdir=met_outdir, naming="window");
+                  colocation.merra = struct( ...
+                     'kind', 'point_met', ...
+                     'met_files', icemodel.verification.setup.relpaths(merra_met_files, met_outdir), ...
+                     'sample_method', 'nearest', ...
+                     'window', windowStruct(leg.merra.start, leg.merra.end));
+                  forcing_sources(end + 1) = "merra"; %#ok<AGROW>
+               else
+                  colocation.merra = skippedLeg('point_met', leg.merra.reason);
+               end
+            catch leg_err
+               colocation.merra = skippedLeg('point_met', leg_err.message);
             end
          end
 
          if ismember("racmo", models)
-            if leg.racmo.staged
-               % RACMO uses its OWN coverage, decoupled from the met window.
-               [racmo_data, ~] = icemodel.forcing.buildRacmoData(point, ...
-                  leg.racmo.years, source_dir=kwargs.racmo_dir, ...
-                  modis_dir=kwargs.modis_dir, method="nearest", dt="1hr");
-               racmo_data = windowSubset(racmo_data, leg.racmo.start, leg.racmo.end);
-               racmo_data_files = icemodel.forcing.helpers.writeuserdata( ...
-                  racmo_data, alias, "racmo", outdir=userdata_outdir);
-               colocation.racmo = struct( ...
-                  'kind', 'point_data_smb_eval', ...
-                  'data_files', relpaths(racmo_data_files, userdata_outdir), ...
-                  'sample_method', 'nearest', ...
-                  'window', windowStruct(leg.racmo.start, leg.racmo.end), ...
-                  'note', 'SMB/eval Data only; RACMO is not a met source.');
-               eval_sources(end + 1) = "racmo"; %#ok<AGROW>
-            else
-               colocation.racmo = skippedLeg('point_data_smb_eval', leg.racmo.reason);
+            try
+               if leg.racmo.staged
+                  % RACMO uses its OWN coverage, decoupled from the met window.
+                  [racmo_data, ~] = icemodel.forcing.buildRacmoData(point, ...
+                     leg.racmo.years, source_dir=kwargs.racmo_dir, ...
+                     modis_dir=kwargs.modis_dir, method="nearest", dt="1hr");
+                  racmo_data = windowSubset(racmo_data, leg.racmo.start, leg.racmo.end);
+                  racmo_data_files = icemodel.forcing.helpers.writeuserdata( ...
+                     racmo_data, alias, "racmo", outdir=userdata_outdir);
+                  colocation.racmo = struct( ...
+                     'kind', 'point_data_smb_eval', ...
+                     'data_files', icemodel.verification.setup.relpaths(racmo_data_files, userdata_outdir), ...
+                     'sample_method', 'nearest', ...
+                     'window', windowStruct(leg.racmo.start, leg.racmo.end), ...
+                     'note', 'SMB/eval Data only; RACMO is not a met source.');
+                  eval_sources(end + 1) = "racmo"; %#ok<AGROW>
+               else
+                  colocation.racmo = skippedLeg('point_data_smb_eval', leg.racmo.reason);
+               end
+            catch leg_err
+               colocation.racmo = skippedLeg('point_data_smb_eval', leg_err.message);
             end
          end
 
@@ -353,6 +373,11 @@ function manifest = importPromiceSites(kwargs)
             icemodel.verification.setup.makeFirnCaseManifestEntry(case_values); %#ok<AGROW>
 
       catch err
+         % Only a PROMICE-leg or metadata failure reaches here and skips the
+         % whole site (the RCM legs are guarded individually above and degrade
+         % to skipped legs, never a skipped site - #15 / RR1). A missing
+         % station file, an empty PROMICE window, or a manifest-entry error is
+         % a legitimate whole-site skip.
          if ~kwargs.skip_missing
             rethrow(err)
          end
@@ -574,14 +599,6 @@ function tt = windowSubset(tt, t1, t2)
    end
    keep = t >= t1 & t <= t2;
    tt = tt(keep, :);
-end
-
-function rel = relpaths(filenames, base)
-   %RELPATHS Reduce absolute staged paths to base-relative names for JSON.
-   filenames = string(filenames);
-   base = string(base);
-   rel = erase(filenames, base + filesep);
-   rel = reshape(rel, 1, []);
 end
 
 function [comparison_vars, obs_vars] = firnComparisonContract(promice_data)
