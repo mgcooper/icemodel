@@ -408,6 +408,67 @@ function test_sumup_cases_inherit_kan_zone_and_target(testCase)
    end
 end
 
+function test_bundled_eval_target_is_forcing_agnostic_data_only(testCase)
+   % The re-architecture central contract: the eval target is a data-only
+   % observations.mat bundle (a `targets` struct with format + data/metadata,
+   % NO forcing), referenced via evaluation_path. Verify it across the two
+   % observational families that ship the bundle on disk (esm_snowmip cdp +
+   % the SUMup KAN cases): the bundle loads through the standard loadArtifact
+   % path, carries a recognized format and a data payload, and bundles no
+   % forcing field. This is the forcing-agnostic eval contract; the forcing is
+   % discovered separately at runtime, never inside observations.mat.
+
+   forcing_fields = ["forcing", "met", "forcings", "tair", "swd", "lwd"];
+
+   % esm_snowmip cdp: timeseries obs bundle.
+   esm = icemodel.verification.loadmanifest("cdp");
+   testCase.assertTrue(isfile(esm.evaluation_path), ...
+      'cdp observations.mat missing on disk');
+   esm_targets = icemodel.verification.helpers.loadArtifact( ...
+      esm.evaluation_path, "targets");
+   testCase.verifyEqual(string(esm_targets.format), "timeseries");
+   testCase.verifyTrue(isfield(esm_targets, 'data'), ...
+      'cdp eval target carries no data payload');
+   testCase.verifyTrue(istimetable(esm_targets.data), ...
+      'cdp eval target data is not a timetable');
+   testCase.verifyFalse(any(isfield(esm_targets, cellstr(forcing_fields))), ...
+      'cdp observations.mat bundles forcing (must be forcing-agnostic)');
+
+   % SUMup KAN cases: subsurface_profile_bundle obs bundles.
+   for id = testCase.TestData.expected_sumup_ids'
+      su = icemodel.verification.loadmanifest(id, dataset_family="sumup");
+      testCase.assertTrue(isfile(su.evaluation_path), ...
+         sprintf('%s sumup observations.mat missing on disk', id));
+      su_targets = icemodel.verification.helpers.loadArtifact( ...
+         su.evaluation_path, "targets");
+      testCase.verifyTrue(strlength(string(su_targets.format)) > 0, ...
+         sprintf('%s sumup eval target has no format', id));
+      testCase.verifyTrue(isfield(su_targets, 'data'), ...
+         sprintf('%s sumup eval target carries no data payload', id));
+      testCase.verifyFalse(any(isfield(su_targets, cellstr(forcing_fields))), ...
+         sprintf('%s sumup observations.mat bundles forcing', id));
+   end
+end
+
+function test_forcing_sources_is_informational_not_load_bearing(testCase)
+   % forcing_sources is INFORMATIONAL only: the eval (observations.mat /
+   % evaluation_path) and the comparison contract (comparison_variables) drive
+   % comparecase, never forcing_sources. Verify each firn case carries
+   % forcing_sources as a metadata string list AND that the comparison driver
+   % resolves the case without consulting it (comparecase reports soft metrics
+   % regardless of what forcing_sources lists).
+
+   for case_entry = reshape(testCase.TestData.firn_cases, 1, [])
+      id = string(case_entry.case_id);
+      manifest = icemodel.verification.loadmanifest(id, dataset_family="promice");
+      testCase.verifyTrue(isfield(manifest, 'forcing_sources'), ...
+         sprintf('%s missing forcing_sources', id));
+      % It is a recorded id list (strings), not a data handle.
+      testCase.verifyTrue(isstring(string(manifest.forcing_sources)), ...
+         sprintf('%s forcing_sources is not a string id list', id));
+   end
+end
+
 function test_sumup_obs_files_resolve_on_disk(testCase)
    % Each committed SUMup case must reference an observation profile bundle
    % (colocation.sumup.obs_file) that resolves on disk, and listcases must

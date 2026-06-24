@@ -116,8 +116,9 @@ function test_colocated_bundle_and_manifest_resolve(testCase)
 end
 
 function test_staged_files_exist_on_disk(testCase)
-   % The individual met / userdata files must be written to disk. Colocation is
-   % metadata-only: NO per-case evaluation.mat / reference.mat bundle is staged.
+   % The individual met / userdata files must be written to disk. The eval is a
+   % data-only observations.mat; NO evaluation.mat / reference.mat bundle (the
+   % forcing/reference side is never bundled with the eval target).
 
    stageKanm(testCase, "2013-06-01", "2013-06-30");
 
@@ -144,7 +145,7 @@ end
 function test_colocated_data_reconstitutes_from_individual_files(testCase)
    % The eval target (PROMICE obs) and the RCM reference (RACMO Data) must
    % reconstitute on demand from the individual per-year userdata files the
-   % metadata-only manifest declares - no committed bundle needed.
+   % forcing-agnostic manifest declares - no committed forcing bundle needed.
 
    manifest = stageKanm(testCase, "2013-06-01", "2013-06-30");
    c = manifest.cases(1);
@@ -224,12 +225,23 @@ function test_staging_second_site_does_not_churn_first(testCase)
       'manifest.json');
    kanl_manifest_before = fileread(manifest_file);
 
-   met_dir = fullfile(testCase.TestData.input_root, 'met');
-   ud_dir = fullfile(testCase.TestData.input_root, 'userdata');
+   % Fingerprint the always-staged KAN_L artifacts: the data-only eval bundle
+   % (eval/promice/kanl/observations.mat) and the promice forcing/Data files.
+   % writemet/writeuserdata stage into a per-source subfolder (met/<source>/,
+   % userdata/<source>/), so glob there. The PROMICE MET leg is independently
+   % skippable (a station/window with no longwave sensor degrades to a skipped
+   % met leg while the eval obs still stage - #15 / RR1), so it is folded in
+   % only when present rather than required.
+   eval_case_dir = fullfile(testCase.TestData.eval_root, 'promice', 'kanl');
+   met_dir = fullfile(testCase.TestData.input_root, 'met', 'promice');
+   ud_dir = fullfile(testCase.TestData.input_root, 'userdata', 'promice');
+   kanl_eval = dir(fullfile(eval_case_dir, 'observations.mat'));
    kanl_met = dir(fullfile(met_dir, 'met_kanl_*'));
    kanl_ud = dir(fullfile(ud_dir, 'kanl_*'));
-   testCase.assertNotEmpty(kanl_met);
-   before = fileFingerprints([kanl_met; kanl_ud], {met_dir, ud_dir});
+   testCase.assertNotEmpty(kanl_ud, ...
+      'KAN_L staged no promice userdata (eval leg failed)');
+   before = fileFingerprints([kanl_eval; kanl_met; kanl_ud], ...
+      {eval_case_dir, met_dir, ud_dir});
 
    % Snapshot the KAN_L case JSON region from the merged manifest.
    m_before = jsondecode(kanl_manifest_before);
@@ -247,8 +259,9 @@ function test_staging_second_site_does_not_churn_first(testCase)
       'KAN_L case churned when KAN_M was staged');
 
    % KAN_L's staged files are byte-identical (size + content hash).
-   after = fileFingerprints([dir(fullfile(met_dir, 'met_kanl_*')); ...
-      dir(fullfile(ud_dir, 'kanl_*'))], {met_dir, ud_dir});
+   after = fileFingerprints([dir(fullfile(eval_case_dir, 'observations.mat')); ...
+      dir(fullfile(met_dir, 'met_kanl_*')); ...
+      dir(fullfile(ud_dir, 'kanl_*'))], {eval_case_dir, met_dir, ud_dir});
    testCase.verifyEqual(after, before, ...
       'KAN_L staged files churned when KAN_M was staged');
 end
