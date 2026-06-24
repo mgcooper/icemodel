@@ -75,7 +75,7 @@ function opts = configureRun(opts)
    end
 
    if ~isfield(opts, 'metfname') || isempty(opts.metfname)
-      opts.metfname = fullfile(opts.pathinput, 'met', ...
+      opts.metfname = resolveMetPaths(opts.pathinput, opts.forcings, ...
          icemodel.createMetFileNames(opts));
    elseif ischar(opts.metfname) || isstring(opts.metfname)
       opts.metfname = cellstr(opts.metfname);
@@ -282,6 +282,27 @@ function args = runWindowArgs(opts)
       return
    end
    args = {opts.startdate, opts.enddate};
+end
+
+function paths = resolveMetPaths(pathinput, forcings, names)
+   %RESOLVEMETPATHS Resolve met file names to full paths, family subfolder first.
+   % Prefer the per-source subfolder input/met/<forcings>/<name> (the staging
+   % layout that keeps met/ from sprawling); fall back to flat input/met/<name>
+   % so existing flat files still resolve. The forcings label IS the subfolder
+   % key, so no extra option is needed.
+
+   met_base = fullfile(pathinput, 'met');
+   sub = fullfile(met_base, char(forcings));
+   names = cellstr(names);
+   paths = cell(1, numel(names));
+   for n = 1:numel(names)
+      candidate = fullfile(sub, names{n});
+      if isfile(candidate)
+         paths{n} = candidate;
+      else
+         paths{n} = fullfile(met_base, names{n});
+      end
+   end
 end
 
 function opts = configureTimeWindow(opts)

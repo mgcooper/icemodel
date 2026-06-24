@@ -91,14 +91,23 @@ function name = findEnclosingMetFile(opts, metname, forcings, ...
    if ~isfield(opts, 'pathinput') || isempty(opts.pathinput)
       return
    end
-   met_dir = fullfile(opts.pathinput, 'met');
-   if ~isfolder(met_dir)
-      return
+   met_base = fullfile(opts.pathinput, 'met');
+   prefix = ['met_' metname '_' forcings];
+   % Look in the per-source subfolder (met/<forcings>/) first, then the flat
+   % met dir, so a staged enclosing window file is found in either layout.
+   for d = {fullfile(met_base, char(forcings)), met_base}
+      met_dir = d{1};
+      if ~isfolder(met_dir)
+         continue
+      end
+      if isfile(fullfile(met_dir, exact_name))
+         return   % exact file exists; caller uses exact_name (path resolved later)
+      end
+      enclosing = icemodel.forcing.helpers.findEnclosingWindowFile(met_dir, ...
+         prefix, ['_' dtstr], startdate, enddate);
+      if strlength(enclosing) > 0
+         name = char(enclosing);
+         return
+      end
    end
-   if isfile(fullfile(met_dir, exact_name))
-      return
-   end
-   enclosing = icemodel.forcing.helpers.findEnclosingWindowFile(met_dir, ...
-      ['met_' metname '_' forcings], ['_' dtstr], startdate, enddate);
-   name = char(enclosing);
 end

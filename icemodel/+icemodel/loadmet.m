@@ -192,15 +192,26 @@ function filepath = resolveUserdataFile(opts, thisyear, mettime)
    % icemodel.createMetFileNames uses for met files), bracketed by the actual
    % met time span rather than the whole calendar year.
 
+   % Look in the per-source subfolder userdata/<source>/ first, then the flat
+   % userdata dir, in each preferring the window file then the per-year file.
    base = [opts.sitename '_' char(opts.userdata)];
-   enclosing = icemodel.forcing.helpers.findEnclosingWindowFile( ...
-      opts.pathuserdata, base, '.mat', min(mettime), max(mettime));
-   if strlength(enclosing) > 0
-      filepath = fullfile(opts.pathuserdata, char(enclosing));
-   else
-      filepath = fullfile(opts.pathuserdata, ...
-         [base '_' int2str(thisyear) '.mat']);
+   peryear_name = [base '_' int2str(thisyear) '.mat'];
+   for u = {fullfile(opts.pathuserdata, char(opts.userdata)), opts.pathuserdata}
+      udir = u{1};
+      enclosing = icemodel.forcing.helpers.findEnclosingWindowFile( ...
+         udir, base, '.mat', min(mettime), max(mettime));
+      if strlength(enclosing) > 0
+         filepath = fullfile(udir, char(enclosing));
+         return
+      end
+      if isfile(fullfile(udir, peryear_name))
+         filepath = fullfile(udir, peryear_name);
+         return
+      end
    end
+   % Not found in either layout: return the flat per-year path so the caller
+   % raises a clean "userdata file does not exist" error.
+   filepath = fullfile(opts.pathuserdata, peryear_name);
 end
 
 %%
