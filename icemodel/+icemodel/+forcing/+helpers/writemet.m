@@ -49,6 +49,10 @@ function filenames = writemet(met, site, forcings, kwargs)
    if outdir == ""
       outdir = string(fullfile(icemodel.getpath('input'), 'met'));
    end
+   % Stage into the per-source subfolder met/<forcings>/ so the flat met/ folder
+   % does not sprawl as verification staging grows; the runtime resolves this
+   % subfolder first (icemodel.configureRun / createMetFileNames).
+   outdir = fullfile(outdir, char(forcings));
    if ~isfolder(outdir)
       mkdir(outdir)
    end

@@ -164,8 +164,9 @@ function test_import_driver_stages_forcing_legs_when_present(testCase)
    testCase.verifyTrue(isfield(c.colocation.racmo, 'data_files') ...
       && ~isempty(c.colocation.racmo.data_files));
    testCase.verifyTrue(ismember("mar", string(c.forcing_sources)));
-   testCase.verifyNotEmpty(dir(fullfile(input_root, 'met', '*mar*.mat')));
-   testCase.verifyNotEmpty(dir(fullfile(input_root, 'userdata', '*racmo*.mat')));
+   testCase.verifyNotEmpty(dir(fullfile(input_root, 'met', 'mar', '*mar*.mat')));
+   testCase.verifyNotEmpty( ...
+      dir(fullfile(input_root, 'userdata', 'racmo', '*racmo*.mat')));
 end
 
 function test_temperature_and_smb_parsed(testCase)

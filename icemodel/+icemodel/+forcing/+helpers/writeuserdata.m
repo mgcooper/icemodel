@@ -56,6 +56,10 @@ function filenames = writeuserdata(Data, site, source, kwargs)
    if outdir == ""
       outdir = string(icemodel.getpath('userdata'));
    end
+   % Stage into the per-source subfolder userdata/<source>/ so the flat userdata/
+   % folder does not sprawl; the runtime resolves this subfolder first
+   % (icemodel.loadmet.resolveUserdataFile).
+   outdir = fullfile(outdir, char(source));
    if ~isfolder(outdir)
       mkdir(outdir)
    end

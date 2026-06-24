@@ -125,13 +125,15 @@ function test_staged_files_exist_on_disk(testCase)
    ud_dir = fullfile(testCase.TestData.input_root, 'userdata');
    eval_dir = fullfile(testCase.TestData.eval_root, 'promice', 'kanm');
 
-   testCase.verifyNotEmpty(dir(fullfile(met_dir, 'met_kanm_promice_*.mat')));
-   testCase.verifyNotEmpty(dir(fullfile(met_dir, 'met_kanm_mar_*.mat')));
-   testCase.verifyNotEmpty(dir(fullfile(met_dir, 'met_kanm_merra_*.mat')));
-   testCase.verifyNotEmpty(dir(fullfile(ud_dir, 'kanm_promice_*.mat')));
-   testCase.verifyNotEmpty(dir(fullfile(ud_dir, 'kanm_racmo_*.mat')));
+   % Forcing/userdata stage into per-source subfolders (met/<source>/, userdata/<source>/).
+   testCase.verifyNotEmpty(dir(fullfile(met_dir, 'promice', 'met_kanm_promice_*.mat')));
+   testCase.verifyNotEmpty(dir(fullfile(met_dir, 'mar', 'met_kanm_mar_*.mat')));
+   testCase.verifyNotEmpty(dir(fullfile(met_dir, 'merra', 'met_kanm_merra_*.mat')));
+   testCase.verifyNotEmpty(dir(fullfile(ud_dir, 'promice', 'kanm_promice_*.mat')));
+   testCase.verifyNotEmpty(dir(fullfile(ud_dir, 'racmo', 'kanm_racmo_*.mat')));
 
-   % No bundled colocation data copy.
+   % Eval is the data-only observations.mat (no bundled evaluation/reference copy).
+   testCase.verifyTrue(isfile(fullfile(eval_dir, 'observations.mat')));
    testCase.verifyFalse(isfile(fullfile(eval_dir, 'evaluation.mat')));
    testCase.verifyFalse(isfile(fullfile(eval_dir, 'reference.mat')));
 
