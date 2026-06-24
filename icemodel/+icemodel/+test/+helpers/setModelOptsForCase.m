@@ -91,7 +91,14 @@ function opts = optsFromVerificationManifest(case_manifest, kwargs)
    smbmodel = char(kwargs.smbmodel);
    sitename = char(string(case_manifest.case_id));
    simyears = unique(year([window_start; window_end]))';
+   % The dataset's own met is labeled by its family (the forcing source), e.g.
+   % met_<site>_esmsnowmip - so forcings is the compact family label, not the
+   % sitename. Falls back to the sitename when no family is recorded.
    forcings = sitename;
+   if isfield(case_manifest, 'dataset_family') ...
+         && strlength(string(case_manifest.dataset_family)) > 0
+      forcings = char(replace(string(case_manifest.dataset_family), "_", ""));
+   end
    userdata = [];
    uservars = [];
    testname = char(kwargs.testname);
