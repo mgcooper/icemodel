@@ -44,17 +44,40 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
       kwargs.startdate = ""
       kwargs.enddate = ""
       kwargs.fillwinter (1, 1) logical = true
+      kwargs.fill_lwd (1, 1) logical = false
    end
 
    [aws, source_meta] = icemodel.forcing.readPromiceAws(site, ...
       source_dir=kwargs.source_dir, timescale="hourly", ...
       startdate=kwargs.startdate, enddate=kwargs.enddate);
 
+   % lwd source. Normally the observed channel. OPT-IN fallback (fill_lwd, off
+   % by default) for stations with no longwave sensor (older GC-Net/firn sites,
+   % where dlr is absent or all-NaN in the window): estimate lwd from air
+   % temperature + vapor pressure via the legacy empirical relation, FLAGGED as
+   % estimated in metadata. The strict met contract still requires a real lwd
+   % for genuine forcing sources, so by default an absent lwd fails validation.
+   has_lwd = ismember('lwd', aws.Properties.VariableNames) ...
+      && any(isfinite(aws.lwd));
+   lwd_estimated = false;
+   if has_lwd
+      lwd = aws.lwd;
+   elseif kwargs.fill_lwd
+      ea = icemodel.vapor.saturation_vapor_pressure(aws.tair, true) ...
+         .* aws.rh ./ 100;
+      lwd = icemodel.surface.empirical_incoming_longwave_radiation(aws.tair, ea);
+      lwd_estimated = true;
+   elseif ismember('lwd', aws.Properties.VariableNames)
+      lwd = aws.lwd;                  % present but all-NaN -> validatemet rejects
+   else
+      lwd = nan(height(aws), 1);      % absent -> clean "no finite samples" error
+   end
+
    % Assemble the met variables. PROMICE has no precipitation channel;
    % ppt is explicitly zero (see header note).
    Time = aws.Time;
    met = timetable(Time, ...
-      aws.tair, aws.swd, aws.lwd, ...
+      aws.tair, aws.swd, lwd, ...
       icemodel.forcing.fillPromiceAlbedo(aws.albedo, Time, ...
       fillwinter=kwargs.fillwinter), ...
       aws.wspd, aws.rh, aws.psfc, zeros(height(aws), 1), ...
@@ -80,4 +103,12 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
       "ppt = 0 (PROMICE has no precipitation sensor; swap in a gridded source)";
    metadata.humidity_policy = ...
       "rh from the PROMICE v3 rh_wrtwater channel (percent, w.r.t. water)";
+   metadata.lwd_estimated = lwd_estimated;
+   if lwd_estimated
+      metadata.lwd_policy = ...
+         "lwd ESTIMATED from tair + vapor pressure (no longwave sensor; " + ...
+         "icemodel.surface.empirical_incoming_longwave_radiation, fill_lwd=true)";
+   else
+      metadata.lwd_policy = "lwd from the observed dlr channel";
+   end
 end
