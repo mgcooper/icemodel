@@ -241,6 +241,7 @@ function manifest = importPromiceSites(kwargs)
          eval_sources = strings(0, 1);
          comparison_vars = strings(0, 1);
          obs_vars = struct();
+         evaluation_file_rel = '';
 
          if ismember("promice", models)
             % EVAL leg FIRST: the PROMICE observations are the primary target and
@@ -254,6 +255,15 @@ function manifest = importPromiceSites(kwargs)
                naming="window");
             eval_sources(end + 1) = "promice_obs"; %#ok<AGROW>
             [comparison_vars, obs_vars] = firnComparisonContract(promice_data);
+
+            % Forcing-AGNOSTIC eval bundle: the data-only observations.mat that
+            % comparecase loads (same contract as ESM-SnowMIP/SUMup). The forcing
+            % lives in separate met/userdata files, not here.
+            targets = struct('format', 'timeseries', ...
+               'data', promice_data, 'metadata', ...
+               struct('source', 'promice_obs', 'site_id', char(site)));
+            save(fullfile(case_root, 'observations.mat'), 'targets');
+            evaluation_file_rel = char(fullfile(alias, 'observations.mat'));
 
             promice_co = struct('kind', 'station_met_and_eval');
             promice_co.data_files = ...
@@ -375,6 +385,7 @@ function manifest = importPromiceSites(kwargs)
             site_location
             struct('start', char(string(promice_start)), ...
             'end', char(string(promice_end)))
+            evaluation_file_rel
             cellstr(forcing_sources)
             cellstr(eval_sources)
             cellstr(comparison_vars)

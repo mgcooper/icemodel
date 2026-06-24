@@ -31,9 +31,13 @@ function names = firnCaseManifestFieldNames()
    %                          /glacier sites carry "none".
    %    site_location         WGS84 + EPSG:3413 projected coordinates
    %    period                {start, end} the case's evaluation window
-   %    forcing_sources       string array of available forcing source ids
-   %                          (e.g. ["promice","mar","merra"]) - which met files
-   %                          exist to run this site, NOT a bundled data copy
+   %    evaluation_file       case-relative path to the data-only observations.mat
+   %                          (the eval target bundle), e.g. "kanm/observations.mat".
+   %                          This is the forcing-AGNOSTIC eval artifact comparecase
+   %                          loads; forcing is discovered at runtime, not here.
+   %    forcing_sources       string array of forcing source ids staged alongside
+   %                          (INFORMATIONAL only - NOT load-bearing; any forcing
+   %                          file may be used at runtime regardless of this list)
    %    eval_sources          string array of available eval source ids
    %                          (e.g. ["promice_obs","racmo"])
    %    comparison_variables  variables compared at this case
@@ -57,6 +61,7 @@ function names = firnCaseManifestFieldNames()
       "permafrost_zone"
       "site_location"
       "period"
+      "evaluation_file"
       "forcing_sources"
       "eval_sources"
       "comparison_variables"

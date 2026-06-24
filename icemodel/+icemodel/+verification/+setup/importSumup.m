@@ -283,6 +283,7 @@ function manifest = importSumup(source_dir, kwargs)
             site_location
             struct('start', periodStr(window_start, obs_start), ...
             'end', periodStr(window_end, obs_end))
+            char(fullfile(alias, obs_file))
             cellstr(forcing_sources)
             cellstr(eval_sources)
             cellstr(comparison_vars)

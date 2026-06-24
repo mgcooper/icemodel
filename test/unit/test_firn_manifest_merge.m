@@ -171,6 +171,7 @@ function entry = caseEntry(case_id, site_id, zone)
       struct('lat_wgs84', 67, 'lon_wgs84', -50, ...
       'x_epsg3413', -2e5, 'y_epsg3413', -2.5e6, 'elev_m', 600)
       struct('start', '01-Jan-2009', 'end', '31-Dec-2022')
+      char(fullfile(char(case_id), 'observations.mat'))
       cellstr(["promice"; "mar"])
       cellstr(["promice_obs"; "racmo"])
       cellstr(["tice1"; "tice2"])
