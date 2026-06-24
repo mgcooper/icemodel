@@ -61,7 +61,7 @@ function cases = listcases(kwargs)
 
    % Sort by case id so runner and test output are stable across filesystems.
    % Snow (esm_snowmip/laugh_tests) and firn (promice/sumup) families carry
-   % different case-entry schemas - the metadata-only firn schema adds
+   % different case-entry schemas - the forcing-agnostic firn schema adds
    % site_location, period, forcing_sources/eval_sources, and colocation - so
    % harmonize the field set to a common union before
    % vertcat, filling family-absent fields with []. This keeps the snow lane
@@ -139,11 +139,12 @@ function resolved = resolveCase(entry, family)
    resolved.family_root = family.family_root;
 
    % Resolve relative artifact paths at read time so manifests stay portable
-   % inside demo/data while workflow functions receive absolute paths. The
-   % metadata-only firn families (promice/sumup) do not ship a bundled
-   % evaluation_file; SUMup instead references a committed observation profile
-   % bundle via colocation.sumup.obs_file, so resolve that to evaluation_path
-   % when no evaluation_file is declared.
+   % inside demo/data while workflow functions receive absolute paths. The firn
+   % families bundle their eval target as observations.mat: promice references it
+   % via evaluation_file, SUMup references it via colocation.sumup.obs_file, so
+   % resolve that to evaluation_path when no evaluation_file is declared. (Legacy
+   % promice fixtures predating the bundle leave both empty and fall back to the
+   % per-year userdata reconstitution downstream.)
    resolved.evaluation_path = resolveCasePath(family.family_root, entry, ...
       'evaluation_file');
    if strlength(resolved.evaluation_path) == 0
@@ -174,9 +175,9 @@ function pathname = resolveCasePath(family_root, entry, fieldname)
    %RESOLVECASEPATH Resolve one optional relative manifest path.
    %
    % An absent field or an empty relative path resolves to "" (no bundle).
-   % The metadata-only families leave reference_file empty (esm_snowmip) or
-   % omit it entirely (promice/sumup); both must yield "" rather than the
-   % bare family_root so downstream existence checks fall through cleanly.
+   % The firn families leave reference_file empty (esm_snowmip) or omit it
+   % entirely (promice/sumup); both must yield "" rather than the bare
+   % family_root so downstream existence checks fall through cleanly.
 
    pathname = "";
    if isfield(entry, fieldname) && strlength(string(entry.(fieldname))) > 0

@@ -8,14 +8,16 @@ function entry = makeFirnCaseManifestEntry(values)
    %           order (icemodel.verification.setup.firnCaseManifestFieldNames).
    %
    % Outputs
-   %  entry    Struct with the canonical metadata-only firn case-manifest schema.
+   %  entry    Struct with the canonical forcing-agnostic firn case-manifest
+   %           schema.
    %
    % Role
-   %  Setup helper used by the firn staging driver to make the metadata-only firn
-   %  case schema explicit. A driver that adds or drops a field fails early here
-   %  rather than writing a shifted JSON manifest. The entry records WHICH
-   %  forcing/eval sources are available (by id) and the colocation regime; it
-   %  does NOT bundle evaluation.mat/reference.mat data.
+   %  Setup helper used by the firn staging driver to make the forcing-agnostic
+   %  firn case schema explicit. A driver that adds or drops a field fails early
+   %  here rather than writing a shifted JSON manifest. The entry references the
+   %  bundled data-only observations.mat eval target via evaluation_file and
+   %  records WHICH forcing/eval sources are available (by id, INFORMATIONAL) and
+   %  the colocation regime; the forcing itself is not bundled or stipulated.
    %
    % See also: icemodel.verification.setup.makeCaseManifestEntry,
    %  icemodel.verification.setup.firnCaseManifestFieldNames

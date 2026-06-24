@@ -48,9 +48,12 @@ function f = plotcase(case_id, kwargs)
    manifest = icemodel.verification.loadmanifest(case_id, ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
       "icemodel_config_casename", kwargs.icemodel_config_casename);
-   % Metadata-only firn cases carry no bundled evaluation.mat/reference.mat:
-   % the PROMICE-obs target and RACMO reference reconstitute on demand from the
-   % staged per-year userdata files. Snow/Colbeck cases load the bundle.
+   % The eval target is a forcing-agnostic, data-only observations.mat bundle
+   % referenced via evaluation_path (ESM-SnowMIP, SUMup, freshly staged PROMICE,
+   % and the Snow/Colbeck evaluation.mat). Only PROMICE fixtures staged before
+   % the observations.mat contract lack that file; they fall back to
+   % reconstituting the PROMICE-obs target on demand from the staged per-year
+   % userdata files. The RACMO reference is always reconstituted from userdata.
    if isfield(manifest, 'evaluation_path') ...
          && strlength(string(manifest.evaluation_path)) > 0 ...
          && isfile(manifest.evaluation_path)

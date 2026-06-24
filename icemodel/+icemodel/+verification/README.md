@@ -178,14 +178,20 @@ Generated / staged smoke artifacts (committed):
 ```sh
 # Forcing follows the standard icemodel input layout so configureRun +
 # createMetFileNames + loadmet resolve it without verification-only branches.
-# Multi-year staged windows produce a single window-stamped file:
-demo/data/input/met/met_<case_id>_<case_id>_<YYYYMMDD>_<YYYYMMDD>_1hr.mat
+# writemet/writeuserdata stage into a per-source subfolder (NOT bundled with the
+# eval target - the eval is forcing-AGNOSTIC: any forcing usable at runtime).
+# Multi-year staged windows produce a single window-stamped file per source:
+demo/data/input/met/<source>/met_<site>_<source>_<YYYYMMDD>_<YYYYMMDD>_1hr.mat
+demo/data/input/userdata/<source>/<site>_<source>_<YYYYMMDD>_<YYYYMMDD>.mat
 
-# Observation targets and reference bundles stay in the eval tree. The
-# taxonomy is dataset-family-flat: families live directly under eval/ with no
-# intermediate snow/ or firn/ level (the physical regime is recorded per case
-# in the surface_zone manifest field instead).
-demo/data/eval/<dataset_family>/<case_id>/{evaluation,reference}.mat
+# Eval targets stay in the eval tree. The eval target is a data-only
+# observations.mat bundle per case (forcing-agnostic; ESM-SnowMIP, SUMup, and
+# freshly staged PROMICE). The analytical families add a reference.mat (the
+# frozen SUMMA / analytical solution). The taxonomy is dataset-family-flat:
+# families live directly under eval/ with no intermediate snow/ or firn/ level
+# (the physical regime is recorded per case in the surface_zone manifest field).
+demo/data/eval/<dataset_family>/<case_id>/observations.mat   # eval target
+demo/data/eval/<dataset_family>/<case_id>/reference.mat      # analytical only
 demo/data/eval/<dataset_family>/manifest.json
 ```
 
@@ -216,10 +222,17 @@ either error with a stable error id or return the partial path.
 ### PROMICE co-located firn staging (`importPromiceSites`)
 
 `importPromiceSites` stages PROMICE + MAR + MERRA-2 met + RACMO Data anchored on
-each PROMICE AWS site, writing **metadata-only** case manifests (colocation is
-recorded by source id, NOT bundled into evaluation.mat/reference.mat; the data
-lives in individual `met_<site>_<source>_<window>.mat` / per-year userdata files
-via the standard naming convention). The per-leg windows are **decoupled**:
+each PROMICE AWS site. The eval target IS bundled as a data-only
+`observations.mat` (the PROMICE-obs timeseries; same contract as
+ESM-SnowMIP/SUMup), referenced from the case `evaluation_file`. The manifest is
+**forcing-AGNOSTIC**: the FORCING is NOT bundled with the eval target and is NOT
+stipulated - any forcing file may be used at the site at runtime without
+rewriting `observations.mat`. Forcing/Data live in individual
+`<source>/met_<site>_<source>_<window>.mat` / per-year userdata files via the
+standard naming convention (`writemet`/`writeuserdata` stage into per-source
+subfolders `met/<source>/` and `userdata/<source>/`) and are recorded in the
+manifest `colocation` record by source id (`forcing_sources` is informational
+only). The per-leg windows are **decoupled**:
 PROMICE met/eval defaults to **all available years for each station** (read live
 from the L3 record, including partial years) and is **never gated by RCM
 coverage**; the MAR/MERRA met legs use the PROMICE window intersected with each
@@ -228,6 +241,15 @@ source's on-disk availability, while the RACMO Data leg uses its own coverage
 on-disk overlap is skipped-with-reason (recorded at `colocation.<model>`), and a
 requested-vs-actual coverage table is printed at the start of every run. Each
 leg's actual staged window is recorded at `colocation.<model>.window`.
+
+RACMO is staged as eval/reference Data, NOT a met source: the available RACMO
+2.3p3 source files carry radiation (swd, lwd, derived albedo), turbulent fluxes
+(shf, lhf), precip and SMB components, but LACK the near-surface meteorological
+STATE variables (tair, wspd, rh, psfc). (RACMO in general carries these; only
+the available source files omit them - obtain the full set from the RACMO
+developers, or borrow tair/wspd/rh/psfc from MAR/MERRA/PROMICE at the point, for
+a RACMO-forced run.) The same applies to the RACMO leg of the SUMup co-located
+forcing (`buildSumupForcing` / `importSumup`).
 
 The `output_root` kwarg is the explicit committed-vs-research switch: eval
 manifest goes to `<output_root>/eval`, forcing/Data to `<output_root>/input`.
@@ -314,18 +336,21 @@ local-glacier AWS -> `ablation`, `permafrost_zone=none` (on glacier ice).
 Uncataloged station ids fall back to the legacy elevation-band heuristic flagged
 `classification="first_pass"`.
 
-### SUMup metadata-only firn cases (`importSumup`)
+### SUMup firn cases (`importSumup`)
 
 `importSumup` stages SUMup_2025 firn observation profiles (density `rho(z)`,
 subsurface temperature `T(z,t)`, accumulation/SMB) as first-class
-**metadata-only** `firn_observational` cases under the `sumup` dataset family,
-enumerated by `listcases`/`loadmanifest` alongside `promice` and the snow
-families. A SUMup case is a manifest (`case_id`, `case_type="firn_observational"`,
-`site`, `surface_zone`, `eval_target`, `permafrost_zone`, `period`,
-`comparison_variables`, an observation-bundle reference, and the colocation
-record) - NOT a bundled forcing artifact. KAN-co-located SUMup cases inherit the
-anchor classification from `promicesiteinfo` (KAN_L/M=`ablation`,
-KAN_U=`percolation`).
+`firn_observational` cases under the `sumup` dataset family, enumerated by
+`listcases`/`loadmanifest` alongside `promice` and the snow families. The eval
+target IS bundled as a data-only `observations.mat` profile bundle (referenced
+via `colocation.sumup.obs_file`, resolved to the case `evaluation_path`); the
+manifest is **forcing-AGNOSTIC** - the co-located MAR met + RACMO Data forcing is
+NOT bundled with the eval target and is recorded by source id only. A SUMup case
+is a manifest (`case_id`, `case_type="firn_observational"`, `site`,
+`surface_zone`, `eval_target`, `permafrost_zone`, `period`,
+`comparison_variables`, the observation-bundle reference, and the colocation
+record). KAN-co-located SUMup cases inherit the anchor classification from
+`promicesiteinfo` (KAN_L/M=`ablation`, KAN_U=`percolation`).
 
 The 3 KAN-co-located SUMup cases are a **committed minimal fixture** under
 `demo/data/eval/sumup/` (small density/temperature/SMB profile tables in each
@@ -373,18 +398,26 @@ The per-case folder layout is split by `case_type`:
   `reference.mat` (the analytical / frozen-SUMMA solution the case is gated
   against). This is the reference, not a smoke copy, so it is KEPT.
 - **Observational families** (`esm_snowmip`/`esm_site`, `promice`/`sumup`/
-  `firn_observational`) are METADATA-ONLY: the case folder stores one
-  `observations.mat` obs bundle (the referenced observation file) and the
-  manifest records which forcing/eval sources are available. No bundled
+  `firn_observational`) are FORCING-AGNOSTIC: the case folder stores one
+  data-only `observations.mat` bundle (the eval target). The manifest is
+  forcing-agnostic - it records which forcing/eval sources are available (by id,
+  informational only), but the forcing is NOT bundled and NOT stipulated, so any
+  forcing usable at runtime without rewriting `observations.mat`. No bundled
   `reference.mat` smoke copy is written — the default candidate, with no model
   output supplied, falls through to the soft diagnostic lane. Forcing always
-  lives separately under `data/input/met/` (standard icemodel naming), never in
-  the eval folder.
+  lives separately under per-source subfolders `data/input/met/<source>/` and
+  `data/input/userdata/<source>/` (standard icemodel naming via
+  `writemet`/`writeuserdata`), never in the eval folder. (PROMICE demo fixtures
+  staged before this contract carry no
+  `observations.mat`; the workflow functions fall back to reconstituting the
+  PROMICE-obs target from the per-year userdata files those manifests declare.)
 
 Manifests keep case paths relative to the dataset-family folder. Normal workflow
-functions resolve those paths to absolute paths at read time. For esm_snowmip the
-`observations.mat` bundle is referenced from `evaluation_file` (and
-`observation_variables.obs_file`); `reference_file` is empty.
+functions resolve those paths to absolute paths at read time. For esm_snowmip and
+freshly staged promice the `observations.mat` bundle is referenced from
+`evaluation_file` (and `observation_variables.obs_file` for esm_snowmip); SUMup
+references it via `colocation.sumup.obs_file`. `reference_file` is empty for all
+observational families.
 
 ### Target schema variants
 

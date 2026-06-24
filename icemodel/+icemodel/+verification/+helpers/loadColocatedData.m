@@ -5,11 +5,14 @@ function bundle = loadColocatedData(manifest, source, kwargs)
    %  bundle = icemodel.verification.helpers.loadColocatedData(manifest, "racmo")
    %
    % Inputs
-   %  manifest         Resolved firn case manifest (metadata-only schema). Its
-   %                   `colocation` field records which source legs were staged
-   %                   and the per-year Data filenames under data/input/userdata.
-   %  source           Source id to load ("promice" for the eval target Data,
-   %                   "racmo" for the co-located RCM reference Data).
+   %  manifest         Resolved firn case manifest. Its `colocation` field
+   %                   records which source legs were staged and the per-year
+   %                   Data filenames under data/input/userdata.
+   %  source           Source id to load. "racmo" loads the co-located RCM
+   %                   reference Data (the standard use). "promice" loads the
+   %                   eval target Data, used only for legacy PROMICE fixtures
+   %                   staged before the bundled observations.mat eval contract;
+   %                   freshly staged cases bundle observations.mat instead.
    %  input_data_root  Optional base input-data root. When blank, the standard
    %                   chain (inputDataRoot) resolves it.
    %
@@ -20,11 +23,12 @@ function bundle = loadColocatedData(manifest, source, kwargs)
    %             .metadata provenance struct
    %
    % Role
-   %  Operational helper for the metadata-only firn lane. Colocation is recorded
-   %  as metadata (available sources + per-leg windows), not bundled into an
-   %  evaluation.mat/reference.mat. This helper reconstitutes a comparison bundle
-   %  on demand from the individual per-source userdata files the manifest
-   %  declares, so comparecase/plotcase keep their timeseries contract without a
+   %  Operational helper for the firn lane. The forcing/reference side is never
+   %  bundled: colocation is recorded as metadata (available sources + per-leg
+   %  windows) pointing at individual per-source userdata files. This helper
+   %  reconstitutes a comparison bundle on demand from those files, so
+   %  comparecase/plotcase keep their timeseries contract for the RACMO
+   %  reference (and the PROMICE-obs target on legacy fixtures) without a
    %  committed data bundle.
    %
    % See also: icemodel.verification.comparecase,

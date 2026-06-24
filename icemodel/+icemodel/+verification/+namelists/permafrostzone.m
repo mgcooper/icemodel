@@ -6,8 +6,9 @@ function permafrost_zones = permafrostzone()
    % Outputs
    %  permafrost_zones   Supported manifest permafrost_zone values. These record
    %                     the permafrost EXTENT class of the ground a verification
-   %                     case sits on, following the International Permafrost
-   %                     Association / Brown et al. (1997) circum-arctic scheme.
+   %                     case sits on, using the standard IPA extent codes
+   %                     sampled from the Obu et al. (2019) permafrost-zone map
+   %                     (the v1 Brown et al. 1997 source was replaced).
    %
    % Role
    %  Canonical permafrost-zone vocabulary shared by the setup importers (which
@@ -16,7 +17,7 @@ function permafrost_zones = permafrostzone()
    %  substrate REGIME ("where on the ice/off-ice transect"), permafrost_zone
    %  records the permafrost extent of the GROUND. An ice-sheet case sits on ice,
    %  not permafrost ground, so it carries "none"; an off-ice land/tundra case
-   %  carries the Brown extent class sampled at its location. "unknown" is
+   %  carries the Obu extent class sampled at its location. "unknown" is
    %  permitted where a site's permafrost extent has not been resolved.
    %
    %  The non-"none"/"unknown" values are the IPA extent codes:

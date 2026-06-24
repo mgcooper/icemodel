@@ -14,12 +14,12 @@ function manifest = importSumup(source_dir, kwargs)
    %      buildSumupForcing (SUMup points carry no station met);
    %    - records whether the point is within a co-location threshold of a
    %      PROMICE anchor (helpers.sumupColocation, default 7.5 km EPSG:3413);
-   %    - writes a METADATA-ONLY family manifest.json
-   %      (case_type="firn_observational"). The SUMup observation profiles are
-   %      staged once as a per-case observations.mat obs bundle (not rebuilt);
-   %      the co-located MAR met + RACMO Data are staged as individual files and
-   %      recorded in the manifest colocation record by source id - no bundled
-   %      evaluation.mat/reference.mat colocation copy is written.
+   %    - writes a FORCING-AGNOSTIC family manifest.json
+   %      (case_type="firn_observational"). The SUMup observation profiles ARE
+   %      the bundled eval target: staged once as a per-case observations.mat obs
+   %      bundle (referenced via the manifest). The co-located MAR met + RACMO
+   %      Data are the FORCING/reference side - staged as individual files and
+   %      recorded in the manifest colocation record by source id, never bundled.
    %
    %  Data-gated: SUMup is access-gated (NASA Earthdata, NSIDC G02288). With
    %  no populated cache, fetchSumup(strict=true) errors with the retrieval
@@ -73,15 +73,16 @@ function manifest = importSumup(source_dir, kwargs)
    %    Setup/update tooling. Creates or refreshes staged data under
    %    demo/data/eval/sumup and is not part of normal verification runs.
    %
-   %  Colocation architecture (LOCKED: metadata-only): the SUMup observation
-   %    parser (buildSumupObservations) reads the real 2025 Greenland files
-   %    end-to-end, and the co-located RCM forcing legs (buildSumupForcing: MAR
-   %    met + RACMO Data) ARE staged through this driver - as INDIVIDUAL files
-   %    recorded in the manifest colocation record by source id, NOT as a bundled
-   %    per-case evaluation.mat/reference.mat. This mirrors importPromiceSites:
-   %    colocation is metadata, not a bundled data copy. The SUMup observations
-   %    are the PRIMARY target and are staged first; a throwing buildSumupForcing
-   %    degrades to a skipped forcing leg, never a skipped SUMup point.
+   %  Colocation architecture (LOCKED: forcing-agnostic eval): the SUMup
+   %    observation parser (buildSumupObservations) reads the real 2025 Greenland
+   %    files end-to-end and stages them as the bundled data-only observations.mat
+   %    eval target. The co-located RCM forcing legs (buildSumupForcing: MAR met +
+   %    RACMO Data) are the forcing/reference side - staged through this driver as
+   %    INDIVIDUAL files recorded in the manifest colocation record by source id,
+   %    never bundled. This mirrors importPromiceSites: the eval target is
+   %    bundled, the forcing is not. The SUMup observations are the PRIMARY target
+   %    and are staged first; a throwing buildSumupForcing degrades to a skipped
+   %    forcing leg, never a skipped SUMup point.
    %
    % See also: icemodel.verification.setup.fetchSumup,
    %  icemodel.verification.setup.buildSumupObservations,
@@ -291,7 +292,7 @@ function manifest = importSumup(source_dir, kwargs)
             colocation
             'irregular'
             sprintf(['SUMup firn point%s; MAR met + RACMO Data ' ...
-            'co-located (metadata-only).'], colocationNote(is_coloc, anchor))};
+            'co-located (forcing not bundled).'], colocationNote(is_coloc, anchor))};
 
          n_cases = n_cases + 1;
          case_entries{n_cases} = ...

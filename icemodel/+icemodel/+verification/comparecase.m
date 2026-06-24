@@ -51,10 +51,13 @@ function result = comparecase(case_id, kwargs)
 
    % Load the target and candidate bundles. With no candidate supplied, the
    % staged smoke reference is used so the suite runs before a snow model exists.
-   % Metadata-only firn cases carry no bundled evaluation.mat: the eval target
-   % (PROMICE observed Data) is reconstituted on demand from the staged per-year
-   % userdata files the manifest declares. Snow/Colbeck cases still load the
-   % committed evaluation.mat bundle.
+   % The eval target is a forcing-agnostic, data-only observations.mat bundle
+   % referenced via evaluation_file/evaluation_path (ESM-SnowMIP, SUMup, and
+   % freshly staged PROMICE cases); Snow/Colbeck cases load their evaluation.mat
+   % the same way. Only PROMICE fixtures staged before the observations.mat
+   % contract lack that file; they fall back to reconstituting the PROMICE-obs
+   % target on demand from the staged per-year userdata files the manifest
+   % declares.
    if isfield(manifest, 'evaluation_path') ...
          && strlength(string(manifest.evaluation_path)) > 0 ...
          && isfile(manifest.evaluation_path)

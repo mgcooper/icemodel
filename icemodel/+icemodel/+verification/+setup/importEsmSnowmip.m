@@ -131,12 +131,12 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       end
 
       % Resolve the per-site case root and the staged obs-bundle path.
-      % esm_snowmip is METADATA-ONLY (mirroring sumup): the staged
-      % observations are the referenced obs file, NOT a bundled
-      % evaluation.mat + a redundant reference.mat smoke copy. Forcing is
-      % staged separately under the standard icemodel input layout
-      % (data/input/met/) so production setopts/configureRun/loadmet
-      % resolve it without verification-only branches.
+      % esm_snowmip is FORCING-AGNOSTIC (mirroring sumup/promice): the eval
+      % target IS a data-only observations.mat bundle (referenced via
+      % evaluation_file), but with NO redundant reference.mat smoke copy.
+      % Forcing is staged separately under the standard icemodel input layout
+      % (data/input/met/) so production setopts/configureRun/loadmet resolve it
+      % without verification-only branches.
       case_root = fullfile(family_root, sitename);
       observations_output_file = fullfile(case_root, "observations.mat");
 
@@ -195,10 +195,10 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
          'soil_depths_m', obs_meta.soil_depths_m
          'obs_file', char(fullfile(sitename, "observations.mat"))});
 
-      % Metadata-only schema: evaluation_file references the committed
-      % observations.mat obs bundle; reference_file is empty (no bundled
-      % smoke reference). The analytical laugh_tests family keeps its real
-      % reference_file - only the esm observational smoke copy is dropped.
+      % Forcing-agnostic schema: evaluation_file references the bundled
+      % data-only observations.mat eval target; reference_file is empty (no
+      % bundled smoke reference). The analytical laugh_tests family keeps its
+      % real reference_file - only the esm observational smoke copy is dropped.
       case_values = { ...
          char(sitename)
          'esm_site'

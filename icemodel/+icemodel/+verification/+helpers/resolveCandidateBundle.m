@@ -45,10 +45,10 @@ function candidate = resolveCandidateBundle(manifest, kwargs)
    end
 
    % With no supplied model output, compare against the staged smoke reference.
-   % Metadata-only firn cases carry no bundled reference.mat: the co-located RCM
-   % reference (RACMO Data) is reconstituted on demand from the staged per-year
-   % userdata files the manifest declares. Snow/Colbeck cases still load the
-   % committed reference.mat bundle.
+   % Firn cases bundle no reference.mat (the forcing/reference side is never
+   % bundled): the co-located RCM reference (RACMO Data) is reconstituted on
+   % demand from the staged per-year userdata files the manifest declares.
+   % Snow/Colbeck cases still load their committed reference.mat bundle.
    if isfield(manifest, 'reference_path') ...
          && strlength(string(manifest.reference_path)) > 0 ...
          && isfile(manifest.reference_path)

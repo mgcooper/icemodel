@@ -114,8 +114,9 @@ function manifest = importPromiceSites(kwargs)
    %               manifest.skipped lists data-gated sites and the reason.
    %
    %  Role
-   %    Setup/update tooling. Creates or refreshes staged data and the
-   %    metadata-only manifest; not part of normal verification runs.
+   %    Setup/update tooling. Creates or refreshes the data-only observations.mat
+   %    eval bundle, the separate forcing/Data files, and the forcing-agnostic
+   %    manifest; not part of normal verification runs.
    %
    % See also: icemodel.verification.setup.importEsmSnowmip,
    %  icemodel.verification.helpers.promicesiteinfo,
@@ -384,7 +385,9 @@ function manifest = importPromiceSites(kwargs)
             end
          end
 
-         % --- Metadata-only manifest entry. ---
+         % --- Forcing-agnostic manifest entry. ---
+         % The eval target (observations.mat) is bundled above via
+         % evaluation_file_rel; the forcing/Data sources are recorded by id only.
          anchor = siteCatalogEntry(site, aws_sites);
 
          case_values = { ...
@@ -645,8 +648,8 @@ function [comparison_vars, obs_vars] = firnComparisonContract(promice_data)
    %
    % Records which firn comparison variables are present in the staged PROMICE
    % Data record and the observation metadata. This is the comparison CONTRACT
-   % only - the actual observation data lives in the per-year userdata files,
-   % not bundled into the manifest.
+   % only - the observation data itself lives in the bundled observations.mat
+   % eval target and the per-year userdata files, not in the manifest.
    if isempty(promice_data)
       comparison_vars = strings(0, 1);
       obs_vars = icemodel.verification.setup.metadataStruct({ ...

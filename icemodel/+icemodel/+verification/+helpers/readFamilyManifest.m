@@ -50,8 +50,8 @@ function cases = normalizeCaseEntries(cases)
       end
 
       % String-array fields. comparison_variables is shared by both schemas;
-      % eval_target / forcing_sources / eval_sources are the metadata-only firn
-      % descriptors. jsondecode renders a single-element array as a scalar char
+      % eval_target / forcing_sources / eval_sources are the forcing-agnostic
+      % firn descriptors. jsondecode renders a single-element array as a scalar char
       % and a multi-element array as a cellstr, so coerce both to a string array.
       array_fields = ["comparison_variables", "eval_target", ...
          "forcing_sources", "eval_sources"];
@@ -63,7 +63,7 @@ function cases = normalizeCaseEntries(cases)
       end
 
       % Window fields. The snow schema names it comparison_window; the
-      % metadata-only firn schema names it period. Both carry {start, end}.
+      % forcing-agnostic firn schema names it period. Both carry {start, end}.
       for window_field = ["comparison_window", "period"]
          if isfield(cases(icase), window_field)
             cases(icase).(window_field).start = ...

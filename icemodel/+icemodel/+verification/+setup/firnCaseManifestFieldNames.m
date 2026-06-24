@@ -8,15 +8,18 @@ function names = firnCaseManifestFieldNames()
    %          evaluation case.
    %
    % Role
-   %  Setup helper used while constructing firn case entries. A firn case is now
-   %  a METADATA-ONLY manifest: it records WHICH forcing/eval sources a case
-   %  draws on (by source id), the colocation regime, and the comparison
-   %  contract - NOT a bundled evaluation.mat/reference.mat data copy. The actual
-   %  forcing and eval data live in individual files under the standard icemodel
-   %  naming convention (icemodel.forcing.helpers.metfilename / writemet /
-   %  writeuserdata): met_<site>_<source>_<window>.mat per forcing source, plus
-   %  the per-source Data files for eval. The model runs colocation-agnostically
-   %  by picking the met file for the desired source.
+   %  Setup helper used while constructing firn case entries. A firn case has a
+   %  FORCING-AGNOSTIC manifest: the eval target IS bundled as a data-only
+   %  observations.mat referenced via evaluation_file (same contract as
+   %  ESM-SnowMIP/SUMup), but the FORCING is not bundled or stipulated. The
+   %  manifest records WHICH forcing/eval sources a case draws on (by source id,
+   %  INFORMATIONAL), the colocation regime, and the comparison contract. The
+   %  forcing data lives in individual files under the standard icemodel naming
+   %  convention (icemodel.forcing.helpers.metfilename / writemet / writeuserdata):
+   %  met_<site>_<source>_<window>.mat per forcing source, plus the per-source
+   %  Data files. The model runs colocation-agnostically by picking the met file
+   %  for the desired source - any forcing usable at runtime without rewriting
+   %  observations.mat.
    %
    %  Fields
    %    case_id               compact case id ("kanm")
@@ -27,7 +30,7 @@ function names = firnCaseManifestFieldNames()
    %    eval_target           capability descriptor array (namelists.evaltarget)
    %    permafrost_zone       permafrost extent class, ORTHOGONAL to surface_zone
    %                          (namelists.permafrostzone): off-ice land/tundra
-   %                          sites carry the Brown et al. (1997) extent, ice-sheet
+   %                          sites carry the Obu et al. (2019) extent, ice-sheet
    %                          /glacier sites carry "none".
    %    site_location         WGS84 + EPSG:3413 projected coordinates
    %    period                {start, end} the case's evaluation window
