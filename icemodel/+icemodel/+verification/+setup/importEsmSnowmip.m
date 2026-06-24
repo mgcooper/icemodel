@@ -67,6 +67,7 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    arguments
       source_dir (1, :) string
       kwargs.evaluation_data_root (1, 1) string = ""
+      kwargs.input_data_root (1, 1) string = ""
       kwargs.icemodel_config_casename (1, 1) string = "test"
       kwargs.case_ids (1, :) string ...
          {icemodel.verification.validators.mustBeSnowmipSite} = ...
@@ -161,7 +162,7 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       % Saved as the bare 'met' timetable (not a struct envelope) so the
       % normal loadmet path consumes it without special-casing.
       writeMetFiles(forcing_tt, sitename, ...
-         kwargs.icemodel_config_casename);
+         kwargs.icemodel_config_casename, kwargs.input_data_root);
 
       targets = struct( ...
          'format', 'timeseries', ...
@@ -282,7 +283,7 @@ function note = siteCaseNote(info)
       info.long_name, info.location, info.sitename);
 end
 
-function writeMetFiles(forcing_tt, sitename, config_casename)
+function writeMetFiles(forcing_tt, sitename, config_casename, input_data_root)
    %WRITEMETFILES Stage one multi-year met file under input/met/.
    %
    % Delegates met-file naming, validation, and saving to the shared
@@ -295,6 +296,7 @@ function writeMetFiles(forcing_tt, sitename, config_casename)
    % importer's overwrite guard fires earlier at prepareCaseRoot.
 
    input_root = icemodel.verification.helpers.inputDataRoot( ...
+      "input_data_root", input_data_root, ...
       "icemodel_config_casename", config_casename);
    icemodel.forcing.helpers.writemet(forcing_tt, sitename, sitename, ...
       outdir=fullfile(input_root, 'met'), naming="window");

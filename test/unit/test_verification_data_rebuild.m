@@ -72,8 +72,10 @@ function test_rebuild_esm_snowmip_smoke_sites(testCase)
       sprintf('ESM-SnowMIP source cache not present at %s', src));
 
    eval_root = fullfile(testCase.TestData.tmp, 'eval');
+   input_root = fullfile(testCase.TestData.tmp, 'input');
    manifest = icemodel.verification.setup.importEsmSnowmip(src, ...
-      evaluation_data_root=string(eval_root), overwrite=true);
+      evaluation_data_root=string(eval_root), ...
+      input_data_root=string(input_root), overwrite=true);
 
    verifyEqual(testCase, manifest.dataset_family, "esm_snowmip");
 

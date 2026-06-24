@@ -142,9 +142,11 @@ end
 %% Local helpers
 function pathname = defaultCacheDir()
    %DEFAULTCACHEDIR Canonical Laugh-Tests source-cache directory.
-   % Repo-root developer resource (gitignored), independent of the active
-   % ICEMODEL_DATA_PATH config - use icemodel.internal.fullpath('data'), not
-   % icemodel.getpath('data') (which points at demo/data under the demo casename).
+   % Repo-root developer resource (gitignored). Resolve with
+   % icemodel.internal.fullpath('data') (always the repo-local data root), not
+   % icemodel.getpath('data'): getpath returns the ICEMODEL_DATA_PATH env var,
+   % which the test/demo config (icemodel.config casename) SETS to demo/data, so
+   % it points away from the repo root under the active suite config.
    pathname = string(fullfile(icemodel.internal.fullpath('data'), ...
       'verification', 'laugh_tests'));
 end
