@@ -289,18 +289,23 @@ function paths = resolveMetPaths(pathinput, forcings, names)
    % Prefer the per-source subfolder input/met/<forcings>/<name> (the staging
    % layout that keeps met/ from sprawling); fall back to flat input/met/<name>
    % so existing flat files still resolve. The forcings label IS the subfolder
-   % key, so no extra option is needed.
+   % key, so no extra option is needed. The subfolder-first ordering is the
+   % shared icemodel.forcing.helpers.sourceSearchDirs primitive.
 
    met_base = fullfile(pathinput, 'met');
-   sub = fullfile(met_base, char(forcings));
+   search_dirs = icemodel.forcing.helpers.sourceSearchDirs(met_base, forcings);
    names = cellstr(names);
    paths = cell(1, numel(names));
    for n = 1:numel(names)
-      candidate = fullfile(sub, names{n});
-      if isfile(candidate)
-         paths{n} = candidate;
-      else
-         paths{n} = fullfile(met_base, names{n});
+      % First directory holding the file wins; fall back to the flat path
+      % (the last candidate) so a missing file surfaces a clean load error.
+      paths{n} = fullfile(search_dirs{end}, names{n});
+      for d = 1:numel(search_dirs)
+         candidate = fullfile(search_dirs{d}, names{n});
+         if isfile(candidate)
+            paths{n} = candidate;
+            break
+         end
       end
    end
 end

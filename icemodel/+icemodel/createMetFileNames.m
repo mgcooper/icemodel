@@ -94,8 +94,9 @@ function name = findEnclosingMetFile(opts, metname, forcings, ...
    met_base = fullfile(opts.pathinput, 'met');
    prefix = ['met_' metname '_' forcings];
    % Look in the per-source subfolder (met/<forcings>/) first, then the flat
-   % met dir, so a staged enclosing window file is found in either layout.
-   for d = {fullfile(met_base, char(forcings)), met_base}
+   % met dir, so a staged enclosing window file is found in either layout. The
+   % subfolder-first ordering is the shared sourceSearchDirs primitive.
+   for d = icemodel.forcing.helpers.sourceSearchDirs(met_base, forcings)
       met_dir = d{1};
       if ~isfolder(met_dir)
          continue

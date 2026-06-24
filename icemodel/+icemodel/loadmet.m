@@ -194,9 +194,11 @@ function filepath = resolveUserdataFile(opts, thisyear, mettime)
 
    % Look in the per-source subfolder userdata/<source>/ first, then the flat
    % userdata dir, in each preferring the window file then the per-year file.
+   % The subfolder-first ordering is the shared sourceSearchDirs primitive.
    base = [opts.sitename '_' char(opts.userdata)];
    peryear_name = [base '_' int2str(thisyear) '.mat'];
-   for u = {fullfile(opts.pathuserdata, char(opts.userdata)), opts.pathuserdata}
+   for u = icemodel.forcing.helpers.sourceSearchDirs( ...
+         opts.pathuserdata, opts.userdata)
       udir = u{1};
       enclosing = icemodel.forcing.helpers.findEnclosingWindowFile( ...
          udir, base, '.mat', min(mettime), max(mettime));
