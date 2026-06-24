@@ -7,31 +7,44 @@ function manifest = importPromiceSites(kwargs)
    %  manifest = icemodel.verification.setup.importPromiceSites( ...
    %     sites="KAN_M", startdate="2013-01-01", enddate="2015-12-31")
    %
-   %  Stages individual forcing/Data files for each PROMICE automatic-weather-
-   %  station site and writes a METADATA-ONLY case manifest per site. PROMICE
-   %  sites anchor the firn evaluation: downstream firn-model work swaps each
-   %  model's albedo into the PROMICE met and runs the firn model at the PROMICE
-   %  point, comparing against the RCMs and the station observations.
+   %  Stages a data-only observations.mat eval bundle per PROMICE automatic-
+   %  weather-station site, the individual forcing/Data files, and a
+   %  FORCING-AGNOSTIC case manifest. PROMICE sites anchor the firn evaluation:
+   %  downstream firn-model work swaps each model's albedo into the PROMICE met
+   %  and runs the firn model at the PROMICE point, comparing against the RCMs
+   %  and the station observations.
    %
-   %  COLOCATION = METADATA, NOT BUNDLED DATA. This driver does NOT write a
-   %  bundled evaluation.mat/reference.mat per case. Instead each forcing/eval
-   %  source is staged as INDIVIDUAL files via the standard icemodel naming
-   %  convention, and the case manifest records WHICH sources are available (by
-   %  id) plus the colocation regime. The model runs colocation-agnostically by
-   %  picking the met file for the desired source.
+   %  EVAL IS FORCING-AGNOSTIC. The per-case eval target is a data-only
+   %  observations.mat (same contract as ESM-SnowMIP/SUMup); the manifest records
+   %  the eval contract (evaluation_file, comparison_variables) but NOT the
+   %  forcing provider, so ANY forcing file may be used at the site at runtime
+   %  without rewriting the eval metadata. No bundled evaluation.mat/reference.mat
+   %  (forcing+obs together) is written; forcing lives in separate,
+   %  runtime-discoverable met/userdata files in per-source subfolders.
    %
-   %    Forcing (data/input/met/, window naming via writemet):
-   %      * PROMICE station met       (buildPromiceMet  -> writemet)
+   %    Eval (data/eval/promice/<site>/):
+   %      * observations.mat           (PROMICE obs target; buildPromiceData)
+   %
+   %    Forcing (data/input/met/<source>/, window naming via writemet):
+   %      * PROMICE station met        (buildPromiceMet -> writemet)
    %      * MAR met at the site point  (buildMarMet     -> writemet)
    %      * MERRA-2 met at the point   (buildMerraMet   -> writemet)
    %
-   %    Data / met-swap + eval userdata (data/input/userdata/, full-period window naming):
-   %      * PROMICE evaluation Data    (buildPromiceData -> writeuserdata)
-   %      * RACMO Data at the point    (buildRacmoData   -> writeuserdata)
-   %        (RACMO carries no met channels and is never a met source.)
+   %    Met-swap + reference Data (data/input/userdata/<source>/):
+   %      * PROMICE Data  (met-swap source; observed channels swapped into a run -
+   %                       the same buildPromiceData product as observations.mat)
+   %      * RACMO Data    (eval/reference; buildRacmoData)
+   %        The available RACMO 2.3p3 source files carry radiation (swd, lwd,
+   %        derived albedo), turbulent fluxes (shf, lhf), precip and SMB
+   %        components, but LACK the near-surface meteorological STATE variables
+   %        (tair, wspd, rh, psfc) - so RACMO is staged as eval/reference Data,
+   %        not a standalone met source. (RACMO in general carries these; only
+   %        the available source files omit them - obtain the full set from the
+   %        RACMO developers, or borrow tair/wspd/rh/psfc from MAR/MERRA/PROMICE
+   %        at the point, if a RACMO-forced run is needed.)
    %
-   %    Per-site metadata-only manifest.json fragment, rolled into the family
-   %    manifest. No evaluation.mat/reference.mat colocation bundle is written.
+   %    Per-site forcing-agnostic manifest.json fragment, rolled into the family
+   %    manifest.
    %
    %  Window resolution (per-leg, DECOUPLED; #15)
    %    PROMICE met + eval are NEVER gated by RCM coverage. A site with no

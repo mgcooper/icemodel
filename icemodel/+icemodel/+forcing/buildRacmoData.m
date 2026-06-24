@@ -7,11 +7,16 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    % Extracts the RACMO2.3p3 surface energy/mass-balance channels at a
    % point or averaged over a polygon. The RACMO archive is organized
    % as one multi-year 3-hourly NetCDF per variable
-   % (<var>.RACMO23p3_*_FGRN11_*.3H*.nc on the FGRN11 rotated-pole
-   % grid); the available variables are SMB components and surface
-   % fluxes, NOT full meteorological forcing (no air temperature, wind,
-   % humidity, or pressure), so RACMO Data files serve evaluation and
-   % met-swap of flux channels rather than met-file creation.
+   % (<var>.RACMO23p3_*_FGRN11_*.3H*.nc on the FGRN11 rotated-pole grid).
+   % The AVAILABLE source files carry radiation (swsd/lwsd -> swd/lwd, with a
+   % derived albedo = 1 - swn/swd), turbulent fluxes (senf/latf -> shf/lhf),
+   % precip and the SMB components - but LACK the near-surface meteorological
+   % STATE variables tair, wspd, rh, and psfc. So RACMO Data files serve
+   % evaluation/reference and met-swap of the radiation/flux channels rather
+   % than standalone met-file creation. (This is a property of the available
+   % 2.3p3 files, not RACMO in general - the full state set must be obtained
+   % from the RACMO developers, or borrowed from MAR/MERRA/PROMICE at the point,
+   % for a RACMO-forced run.)
    %
    % Channels (file prefix -> output, standard units):
    %    swsd -> swd, lwsd -> lwd, swsn -> swn, lwsn -> lwn   [W m-2]
