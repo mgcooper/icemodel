@@ -155,6 +155,91 @@ function test_loadmet_swaps_external_userdata_window_file(testCase)
    testCase.verifyEqual(met_swap.albedo, userdata_values, 'AbsTol', 1e-12);
 end
 
+function test_loadmet_resolves_met_file_in_source_subfolder(testCase)
+   % The runtime resolves a met file staged in the per-source subfolder
+   % met/<forcings>/ (the writemet staging layout). Staging ONLY in the
+   % subfolder (no flat file for this year) proves subfolder-first resolution.
+
+   workspace = testCase.TestData.workspace;
+   metsub = fullfile(workspace.metdir, workspace.forcings);
+   if ~isfolder(metsub)
+      mkdir(metsub);
+   end
+   icemodel.test.fixtures.makeSyntheticMetFile(2017, ...
+      'sitename', workspace.sitename, ...
+      'forcings', workspace.forcings, ...
+      'nsteps', workspace.nsteps, ...
+      'dt_seconds', workspace.dt_seconds, ...
+      'metdir', metsub);
+
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2017);
+   met = icemodel.loadmet(opts);
+
+   testCase.verifyEqual(unique(year(met.Time))', 2017);
+   testCase.verifyEqual(height(met), workspace.nsteps);
+end
+
+function test_loadmet_prefers_subfolder_met_over_flat(testCase)
+   % When the same-named met file exists both flat and in the per-source
+   % subfolder, the subfolder copy wins (subfolder-first is the single rule).
+   % The setup() already wrote a flat 2016 file; stage a subfolder 2016 file
+   % whose tair is offset so the resolved data is unambiguously the subfolder.
+
+   workspace = testCase.TestData.workspace;
+   metsub = fullfile(workspace.metdir, workspace.forcings);
+   if ~isfolder(metsub)
+      mkdir(metsub);
+   end
+   [met_sub, ~] = icemodel.test.fixtures.makeSyntheticMetFile(2016, ...
+      'sitename', workspace.sitename, ...
+      'forcings', workspace.forcings, ...
+      'nsteps', workspace.nsteps, ...
+      'dt_seconds', workspace.dt_seconds, ...
+      'metdir', metsub);
+   met_sub.tair = met_sub.tair + 5;   % distinguish from the flat fixture
+   S.met = met_sub;
+   metname = sprintf('met_%s_%s_2016_1hr.mat', ...
+      workspace.sitename, workspace.forcings);
+   save(fullfile(metsub, metname), '-struct', 'S');
+
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016);
+   met = icemodel.loadmet(opts);
+
+   testCase.verifyEqual(met.tair, met_sub.tair, 'AbsTol', 1e-12);
+end
+
+function test_loadmet_swaps_userdata_in_source_subfolder(testCase)
+   % An external userdata file staged in userdata/<source>/ (the writeuserdata
+   % staging layout) is resolved by loadmet, proving subfolder-first userdata
+   % resolution alongside the flat path covered above.
+
+   workspace = testCase.TestData.workspace;
+   opts_base = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016);
+   met_base = icemodel.loadmet(opts_base);
+
+   userdata_values = min(max(met_base.albedo - 0.08, 0.05), 0.95);
+   userdatasub = fullfile(workspace.userdatadir, 'modis');
+   if ~isfolder(userdatasub)
+      mkdir(userdatasub);
+   end
+   icemodel.test.fixtures.writeSyntheticUserdataFile( ...
+      userdatasub, 2016, ...
+      'sitename', workspace.sitename, ...
+      'userdata', 'modis', ...
+      'varname', 'modis', ...
+      'Time', met_base.Time, ...
+      'values', userdata_values);
+
+   opts_swap = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016, userdata='modis', uservars='albedo');
+   met_swap = icemodel.loadmet(opts_swap);
+
+   testCase.verifyEqual(met_swap.albedo, userdata_values, 'AbsTol', 1e-12);
+end
+
 function test_loadmet_errors_when_userdata_file_lacks_Data(testCase)
    % Corrupt userdata files should fail loudly instead of silently falling
    % back to the met data.

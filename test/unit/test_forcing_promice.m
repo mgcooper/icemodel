@@ -94,6 +94,47 @@ function test_buildPromiceMet_satisfies_met_contract(testCase)
    testCase.verifyEqual(units(names == "ppt"), pptunit);
 end
 
+function test_buildPromiceMet_uses_observed_lwd_by_default(testCase)
+   % A station with a real longwave channel (KAN_M) reports lwd as observed:
+   % lwd_estimated is false and the empirical fallback is not engaged.
+
+   [met, metadata] = icemodel.forcing.buildPromiceMet("kanm", ...
+      source_dir=testCase.TestData.source_dir, ...
+      startdate=datetime(2015, 6, 1), ...
+      enddate=datetime(2015, 6, 2));
+
+   testCase.verifyFalse(metadata.lwd_estimated);
+   testCase.verifyTrue(contains(metadata.lwd_policy, "observed"));
+   testCase.verifyTrue(any(isfinite(met.lwd)));
+end
+
+function test_buildPromiceMet_fill_lwd_does_not_override_observed(testCase)
+   % fill_lwd is an OPT-IN fallback for stations with NO longwave sensor; it
+   % must never override a real observed channel. With fill_lwd=true at a
+   % station that has lwd (KAN_M), lwd stays observed (lwd_estimated false).
+
+   [~, metadata] = icemodel.forcing.buildPromiceMet("kanm", ...
+      source_dir=testCase.TestData.source_dir, ...
+      startdate=datetime(2015, 6, 1), ...
+      enddate=datetime(2015, 6, 2), fill_lwd=true);
+
+   testCase.verifyFalse(metadata.lwd_estimated);
+end
+
+function test_empirical_lwd_estimate_is_physical(testCase)
+   % The empirical fallback the fill_lwd path calls returns finite, physically
+   % plausible downwelling longwave for typical polar air temperature + vapor
+   % pressure (the strict met contract otherwise rejects a missing lwd).
+
+   tair = (250:5:270)';             % K
+   ea = 100 + zeros(size(tair));    % Pa, low-humidity polar air
+   lwd = icemodel.surface.empirical_incoming_longwave_radiation(tair, ea);
+
+   testCase.verifyTrue(all(isfinite(lwd)));
+   testCase.verifyTrue(all(lwd > 50 & lwd < 350));   % plausible polar range
+   testCase.verifyTrue(issorted(lwd));               % warmer sky -> more lwd
+end
+
 function test_buildPromiceData_reads_l3_evaluation_channels(testCase)
    % The Data builder reads the QC'd L3 surface channels (snow depth from
    % snow_height, ablation from z_ice_surf) rather than deriving them, with
