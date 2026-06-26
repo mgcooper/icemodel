@@ -143,7 +143,11 @@ function entry = probeRacmo(source_dir)
    if source_dir == ""
       source_dir = string(fullfile(icemodel.getpath('data'), 'forcing', 'racmo'));
       if ~isfolder(source_dir)
-         source_dir = "/Volumes/S03/DATA/greenland/racmo2p3/surface";
+         % Default to the SUBSURFACE product (2012-2018), matching
+         % buildRacmoData's default. The surface "no_subsurf_en" product only
+         % covers 2012-2015, so defaulting to it here silently capped RACMO
+         % staging to 2012-2015 even though subsurface 2012-2018 was available.
+         source_dir = "/Volumes/S03/DATA/greenland/racmo2p3/subsurface";
       end
    end
    if ~isfolder(source_dir)

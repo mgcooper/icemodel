@@ -7,19 +7,24 @@ function manifest = importSumup(source_dir, kwargs)
    %
    %  Stages SUMup firn observation cases under
    %  demo/data/eval/sumup/<case_id>/, mirroring importPromiceSites'
-   %  structure. For each selected SUMup point it:
+   %  structure. Observation import is DECOUPLED from RCM forcing: for each
+   %  selected SUMup point it
    %    - reads the nearest SUMup firn observations (density / subsurface
-   %      temperature / accumulation) via buildSumupObservations;
-   %    - builds the co-located MAR point met + RACMO point Data via
-   %      buildSumupForcing (SUMup points carry no station met);
+   %      temperature / accumulation) via buildSumupObservations and stages them
+   %      once as the bundled observations.mat eval target;
    %    - records whether the point is within a co-location threshold of a
-   %      PROMICE anchor (helpers.sumupColocation, default 7.5 km EPSG:3413);
+   %      PROMICE anchor (helpers.sumupColocation, default 7.5 km EPSG:3413) -
+   %      PROMICE forcing is NEVER rebuilt; the anchor's own staged met is reused
+   %      via this provenance record;
    %    - writes a FORCING-AGNOSTIC family manifest.json
-   %      (case_type="firn_observational"). The SUMup observation profiles ARE
-   %      the bundled eval target: staged once as a per-case observations.mat obs
-   %      bundle (referenced via the manifest). The co-located MAR met + RACMO
-   %      Data are the FORCING/reference side - staged as individual files and
-   %      recorded in the manifest colocation record by source id, never bundled.
+   %      (case_type="firn_observational");
+   %  then, when build_forcing is true (the convenience bundle), delegates the
+   %  co-located gridded forcing to icemodel.verification.setup.stageRcmForcing,
+   %  which stages MAR + MERRA met+Data and RACMO Data at each point (SUMup points
+   %  carry no station met). The forcing lives in separate, runtime-discoverable
+   %  met/userdata files recorded in the manifest colocation record by source id,
+   %  never bundled. Setting build_forcing=false imports observations only; the
+   %  RCM forcing can be built later, independently, on the staged manifest.
    %
    %  Data-gated: SUMup is access-gated (NASA Earthdata, NSIDC G02288). With
    %  no populated cache, fetchSumup(strict=true) errors with the retrieval
@@ -47,7 +52,12 @@ function manifest = importSumup(source_dir, kwargs)
    %    radius_km : double (default 7.5)  SUMup point-selection radius.
    %    colocation_threshold_km : double (default 7.5)  PROMICE-anchor
    %            co-location threshold (see helpers.sumupColocation).
-   %    mar_dir / racmo_dir / modis_dir : string source dirs for the builders.
+   %    mar_dir / merra_dir / racmo_dir / modis_dir : string source dirs for the
+   %            co-located RCM builders (delegated to stageRcmForcing).
+   %    build_forcing : logical (default false). When true the co-located
+   %            MAR/MERRA met+Data and RACMO Data are staged after the SUMup
+   %            observation import; when false ONLY the observations + manifest
+   %            are written (forcing can be built later via stageRcmForcing).
    %    evaluation_data_root / input_data_root / icemodel_config_casename :
    %            staging roots (mirror importPromiceSites). DEFAULT is SAFE: the
    %            roots resolve to the configured per-case RESEARCH root, NOT the
@@ -76,17 +86,17 @@ function manifest = importSumup(source_dir, kwargs)
    %  Colocation architecture (LOCKED: forcing-agnostic eval): the SUMup
    %    observation parser (buildSumupObservations) reads the real 2025 Greenland
    %    files end-to-end and stages them as the bundled data-only observations.mat
-   %    eval target. The co-located RCM forcing legs (buildSumupForcing: MAR met +
-   %    RACMO Data) are the forcing/reference side - staged through this driver as
+   %    eval target. The co-located RCM forcing legs (MAR + MERRA met+Data, RACMO
+   %    Data) are the forcing/reference side - staged through stageRcmForcing as
    %    INDIVIDUAL files recorded in the manifest colocation record by source id,
    %    never bundled. This mirrors importPromiceSites: the eval target is
    %    bundled, the forcing is not. The SUMup observations are the PRIMARY target
-   %    and are staged first; a throwing buildSumupForcing degrades to a skipped
-   %    forcing leg, never a skipped SUMup point.
+   %    and are staged first; a failing RCM source degrades to a skipped forcing
+   %    leg, never a skipped SUMup point.
    %
    % See also: icemodel.verification.setup.fetchSumup,
    %  icemodel.verification.setup.buildSumupObservations,
-   %  icemodel.verification.setup.buildSumupForcing,
+   %  icemodel.verification.setup.stageRcmForcing,
    %  icemodel.verification.setup.importPromiceSites,
    %  icemodel.verification.helpers.sumupColocation
 
@@ -100,6 +110,7 @@ function manifest = importSumup(source_dir, kwargs)
       kwargs.radius_km (1, 1) double {mustBePositive} = 7.5
       kwargs.colocation_threshold_km (1, 1) double {mustBePositive} = 7.5
       kwargs.mar_dir (1, 1) string = ""
+      kwargs.merra_dir (1, 1) string = ""
       kwargs.racmo_dir (1, 1) string = ""
       kwargs.modis_dir (1, 1) string = ""
       kwargs.evaluation_data_root (1, 1) string = ""
@@ -108,6 +119,7 @@ function manifest = importSumup(source_dir, kwargs)
       kwargs.overwrite (1, 1) logical = false
       kwargs.overwrite_family (1, 1) logical = false
       kwargs.skip_missing (1, 1) logical = true
+      kwargs.build_forcing (1, 1) logical = false
    end
 
    if isempty(kwargs.points)
@@ -146,7 +158,6 @@ function manifest = importSumup(source_dir, kwargs)
       obs_start = "";
       obs_end = "";
    end
-   years = kwargs.years;
 
    % Resolve the sumup family root + the input layout.
    dataset_family = "sumup";
@@ -165,18 +176,22 @@ function manifest = importSumup(source_dir, kwargs)
 
    proj = icemodel.forcing.helpers.psnProjection();
 
-   % Every point yields at most one case OR one skip and exactly one requested
-   % id, so preallocate to n_points and trim with the running counts (no growing
-   % in the loop).
-   case_entries = cell(1, n_points);
-   n_cases = 0;
+   % Per-point state; a point yields at most one staged case OR one skip and
+   % exactly one requested id (no in-loop growth).
+   state = repmat(emptyState(), 1, n_points);
+   alive = false(1, n_points);
    skipped = repmat(struct('site', "", 'reason', ""), 1, n_points);
    n_skipped = 0;
    requested_ids = strings(1, n_points);
    n_requested = 0;
 
+   % --- Pass 1: stage the SUMup observations per point (the PRIMARY target). ---
+   % Observation import is DECOUPLED from RCM forcing: the obs are staged and the
+   % manifest written BEFORE any forcing build (Pass 2), so a killed/aborted
+   % forcing run never destroys the imported observations.
    for n = 1:n_points
       point = points(n, :);
+      case_id = sprintf("point%02d", n);   % fallback id for the catch path
 
       try
          [x3413, y3413] = projfwd(proj, point(1), point(2));
@@ -205,63 +220,26 @@ function manifest = importSumup(source_dir, kwargs)
          case_root = fullfile(family_root, alias);
          icemodel.verification.setup.prepareCaseRoot(case_root, kwargs.overwrite);
 
-         % --- SUMup observations (targets). ---
+         % SUMup observations (targets), staged once as observations.mat (NOT
+         % rebuilt later). The observations are the PRIMARY target and are never
+         % blocked by a forcing failure (forcing is the SECONDARY Pass-2 step).
          [observations, obs_meta] = ...
             icemodel.verification.setup.buildSumupObservations(point, ...
             source_dir=source_dir, radius_km=kwargs.radius_km, ...
             startdate=obs_start, enddate=obs_end);
-
-         % SUMup observation profiles are staged as a per-case obs bundle (NOT
-         % rebuilt here; staged_kind=observations_only). The observations are
-         % the PRIMARY target, so they are staged BEFORE the co-located forcing
-         % legs and never blocked by a forcing failure (see the leg guard below).
          targets = struct('format', 'subsurface_profile_bundle', ...
             'data', observations, 'metadata', obs_meta);
          obs_file = "observations.mat";
          save(fullfile(case_root, obs_file), 'targets');
 
+         % Colocation = the SUMup obs leg + the PROMICE-anchor provenance. The
+         % co-located RCM forcing legs (MAR/MERRA met + RACMO Data) are added in
+         % Pass 2 by stageRcmForcing; PROMICE forcing is NEVER rebuilt here (the
+         % anchor's own staged met is reused via this provenance record).
          colocation = struct( ...
-            'sumup', struct('kind', 'firn_profile_obs', ...
+            'sumup', struct('kind', 'firn_profile_obs', 'staged', true, ...
                'obs_file', char(fullfile(alias, obs_file)), ...
                'note', 'SUMup observation profiles (staged, not rebuilt).'));
-
-         % --- Co-located MAR met + RACMO Data (colocation METADATA). ---
-         % The co-located RCM legs are SECONDARY: a throwing buildSumupForcing
-         % (e.g. a source dir that vanished, or a read error) degrades to a
-         % SKIPPED forcing leg, not a skipped SUMup point - the SUMup obs are the
-         % primary target and have already been staged above. This mirrors the
-         % per-leg guard the PROMICE importer uses (47f5a31).
-         forcing_sources = strings(0, 1);
-         eval_sources = "sumup_obs";
-         try
-            [forcing, ~] = ...
-               icemodel.verification.setup.buildSumupForcing(point, years, ...
-               mar_dir=kwargs.mar_dir, racmo_dir=kwargs.racmo_dir, ...
-               modis_dir=kwargs.modis_dir, ...
-               window_start=obs_start, window_end=obs_end);
-
-            mar_files = icemodel.forcing.helpers.writemet( ...
-               forcing.mar_met, alias, "mar", outdir=met_outdir, naming="window");
-            racmo_files = icemodel.forcing.helpers.writeuserdata( ...
-               forcing.racmo_data, alias, "racmo", outdir=userdata_outdir);
-
-            colocation.mar = struct('kind', 'point_met', ...
-               'met_files', icemodel.verification.setup.relpaths(mar_files, met_outdir), ...
-               'sample_method', 'nearest');
-            colocation.racmo = struct('kind', 'point_data_smb_eval', ...
-               'data_files', icemodel.verification.setup.relpaths(racmo_files, userdata_outdir), ...
-               'sample_method', 'nearest', ...
-               'note', 'SMB/eval Data only; RACMO is not a met source.');
-            forcing_sources = "mar";
-            eval_sources = ["sumup_obs", "racmo"];
-         catch leg_err
-            % Record the co-located forcing as a skipped leg; obs still staged.
-            colocation.mar = skippedLeg('point_met', leg_err.message);
-            colocation.racmo = skippedLeg('point_data_smb_eval', leg_err.message);
-            warning('icemodel:verification:importSumup:forcingSkipped', ...
-               'forcing legs skipped for %s: %s', case_id, leg_err.message);
-         end
-
          colocation.anchor = colocationRecord(is_coloc, anchor, dist_km, ...
             kwargs.colocation_threshold_km);
 
@@ -270,33 +248,20 @@ function manifest = importSumup(source_dir, kwargs)
             'density', 'firn/snow density profile (depth, density, error)'
             'subsurface_temperature', 'SUMup subsurface temperature T(z,t)'
             'accumulation', 'SMB / accumulation records'});
-
          [zone, target, pfz] = sumupZoneAndTarget(is_coloc, anchor);
 
-         case_values = { ...
-            char(case_id)
-            'firn_observational'
-            char(site_id)
-            char(site_name)
-            char(zone)
-            cellstr(target)
-            char(pfz)
-            site_location
-            struct('start', periodStr(window_start, obs_start), ...
-            'end', periodStr(window_end, obs_end))
-            char(fullfile(alias, obs_file))
-            cellstr(forcing_sources)
-            cellstr(eval_sources)
-            cellstr(comparison_vars)
-            obs_vars
-            colocation
-            'irregular'
-            sprintf(['SUMup firn point%s; MAR met + RACMO Data ' ...
-            'co-located (forcing not bundled).'], colocationNote(is_coloc, anchor))};
-
-         n_cases = n_cases + 1;
-         case_entries{n_cases} = ...
-            icemodel.verification.setup.makeFirnCaseManifestEntry(case_values);
+         state(n) = struct('case_id', string(case_id), ...
+            'alias', string(alias), 'site_id', string(site_id), ...
+            'site_name', string(site_name), 'point', point, ...
+            'site_location', site_location, ...
+            'period', struct('start', periodStr(window_start, obs_start), ...
+               'end', periodStr(window_end, obs_end)), ...
+            'obs_file_rel', char(fullfile(alias, obs_file)), ...
+            'colocation', colocation, ...
+            'comparison_vars', {comparison_vars}, 'obs_vars', obs_vars, ...
+            'zone', string(zone), 'target', {target}, 'pfz', string(pfz), ...
+            'anchor_note', string(colocationNote(is_coloc, anchor)));
+         alive(n) = true;
 
       catch err
          if ~kwargs.skip_missing
@@ -310,16 +275,100 @@ function manifest = importSumup(source_dir, kwargs)
       end
    end
 
-   % Trim the preallocated buffers to the counts actually produced.
-   case_entries = case_entries(1:n_cases);
-   skipped = skipped(1:n_skipped);
    requested_ids = requested_ids(1:n_requested);
 
+   % --- Pass 2: write the obs manifest first (kill-safety), then delegate the
+   % co-located RCM forcing/Data (MAR/MERRA met + RACMO Data) to stageRcmForcing.
+   manifest = assembleAndWrite(state, alive, skipped, n_skipped, ...
+      dataset_family, manifest_file, requested_ids, kwargs);
+
+   if kwargs.build_forcing
+      % Forcing window: the explicit comparison window when given, else the
+      % kwargs.years span (preserves the years kwarg's meaning), else unbounded
+      % (each source's full on-disk coverage).
+      [f_start, f_end] = forcingWindow(window_start, window_end, kwargs.years);
+      state = stageColocatedForcing(state, alive, f_start, f_end, ...
+         met_outdir, userdata_outdir, kwargs);
+      manifest = assembleAndWrite(state, alive, skipped, n_skipped, ...
+         dataset_family, manifest_file, requested_ids, kwargs);
+   end
+end
+
+function [t1, t2] = forcingWindow(window_start, window_end, years)
+   %FORCINGWINDOW Resolve the co-located RCM forcing window for the SUMup legs.
+   % The explicit comparison window wins; else the kwargs.years span; else
+   % unbounded (NaT -> each source's full on-disk coverage in resolveLegWindows).
+   if ~isnat(window_start) && ~isnat(window_end)
+      t1 = window_start;
+      t2 = window_end;
+   elseif ~isempty(years)
+      t1 = icemodel.verification.setup.ensureUtc( ...
+         sprintf('%d-01-01', min(years)));
+      t2 = icemodel.verification.setup.ensureUtc( ...
+         sprintf('%d-12-31 23:00:00', max(years)));
+   else
+      t1 = NaT;
+      t2 = NaT;
+   end
+end
+
+%% Manifest assembly + RCM delegation
+function s = emptyState()
+   %EMPTYSTATE Prototype per-point staging state (preallocation seed).
+   s = struct('case_id', "", 'alias', "", 'site_id', "", 'site_name', "", ...
+      'point', [NaN NaN], 'site_location', struct(), ...
+      'period', struct('start', '', 'end', ''), 'obs_file_rel', '', ...
+      'colocation', struct(), 'comparison_vars', {strings(0, 1)}, ...
+      'obs_vars', struct(), 'zone', "", 'target', {strings(0, 1)}, ...
+      'pfz', "", 'anchor_note', "");
+end
+
+function manifest = assembleAndWrite(state, alive, skipped, n_skipped, ...
+      dataset_family, manifest_file, requested_ids, kwargs)
+   %ASSEMBLEANDWRITE Build the forcing-agnostic SUMup manifest + MERGE-write it.
+   %
+   % Called twice: once with observations-only colocation (kill-safety, before
+   % any forcing build) and once after the RCM legs are merged in.
+   case_entries = cell(1, nnz(alive));
+   n_cases = 0;
+   for n = 1:numel(state)
+      if ~alive(n)
+         continue
+      end
+      s = state(n);
+      [forcing_sources, eval_sources] = sumupSourceLists(s.colocation);
+
+      case_values = { ...
+         char(s.case_id)
+         'firn_observational'
+         char(s.site_id)
+         char(s.site_name)
+         char(s.zone)
+         cellstr(s.target)
+         char(s.pfz)
+         s.site_location
+         s.period
+         s.obs_file_rel
+         cellstr(forcing_sources)
+         cellstr(eval_sources)
+         cellstr(s.comparison_vars)
+         s.obs_vars
+         s.colocation
+         'irregular'
+         sprintf(['SUMup firn point%s; MAR/MERRA met + RACMO Data ' ...
+         'co-located (forcing not bundled).'], char(s.anchor_note))};
+
+      n_cases = n_cases + 1;
+      case_entries{n_cases} = ...
+         icemodel.verification.setup.makeFirnCaseManifestEntry(case_values);
+   end
+   case_entries = case_entries(1:n_cases);
+
    % Family manifest. Provenance points at the SUMup release; the co-located
-   % MAR/RACMO per-model provenance lives in each builder.
+   % MAR/MERRA/RACMO per-model provenance lives in each builder.
    source_doi = "10.18739/A2M61BR5M";
    source_url = "https://nsidc.org/data/g02288";
-   source_version = "sumup2024[mar+racmo colocated]";
+   source_version = "sumup2024[mar+merra+racmo colocated]";
    retrieval_date = string(datetime('today'));
 
    if isempty(case_entries)
@@ -330,7 +379,7 @@ function manifest = importSumup(source_dir, kwargs)
    manifest = icemodel.verification.setup.makeFamilyManifest( ...
       dataset_family, source_doi, source_url, source_version, ...
       retrieval_date, cases);
-   manifest.skipped = skipped;
+   manifest.skipped = skipped(1:n_skipped);
 
    % MERGE by default: add/update only the requested points' cases, preserving
    % every other committed SUMup case + files untouched (shared helper with
@@ -338,6 +387,82 @@ function manifest = importSumup(source_dir, kwargs)
    manifest = icemodel.verification.setup.writeFamilyManifestMerge( ...
       manifest_file, manifest, requested_ids=requested_ids, ...
       overwrite_family=kwargs.overwrite_family);
+end
+
+function state = stageColocatedForcing(state, alive, window_start, window_end, ...
+      met_outdir, userdata_outdir, kwargs)
+   %STAGECOLOCATEDFORCING Delegate the co-located MAR/MERRA/RACMO legs.
+   %
+   % SUMup points carry no station met, so PROMICE is NOT a forcing leg here -
+   % only the gridded RCMs are staged, over ALL alive points in one call per
+   % source. stageRcmForcing writes MAR/MERRA met+Data and RACMO Data, degrading
+   % a failing source's legs to skip-with-reason without losing the others. The
+   % forcing window follows the comparison window (NaT = all-available = each
+   % source's full on-disk coverage), resolved fail-early per source.
+   rcm_models = ["mar", "merra", "racmo"];
+   alive_idx = find(alive);
+   if isempty(alive_idx)
+      return
+   end
+
+   coverage = icemodel.verification.setup.promiceSourceCoverage(rcm_models, ...
+      struct('mar', kwargs.mar_dir, 'merra', kwargs.merra_dir, ...
+      'racmo', kwargs.racmo_dir));
+   leg = icemodel.verification.setup.resolveLegWindows(rcm_models, coverage, ...
+      window_start, window_end);
+
+   points = vertcat(state(alive_idx).point);
+   legspec = repmat(legProto(rcm_models), 1, numel(alive_idx));
+   for j = 1:numel(alive_idx)
+      legspec(j).alias = state(alive_idx(j)).alias;
+      for src = rcm_models
+         legspec(j).(char(src)) = leg.(char(src));
+      end
+   end
+
+   colocation = icemodel.verification.setup.stageRcmForcing(points, ...
+      legspec=legspec, models=rcm_models, ...
+      met_outdir=met_outdir, userdata_outdir=userdata_outdir, ...
+      mar_dir=kwargs.mar_dir, merra_dir=kwargs.merra_dir, ...
+      racmo_dir=kwargs.racmo_dir, modis_dir=kwargs.modis_dir, ...
+      method="nearest");
+
+   for j = 1:numel(alive_idx)
+      state(alive_idx(j)).colocation = ...
+         mergeColocation(state(alive_idx(j)).colocation, colocation{j});
+   end
+end
+
+function [forcing_sources, eval_sources] = sumupSourceLists(colocation)
+   %SUMUPSOURCELISTS Informational forcing/eval source ids from staged legs.
+   % SUMup obs are always an eval source; MAR/MERRA are forcing met; RACMO is an
+   % eval/reference source. Derived AFTER the legs run.
+   mar = isfield(colocation, 'mar') && colocation.mar.staged;
+   merra = isfield(colocation, 'merra') && colocation.merra.staged;
+   racmo = isfield(colocation, 'racmo') && colocation.racmo.staged;
+
+   forcing_cands = ["mar", "merra"];
+   forcing_sources = reshape(forcing_cands([mar, merra]), [], 1);
+   eval_cands = ["sumup_obs", "racmo"];
+   eval_sources = reshape(eval_cands([true, racmo]), [], 1);
+end
+
+function L = legProto(models)
+   %LEGPROTO Prototype legspec element (alias + one leg field per source).
+   L = struct('alias', "");
+   proto = struct('staged', false, 'years', [], 'start', NaT, 'end', NaT, ...
+      'reason', "");
+   for src = models
+      L.(char(src)) = proto;
+   end
+end
+
+function s = mergeColocation(s, add)
+   %MERGECOLOCATION Copy every field of `add` onto colocation struct `s`.
+   f = fieldnames(add);
+   for i = 1:numel(f)
+      s.(f{i}) = add.(f{i});
+   end
 end
 
 %% Local helpers
@@ -410,16 +535,6 @@ function rec = colocationRecord(is_coloc, anchor, dist_km, threshold_km)
    if is_coloc && ~isempty(anchor)
       rec.nearest_anchor = string(anchor.site);
    end
-end
-
-function leg = skippedLeg(kind, reason)
-   %SKIPPEDLEG Manifest entry for a co-located forcing leg that failed to build.
-   %
-   % Mirrors importPromiceSites' skipped-leg record so a throwing
-   % buildSumupForcing degrades to a skipped leg (obs still staged), not a
-   % skipped SUMup point.
-   leg = struct('kind', kind, 'staged', false, ...
-      'reason', char(string(reason)));
 end
 
 function note = colocationNote(is_coloc, anchor)

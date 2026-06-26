@@ -73,11 +73,11 @@ end
 
 function test_import_driver_obs_staged_when_forcing_throws(testCase)
    % importSumup driver guard: the SUMup observations are the PRIMARY target, so
-   % a throwing buildSumupForcing (here forced by a non-existent MAR/RACMO source
-   % dir) must degrade to SKIPPED forcing legs, NOT a skipped SUMup point. The
-   % obs case still stages (observations.mat + a manifest entry) with mar/racmo
-   % recorded as skipped legs. Exercises the per-leg try/catch guard added to
-   % importSumup so the obs are never blocked by a forcing failure.
+   % absent RCM sources (here non-existent MAR/MERRA/RACMO source dirs) must
+   % degrade to SKIPPED forcing legs, NOT a skipped SUMup point. The obs case
+   % still stages (observations.mat + a manifest entry) with mar/merra/racmo
+   % recorded as skipped legs. Exercises the decoupled obs/forcing flow so the
+   % observations are never blocked by a forcing failure.
 
    assumeCachePresent(testCase);
 
@@ -91,14 +91,14 @@ function test_import_driver_obs_staged_when_forcing_throws(testCase)
    mkdir(fullfile(input_root, 'met'));
    mkdir(fullfile(input_root, 'userdata'));
 
-   % Bogus RCM source dirs so buildSumupForcing throws (source not found); the
-   % obs cache is real so the observation leg succeeds.
+   % Bogus RCM source dirs so the forcing legs are skipped (source not found);
+   % the obs cache is real so the observation leg succeeds.
    bogus = fullfile(tmp, 'no_such_rcm_source');
 
    manifest = icemodel.verification.setup.importSumup( ...
       string(testCase.TestData.cache), ...
       points=testCase.TestData.point, case_ids="kanu", ...
-      mar_dir=bogus, racmo_dir=bogus, ...
+      mar_dir=bogus, merra_dir=bogus, racmo_dir=bogus, ...
       evaluation_data_root=eval_root, input_data_root=input_root, ...
       overwrite=true);
 
@@ -117,9 +117,11 @@ function test_import_driver_obs_staged_when_forcing_throws(testCase)
    testCase.verifyFalse(ismember("mar", string(c.forcing_sources)));
    testCase.verifyFalse(ismember("racmo", string(c.eval_sources)));
 
-   % The colocation record marks mar/racmo as skipped (staged=false) legs.
+   % The colocation record marks mar/merra/racmo as skipped (staged=false) legs.
    testCase.verifyTrue(isfield(c.colocation, 'mar'));
    testCase.verifyFalse(logical(c.colocation.mar.staged));
+   testCase.verifyTrue(isfield(c.colocation, 'merra'));
+   testCase.verifyFalse(logical(c.colocation.merra.staged));
    testCase.verifyTrue(isfield(c.colocation, 'racmo'));
    testCase.verifyFalse(logical(c.colocation.racmo.staged));
 
@@ -129,16 +131,19 @@ function test_import_driver_obs_staged_when_forcing_throws(testCase)
 end
 
 function test_import_driver_stages_forcing_legs_when_present(testCase)
-   % The GREEN full-driver path: with real MAR + RACMO sources present, the
-   % co-located forcing legs stage (staged=true with a met/Data file), not just
-   % the obs. Data-gated on the S03 reference layout (and the SUMup cache), so it
-   % runs where the raw RCM archives are mounted and self-skips elsewhere.
+   % The GREEN full-driver path: with real MAR + MERRA + RACMO sources present,
+   % the co-located forcing legs stage. RR3 contract: MAR + MERRA each write BOTH
+   % a met file AND a userdata (Data) file; RACMO writes Data only. Data-gated on
+   % the S03 reference layout (and the SUMup cache), so it runs where the raw RCM
+   % archives are mounted and self-skips elsewhere.
 
    assumeCachePresent(testCase);
    mar_dir = "/Volumes/S03/DATA/greenland/mar3p11/RUH2";
+   merra_dir = "/Volumes/S03/DATA/merra2/1hrly/ncfiles";
    racmo_dir = "/Volumes/S03/DATA/greenland/racmo2p3/subsurface";
-   testCase.assumeTrue(isfolder(mar_dir) && isfolder(racmo_dir), ...
-      'MAR/RACMO reference archives not mounted; skipping green-path test.');
+   testCase.assumeTrue( ...
+      isfolder(mar_dir) && isfolder(merra_dir) && isfolder(racmo_dir), ...
+      'MAR/MERRA/RACMO reference archives not mounted; skipping green-path test.');
 
    tmp = tempname;
    mkdir(tmp);
@@ -152,19 +157,32 @@ function test_import_driver_stages_forcing_legs_when_present(testCase)
    manifest = icemodel.verification.setup.importSumup( ...
       string(testCase.TestData.cache), ...
       points=testCase.TestData.point, case_ids="kanu", years=2012, ...
-      mar_dir=mar_dir, racmo_dir=racmo_dir, ...
+      mar_dir=mar_dir, merra_dir=merra_dir, racmo_dir=racmo_dir, ...
       evaluation_data_root=eval_root, input_data_root=input_root, ...
       overwrite=true);
 
    c = manifest.cases(1);
-   % The forcing legs staged (the green path). A STAGED leg carries its file
-   % list (met_files / data_files); only a SKIPPED leg carries staged=false.
-   testCase.verifyTrue(isfield(c.colocation.mar, 'met_files') ...
-      && ~isempty(c.colocation.mar.met_files));
+   % MAR + MERRA each write a met file AND a userdata (Data) file (the RR3 fix).
+   for src = ["mar", "merra"]
+      leg = c.colocation.(char(src));
+      testCase.verifyTrue(logical(leg.staged), ...
+         sprintf('%s leg should be staged', src));
+      testCase.verifyTrue(isfield(leg, 'met_files') && ~isempty(leg.met_files), ...
+         sprintf('%s must write a met file', src));
+      testCase.verifyTrue(isfield(leg, 'data_files') && ~isempty(leg.data_files), ...
+         sprintf('%s must ALSO write a userdata (Data) file', src));
+      testCase.verifyNotEmpty( ...
+         dir(fullfile(input_root, 'met', char(src), '*.mat')));
+      testCase.verifyNotEmpty( ...
+         dir(fullfile(input_root, 'userdata', char(src), '*.mat')));
+   end
+
+   % RACMO: Data only, no met.
    testCase.verifyTrue(isfield(c.colocation.racmo, 'data_files') ...
       && ~isempty(c.colocation.racmo.data_files));
+   testCase.verifyFalse(isfield(c.colocation.racmo, 'met_files'));
    testCase.verifyTrue(ismember("mar", string(c.forcing_sources)));
-   testCase.verifyNotEmpty(dir(fullfile(input_root, 'met', 'mar', '*mar*.mat')));
+   testCase.verifyTrue(ismember("merra", string(c.forcing_sources)));
    testCase.verifyNotEmpty( ...
       dir(fullfile(input_root, 'userdata', 'racmo', '*racmo*.mat')));
 end

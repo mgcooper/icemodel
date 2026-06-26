@@ -65,7 +65,6 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
    %  (strict=true) errors with the retrieval banner rather than fabricating
    %  records.
    %
-   % See also: icemodel.verification.setup.buildSumupForcing,
    %  icemodel.verification.setup.importSumup,
    %  icemodel.verification.setup.fetchSumup
 
