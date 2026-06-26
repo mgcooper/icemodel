@@ -160,9 +160,10 @@ function manifest = importPromiceSites(kwargs)
    models = reshape(kwargs.models, 1, []);
 
    % Site list. With no explicit sites, default to ALL PROMICE stations found
-   % under the source product (the full research set).
+   % under the source product (the full research set), via the single-source-of-
+   % truth auto-discovery namelist.
    if isempty(kwargs.sites)
-      sites = discoverStations(kwargs.promice_dir);
+      sites = icemodel.verification.namelists.promicesite(kwargs.promice_dir);
    else
       sites = reshape(kwargs.sites, 1, []);
    end
@@ -532,24 +533,6 @@ function [forcing_sources, eval_sources] = sourceLists(colocation)
    forcing_sources = reshape(forcing_cands([promice_met, mar, merra]), [], 1);
    eval_cands = ["promice_obs", "racmo"];
    eval_sources = reshape(eval_cands([promice_eval, racmo]), [], 1);
-end
-
-function sites = discoverStations(promice_dir)
-   %DISCOVERSTATIONS Full station list from the on-disk hourly NetCDF product.
-   source_dir = promice_dir;
-   if source_dir == ""
-      source_dir = string(fullfile(icemodel.internal.fullpath('data'), ...
-         'verification', 'promice'));
-   end
-   if isfolder(fullfile(source_dir, 'hour'))
-      source_dir = fullfile(source_dir, 'hour');
-   end
-   files = dir(fullfile(source_dir, '*_hour.nc'));
-   if isempty(files)
-      error('icemodel:verification:importPromiceSites:noStations', ...
-         'no <STATION>_hour.nc files found under %s', source_dir)
-   end
-   sites = reshape(string(erase({files.name}, "_hour.nc")), 1, []);
 end
 
 function aws = readAwsSitesMetadata(promice_dir)
