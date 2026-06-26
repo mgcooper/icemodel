@@ -73,17 +73,44 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
       lwd = nan(height(aws), 1);      % absent -> clean "no finite samples" error
    end
 
-   % Assemble the met variables. PROMICE has no precipitation channel;
-   % ppt is explicitly zero (see header note).
+   % A station that lacks a required FORCING channel (e.g. LYN_L has no swd
+   % sensor) genuinely cannot drive the model. Detect that up front and throw a
+   % clean, named error so the caller's met-leg guard records a readable skip
+   % reason (the eval observations still stage) instead of a cryptic
+   % "Unrecognized table variable name" from the assembly below. lwd is excluded
+   % here - it has its own observed/estimated/absent handling above.
+   forcing_channels = ["tair", "swd", "albedo", "wspd", "rh", "psfc"];
+   absent = forcing_channels(~ismember(forcing_channels, ...
+      string(aws.Properties.VariableNames)));
+   if ~isempty(absent)
+      error('icemodel:forcing:buildPromiceMet:missingForcing', ...
+         'required forcing channel(s) absent at %s: %s (no met built)', ...
+         site, strjoin(absent, ', '));
+   end
+
+   % Assemble the met variables from the required forcings. PROMICE has no
+   % precipitation channel; ppt is explicitly zero (see header note). A missing
+   % OPTIONAL (non-forcing) channel must not block met building.
    Time = aws.Time;
    met = timetable(Time, ...
       aws.tair, aws.swd, lwd, ...
       icemodel.forcing.fillPromiceAlbedo(aws.albedo, Time, ...
       fillwinter=kwargs.fillwinter), ...
       aws.wspd, aws.rh, aws.psfc, zeros(height(aws), 1), ...
-      aws.wdir, aws.tsfc, aws.cfrac, aws.shf, aws.lhf, ...
       'VariableNames', {'tair', 'swd', 'lwd', 'albedo', 'wspd', 'rh', ...
-      'psfc', 'ppt', 'wdir', 'tsfc', 'cfrac', 'shf', 'lhf'});
+      'psfc', 'ppt'});
+
+   % Pass through the optional (non-forcing) diagnostics the station happens to
+   % carry (wind direction, surface temperature, cloud fraction, turbulent
+   % fluxes, ...). These are NOT forcings, so a station missing any of them
+   % (e.g. KAN_B has no cfrac) must still yield a met file. The canonical
+   % optional set is the single source of truth for what is a pass-through.
+   [~, optional] = icemodel.forcing.helpers.metvariables();
+   for v = optional
+      if ismember(v, string(aws.Properties.VariableNames))
+         met.(v) = aws.(v);
+      end
+   end
 
    % Standard QA/QC: gap fill + physical clamps.
    [met, checks] = icemodel.forcing.helpers.metchecks(met);

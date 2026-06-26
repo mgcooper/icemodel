@@ -39,7 +39,12 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    % replaces the legacy hardcoded 2008-2020 calendar).
    %
    % Inputs
-   %  location - [lat lon] point or polyshape in EPSG:3413 meters
+   %  location - [lat lon] point, polyshape (EPSG:3413 m), or an Nx2 [lat lon]
+   %             list of points. A point list returns a 1xN cell of Data
+   %             timetables (metadata a 1xN struct array); the inventory, grid,
+   %             and ice mask are read ONCE and every daily file opened ONCE,
+   %             slicing each point's hyperslab from that single open. N=1 is
+   %             the single-point path.
    %  years    - calendar years to extract
    %
    % Name-value
@@ -151,49 +156,164 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
       validmask = merraIceMask(inventory.glc.files(1), size(X));
    end
 
-   % Preserve the original request before it is mapped into projected /
-   % geographic coordinates below; the MODIS channel re-resolves it on the
-   % GEUS grid (a point stays [lat lon], a polygon stays EPSG:3413), so a
-   % polygon build gets the area-weighted catchment MODIS mean.
-   location0 = location;
+   % Accept one location (1x2 point or polyshape, returns a single Data
+   % timetable) OR a list of N points (Nx2 [lat lon], returns a 1xN cell of
+   % Data timetables). N=1 is the single-point path. The file inventory, grid,
+   % and ice mask above are read ONCE for the whole list; each point's grid
+   % hyperslab + collapse rule is resolved here, then every channel's daily
+   % files are opened ONCE and each point's hyperslab sliced from that open.
+   [locations, batch] = locationList(location);
+   npts = numel(locations);
 
-   % Conservative polygon remap runs in MERRA's NATIVE geographic grid
-   % (regular lon/lat) with exactremap UseGeoCoords=true, which computes
-   % true ellipsoidal overlap areas - the correct conservative weighting for
-   % a lat/lon grid (reprojecting to EPSG:3413 first would make the grid
-   % irregular). Point/nearest and equal-weight stay in the projected grid.
-   if isa(location, 'polyshape') && kwargs.remap == "conservative"
-      [vlat, vlon] = projinv(proj, location.Vertices(:, 1), ...
+   grid = struct('X', X, 'Y', Y, 'LON', LON, 'LAT', LAT, 'proj', proj, ...
+      'validmask', validmask, 'method', kwargs.method, 'remap', kwargs.remap);
+   [slabs, collapses, sites] = deal(cell(1, npts), cell(1, npts), cell(1, npts));
+   for p = 1:npts
+      [slabs{p}, collapses{p}, sites{p}] = resolvePoint(grid, locations{p});
+   end
+
+   % Read each channel: daily hyperslabs concatenated per point (one open per
+   % day per channel for ALL points), stamped at the MERRA bin centers, then
+   % collapsed + interpolated onto the hourly axis per point.
+   Time = hourlyAxis(years);
+   series = cell(size(channels, 1), npts);
+   for n = 1:size(channels, 1)
+      [col, ncname, ~] = channels{n, :};
+      [blocks, stamps] = readChannelSeries(inventory.(col), ncname, slabs);
+      for p = 1:npts
+         series{n, p} = interp1(stamps, collapses{p}(blocks{p}), Time, ...
+            'linear', 'extrap');
+      end
+   end
+
+   data_out = cell(1, npts);
+   meta_out = cell(1, npts);
+   for p = 1:npts
+      Data = timetable(Time);
+      for n = 1:size(channels, 1)
+         Data.(channels{n, 3}) = series{n, p};
+      end
+      [data_out{p}, meta_out{p}] = finalizeMerraData(Data, sites{p}, ...
+         slabs{p}, years, locations{p}, source_dir, collections, ...
+         numel(inventory.slv.files), proj, kwargs);
+   end
+
+   metadata = [meta_out{:}];
+   if batch
+      Data = data_out;
+   else
+      Data = data_out{1};
+   end
+end
+
+%% Local functions
+function t_hourly = hourlyAxis(years)
+   %HOURLYAXIS Full on-the-hour axis covering the requested years.
+   parts = cell(numel(years), 1);
+   for n = 1:numel(years)
+      t0 = datetime(years(n), 1, 1, 0, 0, 0, 'TimeZone', 'UTC');
+      parts{n} = (t0:hours(1):(t0 + calyears(1) - hours(1)))';
+   end
+   t_hourly = vertcat(parts{:});
+end
+
+function [blocks, stamps] = readChannelSeries(coll, ncname, slabs)
+   %READCHANNELSERIES Concatenate one channel's hyperslabs over the daily files.
+   %
+   % Returns a 1xN cell of raw cells-by-time blocks (one per point; cells
+   % flattened column-major over each point's hyperslab, matching
+   % gridLocation's collapse) plus the INTERVAL-START timestamps: 24 hourly
+   % samples on the hour for tavg1 collections, 8 three-hourly samples at
+   % 0/3/6.. for tavg3 (glc), shifted back from the native bin centers. The
+   % caller applies each point's collapse (nearest / natural / polygon mean).
+   % Per-file hyperslab read + standard-unit conversion + fill-masking is
+   % delegated to the shared reader icemodel.forcing.readMerra2 (so mass
+   % fluxes arrive already in mWE/h); this loop opens each daily file ONCE
+   % (reading EVERY point's hyperslab from that open) and stamps the bin
+   % centers. A single point is just a one-element slab list.
+   n_files = numel(coll.files);
+   npts = numel(slabs);
+   info = ncinfo(coll.files(1), ncname);
+   n_per_day = info.Size(3);
+
+   blocks = cell(1, npts);
+   for p = 1:npts
+      blocks{p} = nan(prod(slabs{p}(2, :)), n_per_day * n_files);
+   end
+   for k = 1:n_files
+      day = icemodel.forcing.readMerra2(coll.files(k), ncname, slabs=slabs);
+      cols = (k-1)*n_per_day + 1:k*n_per_day;
+      for p = 1:npts
+         blocks{p}(:, cols) = day{p};
+      end
+   end
+
+   % Stamp each averaged sample at its INTERVAL START, the icemodel forcing
+   % time convention (the [t, t+dt) label is the interval start; see
+   % +forcing/README.md "Time convention", and readMar3p11 which is already
+   % interval-start). MERRA-2 posts tavg samples at the bin CENTRE (00:30
+   % hourly, 01:30 three-hourly), so the start offset is 0:step:24-step, not
+   % the native step/2:step:24 - aligning MERRA with the other sources instead
+   % of carrying a half-step phase error through the interp onto Time.
+   step = 24 / n_per_day;
+   offsets = hours(0:step:24 - step);
+   stamps = reshape((coll.dates + offsets)', [], 1);
+end
+
+function [locations, batch] = locationList(location)
+   %LOCATIONLIST Normalize the location input to a 1xN cell of locations.
+   % A polyshape or a single [lat lon] row is one location (batch=false); an
+   % Nx2 [lat lon] (N>1) is a point list (batch=true).
+   if isnumeric(location) && size(location, 2) == 2 && size(location, 1) > 1
+      locations = num2cell(location, 2)';
+      batch = true;
+   else
+      locations = {location};
+      batch = false;
+   end
+end
+
+function [slab, collapse, site] = resolvePoint(grid, location)
+   %RESOLVEPOINT Map one point or polygon onto a MERRA grid hyperslab.
+   %
+   % Returns the hyperslab as a [start; count] 2x2 (for the batch reader),
+   % the collapse handle, and the site lat/lon (slab mean). Conservative
+   % polygon remap runs in MERRA's NATIVE geographic grid (regular lon/lat)
+   % with exactremap UseGeoCoords=true, which computes true ellipsoidal
+   % overlap areas - the correct conservative weighting for a lat/lon grid
+   % (reprojecting to EPSG:3413 first would make the grid irregular).
+   % Point/nearest and equal-weight stay in the projected grid.
+   if isa(location, 'polyshape') && grid.remap == "conservative"
+      [vlat, vlon] = projinv(grid.proj, location.Vertices(:, 1), ...
          location.Vertices(:, 2));
-      [start, count, collapse, inslab, loctype] = ...
-         icemodel.forcing.helpers.gridLocation(LON, LAT, ...
-         polyshape(vlon, vlat), kwargs.method, remap="conservative", ...
-         validmask=validmask, usegeocoords=true);
+      [start, count, collapse, inslab, site.type] = ...
+         icemodel.forcing.helpers.gridLocation(grid.LON, grid.LAT, ...
+         polyshape(vlon, vlat), grid.method, remap="conservative", ...
+         validmask=grid.validmask, usegeocoords=true);
    else
       if isnumeric(location)
          assert(isequal(size(location), [1 2]), ...
             'point location must be [lat lon]')
-         [xq, yq] = projfwd(proj, location(1), location(2));
+         [xq, yq] = projfwd(grid.proj, location(1), location(2));
          location = [xq, yq];
       end
-      [start, count, collapse, inslab, loctype] = ...
-         icemodel.forcing.helpers.gridLocation(X, Y, location, ...
-         kwargs.method, remap=kwargs.remap, validmask=validmask);
+      [start, count, collapse, inslab, site.type] = ...
+         icemodel.forcing.helpers.gridLocation(grid.X, grid.Y, location, ...
+         grid.method, remap=grid.remap, validmask=grid.validmask);
    end
+   slab = [start; count];
+   site.lat = icemodel.forcing.helpers.slabMean(grid.LAT, start, count, inslab);
+   site.lon = icemodel.forcing.helpers.slabMean(grid.LON, start, count, inslab);
+end
 
-   % Read each channel: per-day hyperslabs concatenated, stamped at the
-   % MERRA bin centers, collapsed to the target (nearest cell, natural-
-   % neighbour point, or polygon mean), then interpolated onto the hourly
-   % axis.
-   Time = hourlyAxis(years);
-   Data = timetable(Time);
-   for n = 1:size(channels, 1)
-      [col, ncname, outname] = channels{n, :};
-      [block, stamps] = readChannelSeries(inventory.(col), ncname, ...
-         start, count);
-      Data.(outname) = interp1(stamps, collapse(block), Time, ...
-         'linear', 'extrap');
-   end
+function [Data, metadata] = finalizeMerraData(Data, site, slab, years, ...
+      location, source_dir, collections, n_files, proj, kwargs)
+   %FINALIZEMERRADATA Post-process one point's assembled MERRA Data + metadata.
+   % Identical to the legacy single-point tail: derived wind/RH, optional
+   % MODIS channel, precip rate, metchecks, units, userdata CustomProperties,
+   % and the provenance struct. start/count come from the point's slab.
+   start = slab(1, :);
+   count = slab(2, :);
 
    % Mass fluxes (PRECTOTCORR/PRECSNO/EVAP/RUNOFF) arrive already converted
    % from kg m-2 s-1 to mWE/h by icemodel.forcing.readMerra2.
@@ -212,11 +332,9 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    % Optional GEUS MODIS albedo channel at the requested location:
    % nearest/natural for a point, conservative (or equal) catchment mean
    % (area-weighted ROI mean) for a polygon.
-   site_lat = icemodel.forcing.helpers.slabMean(LAT, start, count, inslab);
-   site_lon = icemodel.forcing.helpers.slabMean(LON, start, count, inslab);
    if kwargs.modis_dir ~= ""
       Data.modis = icemodel.forcing.helpers.modisAlbedoChannel( ...
-         kwargs.modis_dir, years, location0, kwargs.method, kwargs.remap, ...
+         kwargs.modis_dir, years, location, kwargs.method, kwargs.remap, ...
          Data.Time);
    end
 
@@ -239,14 +357,14 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
 
    % Userdata CustomProperties (MERRA carries no terrain height in
    % these collections; Elev is NaN).
-   [site_x, site_y] = projfwd(proj, site_lat, site_lon);
+   [site_x, site_y] = projfwd(proj, site.lat, site.lon);
    Data = addprop(Data, ...
       {'X', 'Y', 'Lat', 'Lon', 'Elev', 'Slope', 'ScalarUnits'}, ...
       repmat({'table'}, 1, 7));
    Data.Properties.CustomProperties.X = site_x;
    Data.Properties.CustomProperties.Y = site_y;
-   Data.Properties.CustomProperties.Lat = site_lat;
-   Data.Properties.CustomProperties.Lon = site_lon;
+   Data.Properties.CustomProperties.Lat = site.lat;
+   Data.Properties.CustomProperties.Lon = site.lon;
    Data.Properties.CustomProperties.Elev = NaN;
    Data.Properties.CustomProperties.Slope = NaN;
    Data.Properties.CustomProperties.ScalarUnits = ...
@@ -255,66 +373,18 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    metadata = struct( ...
       'source_dir', source_dir, ...
       'collections', {collections'}, ...
-      'n_files', numel(inventory.slv.files), ...
-      'location_type', loctype, ...
+      'n_files', n_files, ...
+      'location_type', site.type, ...
       'method', kwargs.method, ...
       'remap', kwargs.remap, ...
       'grid_start', start, ...
       'grid_count', count, ...
       'n_cells', prod(count), ...
-      'lat', site_lat, 'lon', site_lon, ...
+      'lat', site.lat, 'lon', site.lon, ...
       'humidity_kernel', ...
       "icemodel.vapor.relative_humidity_from_specific_humidity", ...
       'mass_flux_units', "precip m s-1; diagnostic fluxes mWE/h (rate)", ...
       'checks', checks);
-end
-
-%% Local functions
-function t_hourly = hourlyAxis(years)
-   %HOURLYAXIS Full on-the-hour axis covering the requested years.
-   parts = cell(numel(years), 1);
-   for n = 1:numel(years)
-      t0 = datetime(years(n), 1, 1, 0, 0, 0, 'TimeZone', 'UTC');
-      parts{n} = (t0:hours(1):(t0 + calyears(1) - hours(1)))';
-   end
-   t_hourly = vertcat(parts{:});
-end
-
-function [block, stamps] = readChannelSeries(coll, ncname, start, count)
-   %READCHANNELSERIES Concatenate one channel's hyperslab over the daily files.
-   %
-   % Returns the raw cells-by-time block (cells flattened column-major over
-   % the hyperslab, matching gridLocation's collapse) plus the INTERVAL-START
-   % timestamps: 24 hourly samples on the hour for tavg1 collections, 8
-   % three-hourly samples at 0/3/6.. for tavg3 (glc), shifted back from the
-   % native bin centers. The caller applies the collapse (nearest / natural /
-   % polygon mean).
-   % Per-file hyperslab read + standard-unit conversion + fill-masking is
-   % delegated to the shared reader icemodel.forcing.readMerra2 (so mass
-   % fluxes arrive already in mWE/h); this loop only concatenates the daily
-   % files and stamps the bin centers.
-   n_files = numel(coll.files);
-   info = ncinfo(coll.files(1), ncname);
-   n_per_day = info.Size(3);
-   ncells = prod(count(1:2));
-
-   block = nan(ncells, n_per_day * n_files);
-   for k = 1:n_files
-      block(:, (k-1)*n_per_day + 1:k*n_per_day) = ...
-         icemodel.forcing.readMerra2(coll.files(k), ncname, ...
-         start=start, count=count);
-   end
-
-   % Stamp each averaged sample at its INTERVAL START, the icemodel forcing
-   % time convention (the [t, t+dt) label is the interval start; see
-   % +forcing/README.md "Time convention", and readMar3p11 which is already
-   % interval-start). MERRA-2 posts tavg samples at the bin CENTRE (00:30
-   % hourly, 01:30 three-hourly), so the start offset is 0:step:24-step, not
-   % the native step/2:step:24 - aligning MERRA with the other sources instead
-   % of carrying a half-step phase error through the interp onto Time.
-   step = 24 / n_per_day;
-   offsets = hours(0:step:24 - step);
-   stamps = reshape((coll.dates + offsets)', [], 1);
 end
 
 function mask = merraIceMask(glcfile, gridsize)

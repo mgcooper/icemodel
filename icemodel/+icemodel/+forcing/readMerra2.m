@@ -3,6 +3,7 @@ function [data, units, Time] = readMerra2(filename, varname, kwargs)
    %
    %  [data, units, Time] = icemodel.forcing.readMerra2(filename, varname)
    %  [data, units, Time] = ... readMerra2(_, start=[i j], count=[ni nj])
+   %  [blocks, units, Time] = ... readMerra2(_, slabs={[i j;ni nj], ...})
    %
    % Reads one variable from a single MERRA-2 daily collection file
    % (tavg1_2d_{slv,rad,flx}_Nx or tavg3_2d_glc_Nx; optionally a spatial
@@ -33,9 +34,17 @@ function [data, units, Time] = readMerra2(filename, varname, kwargs)
    % Name-value
    %  start, count - optional grid hyperslab: start cell [i j] (1-based) and
    %                 extent [ni nj] over [lon lat]. Default reads the full grid.
+   %  slabs        - optional cell array of [start; count] 2x2 hyperslab specs
+   %                 ({[i j; ni nj], ...}). When given, the file is OPENED ONCE
+   %                 and every listed hyperslab is read from the same open file,
+   %                 returning a cell array of blocks (one per slab) instead of a
+   %                 single matrix - the batch path that extracts many points
+   %                 from one daily file without re-opening it per point.
+   %                 start/count are ignored when slabs is given.
    %
    % Outputs
-   %  data  - (ncells x ntime) double in standard units, native grid order
+   %  data  - (ncells x ntime) double in standard units, native grid order;
+   %          OR, when slabs is given, a cell array {(ncells x ntime), ...}
    %  units - unit string after conversion
    %  Time  - UTC datetime axis from the file (computed only when requested)
    %
@@ -47,8 +56,40 @@ function [data, units, Time] = readMerra2(filename, varname, kwargs)
       varname (1, 1) string
       kwargs.start (1, :) double = []
       kwargs.count (1, :) double = []
+      kwargs.slabs cell = {}
    end
 
+   [dims, native_units] = ncVarInfo(filename, varname);
+
+   if isempty(kwargs.slabs)
+      [start, count] = slabWindow(dims, kwargs.start, kwargs.count);
+      data = convertSlab(double(squeeze( ...
+         ncread(filename, varname, start, count))), native_units, count);
+   else
+      % Batch path: open once, read every listed hyperslab from the same ncid.
+      ncid = netcdf.open(filename, 'NOWRITE');
+      cleanup = onCleanup(@() netcdf.close(ncid));
+      varid = netcdf.inqVarID(ncid, char(varname));
+      data = cell(size(kwargs.slabs));
+      for k = 1:numel(kwargs.slabs)
+         [start, count] = slabWindow(dims, ...
+            kwargs.slabs{k}(1, :), kwargs.slabs{k}(2, :));
+         data{k} = convertSlab( ...
+            double(squeeze(netcdf.getVar(ncid, varid, start - 1, count))), ...
+            native_units, count);
+      end
+   end
+
+   units = convertUnits(native_units);
+
+   if nargout >= 3
+      Time = merraTime(filename);
+   end
+end
+
+%% Local functions
+function [dims, units] = ncVarInfo(filename, varname)
+   %NCVARINFO Variable dimensions and unit string from ncinfo.
    info = ncinfo(filename, varname);
    dims = info.Size;
    units = '';
@@ -56,16 +97,22 @@ function [data, units, Time] = readMerra2(filename, varname, kwargs)
    if any(has_units)
       units = info.Attributes(has_units).Value;
    end
+end
 
-   % Assemble the read window: requested spatial hyperslab, all times.
-   if isempty(kwargs.start)
+function [start, count] = slabWindow(dims, kstart, kcount)
+   %SLABWINDOW Assemble the read window: requested spatial hyperslab, all times.
+   if isempty(kstart)
       start = ones(1, numel(dims));
       count = dims;
    else
-      start = [kwargs.start, ones(1, numel(dims) - 2)];
-      count = [kwargs.count, dims(3:end)];
+      start = [kstart, ones(1, numel(dims) - 2)];
+      count = [kcount, dims(3:end)];
    end
-   data = double(squeeze(ncread(filename, varname, start, count)));
+end
+
+function data = convertSlab(data, units, count)
+   %CONVERTSLAB Reshape to cells x time, mask fill, convert to standard units.
+   % Shared by the ncread (single) and netcdf.getVar (batch) read paths.
 
    % Collapse to cells x time (cells flattened in native [lon lat] order).
    ncells = prod(count(1:2));
@@ -77,31 +124,38 @@ function [data, units, Time] = readMerra2(filename, varname, kwargs)
 
    % Standard unit conversions (shared reader family). Note kg m-2 s-1 (a
    % flux rate) converts to mWE/h, but kg m-2 (a store, e.g. swe) does not.
+   % The unit STRING is relabelled once at the top level by convertUnits.
    switch units
       case 'kg m-2 s-1'
          data = data * 3600 / 1000;   % -> meters water equivalent per hour
-         units = 'mWE/h';
       case 'C'
          data = data + 273.15;
-         units = 'K';
       case 'g/kg'
          data = data / 1000;
-         units = 'kg/kg';
       case 'hPa'
          data = data * 100;
+   end
+end
+
+function units = convertUnits(units)
+   %CONVERTUNITS Relabel a native MERRA-2 unit string to its standard form.
+   % Mirrors the value scaling in convertSlab (data and label stay in sync).
+   switch units
+      case 'kg m-2 s-1'
+         units = 'mWE/h';
+      case 'C'
+         units = 'K';
+      case 'g/kg'
+         units = 'kg/kg';
+      case 'hPa'
          units = 'Pa';
       case 'W m-2'
          units = 'W/m2';
       case 'm s-1'
          units = 'm/s';
    end
-
-   if nargout >= 3
-      Time = merraTime(filename);
-   end
 end
 
-%% Local functions
 function Time = merraTime(filename)
    %MERRATIME UTC interval-START datetime axis from the MERRA-2 'time' variable.
    % MERRA-2 stores time as "minutes since <yyyy-mm-dd hh:mm:ss>" and posts tavg

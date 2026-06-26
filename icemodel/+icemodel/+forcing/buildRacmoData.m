@@ -43,7 +43,13 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    % retained, unchanged, as the legacy reference workflow).
    %
    % Inputs
-   %  location - [lat lon] point or polyshape in EPSG:3413 meters
+   %  location - [lat lon] point, polyshape (EPSG:3413 m), or an Nx2 [lat lon]
+   %             list of points. A point list returns a 1xN cell of Data
+   %             timetables (metadata a 1xN struct array); the per-variable
+   %             files and grid are read ONCE and every variable file opened
+   %             ONCE, slicing each point's hyperslab from that single open
+   %             (decisive for the multi-GB subsurface files). N=1 is the
+   %             single-point path.
    %  years    - calendar years to keep (subset of the archive span)
    %
    % Name-value
@@ -118,31 +124,25 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    proj = icemodel.forcing.helpers.psnProjection();
    [X, Y] = projfwd(proj, LAT, LON);
 
-   % Preserve the original request before it is mapped into projected /
-   % rotated coordinates below; the MODIS channel re-resolves it on the GEUS
-   % grid (a point stays [lat lon], a polygon stays EPSG:3413), so a polygon
-   % build gets the area-weighted catchment MODIS mean, not the nearest cell.
-   location0 = location;
+   % Accept one location (1x2 point or polyshape, returns a single Data
+   % timetable) OR a list of N points (Nx2 [lat lon], returns a 1xN cell of
+   % Data timetables). N=1 is the single-point path. The per-variable files
+   % and the grid above are read ONCE for the whole list; each point's grid
+   % hyperslab + collapse rule is resolved here, then every variable file is
+   % opened ONCE and each point's hyperslab sliced from that single open
+   % (decisive for the multi-GB subsurface files).
+   [locations, batch] = locationList(location);
+   npts = numel(locations);
 
-   % Conservative polygon remap runs in RACMO's NATIVE rotated-pole frame
-   % (the FGRN11 rlon/rlat grid is regular there; reprojecting to EPSG:3413
-   % is curvilinear). exactremap's rotated-pole support handles the rotation
-   % from the CF grid mapping and weights cells by the shipped true cell
-   % areas (gridarea); off-ice cells (IceMask) are inpainted. Point/nearest
-   % and equal-weight stay in the projected grid.
-   if isa(location, 'polyshape') && kwargs.remap == "conservative"
-      [start, count, collapse, inslab, loctype] = ...
-         resolveRacmoConservative(first, source_dir, location, proj);
-   else
-      if isnumeric(location)
-         assert(isequal(size(location), [1 2]), ...
-            'point location must be [lat lon]')
-         [xq, yq] = projfwd(proj, location(1), location(2));
-         location = [xq, yq];
-      end
-      [start, count, collapse, inslab, loctype] = ...
-         icemodel.forcing.helpers.gridLocation(X, Y, location, kwargs.method, ...
-         remap=kwargs.remap);
+   grid = struct('X', X, 'Y', Y, 'LAT', LAT, 'LON', LON, 'proj', proj, ...
+      'first', first, 'source_dir', source_dir, ...
+      'method', kwargs.method, 'remap', kwargs.remap);
+   [slabs, collapses, inslabs, sites] = deal( ...
+      cell(1, npts), cell(1, npts), cell(1, npts), cell(1, npts));
+   loctype = "";
+   for p = 1:npts
+      [slabs{p}, collapses{p}, inslabs{p}, sites{p}, loctype] = ...
+         resolvePoint(grid, locations{p});
    end
 
    % Time axis (shared by all variables): days since 1950-01-01, native
@@ -158,22 +158,116 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
       mat2str(years), year(Time(1)), year(Time(end)))
    Time = Time(keep);
 
-   % Read each available channel at the hyperslab and collapse to the
-   % target (single cell or weighted polygon average).
-   Data = timetable(Time);
+   % Read each available channel ONCE per file (every point's hyperslab from
+   % a single open), then collapse + subset per point.
+   series = cell(size(channels, 1), npts);
    for n = 1:size(channels, 1)
       if ~found(n)
          continue
       end
-      series = readChannel(files(n), channels{n, 1}, ...
-         start, count, collapse, keep);
-      Data.(channels{n, 2}) = series;
+      blocks = icemodel.forcing.readRacmo2p3(files(n), channels{n, 1}, ...
+         slabs=slabs);
+      for p = 1:npts
+         s = collapses{p}(blocks{p});
+         series{n, p} = s(keep);
+      end
    end
+
+   data_out = cell(1, npts);
+   meta_out = cell(1, npts);
+   for p = 1:npts
+      Data = timetable(Time);
+      for n = 1:size(channels, 1)
+         if found(n)
+            Data.(channels{n, 2}) = series{n, p};
+         end
+      end
+      [data_out{p}, meta_out{p}] = finalizeRacmoData(Data, sites{p}, ...
+         slabs{p}, inslabs{p}, loctype, years, locations{p}, files, found, ...
+         source_dir, grid, kwargs);
+   end
+
+   metadata = [meta_out{:}];
+   if batch
+      Data = data_out;
+   else
+      Data = data_out{1};
+   end
+end
+
+%% Local functions
+function [files, found] = locateRacmoFiles(source_dir, prefixes)
+   %LOCATERACMOFILES Resolve one file per RACMO variable prefix.
+   n = numel(prefixes);
+   files = strings(n, 1);
+   found = false(n, 1);
+   for k = 1:n
+      match = dir(fullfile(source_dir, [prefixes{k} '.RACMO*.nc']));
+      if isscalar(match)
+         files(k) = string(fullfile(match.folder, match.name));
+         found(k) = true;
+      end
+   end
+end
+
+function [locations, batch] = locationList(location)
+   %LOCATIONLIST Normalize the location input to a 1xN cell of locations.
+   % A polyshape or a single [lat lon] row is one location (batch=false); an
+   % Nx2 [lat lon] (N>1) is a point list (batch=true).
+   if isnumeric(location) && size(location, 2) == 2 && size(location, 1) > 1
+      locations = num2cell(location, 2)';
+      batch = true;
+   else
+      locations = {location};
+      batch = false;
+   end
+end
+
+function [slab, collapse, inslab, site, loctype] = resolvePoint(grid, location)
+   %RESOLVEPOINT Map one point or polygon onto a RACMO grid hyperslab.
+   %
+   % Returns the hyperslab as a [start; count] 2x2 (for the batch reader),
+   % the collapse handle, the slab-relative metadata index, and the site
+   % lat/lon (slab mean). Conservative polygon remap runs in RACMO's NATIVE
+   % rotated-pole frame (the FGRN11 rlon/rlat grid is regular there;
+   % reprojecting to EPSG:3413 is curvilinear). exactremap's rotated-pole
+   % support handles the rotation from the CF grid mapping and weights cells
+   % by the shipped true cell areas (gridarea); off-ice cells (IceMask) are
+   % inpainted. Point/nearest and equal-weight stay in the projected grid.
+   if isa(location, 'polyshape') && grid.remap == "conservative"
+      [start, count, collapse, inslab, loctype] = ...
+         resolveRacmoConservative(grid.first, grid.source_dir, ...
+         location, grid.proj);
+   else
+      if isnumeric(location)
+         assert(isequal(size(location), [1 2]), ...
+            'point location must be [lat lon]')
+         [xq, yq] = projfwd(grid.proj, location(1), location(2));
+         location = [xq, yq];
+      end
+      [start, count, collapse, inslab, loctype] = ...
+         icemodel.forcing.helpers.gridLocation(grid.X, grid.Y, location, ...
+         grid.method, remap=grid.remap);
+   end
+   slab = [start; count];
+   site.lat = icemodel.forcing.helpers.slabMean(grid.LAT, start, count, inslab);
+   site.lon = icemodel.forcing.helpers.slabMean(grid.LON, start, count, inslab);
+end
+
+function [Data, metadata] = finalizeRacmoData(Data, site, slab, inslab, ...
+      loctype, years, location, files, found, source_dir, grid, kwargs)
+   %FINALIZERACMODATA Post-process one point's assembled RACMO Data + metadata.
+   % Identical to the legacy single-point tail: hourly interpolation, derived
+   % albedo, optional MODIS channel, precip rate, units, metchecks, userdata
+   % CustomProperties, and the provenance struct. start/count come from slab.
+   start = slab(1, :);
+   count = slab(2, :);
 
    % Interpolate to hourly (legacy behavior) unless native requested.
    % The full-year hourly axis extends past the last 3-hourly posting
    % (21:00 on Dec 31); the trailing hours extrapolate linearly.
    if kwargs.dt == "1hr"
+      Time = Data.Time;
       t1 = dateshift(Time(1), 'start', 'year');
       t2 = dateshift(Time(end), 'start', 'year') + calyears(1) - hours(1);
       t_hourly = (t1:hours(1):t2)';
@@ -182,9 +276,7 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    end
 
    % Site location (also needed for the optional MODIS channel below).
-   site_lat = icemodel.forcing.helpers.slabMean(LAT, start, count, inslab);
-   site_lon = icemodel.forcing.helpers.slabMean(LON, start, count, inslab);
-   [site_x, site_y] = projfwd(proj, site_lat, site_lon);
+   [site_x, site_y] = projfwd(grid.proj, site.lat, site.lon);
 
    % Derived surface albedo. RACMO ships no albedo variable, so recover it
    % from downwelling and net shortwave: albedo = SWup/SWdown =
@@ -211,7 +303,7 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    % for catchments) to the area-weighted ROI mean for polygons.
    if kwargs.modis_dir ~= ""
       Data.modis = icemodel.forcing.helpers.modisAlbedoChannel( ...
-         kwargs.modis_dir, years, location0, kwargs.method, kwargs.remap, ...
+         kwargs.modis_dir, years, location, kwargs.method, kwargs.remap, ...
          Data.Time);
    end
 
@@ -236,8 +328,8 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
       repmat({'table'}, 1, 7));
    Data.Properties.CustomProperties.X = site_x;
    Data.Properties.CustomProperties.Y = site_y;
-   Data.Properties.CustomProperties.Lat = site_lat;
-   Data.Properties.CustomProperties.Lon = site_lon;
+   Data.Properties.CustomProperties.Lat = site.lat;
+   Data.Properties.CustomProperties.Lon = site.lon;
    Data.Properties.CustomProperties.Elev = ...
       readElevation(source_dir, start, count, inslab);
    Data.Properties.CustomProperties.Slope = NaN;
@@ -252,39 +344,11 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
       'grid_start', start, ...
       'grid_count', count, ...
       'n_cells', prod(count), ...
-      'lat', site_lat, 'lon', site_lon, ...
+      'lat', site.lat, 'lon', site.lon, ...
       'dt', kwargs.dt, ...
       'mass_flux_units', ...
       "precip m s-1; diagnostic fluxes mWE/h (rate; cumulative sums need dt hours)", ...
       'checks', checks);
-end
-
-%% Local functions
-function [files, found] = locateRacmoFiles(source_dir, prefixes)
-   %LOCATERACMOFILES Resolve one file per RACMO variable prefix.
-   n = numel(prefixes);
-   files = strings(n, 1);
-   found = false(n, 1);
-   for k = 1:n
-      match = dir(fullfile(source_dir, [prefixes{k} '.RACMO*.nc']));
-      if isscalar(match)
-         files(k) = string(fullfile(match.folder, match.name));
-         found(k) = true;
-      end
-   end
-end
-
-function series = readChannel(filename, prefix, start, count, collapse, keep)
-   %READCHANNEL Read one RACMO variable (standard units), collapse, subset.
-   % The hyperslab read + unit conversion is delegated to the shared reader
-   % icemodel.forcing.readRacmo2p3; COLLAPSE (from gridLocation) then reduces
-   % the cells-by-time block to the target series (nearest cell,
-   % natural-neighbour point, or polygon mean), and KEEP subsets to the
-   % requested years.
-   data = icemodel.forcing.readRacmo2p3(filename, prefix, ...
-      start=start, count=count);
-   series = collapse(data);
-   series = series(keep);
 end
 
 function elev = readElevation(source_dir, start, count, inslab)

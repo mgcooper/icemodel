@@ -13,7 +13,9 @@ function [met, metadata] = buildMerraMet(location, years, kwargs)
    % icemodel.forcing.helpers.writemet.
    %
    % Inputs
-   %  location - [lat lon] point or polyshape in EPSG:3413 meters
+   %  location - [lat lon] point, polyshape (EPSG:3413 m), or an Nx2 [lat lon]
+   %             list of points. A point list returns a 1xN cell of met
+   %             timetables (one per point); a single location returns one.
    %  years    - calendar years to extract
    %
    % Name-value
@@ -49,18 +51,32 @@ function [met, metadata] = buildMerraMet(location, years, kwargs)
       kwargs.dt_out (1, 1) string = ""
    end
 
+   % buildMerraData accepts a single location (returns one Data timetable) or a
+   % list of N points (Nx2 [lat lon], returns a 1xN cell of Data timetables).
+   % Map data2met (+ the optional resample) over each, so met mirrors Data:
+   % a single met timetable for one location, a 1xN cell for a point list.
    [Data, metadata] = icemodel.forcing.buildMerraData(location, years, ...
       source_dir=kwargs.source_dir, modis_dir=kwargs.modis_dir, ...
       fillgaps=kwargs.fillgaps, method=kwargs.method, remap=kwargs.remap);
 
-   met = icemodel.forcing.data2met(Data);
+   if iscell(Data)
+      met = cellfun(@(d) toMet(d, years, kwargs.dt_out), Data, ...
+         'UniformOutput', false);
+   else
+      met = toMet(Data, years, kwargs.dt_out);
+   end
+end
 
-   if kwargs.dt_out ~= ""
+%% Local functions
+function met = toMet(Data, years, dt_out)
+   %TOMET Convert one point's Data to the met contract (optional resample).
+   met = icemodel.forcing.data2met(Data);
+   if dt_out ~= ""
       % icemodel.interpmet resamples one calendar year at a time.
       parts = cell(numel(years), 1);
       for n = 1:numel(years)
          parts{n} = icemodel.interpmet( ...
-            met(year(met.Time) == years(n), :), char(kwargs.dt_out));
+            met(year(met.Time) == years(n), :), char(dt_out));
       end
       met = vertcat(parts{:});
    end
