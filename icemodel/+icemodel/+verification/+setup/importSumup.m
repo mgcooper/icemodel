@@ -26,12 +26,13 @@ function manifest = importSumup(source_dir, kwargs)
    %  never bundled. Setting build_forcing=false imports observations only; the
    %  RCM forcing can be built later, independently, on the staged manifest.
    %
-   %  Data-gated: SUMup is access-gated (NASA Earthdata, NSIDC G02288). With
-   %  no populated cache, fetchSumup(strict=true) errors with the retrieval
-   %  banner and nothing is staged. Provide points explicitly (SUMup is a
-   %  point collection, not a curated site list); the default is the PROMICE
-   %  anchor transect so the staged SUMup cases co-locate with the existing
-   %  firn/promice bundles.
+   %  Source: SUMup_2025 is read from the LOCAL verification cache
+   %  (data/verification/sumup, NSIDC G02288); the files are committed there, so
+   %  no download is required. fetchSumup verifies cache presence (and prints a
+   %  retrieval banner only if it is genuinely absent). Provide points explicitly
+   %  (SUMup is a point collection, not a curated site list); the default is the
+   %  PROMICE anchor transect so the staged SUMup cases co-locate with the
+   %  existing firn/promice bundles.
    %
    %  Inputs
    %    source_dir : string  SUMup cache dir (see fetchSumup). When blank, the
@@ -42,8 +43,10 @@ function manifest = importSumup(source_dir, kwargs)
    %             curated PROMICE anchor coordinates from the firn/promice
    %             manifest (so SUMup cases co-locate with the anchors).
    %    case_ids : string vector  case ids for each point (default sumup_NN).
-   %    years : numeric vector  forcing years (default 2012:2015, the RACMO-
-   %            bound firn window for the co-located MAR/RACMO legs).
+   %    years : numeric vector  forcing-window years for the co-located MAR/MERRA
+   %            legs (default 2012:2018, the RACMO subsurface span; RACMO itself
+   %            is decoupled and always stages its full on-disk coverage). Used
+   %            only when startdate/enddate are omitted.
    %    startdate / enddate : OPTIONAL comparison-window clamp; pass both or
    %            neither. The DEFAULT (omitted) is ALL AVAILABLE: no clamp, each
    %            point stages its full on-disk SUMup record and the manifest
@@ -59,10 +62,11 @@ function manifest = importSumup(source_dir, kwargs)
    %            observation import; when false ONLY the observations + manifest
    %            are written (forcing can be built later via stageRcmForcing).
    %    evaluation_data_root / input_data_root / icemodel_config_casename :
-   %            staging roots (mirror importPromiceSites). DEFAULT is SAFE: the
-   %            roots resolve to the configured per-case RESEARCH root, NOT the
-   %            committed demo/data/eval tree, unless a root pointing at
-   %            demo/data is explicitly passed.
+   %            staging roots (mirror importPromiceSites). DEFAULT (roots unset):
+   %            resolves via icemodel_config_casename ("test"), which points at the
+   %            COMMITTED <repo>/demo/data tree (icemodel.config) - NOT a research
+   %            root. To stage the gitignored research set pass
+   %            evaluation_data_root/input_data_root at <repo>/data explicitly.
    %    overwrite : logical (default false)  refresh a requested point's own
    %            staged case folder; other cases are never touched.
    %    overwrite_family : logical (default false)  force a FULL rewrite of the
@@ -104,7 +108,7 @@ function manifest = importSumup(source_dir, kwargs)
       source_dir (1, 1) string = ""
       kwargs.points double = defaultAnchorPoints()
       kwargs.case_ids (1, :) string = strings(1, 0)
-      kwargs.years (1, :) double = 2012:2015
+      kwargs.years (1, :) double = 2012:2018
       kwargs.startdate = ""
       kwargs.enddate = ""
       kwargs.radius_km (1, 1) double {mustBePositive} = 7.5
@@ -247,7 +251,7 @@ function manifest = importSumup(source_dir, kwargs)
          obs_vars = icemodel.verification.setup.metadataStruct({ ...
             'density', 'firn/snow density profile (depth, density, error)'
             'subsurface_temperature', 'SUMup subsurface temperature T(z,t)'
-            'accumulation', 'SMB / accumulation records'});
+            'smb', 'surface mass balance records (signed; accumulation or ablation)'});
          [zone, target, pfz] = sumupZoneAndTarget(is_coloc, anchor);
 
          state(n) = struct('case_id', string(case_id), ...
@@ -573,7 +577,7 @@ end
 
 function vars = sumupComparisonVariables(observations)
    %SUMUPCOMPARISONVARIABLES Comparison axes present in the SUMup obs bundle.
-   candidate = ["density"; "subsurface_temperature"; "accumulation"];
+   candidate = ["density"; "subsurface_temperature"; "smb"];
    present = false(numel(candidate), 1);
    for k = 1:numel(candidate)
       present(k) = isfield(observations, candidate(k)) ...

@@ -85,11 +85,13 @@ function manifest = importPromiceSites(kwargs)
    %            Reviewed, version-controlled; only write here on purpose.
    %          * RESEARCH root (gitignored): <repo>/data/eval (+ .../input).
    %            The full research set; safe to churn.
-   %        DEFAULT is SAFE: when output_root is unset the roots resolve via
-   %        evaluation_data_root/input_data_root/icemodel_config_casename (the
-   %        configured per-case research roots), NOT the committed demo tree -
-   %        so "stage site X" never writes the committed fixtures unless an
-   %        output_root/evaluation_data_root pointing at demo/data is passed.
+   %        DEFAULT (output_root unset): the roots resolve via
+   %        evaluation_data_root/input_data_root/icemodel_config_casename, which
+   %        for the default "test" casename point at the COMMITTED <repo>/demo/data
+   %        tree (icemodel.config) - NOT a research root. To stage the gitignored
+   %        research set pass output_root=<repo>/data explicitly. (Calling with no
+   %        args therefore writes the committed demo tree - stage the research set
+   %        only with output_root set.)
    %    promice_dir, mar_dir, merra_dir, racmo_dir, modis_dir : raw-source
    %        directories for each model.
    %    evaluation_data_root, input_data_root, icemodel_config_casename :
@@ -656,13 +658,17 @@ function [comparison_vars, obs_vars] = firnComparisonContract(promice_data)
    end
 
    present = string(promice_data.Properties.VariableNames);
-   canonical = ["ablation"; "snow_depth"; "tsfc"; ...
+   % tice10m (the L3 standardized 10 m-below-surface temperature) is the PRIMARY
+   % subsurface comparison channel (D-QAQC-3); the raw tice1..ticeN string is
+   % secondary/diagnostic. List tice10m first so it is recorded when staged.
+   canonical = ["ablation"; "snow_depth"; "tsfc"; "tice10m"; ...
       "tice1"; "tice2"; "tice3"; "tice4"; ...
       "tice5"; "tice6"; "tice7"; "tice8"];
    comparison_vars = canonical(ismember(canonical, present));
 
    obs_vars = icemodel.verification.setup.metadataStruct({ ...
-      'subsurface_temperature', 'tice1..tice8 (string thermistors)'
+      'subsurface_temperature_primary', 'tice10m [K] (standardized 10 m below surface)'
+      'subsurface_temperature_string', 'tice1..tice8 (raw string thermistors)'
       'surface_ablation', 'ablation [m, positive down]'
       'snow_depth', 'snow_depth [m]'});
 end

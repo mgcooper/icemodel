@@ -503,16 +503,18 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
    nz = 40;
    n = 6;
    time = (datetime(2013, 6, 1) + hours(0:n - 1))';
-   ice1 = struct("Time", time, "accumulation", linspace(0, 0.2, n)');
+   ice1 = struct("Time", time, "smb", linspace(0, 0.2, n)');
    ice2 = struct( ...
       "T", 263.15 + repmat((0:nz - 1)' * 0.05, 1, n), ...
       "ro_sno", 350 + (0:nz - 1)' * 5);
    opts = struct("smbmodel", "icemodel", "sitename", "kanu", ...
       "simyears", 2013, "dz_thermal", 0.04);
 
+   % Drive the adapter with the full profile-bundle axis set incl. smb (SUMup's
+   % third axis is SMB, not "accumulation": it spans accumulation + ablation).
    adapter_manifest = struct( ...
       "case_type", "firn_observational", ...
-      "comparison_variables", vars, ...
+      "comparison_variables", ["density", "subsurface_temperature", "smb"], ...
       "observation_variables", manifest.observation_variables);
 
    candidate = icemodel.verification.candidateFromIcemodelOutput( ...
@@ -529,6 +531,10 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
    % Subsurface temperature profile T(z,t) resolves in degrees C.
    testCase.verifyTrue(isfield(candidate.data, 'subsurface_temperature'));
    testCase.verifyEqual(candidate.data.subsurface_temperature, ice2.T - Tf);
+
+   % SMB axis maps from ice1.smb.
+   testCase.verifyTrue(isfield(candidate.data, 'smb'));
+   testCase.verifyEqual(candidate.data.smb, ice1.smb);
 end
 
 function test_committed_accum_firn_fixtures_enumerate(testCase)

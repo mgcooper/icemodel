@@ -7,29 +7,28 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
    %     icemodel.verification.setup.buildSumupObservations([lat lon], ...
    %        source_dir=..., radius_km=..., startdate=..., enddate=...)
    %
-   %  Reads the cached SUMup density / accumulation / subsurface-temperature
-   %  files and returns the firn observations nearest one [lat lon] point as a
-   %  verification-target struct. SUMup is the firn observation source; it
-   %  subsumes Humphrey 2012 subsurface temperature and GreenTRACS
-   %  accumulation. Mirrors buildEsmSnowmipObservations: a reusable per-point
-   %  observation builder used by importSumup during staging.
+   %  Reads the cached SUMup density / SMB / subsurface-temperature files and
+   %  returns the firn observations nearest one [lat lon] point as a
+   %  verification-target struct. Mirrors buildEsmSnowmipObservations: a reusable
+   %  per-point observation builder used by importSumup during staging.
    %
    %  Output target schema (verification timeseries / profile bundle):
    %    observations.format   = "subsurface_profile_bundle"
    %    observations.density            depth-indexed profile TABLE
    %                                    (depth, density, error, datetime)
    %    observations.subsurface_temperature  datetime-indexed TIMETABLE T(z,t)
-   %    observations.accumulation       period-indexed TABLE with start_date /
-   %                                    end_date datetimes
+   %    observations.smb                period-indexed TABLE with start_date /
+   %                                    end_date datetimes (signed surface mass
+   %                                    balance: accumulation OR ablation)
    %  Each sub-bundle is present only when the corresponding SUMup variable
    %  file is in the cache and has a record within radius_km of the point.
    %
    %  The bundle struct is a WRAPPER for three heterogeneous profile tables
-   %  (density rho(z), subsurface temperature T(z,t), accumulation/SMB), not a
-   %  storage choice; the three tables carry different indexing axes (depth,
-   %  time, period) and cannot share one table. The generic name
-   %  "subsurface_profile_bundle" (not "firn_profile_bundle") covers ablation
-   %  sites too, where the bare-ice/seasonal-snow column is not firn.
+   %  (density rho(z), subsurface temperature T(z,t), smb), not a storage choice;
+   %  the three tables carry different indexing axes (depth, time, period) and
+   %  cannot share one table. The generic name "subsurface_profile_bundle" (not
+   %  "firn_profile_bundle") covers ablation sites too, where the bare-ice/
+   %  seasonal-snow column is not firn.
    %
    %  TIME AXIS. SUMup stores a numeric `timestamp` (days since 1900-01-01).
    %  This builder converts it to real UTC datetimes:
@@ -37,7 +36,7 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
    %      indexed by the measurement datetime (row time `Time`);
    %    - density is a depth profile, returned as a TABLE with an added
    %      `datetime` column carrying the profile timestamp;
-   %    - accumulation is a period observation, returned as a TABLE with
+   %    - smb is a period observation, returned as a TABLE with
    %      `start_date` / `end_date` converted to datetimes (the integer
    %      days-since-1900 columns are replaced in place).
    %
@@ -98,14 +97,17 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
       point, kwargs.radius_km, kwargs.startdate, kwargs.enddate);
    [temperature, temp_note] = readSumupVariable(source_dir, "temperature", ...
       point, kwargs.radius_km, kwargs.startdate, kwargs.enddate);
-   [accumulation, accum_note] = readSumupVariable(source_dir, "SMB", ...
+   % SMB (surface mass balance) - the third obs axis. NOT "accumulation": SUMup
+   % spans accumulation AND ablation zones, so this quantity is signed SMB
+   % (positive net accumulation / negative net ablation), not accumulation per se.
+   [smb, smb_note] = readSumupVariable(source_dir, "SMB", ...
       point, kwargs.radius_km, kwargs.startdate, kwargs.enddate);
 
    observations = struct( ...
       'format', 'subsurface_profile_bundle', ...
       'density', density, ...
       'subsurface_temperature', temperature, ...
-      'accumulation', accumulation);
+      'smb', smb);
 
    metadata = icemodel.verification.setup.metadataStruct({ ...
       'observation_source', 'SUMup 2025 release (NSIDC G02288)'
@@ -114,7 +116,7 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
       'selection_radius_km', kwargs.radius_km
       'density_note', density_note
       'subsurface_temperature_note', temp_note
-      'accumulation_note', accum_note});
+      'smb_note', smb_note});
 end
 
 %% Local helpers

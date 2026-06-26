@@ -36,8 +36,8 @@ function candidate = firnCandidateFromIce1(ice1, ice2, opts, case_manifest)
    % comparison axes the staged manifests declare are the surface-energy /
    % ablation series (ablation, snow_depth, tsfc) plus the subsurface
    % thermistor profile (tice1..tice8 = T(z,t) sampled at thermistor depths)
-   % and, when staged, density rho(z,t) and accumulation/SMB. Variables are
-   % mapped only as far as the staged cases require; porosity / saturation /
+   % and, when staged, density rho(z,t) and smb (surface mass balance). Variables
+   % are mapped only as far as the staged cases require; porosity / saturation /
    % runoff are deferred with the firn physics.
 
    if ~isfield(ice1, "Time")
@@ -47,7 +47,7 @@ function candidate = firnCandidateFromIce1(ice1, ice2, opts, case_manifest)
    variable_names = string(case_manifest.comparison_variables);
 
    % SUMup firn-observational cases declare profile-bundle comparison axes
-   % (density rho(z), subsurface_temperature T(z,t), accumulation) rather than
+   % (density rho(z), subsurface_temperature T(z,t), smb) rather than
    % the PROMICE thermistor/ablation timeseries. Dispatch on the declared axes:
    % a case that asks for the profile-bundle variables gets a profile-bundle
    % candidate; the PROMICE thermistor timeseries stays the default firn path.
@@ -126,8 +126,8 @@ function candidate = firnProfileCandidateFromIce2(ice1, ice2, opts, case_manifes
       end
    end
 
-   if ismember("accumulation", variable_names) && isfield(ice1, "accumulation")
-      bundle.accumulation = ice1.accumulation;
+   if ismember("smb", variable_names) && isfield(ice1, "smb")
+      bundle.smb = ice1.smb;
    end
 
    candidate = struct( ...

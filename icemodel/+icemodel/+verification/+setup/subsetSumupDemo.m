@@ -64,7 +64,7 @@ function [observations, provenance] = subsetSumupDemo(observations, point, kwarg
       'point_lon_wgs84', point(2), ...
       'channels', struct([]));
 
-   channels = ["density", "subsurface_temperature", "accumulation"];
+   channels = ["density", "subsurface_temperature", "smb"];
    for k = 1:numel(channels)
       ch = channels(k);
       if ~isfield(observations, ch) || isempty(observations.(ch))
