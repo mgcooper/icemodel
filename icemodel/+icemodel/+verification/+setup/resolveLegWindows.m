@@ -11,12 +11,14 @@ function leg = resolveLegWindows(models, coverage, window_start, window_end)
    %  any NetCDF is opened, so an empty model/window is skipped without entering
    %  an hours-long build (RR3 feedback #1).
    %
-   %  Per-source policy:
+   %  Per-source policy (all three intersect the requested window via capLeg):
    %    * MAR / MERRA : met sources. Window = requested window intersected with
-   %      on-disk years (capLeg). When the requested window is unbounded (NaT -
-   %      the all-available default), the source's FULL on-disk coverage is used.
-   %    * RACMO       : eval/reference Data only, DECOUPLED from the met window -
-   %      always its full on-disk coverage (ownLeg), ignoring window_start/end.
+   %      on-disk years. When the requested window is unbounded (NaT - the
+   %      all-available default), the source's FULL on-disk coverage is used.
+   %    * RACMO       : eval/reference Data only (no met), but still intersected
+   %      with the window (8fc): a station whose record lies entirely outside
+   %      RACMO's coverage gets a SKIPPED RACMO leg rather than a zero-overlap
+   %      file; an unbounded window falls back to RACMO's full coverage.
    %
    %  Inputs
    %    models       : string vector subset of ["mar","merra","racmo"] (other
@@ -44,9 +46,12 @@ function leg = resolveLegWindows(models, coverage, window_start, window_end)
       leg.merra = capLeg(coverage.merra, window_start, window_end, "MERRA-2");
    end
    if ismember("racmo", models)
-      % RACMO is decoupled: stage its full on-disk coverage, ignoring the met
-      % window entirely (eval/reference Data, not a met source).
-      leg.racmo = ownLeg(coverage.racmo, "RACMO");
+      % RACMO is intersected with the requested window like MAR/MERRA (8fc):
+      % staging RACMO's full 2012-2018 span for a station whose observations are
+      % entirely outside it (e.g. a 2022+ record) produces a zero-overlap,
+      % unusable Data file. capLeg SKIPS on no overlap and CLIPS on partial. An
+      % unbounded (NaT) window still falls back to RACMO's full coverage.
+      leg.racmo = capLeg(coverage.racmo, window_start, window_end, "RACMO");
    end
 end
 

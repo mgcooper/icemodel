@@ -291,10 +291,13 @@ function manifest = importSumup(source_dir, kwargs)
       % kwargs.years span (preserves the years kwarg's meaning), else unbounded
       % (each source's full on-disk coverage).
       [f_start, f_end] = forcingWindow(window_start, window_end, kwargs.years);
-      state = stageColocatedForcing(state, alive, f_start, f_end, ...
-         met_outdir, userdata_outdir, kwargs);
-      manifest = assembleAndWrite(state, alive, skipped, n_skipped, ...
+      % de7: persist the manifest after EACH RCM source (callback), so a kill
+      % mid-forcing keeps the completed sources' legs.
+      persist = @(st) assembleAndWrite(st, alive, skipped, n_skipped, ...
          dataset_family, manifest_file, requested_ids, kwargs);
+      state = stageColocatedForcing(state, alive, f_start, f_end, ...
+         met_outdir, userdata_outdir, kwargs, persist);
+      manifest = persist(state);
    end
 end
 
@@ -394,15 +397,17 @@ function manifest = assembleAndWrite(state, alive, skipped, n_skipped, ...
 end
 
 function state = stageColocatedForcing(state, alive, window_start, window_end, ...
-      met_outdir, userdata_outdir, kwargs)
+      met_outdir, userdata_outdir, kwargs, persist)
    %STAGECOLOCATEDFORCING Delegate the co-located MAR/MERRA/RACMO legs.
    %
    % SUMup points carry no station met, so PROMICE is NOT a forcing leg here -
-   % only the gridded RCMs are staged, over ALL alive points in one call per
-   % source. stageRcmForcing writes MAR/MERRA met+Data and RACMO Data, degrading
-   % a failing source's legs to skip-with-reason without losing the others. The
-   % forcing window follows the comparison window (NaT = all-available = each
-   % source's full on-disk coverage), resolved fail-early per source.
+   % only the gridded RCMs are staged. Each source is staged in its OWN
+   % stageRcmForcing call, the legs merged into each point's state, and `persist`
+   % MERGE-writes the manifest after EACH source (de7) with a per-source progress
+   % line (8fc). stageRcmForcing writes MAR/MERRA met+Data and RACMO Data,
+   % degrading a failing source's legs to skip-with-reason without losing the
+   % others. The forcing window follows the comparison window (NaT = all-available
+   % = each source's full on-disk coverage), resolved fail-early per source.
    rcm_models = ["mar", "merra", "racmo"];
    alive_idx = find(alive);
    if isempty(alive_idx)
@@ -416,24 +421,35 @@ function state = stageColocatedForcing(state, alive, window_start, window_end, .
       window_start, window_end);
 
    points = vertcat(state(alive_idx).point);
-   legspec = repmat(legProto(rcm_models), 1, numel(alive_idx));
-   for j = 1:numel(alive_idx)
-      legspec(j).alias = state(alive_idx(j)).alias;
-      for src = rcm_models
+   for src = rcm_models
+      fprintf('[staging] %s forcing for %d SUMup point(s)...\n', ...
+         upper(char(src)), numel(alive_idx));
+
+      legspec = repmat(legProto(src), 1, numel(alive_idx));
+      for j = 1:numel(alive_idx)
+         legspec(j).alias = state(alive_idx(j)).alias;
          legspec(j).(char(src)) = leg.(char(src));
       end
-   end
 
-   colocation = icemodel.verification.setup.stageRcmForcing(points, ...
-      legspec=legspec, models=rcm_models, ...
-      met_outdir=met_outdir, userdata_outdir=userdata_outdir, ...
-      mar_dir=kwargs.mar_dir, merra_dir=kwargs.merra_dir, ...
-      racmo_dir=kwargs.racmo_dir, modis_dir=kwargs.modis_dir, ...
-      method="nearest");
+      colocation = icemodel.verification.setup.stageRcmForcing(points, ...
+         legspec=legspec, models=src, ...
+         met_outdir=met_outdir, userdata_outdir=userdata_outdir, ...
+         mar_dir=kwargs.mar_dir, merra_dir=kwargs.merra_dir, ...
+         racmo_dir=kwargs.racmo_dir, modis_dir=kwargs.modis_dir, ...
+         method="nearest");
 
-   for j = 1:numel(alive_idx)
-      state(alive_idx(j)).colocation = ...
-         mergeColocation(state(alive_idx(j)).colocation, colocation{j});
+      n_staged = 0;
+      for j = 1:numel(alive_idx)
+         state(alive_idx(j)).colocation = ...
+            mergeColocation(state(alive_idx(j)).colocation, colocation{j});
+         if isfield(colocation{j}, char(src)) && colocation{j}.(char(src)).staged
+            n_staged = n_staged + 1;
+         end
+      end
+      fprintf('[staging] %s: %d staged, %d skipped\n', upper(char(src)), ...
+         n_staged, numel(alive_idx) - n_staged);
+
+      persist(state);   % de7: incremental manifest after this source
    end
 end
 
