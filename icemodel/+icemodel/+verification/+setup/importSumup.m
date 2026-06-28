@@ -4,6 +4,8 @@ function manifest = importSumup(source_dir, kwargs)
    %  manifest = icemodel.verification.setup.importSumup(source_dir)
    %  manifest = icemodel.verification.setup.importSumup(source_dir, ...
    %     points=[lat lon; ...], overwrite=true)
+   %  manifest = icemodel.verification.setup.importSumup(source_dir, ...
+   %     anchors=anchor_catalog)
    %
    %  Stages SUMup firn observation cases under
    %  demo/data/eval/sumup/<case_id>/, mirroring importPromiceSites'
@@ -40,8 +42,12 @@ function manifest = importSumup(source_dir, kwargs)
    %
    %  Name-value
    %    points : Nx2 double  [lat lon] WGS84 points to stage. Default: the
-   %             curated PROMICE anchor coordinates from the firn/promice
-   %             manifest (so SUMup cases co-locate with the anchors).
+   %             explicit anchors when anchors is provided, otherwise curated
+   %             PROMICE anchor coordinates from the firn/promice manifest.
+   %    anchors : struct array  mixed anchor catalog with site/family/source_id
+   %             and coordinates. When points is empty, anchors with finite
+   %             lat/lon become the staging points. When points is provided,
+   %             anchors are used only for nearest-anchor metadata.
    %    case_ids : string vector  case ids for each point (default sumup_NN).
    %    years : numeric vector  forcing-window years for the co-located MAR/MERRA
    %            legs (default 2012:2018, the RACMO subsurface span; RACMO itself
@@ -107,6 +113,7 @@ function manifest = importSumup(source_dir, kwargs)
    arguments
       source_dir (1, 1) string = ""
       kwargs.points double = defaultAnchorPoints()
+      kwargs.anchors = []
       kwargs.case_ids (1, :) string = strings(1, 0)
       kwargs.years (1, :) double = 2012:2018
       kwargs.startdate = ""
@@ -126,12 +133,16 @@ function manifest = importSumup(source_dir, kwargs)
       kwargs.build_forcing (1, 1) logical = false
    end
 
-   if isempty(kwargs.points)
-      error('icemodel:verification:importSumup:noPoints', ...
-         ['no SUMup points to stage and no PROMICE anchor coordinates ' ...
-         'available; provide points=[lat lon; ...]'])
-   end
    points = kwargs.points;
+   if isempty(points) && ~isempty(kwargs.anchors)
+      points = pointsFromAnchors(kwargs.anchors);
+   end
+
+   if isempty(points)
+      error('icemodel:verification:importSumup:noPoints', ...
+         ['no SUMup points to stage and no mixed-anchor coordinates ' ...
+         'available; provide points=[lat lon; ...] or anchors=...'])
+   end
    n_points = size(points, 1);
 
    % Verify the SUMup cache up front (single source of truth for presence).
@@ -155,7 +166,7 @@ function manifest = importSumup(source_dir, kwargs)
    else
       % DEFAULT (omitted) is ALL AVAILABLE: no comparison clamp, so each SUMup
       % point stages its full on-disk observation record (mirrors the PROMICE
-      % RR1 all-available-years default). The obs/forcing builders treat ""
+      % all-available-years default). The obs/forcing builders treat ""
       % (and NaT) as unbounded; the manifest period records "" / "" too.
       window_start = NaT;
       window_end = NaT;
@@ -181,7 +192,7 @@ function manifest = importSumup(source_dir, kwargs)
    proj = icemodel.forcing.helpers.psnProjection();
 
    % Per-point state; a point yields at most one staged case OR one skip and
-   % exactly one requested id (no in-loop growth).
+   % exactly one requested id.
    state = repmat(emptyState(), 1, n_points);
    alive = false(1, n_points);
    skipped = repmat(struct('site', "", 'reason', ""), 1, n_points);
@@ -204,6 +215,7 @@ function manifest = importSumup(source_dir, kwargs)
          [is_coloc, anchor, dist_km] = ...
             icemodel.verification.helpers.sumupColocation(x3413, y3413, ...
             threshold_km=kwargs.colocation_threshold_km, ...
+            anchors=kwargs.anchors, ...
             evaluation_data_root=kwargs.evaluation_data_root, ...
             icemodel_config_casename=kwargs.icemodel_config_casename);
 
@@ -281,7 +293,7 @@ function manifest = importSumup(source_dir, kwargs)
 
    requested_ids = requested_ids(1:n_requested);
 
-   % --- Pass 2: write the obs manifest first (kill-safety), then delegate the
+   % --- Pass 2: write the obs manifest first, then delegate the
    % co-located RCM forcing/Data (MAR/MERRA met + RACMO Data) to stageRcmForcing.
    manifest = assembleAndWrite(state, alive, skipped, n_skipped, ...
       dataset_family, manifest_file, requested_ids, kwargs);
@@ -291,8 +303,8 @@ function manifest = importSumup(source_dir, kwargs)
       % kwargs.years span (preserves the years kwarg's meaning), else unbounded
       % (each source's full on-disk coverage).
       [f_start, f_end] = forcingWindow(window_start, window_end, kwargs.years);
-      % de7: persist the manifest after EACH RCM source (callback), so a kill
-      % mid-forcing keeps the completed sources' legs.
+      % Persist the manifest after each RCM source so a partial forcing run
+      % keeps the completed sources' legs.
       persist = @(st) assembleAndWrite(st, alive, skipped, n_skipped, ...
          dataset_family, manifest_file, requested_ids, kwargs);
       state = stageColocatedForcing(state, alive, f_start, f_end, ...
@@ -334,7 +346,7 @@ function manifest = assembleAndWrite(state, alive, skipped, n_skipped, ...
       dataset_family, manifest_file, requested_ids, kwargs)
    %ASSEMBLEANDWRITE Build the forcing-agnostic SUMup manifest + MERGE-write it.
    %
-   % Called twice: once with observations-only colocation (kill-safety, before
+   % Called twice: once with observations-only colocation (before
    % any forcing build) and once after the RCM legs are merged in.
    case_entries = cell(1, nnz(alive));
    n_cases = 0;
@@ -343,7 +355,8 @@ function manifest = assembleAndWrite(state, alive, skipped, n_skipped, ...
          continue
       end
       s = state(n);
-      [forcing_sources, eval_sources] = sumupSourceLists(s.colocation);
+      [forcing_sources, eval_sources] = ...
+         icemodel.verification.setup.colocationSourceLists(s.colocation);
 
       case_values = { ...
          char(s.case_id)
@@ -403,8 +416,8 @@ function state = stageColocatedForcing(state, alive, window_start, window_end, .
    % SUMup points carry no station met, so PROMICE is NOT a forcing leg here -
    % only the gridded RCMs are staged. Each source is staged in its OWN
    % stageRcmForcing call, the legs merged into each point's state, and `persist`
-   % MERGE-writes the manifest after EACH source (de7) with a per-source progress
-   % line (8fc). stageRcmForcing writes MAR/MERRA met+Data and RACMO Data,
+   % MERGE-writes the manifest after each source with a per-source progress
+   % line. stageRcmForcing writes MAR/MERRA met+Data and RACMO Data,
    % degrading a failing source's legs to skip-with-reason without losing the
    % others. The forcing window follows the comparison window (NaT = all-available
    % = each source's full on-disk coverage), resolved fail-early per source.
@@ -441,7 +454,8 @@ function state = stageColocatedForcing(state, alive, window_start, window_end, .
       n_staged = 0;
       for j = 1:numel(alive_idx)
          state(alive_idx(j)).colocation = ...
-            mergeColocation(state(alive_idx(j)).colocation, colocation{j});
+            icemodel.verification.setup.mergeColocation( ...
+            state(alive_idx(j)).colocation, colocation{j});
          if isfield(colocation{j}, char(src)) && colocation{j}.(char(src)).staged
             n_staged = n_staged + 1;
          end
@@ -449,22 +463,8 @@ function state = stageColocatedForcing(state, alive, window_start, window_end, .
       fprintf('[staging] %s: %d staged, %d skipped\n', upper(char(src)), ...
          n_staged, numel(alive_idx) - n_staged);
 
-      persist(state);   % de7: incremental manifest after this source
+      persist(state);   % Incremental manifest after this source.
    end
-end
-
-function [forcing_sources, eval_sources] = sumupSourceLists(colocation)
-   %SUMUPSOURCELISTS Informational forcing/eval source ids from staged legs.
-   % SUMup obs are always an eval source; MAR/MERRA are forcing met; RACMO is an
-   % eval/reference source. Derived AFTER the legs run.
-   mar = isfield(colocation, 'mar') && colocation.mar.staged;
-   merra = isfield(colocation, 'merra') && colocation.merra.staged;
-   racmo = isfield(colocation, 'racmo') && colocation.racmo.staged;
-
-   forcing_cands = ["mar", "merra"];
-   forcing_sources = reshape(forcing_cands([mar, merra]), [], 1);
-   eval_cands = ["sumup_obs", "racmo"];
-   eval_sources = reshape(eval_cands([true, racmo]), [], 1);
 end
 
 function L = legProto(models)
@@ -474,14 +474,6 @@ function L = legProto(models)
       'reason', "");
    for src = models
       L.(char(src)) = proto;
-   end
-end
-
-function s = mergeColocation(s, add)
-   %MERGECOLOCATION Copy every field of `add` onto colocation struct `s`.
-   f = fieldnames(add);
-   for i = 1:numel(f)
-      s.(f{i}) = add.(f{i});
    end
 end
 
@@ -521,6 +513,24 @@ function points = defaultAnchorPoints()
    end
 end
 
+function points = pointsFromAnchors(anchors)
+   %POINTSFROMANCHORS Resolve [lat lon] staging points from a mixed catalog.
+   %
+   % Only anchors with finite WGS84 coordinates become staging points. Anchors
+   % without coordinates can still be used as metadata when explicit points are
+   % supplied, but they cannot define point-selection geometry themselves.
+   points = zeros(0, 2);
+   if isempty(anchors) || ~isfield(anchors, 'lat_wgs84') ...
+         || ~isfield(anchors, 'lon_wgs84')
+      return
+   end
+
+   lat = [anchors.lat_wgs84];
+   lon = [anchors.lon_wgs84];
+   keep = isfinite(lat) & isfinite(lon);
+   points = [lat(keep).', lon(keep).'];
+end
+
 function [case_id, alias, site_id, site_name] = ...
       resolveCaseId(case_ids, n, is_coloc, anchor)
    %RESOLVECASEID Resolve the n-th case id, dir, and site labels.
@@ -551,16 +561,27 @@ function rec = colocationRecord(is_coloc, anchor, dist_km, threshold_km)
    %COLOCATIONRECORD Build the JSON co-location provenance record.
    rec = struct('is_colocated', is_coloc, ...
       'threshold_km', threshold_km, ...
-      'nearest_anchor', "", 'distance_km', dist_km);
-   if is_coloc && ~isempty(anchor)
+      'nearest_anchor', "", 'nearest_family', "", ...
+      'nearest_source_id', "", 'distance_km', dist_km);
+   if ~isempty(anchor)
       rec.nearest_anchor = string(anchor.site);
+      if isfield(anchor, 'family')
+         rec.nearest_family = string(anchor.family);
+      end
+      if isfield(anchor, 'source_id')
+         rec.nearest_source_id = string(anchor.source_id);
+      end
    end
 end
 
 function note = colocationNote(is_coloc, anchor)
    %COLOCATIONNOTE Short co-location phrase for the case note.
    if is_coloc && ~isempty(anchor)
-      note = sprintf(' co-located with PROMICE %s', anchor.site);
+      family = "anchor";
+      if isfield(anchor, 'family') && strlength(string(anchor.family)) > 0
+         family = string(anchor.family);
+      end
+      note = sprintf(' co-located with %s %s', family, anchor.site);
    else
       note = '';
    end

@@ -61,6 +61,7 @@ function map = variables()
    'precip', 'precipitation_flux',                         'total precipitation as water-equivalent rate',       'm s-1'
    'rainf',  'rainfall_flux',                              'rainfall as water-equivalent rate',                  'm s-1'
    'snowf',  'snowfall_flux',                              'snowfall as water-equivalent rate',                  'm s-1'
+   'snowf_subl', '',                                        'RetMIP net snowfall plus sublimation/deposition forcing', 'mWE/h'
    'rain',   'rainfall_flux',                              'rainfall as water-equivalent rate',                  'm s-1'
    'snow',   'snowfall_flux',                              'snowfall as water-equivalent rate',                  'm s-1'
    % --- mass-flux diagnostics (mWE/h) -------------------------------------

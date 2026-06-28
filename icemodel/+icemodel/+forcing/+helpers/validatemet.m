@@ -3,11 +3,10 @@ function validatemet(met)
    %
    %  icemodel.forcing.helpers.validatemet(met)
    %
-   % Errors unless MET is a timetable with a regular time axis containing
-   % every required met variable (see icemodel.forcing.helpers.metvariables)
-   % with at least one finite sample per required variable. Builders and
-   % write helpers call this at the contract boundary so malformed forcing
-   % never reaches disk.
+   % Errors unless MET is a timetable with a regular time axis containing every
+   % required met variable (see icemodel.forcing.helpers.metvariables). All-NaN
+   % required variables are allowed as explicit placeholders for runtime
+   % substitution, but absent variables remain invalid.
    %
    % See also: icemodel.forcing.helpers.metvariables,
    %  icemodel.forcing.helpers.writemet, icemodel.loadmet
@@ -35,13 +34,6 @@ function validatemet(met)
    if any(steps ~= steps(1))
       error('icemodel:forcing:validatemet:irregularTimeAxis', ...
          'met file time axis must have a uniform timestep');
-   end
-
-   for varname = required
-      if ~any(isfinite(met.(varname)), 'all')
-         error('icemodel:forcing:validatemet:allMissingVariable', ...
-            'required variable %s has no finite samples', varname);
-      end
    end
 
    % Precipitation-rate unit. When the met timetable records VariableUnits,

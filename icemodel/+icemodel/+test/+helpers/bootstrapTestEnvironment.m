@@ -24,6 +24,12 @@ function [rootdir, input_path, output_path, eval_path, cleanup] = ...
    % artifact, profiler, and archive directories stay off the MATLAB path.
    addCodeFolders(icemodel.getpath('test'))
 
+   % Add the staged test-data tree itself when it exists. Some direct unit
+   % runs and fixture loaders resolve bundled files relative to this folder,
+   % so keeping the parent directory on the MATLAB path avoids per-file
+   % bootstrap duplication while staying harmless when the tree is absent.
+   addTestDataFolder(fullfile(rootdir, 'data', 'test'))
+
    % Wire the external dev-repo dependencies (exactremap, activelayer, and the
    % matfunclib helpers activelayer needs) through the single central config
    % function so they are never bootstrapped from arbitrary locations. This
@@ -107,5 +113,13 @@ function addCodeFolders(rootdir)
    folders = unique(string({files.folder}), 'stable');
    for n = 1:numel(folders)
       addpath(char(folders(n)))
+   end
+end
+
+function addTestDataFolder(rootdir)
+   %ADDTESTDATAFOLDER Add the staged test-data root when present.
+
+   if isfolder(rootdir)
+      addpath(char(rootdir))
    end
 end

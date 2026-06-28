@@ -16,7 +16,7 @@ function out = stageRcmForcing(points, kwargs)
    %  (re)built at any time - including when a new model/forcing collection is
    %  added - without re-importing observations.
    %
-   %  WHAT IS WRITTEN (per source, RR3 contract)
+   %  WHAT IS WRITTEN (per source)
    %    * MAR / MERRA : the COMPLETE Data timetable via writeuserdata
    %      (userdata/<src>/) AND the met-contract timetable via data2met+writemet
    %      (met/<src>/). ALWAYS BOTH. The Data file carries every channel; the met
@@ -27,17 +27,20 @@ function out = stageRcmForcing(points, kwargs)
    %      channels (tair/wspd/rh/psfc), so a RACMO met would fail validatemet;
    %      RACMO is staged as eval/reference Data, not a met source.
    %
-   %  EXECUTION + ERROR HANDLING (RR3 feedback #1: fail cheap, never lose work)
-   %    Each source is built ONCE over the UNION of its participating points'
-   %    years (one file open per source-year, not per point), then each point is
-   %    windowSubset to its own window and written. Sources are processed in
-   %    order and each source's files are written IMMEDIATELY, so a later source's
-   %    failure never rolls back an earlier source already on disk (MAR survives a
-   %    RACMO failure). A source-level build failure degrades only THAT source's
-   %    participating legs to skip-with-reason; the other sources stand. The
-   %    empty-coverage case is caught EARLIER (resolveLegWindows marks the leg
-   %    staged=false before any build), so a model/site/window with no data is
-   %    skipped without entering an hours-long build.
+   %  EXECUTION + ERROR HANDLING
+   %    Each source is staged only for the files it still needs. Existing window
+   %    files whose encoded date range encloses the requested leg are reused and
+   %    recorded in the manifest instead of building a narrower duplicate. Points
+   %    that still need source reads are grouped by identical year set, so one
+   %    long station record does not force every shorter station to read the long
+   %    union span. Sources are processed in order and each source's files are
+   %    written IMMEDIATELY, so a later source's failure never rolls back an
+   %    earlier source already on disk (MAR survives a RACMO failure). A
+   %    source-group build failure degrades only THAT source's participating legs
+   %    to skip-with-reason; the other sources stand. The empty-coverage case is
+   %    caught EARLIER (resolveLegWindows marks the leg staged=false before any
+   %    build), so a model/site/window with no data is skipped without entering
+   %    an hours-long build.
    %
    %  MODES
    %    Explicit (drivers): pass `points` (Nx2 [lat lon]) and `legspec` (a 1xN
@@ -118,26 +121,37 @@ function colocation = stageExplicit(points, legspec, models, kwargs)
    colocation = repmat({struct()}, 1, n);
 
    % One source at a time, written immediately, so completed sources persist if
-   % a later source fails (RR3 feedback #1).
+   % a later source fails.
    for src = models
       colocation = stageOneSource(src, points, legspec, colocation, kwargs);
    end
 end
 
 function colocation = stageOneSource(src, points, legspec, colocation, kwargs)
-   %STAGEONESOURCE Build one source ONCE over the union years, write per point.
+   %STAGEONESOURCE Build one source by needed year groups, write per point.
    srcc = char(src);
    kind = rcmLegKind(src);
    n = size(points, 1);
 
-   % Participants: points whose leg for this source resolved staged=true. A
-   % non-participant gets a skip-with-reason now (its coverage gap was found
-   % cheaply by resolveLegWindows, before any build).
+   % Participants: points whose leg for this source resolved staged=true and
+   % whose required output files are not already bracketed by an existing staged
+   % window file. A non-participant gets a skip-with-reason now (its coverage gap
+   % was found cheaply by resolveLegWindows, before any build).
    part = false(1, n);
+   existing = repmat(emptyExistingFiles, 1, n);
    for k = 1:n
       L = legspec(k).(srcc);
       if L.staged
-         part(k) = true;
+         existing(k) = existingRcmFiles(src, legspec(k).alias, L, kwargs);
+         if existingLegComplete(src, existing(k))
+            colocation{k}.(srcc) = existingRcmLeg(src, kind, L, existing(k), kwargs);
+            warning('icemodel:verification:stageRcmForcing:existingWindowFile', ...
+               ['Skipping %s build for %s because existing staged file(s) ' ...
+               'already bracket %s to %s.'], upper(srcc), ...
+               legspec(k).alias, string(L.start), string(L.end));
+         else
+            part(k) = true;
+         end
       else
          colocation{k}.(srcc) = skippedLeg(kind, L.reason);
       end
@@ -147,35 +161,39 @@ function colocation = stageOneSource(src, points, legspec, colocation, kwargs)
       return
    end
 
-   % Union of requested years + the matching point list (Mx2 [lat lon]).
-   years = [];
-   pts = zeros(numel(idx), 2);
-   for j = 1:numel(idx)
-      years = union(years, legspec(idx(j)).(srcc).years);
-      pts(j, :) = points(idx(j), :);
-   end
-
-   try
-      Data = buildSourceData(src, pts, years, kwargs);   % 1xM cell of Data
-   catch build_err
-      % The source build threw (vanished dir, read error): degrade EVERY
-      % participant's leg for THIS source. Sources already written stand.
-      for j = 1:numel(idx)
-         colocation{idx(j)}.(srcc) = skippedLeg(kind, build_err.message);
+   % Build each distinct year-set separately: this keeps the batch-reader
+   % benefit for matching points without over-reading short-window points.
+   groups = sameYearGroups(idx, legspec, srcc);
+   for g = 1:numel(groups)
+      gidx = groups(g).idx;
+      pts = zeros(numel(gidx), 2);
+      for j = 1:numel(gidx)
+         pts(j, :) = points(gidx(j), :);
       end
-      return
-   end
 
-   % Per point: clip to its own window and write. A per-point write failure
-   % degrades only that point's leg (others already written stand).
-   for j = 1:numel(idx)
-      k = idx(j);
-      L = legspec(k).(srcc);
       try
-         d = windowSubset(Data{j}, L.start, L.end);
-         colocation{k}.(srcc) = writeRcmLeg(src, d, legspec(k).alias, kind, L, kwargs);
-      catch write_err
-         colocation{k}.(srcc) = skippedLeg(kind, write_err.message);
+         Data = buildSourceData(src, pts, groups(g).years, kwargs);
+      catch build_err
+         % The source build threw (vanished dir, read error): degrade this
+         % source/year group only. Sources already written stand.
+         for j = 1:numel(gidx)
+            colocation{gidx(j)}.(srcc) = skippedLeg(kind, build_err.message);
+         end
+         continue
+      end
+
+      % Per point: clip to its own window and write only the outputs that were
+      % not already covered. A write failure degrades only that point's leg.
+      for j = 1:numel(gidx)
+         k = gidx(j);
+         L = legspec(k).(srcc);
+         try
+            d = windowSubset(Data{j}, L.start, L.end);
+            colocation{k}.(srcc) = writeRcmLeg( ...
+               src, d, legspec(k).alias, kind, L, kwargs, existing(k));
+         catch write_err
+            colocation{k}.(srcc) = skippedLeg(kind, write_err.message);
+         end
       end
    end
 end
@@ -200,31 +218,46 @@ function Data = buildSourceData(src, pts, years, kwargs)
    end
 end
 
-function co = writeRcmLeg(src, d, alias, kind, L, kwargs)
+function co = writeRcmLeg(src, d, alias, kind, L, kwargs, existing)
    %WRITERCMLEG Write one point's staged leg + build its colocation record.
    % MAR/MERRA write BOTH the full Data (userdata) AND the met (data2met); RACMO
-   % writes Data only. Every staged leg carries staged==true (uniform schema).
+   % writes Data only. Existing enclosing files are reused so staging a narrower
+   % window cannot create duplicate files. Every staged leg carries staged==true.
+   if nargin < 7
+      existing = emptyExistingFiles;
+   end
+   met_outdir = metOutdir(kwargs);
+   userdata_outdir = userdataOutdir(kwargs);
    if src == "racmo"
-      data_files = icemodel.forcing.helpers.writeuserdata( ...
-         d, alias, "racmo", outdir=kwargs.userdata_outdir, naming="window");
+      data_files = existing.data_files;
+      if isempty(data_files)
+         data_files = icemodel.forcing.helpers.writeuserdata( ...
+            d, alias, "racmo", outdir=userdata_outdir, naming="window");
+      end
       co = struct('kind', kind, 'staged', true, ...
          'data_files', ...
-         icemodel.verification.setup.relpaths(data_files, kwargs.userdata_outdir), ...
+         icemodel.verification.setup.relpaths(data_files, userdata_outdir), ...
          'sample_method', 'nearest', ...
          'window', windowStruct(L.start, L.end), ...
          'note', 'SMB/eval Data only; RACMO is not a met source.');
    else
       % MAR/MERRA: the COMPLETE Data timetable AND the met forcing it derives.
-      data_files = icemodel.forcing.helpers.writeuserdata( ...
-         d, alias, src, outdir=kwargs.userdata_outdir, naming="window");
-      met = toMet(d, kwargs.dt_out);
-      met_files = icemodel.forcing.helpers.writemet( ...
-         met, alias, src, outdir=kwargs.met_outdir, naming="window");
+      data_files = existing.data_files;
+      if isempty(data_files)
+         data_files = icemodel.forcing.helpers.writeuserdata( ...
+            d, alias, src, outdir=userdata_outdir, naming="window");
+      end
+      met_files = existing.met_files;
+      if isempty(met_files)
+         met = toMet(d, kwargs.dt_out);
+         met_files = icemodel.forcing.helpers.writemet( ...
+            met, alias, src, outdir=met_outdir, naming="window");
+      end
       co = struct('kind', kind, 'staged', true, ...
          'met_files', ...
-         icemodel.verification.setup.relpaths(met_files, kwargs.met_outdir), ...
+         icemodel.verification.setup.relpaths(met_files, met_outdir), ...
          'data_files', ...
-         icemodel.verification.setup.relpaths(data_files, kwargs.userdata_outdir), ...
+         icemodel.verification.setup.relpaths(data_files, userdata_outdir), ...
          'sample_method', 'nearest', ...
          'window', windowStruct(L.start, L.end));
    end
@@ -295,8 +328,11 @@ function manifest = stageFromManifest(models, kwargs)
    ids = strings(1, n);
    for k = 1:n
       cases(k).colocation = mergeFields(cases(k).colocation, colocation{k});
-      [cases(k).forcing_sources, cases(k).eval_sources] = ...
-         sourceLists(cases(k).colocation);
+      [forcing_sources, eval_sources] = ...
+         icemodel.verification.setup.colocationSourceLists( ...
+         cases(k).colocation);
+      cases(k).forcing_sources = cellstr(forcing_sources);
+      cases(k).eval_sources = cellstr(eval_sources);
       ids(k) = string(cases(k).case_id);
    end
    manifest.cases = cases;
@@ -319,25 +355,6 @@ function t = parseStamp(s)
    else
       t = icemodel.verification.setup.ensureUtc(string(s));
    end
-end
-
-function [forcing_sources, eval_sources] = sourceLists(colocation)
-   %SOURCELISTS Informational forcing/eval source ids from the staged legs.
-   promice_eval = isfield(colocation, 'promice') && colocation.promice.staged;
-   promice_met = promice_eval ...
-      && isfield(colocation.promice, 'met_files') ...
-      && ~isempty(colocation.promice.met_files);
-   mar = isfield(colocation, 'mar') && colocation.mar.staged;
-   merra = isfield(colocation, 'merra') && colocation.merra.staged;
-   racmo = isfield(colocation, 'racmo') && colocation.racmo.staged;
-   sumup = isfield(colocation, 'sumup') && colocation.sumup.staged;
-
-   forcing_cands = ["promice", "mar", "merra"];
-   forcing_sources = cellstr(reshape( ...
-      forcing_cands([promice_met, mar, merra]), [], 1));
-   eval_cands = ["promice_obs", "sumup_obs", "racmo"];
-   eval_sources = cellstr(reshape( ...
-      eval_cands([promice_eval, sumup, racmo]), [], 1));
 end
 
 function s = mergeFields(s, add)
@@ -365,6 +382,119 @@ function results = asCell(out)
       results = out;
    else
       results = {out};
+   end
+end
+
+function groups = sameYearGroups(idx, legspec, srcc)
+   %SAMEYEARGROUPS Partition participant indices by identical source years.
+   groups = repmat(struct('idx', [], 'years', []), 1, numel(idx));
+   ngroups = 0;
+   for j = 1:numel(idx)
+      k = idx(j);
+      years = legspec(k).(srcc).years;
+      found = false;
+      for g = 1:ngroups
+         if isequal(groups(g).years, years)
+            groups(g).idx(end + 1) = k;
+            found = true;
+            break
+         end
+      end
+      if ~found
+         ngroups = ngroups + 1;
+         groups(ngroups).idx = k;
+         groups(ngroups).years = years;
+      end
+   end
+   groups = groups(1:ngroups);
+end
+
+function existing = emptyExistingFiles
+   %EMPTYEXISTINGFILES Prototype for optional pre-staged output paths.
+   existing = struct('met_files', strings(1, 0), ...
+      'data_files', strings(1, 0));
+end
+
+function existing = existingRcmFiles(src, alias, L, kwargs)
+   %EXISTINGRCMFILES Locate staged window files enclosing the requested leg.
+   existing = emptyExistingFiles;
+   existing.data_files = findExistingWindowPath(userdataOutdir(kwargs), src, ...
+      sprintf('%s_%s', alias, src), ".mat", L.start, L.end);
+   if src ~= "racmo"
+      existing.met_files = findExistingWindowPath(metOutdir(kwargs), src, ...
+         sprintf('met_%s_%s', alias, src), metWindowSuffix(kwargs.dt_out), ...
+         L.start, L.end);
+   end
+end
+
+function tf = existingLegComplete(src, existing)
+   %EXISTINGLEGCOMPLETE True when all outputs required for SRC already exist.
+   if src == "racmo"
+      tf = ~isempty(existing.data_files);
+   else
+      tf = ~isempty(existing.data_files) && ~isempty(existing.met_files);
+   end
+end
+
+function co = existingRcmLeg(src, kind, L, existing, kwargs)
+   %EXISTINGRCMLEG Manifest leg pointing at already-staged enclosing files.
+   if src == "racmo"
+      co = struct('kind', kind, 'staged', true, ...
+         'data_files', ...
+         icemodel.verification.setup.relpaths( ...
+         existing.data_files, userdataOutdir(kwargs)), ...
+         'sample_method', 'nearest', ...
+         'window', windowStruct(L.start, L.end), ...
+         'note', 'Existing staged Data file brackets requested window.');
+   else
+      co = struct('kind', kind, 'staged', true, ...
+         'met_files', ...
+         icemodel.verification.setup.relpaths( ...
+         existing.met_files, metOutdir(kwargs)), ...
+         'data_files', ...
+         icemodel.verification.setup.relpaths( ...
+         existing.data_files, userdataOutdir(kwargs)), ...
+         'sample_method', 'nearest', ...
+         'window', windowStruct(L.start, L.end), ...
+         'note', 'Existing staged met/Data files bracket requested window.');
+   end
+end
+
+function path = findExistingWindowPath(base, source, prefix, suffix, t1, t2)
+   %FINDEXISTINGWINDOWPATH First staged file whose encoded window encloses T1-T2.
+   path = strings(1, 0);
+   for d = icemodel.forcing.helpers.sourceSearchDirs(base, source)
+      name = icemodel.forcing.helpers.findEnclosingWindowFile( ...
+         d{1}, prefix, suffix, t1, t2);
+      if strlength(name) > 0
+         path = string(fullfile(d{1}, char(name)));
+         return
+      end
+   end
+end
+
+function outdir = metOutdir(kwargs)
+   %METOUTDIR Match writemet's default output root when callers omit it.
+   outdir = kwargs.met_outdir;
+   if outdir == ""
+      outdir = string(fullfile(icemodel.getpath('input'), 'met'));
+   end
+end
+
+function outdir = userdataOutdir(kwargs)
+   %USERDATAOUTDIR Match writeuserdata's default output root when callers omit it.
+   outdir = kwargs.userdata_outdir;
+   if outdir == ""
+      outdir = string(icemodel.getpath('userdata'));
+   end
+end
+
+function suffix = metWindowSuffix(dt_out)
+   %METWINDOWSUFFIX File suffix used by writemet for the requested met cadence.
+   if dt_out == ""
+      suffix = "_1hr.mat";
+   else
+      suffix = "_" + dt_out + ".mat";
    end
 end
 

@@ -3,7 +3,7 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    %
    %  [met, metadata] = icemodel.forcing.buildPromiceMet(site)
    %  [met, metadata] = ... buildPromiceMet(site, source_dir=..., ...
-   %     startdate=..., enddate=..., fillwinter=true)
+   %     startdate=..., enddate=..., fillwinter=true, fillwithmissing=true)
    %
    % Reads the station's PROMICE v3 hourly NetCDF (icemodel.forcing.
    % readPromiceAws), applies the albedo winter-fill policy, runs the
@@ -26,6 +26,8 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    %  startdate, enddate : optional window; default full station record
    %  fillwinter : fill polar-night albedo with the dry-snow constant
    %               (default true); see icemodel.forcing.fillPromiceAlbedo
+   %  fillwithmissing : add absent required channels as NaN placeholders
+   %                    instead of rejecting the met build up front
    %
    % Outputs
    %  met      - timetable: tair [K], swd, lwd [W m-2], albedo [-],
@@ -45,6 +47,7 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
       kwargs.enddate = ""
       kwargs.fillwinter (1, 1) logical = true
       kwargs.fill_lwd (1, 1) logical = false
+      kwargs.fillwithmissing (1, 1) logical = false
    end
 
    [aws, source_meta] = icemodel.forcing.readPromiceAws(site, ...
@@ -67,10 +70,13 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
          .* aws.rh ./ 100;
       lwd = icemodel.surface.empirical_incoming_longwave_radiation(aws.tair, ea);
       lwd_estimated = true;
-   elseif ismember('lwd', aws.Properties.VariableNames)
-      lwd = aws.lwd;                  % present but all-NaN -> validatemet rejects
+   elseif kwargs.fillwithmissing && ismember('lwd', aws.Properties.VariableNames)
+      lwd = aws.lwd;                  % present but all-NaN -> explicit placeholder
+   elseif kwargs.fillwithmissing
+      lwd = nan(height(aws), 1);      % absent -> explicit placeholder
    else
-      lwd = nan(height(aws), 1);      % absent -> clean "no finite samples" error
+      error('icemodel:forcing:buildPromiceMet:missingForcing', ...
+         'required forcing channel(s) absent at %s: lwd (no met built)', site);
    end
 
    % A station that lacks a required FORCING channel (e.g. LYN_L has no swd
@@ -82,7 +88,7 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    forcing_channels = ["tair", "swd", "albedo", "wspd", "rh", "psfc"];
    absent = forcing_channels(~ismember(forcing_channels, ...
       string(aws.Properties.VariableNames)));
-   if ~isempty(absent)
+   if ~isempty(absent) && ~kwargs.fillwithmissing
       error('icemodel:forcing:buildPromiceMet:missingForcing', ...
          'required forcing channel(s) absent at %s: %s (no met built)', ...
          site, strjoin(absent, ', '));
@@ -92,13 +98,20 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    % precipitation channel; ppt is explicitly zero (see header note). A missing
    % OPTIONAL (non-forcing) channel must not block met building.
    Time = aws.Time;
-   met = timetable(Time, ...
-      aws.tair, aws.swd, lwd, ...
-      icemodel.forcing.fillPromiceAlbedo(aws.albedo, Time, ...
-      fillwinter=kwargs.fillwinter), ...
-      aws.wspd, aws.rh, aws.psfc, zeros(height(aws), 1), ...
-      'VariableNames', {'tair', 'swd', 'lwd', 'albedo', 'wspd', 'rh', ...
-      'psfc', 'ppt'});
+   met = timetable(Time);
+   met.tair = channelOrNan(aws, "tair");
+   met.swd = channelOrNan(aws, "swd");
+   met.lwd = lwd;
+   if ismember("albedo", string(aws.Properties.VariableNames))
+      met.albedo = icemodel.forcing.fillPromiceAlbedo(aws.albedo, Time, ...
+         fillwinter=kwargs.fillwinter);
+   else
+      met.albedo = nan(height(aws), 1);
+   end
+   met.wspd = channelOrNan(aws, "wspd");
+   met.rh = channelOrNan(aws, "rh");
+   met.psfc = channelOrNan(aws, "psfc");
+   met.ppt = zeros(height(aws), 1);
 
    % Pass through the optional (non-forcing) diagnostics the station happens to
    % carry (wind direction, surface temperature, cloud fraction, turbulent
@@ -114,6 +127,9 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
 
    % Standard QA/QC: gap fill + physical clamps.
    [met, checks] = icemodel.forcing.helpers.metchecks(met);
+   if kwargs.fillwithmissing
+      met = icemodel.forcing.helpers.completeMetVariables(met);
+   end
 
    % Per-variable units from the shared canonical map. ppt is the canonical
    % m s-1 water-equivalent rate (PROMICE has no precipitation sensor, so the
@@ -137,5 +153,14 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
          "icemodel.surface.empirical_incoming_longwave_radiation, fill_lwd=true)";
    else
       metadata.lwd_policy = "lwd from the observed dlr channel";
+   end
+end
+
+function data = channelOrNan(tt, name)
+   %CHANNELORNAN Return a source channel or an all-NaN placeholder.
+   if ismember(name, string(tt.Properties.VariableNames))
+      data = tt.(name);
+   else
+      data = nan(height(tt), 1);
    end
 end

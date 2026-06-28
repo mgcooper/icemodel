@@ -2,7 +2,7 @@ function met = data2met(Data, kwargs)
    %DATA2MET Convert a Data timetable to an icemodel met timetable.
    %
    %  met = icemodel.forcing.data2met(Data)
-   %  met = ... data2met(Data, validate=false)
+   %  met = ... data2met(Data, validate=false, fillwithmissing=true)
    %
    % Generalizes the legacy marData2Met: selects the met-contract
    % variables from a Data timetable (any source), derives the total
@@ -27,6 +27,8 @@ function met = data2met(Data, kwargs)
    %
    % Name-value
    %  validate : assert the met contract on the result (default true)
+   %  fillwithmissing : add absent required met channels as NaN placeholders
+   %                    before validation (default false)
    %
    % Outputs
    %  met - timetable ready for icemodel.forcing.helpers.writemet
@@ -44,6 +46,7 @@ function met = data2met(Data, kwargs)
    arguments
       Data timetable
       kwargs.validate (1, 1) logical = true
+      kwargs.fillwithmissing (1, 1) logical = false
    end
 
    met = Data;
@@ -62,6 +65,12 @@ function met = data2met(Data, kwargs)
    % Drop bookkeeping columns.
    met = removevars(met, intersect("date", ...
       string(met.Properties.VariableNames)));
+
+   % Optional completion lets source adapters write native met products even
+   % when a required channel must be supplied by runtime substitution later.
+   if kwargs.fillwithmissing
+      met = icemodel.forcing.helpers.completeMetVariables(met);
+   end
 
    % Required contract variables first, everything else after.
    required = icemodel.forcing.helpers.metvariables();

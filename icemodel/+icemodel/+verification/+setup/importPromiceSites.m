@@ -1,7 +1,9 @@
-function manifest = importPromiceSites(kwargs)
+function manifest = importPromiceSites(source_dir, kwargs)
    %IMPORTPROMICESITES Stage PROMICE-anchored firn-evaluation cases.
    %
    %  manifest = icemodel.verification.setup.importPromiceSites()
+   %  manifest = icemodel.verification.setup.importPromiceSites(source_dir, ...
+   %     sites=["KAN_M","KAN_L"])
    %  manifest = icemodel.verification.setup.importPromiceSites( ...
    %     sites=["KAN_M","KAN_L"], overwrite=true)
    %  manifest = icemodel.verification.setup.importPromiceSites( ...
@@ -55,7 +57,7 @@ function manifest = importPromiceSites(kwargs)
    %    override the PROMICE window. The RCM legs are independent and optional:
    %      * MAR met            : PROMICE window cap MAR years on disk
    %      * MERRA-2 met        : PROMICE window cap MERRA-2 years on disk
-   %      * RACMO Data         : PROMICE window cap RACMO years on disk (8fc);
+   %      * RACMO Data         : PROMICE window cap RACMO years on disk;
    %                             skipped when the record has no RACMO overlap
    %    A leg with zero overlap is skipped-with-reason (recorded in the
    %    manifest), never fabricated. Each leg's actual staged window is recorded
@@ -136,6 +138,7 @@ function manifest = importPromiceSites(kwargs)
    %  icemodel.forcing.buildRacmoData
 
    arguments
+      source_dir (1, 1) string = ""
       kwargs.sites (1, :) string = strings(1, 0)
       kwargs.models (1, :) string {mustBeMember(kwargs.models, ...
          ["promice", "mar", "merra", "racmo"])} = ...
@@ -159,6 +162,10 @@ function manifest = importPromiceSites(kwargs)
    end
 
    models = reshape(kwargs.models, 1, []);
+   kwargs.promice_dir = resolvePromiceDir(source_dir, kwargs.promice_dir);
+   [kwargs.promice_dir, ~] = icemodel.verification.setup.fetchPromice( ...
+      cache_dir=kwargs.promice_dir, stations=kwargs.sites, products="hour", ...
+      strict=~kwargs.skip_missing, silent=true);
 
    % Site list. With no explicit sites, default to ALL PROMICE stations found
    % under the source product (the full research set), via the single-source-of-
@@ -214,14 +221,14 @@ function manifest = importPromiceSites(kwargs)
 
    % Preallocate the per-site state to numel(sites) and index by n; a site
    % yields at most one staged case OR one skip, so the buffers are compacted
-   % at the end (no in-loop growth -> no AGROW). The state captures everything
-   % the RCM batch passes and the manifest assembly need.
+   % at the end. The state captures everything the RCM batch passes and the
+   % manifest assembly need.
    state = repmat(emptyState(), 1, numel(sites));
    alive = false(1, numel(sites));
    skipped = repmat(struct('site', "", 'reason', ""), 1, numel(sites));
    n_skipped = 0;
 
-   % --- Pass 1: per-site PROMICE eval + met (RR1 anchor). ---
+   % --- Pass 1: per-site PROMICE eval + met. ---
    % PROMICE met+eval is NEVER gated by RCM coverage; only a PROMICE metadata
    % or eval failure here skips the whole site. The RCM legs are staged in
    % Pass 2 over the union of staged points, then clipped per site.
@@ -260,7 +267,7 @@ function manifest = importPromiceSites(kwargs)
             'y_epsg3413', y3413, ...
             'elev_m', aws_meta.elev);
 
-         % Per-leg windows. RCM legs (incl. RACMO, 8fc) use the PROMICE window
+         % Per-leg windows. RCM legs use the PROMICE window
          % capped to on-disk years. The shared resolver is the cheap fail-early
          % gate: a source with no overlap resolves staged=false here, before any
          % RCM build is attempted.
@@ -268,7 +275,7 @@ function manifest = importPromiceSites(kwargs)
             models, coverage, promice_start, promice_end);
 
          % Print the requested-vs-actual RCM coverage table, named by station
-         % (8fc). Only when forcing is actually staged - it is noise otherwise.
+         % Only when forcing is actually staged - it is noise otherwise.
          if kwargs.build_forcing
             fprintf('[coverage] %s (PROMICE %d-%d):\n', site, ...
                year(promice_start), year(promice_end));
@@ -290,7 +297,7 @@ function manifest = importPromiceSites(kwargs)
          if ismember("promice", models)
             % EVAL leg FIRST: the PROMICE observations are the primary target and
             % do NOT need the met-file-required channels (e.g. lwd), so they stage
-            % independently of the met leg (RR1: PROMICE eval is never gated).
+            % independently of the met leg.
             [promice_data, ~] = icemodel.forcing.buildPromiceData( ...
                site, source_dir=kwargs.promice_dir, ...
                startdate=promice_start, enddate=promice_end, frequency="daily");
@@ -346,7 +353,7 @@ function manifest = importPromiceSites(kwargs)
       catch err
          % Only a PROMICE-leg or metadata failure reaches here and skips the
          % whole site (the RCM legs are batched in Pass 2 and degrade to
-         % skipped legs, never a skipped site - #15 / RR1). A missing station
+         % skipped legs, never a skipped site. A missing station
          % file, an empty PROMICE window, or an eval-staging error is a
          % legitimate whole-site skip.
          if ~kwargs.skip_missing
@@ -360,13 +367,13 @@ function manifest = importPromiceSites(kwargs)
       end
    end
 
-   % --- Pass 2: write the OBSERVATION manifest first (kill-safety), then stage
+   % --- Pass 2: write the OBSERVATION manifest first, then stage
    % the co-located RCM forcing/Data as a SEPARATE, delegated step. ---
    % Observation import is complete now; persisting the manifest BEFORE any RCM
    % build means a killed/aborted forcing run never destroys the imported
-   % observations (the failure mode RR3 fixes). The RCM forcing/Data is owned by
-   % icemodel.verification.setup.stageRcmForcing - this driver no longer contains
-   % the RCM build logic, and observation import is never gated on RCM presence.
+   % observations. The RCM forcing/Data is delegated to
+   % icemodel.verification.setup.stageRcmForcing, and observation import is
+   % never gated on RCM presence.
    requested_ids = lower(erase(sites, "_"));
    manifest = assembleAndWrite(state, alive, sites, models, skipped, ...
       n_skipped, dataset_family, manifest_file, requested_ids, kwargs);
@@ -376,7 +383,7 @@ function manifest = importPromiceSites(kwargs)
    % build_forcing=false the import is observations-only and stageRcmForcing can
    % be called later, independently, on the staged manifest.
    if kwargs.build_forcing
-      % de7: persist the manifest after EACH RCM source (not once at the end), so
+      % Persist the manifest after each RCM source so
       % a kill mid-forcing keeps every completed source's legs. The callback
       % re-assembles + MERGE-writes the manifest from the current state.
       persist = @(st) assembleAndWrite(st, alive, sites, models, skipped, ...
@@ -401,7 +408,7 @@ function manifest = assembleAndWrite(state, alive, sites, models, skipped, ...
       n_skipped, dataset_family, manifest_file, requested_ids, kwargs)
    %ASSEMBLEANDWRITE Build the forcing-agnostic family manifest + MERGE-write it.
    %
-   % Called twice: once with observations-only colocation (kill-safety, before
+   % Called twice: once with observations-only colocation (before
    % any RCM build) and once after the RCM legs are merged in. The forcing/eval
    % source lists derive from each case's colocation, so the second write simply
    % reflects the added mar/merra/racmo legs.
@@ -412,7 +419,8 @@ function manifest = assembleAndWrite(state, alive, sites, models, skipped, ...
          continue
       end
       s = state(n);
-      [forcing_sources, eval_sources] = sourceLists(s.colocation);
+      [forcing_sources, eval_sources] = ...
+         icemodel.verification.setup.colocationSourceLists(s.colocation);
 
       case_values = { ...
          char(s.alias)
@@ -476,8 +484,8 @@ function state = stageColocatedForcing(state, alive, models, ...
    % only mar/merra/racmo are staged here. Each source is staged in its OWN
    % stageRcmForcing call (still one file open per source-year), the legs are
    % merged into each site's state, and `persist` MERGE-writes the manifest after
-   % EACH source (de7) so a kill mid-forcing keeps the completed sources. A
-   % per-source progress line names the source + staged/skipped counts (8fc).
+   % each source so a partial forcing run keeps the completed sources. A
+   % per-source progress line names the source and staged/skipped counts.
    % stageRcmForcing writes MAR/MERRA met+Data and RACMO Data, and degrades a
    % failing source's legs to skip-with-reason without losing the others.
    rcm_models = intersect(models, ["mar", "merra", "racmo"], "stable");
@@ -507,7 +515,8 @@ function state = stageColocatedForcing(state, alive, models, ...
       n_staged = 0;
       for j = 1:numel(alive_idx)
          state(alive_idx(j)).colocation = ...
-            mergeColocation(state(alive_idx(j)).colocation, colocation{j});
+            icemodel.verification.setup.mergeColocation( ...
+            state(alive_idx(j)).colocation, colocation{j});
          if isfield(colocation{j}, char(src)) && colocation{j}.(char(src)).staged
             n_staged = n_staged + 1;
          end
@@ -515,7 +524,7 @@ function state = stageColocatedForcing(state, alive, models, ...
       fprintf('[staging] %s: %d staged, %d skipped\n', upper(char(src)), ...
          n_staged, numel(alive_idx) - n_staged);
 
-      persist(state);   % de7: incremental manifest after this source
+      persist(state);   % Incremental manifest after this source.
    end
 end
 
@@ -527,36 +536,6 @@ function L = legProto(models)
    for src = models
       L.(char(src)) = proto;
    end
-end
-
-function s = mergeColocation(s, add)
-   %MERGECOLOCATION Copy every field of `add` onto colocation struct `s`.
-   f = fieldnames(add);
-   for i = 1:numel(f)
-      s.(f{i}) = add.(f{i});
-   end
-end
-
-function [forcing_sources, eval_sources] = sourceLists(colocation)
-   %SOURCELISTS Derive forcing/eval source ids from the staged colocation legs.
-   %
-   % A staged leg is exactly a colocation.<key> with staged==true: PROMICE
-   % contributes "promice" (forcing) when its met staged and "promice_obs"
-   % (eval) always; MAR/MERRA are forcing met; RACMO is an eval/reference
-   % source. Derived AFTER all legs run, so no in-loop appends are needed.
-   promice_eval = isfield(colocation, 'promice') && colocation.promice.staged;
-   promice_met = promice_eval ...
-      && isfield(colocation.promice, 'met_files') ...
-      && ~isempty(colocation.promice.met_files);
-   mar = isfield(colocation, 'mar') && colocation.mar.staged;
-   merra = isfield(colocation, 'merra') && colocation.merra.staged;
-   racmo = isfield(colocation, 'racmo') && colocation.racmo.staged;
-
-   % Fixed candidate -> membership masks (no in-loop growth).
-   forcing_cands = ["promice", "mar", "merra"];
-   forcing_sources = reshape(forcing_cands([promice_met, mar, merra]), [], 1);
-   eval_cands = ["promice_obs", "racmo"];
-   eval_sources = reshape(eval_cands([promice_eval, racmo]), [], 1);
 end
 
 function aws = readAwsSitesMetadata(promice_dir)
@@ -648,6 +627,17 @@ function [eval_root, input_root] = resolveRoots(kwargs)
    input_root = icemodel.verification.helpers.inputDataRoot( ...
       "input_data_root", kwargs.input_data_root, ...
       "icemodel_config_casename", kwargs.icemodel_config_casename);
+end
+
+function promice_dir = resolvePromiceDir(source_dir, promice_dir)
+   %RESOLVEPROMICEDIR Resolve the positional source_dir / promice_dir alias.
+   if source_dir ~= "" && promice_dir ~= "" && source_dir ~= promice_dir
+      error('icemodel:verification:importPromiceSites:sourceAliasConflict', ...
+         'source_dir and promice_dir refer to different PROMICE caches');
+   end
+   if source_dir ~= ""
+      promice_dir = source_dir;
+   end
 end
 
 function [comparison_vars, obs_vars] = firnComparisonContract(promice_data)
