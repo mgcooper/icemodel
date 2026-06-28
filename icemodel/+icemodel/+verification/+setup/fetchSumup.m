@@ -13,10 +13,8 @@ function source_dir = fetchSumup(kwargs)
    %  user / developer following the retrieval instructions printed when
    %  files are missing.
    %
-   %  SUMup is the firn observation source. It subsumes Humphrey 2012
-   %  subsurface temperature and GreenTRACS accumulation, so no separate
-   %  sourcing is required. FirnCover compaction strain is NOT in SUMup and
-   %  is out of scope.
+   %  SUMup is the firn observation source for density, SMB, and subsurface
+   %  temperature. FirnCover compaction strain is not part of this cache.
    %
    %  Expected files (SUMup 2025 release; NetCDF, per ice sheet):
    %    SUMup_2025_density_greenland.nc       firn/snow density profiles
@@ -42,7 +40,7 @@ function source_dir = fetchSumup(kwargs)
    %      directory (kwargs.strict=false).
    %    - Does NOT attempt automatic download. SUMup is access-gated behind
    %      a NASA Earthdata Login (registration), so the retrieval step is
-   %      made explicit rather than a silent failure mode in CI.
+   %      made explicit rather than hidden behind an automatic download.
    %
    %  Role
    %    Validator. The fetch helper guarantees the cache directory exists and

@@ -50,9 +50,7 @@ function files = fixtureFileList(kwargs)
       fullfile("input", "userdata", "*.mat")];
 
    % Collect absolute matches per pattern, then convert to root-relative POSIX
-   % paths so the manifest is portable. Preallocation is impossible before the
-   % globs run, so accumulate into a cell and concatenate once (no in-loop grow
-   % of the final array).
+   % paths so the manifest is portable.
    parts = cell(numel(patterns), 1);
    for k = 1:numel(patterns)
       hits = dir(char(fullfile(root, patterns(k))));

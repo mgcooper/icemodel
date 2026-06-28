@@ -88,8 +88,7 @@ function result = packFixtures(version, kwargs)
          'Pass overwrite=true to replace them.'], version, kwargs.staging_dir);
    end
 
-   % Hash every fixture file and total the committed footprint. Preallocate the
-   % per-file struct array to the known file count (no in-loop growth).
+   % Hash every fixture file and total the committed footprint.
    n = numel(files);
    entries = repmat(struct('path', "", 'sha256', "", 'bytes', 0), n, 1);
    source_bytes = 0;

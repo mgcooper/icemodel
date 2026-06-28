@@ -9,14 +9,14 @@ function leg = resolveLegWindows(models, coverage, window_start, window_end)
    %  coverage (probed cheaply by promiceSourceCoverage). This is the FAIL-EARLY
    %  gate: a source with no overlap is marked staged=false WITH A REASON before
    %  any NetCDF is opened, so an empty model/window is skipped without entering
-   %  an hours-long build (RR3 feedback #1).
+   %  an expensive source build.
    %
    %  Per-source policy (all three intersect the requested window via capLeg):
    %    * MAR / MERRA : met sources. Window = requested window intersected with
    %      on-disk years. When the requested window is unbounded (NaT - the
    %      all-available default), the source's FULL on-disk coverage is used.
    %    * RACMO       : eval/reference Data only (no met), but still intersected
-   %      with the window (8fc): a station whose record lies entirely outside
+   %      with the window: a station whose record lies entirely outside
    %      RACMO's coverage gets a SKIPPED RACMO leg rather than a zero-overlap
    %      file; an unbounded window falls back to RACMO's full coverage.
    %
@@ -46,7 +46,7 @@ function leg = resolveLegWindows(models, coverage, window_start, window_end)
       leg.merra = capLeg(coverage.merra, window_start, window_end, "MERRA-2");
    end
    if ismember("racmo", models)
-      % RACMO is intersected with the requested window like MAR/MERRA (8fc):
+      % RACMO is intersected with the requested window like MAR/MERRA:
       % staging RACMO's full 2012-2018 span for a station whose observations are
       % entirely outside it (e.g. a 2022+ record) produces a zero-overlap,
       % unusable Data file. capLeg SKIPS on no overlap and CLIPS on partial. An

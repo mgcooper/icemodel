@@ -15,8 +15,7 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    %  - location = Nx2 [lat lon] (N>1): a LIST of points. Returns a 1xN cell
    %    of Data timetables (metadata is a 1xN struct array). The grid is read
    %    ONCE and every yearly file is opened ONCE, slicing each point's
-   %    hyperslab from that single open - so staging many points no longer
-   %    re-opens each source file per point. N=1 is the single-point path.
+   %    hyperslab from that single open. N=1 is the single-point path.
    %  - location = polyshape (vertices in EPSG:3413 meters): the MAR cells
    %    are averaged over the polygon. remap="conservative" (default) uses
    %    exact overlap-area weighting via the exactremap toolbox; remap="equal"
@@ -191,9 +190,9 @@ function grid = resolveGrid(filename, method, remap)
    % grid is exactly regular (the EPSG:3413 reprojection is curvilinear and
    % would be rejected as irregular by the conservative remap). The query
    % (point or polygon, given as [lat lon] / EPSG:3413) is mapped into native
-   % coordinates with the shipped LON/LAT <-> native correspondence. The grid
-   % and the scatteredInterpolant native-coordinate maps are built once and
-   % reused for every point in a batch (the dominant per-point cost otherwise).
+   % coordinates with the paired LON/LAT and Xnat/Ynat values carried by each
+   % MAR grid cell. The grid and native-coordinate maps are built once and
+   % reused for every point in a batch.
    grid = icemodel.forcing.marGridInfo(filename);
    grid.method = method;
    grid.remap = remap;
