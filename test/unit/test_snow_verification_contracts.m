@@ -73,9 +73,8 @@ function test_each_site_stages_expected_comparison_variables(testCase)
          sprintf('snow_depth_m missing for %s', sitename));
    end
 
-   % Surface temperature is observed at WFJ (Weissfluhjoch). Losing it from
-   % comparison_variables is the original regression revision-request-5
-   % flagged. Pin it explicitly here; sites without a usable 'ts' channel
+   % Surface temperature is observed at WFJ (Weissfluhjoch). Pin it explicitly
+   % here; sites without a usable 'ts' channel
    % (e.g. sod) are expected to drop the variable and are excluded.
    wfj = icemodel.verification.loadmanifest("wfj");
    testCase.verifyTrue(ismember("surface_temp_C", ...
@@ -415,10 +414,11 @@ end
 
 function names = expectedDatasetFamilies()
    %EXPECTEDDATASETFAMILIES Dataset families currently staged for verification.
-   % snow/: esm_snowmip, laugh_tests. firn/: promice, sumup (sumup is the
-   % data-gated SUMup family; the filter accepts it ahead of staged data).
+   % snow/: esm_snowmip, laugh_tests. firn/source families include promice,
+   % sumup, retmip, imau, and research_site.
 
-   names = ["esm_snowmip"; "laugh_tests"; "promice"; "sumup"];
+   names = ["esm_snowmip"; "laugh_tests"; "promice"; "sumup"; ...
+      "retmip"; "imau"; "research_site"];
 end
 
 function names = expectedCaseTypes()

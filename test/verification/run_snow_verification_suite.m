@@ -14,9 +14,9 @@ function results = run_snow_verification_suite(kwargs)
    %     cases=icemodel.verification.namelists.snowmipsite, ...
    %     run_icemodel=true, plot_visible="on", save_plots=false)
    %
-   % This runner is the verification-suite entry point used by agents and
-   % interactive development. It reads staged data and writes artifacts; it
-   % does not import or refresh setup data.
+   % This runner is the verification-suite entry point for interactive
+   % development. It reads staged data and writes artifacts; it does not import
+   % or refresh setup data.
    %
    % Default behaviour
    %   With no arguments, runs Col de Porte (cdp) over its
@@ -29,8 +29,8 @@ function results = run_snow_verification_suite(kwargs)
    % Artifact policy (opt-in)
    %   Defaults are tuned for interactive development: no figures created,
    %   no artifacts written. The runner returns a result struct (summary
-   %   table + per-case results) so agents and developers can inspect
-   %   metrics without producing on-disk side effects.
+   %   table + per-case results) so metrics can be inspected without producing
+   %   on-disk side effects.
    %
    %     make_plots       = false   create comparison/scatter figures?
    %     save_plots       = false   export those figures as PNG?
@@ -158,7 +158,7 @@ function results = run_snow_verification_suite(kwargs)
       'case_results', {case_results}, ...
       'cases', {cases}, ...
       'report_path', report_path);
-   clear cleanup
+   delete(cleanup)
 end
 
 %%

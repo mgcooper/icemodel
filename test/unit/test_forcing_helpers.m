@@ -3,6 +3,13 @@ function tests = test_forcing_helpers
    tests = functiontests(localfunctions);
 end
 
+function setupOnce(testCase)
+   % Bootstrap the repo test environment so exactremap is available when
+   % this file is run directly.
+   [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
+   testCase.TestData.bootstrap_cleanup = cleanup;
+end
+
 function setup(testCase)
    % Per-test temporary output directory for the write helpers.
 
@@ -125,7 +132,9 @@ function test_variableUnits_canonical_and_precip_rate(testCase)
    precip = ["ppt", "snow", "rain", "snowf", "rainf", "precip"];
    testCase.verifyTrue(all(units(ismember(names, precip)) == "m s-1"));
 
-   massflux = ["runoff", "melt", "smb", "evap"];
+   massflux = ["runoff", "melt", "smb", "evap", "snowf_subl"];
+   snowf_subl_unit = string(icemodel.forcing.helpers.variableUnits("snowf_subl"));
+   testCase.verifyEqual(snowf_subl_unit, "mWE/h");
    testCase.verifyTrue(all(units(ismember(names, massflux)) == "mWE/h"));
 
    testCase.verifyEqual(units(names == "tair"), "K");
@@ -218,7 +227,7 @@ function test_cfStandardNames_fixture_parses(testCase)
    % The committed CF fixture parses to a string set containing the core
    % standard names the canonical map uses.
 
-   repo_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
+   repo_root = icemodel.internal.fullpath();
    fixture = fullfile(repo_root, "test", "fixtures", ...
       "cf-standard-names", "cf-standard-name-table.xml");
    testCase.assumeTrue(isfile(fixture), 'CF fixture missing');
@@ -265,6 +274,22 @@ function test_data2met_carries_embedded_metadata(testCase)
    testCase.verifyEqual( ...
       met.Properties.CustomProperties.StandardNames(names == "tair"), ...
       "air_temperature");
+end
+
+function test_data2met_fillwithmissing_adds_nan_contract(testCase)
+   % fillwithmissing creates explicit NaN placeholders for absent met channels.
+
+   Time = (datetime(2016, 1, 1):hours(1):datetime(2016, 1, 1, 2, 0, 0))';
+   Data = timetable(Time, [265; 266; 267], [0; 0; 0], ...
+      'VariableNames', {'tair', 'ppt'});
+
+   met = icemodel.forcing.data2met(Data, fillwithmissing=true);
+
+   required = icemodel.forcing.helpers.metvariables();
+   testCase.verifyTrue(all(ismember(required, string(met.Properties.VariableNames))));
+   testCase.verifyTrue(all(isnan(met.swd)));
+   testCase.verifyEqual(string(met.Properties.VariableUnits( ...
+      string(met.Properties.VariableNames) == "ppt")), "m s-1");
 end
 
 %% windFromComponents
@@ -328,6 +353,18 @@ function test_metchecks_fills_wdir_circularly(testCase)
 
    testCase.verifyEqual(met.wdir(2), 360, 'AbsTol', 1e-9);
    testCase.verifyEqual(met.wdir([1 3]), [350; 10], 'AbsTol', 1e-9);
+end
+
+function test_metchecks_preserves_all_nan_placeholder(testCase)
+   % All-NaN placeholder channels stay missing; metchecks only records counts.
+
+   Time = (datetime(2016, 1, 1):hours(1):datetime(2016, 1, 1, 2, 0, 0))';
+   met = timetable(Time, nan(3, 1), 'VariableNames', {'swd'});
+
+   [met, checks] = icemodel.forcing.helpers.metchecks(met);
+
+   testCase.verifyEqual(checks.numnan.swd, 3);
+   testCase.verifyTrue(all(isnan(met.swd)));
 end
 
 %% dailyToHourly
@@ -410,8 +447,6 @@ function test_remapPolygon_conservative_areaavg(testCase)
    % Inputs are ndgrid (the icemodel builder convention); remapPolygon
    % transposes to exactremap's meshgrid contract and reshapes the
    % cells-by-time block to the 3-D form exactremap weights correctly.
-   testCase.assumeTrue(~isempty(which('exactremap')), ...
-      'exactremap toolbox not on path');
 
    [X, Y] = ndgrid(0:5, 0:5);
    f = 10 * X + Y;
@@ -426,8 +461,6 @@ function test_gridLocation_conservative_vs_equal(testCase)
    % The polygon collapse: "equal" weights only centre-in-polygon cells
    % (here just one -> 22), "conservative" area-weights the overlap (the
    % analytic linear-field mean over [1,3]^2, also 22 at the centroid).
-   testCase.assumeTrue(~isempty(which('exactremap')), ...
-      'exactremap toolbox not on path');
 
    [X, Y] = ndgrid(0:6, 0:6);
    P = polyshape([1 3 3 1], [1 1 3 3]);
@@ -463,6 +496,15 @@ function test_validatemet_rejects_irregular_time(testCase)
 
    testCase.verifyError(@() icemodel.forcing.helpers.validatemet(met), ...
       'icemodel:forcing:validatemet:irregularTimeAxis');
+end
+
+function test_validatemet_accepts_all_nan_required_placeholder(testCase)
+   % An all-NaN required channel is an explicit placeholder, not an absent var.
+
+   met = makeSyntheticMet(datetime(2016, 1, 1), 24);
+   met.swd(:) = NaN;
+
+   testCase.verifyWarningFree(@() icemodel.forcing.helpers.validatemet(met));
 end
 
 %% writemet

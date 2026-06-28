@@ -73,6 +73,7 @@ function test_namelist_includes_firn_observational(testCase)
    families = icemodel.verification.namelists.datasetfamily();
    testCase.verifyTrue(ismember("promice", families));
    testCase.verifyTrue(ismember("sumup", families));
+   testCase.verifyTrue(ismember("research_site", families));
 end
 
 function test_listcases_enumerates_firn_family_alongside_snow(testCase)
@@ -218,7 +219,7 @@ function test_manifest_is_metadata_only(testCase)
       testCase.verifyTrue(all(ismember(["promice", "mar", "merra"], ...
          string(manifest.forcing_sources))), ...
          sprintf('%s forcing_sources incomplete', id));
-      testCase.verifyTrue(all(ismember(["promice_obs", "racmo"], ...
+      testCase.verifyTrue(all(ismember(["promice_obs", "mar", "merra", "racmo"], ...
          string(manifest.eval_sources))), ...
          sprintf('%s eval_sources incomplete', id));
 

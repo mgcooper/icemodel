@@ -3,39 +3,36 @@ function tests = test_firn_staging_promice
    %
    % Exercises icemodel.verification.setup.importPromiceSites end to end:
    % the co-located PROMICE/MAR/MERRA/RACMO bundle is staged for a PROMICE
-   % anchor site and the per-site manifest entry resolves. Reads the raw
-   % multi-model sources from the S03 external-drive layout (or local
-   % caches) and skips cleanly when any required source is unavailable.
+   % anchor site and the per-site manifest entry resolves. Reads PROMICE from
+   % the verification cache and RCMs from the small data/test/forcing fixtures.
    tests = functiontests(localfunctions);
 end
 
 function setupOnce(testCase)
-   % Resolve every raw source the bundle needs; skip the whole file when
-   % any is absent (the bundle is co-located, so a partial mount cannot
-   % stage a faithful bundle).
+   % Resolve every source the bundle needs; skip the whole file when any is
+   % absent (the bundle is co-located, so a partial fixture tree cannot stage
+   % a faithful bundle).
+   [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
+   testCase.TestData.cleanup = cleanup;
 
-   promice = firstWithData([ ...
+   promice = firstWithData( ...
       string(fullfile(icemodel.internal.fullpath('data'), ...
       'verification', 'promice')), ...
-      "/Volumes/S03/DATA/greenland/geus/aws/l3"], ...
       @(p) ~isempty(dir(fullfile(p, "hour", "*_hour.nc"))));
-   mar = firstWithData([ ...
-      "/Volumes/S03/DATA/greenland/mar3p11/RUH2", ...
-      string(fullfile(icemodel.getpath('data'), 'forcing', 'mar'))], ...
+   mar = firstWithData( ...
+      string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'mar')), ...
       @(p) ~isempty(dir(fullfile(p, "MARv3.11*.nc"))));
-   merra = firstWithData([ ...
-      "/Volumes/S03/DATA/merra2/1hrly/ncfiles", ...
-      string(fullfile(icemodel.getpath('data'), 'forcing', 'merra2'))], ...
+   merra = firstWithData( ...
+      string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'merra2')), ...
       @(p) ~isempty(dir(fullfile(p, "slv", "*_Nx.*.nc4*"))));
-   racmo = firstWithData([ ...
-      "/Volumes/S03/DATA/greenland/racmo2p3/surface", ...
-      string(fullfile(icemodel.getpath('data'), 'forcing', 'racmo'))], ...
+   racmo = firstWithData( ...
+      string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'racmo')), ...
       @(p) ~isempty(dir(fullfile(p, "*.RACMO23p3_*.nc"))));
 
    testCase.assumeTrue(all([ ...
       strlength(promice) > 0, strlength(mar) > 0, ...
       strlength(merra) > 0, strlength(racmo) > 0]), ...
-      'co-located firn sources not all available (S03 unmounted/spun down)');
+      'co-located firn fixture sources not all available');
 
    testCase.TestData.promice = promice;
    testCase.TestData.mar = mar;
@@ -64,8 +61,8 @@ function test_colocated_bundle_and_manifest_resolve(testCase)
    % Stage a short single-site bundle and assert every model artifact and
    % the firn manifest entry resolve.
 
-   % A short window inside the RACMO 2012-2015 archive keeps the test fast.
-   manifest = stageKanm(testCase, "2013-06-01", "2013-06-30");
+   % A short window inside the staged fixture window keeps the test fast.
+   manifest = stageKanm(testCase, "2012-01-01", "2012-01-31");
 
    % Family manifest shape.
    testCase.verifyEqual(string(manifest.dataset_family), "promice");
@@ -120,7 +117,7 @@ function test_staged_files_exist_on_disk(testCase)
    % data-only observations.mat; NO evaluation.mat / reference.mat bundle (the
    % forcing/reference side is never bundled with the eval target).
 
-   stageKanm(testCase, "2013-06-01", "2013-06-30");
+   stageKanm(testCase, "2012-01-01", "2012-01-31");
 
    met_dir = fullfile(testCase.TestData.input_root, 'met');
    ud_dir = fullfile(testCase.TestData.input_root, 'userdata');
@@ -147,7 +144,7 @@ function test_colocated_data_reconstitutes_from_individual_files(testCase)
    % reconstitute on demand from the individual per-year userdata files the
    % forcing-agnostic manifest declares - no committed forcing bundle needed.
 
-   manifest = stageKanm(testCase, "2013-06-01", "2013-06-30");
+   manifest = stageKanm(testCase, "2012-01-01", "2012-01-31");
    c = manifest.cases(1);
    c.manifest_path = fullfile(testCase.TestData.eval_root, 'promice', ...
       'manifest.json');
@@ -169,7 +166,7 @@ function test_manifest_json_is_valid(testCase)
    % The written manifest.json must parse back to a struct with the firn
    % case schema fields.
 
-   stageKanm(testCase, "2013-06-01", "2013-06-30");
+   stageKanm(testCase, "2012-01-01", "2012-01-31");
    manifest_file = fullfile(testCase.TestData.eval_root, ...
       'promice', 'manifest.json');
 
@@ -193,7 +190,7 @@ function test_data_gated_site_is_skipped_not_fabricated(testCase)
       mar_dir=testCase.TestData.mar, ...
       merra_dir=testCase.TestData.merra, ...
       racmo_dir=testCase.TestData.racmo, ...
-      startdate="2013-06-01", enddate="2013-06-30", ...
+      startdate="2012-01-01", enddate="2012-01-31", ...
       evaluation_data_root=testCase.TestData.eval_root, ...
       input_data_root=testCase.TestData.input_root, ...
       icemodel_config_casename="", overwrite=true);
@@ -219,7 +216,7 @@ function test_staging_second_site_does_not_churn_first(testCase)
    % the file-level counterpart to test_firn_manifest_merge.
 
    % Stage KAN_L first (a short window keeps it fast).
-   stageSite(testCase, "KAN_L", "2013-06-01", "2013-06-30");
+   stageSite(testCase, "KAN_L", "2012-01-01", "2012-01-31");
 
    manifest_file = fullfile(testCase.TestData.eval_root, 'promice', ...
       'manifest.json');
@@ -228,10 +225,9 @@ function test_staging_second_site_does_not_churn_first(testCase)
    % Fingerprint the always-staged KAN_L artifacts: the data-only eval bundle
    % (eval/promice/kanl/observations.mat) and the promice forcing/Data files.
    % writemet/writeuserdata stage into a per-source subfolder (met/<source>/,
-   % userdata/<source>/), so glob there. The PROMICE MET leg is independently
-   % skippable (a station/window with no longwave sensor degrades to a skipped
-   % met leg while the eval obs still stage - #15 / RR1), so it is folded in
-   % only when present rather than required.
+   % userdata/<source>/), so glob there. The PROMICE met leg is independently
+   % skippable when a station/window lacks a required met channel, so it is
+   % folded in only when present rather than required.
    eval_case_dir = fullfile(testCase.TestData.eval_root, 'promice', 'kanl');
    met_dir = fullfile(testCase.TestData.input_root, 'met', 'promice');
    ud_dir = fullfile(testCase.TestData.input_root, 'userdata', 'promice');
@@ -248,7 +244,7 @@ function test_staging_second_site_does_not_churn_first(testCase)
    kanl_case_before = encodeCaseById(m_before, "kanl");
 
    % Stage KAN_M into the SAME roots (merge, default).
-   stageSite(testCase, "KAN_M", "2013-06-01", "2013-06-30");
+   stageSite(testCase, "KAN_M", "2012-01-01", "2012-01-31");
 
    m_after = jsondecode(fileread(manifest_file));
    ids = string(arrayfun(@(c) string(c.case_id), m_after.cases));
@@ -267,19 +263,15 @@ function test_staging_second_site_does_not_churn_first(testCase)
 end
 
 function test_missing_rcm_legs_still_yield_a_case(testCase)
-   % #15 / RR1 regression: PROMICE met+eval must NEVER be gated by RCM
-   % coverage. A site whose MAR/MERRA/RACMO source dirs are absent (the
-   % builders THROW) must still stage a PROMICE case - the RCM legs degrade
-   % to skipped legs in colocation, and the site is NOT wholesale skipped.
-   % This guards the staging bug where an erroring RCM builder, called inside
-   % the per-site try/catch, skipped the entire site.
+   % PROMICE met+eval must never be gated by RCM coverage. A site whose
+   % MAR/MERRA/RACMO source dirs are absent must still stage a PROMICE case:
+   % the RCM legs degrade to skipped legs in colocation, and the site is not
+   % wholesale skipped.
 
-   % Resolve PROMICE on its own; this test does not need the RCM sources, so
-   % it must run even when S03 is unmounted (unlike the colocated tests).
-   promice = firstWithData([ ...
+   % Resolve PROMICE on its own; this test does not need the RCM sources.
+   promice = firstWithData( ...
       string(fullfile(icemodel.internal.fullpath('data'), ...
       'verification', 'promice')), ...
-      "/Volumes/S03/DATA/greenland/geus/aws/l3"], ...
       @(p) ~isempty(dir(fullfile(p, "hour", "*_hour.nc"))));
    testCase.assumeTrue(strlength(promice) > 0, ...
       'PROMICE source not available (no *_hour.nc on disk)');
@@ -295,15 +287,14 @@ function test_missing_rcm_legs_still_yield_a_case(testCase)
    mkdir(fullfile(input_root, 'userdata'))
 
    % Point every RCM dir at a path that cannot exist, forcing each builder to
-   % throw the "source directory not found" error - the exact failure mode
-   % that previously skipped the whole site.
+   % throw the "source directory not found" error.
    missing = fullfile(tmp, 'no_such_rcm_source');
 
    manifest = icemodel.verification.setup.importPromiceSites( ...
       sites="KAN_M", build_forcing=true, ...
       promice_dir=promice, ...
       mar_dir=missing, merra_dir=missing, racmo_dir=missing, ...
-      startdate="2013-06-01", enddate="2013-06-30", ...
+      startdate="2012-01-01", enddate="2012-01-31", ...
       evaluation_data_root=eval_root, input_data_root=input_root, ...
       icemodel_config_casename="", overwrite=true);
 

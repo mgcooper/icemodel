@@ -11,8 +11,7 @@ end
 function setup(testCase)
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.cleanup = cleanup;
-   repo_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
-   testCase.TestData.promice_dir = string(fullfile(repo_root, ...
+   testCase.TestData.promice_dir = string(fullfile(icemodel.internal.fullpath(), ...
       'data', 'verification', 'promice'));
 end
 

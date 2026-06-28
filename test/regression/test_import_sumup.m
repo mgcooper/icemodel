@@ -24,8 +24,7 @@ function setup(testCase)
    % data/verification/sumup (whitelisted in .gitignore), independent of the
    % test bootstrap's demo/data redirect. Resolve it from this test file's
    % location: test/unit/<file>.m -> repo root is three levels up.
-   repo_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
-   testCase.TestData.cache = fullfile(repo_root, ...
+   testCase.TestData.cache = fullfile(icemodel.internal.fullpath(), ...
       'data', 'verification', 'sumup');
    % KAN_U: densest SUMup co-location (FirnCover / GC-Net KANU cores & pits).
    testCase.TestData.point = [67.00045840765831, -47.02720909947265];
@@ -131,19 +130,17 @@ function test_import_driver_obs_staged_when_forcing_throws(testCase)
 end
 
 function test_import_driver_stages_forcing_legs_when_present(testCase)
-   % The GREEN full-driver path: with real MAR + MERRA + RACMO sources present,
-   % the co-located forcing legs stage. RR3 contract: MAR + MERRA each write BOTH
-   % a met file AND a userdata (Data) file; RACMO writes Data only. Data-gated on
-   % the S03 reference layout (and the SUMup cache), so it runs where the raw RCM
-   % archives are mounted and self-skips elsewhere.
+   % With staged MAR + MERRA + RACMO fixtures present, the co-located forcing
+   % legs stage. MAR + MERRA each write both a met file and a userdata (Data)
+   % file; RACMO writes Data only.
 
    assumeCachePresent(testCase);
-   mar_dir = "/Volumes/S03/DATA/greenland/mar3p11/RUH2";
-   merra_dir = "/Volumes/S03/DATA/merra2/1hrly/ncfiles";
-   racmo_dir = "/Volumes/S03/DATA/greenland/racmo2p3/subsurface";
+   mar_dir = string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'mar'));
+   merra_dir = string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'merra2'));
+   racmo_dir = string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'racmo'));
    testCase.assumeTrue( ...
       isfolder(mar_dir) && isfolder(merra_dir) && isfolder(racmo_dir), ...
-      'MAR/MERRA/RACMO reference archives not mounted; skipping green-path test.');
+      'MAR/MERRA/RACMO fixtures absent; skipping green-path test.');
 
    tmp = tempname;
    mkdir(tmp);
@@ -163,7 +160,7 @@ function test_import_driver_stages_forcing_legs_when_present(testCase)
       overwrite=true);
 
    c = manifest.cases(1);
-   % MAR + MERRA each write a met file AND a userdata (Data) file (the RR3 fix).
+   % MAR + MERRA each write a met file and a userdata (Data) file.
    for src = ["mar", "merra"]
       leg = c.colocation.(char(src));
       testCase.verifyTrue(logical(leg.staged), ...
@@ -178,12 +175,14 @@ function test_import_driver_stages_forcing_legs_when_present(testCase)
          dir(fullfile(input_root, 'userdata', char(src), '*.mat')));
    end
 
+   testCase.verifyTrue(ismember("mar", string(c.forcing_sources)));
+   testCase.verifyTrue(ismember("merra", string(c.forcing_sources)));
+   testCase.verifyTrue(all(ismember(["sumup_obs", "mar", "merra", "racmo"], ...
+      string(c.eval_sources))));
    % RACMO: Data only, no met.
    testCase.verifyTrue(isfield(c.colocation.racmo, 'data_files') ...
       && ~isempty(c.colocation.racmo.data_files));
    testCase.verifyFalse(isfield(c.colocation.racmo, 'met_files'));
-   testCase.verifyTrue(ismember("mar", string(c.forcing_sources)));
-   testCase.verifyTrue(ismember("merra", string(c.forcing_sources)));
    testCase.verifyNotEmpty( ...
       dir(fullfile(input_root, 'userdata', 'racmo', '*racmo*.mat')));
 end

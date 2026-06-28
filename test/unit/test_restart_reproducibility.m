@@ -8,8 +8,9 @@ function setup(testCase)
    % failed cases leave inspectable artifacts in the repo-local test tree.
    tmpdir = fullfile(icemodel.getpath('test'), 'artifacts', 'tmp');
    workspace = icemodel.test.fixtures.makeSyntheticWorkspace([2015; 2016], ...
-      configure=false, parentdir=tmpdir);
+      configure=true, parentdir=tmpdir);
 
+   testCase.TestData.workspace = workspace;
    testCase.TestData.rootdir = workspace.rootdir;
    testCase.TestData.inputdir = workspace.inputdir;
    testCase.TestData.evaldir = workspace.evaldir;
@@ -17,12 +18,10 @@ function setup(testCase)
 end
 
 function teardown(testCase)
-   % Remove the restart workspace after the file-level checks complete.
+   % Restore the caller's config and remove the synthetic workspace.
 
-   rootdir = testCase.TestData.rootdir;
-   if exist(rootdir, 'dir') == 7
-      rmdir(rootdir, 's');
-   end
+   icemodel.test.fixtures.cleanupSyntheticWorkspace( ...
+      testCase.TestData.workspace);
 end
 
 function test_skinmodel_year_boundary_restart(testCase)
@@ -88,14 +87,29 @@ function verifyRestartRun(testCase, smbmodel, solver)
    [ice1_restart_pp, ice2_restart_pp] = icemodel.postprocess( ...
       ice1_restart, ice2_restart, opts_restart, opts_restart.output_years);
 
+   % The continuous run is the expected reference for resumed ice1 output.
+   expected_ice1 = ice1_full;
+   returned_ice1 = ice1_restart;
    icemodel.test.verify.verifyEqualNested(testCase, ...
-      ice1_full, ice1_restart, 1e-12);
+      expected_ice1, returned_ice1, 1e-12);
+
+   % The continuous run is the expected reference for resumed ice2 output.
+   expected_ice2 = ice2_full;
+   returned_ice2 = ice2_restart;
    icemodel.test.verify.verifyEqualNested(testCase, ...
-      ice2_full, ice2_restart, 1e-12);
+      expected_ice2, returned_ice2, 1e-12);
+
+   % Postprocessing must preserve the same continuous-vs-resumed agreement.
+   expected_ice1_pp = ice1_full_pp;
+   returned_ice1_pp = ice1_restart_pp;
    icemodel.test.verify.verifyEqualNested(testCase, ...
-      ice1_full_pp, ice1_restart_pp, 1e-12);
+      expected_ice1_pp, returned_ice1_pp, 1e-12);
+
+   % Postprocessing must preserve the same continuous-vs-resumed agreement.
+   expected_ice2_pp = ice2_full_pp;
+   returned_ice2_pp = ice2_restart_pp;
    icemodel.test.verify.verifyEqualNested(testCase, ...
-      ice2_full_pp, ice2_restart_pp, 1e-12);
+      expected_ice2_pp, returned_ice2_pp, 1e-12);
 end
 
 function opts = buildOpts(testCase, smbmodel, simyears, kwargs)

@@ -10,6 +10,8 @@ end
 function setupOnce(testCase)
    % Resolve the staged L3 product; skip the whole file when absent. Require
    % readable station NetCDF files, not just the folder.
+   [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
+   testCase.TestData.cleanup = cleanup;
 
    source_dir = string(fullfile(icemodel.internal.fullpath('data'), ...
       'verification', 'promice'));

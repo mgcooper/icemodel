@@ -8,33 +8,34 @@ function tests = test_forcing_batch_equivalence
    % suite is the hard equivalence gate: building 2-3 points the NEW way (one
    % multi-point call) must be byte-identical (isequaln on the variables,
    % times, and CustomProperties) to the OLD way (a loop of single-point
-   % calls). Lanes self-skip when their raw source data is not on disk.
+   % calls). Lanes self-skip when their staged fast fixtures are not on disk.
    %
-   % Reads the raw RCM sources from the S03 external-drive layout or the local
-   % cache, matching test_forcing_mar / test_forcing_merra / test_forcing_racmo.
+   % Reads the small fixture subset under data/test/forcing. This belongs in
+   % regression because it exercises real RCM I/O and batch-vs-loop behavior,
+   % not an isolated unit.
    tests = functiontests(localfunctions);
 end
 
 function setupOnce(testCase)
    % A small cluster of points near the KAN transect (western Greenland
    % ablation/percolation), so every point resolves on every grid.
+   [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
+   testCase.TestData.cleanup = cleanup;
+
    testCase.TestData.points = [ ...
       67.0955, -50.0699;    % ~KAN_L
       67.0670, -48.8355;    % ~KAN_M
       67.0003, -47.0245];   % ~KAN_U
-   testCase.TestData.year = 2013;   % inside the RACMO 2012-2015 surface span
+   testCase.TestData.year = 2012;
 
-   testCase.TestData.mar = firstWithData([ ...
-      "/Volumes/S03/DATA/greenland/mar3p11/RUH2", ...
-      string(fullfile(icemodel.getpath('data'), 'forcing', 'mar'))], ...
+   testCase.TestData.mar = firstWithData( ...
+      string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'mar')), ...
       @(p) ~isempty(dir(fullfile(p, "MARv3.11*.nc"))));
-   testCase.TestData.merra = firstWithData([ ...
-      "/Volumes/S03/DATA/merra2/1hrly/ncfiles", ...
-      string(fullfile(icemodel.getpath('data'), 'forcing', 'merra2'))], ...
+   testCase.TestData.merra = firstWithData( ...
+      string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'merra2')), ...
       @(p) ~isempty(dir(fullfile(p, "slv", "*_Nx.*.nc4*"))));
-   testCase.TestData.racmo = firstWithData([ ...
-      "/Volumes/S03/DATA/greenland/racmo2p3/surface", ...
-      string(fullfile(icemodel.getpath('data'), 'forcing', 'racmo'))], ...
+   testCase.TestData.racmo = firstWithData( ...
+      string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'racmo')), ...
       @(p) ~isempty(dir(fullfile(p, "*.RACMO23p3_*.nc"))));
 end
 
@@ -42,7 +43,7 @@ function test_mar_batch_equals_single_loop(testCase)
    % buildMarData/buildMarMet: a 3-point list equals the single-point loop.
    src = testCase.TestData.mar;
    testCase.assumeTrue(strlength(src) > 0, ...
-      'MAR source data not available (S03 unmounted/spun down, no cache)');
+      'MAR fixture data not available under data/test/forcing');
    pts = testCase.TestData.points;
    yr = testCase.TestData.year;
 
@@ -60,7 +61,7 @@ function test_merra_batch_equals_single_loop(testCase)
    % buildMerraData/buildMerraMet: a 3-point list equals the single-point loop.
    src = testCase.TestData.merra;
    testCase.assumeTrue(strlength(src) > 0, ...
-      'MERRA-2 source data not available (S03 unmounted/spun down, no cache)');
+      'MERRA-2 fixture data not available under data/test/forcing');
    pts = testCase.TestData.points;
    yr = testCase.TestData.year;
 
@@ -77,7 +78,7 @@ function test_racmo_batch_equals_single_loop(testCase)
    % buildRacmoData: a 3-point list equals the single-point loop.
    src = testCase.TestData.racmo;
    testCase.assumeTrue(strlength(src) > 0, ...
-      'RACMO source data not available (S03 unmounted/spun down, no cache)');
+      'RACMO fixture data not available under data/test/forcing');
    pts = testCase.TestData.points;
    yr = testCase.TestData.year;
 
@@ -91,7 +92,7 @@ function test_single_point_still_returns_a_timetable(testCase)
    % 1x1 cell), preserving the legacy single-location contract.
    src = testCase.TestData.mar;
    testCase.assumeTrue(strlength(src) > 0, ...
-      'MAR source data not available (S03 unmounted/spun down, no cache)');
+      'MAR fixture data not available under data/test/forcing');
    one = icemodel.forcing.buildMarData( ...
       testCase.TestData.points(1, :), testCase.TestData.year, source_dir=src);
    testCase.verifyTrue(istimetable(one));

@@ -1,8 +1,8 @@
 function tests = test_forcing_mar
    %TEST_FORCING_MAR Verify the MAR forcing/Data builders.
    %
-   % Reads MAR v3.11 yearly NetCDF from the raw-source directory (S03
-   % external drive layout or local cache); skips cleanly when absent.
+   % Reads the staged MAR v3.11 NetCDF subset under data/test/forcing; skips
+   % cleanly when absent.
    %
    % The durable gates here are (a) the met contract on a full hourly axis
    % and (b) exact self-consistency of the builder against the raw NetCDF at
@@ -18,39 +18,41 @@ function setupOnce(testCase)
    % Resolve raw sources; build the shared single-point extraction once
    % (the per-test fixture cost dominates otherwise).
 
-   candidates = [ ...
-      "/Volumes/S03/DATA/greenland/mar3p11/RUH2", ...
-      string(fullfile(icemodel.getpath('data'), 'forcing', 'mar'))];
-   % Require actual MAR files to be readable, not just the folder to exist:
-   % an external drive that is mounted but spun down passes isfolder yet
-   % returns no files, which must skip cleanly rather than error.
-   hasdata = arrayfun(@(p) isfolder(p) ...
-      && ~isempty(dir(fullfile(p, 'MARv3.11*.nc'))), candidates);
-   source_dir = candidates(hasdata);
-   testCase.assumeTrue(~isempty(source_dir), ...
-      'MAR source data not available (S03 unmounted/spun down, no cache)');
-   testCase.TestData.source_dir = source_dir(1);
+   % Bootstrap the repo test environment so exactremap is available when
+   % this file is run directly.
+   [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
+   testCase.TestData.bootstrap_cleanup = cleanup;
 
-   modis_dir = "/Volumes/S03/DATA/greenland/geus/albedo/gris";
+   source_dir = string(fullfile(icemodel.internal.fullpath('data'), 'test', ...
+      'forcing', 'mar'));
+   testCase.assumeTrue(isfolder(source_dir) ...
+      && ~isempty(dir(fullfile(source_dir, 'MARv3.11*.nc'))), ...
+      'MAR fixture data not available under data/test/forcing');
+   testCase.TestData.source_dir = source_dir;
+   testCase.TestData.year = 2012;
+
+   modis_dir = string(fullfile(icemodel.internal.fullpath('data'), 'test', ...
+      'forcing', 'geus', 'albedo', 'gris'));
    if ~isfolder(modis_dir)
       modis_dir = "";
    end
    testCase.TestData.modis_dir = modis_dir;
 
    [met, metadata] = icemodel.forcing.buildMarMet([67.1556, -49.9226], ...
-      2009, source_dir=testCase.TestData.source_dir, ...
+      testCase.TestData.year, source_dir=testCase.TestData.source_dir, ...
       modis_dir=modis_dir);
    testCase.TestData.met = met;
    testCase.TestData.metadata = metadata;
 end
 
 function test_buildMarMet_satisfies_met_contract(testCase)
-   % A full-year point build passes the met contract on a complete
+   % A point build passes the met contract on the source file's full
    % hourly axis with ppt = snow + rain.
 
    met = testCase.TestData.met;
    icemodel.forcing.helpers.validatemet(met)
-   testCase.verifyEqual(height(met), 8760);
+   expected = ncinfo(testCase.TestData.metadata.source_files(1), 'TIME').Size(1) * 24;
+   testCase.verifyEqual(height(met), expected);
    testCase.verifyEqual(met.ppt, met.snowf + met.rainf, 'AbsTol', 1e-12);
    testCase.verifyTrue(all(isfinite(met.tair)));
    testCase.verifyGreaterThan(median(met.rh), 40);   % percent scale
@@ -91,7 +93,7 @@ function test_buildMarData_polygon_average(testCase)
    poly = polyshape(x0 + half*[-1 1 1 -1], y0 + half*[-1 -1 1 1]);
 
    % Equal-weight aggregation (no exactremap dependency).
-   Data = icemodel.forcing.buildMarData(poly, 2009, ...
+   Data = icemodel.forcing.buildMarData(poly, testCase.TestData.year, ...
       source_dir=testCase.TestData.source_dir, remap="equal");
 
    testCase.verifyGreaterThan(height(Data), 0);
@@ -100,10 +102,7 @@ function test_buildMarData_polygon_average(testCase)
    % Conservative area-weighted remap (the default), via exactremap on the
    % native MAR grid with the ice mask inpainted: same shape, finite, and
    % physically near the equal-weight mean (different weighting, same field).
-   % Skipped only when the exactremap toolbox is absent.
-   testCase.assumeTrue(~isempty(which('exactremap')), ...
-      'exactremap toolbox not on path');
-   Dc = icemodel.forcing.buildMarData(poly, 2009, ...
+   Dc = icemodel.forcing.buildMarData(poly, testCase.TestData.year, ...
       source_dir=testCase.TestData.source_dir, remap="conservative");
    testCase.verifyEqual(height(Dc), height(Data));
    testCase.verifyTrue(all(isfinite(Dc.tair)));
@@ -118,7 +117,7 @@ function test_buildMarMet_modis_channel(testCase)
    met = testCase.TestData.met;
    testCase.verifyTrue(ismember("modis", ...
       string(met.Properties.VariableNames)));
-   testCase.verifyGreaterThan(sum(isfinite(met.modis)), 8000);
+   testCase.verifyGreaterThan(sum(isfinite(met.modis)), 700);
    testCase.verifyTrue(all(met.modis >= 0 & met.modis <= 1));
 end
 
@@ -162,8 +161,6 @@ function test_modis_polygon_is_area_weighted_roi_mean(testCase)
 
    testCase.assumeTrue(testCase.TestData.modis_dir ~= "", ...
       'GEUS MODIS albedo source not available');
-   testCase.assumeTrue(~isempty(which('exactremap')), ...
-      'exactremap toolbox not on path');
 
    metadata = testCase.TestData.metadata;
    proj = icemodel.forcing.helpers.psnProjection();
@@ -172,7 +169,7 @@ function test_modis_polygon_is_area_weighted_roi_mean(testCase)
    poly = polyshape(x0 + half*[-1 1 1 -1], y0 + half*[-1 -1 1 1]);
 
    % Polygon Data build with the MODIS channel (conservative default).
-   Data = icemodel.forcing.buildMarData(poly, 2009, ...
+   Data = icemodel.forcing.buildMarData(poly, testCase.TestData.year, ...
       source_dir=testCase.TestData.source_dir, ...
       modis_dir=testCase.TestData.modis_dir);
    testCase.verifyTrue(ismember("modis", ...
@@ -180,7 +177,8 @@ function test_modis_polygon_is_area_weighted_roi_mean(testCase)
 
    % Reference: the area-weighted ROI mean straight from readGeusModis on the
    % same polygon, interpolated to the Data axis the same way the builder does.
-   modisfile = dir(fullfile(testCase.TestData.modis_dir, '*_2009_*.nc'));
+   modisfile = dir(fullfile(testCase.TestData.modis_dir, ...
+      sprintf('*_%d_*.nc', testCase.TestData.year)));
    [albedo_roi, Tdaily] = icemodel.forcing.readGeusModis( ...
       string(fullfile(modisfile.folder, modisfile.name)), poly, ...
       "nearest", remap="conservative");
@@ -206,7 +204,8 @@ function test_modis_point_is_nearest_cell(testCase)
       'GEUS MODIS albedo source not available');
 
    metadata = testCase.TestData.metadata;
-   modisfile = dir(fullfile(testCase.TestData.modis_dir, '*_2009_*.nc'));
+   modisfile = dir(fullfile(testCase.TestData.modis_dir, ...
+      sprintf('*_%d_*.nc', testCase.TestData.year)));
    filename = string(fullfile(modisfile.folder, modisfile.name));
 
    [albedo_new, ~] = icemodel.forcing.readGeusModis(filename, ...

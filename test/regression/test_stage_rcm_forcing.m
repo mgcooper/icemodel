@@ -1,9 +1,8 @@
 function tests = test_stage_rcm_forcing
-   %TEST_STAGE_RCM_FORCING Decoupled RCM forcing/Data staging (RR3).
+   %TEST_STAGE_RCM_FORCING Decoupled RCM forcing/Data staging.
    %
-   % Covers the observation-import / RCM-forcing decoupling and the RR3
-   % correctness fix that EVERY supported RCM writes its complete Data
-   % ("userdata") timetable:
+   % Covers the observation-import / RCM-forcing decoupling and the contract
+   % that every supported RCM writes its complete Data ("userdata") timetable:
    %   * MAR / MERRA write BOTH a met file AND a userdata (Data) file.
    %   * RACMO writes a userdata (Data) file ONLY (no met - it lacks the
    %     near-surface state channels).
@@ -15,29 +14,30 @@ function tests = test_stage_rcm_forcing
    %   - stageRcmForcing in manifest-convenience mode resolves legs from a staged
    %     manifest and degrades every source to skip-with-reason when the sources
    %     are absent, never throwing (the cheap fail-early gate).
-   % The Data-write contract + the completed-source-survives-failure guard need
-   % the real MAR/MERRA archives and self-skip when S03 (or a local cache) is
-   % absent.
+   % The Data-write contract + completed-source-survives-failure guard use the
+   % staged fast RCM fixtures under data/test/forcing.
    tests = functiontests(localfunctions);
 end
 
 function setupOnce(testCase)
-   repo_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
-   testCase.TestData.promice_dir = string(fullfile(repo_root, ...
+   [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
+   testCase.TestData.cleanup = cleanup;
+
+   testCase.TestData.promice_dir = string(fullfile(icemodel.internal.fullpath(), ...
       'data', 'verification', 'promice'));
    testCase.TestData.site = "KAN_L";
-   % A single calendar year keeps the MAR/MERRA green-path builds quick.
-   testCase.TestData.startdate = "2013-01-01";
-   testCase.TestData.enddate = "2013-12-31";
-   testCase.TestData.mar = firstWithData([ ...
-      "/Volumes/S03/DATA/greenland/mar3p11/RUH2", ...
-      string(fullfile(icemodel.getpath('data'), 'forcing', 'mar'))], ...
+   % A single January window keeps the staged fixture-backed green-path builds quick.
+   testCase.TestData.startdate = "2012-01-01";
+   testCase.TestData.enddate = "2012-01-31";
+   testCase.TestData.mar = firstWithData( ...
+      string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'mar')), ...
       @(p) ~isempty(dir(fullfile(p, "MARv3.11*.nc"))));
-   testCase.TestData.merra = firstWithData([ ...
-      "/Volumes/S03/DATA/merra2/1hrly/ncfiles", ...
-      string(fullfile(icemodel.getpath('data'), 'forcing', 'merra2'))], ...
+   testCase.TestData.merra = firstWithData( ...
+      string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'merra2')), ...
       @(p) ~isempty(dir(fullfile(p, "slv", "*_Nx.*.nc4*"))));
-   testCase.TestData.racmo = "/Volumes/S03/DATA/greenland/racmo2p3/subsurface";
+   testCase.TestData.racmo = firstWithData( ...
+      string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'racmo')), ...
+      @(p) ~isempty(dir(fullfile(p, "*.RACMO*.nc"))));
 end
 
 function setup(testCase)
@@ -131,14 +131,97 @@ function test_manifest_convenience_skips_absent_sources(testCase)
    testCase.verifyEmpty(dir(fullfile(root, 'input', 'userdata', 'racmo', '*.mat')));
 end
 
+function test_existing_enclosing_files_skip_rebuild(testCase)
+   % A previously staged full-period file should satisfy a narrower requested
+   % leg. This guards the write-side equivalent of createMetFileNames/loadmet
+   % enclosing-file resolution without needing the external RCM archives.
+   root = testCase.TestData.root;
+   met_outdir = fullfile(root, 'input', 'met');
+   userdata_outdir = fullfile(root, 'input', 'userdata');
+   alias = "kanl";
+
+   writeEmptyMat(fullfile(met_outdir, 'mar', ...
+      'met_kanl_mar_20100101_20200101_1hr.mat'));
+   writeEmptyMat(fullfile(met_outdir, 'merra', ...
+      'met_kanl_merra_20100101_20200101_1hr.mat'));
+   writeEmptyMat(fullfile(userdata_outdir, 'mar', ...
+      'kanl_mar_20100101_20200101.mat'));
+   writeEmptyMat(fullfile(userdata_outdir, 'merra', ...
+      'kanl_merra_20100101_20200101.mat'));
+   writeEmptyMat(fullfile(userdata_outdir, 'racmo', ...
+      'kanl_racmo_20100101_20200101.mat'));
+
+   L = struct('staged', true, 'years', 2013, ...
+      'start', icemodel.verification.setup.ensureUtc('2013-01-01'), ...
+      'end', icemodel.verification.setup.ensureUtc('2013-12-31 23:00:00'), ...
+      'reason', "");
+   legspec = struct('alias', alias, 'mar', L, 'merra', L, 'racmo', L);
+
+   colocation = icemodel.verification.setup.stageRcmForcing( ...
+      [67.0, -50.0], legspec=legspec, ...
+      models=["mar", "merra", "racmo"], ...
+      met_outdir=string(met_outdir), ...
+      userdata_outdir=string(userdata_outdir), ...
+      mar_dir=string(fullfile(root, 'absent_mar')), ...
+      merra_dir=string(fullfile(root, 'absent_merra')), ...
+      racmo_dir=string(fullfile(root, 'absent_racmo')));
+
+   c = colocation{1};
+   testCase.verifyTrue(logical(c.mar.staged));
+   testCase.verifyEqual(string(c.mar.met_files), ...
+      "mar/met_kanl_mar_20100101_20200101_1hr.mat");
+   testCase.verifyEqual(string(c.mar.data_files), ...
+      "mar/kanl_mar_20100101_20200101.mat");
+   testCase.verifyTrue(logical(c.merra.staged));
+   testCase.verifyEqual(string(c.merra.met_files), ...
+      "merra/met_kanl_merra_20100101_20200101_1hr.mat");
+   testCase.verifyTrue(logical(c.racmo.staged));
+   testCase.verifyEqual(string(c.racmo.data_files), ...
+      "racmo/kanl_racmo_20100101_20200101.mat");
+
+   % No requested-window duplicates were created because every required output
+   % was already bracketed by a wider staged file.
+   testCase.verifyFalse(isfile(fullfile(met_outdir, 'mar', ...
+      'met_kanl_mar_20130101_20131231_1hr.mat')));
+   testCase.verifyFalse(isfile(fullfile(userdata_outdir, 'racmo', ...
+      'kanl_racmo_20130101_20131231.mat')));
+end
+
+function test_existing_met_only_does_not_block_userdata_build(testCase)
+   % A MAR/MERRA leg is complete only when both met and userdata bracket the
+   % requested window. A pre-refactor met-only artifact must not block creation
+   % of the missing userdata file.
+   root = testCase.TestData.root;
+   met_outdir = fullfile(root, 'input', 'met');
+   userdata_outdir = fullfile(root, 'input', 'userdata');
+   alias = "kanl";
+
+   writeEmptyMat(fullfile(met_outdir, 'mar', ...
+      'met_kanl_mar_20100101_20200101_1hr.mat'));
+
+   L = struct('staged', true, 'years', 2013, ...
+      'start', icemodel.verification.setup.ensureUtc('2013-01-01'), ...
+      'end', icemodel.verification.setup.ensureUtc('2013-12-31 23:00:00'), ...
+      'reason', "");
+   legspec = struct('alias', alias, 'mar', L);
+
+   colocation = icemodel.verification.setup.stageRcmForcing( ...
+      [67.0, -50.0], legspec=legspec, models="mar", ...
+      met_outdir=string(met_outdir), ...
+      userdata_outdir=string(userdata_outdir), ...
+      mar_dir=string(fullfile(root, 'absent_mar')));
+
+   testCase.verifyFalse(logical(colocation{1}.mar.staged));
+end
+
 function test_mar_merra_write_met_and_userdata(testCase)
-   % RR3 regression guard (S03-gated): MAR and MERRA each write BOTH a met file
-   % AND a userdata (Data) file; RACMO writes a userdata file ONLY (no met).
+   % MAR and MERRA each write both a met file and a
+   % userdata (Data) file; RACMO writes a userdata file ONLY (no met).
    assumePromicePresent(testCase);
    testCase.assumeTrue(strlength(testCase.TestData.mar) > 0 ...
       && strlength(testCase.TestData.merra) > 0 ...
       && isfolder(testCase.TestData.racmo), ...
-      'MAR/MERRA/RACMO archives not available; skipping Data-write guard.');
+      'MAR/MERRA/RACMO fixtures not available; skipping Data-write guard.');
    root = testCase.TestData.root;
 
    manifest = icemodel.verification.setup.importPromiceSites( ...
@@ -176,14 +259,14 @@ function test_mar_merra_write_met_and_userdata(testCase)
 end
 
 function test_completed_sources_survive_racmo_failure(testCase)
-   % Per-source isolation (S03-gated): with MAR/MERRA real but RACMO absent, the
+   % Per-source isolation: with MAR/MERRA present but RACMO absent, the
    % MAR/MERRA met+userdata files AND their manifest legs are staged; only the
    % RACMO leg degrades to skip-with-reason. A failing/absent source never rolls
    % back a completed one.
    assumePromicePresent(testCase);
    testCase.assumeTrue(strlength(testCase.TestData.mar) > 0 ...
       && strlength(testCase.TestData.merra) > 0, ...
-      'MAR/MERRA archives not available; skipping isolation guard.');
+      'MAR/MERRA fixtures not available; skipping isolation guard.');
    root = testCase.TestData.root;
    bogus = fullfile(root, 'no_such_racmo');
 
@@ -204,6 +287,16 @@ function test_completed_sources_survive_racmo_failure(testCase)
 end
 
 %% Local helpers
+function writeEmptyMat(filename)
+   %WRITEEMPTYMAT Create a placeholder .mat file for filename-resolution tests.
+   folder = fileparts(filename);
+   if ~isfolder(folder)
+      mkdir(folder)
+   end
+   placeholder = true;
+   save(filename, 'placeholder')
+end
+
 function p = firstWithData(candidates, hasData)
    %FIRSTWITHDATA First candidate dir that exists and satisfies hasData, else "".
    p = "";

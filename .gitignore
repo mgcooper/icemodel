@@ -1,9 +1,12 @@
 # icemodel stuff
+data/test/*
 data/input/*
 data/eval/*
 data/output/*
 data/verification/**
 !data/.gitkeep
+!data/test/
+!data/test/.gitkeep
 !data/eval/
 !data/eval/.gitkeep
 !data/input/
