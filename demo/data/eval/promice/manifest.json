@@ -35,6 +35,8 @@
       ],
       "eval_sources": [
         "promice_obs",
+        "mar",
+        "merra",
         "racmo"
       ],
       "comparison_variables": [
@@ -146,6 +148,8 @@
       ],
       "eval_sources": [
         "promice_obs",
+        "mar",
+        "merra",
         "racmo"
       ],
       "comparison_variables": [
@@ -257,6 +261,8 @@
       ],
       "eval_sources": [
         "promice_obs",
+        "mar",
+        "merra",
         "racmo"
       ],
       "comparison_variables": [
@@ -368,6 +374,8 @@
       ],
       "eval_sources": [
         "promice_obs",
+        "mar",
+        "merra",
         "racmo"
       ],
       "comparison_variables": [
