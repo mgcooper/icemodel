@@ -17,32 +17,33 @@
       ],
       "permafrost_zone": "none",
       "site_location": {
-        "lat_wgs84": 67.096950868291529,
-        "lon_wgs84": -49.947077120638447,
+        "lat_wgs84": 67.09695086829153,
+        "lon_wgs84": -49.94707712063845,
         "x_epsg3413": -216732.66778461527,
-        "y_epsg3413": -2.5039013503936823E+6,
-        "elev_m": []
+        "y_epsg3413": -2503901.3503936823,
+        "elev_m": [
+
+        ]
       },
       "period": {
-        "start": "01-Jan-2012",
-        "end": "31-Dec-2015"
+        "start": "01-Jan-2012 00:00:00",
+        "end": "31-Dec-2015 00:00:00"
       },
       "forcing_sources": [
-        "mar"
+        "mar3.11"
       ],
       "eval_sources": [
-        "sumup_obs",
-        "racmo"
+        "sumup_obs"
       ],
       "comparison_variables": [
         "subsurface_temperature",
-        "accumulation"
+        "smb"
       ],
       "observation_variables": {
         "density": "firn/snow density profile (depth, density, error)",
         "subsurface_temperature": "SUMup subsurface temperature T(z,t)",
-        "accumulation": "SMB / accumulation records",
-        "obs_file": "kanl/observations.mat"
+        "obs_file": "kanl/observations.mat",
+        "smb": "surface mass balance records"
       },
       "colocation": {
         "sumup": {
@@ -52,8 +53,8 @@
           "demo_subset": {
             "rule": "(1) single nearest profile per channel (minimum EPSG:3413 distance of the profile mean location to the case point); (2) first max_rows rows of that profile in native record order",
             "max_rows": 500,
-            "point_lat_wgs84": 67.096950868291529,
-            "point_lon_wgs84": -49.947077120638447,
+            "point_lat_wgs84": 67.09695086829153,
+            "point_lon_wgs84": -49.94707712063845,
             "channels": [
               {
                 "channel": "subsurface_temperature",
@@ -64,7 +65,7 @@
                 "datetime_end": "03-Nov-2008"
               },
               {
-                "channel": "accumulation",
+                "channel": "smb",
                 "name_key": 427022,
                 "name": "KAN_L",
                 "n_rows": 500,
@@ -72,13 +73,26 @@
                 "datetime_end": "05-Jul-2014"
               }
             ]
-          }
+          },
+          "staged": true
         },
         "anchor": {
           "is_colocated": true,
           "threshold_km": 7.5,
           "nearest_anchor": "KAN_L",
           "distance_km": 0
+        },
+        "mar": {
+          "kind": "point_met",
+          "met_files": "mar3.11/met_kanl_mar3.11_20090101_20191231_1hr.mat",
+          "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2009 00:00:00",
+            "end": "31-Dec-2019 23:00:00"
+          },
+          "source": "mar",
+          "source_id": "mar3.11",
+          "staged": true
         }
       },
       "native_timestep": "irregular",
@@ -96,32 +110,33 @@
       ],
       "permafrost_zone": "none",
       "site_location": {
-        "lat_wgs84": 67.067095734019745,
-        "lon_wgs84": -48.837346104065588,
+        "lat_wgs84": 67.06709573401974,
+        "lon_wgs84": -48.83734610406559,
         "x_epsg3413": -168423.32107893252,
-        "y_epsg3413": -2.5109834822118757E+6,
-        "elev_m": []
+        "y_epsg3413": -2510983.4822118757,
+        "elev_m": [
+
+        ]
       },
       "period": {
-        "start": "01-Jan-2012",
-        "end": "31-Dec-2015"
+        "start": "01-Jan-2012 00:00:00",
+        "end": "31-Dec-2015 00:00:00"
       },
       "forcing_sources": [
-        "mar"
+        "mar3.11"
       ],
       "eval_sources": [
-        "sumup_obs",
-        "racmo"
+        "sumup_obs"
       ],
       "comparison_variables": [
         "subsurface_temperature",
-        "accumulation"
+        "smb"
       ],
       "observation_variables": {
         "density": "firn/snow density profile (depth, density, error)",
         "subsurface_temperature": "SUMup subsurface temperature T(z,t)",
-        "accumulation": "SMB / accumulation records",
-        "obs_file": "kanm/observations.mat"
+        "obs_file": "kanm/observations.mat",
+        "smb": "surface mass balance records"
       },
       "colocation": {
         "sumup": {
@@ -131,8 +146,8 @@
           "demo_subset": {
             "rule": "(1) single nearest profile per channel (minimum EPSG:3413 distance of the profile mean location to the case point); (2) first max_rows rows of that profile in native record order",
             "max_rows": 500,
-            "point_lat_wgs84": 67.067095734019745,
-            "point_lon_wgs84": -48.837346104065588,
+            "point_lat_wgs84": 67.06709573401974,
+            "point_lon_wgs84": -48.83734610406559,
             "channels": [
               {
                 "channel": "subsurface_temperature",
@@ -143,7 +158,7 @@
                 "datetime_end": "24-Jul-2010"
               },
               {
-                "channel": "accumulation",
+                "channel": "smb",
                 "name_key": 427023,
                 "name": "KAN_M",
                 "n_rows": 500,
@@ -151,13 +166,26 @@
                 "datetime_end": "16-Aug-2023"
               }
             ]
-          }
+          },
+          "staged": true
         },
         "anchor": {
           "is_colocated": true,
           "threshold_km": 7.5,
           "nearest_anchor": "KAN_M",
           "distance_km": 0
+        },
+        "mar": {
+          "kind": "point_met",
+          "met_files": "mar3.11/met_kanm_mar3.11_20090101_20191231_1hr.mat",
+          "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2009 00:00:00",
+            "end": "31-Dec-2019 23:00:00"
+          },
+          "source": "mar",
+          "source_id": "mar3.11",
+          "staged": true
         }
       },
       "native_timestep": "irregular",
@@ -175,33 +203,34 @@
       ],
       "permafrost_zone": "none",
       "site_location": {
-        "lat_wgs84": 67.000458407658314,
+        "lat_wgs84": 67.00045840765831,
         "lon_wgs84": -47.02720909947265,
-        "x_epsg3413": -89288.821989512624,
-        "y_epsg3413": -2.5225506903707683E+6,
-        "elev_m": []
+        "x_epsg3413": -89288.82198951262,
+        "y_epsg3413": -2522550.6903707683,
+        "elev_m": [
+
+        ]
       },
       "period": {
-        "start": "01-Jan-2012",
-        "end": "31-Dec-2015"
+        "start": "01-Jan-2012 00:00:00",
+        "end": "31-Dec-2015 00:00:00"
       },
       "forcing_sources": [
-        "mar"
+        "mar3.11"
       ],
       "eval_sources": [
-        "sumup_obs",
-        "racmo"
+        "sumup_obs"
       ],
       "comparison_variables": [
         "density",
         "subsurface_temperature",
-        "accumulation"
+        "smb"
       ],
       "observation_variables": {
         "density": "firn/snow density profile (depth, density, error)",
         "subsurface_temperature": "SUMup subsurface temperature T(z,t)",
-        "accumulation": "SMB / accumulation records",
-        "obs_file": "kanu/observations.mat"
+        "obs_file": "kanu/observations.mat",
+        "smb": "surface mass balance records"
       },
       "colocation": {
         "sumup": {
@@ -211,7 +240,7 @@
           "demo_subset": {
             "rule": "(1) single nearest profile per channel (minimum EPSG:3413 distance of the profile mean location to the case point); (2) first max_rows rows of that profile in native record order",
             "max_rows": 500,
-            "point_lat_wgs84": 67.000458407658314,
+            "point_lat_wgs84": 67.00045840765831,
             "point_lon_wgs84": -47.02720909947265,
             "channels": [
               {
@@ -231,7 +260,7 @@
                 "datetime_end": "15-Jun-2009"
               },
               {
-                "channel": "accumulation",
+                "channel": "smb",
                 "name_key": 426884,
                 "name": "KANU Pit 01 2015",
                 "n_rows": 1,
@@ -239,13 +268,26 @@
                 "datetime_end": "04-May-2015"
               }
             ]
-          }
+          },
+          "staged": true
         },
         "anchor": {
           "is_colocated": true,
           "threshold_km": 7.5,
           "nearest_anchor": "KAN_U",
           "distance_km": 0
+        },
+        "mar": {
+          "kind": "point_met",
+          "met_files": "mar3.11/met_kanu_mar3.11_20090101_20191231_1hr.mat",
+          "sample_method": "nearest",
+          "window": {
+            "start": "01-Jan-2009 00:00:00",
+            "end": "31-Dec-2019 23:00:00"
+          },
+          "source": "mar",
+          "source_id": "mar3.11",
+          "staged": true
         }
       },
       "native_timestep": "irregular",
@@ -266,51 +308,37 @@
         "lat_wgs84": 75.62151864466415,
         "lon_wgs84": -35.973961899732814,
         "x_epsg3413": 245597.36584112883,
-        "y_epsg3413": -1.5460929424099096E+6,
-        "elev_m": []
+        "y_epsg3413": -1546092.9424099096,
+        "elev_m": [
+
+        ]
       },
       "period": {
-        "start": "01-Jan-2012",
+        "start": "01-Jan-2012 00:00:00",
         "end": "31-Dec-2015 23:00:00"
       },
       "forcing_sources": [
-        "mar"
+
       ],
       "eval_sources": [
-        "sumup_obs",
-        "racmo"
+        "sumup_obs"
       ],
       "comparison_variables": [
         "density",
         "subsurface_temperature",
-        "accumulation"
+        "smb"
       ],
       "observation_variables": {
         "density": "firn/snow density profile (depth, density, error)",
         "subsurface_temperature": "SUMup subsurface temperature T(z,t)",
-        "accumulation": "SMB / accumulation records"
+        "smb": "surface mass balance records"
       },
       "colocation": {
         "sumup": {
           "kind": "firn_profile_obs",
           "obs_file": "egp/observations.mat",
-          "note": "SUMup observation profiles (staged, not rebuilt)."
-        },
-        "mar": {
-          "kind": "point_met",
-          "met_files": "met_egp_mar_20120101_20151231_1hr.mat",
-          "sample_method": "nearest"
-        },
-        "racmo": {
-          "kind": "point_data_smb_eval",
-          "data_files": [
-            "egp_racmo_2012.mat",
-            "egp_racmo_2013.mat",
-            "egp_racmo_2014.mat",
-            "egp_racmo_2015.mat"
-          ],
-          "sample_method": "nearest",
-          "note": "SMB/eval Data only; RACMO is not a met source."
+          "note": "SUMup observation profiles (staged, not rebuilt).",
+          "staged": true
         },
         "anchor": {
           "is_colocated": true,
@@ -325,6 +353,8 @@
   ],
   "staged_kind": "observations_only",
   "colocation_threshold_km": 7.5,
-  "skipped": [],
+  "skipped": [
+
+  ],
   "note": "Metadata-only firn_observational cases. The 3 KAN-colocated cases here are a COMMITTED minimal fixture (small density/temperature/SMB profiles). The full SUMup staging is on-demand to gitignored data/eval/sumup."
 }

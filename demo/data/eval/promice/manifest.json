@@ -3,8 +3,7 @@
   "source_doi": "",
   "source_url": "https://promice.org",
   "source_version": "colocated[promice+mar+merra+racmo]",
-  "retrieval_date": "21-Jun-2026",
-  "schema": "metadata_only",
+  "retrieval_date": "08-Jul-2026",
   "cases": [
     {
       "case_id": "kanl",
@@ -18,31 +17,30 @@
       ],
       "permafrost_zone": "none",
       "site_location": {
-        "lat_wgs84": 67.096950868291529,
-        "lon_wgs84": -49.947077120638447,
+        "lat_wgs84": 67.09695086829153,
+        "lon_wgs84": -49.94707712063845,
         "x_epsg3413": -216732.66778461527,
-        "y_epsg3413": -2.5039013503936823E+6,
-        "elev_m": 667.74607640585248
+        "y_epsg3413": -2503901.3503936823,
+        "elev_m": 667.7460764058525
       },
       "period": {
-        "start": "01-Jan-2009",
-        "end": "31-Dec-2022"
+        "start": "2008-09-01 20:00:00",
+        "end": "2026-06-01 15:00:00"
       },
+      "evaluation_file": "kanl/observations.mat",
       "forcing_sources": [
         "promice",
-        "mar",
-        "merra"
+        "mar3.11",
+        "merra2"
       ],
       "eval_sources": [
-        "promice_obs",
-        "mar",
-        "merra",
-        "racmo"
+        "promice_obs"
       ],
       "comparison_variables": [
         "ablation",
         "snow_depth",
         "tsfc",
+        "tice10m",
         "tice1",
         "tice2",
         "tice3",
@@ -53,71 +51,53 @@
         "tice8"
       ],
       "observation_variables": {
-        "subsurface_temperature": "tice1..tice8 (string thermistors)",
+        "subsurface_temperature_primary": "tice10m [K] (standardized 10 m below surface)",
+        "subsurface_temperature_string": "tice1..tice8 (raw string thermistors)",
         "surface_ablation": "ablation [m, positive down]",
         "snow_depth": "snow_depth [m]"
       },
       "colocation": {
         "promice": {
           "kind": "station_met_and_eval",
-          "met_files": "met_kanl_promice_20090101_20221231_1hr.mat",
-          "data_files": [
-            "kanl_promice_2009.mat",
-            "kanl_promice_2010.mat",
-            "kanl_promice_2011.mat",
-            "kanl_promice_2012.mat",
-            "kanl_promice_2013.mat",
-            "kanl_promice_2014.mat",
-            "kanl_promice_2015.mat",
-            "kanl_promice_2016.mat",
-            "kanl_promice_2017.mat",
-            "kanl_promice_2018.mat",
-            "kanl_promice_2019.mat",
-            "kanl_promice_2020.mat",
-            "kanl_promice_2021.mat",
-            "kanl_promice_2022.mat"
-          ],
+          "staged": true,
+          "data_files": "promice/kanl_promice_20080901_20260601.mat",
           "window": {
-            "start": "01-Jan-2009",
-            "end": "31-Dec-2022"
-          }
+            "start": "2008-09-01 20:00:00",
+            "end": "2026-06-01 15:00:00"
+          },
+          "met_files": "promice/met_kanl_promice_20080901_20260601_1hr.mat",
+          "forcing_ready": false,
+          "forcing_ready_reason": "required met placeholder channel(s): ppt"
         },
         "mar": {
           "kind": "point_met",
-          "met_files": "met_kanl_mar_20090101_20191231_1hr.mat",
+          "staged": true,
+          "source": "mar",
+          "source_id": "mar3.11",
           "sample_method": "nearest",
           "window": {
-            "start": "01-Jan-2009",
-            "end": "31-Dec-2019 23:00:00"
-          }
+            "start": "2009-01-01 00:00:00",
+            "end": "2019-12-31 23:59:59"
+          },
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "mar3.11/met_kanl_mar3.11_20090101_20191231_1hr.mat"
         },
         "merra": {
           "kind": "point_met",
-          "met_files": "met_kanl_merra_20120101_20181231_1hr.mat",
+          "staged": true,
+          "source": "merra",
+          "source_id": "merra2",
           "sample_method": "nearest",
           "window": {
-            "start": "01-Jan-2012",
-            "end": "31-Dec-2018 23:00:00"
-          }
-        },
-        "racmo": {
-          "kind": "point_data_smb_eval",
-          "data_files": [
-            "kanl_racmo_2012.mat",
-            "kanl_racmo_2013.mat",
-            "kanl_racmo_2014.mat",
-            "kanl_racmo_2015.mat"
-          ],
-          "sample_method": "nearest",
-          "window": {
-            "start": "01-Jan-2012",
-            "end": "31-Dec-2015 23:00:00"
+            "start": "2012-01-01 00:00:00",
+            "end": "2018-12-31 23:59:59"
           },
-          "note": "SMB/eval Data only; RACMO is not a met source."
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "merra2/met_kanl_merra2_20120101_20181231_1hr.mat"
         }
       },
       "native_timestep": "daily",
-      "notes": "Lower ablation zone (~670 m); curated KAN_L recipe. KAN anchor."
+      "notes": "Lower ablation zone (~679 m); curated KAN_L recipe. KAN anchor. MODIS bare-ice freq=1.00."
     },
     {
       "case_id": "kanm",
@@ -131,31 +111,30 @@
       ],
       "permafrost_zone": "none",
       "site_location": {
-        "lat_wgs84": 67.067095734019745,
-        "lon_wgs84": -48.837346104065588,
+        "lat_wgs84": 67.06709573401974,
+        "lon_wgs84": -48.83734610406559,
         "x_epsg3413": -168423.32107893252,
-        "y_epsg3413": -2.5109834822118757E+6,
+        "y_epsg3413": -2510983.4822118757,
         "elev_m": 1268.9033288544692
       },
       "period": {
-        "start": "01-Jan-2009",
-        "end": "31-Dec-2022"
+        "start": "2008-09-02 14:00:00",
+        "end": "2026-06-01 15:00:00"
       },
+      "evaluation_file": "kanm/observations.mat",
       "forcing_sources": [
         "promice",
-        "mar",
-        "merra"
+        "mar3.11",
+        "merra2"
       ],
       "eval_sources": [
-        "promice_obs",
-        "mar",
-        "merra",
-        "racmo"
+        "promice_obs"
       ],
       "comparison_variables": [
         "ablation",
         "snow_depth",
         "tsfc",
+        "tice10m",
         "tice1",
         "tice2",
         "tice3",
@@ -166,71 +145,53 @@
         "tice8"
       ],
       "observation_variables": {
-        "subsurface_temperature": "tice1..tice8 (string thermistors)",
+        "subsurface_temperature_primary": "tice10m [K] (standardized 10 m below surface)",
+        "subsurface_temperature_string": "tice1..tice8 (raw string thermistors)",
         "surface_ablation": "ablation [m, positive down]",
         "snow_depth": "snow_depth [m]"
       },
       "colocation": {
         "promice": {
           "kind": "station_met_and_eval",
-          "met_files": "met_kanm_promice_20090101_20221231_1hr.mat",
-          "data_files": [
-            "kanm_promice_2009.mat",
-            "kanm_promice_2010.mat",
-            "kanm_promice_2011.mat",
-            "kanm_promice_2012.mat",
-            "kanm_promice_2013.mat",
-            "kanm_promice_2014.mat",
-            "kanm_promice_2015.mat",
-            "kanm_promice_2016.mat",
-            "kanm_promice_2017.mat",
-            "kanm_promice_2018.mat",
-            "kanm_promice_2019.mat",
-            "kanm_promice_2020.mat",
-            "kanm_promice_2021.mat",
-            "kanm_promice_2022.mat"
-          ],
+          "staged": true,
+          "data_files": "promice/kanm_promice_20080902_20260601.mat",
           "window": {
-            "start": "01-Jan-2009",
-            "end": "31-Dec-2022"
-          }
+            "start": "2008-09-02 14:00:00",
+            "end": "2026-06-01 15:00:00"
+          },
+          "met_files": "promice/met_kanm_promice_20080902_20260601_1hr.mat",
+          "forcing_ready": false,
+          "forcing_ready_reason": "required met placeholder channel(s): ppt"
         },
         "mar": {
           "kind": "point_met",
-          "met_files": "met_kanm_mar_20090101_20191231_1hr.mat",
+          "staged": true,
+          "source": "mar",
+          "source_id": "mar3.11",
           "sample_method": "nearest",
           "window": {
-            "start": "01-Jan-2009",
-            "end": "31-Dec-2019 23:00:00"
-          }
+            "start": "2009-01-01 00:00:00",
+            "end": "2019-12-31 23:59:59"
+          },
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "mar3.11/met_kanm_mar3.11_20090101_20191231_1hr.mat"
         },
         "merra": {
           "kind": "point_met",
-          "met_files": "met_kanm_merra_20120101_20181231_1hr.mat",
+          "staged": true,
+          "source": "merra",
+          "source_id": "merra2",
           "sample_method": "nearest",
           "window": {
-            "start": "01-Jan-2012",
-            "end": "31-Dec-2018 23:00:00"
-          }
-        },
-        "racmo": {
-          "kind": "point_data_smb_eval",
-          "data_files": [
-            "kanm_racmo_2012.mat",
-            "kanm_racmo_2013.mat",
-            "kanm_racmo_2014.mat",
-            "kanm_racmo_2015.mat"
-          ],
-          "sample_method": "nearest",
-          "window": {
-            "start": "01-Jan-2012",
-            "end": "31-Dec-2015 23:00:00"
+            "start": "2012-01-01 00:00:00",
+            "end": "2018-12-31 23:59:59"
           },
-          "note": "SMB/eval Data only; RACMO is not a met source."
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "merra2/met_kanm_merra2_20120101_20181231_1hr.mat"
         }
       },
       "native_timestep": "daily",
-      "notes": "Upper ablation zone / bare ice (~1270 m); curated KAN_M recipe."
+      "notes": "Upper ablation / bare ice (~1272 m); curated KAN_M recipe. KAN anchor. MODIS bare-ice freq=1.00."
     },
     {
       "case_id": "kanu",
@@ -244,31 +205,28 @@
       ],
       "permafrost_zone": "none",
       "site_location": {
-        "lat_wgs84": 67.000458407658314,
+        "lat_wgs84": 67.00045840765831,
         "lon_wgs84": -47.02720909947265,
-        "x_epsg3413": -89288.821989512624,
-        "y_epsg3413": -2.5225506903707683E+6,
+        "x_epsg3413": -89288.82198951262,
+        "y_epsg3413": -2522550.6903707683,
         "elev_m": 1840.0789269495797
       },
       "period": {
-        "start": "04-Apr-2009",
-        "end": "31-Dec-2022"
+        "start": "2009-04-04 21:00:00",
+        "end": "2026-06-01 15:00:00"
       },
+      "evaluation_file": "kanu/observations.mat",
       "forcing_sources": [
         "promice",
-        "mar",
-        "merra"
+        "mar3.11",
+        "merra2"
       ],
       "eval_sources": [
-        "promice_obs",
-        "mar",
-        "merra",
-        "racmo"
+        "promice_obs"
       ],
       "comparison_variables": [
-        "ablation",
-        "snow_depth",
         "tsfc",
+        "tice10m",
         "tice1",
         "tice2",
         "tice3",
@@ -279,71 +237,53 @@
         "tice8"
       ],
       "observation_variables": {
-        "subsurface_temperature": "tice1..tice8 (string thermistors)",
+        "subsurface_temperature_primary": "tice10m [K] (standardized 10 m below surface)",
+        "subsurface_temperature_string": "tice1..tice8 (raw string thermistors)",
         "surface_ablation": "ablation [m, positive down]",
         "snow_depth": "snow_depth [m]"
       },
       "colocation": {
         "promice": {
           "kind": "station_met_and_eval",
-          "met_files": "met_kanu_promice_20090404_20221231_1hr.mat",
-          "data_files": [
-            "kanu_promice_2009.mat",
-            "kanu_promice_2010.mat",
-            "kanu_promice_2011.mat",
-            "kanu_promice_2012.mat",
-            "kanu_promice_2013.mat",
-            "kanu_promice_2014.mat",
-            "kanu_promice_2015.mat",
-            "kanu_promice_2016.mat",
-            "kanu_promice_2017.mat",
-            "kanu_promice_2018.mat",
-            "kanu_promice_2019.mat",
-            "kanu_promice_2020.mat",
-            "kanu_promice_2021.mat",
-            "kanu_promice_2022.mat"
-          ],
+          "staged": true,
+          "data_files": "promice/kanu_promice_20090404_20260601.mat",
           "window": {
-            "start": "04-Apr-2009",
-            "end": "31-Dec-2022"
-          }
+            "start": "2009-04-04 21:00:00",
+            "end": "2026-06-01 15:00:00"
+          },
+          "met_files": "promice/met_kanu_promice_20090404_20260601_1hr.mat",
+          "forcing_ready": false,
+          "forcing_ready_reason": "required met placeholder channel(s): ppt"
         },
         "mar": {
           "kind": "point_met",
-          "met_files": "met_kanu_mar_20090101_20191231_1hr.mat",
+          "staged": true,
+          "source": "mar",
+          "source_id": "mar3.11",
           "sample_method": "nearest",
           "window": {
-            "start": "01-Jan-2009",
-            "end": "31-Dec-2019 23:00:00"
-          }
+            "start": "2009-04-04 21:00:00",
+            "end": "2019-12-31 23:59:59"
+          },
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "mar3.11/met_kanu_mar3.11_20090101_20191231_1hr.mat"
         },
         "merra": {
           "kind": "point_met",
-          "met_files": "met_kanu_merra_20120101_20181231_1hr.mat",
+          "staged": true,
+          "source": "merra",
+          "source_id": "merra2",
           "sample_method": "nearest",
           "window": {
-            "start": "01-Jan-2012",
-            "end": "31-Dec-2018 23:00:00"
-          }
-        },
-        "racmo": {
-          "kind": "point_data_smb_eval",
-          "data_files": [
-            "kanu_racmo_2012.mat",
-            "kanu_racmo_2013.mat",
-            "kanu_racmo_2014.mat",
-            "kanu_racmo_2015.mat"
-          ],
-          "sample_method": "nearest",
-          "window": {
-            "start": "01-Jan-2012",
-            "end": "31-Dec-2015 23:00:00"
+            "start": "2012-01-01 00:00:00",
+            "end": "2018-12-31 23:59:59"
           },
-          "note": "SMB/eval Data only; RACMO is not a met source."
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "merra2/met_kanu_merra2_20120101_20181231_1hr.mat"
         }
       },
       "native_timestep": "daily",
-      "notes": "Lower percolation zone (~1840 m); generic recipe. KAN anchor."
+      "notes": "Lower percolation zone (~1845 m); KAN anchor. MODIS bare-ice freq=0.00 (snow-covered surface); percolation by firn-core truth, consistent with SUMup density 0.2 km."
     },
     {
       "case_id": "egp",
@@ -360,26 +300,25 @@
         "lat_wgs84": 75.62151864466415,
         "lon_wgs84": -35.973961899732814,
         "x_epsg3413": 245597.36584112883,
-        "y_epsg3413": -1.5460929424099096E+6,
-        "elev_m": 2663.8860204839912
+        "y_epsg3413": -1546092.9424099096,
+        "elev_m": 2663.886020483991
       },
       "period": {
-        "start": "01-Jan-2015",
-        "end": "31-Dec-2016"
+        "start": "2014-05-17 20:00:00",
+        "end": "2026-06-01 15:00:00"
       },
+      "evaluation_file": "egp/observations.mat",
       "forcing_sources": [
         "promice",
-        "mar",
-        "merra"
+        "mar3.11",
+        "merra2"
       ],
       "eval_sources": [
-        "promice_obs",
-        "mar",
-        "merra",
-        "racmo"
+        "promice_obs"
       ],
       "comparison_variables": [
         "tsfc",
+        "tice10m",
         "tice1",
         "tice2",
         "tice3",
@@ -390,60 +329,57 @@
         "tice8"
       ],
       "observation_variables": {
-        "subsurface_temperature": "tice1..tice8 (string thermistors)",
+        "subsurface_temperature_primary": "tice10m [K] (standardized 10 m below surface)",
+        "subsurface_temperature_string": "tice1..tice8 (raw string thermistors)",
         "surface_ablation": "ablation [m, positive down]",
         "snow_depth": "snow_depth [m]"
       },
       "colocation": {
         "promice": {
           "kind": "station_met_and_eval",
-          "met_files": "met_egp_promice_20150101_20161231_1hr.mat",
-          "data_files": [
-            "egp_promice_2015.mat",
-            "egp_promice_2016.mat"
-          ],
+          "staged": true,
+          "data_files": "promice/egp_promice_20140517_20260601.mat",
           "window": {
-            "start": "01-Jan-2015",
-            "end": "31-Dec-2016"
-          }
+            "start": "2014-05-17 20:00:00",
+            "end": "2026-06-01 15:00:00"
+          },
+          "met_files": "promice/met_egp_promice_20140517_20260601_1hr.mat",
+          "forcing_ready": false,
+          "forcing_ready_reason": "required met placeholder channel(s): ppt"
         },
         "mar": {
           "kind": "point_met",
-          "met_files": "met_egp_mar_20150101_20161231_1hr.mat",
+          "staged": true,
+          "source": "mar",
+          "source_id": "mar3.11",
           "sample_method": "nearest",
           "window": {
-            "start": "01-Jan-2015",
-            "end": "31-Dec-2016"
-          }
+            "start": "2015-01-01 00:00:00",
+            "end": "2016-12-31 23:59:59"
+          },
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "mar3.11/met_egp_mar3.11_20150101_20161231_1hr.mat"
         },
         "merra": {
           "kind": "point_met",
-          "met_files": "met_egp_merra_20150101_20161231_1hr.mat",
+          "staged": true,
+          "source": "merra",
+          "source_id": "merra2",
           "sample_method": "nearest",
           "window": {
-            "start": "01-Jan-2015",
-            "end": "31-Dec-2016"
-          }
-        },
-        "racmo": {
-          "kind": "point_data_smb_eval",
-          "data_files": [
-            "egp_racmo_2012.mat",
-            "egp_racmo_2013.mat",
-            "egp_racmo_2014.mat",
-            "egp_racmo_2015.mat"
-          ],
-          "sample_method": "nearest",
-          "window": {
-            "start": "01-Jan-2012",
-            "end": "31-Dec-2015 23:00:00"
+            "start": "2015-01-01 00:00:00",
+            "end": "2016-12-31 23:59:59"
           },
-          "note": "SMB/eval Data only; RACMO is not a met source."
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "merra2/met_egp_merra2_20150101_20161231_1hr.mat"
         }
       },
       "native_timestep": "daily",
       "notes": "Accumulation interior (MODIS bare-ice freq=0.00, elev 2663 m; high-interior site, no SUMup firn co-location)."
     }
   ],
-  "skipped": []
+  "skipped": [
+
+  ],
+  "schema": "metadata_only"
 }
