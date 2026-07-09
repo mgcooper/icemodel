@@ -1,4 +1,6 @@
 # icemodel stuff
+data/preview/*
+data/figures/*
 data/test/*
 data/input/*
 data/eval/*
@@ -34,29 +36,27 @@ data/input/userdata/*
 !data/verification/sumup/.gitkeep
 demo/data/output/
 
+# Demo data are generated fixtures except the spectral inputs, three small
+# canonical met files, and keepers for the desired empty directory skeleton.
+demo/data/**
+!demo/data/
+!demo/data/eval/
+!demo/data/eval/.gitkeep
+!demo/data/input/
+!demo/data/input/met/
+!demo/data/input/met/.gitkeep
+!demo/data/input/met/met_kanl_kanl_2015_1hr.mat
+!demo/data/input/met/met_kanm_kanm_2015_1hr.mat
+!demo/data/input/met/met_kanm_kanm_2016_1hr.mat
+!demo/data/input/spectral/
+!demo/data/input/spectral/**
+!demo/data/input/userdata/
+!demo/data/input/userdata/.gitkeep
+
 # Release-with-assets fixture bundle staging. packFixtures writes the versioned
 # archive + MANIFEST.json here; it is a build artifact and must never be
 # committed (the bundle is uploaded as a GitHub release asset instead).
 release-staging/
-
-# --- Demo fixture data: release-asset flip (currently OFF) ---------------------
-# The heavy committed demo fixture .mat data (demo/data/eval/**/*.mat,
-# demo/data/input/met/*.mat, demo/data/input/userdata/*.mat, ~119 MB) is bundled
-# by icemodel.verification.setup.packFixtures and provisioned by fetchFixtures.
-# To FLIP to the release-asset strategy (icemodel-1ps.17), uncomment the block
-# below. It ignores the fixture .mat DATA while KEEPING the lean reviewable
-# companions committed (per-family manifest.json and the .gitkeep placeholders),
-# so the directory structure and manifests stay in the repo and fetchFixtures
-# fills in the data on demand. Until then this block stays commented so offline
-# CI keeps loading the committed fixtures unchanged.
-# demo/data/eval/**/*.mat
-# demo/data/input/met/*.mat
-# demo/data/input/userdata/*.mat
-# !demo/data/eval/**/manifest.json
-# !demo/data/eval/**/.gitkeep
-# !demo/data/input/met/.gitkeep
-# !demo/data/input/userdata/.gitkeep
-# -------------------------------------------------------------------------------
 
 test/artifacts/
 test/backups/
