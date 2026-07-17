@@ -76,7 +76,7 @@ function plot_thf_scalar_comparison(options)
 
       if options.save_figs
          fname = fullfile(figdir, [gname '_scalar_comparison.png']);
-         saveas(fig, fname);
+         exportgraphics(fig, fname, 'Resolution', 150);
          fprintf('Saved: %s\n', fname);
       end
    end

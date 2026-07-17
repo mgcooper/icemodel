@@ -22,7 +22,7 @@ function [T, mdfile] = firn_coverage_analysis(kwargs)
    %   GEOGRAPHY      GrIS basin/sector from lat/lon (Greenland_sectors.nc, the
    %                  Mouginot/Zwally 8-basin mask on the RACMO FGRN055 grid).
    %   ELEVATION      installation altitude from the L3 NetCDF metadata.
-   %   SURFACE_ZONE   glaciological facies (promicesiteinfo, the authoritative
+   %   SURFACE_ZONE   glaciological facies (promiceSiteCatalog, the authoritative
    %                  MODIS-bare-ice + SUMup-density classification).
    %   CLIMATE        accumulation magnitude proxy (SUMup SMB mean within radius,
    %                  else the PROMICE net surface-height trend) binned
@@ -47,7 +47,7 @@ function [T, mdfile] = firn_coverage_analysis(kwargs)
    %   site into the aquifer class. Aquifer coverage requires the SUMup SE cores
    %   (or a dedicated FA core) - reported as a GAP in the markdown.
    %
-   % See also: icemodel.verification.helpers.promicesiteinfo,
+   % See also: icemodel.verification.setup.promiceSiteCatalog,
    %  icemodel.verification.setup.importPromiceSites,
    %  icemodel.verification.setup.buildSumupObservations,
    %  test/interactive/classify_site_facies.m
@@ -107,7 +107,7 @@ function row = profileSite(site, sectors, cov, sumup_radius_km)
    rec_end = meta.window_end;
    rec_years = max(0, years(rec_end - rec_start));
 
-   info = icemodel.verification.helpers.promicesiteinfo(site);
+   info = icemodel.verification.setup.promiceSiteCatalog(site);
 
    % --- Geography: GrIS sector from the basin mask. ---
    sector = sampleSector(sectors, lat, lon);
@@ -248,7 +248,7 @@ function tf = classifyMelt(zone, elev)
    % facies) summer melt is negligible (DRY FIRN); below it some melt occurs.
    % The surface-height seasonal drawdown is not a reliable melt proxy on these
    % gap-bridged GC-Net records, so we use the facies + elevation classification
-   % consistent with promicesiteinfo rather than the noisy amplitude.
+   % consistent with promiceSiteCatalog rather than the noisy amplitude.
    if any(zone == ["ablation", "percolation"])
       tf = true; return
    end

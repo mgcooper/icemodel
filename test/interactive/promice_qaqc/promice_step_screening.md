@@ -54,7 +54,7 @@ auto-corrected.
 
 `detected` = total candidate steps; `unamb` = unambiguous (correctable by the
 default transform); `amb` = ambiguous (flagged only). `multi` = site merges
-multiple AWS (1) per `promicesiteinfo.stations`. `example unambiguous` = the
+multiple AWS (1) per `promiceSiteCatalog.stations`. `example unambiguous` = the
 largest-magnitude unambiguous step (date, magnitude, evidence).
 
 | Site | type (operational) | multi | detected | unamb | amb | example unambiguous |

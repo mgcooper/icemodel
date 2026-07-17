@@ -68,7 +68,8 @@ function plot_thf_cases(options)
       fig_sc = plot_scatter_comparison(gdata, gtitle);
 
       if options.save_figs
-         saveas(fig_sc, fullfile(figdir, [gname '_scatter.png']));
+         exportgraphics(fig_sc, fullfile(figdir, [gname '_scatter.png']), ...
+            'Resolution', 150);
       end
 
       % --- Figure 2: enbal timeseries comparison ---
@@ -79,7 +80,8 @@ function plot_thf_cases(options)
          'grouptitle', gtitle);
 
       if options.save_figs
-         saveas(gcf, fullfile(figdir, [gname '_timeseries.png']));
+         exportgraphics(gcf, fullfile(figdir, [gname '_timeseries.png']), ...
+            'Resolution', 150);
       end
    end
 end

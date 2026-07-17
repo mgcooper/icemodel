@@ -8,13 +8,13 @@ function T = classify_site_facies(varargin)
    %  AWS site (and the ESM-SnowMIP sites for permafrost) to derive an
    %  AUTHORITATIVE surface_zone + permafrost_zone classification, replacing the
    %  elevation-band FIRST-PASS heuristic in
-   %  icemodel.verification.helpers.promicesiteinfo.
+   %  icemodel.verification.setup.promiceSiteCatalog.
    %
    %  THIS SCRIPT REQUIRES /Volumes/S03 (mounted) plus the staged SUMup_2025
    %  density file under data/verification/sumup. It is the analysis tool; its
-   %  RESULTS are hard-coded into promicesiteinfo so the committed catalog has NO
+   %  RESULTS are hard-coded into promiceSiteCatalog so the committed catalog has NO
    %  S03 runtime dependency. Re-run this when the datasets or sites change, then
-   %  paste the emitted table into promicesiteinfo.
+   %  paste the emitted table into promiceSiteCatalog.
    %
    %  DATASETS
    %  --------
@@ -87,7 +87,7 @@ function T = classify_site_facies(varargin)
    %  at the surface while being percolation by firn-core truth is EXPECTED (surface
    %  remote sensing cannot see subsurface percolation).
    %
-   % See also: icemodel.verification.helpers.promicesiteinfo,
+   % See also: icemodel.verification.setup.promiceSiteCatalog,
    %  icemodel.verification.namelists.surfacezone,
    %  icemodel.verification.namelists.permafrostzone,
    %  activelayer.readobuzones
@@ -237,7 +237,7 @@ function sites = readSiteList(csv)
          "kind", "promice"); %#ok<AGROW>
    end
    % ESM-SnowMIP sites: permafrost descriptor only (off-ice land surfaces).
-   smip = icemodel.verification.helpers.snowmipinfo();
+   smip = icemodel.verification.setup.esmSnowmipSiteCatalog();
    coords = struct( ... % lat lon from Menard et al. 2019 site table
       "cdp",[45.30 5.77], "oas",[53.629 -106.198], "obs",[53.987 -105.118], ...
       "ojp",[53.916 -104.692], "rme",[43.064 -116.755], "sap",[43.08 141.34], ...
