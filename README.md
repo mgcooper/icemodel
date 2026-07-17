@@ -118,10 +118,11 @@ The met (forcing data) file naming convention has two forms:
   spanning a full window; preferred when a run sets `opts.startdate` /
   `opts.enddate`, e.g. for the verification suite)
 
-Here `FORCINGS` is the forcing-source label (the climate model `mar` / `merra`
-/ `racmo`, a station such as `kanm`, the generic AWS source `promice`, or the
-ESM-SnowMIP family `esmsnowmip`). Met files therefore follow `met_<site>_<source>`
-across all families. The legacy per-station convention sets `FORCINGS == SITENAME`
+Here `FORCINGS` is the forcing-source label (a versioned climate product such
+as `mar3.11` / `merra2` / `racmo2.3p3`, a station such as `kanm`, the generic
+AWS source `promice`, or the ESM-SnowMIP family `esm_snowmip`). Met files
+therefore follow `met_<site>_<source>` across all families. The legacy
+per-station convention sets `FORCINGS == SITENAME`
 (e.g. `met_kanm_kanm_...`); the `kanl` / `kanm` station forcings are kept under
 this legacy naming and are deliberately not relabeled.
 
@@ -129,8 +130,8 @@ Examples:
 
 - `met_kanm_kanm_2016_1hr.mat` specifies a met (forcing) data file for site KAN-M with KAN-M forcings for year 2016 at a 1-hour timestep.
 - `met_kanm_kanm_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with KAN-M forcings for year 2016 at a 15-minute timestep.
-- `met_kanm_merra_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with MERRA-2 forcings for year 2016 at a 15-minute timestep.
-- `met_cdp_esmsnowmip_19940801_20140731_1hr.mat` specifies an ESM-SnowMIP
+- `met_kanm_merra2_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with MERRA-2 forcings for year 2016 at a 15-minute timestep.
+- `met_cdp_esm_snowmip_19940801_20140731_1hr.mat` specifies an ESM-SnowMIP
   window-stamped met file for site `cdp` spanning 1994-2014 at a 1-hour timestep.
 
 Met files live under `input/met/`. Staging writes them into a per-source
@@ -140,6 +141,12 @@ as forcing sources accumulate. The runtime resolves `input/met/<FORCINGS>/`
 committed flat fixtures still load. (`icemodel.forcing.helpers.writemet` writes
 the subfolder; `icemodel.forcing.helpers.sourceSearchDirs` defines the
 subfolder-first search order shared by the runtime resolvers.)
+
+Repository writers default model met to a 15-minute timestep. Public met
+builders/importers expose `dt_out="15m"`; pass `dt_out=""` explicitly to retain
+the source's native model-met cadence. Repeated writes are additive no-ops for
+an existing target unless `overwrite=true` is requested. A broader
+window-stamped artifact also satisfies a narrower ordinary request.
 
 Each met file must contain a timetable object named `met` with one column for each forcing variable. See the example met file.
 
@@ -151,12 +158,16 @@ The "userdata" file naming convention has two forms:
 - window-stamped: `SITENAME_SOURCE_YYYYMMDD_YYYYMMDD` (one file spanning a full
   window; preferred and resolved when its encoded period brackets the run year)
 
-Note: hourly userdata files are supported, thus unlike the met file naming
-convention, there is no `TIMESTEP` file part.
+Repository userdata writers default to hourly artifacts. Source-native hourly
+data, including PROMICE, is unchanged; finer data is averaged into clock-hour
+bins, coarser data is linearly interpolated to hourly support, and wind
+direction uses circular aggregation/interpolation. Pass `dt_out=""` explicitly
+to retain native cadence. Unlike met filenames, userdata has no `TIMESTEP` file
+part; saved metadata records the source and output cadence policy.
 
 Examples:
 
-- `kanm_merra_2016.mat` specifies a user data file with MERRA-2 climate model forcings for the KAN-M weather station location for year 2016 on a 1-hr timestep.
+- `kanm_merra2_2016.mat` specifies a user data file with MERRA-2 climate model forcings for the KAN-M weather station location for year 2016 on a 1-hr timestep.
 - `kanm_modis_2016.mat` specifies a user data file with MODIS satellite albedo values for the KAN-M weather station location for year 2016 on a 1-hr timestep.
 
 As with met files, staging writes userdata into a per-source subfolder

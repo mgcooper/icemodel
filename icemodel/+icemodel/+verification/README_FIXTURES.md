@@ -19,8 +19,8 @@ This document describes the tooling, the workflow, and the one-time migration.
 | Path | After the flip |
 |------|----------------|
 | `demo/data/eval/**/*.mat` (obs/reference bundles, ~14 MB) | moves to the asset |
-| `demo/data/input/met/*.mat` (forcing, ~91 MB) | moves to the asset |
-| `demo/data/input/userdata/*.mat` (per-year userdata, ~15 MB) | moves to the asset |
+| `demo/data/input/met/**/*.mat` (forcing, ~91 MB) | moves to the asset |
+| `demo/data/input/userdata/**/*.mat` (userdata, ~15 MB) | moves to the asset |
 | `demo/data/eval/<family>/manifest.json` | **stays committed** (lean, reviewable) |
 | `.gitkeep` placeholders | **stays committed** (preserve tree structure) |
 | `data/verification/**` raw source caches | already gitignored (unchanged) |
@@ -98,8 +98,8 @@ gh release create fixtures-v0.1.0 \
 # 3. Remove the heavy fixture .mat from version control (keep the working-tree
 #    copies; --cached deletes only the tracked entry). Manifests/.gitkeep stay.
 git rm --cached $(git ls-files 'demo/data/eval/**/*.mat')
-git rm --cached $(git ls-files 'demo/data/input/met/*.mat')
-git rm --cached $(git ls-files 'demo/data/input/userdata/*.mat')
+git rm --cached $(git ls-files 'demo/data/input/met/**/*.mat')
+git rm --cached $(git ls-files 'demo/data/input/userdata/**/*.mat')
 
 # 4. Activate the .gitignore flip block (uncomment the "release-asset flip"
 #    block in .gitignore so the fixture .mat are ignored while manifest.json /
