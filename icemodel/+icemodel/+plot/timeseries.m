@@ -21,7 +21,7 @@ function h = timeseries(time, values, kwargs)
       kwargs.color = []
       kwargs.line_width (1, 1) double {mustBePositive} = 1.2
       kwargs.marker_style (1, :) char = 'auto'
-      kwargs.marker_size (1, 1) double {mustBePositive} = 12
+      kwargs.marker_size (1, 1) double {mustBePositive} = 6
    end
 
    if isvector(values)
@@ -40,6 +40,7 @@ function h = timeseries(time, values, kwargs)
 
    for n = 1:n_series
       series = values(:, n);
+      [line_time, line_series] = breakOmittedTimeGaps(time, series);
       plot_args = cell(1, 8);
       plot_args(1:4) = {'LineStyle', kwargs.line_style, ...
          'LineWidth', kwargs.line_width};
@@ -52,7 +53,7 @@ function h = timeseries(time, values, kwargs)
          plot_args(n_args + (1:2)) = {'DisplayName', char(display_name(n))};
          n_args = n_args + 2;
       end
-      h(n) = plot(kwargs.axes, time, series, plot_args{1:n_args});
+      h(n) = plot(kwargs.axes, line_time, line_series, plot_args{1:n_args});
       addSparseMarkers(kwargs.axes, time, series, kwargs, display_name(n));
    end
 
@@ -61,7 +62,50 @@ function h = timeseries(time, values, kwargs)
    end
 end
 
-function addSparseMarkers(ax, time, series, kwargs, display_name)
+function [line_time, line_series] = breakOmittedTimeGaps(time, series)
+   %BREAKOMITTEDTIMEGAPS Insert NaNs only when cadence is safely inferable.
+   line_time = time;
+   line_series = series;
+   steps_s = seconds(diff(time));
+   if numel(steps_s) < 3 || any(steps_s <= 0)
+      return
+   end
+
+   cadence_s = median(steps_s);
+   tolerance_s = max(1e-6, cadence_s * 1e-6);
+   nominal = abs(steps_s - cadence_s) <= tolerance_s;
+   if nnz(nominal) < 2
+      return
+   end
+
+   gaps = find(steps_s > 1.5 * cadence_s);
+   if isempty(gaps)
+      return
+   end
+
+   % Insert one unavailable midpoint per omitted interval. Original finite
+   % samples remain untouched, so sparse-marker and interval observations keep
+   % their values while the line renderer cannot bridge the outage.
+   n_rows = numel(time) + numel(gaps);
+   line_time = repmat(time(1), n_rows, 1);
+   line_series = nan(n_rows, 1);
+   source_row = 1;
+   output_row = 1;
+   for gap = reshape(gaps, 1, [])
+      count = gap - source_row + 1;
+      rows = output_row:(output_row + count - 1);
+      line_time(rows) = time(source_row:gap);
+      line_series(rows) = series(source_row:gap);
+      output_row = output_row + count;
+      line_time(output_row) = time(gap) + (time(gap + 1) - time(gap)) / 2;
+      output_row = output_row + 1;
+      source_row = gap + 1;
+   end
+   line_time(output_row:end) = time(source_row:end);
+   line_series(output_row:end) = series(source_row:end);
+end
+
+function addSparseMarkers(ax, time, series, kwargs, ~)
    %ADDSPARSEMARKERS Overlay markers when a sparse series would otherwise vanish.
 
    marker_style = resolveMarkerStyle(series, kwargs.marker_style);

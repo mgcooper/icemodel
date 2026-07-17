@@ -23,7 +23,7 @@ function teardown(testCase)
 end
 
 function test_listcases_returns_expected_ids(testCase)
-   % LISTCASES should expose the curated smoke cases from committed demo/data.
+   % LISTCASES should expose the curated smoke cases from top-level data/eval.
 
    cases = icemodel.verification.listcases();
    ids = [cases.case_id];
@@ -51,9 +51,9 @@ function test_verification_namelists_expose_curated_selectors(testCase)
       "colbeck1976");
 
    % The richer site catalog is keyed by the same site-name namelist.
-   catalog = icemodel.verification.helpers.snowmipinfo();
+   catalog = icemodel.verification.setup.esmSnowmipSiteCatalog();
    testCase.verifyEqual(string({catalog.sitename})', expectedEsmCaseIds());
-   info_cdp = icemodel.verification.helpers.snowmipinfo("cdp");
+   info_cdp = icemodel.verification.setup.esmSnowmipSiteCatalog("cdp");
    testCase.verifyEqual(info_cdp.long_name, "Col de Porte");
 end
 
@@ -168,18 +168,20 @@ function test_manifest_schema_helpers_are_setup_owned(testCase)
    testCase.verifyTrue(ismember("case_type", case_names));
 end
 
-function test_loadmanifest_resolves_demo_data_paths(testCase)
-   % LOADMANIFEST should resolve case files under the demo/data tree.
-   % Forcing is no longer in the manifest — it is staged under
-   % demo/data/input/met/ via the standard icemodel naming convention,
-   % so checks below cover only evaluation / reference paths.
+function test_loadmanifest_resolves_repo_data_paths(testCase)
+   % LOADMANIFEST should resolve committed demo fixtures or top-level staged files.
+   % Forcing is no longer in the manifest - it is staged under data/input/met/ via
+   % the standard icemodel naming convention, so checks below cover evaluation
+   % paths only.
 
    manifest = icemodel.verification.loadmanifest("cdp");
 
    testCase.verifyEqual(manifest.dataset_family, "esm_snowmip");
    testCase.verifyEqual(manifest.case_type, "esm_site");
    testCase.verifyTrue(contains(manifest.evaluation_path, ...
-      fullfile("demo", "data", "eval", "esm_snowmip", "cdp")));
+      fullfile("eval", "esm_snowmip", "cdp")));
+   testCase.verifyTrue(contains(manifest.evaluation_path, fullfile("data")) ...
+      || contains(manifest.evaluation_path, fullfile("demo", "data")));
    testCase.verifyTrue(exist(manifest.evaluation_path, 'file') == 2);
 end
 
@@ -327,7 +329,34 @@ function test_plotcase_writes_figure_without_candidate(testCase)
       "output_file", outfile);
 
    testCase.verifyTrue(exist(outfile, 'file') == 2);
+   lines = findall(f, 'Type', 'Line');
+   testCase.verifyTrue(all(string(get(lines, 'Marker')) == "none"));
+   testCase.verifyEmpty(findall(f, 'Type', 'Line', 'LineStyle', 'none'));
    close(f)
+end
+
+function test_colbeck_compare_solutions_is_line_only(testCase)
+   % The dedicated four-way Colbeck driver shares the no-marker contract.
+   old_close = get(groot, 'DefaultFigureCloseRequestFcn');
+   restore_close = onCleanup(@() set(groot, ...
+      'DefaultFigureCloseRequestFcn', old_close));
+   set(groot, 'DefaultFigureCloseRequestFcn', @(~, ~) []);
+   before = findall(groot, 'Type', 'Figure');
+
+   icemodel.verification.colbeck.compareSolutions( ...
+      experiment_names="exp1", make_plot=true, save_plot=false, ...
+      plot_visible="off");
+   clear restore_close
+
+   after = findall(groot, 'Type', 'Figure');
+   is_new = arrayfun(@(candidate) ~any(candidate == before), after);
+   fig = after(is_new);
+   testCase.addTeardown(@() delete(fig(isgraphics(fig))));
+   testCase.verifyNumElements(fig, 1);
+   lines = findall(fig, 'Type', 'Line');
+   testCase.verifyNotEmpty(lines);
+   testCase.verifyTrue(all(string(get(lines, 'Marker')) == "none"));
+   testCase.verifyEmpty(findall(fig, 'Type', 'Line', 'LineStyle', 'none'));
 end
 
 function test_comparecase_writes_separate_scatter_for_site_cases(testCase)
@@ -374,7 +403,7 @@ function test_colbeck_evaluation_carries_two_target_sources(testCase)
 end
 
 function test_plot_timeseries_shows_sparse_points_with_markers(testCase)
-   % Sparse observation series should remain visible on a dense time axis.
+   % Generic sparse observation series should remain visible on a dense axis.
 
    % A short dense hourly axis with only three finite observations reproduces
    % the sparse SWE target pattern that originally rendered as a blank line.
@@ -393,9 +422,8 @@ function test_plot_timeseries_shows_sparse_points_with_markers(testCase)
    icemodel.plot.timeseries(time(:), values, axes=ax);
 
    lines = findall(ax, 'Type', 'line');
-   markers = string(get(lines, 'Marker'));
 
-   testCase.verifyTrue(any(markers ~= "none"));
+   testCase.verifyTrue(any(string(get(lines, 'Marker')) ~= "none"));
 end
 
 function ids = expectedCaseIds()

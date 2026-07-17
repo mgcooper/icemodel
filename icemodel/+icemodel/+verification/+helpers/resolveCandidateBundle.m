@@ -44,18 +44,101 @@ function candidate = resolveCandidateBundle(manifest, kwargs)
       return
    end
 
-   % With no supplied model output, compare against the staged smoke reference.
-   % Firn cases bundle no reference.mat (the forcing/reference side is never
-   % bundled): the co-located RCM reference (RACMO Data) is reconstituted on
-   % demand from the staged per-year userdata files the manifest declares.
-   % Snow/Colbeck cases still load their committed reference.mat bundle.
+   % With no supplied model output, compare against a staged smoke reference.
+   % Firn cases bundle no reference.mat, so pick a declared staged model source
+   % and reconstitute its per-year userdata files. RACMO remains preferred when
+   % present to preserve the old smoke-reference behavior, but MAR/MERRA-only
+   % cases still resolve a usable default candidate.
    if isfield(manifest, 'reference_path') ...
          && strlength(string(manifest.reference_path)) > 0 ...
          && isfile(manifest.reference_path)
       candidate = icemodel.verification.helpers.loadArtifact( ...
          manifest.reference_path, "reference");
    else
-      candidate = icemodel.verification.helpers.loadColocatedData( ...
-         manifest, "racmo");
+      source = defaultCandidateSource(manifest);
+      if source == ""
+         candidate = emptyCandidate("no staged model candidate source");
+      else
+         candidate = icemodel.verification.helpers.loadColocatedData( ...
+            manifest, source);
+      end
    end
+end
+
+function source = defaultCandidateSource(manifest)
+   %DEFAULTCANDIDATESOURCE Pick a runnable model source from manifest metadata.
+   source = "";
+   if isfield(manifest, 'eval_sources')
+      eval_sources = reshape(string(manifest.eval_sources), [], 1);
+   else
+      eval_sources = strings(0, 1);
+   end
+
+   preferred = icemodel.verification.namelists.rcmProductIds( ...
+      ["racmo", "mar", "merra"]);
+   for candidate = reshape(preferred, 1, [])
+      if any(eval_sources == candidate) && hasStagedData(manifest, candidate)
+         source = candidate;
+         return
+      end
+   end
+
+   legacy = ["racmo", "mar", "merra"];
+   for candidate = reshape(legacy, 1, [])
+      if hasStagedData(manifest, candidate)
+         source = candidate;
+         return
+      end
+   end
+end
+
+function tf = hasStagedData(manifest, source)
+   %HASSTAGEDDATA True when a colocation leg has userdata or model output.
+   tf = false;
+   if ~isfield(manifest, 'colocation') || ~isstruct(manifest.colocation)
+      return
+   end
+   source = string(source);
+   fields = string(fieldnames(manifest.colocation));
+   field = "";
+   if any(fields == source)
+      field = source;
+   else
+      for f = reshape(fields, 1, [])
+         if sourceLabel(manifest.colocation, f) == source
+            field = f;
+            break
+         end
+      end
+   end
+   if field == ""
+      return
+   end
+   leg = manifest.colocation.(char(field));
+   has_data = isfield(leg, 'data_files') && ~isempty(leg.data_files);
+   has_model_output = isfield(leg, 'model_output_files') ...
+      && ~isempty(leg.model_output_files);
+   tf = isstruct(leg) && isfield(leg, 'staged') && logical(leg.staged) ...
+      && (has_data || has_model_output);
+end
+
+function label = sourceLabel(colocation, source)
+   %SOURCELABEL Return the manifest source id for a colocation field.
+   source = string(source);
+   name = char(source);
+   if isfield(colocation, name) && isstruct(colocation.(name)) ...
+         && isfield(colocation.(name), 'source_id') ...
+         && strlength(string(colocation.(name).source_id)) > 0
+      label = string(colocation.(name).source_id);
+   elseif ismember(source, icemodel.verification.namelists.rcmsources())
+      label = icemodel.verification.namelists.rcmProductIds(source);
+   else
+      label = source;
+   end
+end
+
+function candidate = emptyCandidate(note)
+   %EMPTYCANDIDATE Return an explicit empty timeseries candidate bundle.
+   candidate = struct('format', 'timeseries', 'data', timetable.empty, ...
+      'metadata', struct('note', char(note)));
 end

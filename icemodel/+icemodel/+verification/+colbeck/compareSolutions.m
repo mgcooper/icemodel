@@ -295,7 +295,7 @@ function [f, figure_path] = plotSolutions(targets, candidates, ...
          xlabel(ax, 'Time');
          ylabel(ax, '');
          if n == 1 && m == 1
-            legend(ax, 'show', 'Location', 'best');
+            legend(ax, 'show', 'Location', 'eastoutside');
          end
          grid(ax, 'on');
       end
@@ -322,5 +322,6 @@ function plotOneSeries(ax, tt, varname, display_name, line_style)
       return
    end
    icemodel.plot.timeseries(tt.Time, values, axes=ax, ...
-      display_name=string(display_name), line_style=line_style);
+      display_name=string(display_name), line_style=line_style, ...
+      marker_style='none');
 end

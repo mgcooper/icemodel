@@ -16,8 +16,8 @@ function [is_colocated, anchor, distance_km] = sumupColocation(x3413, y3413, kwa
    %  threshold_km   Co-location distance threshold in km (default 7.5).
    %  anchors        Optional struct array of anchor points with fields site,
    %                 x_epsg3413, y_epsg3413, and optionally family/source_id.
-   %                 When omitted, anchors are resolved from the committed
-   %                 firn/promice manifest (legacy PROMICE-only default).
+   %                 When omitted, anchors are resolved from the top-level
+   %                 staged firn/research manifests.
    %
    % Outputs
    %  is_colocated   true when the SUMup point is within threshold_km of any
@@ -44,10 +44,10 @@ function [is_colocated, anchor, distance_km] = sumupColocation(x3413, y3413, kwa
    % Role
    %  Setup/staging helper used by importSumup to record which SUMup points
    %  fall near PROMICE, RetMIP, IMAU, or research_site anchors.
-   %  Pure geometry; reads the committed manifest but mutates nothing.
+   %  Pure geometry; reads staged manifests but mutates nothing.
    %
    % See also: icemodel.verification.setup.importSumup,
-   %  icemodel.verification.helpers.promicesiteinfo
+   %  icemodel.verification.setup.promiceSiteCatalog
 
    arguments
       x3413 (1, 1) double
@@ -56,7 +56,7 @@ function [is_colocated, anchor, distance_km] = sumupColocation(x3413, y3413, kwa
       kwargs.anchors = []
       kwargs.output_root (1, 1) string = ""
       kwargs.evaluation_data_root (1, 1) string = ""
-      kwargs.icemodel_config_casename (1, 1) string = "test"
+      kwargs.icemodel_config_casename (1, 1) string = ""
    end
 
    % Keep the legacy helper name for importSumup callers while sharing the

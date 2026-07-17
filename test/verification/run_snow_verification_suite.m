@@ -225,8 +225,8 @@ function [run_name, run_dir, write_any_artifacts, kwargs, cleanup] = ...
       fprintf('=========================================\n\n');
    end
 
-   % Install the same test/demo config used by unit tests so fresh-clone runs
-   % resolve the committed demo/data verification assets.
+   % Install the same test config used by unit tests so fresh-clone runs get the
+   % dependency paths and deterministic workspace setup before resolving cases.
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
 
    % Resolve the run-artifact directory only when at least one artifact will

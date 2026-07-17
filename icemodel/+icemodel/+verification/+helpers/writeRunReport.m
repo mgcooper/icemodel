@@ -163,9 +163,9 @@ function window = caseWindow(cases, case_id)
    match = string({cases.case_id}) == string(case_id);
    if any(match)
       c = cases(find(match, 1));
-      if isfield(c, 'comparison_window') && isstruct(c.comparison_window)
-         window = sprintf("%s..%s", string(c.comparison_window.start), ...
-            string(c.comparison_window.end));
+      if isfield(c, 'period') && isstruct(c.period)
+         window = sprintf("%s..%s", string(c.period.start), ...
+            string(c.period.end));
       else
          window = "?";
       end
