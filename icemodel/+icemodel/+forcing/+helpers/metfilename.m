@@ -13,8 +13,9 @@ function filename = metfilename(site, forcings, t1, t2, dt)
    %  Legacy per-year form (t1 is a year number, t2 is []):
    %     met_<site>_<forcings>_<YYYY>_<dt>.mat
    %
-   % DT is the forcing timestep in seconds (900 or 3600) or the literal
-   % filename suffix ("15m" or "1hr").
+   % DT is the forcing timestep in seconds (900, 1800, or 3600) or the literal
+   % filename suffix ("15m", "30m", or "1hr"). The 30-minute form supports the
+   % proven native Samimi Dye-2 cadence; repository writers still default to 15m.
    %
    % See also: icemodel.createMetFileNames,
    %  icemodel.forcing.helpers.writemet
@@ -27,7 +28,17 @@ function filename = metfilename(site, forcings, t1, t2, dt)
       dt
    end
 
-   dtstr = dtsuffix(dt);
+   try
+      dtstr = char(icemodel.forcing.helpers.metTimestepSuffix(dt));
+   catch err
+      if string(err.identifier) ~= ...
+            "icemodel:forcing:metTimestepSuffix:unsupportedTimestep"
+         rethrow(err)
+      end
+      % Preserve the established public writer-side error identifier.
+      error('icemodel:forcing:metfilename:unsupportedTimestep', ...
+         'unsupported dt for met file naming')
+   end
 
    if isa(t1, 'datetime')
       if ~isa(t2, 'datetime')
@@ -45,22 +56,4 @@ function filename = metfilename(site, forcings, t1, t2, dt)
          't1/t2 must be datetimes (window form) or a year and [] (per-year form)');
    end
    filename = string(filename);
-end
-
-function dtstr = dtsuffix(dt)
-   %DTSUFFIX Map a timestep to its met-filename suffix.
-   if isstring(dt) || ischar(dt)
-      dtstr = char(dt);
-      mustBeMember(string(dtstr), ["15m", "1hr"])
-      return
-   end
-   switch dt
-      case 900
-         dtstr = '15m';
-      case 3600
-         dtstr = '1hr';
-      otherwise
-         error('icemodel:forcing:metfilename:unsupportedTimestep', ...
-            'unsupported dt for met file naming: %g', dt);
-   end
 end

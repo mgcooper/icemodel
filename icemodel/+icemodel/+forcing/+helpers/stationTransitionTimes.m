@@ -20,7 +20,7 @@ function [times, record] = stationTransitionTimes(composing_stations, kwargs)
    %
    % Inputs
    %  composing_stations  - string array of the site's composing AWS names
-   %                        (from promicesiteinfo / AWS_sites_metadata.csv)
+   %                        (from promiceSiteCatalog / AWS_sites_metadata.csv)
    %
    % Name-value
    %  window_start, window_end : the site record window (datetime). When set, a
@@ -40,7 +40,7 @@ function [times, record] = stationTransitionTimes(composing_stations, kwargs)
    %
    % See also: icemodel.forcing.helpers.surfaceFlags,
    %  icemodel.forcing.destepSurface, icemodel.forcing.buildPromiceData,
-   %  icemodel.verification.helpers.promicesiteinfo
+   %  icemodel.verification.setup.promiceSiteCatalog
 
    arguments
       composing_stations (1, :) string

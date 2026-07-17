@@ -1,14 +1,15 @@
-function sites = researchSiteMetadata(site_ids)
-   %RESEARCHSITEMETADATA Return catchall research-site metadata.
+function sites = researchSiteCatalog(site_ids)
+   %RESEARCHSITECATALOG Return the catchall research source-site catalog.
    %
-   %  sites = icemodel.verification.setup.researchSiteMetadata()
-   %  sites = icemodel.verification.setup.researchSiteMetadata("humphrey")
+   %  sites = icemodel.verification.setup.researchSiteCatalog()
+   %  sites = icemodel.verification.setup.researchSiteCatalog("humphrey")
    %
    % Role
    %  Catchall site catalog for high-value research targets that do not belong
    %  cleanly to a network family such as PROMICE, IMAU, or RetMIP. These sites
    %  are source-family anchors for colocation metadata, not a special SUMup
-   %  subcategory.
+   %  subcategory. Staged cases are normalized separately through
+   %  icemodel.verification.setup.makeFirnCaseManifestEntry.
 
    arguments
       site_ids (1, :) string = strings(1, 0)
@@ -18,16 +19,11 @@ function sites = researchSiteMetadata(site_ids)
    % and should be represented by the generic research_site family.
    sites = one("humphrey", "Humphrey percolation thermistor network");
 
-   % A caller can request a subset; fail before writing a mislabeled manifest.
-   if ~isempty(site_ids)
-      keep = ismember([sites.site_id], site_ids);
-      missing = setdiff(site_ids, [sites.site_id], 'stable');
-      if ~isempty(missing)
-         error('icemodel:verification:researchSiteMetadata:unknownSite', ...
-            'unknown research_site id(s): %s', strjoin(missing, ', '));
-      end
-      sites = sites(keep);
-   end
+   % Reject unknown ids before staging and retain canonical catalog order. Keep
+   % the established error id so callers can catch it across the API rename.
+   sites = icemodel.verification.setup.selectSiteCatalogEntries(sites, ...
+      site_ids, "icemodel:verification:researchSiteMetadata:unknownSite", ...
+      "research_site");
 end
 
 function s = one(site_id, site_name)
@@ -41,13 +37,15 @@ function s = one(site_id, site_name)
       'site_name', site_name, ...
       'family', "research_site", ...
       'source_id', site_id, ...
-      'surface_zone', "unknown", ...
+      'surface_zone', "percolation", ...
       'eval_target', "firn", ...
-      'permafrost_zone', "unknown", ...
+      'permafrost_zone', "none", ...
       'lat_wgs84', 69.725714, ...
       'lon_wgs84', -48.190512, ...
       'x_epsg3413', NaN, ...
       'y_epsg3413', NaN, ...
       'elev_m', 1645.1, ...
+      'period', struct('start', '2007-01-01 00:00:00', ...
+      'end', '2008-12-31 23:00:00'), ...
       'note', "SUMup Humphrey2012/Harper2011 thermistor-network centroid; use RCM forcing first.");
 end

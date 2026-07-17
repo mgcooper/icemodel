@@ -45,7 +45,7 @@ function names = firnCaseManifestFieldNames()
    %                          (e.g. ["promice_obs","racmo"])
    %    comparison_variables  variables compared at this case
    %    observation_variables observation metadata (e.g. thermistor depths)
-   %    colocation            recorded colocation metadata: available models and
+   %    colocation            recorded colocation metadata: available sources and
    %                          their per-leg windows (METADATA, not bundled data)
    %    native_timestep       observation timestep ("daily")
    %    notes                 provenance note

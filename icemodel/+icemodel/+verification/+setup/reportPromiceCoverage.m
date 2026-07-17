@@ -42,8 +42,8 @@ function report = reportPromiceCoverage(coverage, requested, leg_windows)
    lines(end+1) = sprintf('%-8s %-14s %-22s %s', ...
       'promice', 'full record', stagedTag(leg_windows, 'promice', y0, y1), 'none');
 
-   models = ["mar", "merra", "racmo"];
-   for m = models
+   sources = icemodel.verification.namelists.rcmsources();
+   for m = sources
       if ~isfield(coverage, m)
          continue
       end

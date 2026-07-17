@@ -23,7 +23,7 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    %    wdir_u -> wdir [deg]           dsr -> swd [W m-2]
    %    usr -> swu [W m-2]             dlr -> lwd [W m-2]
    %    ulr -> lwu [W m-2]             albedo -> albedo [-]
-   %    cc [%] -> cfrac [-]            t_surf [C] -> tsfc [K]
+   %    cc [0..1 or %] -> cfrac [-]    t_surf [C] -> tsfc [K]
    %    dshf_u -> shf, dlhf_u -> lhf [W m-2]
    %    rainfall_cor_u [mm] -> rainf [mm per timestep]
    %    qh_u [g/kg] -> shum [kg/kg]    (specific humidity, /1000; the L3
@@ -49,11 +49,14 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    %    d_t_i_1..d_t_i_N [m] -> dtice1..dticeN (thermistor depths below the
    %       surface, positive down, so the tice string can be interpreted
    %       vertically and the surfaced-sensor discard applied)
-   %    t_i_10m [degC] -> tice10m [K] (PRIMARY subsurface-temperature
-   %       evaluation channel: the standardized 10 m firn temperature,
-   %       depth-interpolated by GEUS. Prefer tice10m for site-to-site model
-   %       comparison; the raw depth-tagged tice string is the per-sensor
-   %       diagnostic)
+   %    t_i_10m [degC] -> tice10m_source [K] (unmodified GEUS value) and
+   %       tice10m [K] (PRIMARY subsurface-temperature evaluation channel,
+   %       masked at physically discontinuous consecutive-hour endpoints).
+   %       tice10m_qc_flag records 0=accepted, 1=failed by the source-range
+   %       screen or by a discontinuity with native-neighbor support,
+   %       2=unreviewed because fewer than two depth-tagged native thermistors
+   %       span the endpoint pair, and 3=an unresolved isolated-sensor epoch.
+   %       The raw depth-tagged tice string remains diagnostic.
    %    alt -> elev [m] (smoothed postprocessed GPS altitude)
    %
    % The upper-boom channels (the dictionary "all" / "_u" set) are used so
@@ -77,7 +80,8 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    %  aws      - timetable, UTC time axis, channels above (a channel missing
    %             from the file is omitted from the output)
    %  metadata - provenance struct: source file, station id, lat, lon,
-   %             elevation, boom count, row count, time bounds
+   %             elevation, boom count, row count, time bounds, and whole-file
+   %             raw/corrected shortwave availability
    %
    % See also: icemodel.forcing.buildPromiceMet,
    %  icemodel.forcing.buildPromiceData
@@ -90,6 +94,11 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
       kwargs.startdate = ""
       kwargs.enddate = ""
    end
+
+   % Validate and normalize the optional interval before source discovery so
+   % malformed public input cannot be obscured by an unrelated file error.
+   [window_start, window_end, has_window] = ...
+      icemodel.internal.pairedWindow(kwargs.startdate, kwargs.enddate);
 
    filename = locateStationFile(site, kwargs.source_dir, kwargs.timescale);
 
@@ -181,7 +190,17 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
       aws.tsfc = aws.tsfc + Tf;                   % C -> K
    end
    if ismember('cfrac', string(aws.Properties.VariableNames))
-      aws.cfrac = aws.cfrac / 100;                % percent -> fraction
+      % Current pypromice L3 files store cc as a 0..1 fraction despite the
+      % percent label, while older products may contain 0..100 percentages.
+      % Mask impossible values before inferring the whole-series scale so a
+      % fill sentinel cannot make a fractional product divide a second time.
+      invalid = ~isnan(aws.cfrac) & ...
+         (~isfinite(aws.cfrac) | aws.cfrac < 0 | aws.cfrac > 100);
+      aws.cfrac(invalid) = NaN;
+      finite = isfinite(aws.cfrac);
+      if any(aws.cfrac(finite) > 1)
+         aws.cfrac(finite) = aws.cfrac(finite) / 100;
+      end
    end
    if ismember('shum', string(aws.Properties.VariableNames))
       % qh_u is specific humidity reported in g/kg: the L3 magnitudes are
@@ -223,19 +242,53 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
       aws.(sprintf('tice%d', nice)) = v + Tf;
    end
 
-   % 10 m subsurface (firn) temperature t_i_10m [degC] -> tice10m [K]: the
-   % standard firn thermal-state benchmark.
+   % Preserve GEUS's derived t_i_10m verbatim (apart from degC -> K) and expose
+   % one conservative canonical target. The source processor documents that
+   % noisy-thermistor filtering is disabled; a 45-site audit of 2.30 million
+   % consecutive hourly pairs found a 99.9th-percentile change of 0.350 C, while
+   % known KAN_U sensor failures jump 5.23 and 6.90 C in one hour. Therefore a
+   % >1 C consecutive-hour change is an impossible 10 m thermal response, not
+   % seasonal evolution. Both endpoints are masked so no plot or scorer bridges
+   % the discontinuity; the source channel and a review-status flag remain.
    if ismember('t_i_10m', available)
-      aws.tice10m = double(ncread(filename, 't_i_10m')) + Tf;
+      aws.tice10m_source = double(ncread(filename, 't_i_10m')) + Tf;
+      [aws.tice10m, aws.tice10m_qc_flag] = ...
+         qualityControlTice10m(aws, kwargs.timescale);
+   end
+
+   % Record radiation support before applying the requested window. Builders
+   % need whole-file status so an outage-only surgical build makes the same
+   % geometry-derived darkness decision as a broader build containing finite
+   % source samples. A genuinely absent or whole-file all-missing channel stays
+   % distinguishable from a locally all-missing slice of an observed record.
+   full_names = string(aws.Properties.VariableNames);
+   swd_source_file_present = ismember("swd", full_names);
+   swd_corrected_source_file_present = ismember("swd_cor", full_names);
+   swd_source_file_observations_present = false;
+   if swd_source_file_present
+      swd_source_file_observations_present = any(isfinite(aws.swd), 'all');
+   end
+   if swd_corrected_source_file_present
+      swd_source_file_observations_present = ...
+         swd_source_file_observations_present ...
+         || any(isfinite(aws.swd_cor), 'all');
+   end
+   swu_source_file_present = ismember("swu", full_names);
+   swu_corrected_source_file_present = ismember("swu_cor", full_names);
+   swu_source_file_observations_present = false;
+   if swu_source_file_present
+      swu_source_file_observations_present = any(isfinite(aws.swu), 'all');
+   end
+   if swu_corrected_source_file_present
+      swu_source_file_observations_present = ...
+         swu_source_file_observations_present ...
+         || any(isfinite(aws.swu_cor), 'all');
    end
 
    % Optional window subset.
    keep = true(height(aws), 1);
-   if ~strcmp(string(kwargs.startdate), "")
-      keep = keep & aws.Time >= ensureUtc(kwargs.startdate);
-   end
-   if ~strcmp(string(kwargs.enddate), "")
-      keep = keep & aws.Time <= ensureUtc(kwargs.enddate);
+   if has_window
+      keep = aws.Time >= window_start & aws.Time <= window_end;
    end
    if ~any(keep)
       error('icemodel:forcing:readPromiceAws:emptyWindow', ...
@@ -252,12 +305,190 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
       'elev', readGlobalNumber(filename, 'altitude'), ...
       'n_booms', detectBooms(available), ...
       'n_tice', nice, ...
+      'swd_source_file_present', swd_source_file_present, ...
+      'swd_corrected_source_file_present', ...
+      swd_corrected_source_file_present, ...
+      'swd_source_file_observations_present', ...
+      swd_source_file_observations_present, ...
+      'swu_source_file_present', swu_source_file_present, ...
+      'swu_corrected_source_file_present', ...
+      swu_corrected_source_file_present, ...
+      'swu_source_file_observations_present', ...
+      swu_source_file_observations_present, ...
       'n_rows', height(aws), ...
       'window_start', aws.Time(1), ...
       'window_end', aws.Time(end));
+   if ismember('tice10m_qc_flag', string(aws.Properties.VariableNames))
+      metadata.tice10m_qc_status = "applied";
+      metadata.tice10m_qc_method = ...
+         "mask_gt_1K_hourly_endpoints_and_large_isolated_sensor_epochs";
+      metadata.tice10m_qc_source_variable = "t_i_10m";
+      metadata.tice10m_qc_source_channel = "tice10m_source";
+      metadata.tice10m_qc_jump_threshold_K = 1;
+      metadata.tice10m_qc_persistent_jump_threshold_K = 4;
+      metadata.tice10m_qc_other_sensor_median_threshold_K = 0.25;
+      metadata.tice10m_qc_target_depth_tolerance_m = 2;
+      metadata.tice10m_qc_recovery_window_hours = 24;
+      metadata.tice10m_qc_depth_reset_threshold_m = 0.5;
+      metadata.tice10m_qc_flag_codes = struct( ...
+         'accepted', 0, 'failed', 1, 'unreviewed', 2, ...
+         'persistent_unreviewed', 3);
+      metadata.tice10m_qc_flagged_sample_count = ...
+         nnz(aws.tice10m_qc_flag > 0);
+      metadata.tice10m_qc_failed_sample_count = ...
+         nnz(aws.tice10m_qc_flag == 1);
+      metadata.tice10m_qc_unreviewed_sample_count = ...
+         nnz(aws.tice10m_qc_flag >= 2);
+      metadata.tice10m_qc_persistent_sample_count = ...
+         nnz(aws.tice10m_qc_flag == 3);
+      metadata.tice10m_qc_basis = ...
+         "GEUS t_i_10m preserved in tice10m_source; canonical tice10m " ...
+         + "masks source values outside -80..1 degC and both endpoints of " ...
+         + ">1 K changes across exactly one hour. " ...
+         + "Depth-tagged native thermistors classify events as reviewed " ...
+         + "or neighbor-insufficient. An isolated >4 K jump in a sensor " ...
+         + "within 2 m of the 10 m target, with no 24-hour recovery, is " ...
+         + "masked as unreviewed until that sensor's next >0.5 m depth " ...
+         + "reset; gaps are not treated as jumps.";
+   end
 end
 
 %% Local functions
+function [clean, flag] = qualityControlTice10m(aws, timescale)
+   %QUALITYCONTROLTICE10M Mask impossible hourly 10 m temperature jumps.
+   %
+   % The canonical target is screened only across contiguous hourly source
+   % samples. Native thermistor temperatures and time-varying depths determine
+   % whether each event has at least two comparable subsurface sensors; sparse
+   % events are still masked but remain explicitly unreviewed (code 2).
+   source = aws.tice10m_source;
+   clean = source;
+   flag = zeros(size(source));
+
+   % A finite value outside the physical ice-temperature envelope is invalid
+   % even when there is no neighboring sample. Apply this cadence-independent
+   % screen before the hourly discontinuity rule and preserve only the source.
+   out_of_range = isfinite(source) ...
+      & (source < icemodel.physicalConstant('Tf') - 80 ...
+      | source > icemodel.physicalConstant('Tf') + 1);
+   flag(out_of_range) = 1;
+   clean(out_of_range) = NaN;
+
+   % The cross-site jump threshold was validated for the hourly product. Daily
+   % files skip that rule; buildPromiceData always reads the hourly source.
+   if timescale ~= "hourly" || numel(source) < 2
+      return
+   end
+
+   % Only exact adjacent-hour pairs can prove a temporal discontinuity. A large
+   % change across an omitted interval is missing evidence, not a sensor jump.
+   contiguous = abs(seconds(diff(aws.Time)) - 3600) <= 1;
+   jump = abs(diff(source));
+   candidates = find(contiguous & isfinite(source(1:end-1)) ...
+      & isfinite(source(2:end)) & jump > 1);
+   names = string(aws.Properties.VariableNames);
+   thermistors = names(~cellfun('isempty', ...
+      regexp(cellstr(names), '^tice\d+$', 'once')));
+
+   closed_through = 0;
+   for first = reshape(candidates, 1, [])
+      % Count thermistors whose temperature and positive depth are known at
+      % both endpoints. Two provide the minimum native-profile context needed
+      % to call the target discontinuity reviewed rather than merely suspect.
+      comparable = 0;
+      comparable_names = strings(0, 1);
+      sensor_jumps = zeros(0, 1);
+      depth_jumps = zeros(0, 1);
+      depths_before = zeros(0, 1);
+      depths_after = zeros(0, 1);
+      before_support = strings(0, 1);
+      after_support = strings(0, 1);
+      for name = reshape(thermistors, 1, [])
+         depth_name = "d" + name;
+         if ~ismember(depth_name, names)
+            continue
+         end
+         temperature = aws.(name);
+         depth = aws.(depth_name);
+         pair = first:first + 1;
+         before_valid = isfinite(temperature(first)) ...
+            && isfinite(depth(first)) && depth(first) > 0;
+         after_valid = isfinite(temperature(first + 1)) ...
+            && isfinite(depth(first + 1)) && depth(first + 1) > 0;
+         if before_valid
+            before_support(end + 1, 1) = name; %#ok<AGROW>
+         end
+         if after_valid
+            after_support(end + 1, 1) = name; %#ok<AGROW>
+         end
+         if before_valid && after_valid
+            comparable = comparable + 1;
+            comparable_names(end + 1, 1) = name; %#ok<AGROW>
+            sensor_jumps(end + 1, 1) = ...
+               abs(diff(temperature(pair))); %#ok<AGROW>
+            depth_jumps(end + 1, 1) = ...
+               abs(diff(depth(pair))); %#ok<AGROW>
+            depths_before(end + 1, 1) = depth(first); %#ok<AGROW>
+            depths_after(end + 1, 1) = depth(first + 1); %#ok<AGROW>
+         end
+      end
+      code = 1;
+      if comparable < 2
+         code = 2;
+      end
+      flag(first:first + 1) = max(flag(first:first + 1), code);
+
+      % A large isolated sensor jump can create a persistent derived-target
+      % level shift even after its first missing endpoint. Extend the mask only
+      % when the evidence is unusually strong: at least three comparable native
+      % sensors, exactly one >1 K jump from within 2 m of the 10 m target,
+      % stable other sensors/support/depths, and no return to the pre-jump level
+      % within 24 hours. The next >0.5 m reset of the offending sensor starts a
+      % new independently configured epoch.
+      offender_index = NaN;
+      offender_near_target = false;
+      if comparable > 0
+         [~, offender_index] = max(sensor_jumps);
+         offender_depths = [depths_before(offender_index), ...
+            depths_after(offender_index)];
+         offender_near_target = any(abs(offender_depths - 10) <= 2);
+      end
+      isolated = jump(first) > 4 && comparable >= 3 ...
+         && nnz(sensor_jumps > 1) == 1 ...
+         && median(sensor_jumps) <= 0.25 ...
+         && isequal(before_support, after_support) ...
+         && ~any(depth_jumps > 0.5) && offender_near_target;
+      event_time = aws.Time(first + 1);
+      recovery_window = find(aws.Time > event_time ...
+         & aws.Time <= event_time + hours(24));
+      recovery_offset = find(isfinite(source(recovery_window)) ...
+         & abs(source(recovery_window) - source(first)) <= 1, 1);
+      recovered = ~isempty(recovery_offset);
+      if recovered
+         recovery = recovery_window(recovery_offset);
+         closed_through = max(closed_through, recovery);
+      end
+      % A recovery jump belongs to the transient segment that it closes; do not
+      % reinterpret the same opposite edge as the start of a persistent epoch.
+      if isolated && ~recovered && first >= closed_through
+         offender = comparable_names(offender_index);
+         offender_depth = aws.("d" + offender);
+         depth_step = [false; abs(diff(offender_depth)) > 0.5 ...
+            & isfinite(offender_depth(1:end-1)) ...
+            & isfinite(offender_depth(2:end)) ...
+            & abs(seconds(diff(aws.Time)) - 3600) <= 1];
+         reset = find((1:height(aws))' > first + 1 & depth_step, 1);
+         if isempty(reset)
+            reset = height(aws);
+         end
+         flag(first:reset) = 3;
+      end
+   end
+
+   % Materialize every discontinuity decision in the canonical masked target.
+   clean(flag > 0) = NaN;
+end
+
 function filename = locateStationFile(site, source_dir, timescale)
    %LOCATESTATIONFILE Resolve the station NetCDF, matching site loosely.
    if source_dir == ""
@@ -351,15 +582,5 @@ function value = readGlobalString(filename, attname, fallback)
       value = string(ncreadatt(filename, '/', attname));
    catch
       value = string(fallback);
-   end
-end
-
-function t = ensureUtc(t)
-   %ENSUREUTC Coerce a datetime (or text) to a UTC-zoned datetime.
-   t = datetime(t);
-   if isempty(t.TimeZone)
-      t.TimeZone = 'UTC';
-   else
-      t = datetime(t, 'TimeZone', 'UTC');
    end
 end

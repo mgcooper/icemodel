@@ -30,16 +30,16 @@ function [required, optional, pptunit] = metvariables()
    %
    % The optional set covers source-specific diagnostics the builders
    % pass through when available (rain/snow precipitation split, melt,
-   % runoff, turbulent fluxes, surface temperature, cloud fraction, snow
-   % depth, wind direction).
+   % runoff, surface mass balance, turbulent fluxes, surface temperature,
+   % cloud fraction, snow depth, wind direction, and optional MODIS albedo).
    %
    % See also: icemodel.forcing.helpers.validatemet, icemodel.forcing.data2met,
    %  icemodel.loadmet
 
    required = ["tair", "swd", "lwd", "albedo", "wspd", "rh", "psfc", "ppt"];
 
-   optional = ["rainf", "snowf", "snow_depth", "melt", "runoff", ...
-      "shf", "lhf", "tsfc", "cfrac", "snowd", "wdir"];
+   optional = ["rainf", "snowf", "snow_depth", "melt", "runoff", "smb", ...
+      "shf", "lhf", "tsfc", "cfrac", "snowd", "wdir", "modis"];
 
    % Canonical precipitation-rate unit (water-equivalent metres per second).
    pptunit = "m s-1";

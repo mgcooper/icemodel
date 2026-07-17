@@ -1,10 +1,10 @@
-function info = promicesiteinfo(site)
-   %PROMICESITEINFO Catalog of PROMICE anchor sites for firn evaluation.
+function info = promiceSiteCatalog(site)
+   %PROMICESITECATALOG Return the PROMICE source-site catalog.
    %
-   %  info = icemodel.verification.helpers.promicesiteinfo()
-   %  info = icemodel.verification.helpers.promicesiteinfo("KAN_M")
+   %  info = icemodel.verification.setup.promiceSiteCatalog()
+   %  info = icemodel.verification.setup.promiceSiteCatalog("KAN_M")
    %
-   %  Returns the curated catalog of PROMICE automatic-weather-station anchor
+   %  Returns the curated source catalog of PROMICE automatic-weather-station anchor
    %  sites used to stage firn/snow-evaluation cases. With no arguments, returns
    %  a struct array; with one site argument (canonical id "KAN_M" or compact
    %  alias "kanm") returns the matching scalar struct.
@@ -53,8 +53,10 @@ function info = promicesiteinfo(site)
    %                    could resolve the site (e.g. missing coordinates).
    %    has_recipe      true when buildPromiceData carries a curated
    %                    service-window ablation recipe for the site
-   %    models          co-located model set available at the site, in the
-   %                    canonical order [promice, mar, merra, racmo]
+   %    models          catalog metadata listing the co-located model set in the
+   %                    canonical order [promice, mar, merra, racmo]. This field
+   %                    is not a runtime selector; import APIs use
+   %                    forcing_sources.
    %    note            short provenance note
    %
    %  Site coordinates are NOT stored here: they are read live from the L3
@@ -124,7 +126,9 @@ function info = promicesiteinfo(site)
    %  ===========================================================================
    %
    %  Role
-   %    Catalog metadata used by the firn staging driver and report tooling.
+   %    Family-specific source metadata used by the firn staging driver and
+   %    report tooling. Staged cases are normalized separately through
+   %    icemodel.verification.setup.makeFirnCaseManifestEntry.
    %    Not an argument validator - the driver accepts any PROMICE station id.
    %    Uncataloged station ids fall back to firstPassZone() (a coarse
    %    elevation/location_type heuristic) flagged classification="first_pass".
@@ -134,7 +138,7 @@ function info = promicesiteinfo(site)
    %  icemodel.verification.namelists.evaltarget,
    %  icemodel.verification.namelists.permafrostzone,
    %  icemodel.forcing.readPromiceAws, icemodel.forcing.buildPromiceData,
-   %  icemodel.verification.helpers.snowmipinfo,
+   %  icemodel.verification.setup.esmSnowmipSiteCatalog,
    %  test/interactive/site_classification/classify_site_facies.m
 
    arguments

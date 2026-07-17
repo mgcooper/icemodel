@@ -8,7 +8,8 @@ function tests = test_forcing_batch_equivalence
    % suite is the hard equivalence gate: building 2-3 points the NEW way (one
    % multi-point call) must be byte-identical (isequaln on the variables,
    % times, and CustomProperties) to the OLD way (a loop of single-point
-   % calls). Lanes self-skip when their staged fast fixtures are not on disk.
+   % calls). Payload metadata is part of that equality contract. Lanes self-skip
+   % when their staged fast fixtures are not on disk.
    %
    % Reads the small fixture subset under data/test/forcing. This belongs in
    % regression because it exercises real RCM I/O and batch-vs-loop behavior,
@@ -52,9 +53,12 @@ function test_mar_batch_equals_single_loop(testCase)
       @(p) icemodel.forcing.buildMarData(p, yr, source_dir=src), 'MAR Data');
 
    % The thin met wrapper threads the point list through data2met too.
-   metbatch = icemodel.forcing.buildMarMet(pts, yr, source_dir=src);
+   [metbatch, metmetadata, metData] = ...
+      icemodel.forcing.buildMarMet(pts, yr, source_dir=src);
    verifyBatchEqualsLoop(testCase, metbatch, pts, ...
       @(p) icemodel.forcing.buildMarMet(p, yr, source_dir=src), 'MAR met');
+   verifyMetBatchOutputs(testCase, metbatch, metmetadata, metData, batch, ...
+      'MAR met');
 end
 
 function test_merra_batch_equals_single_loop(testCase)
@@ -69,9 +73,12 @@ function test_merra_batch_equals_single_loop(testCase)
    verifyBatchEqualsLoop(testCase, batch, pts, ...
       @(p) icemodel.forcing.buildMerraData(p, yr, source_dir=src), 'MERRA Data');
 
-   metbatch = icemodel.forcing.buildMerraMet(pts, yr, source_dir=src);
+   [metbatch, metmetadata, metData] = ...
+      icemodel.forcing.buildMerraMet(pts, yr, source_dir=src);
    verifyBatchEqualsLoop(testCase, metbatch, pts, ...
       @(p) icemodel.forcing.buildMerraMet(p, yr, source_dir=src), 'MERRA met');
+   verifyMetBatchOutputs(testCase, metbatch, metmetadata, metData, batch, ...
+      'MERRA met');
 end
 
 function test_racmo_batch_equals_single_loop(testCase)
@@ -112,9 +119,25 @@ function verifyBatchEqualsLoop(testCase, batch, pts, buildOne, label)
    end
 end
 
+function verifyMetBatchOutputs(testCase, met, metadata, Data, expectedData, label)
+   %VERIFYMETBATCHOUTPUTS Enforce the common three-output met-builder contract.
+   testCase.verifyTrue(isstruct(metadata), ...
+      sprintf('%s: metadata must be a struct array', label));
+   testCase.verifySize(metadata, size(met), ...
+      sprintf('%s: metadata must preserve the met collection shape', label));
+   testCase.verifySize(Data, size(met), ...
+      sprintf('%s: Data must preserve the met collection shape', label));
+   for k = 1:numel(met)
+      testCase.verifyEqual(metadata(k), met{k}.Properties.UserData, ...
+         sprintf('%s: metadata %d must equal met UserData', label, k));
+      verifyTimetablesIdentical(testCase, Data{k}, expectedData{k}, ...
+         sprintf('%s source Data %d', label, k));
+   end
+end
+
 function verifyTimetablesIdentical(testCase, a, b, label)
    %VERIFYTIMETABLESIDENTICAL isequaln on variables, times, units, and
-   % the userdata CustomProperties.
+   % the userdata metadata/CustomProperties.
    testCase.verifyEqual(string(a.Properties.VariableNames), ...
       string(b.Properties.VariableNames), ...
       sprintf('%s: variable names differ', label));
@@ -125,6 +148,9 @@ function verifyTimetablesIdentical(testCase, a, b, label)
    testCase.verifyEqual(string(a.Properties.VariableUnits), ...
       string(b.Properties.VariableUnits), ...
       sprintf('%s: variable units differ', label));
+   testCase.verifyTrue(isequaln(a.Properties.UserData, ...
+      b.Properties.UserData), ...
+      sprintf('%s: UserData metadata differ', label));
 
    props = ["X", "Y", "Lat", "Lon", "Elev", "Slope", "ScalarUnits"];
    for q = props

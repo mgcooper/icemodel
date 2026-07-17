@@ -1,13 +1,13 @@
-function values = readObsChannel(pathname, varname, kwargs)
-   %READOBSCHANNEL Read one ESM-SnowMIP-style obs channel with NaN-fill.
+function values = readNetcdfVariable(pathname, varname, kwargs)
+   %READNETCDFVARIABLE Read one ESM-SnowMIP-style NetCDF variable with NaN-fill.
    %
-   %  values = icemodel.verification.setup.readObsChannel(pathname, varname)
-   %  values = icemodel.verification.setup.readObsChannel(pathname, varname, ...
+   %  values = icemodel.verification.setup.readNetcdfVariable(pathname, varname)
+   %  values = icemodel.verification.setup.readNetcdfVariable(pathname, varname, ...
    %     optional=true, ntime=N)
    %
-   %  Reads a NetCDF observation variable and converts upstream sentinel
-   %  fill values (<= -900) to NaN. ESM-SnowMIP and Laugh-Tests both use
-   %  -9999 / -999.99 as missing-value sentinels.
+   %  Reads a NetCDF variable and converts upstream sentinel fill values
+   %  (<= -900) to NaN. ESM-SnowMIP uses -9999 / -999.99 as missing-value
+   %  sentinels in its met and observation files.
    %
    %  When optional=true and the variable is absent from the file, the
    %  function returns an ntime-element NaN column instead of erroring.

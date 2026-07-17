@@ -31,7 +31,8 @@ function [albedo, Time] = readGeusModis(filename, location, method, kwargs)
    %  remap - polygon aggregation "conservative" (default) | "equal"
    %
    % Outputs
-   %  albedo - daily albedo series at the target [-]
+   %  albedo - daily albedo series at the target [-]; undocumented finite 999
+   %           sentinels and other nonphysical samples are returned as NaN
    %  Time   - UTC daily datetime axis (Jan 1 of the file year onward)
    %
    % See also: icemodel.forcing.buildMarData,
@@ -92,11 +93,30 @@ function [albedo, Time] = readGeusModis(filename, location, method, kwargs)
    % flatten the cells column-major (cells x time) so the gridLocation
    % collapse handle reduces it to the target series exactly as it does for
    % the MAR / RACMO / MERRA channels.
-   block = double(ncread(filename, 'albedo', [start 1], [count ndays]));
+   block = ncread(filename, 'albedo', [start 1], [count ndays]);
+   % Raw C6 files do not declare their finite 999 missing-data sentinel. Mask
+   % nonphysical albedo before spatial collapse so no sentinel can contaminate
+   % point interpolation or polygon aggregation.
+   block = icemodel.forcing.helpers.normalizeGeusModisAlbedo(block);
    block = reshape(block, prod(count), ndays);
-   albedo = collapse(block);
+   % Collapse values and their validity weights separately. This preserves a
+   % valid polygon/interpolated mean when only part of the selected slab is
+   % missing, while an entirely missing target/day remains NaN.
+   valid = isfinite(block);
+   block(~valid) = 0;
+   numerator = collapse(block);
+   denominator = collapse(double(valid));
+   albedo = numerator ./ denominator;
+   albedo(denominator <= 0) = NaN;
+   albedo = icemodel.forcing.helpers.normalizeGeusModisAlbedo(albedo);
 
-   tok = regexp(filename, '_(\d{4})_', 'tokens', 'once');
+   % Parse only the source basename: parent work directories can themselves
+   % contain underscore-delimited four-digit tokens unrelated to the product.
+   [~, source_name, source_ext] = fileparts(filename);
+   if strcmpi(source_ext, '.gz')
+      [~, source_name] = fileparts(source_name);
+   end
+   tok = regexp(source_name, '_(\d{4})_', 'tokens', 'once');
    assert(~isempty(tok), ...
       'cannot parse the file year from %s', filename)
    t0 = datetime(str2double(tok{1}), 1, 1, 'TimeZone', 'UTC');

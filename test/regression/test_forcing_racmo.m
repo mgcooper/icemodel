@@ -52,8 +52,10 @@ function test_buildRacmoData_shape_and_channels(testCase)
    testCase.verifyEqual(day(Data.Time([1 end])), [1; 31]);
    testCase.verifyEqual(hour(Data.Time([1 end])), [0; 23]);
    testCase.verifyTrue(all(ismember( ...
-      ["swd", "lwd", "shf", "lhf", "precip", "melt", "runoff", "smb"], ...
+      ["swd", "lwd", "shf", "lhf", "ppt", "melt", "runoff", "smb"], ...
       string(Data.Properties.VariableNames))));
+   testCase.verifyFalse(ismember("precip", ...
+      string(Data.Properties.VariableNames)));
    testCase.verifyTrue(all(isfinite(Data.runoff)));
 
    % Derived albedo (1 - swn/swd) restored and clamped by metchecks.
@@ -100,6 +102,27 @@ function test_buildRacmoData_self_consistent_with_raw_netcdf(testCase)
    raw = raw(year(Time) == testCase.TestData.year);
 
    testCase.verifyEqual(native.swd, raw, 'AbsTol', 1e-9);
+end
+
+function test_buildRacmoData_normalizes_sublimation_sign(testCase)
+   % RACMO stores loss as negative mass change; the public channel uses the
+   % same positive-loss convention as MAR SUH and records both conventions.
+   metadata = testCase.TestData.metadata;
+   native = icemodel.forcing.buildRacmoData([67.067, -48.8355], ...
+      testCase.TestData.year, ...
+      source_dir=testCase.TestData.source_dir, dt="3hr");
+   filename = metadata.source_files(contains(metadata.source_files, "subl"));
+   [raw, ~, Time] = icemodel.forcing.readRacmo2p3(filename, "subl", ...
+      start=metadata.grid_start, count=[1, 1]);
+   raw = reshape(raw, [], 1);
+   raw = raw(year(Time) == testCase.TestData.year);
+
+   testCase.verifyEqual(native.subl, -raw, 'AbsTol', 1e-12);
+   testCase.verifyEqual( ...
+      string(metadata.racmo_subl_native_sign_convention), ...
+      "negative_loss_positive_deposition");
+   testCase.verifyEqual(string(metadata.racmo_subl_sign_convention), ...
+      "positive_loss_negative_deposition");
 end
 
 function test_buildRacmoData_conservative_polygon_rotated(testCase)
@@ -162,10 +185,50 @@ function test_buildRacmoData_mass_flux_units(testCase)
    iu = strcmp(Data.Properties.VariableNames, 'runoff');
    testCase.verifyEqual(Data.Properties.VariableUnits{iu}, 'mWE/h');
 
-   % Precipitation is the canonical m s-1 rate and remains finite.
-   ip = strcmp(Data.Properties.VariableNames, 'precip');
+   % Precipitation is the canonical ppt channel in m s-1, remains finite, and
+   % satisfies the physical nonnegative source-finalization contract.
+   ip = strcmp(Data.Properties.VariableNames, 'ppt');
    testCase.verifyEqual(Data.Properties.VariableUnits{ip}, 'm s-1');
-   testCase.verifyTrue(all(isfinite(Data.precip)));
+   testCase.verifyTrue(all(isfinite(Data.ppt)));
+   testCase.verifyGreaterThanOrEqual(Data.ppt, 0);
+
+   metadata = testCase.TestData.metadata;
+   testCase.verifyEqual(string(metadata.racmo_ppt_qc_method), ...
+      "negative_to_zero");
+   testCase.verifyEqual(string(metadata.racmo_ppt_qc_stage), ...
+      "after_spatial_sampling_and_temporal_interpolation");
+   testCase.verifyGreaterThanOrEqual( ...
+      metadata.racmo_ppt_qc_replaced_count, 0);
+   testCase.verifyGreaterThanOrEqual( ...
+      metadata.racmo_ppt_qc_output_minimum, 0);
+end
+
+function test_buildRacmoData_saved_userdata_keeps_ppt_qc(testCase)
+   % Builder provenance must live on Data itself because writeuserdata saves
+   % Data.Properties.UserData rather than the separate metadata return value.
+   Data = testCase.TestData.Data;
+   metadata = testCase.TestData.metadata;
+   testCase.verifyEqual(Data.Properties.UserData, metadata);
+   qc_fields = string(fieldnames(metadata));
+   qc_fields = qc_fields(startsWith(qc_fields, "racmo_ppt_qc_"));
+   testCase.assertNotEmpty(qc_fields);
+   testCase.verifyGreaterThanOrEqual(Data.ppt, 0);
+
+   % Write and reload an actual window artifact so serialization cannot hide a
+   % builder-only metadata contract that is absent from the saved Data value.
+   outdir = string(tempname);
+   icemodel.helpers.ensureDirExists(outdir);
+   cleanup = onCleanup(@() rmdir(outdir, 's'));
+   filenames = icemodel.forcing.helpers.writeuserdata( ...
+      Data, "racmo_qc", "racmo2.3p3", outdir=outdir, naming="window");
+   testCase.assertNumElements(filenames, 1);
+   saved = load(filenames(1), 'Data');
+   testCase.verifyGreaterThanOrEqual(saved.Data.ppt, 0);
+   for k = 1:numel(qc_fields)
+      field = qc_fields(k);
+      testCase.verifyEqual(saved.Data.Properties.UserData.(field), ...
+         metadata.(field));
+   end
 end
 
 function ref = racmoConservativeReference(source_dir, P, varname, years)

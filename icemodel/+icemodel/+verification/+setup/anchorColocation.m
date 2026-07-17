@@ -34,7 +34,7 @@ function [is_colocated, anchor, distance_km] = anchorColocation(x3413, y3413, kw
       kwargs.anchors = []
       kwargs.output_root (1, 1) string = ""
       kwargs.evaluation_data_root (1, 1) string = ""
-      kwargs.icemodel_config_casename (1, 1) string = "test"
+      kwargs.icemodel_config_casename (1, 1) string = ""
    end
 
    anchors = kwargs.anchors;

@@ -1,8 +1,8 @@
-function coverage = promiceSourceCoverage(models, dirs)
+function coverage = promiceSourceCoverage(sources, dirs)
    %PROMICESOURCECOVERAGE Probe on-disk year coverage of each forcing source.
    %
    %  coverage = icemodel.verification.setup.promiceSourceCoverage( ...
-   %     models, dirs)
+   %     sources, dirs)
    %
    % Probes the available calendar-year span of each requested forcing source
    % directly from the files on disk, so the staging driver can decouple each
@@ -11,7 +11,7 @@ function coverage = promiceSourceCoverage(models, dirs)
    % empty year set with a reason.
    %
    % Inputs
-   %  models  string vector subset of ["promice","mar","merra","racmo"].
+   %  sources string vector subset of ["promice","mar","merra","racmo"].
    %  dirs    struct with the (possibly empty) source directory for each
    %          model: dirs.promice, dirs.mar, dirs.merra, dirs.racmo. Empty
    %          fields fall back to each builder's reference layout (the same
@@ -32,19 +32,19 @@ function coverage = promiceSourceCoverage(models, dirs)
    % See also: icemodel.verification.setup.importPromiceSites
 
    arguments
-      models (1, :) string
+      sources (1, :) string
       dirs (1, 1) struct
    end
 
    coverage = struct();
 
-   if ismember("mar", models)
+   if ismember("mar", sources)
       coverage.mar = probeMar(getfielddefault(dirs, "mar"));
    end
-   if ismember("merra", models)
+   if ismember("merra", sources)
       coverage.merra = probeMerra(getfielddefault(dirs, "merra"));
    end
-   if ismember("racmo", models)
+   if ismember("racmo", sources)
       coverage.racmo = probeRacmo(getfielddefault(dirs, "racmo"));
    end
 end
@@ -72,7 +72,7 @@ end
 function entry = probeMar(source_dir)
    %PROBEMAR On-disk MAR yearly-file coverage (one *-YYYY.nc per year).
    if source_dir == ""
-      source_dir = string(fullfile(icemodel.getpath('data'), 'forcing', 'mar'));
+      source_dir = defaultForcingDir("mar");
       if ~isfolder(source_dir)
          source_dir = "/Volumes/S03/DATA/greenland/mar3p11/RUH2";
       end
@@ -98,7 +98,7 @@ end
 function entry = probeMerra(source_dir)
    %PROBEMERRA On-disk MERRA-2 coverage (intersection across collections).
    if source_dir == ""
-      source_dir = string(fullfile(icemodel.getpath('data'), 'forcing', 'merra2'));
+      source_dir = defaultForcingDir("merra2");
       if ~isfolder(source_dir)
          source_dir = "/Volumes/S03/DATA/merra2/1hrly/ncfiles";
       end
@@ -141,7 +141,7 @@ end
 function entry = probeRacmo(source_dir)
    %PROBERACMO On-disk RACMO coverage (union of FGRN11 archive spans).
    if source_dir == ""
-      source_dir = string(fullfile(icemodel.getpath('data'), 'forcing', 'racmo'));
+      source_dir = defaultForcingDir("racmo");
       if ~isfolder(source_dir)
          % Default to the SUBSURFACE product (2012-2018), matching
          % buildRacmoData's default. The surface "no_subsurf_en" product only
@@ -176,4 +176,10 @@ function entry = probeRacmo(source_dir)
       years = [years, y0:y1]; %#ok<AGROW>
    end
    entry = yearsCoverage(years);
+end
+
+function source_dir = defaultForcingDir(name)
+   %DEFAULTFORCINGDIR Repo-local default forcing source directory.
+   source_dir = string(fullfile(icemodel.internal.fullpath('data'), ...
+      'forcing', name));
 end

@@ -22,7 +22,7 @@ function names = caseManifestFieldNames()
       "evaluation_file"
       "reference_file"
       "native_timestep"
-      "comparison_window"
+      "period"
       "comparison_variables"
       "observation_variables"
       "notes"];

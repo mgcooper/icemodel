@@ -60,7 +60,10 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    % Ice temperatures: tice1..ticeN from the L3 t_i_* string (surfaced
    % thermistors discarded, clamped to the dictionary physical range in
    % icemodel.forcing.readPromiceAws) plus tice10m, the PRIMARY standardized
-   % 10 m subsurface-temperature evaluation channel.
+   % 10 m subsurface-temperature evaluation channel. The paired dtice1..dticeN
+   % channels preserve each sensor's evolving depth. tice10m_source preserves
+   % GEUS's unmodified derived value and tice10m_qc_flag records the explicit
+   % discontinuity review; the canonical tice10m masks flagged endpoints.
    %
    % tice10m COMPARISON PROTOCOL (the primary subsurface channel). tice10m is
    % GEUS's standardized 10 m-BELOW-the-EVOLVING-SURFACE temperature: GEUS
@@ -74,10 +77,17 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    % comparison channel; the raw tice1..N string needs the per-sensor d_t_i_N
    % depths to place each reading and is SECONDARY / diagnostic.
    %
-   % Gap policy: observational channels are NOT gap-filled (missing data
-   % stays missing so evaluations are honest); the physical-range clamps of
-   % metchecks are still applied. The surface-height channel additionally
-   % carries the gap flag described above.
+   % Radiation policy: public swd/swu prefer pypromice's tilt/bias-corrected
+   % dsr_cor/usr_cor values, fall back to the raw measurement where corrected
+   % values are unavailable, and clamp any remaining finite negative selected
+   % value to zero. readPromiceAws still exposes the source-faithful raw and
+   % corrected channels, while artifact metadata records exact selection counts.
+   %
+   % Gap policy: only missing shortwave intervals wholly below deep civil night
+   % become physical zero. Other missing observations stay missing so
+   % evaluations remain honest; the physical-range clamps of metchecks are still
+   % applied. The surface-height channel additionally carries the gap flag
+   % described above.
    %
    % Inputs
    %  site - station id ("KAN_M" or compact alias "kanm")
@@ -92,7 +102,8 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    %             Slope, ScalarUnits). Common channels: tair, tsfc [K]; swd,
    %             swu, lwd, lwu, swn, lwn, netr, shf, lhf, thf [W m-2]; albedo,
    %             cfrac [-]; rh [%]; wspd [m s-1]; wdir [deg]; psfc [Pa];
-   %             tice1..ticeN, tice10m [K]. Surface-height channels are
+   %             tice1..ticeN, tice10m, tice10m_source [K], dtice1..dticeN [m],
+   %             and tice10m_qc_flag [1]. Surface-height channels are
    %             site-type dependent: ABLATION sites carry ablation +
    %             snow_depth [m]; ACCUMULATION sites carry surface_height [m].
    %             Either carries the surface flag channels: surface_height_flag
@@ -122,14 +133,63 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
       source_dir=kwargs.source_dir, timescale="hourly", ...
       startdate=kwargs.startdate, enddate=kwargs.enddate);
 
+   % Use one corrected-first shortwave selection for observational Data and the
+   % met builder. Missing radiation is derived as zero only when the complete
+   % source hour is below deep civil twilight; daylight/twilight outages stay
+   % missing. Only channels represented by the source product are added, so an
+   % absent observational channel remains absent instead of becoming data.
+   [public_swd, public_swu, shortwave_meta] = ...
+      icemodel.forcing.helpers.promiceShortwave(aws, fill_darkness=true, ...
+      latitude=source_meta.lat, longitude=source_meta.lon, ...
+      swd_source_file_observations_present= ...
+      source_meta.swd_source_file_observations_present, ...
+      swu_source_file_observations_present= ...
+      source_meta.swu_source_file_observations_present);
+   if shortwave_meta.swd_source_present ...
+         || shortwave_meta.swd_corrected_source_present
+      aws.swd = public_swd;
+   end
+   if shortwave_meta.swu_source_present ...
+         || shortwave_meta.swu_corrected_source_present
+      aws.swu = public_swu;
+   end
+
+   % Record whether the source supplied finite albedo observations. Unlike the
+   % forcing builder, observational Data never fills an absent/all-missing
+   % channel or a temporal gap.
+   has_albedo_source = ismember("albedo", ...
+      string(aws.Properties.VariableNames));
+   has_albedo_observations = has_albedo_source ...
+      && any(isfinite(aws.albedo), 'all');
+   if has_albedo_observations
+      albedo_policy = ...
+         "albedo retains PROMICE L3 observations; missing samples remain " + ...
+         "missing; physical-range clamp only";
+   elseif has_albedo_source
+      albedo_policy = ...
+         "albedo = NaN placeholder (PROMICE L3 albedo is all missing); no observations invented";
+   else
+      albedo_policy = ...
+         "albedo = NaN placeholder (PROMICE L3 albedo source channel " + ...
+         "absent); no observations invented";
+   end
+
    % Derived net fluxes. Sparse stations may ship no radiation or turbulent-
    % flux channels, so each derived term is computed only when its inputs are
    % present (a missing input drops the derived channel rather than erroring).
    % has() is re-bound after channels are added so terms that build on a
    % derived channel (netr on swn/lwn) see it.
    has = @(v) ismember(v, string(aws.Properties.VariableNames));
+   swn_negative_invalid_count = 0;
    if has("swd") && has("swu")
       aws.swn = aws.swd - aws.swu;
+
+      % Net shortwave cannot be negative at the surface. Preserve the selected
+      % component observations, but mark their physically inconsistent derived
+      % net flux missing so evaluation totals do not consume bad radiometry.
+      invalid_swn = isfinite(aws.swn) & aws.swn < 0;
+      swn_negative_invalid_count = nnz(invalid_swn);
+      aws.swn(invalid_swn) = NaN;
    end
    if has("lwd") && has("lwu")
       aws.lwn = aws.lwd - aws.lwu;
@@ -175,7 +235,7 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    % recover a transition as a coincident step. The window clamp uses the L3
    % record bounds (source_meta), so an install outside this station's record is
    % excluded.
-   info = icemodel.verification.helpers.promicesiteinfo(site);
+   info = icemodel.verification.setup.promiceSiteCatalog(site);
    composing_stations = info.stations;
    [transition_times, transition_record] = ...
       icemodel.forcing.helpers.stationTransitionTimes(composing_stations, ...
@@ -280,21 +340,33 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    % Order the output channels (the ice-temperature string is variable
    % length). Thermistor channels with no finite samples (sensors absent on
    % this station's record) are dropped; tice10m is the primary subsurface
-   % evaluation channel and is kept first in the string block.
+   % evaluation channel and is kept first in the string block. Its source and
+   % QC channels remain adjacent diagnostics, not members of the sensor string.
    awsnames = string(aws.Properties.VariableNames);
-   tice = awsnames(startsWith(awsnames, "tice") & awsnames ~= "tice10m");
+   tice_diagnostics = ["tice10m", "tice10m_source", "tice10m_qc_flag"];
+   tice = awsnames(startsWith(awsnames, "tice") ...
+      & ~ismember(awsnames, tice_diagnostics));
    tice = tice(arrayfun(@(v) any(isfinite(aws.(v))), tice));
+   dtice = awsnames(~cellfun('isempty', ...
+      regexp(cellstr(awsnames), '^dtice\d+$', 'once')));
+   dtice = dtice(arrayfun(@(v) any(isfinite(aws.(v))), dtice));
+   % Keep the canonical channel even when a surgical window is wholly masked;
+   % dropping it would break the source/target/flag contract precisely where QC
+   % has determined that no canonical samples are usable.
    tice10m = awsnames(awsnames == "tice10m");
-   tice10m = tice10m(arrayfun(@(v) any(isfinite(aws.(v))), tice10m));
+   tice10m_diagnostics = intersect(["tice10m_source", ...
+      "tice10m_qc_flag"], awsnames, 'stable');
    channels = ["tair", "tsfc", "swd", "swu", "lwd", "lwu", "swn", ...
       "lwn", "netr", "shf", "lhf", "thf", "albedo", "cfrac", "rh", ...
-      "wspd", "wdir", "psfc", surf_channels, tice10m, tice];
+      "wspd", "wdir", "psfc", surf_channels, tice10m, ...
+      tice10m_diagnostics, tice, dtice];
    channels = channels(ismember(channels, awsnames));
    Data = aws(:, cellstr(channels));
 
-   % Physical-range clamps only; observational gaps stay missing. The gap
-   % flag is a 0/1 mask: metchecks leaves it untouched (not a clamp var, and
-   % fillgaps=false), so it stays a faithful per-sample quality mask.
+   % Apply physical-range clamps without interpolation. Observational gaps stay
+   % missing except the explicit whole-hour deep-night shortwave zeros selected
+   % above. The gap flag is a 0/1 mask: metchecks leaves it untouched (not a
+   % clamp var, and fillgaps=false), so it stays a faithful per-sample mask.
    [Data, checks] = icemodel.forcing.helpers.metchecks(Data, ...
       fillgaps=false);
 
@@ -306,7 +378,8 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
       % series still reports the size of any step that day.
       flag_channels = intersect(["surface_height_flag", ...
          "station_transition_flag", "step_detected_flag", ...
-         "step_correctable_flag"], string(Data.Properties.VariableNames));
+         "step_correctable_flag", "tice10m_qc_flag"], ...
+         string(Data.Properties.VariableNames));
       flags_daily = retime(Data(:, cellstr(flag_channels)), 'daily', 'max');
       if ismember("step_magnitude", string(Data.Properties.VariableNames))
          mag_daily = retime(Data(:, "step_magnitude"), 'daily', ...
@@ -319,30 +392,54 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
       if ismember("step_magnitude", string(Data.Properties.VariableNames))
          Data.step_magnitude = mag_daily.step_magnitude;
       end
+      % A daily mean must not revive a canonical target on a day containing an
+      % invalid hourly discontinuity; the source daily mean remains available.
+      if all(ismember(["tice10m", "tice10m_qc_flag"], ...
+            string(Data.Properties.VariableNames)))
+         Data.tice10m(Data.tice10m_qc_flag > 0) = NaN;
+      end
    end
 
    % Per-variable units from the shared canonical map.
    Data.Properties.VariableUnits = icemodel.forcing.helpers.variableUnits( ...
       string(Data.Properties.VariableNames));
 
-   % Location metadata for the Data-file (userdata) contract.
-   proj = icemodel.forcing.helpers.psnProjection();
-   [x, y] = projfwd(proj, source_meta.lat, source_meta.lon);
-   Data = addprop(Data, ...
-      {'X', 'Y', 'Lat', 'Lon', 'Elev', 'Slope', 'ScalarUnits'}, ...
-      repmat({'table'}, 1, 7));
-   Data.Properties.CustomProperties.X = x;
-   Data.Properties.CustomProperties.Y = y;
-   Data.Properties.CustomProperties.Lat = source_meta.lat;
-   Data.Properties.CustomProperties.Lon = source_meta.lon;
-   Data.Properties.CustomProperties.Elev = source_meta.elev;
-   Data.Properties.CustomProperties.Slope = NaN;
-   Data.Properties.CustomProperties.ScalarUnits = ...
-      ["m", "m", "degrees N", "degrees W", "m asl", "m/m"];
+   % Attach the same location schema used by every forcing-family Data builder.
+   location_metadata = struct( ...
+      'lat_wgs84', source_meta.lat, 'lon_wgs84', source_meta.lon, ...
+      'elev_m', source_meta.elev);
+   Data = icemodel.forcing.helpers.attachLocationMetadata( ...
+      Data, location_metadata);
 
    metadata = source_meta;
    metadata.checks = checks;
    metadata.frequency = kwargs.frequency;
+   if ismember("tice10m_qc_flag", string(Data.Properties.VariableNames))
+      % Reader counts describe hourly source samples; artifact counts must match
+      % the emitted cadence (daily flags aggregate by max).
+      metadata.tice10m_qc_flagged_sample_count = ...
+         nnz(Data.tice10m_qc_flag > 0);
+      metadata.tice10m_qc_failed_sample_count = ...
+         nnz(Data.tice10m_qc_flag == 1);
+      metadata.tice10m_qc_unreviewed_sample_count = ...
+         nnz(Data.tice10m_qc_flag >= 2);
+      metadata.tice10m_qc_persistent_sample_count = ...
+         nnz(Data.tice10m_qc_flag == 3);
+   end
+
+   % Carry source-faithful radiation provenance into both userdata and the
+   % observations.mat timetable that reuses this exact Data product.
+   fields = fieldnames(shortwave_meta);
+   for k = 1:numel(fields)
+      metadata.(fields{k}) = shortwave_meta.(fields{k});
+   end
+   metadata.albedo_source_present = has_albedo_source;
+   metadata.albedo_observations_present = has_albedo_observations;
+   metadata.albedo_policy = albedo_policy;
+   metadata.swn_negative_invalid_count = swn_negative_invalid_count;
+   metadata.swn_policy = "swd - swu; finite negative derived net shortwave " ...
+      + "is physically inconsistent and remains NaN; component observations " ...
+      + "remain source-faithful";
    metadata.site_surface_type = surface_meta.site_surface_type;
    metadata.surface_channel = surface_meta.surface_channel;
    metadata.surface_source = surface_meta.surface_source;
@@ -372,12 +469,16 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    % AWS-handover windows. The step_* channels stage de-stepping DETECTION only;
    % the de-stepping CORRECTION is opt-in at analysis time via
    % icemodel.forcing.destepSurface (default: correct UNAMBIGUOUS steps only).
-   metadata.gap_policy = ["no gap fill (observational); clamps applied; " ...
+   metadata.gap_policy = ["no temporal interpolation (observational); " ...
+      "missing shortwave is zero only for whole-hour deep civil night; " ...
+      "other source gaps remain missing; clamps applied; " ...
       "surface_height_flag=1 marks gap-bridged samples (RATE-based " ...
       "diagnostics exclude them; cumulative/visual comparison uses the full " ...
       "series). station_transition_flag marks AWS-handover windows. step_* " ...
       "channels stage de-stepping DETECTION; correction is opt-in via " ...
       "icemodel.forcing.destepSurface (default: unambiguous steps only)."];
+   metadata = icemodel.forcing.helpers.columnizeMetadata(metadata);
+   Data.Properties.UserData = metadata;
 end
 
 %% Local functions

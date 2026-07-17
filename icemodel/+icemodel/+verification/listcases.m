@@ -6,7 +6,7 @@ function cases = listcases(kwargs)
    %
    % Inputs
    %  evaluation_data_root       Base evaluation-data root. When blank, the
-   %                             path is resolved from icemodel.config.
+   %                             repo-local data/eval tree is used.
    %  icemodel_config_casename   Config casename used to resolve the default
    %                             evaluation-data root without mutating config.
    %  dataset_family             Optional family filter, for example
@@ -22,7 +22,8 @@ function cases = listcases(kwargs)
 
    arguments
       kwargs.evaluation_data_root (1, 1) string = ""
-      kwargs.icemodel_config_casename (1, 1) string = "test"
+      kwargs.input_data_root (1, 1) string = ""
+      kwargs.icemodel_config_casename (1, 1) string = ""
       kwargs.dataset_family (1, 1) string ...
          {icemodel.verification.validators.mustBeDatasetFamilyFilter} = ""
    end
@@ -43,7 +44,7 @@ function cases = listcases(kwargs)
          continue
       end
 
-      group = resolveFamilyCases(family);
+      group = resolveFamilyCases(family, kwargs.input_data_root);
       if isempty(group)
          continue
       end
@@ -103,7 +104,7 @@ function tf = skipFamily(family, dataset_family)
       family.dataset_family ~= dataset_family;
 end
 
-function cases = resolveFamilyCases(family)
+function cases = resolveFamilyCases(family, input_data_root)
    %RESOLVEFAMILYCASES Resolve one family's case entries.
    %
    % family.cases may arrive as a scalar struct (single-case families
@@ -113,19 +114,24 @@ function cases = resolveFamilyCases(family)
    % column even when only one case exists.
 
    entries = reshape(family.cases, [], 1);
+   if isempty(entries)
+      cases = struct([]);
+      return
+   end
    if isscalar(entries)
-      cases = resolveCase(entries, family);
+      cases = resolveCase(entries, family, input_data_root);
       return
    end
 
-   resolved_rows = repmat(resolveCase(entries(1), family), numel(entries), 1);
+   resolved_rows = repmat(resolveCase(entries(1), family, input_data_root), ...
+      numel(entries), 1);
    for n = 1:numel(entries)
-      resolved_rows(n) = resolveCase(entries(n), family);
+      resolved_rows(n) = resolveCase(entries(n), family, input_data_root);
    end
    cases = resolved_rows;
 end
 
-function resolved = resolveCase(entry, family)
+function resolved = resolveCase(entry, family, input_data_root)
    %RESOLVECASE Combine family metadata with one case entry.
 
    % Copy case-local metadata first, then add family-level provenance.
@@ -137,6 +143,8 @@ function resolved = resolveCase(entry, family)
    resolved.retrieval_date = family.retrieval_date;
    resolved.manifest_path = family.manifest_path;
    resolved.family_root = family.family_root;
+   resolved.input_data_root = resolvedInputRoot(family.family_root, ...
+      input_data_root);
 
    % Resolve relative artifact paths at read time so manifests stay portable
    % inside demo/data while workflow functions receive absolute paths. The firn
@@ -152,6 +160,22 @@ function resolved = resolveCase(entry, family)
    end
    resolved.reference_path = resolveCasePath(family.family_root, entry, ...
       'reference_file');
+end
+
+function input_root = resolvedInputRoot(family_root, input_data_root)
+   %RESOLVEDINPUTROOT Prefer explicit input roots over sibling inference.
+   if input_data_root ~= ""
+      input_root = char(input_data_root);
+   else
+      input_root = siblingInputRoot(family_root);
+   end
+end
+
+function input_root = siblingInputRoot(family_root)
+   %SIBLINGINPUTROOT Infer the paired input root from an eval family root.
+   eval_root = fileparts(string(family_root));
+   output_root = fileparts(eval_root);
+   input_root = char(fullfile(output_root, 'input'));
 end
 
 function pathname = resolveObsFile(family_root, entry)

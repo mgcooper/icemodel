@@ -1,4 +1,4 @@
-function source_dir = fetchEsmSnowmip(kwargs)
+function [source_dir, status] = fetchEsmSnowmip(kwargs)
    %FETCHESMSNOWMIP Locate or verify the ESM-SnowMIP source NetCDF files.
    %
    %  source_dir = icemodel.verification.setup.fetchEsmSnowmip()
@@ -40,10 +40,12 @@ function source_dir = fetchEsmSnowmip(kwargs)
    %      mode in CI.
    %
    %  Role
-   %    Validator. The fetch helper guarantees the cache directory
-   %    exists and that every site's met/obs file pair is present and
-   %    readable, so downstream importers / builders can assume the
-   %    layout is correct without repeating per-file checks.
+   %    Validator. With create_cache_dir=true, the fetch helper creates the
+   %    cache directory before checking every site's met/obs pair. With false,
+   %    it reports the same status without mutation. A successful strict result
+   %    lets downstream importers/builders assume the layout is complete.
+   %    An empty sitenames selection returns an empty status without creating or
+   %    scanning cache_dir.
    %
    %  Name-value
    %    cache_dir : string (default data/verification/esm_snowmip)
@@ -56,10 +58,14 @@ function source_dir = fetchEsmSnowmip(kwargs)
    %    silent : logical (default false)
    %        Suppress the retrieval-instructions printout when files
    %        are missing.
+   %    create_cache_dir : logical (default true)
+   %        Create the resolved cache directory before validation.
    %
    %  Returns
    %    source_dir : string
    %        Absolute path to the cache directory.
+   %    status : struct array
+   %        Shared fetch-status rows describing missing cache items.
    %
    % See also: icemodel.verification.setup.importEsmSnowmip,
    %  icemodel.verification.setup.fetchLaughTests,
@@ -71,71 +77,68 @@ function source_dir = fetchEsmSnowmip(kwargs)
          icemodel.verification.namelists.snowmipsite()
       kwargs.strict   (1, 1) logical = true
       kwargs.silent   (1, 1) logical = false
+      kwargs.create_cache_dir (1, 1) logical = true
    end
 
-   cache_dir = kwargs.cache_dir;
+   cache_dir = icemodel.verification.setup.resolveFetchCacheDir( ...
+      kwargs.cache_dir, defaultCacheDir());
 
-   % Ensure the cache directory exists so users following the retrieval
-   % banner can drop files into a path that is already there.
-   icemodel.helpers.ensureDirExists(cache_dir);
+   % Cache creation is explicit so dry-run callers can remain non-mutating.
+   if kwargs.create_cache_dir && ~isempty(kwargs.sitenames)
+      icemodel.helpers.ensureDirExists(cache_dir);
+   end
 
-   % Per-site presence + readability check. Each ESM-SnowMIP site needs one met
-   % (forcing) and one obs (evaluation) NetCDF; both are located by glob match
-   % against the canonical PANGAEA naming pattern so year-stamped filenames do
-   % not need to be hard-coded.
+   % Build cache status before strict handling.
    [missing, broken] = missingOrBrokenFiles(cache_dir, kwargs.sitenames);
-
-   ok = isempty(missing) && isempty(broken);
-   if ok
-      source_dir = string(cache_dir);
-      return
-   end
-
-   % Print actionable retrieval instructions when files are missing
-   % or broken. The banner format is stable so developers can grep
-   % for it and so it cannot be confused with a regular error.
-   if ~kwargs.silent
-      fprintf('\n');
-      fprintf('=== ESM-SnowMIP source cache incomplete ===\n');
-      fprintf('Cache directory: %s\n', cache_dir);
-      if ~isempty(missing)
-         fprintf('Missing file patterns:\n');
-         for j = 1:numel(missing)
-            fprintf('  - %s\n', missing(j));
-         end
-      end
-      if ~isempty(broken)
-         fprintf('Unreadable NetCDF files (partial download):\n');
-         for j = 1:numel(broken)
-            fprintf('  - %s\n', broken(j));
-         end
-      end
-      fprintf('\nRetrieval:\n');
-      fprintf('  Reference: Menard et al. 2019, ESSD\n');
-      fprintf('             https://doi.org/10.5194/essd-11-865-2019\n');
-      fprintf('  Data DOI:  https://doi.org/10.1594/PANGAEA.897575\n');
-      fprintf('  Bundle:    "All ESM-SnowMIP netCDF files in one zip" on PANGAEA.\n');
-      fprintf('  Manual workflow: download the zip and extract met_insitu_*.nc\n');
-      fprintf('  and obs_insitu_*.nc into the cache directory.\n');
-      fprintf('\nAfter retrieval, re-run:\n');
-      fprintf('  icemodel.verification.setup.fetchEsmSnowmip()\n');
-      fprintf('  icemodel.verification.setup.importEsmSnowmip(source_dir, overwrite=true)\n');
-      fprintf('\n');
-   end
-
-   if kwargs.strict
-      error('icemodel:verification:fetchEsmSnowmip:missingSources', ...
-         ['ESM-SnowMIP source cache incomplete in %s. Missing: %s. ' ...
-         'Unreadable: %s. See retrieval instructions above.'], ...
-         cache_dir, ...
-         strjoin(missing, ', '), ...
-         strjoin(broken, ', '));
-   end
-
-   source_dir = string(cache_dir);
+   failures = [missing(:); broken(:)];
+   status = icemodel.verification.setup.fetchMissingStatus(failures);
+   source_dir = icemodel.verification.setup.finishFetchStatus( ...
+      cache_dir, status, strict=kwargs.strict, silent=kwargs.silent, ...
+      error_id="icemodel:verification:fetchEsmSnowmip:missingSources", ...
+      error_label="ESM-SnowMIP", ...
+      banner_callback=@(root, ~, ~) printRetrievalBanner(root, missing, broken), ...
+      error_callback=@(root, ~, ~) throwMissingSources(root, missing, broken));
 end
 
 %% Local helpers
+function printRetrievalBanner(cache_dir, missing, broken)
+   %PRINTRETRIEVALBANNER Print ESM-SnowMIP retrieval instructions.
+   fprintf('\n');
+   fprintf('=== ESM-SnowMIP source cache incomplete ===\n');
+   fprintf('Cache directory: %s\n', cache_dir);
+   if ~isempty(missing)
+      fprintf('Missing file patterns:\n');
+      for j = 1:numel(missing)
+         fprintf('  - %s\n', missing(j));
+      end
+   end
+   if ~isempty(broken)
+      fprintf('Unreadable NetCDF files (partial download):\n');
+      for j = 1:numel(broken)
+         fprintf('  - %s\n', broken(j));
+      end
+   end
+   fprintf('\nRetrieval:\n');
+   fprintf('  Reference: Menard et al. 2019, ESSD\n');
+   fprintf('             https://doi.org/10.5194/essd-11-865-2019\n');
+   fprintf('  Data DOI:  https://doi.org/10.1594/PANGAEA.897575\n');
+   fprintf('  Bundle:    "All ESM-SnowMIP netCDF files in one zip" on PANGAEA.\n');
+   fprintf('  Manual workflow: download the zip and extract met_insitu_*.nc\n');
+   fprintf('  and obs_insitu_*.nc into the cache directory.\n');
+   fprintf('\nAfter retrieval, re-run:\n');
+   fprintf('  icemodel.verification.setup.fetchEsmSnowmip()\n');
+   fprintf('  icemodel.verification.setup.importEsmSnowmip(source_dir, overwrite=true)\n');
+   fprintf('\n');
+end
+
+function throwMissingSources(cache_dir, missing, broken)
+   %THROWMISSINGSOURCES Raise the ESM-SnowMIP missing-cache error.
+   error('icemodel:verification:fetchEsmSnowmip:missingSources', ...
+      ['ESM-SnowMIP source cache incomplete in %s. Missing: %s. ' ...
+      'Unreadable: %s. See retrieval instructions above.'], ...
+      cache_dir, strjoin(missing, ', '), strjoin(broken, ', '));
+end
+
 function pathname = defaultCacheDir()
    %DEFAULTCACHEDIR Canonical ESM-SnowMIP source-cache directory.
    %

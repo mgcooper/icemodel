@@ -9,88 +9,74 @@ function [source_dir, status] = fetchImau(kwargs)
    %  Cache validator for the IMAU hourly S21/S22/S23 network plus the daily
    %  19-site SEB product used for QA/provenance. It does not auto-download in
    %  tests; it reports the DOI landing URLs and validates local files.
+   %  An empty products selection returns an empty status without creating or
+   %  scanning cache_dir.
 
    arguments
       kwargs.cache_dir (1, 1) string = defaultCacheDir()
-      kwargs.products (1, :) string = ["hourly", "daily"]
+      kwargs.products (1, :) string = ...
+         icemodel.verification.setup.fetchProductNames(productRegistry())
       kwargs.strict (1, 1) logical = true
       kwargs.silent (1, 1) logical = false
+      kwargs.create_cache_dir (1, 1) logical = true
    end
 
-   cache_dir = kwargs.cache_dir;
-   icemodel.helpers.ensureDirExists(cache_dir);
+   % Validate the registry selection before cache creation or discovery.
+   icemodel.verification.setup.mustBeKnownFetchProducts( ...
+      kwargs.products, productRegistry(), ...
+      "icemodel:verification:fetchImau:unknownProduct", "IMAU");
 
-   % Build status first so callers can use this as a dry-run retrieval manifest.
+   % Resolve and optionally create the family cache root.
+   cache_dir = icemodel.verification.setup.resolveFetchCacheDir( ...
+      kwargs.cache_dir, defaultCacheDir());
+   if kwargs.create_cache_dir && ~isempty(kwargs.products)
+      icemodel.helpers.ensureDirExists(cache_dir);
+   end
+
+   % Build family-specific cache rows before shared strict handling.
    status = productStatus(cache_dir, kwargs.products);
-   missing = string({status(~[status.present]).product});
-
-   if isempty(missing)
-      source_dir = cache_dir;
-      return
-   end
-
-   % The banner keeps the two PANGAEA products distinct: hourly sites are the
-   % case inventory, daily stations are QA/provenance only.
-   if ~kwargs.silent
-      fprintf('\n');
-      fprintf('=== IMAU source cache incomplete ===\n');
-      fprintf('Cache directory: %s\n', cache_dir);
-      fprintf('Missing products: %s\n', strjoin(missing, ', '));
-      fprintf('\nRetrieval:\n');
-      for k = 1:numel(status)
-         fprintf('  %-6s DOI: %s\n', status(k).product, status(k).doi);
-         fprintf('         URL: %s\n', status(k).landing_url);
-      end
-      fprintf('\nPlace downloaded files under cache_dir/<product>/ or use files\n');
-      fprintf('whose names contain the product token.\n\n');
-   end
-
-   if kwargs.strict
-      error('icemodel:verification:fetchImau:missingSources', ...
-         'IMAU source cache incomplete in %s. Missing: %s', ...
-         cache_dir, strjoin(missing, ', '));
-   end
-
-   source_dir = cache_dir;
+   source_dir = icemodel.verification.setup.finishFetchStatus( ...
+      cache_dir, status, strict=kwargs.strict, silent=kwargs.silent, ...
+      error_id="icemodel:verification:fetchImau:missingSources", ...
+      error_label="IMAU", banner_callback=@(cache_dir, status, missing) ...
+      icemodel.verification.setup.printFetchProductBanner( ...
+      cache_dir, status, missing, "IMAU"));
 end
 
 function pathname = defaultCacheDir()
    %DEFAULTCACHEDIR Canonical IMAU source-cache directory.
-   pathname = string(fullfile(icemodel.getpath('data'), ...
-      'verification', 'imau'));
+   pathname = icemodel.forcing.helpers.verificationSourceDir("", "imau");
 end
 
 function status = productStatus(cache_dir, products)
    %PRODUCTSTATUS Return one validation/URL row per requested IMAU product.
-   status = repmat(productRow("", "", cache_dir), 1, numel(products));
-   for k = 1:numel(products)
-      status(k) = productRow(products(k), productDoi(products(k)), cache_dir);
-   end
+   status = icemodel.verification.setup.buildFetchProductStatus( ...
+      cache_dir, products, productRegistry(), @productRow);
 end
 
-function row = productRow(product, doi, cache_dir)
+function row = productRow(cache_dir, product, doi)
    %PRODUCTROW Build one stable status row.
-   product_dir = fullfile(cache_dir, product);
-   files = [dir(fullfile(product_dir, '*')); ...
-      dir(fullfile(cache_dir, "*" + product + "*"))];
-   files = files(~[files.isdir]);
-   row = struct( ...
-      'product', product, ...
-      'doi', doi, ...
-      'landing_url', "https://doi.org/" + doi, ...
-      'present', ~isempty(files), ...
-      'cache_dir', string(product_dir));
-end
-
-function doi = productDoi(product)
-   %PRODUCTDOI Map IMAU products to PANGAEA DOI ids.
    switch string(product)
       case "hourly"
-         doi = "10.1594/PANGAEA.971647";
+         patterns = [fullfile("hourly", "*.tab"), "*.tab", ...
+            fullfile("**", "*.tab")];
+         row = icemodel.verification.setup.fetchProductStatusRow( ...
+            cache_dir, product, doi, patterns, ...
+            exclude_folders=filesep + "daily", exclude_names="GRL_");
       case "daily"
-         doi = "10.1594/PANGAEA.970127";
+         patterns = [fullfile("daily", "GRL_*_AWS.tab"), ...
+            "GRL_*_AWS.tab", fullfile("**", "GRL_*_AWS.tab")];
+         row = icemodel.verification.setup.fetchProductStatusRow( ...
+            cache_dir, product, doi, patterns);
       otherwise
-         error('icemodel:verification:fetchImau:unknownProduct', ...
-            'unknown IMAU product: %s', product);
+         row = icemodel.verification.setup.fetchProductStatusRow( ...
+            cache_dir, product, doi, "*" + product + "*");
    end
+end
+
+function registry = productRegistry()
+   %PRODUCTREGISTRY Keep IMAU selectors and DOI provenance in one table.
+   registry = [ ...
+      "hourly", "10.1594/PANGAEA.971647"
+      "daily", "10.1594/PANGAEA.970127"];
 end

@@ -28,7 +28,7 @@ function met = data2met(Data, kwargs)
    % Name-value
    %  validate : assert the met contract on the result (default true)
    %  fillwithmissing : add absent required met channels as NaN placeholders
-   %                    before validation (default false)
+   %                    before validation (default true)
    %
    % Outputs
    %  met - timetable ready for icemodel.forcing.helpers.writemet
@@ -46,7 +46,7 @@ function met = data2met(Data, kwargs)
    arguments
       Data timetable
       kwargs.validate (1, 1) logical = true
-      kwargs.fillwithmissing (1, 1) logical = false
+      kwargs.fillwithmissing (1, 1) logical = true
    end
 
    met = Data;

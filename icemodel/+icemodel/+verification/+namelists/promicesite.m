@@ -16,14 +16,14 @@ function sites = promicesite(source_dir)
    %  consumer needing the full set - importPromiceSites' default-sites path,
    %  analysis scripts, tests - calls this rather than re-globbing or hardcoding.
    %  For the per-site catalog (zone, eval_target, coords) use
-   %  icemodel.verification.helpers.promicesiteinfo.
+   %  icemodel.verification.setup.promiceSiteCatalog.
    %
    % Input
    %  source_dir  Optional PROMICE product directory. Default is
    %              data/verification/promice; the /hour subfolder is appended when
    %              present (the hourly product carries the <STATION>_hour.nc files).
    %
-   % See also: icemodel.verification.helpers.promicesiteinfo,
+   % See also: icemodel.verification.setup.promiceSiteCatalog,
    %  icemodel.verification.setup.importPromiceSites,
    %  icemodel.verification.namelists.snowmipsite
 

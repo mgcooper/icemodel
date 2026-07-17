@@ -2,7 +2,7 @@ function tests = test_firn_verification_contracts
    %TEST_FIRN_VERIFICATION_CONTRACTS Verify the firn-evaluation contracts.
    %
    % Exercises the firn_observational lane end to end against the committed
-   % co-located PROMICE firn cases under demo/data/eval/promice/:
+   % co-located PROMICE firn cases under data/eval/promice/:
    %   - listcases enumerates the firn family alongside the snow families;
    %   - each firn manifest's case_type validates against the namelist;
    %   - the candidate adapter resolves the declared comparison variables;
@@ -17,8 +17,8 @@ function tests = test_firn_verification_contracts
 end
 
 function setupOnce(testCase)
-   % Install the canonical test/demo config (resolves the demo/data eval root)
-   % and require the committed firn cases to be present.
+   % Install the canonical test environment and require the staged firn cases to
+   % be present under the normal top-level data/eval tree.
 
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.cleanup = cleanup;
@@ -49,7 +49,7 @@ function setupOnce(testCase)
    testCase.TestData.expected_accum_sumup_ids = "egp";
    sumup_cases = icemodel.verification.listcases(dataset_family="sumup");
    testCase.assertNotEmpty(sumup_cases, ...
-      'no staged sumup firn cases enumerated; committed fixture missing');
+      'no staged sumup firn cases enumerated under top-level data/eval');
    testCase.TestData.sumup_cases = sumup_cases;
 end
 
@@ -115,7 +115,7 @@ end
 
 function test_each_firn_case_carries_valid_surface_zone(testCase)
    % Every promice firn case must carry a surface_zone single-sourced from
-   % promicesiteinfo and validating against the canonical (glaciological-zone-
+   % promiceSiteCatalog and validating against the canonical (glaciological-zone-
    % only) namelist. The KAN transect zones are pinned: kanl=ablation,
    % kanm=ablation, kanu=percolation. bare_ice / seasonal_snow are NOT zones.
 
@@ -136,14 +136,14 @@ function test_each_firn_case_carries_valid_surface_zone(testCase)
          sprintf('%s surface_zone mismatch', id));
       % The manifest must agree with the single source of truth.
       testCase.verifyEqual(zone, ...
-         string(icemodel.verification.helpers.promicesiteinfo( ...
+         string(icemodel.verification.setup.promiceSiteCatalog( ...
          manifest.site_id).surface_zone));
    end
 end
 
 function test_each_firn_case_carries_valid_permafrost_zone(testCase)
    % Every promice firn case carries a permafrost_zone (ORTHOGONAL to
-   % surface_zone) single-sourced from promicesiteinfo and validating against the
+   % surface_zone) single-sourced from promiceSiteCatalog and validating against the
    % canonical namelist. The KAN anchors sit on the ice sheet (not permafrost
    % ground) so all three are "none".
 
@@ -165,14 +165,14 @@ function test_each_firn_case_carries_valid_permafrost_zone(testCase)
          sprintf('%s (KAN ice-sheet anchor) permafrost_zone should be none', id));
       % The manifest must agree with the single source of truth.
       testCase.verifyEqual(pfz, string( ...
-         icemodel.verification.helpers.promicesiteinfo( ...
+         icemodel.verification.setup.promiceSiteCatalog( ...
          manifest.site_id).permafrost_zone));
    end
 end
 
 function test_each_firn_case_carries_valid_eval_target(testCase)
    % Every promice firn case must carry an eval_target string array single-
-   % sourced from promicesiteinfo and validating against the eval_target
+   % sourced from promiceSiteCatalog and validating against the eval_target
    % namelist. KAN pins: kanl/kanm=["seasonal_snow","bare_ice"],
    % kanu=["seasonal_snow","firn"].
 
@@ -191,7 +191,7 @@ function test_each_firn_case_carries_valid_eval_target(testCase)
          sprintf('%s eval_target mismatch', id));
       % The manifest must agree with the single source of truth.
       testCase.verifyEqual(sort(target(:)), sort(string( ...
-         icemodel.verification.helpers.promicesiteinfo( ...
+         icemodel.verification.setup.promiceSiteCatalog( ...
          manifest.site_id).eval_target(:))));
    end
 end
@@ -215,13 +215,17 @@ function test_manifest_is_metadata_only(testCase)
       testCase.verifyTrue(all(ismember(needed, string(fieldnames(manifest)))), ...
          sprintf('%s manifest missing a canonical firn field', id));
 
-      % Source ids recorded by name (not bundled data).
-      testCase.verifyTrue(all(ismember(["promice", "mar", "merra"], ...
-         string(manifest.forcing_sources))), ...
-         sprintf('%s forcing_sources incomplete', id));
-      testCase.verifyTrue(all(ismember(["promice_obs", "mar", "merra", "racmo"], ...
-         string(manifest.eval_sources))), ...
-         sprintf('%s eval_sources incomplete', id));
+      % Source lists are informational and must match currently staged,
+      % compatible colocation legs; stale/incompatible RCM legs are not exposed.
+      [forcing_sources, eval_sources] = ...
+         icemodel.verification.setup.colocationSourceLists( ...
+         manifest.colocation);
+      testCase.verifyEqual(sort(string(manifest.forcing_sources)), ...
+         sort(forcing_sources), sprintf('%s forcing_sources drifted', id));
+      testCase.verifyEqual(sort(string(manifest.eval_sources)), ...
+         sort(eval_sources), sprintf('%s eval_sources drifted', id));
+      testCase.verifyTrue(ismember("promice_obs", string(manifest.eval_sources)), ...
+         sprintf('%s missing promice_obs eval source', id));
 
       % NO bundled evaluation.mat / reference.mat colocation copy on disk.
       testCase.verifyFalse(isfile(fullfile(family_root, id, "evaluation.mat")), ...
@@ -239,6 +243,8 @@ function test_candidate_adapter_resolves_declared_firn_variables(testCase)
 
    manifest = icemodel.verification.loadmanifest("kanm");
    vars = string(manifest.comparison_variables);
+   vars = vars(ismember(vars, ["ablation", "snow_depth", "tsfc"]) ...
+      | startsWith(vars, "tice"));
 
    % Build a small synthetic icemodel output covering the declared axes.
    time = (datetime(2013, 6, 1, 0, 0, 0) + hours(0:5))';
@@ -293,6 +299,10 @@ function test_candidate_adapter_resolves_declared_firn_variables(testCase)
       testCase.verifyTrue(ismember(tv, resolved), ...
          sprintf('thermistor axis %s not resolved by firn adapter', tv));
    end
+   if ismember("tice10m", resolved)
+      zidx = min(size(ice2.T, 1), round(10 / dz) + 1);
+      testCase.verifyEqual(candidate.data.tice10m, ice2.T(zidx, :)');
+   end
 end
 
 function test_comparecase_soft_gate_no_hard_fail(testCase)
@@ -328,7 +338,8 @@ function test_colocated_files_resolve_on_disk(testCase)
    % standard icemodel input layout. Colocation is recorded as metadata
    % (manifest.colocation) pointing at these individual files, NOT a bundle.
 
-   input_root = icemodel.verification.helpers.inputDataRoot();
+   input_root = icemodel.verification.helpers.inputDataRoot( ...
+      icemodel_config_casename="");
    met_dir = fullfile(input_root, 'met');
    ud_dir = fullfile(input_root, 'userdata');
 
@@ -336,19 +347,10 @@ function test_colocated_files_resolve_on_disk(testCase)
       manifest = icemodel.verification.loadmanifest(id);
       cf = manifest.colocation;
 
-      % All four model legs are recorded as colocation metadata.
-      testCase.verifyTrue(all(isfield(cf, ...
-         {'promice', 'mar', 'merra', 'racmo'})), ...
-         sprintf('%s colocation missing a model leg', id));
-
-      % Met files (promice/mar/merra) resolve under met/.
+      % Met files and Data files resolve when a compatible leg declares them.
       verifyFilesResolve(testCase, met_dir, cf.promice.met_files, id, "promice met");
-      verifyFilesResolve(testCase, met_dir, cf.mar.met_files, id, "mar met");
-      verifyFilesResolve(testCase, met_dir, cf.merra.met_files, id, "merra met");
-
-      % Data files (promice/racmo) resolve under userdata/.
       verifyFilesResolve(testCase, ud_dir, cf.promice.data_files, id, "promice data");
-      verifyFilesResolve(testCase, ud_dir, cf.racmo.data_files, id, "racmo data");
+      verifyOptionalLegFiles(testCase, cf, met_dir, ud_dir, id);
    end
 end
 
@@ -369,7 +371,7 @@ end
 
 function test_sumup_cases_inherit_kan_zone_and_target(testCase)
    % The KAN-co-located SUMup cases inherit the anchor classification from
-   % promicesiteinfo (the single source of truth): kanl/kanm=ablation +
+   % promiceSiteCatalog (the single source of truth): kanl/kanm=ablation +
    % [seasonal_snow,bare_ice]; kanu=percolation + [seasonal_snow,firn]. All
    % three carry permafrost_zone=none (KAN ice-sheet anchors).
 
@@ -385,7 +387,7 @@ function test_sumup_cases_inherit_kan_zone_and_target(testCase)
    for id = testCase.TestData.expected_sumup_ids'
       manifest = icemodel.verification.loadmanifest(id, dataset_family="sumup");
       exp = expected.(char(id));
-      anchor = icemodel.verification.helpers.promicesiteinfo(exp.site);
+      anchor = icemodel.verification.setup.promiceSiteCatalog(exp.site);
 
       zone = string(manifest.surface_zone);
       testCase.verifyTrue(ismember(zone, zone_ok), ...
@@ -503,7 +505,7 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
 
    nz = 40;
    n = 6;
-   time = (datetime(2013, 6, 1) + hours(0:n - 1))';
+   time = (datetime(2014, 9, 15, 'TimeZone', 'UTC') + days(0:n - 1))';
    ice1 = struct("Time", time, "smb", linspace(0, 0.2, n)');
    ice2 = struct( ...
       "T", 263.15 + repmat((0:nz - 1)' * 0.05, 1, n), ...
@@ -527,15 +529,142 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
 
    % Density profile rho(z) resolves with a depth axis.
    testCase.verifyTrue(isfield(candidate.data, 'density'));
-   testCase.verifyEqual(candidate.data.density.value, ice2.ro_sno);
+   testCase.verifyTrue(istable(candidate.data.density));
+   testCase.verifyEqual(candidate.data.density.density, ice2.ro_sno);
+   testCase.verifyEqual(unique(candidate.data.density.datetime), time(1));
 
-   % Subsurface temperature profile T(z,t) resolves in degrees C.
+   % Subsurface temperature profile T(z,t) preserves every dated column in
+   % degrees C rather than silently retaining only the first model timestamp.
    testCase.verifyTrue(isfield(candidate.data, 'subsurface_temperature'));
-   testCase.verifyEqual(candidate.data.subsurface_temperature, ice2.T - Tf);
+   testCase.verifyTrue(istable(candidate.data.subsurface_temperature));
+   testCase.verifyEqual( ...
+      candidate.data.subsurface_temperature.subsurface_temperature, ...
+      ice2.T(:) - Tf);
+   testCase.verifyEqual( ...
+      numel(unique(candidate.data.subsurface_temperature.datetime)), n);
 
    % SMB axis maps from ice1.smb.
    testCase.verifyTrue(isfield(candidate.data, 'smb'));
-   testCase.verifyEqual(candidate.data.smb, ice1.smb);
+   testCase.verifyTrue(istimetable(candidate.data.smb));
+   testCase.verifyEqual(candidate.data.smb.smb, ice1.smb);
+
+   % A short synthetic model snippet maps SMB but cannot compare against a full
+   % annual SUMup interval until the candidate covers that interval.
+   result = icemodel.verification.comparecase("kanu", ...
+      dataset_family="sumup", candidate=candidate, make_plot=false);
+   smb_row = result.metrics(result.metrics.variable == "smb", :);
+   testCase.verifyFalse(any(string(smb_row.status) == "ok"));
+
+   % RCM/native SMB candidates are hourly rates; comparecase must integrate
+   % them to the observed SUMup interval total instead of averaging the rate.
+   loaded = icemodel.verification.helpers.loadArtifact( ...
+      manifest.evaluation_path, "targets");
+   observed_smb = loaded.data.smb;
+   idx = find(isfinite(observed_smb.smb), 1, 'first');
+   testCase.assertNotEmpty(idx);
+   interval_time = (observed_smb.start_date(idx):hours(1): ...
+      observed_smb.end_date(idx) - hours(1))';
+   sparse_candidate = struct("data", timetable( ...
+      [observed_smb.start_date(idx); observed_smb.end_date(idx)], ...
+      [0; 0], 'VariableNames', {'smb'}));
+   result = icemodel.verification.comparecase("kanu", ...
+      dataset_family="sumup", candidate=sparse_candidate, make_plot=false);
+   smb_row = result.metrics(result.metrics.variable == "smb", :);
+   testCase.verifyFalse(any(string(smb_row.status) == "ok"));
+
+   interval_rate = observed_smb.smb(idx) / numel(interval_time);
+   rcm_candidate = struct("data", timetable(interval_time, ...
+      repmat(interval_rate, numel(interval_time), 1), ...
+      'VariableNames', {'smb'}));
+   result = icemodel.verification.comparecase("kanu", ...
+      dataset_family="sumup", candidate=rcm_candidate, make_plot=false);
+   smb_row = result.metrics(result.metrics.variable == "smb", :);
+   testCase.verifyEqual(smb_row.rmse, 0, 'AbsTol', 1e-12);
+
+   % SMB-only profile bundles still need the profile-bundle candidate shape;
+   % otherwise comparecase receives a timeseries candidate for a profile target.
+   adapter_manifest.comparison_variables = "smb";
+   candidate = icemodel.verification.candidateFromIcemodelOutput( ...
+      ice1, ice2, opts, adapter_manifest);
+   testCase.verifyEqual(string(candidate.format), "subsurface_profile_bundle");
+   testCase.verifyTrue(isfield(candidate.data, 'smb'));
+   testCase.verifyFalse(isfield(candidate.data, 'density'));
+end
+
+function test_profile_compare_aligns_timetable_target_to_table_candidate(testCase)
+   % SUMup temperature observations are timetables with a depth column, while
+   % model profile candidates are depth tables. comparecase should align these
+   % by depth before falling back to time axes.
+   eval_root = fullfile(testCase.TestData.tmpdir, 'mixed-profile-eval');
+   case_root = fullfile(eval_root, 'sumup', 'mixedtemp');
+   icemodel.helpers.ensureDirExists(case_root);
+
+   Time = (datetime(2012, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') ...
+      + hours(0:2))';
+   target = timetable(Time, [1; 2; 3], [10; 20; 30], ...
+      'VariableNames', {'depth', 'subsurface_temperature'});
+   targets = struct('format', 'subsurface_profile_bundle', ...
+      'data', struct('subsurface_temperature', target), ...
+      'metadata', struct('source', 'mixed schema fixture'));
+   save(fullfile(case_root, 'observations.mat'), 'targets');
+   writeMixedProfileManifest(eval_root);
+
+   candidate_profile = table([1; 2; 3], [11; 21; 31], ...
+      'VariableNames', {'depth', 'subsurface_temperature'});
+   candidate = struct('data', ...
+      struct('subsurface_temperature', candidate_profile));
+
+   result = icemodel.verification.comparecase("mixedtemp", ...
+      evaluation_data_root=eval_root, dataset_family="sumup", ...
+      candidate=candidate, make_plot=false);
+   row = result.metrics(result.metrics.variable == ...
+      "subsurface_temperature", :);
+
+   testCase.verifyEqual(string(row.status), "ok");
+   testCase.verifyEqual(row.n, uint64(3));
+   testCase.verifyEqual(row.rmse, 1, 'AbsTol', 1e-12);
+end
+
+function test_plotcase_plots_sumup_interval_smb(testCase)
+   % SUMup SMB targets are interval tables, not depth profiles. plotcase should
+   % still render them through the profile-bundle plotting path.
+   eval_root = fullfile(testCase.TestData.tmpdir, 'smb-interval-eval');
+   case_root = fullfile(eval_root, 'sumup', 'smbinterval');
+   icemodel.helpers.ensureDirExists(case_root);
+
+   smb = table( ...
+      datetime(2012, 1, 1, 'TimeZone', 'UTC'), ...
+      datetime(2013, 1, 1, 'TimeZone', 'UTC'), ...
+      0.42, 'VariableNames', {'start_date', 'end_date', 'smb'});
+   targets = struct('format', 'subsurface_profile_bundle', ...
+      'data', struct('smb', smb), ...
+      'metadata', struct('source', 'interval fixture'));
+   save(fullfile(case_root, 'observations.mat'), 'targets');
+   writeIntervalSmbManifest(eval_root);
+
+   f = icemodel.verification.plotcase("smbinterval", ...
+      evaluation_data_root=eval_root, dataset_family="sumup", ...
+      source="targets", visible="off");
+   testCase.addTeardown(@() close(f));
+
+   lines = findobj(f, 'Type', 'Line');
+   testCase.verifyNotEmpty(lines);
+   x = lines(1).XData;
+   testCase.verifyEqual(x(1), smb.start_date(1));
+   testCase.verifyEqual(x(end), smb.end_date(1));
+   ax = findobj(f, 'Type', 'Axes');
+   testCase.verifyTrue(all(arrayfun(@(one) string(one.YDir) == "normal", ax)));
+
+   candidate_time = datetime(2012, 7, 1, 'TimeZone', 'UTC');
+   candidate = struct('data', timetable(candidate_time, 0.39, ...
+      'VariableNames', {'smb'}));
+   f_compare = icemodel.verification.plotcase("smbinterval", ...
+      evaluation_data_root=eval_root, dataset_family="sumup", ...
+      source="compare", candidate=candidate, visible="off");
+   testCase.addTeardown(@() close(f_compare));
+
+   testCase.verifyGreaterThanOrEqual( ...
+      numel(findobj(f_compare, 'Type', 'Line')), 2);
 end
 
 function test_committed_accum_firn_fixtures_enumerate(testCase)
@@ -557,7 +686,7 @@ end
 function test_all_committed_promice_fixtures_validate(testCase)
    % DATA-DRIVEN contract: EVERY committed promice firn fixture (KAN transect +
    % the egp accumulation fixture) must validate against the canonical
-   % namelists AND agree with promicesiteinfo (the single source of truth) for
+   % namelists AND agree with promiceSiteCatalog (the single source of truth) for
    % case_type / surface_zone / eval_target / permafrost_zone. This enumerates
    % the fixtures rather than hard-coding KAN-specific values, so new committed
    % firn-accumulation cases are validated automatically.
@@ -570,7 +699,7 @@ function test_all_committed_promice_fixtures_validate(testCase)
    for case_entry = reshape(testCase.TestData.firn_cases, 1, [])
       id = string(case_entry.case_id);
       manifest = icemodel.verification.loadmanifest(id, dataset_family="promice");
-      anchor = icemodel.verification.helpers.promicesiteinfo(manifest.site_id);
+      anchor = icemodel.verification.setup.promiceSiteCatalog(manifest.site_id);
 
       testCase.verifyEqual(string(manifest.case_type), "firn_observational", ...
          sprintf('%s case_type', id));
@@ -581,19 +710,19 @@ function test_all_committed_promice_fixtures_validate(testCase)
       testCase.verifyTrue(ismember(zone, zone_ok), ...
          sprintf('%s surface_zone "%s" not in namelist', id, zone));
       testCase.verifyEqual(zone, string(anchor.surface_zone), ...
-         sprintf('%s surface_zone disagrees with promicesiteinfo', id));
+         sprintf('%s surface_zone disagrees with promiceSiteCatalog', id));
 
       target = string(manifest.eval_target);
       testCase.verifyTrue(all(ismember(target, target_ok)), ...
          sprintf('%s eval_target not in namelist', id));
       testCase.verifyEqual(sort(target(:)), sort(string(anchor.eval_target(:))), ...
-         sprintf('%s eval_target disagrees with promicesiteinfo', id));
+         sprintf('%s eval_target disagrees with promiceSiteCatalog', id));
 
       pfz = string(manifest.permafrost_zone);
       testCase.verifyTrue(ismember(pfz, pfz_ok), ...
          sprintf('%s permafrost_zone "%s" not in namelist', id, pfz));
       testCase.verifyEqual(pfz, string(anchor.permafrost_zone), ...
-         sprintf('%s permafrost_zone disagrees with promicesiteinfo', id));
+         sprintf('%s permafrost_zone disagrees with promiceSiteCatalog', id));
    end
 end
 
@@ -621,7 +750,8 @@ function test_accum_firn_colocation_files_resolve_on_disk(testCase)
    % (promice/mar/merra met + promice/racmo Data) must resolve on disk under the
    % standard icemodel input layout, exactly as the KAN fixtures do.
 
-   input_root = icemodel.verification.helpers.inputDataRoot();
+   input_root = icemodel.verification.helpers.inputDataRoot( ...
+      icemodel_config_casename="");
    met_dir = fullfile(input_root, 'met');
    ud_dir = fullfile(input_root, 'userdata');
 
@@ -629,17 +759,15 @@ function test_accum_firn_colocation_files_resolve_on_disk(testCase)
       manifest = icemodel.verification.loadmanifest(id, dataset_family="promice");
       cf = manifest.colocation;
       verifyFilesResolve(testCase, met_dir, cf.promice.met_files, id, "promice met");
-      verifyFilesResolve(testCase, met_dir, cf.mar.met_files, id, "mar met");
-      verifyFilesResolve(testCase, met_dir, cf.merra.met_files, id, "merra met");
       verifyFilesResolve(testCase, ud_dir, cf.promice.data_files, id, "promice data");
-      verifyFilesResolve(testCase, ud_dir, cf.racmo.data_files, id, "racmo data");
+      verifyOptionalLegFiles(testCase, cf, met_dir, ud_dir, id);
    end
 end
 
 function test_all_committed_sumup_fixtures_resolve(testCase)
    % DATA-DRIVEN contract: every committed sumup fixture (KAN + egp) must be
    % a firn_observational case whose obs bundle resolves on disk and whose
-   % anchor classification agrees with promicesiteinfo.
+   % anchor classification agrees with promiceSiteCatalog.
 
    case_types = icemodel.verification.namelists.casetype();
    for case_entry = reshape(testCase.TestData.sumup_cases, 1, [])
@@ -657,17 +785,81 @@ function test_all_committed_sumup_fixtures_resolve(testCase)
          sprintf('%s sumup obs bundle missing: %s', id, ...
          case_entry.evaluation_path));
 
-      % Anchor classification (when co-located) matches promicesiteinfo.
-      anchor = icemodel.verification.helpers.promicesiteinfo(manifest.site_id);
-      if strlength(string(manifest.surface_zone)) > 0
-         testCase.verifyEqual(string(manifest.surface_zone), ...
-            string(anchor.surface_zone), ...
-            sprintf('%s sumup surface_zone disagrees with anchor', id));
+      % Anchor classification (when co-located) matches promiceSiteCatalog.
+      is_colocated = isfield(manifest.colocation, 'anchor') ...
+         && isfield(manifest.colocation.anchor, 'is_colocated') ...
+         && logical(manifest.colocation.anchor.is_colocated);
+      if is_colocated && strlength(string(manifest.surface_zone)) > 0
+         anchor = icemodel.verification.setup.promiceSiteCatalog(manifest.site_id);
+         if string(anchor.surface_zone) ~= "unknown"
+            testCase.verifyEqual(string(manifest.surface_zone), ...
+               string(anchor.surface_zone), ...
+               sprintf('%s sumup surface_zone disagrees with anchor', id));
+         end
       end
    end
 end
 
 %% Local helpers
+function writeMixedProfileManifest(eval_root)
+   %WRITEMIXEDPROFILEMANIFEST Write a tiny SUMup manifest for comparecase.
+   values = { ...
+      'mixedtemp'
+      'firn_observational'
+      'MIXED_TEMP'
+      'MIXED_TEMP'
+      'accumulation'
+      {'firn'}
+      'none'
+      struct('lat_wgs84', 67, 'lon_wgs84', -48, ...
+      'x_epsg3413', 0, 'y_epsg3413', 0, 'elev_m', 1000)
+      struct('start', '2012-01-01 00:00:00', ...
+      'end', '2012-01-01 02:00:00')
+      'mixedtemp/observations.mat'
+      {}
+      {'sumup_obs'}
+      {'subsurface_temperature'}
+      struct('present_groups', {{'subsurface_temperature'}}, ...
+      'native_variables', {{'temperature'}})
+      struct('sumup', struct('kind', 'firn_profile_obs', 'staged', true))
+      'irregular'
+      'mixed profile comparison fixture'};
+   entry = icemodel.verification.setup.makeFirnCaseManifestEntry(values);
+   manifest = icemodel.verification.setup.makeFamilyManifest( ...
+      "sumup", "", "", "tiny", "today", entry);
+   icemodel.verification.setup.writeManifest( ...
+      fullfile(eval_root, 'sumup', 'manifest.json'), manifest);
+end
+
+function writeIntervalSmbManifest(eval_root)
+   %WRITEINTERVALSMBMANIFEST Write a tiny SUMup SMB manifest for plotcase.
+   values = { ...
+      'smbinterval'
+      'firn_observational'
+      'SMB_INTERVAL'
+      'SMB_INTERVAL'
+      'accumulation'
+      {'firn'}
+      'none'
+      struct('lat_wgs84', 67, 'lon_wgs84', -48, ...
+      'x_epsg3413', 0, 'y_epsg3413', 0, 'elev_m', 1000)
+      struct('start', '2012-01-01 00:00:00', ...
+      'end', '2013-01-01 00:00:00')
+      'smbinterval/observations.mat'
+      {}
+      {'sumup_obs'}
+      {'smb'}
+      struct('present_groups', {{'smb'}}, 'native_variables', {{'smb'}})
+      struct('sumup', struct('kind', 'firn_profile_obs', 'staged', true))
+      'irregular'
+      'interval SMB plotting fixture'};
+   entry = icemodel.verification.setup.makeFirnCaseManifestEntry(values);
+   manifest = icemodel.verification.setup.makeFamilyManifest( ...
+      "sumup", "", "", "tiny", "today", entry);
+   icemodel.verification.setup.writeManifest( ...
+      fullfile(eval_root, 'sumup', 'manifest.json'), manifest);
+end
+
 function verifyFilesResolve(testCase, base, names, id, label)
    %VERIFYFILESRESOLVE Assert each relative filename resolves under base.
    names = string(names);
@@ -677,5 +869,21 @@ function verifyFilesResolve(testCase, base, names, id, label)
    for nm = reshape(names, 1, [])
       testCase.verifyTrue(exist(fullfile(base, nm), 'file') == 2, ...
          sprintf('%s %s file missing on disk: %s', id, label, nm));
+   end
+end
+
+function verifyOptionalLegFiles(testCase, cf, met_dir, ud_dir, id)
+   %VERIFYOPTIONALLEGFILES Resolve files only for compatible declared RCM legs.
+   for src = ["mar", "merra", "racmo"]
+      if ~isfield(cf, src)
+         continue
+      end
+      leg = cf.(char(src));
+      if isfield(leg, 'met_files')
+         verifyFilesResolve(testCase, met_dir, leg.met_files, id, src + " met");
+      end
+      if isfield(leg, 'data_files')
+         verifyFilesResolve(testCase, ud_dir, leg.data_files, id, src + " data");
+      end
    end
 end

@@ -1,8 +1,8 @@
-function info = snowmipinfo(sitename)
-   %SNOWMIPINFO Canonical ESM-SnowMIP site catalog (richer than the namelist).
+function info = esmSnowmipSiteCatalog(sitename)
+   %ESMSNOWMIPSITECATALOG Return the ESM-SnowMIP source-site catalog.
    %
-   %  info = icemodel.verification.helpers.snowmipinfo()
-   %  info = icemodel.verification.helpers.snowmipinfo("cdp")
+   %  info = icemodel.verification.setup.esmSnowmipSiteCatalog()
+   %  info = icemodel.verification.setup.esmSnowmipSiteCatalog("cdp")
    %
    %  Returns the canonical ESM-SnowMIP site catalog. With no arguments,
    %  returns a struct array covering all 10 reference sites; with one
@@ -21,7 +21,9 @@ function info = snowmipinfo(sitename)
    %  (https://doi.org/10.1594/PANGAEA.897575).
    %
    %  Role
-   %    Catalog metadata used by importers and report tooling. The pure
+   %    Family-specific source metadata used by importers and report tooling.
+   %    Staged cases are normalized separately through
+   %    icemodel.verification.setup.makeCaseManifestEntry. The pure
    %    site-name list (suitable for argument validation) lives in
    %    icemodel.verification.namelists.snowmipsite.
    %
@@ -68,6 +70,7 @@ function info = snowmipinfo(sitename)
    match = string({catalog.sitename}) == sitename;
    if ~any(match)
       valid = strjoin([catalog.sitename], ', ');
+      % Preserve the established identifier across the catalog rename.
       error('icemodel:verification:snowmipinfo:unknown', ...
          'unknown ESM-SnowMIP sitename %s. Valid: %s', sitename, valid);
    end

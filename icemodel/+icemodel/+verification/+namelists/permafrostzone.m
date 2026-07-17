@@ -27,7 +27,7 @@ function permafrost_zones = permafrostzone()
    %    isolated       0-10%   (EXTENT "I")
    %
    % See also: icemodel.verification.namelists.surfacezone,
-   %  icemodel.verification.helpers.promicesiteinfo
+   %  icemodel.verification.setup.promiceSiteCatalog
 
    % Keep this explicit so adding a zone is a deliberate schema change. Ordered
    % most-to-least extensive (continuous through isolated), then "none" for

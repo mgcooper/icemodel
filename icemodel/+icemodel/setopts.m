@@ -27,8 +27,12 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  FORCINGS - a string scalar indicating the forcing data. Standard values
    %  include the climate-model forcings "mar", "merra", and "racmo", plus
    %  supported met station runs such as "kanm" and "kanl". "promice" is the
-   %  generic PROMICE/GC-Net AWS station-met source (a met_<site>_promice file
+   %  generic PROMICE AWS station-met source (a met_<site>_promice file
    %  staged by the verification builders), where the site is named by SITENAME;
+   %  "gcnet" is the Vandecrux GC-Net gap-filled surface/SEB source for RetMIP
+   %  Dye-2-long and Summit (2 m T/RH, 10 m wind); "imau", "retmip", and
+   %  "esm_snowmip" are native verification-staged sources with source-specific
+   %  height policy;
    %  the legacy per-station convention (forcings == sitename, met_<site>_<site>)
    %  is still accepted. Users who wish to add new forcing files can update the
    %  icemodel.namelists definitions used throughout the repository.
@@ -79,6 +83,9 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  Setting a non-empty value (via name/value override or resetopts) bypasses
    %  the lookup and uses the supplied value instead. This is the intended
    %  mechanism for sensitivity analyses and site-specific calibration.
+   %  USERDATAFNAME is an optional cell/string list of exact staged Data files.
+   %  When nonempty it is authoritative for external met-channel swapping; the
+   %  default empty list keeps legacy site/source/year filename discovery.
    %
    % Outputs
    %
@@ -315,7 +322,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    % Forcing-dependent observation heights for the turbulent-flux scheme.
    switch forcings
-      case 'mar'
+      case {'mar', 'mar3.11'}
          opts.z_tair = 2.0;
          opts.z_wind = 10.0;
 
@@ -333,7 +340,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
          opts.z_tair = 2.6;
          opts.z_wind = 2.6;
 
-      case 'merra'
+      case {'merra', 'merra2'}
          opts.z_tair = 2.0;
          opts.z_wind = 2.0;
 
@@ -345,6 +352,29 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
          % path (those ARE PROMICE stations) with the documented boom height.
          opts.z_tair = 2.6;
          opts.z_wind = 2.6;
+
+      case 'gcnet'
+         % Vandecrux GC-Net surface/SEB files expose Ta_2m and WS_10m, so use
+         % standard 2 m T/RH and 10 m wind heights rather than the PROMICE
+         % single-boom convention.
+         opts.z_tair = 2.0;
+         opts.z_wind = 10.0;
+
+      case 'imau'
+         % IMAU hourly AWS files provide air temperature at standard screen
+         % height and FF10 wind speed at 10 m.
+         opts.z_tair = 2.0;
+         opts.z_wind = 10.0;
+
+      case 'retmip'
+         % RetMIP-native met files are staged under one runtime source label,
+         % but their measurement heights follow the native source for the case.
+         [opts.z_tair, opts.z_wind] = retmipObservationHeights(sitename);
+
+      case 'esm_snowmip'
+         % ESM-SnowMIP met files use the standard near-surface forcing heights.
+         opts.z_tair = 2.0;
+         opts.z_wind = 2.0;
 
       otherwise
          % Assume standard heights for other forcings.
@@ -454,6 +484,24 @@ function opts = initopts(smbmodel, sitename, simyears, forcings, ...
    opts.pathrestart = [];
    opts.casename = [];
    opts.metfname = {};
+   opts.userdatafname = {};
    opts.vars1 = {};
    opts.vars2 = {};
+end
+
+function [z_tair, z_wind] = retmipObservationHeights(sitename)
+   %RETMIPOBSERVATIONHEIGHTS Measurement heights for RetMIP native met cases.
+   token = lower(regexprep(string(sitename), '[\s_\-]', ''));
+   switch token
+      case {"dye2long", "dye2", "dy2", "dye22016", "dye216", ...
+            "summit", "sum", "fa"}
+         z_tair = 2.0;
+         z_wind = 10.0;
+      case {"kanu", "kan"}
+         z_tair = 2.6;
+         z_wind = 2.6;
+      otherwise
+         z_tair = 2.0;
+         z_wind = 2.0;
+   end
 end

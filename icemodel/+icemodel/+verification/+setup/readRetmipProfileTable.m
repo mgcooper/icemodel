@@ -67,4 +67,28 @@ function data = readSimpleDelimitedTable(filename)
       end
    end
    data.Properties.VariableNames = cellstr(names);
+   data = canonicalProfileNames(data);
+end
+
+function data = canonicalProfileNames(data)
+   %CANONICALPROFILENAMES Use verification variable names for stored columns.
+   data = renameProfileAlias(data, ["depth", "z", "depth_m"], "depth");
+   data = renameProfileAlias(data, ["density", "density_kgm3", "rho"], ...
+      "density");
+   data = renameProfileAlias(data, ["temperature", "temp", "t"], ...
+      "subsurface_temperature");
+   data = renameProfileAlias(data, ["lwc", "liquid_water_content"], "lwc");
+end
+
+function data = renameProfileAlias(data, aliases, canonical)
+   %RENAMEPROFILEALIAS Rename the first accepted alias when needed.
+   names = string(data.Properties.VariableNames);
+   if ismember(canonical, names)
+      return
+   end
+   lower_names = lower(names);
+   hit = find(ismember(lower_names, lower(aliases)), 1);
+   if ~isempty(hit)
+      data = renamevars(data, names(hit), canonical);
+   end
 end

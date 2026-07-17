@@ -1,4 +1,4 @@
-function name = findEnclosingWindowFile(directory, prefix, suffix, qstart, qend)
+function name = findEnclosingWindowFile(directory, prefix, suffix, qstart, qend, kwargs)
    %FINDENCLOSINGWINDOWFILE Name of a staged window file bracketing a query span.
    %
    %  name = icemodel.forcing.helpers.findEnclosingWindowFile(DIRECTORY, ...
@@ -6,7 +6,9 @@ function name = findEnclosingWindowFile(directory, prefix, suffix, qstart, qend)
    %
    % Returns the file name PREFIX_<YYYYMMDD>_<YYYYMMDD>SUFFIX in DIRECTORY whose
    % encoded period [file-start 00:00, file-end 23:59:59] CONTAINS the query span
-   % [QSTART, QEND], or "" when none matches. This is the single source of the
+   % [QSTART, QEND], or "" when none matches. When several files enclose the
+   % query, selection is deterministic: widest window first, then latest end,
+   % then lexical file name. This is the single source of the
    % "does a staged full-period file already cover this window" logic shared by
    % met-file resolution (icemodel.createMetFileNames) and met-swap userdata
    % resolution (icemodel.loadmet).
@@ -23,6 +25,15 @@ function name = findEnclosingWindowFile(directory, prefix, suffix, qstart, qend)
    % Output
    %  name      - the matching file name (string), or "" if none brackets
 
+   arguments
+      directory (1, 1) string
+      prefix (1, 1) string
+      suffix (1, 1) string
+      qstart (1, 1) datetime
+      qend (1, 1) datetime
+      kwargs.accept_candidate = []
+   end
+
    name = "";
    if ~isfolder(directory)
       return
@@ -33,6 +44,10 @@ function name = findEnclosingWindowFile(directory, prefix, suffix, qstart, qend)
    pat = ['^' regexptranslate('escape', prefix) ...
       '_(\d{8})_(\d{8})' regexptranslate('escape', suffix) '$'];
    tz = qstart.TimeZone;
+   candidates = strings(numel(d), 1);
+   starts = NaT(numel(d), 1, 'TimeZone', tz);
+   ends = NaT(numel(d), 1, 'TimeZone', tz);
+   n_candidates = 0;
    for n = 1:numel(d)
       tok = regexp(d(n).name, pat, 'tokens', 'once');
       if isempty(tok)
@@ -42,8 +57,29 @@ function name = findEnclosingWindowFile(directory, prefix, suffix, qstart, qend)
       file_end = datetime(tok{2}, 'InputFormat', 'yyyyMMdd', 'TimeZone', tz) ...
          + hours(23) + minutes(59) + seconds(59);
       if file_start <= qstart && file_end >= qend
-         name = string(d(n).name);
-         return
+         candidate_path = fullfile(directory, string(d(n).name));
+         if ~isempty(kwargs.accept_candidate) ...
+               && ~kwargs.accept_candidate(candidate_path)
+            continue
+         end
+         n_candidates = n_candidates + 1;
+         candidates(n_candidates) = string(d(n).name);
+         starts(n_candidates) = file_start;
+         ends(n_candidates) = file_end;
       end
    end
+   if n_candidates == 0
+      return
+   end
+
+   % Select by explicit sortable keys instead of filesystem directory order.
+   candidates = candidates(1:n_candidates);
+   starts = starts(1:n_candidates);
+   ends = ends(1:n_candidates);
+   durations = seconds(ends - starts);
+   end_key = year(ends) .* 10000 + month(ends) .* 100 + day(ends);
+   rank = table(-durations, -end_key, candidates, ...
+      'VariableNames', {'neg_duration', 'neg_end', 'name'});
+   [~, order] = sortrows(rank, {'neg_duration', 'neg_end', 'name'});
+   name = candidates(order(1));
 end

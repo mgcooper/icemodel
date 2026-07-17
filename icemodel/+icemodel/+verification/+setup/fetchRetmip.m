@@ -9,91 +9,70 @@ function [source_dir, status] = fetchRetmip(kwargs)
    %  Cache validator and retrieval-instruction helper. It validates local
    %  RetMIP forcing/protocol, model-output, and script caches without pulling
    %  multi-GB products during tests.
+   %  An empty products selection returns an empty status without creating or
+   %  scanning cache_dir.
 
    arguments
       kwargs.cache_dir (1, 1) string = defaultCacheDir()
-      kwargs.products (1, :) string = ["forcing", "outputs", "scripts"]
+      kwargs.products (1, :) string = ...
+         icemodel.verification.setup.fetchProductNames(productRegistry())
       kwargs.strict (1, 1) logical = true
       kwargs.silent (1, 1) logical = false
+      kwargs.create_cache_dir (1, 1) logical = true
    end
 
-   cache_dir = kwargs.cache_dir;
-   icemodel.helpers.ensureDirExists(cache_dir);
+   % Validate the registry selection before cache creation or discovery.
+   icemodel.verification.setup.mustBeKnownFetchProducts( ...
+      kwargs.products, productRegistry(), ...
+      "icemodel:verification:fetchRetmip:unknownProduct", "RetMIP");
 
-   % Build status first so callers/tests can inspect DOI/URL construction even
-   % when the local cache is intentionally incomplete.
+   % Resolve and optionally create the family cache root.
+   cache_dir = icemodel.verification.setup.resolveFetchCacheDir( ...
+      kwargs.cache_dir, defaultCacheDir());
+   if kwargs.create_cache_dir && ~isempty(kwargs.products)
+      icemodel.helpers.ensureDirExists(cache_dir);
+   end
+
+   % Build family-specific cache rows before shared strict handling.
    status = productStatus(cache_dir, kwargs.products);
-   missing = string({status(~[status.present]).product});
-
-   if isempty(missing)
-      source_dir = cache_dir;
-      return
-   end
-
-   % Print actionable instructions instead of hiding the missing cache behind a
-   % generic file-not-found error.
-   if ~kwargs.silent
-      fprintf('\n');
-      fprintf('=== RetMIP source cache incomplete ===\n');
-      fprintf('Cache directory: %s\n', cache_dir);
-      fprintf('Missing products: %s\n', strjoin(missing, ', '));
-      fprintf('\nRetrieval:\n');
-      for k = 1:numel(status)
-         fprintf('  %-8s DOI: %s\n', status(k).product, status(k).doi);
-         fprintf('           URL: %s\n', status(k).landing_url);
-      end
-      fprintf('\nPlace downloaded files under cache_dir/<product>/ or use files\n');
-      fprintf('whose names contain the product token.\n\n');
-   end
-
-   if kwargs.strict
-      error('icemodel:verification:fetchRetmip:missingSources', ...
-         'RetMIP source cache incomplete in %s. Missing: %s', ...
-         cache_dir, strjoin(missing, ', '));
-   end
-
-   source_dir = cache_dir;
+   source_dir = icemodel.verification.setup.finishFetchStatus( ...
+      cache_dir, status, strict=kwargs.strict, silent=kwargs.silent, ...
+      error_id="icemodel:verification:fetchRetmip:missingSources", ...
+      error_label="RetMIP", banner_callback=@(cache_dir, status, missing) ...
+      icemodel.verification.setup.printFetchProductBanner( ...
+      cache_dir, status, missing, "RetMIP"));
 end
 
 function pathname = defaultCacheDir()
    %DEFAULTCACHEDIR Canonical RetMIP source-cache directory.
-   pathname = string(fullfile(icemodel.getpath('data'), ...
-      'verification', 'retmip'));
+   pathname = icemodel.forcing.helpers.verificationSourceDir("", "retmip");
 end
 
 function status = productStatus(cache_dir, products)
    %PRODUCTSTATUS Return one validation/URL row per requested RetMIP product.
-   status = repmat(productRow("", "", cache_dir), 1, numel(products));
-   for k = 1:numel(products)
-      status(k) = productRow(products(k), productDoi(products(k)), cache_dir);
-   end
+   prototype = icemodel.verification.setup.emptyFetchProductStatusRow();
+   prototype.dataverse_api_url = "";
+   status = icemodel.verification.setup.buildFetchProductStatus( ...
+      cache_dir, products, productRegistry(), @productRow, ...
+      prototype=prototype);
 end
 
-function row = productRow(product, doi, cache_dir)
+function row = productRow(cache_dir, product, doi)
    %PRODUCTROW Build one stable status row.
-   product_dir = fullfile(cache_dir, product);
-   files = [dir(fullfile(product_dir, '*')); ...
-      dir(fullfile(cache_dir, "*" + product + "*"))];
-   files = files(~[files.isdir]);
-   row = struct( ...
-      'product', product, ...
-      'doi', doi, ...
-      'landing_url', "https://doi.org/" + doi, ...
-      'dataverse_api_url', ...
-         "https://dataverse.geus.dk/api/datasets/:persistentId/?persistentId=doi:" + doi, ...
-      'present', ~isempty(files), ...
-      'cache_dir', string(product_dir));
+   patterns = [fullfile(product, "*"), "*" + product + "*"];
+   if string(product) == "outputs"
+      patterns = [patterns, "*_*_3hourly_*.nc"];
+   end
+   row = icemodel.verification.setup.fetchProductStatusRow( ...
+      cache_dir, product, doi, patterns);
+   row.dataverse_api_url = ...
+      "https://dataverse.geus.dk/api/datasets/:persistentId/?persistentId=doi:" + doi;
 end
 
-function doi = productDoi(product)
-   %PRODUCTDOI Map RetMIP products to their GEUS Dataverse DOI.
-   switch string(product)
-      case {"forcing", "scripts"}
-         doi = "10.22008/FK2/GZ3CSN";
-      case "outputs"
-         doi = "10.22008/FK2/CVPUJL";
-      otherwise
-         error('icemodel:verification:fetchRetmip:unknownProduct', ...
-            'unknown RetMIP product: %s', product);
-   end
+function registry = productRegistry()
+   %PRODUCTREGISTRY Keep RetMIP selectors and DOI provenance in one table.
+   registry = [ ...
+      "forcing", "10.22008/FK2/GZ3CSN"
+      "outputs", "10.22008/FK2/CVPUJL"
+      "scripts", "10.22008/FK2/GZ3CSN"];
 end

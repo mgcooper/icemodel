@@ -13,8 +13,8 @@ function files = fixtureFileList(kwargs)
    %
    %  The enumerated set is exactly the heavy committed .mat data:
    %    demo/data/eval/**/*.mat          observation / reference bundles
-   %    demo/data/input/met/*.mat        forcing timetables
-   %    demo/data/input/userdata/*.mat   per-year userdata swap files
+   %    demo/data/input/met/**/*.mat        forcing timetables
+   %    demo/data/input/userdata/**/*.mat   userdata swap files
    %
    %  The lean, reviewable companions (per-family manifest.json, .gitkeep) are
    %  deliberately EXCLUDED: they stay committed even after the fixtures flip to
@@ -46,8 +46,8 @@ function files = fixtureFileList(kwargs)
    % demo/data restores the exact paths).
    patterns = [ ...
       fullfile("eval", "**", "*.mat"); ...
-      fullfile("input", "met", "*.mat"); ...
-      fullfile("input", "userdata", "*.mat")];
+      fullfile("input", "met", "**", "*.mat"); ...
+      fullfile("input", "userdata", "**", "*.mat")];
 
    % Collect absolute matches per pattern, then convert to root-relative POSIX
    % paths so the manifest is portable.

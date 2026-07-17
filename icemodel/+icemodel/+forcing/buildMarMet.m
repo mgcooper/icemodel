@@ -1,7 +1,8 @@
-function [met, metadata] = buildMarMet(location, years, kwargs)
+function [met, metadata, Data] = buildMarMet(location, years, kwargs)
    %BUILDMARMET Build an icemodel met timetable from MAR v3.11 data.
    %
    %  [met, metadata] = icemodel.forcing.buildMarMet(location, years)
+   %  [met, metadata, Data] = ... buildMarMet(location, years)
    %  [met, metadata] = ... buildMarMet(_, source_dir=..., modis_dir=..., ...
    %     dt_out="15m")
    %
@@ -18,16 +19,20 @@ function [met, metadata] = buildMarMet(location, years, kwargs)
    %  years    - calendar years to extract
    %
    % Name-value
-   %  source_dir, modis_dir, fillgaps, method, remap : see
+   %  source_dir, modis_dir, method, remap : see
    %      icemodel.forcing.buildMarData (method = point sampling;
    %      remap = "conservative" (default, exact overlap-area weighting via
    %      exactremap); "equal" = plain in-polygon cell-centre mean
-   %  dt_out : optional output timestep ("15m") resampled per calendar
-   %           year with icemodel.interpmet; default keeps hourly
+   %  fillgaps : opt in to legacy metchecks gap filling (default false)
+   %  dt_out : output timestep resampled with the interval-support shared helper;
+   %           default "15m", pass "" for native hourly
+   %  fillwithmissing : add absent required channels as NaN placeholders
+   %                    before met validation (default true)
    %
    % Outputs
    %  met      - met-contract timetable (hourly, or dt_out)
-   %  metadata - provenance from buildMarData
+   %  metadata - finalized met metadata; exactly met.Properties.UserData
+   %  Data     - source Data timetable before conversion/resampling
    %
    % Legacy: reimplements runoff/functions/makeMarMetfile.m (the original
    % retained, unchanged, as the legacy reference workflow). The legacy
@@ -35,48 +40,32 @@ function [met, metadata] = buildMarMet(location, years, kwargs)
    % reproduced (saving is icemodel.forcing.helpers.writemet's job).
    %
    % See also: icemodel.forcing.buildMarData, icemodel.forcing.data2met,
-   %  icemodel.forcing.helpers.writemet, icemodel.interpmet
+   %  icemodel.forcing.helpers.writemet,
+   %  icemodel.forcing.helpers.resampleMetTimestep
 
    arguments
       location
       years (1, :) double {mustBeInteger}
       kwargs.source_dir (1, 1) string = ""
       kwargs.modis_dir (1, 1) string = ""
-      kwargs.fillgaps (1, 1) logical = true
+      kwargs.fillgaps (1, 1) logical = false
       kwargs.method (1, 1) string {mustBeMember(kwargs.method, ...
          ["nearest", "natural"])} = "nearest"
       kwargs.remap (1, 1) string {mustBeMember(kwargs.remap, ...
          ["equal", "conservative"])} = "conservative"
-      kwargs.dt_out (1, 1) string = ""
+      kwargs.dt_out (1, 1) string = "15m"
+      kwargs.fillwithmissing (1, 1) logical = true
    end
 
    % buildMarData accepts a single location (returns one Data timetable) or a
    % list of N points (Nx2 [lat lon], returns a 1xN cell of Data timetables).
-   % Map data2met (+ the optional resample) over each, so met mirrors Data:
-   % a single met timetable for one location, a 1xN cell for a point list.
-   [Data, metadata] = icemodel.forcing.buildMarData(location, years, ...
+   % Build the source Data first, then apply the shared Data-to-met collection
+   % conversion. The returned shape mirrors Data: one timetable for one
+   % location and a 1xN cell for a point list.
+   [Data, ~] = icemodel.forcing.buildMarData(location, years, ...
       source_dir=kwargs.source_dir, modis_dir=kwargs.modis_dir, ...
       fillgaps=kwargs.fillgaps, method=kwargs.method, remap=kwargs.remap);
 
-   if iscell(Data)
-      met = cellfun(@(d) toMet(d, years, kwargs.dt_out), Data, ...
-         'UniformOutput', false);
-   else
-      met = toMet(Data, years, kwargs.dt_out);
-   end
-end
-
-%% Local functions
-function met = toMet(Data, years, dt_out)
-   %TOMET Convert one point's Data to the met contract (optional resample).
-   met = icemodel.forcing.data2met(Data);
-   if dt_out ~= ""
-      % icemodel.interpmet resamples one calendar year at a time.
-      parts = cell(numel(years), 1);
-      for n = 1:numel(years)
-         parts{n} = icemodel.interpmet( ...
-            met(year(met.Time) == years(n), :), char(dt_out));
-      end
-      met = vertcat(parts{:});
-   end
+   [met, metadata] = icemodel.forcing.helpers.data2metCollection(Data, ...
+      dt_out=kwargs.dt_out, fillwithmissing=kwargs.fillwithmissing);
 end

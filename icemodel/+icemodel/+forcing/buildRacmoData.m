@@ -21,10 +21,12 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    % Channels (file prefix -> output, standard units):
    %    swsd -> swd, lwsd -> lwd, swsn -> swn, lwsn -> lwn   [W m-2]
    %    senf -> shf, latf -> lhf                             [W m-2]
-   %    precip -> precip   [m s-1, the canonical water-equivalent precip rate]
+   %    precip -> ppt      [m s-1, the canonical water-equivalent precip rate]
    %    snowmelt -> melt, runoff -> runoff, smb -> smb,
-   %    refreeze -> refreeze, subl -> subl, sndiv -> sndiv,
+   %    refreeze -> refreeze, -subl -> subl, sndiv -> sndiv,
    %    meltin -> meltin                                     [mWE/h]
+   % RACMO stores sublimation as negative mass change and deposition as
+   % positive. Canonical subl is positive surface loss, matching MAR SUH.
    % Derived:  albedo [-] = 1 - swn/swd (RACMO ships no albedo variable).
    % Optional: modis [-] (GEUS MODIS daily albedo, when modis_dir is given).
    %
@@ -36,7 +38,7 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    % Mass fluxes convert from kg m-2 s-1 to meters water equivalent per
    % hour (x 3600 / 1000); they are rates, so cumulative sums must
    % multiply by the timestep in hours (1 for dt="1hr", 3 for "3hr"). The
-   % precipitation channel (precip) is then carried in the canonical m s-1
+   % precipitation channel (ppt) is then carried in the canonical m s-1
    % water-equivalent rate; the diagnostic mass fluxes keep mWE/h.
    %
    % Legacy: reimplements runoff/functions/saveRacmoData.m (the original
@@ -64,7 +66,10 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    %      Reference layout: /Volumes/S03/DATA/greenland/geus/albedo/gris.
    %  dt : "1hr" (default; linear interpolation to hourly, the legacy
    %      behavior) or "3hr" (native posting)
-   %  method : point sampling "nearest" (default) | "natural"
+   %  method : point sampling "nearest" (default) | "natural". When the
+   %      FGRN11 topography is available, both methods exclude cells outside
+   %      its rounded IceMask (fraction >= 0.5; Promicemask > 0 fallback) and
+   %      reject a nearest valid cell farther than one native grid diagonal.
    %  remap : polygon aggregation "conservative" (default) | "equal"
    %      ("conservative" uses exactremap with FGRN11 gridarea as the true
    %      cell areas and the ice mask as the valid-cells mask)
@@ -109,7 +114,7 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    channels = {
       'swsd', 'swd'     ; 'lwsd', 'lwd'      ; 'swsn', 'swn'
       'lwsn', 'lwn'     ; 'senf', 'shf'      ; 'latf', 'lhf'
-      'precip', 'precip'; 'snowmelt', 'melt' ; 'runoff', 'runoff'
+      'precip', 'ppt'   ; 'snowmelt', 'melt' ; 'runoff', 'runoff'
       'smb', 'smb'      ; 'refreeze', 'refreeze'; 'subl', 'subl'
       'sndiv', 'sndiv'  ; 'meltin', 'meltin'
       };
@@ -123,6 +128,17 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    LON = double(ncread(first, 'lon'));
    proj = icemodel.forcing.helpers.psnProjection();
    [X, Y] = projfwd(proj, LAT, LON);
+   [~, validmask] = racmoGridStatics(source_dir);
+   if isnumeric(location) && isempty(validmask)
+      error('icemodel:forcing:buildRacmoData:maskNotFound', ...
+         ['RACMO point sampling requires the companion FGRN11 topography ' ...
+         'IceMask; none was found in %s or its parent directory'], source_dir)
+   end
+   dx = hypot(diff(X, 1, 1), diff(Y, 1, 1));
+   dy = hypot(diff(X, 1, 2), diff(Y, 1, 2));
+   edge_lengths = [dx(:); dy(:)];
+   edge_lengths = edge_lengths(isfinite(edge_lengths) & edge_lengths > 0);
+   max_point_distance = sqrt(2) * median(edge_lengths);
 
    % Accept one location (1x2 point or polyshape, returns a single Data
    % timetable) OR a list of N points (Nx2 [lat lon], returns a 1xN cell of
@@ -131,12 +147,14 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    % hyperslab + collapse rule is resolved here, then every variable file is
    % opened ONCE and each point's hyperslab sliced from that single open
    % (decisive for the multi-GB subsurface files).
-   [locations, batch] = locationList(location);
+   [locations, batch] = ...
+      icemodel.forcing.helpers.normalizeLocations(location);
    npts = numel(locations);
 
    grid = struct('X', X, 'Y', Y, 'LAT', LAT, 'LON', LON, 'proj', proj, ...
       'first', first, 'source_dir', source_dir, ...
-      'method', kwargs.method, 'remap', kwargs.remap);
+      'method', kwargs.method, 'remap', kwargs.remap, ...
+      'validmask', validmask, 'max_point_distance', max_point_distance);
    [slabs, collapses, inslabs, sites] = deal( ...
       cell(1, npts), cell(1, npts), cell(1, npts), cell(1, npts));
    loctype = "";
@@ -153,9 +171,11 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
       'unexpected RACMO time units: %s', t_units)
    Time = datetime(1950, 1, 1, 'TimeZone', 'UTC') + days(double(t));
    keep = ismember(year(Time), years);
-   assert(any(keep), ...
-      'requested years %s not in the RACMO archive span %d-%d', ...
-      mat2str(years), year(Time(1)), year(Time(end)))
+   if ~any(keep)
+      error('icemodel:forcing:buildRacmoData:yearNotInArchive', ...
+         'requested years %s not in the RACMO archive span %d-%d', ...
+         mat2str(years), year(Time(1)), year(Time(end)))
+   end
    Time = Time(keep);
 
    % Read each available channel ONCE per file (every point's hyperslab from
@@ -210,19 +230,6 @@ function [files, found] = locateRacmoFiles(source_dir, prefixes)
    end
 end
 
-function [locations, batch] = locationList(location)
-   %LOCATIONLIST Normalize the location input to a 1xN cell of locations.
-   % A polyshape or a single [lat lon] row is one location (batch=false); an
-   % Nx2 [lat lon] (N>1) is a point list (batch=true).
-   if isnumeric(location) && size(location, 2) == 2 && size(location, 1) > 1
-      locations = num2cell(location, 2)';
-      batch = true;
-   else
-      locations = {location};
-      batch = false;
-   end
-end
-
 function [slab, collapse, inslab, site, loctype] = resolvePoint(grid, location)
    %RESOLVEPOINT Map one point or polygon onto a RACMO grid hyperslab.
    %
@@ -233,7 +240,8 @@ function [slab, collapse, inslab, site, loctype] = resolvePoint(grid, location)
    % reprojecting to EPSG:3413 is curvilinear). exactremap's rotated-pole
    % support handles the rotation from the CF grid mapping and weights cells
    % by the shipped true cell areas (gridarea); off-ice cells (IceMask) are
-   % inpainted. Point/nearest and equal-weight stay in the projected grid.
+   % inpainted. Point methods and equal-weight polygons stay in the projected
+   % grid; point methods exclude the same masked cells when the mask is present.
    if isa(location, 'polyshape') && grid.remap == "conservative"
       [start, count, collapse, inslab, loctype] = ...
          resolveRacmoConservative(grid.first, grid.source_dir, ...
@@ -247,7 +255,8 @@ function [slab, collapse, inslab, site, loctype] = resolvePoint(grid, location)
       end
       [start, count, collapse, inslab, loctype] = ...
          icemodel.forcing.helpers.gridLocation(grid.X, grid.Y, location, ...
-         grid.method, remap=grid.remap);
+         grid.method, remap=grid.remap, validmask=grid.validmask, ...
+         maxdistance=grid.max_point_distance);
    end
    slab = [start; count];
    site.lat = icemodel.forcing.helpers.slabMean(grid.LAT, start, count, inslab);
@@ -301,40 +310,53 @@ function [Data, metadata] = finalizeRacmoData(Data, site, slab, inslab, ...
    % conservative (or equal) catchment mean for a polygon. This generalizes
    % the legacy saveRacmoData MODIS channel (which took the nearest cell even
    % for catchments) to the area-weighted ROI mean for polygons.
+   modis_metadata = struct();
    if kwargs.modis_dir ~= ""
-      Data.modis = icemodel.forcing.helpers.modisAlbedoChannel( ...
+      [modis, modis_metadata] = ...
+         icemodel.forcing.helpers.modisAlbedoChannel( ...
          kwargs.modis_dir, years, location, kwargs.method, kwargs.remap, ...
          Data.Time);
+      if ~isempty(modis_metadata.modis_coverage_years)
+         Data.modis = modis;
+      end
    end
 
    % Precipitation to the canonical water-equivalent rate m s-1. RACMO posts
    % precip as mWE/h, so dividing by 3600 s/h yields m s-1. The diagnostic
    % mass fluxes (melt/runoff/smb/refreeze/subl/sndiv/meltin) keep mWE/h.
-   Data.precip = Data.precip / 3600;
+   Data.ppt = Data.ppt / 3600;
+
+   % Normalize RACMO's native mass-balance sign at the source boundary.
+   % Native negative loss / positive deposition is the exact opposite of the
+   % public positive-loss / negative-deposition sublimation contract.
+   if ismember("subl", string(Data.Properties.VariableNames))
+      Data.subl = -Data.subl;
+   end
+
+   % RACMO's physical precipitation flux contains small negative numerical
+   % undershoots at the source grid cells. Enforce the nonnegative invariant at
+   % the source-finalization boundary, after spatial sampling/remapping and
+   % hourly interpolation, and retain the exact input minimum/count in metadata.
+   [Data, ppt_qc] = ...
+      icemodel.forcing.helpers.applyRacmoPrecipitationQualityControl(Data);
 
    % Per-variable units from the shared canonical map.
    Data.Properties.VariableUnits = icemodel.forcing.helpers.variableUnits( ...
       string(Data.Properties.VariableNames));
 
-   % QA/QC: gap-fill + physical clamps. The legacy saveRacmoData ran
-   % metchecks as its final step; here it also clamps the derived albedo to
-   % [0.05, 0.98] and linearly fills the polar-night gap.
-   [Data, checks] = icemodel.forcing.helpers.metchecks(Data);
+   % Source-faithful QA/QC applies physical clamps without inventing values
+   % across native outages. The legacy caller can still request gap filling at
+   % its own boundary if needed.
+   [Data, checks] = icemodel.forcing.helpers.metchecks(Data, fillgaps=false);
 
-   % Userdata CustomProperties. Elevation from the topography channel
-   % when present in the directory; otherwise NaN.
-   Data = addprop(Data, ...
-      {'X', 'Y', 'Lat', 'Lon', 'Elev', 'Slope', 'ScalarUnits'}, ...
-      repmat({'table'}, 1, 7));
-   Data.Properties.CustomProperties.X = site_x;
-   Data.Properties.CustomProperties.Y = site_y;
-   Data.Properties.CustomProperties.Lat = site.lat;
-   Data.Properties.CustomProperties.Lon = site.lon;
-   Data.Properties.CustomProperties.Elev = ...
-      readElevation(source_dir, start, count, inslab);
-   Data.Properties.CustomProperties.Slope = NaN;
-   Data.Properties.CustomProperties.ScalarUnits = ...
-      ["m", "m", "degrees N", "degrees W", "m asl", "m/m"];
+   % Attach the shared location schema. Elevation comes from the companion
+   % topography channel when present; RACMO supplies no surface slope here.
+   location_metadata = struct( ...
+      'lat_wgs84', site.lat, 'lon_wgs84', site.lon, ...
+      'x_epsg3413', site_x, 'y_epsg3413', site_y, ...
+      'elev_m', readElevation(source_dir, start, count, inslab));
+   Data = icemodel.forcing.helpers.attachLocationMetadata( ...
+      Data, location_metadata);
 
    metadata = struct( ...
       'source_files', files(found), ...
@@ -345,10 +367,32 @@ function [Data, metadata] = finalizeRacmoData(Data, site, slab, inslab, ...
       'grid_count', count, ...
       'n_cells', prod(count), ...
       'lat', site.lat, 'lon', site.lon, ...
+      'racmo_ice_mask_applied', ~isempty(grid.validmask), ...
+      'racmo_point_max_distance_m', grid.max_point_distance, ...
       'dt', kwargs.dt, ...
+      'racmo_subl_native_sign_convention', ...
+      "negative_loss_positive_deposition", ...
+      'racmo_subl_sign_convention', ...
+      "positive_loss_negative_deposition", ...
       'mass_flux_units', ...
-      "precip m s-1; diagnostic fluxes mWE/h (rate; cumulative sums need dt hours)", ...
+      "ppt m s-1; diagnostic fluxes mWE/h (rate; cumulative sums need dt hours)", ...
       'checks', checks);
+
+   % Copy exact GEUS product/status/year provenance resolved by the channel
+   % reader without any second inventory or NetCDF access.
+   modis_fields = fieldnames(modis_metadata);
+   for k = 1:numel(modis_fields)
+      metadata.(modis_fields{k}) = modis_metadata.(modis_fields{k});
+   end
+
+   % Copy the flat precipitation-QC contract so writeuserdata carries it with
+   % artifact metadata and the bounded repair can apply the identical policy.
+   fields = fieldnames(ppt_qc);
+   for k = 1:numel(fields)
+      metadata.(fields{k}) = ppt_qc.(fields{k});
+   end
+   metadata = icemodel.forcing.helpers.columnizeMetadata(metadata);
+   Data.Properties.UserData = metadata;
 end
 
 function elev = readElevation(source_dir, start, count, inslab)
@@ -385,7 +429,8 @@ function [cellareas, validmask] = racmoGridStatics(source_dir)
    filename = fullfile(match(1).folder, match(1).name);
    cellareas = double(ncread(filename, 'gridarea')) * 1e6;   % km^2 -> m^2
    try
-      validmask = logical(round(double(ncread(filename, 'IceMask'))));
+      ice_mask = double(ncread(filename, 'IceMask'));
+      validmask = isfinite(ice_mask) & ice_mask >= 0.5;
    catch
       validmask = double(ncread(filename, 'Promicemask')) > 0;
    end

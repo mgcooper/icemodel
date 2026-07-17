@@ -14,7 +14,8 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    %        after rh derivation), U2M/V2M -> wspd/wdir, PS -> psfc [Pa]
    %    rad (hourly): SWGDN -> swd, SWGNT -> swn, LWGAB -> lwd,
    %        LWGNT -> lwn [W m-2]
-   %    flx (hourly): HFLUX -> shf, EFLUX -> lhf [W m-2],
+   %    flx (hourly): HFLUX -> shf, EFLUX -> lhf [W m-2, sign flipped to
+   %        the icemodel positive-toward-surface convention],
    %        PRECTOTCORR -> ppt, PRECSNO -> snowf [m s-1, the canonical
    %        water-equivalent precipitation rate], EVAP -> evap [mWE/h]
    %    glc (3-hourly): RUNOFF -> runoff [mWE/h], SNICEALB -> albedo,
@@ -25,9 +26,9 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    % icemodel.processmet recomputes them on load from swd/albedo/tsfc/lwd.
    % Mass fluxes convert kg m-2 s-1 -> meters water equivalent per hour.
    % MERRA-2 posts tavg samples at the bin center (00:30 hourly, 01:30
-   % 3-hourly); they are relabeled to the INTERVAL START (the icemodel time
-   % convention) and interpolated onto the on-the-hour axis, so MERRA aligns
-   % with MAR/RACMO/PROMICE rather than carrying a half-step phase error.
+   % 3-hourly). This application builder explicitly relabels only those
+   % time-averaged collections to the INTERVAL START and holds each mean over
+   % its declared support. The source reader preserves native coordinates.
    %
    % Legacy: reimplements runoff/functions/saveMerraData.m (the original
    % retained, unchanged, as the legacy reference workflow). Note the legacy
@@ -53,7 +54,7 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    %      data/forcing/merra2. Reference layout:
    %      /Volumes/S03/DATA/merra2/1hrly/ncfiles.
    %  modis_dir : optional GEUS MODIS albedo directory (see buildMarData)
-   %  fillgaps  : gap-fill through metchecks (default true)
+   %  fillgaps  : opt in to legacy metchecks gap filling (default false)
    %
    % Outputs
    %  Data     - hourly timetable with userdata CustomProperties
@@ -67,7 +68,7 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
       years (1, :) double {mustBeInteger}
       kwargs.source_dir (1, 1) string = ""
       kwargs.modis_dir (1, 1) string = ""
-      kwargs.fillgaps (1, 1) logical = true
+      kwargs.fillgaps (1, 1) logical = false
       kwargs.method (1, 1) string {mustBeMember(kwargs.method, ...
          ["nearest", "natural"])} = "nearest"
       kwargs.remap (1, 1) string {mustBeMember(kwargs.remap, ...
@@ -110,6 +111,7 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
       'glc', 'SNOMAS_GL',   'swe'
       };
    collections = unique(channels(:, 1), 'stable');
+   support_hours = struct('slv', 1, 'rad', 1, 'flx', 1, 'glc', 3);
 
    % File inventory per collection, keyed by the YYYYMMDD name token.
    % The calendar derives from the files present (no hardcoded period).
@@ -133,6 +135,17 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
       kept = files(keep);
       inventory.(c{1}).files = string(fullfile( ...
          {kept(order).folder}, {kept(order).name}))';
+   end
+
+   % Read native collection coordinates once per collection, validate their
+   % official center stamps, and convert only these declared tavg products to
+   % application-level interval starts. Every channel in a collection shares
+   % the resulting axis.
+   interval_starts = struct();
+   for c = collections'
+      collection = c{1};
+      interval_starts.(collection) = averagedIntervalStarts( ...
+         inventory.(collection), support_hours.(collection));
    end
 
    % Grid and target cells from the first slv file (all collections
@@ -162,7 +175,8 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    % and ice mask above are read ONCE for the whole list; each point's grid
    % hyperslab + collapse rule is resolved here, then every channel's daily
    % files are opened ONCE and each point's hyperslab sliced from that open.
-   [locations, batch] = locationList(location);
+   [locations, batch] = ...
+      icemodel.forcing.helpers.normalizeLocations(location);
    npts = numel(locations);
 
    grid = struct('X', X, 'Y', Y, 'LON', LON, 'LAT', LAT, 'proj', proj, ...
@@ -173,16 +187,20 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    end
 
    % Read each channel: daily hyperslabs concatenated per point (one open per
-   % day per channel for ALL points), stamped at the MERRA bin centers, then
-   % collapsed + interpolated onto the hourly axis per point.
+   % day per channel for ALL points), then collapsed and held over the source
+   % interval support on the hourly application axis.
    Time = hourlyAxis(years);
+   source_grid = merraTavg3SourceGrid(Time, interval_starts.glc);
    series = cell(size(channels, 1), npts);
    for n = 1:size(channels, 1)
       [col, ncname, ~] = channels{n, :};
-      [blocks, stamps] = readChannelSeries(inventory.(col), ncname, slabs);
+      blocks = readChannelSeries(inventory.(col), ncname, slabs, ...
+         interval_starts.(col));
       for p = 1:npts
-         series{n, p} = interp1(stamps, collapses{p}(blocks{p}), Time, ...
-            'linear', 'extrap');
+         values = reshape(collapses{p}(blocks{p}), ...
+            numel(interval_starts.(col)), []);
+         series{n, p} = holdIntervalAverages(interval_starts.(col), ...
+            values, Time, support_hours.(col));
       end
    end
 
@@ -195,7 +213,7 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
       end
       [data_out{p}, meta_out{p}] = finalizeMerraData(Data, sites{p}, ...
          slabs{p}, years, locations{p}, source_dir, collections, ...
-         numel(inventory.slv.files), proj, kwargs);
+         numel(inventory.slv.files), proj, support_hours, source_grid, kwargs);
    end
 
    metadata = [meta_out{:}];
@@ -217,24 +235,24 @@ function t_hourly = hourlyAxis(years)
    t_hourly = vertcat(parts{:});
 end
 
-function [blocks, stamps] = readChannelSeries(coll, ncname, slabs)
+function blocks = readChannelSeries(coll, ncname, slabs, stamps)
    %READCHANNELSERIES Concatenate one channel's hyperslabs over the daily files.
    %
    % Returns a 1xN cell of raw cells-by-time blocks (one per point; cells
    % flattened column-major over each point's hyperslab, matching
-   % gridLocation's collapse) plus the INTERVAL-START timestamps: 24 hourly
-   % samples on the hour for tavg1 collections, 8 three-hourly samples at
-   % 0/3/6.. for tavg3 (glc), shifted back from the native bin centers. The
-   % caller applies each point's collapse (nearest / natural / polygon mean).
+   % gridLocation's collapse). The caller applies each point's collapse and
+   % support-aware hold using the validated interval-start axis.
    % Per-file hyperslab read + standard-unit conversion + fill-masking is
    % delegated to the shared reader icemodel.forcing.readMerra2 (so mass
    % fluxes arrive already in mWE/h); this loop opens each daily file ONCE
-   % (reading EVERY point's hyperslab from that open) and stamps the bin
-   % centers. A single point is just a one-element slab list.
+   % (reading EVERY point's hyperslab from that open). A single point is just a
+   % one-element slab list.
    n_files = numel(coll.files);
    npts = numel(slabs);
    info = ncinfo(coll.files(1), ncname);
    n_per_day = info.Size(3);
+   assert(numel(stamps) == n_per_day * n_files, ...
+      'MERRA interval-start axis does not match the channel record count')
 
    blocks = cell(1, npts);
    for p = 1:npts
@@ -248,29 +266,63 @@ function [blocks, stamps] = readChannelSeries(coll, ncname, slabs)
       end
    end
 
-   % Stamp each averaged sample at its INTERVAL START, the icemodel forcing
-   % time convention (the [t, t+dt) label is the interval start; see
-   % +forcing/README.md "Time convention", and readMar3p11 which is already
-   % interval-start). MERRA-2 posts tavg samples at the bin CENTRE (00:30
-   % hourly, 01:30 three-hourly), so the start offset is 0:step:24-step, not
-   % the native step/2:step:24 - aligning MERRA with the other sources instead
-   % of carrying a half-step phase error through the interp onto Time.
-   step = 24 / n_per_day;
-   offsets = hours(0:step:24 - step);
-   stamps = reshape((coll.dates + offsets)', [], 1);
 end
 
-function [locations, batch] = locationList(location)
-   %LOCATIONLIST Normalize the location input to a 1xN cell of locations.
-   % A polyshape or a single [lat lon] row is one location (batch=false); an
-   % Nx2 [lat lon] (N>1) is a point list (batch=true).
-   if isnumeric(location) && size(location, 2) == 2 && size(location, 1) > 1
-      locations = num2cell(location, 2)';
-      batch = true;
-   else
-      locations = {location};
-      batch = false;
+function starts = averagedIntervalStarts(coll, support_hours)
+   %AVERAGEDINTERVALSTARTS Validate native centers and relabel tavg support.
+   % The official tavg1/tavg3 coordinates are centered at support/2 and repeat
+   % at the support cadence. Decode every daily coordinate so a malformed middle
+   % file or filename/native-day mismatch cannot acquire a synthetic proof.
+   expected_offsets = hours((support_hours / 2):support_hours: ...
+      (24 - support_hours / 2))';
+   starts = NaT(numel(coll.files) * numel(expected_offsets), 1, ...
+      'TimeZone', 'UTC');
+   for k = 1:numel(coll.files)
+      native = icemodel.forcing.helpers.readMerra2Time(coll.files(k));
+      expected = coll.dates(k) + expected_offsets;
+      if ~isequal(native, expected)
+         error('icemodel:forcing:buildMerraData:badNativeTime', ...
+            ['MERRA tavg%d file does not match its native interval-center ' ...
+            'coordinate: %s'], support_hours, coll.files(k))
+      end
+      rows = (k - 1) * numel(expected_offsets) + (1:numel(expected_offsets));
+      starts(rows) = native - hours(support_hours / 2);
    end
+end
+
+function output = holdIntervalAverages(starts, values, target, support_hours)
+   %HOLDINTERVALAVERAGES Hold each mean over [start,start+support).
+   assert(size(values, 1) == numel(starts), ...
+      'MERRA value rows do not match the source time axis')
+   assert(all(diff(starts) >= hours(support_hours)), ...
+      'MERRA source intervals overlap or are out of order')
+
+   % Missing source files create no assignment, so their hourly rows remain
+   % NaN. ismember also handles nonconsecutive requested years without treating
+   % the omitted years as a continuous target axis.
+   output = nan(numel(target), size(values, 2));
+   for offset = 0:support_hours - 1
+      [present, target_rows] = ismember(starts + hours(offset), target);
+      output(target_rows(present), :) = values(present, :);
+   end
+end
+
+function proof = merraTavg3SourceGrid(target, starts)
+   %MERRATAVG3SOURCEGRID Record the exact native glc stamps used by this build.
+   expected = target(mod(hour(target), 3) == 0);
+   if numel(unique(starts)) ~= numel(starts)
+      error('icemodel:forcing:buildMerraData:duplicateGlcTime', ...
+         'MERRA glc inventory contains duplicate native timestamps')
+   end
+   present = ismember(expected, starts);
+   missing = expected(~present);
+   proof = struct( ...
+      'merra_tavg3_source_grid_policy', ...
+      'native_glc_timestamp_inventory', ...
+      'merra_tavg3_expected_source_row_count', numel(expected), ...
+      'merra_tavg3_source_row_count', nnz(present), ...
+      'merra_tavg3_source_time_gap_count', nnz(~present), ...
+      'merra_tavg3_missing_source_times', missing);
 end
 
 function [slab, collapse, site] = resolvePoint(grid, location)
@@ -307,7 +359,8 @@ function [slab, collapse, site] = resolvePoint(grid, location)
 end
 
 function [Data, metadata] = finalizeMerraData(Data, site, slab, years, ...
-      location, source_dir, collections, n_files, proj, kwargs)
+      location, source_dir, collections, n_files, proj, support_hours, ...
+      source_grid, kwargs)
    %FINALIZEMERRADATA Post-process one point's assembled MERRA Data + metadata.
    % Identical to the legacy single-point tail: derived wind/RH, optional
    % MODIS channel, precip rate, metchecks, units, userdata CustomProperties,
@@ -317,6 +370,35 @@ function [Data, metadata] = finalizeMerraData(Data, site, slab, years, ...
 
    % Mass fluxes (PRECTOTCORR/PRECSNO/EVAP/RUNOFF) arrive already converted
    % from kg m-2 s-1 to mWE/h by icemodel.forcing.readMerra2.
+
+   % MERRA-2 HFLUX/EFLUX are positive upward from the surface; icemodel uses
+   % positive toward the surface for the staged forcing/evaluation contract.
+   for ch = ["shf", "lhf"]
+      Data.(ch) = -Data.(ch);
+   end
+
+   % Accumulate source-sign and time-support proof in the single metadata
+   % record that is finalized and attached after all payload processing.
+   artifact_metadata = Data.Properties.UserData;
+   if isempty(artifact_metadata) || ~isstruct(artifact_metadata)
+      artifact_metadata = struct();
+   end
+   artifact_metadata.merra_flux_sign_convention = ...
+      'positive_toward_surface';
+   proof_fields = fieldnames(source_grid);
+   for k = 1:numel(proof_fields)
+      field = proof_fields{k};
+      artifact_metadata.(field) = source_grid.(field);
+   end
+   artifact_metadata.merra_source_time_coordinate = 'native_at_reader';
+   artifact_metadata.merra_time_relabel_policy = ...
+      'time_averaged_center_to_interval_start';
+   artifact_metadata.merra_time_upsample_policy = ...
+      'zero_order_hold_over_declared_support';
+   artifact_metadata.merra_collection_support_hours = support_hours;
+   [Data, artifact_metadata] = ...
+      icemodel.forcing.helpers.applyMerraTimeSupport( ...
+      Data, artifact_metadata);
 
    % Derived channels: wind speed/direction and relative humidity. The
    % derivable radiation terms (swu = swd - swn, netr = swn + lwn, lwu) are
@@ -332,10 +414,19 @@ function [Data, metadata] = finalizeMerraData(Data, site, slab, years, ...
    % Optional GEUS MODIS albedo channel at the requested location:
    % nearest/natural for a point, conservative (or equal) catchment mean
    % (area-weighted ROI mean) for a polygon.
+   modis_metadata = struct();
    if kwargs.modis_dir ~= ""
-      Data.modis = icemodel.forcing.helpers.modisAlbedoChannel( ...
+      [modis, modis_metadata] = ...
+         icemodel.forcing.helpers.modisAlbedoChannel( ...
          kwargs.modis_dir, years, location, kwargs.method, kwargs.remap, ...
          Data.Time);
+      % Keep provenance current at the same source-selection boundary;
+      % stageRcmForcing derives met from this Data without a second GEUS read.
+      modis_fields = fieldnames(modis_metadata);
+      for k = 1:numel(modis_fields)
+         artifact_metadata.(modis_fields{k}) = ...
+            modis_metadata.(modis_fields{k});
+      end
    end
 
    % Precipitation to the canonical water-equivalent rate m s-1. MERRA mass
@@ -348,6 +439,12 @@ function [Data, metadata] = finalizeMerraData(Data, site, slab, years, ...
 
    [Data, checks] = icemodel.forcing.helpers.metchecks(Data, ...
       fillgaps=kwargs.fillgaps);
+   % Attach optional MODIS only after generic gap filling so missing source years
+   % remain missing even for direct builder calls that request filled met inputs.
+   if isfield(modis_metadata, 'modis_coverage_years') ...
+         && ~isempty(modis_metadata.modis_coverage_years)
+      Data.modis = modis;
+   end
 
    % Per-variable units from the shared canonical map. Precipitation is m s-1
    % (converted above); the diagnostic mass fluxes are mWE/h rates and swe is
@@ -355,36 +452,38 @@ function [Data, metadata] = finalizeMerraData(Data, site, slab, years, ...
    Data.Properties.VariableUnits = icemodel.forcing.helpers.variableUnits( ...
       string(Data.Properties.VariableNames));
 
-   % Userdata CustomProperties (MERRA carries no terrain height in
-   % these collections; Elev is NaN).
+   % Attach the shared location schema. These MERRA collections carry no
+   % terrain height or surface slope, so both source fields remain NaN.
    [site_x, site_y] = projfwd(proj, site.lat, site.lon);
-   Data = addprop(Data, ...
-      {'X', 'Y', 'Lat', 'Lon', 'Elev', 'Slope', 'ScalarUnits'}, ...
-      repmat({'table'}, 1, 7));
-   Data.Properties.CustomProperties.X = site_x;
-   Data.Properties.CustomProperties.Y = site_y;
-   Data.Properties.CustomProperties.Lat = site.lat;
-   Data.Properties.CustomProperties.Lon = site.lon;
-   Data.Properties.CustomProperties.Elev = NaN;
-   Data.Properties.CustomProperties.Slope = NaN;
-   Data.Properties.CustomProperties.ScalarUnits = ...
-      ["m", "m", "degrees N", "degrees W", "m asl", "m/m"];
+   location_metadata = struct( ...
+      'lat_wgs84', site.lat, 'lon_wgs84', site.lon, ...
+      'x_epsg3413', site_x, 'y_epsg3413', site_y, 'elev_m', NaN);
+   Data = icemodel.forcing.helpers.attachLocationMetadata( ...
+      Data, location_metadata);
 
-   metadata = struct( ...
-      'source_dir', source_dir, ...
-      'collections', {collections'}, ...
-      'n_files', n_files, ...
-      'location_type', site.type, ...
-      'method', kwargs.method, ...
-      'remap', kwargs.remap, ...
-      'grid_start', start, ...
-      'grid_count', count, ...
-      'n_cells', prod(count), ...
-      'lat', site.lat, 'lon', site.lon, ...
-      'humidity_kernel', ...
-      "icemodel.vapor.relative_humidity_from_specific_humidity", ...
-      'mass_flux_units', "precip m s-1; diagnostic fluxes mWE/h (rate)", ...
-      'checks', checks);
+   % Finalize the exact record returned to the caller and persisted on Data.
+   % Starting from the accumulated source proof avoids parallel public and
+   % payload metadata records that can silently drift apart.
+   metadata = artifact_metadata;
+   metadata.source_dir = source_dir;
+   metadata.collections = collections';
+   metadata.n_files = n_files;
+   metadata.location_type = site.type;
+   metadata.method = kwargs.method;
+   metadata.remap = kwargs.remap;
+   metadata.grid_start = start;
+   metadata.grid_count = count;
+   metadata.n_cells = prod(count);
+   metadata.lat = site.lat;
+   metadata.lon = site.lon;
+   metadata.humidity_kernel = ...
+      "icemodel.vapor.relative_humidity_from_specific_humidity";
+   metadata.mass_flux_units = ...
+      "precip m s-1; diagnostic fluxes mWE/h (rate)";
+   metadata.merra_collection_support_hours = support_hours;
+   metadata.checks = checks;
+   metadata = icemodel.forcing.helpers.columnizeMetadata(metadata);
+   Data.Properties.UserData = metadata;
 end
 
 function mask = merraIceMask(glcfile, gridsize)

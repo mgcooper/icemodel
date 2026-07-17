@@ -26,10 +26,15 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    % Channels (canonical units; daily MAR channels interpolated hourly):
    %  hourly: tair [K], shum [kg/kg] (dropped after rh derivation), swd,
    %  lwd, shf, lhf [W m-2], albedo [-], snowf, rainf [m s-1, the canonical
-   %  water-equivalent precipitation rates], melt, runoff, smb [mWE/h];
+   %  water-equivalent precipitation rates], melt [mWE/h], runoff and smb
+   %  [mWE/h, hourly RUH/SMBH where their UTC-day sums match native daily
+   %  RU/SMB, otherwise native daily RU/SMB divided by 24], subl [mWE/h,
+   %  native hourly SUH when available];
    %  daily: snowd [m], cfrac [-], tsfc [K], psfc [Pa]; derived: wspd
    %  [m s-1], wdir [deg] (from UUH/VVH), rh [%] (icemodel.vapor kernel);
-   %  optional: modis [-] (GEUS MODIS daily albedo).
+   %  optional diagnostics: subl_evap [mWE/h, native daily SU/24],
+   %  refreeze_deposition [mWE/h, native daily RZ/24], and daily ME used only
+   %  to validate hourly MEH; modis [-] (GEUS MODIS daily albedo).
    %
    % Inputs
    %  location - [lat lon] point or polyshape (see above)
@@ -50,7 +55,8 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    % Outputs
    %  Data     - hourly timetable with userdata CustomProperties (X, Y,
    %             Lat, Lon, Elev, Slope, ScalarUnits)
-   %  metadata - provenance: files read, cell/polygon info, policies
+   %  metadata - provenance: files read, cell/polygon info, MAR native-daily
+   %             diagnostic policy, and build checks
    %
    % Observation heights (important for the turbulent-flux scheme): MAR's
    % hourly diagnostics are at the standard meteorological heights -
@@ -99,11 +105,12 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    hourly_vars = {
       'tair', 'TTH'  ; 'shum', 'QQH'  ; 'uwind', 'UUH' ; 'vwind', 'VVH'
       'swd',  'SWDH' ; 'lwd',  'LWDH' ; 'albedo', 'ALH'
-      'snowf', 'SFH' ; 'rainf', 'RFH' ; 'melt', 'MEH'  ; 'runoff', 'RUH'
-      'shf',  'SHFH' ; 'lhf',  'LHFH' ; 'smb',  'SMBH'
+      'snowf', 'SFH' ; 'rainf', 'RFH' ; 'melt', 'MEH'
+      'runoff', 'RUH'; 'shf',  'SHFH' ; 'lhf',  'LHFH'; 'smb', 'SMBH'
       };
    daily_vars = {
-      'snowd', 'SHSN2'; 'cfrac', 'CC'; 'tsfc', 'ST'; 'psfc', 'SP'
+      'snowd', 'SHSN2', "none", false; 'cfrac', 'CC', "none", false
+      'tsfc', 'ST', "none", false; 'psfc', 'SP', "none", false
       };
 
    % Accept one location (1x2 point or polyshape, returns a single Data
@@ -112,12 +119,50 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    % is ONE code path: resolve every point's grid hyperslab up front (grid
    % metadata + interpolants read ONCE), then loop years opening each yearly
    % file ONCE and reading every point's hyperslab from that single open.
-   [locations, batch] = locationList(location);
+   [locations, batch] = ...
+      icemodel.forcing.helpers.normalizeLocations(location);
    npts = numel(locations);
 
    files = strings(numel(years), 1);
    for n = 1:numel(years)
       files(n) = locateMarFile(source_dir, years(n));
+   end
+
+   % Read each yearly header once, then reuse the compact schema matrix for all
+   % required and optional availability decisions. Full MAR files are large;
+   % repeated ncinfo calls would add avoidable staging overhead even though no
+   % field data are read here.
+   schema_names = ["RU", "SMB", "SUH", "SU", "RZ", "ME"];
+   schema_available = false(numel(files), numel(schema_names));
+   for n = 1:numel(files)
+      info = ncinfo(files(n));
+      schema_available(n, :) = ismember( ...
+         schema_names, string({info.Variables.Name}));
+   end
+   has_all = @(variables) all(schema_available(:, ...
+      ismember(schema_names, variables)), 'all');
+   if has_all(["RU", "SMB"])
+      daily_vars = [daily_vars; ...
+         {'runoff_daily', 'RU', "site", true; ...
+         'smb_daily', 'SMB', "site", true}];
+   end
+
+   % Optional MAR mass-balance diagnostics are emitted only when every selected
+   % source year declares the native field. This keeps mixed/reduced archives
+   % explicit and avoids filling a missing source year with invented support.
+   if has_all("SUH")
+      hourly_vars = [hourly_vars; {'subl', 'SUH'}];
+   end
+   if has_all("SU")
+      daily_vars = [daily_vars; {'subl_evap', 'SU', "site", true}];
+   end
+   if has_all("RZ")
+      daily_vars = [daily_vars; ...
+         {'refreeze_deposition', 'RZ', "ice", true}];
+   end
+   if has_all("ME")
+      daily_vars = [daily_vars; ...
+         {'melt_daily_reference', 'ME', "ice", true}];
    end
 
    % Per-point grid hyperslab + collapse rule + site metadata, resolved once
@@ -133,7 +178,9 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    % from that single open, then assemble per point.
    parts = cell(numel(years), npts);
    for n = 1:numel(years)
-      blocks = extractOneYear(files(n), hourly_vars, daily_vars, slabs);
+      sectors = cellfun(@(site) site.sector, sites);
+      blocks = extractOneYear( ...
+         files(n), hourly_vars, daily_vars, slabs, sectors);
       for p = 1:npts
          parts{n, p} = assemblePart(blocks, hourly_vars, daily_vars, ...
             collapses{p}, p);
@@ -167,20 +214,6 @@ function filename = locateMarFile(source_dir, yyyy)
          yyyy, source_dir, numel(match))
    end
    filename = string(fullfile(match.folder, match.name));
-end
-
-function [locations, batch] = locationList(location)
-   %LOCATIONLIST Normalize the location input to a 1xN cell of locations.
-   % A polyshape or a single [lat lon] row is one location (batch=false,
-   % single Data timetable). An Nx2 [lat lon] (N>1) is a point list
-   % (batch=true, 1xN cell of Data timetables); a single row stays scalar.
-   if isnumeric(location) && size(location, 2) == 2 && size(location, 1) > 1
-      locations = num2cell(location, 2)';
-      batch = true;
-   else
-      locations = {location};
-      batch = false;
-   end
 end
 
 function grid = resolveGrid(filename, method, remap)
@@ -219,11 +252,17 @@ function [slab, collapse, site] = resolvePoint(grid, location)
       lat = location(1);
       lon = location(2);
       location = [grid.toNativeX(lon, lat), grid.toNativeY(lon, lat)];
+      [~, nearest] = min(hypot(grid.Xnat(:) - location(1), ...
+         grid.Ynat(:) - location(2)));
+      site.sector = 1 + double(grid.srf(nearest) ~= 4);
    elseif isa(location, 'polyshape')
       [vlat, vlon] = projinv(grid.proj, location.Vertices(:, 1), ...
          location.Vertices(:, 2));
       location = polyshape(grid.toNativeX(vlon, vlat), ...
          grid.toNativeY(vlon, vlat));
+      % Polygon remapping already uses the ice-sheet valid mask, so its mass
+      % diagnostics must come from MAR's permanent-ice surface sector.
+      site.sector = 1;
    end
    [start, count, collapse, inslab, site.type] = ...
       icemodel.forcing.helpers.gridLocation(grid.Xnat, grid.Ynat, ...
@@ -240,7 +279,8 @@ function [slab, collapse, site] = resolvePoint(grid, location)
    site.srf_warning = any(slabmean(grid.srf) ~= 4);
 end
 
-function blocks = extractOneYear(filename, hourly_vars, daily_vars, slabs)
+function blocks = extractOneYear( ...
+      filename, hourly_vars, daily_vars, slabs, sectors)
    %EXTRACTONEYEAR Read one MAR year, every point's hyperslab per variable.
    % Opens each yearly file ONCE per variable (the batch reader slices every
    % point's hyperslab from a single open) and returns the raw cells-by-time
@@ -259,8 +299,24 @@ function blocks = extractOneYear(filename, hourly_vars, daily_vars, slabs)
    end
 
    for n = 1:size(daily_vars, 1)
-      [data, ~, Tdaily] = icemodel.forcing.readMar3p11(filename, ...
-         daily_vars{n, 2}, slabs=slabs);
+      sector_mode = string(daily_vars{n, 3});
+      if sector_mode ~= "none"
+         % SU follows the target surface sector; singleton RZ/ME products are
+         % explicitly read from their permanent-ice sector.
+         selected_sectors = sectors;
+         if sector_mode == "ice"
+            selected_sectors = ones(size(sectors));
+         end
+         [data, units, Tdaily] = icemodel.forcing.readMar3p11(filename, ...
+            daily_vars{n, 2}, slabs=slabs, sector=selected_sectors);
+      else
+         [data, units, Tdaily] = icemodel.forcing.readMar3p11(filename, ...
+            daily_vars{n, 2}, slabs=slabs);
+      end
+      if daily_vars{n, 4}
+         assert(string(units) == "mWE/day", ...
+            'MAR daily mass diagnostics must use mWE/day after conversion')
+      end
       blocks.daily{n} = data;
       if n == 1
          blocks.Tdaily = Tdaily;
@@ -278,8 +334,27 @@ function part = assemblePart(blocks, hourly_vars, daily_vars, collapse, p)
       part.(hourly_vars{n, 1}) = collapse(blocks.hourly{n}{p});
    end
    for n = 1:size(daily_vars, 1)
-      part.(daily_vars{n, 1}) = icemodel.forcing.helpers.dailyToHourly( ...
-         collapse(blocks.daily{n}{p}), blocks.Tdaily, part.Time);
+      daily = collapse(blocks.daily{n}{p});
+      if daily_vars{n, 4}
+         % Daily mass rates use exact UTC-day support. RU/SMB remain beside
+         % their hourly products for selective QC; SU/RZ become explicitly
+         % combined diagnostics, while ME is a private MEH validation channel.
+         part.(daily_vars{n, 1}) = ...
+            icemodel.forcing.helpers.dailyToHourly( ...
+            daily / 24, blocks.Tdaily, part.Time, method="previous");
+      else
+         if string(daily_vars{n, 1}) == "cfrac"
+            % Cloud cover is a bounded diagnostic. Endpoint holding plus an
+            % explicit range postcondition prevents year-end extrapolation.
+            part.(daily_vars{n, 1}) = ...
+               icemodel.forcing.helpers.dailyToHourly( ...
+               daily, blocks.Tdaily, part.Time, bounds=[0 1]);
+         else
+            part.(daily_vars{n, 1}) = ...
+               icemodel.forcing.helpers.dailyToHourly( ...
+               daily, blocks.Tdaily, part.Time);
+         end
+      end
    end
 end
 
@@ -296,8 +371,10 @@ function [Data, metadata] = finalizeMarData(Data, files, slab, site, ...
    % a point, conservative (or equal) catchment mean for a polygon (the same
    % selection as the gridded channels). Added on the assembled axis via the
    % shared helper so MAR/MERRA/RACMO resolve MODIS identically.
+   modis_metadata = struct();
    if kwargs.modis_dir ~= ""
-      Data.modis = icemodel.forcing.helpers.modisAlbedoChannel( ...
+      [modis, modis_metadata] = ...
+         icemodel.forcing.helpers.modisAlbedoChannel( ...
          kwargs.modis_dir, years, location, kwargs.method, kwargs.remap, ...
          Data.Time);
    end
@@ -314,14 +391,72 @@ function [Data, metadata] = finalizeMarData(Data, files, slab, site, ...
    % snowfall/rainfall as mWE/h (an hourly water-equivalent depth rate), so
    % dividing by 3600 s/h yields m s-1. Channels use the canonical snowf/rainf
    % names (icemodel.forcing.helpers.metvariables optional split; data2met
-   % derives ppt = rainf + snowf). The diagnostic mass fluxes (melt/runoff/smb)
-   % keep their natural mWE/h rate.
+   % derives ppt = rainf + snowf). Melt keeps its native mWE/h rate.
    for ch = ["snowf", "rainf"]
       Data.(ch) = Data.(ch) / 3600;
    end
 
+   % Native daily delayed RU and daily SMB constrain the hourly diagnostics.
+   % Retain them outside metchecks so missing source days cannot be synthesized
+   % by generic gap filling; the selective helper below preserves raw hourly
+   % structure only where its complete UTC-day aggregate is source-consistent.
+   names = string(Data.Properties.VariableNames);
+   if all(ismember(["runoff_daily", "smb_daily"], names))
+      replacements = struct('runoff', Data.runoff_daily, ...
+         'smb', Data.smb_daily);
+      Data = removevars(Data, {'runoff_daily', 'smb_daily'});
+   else
+      % Some intentionally reduced test/legacy sources contain only hourly
+      % RUH/SMBH. Preserve those source values but mark native-daily QC as not
+      % applicable; production MAR archives carry RU/SMB and take the branch
+      % above. This is a source-schema compatibility hook, not a silent mask.
+      replacements = struct();
+   end
+   if ismember("melt_daily_reference", names)
+      melt_daily_rate = Data.melt_daily_reference;
+      Data = removevars(Data, 'melt_daily_reference');
+   else
+      % Reduced/legacy sources without daily ME retain hourly MEH and receive
+      % explicit not-available validation provenance below.
+      melt_daily_rate = zeros(0, 1);
+   end
+   mass_names = intersect(["runoff", "smb"], ...
+      string(Data.Properties.VariableNames), 'stable');
+   diagnostic_names = intersect( ...
+      ["melt", "subl", "subl_evap", "refreeze_deposition"], ...
+      string(Data.Properties.VariableNames), 'stable');
+   preserved_names = [mass_names, diagnostic_names];
+   native_mass_diagnostics = Data(:, preserved_names);
    [Data, checks] = icemodel.forcing.helpers.metchecks(Data, ...
       fillgaps=kwargs.fillgaps);
+
+   % Generic met gap filling must not turn missing native mass samples into
+   % apparent source support. Restore RUH/SMBH, native hourly MEH-derived melt,
+   % and every optional diagnostic before source-aware QC/provenance classifies
+   % their temporal support.
+   for channel = reshape(preserved_names, 1, [])
+      Data.(channel) = native_mass_diagnostics.(channel);
+   end
+   % MODIS is optional source data: attach it after generic metchecks so a
+   % direct builder call with gap filling cannot invent values in missing years.
+   if isfield(modis_metadata, 'modis_coverage_years') ...
+         && ~isempty(modis_metadata.modis_coverage_years)
+      Data.modis = modis;
+   end
+
+   % Apply source-specific QC after generic met checking so neither the SHSN2
+   % discontinuity mask nor a missing daily mass reference is gap-filled.
+   [Data, snow_metadata] = ...
+      icemodel.forcing.helpers.applyMarSnowDepthQualityControl(Data);
+   [Data, qc_metadata] = ...
+      icemodel.forcing.helpers.applyMarDailyQualityControl( ...
+      Data, replacements, sector=site.sector);
+   snow_fields = fieldnames(snow_metadata);
+   for k = 1:numel(snow_fields)
+      qc_metadata.(snow_fields{k}) = snow_metadata.(snow_fields{k});
+   end
+   qc_metadata = icemodel.forcing.helpers.marDiagnosticMetadata( ...
+      Data, melt_daily_rate, qc_metadata, sector=site.sector);
 
    % Per-variable units from the shared canonical map. Precipitation is m s-1
    % (converted above); the diagnostic mass fluxes are mWE/h rates (cumulative
@@ -329,18 +464,14 @@ function [Data, metadata] = finalizeMarData(Data, files, slab, site, ...
    Data.Properties.VariableUnits = icemodel.forcing.helpers.variableUnits( ...
       string(Data.Properties.VariableNames));
 
-   % Userdata CustomProperties.
-   Data = addprop(Data, ...
-      {'X', 'Y', 'Lat', 'Lon', 'Elev', 'Slope', 'ScalarUnits'}, ...
-      repmat({'table'}, 1, 7));
-   Data.Properties.CustomProperties.X = site.x;
-   Data.Properties.CustomProperties.Y = site.y;
-   Data.Properties.CustomProperties.Lat = site.lat;
-   Data.Properties.CustomProperties.Lon = site.lon;
-   Data.Properties.CustomProperties.Elev = site.elev;
-   Data.Properties.CustomProperties.Slope = site.slope;
-   Data.Properties.CustomProperties.ScalarUnits = ...
-      ["m", "m", "degrees N", "degrees W", "m asl", "m/m"];
+   % Attach the shared location schema while retaining MAR's native terrain
+   % elevation, projected coordinates, and real surface slope.
+   location_metadata = struct( ...
+      'lat_wgs84', site.lat, 'lon_wgs84', site.lon, ...
+      'x_epsg3413', site.x, 'y_epsg3413', site.y, ...
+      'elev_m', site.elev, 'slope', site.slope);
+   Data = icemodel.forcing.helpers.attachLocationMetadata( ...
+      Data, location_metadata);
 
    metadata = struct( ...
       'source_files', files, ...
@@ -352,9 +483,21 @@ function [Data, metadata] = finalizeMarData(Data, files, slab, site, ...
       'n_cells', prod(count), ...
       'lat', site.lat, 'lon', site.lon, ...
       'elev', site.elev, ...
-      'humidity_kernel', ...
-      "icemodel.vapor.relative_humidity_from_specific_humidity", ...
-      'checks', checks);
+       'humidity_kernel', ...
+       "icemodel.vapor.relative_humidity_from_specific_humidity", ...
+       'checks', checks);
+   % The channel helper already resolved exact source years while reading the
+   % physical data, so copying its canonical fields adds no source access.
+   modis_fields = fieldnames(modis_metadata);
+   for k = 1:numel(modis_fields)
+      metadata.(modis_fields{k}) = modis_metadata.(modis_fields{k});
+   end
+   qc_fields = fieldnames(qc_metadata);
+   for k = 1:numel(qc_fields)
+      metadata.(qc_fields{k}) = qc_metadata.(qc_fields{k});
+   end
+   metadata = icemodel.forcing.helpers.columnizeMetadata(metadata);
+   Data.Properties.UserData = metadata;
    if site.srf_warning
       warning('icemodel:forcing:buildMarData:surfaceNotIce', ...
          'MAR surface type at the requested location is not ice sheet')

@@ -5,12 +5,12 @@ function [window_start, window_end] = default_smoke_window(sitename)
    %  [start, end] = icemodel.verification.helpers.default_smoke_window("cdp")
    %
    %  Returns the canonical "one snow water year" window for the given
-   %  ESM-SnowMIP site, used as the default staging window for
-   %  importEsmSnowmip and the default runtime window for
-   %  run_snow_verification_suite. The window is the second insitu year
-   %  (start_year + 1) covering [Oct 1, 0:00 UTC] to [Sep 30, 23:00 UTC].
-   %  Picking the second year lets staging skip any leading spin-up gaps
-   %  in the upstream PANGAEA files.
+   %  ESM-SnowMIP site, used by importEsmSnowmip dry-run previews and as the
+   %  default runtime window for run_snow_verification_suite. Real imports
+   %  without explicit bounds stage the full source record instead. The smoke
+   %  window is the second insitu year (start_year + 1), covering [Oct 1, 0:00
+   %  UTC] to [Sep 30, 23:00 UTC], which avoids leading spin-up gaps in the
+   %  upstream PANGAEA files.
    %
    %  With no argument, defaults to "cdp" (Col de Porte, Menard 2019
    %  ESSD) — the most canonical / widely-cited ESM-SnowMIP snow
@@ -26,7 +26,7 @@ function [window_start, window_end] = default_smoke_window(sitename)
    %    window_end   : datetime (TimeZone='UTC')  Sep 30 23:00 of the
    %                                              following year.
    %
-   % See also: icemodel.verification.helpers.snowmipinfo,
+   % See also: icemodel.verification.setup.esmSnowmipSiteCatalog,
    %  icemodel.verification.setup.importEsmSnowmip,
    %  run_snow_verification_suite
 
@@ -35,7 +35,7 @@ function [window_start, window_end] = default_smoke_window(sitename)
          {icemodel.verification.validators.mustBeSnowmipSite} = "cdp"
    end
 
-   info = icemodel.verification.helpers.snowmipinfo(sitename);
+   info = icemodel.verification.setup.esmSnowmipSiteCatalog(sitename);
    smoke_year = info.insitu_window(1) + 1;
    window_start = datetime(smoke_year, ...
       10, 1, 0, 0, 0, 'TimeZone', 'UTC');

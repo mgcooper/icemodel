@@ -1,4 +1,4 @@
-function source_dir = fetchSumup(kwargs)
+function [source_dir, status] = fetchSumup(kwargs)
    %FETCHSUMUP Locate or verify the SUMup firn source files.
    %
    %  source_dir = icemodel.verification.setup.fetchSumup()
@@ -30,7 +30,7 @@ function source_dir = fetchSumup(kwargs)
    %    Contact:    Baptiste Vandecrux (bav@geus.dk)
    %
    %  Behaviour
-   %    - For each required SUMup variable (density, accumulation,
+   %    - For each required SUMup variable (density, SMB,
    %      temperature), glob-match at least one CSV or NetCDF file.
    %    - On success, return the cache directory so the caller can pass it
    %      to icemodel.verification.setup.importSumup.
@@ -43,10 +43,12 @@ function source_dir = fetchSumup(kwargs)
    %      made explicit rather than hidden behind an automatic download.
    %
    %  Role
-   %    Validator. The fetch helper guarantees the cache directory exists and
-   %    that every required SUMup variable file is present, so downstream
-   %    importers / builders can assume the layout is correct without
-   %    repeating per-file checks. This mirrors fetchEsmSnowmip.
+   %    Validator. With create_cache_dir=true, the fetch helper creates the
+   %    cache directory before checking every required SUMup variable. With
+   %    false, it reports the same status without mutation. A successful strict
+   %    result lets downstream importers/builders assume the layout is complete.
+   %    An empty variables selection returns an empty status without creating or
+   %    scanning cache_dir.
    %
    %  Name-value
    %    cache_dir : string (default data/verification/sumup)
@@ -62,86 +64,83 @@ function source_dir = fetchSumup(kwargs)
    %    silent : logical (default false)
    %        Suppress the retrieval-instructions printout when files are
    %        missing.
+   %    create_cache_dir : logical (default true)
+   %        Create the resolved cache directory before validation.
    %
    %  Returns
    %    source_dir : string
    %        Absolute path to the cache directory.
+   %    status : struct array
+   %        Shared fetch-status rows describing missing cache items.
    %
    % See also: icemodel.verification.setup.importSumup,
    %  icemodel.verification.setup.fetchEsmSnowmip
 
    arguments
       kwargs.cache_dir (1, 1) string = defaultCacheDir()
-      kwargs.variables (1, :) string = ...
-         ["density", "SMB", "temperature"]
+      kwargs.variables (1, :) string ...
+         {mustBeKnownVariables(kwargs.variables)} = variableRegistry()
       kwargs.region   (1, 1) string = "greenland"
       kwargs.strict   (1, 1) logical = true
       kwargs.silent   (1, 1) logical = false
+      kwargs.create_cache_dir (1, 1) logical = true
    end
 
-   cache_dir = kwargs.cache_dir;
+   cache_dir = icemodel.verification.setup.resolveFetchCacheDir( ...
+      kwargs.cache_dir, defaultCacheDir());
 
-   % Ensure the cache directory exists so users following the retrieval banner
-   % can drop files into a path that is already there.
-   icemodel.helpers.ensureDirExists(cache_dir);
+   % Cache creation is explicit so dry-run callers can remain non-mutating.
+   if kwargs.create_cache_dir && ~isempty(kwargs.variables)
+      icemodel.helpers.ensureDirExists(cache_dir);
+   end
 
-   % Per-variable presence check. Each SUMup variable group needs at least one
-   % CSV or NetCDF file matching the release naming pattern for the region.
+   % Build cache status before strict handling.
    missing = missingVariableFiles(cache_dir, kwargs.variables, kwargs.region);
-
-   ok = isempty(missing);
-   if ok
-      source_dir = string(cache_dir);
-      return
-   end
-
-   % Print actionable retrieval instructions when files are missing. The banner
-   % format is stable so developers can grep for it and so it cannot be
-   % confused with a regular error.
-   if ~kwargs.silent
-      fprintf('\n');
-      fprintf('=== SUMup firn source cache incomplete ===\n');
-      fprintf('Cache directory: %s\n', cache_dir);
-      fprintf('Missing variable file patterns:\n');
-      for j = 1:numel(missing)
-         fprintf('  - %s\n', missing(j));
-      end
-      fprintf('\nRetrieval (Arctic Data Center / NSIDC G02288):\n');
-      fprintf('  Dataset:   SUMup 2025 release\n');
-      fprintf('  Data DOI:  https://doi.org/10.18739/A2M61BR5M\n');
-      fprintf('  NSIDC:     https://nsidc.org/data/g02288\n');
-      fprintf('  Files:     SUMup_2025_density_greenland.nc\n');
-      fprintf('             SUMup_2025_SMB_greenland.nc\n');
-      fprintf('             SUMup_2025_temperature_greenland.nc\n');
-      fprintf('  Manual workflow: download the density / SMB / temperature\n');
-      fprintf('  NetCDF files for the region and place them into the cache\n');
-      fprintf('  directory above.\n');
-      fprintf('\nAfter retrieval, re-run:\n');
-      fprintf('  icemodel.verification.setup.fetchSumup()\n');
-      fprintf('  icemodel.verification.setup.importSumup(source_dir, overwrite=true)\n');
-      fprintf('\n');
-   end
-
-   if kwargs.strict
-      error('icemodel:verification:fetchSumup:missingSources', ...
-         ['SUMup firn source cache incomplete in %s. Missing: %s. ' ...
-         'See retrieval instructions above.'], ...
-         cache_dir, strjoin(missing, ', '));
-   end
-
-   source_dir = string(cache_dir);
+   status = icemodel.verification.setup.fetchMissingStatus(missing);
+   source_dir = icemodel.verification.setup.finishFetchStatus( ...
+      cache_dir, status, strict=kwargs.strict, silent=kwargs.silent, ...
+      error_id="icemodel:verification:fetchSumup:missingSources", ...
+      error_label="SUMup", ...
+      banner_callback=@(~, ~, items) printRetrievalBanner(cache_dir, items), ...
+      error_callback=@(~, ~, items) throwMissingSources(cache_dir, items));
 end
 
 %% Local helpers
+function printRetrievalBanner(cache_dir, missing)
+   %PRINTRETRIEVALBANNER Print SUMup retrieval instructions.
+   fprintf('\n');
+   fprintf('=== SUMup firn source cache incomplete ===\n');
+   fprintf('Cache directory: %s\n', cache_dir);
+   fprintf('Missing variable file patterns:\n');
+   for j = 1:numel(missing)
+      fprintf('  - %s\n', missing(j));
+   end
+   fprintf('\nRetrieval (Arctic Data Center / NSIDC G02288):\n');
+   fprintf('  Dataset:   SUMup 2025 release\n');
+   fprintf('  Data DOI:  https://doi.org/10.18739/A2M61BR5M\n');
+   fprintf('  NSIDC:     https://nsidc.org/data/g02288\n');
+   fprintf('  Files:     SUMup_2025_density_greenland.nc\n');
+   fprintf('             SUMup_2025_SMB_greenland.nc\n');
+   fprintf('             SUMup_2025_temperature_greenland.nc\n');
+   fprintf('  Manual workflow: download the density / SMB / temperature\n');
+   fprintf('  NetCDF files for the region and place them into the cache\n');
+   fprintf('  directory above.\n');
+   fprintf('\nAfter retrieval, re-run:\n');
+   fprintf('  icemodel.verification.setup.fetchSumup()\n');
+   fprintf('  icemodel.verification.setup.importSumup(source_dir, overwrite=true)\n');
+   fprintf('\n');
+end
+
+function throwMissingSources(cache_dir, missing)
+   %THROWMISSINGSOURCES Raise the SUMup missing-cache error.
+   error('icemodel:verification:fetchSumup:missingSources', ...
+      ['SUMup firn source cache incomplete in %s. Missing: %s. ' ...
+      'See retrieval instructions above.'], cache_dir, strjoin(missing, ', '));
+end
+
 function pathname = defaultCacheDir()
    %DEFAULTCACHEDIR Canonical SUMup source-cache directory.
-   %
-   % icemodel.getpath('data') returns the canonical top-level data root
-   % (<repo>/data/), which the verification source-cache layout extends under
-   % data/verification/<dataset_family>/ (family-flat taxonomy; the same
-   % layout used by ESM-SnowMIP and the other families).
-   pathname = string(fullfile(icemodel.getpath('data'), ...
-      'verification', 'sumup'));
+   pathname = icemodel.forcing.helpers.verificationSourceDir("", "sumup");
 end
 
 function missing = missingVariableFiles(cache_dir, variables, region)
@@ -169,4 +168,19 @@ function missing = missingVariableFiles(cache_dir, variables, region)
    end
 
    missing = missing(1:n_missing);
+end
+
+function variables = variableRegistry()
+   %VARIABLEREGISTRY Return supported SUMup variable groups in fetch order.
+   variables = ["density", "SMB", "temperature"];
+end
+
+function mustBeKnownVariables(variables)
+   %MUSTBEKNOWNVARIABLES Reject typos before cache creation or discovery.
+   bad = setdiff(reshape(string(variables), 1, []), ...
+      variableRegistry(), 'stable');
+   if ~isempty(bad)
+      error('icemodel:verification:fetchSumup:unknownVariable', ...
+         'unknown SUMup variable group(s): %s', strjoin(bad, ', '));
+   end
 end

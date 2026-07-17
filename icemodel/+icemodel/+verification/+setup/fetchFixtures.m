@@ -70,11 +70,11 @@ function result = fetchFixtures(version, kwargs)
 
    arguments
       version (1, 1) string = ""
-      kwargs.root (1, 1) string = string(icemodel.internal.fullpath('demo', 'data'))
+      kwargs.root (1, 1) string = icemodel.internal.fullpath('demo', 'data')
       kwargs.manifest (1, 1) string = ""
       kwargs.archive (1, 1) string = ""
-      kwargs.staging_dir (1, 1) string = string(icemodel.internal.fullpath('release-staging'))
-      kwargs.extract (1, 1) logical = false
+      kwargs.staging_dir (1, 1) string = icemodel.internal.fullpath('release-staging')
+      kwargs.extract (1, 1) logical = true
       kwargs.repo (1, 1) string = "mgcooper/icemodel"
       kwargs.strict (1, 1) logical = true
       kwargs.silent (1, 1) logical = false
@@ -83,15 +83,12 @@ function result = fetchFixtures(version, kwargs)
    root = kwargs.root;
 
    % Ensure the demo data root exists so a download banner points at a path that
-   % is already there (mirrors fetchSumup creating its cache dir).
+   % is already there.
    icemodel.helpers.ensureDirExists(root);
 
-   % Mode 1: if a local archive was given, extract it into the demo data root.
-   % Extraction defaults on when an archive is supplied; an explicit extract
-   % kwarg can force it off (verify the archive's manifest against what is
-   % already on disk).
-   do_extract = kwargs.extract || (strlength(kwargs.archive) > 0 && ~kwargs.extract);
-   if strlength(kwargs.archive) > 0 && (kwargs.extract || do_extract)
+   % Mode 1: extract a local archive only when requested. With extract=false the
+   % helper verifies the archive manifest against files already on disk.
+   if strlength(kwargs.archive) > 0 && kwargs.extract
       if ~isfile(kwargs.archive)
          error('icemodel:verification:fetchFixtures:noArchive', ...
             'Archive not found: %s', kwargs.archive);

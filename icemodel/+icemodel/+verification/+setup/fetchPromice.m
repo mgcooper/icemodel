@@ -9,6 +9,8 @@ function [source_dir, status] = fetchPromice(kwargs)
    %  Cache validator for local PROMICE station NetCDF files and required AWS
    %  metadata tables. It does not download data; it reports missing local
    %  files so staging can fail early in strict mode or skip per site.
+   %  An empty products selection returns an empty status without creating or
+   %  scanning cache_dir.
 
    arguments
       kwargs.cache_dir (1, 1) string = defaultCacheDir()
@@ -17,43 +19,38 @@ function [source_dir, status] = fetchPromice(kwargs)
          ["hour", "day", "month"])} = "hour"
       kwargs.strict (1, 1) logical = true
       kwargs.silent (1, 1) logical = false
+      kwargs.create_cache_dir (1, 1) logical = true
    end
 
-   cache_dir = kwargs.cache_dir;
-   if cache_dir == ""
-      cache_dir = defaultCacheDir();
-   end
-   icemodel.helpers.ensureDirExists(cache_dir);
-
-   % Build status before throwing so callers can inspect the cache manifest in
-   % dry-run or skip-missing mode.
-   status = cacheStatus(cache_dir, kwargs.products, kwargs.stations);
-   missing = string({status(~[status.present]).product});
-
-   if isempty(missing)
+   cache_dir = icemodel.verification.setup.resolveFetchCacheDir( ...
+      kwargs.cache_dir, defaultCacheDir());
+   if isempty(kwargs.products)
+      % A caller selecting no products has no cache contract to validate.
       source_dir = cache_dir;
+      status = repmat(emptyRow(), 1, 0);
       return
    end
-
-   % Keep the message actionable without embedding download behavior in tests or
-   % staging helpers.
-   if ~kwargs.silent
-      fprintf('\n');
-      fprintf('=== PROMICE source cache incomplete ===\n');
-      fprintf('Cache directory: %s\n', cache_dir);
-      fprintf('Missing products: %s\n', strjoin(missing, ', '));
-      fprintf('\nExpected pypromice L3 files under cache_dir/<product>/ and\n');
-      fprintf('AWS_sites_metadata.csv, AWS_stations_metadata.csv, AWS_variables.csv\n');
-      fprintf('at the cache root. Source portal: https://promice.org\n\n');
+   if kwargs.create_cache_dir
+      icemodel.helpers.ensureDirExists(cache_dir);
    end
 
-   if kwargs.strict
-      error('icemodel:verification:fetchPromice:missingSources', ...
-         'PROMICE source cache incomplete in %s. Missing: %s', ...
-         cache_dir, strjoin(missing, ', '));
-   end
+   % Build cache status before strict handling.
+   status = cacheStatus(cache_dir, kwargs.products, kwargs.stations);
+   source_dir = icemodel.verification.setup.finishFetchStatus( ...
+      cache_dir, status, strict=kwargs.strict, silent=kwargs.silent, ...
+      error_id="icemodel:verification:fetchPromice:missingSources", ...
+      error_label="PROMICE", banner_callback=@printRetrievalBanner);
+end
 
-   source_dir = cache_dir;
+function printRetrievalBanner(cache_dir, ~, missing)
+   %PRINTRETRIEVALBANNER Print PROMICE retrieval instructions.
+   fprintf('\n');
+   fprintf('=== PROMICE source cache incomplete ===\n');
+   fprintf('Cache directory: %s\n', cache_dir);
+   fprintf('Missing products: %s\n', strjoin(missing, ', '));
+   fprintf('\nExpected pypromice L3 files under cache_dir/<product>/ and\n');
+   fprintf('AWS_sites_metadata.csv, AWS_stations_metadata.csv, AWS_variables.csv\n');
+   fprintf('at the cache root. Source portal: https://promice.org\n\n');
 end
 
 function pathname = defaultCacheDir()

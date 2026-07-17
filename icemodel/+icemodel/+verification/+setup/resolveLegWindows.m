@@ -1,7 +1,7 @@
-function leg = resolveLegWindows(models, coverage, window_start, window_end)
+function leg = resolveLegWindows(sources, coverage, window_start, window_end)
    %RESOLVELEGWINDOWS Decouple each gridded RCM leg's window from the met window.
    %
-   %  leg = icemodel.verification.setup.resolveLegWindows(models, coverage, ...
+   %  leg = icemodel.verification.setup.resolveLegWindows(sources, coverage, ...
    %     window_start, window_end)
    %
    %  Resolves, for each requested gridded source, the calendar window/years to
@@ -21,7 +21,7 @@ function leg = resolveLegWindows(models, coverage, window_start, window_end)
    %      file; an unbounded window falls back to RACMO's full coverage.
    %
    %  Inputs
-   %    models       : string vector subset of ["mar","merra","racmo"] (other
+   %    sources      : string vector subset of ["mar","merra","racmo"] (other
    %                   entries, e.g. "promice", are ignored - PROMICE is not a
    %                   gridded RCM leg).
    %    coverage     : struct from promiceSourceCoverage (per-source year ranges).
@@ -39,13 +39,13 @@ function leg = resolveLegWindows(models, coverage, window_start, window_end)
 
    leg = struct();
 
-   if ismember("mar", models)
+   if ismember("mar", sources)
       leg.mar = capLeg(coverage.mar, window_start, window_end, "MAR");
    end
-   if ismember("merra", models)
+   if ismember("merra", sources)
       leg.merra = capLeg(coverage.merra, window_start, window_end, "MERRA-2");
    end
-   if ismember("racmo", models)
+   if ismember("racmo", sources)
       % RACMO is intersected with the requested window like MAR/MERRA:
       % staging RACMO's full 2012-2018 span for a station whose observations are
       % entirely outside it (e.g. a 2022+ record) produces a zero-overlap,
@@ -64,9 +64,8 @@ function L = capLeg(cov, window_start, window_end, label)
       return
    end
 
-   % An unbounded (NaT) requested window means "all available" - fall back to
-   % the source's full on-disk coverage (mirrors ownLeg). This is the SUMup
-   % all-available default; PROMICE always passes a bounded station window.
+   % An unbounded (NaT) requested window means "all available" - use the
+   % source's full on-disk coverage.
    if isnat(window_start) || isnat(window_end)
       L = ownLeg(cov, label);
       return

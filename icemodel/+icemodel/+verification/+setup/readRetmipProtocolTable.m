@@ -35,24 +35,31 @@ function [data, metadata] = readRetmipProtocolTable(filename, kwargs)
    % Normalize protocol userdata to the comparison names used by manifests while
    % retaining the source variable inventory in metadata.
    raw_variables = string(data.Properties.VariableNames);
-   data = canonicalizeProtocolVariables(data);
+   data = canonicalizeProtocolVariables(data, kwargs.expected_hours);
 
    metadata = struct( ...
       'filename', filename, ...
       'time_variable', time_name, ...
       'timestep_hours', kwargs.expected_hours, ...
+      'mass_flux_policy', ...
+         "source mm w.e. timestep amounts converted to canonical mWE/h", ...
+      'mass_flux_conversion_factor', 1e-3 / kwargs.expected_hours, ...
       'variables', string(data.Properties.VariableNames), ...
       'raw_variables', raw_variables);
 end
 
-function data = canonicalizeProtocolVariables(data)
+function data = canonicalizeProtocolVariables(data, timestep_hours)
    %CANONICALIZEPROTOCOLVARIABLES Map RetMIP protocol names to eval variables.
    names = string(data.Properties.VariableNames);
-   data = copyAs(data, names, "Tsurf_K", "tsfc", 0);
-   data = copyAs(data, names, "Tsurf_degC", "tsfc", 273.15);
-   data = copyAs(data, names, "melt_mmweq", "melt", 0);
+   data = copyAs(data, names, "Tsurf_K", "tsfc", 0, 1);
+   data = copyAs(data, names, "Tsurf_degC", "tsfc", 273.15, 1);
+
+   % RetMIP posts mass as millimetres water equivalent accumulated over each
+   % three-hour interval. Canonical melt-style diagnostics are rates [mWE/h].
+   mass_flux_scale = 1e-3 / timestep_hours;
+   data = copyAs(data, names, "melt_mmweq", "melt", 0, mass_flux_scale);
    data = copyAs(data, names, ["acc_subl_mmweq", "net_acc_mmweq"], ...
-      "snowf_subl", 0);
+      "snowf_subl", 0, mass_flux_scale);
 
    % The protocol does not split precipitation phase, so keep explicit empty
    % placeholders for consumers that expect the standard met-like channels.
@@ -63,7 +70,7 @@ function data = canonicalizeProtocolVariables(data)
    end
 end
 
-function data = copyAs(data, names, sources, target, offset)
+function data = copyAs(data, names, sources, target, offset, scale)
    %COPYAS Copy the first present source variable to a canonical target.
    if ismember(target, string(data.Properties.VariableNames))
       return
@@ -74,7 +81,7 @@ function data = copyAs(data, names, sources, target, offset)
       return
    end
 
-   data.(target) = data.(hit) + offset;
+   data.(target) = (data.(hit) + offset) .* scale;
    if hit ~= target
       data.(hit) = [];
    end

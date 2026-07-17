@@ -94,6 +94,24 @@ function s = resolveOne(name, map)
       return
    end
 
+   % ESM-SnowMIP soil-temperature channels carry depth in the variable name.
+   if ~isempty(regexp(name, '^soil_temp_\d+_C$', 'once'))
+      s = emptyInfo();
+      s.long_name = char(name + " soil temperature");
+      s.unit = 'degC';
+      return
+   end
+
+   % ESM-SnowMIP snow-depth observations use site-specific native names.
+   if ~isempty(regexp(name, '^snd_.*_m$', 'once'))
+      s = emptyInfo();
+      s.standard_name = 'surface_snow_thickness';
+      s.long_name = char(name + " snow depth");
+      s.unit = 'm';
+      s.is_cf = true;
+      return
+   end
+
    error('icemodel:netcdf:variable:unknownChannel', ...
       ['no canonical metadata for channel "%s"; add it to ' ...
       'icemodel.netcdf.defaults.variables'], name)

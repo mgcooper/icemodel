@@ -20,6 +20,8 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
    %    observations.smb                period-indexed TABLE with start_date /
    %                                    end_date datetimes (signed surface mass
    %                                    balance: accumulation OR ablation)
+   %    metadata                        per-bundle provenance including exact
+   %                                    raw/unique/duplicate-removed row counts
    %  Each sub-bundle is present only when the corresponding SUMup variable
    %  file is in the cache and has a record within radius_km of the point.
    %
@@ -54,15 +56,16 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
    %    metadata     : struct  provenance + which variables were found
    %
    %  Role
-   %    Reusable per-point SUMup observation builder, symmetric with
-   %    buildSumupForcing. Used by importSumup. The low-level SUMup file
-   %    parsing is intentionally isolated here so importSumup stays a staging
-   %    orchestrator.
+   %    Reusable per-point SUMup observation builder used by importSumup. The
+   %    low-level SUMup file parsing is intentionally isolated here so
+   %    importSumup stays a staging orchestrator.
    %
    %  The concrete SUMup parsing targets the real 2025 release Greenland files
    %  (grouped NetCDF: /DATA + /METADATA). When the cache is missing, fetchSumup
    %  (strict=true) errors with the retrieval banner rather than fabricating
-   %  records.
+   %  records. Exact scientific duplicates are removed after spatial/window
+   %  selection and before this datetime shaping; aliases/elevation retain the
+   %  first selected source row as provenance.
    %
    %  icemodel.verification.setup.importSumup,
    %  icemodel.verification.setup.fetchSumup
@@ -75,62 +78,182 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
       kwargs.enddate   = ""
    end
 
+   % Reject malformed public windows before resolving or probing the SUMup cache.
+   [window_start, window_end, has_window] = ...
+      icemodel.internal.pairedWindow( ...
+      kwargs.startdate, kwargs.enddate);
+
    % Resolve and verify the cache (fetch is the single source of truth for
    % "are the SUMup files present?"). strict=true errors with the retrieval
    % banner when the cache is empty, so this builder never fabricates records.
    source_dir = icemodel.verification.setup.fetchSumup( ...
-      cache_dir=resolveCacheDir(kwargs.source_dir), strict=true);
+      cache_dir=icemodel.verification.setup.sumupCacheDir(kwargs.source_dir), ...
+      strict=true);
 
-   % Resolve the optional comparison window.
-   has_start = ~strcmp(string(kwargs.startdate), "");
-   has_end = ~strcmp(string(kwargs.enddate), "");
-   if has_start ~= has_end
-      error('icemodel:verification:buildSumupObservations:halfWindow', ...
-         'startdate and enddate must be provided together')
+   % Use the normalized optional comparison window for all three source readers.
+   if ~has_window
+      window_start = "";
+      window_end = "";
    end
 
    % Read each SUMup variable group nearest the point. Each reader returns a
    % table and a per-variable provenance note, or empty when no record falls
    % within radius_km. The 2025 release stores the measured channel as `SMB`
    % (the firn accumulation/SMB observation source).
-   [density, density_note] = readSumupVariable(source_dir, "density", ...
-      point, kwargs.radius_km, kwargs.startdate, kwargs.enddate);
-   [temperature, temp_note] = readSumupVariable(source_dir, "temperature", ...
-      point, kwargs.radius_km, kwargs.startdate, kwargs.enddate);
+   [density, density_note, density_counts] = ...
+      readSumupVariable(source_dir, "density", ...
+      point, kwargs.radius_km, window_start, window_end);
+   [temperature, temp_note, temperature_counts] = ...
+      readSumupVariable(source_dir, "temperature", ...
+      point, kwargs.radius_km, window_start, window_end);
    % SMB (surface mass balance) - the third obs axis. NOT "accumulation": SUMup
    % spans accumulation AND ablation zones, so this quantity is signed SMB
    % (positive net accumulation / negative net ablation), not accumulation per se.
-   [smb, smb_note] = readSumupVariable(source_dir, "SMB", ...
-      point, kwargs.radius_km, kwargs.startdate, kwargs.enddate);
+   [smb, smb_note, smb_counts] = readSumupVariable(source_dir, "SMB", ...
+      point, kwargs.radius_km, window_start, window_end);
 
    observations = struct( ...
       'format', 'subsurface_profile_bundle', ...
       'density', density, ...
       'subsurface_temperature', temperature, ...
       'smb', smb);
+   observations = icemodel.verification.setup.stampArtifactMetadata( ...
+      observations);
+   % Reported uncertainties have the same physical units as their measured
+   % channel; the generic `error` name cannot supply that context by itself.
+   observations.density = stampObservedUncertaintyUnits( ...
+      observations.density, "density");
+   observations.subsurface_temperature = stampObservedTemperatureUnits( ...
+      observations.subsurface_temperature);
+   observations.subsurface_temperature = stampObservedUncertaintyUnits( ...
+      observations.subsurface_temperature, "subsurface_temperature");
+   observations.smb = stampObservedSmbUnits(observations.smb);
+   observations.smb = stampObservedUncertaintyUnits( ...
+      observations.smb, "smb");
+
+   % Record the actual observation coverage so unbounded imports can still
+   % write inspectable manifest periods without imposing a hidden fixed window.
+   [period_start, period_end] = observationPeriod(observations);
 
    metadata = icemodel.verification.setup.metadataStruct({ ...
       'observation_source', 'SUMup 2025 release (NSIDC G02288)'
       'point_lat_wgs84', point(1)
       'point_lon_wgs84', point(2)
       'selection_radius_km', kwargs.radius_km
+      'observation_period_start', period_start
+      'observation_period_end', period_end
       'density_note', density_note
+      'density_raw_rows', density_counts.raw_rows
+      'density_unique_rows', density_counts.unique_rows
+      'density_duplicate_rows_removed', density_counts.removed_rows
       'subsurface_temperature_note', temp_note
-      'smb_note', smb_note});
+      'subsurface_temperature_raw_rows', temperature_counts.raw_rows
+      'subsurface_temperature_unique_rows', temperature_counts.unique_rows
+      'subsurface_temperature_duplicate_rows_removed', ...
+      temperature_counts.removed_rows
+      'smb_note', smb_note
+      'smb_raw_rows', smb_counts.raw_rows
+      'smb_unique_rows', smb_counts.unique_rows
+      'smb_duplicate_rows_removed', smb_counts.removed_rows});
 end
 
-%% Local helpers
-function cache_dir = resolveCacheDir(source_dir)
-   %RESOLVECACHEDIR Resolve the SUMup cache dir, defaulting to the standard one.
-   if strlength(source_dir) > 0
-      cache_dir = source_dir;
+function [t1, t2] = observationPeriod(observations)
+   %OBSERVATIONPERIOD Return min/max datetimes across SUMup observation tables.
+   t = NaT(0, 1, 'TimeZone', 'UTC');
+   fields = string(fieldnames(observations));
+   for k = 1:numel(fields)
+      value = observations.(fields(k));
+      if istimetable(value)
+         t = appendTimes(t, value.Time);
+      elseif istable(value)
+         if ismember("datetime", string(value.Properties.VariableNames))
+            t = appendTimes(t, value.datetime);
+         end
+         if all(ismember(["start_date", "end_date"], ...
+               string(value.Properties.VariableNames)))
+            t = appendTimes(t, value.start_date);
+            t = appendTimes(t, value.end_date);
+         end
+      end
+   end
+
+   if isempty(t)
+      t1 = NaT(1, 1, 'TimeZone', 'UTC');
+      t2 = NaT(1, 1, 'TimeZone', 'UTC');
    else
-      cache_dir = string(fullfile(icemodel.getpath('data'), ...
-         'verification', 'sumup'));
+      t1 = min(t);
+      t2 = max(t);
    end
 end
 
-function [record, note] = readSumupVariable(source_dir, variable, point, ...
+function out = appendTimes(out, values)
+   %APPENDTIMES Add finite datetimes to an accumulated UTC datetime vector.
+   values = values(:);
+   values = values(~isnat(values));
+   if isempty(values)
+      return
+   end
+   if isempty(values.TimeZone)
+      values.TimeZone = 'UTC';
+   end
+   values.TimeZone = 'UTC';
+   out = [out; values];
+end
+
+function smb = stampObservedSmbUnits(smb)
+   %STAMPOBSERVEDSMBUNITS Override forcing-rate metadata for SUMup SMB.
+   if ~istable(smb) || ~ismember("smb", string(smb.Properties.VariableNames))
+      return
+   end
+
+   idx = find(string(smb.Properties.VariableNames) == "smb", 1);
+   smb.Properties.VariableUnits{idx} = 'm w.e.';
+   smb.Properties.VariableDescriptions{idx} = ...
+      'accumulated surface mass balance over the observation interval';
+   if isprop(smb.Properties.CustomProperties, "StandardNames")
+      smb.Properties.CustomProperties.StandardNames(idx) = "";
+   end
+end
+
+function temperature = stampObservedTemperatureUnits(temperature)
+   %STAMPOBSERVEDTEMPERATUREUNITS Keep SUMup profile temperatures in Celsius.
+   if ~(istable(temperature) || istimetable(temperature)) ...
+         || ~ismember("subsurface_temperature", ...
+         string(temperature.Properties.VariableNames))
+      return
+   end
+
+   idx = find(string(temperature.Properties.VariableNames) ...
+      == "subsurface_temperature", 1);
+   temperature.Properties.VariableUnits{idx} = 'degC';
+   temperature.Properties.VariableDescriptions{idx} = ...
+      'observed subsurface temperature';
+   if isprop(temperature.Properties.CustomProperties, "StandardNames")
+      temperature.Properties.CustomProperties.StandardNames(idx) = "";
+   end
+end
+
+function artifact = stampObservedUncertaintyUnits(artifact, measured_name)
+   %STAMPOBSERVEDUNCERTAINTYUNITS Apply the measured channel's units to error.
+   names = string.empty(1, 0);
+   if istable(artifact) || istimetable(artifact)
+      names = string(artifact.Properties.VariableNames);
+   end
+   if ~all(ismember([measured_name, "error"], names))
+      return
+   end
+
+   measured_idx = find(names == measured_name, 1);
+   error_idx = find(names == "error", 1);
+   artifact.Properties.VariableUnits{error_idx} = ...
+      artifact.Properties.VariableUnits{measured_idx};
+   artifact.Properties.VariableDescriptions{error_idx} = ...
+      sprintf('reported uncertainty in %s', measured_name);
+end
+
+%% Local helpers
+function [record, note, counts] = readSumupVariable(source_dir, variable, ...
+      point, ...
       radius_km, startdate, enddate)
    %READSUMUPVARIABLE Read the nearest SUMup records for one variable group.
    %
@@ -150,16 +273,19 @@ function [record, note] = readSumupVariable(source_dir, variable, point, ...
    % reference_short. The reader is scoped to the Greenland files via the glob.
 
    record = [];
+   counts = struct('raw_rows', 0, 'unique_rows', 0, 'removed_rows', 0);
    nc = dir(fullfile(source_dir, sprintf('*%s*greenland*.nc', variable)));
 
    if isempty(nc)
-      note = sprintf('no SUMup %s greenland file in cache', variable);
+      note = sprintf([ ...
+         'no SUMup %s greenland file in cache; rows raw=0 unique=0 ' ...
+         'duplicates_removed=0'], variable);
       return
    end
 
    file = fullfile(nc(1).folder, nc(1).name);
    tbl = readSumupNetcdf(file, variable);
-   [record, note] = selectNearest( ...
+   [record, note, counts] = selectNearest( ...
       tbl, point, radius_km, startdate, enddate, variable);
 end
 
@@ -198,6 +324,11 @@ function tbl = readSumupNetcdf(file, variable)
       tbl.(name) = double(v(:));
    end
 
+   % measurement_id is the native NetCDF dimension rather than a coordinate
+   % variable. Preserve its one-based source row index as provenance, but keep it
+   % outside scientific identity because duplicate groups have distinct ids.
+   tbl.measurement_id = (1:height(tbl))';
+
    % Resolve name_key -> name (core / location label) from /METADATA. The
    % /METADATA/name char matrix is fixed-width: each name is padded to the
    % column width with trailing NUL (char 0) and/or space. Strip both so the
@@ -212,10 +343,11 @@ function tbl = readSumupNetcdf(file, variable)
    tbl.name = names;
 end
 
-function [record, note] = selectNearest(tbl, point, radius_km, ...
+function [record, note, counts] = selectNearest(tbl, point, radius_km, ...
       startdate, enddate, variable)
    %SELECTNEAREST Keep table rows within radius_km of the point (optional window).
    record = [];
+   counts = struct('raw_rows', 0, 'unique_rows', 0, 'removed_rows', 0);
 
    proj = icemodel.forcing.helpers.psnProjection();
    [px, py] = projfwd(proj, point(1), point(2));
@@ -223,54 +355,76 @@ function [record, note] = selectNearest(tbl, point, radius_km, ...
    d_km = hypot(rx - px, ry - py) / 1000;
    keep = d_km <= radius_km;
 
-   % Optional temporal window. Density/temperature carry `timestamp`; SMB
-   % carries a `start_date` span. Both are int64 days since 1900-01-01.
-   time_name = "";
-   if ismember("timestamp", string(tbl.Properties.VariableNames))
-      time_name = "timestamp";
-   elseif ismember("start_date", string(tbl.Properties.VariableNames))
-      time_name = "start_date";
-   end
-   if time_name ~= "" && ~strcmp(string(startdate), "")
-      t = datetime(1900, 1, 1) + days(tbl.(time_name));
-      t.TimeZone = 'UTC';
+   % Optional temporal window. Point observations use timestamp containment.
+   % SMB period observations are accumulated over their full start/end interval,
+   % so explicit windows retain only records fully contained in that window.
+   names = string(tbl.Properties.VariableNames);
+   if ismember("timestamp", names) && ~strcmp(string(startdate), "")
+      t = sumupDatetime(tbl.timestamp);
       t1 = icemodel.verification.setup.ensureUtc(startdate);
       t2 = icemodel.verification.setup.ensureUtc(enddate);
       keep = keep & t >= t1 & t <= t2;
+   elseif all(ismember(["start_date", "end_date"], names)) ...
+         && ~strcmp(string(startdate), "")
+      t_start = sumupDatetime(tbl.start_date);
+      t_end = sumupDatetime(tbl.end_date);
+      t1 = icemodel.verification.setup.ensureUtc(startdate);
+      t2 = icemodel.verification.setup.ensureUtc(enddate);
+      keep = keep & t_start >= t1 & t_end <= t2;
    end
 
    if ~any(keep)
-      note = sprintf('no SUMup %s record within %.1f km', variable, radius_km);
+      note = sprintf([ ...
+         'no SUMup %s record within %.1f km; rows raw=0 unique=0 ' ...
+         'duplicates_removed=0'], variable, radius_km);
       return
    end
    record = tbl(keep, :);
 
+   % Scientific identity is resolved while every source field is still numeric.
+   % Keep the pre-dedup profile count for the existing selection provenance.
+   n_profiles = numel(unique(record.name_key));
+   [record, counts.raw_rows, counts.unique_rows, counts.removed_rows] = ...
+      icemodel.verification.setup.deduplicateSumupRecords(record, variable);
+
    % Attach real UTC datetimes from the SUMup days-since-1900 integers, and
    % shape each variable to its natural index axis (see header). Temperature is
    % a time series -> datetime-indexed timetable; density is a depth profile ->
-   % table + profile datetime column; accumulation is a period observation ->
+   % table + profile datetime column; SMB is a period observation ->
    % table with start_date/end_date as datetimes.
    record = attachDatetimes(record, variable);
 
-   note = sprintf('%d SUMup %s record(s) within %.1f km of %d profile(s)', ...
-      nnz(keep), variable, radius_km, numel(unique(record.name_key)));
+   note = sprintf([ ...
+      '%d SUMup %s record(s) within %.1f km of %d profile(s); ' ...
+      'rows raw=%d unique=%d duplicates_removed=%d'], ...
+      counts.unique_rows, variable, radius_km, n_profiles, ...
+      counts.raw_rows, counts.unique_rows, counts.removed_rows);
 end
 
 function record = attachDatetimes(record, variable)
    %ATTACHDATETIMES Convert SUMup days-since-1900 integers to UTC datetimes.
-   epoch = datetime(1900, 1, 1, 'TimeZone', 'UTC');
    switch lower(char(variable))
       case "temperature"
          % Subsurface temperature is a time series: index by measurement time.
-         t = epoch + days(record.timestamp);
+         t = sumupDatetime(record.timestamp);
          record.timestamp = [];
          record = table2timetable(record, 'RowTimes', t);
+         record = renamevars(record, "temperature", ...
+            "subsurface_temperature");
+         record.Properties.DimensionNames{1} = 'Time';
       case "density"
          % Depth profile: keep the table, add the profile datetime column.
-         record.datetime = epoch + days(record.timestamp);
+         record.datetime = sumupDatetime(record.timestamp);
+         record.timestamp = [];
       case "smb"
          % Period observation: replace the integer span with datetimes.
-         record.start_date = epoch + days(record.start_date);
-         record.end_date = epoch + days(record.end_date);
+         record.start_date = sumupDatetime(record.start_date);
+         record.end_date = sumupDatetime(record.end_date);
    end
+end
+
+function t = sumupDatetime(days_since_1900)
+   %SUMUPDATETIME Convert SUMup day offsets to UTC datetime values.
+   epoch = datetime(1900, 1, 1, 'TimeZone', 'UTC');
+   t = epoch + days(days_since_1900);
 end

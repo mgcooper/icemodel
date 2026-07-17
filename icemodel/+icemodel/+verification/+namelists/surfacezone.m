@@ -17,13 +17,13 @@ function surface_zones = surfacezone()
    %  the case sits. It deliberately does NOT carry capability descriptors such
    %  as "bare_ice" or "seasonal_snow" - those are eval_target values. The single
    %  source of truth for a PROMICE anchor's zone is
-   %  icemodel.verification.helpers.promicesiteinfo(site).surface_zone, which uses
+   %  icemodel.verification.setup.promiceSiteCatalog(site).surface_zone, which uses
    %  this vocabulary. An empty surface_zone ("") is permitted for analytical
    %  cases where the regime is not meaningful (e.g. the Laugh-Tests Colbeck
    %  benchmark).
    %
    % See also: icemodel.verification.namelists.evaltarget,
-   %  icemodel.verification.helpers.promicesiteinfo
+   %  icemodel.verification.setup.promiceSiteCatalog
 
    % Keep this explicit so adding a new zone is a deliberate schema change.
    % Ordered low-to-high on a Greenland ice-sheet transect (ablation through

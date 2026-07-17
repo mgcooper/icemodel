@@ -17,7 +17,7 @@ function time = readNetcdfTime(pathname, varname)
    %  Returns
    %    time : datetime column (TimeZone = 'UTC')
    %
-   % See also: icemodel.verification.setup.readObsChannel,
+   % See also: icemodel.verification.setup.readNetcdfVariable,
    %  icemodel.verification.setup.buildEsmSnowmipForcing,
    %  icemodel.verification.setup.buildEsmSnowmipObservations
 

@@ -4,13 +4,16 @@ function [data, units, Time] = readMar3p11(filename, varname, kwargs)
    %  [data, units, Time] = icemodel.forcing.readMar3p11(filename, varname)
    %  [data, units, Time] = ... readMar3p11(_, start=[i j], count=[ni nj])
    %  [blocks, units, Time] = ... readMar3p11(_, slabs={[i j;ni nj], ...})
+   %  [blocks, units, Time] = ... readMar3p11(_, slabs=..., sector=[1 2])
    %
    % Reads a MAR v3.11 NetCDF variable (optionally a spatial hyperslab)
    % and converts the legacy MAR units to icemodel-standard ones:
    %
    %    C      -> K        (air/surface temperature)
    %    g/kg   -> kg/kg    (specific humidity)
-   %    mmWE/h -> mWE/h    (precipitation / melt / runoff / SMB)
+   %    mmWE/h -> mWE/h    (hourly precipitation / melt / runoff / SMB /
+   %                         sublimation)
+   %    mmWE/day -> mWE/day (daily mass-balance diagnostics)
    %    hPa    -> Pa       (surface pressure)
    %
    % MAR yearly files store hourly variables as [nx ny 24 ndays] and
@@ -33,6 +36,9 @@ function [data, units, Time] = readMar3p11(filename, varname, kwargs)
    %                 batch path used to extract many points from one source
    %                 file without re-opening it per point. start/count are
    %                 ignored when slabs is given.
+   %  sector       - optional surface-sector index for variables whose third
+   %                 dimension is SECTOR (1 = permanent ice, 2 = tundra).
+   %                 Supply one value for a single slab or one value per slab.
    %
    % Outputs
    %  data  - (ncells x ntime) double in standard units; OR, when slabs is
@@ -49,13 +55,17 @@ function [data, units, Time] = readMar3p11(filename, varname, kwargs)
       kwargs.start (1, :) double = []
       kwargs.count (1, :) double = []
       kwargs.slabs cell = {}
+      kwargs.sector (1, :) double {mustBeInteger, mustBePositive} = []
    end
 
    [dims, native_units] = ncVarInfo(filename, varname);
 
    if isempty(kwargs.slabs)
       % Single-hyperslab path (the original contract, returns one matrix).
-      [start, count] = slabWindow(dims, kwargs.start, kwargs.count);
+      assert(numel(kwargs.sector) <= 1, ...
+         'a single MAR slab accepts at most one surface sector')
+      [start, count] = slabWindow( ...
+         dims, kwargs.start, kwargs.count, kwargs.sector);
       data = readSlab(filename, varname, start, count, native_units);
    else
       % Batch path: open the file ONCE and read each requested hyperslab
@@ -65,9 +75,10 @@ function [data, units, Time] = readMar3p11(filename, varname, kwargs)
       cleanup = onCleanup(@() netcdf.close(ncid));
       varid = netcdf.inqVarID(ncid, char(varname));
       data = cell(size(kwargs.slabs));
+      sectors = normalizeSectors(kwargs.sector, numel(kwargs.slabs));
       for k = 1:numel(kwargs.slabs)
          [start, count] = slabWindow(dims, ...
-            kwargs.slabs{k}(1, :), kwargs.slabs{k}(2, :));
+            kwargs.slabs{k}(1, :), kwargs.slabs{k}(2, :), sectors(k));
          data{k} = convertSlab( ...
             ncGetSlab(ncid, varid, start, count), native_units, count);
       end
@@ -92,7 +103,7 @@ function [dims, units] = ncVarInfo(filename, varname)
    end
 end
 
-function [start, count] = slabWindow(dims, kstart, kcount)
+function [start, count] = slabWindow(dims, kstart, kcount, sector)
    %SLABWINDOW Assemble the read window: requested spatial hyperslab, all times.
    if isempty(kstart)
       start = ones(1, numel(dims));
@@ -100,6 +111,28 @@ function [start, count] = slabWindow(dims, kstart, kcount)
    else
       start = [kstart, ones(1, numel(dims) - 2)];
       count = [kcount, dims(3:end)];
+   end
+
+   % Sector selection keeps the native daily time dimension while removing the
+   % permanent-ice/tundra dimension. It is valid only for 4-D daily products.
+   if ~isempty(sector) && isfinite(sector)
+      assert(numel(dims) >= 4 && sector <= dims(3), ...
+         'requested MAR surface sector is not present in this variable')
+      start(3) = sector;
+      count(3) = 1;
+   end
+end
+
+function sectors = normalizeSectors(sector, nslab)
+   %NORMALIZESECTORS Broadcast or validate one sector per requested slab.
+   if isempty(sector)
+      sectors = nan(1, nslab);
+   elseif isscalar(sector)
+      sectors = repmat(sector, 1, nslab);
+   else
+      assert(numel(sector) == nslab, ...
+         'MAR sector must be scalar or have one value per slab')
+      sectors = reshape(sector, 1, []);
    end
 end
 
@@ -126,20 +159,12 @@ function data = convertSlab(data, units, count)
    ncells = prod(count(1:2));
    data = reshape(data, ncells, []);
 
-   % No-data handling (before unit conversion, so sentinels are caught at
-   % their native magnitude). MAR uses two no-data conventions: a ~1e36
-   % _FillValue (unambiguous for any variable) and a 999 sentinel that
-   % appears in the mass-flux fields (notably RUH/SMBH outside the melt
-   % season; see runoff/NEW/test/BAD_MAR_DATA.m). A blanket 999 threshold
-   % is unsafe for e.g. SWDH (~1000 W m-2), so the 999 cut is applied only
-   % to the mmWE/h mass fluxes, where a legitimate value never reaches it.
-   % Left as NaN here; downstream metchecks / conservative-remap inpainting
-   % handle the gaps. Without this filter a single 1e36 cell would corrupt
-   % any catchment mean/sum that includes it.
-   data(data >= 1e30) = NaN;
-   if strcmp(units, 'mmWE/h')
-      data(data >= 999) = NaN;
-   end
+   % No-data handling precedes unit conversion. MAR uses signed ~1e34/1e36
+   % fill values; both signs are unambiguous. Do not apply the legacy >=999
+   % mass-flux cut: raw RUH values above 999 sum to native no-delay RU2, and
+   % paired positive/negative SMBH pulses sum to native daily SMB. Treating
+   % only the positive pulse as missing corrupts the daily mass balance.
+   data(abs(data) >= 1e30) = NaN;
 
    % Standard unit conversions (legacy readMar3p11 table). The unit STRING is
    % relabelled once at the top level by convertUnits (kept in lockstep here).
@@ -149,6 +174,8 @@ function data = convertSlab(data, units, count)
       case 'g/kg'
          data = data / 1000;
       case 'mmWE/h'
+         data = data / 1000;
+      case 'mmWE/day'
          data = data / 1000;
       case 'hPa'
          data = data * 100;
@@ -165,6 +192,8 @@ function units = convertUnits(units)
          units = 'kg/kg';
       case 'mmWE/h'
          units = 'mWE/h';
+      case 'mmWE/day'
+         units = 'mWE/day';
       case 'hPa'
          units = 'Pa';
    end

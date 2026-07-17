@@ -1,4 +1,4 @@
-function source_dir = fetchLaughTests(kwargs)
+function [source_dir, status] = fetchLaughTests(kwargs)
    %FETCHLAUGHTESTS Locate or verify the Laugh-Tests source checkout.
    %
    %  source_dir = icemodel.verification.setup.fetchLaughTests()
@@ -45,9 +45,10 @@ function source_dir = fetchLaughTests(kwargs)
    %      explicitly to disable this fallback.
    %
    %  Role
-   %    Validator. The fetch helper guarantees the cache directory
-   %    exists and that every required Laugh-Tests file is present,
-   %    so importLaughTests does not have to repeat per-file checks.
+   %    Validator. With create_cache_dir=true, the fetch helper creates the
+   %    cache directory before checking the required Laugh-Tests files. With
+   %    false, it reports the same status without mutation. A successful strict
+   %    result lets importLaughTests assume the checkout is complete.
    %
    %  Name-value
    %    cache_dir : string (default data/verification/laugh_tests)
@@ -56,10 +57,14 @@ function source_dir = fetchLaughTests(kwargs)
    %        Error when the checkout is missing or incomplete.
    %    silent : logical (default false)
    %        Suppress the retrieval-instructions printout.
+   %    create_cache_dir : logical (default true)
+   %        Create the resolved cache directory before validation.
    %
    %  Returns
    %    source_dir : string
    %        Absolute path to the resolved Laugh-Tests checkout.
+   %    status : struct array
+   %        Shared fetch-status rows describing missing checkout items.
    %
    % See also: icemodel.verification.setup.importLaughTests,
    %  icemodel.verification.setup.fetchEsmSnowmip
@@ -68,10 +73,17 @@ function source_dir = fetchLaughTests(kwargs)
       kwargs.cache_dir (1, 1) string = defaultCacheDir()
       kwargs.strict   (1, 1) logical = true
       kwargs.silent   (1, 1) logical = false
+      kwargs.create_cache_dir (1, 1) logical = true
    end
 
-   cache_dir = kwargs.cache_dir;
+   cache_dir = icemodel.verification.setup.resolveFetchCacheDir( ...
+      kwargs.cache_dir, defaultCacheDir());
    user_supplied = ~strcmp(cache_dir, defaultCacheDir());
+
+   % Cache creation is explicit so dry-run callers can remain non-mutating.
+   if kwargs.create_cache_dir
+      icemodel.helpers.ensureDirExists(cache_dir);
+   end
 
    % Required files (Colbeck case).
    required = colbeckRequiredFiles();
@@ -92,6 +104,8 @@ function source_dir = fetchLaughTests(kwargs)
          [ok_sibling, missing_sibling] = checkLaughTestsCheckout( ...
             sibling, required);
          if ok_sibling
+            status = icemodel.verification.setup.fetchMissingStatus( ...
+               strings(0, 1));
             source_dir = sibling;
             return
          else
@@ -103,43 +117,48 @@ function source_dir = fetchLaughTests(kwargs)
       end
    end
 
+   % Build cache status before strict handling.
    if ok
-      source_dir = string(cache_dir);
-      return
+      missing = strings(0, 1);
    end
-
-   % Print actionable retrieval instructions when files are missing.
-   if ~kwargs.silent
-      fprintf('\n');
-      fprintf('=== Laugh-Tests source checkout incomplete ===\n');
-      fprintf('Cache directory: %s\n', cache_dir);
-      fprintf('Missing files (relative to cache directory):\n');
-      for j = 1:numel(missing)
-         fprintf('  - %s\n', missing(j));
-      end
-      fprintf('\nRetrieval:\n');
-      fprintf('  Upstream: https://github.com/KyleKlenk/Laugh-Tests\n');
-      fprintf('  Bundle:   m2_mac_Sept23 validation set\n');
-      fprintf('  Manual workflow: clone the repository into the cache dir.\n');
-      fprintf('    git clone https://github.com/KyleKlenk/Laugh-Tests %s\n', ...
-         cache_dir);
-      fprintf('\nAfter retrieval, re-run:\n');
-      fprintf('  icemodel.verification.setup.fetchLaughTests()\n');
-      fprintf('  icemodel.verification.setup.importLaughTests(source_dir, overwrite=true)\n');
-      fprintf('\n');
-   end
-
-   if kwargs.strict
-      error('icemodel:verification:fetchLaughTests:missingSources', ...
-         ['Laugh-Tests source checkout incomplete in %s. ' ...
-         'See retrieval instructions above.'], ...
-         cache_dir);
-   end
-
-   source_dir = string(cache_dir);
+   status = icemodel.verification.setup.fetchMissingStatus(missing);
+   source_dir = icemodel.verification.setup.finishFetchStatus( ...
+      cache_dir, status, strict=kwargs.strict, silent=kwargs.silent, ...
+      error_id="icemodel:verification:fetchLaughTests:missingSources", ...
+      error_label="Laugh-Tests", ...
+      banner_callback=@(~, ~, items) printRetrievalBanner(cache_dir, items), ...
+      error_callback=@(~, ~, items) throwMissingSources(cache_dir, items));
 end
 
 %% Local helpers
+function printRetrievalBanner(cache_dir, missing)
+   %PRINTRETRIEVALBANNER Print Laugh-Tests retrieval instructions.
+   fprintf('\n');
+   fprintf('=== Laugh-Tests source checkout incomplete ===\n');
+   fprintf('Cache directory: %s\n', cache_dir);
+   fprintf('Missing files (relative to cache directory):\n');
+   for j = 1:numel(missing)
+      fprintf('  - %s\n', missing(j));
+   end
+   fprintf('\nRetrieval:\n');
+   fprintf('  Upstream: https://github.com/KyleKlenk/Laugh-Tests\n');
+   fprintf('  Bundle:   m2_mac_Sept23 validation set\n');
+   fprintf('  Manual workflow: clone the repository into the cache dir.\n');
+   fprintf('    git clone https://github.com/KyleKlenk/Laugh-Tests %s\n', ...
+      cache_dir);
+   fprintf('\nAfter retrieval, re-run:\n');
+   fprintf('  icemodel.verification.setup.fetchLaughTests()\n');
+   fprintf('  icemodel.verification.setup.importLaughTests(source_dir, overwrite=true)\n');
+   fprintf('\n');
+end
+
+function throwMissingSources(cache_dir, ~)
+   %THROWMISSINGSOURCES Raise the Laugh-Tests missing-cache error.
+   error('icemodel:verification:fetchLaughTests:missingSources', ...
+      ['Laugh-Tests source checkout incomplete in %s. ' ...
+      'See retrieval instructions above.'], cache_dir);
+end
+
 function pathname = defaultCacheDir()
    %DEFAULTCACHEDIR Canonical Laugh-Tests source-cache directory.
    % Repo-root developer resource (gitignored). Resolve with

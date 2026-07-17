@@ -10,8 +10,10 @@ function root = inputDataRoot(kwargs)
    % Inputs
    %  input_data_root            Explicit base input-data root. When this
    %                             is provided, it is returned unchanged.
-   %  icemodel_config_casename   Config casename used to resolve the default
+   %  icemodel_config_casename   Optional config casename used to resolve the
    %                             input-data root without mutating config.
+   %                             Leave blank to use the repo top-level data
+   %                             tree, independent of ICEMODEL_DATA_PATH.
    %
    % Outputs
    %  root   Base input-data root (the parent of `met/`). The verification
@@ -34,8 +36,11 @@ function root = inputDataRoot(kwargs)
       return
    end
 
+   % Use a repo-root default for staging workflows so importer output does not
+   % depend on the user's active ICEMODEL_DATA_PATH. A nonblank casename keeps
+   % the older committed-fixture path available for tests and demo reads.
    if isblanktext(kwargs.icemodel_config_casename)
-      root = string(icemodel.getpath('input'));
+      root = string(fullfile(icemodel.internal.fullpath('data'), 'input'));
    else
       cfg = icemodel.config( ...
          "casename", kwargs.icemodel_config_casename, ...

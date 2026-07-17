@@ -155,6 +155,60 @@ function test_loadmet_swaps_external_userdata_window_file(testCase)
    testCase.verifyEqual(met_swap.albedo, userdata_values, 'AbsTol', 1e-12);
 end
 
+function test_loadmet_explicit_userdata_path_selects_native_variant(testCase)
+   % A manifest-selected native Data path must win over the cadence-blind legacy
+   % hourly filename when both share one site/source/window identity.
+   workspace = testCase.TestData.workspace;
+   opts_base = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016);
+   met_base = icemodel.loadmet(opts_base);
+
+   hourly_file = fullfile(workspace.userdatadir, ...
+      sprintf('%s_modis_20160101_20160101.mat', workspace.sitename));
+   Data = timetable(repmat(0.7, height(met_base), 1), ...
+      'RowTimes', met_base.Time, 'VariableNames', {'modis'});
+   save(hourly_file, 'Data');
+
+   native_time = (met_base.Time(1):minutes(30):met_base.Time(end))';
+   Data = timetable(repmat(0.3, numel(native_time), 1), ...
+      'RowTimes', native_time, 'VariableNames', {'modis'});
+   native_file = fullfile(workspace.userdatadir, ...
+      sprintf('%s_modis_20160101_20160101_30m.mat', workspace.sitename));
+   save(native_file, 'Data');
+
+   opts_swap = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016, userdata='modis', uservars='albedo');
+   missing_year = fullfile(workspace.userdatadir, ...
+      sprintf('%s_modis_2015_30m.mat', workspace.sitename));
+   opts_swap = icemodel.resetopts(opts_swap, ...
+      'userdatafname', {missing_year, native_file});
+   met_swap = icemodel.loadmet(opts_swap);
+
+   testCase.verifyEqual(met_swap.albedo, ...
+      repmat(0.3, height(met_swap), 1), 'AbsTol', 1e-12);
+end
+
+function test_loadmet_explicit_userdata_requires_covering_support(testCase)
+   % An existing explicit artifact outside the requested support must fail
+   % clearly instead of silently retiming/extrapolating the wrong Data variant.
+   workspace = testCase.TestData.workspace;
+   Time = (datetime(2015, 1, 1, 'TimeZone', 'UTC'):hours(1): ...
+      datetime(2015, 1, 1, 23, 0, 0, 'TimeZone', 'UTC'))';
+   Data = timetable(Time, repmat(0.4, numel(Time), 1), ...
+      'VariableNames', {'modis'});
+   outside_file = fullfile(workspace.userdatadir, ...
+      sprintf('%s_modis_2015_30m.mat', workspace.sitename));
+   save(outside_file, 'Data');
+
+   opts_swap = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016, userdata='modis', uservars='albedo');
+   opts_swap = icemodel.resetopts(opts_swap, ...
+      'userdatafname', {outside_file});
+
+   testCase.verifyError(@() icemodel.loadmet(opts_swap), ...
+      'icemodel:loadmet:explicitUserdataCoverage');
+end
+
 function test_loadmet_resolves_met_file_in_source_subfolder(testCase)
    % The runtime resolves a met file staged in the per-source subfolder
    % met/<forcings>/ (the writemet staging layout). Staging ONLY in the
@@ -238,6 +292,128 @@ function test_loadmet_swaps_userdata_in_source_subfolder(testCase)
    met_swap = icemodel.loadmet(opts_swap);
 
    testCase.verifyEqual(met_swap.albedo, userdata_values, 'AbsTol', 1e-12);
+end
+
+function test_loadmet_prefers_external_met_swap_source(testCase)
+   % Swap sources should prefer staged met files over legacy userdata files so
+   % RCM met artifacts can fill missing native channels without duplicate Data
+   % files. The target run is 15 min while the source met is hourly, matching
+   % the PROMICE-plus-RCM development workflow.
+
+   workspace = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
+      configure=true, nsteps=8, dt_seconds=900);
+   cleanup = onCleanup(@() ...
+      icemodel.test.fixtures.cleanupSyntheticWorkspace(workspace));
+
+   opts_base = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016);
+   met_base = icemodel.loadmet(opts_base);
+
+   metsub = fullfile(workspace.metdir, 'modis');
+   if ~isfolder(metsub)
+      mkdir(metsub);
+   end
+   [met_source, source_file] = icemodel.test.fixtures.makeSyntheticMetFile( ...
+      2016, sitename=workspace.sitename, forcings='modis', nsteps=3, ...
+      dt_seconds=3600, metdir=metsub);
+   met_source.albedo = 0.35 + (0:height(met_source)-1)' * 0.01;
+   met = met_source;
+   save(source_file, 'met');
+
+   userdata_values = 0.91 + zeros(height(met_base), 1);
+   icemodel.test.fixtures.writeSyntheticUserdataFile( ...
+      workspace.userdatadir, 2016, ...
+      'sitename', workspace.sitename, ...
+      'userdata', 'modis', ...
+      'varname', 'modis', ...
+      'Time', met_base.Time, ...
+      'values', userdata_values);
+
+   opts_swap = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016, userdata='modis', uservars='albedo');
+   met_swap = icemodel.loadmet(opts_swap);
+
+   expected = retime(met_source, met_base.Time, 'linear');
+   testCase.verifyEqual(met_swap.albedo, expected.albedo, 'AbsTol', 1e-12);
+   testCase.verifyNotEqual(met_swap.albedo, userdata_values);
+
+   clear cleanup
+end
+
+function test_loadmet_supports_native_30m_swap_source_and_fallbacks(testCase)
+   % A native 30-minute run must prefer exact 30m swap met, then retain the
+   % established compatible 15-minute and hourly source fallbacks.
+   workspace = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
+      configure=true, nsteps=8, dt_seconds=1800);
+   cleanup = onCleanup(@() ...
+      icemodel.test.fixtures.cleanupSyntheticWorkspace(workspace));
+   metsub = fullfile(workspace.metdir, 'modis');
+   mkdir(metsub);
+
+   % Distinct constant albedos make the selected cadence observable after the
+   % source timetable is retimed onto the target 30-minute run.
+   [met_30m, file_30m] = icemodel.test.fixtures.makeSyntheticMetFile( ...
+      2016, sitename=workspace.sitename, forcings='modis', nsteps=8, ...
+      dt_seconds=1800, metdir=metsub);
+   met_30m.albedo(:) = 0.30;
+   met = met_30m;
+   save(file_30m, 'met');
+   [met_15m, file_15m] = icemodel.test.fixtures.makeSyntheticMetFile( ...
+      2016, sitename=workspace.sitename, forcings='modis', nsteps=15, ...
+      dt_seconds=900, metdir=metsub);
+   met_15m.albedo(:) = 0.15;
+   met = met_15m;
+   save(file_15m, 'met');
+   [met_hourly, file_hourly] = icemodel.test.fixtures.makeSyntheticMetFile( ...
+      2016, sitename=workspace.sitename, forcings='modis', nsteps=5, ...
+      dt_seconds=3600, metdir=metsub);
+   met_hourly.albedo(:) = 0.60;
+   met = met_hourly;
+   save(file_hourly, 'met');
+
+   opts_swap = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016, userdata='modis', uservars='albedo');
+   selected = icemodel.loadmet(opts_swap);
+   testCase.verifyEqual(selected.albedo, ...
+      repmat(0.30, height(selected), 1), 'AbsTol', 1e-12);
+
+   % Removing exact support exposes the documented finer then hourly fallback
+   % order without changing the target run cadence.
+   delete(file_30m);
+   selected = icemodel.loadmet(opts_swap);
+   testCase.verifyEqual(selected.albedo, ...
+      repmat(0.15, height(selected), 1), 'AbsTol', 1e-12);
+   delete(file_15m);
+   selected = icemodel.loadmet(opts_swap);
+   testCase.verifyEqual(selected.albedo, ...
+      repmat(0.60, height(selected), 1), 'AbsTol', 1e-12);
+
+   clear cleanup
+end
+
+function test_loadmet_errors_when_only_daily_userdata_swap_available(testCase)
+   % Daily observations are not safe met-channel swap sources. If no matching
+   % met file exists, loadmet should fail clearly instead of interpolating a
+   % daily userdata fallback into subdaily forcing.
+
+   workspace = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
+      configure=true, nsteps=24, dt_seconds=3600);
+   cleanup = onCleanup(@() ...
+      icemodel.test.fixtures.cleanupSyntheticWorkspace(workspace));
+
+   Time = [datetime(2016, 1, 1, 'TimeZone', 'UTC'); ...
+      datetime(2016, 1, 2, 'TimeZone', 'UTC')];
+   modis = [0.45; 0.46];
+   Data = timetable(Time, modis);
+   save(fullfile(workspace.userdatadir, 'kanm_modis_2016.mat'), 'Data');
+
+   opts_swap = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016, userdata='modis', uservars='albedo');
+
+   testCase.verifyError(@() icemodel.loadmet(opts_swap), ...
+      'icemodel:loadmet:dailySwapData');
+
+   clear cleanup
 end
 
 function test_loadmet_errors_when_userdata_file_lacks_Data(testCase)

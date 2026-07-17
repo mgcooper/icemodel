@@ -133,6 +133,44 @@ function test_roundtrip_extract_into_empty_root_matches_sha256(testCase)
       "input", "met", "met_a_b_2016_1hr.mat")));
 end
 
+function test_fetch_archive_default_extracts_into_empty_root(testCase)
+   % An archive argument provisions by default, matching the documented release
+   % asset workflow without requiring users to remember extract=true.
+   result = icemodel.verification.setup.packFixtures(testCase.TestData.version, ...
+      root=testCase.TestData.root, staging_dir=testCase.TestData.staging, ...
+      silent=true);
+
+   empty_root = string(tempname);
+   cleaner = onCleanup(@() rmIfPresent(empty_root));
+
+   returned = icemodel.verification.setup.fetchFixtures(testCase.TestData.version, ...
+      root=empty_root, archive=result.archive_file, ...
+      manifest=result.manifest_file, strict=true, silent=true);
+
+   testCase.verifyTrue(returned.ok);
+   testCase.verifyTrue(isfile(fullfile(empty_root, ...
+      "input", "met", "met_a_b_2016_1hr.mat")));
+end
+
+function test_fetch_archive_extract_false_does_not_unpack(testCase)
+   % extract=false verifies existing files only, even when an archive is supplied.
+   result = icemodel.verification.setup.packFixtures(testCase.TestData.version, ...
+      root=testCase.TestData.root, staging_dir=testCase.TestData.staging, ...
+      silent=true);
+
+   empty_root = string(tempname);
+   mkdir(empty_root)
+   cleaner = onCleanup(@() rmIfPresent(empty_root));
+
+   returned = icemodel.verification.setup.fetchFixtures(testCase.TestData.version, ...
+      root=empty_root, archive=result.archive_file, extract=false, ...
+      manifest=result.manifest_file, strict=false, silent=true);
+
+   testCase.verifyFalse(returned.ok);
+   testCase.verifyFalse(isfile(fullfile(empty_root, ...
+      "input", "met", "met_a_b_2016_1hr.mat")));
+end
+
 function test_fetch_detects_tampered_fixture(testCase)
    % Mutating a fixture after packing must be caught as a SHA-256 mismatch.
    result = icemodel.verification.setup.packFixtures(testCase.TestData.version, ...

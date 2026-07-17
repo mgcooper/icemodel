@@ -22,7 +22,7 @@ function eval_targets = evaltarget()
    %  exercise a curated capability (e.g. analytical Colbeck benchmarks).
    %
    % See also: icemodel.verification.namelists.surfacezone,
-   %  icemodel.verification.helpers.promicesiteinfo
+   %  icemodel.verification.setup.promiceSiteCatalog
 
    % Keep this explicit so adding a capability descriptor is a deliberate schema
    % change. "seasonal_snow" / "bare_ice" / "firn" / "ablation" are the capability

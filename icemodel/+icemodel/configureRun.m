@@ -81,6 +81,15 @@ function opts = configureRun(opts)
       opts.metfname = cellstr(opts.metfname);
    end
 
+   % Verification manifests can select an exact staged Data artifact when
+   % multiple cadence variants share one site/source identity. Keep this list
+   % caller-controlled; loadmet falls back to legacy name discovery when empty.
+   if ~isfield(opts, 'userdatafname') || isempty(opts.userdatafname)
+      opts.userdatafname = {};
+   elseif ischar(opts.userdatafname) || isstring(opts.userdatafname)
+      opts.userdatafname = cellstr(opts.userdatafname);
+   end
+
    if ~isfield(opts, 'vars1') || isempty(opts.vars1) ...
          || ~isfield(opts, 'vars2') || isempty(opts.vars2)
       [vars1, vars2] = defaultOutputVariables(opts);

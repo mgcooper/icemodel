@@ -40,7 +40,13 @@ function test_protocol_table_parses_three_hour_cadence(testCase)
    testCase.verifyTrue(all(ismember(["ppt", "rainf", "snowf"], ...
       meta.variables)));
    testCase.verifyEqual(returned.tsfc(1), 260);
-   testCase.verifyEqual(returned.snowf_subl(2), 2);
+   testCase.verifyEqual(returned.melt(2), 0.1e-3 / expected, ...
+      'AbsTol', 1e-15);
+   testCase.verifyEqual(returned.snowf_subl(2), 2e-3 / expected, ...
+      'AbsTol', 1e-15);
+   testCase.verifyEqual(meta.mass_flux_conversion_factor, 1e-3 / expected, ...
+      'AbsTol', 1e-15);
+   testCase.verifyTrue(contains(meta.mass_flux_policy, "mWE/h"));
    testCase.verifyTrue(isnan(returned.rainf(1)));
 end
 
@@ -55,7 +61,8 @@ function test_protocol_table_converts_surface_temperature_celsius(testCase)
    returned = icemodel.verification.setup.readRetmipProtocolTable(filename);
 
    testCase.verifyEqual(returned.tsfc(1), 260, 'AbsTol', 1e-12);
-   testCase.verifyEqual(returned.snowf_subl(2), 2);
+   testCase.verifyEqual(returned.snowf_subl(2), 2e-3 / 3, ...
+      'AbsTol', 1e-15);
 end
 
 function test_protocol_table_rejects_bad_cadence(testCase)
@@ -84,7 +91,9 @@ function test_profile_table_requires_depth_and_state(testCase)
    expected = 1;
    testCase.verifyEqual(height(returned), expected);
    testCase.verifyTrue(ismember("depth", meta.variables));
-   testCase.verifyTrue(ismember("rho", meta.variables));
+   testCase.verifyTrue(ismember("density", meta.variables));
+   testCase.verifyTrue(ismember("subsurface_temperature", meta.variables));
+   testCase.verifyTrue(ismember("lwc", meta.variables));
 end
 
 function test_output_inventory_reads_netcdf_header(testCase)

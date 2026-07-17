@@ -20,21 +20,19 @@ function anchors = mixedAnchorCatalog(kwargs)
    arguments
       kwargs.output_root (1, 1) string = ""
       kwargs.evaluation_data_root (1, 1) string = ""
-      kwargs.icemodel_config_casename (1, 1) string = "test"
+      kwargs.icemodel_config_casename (1, 1) string = ""
    end
 
-   families = ["promice", "retmip", "imau", "research_site"];
-   eval_root = resolveEvalRoot(kwargs);
+   families = setdiff(icemodel.verification.namelists.firndatasetfamily(), ...
+      "sumup", 'stable');
+   manifest_files = anchorManifestFiles(kwargs, families);
    rows = cell(1, numel(families));
    n_rows = 0;
 
    % Each family can be staged independently; skip absent manifests rather than
    % turning a partial eval tree into a hard failure for colocation metadata.
-   for family = families
-      manifest_file = fullfile(eval_root, family, "manifest.json");
-      if ~isfile(manifest_file)
-         continue
-      end
+   for manifest_file = reshape(manifest_files, 1, [])
+      [~, family] = fileparts(fileparts(manifest_file));
       add = familyAnchors(manifest_file, family);
       for k = 1:numel(add)
          n_rows = n_rows + 1;
@@ -49,15 +47,21 @@ function anchors = mixedAnchorCatalog(kwargs)
    end
 end
 
-function eval_root = resolveEvalRoot(kwargs)
-   %RESOLVEEVALROOT Honor output_root=<root>/eval before normal eval roots.
+function files = anchorManifestFiles(kwargs, families)
+   %ANCHORMANIFESTFILES List available anchor family manifests.
    if kwargs.output_root ~= ""
-      eval_root = fullfile(kwargs.output_root, "eval");
+      files = icemodel.verification.helpers.familyManifestFiles( ...
+         evaluation_data_root=fullfile(kwargs.output_root, "eval"));
    else
-      eval_root = icemodel.verification.helpers.evaluationDataRoot( ...
+      files = icemodel.verification.helpers.familyManifestFiles( ...
          evaluation_data_root=kwargs.evaluation_data_root, ...
          icemodel_config_casename=kwargs.icemodel_config_casename);
    end
+   file_families = strings(numel(files), 1);
+   for k = 1:numel(files)
+      [~, file_families(k)] = fileparts(fileparts(files(k)));
+   end
+   files = files(ismember(file_families, families));
 end
 
 function rows = familyAnchors(manifest_file, family)
@@ -77,23 +81,37 @@ end
 
 function a = caseAnchor(c, family)
    %CASEANCHOR Pull the common anchor fields from one manifest case.
-   loc = fieldOr(c, 'site_location', struct());
-   colocation = fieldOr(c, 'colocation', struct());
+   loc = icemodel.verification.helpers.fieldOr(c, 'site_location', struct());
+   colocation = icemodel.verification.helpers.fieldOr(c, ...
+      'colocation', struct());
 
    a = anchorPrototype();
    a.family = string(family);
-   a.site = string(fieldOr(c, 'site_id', fieldOr(c, 'case_id', "")));
+   a.site = string(icemodel.verification.helpers.fieldOr(c, 'site_id', ...
+      icemodel.verification.helpers.fieldOr(c, 'case_id', "")));
    a.source_id = sourceId(c, colocation);
-   a.case_id = string(fieldOr(c, 'case_id', a.source_id));
+   a.case_id = string(icemodel.verification.helpers.fieldOr(c, ...
+      'case_id', a.source_id));
    a.lat_wgs84 = scalarField(loc, 'lat_wgs84');
    a.lon_wgs84 = scalarField(loc, 'lon_wgs84');
    a.x_epsg3413 = scalarField(loc, 'x_epsg3413');
    a.y_epsg3413 = scalarField(loc, 'y_epsg3413');
+   [a.x_epsg3413, a.y_epsg3413] = fillProjectedCoordinates( ...
+      a.lat_wgs84, a.lon_wgs84, a.x_epsg3413, a.y_epsg3413);
    a.elev_m = scalarField(loc, 'elev_m');
-   a.period = fieldOr(c, 'period', struct('start', '', 'end', ''));
-   a.met_sources = string(fieldOr(c, 'forcing_sources', strings(0, 1)));
+   a.period = icemodel.verification.helpers.fieldOr(c, 'period', ...
+      struct('start', '', 'end', ''));
+   a.surface_zone = string(icemodel.verification.helpers.fieldOr(c, ...
+      'surface_zone', ""));
+   a.eval_target = string(icemodel.verification.helpers.fieldOr(c, ...
+      'eval_target', strings(0, 1)));
+   a.permafrost_zone = string(icemodel.verification.helpers.fieldOr(c, ...
+      'permafrost_zone', ""));
+   a.met_sources = string(icemodel.verification.helpers.fieldOr(c, ...
+      'forcing_sources', strings(0, 1)));
    a.userdata_sources = userdataSources(colocation);
-   a.eval_sources = string(fieldOr(c, 'eval_sources', strings(0, 1)));
+   a.eval_sources = string(icemodel.verification.helpers.fieldOr(c, ...
+      'eval_sources', strings(0, 1)));
 end
 
 function a = emptyAnchor()
@@ -108,6 +126,8 @@ function a = anchorPrototype()
       'lat_wgs84', NaN, 'lon_wgs84', NaN, ...
       'x_epsg3413', NaN, 'y_epsg3413', NaN, 'elev_m', NaN, ...
       'period', struct('start', '', 'end', ''), ...
+      'surface_zone', "", 'eval_target', strings(0, 1), ...
+      'permafrost_zone', "", ...
       'met_sources', strings(0, 1), ...
       'userdata_sources', strings(0, 1), ...
       'eval_sources', strings(0, 1));
@@ -139,20 +159,22 @@ function sources = userdataSources(colocation)
    sources = fields(keep);
 end
 
-function v = fieldOr(s, name, default)
-   %FIELDOR Read a struct field with a default for mixed manifest schemas.
-   if isstruct(s) && isfield(s, name)
-      v = s.(name);
+function v = scalarField(s, name)
+   %SCALARFIELD Read one numeric field, returning NaN when absent.
+   if isstruct(s) && isfield(s, name) && ~isempty(s.(name))
+      v = double(s.(name));
+      if ~isscalar(v)
+         v = NaN;
+      end
    else
-      v = default;
+      v = NaN;
    end
 end
 
-function v = scalarField(s, name)
-   %SCALARFIELD Read one numeric field, returning NaN when absent.
-   if isstruct(s) && isfield(s, name)
-      v = double(s.(name));
-   else
-      v = NaN;
+function [x, y] = fillProjectedCoordinates(lat, lon, x, y)
+   %FILLPROJECTEDCOORDINATES Derive EPSG:3413 when manifests omit it.
+   if all(isfinite([lat lon])) && any(~isfinite([x y]))
+      proj = icemodel.forcing.helpers.psnProjection();
+      [x, y] = projfwd(proj, lat, lon);
    end
 end

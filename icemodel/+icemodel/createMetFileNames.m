@@ -39,14 +39,9 @@ function metfname = createMetFileNames(opts)
       metname = sitename;
    end
 
-   switch opts.dt
-      case 900
-         dtstr = '15m.mat';
-      case 3600
-         dtstr = '1hr.mat';
-      otherwise
-         error('unsupported dt for met file naming: %g', opts.dt)
-   end
+   % Use the same closed cadence registry as the writer so every emitted file is
+   % discoverable, including the proven RetMIP/Samimi native 30-minute override.
+   dtstr = char(icemodel.forcing.helpers.metTimestepSuffix(opts.dt) + ".mat");
 
    % Prefer the window form when both startdate and enddate are set
    % (regardless of whether simyears is also set). The window form is
