@@ -11,6 +11,17 @@ function [source_dir, status] = fetchRetmip(kwargs)
    %  multi-GB products during tests.
    %  An empty products selection returns an empty status without creating or
    %  scanning cache_dir.
+   %
+   % Name-value
+   %  cache_dir : string  Local family cache root.
+   %  products : string vector  Forcing, output, and/or script products.
+   %  strict : logical  Error when a requested product is incomplete.
+   %  silent : logical  Suppress retrieval guidance for incomplete products.
+   %  create_cache_dir : logical  Create cache_dir before validation.
+   %
+   % Returns
+   %  source_dir : string  Resolved cache root.
+   %  status : struct array  One shared fetch-status row per product.
 
    arguments
       kwargs.cache_dir (1, 1) string = defaultCacheDir()

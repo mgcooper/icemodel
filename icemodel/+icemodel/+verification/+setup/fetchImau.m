@@ -11,6 +11,17 @@ function [source_dir, status] = fetchImau(kwargs)
    %  tests; it reports the DOI landing URLs and validates local files.
    %  An empty products selection returns an empty status without creating or
    %  scanning cache_dir.
+   %
+   % Name-value
+   %  cache_dir : string  Local family cache root.
+   %  products : string vector  "hourly" and/or "daily" cache products.
+   %  strict : logical  Error when a requested product is incomplete.
+   %  silent : logical  Suppress retrieval guidance for incomplete products.
+   %  create_cache_dir : logical  Create cache_dir before validation.
+   %
+   % Returns
+   %  source_dir : string  Resolved cache root.
+   %  status : struct array  One shared fetch-status row per product.
 
    arguments
       kwargs.cache_dir (1, 1) string = defaultCacheDir()

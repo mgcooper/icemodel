@@ -11,6 +11,18 @@ function [source_dir, status] = fetchPromice(kwargs)
    %  files so staging can fail early in strict mode or skip per site.
    %  An empty products selection returns an empty status without creating or
    %  scanning cache_dir.
+   %
+   % Name-value
+   %  cache_dir : string  Local family cache root.
+   %  stations : string vector  Optional physical-station subset.
+   %  products : string vector  L3 hour, day, and/or month products.
+   %  strict : logical  Error when a requested product is incomplete.
+   %  silent : logical  Suppress retrieval guidance for incomplete products.
+   %  create_cache_dir : logical  Create cache_dir before validation.
+   %
+   % Returns
+   %  source_dir : string  Resolved cache root.
+   %  status : struct array  Metadata plus requested product status rows.
 
    arguments
       kwargs.cache_dir (1, 1) string = defaultCacheDir()
