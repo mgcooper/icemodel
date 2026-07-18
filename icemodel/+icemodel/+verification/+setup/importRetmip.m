@@ -1,50 +1,55 @@
 function manifest = importRetmip(source_dir, kwargs)
-   %IMPORTRETMIP Build the RetMIP family manifest.
+   %IMPORTRETMIP Stage the RetMIP protocol verification family.
    %
    %  manifest = icemodel.verification.setup.importRetmip(source_dir)
    %  manifest = icemodel.verification.setup.importRetmip(source_dir, ...
    %     dry_run=true)
    %
    %  Role
-   %    RetMIP staging hook. It records RetMIP protocol cases as evaluation
-   %    userdata and stages confirmed native meteorological sources separately
-   %    under the standard icemodel input/met and input/userdata layout. Optional
-   %    MAR/MERRA/RACMO legs are delegated to the shared dataset-family RCM
-   %    staging helper after protocol/native products are safely persisted.
+   %    RetMIP staging hook. It records RetMIP protocol cases as data-only
+   %    observations.mat evaluation bundles and stages confirmed native
+   %    meteorological sources separately under the standard icemodel input/met
+   %    and input/userdata layout. Optional MAR/MERRA/RACMO legs are delegated
+   %    to the shared dataset-family RCM staging helper after protocol/native
+   %    products are safely persisted.
    %    forcing_sources selects runtime sources requested by the current call.
    %    Ordinary calls preserve omitted existing legs; overwrite_family=true
    %    deliberately replaces the whole family state.
    %    build_observations=false is a guarded non-dry fast path: requested cases
-   %    must already exist in the target manifest, whose protocol/native entry is
+   %    must already exist in the target manifest, whose observation entry is
    %    reused while selected forcing is attached.
    %
    %  Default roots
    %    source_dir="" reads <repo>/data/verification/retmip. With no output_root,
-   %    evaluation artifacts go to <repo>/data/eval/retmip/<case_id>/ and native
-   %    met/userdata go to <repo>/data/input/{met,userdata}/retmip/. Explicit
-   %    source_dir, output_root, evaluation_data_root, and input_data_root
-   %    overrides are honored as-is.
+   %    observations go to <repo>/data/eval/retmip/<case_id>/observations.mat and
+   %    native met/userdata go to <repo>/data/input/{met,userdata}/retmip/.
+   %    Explicit source_dir, output_root, evaluation_data_root, and
+   %    input_data_root overrides are honored as-is.
    %
-   %  startdate/enddate optionally clamp each requested RetMIP protocol period.
-   %  This is intended for short preview staging; omit both for full production
-   %  artifacts.
-   %  Model met defaults to dt_out="15m"; pass dt_out="" for native cadence.
-   %  Data/userdata defaults to hourly at the shared writer boundary.
-   %  Native met schema completion is fixed at the importer boundary: absent
-   %  required channels are retained as NaN placeholders.
-   %  Call the source-family met builder directly for strict validation.
+   %  Met and userdata
+   %    Model met defaults to dt_out="15m"; pass dt_out="" for native cadence.
+   %    Data/userdata defaults to hourly at the shared writer boundary.
+   %    Native met schema completion is fixed at the importer boundary: absent
+   %    required channels are retained as NaN placeholders.
+   %    Call the family-native met builder directly for strict source-schema
+   %    validation.
+   %
+   %  Window selection
+   %    startdate/enddate optionally clamp each requested RetMIP protocol record.
+   %    This is intended for short preview staging; omit both for full
+   %    production artifacts.
    %
    %  Name-value
    %    case_ids : string vector  RetMIP protocol cases; blank selects all.
    %    forcing_sources : string vector  Native/RCM legs requested by this call.
    %    startdate, enddate : paired optional protocol/forcing clamp.
    %    output_root : string  Convenience root for eval and input artifacts.
-   %    build_observations : logical  Build or reuse protocol/native entries.
-   %    build_forcing : logical  Stage requested runtime legs (default false).
    %    overwrite : logical  Refresh requested case artifacts (default false).
    %    overwrite_family : logical  Replace the whole family (default false).
    %    skip_missing : logical  Record source-local skips instead of failing.
    %    dry_run : logical  Return metadata without source or output writes.
+   %    build_forcing : logical  Stage requested runtime legs (default false).
+   %    build_observations : logical  Build or reuse the case observation entry.
    %
    %  Returns
    %    manifest : struct  Final or dry-run family manifest.
@@ -82,10 +87,9 @@ function manifest = importRetmip(source_dir, kwargs)
       kwargs.build_observations (1, 1) logical = true
    end
 
-   forcing_sources = ...
-      icemodel.verification.setup.normalizeForcingSources( ...
-      kwargs.forcing_sources, kwargs.build_forcing);
-   kwargs.forcing_sources = forcing_sources;
+   % Resolve the case IDs.
+   cases = icemodel.verification.setup.retmipCaseCatalog(kwargs.case_ids);
+   requested_ids = string({cases.case_id});
 
    % Validate the optional clamp before any cache or staging side effect.
    [window_start, window_end, window_enabled] = ...
@@ -94,6 +98,12 @@ function manifest = importRetmip(source_dir, kwargs)
    requested_window = struct('enabled', window_enabled, ...
       'start', window_start, 'end', window_end);
 
+   % Resolve the forcing sources.
+   forcing_sources = ...
+      icemodel.verification.setup.normalizeForcingSources( ...
+      kwargs.forcing_sources, kwargs.build_forcing);
+   kwargs.forcing_sources = forcing_sources;
+
    % Resolve the family identity and requested runtime source sets once.
    dataset_family = "retmip";
    build_native_forcing = kwargs.build_forcing ...
@@ -101,9 +111,6 @@ function manifest = importRetmip(source_dir, kwargs)
    rcm_sources = intersect(forcing_sources, ...
       icemodel.verification.namelists.rcmsources(), "stable");
    build_rcm_forcing = kwargs.build_forcing && ~isempty(rcm_sources);
-
-   cases = icemodel.verification.setup.retmipCaseCatalog(kwargs.case_ids);
-   requested_ids = string({cases.case_id});
 
    % Resolve output roots and paths before raw sources. Forcing-only calls can
    % reuse the existing manifest without requiring observation/native caches.
@@ -145,9 +152,9 @@ function manifest = importRetmip(source_dir, kwargs)
    end
 
    if ~kwargs.dry_run && ~kwargs.build_observations ...
-         && ~build_native_forcing
+      && ~build_native_forcing
       % Reuse the staged case entry so an RCM-only attachment does not require
-      % source caches.
+      % observation or native-source caches.
       [state, alive, skipped] = ...
          icemodel.verification.setup.reuseDatasetFamilyCases( ...
          manifest_file, requested_ids, emptyState(), ...
@@ -167,14 +174,14 @@ function manifest = importRetmip(source_dir, kwargs)
       % Dry runs remain metadata-only; optional skips stay quiet while required
       % RetMIP products print their retrieval guidance before failing.
       cache_status = struct();
+      cache_products = ["forcing", "outputs"];
       if ~kwargs.dry_run && kwargs.build_observations
          strict_cache = ~kwargs.skip_missing;
          [source_dir, cache_status] = icemodel.verification.setup.fetchRetmip( ...
             cache_dir=icemodel.forcing.helpers.verificationSourceDir( ...
-            source_dir, "retmip"), ...
-            products=["forcing", "outputs"], strict=strict_cache, ...
-            silent=kwargs.skip_missing, ...
-            create_cache_dir=true);
+            source_dir, dataset_family), products=cache_products, ...
+            strict=strict_cache, ...
+            silent=kwargs.skip_missing, create_cache_dir=true);
       end
       if ~kwargs.dry_run && ~kwargs.skip_missing
          preflightCases( ...
@@ -186,7 +193,7 @@ function manifest = importRetmip(source_dir, kwargs)
          cases(n), source_dir, cache_status, family_root, input_root, kwargs, ...
          coverage, rcm_sources, requested_window, ...
          icemodel.verification.setup.priorCaseById( ...
-         prior_cases, cases(n).case_id), build_native_forcing);
+         prior_cases, cases(n).case_id), build_native_forcing, dataset_family);
 
       % Stage each requested case into importer state.
       [state, alive, skipped] = ...
@@ -233,51 +240,29 @@ function manifest = importRetmip(source_dir, kwargs)
       method="nearest", dt_out=kwargs.dt_out);
 end
 
-function entry = emptyEntry()
-   %EMPTYENTRY Prototype RetMIP manifest entry.
-   case_values = { ...
-      ''
-      'firn_observational'
-      ''
-      ''
-      'unknown'
-      {'firn'}
-      'none'
-      struct('lat_wgs84', NaN, 'lon_wgs84', NaN, ...
-      'x_epsg3413', NaN, 'y_epsg3413', NaN, 'elev_m', NaN)
-      struct('start', '', 'end', '')
-      ''
-      {}
-      {'retmip_protocol'}
-      {'tsfc', 'melt', 'snowf_subl', 'density', 'subsurface_temperature', 'lwc'}
-      struct()
-      struct()
-      '3hr'
-      ''};
-   entry = icemodel.verification.setup.makeFirnCaseManifestEntry(case_values);
-end
-
+%% Local helpers
 function s = emptyState()
-   %EMPTYSTATE Prototype RetMIP staging state.
+   %EMPTYSTATE Prototype dataset-family staging state.
    s = struct('case_id', "", 'storage_alias', "", ...
       'point', [NaN NaN], ...
       'evaluation_file_rel', "", ...
-      'entry', emptyEntry(), 'period', struct('start', '', 'end', ''), ...
+      'entry', struct(), 'period', struct('start', '', 'end', ''), ...
       'colocation', struct(), 'leg', struct(), 'reuse_entry', false, ...
       'dry_run', false);
 end
 
 function s = stageRetmipCase(c, source_dir, cache_status, family_root, ...
       input_root, kwargs, coverage, rcm_sources, requested_window, prior_case, ...
-      build_native_forcing)
+      build_native_forcing, dataset_family)
    %STAGERETMIPCASE Stage one RetMIP case and return importer state.
    c = clampCasePeriod(c, requested_window);
-   entry = manifestEntry(c, source_dir, cache_status, family_root, input_root, ...
+   entry = retmipCaseEntry( ...
+      c, source_dir, cache_status, family_root, input_root, ...
       kwargs.promice_dir, kwargs.gcnet_dir, kwargs.samimi_dir, ...
       kwargs.imau_dir, kwargs.dry_run, kwargs.build_observations, ...
       kwargs.build_forcing, build_native_forcing, kwargs.overwrite_family, ...
       kwargs.skip_missing, kwargs.overwrite, ...
-      kwargs.dt_out, prior_case);
+      kwargs.dt_out, prior_case, dataset_family);
    leg = struct();
    if ~kwargs.dry_run && kwargs.build_forcing && ~isempty(rcm_sources)
       [t1, t2] = icemodel.verification.setup.periodBounds(c.period);
@@ -285,7 +270,7 @@ function s = stageRetmipCase(c, source_dir, cache_status, family_root, ...
          rcm_sources, coverage, t1, t2);
    end
    s = struct('case_id', string(c.case_id), 'storage_alias', ...
-      icemodel.verification.setup.rcmStorageAlias("retmip", c.case_id), ...
+      icemodel.verification.setup.rcmStorageAlias(dataset_family, c.case_id), ...
       'point', [c.site_location.lat_wgs84, c.site_location.lon_wgs84], ...
       'evaluation_file_rel', string(entry.evaluation_file), ...
       'entry', entry, 'period', entry.period, ...
@@ -358,11 +343,12 @@ function throwMissingNative(reason, family)
       '%s', reason)
 end
 
-function entry = manifestEntry(c, source_dir, cache_status, family_root, ...
+function entry = retmipCaseEntry(c, source_dir, cache_status, family_root, ...
       input_root, promice_dir, gcnet_dir, samimi_dir, imau_dir, dry_run, ...
       build_observations, build_forcing, build_native_forcing, ...
-      overwrite_family, skip_missing, overwrite, dt_out, prior_case)
-   %MANIFESTENTRY Build one RetMIP firn case entry.
+      overwrite_family, skip_missing, overwrite, dt_out, prior_case, ...
+      dataset_family)
+   %RETMIPCASEENTRY Build and stage one RetMIP manifest case entry.
    if ~dry_run && ~build_observations
       if isempty(prior_case)
          error('icemodel:verification:importRetmip:missingPriorCase', ...
@@ -373,12 +359,12 @@ function entry = manifestEntry(c, source_dir, cache_status, family_root, ...
       if overwrite_family
          entry = ...
             icemodel.verification.setup.prepareReplacementCaseEntry( ...
-            entry, "retmip");
+            entry, dataset_family);
       end
       [entry.colocation, ~, native_obs, native_timestep] = stageNativeSource( ...
          entry.colocation, c, input_root, promice_dir, gcnet_dir, samimi_dir, ...
          imau_dir, false, build_forcing, build_native_forcing, skip_missing, ...
-         overwrite, dt_out, prior_case);
+         overwrite, dt_out, prior_case, dataset_family);
       if ~isempty(fieldnames(native_obs))
          entry.observation_variables.native_source = native_obs;
       end
@@ -427,7 +413,7 @@ function entry = manifestEntry(c, source_dir, cache_status, family_root, ...
    [colocation, ~, native_obs, native_timestep] = stageNativeSource( ...
       colocation, c, input_root, promice_dir, gcnet_dir, samimi_dir, ...
       imau_dir, dry_run, build_forcing, build_native_forcing, skip_missing, ...
-      overwrite, dt_out, prior_case);
+      overwrite, dt_out, prior_case, dataset_family);
 
    comparison_variables = comparisonVariables(files);
    if dry_run
@@ -467,7 +453,7 @@ end
 function [colocation, native_vars, native_obs, native_timestep] = stageNativeSource( ...
       colocation, c, input_root, promice_dir, gcnet_dir, samimi_dir, ...
       imau_dir, dry_run, build_forcing, build_native_forcing, skip_missing, ...
-      overwrite, dt_out, prior_case)
+      overwrite, dt_out, prior_case, dataset_family)
    %STAGENATIVESOURCE Stage the confirmed native source for one RetMIP case.
    native_vars = strings(0, 1);
    native_obs = struct();
@@ -488,7 +474,7 @@ function [colocation, native_vars, native_obs, native_timestep] = stageNativeSou
    % Dry runs publish selector intent without reading native source caches.
    if dry_run
       status = "not_requested";
-      reason = "retmip was not requested in forcing_sources";
+      reason = dataset_family + " was not requested in forcing_sources";
       if ~build_forcing
          status = "forcing_disabled";
          reason = "native forcing disabled because build_forcing=false";
@@ -511,7 +497,7 @@ function [colocation, native_vars, native_obs, native_timestep] = stageNativeSou
          return
       end
       status = "not_requested";
-      reason = "retmip was not requested in forcing_sources";
+      reason = dataset_family + " was not requested in forcing_sources";
       if ~build_forcing
          status = "forcing_disabled";
          reason = "native forcing disabled because build_forcing=false";
@@ -519,7 +505,8 @@ function [colocation, native_vars, native_obs, native_timestep] = stageNativeSou
       if identity_conflict
          status = "identity_changed_requires_rebuild";
          reason = "native source identity changed; rerun with " + ...
-            "build_forcing=true and forcing_sources including retmip";
+            "build_forcing=true and forcing_sources including " + ...
+            dataset_family;
       end
       colocation = recordNativeStatus( ...
          colocation, false, status, reason, family);
@@ -546,14 +533,14 @@ function [colocation, native_vars, native_obs, native_timestep] = stageNativeSou
       met_outdir = fullfile(input_root, 'met');
       userdata_outdir = fullfile(input_root, 'userdata');
       met_files = icemodel.forcing.helpers.writemet(met, c.case_id, ...
-         "retmip", outdir=met_outdir, naming="window", dt_out=dt_out, ...
+         dataset_family, outdir=met_outdir, naming="window", dt_out=dt_out, ...
          overwrite=overwrite);
       % Diagnose the exact returned path because no-overwrite staging may
       % select an existing exact or broader enclosing artifact.
       [forcing_ready, forcing_ready_reason, forcing_complete_windows] = ...
          icemodel.verification.setup.metArtifactReadiness(met_files);
       data_files = icemodel.forcing.helpers.writeuserdata(Data, c.case_id, ...
-         "retmip", outdir=userdata_outdir, naming="window", ...
+         dataset_family, outdir=userdata_outdir, naming="window", ...
          overwrite=overwrite);
 
       colocation.retmip.kind = 'protocol_userdata_and_native_met';

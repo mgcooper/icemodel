@@ -184,8 +184,9 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       entry_callback=entry_callback);
 end
 
+%% Local helpers
 function s = emptyState()
-   %EMPTYSTATE Prototype ESM-SnowMIP staging state.
+   %EMPTYSTATE Prototype dataset-family staging state.
    s = struct('case_id', "", 'entry', struct());
 end
 
@@ -194,15 +195,14 @@ function s = stageEsmCase(sitename, source_dir, family_root, input_root, ...
    %STAGEESMCASE Stage one ESM-SnowMIP case and return importer state.
    info = icemodel.verification.setup.esmSnowmipSiteCatalog(sitename);
 
-   % Resolve the staged time window. Explicit kwargs request one shared window;
-   % otherwise the builders read the full source record and the manifest period
-   % is taken from the staged forcing/observation time axes.
    % Resolve the per-site case root and the staged obs-bundle path.
    case_root = fullfile(family_root, sitename);
    observations_output_file = fullfile(case_root, "observations.mat");
 
    if ~kwargs.dry_run
-      % Build forcing and observations through the reusable builders.
+      % Build forcing and observations through the reusable builders. Explicit
+      % kwargs request one shared window; otherwise the full source records set
+      % the manifest period from their staged forcing/observation time axes.
       if window_enabled
          [forcing_tt, ~] = ...
             icemodel.verification.setup.buildEsmSnowmipForcing( ...
@@ -285,7 +285,7 @@ function s = stageEsmCase(sitename, source_dir, family_root, input_root, ...
       'entry', icemodel.verification.setup.makeCaseManifestEntry(case_values));
 end
 
-%% Local helpers
+%% ESM-SnowMIP source helpers
 function [window_start, window_end] = stagedTimeBounds(forcing_tt, obs_tt)
    %STAGEDTIMEBOUNDS Return the full staged period from nonempty time axes.
    times = [forcing_tt.Time(:); obs_tt.Time(:)];

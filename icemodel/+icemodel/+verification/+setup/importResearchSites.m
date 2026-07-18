@@ -20,7 +20,8 @@ function manifest = importResearchSites(source_dir, kwargs)
    %
    %  Default roots
    %    source_dir="" reads <repo>/data/verification/sumup. With no output_root,
-   %    observations go to <repo>/data/eval/research_site/<case_id>/ and RCM
+   %    observations go to
+   %    <repo>/data/eval/research_site/<case_id>/observations.mat and RCM
    %    met/userdata go to <repo>/data/input/{met,userdata}/<source>/.
    %
    %  Minimal first implementation: Humphrey is represented as a generic
@@ -80,15 +81,16 @@ function manifest = importResearchSites(source_dir, kwargs)
       kwargs.build_observations (1, 1) logical = true
    end
 
-   forcing_sources = ...
-      icemodel.verification.setup.normalizeForcingSources( ...
-      kwargs.forcing_sources, kwargs.build_forcing);
-   kwargs.forcing_sources = forcing_sources;
-
    % Validate the optional clamp before any cache or staging side effect.
    [window_start, window_end, window_enabled] = ...
       icemodel.internal.pairedWindow( ...
       kwargs.startdate, kwargs.enddate);
+
+   % Resolve the forcing sources.
+   forcing_sources = ...
+      icemodel.verification.setup.normalizeForcingSources( ...
+      kwargs.forcing_sources, kwargs.build_forcing);
+   kwargs.forcing_sources = forcing_sources;
 
    % Resolve the family identity and requested runtime source sets once.
    dataset_family = kwargs.family;
@@ -207,11 +209,12 @@ function manifest = importResearchSites(source_dir, kwargs)
       method="nearest", dt_out=kwargs.dt_out);
 end
 
+%% Local helpers
 function s = emptyState()
-   %EMPTYSTATE Prototype research-site staging state.
+   %EMPTYSTATE Prototype dataset-family staging state.
    s = struct('case_id', "", 'point', [NaN NaN], ...
       'evaluation_file_rel', "", ...
-      'entry', emptyEntry(), 'period', struct('start', '', 'end', ''), ...
+      'entry', struct(), 'period', struct('start', '', 'end', ''), ...
       'colocation', struct(), 'leg', struct(), 'reuse_entry', false, ...
       'dry_run', false);
 end
@@ -220,7 +223,7 @@ function state = stageResearchCase(site, source_dir, family_root, obs_start, ...
       obs_end, period, kwargs, coverage, rcm_sources)
    %STAGERESEARCHCASE Stage one research-site case and return manifest state.
    if kwargs.dry_run
-      state = dryRunResearchSite(site, period, kwargs);
+      state = dryRunResearchCase(site, period, kwargs);
       return
    end
 
@@ -265,7 +268,7 @@ function state = stageResearchCase(site, source_dir, family_root, obs_start, ...
    evaluation_file = fullfile(case_id, "observations.mat");
    colocation = researchSiteColocation(evaluation_file, true, ...
       nearestPromice(site_location, kwargs), kwargs.radius_km);
-   entry = siteEntry(site, site_location, period, evaluation_file, ...
+   entry = researchCaseEntry(site, site_location, period, evaluation_file, ...
       comparison_variables, colocation, kwargs);
 
    leg = struct();
@@ -277,15 +280,15 @@ function state = stageResearchCase(site, source_dir, family_root, obs_start, ...
    state = researchSiteState(entry, leg, false);
 end
 
-function s = dryRunResearchSite(site, period, kwargs)
-   %DRYRUNRESEARCHSITE Build one metadata-only research-site preview state.
+function s = dryRunResearchCase(site, period, kwargs)
+   %DRYRUNRESEARCHCASE Build one metadata-only research-site preview state.
    period = sitePeriod(site, period);
    site_location = siteLocation(site);
    colocation = researchSiteColocation("", false, ...
       emptyNearestPromice(), kwargs.radius_km);
    comparison_variables = ["density", "subsurface_temperature", "smb"];
-   entry = siteEntry(site, site_location, period, "", comparison_variables, ...
-      colocation, kwargs);
+   entry = researchCaseEntry( ...
+      site, site_location, period, "", comparison_variables, colocation, kwargs);
    s = researchSiteState(entry, struct(), true);
 end
 
@@ -300,11 +303,12 @@ function s = researchSiteState(entry, leg, dry_run)
       'dry_run', dry_run);
 end
 
-function entry = siteEntry(site, site_location, period, evaluation_file, ...
+function entry = researchCaseEntry( ...
+      site, site_location, period, evaluation_file, ...
       comparison_variables, colocation, kwargs)
-   %SITEENTRY Build one canonical research_site manifest entry.
+   %RESEARCHCASEENTRY Build one canonical research-site manifest entry.
    [forcing_sources, eval_sources] = sourceListsForSite(colocation, kwargs);
-   observation_variables = observationVariables();
+   observation_variables = researchObservationVariables();
    case_values = { ...
       char(site.case_id)
       'firn_observational'
@@ -398,30 +402,6 @@ function [forcing_sources, eval_sources] = sourceListsForSite(colocation, kwargs
    end
 end
 
-function entry = emptyEntry()
-   %EMPTYENTRY Prototype research_site manifest entry.
-   case_values = { ...
-      ''
-      'firn_observational'
-      ''
-      ''
-      'unknown'
-      {'firn'}
-      'unknown'
-      struct('lat_wgs84', NaN, 'lon_wgs84', NaN, ...
-      'x_epsg3413', NaN, 'y_epsg3413', NaN, 'elev_m', NaN)
-      struct('start', '', 'end', '')
-      ''
-      {}
-      {'sumup_obs'}
-      {}
-      struct()
-      struct()
-      'irregular'
-      ''};
-   entry = icemodel.verification.setup.makeFirnCaseManifestEntry(case_values);
-end
-
 function [x3413, y3413] = projectedCoords(site)
    %PROJECTEDCOORDS Use metadata coords when present, otherwise compute them.
    x3413 = site.x_epsg3413;
@@ -475,8 +455,8 @@ function rec = emptyNearestPromice()
       'note', "no staged CP1/SWC/JAR promice anchors available");
 end
 
-function observation_variables = observationVariables()
-   %OBSERVATIONVARIABLES Manifest metadata for SUMup-derived research targets.
+function observation_variables = researchObservationVariables()
+   %RESEARCHOBSERVATIONVARIABLES Manifest metadata for research-site targets.
    observation_variables = icemodel.verification.setup.metadataStruct({ ...
       'density', 'SUMup density profile'
       'subsurface_temperature', 'SUMup subsurface temperature profile'

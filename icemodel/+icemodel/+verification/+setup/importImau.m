@@ -13,30 +13,39 @@ function manifest = importImau(source_dir, kwargs)
    %    Ordinary calls preserve omitted existing legs; overwrite_family=true
    %    deliberately replaces the whole family state.
    %    build_observations=false is a guarded non-dry fast path: requested cases
-   %    must already exist in the target manifest, whose observation/native entry
-   %    is reused while selected forcing is attached.
+   %    must already exist in the target manifest, whose observation entry is
+   %    reused while selected forcing is attached.
    %
    %  Default roots
    %    source_dir="" reads <repo>/data/verification/imau. With no output_root,
    %    observations go to <repo>/data/eval/imau/<case_id>/observations.mat and
    %    native met/userdata go to <repo>/data/input/{met,userdata}/imau/.
+   %    Explicit source_dir, output_root, evaluation_data_root, and
+   %    input_data_root overrides are honored as-is.
+   %
+   %  Met and userdata
    %    Model met defaults to dt_out="15m"; pass dt_out="" for native cadence.
    %    Data/userdata defaults to hourly at the shared writer boundary.
    %    Native met schema completion is fixed at the importer boundary: absent
    %    required channels are retained as NaN placeholders.
    %    Call buildImauHourlyMet directly for strict source-schema validation.
    %
+   %  Window selection
+   %    startdate/enddate optionally clamp each requested IMAU hourly record.
+   %    This is intended for short preview staging; omit both for full
+   %    production artifacts.
+   %
    %  Name-value
    %    case_ids : string vector  IMAU site cases; blank selects the catalog.
    %    forcing_sources : string vector  Native/RCM legs requested by this call.
    %    startdate, enddate : paired optional observation/forcing clamp.
    %    output_root : string  Convenience root for eval and input artifacts.
-   %    build_observations : logical  Build or reuse the case observation entry.
-   %    build_forcing : logical  Stage requested runtime legs (default false).
    %    overwrite : logical  Refresh requested case artifacts (default false).
    %    overwrite_family : logical  Replace the whole family (default false).
    %    skip_missing : logical  Record source-local skips instead of failing.
    %    dry_run : logical  Return metadata without source or output writes.
+   %    build_forcing : logical  Stage requested runtime legs (default false).
+   %    build_observations : logical  Build or reuse the case observation entry.
    %
    %  Returns
    %    manifest : struct  Final or dry-run family manifest.
@@ -70,14 +79,21 @@ function manifest = importImau(source_dir, kwargs)
       kwargs.build_observations (1, 1) logical = true
    end
 
+   % Resolve the case IDs.
+   cases = icemodel.verification.setup.imauSiteCatalog(kwargs.case_ids);
+   requested_ids = string({cases.case_id});
+
+   % Validate the optional clamp before any cache or staging side effect.
+   % IMAU builders consume the original name-values directly, so only paired
+   % input validation is needed here.
+   icemodel.internal.pairedWindow( ...
+      kwargs.startdate, kwargs.enddate);
+
+   % Resolve the forcing sources.
    forcing_sources = ...
       icemodel.verification.setup.normalizeForcingSources( ...
       kwargs.forcing_sources, kwargs.build_forcing);
    kwargs.forcing_sources = forcing_sources;
-
-   % Validate the optional clamp before any cache or staging side effect.
-   icemodel.internal.pairedWindow( ...
-      kwargs.startdate, kwargs.enddate);
 
    % Resolve the family identity and requested runtime source sets once.
    dataset_family = "imau";
@@ -86,9 +102,6 @@ function manifest = importImau(source_dir, kwargs)
    rcm_sources = intersect(forcing_sources, ...
       icemodel.verification.namelists.rcmsources(), "stable");
    build_rcm_forcing = kwargs.build_forcing && ~isempty(rcm_sources);
-
-   cases = icemodel.verification.setup.imauSiteCatalog(kwargs.case_ids);
-   requested_ids = lower([cases.site_id]);
 
    % Resolve output roots and paths before raw sources. Forcing-only calls can
    % reuse the existing manifest without requiring observation/native caches.
@@ -130,9 +143,9 @@ function manifest = importImau(source_dir, kwargs)
    end
 
    if ~kwargs.dry_run && ~kwargs.build_observations ...
-         && ~build_native_forcing
+      && ~build_native_forcing
       % Reuse the staged case entry so an RCM-only attachment does not require
-      % source caches.
+      % observation or native-source caches.
       [state, alive, skipped] = ...
          icemodel.verification.setup.reuseDatasetFamilyCases( ...
          manifest_file, requested_ids, emptyState(), ...
@@ -145,8 +158,8 @@ function manifest = importImau(source_dir, kwargs)
       % Dry runs remain metadata-only; optional skips stay quiet while required
       % IMAU products print their retrieval guidance before failing.
       cache_status = struct();
-      validate_daily_qa = ~kwargs.dry_run && kwargs.build_observations;
       cache_products = "hourly";
+      validate_daily_qa = ~kwargs.dry_run && kwargs.build_observations;
       if validate_daily_qa
          cache_products = ["hourly", "daily"];
       end
@@ -154,11 +167,12 @@ function manifest = importImau(source_dir, kwargs)
          strict_cache = ~kwargs.skip_missing;
          [source_dir, cache_status] = icemodel.verification.setup.fetchImau( ...
             cache_dir=icemodel.forcing.helpers.verificationSourceDir( ...
-            source_dir, "imau"), products=cache_products, strict=strict_cache, ...
+            source_dir, dataset_family), products=cache_products, ...
+            strict=strict_cache, ...
             silent=kwargs.skip_missing, create_cache_dir=true);
       end
       if ~kwargs.dry_run && ~kwargs.skip_missing
-         preflightHourlyFiles(source_dir, [cases.site_id]);
+         preflightCases(cases, source_dir);
       end
       daily_qa = dailyQaStatus(source_dir, [cases.site_id], ...
          validate=validate_daily_qa, ...
@@ -166,7 +180,7 @@ function manifest = importImau(source_dir, kwargs)
       stage_callback = @(~, n) stageImauCase( ...
          cases(n), source_dir, cache_status, family_root, met_outdir, ...
          userdata_outdir, kwargs, daily_qa, coverage, rcm_sources, ...
-         prior_cases, build_native_forcing);
+         prior_cases, build_native_forcing, dataset_family);
 
       % Stage each requested case into importer state.
       [state, alive, skipped] = ...
@@ -213,9 +227,24 @@ function manifest = importImau(source_dir, kwargs)
       method="nearest", dt_out=kwargs.dt_out);
 end
 
-function preflightHourlyFiles(source_dir, site_ids)
-   %PREFLIGHTHOURLYFILES Fail before staging when requested IMAU files are absent.
-   for site_id = reshape(site_ids, 1, [])
+%% Local helpers
+function s = emptyState()
+   %EMPTYSTATE Prototype dataset-family staging state.
+   s = struct('site_id', "", 'case_id', "", ...
+      'site_name', "", 'site_location', struct(), 'point', [NaN NaN], ...
+      'period', struct('start', '', 'end', ''), 'evaluation_file_rel', '', ...
+      'entry', struct(), 'colocation', struct(), 'leg', struct(), ...
+      'comparison_variables', {strings(0, 1)}, ...
+      'observation_variables', struct(), ...
+      'surface_zone', "", 'eval_target', {strings(0, 1)}, ...
+      'permafrost_zone', "", 'notes', "", 'reuse_entry', false, ...
+      'dry_run', false);
+end
+
+function preflightCases(cases, source_dir)
+   %PREFLIGHTCASES Validate every strict IMAU case before staging begins.
+   for k = 1:numel(cases)
+      site_id = cases(k).site_id;
       try
          icemodel.forcing.helpers.locateImauHourlyFile(source_dir, site_id);
       catch err
@@ -229,25 +258,12 @@ function preflightHourlyFiles(source_dir, site_ids)
    end
 end
 
-function s = emptyState()
-   %EMPTYSTATE Prototype per-site staging state.
-   s = struct('site_id', "", 'case_id', "", ...
-      'site_name', "", 'site_location', struct(), 'point', [NaN NaN], ...
-      'period', struct('start', '', 'end', ''), 'evaluation_file_rel', '', ...
-      'entry', struct(), 'colocation', struct(), 'leg', struct(), ...
-      'comparison_variables', {strings(0, 1)}, ...
-      'observation_variables', struct(), ...
-      'surface_zone', "", 'eval_target', {strings(0, 1)}, ...
-      'permafrost_zone', "", 'notes', "", 'reuse_entry', false, ...
-      'dry_run', false);
-end
-
 function state = stageImauCase(site, source_dir, cache_status, family_root, ...
       met_outdir, userdata_outdir, kwargs, daily_qa, coverage, rcm_sources, ...
-      prior_cases, build_native_forcing)
+      prior_cases, build_native_forcing, dataset_family)
    %STAGEIMAUCASE Stage one IMAU hourly case and return manifest state.
    if kwargs.dry_run
-      state = dryRunSite(site, source_dir, cache_status, daily_qa);
+      state = dryRunImauCase(site, source_dir, cache_status, daily_qa);
       return
    end
 
@@ -299,7 +315,8 @@ function state = stageImauCase(site, source_dir, cache_status, family_root, ...
    data_files = strings(1, 0);
    forcing_ready = false;
    if kwargs.build_forcing
-      forcing_ready_reason = "imau was not requested in forcing_sources";
+      forcing_ready_reason = ...
+         dataset_family + " was not requested in forcing_sources";
    else
       forcing_ready_reason = "native forcing disabled because build_forcing=false";
    end
@@ -310,15 +327,16 @@ function state = stageImauCase(site, source_dir, cache_status, family_root, ...
    if build_native_forcing
       % Native input artifacts obey the suite-wide forcing toggle; the same
       % source Data can still back observations.mat when forcing is disabled.
-      met_files = icemodel.forcing.helpers.writemet(met, case_id, "imau", ...
-         outdir=met_outdir, naming="window", dt_out=kwargs.dt_out, ...
+      met_files = icemodel.forcing.helpers.writemet( ...
+         met, case_id, dataset_family, outdir=met_outdir, naming="window", ...
+         dt_out=kwargs.dt_out, ...
          overwrite=kwargs.overwrite);
       % Diagnose the exact returned path because no-overwrite staging may
       % select an existing exact or broader enclosing artifact.
       [forcing_ready, forcing_ready_reason, forcing_complete_windows] = ...
          icemodel.verification.setup.metArtifactReadiness(met_files);
       data_files = icemodel.forcing.helpers.writeuserdata(Data, case_id, ...
-         "imau", outdir=userdata_outdir, naming="window", ...
+         dataset_family, outdir=userdata_outdir, naming="window", ...
          overwrite=kwargs.overwrite);
    end
 
@@ -366,7 +384,8 @@ function state = stageImauCase(site, source_dir, cache_status, family_root, ...
       imauObservationVariables(metadata, Data, daily_qa), ...
       'surface_zone', site.surface_zone, ...
       'eval_target', {string(site.eval_target)}, ...
-      'permafrost_zone', site.permafrost_zone, 'notes', site.note, ...
+      'permafrost_zone', site.permafrost_zone, ...
+      'notes', imauCaseNote(site), ...
       'reuse_entry', false, 'dry_run', false);
    if kwargs.build_observations
       state.entry = imauCaseEntry(state);
@@ -500,8 +519,8 @@ function [colocation, identity_conflict] = preservePriorImauLeg( ...
    end
 end
 
-function state = dryRunSite(site, source_dir, cache_status, daily_qa)
-   %DRYRUNSITE Build one non-writing IMAU state record.
+function state = dryRunImauCase(site, source_dir, cache_status, daily_qa)
+   %DRYRUNIMAUCASE Build one non-writing IMAU state record.
    imau = struct('kind', 'hourly_aws', 'staged', false, ...
       'source_dir', char(source_dir), 'cache_status', cache_status);
    colocation = struct('imau', imau, ...
@@ -522,16 +541,17 @@ function state = dryRunSite(site, source_dir, cache_status, daily_qa)
       'daily_qa_bundle', daily_qa.bundle_doi), ...
       'surface_zone', site.surface_zone, ...
       'eval_target', {string(site.eval_target)}, ...
-      'permafrost_zone', site.permafrost_zone, 'notes', site.note, ...
+      'permafrost_zone', site.permafrost_zone, ...
+      'notes', imauCaseNote(site), ...
       'reuse_entry', false, 'dry_run', true);
    state.entry = imauCaseEntry(state);
 end
 
 function entry = imauCaseEntry(s)
-   %IMAUCASEENTRY Convert one staged IMAU state record to a manifest entry.
+   %IMAUCASEENTRY Convert one IMAU state record to a manifest case entry.
    [forcing_sources, eval_sources] = ...
       icemodel.verification.setup.colocationSourceLists(s.colocation);
-   if isfield(s, 'dry_run') && s.dry_run && isempty(eval_sources)
+   if s.dry_run && isempty(eval_sources)
       eval_sources = "imau_obs";
    end
 
@@ -552,8 +572,14 @@ function entry = imauCaseEntry(s)
       s.observation_variables
       s.colocation
       '1hr'
-      sprintf('IMAU hourly AWS site %s. %s', s.site_id, s.notes)};
+      char(s.notes)};
+
    entry = icemodel.verification.setup.makeFirnCaseManifestEntry(case_values);
+end
+
+function note = imauCaseNote(site)
+   %IMAUCASENOTE Return the staged IMAU case description.
+   note = sprintf('IMAU hourly AWS site %s. %s', site.site_id, site.note);
 end
 
 function colocation = imauColocation(source_dir, metadata, met_files, ...

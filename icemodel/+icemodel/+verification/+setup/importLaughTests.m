@@ -122,8 +122,9 @@ function manifest = importLaughTests(laugh_tests_source_dir, kwargs)
       entry_callback=entry_callback);
 end
 
+%% Local helpers
 function s = emptyState()
-   %EMPTYSTATE Prototype Laugh-Tests staging state.
+   %EMPTYSTATE Prototype dataset-family staging state.
    s = struct('case_id', "", 'entry', struct());
 end
 

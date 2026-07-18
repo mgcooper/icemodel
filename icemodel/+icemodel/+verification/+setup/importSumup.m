@@ -161,15 +161,16 @@ function manifest = importSumup(source_dir, kwargs)
       kwargs.build_observations (1, 1) logical = true
    end
 
-   forcing_sources = ...
-      icemodel.verification.setup.normalizeForcingSources( ...
-      kwargs.forcing_sources, kwargs.build_forcing);
-   kwargs.forcing_sources = forcing_sources;
-
    % Validate the optional clamp before any cache or staging side effect.
    [window_start, window_end, window_enabled] = ...
       icemodel.internal.pairedWindow( ...
       kwargs.startdate, kwargs.enddate);
+
+   % Resolve the forcing sources.
+   forcing_sources = ...
+      icemodel.verification.setup.normalizeForcingSources( ...
+      kwargs.forcing_sources, kwargs.build_forcing);
+   kwargs.forcing_sources = forcing_sources;
 
    % Resolve the family identity and requested runtime source sets once.
    dataset_family = "sumup";
@@ -359,6 +360,7 @@ function manifest = importSumup(source_dir, kwargs)
       overwrite=kwargs.overwrite));
 end
 
+%% Local helpers
 function s = stageSumupPoint(point, n, source_dir, family_root, proj, ...
       source_status, obs_start, obs_end, window_start, window_end, kwargs)
    %STAGESUMUPPOINT Stage one SUMup point and return importer state.
@@ -507,7 +509,7 @@ end
 
 %% Manifest assembly + RCM delegation
 function s = emptyState()
-   %EMPTYSTATE Prototype per-point staging state (preallocation seed).
+   %EMPTYSTATE Prototype dataset-family staging state.
    s = struct('case_id', "", 'storage_alias', "", ...
       'site_id', "", 'site_name', "", ...
       'point', [NaN NaN], 'site_location', struct(), ...
@@ -589,7 +591,7 @@ function entry = sumupCaseEntry(s)
    entry = icemodel.verification.setup.makeFirnCaseManifestEntry(case_values);
 end
 
-%% Local helpers
+%% SUMup catalog helpers
 function points = defaultAnchorPoints(evaluation_data_root)
    %DEFAULTANCHORPOINTS Mixed firn anchor [lat lon] from staged manifests.
    %
