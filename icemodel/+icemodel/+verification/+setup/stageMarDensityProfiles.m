@@ -74,7 +74,8 @@ function state = stageMarDensityProfiles(state, alive_idx, source, kwargs)
          continue
       end
       method = string(fieldOr(leg, 'sample_method', "nearest"));
-      observation_file = fullfile(kwargs.family_root, state(idx).obs_file_rel);
+      observation_file = fullfile( ...
+         kwargs.family_root, state(idx).evaluation_file_rel);
       if method ~= "nearest" || ~isfile(observation_file)
          leg = recordModelOutputFailure(leg, 'profile_not_available', ...
             'MAR density profiles require nearest sampling and staged SUMup observations.');
@@ -121,7 +122,7 @@ function state = stageMarDensityProfiles(state, alive_idx, source, kwargs)
          requested_location=double(state(idx).point));
 
       relative_file = fullfile("mar3.11", ...
-         string(state(idx).alias) + "_mar3.11_density_profiles.mat");
+         string(state(idx).case_id) + "_mar3.11_density_profiles.mat");
       output_file = fullfile(kwargs.userdata_outdir, relative_file);
       if isempty(profiles)
          % A failed/empty refresh is additive: keep an earlier valid sidecar and

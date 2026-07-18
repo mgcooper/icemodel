@@ -156,6 +156,37 @@ Setup and refresh tooling lives under `icemodel.verification.setup`:
 - `prepareCaseRoot`, `writeManifest`, `makeFamilyManifest`, `makeCaseManifestEntry`,
    and `metadataStruct` are setup helpers used by the importers.
 
+### Canonical family API
+
+Every public family importer uses `case_ids` for its case selector. The
+non-atomic firn importers also use the same runtime-source surface:
+`forcing_sources`, `build_observations`, and `build_forcing`. Their
+`build_forcing` default is `false`; a caller must opt in before any runtime
+met/userdata artifacts are written. `overwrite=false`,
+`overwrite_family=false`, paired `startdate`/`enddate`, `skip_missing`,
+`dry_run`, and the staging-root options have the same meaning across families.
+Strict cache validation belongs to each `fetch*` function; importers select
+fail-fast versus per-case skips with `skip_missing`.
+
+The remaining public differences are source contracts, not aliases:
+
+| Family | Case/source-specific inputs | Why it differs |
+|---|---|---|
+| ESM-SnowMIP | `case_ids`, `dt_out` | Forcing and observations share one source window and stage atomically; there is no independently attachable RCM leg. |
+| Laugh Tests | `case_ids` | Each case is an atomic evaluation/reference experiment bundle with no runtime forcing artifact. |
+| PROMICE | `forcing_sources` may include native `"promice"` plus RCM ids | PROMICE owns both observations and an optional native AWS runtime leg. |
+| RetMIP | protocol/native source directories | Protocol, Vandecrux, Samimi, PROMICE, and IMAU products require explicit family parsing before optional RCM attachment. |
+| IMAU | hourly AWS plus daily-QA cache | The daily product is provenance/QA, not another staged case inventory. |
+| SUMup | `points`, `anchors`, `years`, spatial radii | Cases are selected from geospatial observations rather than a fixed site catalog. |
+| research_site | fixed `family="research_site"`, `observation_source="sumup"` | The current Humphrey adapter derives observations from SUMup and owns no native station forcing. |
+
+Fetchers use `products` for independently cached products, `stations` for a
+physical-station subset, and SUMup's `variables`/`region` for its grouped
+geospatial release. Builders likewise keep source-faithful selectors:
+`station`/`site` for native AWS readers, `location` for gridded RCM extraction,
+and `point` for SUMup observations. Those names do not represent the common
+manifest case selector and must not be replaced with compatibility aliases.
+
 The setup functions are intentionally separate because they create MAT
 artifacts and manifests. Ordinary `overwrite=false` calls are additive: they
 reuse current requested artifacts, add missing artifacts/sites/sources, and
@@ -512,7 +543,7 @@ research_site = icemodel.verification.setup.importResearchSites( ...
    sumup_dir, common{:}, ...
    "family", "research_site", ...
    "observation_source", "sumup", ...
-   "site_ids", "humphrey");
+   "case_ids", "humphrey");
 
 anchors = icemodel.verification.setup.mixedAnchorCatalog( ...
    "output_root", data_root);
@@ -820,17 +851,19 @@ rebuild the entire family root from the requested sites alone.
 % intentionally comparing against old artifacts. Omit startdate/enddate to use
 % each station's full available record; pass them only to restrict the window.
 icemodel.verification.setup.importPromiceSites( ...
-   sites=["KAN_L","KAN_M","KAN_U"], ...
+   case_ids=["KAN_L","KAN_M","KAN_U"], ...
    output_root=icemodel.internal.fullpath("demo","data"), ...
+   forcing_sources="promice", build_forcing=true, ...
    overwrite=true);
 
 % Observation-only full PROMICE refresh: ALL stations found under
 % data/verification/promice/hour, all available years, into the repo-root data/
-% tree (data/eval + data/input). With no `sites` the driver defaults to the
+% tree (data/eval + data/input). With no `case_ids` the driver defaults to the
 % full station list. Use the firn/ablation production staging command above
 % for the build_forcing=true PROMICE + MAR/MERRA/RACMO workflow.
 icemodel.verification.setup.importPromiceSites( ...
    output_root=icemodel.internal.fullpath("data"), ...
+   build_forcing=false, ...
    overwrite=true);
 ```
 

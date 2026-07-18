@@ -117,8 +117,6 @@ function id = stateCaseId(state)
    %STATECASEID Return the stable case identity used by the family manifest.
    if isfield(state, 'case_id') && strlength(string(state.case_id)) > 0
       id = string(state.case_id);
-   elseif isfield(state, 'alias') && strlength(string(state.alias)) > 0
-      id = string(state.alias);
    else
       id = "";
    end

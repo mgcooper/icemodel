@@ -41,9 +41,12 @@ function state = stageDatasetRcmForcing(state, alive, kwargs)
       kwargs.overwrite (1, 1) logical = false
    end
 
-   % Treat a caller's selection as an ordered set so duplicate tokens cannot
-   % repeat expensive builders, warnings, or persistence callbacks.
-   forcing_sources = unique(kwargs.forcing_sources, 'stable');
+   % Remove blank optional selectors before dynamic field dispatch, then treat
+   % the remaining selection as an ordered set so duplicates cannot repeat work.
+   forcing_sources = reshape(kwargs.forcing_sources, 1, []);
+   forcing_sources = ...
+      forcing_sources(strlength(strtrim(forcing_sources)) > 0);
+   forcing_sources = unique(forcing_sources, 'stable');
    alive_idx = find(alive);
    if isempty(alive_idx) || isempty(forcing_sources)
       return
@@ -72,7 +75,7 @@ function state = stageDatasetRcmForcing(state, alive, kwargs)
          % A manifest id can name a different physical cache point in another
          % family. Keep that scientific id in the manifest while letting the
          % importer provide a collision-safe RCM-only storage identity.
-         legspec(j).alias = string(s.alias);
+         legspec(j).alias = string(s.case_id);
          if isfield(s, 'storage_alias') ...
                && strlength(string(s.storage_alias)) > 0
             legspec(j).alias = string(s.storage_alias);

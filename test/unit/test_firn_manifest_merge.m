@@ -1125,8 +1125,8 @@ function m = familyWith(case_cell)
       cases = vertcat(case_cell{:});
    end
    m = icemodel.verification.setup.makeFamilyManifest("promice", "", ...
-      "https://promice.org", "colocated[test]", "01-Jan-2026", cases);
-   m.skipped = struct('site', {}, 'reason', {});
+      "https://promice.org", "colocated[test]", "01-Jan-2026", cases, ...
+      struct('site', {}, 'reason', {}));
 end
 
 function entry = caseEntry(case_id, site_id, zone)

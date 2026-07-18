@@ -110,9 +110,11 @@ function out = stageRcmForcing(points, kwargs)
       kwargs.overwrite_family (1, 1) logical = false
    end
 
-   % Repeated selectors are one request. Stable deduplication preserves the
-   % caller's source order while preventing duplicate artifact/manifest work.
-   sources = unique(reshape(kwargs.forcing_sources, 1, []), 'stable');
+   % Remove blank optional selectors before dynamic field dispatch. Stable
+   % deduplication then prevents repeated artifact and manifest work.
+   sources = reshape(kwargs.forcing_sources, 1, []);
+   sources = sources(strlength(strtrim(sources)) > 0);
+   sources = unique(sources, 'stable');
    kwargs.modis_dir = defaultModisDir(kwargs.modis_dir);
 
    % Mode select: a struct or a non-empty path in obs_manifest -> manifest mode.

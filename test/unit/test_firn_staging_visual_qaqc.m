@@ -2142,7 +2142,8 @@ function writeTinyFirnTree(root)
       'tiny visual QA fixture'};
    entry = icemodel.verification.setup.makeFirnCaseManifestEntry(values);
    manifest = icemodel.verification.setup.makeFamilyManifest( ...
-      "promice", "", "", "tiny", "today", entry);
+      "promice", "", "", "tiny", "today", entry, ...
+      struct('site', {}, 'reason', {}));
    icemodel.verification.setup.writeManifest( ...
       fullfile(root, 'eval', 'promice', 'manifest.json'), manifest);
 end
@@ -2197,7 +2198,8 @@ function writeTinyEsmTree(root)
       'tiny visual QA ESM fixture'};
    entry = icemodel.verification.setup.makeCaseManifestEntry(values);
    manifest = icemodel.verification.setup.makeFamilyManifest( ...
-      "esm_snowmip", "", "", "tiny", "today", entry);
+      "esm_snowmip", "", "", "tiny", "today", entry, ...
+      struct('site', {}, 'reason', {}));
    icemodel.verification.setup.writeManifest( ...
       fullfile(root, 'eval', 'esm_snowmip', 'manifest.json'), manifest);
 end
@@ -2258,7 +2260,8 @@ function writeTinyLaughTree(root)
       'tiny Laugh-Test visual QA fixture'};
    entry = icemodel.verification.setup.makeCaseManifestEntry(values);
    manifest = icemodel.verification.setup.makeFamilyManifest( ...
-      "laugh_tests", "", "", "tiny", "today", entry);
+      "laugh_tests", "", "", "tiny", "today", entry, ...
+      struct('site', {}, 'reason', {}));
    icemodel.verification.setup.writeManifest( ...
       fullfile(root, 'eval', 'laugh_tests', 'manifest.json'), manifest);
 end
@@ -2287,7 +2290,8 @@ function writeEmptyResearchTree(root)
       'empty visual QA fixture'};
    entry = icemodel.verification.setup.makeFirnCaseManifestEntry(values);
    manifest = icemodel.verification.setup.makeFamilyManifest( ...
-      "research_site", "", "", "tiny", "today", entry);
+      "research_site", "", "", "tiny", "today", entry, ...
+      struct('site', {}, 'reason', {}));
    icemodel.verification.setup.writeManifest( ...
       fullfile(root, 'eval', 'research_site', 'manifest.json'), manifest);
 end

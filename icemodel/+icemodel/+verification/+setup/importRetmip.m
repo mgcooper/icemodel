@@ -5,18 +5,18 @@ function manifest = importRetmip(source_dir, kwargs)
    %  manifest = icemodel.verification.setup.importRetmip(source_dir, ...
    %     dry_run=true)
    %
-   % Role
-   %  RetMIP staging hook. It records RetMIP protocol cases as evaluation
-   %  userdata and stages confirmed native meteorological sources separately
-   %  under the standard icemodel input/met and input/userdata layout. Optional
-   %  MAR/MERRA/RACMO legs are delegated to the shared dataset-family RCM
-   %  staging helper after protocol/native products are safely persisted.
-   %  forcing_sources selects RCM sources requested by the current call.
-   %  Ordinary calls preserve omitted existing legs; overwrite_family=true
-   %  deliberately replaces the whole family state.
-   %  build_observations=false is a guarded non-dry fast path: requested cases
-   %  must already exist in the target manifest, whose protocol/native entry is
-   %  reused while selected RCM forcing is attached.
+   %  Role
+   %    RetMIP staging hook. It records RetMIP protocol cases as evaluation
+   %    userdata and stages confirmed native meteorological sources separately
+   %    under the standard icemodel input/met and input/userdata layout. Optional
+   %    MAR/MERRA/RACMO legs are delegated to the shared dataset-family RCM
+   %    staging helper after protocol/native products are safely persisted.
+   %    forcing_sources selects runtime sources requested by the current call.
+   %    Ordinary calls preserve omitted existing legs; overwrite_family=true
+   %    deliberately replaces the whole family state.
+   %    build_observations=false is a guarded non-dry fast path: requested cases
+   %    must already exist in the target manifest, whose protocol/native entry is
+   %    reused while selected forcing is attached.
    %
    %  Default roots
    %    source_dir="" reads <repo>/data/verification/retmip. With no output_root,
@@ -33,18 +33,31 @@ function manifest = importRetmip(source_dir, kwargs)
    %  Native met schema completion is fixed at the importer boundary: absent
    %  required channels are retained as NaN placeholders.
    %  Call the source-family met builder directly for strict validation.
+   %
+   %  Name-value
+   %    case_ids : string vector  RetMIP protocol cases; blank selects all.
+   %    forcing_sources : string vector  Native/RCM legs requested by this call.
+   %    startdate, enddate : paired optional protocol/forcing clamp.
+   %    output_root : string  Convenience root for eval and input artifacts.
+   %    build_observations : logical  Build or reuse protocol/native entries.
+   %    build_forcing : logical  Stage requested runtime legs (default false).
+   %    overwrite : logical  Refresh requested case artifacts (default false).
+   %    overwrite_family : logical  Replace the whole family (default false).
+   %    skip_missing : logical  Record source-local skips instead of failing.
+   %    dry_run : logical  Return metadata without source or output writes.
+   %
+   %  Returns
+   %    manifest : struct  Final or dry-run family manifest.
+   %
+   %  See also: icemodel.verification.setup.importPromiceSites,
+   %    icemodel.verification.setup.importImau
 
    arguments
       source_dir (1, 1) string = ""
       kwargs.case_ids (1, :) string = strings(1, 0)
       kwargs.forcing_sources (1, :) string ...
          {icemodel.verification.validators.mustBeRcmSourceSelection( ...
-         kwargs.forcing_sources)} = ...
-         icemodel.verification.namelists.rcmsources()
-      kwargs.output_root (1, 1) string = ""
-      kwargs.evaluation_data_root (1, 1) string = ""
-      kwargs.input_data_root (1, 1) string = ""
-      kwargs.icemodel_config_casename (1, 1) string = ""
+         kwargs.forcing_sources, "retmip")} = "retmip"
       kwargs.startdate = ""
       kwargs.enddate = ""
       kwargs.promice_dir (1, 1) string = ""
@@ -55,57 +68,91 @@ function manifest = importRetmip(source_dir, kwargs)
       kwargs.merra_dir (1, 1) string = ""
       kwargs.racmo_dir (1, 1) string = ""
       kwargs.modis_dir (1, 1) string = ""
+      kwargs.output_root (1, 1) string = ""
+      kwargs.evaluation_data_root (1, 1) string = ""
+      kwargs.input_data_root (1, 1) string = ""
+      kwargs.icemodel_config_casename (1, 1) string = ""
       kwargs.dt_out (1, 1) string ...
          {mustBeMember(kwargs.dt_out, ["", "15m"])} = "15m"
-      kwargs.dry_run (1, 1) logical = false
-      kwargs.strict (1, 1) logical = false
-      kwargs.skip_missing (1, 1) logical = true
       kwargs.overwrite (1, 1) logical = false
       kwargs.overwrite_family (1, 1) logical = false
+      kwargs.skip_missing (1, 1) logical = true
+      kwargs.dry_run (1, 1) logical = false
       kwargs.build_forcing (1, 1) logical = false
       kwargs.build_observations (1, 1) logical = true
    end
-   cases = icemodel.verification.setup.retmipCaseCatalog(kwargs.case_ids);
-   % Resolve the optional preview clamp once before any cache or output work.
+
+   forcing_sources = ...
+      icemodel.verification.setup.normalizeForcingSources( ...
+      kwargs.forcing_sources, kwargs.build_forcing);
+   kwargs.forcing_sources = forcing_sources;
+
+   % Validate the optional clamp before any cache or staging side effect.
    [window_start, window_end, window_enabled] = ...
       icemodel.internal.pairedWindow( ...
       kwargs.startdate, kwargs.enddate);
    requested_window = struct('enabled', window_enabled, ...
       'start', window_start, 'end', window_end);
 
-   % Resolve the family root even for dry runs; non-dry runs use it to stage
-   % protocol userdata bundles beside the manifest.
+   % Resolve the family identity and requested runtime source sets once.
+   dataset_family = "retmip";
+   build_native_forcing = kwargs.build_forcing ...
+      && ismember(dataset_family, forcing_sources);
+   rcm_sources = intersect(forcing_sources, ...
+      icemodel.verification.namelists.rcmsources(), "stable");
+   build_rcm_forcing = kwargs.build_forcing && ~isempty(rcm_sources);
+
+   cases = icemodel.verification.setup.retmipCaseCatalog(kwargs.case_ids);
+   requested_ids = string({cases.case_id});
+
+   % Resolve output roots and paths before raw sources. Forcing-only calls can
+   % reuse the existing manifest without requiring observation/native caches.
    [evaluation_data_root, input_root] = ...
       icemodel.verification.setup.resolveStagingRoots( ...
       output_root=kwargs.output_root, ...
       evaluation_data_root=kwargs.evaluation_data_root, ...
       input_data_root=kwargs.input_data_root, ...
       icemodel_config_casename=kwargs.icemodel_config_casename);
-   % Name the family once so full, dry-run, and forcing-only paths share the
-   % same manifest and collision-safe storage-alias contract.
-   dataset_family = "retmip";
-   family_root = fullfile(evaluation_data_root, dataset_family);
-   manifest_file = fullfile(family_root, "manifest.json");
-   requested_ids = string({cases.case_id});
-   prior_cases = struct([]);
+   [family_root, manifest_file, met_outdir, userdata_outdir] = ...
+      icemodel.verification.setup.datasetFamilyStagingPaths( ...
+      evaluation_data_root, input_root, dataset_family);
 
-   rcm_sources = intersect(kwargs.forcing_sources, ...
-      icemodel.verification.namelists.rcmsources(), "stable");
+   prior_cases = struct([]);
    coverage = struct();
    reuse_sources = strings(1, 0);
-   if ~kwargs.dry_run && kwargs.build_forcing && ~isempty(rcm_sources)
+
+   if ~kwargs.dry_run
+      prior_cases = ...
+         icemodel.verification.setup.loadPriorDatasetFamilyCases( ...
+         manifest_file, overwrite_family=kwargs.overwrite_family, ...
+         build_observations=kwargs.build_observations);
+   end
+
+   if ~kwargs.dry_run && kwargs.build_observations
+      icemodel.helpers.ensureDirExists(family_root);
+   end
+   if ~kwargs.dry_run && kwargs.build_forcing
+      icemodel.helpers.ensureDirExists(met_outdir);
+      icemodel.helpers.ensureDirExists(userdata_outdir);
+   end
+
+   % Resolve RCM coverage only for a real requested build.
+   if ~kwargs.dry_run && build_rcm_forcing
       reuse_sources = rcm_sources;
       coverage = icemodel.verification.setup.promiceSourceCoverage( ...
          rcm_sources, struct('mar', kwargs.mar_dir, ...
          'merra', kwargs.merra_dir, 'racmo', kwargs.racmo_dir));
    end
 
-   if ~kwargs.dry_run && ~kwargs.build_observations
-      % Forcing-only attachment trusts the already-staged protocol/native entry;
-      % it does not require the raw RetMIP or native-source caches again.
+   if ~kwargs.dry_run && ~kwargs.build_observations ...
+         && ~build_native_forcing
+      % Reuse the staged case entry so an RCM-only attachment does not require
+      % source caches.
       [state, alive, skipped] = ...
          icemodel.verification.setup.reuseDatasetFamilyCases( ...
          manifest_file, requested_ids, emptyState(), ...
+         dataset_family=dataset_family, ...
+         overwrite_family=kwargs.overwrite_family, ...
          forcing_sources=reuse_sources, coverage=coverage, ...
          startdate=kwargs.startdate, enddate=kwargs.enddate);
       for k = 1:numel(state)
@@ -116,36 +163,38 @@ function manifest = importRetmip(source_dir, kwargs)
             dataset_family, state(k).case_id);
       end
    else
-      % Validate source caches only when observations/native artifacts are part
-      % of this call. Dry runs remain source-light contract previews; optional
-      % skips stay quiet while required caches print their DOI guidance.
-      if ~kwargs.dry_run
-         prior_cases = ...
-            icemodel.verification.setup.loadPriorDatasetFamilyCases( ...
-            manifest_file, build_forcing=kwargs.build_forcing, ...
-            overwrite_family=kwargs.overwrite_family);
+      % Validate caches only when building observations or native runtime files.
+      % Dry runs remain metadata-only; optional skips stay quiet while required
+      % RetMIP products print their retrieval guidance before failing.
+      cache_status = struct();
+      if ~kwargs.dry_run && kwargs.build_observations
+         strict_cache = ~kwargs.skip_missing;
+         [source_dir, cache_status] = icemodel.verification.setup.fetchRetmip( ...
+            cache_dir=icemodel.forcing.helpers.verificationSourceDir( ...
+            source_dir, "retmip"), ...
+            products=["forcing", "outputs"], strict=strict_cache, ...
+            silent=kwargs.skip_missing, ...
+            create_cache_dir=true);
       end
-      strict_cache = kwargs.strict || (~kwargs.dry_run && ~kwargs.skip_missing);
-      [source_dir, cache_status] = icemodel.verification.setup.fetchRetmip( ...
-         cache_dir=icemodel.forcing.helpers.verificationSourceDir( ...
-         source_dir, "retmip"), ...
-         products=["forcing", "outputs"], strict=strict_cache, ...
-         silent=kwargs.skip_missing, ...
-         create_cache_dir=~kwargs.dry_run);
-       if ~kwargs.dry_run && ~kwargs.skip_missing
-          preflightCases(cases, source_dir, kwargs, requested_window);
+      if ~kwargs.dry_run && ~kwargs.skip_missing
+         preflightCases( ...
+            cases, source_dir, kwargs, requested_window, ...
+            build_native_forcing);
       end
+
+      stage_callback = @(~, n) stageRetmipCase( ...
+         cases(n), source_dir, cache_status, family_root, input_root, kwargs, ...
+         coverage, rcm_sources, requested_window, ...
+         icemodel.verification.setup.priorCaseById( ...
+         prior_cases, cases(n).case_id), build_native_forcing);
 
       % Stage each requested case into importer state.
       [state, alive, skipped] = ...
          icemodel.verification.setup.stageDatasetFamilyCases( ...
-         1:numel(cases), emptyState(), ...
-         @(~, n) stageRetmipCase(cases(n), source_dir, cache_status, ...
-          family_root, input_root, kwargs, coverage, rcm_sources, ...
-          requested_window, priorCaseById(prior_cases, cases(n).case_id)), ...
+         1:numel(requested_ids), emptyState(), stage_callback, ...
          skip_missing=kwargs.skip_missing, ...
          warning_id="icemodel:verification:importRetmip:caseSkipped", ...
-         label_callback=@(~, n) cases(n).case_id);
+         label_callback=@(~, n) requested_ids(n));
    end
 
    % Record source provenance once so dry-run and persisted manifests match.
@@ -154,21 +203,20 @@ function manifest = importRetmip(source_dir, kwargs)
    source_version = "retmip-protocol+outputs";
    retrieval_date = string(datetime('today'));
 
+   entry_callback = @icemodel.verification.setup.stateCaseEntry;
+
+   % Return metadata without writing case or manifest artifacts.
    if kwargs.dry_run
       manifest = icemodel.verification.setup.runDatasetFamilyDryRun( ...
          state, alive, dataset_family=dataset_family, ...
          requested_ids=requested_ids, skipped=skipped, ...
          source_doi=source_doi, source_url=source_url, ...
          source_version=source_version, retrieval_date=retrieval_date, ...
-         entry_callback=@icemodel.verification.setup.stateCaseEntry);
+         entry_callback=entry_callback);
       return
    end
 
-   icemodel.helpers.ensureDirExists(family_root);
-   leg_callback = [];
-   if ~kwargs.dry_run && kwargs.build_forcing && ~isempty(rcm_sources)
-      leg_callback = @(s, src) s.leg.(char(src));
-   end
+   % Persist case entries first, then attach requested RCM source legs.
    [manifest, ~] = icemodel.verification.setup.runDatasetFamilyImport( ...
       state, alive, dataset_family=dataset_family, ...
       manifest_file=manifest_file, requested_ids=requested_ids, ...
@@ -176,10 +224,10 @@ function manifest = importRetmip(source_dir, kwargs)
       source_doi=source_doi, source_url=source_url, ...
       source_version=source_version, retrieval_date=retrieval_date, ...
       overwrite_family=kwargs.overwrite_family, overwrite=kwargs.overwrite, ...
-      entry_callback=@icemodel.verification.setup.stateCaseEntry, ...
-      build_forcing=kwargs.build_forcing, forcing_sources=rcm_sources, ...
-      leg_callback=leg_callback, met_outdir=fullfile(input_root, 'met'), ...
-      userdata_outdir=fullfile(input_root, 'userdata'), ...
+      entry_callback=entry_callback, ...
+      build_forcing=build_rcm_forcing, forcing_sources=rcm_sources, ...
+      leg_callback=@(s, src) s.leg.(char(src)), ...
+      met_outdir=met_outdir, userdata_outdir=userdata_outdir, ...
       mar_dir=kwargs.mar_dir, merra_dir=kwargs.merra_dir, ...
       racmo_dir=kwargs.racmo_dir, modis_dir=kwargs.modis_dir, ...
       method="nearest", dt_out=kwargs.dt_out);
@@ -187,7 +235,7 @@ end
 
 function entry = emptyEntry()
    %EMPTYENTRY Prototype RetMIP manifest entry.
-   values = { ...
+   case_values = { ...
       ''
       'firn_observational'
       ''
@@ -206,37 +254,40 @@ function entry = emptyEntry()
       struct()
       '3hr'
       ''};
-   entry = icemodel.verification.setup.makeFirnCaseManifestEntry(values);
+   entry = icemodel.verification.setup.makeFirnCaseManifestEntry(case_values);
 end
 
 function s = emptyState()
    %EMPTYSTATE Prototype RetMIP staging state.
-   s = struct('case_id', "", 'alias', "", 'storage_alias', "", ...
+   s = struct('case_id', "", 'storage_alias', "", ...
       'point', [NaN NaN], ...
+      'evaluation_file_rel', "", ...
       'entry', emptyEntry(), 'period', struct('start', '', 'end', ''), ...
       'colocation', struct(), 'leg', struct(), 'reuse_entry', false, ...
       'dry_run', false);
 end
 
 function s = stageRetmipCase(c, source_dir, cache_status, family_root, ...
-      input_root, kwargs, coverage, rcm_sources, requested_window, prior_case)
+      input_root, kwargs, coverage, rcm_sources, requested_window, prior_case, ...
+      build_native_forcing)
    %STAGERETMIPCASE Stage one RetMIP case and return importer state.
    c = clampCasePeriod(c, requested_window);
    entry = manifestEntry(c, source_dir, cache_status, family_root, input_root, ...
       kwargs.promice_dir, kwargs.gcnet_dir, kwargs.samimi_dir, ...
-      kwargs.imau_dir, kwargs.dry_run, kwargs.build_forcing, ...
-      kwargs.skip_missing, ...
-      kwargs.overwrite, kwargs.dt_out, prior_case);
+      kwargs.imau_dir, kwargs.dry_run, kwargs.build_observations, ...
+      kwargs.build_forcing, build_native_forcing, kwargs.overwrite_family, ...
+      kwargs.skip_missing, kwargs.overwrite, ...
+      kwargs.dt_out, prior_case);
    leg = struct();
    if ~kwargs.dry_run && kwargs.build_forcing && ~isempty(rcm_sources)
       [t1, t2] = icemodel.verification.setup.periodBounds(c.period);
       leg = icemodel.verification.setup.resolveLegWindows( ...
          rcm_sources, coverage, t1, t2);
    end
-   s = struct('case_id', string(c.case_id), 'alias', string(c.case_id), ...
-      'storage_alias', ...
+   s = struct('case_id', string(c.case_id), 'storage_alias', ...
       icemodel.verification.setup.rcmStorageAlias("retmip", c.case_id), ...
       'point', [c.site_location.lat_wgs84, c.site_location.lon_wgs84], ...
+      'evaluation_file_rel', string(entry.evaluation_file), ...
       'entry', entry, 'period', entry.period, ...
       'colocation', entry.colocation, 'leg', leg, 'reuse_entry', false, ...
       'dry_run', kwargs.dry_run);
@@ -260,19 +311,22 @@ function c = clampCasePeriod(c, requested_window)
    c.period_is_clamped = true;
 end
 
-function preflightCases(cases, source_dir, kwargs, requested_window)
+function preflightCases(cases, source_dir, kwargs, requested_window, ...
+      build_native_forcing)
    %PREFLIGHTCASES Validate every strict RetMIP case before staging begins.
    % Parse all protocol bundles first so a later malformed case cannot follow an
    % earlier case-root or manifest mutation.
-   for k = 1:numel(cases)
-      c = clampCasePeriod(cases(k), requested_window);
-      files = retmipFiles(source_dir, c);
-      prepareProtocolBundle(c, files);
+   if kwargs.build_observations
+      for k = 1:numel(cases)
+         c = clampCasePeriod(cases(k), requested_window);
+         files = retmipFiles(source_dir, c);
+         prepareProtocolBundle(c, files);
+      end
    end
 
    % Native meteorological caches are runtime forcing inputs, not protocol
-   % observation prerequisites, so probe them only after every bundle parses.
-   if ~kwargs.build_forcing
+   % observation prerequisites, so validate them only after every bundle parses.
+   if ~build_native_forcing
       return
    end
 
@@ -282,12 +336,15 @@ function preflightCases(cases, source_dir, kwargs, requested_window)
       if ~ismember(family, ["promice", "gcnet_vandecrux", "samimi", "imau"])
          continue
       end
-      [available, ~, reason] = nativeSourceStatus(family, kwargs.promice_dir, ...
+      [available, resolved_dir, reason] = nativeSourceStatus( ...
+         family, kwargs.promice_dir, ...
          kwargs.gcnet_dir, kwargs.samimi_dir, kwargs.imau_dir, ...
          string(assoc.source_id));
       if ~available
          throwMissingNative(reason, family);
       end
+      c = clampCasePeriod(cases(k), requested_window);
+      buildNativeMet(family, string(assoc.source_id), resolved_dir, c.period);
    end
 end
 
@@ -303,9 +360,38 @@ end
 
 function entry = manifestEntry(c, source_dir, cache_status, family_root, ...
       input_root, promice_dir, gcnet_dir, samimi_dir, imau_dir, dry_run, ...
-      build_forcing, skip_missing, overwrite, dt_out, prior_case)
+      build_observations, build_forcing, build_native_forcing, ...
+      overwrite_family, skip_missing, overwrite, dt_out, prior_case)
    %MANIFESTENTRY Build one RetMIP firn case entry.
-   files = retmipFiles(source_dir, c);
+   if ~dry_run && ~build_observations
+      if isempty(prior_case)
+         error('icemodel:verification:importRetmip:missingPriorCase', ...
+            ['build_observations=false requires case "%s" in the target ' ...
+            'RetMIP manifest.'], c.case_id);
+      end
+      entry = prior_case;
+      if overwrite_family
+         entry = ...
+            icemodel.verification.setup.prepareReplacementCaseEntry( ...
+            entry, "retmip");
+      end
+      [entry.colocation, ~, native_obs, native_timestep] = stageNativeSource( ...
+         entry.colocation, c, input_root, promice_dir, gcnet_dir, samimi_dir, ...
+         imau_dir, false, build_forcing, build_native_forcing, skip_missing, ...
+         overwrite, dt_out, prior_case);
+      if ~isempty(fieldnames(native_obs))
+         entry.observation_variables.native_source = native_obs;
+      end
+      entry.native_timestep = char(native_timestep);
+      return
+   end
+
+   % Dry runs use the catalog contract without discovering protocol files.
+   files = struct('surface', "", 'profiles', strings(0, 1), ...
+      'outputs', strings(0, 1));
+   if ~dry_run
+      files = retmipFiles(source_dir, c);
+   end
    evaluation_file = "";
    if ~dry_run
       % Parse and stamp the complete bundle before prepareCaseRoot can create,
@@ -340,8 +426,8 @@ function entry = manifestEntry(c, source_dir, cache_status, family_root, ...
    colocation.source_association = c.source_association;
    [colocation, ~, native_obs, native_timestep] = stageNativeSource( ...
       colocation, c, input_root, promice_dir, gcnet_dir, samimi_dir, ...
-      imau_dir, dry_run, build_forcing, skip_missing, overwrite, dt_out, ...
-      prior_case);
+      imau_dir, dry_run, build_forcing, build_native_forcing, skip_missing, ...
+      overwrite, dt_out, prior_case);
 
    comparison_variables = comparisonVariables(files);
    if dry_run
@@ -357,7 +443,7 @@ function entry = manifestEntry(c, source_dir, cache_status, family_root, ...
       observation_variables.native_source = native_obs;
    end
 
-   values = { ...
+   case_values = { ...
       char(c.case_id)
       'firn_observational'
       char(c.site_id)
@@ -375,13 +461,13 @@ function entry = manifestEntry(c, source_dir, cache_status, family_root, ...
       colocation
       char(native_timestep)
       caseNote(c, colocation)};
-   entry = icemodel.verification.setup.makeFirnCaseManifestEntry(values);
+   entry = icemodel.verification.setup.makeFirnCaseManifestEntry(case_values);
 end
 
 function [colocation, native_vars, native_obs, native_timestep] = stageNativeSource( ...
       colocation, c, input_root, promice_dir, gcnet_dir, samimi_dir, ...
-      imau_dir, dry_run, build_forcing, skip_missing, overwrite, dt_out, ...
-      prior_case)
+      imau_dir, dry_run, build_forcing, build_native_forcing, skip_missing, ...
+      overwrite, dt_out, prior_case)
    %STAGENATIVESOURCE Stage the confirmed native source for one RetMIP case.
    native_vars = strings(0, 1);
    native_obs = struct();
@@ -399,20 +485,41 @@ function [colocation, native_vars, native_obs, native_timestep] = stageNativeSou
       'source_id', station, 'relationship', assoc.relationship);
    colocation.retmip.native_source = source;
 
+   % Dry runs publish selector intent without reading native source caches.
+   if dry_run
+      status = "not_requested";
+      reason = "retmip was not requested in forcing_sources";
+      if ~build_forcing
+         status = "forcing_disabled";
+         reason = "native forcing disabled because build_forcing=false";
+      elseif build_native_forcing
+         status = "not_checked";
+         reason = "native source cache not read during dry run";
+      end
+      colocation = recordNativeStatus( ...
+         colocation, false, status, reason, family);
+      return
+   end
+
    % A protocol-only import neither probes nor writes native runtime artifacts.
    % Ordinary refreshes retain a compatible previously staged native leg;
    % identity changes leave a fresh unstaged leg that requires a forcing rebuild.
-   if ~build_forcing
+   if ~build_native_forcing
       [colocation, native_obs, native_timestep, preserved, identity_conflict] = ...
          preservePriorNativeSource(colocation, prior_case, native_timestep);
       if preserved
          return
       end
       status = "not_requested";
-      reason = "build_forcing=false";
+      reason = "retmip was not requested in forcing_sources";
+      if ~build_forcing
+         status = "forcing_disabled";
+         reason = "native forcing disabled because build_forcing=false";
+      end
       if identity_conflict
          status = "identity_changed_requires_rebuild";
-         reason = "native source identity changed; rerun with build_forcing=true";
+         reason = "native source identity changed; rerun with " + ...
+            "build_forcing=true and forcing_sources including retmip";
       end
       colocation = recordNativeStatus( ...
          colocation, false, status, reason, family);
@@ -422,16 +529,6 @@ function [colocation, native_vars, native_obs, native_timestep] = stageNativeSou
    [available, resolved_dir, reason] = nativeSourceStatus( ...
       family, promice_dir, gcnet_dir, samimi_dir, imau_dir, station, dry_run);
    colocation.retmip.native_source.cache_dir = char(resolved_dir);
-   if dry_run
-      % Dry runs advertise cache availability but never claim staged files.
-      status = "available_" + family;
-      if ~available
-         status = "missing_" + family;
-      end
-      colocation = recordNativeStatus(colocation, false, status, reason, family);
-      return
-   end
-
    if ~available
       colocation = handleNativeMissing(colocation, reason, skip_missing, family);
       return
@@ -491,18 +588,6 @@ function [colocation, native_vars, native_obs, native_timestep] = stageNativeSou
          rethrow(err)
       end
       colocation = handleNativeMissing(colocation, err.message, true, family);
-   end
-end
-
-function prior_case = priorCaseById(cases, case_id)
-   %PRIORCASEBYID Return one prior RetMIP case or an empty struct.
-   prior_case = struct();
-   if isempty(cases) || ~isfield(cases, 'case_id')
-      return
-   end
-   hit = find(string({cases.case_id}) == string(case_id), 1);
-   if ~isempty(hit)
-      prior_case = cases(hit);
    end
 end
 

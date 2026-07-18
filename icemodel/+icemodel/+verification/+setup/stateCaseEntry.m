@@ -3,14 +3,15 @@ function entry = stateCaseEntry(state)
    %
    %  entry = icemodel.verification.setup.stateCaseEntry(state)
    %
-   % Dry-run states already carry their complete metadata-only entry. Persisted
-   % states replace colocation and derive the public source lists from those
-   % staged legs.
+   % Atomic states and dry-run states already carry their complete entry.
+   % Persisted firn states replace colocation and derive the public source lists
+   % from those staged legs.
 
-   % Preserve source-light dry-run entries exactly as the family adapter built
-   % them because no staged colocation facts are available to recompute.
+   % Preserve atomic or dry-run entries exactly because they have no final staged
+   % colocation graph to recompute.
    entry = state.entry;
-   if state.dry_run
+   if ~isfield(state, 'colocation') ...
+         || (isfield(state, 'dry_run') && state.dry_run)
       return
    end
 

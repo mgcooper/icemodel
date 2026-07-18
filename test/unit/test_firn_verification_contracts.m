@@ -826,7 +826,8 @@ function writeMixedProfileManifest(eval_root)
       'mixed profile comparison fixture'};
    entry = icemodel.verification.setup.makeFirnCaseManifestEntry(values);
    manifest = icemodel.verification.setup.makeFamilyManifest( ...
-      "sumup", "", "", "tiny", "today", entry);
+      "sumup", "", "", "tiny", "today", entry, ...
+      struct('site', {}, 'reason', {}));
    icemodel.verification.setup.writeManifest( ...
       fullfile(eval_root, 'sumup', 'manifest.json'), manifest);
 end
@@ -855,7 +856,8 @@ function writeIntervalSmbManifest(eval_root)
       'interval SMB plotting fixture'};
    entry = icemodel.verification.setup.makeFirnCaseManifestEntry(values);
    manifest = icemodel.verification.setup.makeFamilyManifest( ...
-      "sumup", "", "", "tiny", "today", entry);
+      "sumup", "", "", "tiny", "today", entry, ...
+      struct('site', {}, 'reason', {}));
    icemodel.verification.setup.writeManifest( ...
       fullfile(eval_root, 'sumup', 'manifest.json'), manifest);
 end

@@ -7,6 +7,15 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %  manifest = icemodel.verification.setup.importEsmSnowmip(source_dir, ...
    %     case_ids="cdp", startdate="2005-10-01", enddate="2006-07-01")
    %
+   %  Role
+   %    Setup/update tooling. Creates or refreshes staged data under the resolved
+   %    data/eval/esm_snowmip tree and is not part of normal verification runs.
+   %
+   %  Default roots
+   %    source_dir="" reads the configured ESM-SnowMIP cache. With no output_root,
+   %    cases go to <repo>/data/eval/esm_snowmip/<case_id>/ and met files go to
+   %    <repo>/data/input/met/esm_snowmip/.
+   %
    %  Stages the requested ESM-SnowMIP site cases under the resolved
    %  data/eval/esm_snowmip/<sitename>/ tree. All 10 reference sites are
    %  supported; the per-site forcing and observation artifacts are produced by
@@ -66,33 +75,30 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %  Returns
    %    manifest : struct  Family manifest also written to manifest.json.
    %
-   %  Role
-   %    Setup/update tooling. This function creates or refreshes staged data
-   %    under the resolved data/eval/esm_snowmip tree and is not part of normal verification
-   %    runs.
+   %  Source guarantees
    %    Layout / file-presence guarantees come from
    %    icemodel.verification.setup.fetchEsmSnowmip; downstream from that
    %    point this importer can write the resolved output files directly
    %    without repeating per-file existence checks.
    %
-   % See also: icemodel.verification.setup.fetchEsmSnowmip,
-   %  icemodel.verification.setup.buildEsmSnowmipForcing,
-   %  icemodel.verification.setup.buildEsmSnowmipObservations,
-   %  icemodel.verification.namelists.snowmipsite,
-   %  icemodel.verification.setup.esmSnowmipSiteCatalog,
-   %  icemodel.verification.helpers.default_smoke_window
+   %  See also: icemodel.verification.setup.fetchEsmSnowmip,
+   %    icemodel.verification.setup.buildEsmSnowmipForcing,
+   %    icemodel.verification.setup.buildEsmSnowmipObservations,
+   %    icemodel.verification.namelists.snowmipsite,
+   %    icemodel.verification.setup.esmSnowmipSiteCatalog,
+   %    icemodel.verification.helpers.default_smoke_window
 
    arguments
       source_dir (1, 1) string = ""
-      kwargs.output_root (1, 1) string = ""
-      kwargs.evaluation_data_root (1, 1) string = ""
-      kwargs.input_data_root (1, 1) string = ""
-      kwargs.icemodel_config_casename (1, 1) string = ""
       kwargs.case_ids (1, :) string ...
          {icemodel.verification.validators.mustBeSnowmipSite} = ...
          icemodel.verification.namelists.snowmipsite()
       kwargs.startdate = ""
       kwargs.enddate = ""
+      kwargs.output_root (1, 1) string = ""
+      kwargs.evaluation_data_root (1, 1) string = ""
+      kwargs.input_data_root (1, 1) string = ""
+      kwargs.icemodel_config_casename (1, 1) string = ""
       kwargs.dt_out (1, 1) string ...
          {mustBeMember(kwargs.dt_out, ["", "15m"])} = "15m"
       kwargs.overwrite (1, 1) logical = false
@@ -101,55 +107,52 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       kwargs.dry_run (1, 1) logical = false
    end
 
-   case_ids = reshape(kwargs.case_ids, 1, []);
+   cases = reshape(kwargs.case_ids, 1, []);
+   requested_ids = lower(cases);
 
-   % Normalize the optional shared site window before source/cache work.
+   % Validate the optional clamp before any cache or staging side effect.
    [window_start, window_end, window_enabled] = ...
       icemodel.internal.pairedWindow( ...
       kwargs.startdate, kwargs.enddate);
 
-   % Confirm the source-cache layout before real staging. Dry runs are
-   % metadata-only contract previews, so they resolve the default root without
-   % creating cache folders or reading upstream NetCDF files.
+   % Validate source caches only for real staging. Dry runs remain metadata-only.
    if kwargs.dry_run
       source_dir = resolveDryRunSourceDir(source_dir);
    else
       source_dir = icemodel.verification.setup.fetchEsmSnowmip( ...
-         cache_dir=string(source_dir), sitenames=case_ids, ...
+         cache_dir=string(source_dir), stations=cases, ...
          strict=~kwargs.skip_missing, silent=kwargs.skip_missing);
    end
 
-   % Name the source family and runnable cases once. dataset_family is the
-   % staged source folder/manifest family; case_ids are the site cases inside
-   % that family.
+   % Name the family once so dry-run and persisted paths use one identifier.
    dataset_family = "esm_snowmip";
 
-   % Resolve the paired eval/input roots once, so staged met files land beside
-   % the eval tree that declares them.
+   % Resolve output roots and paths before staging artifacts.
+   % ESM-SnowMIP writes both evaluation cases and atomic input/met artifacts.
    [evaluation_data_root, input_root] = ...
       icemodel.verification.setup.resolveStagingRoots( ...
       output_root=kwargs.output_root, ...
       evaluation_data_root=kwargs.evaluation_data_root, ...
       input_data_root=kwargs.input_data_root, ...
       icemodel_config_casename=kwargs.icemodel_config_casename);
-   family_root = fullfile(evaluation_data_root, dataset_family);
+   [family_root, manifest_file] = ...
+      icemodel.verification.setup.datasetFamilyStagingPaths( ...
+      evaluation_data_root, input_root, dataset_family);
    if ~kwargs.dry_run
       icemodel.helpers.ensureDirExists(family_root);
    end
 
-   % Resolve the path to the dataset family manifest
-   %   <evaluation_data_root>/esm_snowmip/manifest.json
-   manifest_file = fullfile(family_root, "manifest.json");
+   stage_callback = @(~, n) stageEsmCase( ...
+      cases(n), source_dir, family_root, input_root, ...
+      window_enabled, window_start, window_end, kwargs);
 
    % Stage each requested case into importer state.
    [state, alive, skipped] = ...
       icemodel.verification.setup.stageDatasetFamilyCases( ...
-      1:numel(case_ids), emptyState(), ...
-      @(~, n) stageEsmCase(case_ids(n), source_dir, family_root, ...
-      input_root, window_enabled, window_start, window_end, kwargs), ...
+      1:numel(requested_ids), emptyState(), stage_callback, ...
       skip_missing=kwargs.skip_missing, ...
       warning_id="icemodel:verification:importEsmSnowmip:caseSkipped", ...
-      label_callback=@(~, n) case_ids(n));
+      label_callback=@(~, n) requested_ids(n));
 
    % Record source provenance once so dry-run and persisted manifests match.
    source_doi = "10.1594/PANGAEA.897575";
@@ -157,22 +160,28 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    source_version = "ESM-SnowMIP_all.zip";
    retrieval_date = string(datetime('today'));
 
+   entry_callback = @icemodel.verification.setup.stateCaseEntry;
+
+   % Return metadata without writing case or manifest artifacts.
    if kwargs.dry_run
       manifest = icemodel.verification.setup.runDatasetFamilyDryRun( ...
          state, alive, dataset_family=dataset_family, ...
-         requested_ids=case_ids, skipped=skipped, ...
+         requested_ids=requested_ids, skipped=skipped, ...
          source_doi=source_doi, source_url=source_url, ...
          source_version=source_version, retrieval_date=retrieval_date, ...
-         entry_callback=@caseEntry);
+         entry_callback=entry_callback);
       return
    end
 
+   % Persist each atomic case without separately attachable source legs.
    [manifest, ~] = icemodel.verification.setup.runDatasetFamilyImport( ...
-      state, alive, dataset_family=dataset_family, manifest_file=manifest_file, ...
-      requested_ids=case_ids, skipped=skipped, source_doi=source_doi, ...
-      source_url=source_url, source_version=source_version, retrieval_date=retrieval_date, ...
+      state, alive, dataset_family=dataset_family, ...
+      manifest_file=manifest_file, requested_ids=requested_ids, ...
+      skipped=skipped, ...
+      source_doi=source_doi, source_url=source_url, ...
+      source_version=source_version, retrieval_date=retrieval_date, ...
       overwrite_family=kwargs.overwrite_family, overwrite=kwargs.overwrite, ...
-      entry_callback=@caseEntry);
+      entry_callback=entry_callback);
 end
 
 function s = emptyState()
@@ -276,11 +285,6 @@ function s = stageEsmCase(sitename, source_dir, family_root, input_root, ...
       'entry', icemodel.verification.setup.makeCaseManifestEntry(case_values));
 end
 
-function entry = caseEntry(s)
-   %CASEENTRY Return the staged ESM-SnowMIP case entry.
-   entry = s.entry;
-end
-
 %% Local helpers
 function [window_start, window_end] = stagedTimeBounds(forcing_tt, obs_tt)
    %STAGEDTIMEBOUNDS Return the full staged period from nonempty time axes.
@@ -291,7 +295,7 @@ function [window_start, window_end] = stagedTimeBounds(forcing_tt, obs_tt)
    window_end = max(times);
 end
 
-function pfz = snowmipPermafrostZone(sitename)
+function permafrost_zone = snowmipPermafrostZone(sitename)
    %SNOWMIPPERMAFROSTZONE Obu et al. (2019) permafrost extent per SnowMIP site.
    %
    % Hard-coded results of a point-in-polygon test of the Obu et al. (2019) ESA
@@ -302,15 +306,15 @@ function pfz = snowmipPermafrostZone(sitename)
    % (1997) source.
    switch lower(string(sitename))
       case "sod"   % Sodankyla, boreal Lapland
-         pfz = "continuous";
+         permafrost_zone = "continuous";
       case "snb"   % Senator Beck, Colorado alpine
-         pfz = "discontinuous";
+         permafrost_zone = "discontinuous";
       case {"swa", "wfj"}  % Swamp Angel (CO), Weissfluhjoch (Alps)
-         pfz = "sporadic";
+         permafrost_zone = "sporadic";
       case "ojp"   % Old Jack Pine, boreal Saskatchewan
-         pfz = "isolated";
+         permafrost_zone = "isolated";
       otherwise    % cdp, oas, obs, rme, sap: outside Obu permafrost polygons
-         pfz = "none";
+         permafrost_zone = "none";
    end
 end
 
@@ -335,13 +339,13 @@ function vars = obsComparisonVariables(obs_tt)
 end
 
 function vars = dryRunEsmComparisonVariables()
-   %DRYRUNESMCOMPARISONVARIABLES Source-light ESM manifest comparison axes.
+   %DRYRUNESMCOMPARISONVARIABLES ESM manifest axes used without raw files.
    vars = ["snow_depth_m"; "swe_kg_m2"; "surface_temp_C"];
 end
 
-function obs_vars = dryRunEsmObservationVariables(sitename)
-   %DRYRUNESMOBSERVATIONVARIABLES Metadata for source-light ESM dry runs.
-   obs_vars = icemodel.verification.setup.metadataStruct({ ...
+function observation_variables = dryRunEsmObservationVariables(sitename)
+   %DRYRUNESMOBSERVATIONVARIABLES Observation metadata used without raw files.
+   observation_variables = icemodel.verification.setup.metadataStruct({ ...
       'snow_depth_source', 'ESM-SnowMIP snow-depth observation channels'
       'swe_source', 'ESM-SnowMIP SWE observation channels'
       'soil_depths_m', []

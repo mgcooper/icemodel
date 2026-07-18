@@ -44,13 +44,13 @@ function [source_dir, status] = fetchEsmSnowmip(kwargs)
    %    cache directory before checking every site's met/obs pair. With false,
    %    it reports the same status without mutation. A successful strict result
    %    lets downstream importers/builders assume the layout is complete.
-   %    An empty sitenames selection returns an empty status without creating or
+   %    An empty stations selection returns an empty status without creating or
    %    scanning cache_dir.
    %
    %  Name-value
    %    cache_dir : string (default data/verification/esm_snowmip)
    %        Local source-cache directory.
-   %    sitenames : string vector (default all 10 ESM-SnowMIP sites)
+   %    stations : string vector (default all 10 ESM-SnowMIP sites)
    %        Restrict the validation to a subset (used by builders that
    %        only need one site).
    %    strict : logical (default true)
@@ -73,7 +73,7 @@ function [source_dir, status] = fetchEsmSnowmip(kwargs)
 
    arguments
       kwargs.cache_dir (1, 1) string = defaultCacheDir()
-      kwargs.sitenames (1, :) string = ...
+      kwargs.stations (1, :) string = ...
          icemodel.verification.namelists.snowmipsite()
       kwargs.strict   (1, 1) logical = true
       kwargs.silent   (1, 1) logical = false
@@ -84,12 +84,12 @@ function [source_dir, status] = fetchEsmSnowmip(kwargs)
       kwargs.cache_dir, defaultCacheDir());
 
    % Cache creation is explicit so dry-run callers can remain non-mutating.
-   if kwargs.create_cache_dir && ~isempty(kwargs.sitenames)
+   if kwargs.create_cache_dir && ~isempty(kwargs.stations)
       icemodel.helpers.ensureDirExists(cache_dir);
    end
 
    % Build cache status before strict handling.
-   [missing, broken] = missingOrBrokenFiles(cache_dir, kwargs.sitenames);
+   [missing, broken] = missingOrBrokenFiles(cache_dir, kwargs.stations);
    failures = [missing(:); broken(:)];
    status = icemodel.verification.setup.fetchMissingStatus(failures);
    source_dir = icemodel.verification.setup.finishFetchStatus( ...
@@ -154,15 +154,15 @@ function pathname = defaultCacheDir()
       'verification', 'esm_snowmip'));
 end
 
-function [missing, broken] = missingOrBrokenFiles(cache_dir, sitenames)
+function [missing, broken] = missingOrBrokenFiles(cache_dir, stations)
    %MISSINGORBROKENFILES Collect missing-pattern / unreadable-file lists.
    %
    % Each site contributes one met and one obs expected pattern. The
    % return arrays are preallocated to the worst case (2 * n_sites) so
    % no growth in the loop, then trimmed.
 
-   sitenames = reshape(sitenames, 1, []);
-   n_sites = numel(sitenames);
+   stations = reshape(stations, 1, []);
+   n_sites = numel(stations);
    n_max = 2 * n_sites;
    missing = strings(n_max, 1);
    broken  = strings(n_max, 1);
@@ -171,8 +171,8 @@ function [missing, broken] = missingOrBrokenFiles(cache_dir, sitenames)
 
    patterns = strings(n_max, 1);
    for k = 1:n_sites
-      patterns(2 * k - 1) = sprintf('met_insitu_%s_*.nc', sitenames(k));
-      patterns(2 * k)     = sprintf('obs_insitu_%s_*.nc', sitenames(k));
+      patterns(2 * k - 1) = sprintf('met_insitu_%s_*.nc', stations(k));
+      patterns(2 * k)     = sprintf('obs_insitu_%s_*.nc', stations(k));
    end
 
    for k = 1:n_max

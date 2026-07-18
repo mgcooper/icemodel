@@ -3,47 +3,65 @@ function manifest = importResearchSites(source_dir, kwargs)
    %
    %  manifest = icemodel.verification.setup.importResearchSites(source_dir)
    %  manifest = icemodel.verification.setup.importResearchSites(source_dir, ...
-   %     site_ids="humphrey", dry_run=true)
+   %     case_ids="humphrey", dry_run=true)
    %
-   % Minimal first implementation: Humphrey is represented as a generic
-   % research_site anchor, with observations sourced from nearby SUMup records
-   % via buildSumupObservations. It records no native station met. Optional RCM
-   % forcing/Data legs are delegated to stageRcmForcing after observations stage.
-   % When source_dir is blank, SUMup observations are read from
-   % <repo>/data/verification/sumup and outputs stage under top-level
-   % <repo>/data/{eval,input} unless roots are overridden.
+   %  Role
+   %    Setup/update tooling. Creates or refreshes research_site manifest entries
+   %    and, when not a dry run, data-only observations.mat targets. Dry runs are
+   %    metadata-only and do not read source caches or write staged artifacts.
+   %    forcing_sources selects RCM sources requested by the current call.
+   %    Ordinary calls preserve omitted existing legs; overwrite_family=true
+   %    deliberately replaces the whole family state.
+   %    build_observations=false is a guarded non-dry fast path: requested cases
+   %    must already exist in the target manifest, whose SUMup-derived observation
+   %    entry is reused while selected RCM forcing is attached.
+   %    Delegated RCM model met defaults to dt_out="15m"; pass dt_out="" for
+   %    native model-met cadence. RCM Data/userdata defaults to hourly.
    %
-   % Role
-   %  Setup/update tooling. Creates or refreshes research_site manifest entries
-   %  and, when not a dry run, data-only observations.mat targets. Dry runs are
-   %  metadata-only previews and do not resolve or read source/staging roots.
-   %  forcing_sources selects RCM sources requested by the current call.
-   %  Ordinary calls preserve omitted existing legs; overwrite_family=true
-   %  deliberately replaces the whole family state.
-   %  build_observations=false is a guarded non-dry fast path: requested cases
-   %  must already exist in the target manifest, whose SUMup-derived observation
-   %  entry is reused while selected RCM forcing is attached.
-   %  Delegated RCM model met defaults to dt_out="15m"; pass dt_out="" for
-   %  native model-met cadence. RCM Data/userdata defaults to hourly.
+   %  Default roots
+   %    source_dir="" reads <repo>/data/verification/sumup. With no output_root,
+   %    observations go to <repo>/data/eval/research_site/<case_id>/ and RCM
+   %    met/userdata go to <repo>/data/input/{met,userdata}/<source>/.
    %
-   % See also: icemodel.verification.setup.researchSiteCatalog,
-   %  icemodel.verification.setup.buildSumupObservations,
-   %  icemodel.verification.setup.stageRcmForcing
+   %  Minimal first implementation: Humphrey is represented as a generic
+   %  research_site anchor, with observations sourced from nearby SUMup records
+   %  via buildSumupObservations. It records no native station met. Optional RCM
+   %  forcing/Data legs are delegated to stageRcmForcing after observations stage.
+   %
+   %  Name-value
+   %    case_ids : string vector  Research-site cases (default "humphrey").
+   %    family, observation_source : fixed research_site/SUMup source contract.
+   %    forcing_sources : string vector  RCM legs requested by this call.
+   %    startdate, enddate : paired optional observation/forcing clamp.
+   %    output_root : string  Convenience root for eval and input artifacts.
+   %    build_observations : logical  Build or reuse the observation entry.
+   %    build_forcing : logical  Stage requested runtime legs (default false).
+   %    overwrite : logical  Refresh requested case artifacts (default false).
+   %    overwrite_family : logical  Replace the whole family (default false).
+   %    skip_missing : logical  Record source-local skips instead of failing.
+   %    dry_run : logical  Return metadata without source or output writes.
+   %
+   %  Returns
+   %    manifest : struct  Final or dry-run family manifest.
+   %
+   %  See also: icemodel.verification.setup.researchSiteCatalog,
+   %    icemodel.verification.setup.buildSumupObservations,
+   %    icemodel.verification.setup.stageRcmForcing
 
    arguments
       source_dir (1, 1) string = ""
-      kwargs.family (1, 1) string ...
-         {mustBeMember(kwargs.family, "research_site")} = "research_site"
-      kwargs.site_ids (1, :) string = "humphrey"
-      kwargs.observation_source (1, 1) string ...
-         {mustBeMember(kwargs.observation_source, "sumup")} = "sumup"
-      kwargs.radius_km (1, 1) double {mustBePositive} = 7.5
+      kwargs.case_ids (1, :) string = "humphrey"
       kwargs.forcing_sources (1, :) string ...
          {icemodel.verification.validators.mustBeRcmSourceSelection( ...
          kwargs.forcing_sources)} = ...
          icemodel.verification.namelists.rcmsources()
       kwargs.startdate = ""
       kwargs.enddate = ""
+      kwargs.family (1, 1) string ...
+         {mustBeMember(kwargs.family, "research_site")} = "research_site"
+      kwargs.observation_source (1, 1) string ...
+         {mustBeMember(kwargs.observation_source, "sumup")} = "sumup"
+      kwargs.radius_km (1, 1) double {mustBePositive} = 7.5
       kwargs.mar_dir (1, 1) string = ""
       kwargs.merra_dir (1, 1) string = ""
       kwargs.racmo_dir (1, 1) string = ""
@@ -52,24 +70,34 @@ function manifest = importResearchSites(source_dir, kwargs)
       kwargs.evaluation_data_root (1, 1) string = ""
       kwargs.input_data_root (1, 1) string = ""
       kwargs.icemodel_config_casename (1, 1) string = ""
+      kwargs.dt_out (1, 1) string ...
+         {mustBeMember(kwargs.dt_out, ["", "15m"])} = "15m"
       kwargs.overwrite (1, 1) logical = false
       kwargs.overwrite_family (1, 1) logical = false
       kwargs.skip_missing (1, 1) logical = true
       kwargs.dry_run (1, 1) logical = false
       kwargs.build_forcing (1, 1) logical = false
       kwargs.build_observations (1, 1) logical = true
-      kwargs.dt_out (1, 1) string ...
-         {mustBeMember(kwargs.dt_out, ["", "15m"])} = "15m"
    end
 
-   % Reject malformed windows before metadata/cache/root resolution.
+   forcing_sources = ...
+      icemodel.verification.setup.normalizeForcingSources( ...
+      kwargs.forcing_sources, kwargs.build_forcing);
+   kwargs.forcing_sources = forcing_sources;
+
+   % Validate the optional clamp before any cache or staging side effect.
    [window_start, window_end, window_enabled] = ...
       icemodel.internal.pairedWindow( ...
       kwargs.startdate, kwargs.enddate);
 
-   sites = icemodel.verification.setup.researchSiteCatalog(kwargs.site_ids);
+   % Resolve the family identity and requested runtime source sets once.
    dataset_family = kwargs.family;
-   requested_ids = string({sites.case_id});
+   rcm_sources = intersect(forcing_sources, ...
+      icemodel.verification.namelists.rcmsources(), "stable");
+   build_rcm_forcing = kwargs.build_forcing && ~isempty(rcm_sources);
+
+   cases = icemodel.verification.setup.researchSiteCatalog(kwargs.case_ids);
+   requested_ids = string({cases.case_id});
 
    % Use one normalized observation/forcing window across every staged site.
    if window_enabled
@@ -83,120 +111,119 @@ function manifest = importResearchSites(source_dir, kwargs)
       period = struct('start', '', 'end', '');
    end
 
-   % Record source provenance once so dry-run and persisted manifests match.
-   source_version = "sumup-derived-research-site";
-   retrieval_date = string(datetime('today'));
-
-   % Build a metadata-only preview before resolving any source or staging root.
-   % This keeps dry runs valid on a clean machine while preserving the complete
-   % firn manifest-entry shape used by the non-dry importer.
-   if kwargs.dry_run
-      [state, alive, skipped] = ...
-         icemodel.verification.setup.stageDatasetFamilyCases( ...
-         1:numel(sites), emptyState(), ...
-         @(~, n) dryRunResearchSite(sites(n), period, kwargs), ...
-         skip_missing=kwargs.skip_missing, ...
-         warning_id="icemodel:verification:importResearchSites:siteSkipped", ...
-         label_callback=@(~, n) sites(n).case_id);
-      manifest = icemodel.verification.setup.runDatasetFamilyDryRun( ...
-         state, alive, dataset_family=dataset_family, ...
-         requested_ids=requested_ids, skipped=skipped, ...
-         source_version=source_version, retrieval_date=retrieval_date, ...
-         entry_callback=@icemodel.verification.setup.stateCaseEntry);
-      return
-   end
-
-   % Non-dry calls resolve the source and destination trees only after the
-   % source-free preview path has returned.
+   % Resolve output roots and paths before raw sources. Forcing-only calls can
+   % reuse the existing manifest without requiring observation caches.
    [evaluation_data_root, input_root] = ...
       icemodel.verification.setup.resolveStagingRoots( ...
       output_root=kwargs.output_root, ...
       evaluation_data_root=kwargs.evaluation_data_root, ...
       input_data_root=kwargs.input_data_root, ...
       icemodel_config_casename=kwargs.icemodel_config_casename);
-   family_root = fullfile(evaluation_data_root, dataset_family);
-   manifest_file = fullfile(family_root, "manifest.json");
+   [family_root, manifest_file, met_outdir, userdata_outdir] = ...
+      icemodel.verification.setup.datasetFamilyStagingPaths( ...
+      evaluation_data_root, input_root, dataset_family);
    source_dir = icemodel.verification.setup.sumupCacheDir(source_dir);
 
-   rcm_sources = kwargs.forcing_sources;
    coverage = struct();
    reuse_sources = strings(1, 0);
-   if kwargs.build_forcing && ~isempty(rcm_sources)
+   % Resolve RCM coverage only for a real requested build.
+   if ~kwargs.dry_run && build_rcm_forcing
       reuse_sources = rcm_sources;
       coverage = icemodel.verification.setup.promiceSourceCoverage( ...
          rcm_sources, struct('mar', kwargs.mar_dir, ...
          'merra', kwargs.merra_dir, 'racmo', kwargs.racmo_dir));
    end
 
-   if ~kwargs.build_observations
-      % A forcing-only refresh reuses the staged SUMup-derived observation entry
-      % and does not require the SUMup cache again.
+   if ~kwargs.dry_run && ~kwargs.build_observations
+      % Reuse the staged case entry so an RCM-only attachment does not require
+      % source caches.
       [state, alive, skipped] = ...
          icemodel.verification.setup.reuseDatasetFamilyCases( ...
          manifest_file, requested_ids, emptyState(), ...
+         dataset_family=dataset_family, ...
+         overwrite_family=kwargs.overwrite_family, ...
          forcing_sources=reuse_sources, coverage=coverage, ...
          startdate=kwargs.startdate, enddate=kwargs.enddate);
    else
-      % Research-site observation builds are backed by SUMup, so validate the
-      % cache before invoking any source-backed case callback.
-      source_dir = icemodel.verification.setup.fetchSumup( ...
-         cache_dir=source_dir, strict=~kwargs.skip_missing, ...
-         silent=kwargs.skip_missing);
+      % Validate caches only when building observations.
+      % Dry runs remain metadata-only; optional skips stay quiet while required
+      % SUMup products print their retrieval guidance before failing.
+      if ~kwargs.dry_run
+         source_dir = icemodel.verification.setup.fetchSumup( ...
+            cache_dir=source_dir, strict=~kwargs.skip_missing, ...
+            silent=kwargs.skip_missing);
+      end
+
+      stage_callback = @(~, n) stageResearchCase( ...
+         cases(n), source_dir, family_root, window_start, window_end, ...
+         period, kwargs, coverage, rcm_sources);
 
       % Stage each requested case into importer state.
       [state, alive, skipped] = ...
          icemodel.verification.setup.stageDatasetFamilyCases( ...
-         1:numel(sites), emptyState(), ...
-         @(~, n) stageResearchSite(sites(n), source_dir, family_root, ...
-         window_start, window_end, period, kwargs, coverage, rcm_sources), ...
+         1:numel(requested_ids), emptyState(), stage_callback, ...
          skip_missing=kwargs.skip_missing, ...
-         warning_id="icemodel:verification:importResearchSites:siteSkipped", ...
-         label_callback=@(~, n) sites(n).case_id);
+         warning_id="icemodel:verification:importResearchSites:caseSkipped", ...
+         label_callback=@(~, n) requested_ids(n));
    end
 
-   icemodel.helpers.ensureDirExists(family_root);
-   leg_callback = [];
-   if kwargs.build_forcing && ~isempty(rcm_sources)
-      leg_callback = @(s, src) s.leg.(char(src));
+   % Record source provenance once so dry-run and persisted manifests match.
+   source_doi = "10.18739/A2M61BR5M";
+   source_url = "https://nsidc.org/data/g02288";
+   source_version = "sumup-derived-research-site";
+   retrieval_date = string(datetime('today'));
+
+   entry_callback = @icemodel.verification.setup.stateCaseEntry;
+
+   % Return metadata without writing case or manifest artifacts.
+   if kwargs.dry_run
+      manifest = icemodel.verification.setup.runDatasetFamilyDryRun( ...
+         state, alive, dataset_family=dataset_family, ...
+         requested_ids=requested_ids, skipped=skipped, ...
+         source_doi=source_doi, source_url=source_url, ...
+         source_version=source_version, retrieval_date=retrieval_date, ...
+         entry_callback=entry_callback);
+      return
    end
+
+   if kwargs.build_observations
+      icemodel.helpers.ensureDirExists(family_root);
+   end
+
+   % Persist case entries first, then attach requested RCM source legs.
    [manifest, ~] = icemodel.verification.setup.runDatasetFamilyImport( ...
       state, alive, dataset_family=dataset_family, ...
       manifest_file=manifest_file, requested_ids=requested_ids, ...
       skipped=skipped, ...
+      source_doi=source_doi, source_url=source_url, ...
       source_version=source_version, retrieval_date=retrieval_date, ...
       overwrite_family=kwargs.overwrite_family, overwrite=kwargs.overwrite, ...
-      entry_callback=@icemodel.verification.setup.stateCaseEntry, ...
-      build_forcing=kwargs.build_forcing, forcing_sources=rcm_sources, ...
-      leg_callback=leg_callback, met_outdir=fullfile(input_root, 'met'), ...
-      userdata_outdir=fullfile(input_root, 'userdata'), ...
+      entry_callback=entry_callback, ...
+      build_forcing=build_rcm_forcing, forcing_sources=rcm_sources, ...
+      leg_callback=@(s, src) s.leg.(char(src)), ...
+      met_outdir=met_outdir, userdata_outdir=userdata_outdir, ...
       mar_dir=kwargs.mar_dir, merra_dir=kwargs.merra_dir, ...
       racmo_dir=kwargs.racmo_dir, modis_dir=kwargs.modis_dir, ...
-      dt_out=kwargs.dt_out);
+      method="nearest", dt_out=kwargs.dt_out);
 end
 
 function s = emptyState()
    %EMPTYSTATE Prototype research-site staging state.
-   s = struct('case_id', "", 'alias', "", 'point', [NaN NaN], ...
+   s = struct('case_id', "", 'point', [NaN NaN], ...
+      'evaluation_file_rel', "", ...
       'entry', emptyEntry(), 'period', struct('start', '', 'end', ''), ...
       'colocation', struct(), 'leg', struct(), 'reuse_entry', false, ...
       'dry_run', false);
 end
 
-function s = dryRunResearchSite(site, period, kwargs)
-   %DRYRUNRESEARCHSITE Build one source-free research-site preview state.
-   period = sitePeriod(site, period);
-   site_location = siteLocation(site);
-   colocation = researchSiteColocation("", false, ...
-      emptyNearestPromice(), kwargs.radius_km);
-   comparison_vars = ["density", "subsurface_temperature", "smb"];
-   entry = siteEntry(site, site_location, period, "", comparison_vars, ...
-      colocation, kwargs);
-   s = researchSiteState(entry, struct(), true);
-end
-
-function s = stageResearchSite(site, source_dir, family_root, obs_start, ...
+function state = stageResearchCase(site, source_dir, family_root, obs_start, ...
       obs_end, period, kwargs, coverage, rcm_sources)
-   %STAGERESEARCHSITE Stage one source-backed research_site case.
+   %STAGERESEARCHCASE Stage one research-site case and return manifest state.
+   if kwargs.dry_run
+      state = dryRunResearchSite(site, period, kwargs);
+      return
+   end
+
    [period, used_site_period] = sitePeriod(site, period);
    if used_site_period
       % The source-authored default period also bounds SUMup selection.
@@ -216,7 +243,7 @@ function s = stageResearchSite(site, source_dir, family_root, obs_start, ...
       error('icemodel:verification:importResearchSites:missingObservation', ...
          'no SUMup observations found for research site %s', case_id)
    end
-   comparison_vars = ...
+   comparison_variables = ...
       icemodel.verification.setup.sumupComparisonVariables(observations);
 
    % A future site without source-authored bounds adopts its observation span.
@@ -239,7 +266,7 @@ function s = stageResearchSite(site, source_dir, family_root, obs_start, ...
    colocation = researchSiteColocation(evaluation_file, true, ...
       nearestPromice(site_location, kwargs), kwargs.radius_km);
    entry = siteEntry(site, site_location, period, evaluation_file, ...
-      comparison_vars, colocation, kwargs);
+      comparison_variables, colocation, kwargs);
 
    leg = struct();
    if kwargs.build_forcing && ~isempty(rcm_sources)
@@ -247,26 +274,38 @@ function s = stageResearchSite(site, source_dir, family_root, obs_start, ...
       leg = icemodel.verification.setup.resolveLegWindows( ...
          rcm_sources, coverage, t1, t2);
    end
-   s = researchSiteState(entry, leg, false);
+   state = researchSiteState(entry, leg, false);
+end
+
+function s = dryRunResearchSite(site, period, kwargs)
+   %DRYRUNRESEARCHSITE Build one metadata-only research-site preview state.
+   period = sitePeriod(site, period);
+   site_location = siteLocation(site);
+   colocation = researchSiteColocation("", false, ...
+      emptyNearestPromice(), kwargs.radius_km);
+   comparison_variables = ["density", "subsurface_temperature", "smb"];
+   entry = siteEntry(site, site_location, period, "", comparison_variables, ...
+      colocation, kwargs);
+   s = researchSiteState(entry, struct(), true);
 end
 
 function s = researchSiteState(entry, leg, dry_run)
    %RESEARCHSITESTATE Wrap one manifest entry for shared importer orchestration.
    s = struct('case_id', string(entry.case_id), ...
-      'alias', string(entry.case_id), ...
       'point', [entry.site_location.lat_wgs84, ...
       entry.site_location.lon_wgs84], ...
+      'evaluation_file_rel', string(entry.evaluation_file), ...
       'entry', entry, 'period', entry.period, ...
       'colocation', entry.colocation, 'leg', leg, 'reuse_entry', false, ...
       'dry_run', dry_run);
 end
 
 function entry = siteEntry(site, site_location, period, evaluation_file, ...
-      comparison_vars, colocation, kwargs)
+      comparison_variables, colocation, kwargs)
    %SITEENTRY Build one canonical research_site manifest entry.
    [forcing_sources, eval_sources] = sourceListsForSite(colocation, kwargs);
-   obs_vars = observationVariables();
-   values = { ...
+   observation_variables = observationVariables();
+   case_values = { ...
       char(site.case_id)
       'firn_observational'
       char(site.site_id)
@@ -279,12 +318,12 @@ function entry = siteEntry(site, site_location, period, evaluation_file, ...
       char(evaluation_file)
       cellstr(forcing_sources)
       cellstr(eval_sources)
-      cellstr(comparison_vars)
-      obs_vars
+      cellstr(comparison_variables)
+      observation_variables
       colocation
       'irregular'
       char(site.note)};
-   entry = icemodel.verification.setup.makeFirnCaseManifestEntry(values);
+   entry = icemodel.verification.setup.makeFirnCaseManifestEntry(case_values);
 end
 
 function [period, used_site_period] = sitePeriod(site, period)
@@ -361,7 +400,7 @@ end
 
 function entry = emptyEntry()
    %EMPTYENTRY Prototype research_site manifest entry.
-   values = { ...
+   case_values = { ...
       ''
       'firn_observational'
       ''
@@ -380,7 +419,7 @@ function entry = emptyEntry()
       struct()
       'irregular'
       ''};
-   entry = icemodel.verification.setup.makeFirnCaseManifestEntry(values);
+   entry = icemodel.verification.setup.makeFirnCaseManifestEntry(case_values);
 end
 
 function [x3413, y3413] = projectedCoords(site)
@@ -436,9 +475,9 @@ function rec = emptyNearestPromice()
       'note', "no staged CP1/SWC/JAR promice anchors available");
 end
 
-function obs_vars = observationVariables()
+function observation_variables = observationVariables()
    %OBSERVATIONVARIABLES Manifest metadata for SUMup-derived research targets.
-   obs_vars = icemodel.verification.setup.metadataStruct({ ...
+   observation_variables = icemodel.verification.setup.metadataStruct({ ...
       'density', 'SUMup density profile'
       'subsurface_temperature', 'SUMup subsurface temperature profile'
       'smb', 'SUMup surface mass balance records'});

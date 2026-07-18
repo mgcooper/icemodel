@@ -366,7 +366,8 @@ function writeMatcherManifest(eval_root)
       'public matcher delegation fixture'};
    entry = icemodel.verification.setup.makeFirnCaseManifestEntry(values);
    manifest = icemodel.verification.setup.makeFamilyManifest( ...
-      "sumup", "", "", "tiny", "today", entry);
+      "sumup", "", "", "tiny", "today", entry, ...
+      struct('site', {}, 'reason', {}));
    icemodel.verification.setup.writeManifest( ...
       fullfile(eval_root, 'sumup', 'manifest.json'), manifest);
 end

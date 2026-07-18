@@ -28,6 +28,8 @@ function [state, alive, skipped] = reuseDatasetFamilyCases( ...
       kwargs.enddate = ""
       kwargs.forcing_startdate = ""
       kwargs.forcing_enddate = ""
+      kwargs.dataset_family (1, 1) string = ""
+      kwargs.overwrite_family (1, 1) logical = false
    end
 
    % Normalize both optional windows before any manifest existence/read check.
@@ -67,6 +69,11 @@ function [state, alive, skipped] = reuseDatasetFamilyCases( ...
             '%s'], requested_ids(k), manifest_file)
       end
       entry = cases(hit);
+      if kwargs.overwrite_family
+         entry = ...
+            icemodel.verification.setup.prepareReplacementCaseEntry( ...
+            entry, kwargs.dataset_family);
+      end
       [period_start, period_end] = ...
          icemodel.verification.setup.periodBounds(entry.period);
 
@@ -110,12 +117,21 @@ function [state, alive, skipped] = reuseDatasetFamilyCases( ...
       % Preserve the prior entry verbatim. Family-specific callbacks update only
       % colocation and its derived source lists after requested forcing stages.
       state(k).case_id = string(entry.case_id);
-      state(k).alias = string(entry.case_id);
       state(k).point = [entry.site_location.lat_wgs84, ...
          entry.site_location.lon_wgs84];
       state(k).entry = entry;
       state(k).colocation = entry.colocation;
       state(k).leg = leg;
+      % Copy optional manifest identities carried by the family prototype.
+      for field = ["site_id", "site_name"]
+         name = char(field);
+         if isfield(state(k), name) && isfield(entry, name)
+            state(k).(name) = entry.(name);
+         end
+      end
+      % Every reusable firn state carries the canonical relative evaluation
+      % artifact so later callbacks can reopen the staged observation bundle.
+      state(k).evaluation_file_rel = entry.evaluation_file;
       % The case period belongs to the staged observations. Keep it stable while
       % the independently resolved leg carries any narrower or wider forcing
       % request used by the RCM builder.

@@ -7,7 +7,7 @@ function info = promiceSiteCatalog(site)
    %  Returns the curated source catalog of PROMICE automatic-weather-station anchor
    %  sites used to stage firn/snow-evaluation cases. With no arguments, returns
    %  a struct array; with one site argument (canonical id "KAN_M" or compact
-   %  alias "kanm") returns the matching scalar struct.
+   %  case id "kanm") returns the matching scalar struct.
    %
    %  The catalog carries THREE independent descriptors per site:
    %    surface_zone   the glaciological substrate REGIME the site sits in
@@ -28,7 +28,7 @@ function info = promiceSiteCatalog(site)
    %
    %  Each entry has fields:
    %    site            canonical PROMICE station id ("KAN_M")
-   %    alias           compact lowercase alias used in filenames ("kanm")
+   %    case_id         compact lowercase evaluation-case id ("kanm")
    %    long_name       display-friendly name
    %    site_type       PROMICE/GC-Net AWS readme Table 1 "Site type"
    %                    (Ablation/Accumulation/Bedrock). This is the
@@ -53,10 +53,6 @@ function info = promiceSiteCatalog(site)
    %                    could resolve the site (e.g. missing coordinates).
    %    has_recipe      true when buildPromiceData carries a curated
    %                    service-window ablation recipe for the site
-   %    models          catalog metadata listing the co-located model set in the
-   %                    canonical order [promice, mar, merra, racmo]. This field
-   %                    is not a runtime selector; import APIs use
-   %                    forcing_sources.
    %    note            short provenance note
    %
    %  Site coordinates are NOT stored here: they are read live from the L3
@@ -148,9 +144,7 @@ function info = promiceSiteCatalog(site)
    % Canonical co-located model order. PROMICE is the station anchor; MAR and
    % MERRA are point met sources whose albedo is swapped downstream; RACMO is a
    % Data-only SMB/eval source (never met).
-   models = ["promice", "mar", "merra", "racmo"];
-
-   catalog = buildCatalog(models);
+   catalog = buildCatalog();
 
    if site == ""
       info = catalog;
@@ -158,28 +152,29 @@ function info = promiceSiteCatalog(site)
    end
 
    wanted = lower(erase(site, "_"));
-   match = string({catalog.alias}) == wanted;
+   match = string({catalog.case_id}) == wanted;
    if ~any(match)
       % Uncataloged station: fall back to the coarse first-pass heuristic so the
       % staging driver still gets a (flagged) zone for any L3 station id.
-      info = firstPassEntry(site, models);
+      info = firstPassEntry(site);
       return
    end
    info = catalog(match);
 end
 
 %% Local helpers
-function catalog = buildCatalog(models)
+function catalog = buildCatalog()
    %BUILDCATALOG Hard-coded authoritative PROMICE catalog (see header provenance).
    %
-   % Columns: site, alias, long_name, surface_zone, eval_target, permafrost_zone,
+   % Columns: site, case_id, long_name, surface_zone, eval_target,
+   % permafrost_zone,
    % has_recipe, note. eval_target uses sentinel codes expanded by evalTarget():
    %   "si" = ["seasonal_snow";"bare_ice"]   (seasonal snow + bare ice)
    %   "sf" = ["seasonal_snow";"firn"]       (seasonal snow + firn)
    %   ""   = empty (off-ice land/tundra/unknown surfaces)
    % Order: KAN transect first (anchors), then the rest alphabetically.
    rows = {
-   % site      surf_zone        et    pfz                recipe note
+   % site      surface_zone     target permafrost_zone    recipe note
      "KAN_L",  "ablation",      "si", "none",            true,  "Lower ablation zone (~679 m); curated KAN_L recipe. KAN anchor. MODIS bare-ice freq=1.00."
      "KAN_M",  "ablation",      "si", "none",            true,  "Upper ablation / bare ice (~1272 m); curated KAN_M recipe. KAN anchor. MODIS bare-ice freq=1.00."
      "KAN_U",  "percolation",   "sf", "none",            false, "Lower percolation zone (~1845 m); KAN anchor. MODIS bare-ice freq=0.00 (snow-covered surface); percolation by firn-core truth, consistent with SUMup density 0.2 km."
@@ -249,7 +244,7 @@ function catalog = buildCatalog(models)
       end
       catalog(k) = struct( ...
          'site',           site, ...
-         'alias',          lower(erase(site, "_")), ...
+         'case_id',        lower(erase(site, "_")), ...
          'long_name',      replace(site, "_", "-"), ...
          'site_type',      lookupSiteType(typemap, site), ...
          'stations',       lookupStations(stationmap, site), ...
@@ -258,7 +253,6 @@ function catalog = buildCatalog(models)
          'permafrost_zone',rows{k, 4}, ...
          'classification', classification, ...
          'has_recipe',     rows{k, 5}, ...
-         'models',         models, ...
          'note',           rows{k, 6});
    end
 end
@@ -329,19 +323,19 @@ function stationmap = stationsMap()
    end
 end
 
-function target = evalTarget(code)
+function eval_target = evalTarget(code)
    %EVALTARGET Expand a catalog eval_target sentinel code to a string array.
    switch code
       case "si"
-         target = ["seasonal_snow"; "bare_ice"];
+         eval_target = ["seasonal_snow"; "bare_ice"];
       case "sf"
-         target = ["seasonal_snow"; "firn"];
+         eval_target = ["seasonal_snow"; "firn"];
       otherwise
-         target = strings(0, 1);
+         eval_target = strings(0, 1);
    end
 end
 
-function entry = firstPassEntry(site, models)
+function entry = firstPassEntry(site)
    %FIRSTPASSENTRY Coarse first-pass entry for an UNCATALOGED station.
    %
    % Used only when a station id is not in the hard-coded authoritative catalog.
@@ -362,26 +356,27 @@ function entry = firstPassEntry(site, models)
          end
       end
    end
-   [zone, target, pfz] = firstPassZone(loctype, elev);
+   [surface_zone, eval_target, permafrost_zone] = ...
+      firstPassZone(loctype, elev);
 
    entry = emptyEntry();
    entry.site = site;
-   entry.alias = lower(erase(site, "_"));
+   entry.case_id = lower(erase(site, "_"));
    entry.long_name = replace(site, "_", "-");
    entry.site_type = lookupSiteType(siteTypeMap(), site);
    entry.stations = lookupStations(stationsMap(), site);
-   entry.surface_zone = zone;
-   entry.eval_target = target;
-   entry.permafrost_zone = pfz;
+   entry.surface_zone = surface_zone;
+   entry.eval_target = eval_target;
+   entry.permafrost_zone = permafrost_zone;
    entry.classification = "first_pass";
    entry.has_recipe = false;
-   entry.models = models;
    entry.note = sprintf( ...
       "FIRST PASS (uncataloged): location_type=%s, elev=%s m.", ...
       loctype, num2str(elev));
 end
 
-function [zone, target, pfz] = firstPassZone(loctype, elev)
+function [surface_zone, eval_target, permafrost_zone] = ...
+      firstPassZone(loctype, elev)
    %FIRSTPASSZONE Coarse first-pass zone+target from location_type + elevation.
    %
    % Legacy elevation-band heuristic retained ONLY as a fallback for uncataloged
@@ -393,32 +388,47 @@ function [zone, target, pfz] = firstPassZone(loctype, elev)
 
    switch loctype
       case "tundra"
-         zone = "tundra"; target = strings(0, 1); pfz = "unknown"; return
+         surface_zone = "tundra";
+         eval_target = strings(0, 1);
+         permafrost_zone = "unknown";
+         return
       case {"bedrock", "not greenland"}
-         zone = "land"; target = strings(0, 1); pfz = "unknown"; return
+         surface_zone = "land";
+         eval_target = strings(0, 1);
+         permafrost_zone = "unknown";
+         return
       case "local glacier"
-         zone = "ablation"; target = seasonal_ice; pfz = "none"; return
+         surface_zone = "ablation";
+         eval_target = seasonal_ice;
+         permafrost_zone = "none";
+         return
    end
 
-   pfz = "none"; % "ice sheet" (and any other on-ice type): band by elevation.
+   % Ice-sheet and other on-ice sites have no permafrost classification.
+   permafrost_zone = "none";
    if ~isfinite(elev)
-      zone = "unknown"; target = strings(0, 1); pfz = "unknown";
+      surface_zone = "unknown";
+      eval_target = strings(0, 1);
+      permafrost_zone = "unknown";
    elseif elev < 1500
-      zone = "ablation"; target = seasonal_ice;
+      surface_zone = "ablation";
+      eval_target = seasonal_ice;
    elseif elev < 2000
-      zone = "percolation"; target = seasonal_firn;
+      surface_zone = "percolation";
+      eval_target = seasonal_firn;
    else
-      zone = "accumulation"; target = seasonal_firn;
+      surface_zone = "accumulation";
+      eval_target = seasonal_firn;
    end
 end
 
 function entry = emptyEntry()
    %EMPTYENTRY One catalog entry with the canonical field order.
-   entry = struct('site', "", 'alias', "", 'long_name', "", ...
+   entry = struct('site', "", 'case_id', "", 'long_name', "", ...
       'site_type', "", 'stations', strings(1, 0), ...
       'surface_zone', "", 'eval_target', strings(0, 1), ...
       'permafrost_zone', "", 'classification', "", 'has_recipe', false, ...
-      'models', strings(1, 0), 'note', "");
+      'note', "");
 end
 
 function csv = locateAwsCsv()
