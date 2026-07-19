@@ -61,57 +61,54 @@ function manifest = importSumup(source_dir, kwargs)
    %             lat/lon become the staging points. When points is provided,
    %             anchors are used only for nearest-anchor metadata.
    %    case_ids : string vector  case ids for each point (default sumup_NN).
-   %    years : numeric vector  forcing-window years for the co-located MAR/MERRA
-   %            legs (default 2012:2018, the RACMO subsurface span; RACMO itself
-   %            is decoupled and always stages its full on-disk coverage). Used
-   %            only when startdate/enddate are omitted.
-   %    startdate / enddate : OPTIONAL comparison-window clamp; pass both or
-   %            neither. The DEFAULT (omitted) is ALL AVAILABLE: no clamp, each
-   %            point stages its full on-disk SUMup record and the manifest
-   %            period records "" / "". There is no buried 2012-2015
-   %            comparison window.
+   %    forcing_sources : string vector subset of ["mar","merra","racmo"]
+   %        (default all three). SUMup observations are always the case definition
+   %        when build_observations is true; forcing_sources selects only runtime
+   %        met/userdata artifacts. It is a patch selector, not the complete
+   %        desired source state: an existing case's omitted legs remain
+   %        unchanged during ordinary merge updates and are removed only by
+   %        explicit family replacement.
+   %    startdate, enddate : datetime / string. Optional explicit observation and
+   %        forcing window; pass both or neither. With both omitted, each point
+   %        stages its full on-disk SUMup record and the manifest period records
+   %        "" / "". Every selected leg is limited to the overlap between the
+   %        case window and its own on-disk coverage.
+   %    years : numeric vector. Fallback forcing-window years used only when
+   %        startdate/enddate are omitted (default 2012:2018).
    %    radius_km : double (default 7.5)  SUMup point-selection radius.
    %    colocation_threshold_km : double (default 7.5)  PROMICE-anchor
    %            co-location threshold (see helpers.sumupColocation).
-   %    mar_dir / merra_dir / racmo_dir / modis_dir : string source dirs for the
-   %            co-located RCM builders (delegated to stageRcmForcing).
-   %    dt_out : model-met output timestep (default "15m"). Pass "" only to
-   %            preserve an explicit native model-met cadence. Data/userdata
-   %            uses the shared hourly writer default.
-   %    forcing_sources : string vector  RCM sources requested by this call when
-   %            build_forcing=true. Defaults to
-   %            icemodel.verification.namelists.rcmsources().
-   %    build_forcing : logical (default false). When true the co-located
-   %            MAR/MERRA met+Data and RACMO Data are staged after the SUMup
-   %            observation import; when false ONLY the observations + manifest
-   %            are written (forcing can be built later via stageRcmForcing).
-   %    build_observations : logical (default true). When false, explicit
-   %            case_ids must already exist in the target manifest. Their staged
-   %            observation entries are reused while forcing_sources are attached
-   %            without reading the SUMup cache or rediscovering points; reuse and
-   %            fresh staging share the same manifest finalization path.
-   %    output_root : base output root. When set, eval goes to
-   %            <output_root>/eval and runtime files to <output_root>/input.
-   %    evaluation_data_root / input_data_root / icemodel_config_casename :
-   %            lower-level staging roots. DEFAULT (roots unset) stages to the
-   %            gitignored top-level <repo>/data tree. Pass
-   %            output_root/evaluation_data_root/input_data_root or a
-   %            nonblank config casename only when intentionally targeting
-   %            another tree.
-   %    overwrite : logical (default false)  refresh a requested point's own
-   %            staged case folder; other cases are never touched.
-   %    overwrite_family : logical (default false)  force a FULL rewrite of the
-   %            family manifest from the requested points alone. DEFAULT MERGE.
-   %    skip_missing : logical (default true)  record data-gated points in
-   %            manifest.skipped rather than aborting.
-   %    dry_run : logical (default false)  return the manifest shape without
-   %            writing observations, runtime files, or the family manifest.
+   %    mar_dir, merra_dir, racmo_dir, modis_dir : raw-source directories for
+   %        the gridded source builders.
+   %    output_root : string. Convenience root for eval and input artifacts.
+   %        When set, eval artifacts go to <output_root>/eval and runtime files
+   %        go to <output_root>/input.
+   %    evaluation_data_root, input_data_root, icemodel_config_casename : lower-
+   %        level root resolution when output_root is unset. With all roots
+   %        unset, the importer targets the gitignored top-level <repo>/data tree.
+   %    dt_out : model-met output timestep (default "15m") for gridded forcing;
+   %        pass "" to retain native model-met cadence. Data/userdata uses the
+   %        shared hourly writer default.
+   %    overwrite : logical (default false). Refresh requested case artifacts;
+   %        other cases are never touched.
+   %    overwrite_family : logical (default false). Replace the family manifest
+   %        from the requested cases alone. The default is merge.
+   %    skip_missing : logical (default true). Record source-local skips in
+   %        manifest.skipped instead of aborting.
+   %    dry_run : logical (default false). Return the manifest shape without
+   %        reading source caches, writing artifacts, or merging the manifest.
+   %    build_forcing : logical (default false). Stage runtime artifacts for
+   %        forcing_sources. When false, only observations are staged.
+   %    build_observations : logical (default true). When false, requested cases
+   %        must already exist in the target manifest. Their observation entries
+   %        are reused while forcing_sources are attached without rebuilding the
+   %        observation artifact.
    %
    %  Incremental staging (MERGE by default)
-   %    Staging a point ADDS or UPDATES only that case in the sumup family
-   %    manifest and PRESERVES every other committed case + files byte for byte
-   %    through icemodel.verification.setup.writeFamilyManifestMerge.
-   %    overwrite_family=true rebuilds the family root.
+   %    Staging one case adds or updates only that case in the family manifest
+   %    and preserves every other committed case and file. Re-staging the same
+   %    case updates exactly its entry. Set overwrite_family=true only to
+   %    deliberately rebuild the family root.
    %
    %  Colocation architecture: SUMup observations are staged first as the
    %    bundled data-only observations.mat eval target. Co-located RCM forcing
@@ -282,15 +279,15 @@ function manifest = importSumup(source_dir, kwargs)
       end
 
       proj = icemodel.forcing.helpers.psnProjection();
-      requested_ids = sumupRequestedIds(cases, proj, kwargs);
+      requested_ids = requestedCaseIds(cases, proj, kwargs);
       if catalog_points
          [cases, requested_ids] = ...
             deduplicateCatalogPoints( ...
             cases, requested_ids, canonical_default);
       end
-      stage_callback = @(~, n) stageSumupPoint( ...
+      stage_callback = @(~, n) stageCase( ...
          cases(n, :), n, source_dir, family_root, proj, source_status, ...
-         obs_start, obs_end, window_start, window_end, kwargs);
+         obs_start, obs_end, window_start, window_end, kwargs, dataset_family);
 
       % Stage each requested case into importer state.
       [state, alive, skipped] = ...
@@ -300,8 +297,8 @@ function manifest = importSumup(source_dir, kwargs)
          warning_id="icemodel:verification:importSumup:caseSkipped", ...
          label_callback=@(~, n) requested_ids(n));
 
-      % The delegated RCM pass receives source-local windows only after native
-      % observation staging has completed.
+      % Resolve RCM coverage only for a real requested build.
+      % SUMup defers this pass until native observation staging has completed.
       if ~kwargs.dry_run && build_rcm_forcing
          [f_start, f_end] = ...
             forcingWindow(window_start, window_end, kwargs.years);
@@ -325,7 +322,7 @@ function manifest = importSumup(source_dir, kwargs)
    retrieval_date = string(datetime('today'));
 
    % SUMup alone finalizes comparison-window overlap while building each entry.
-   entry_callback = @sumupCaseEntry;
+   entry_callback = @caseEntry;
 
    % Return metadata without writing case or manifest artifacts.
    if kwargs.dry_run
@@ -361,9 +358,25 @@ function manifest = importSumup(source_dir, kwargs)
 end
 
 %% Local helpers
-function s = stageSumupPoint(point, n, source_dir, family_root, proj, ...
-      source_status, obs_start, obs_end, window_start, window_end, kwargs)
-   %STAGESUMUPPOINT Stage one SUMup point and return importer state.
+function s = emptyState()
+   %EMPTYSTATE Prototype dataset-family staging state.
+   s = struct('case_id', "", 'storage_alias', "", ...
+      'site_id', "", 'site_name', "", ...
+      'point', [NaN NaN], 'site_location', struct(), ...
+      'period', struct('start', '', 'end', ''), ...
+      'evaluation_file_rel', '', ...
+      'entry', struct(), 'colocation', struct(), 'leg', struct(), ...
+      'comparison_variables', {strings(0, 1)}, ...
+      'observation_variables', struct(), 'surface_zone', "", ...
+      'eval_target', {strings(0, 1)}, 'permafrost_zone', "", ...
+      'anchor_note', "", 'reuse_entry', false, ...
+      'dry_run', false);
+end
+
+function s = stageCase(point, n, source_dir, family_root, proj, ...
+      source_status, obs_start, obs_end, window_start, window_end, kwargs, ...
+      dataset_family)
+   %STAGECASE Stage one requested case and return importer state.
    [x3413, y3413] = projfwd(proj, point(1), point(2));
 
    % Co-location records provenance only; it never rebuilds anchor files.
@@ -387,7 +400,7 @@ function s = stageSumupPoint(point, n, source_dir, family_root, proj, ...
    if ~kwargs.dry_run
       % Stop a quiet, importer-level cache miss before the standalone builder's
       % strict fetch can print its user-facing retrieval banner.
-      assertSumupSourceAvailable(source_status);
+      assertSourceAvailable(source_status);
       % Observations are the primary target and are never blocked by forcing.
       [observations, obs_meta] = ...
          icemodel.verification.setup.buildSumupObservations(point, ...
@@ -414,11 +427,11 @@ function s = stageSumupPoint(point, n, source_dir, family_root, proj, ...
       comparison_variables = ...
          icemodel.verification.setup.sumupComparisonVariables(observations);
       observation_variables = ...
-         sumupObservationVariables(observations, obs_meta);
+         observationVariables(observations, obs_meta);
    else
-      comparison_variables = dryRunSumupComparisonVariables();
+      comparison_variables = dryRunComparisonVariables();
       observation_variables = ...
-         dryRunSumupObservationVariables(kwargs.radius_km);
+         dryRunObservationVariables(kwargs.radius_km);
       period = struct('start', periodStr(window_start, obs_start), ...
          'end', periodStr(window_end, obs_end));
    end
@@ -432,9 +445,9 @@ function s = stageSumupPoint(point, n, source_dir, family_root, proj, ...
       kwargs.colocation_threshold_km);
 
    [surface_zone, eval_target, permafrost_zone] = ...
-      sumupZoneAndTarget(is_coloc, anchor);
+       caseZoneAndTarget(is_coloc, anchor);
    s = struct('case_id', string(case_id), 'storage_alias', ...
-      icemodel.verification.setup.rcmStorageAlias("sumup", case_id), ...
+      icemodel.verification.setup.rcmStorageAlias(dataset_family, case_id), ...
       'site_id', string(site_id), ...
       'site_name', string(site_name), 'point', point, ...
       'site_location', site_location, ...
@@ -450,8 +463,8 @@ function s = stageSumupPoint(point, n, source_dir, family_root, proj, ...
       'reuse_entry', false, 'dry_run', kwargs.dry_run);
 end
 
-function assertSumupSourceAvailable(status)
-   %ASSERTSUMUPSOURCEAVAILABLE Throw a stable per-point missing-source error.
+function assertSourceAvailable(status)
+   %ASSERTSOURCEAVAILABLE Throw a stable per-case missing-source error.
    if isempty(status) || all([status.present])
       return
    end
@@ -459,8 +472,8 @@ function assertSumupSourceAvailable(status)
       'SUMup source cache is incomplete')
 end
 
-function requested_ids = sumupRequestedIds(points, proj, kwargs)
-   %SUMUPREQUESTEDIDS Resolve merge-scope ids for every requested SUMup point.
+function requested_ids = requestedCaseIds(points, proj, kwargs)
+   %REQUESTEDCASEIDS Resolve merge-scope ids for every requested SUMup point.
    requested_ids = strings(1, size(points, 1));
    for n = 1:size(points, 1)
       point = points(n, :);
@@ -507,24 +520,8 @@ function [t1, t2] = forcingWindow(window_start, window_end, years)
    end
 end
 
-%% Manifest assembly + RCM delegation
-function s = emptyState()
-   %EMPTYSTATE Prototype dataset-family staging state.
-   s = struct('case_id', "", 'storage_alias', "", ...
-      'site_id', "", 'site_name', "", ...
-      'point', [NaN NaN], 'site_location', struct(), ...
-      'period', struct('start', '', 'end', ''), ...
-      'evaluation_file_rel', '', ...
-      'entry', struct(), 'colocation', struct(), 'leg', struct(), ...
-      'comparison_variables', {strings(0, 1)}, ...
-      'observation_variables', struct(), 'surface_zone', "", ...
-      'eval_target', {strings(0, 1)}, 'permafrost_zone', "", ...
-      'anchor_note', "", 'reuse_entry', false, ...
-      'dry_run', false);
-end
-
-function entry = sumupCaseEntry(s)
-   %SUMUPCASEENTRY Convert one SUMup state record to a manifest case entry.
+function entry = caseEntry(s)
+   %CASEENTRY Convert one SUMup state record to a manifest case entry.
    if s.reuse_entry
       % A forcing-only refresh keeps the staged observation contract verbatim
       % and updates only requested colocation legs plus derived source lists.
@@ -748,8 +745,8 @@ function note = colocationNote(is_coloc, anchor)
 end
 
 function [surface_zone, eval_target, permafrost_zone] = ...
-      sumupZoneAndTarget(is_coloc, anchor)
-   %SUMUPZONEANDTARGET Resolve a SUMup case surface_zone/eval_target/permafrost.
+      caseZoneAndTarget(is_coloc, anchor)
+   %CASEZONEANDTARGET Resolve one case's zone and evaluation target.
    %
    % When a SUMup point co-locates with a staged mixed-family anchor, inherit the
    % anchor's already-curated regime fields. Older/promice-only anchor structs
@@ -785,13 +782,13 @@ function [surface_zone, eval_target, permafrost_zone] = ...
    end
 end
 
-function vars = dryRunSumupComparisonVariables()
-   %DRYRUNSUMUPCOMPARISONVARIABLES SUMup manifest axes used without raw files.
+function vars = dryRunComparisonVariables()
+   %DRYRUNCOMPARISONVARIABLES Manifest axes used without raw files.
    vars = ["density"; "subsurface_temperature"; "smb"];
 end
 
-function observation_variables = dryRunSumupObservationVariables(radius_km)
-   %DRYRUNSUMUPOBSERVATIONVARIABLES Observation metadata used without raw files.
+function observation_variables = dryRunObservationVariables(radius_km)
+   %DRYRUNOBSERVATIONVARIABLES Observation metadata used without raw files.
    observation_variables = struct( ...
       'present_groups', {{'density', 'subsurface_temperature', 'smb'}}, ...
       'observation_source', "SUMup 2025 release (NSIDC G02288)", ...
@@ -802,8 +799,8 @@ function observation_variables = dryRunSumupObservationVariables(radius_km)
 end
 
 function observation_variables = ...
-      sumupObservationVariables(observations, obs_meta)
-   %SUMUPOBSERVATIONVARIABLES Metadata for SUMup groups actually staged.
+      observationVariables(observations, obs_meta)
+   %OBSERVATIONVARIABLES Return staged observation metadata.
    present = ...
       icemodel.verification.setup.sumupComparisonVariables(observations);
    observation_variables = struct( ...

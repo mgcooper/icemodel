@@ -42,35 +42,35 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %        See icemodel.verification.setup.fetchEsmSnowmip.
    %
    %  Name-value
-   %    output_root : string
-   %        Base output root. When set, eval artifacts go to output_root/eval
-   %        and met files go to output_root/input.
-   %    evaluation_data_root : string (default config-derived)
-   %        Base evaluation-data root to stage into.
-   %    icemodel_config_casename : string (default "")
-   %        Config casename when evaluation_data_root is blank.
-   %    case_ids : string vector (default all 10 ESM-SnowMIP sites)
-   %        Site case ids to stage.
-   %    startdate : datetime / string ("" default)
-   %        Optional explicit window start. When omitted, each site stages
-   %        the full source record.
-   %    enddate : datetime / string ("" default)
-   %        Optional explicit window end. Required when startdate is
-   %        provided.
-   %    dt_out : string (default "15m")
-   %        Model-met output timestep. Pass "" only to preserve the explicit
-   %        native hourly cadence.
-   %    overwrite : logical (default false)
-   %        Refresh requested case folders when true.
-   %    overwrite_family : logical (default false)
-   %        Replace the family manifest instead of merging requested cases.
-   %    skip_missing : logical (default false)
-   %        When true, missing per-case source files are recorded as skipped cases.
-   %        The default import path is strict so absent source caches fail with
-   %        retrieval instructions before any manifest merge can occur.
-   %    dry_run : logical (default false)
-   %        Return a one-year smoke-window manifest preview without reading
-   %        source files or writing eval/input artifacts.
+   %    case_ids : string vector. Default is all 10 canonical ESM-SnowMIP sites.
+   %        Pass an explicit list to stage a subset.
+   %    startdate, enddate : datetime / string. Optional explicit forcing and
+   %        observation window; pass both or neither. With both omitted, each
+   %        site stages its full source record.
+   %    output_root : string. Convenience root for eval and input artifacts.
+   %        When set, eval artifacts go to <output_root>/eval and runtime files
+   %        go to <output_root>/input.
+   %    evaluation_data_root, input_data_root, icemodel_config_casename : lower-
+   %        level root resolution when output_root is unset. With all roots
+   %        unset, the importer targets the gitignored top-level <repo>/data tree.
+   %    dt_out : model-met output timestep (default "15m"); pass "" to retain
+   %        native model-met cadence.
+   %    overwrite : logical (default false). Refresh requested case artifacts;
+   %        other cases are never touched.
+   %    overwrite_family : logical (default false). Replace the family manifest
+   %        from the requested cases alone. The default is merge.
+   %    skip_missing : logical (default false). Record source-local skips in
+   %        manifest.skipped instead of aborting. The default import is strict,
+   %        so absent source caches fail with retrieval instructions before any
+   %        manifest merge can occur.
+   %    dry_run : logical (default false). Return the manifest shape without
+   %        reading source caches, writing artifacts, or merging the manifest.
+   %
+   %  Incremental staging (MERGE by default)
+   %    Staging one case adds or updates only that case in the family manifest
+   %    and preserves every other committed case and file. Re-staging the same
+   %    case updates exactly its entry. Set overwrite_family=true only to
+   %    deliberately rebuild the family root.
    %
    %  Returns
    %    manifest : struct  Family manifest also written to manifest.json.
@@ -142,9 +142,9 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
       icemodel.helpers.ensureDirExists(family_root);
    end
 
-   stage_callback = @(~, n) stageEsmCase( ...
+   stage_callback = @(~, n) stageCase( ...
       cases(n), source_dir, family_root, input_root, ...
-      window_enabled, window_start, window_end, kwargs);
+      window_enabled, window_start, window_end, kwargs, dataset_family);
 
    % Stage each requested case into importer state.
    [state, alive, skipped] = ...
@@ -190,9 +190,9 @@ function s = emptyState()
    s = struct('case_id', "", 'entry', struct());
 end
 
-function s = stageEsmCase(sitename, source_dir, family_root, input_root, ...
-      window_enabled, window_start, window_end, kwargs)
-   %STAGEESMCASE Stage one ESM-SnowMIP case and return importer state.
+function s = stageCase(sitename, source_dir, family_root, input_root, ...
+      window_enabled, window_start, window_end, kwargs, dataset_family)
+   %STAGECASE Stage one requested case and return importer state.
    info = icemodel.verification.setup.esmSnowmipSiteCatalog(sitename);
 
    % Resolve the per-site case root and the staged obs-bundle path.
@@ -234,7 +234,7 @@ function s = stageEsmCase(sitename, source_dir, family_root, input_root, ...
       % Stage forcing under the standard icemodel input layout so loadmet consumes it
       % without verification-only branches.
       writeMetFiles(forcing_tt, sitename, input_root, kwargs.dt_out, ...
-         kwargs.overwrite);
+         kwargs.overwrite, dataset_family);
 
       if write_observation
          % Repeated non-overwrite imports keep the current observation bytes.
@@ -252,8 +252,8 @@ function s = stageEsmCase(sitename, source_dir, family_root, input_root, ...
    else
       [window_start, window_end] = ...
          icemodel.verification.helpers.default_smoke_window(sitename);
-      comparison_variables = dryRunEsmComparisonVariables();
-      observation_variables = dryRunEsmObservationVariables(sitename);
+      comparison_variables = dryRunComparisonVariables();
+      observation_variables = dryRunObservationVariables(sitename);
    end
 
    % Forcing-agnostic schema: evaluation_file references observations.mat and
@@ -271,7 +271,7 @@ function s = stageEsmCase(sitename, source_dir, family_root, input_root, ...
       char(info.long_name)
       'land'
       {'seasonal_snow'}
-      char(snowmipPermafrostZone(sitename))
+      char(casePermafrostZone(sitename))
       char(fullfile(sitename, "observations.mat"))
       ''
       char(staged_timestep)
@@ -279,7 +279,7 @@ function s = stageEsmCase(sitename, source_dir, family_root, input_root, ...
       'end', icemodel.verification.setup.formatManifestTime(window_end))
       cellstr(comparison_variables)
       observation_variables
-      char(siteCaseNote(info))};
+      char(caseNote(info))};
 
    s = struct('case_id', sitename, ...
       'entry', icemodel.verification.setup.makeCaseManifestEntry(case_values));
@@ -295,8 +295,8 @@ function [window_start, window_end] = stagedTimeBounds(forcing_tt, obs_tt)
    window_end = max(times);
 end
 
-function permafrost_zone = snowmipPermafrostZone(sitename)
-   %SNOWMIPPERMAFROSTZONE Obu et al. (2019) permafrost extent per SnowMIP site.
+function permafrost_zone = casePermafrostZone(sitename)
+   %CASEPERMAFROSTZONE Obu et al. (2019) extent per SnowMIP site.
    %
    % Hard-coded results of a point-in-polygon test of the Obu et al. (2019) ESA
    % GlobPermafrost / UiO PEX permafrost-zone map at each ESM-SnowMIP site
@@ -338,13 +338,13 @@ function vars = obsComparisonVariables(obs_tt)
    vars = [canonical(ismember(canonical, present)); sort(soil)];
 end
 
-function vars = dryRunEsmComparisonVariables()
-   %DRYRUNESMCOMPARISONVARIABLES ESM manifest axes used without raw files.
+function vars = dryRunComparisonVariables()
+   %DRYRUNCOMPARISONVARIABLES Manifest axes used without raw files.
    vars = ["snow_depth_m"; "swe_kg_m2"; "surface_temp_C"];
 end
 
-function observation_variables = dryRunEsmObservationVariables(sitename)
-   %DRYRUNESMOBSERVATIONVARIABLES Observation metadata used without raw files.
+function observation_variables = dryRunObservationVariables(sitename)
+   %DRYRUNOBSERVATIONVARIABLES Observation metadata used without raw files.
    observation_variables = icemodel.verification.setup.metadataStruct({ ...
       'snow_depth_source', 'ESM-SnowMIP snow-depth observation channels'
       'swe_source', 'ESM-SnowMIP SWE observation channels'
@@ -359,14 +359,15 @@ function source_dir = resolveDryRunSourceDir(source_dir)
       'verification', 'esm_snowmip'));
 end
 
-function note = siteCaseNote(info)
-   %SITECASENOTE Short manifest note describing the staged case.
+function note = caseNote(info)
+   %CASENOTE Return the staged case description.
    note = sprintf( ...
       'ESM-SnowMIP %s reference site (%s, %s).', ...
       info.long_name, info.location, info.sitename);
 end
 
-function writeMetFiles(forcing_tt, sitename, input_root, dt_out, overwrite)
+function writeMetFiles(forcing_tt, sitename, input_root, dt_out, overwrite, ...
+      dataset_family)
    %WRITEMETFILES Stage one multi-year met file under input/met/.
    %
    % Delegates met-file naming, validation, and saving to the shared
@@ -374,7 +375,7 @@ function writeMetFiles(forcing_tt, sitename, input_root, dt_out, overwrite)
    % configureRun + loadmet resolve the file without verification-only branches.
    % Existing files are additive no-ops unless overwrite=true.
 
-   icemodel.forcing.helpers.writemet(forcing_tt, sitename, "esm_snowmip", ...
+   icemodel.forcing.helpers.writemet(forcing_tt, sitename, dataset_family, ...
       outdir=fullfile(input_root, 'met'), naming="window", dt_out=dt_out, ...
       overwrite=overwrite);
 end

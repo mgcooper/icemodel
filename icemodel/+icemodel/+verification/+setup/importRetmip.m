@@ -40,16 +40,57 @@ function manifest = importRetmip(source_dir, kwargs)
    %    production artifacts.
    %
    %  Name-value
-   %    case_ids : string vector  RetMIP protocol cases; blank selects all.
-   %    forcing_sources : string vector  Native/RCM legs requested by this call.
-   %    startdate, enddate : paired optional protocol/forcing clamp.
-   %    output_root : string  Convenience root for eval and input artifacts.
-   %    overwrite : logical  Refresh requested case artifacts (default false).
-   %    overwrite_family : logical  Replace the whole family (default false).
-   %    skip_missing : logical  Record source-local skips instead of failing.
-   %    dry_run : logical  Return metadata without source or output writes.
-   %    build_forcing : logical  Stage requested runtime legs (default false).
-   %    build_observations : logical  Build or reuse the case observation entry.
+   %    case_ids : string vector. Default is every canonical RetMIP protocol case
+   %        in retmipCaseCatalog. Pass an explicit list to stage a subset.
+   %    forcing_sources : string vector subset of
+   %        ["retmip","mar","merra","racmo"] (default "retmip"). RetMIP
+   %        protocol observations are always the case definition when
+   %        build_observations is true; forcing_sources selects only runtime
+   %        met/userdata artifacts. It is a patch selector, not the complete
+   %        desired source state: an existing case's omitted legs remain
+   %        unchanged during ordinary merge updates and are removed only by
+   %        explicit family replacement.
+   %    startdate, enddate : datetime / string. Optional explicit protocol and
+   %        forcing window; pass both or neither. With both omitted, each case
+   %        uses its catalog-authored RetMIP protocol period. Every selected leg
+   %        is limited to the overlap between this case window and its own
+   %        on-disk coverage.
+   %    promice_dir, gcnet_dir, samimi_dir, imau_dir, mar_dir, merra_dir,
+   %        racmo_dir, modis_dir : raw-source directories for the associated
+   %        native and gridded source builders.
+   %    output_root : string. Convenience root for eval and input artifacts.
+   %        When set, eval artifacts go to <output_root>/eval and runtime files
+   %        go to <output_root>/input.
+   %    evaluation_data_root, input_data_root, icemodel_config_casename : lower-
+   %        level root resolution when output_root is unset. With all roots
+   %        unset, the importer targets the gitignored top-level <repo>/data tree.
+   %    dt_out : model-met output timestep (default "15m") for native and
+   %        gridded forcing; pass "" to retain native model-met cadence.
+   %        Protocol observations retain their source-authored cadence.
+   %        Native met schema completion is fixed at the importer boundary:
+   %        absent required channels are retained as NaN placeholders.
+   %        Call the associated native met builder directly for strict source-
+   %        schema validation.
+   %    overwrite : logical (default false). Refresh requested case artifacts;
+   %        other cases are never touched.
+   %    overwrite_family : logical (default false). Replace the family manifest
+   %        from the requested cases alone. The default is merge.
+   %    skip_missing : logical (default true). Record source-local skips in
+   %        manifest.skipped instead of aborting.
+   %    dry_run : logical (default false). Return the manifest shape without
+   %        reading source caches, writing artifacts, or merging the manifest.
+   %    build_forcing : logical (default false). Stage runtime artifacts for
+   %        forcing_sources. When false, only observations are staged.
+   %    build_observations : logical (default true). When false, requested cases
+   %        must already exist in the target manifest. Their observation entries
+   %        are reused while forcing_sources are attached without rebuilding the
+   %        observation artifact.
+   %
+   %  Incremental staging (MERGE by default)
+   %    Staging one case adds or updates only that case in the family manifest
+   %    and preserves every other committed case and file. Re-staging the same
+   %    case updates exactly its entry. Set overwrite_family=true only to
+   %    deliberately rebuild the family root.
    %
    %  Returns
    %    manifest : struct  Final or dry-run family manifest.
@@ -95,8 +136,6 @@ function manifest = importRetmip(source_dir, kwargs)
    [window_start, window_end, window_enabled] = ...
       icemodel.internal.pairedWindow( ...
       kwargs.startdate, kwargs.enddate);
-   requested_window = struct('enabled', window_enabled, ...
-      'start', window_start, 'end', window_end);
 
    % Resolve the forcing sources.
    forcing_sources = ...
@@ -152,7 +191,7 @@ function manifest = importRetmip(source_dir, kwargs)
    end
 
    if ~kwargs.dry_run && ~kwargs.build_observations ...
-      && ~build_native_forcing
+         && ~build_native_forcing
       % Reuse the staged case entry so an RCM-only attachment does not require
       % observation or native-source caches.
       [state, alive, skipped] = ...
@@ -185,13 +224,13 @@ function manifest = importRetmip(source_dir, kwargs)
       end
       if ~kwargs.dry_run && ~kwargs.skip_missing
          preflightCases( ...
-            cases, source_dir, kwargs, requested_window, ...
+            cases, source_dir, kwargs, window_enabled, window_start, window_end, ...
             build_native_forcing);
       end
 
-      stage_callback = @(~, n) stageRetmipCase( ...
+      stage_callback = @(~, n) stageCase( ...
          cases(n), source_dir, cache_status, family_root, input_root, kwargs, ...
-         coverage, rcm_sources, requested_window, ...
+         coverage, rcm_sources, window_enabled, window_start, window_end, ...
          icemodel.verification.setup.priorCaseById( ...
          prior_cases, cases(n).case_id), build_native_forcing, dataset_family);
 
@@ -251,60 +290,16 @@ function s = emptyState()
       'dry_run', false);
 end
 
-function s = stageRetmipCase(c, source_dir, cache_status, family_root, ...
-      input_root, kwargs, coverage, rcm_sources, requested_window, prior_case, ...
-      build_native_forcing, dataset_family)
-   %STAGERETMIPCASE Stage one RetMIP case and return importer state.
-   c = clampCasePeriod(c, requested_window);
-   entry = retmipCaseEntry( ...
-      c, source_dir, cache_status, family_root, input_root, ...
-      kwargs.promice_dir, kwargs.gcnet_dir, kwargs.samimi_dir, ...
-      kwargs.imau_dir, kwargs.dry_run, kwargs.build_observations, ...
-      kwargs.build_forcing, build_native_forcing, kwargs.overwrite_family, ...
-      kwargs.skip_missing, kwargs.overwrite, ...
-      kwargs.dt_out, prior_case, dataset_family);
-   leg = struct();
-   if ~kwargs.dry_run && kwargs.build_forcing && ~isempty(rcm_sources)
-      [t1, t2] = icemodel.verification.setup.periodBounds(c.period);
-      leg = icemodel.verification.setup.resolveLegWindows( ...
-         rcm_sources, coverage, t1, t2);
-   end
-   s = struct('case_id', string(c.case_id), 'storage_alias', ...
-      icemodel.verification.setup.rcmStorageAlias(dataset_family, c.case_id), ...
-      'point', [c.site_location.lat_wgs84, c.site_location.lon_wgs84], ...
-      'evaluation_file_rel', string(entry.evaluation_file), ...
-      'entry', entry, 'period', entry.period, ...
-      'colocation', entry.colocation, 'leg', leg, 'reuse_entry', false, ...
-      'dry_run', kwargs.dry_run);
-end
-
-function c = clampCasePeriod(c, requested_window)
-   %CLAMPCASEPERIOD Intersect a RetMIP case period with the requested window.
-   c.period_is_clamped = false;
-   if ~requested_window.enabled
-      return
-   end
-
-   [t1, t2] = icemodel.verification.setup.periodBounds(c.period);
-   t1 = max(t1, requested_window.start);
-   t2 = min(t2, requested_window.end);
-   if t2 < t1
-      error('icemodel:verification:importRetmip:emptyWindow', ...
-         'requested RetMIP window does not overlap %s', c.case_id)
-   end
-   c.period = icemodel.verification.setup.manifestWindow(t1, t2);
-   c.period_is_clamped = true;
-end
-
-function preflightCases(cases, source_dir, kwargs, requested_window, ...
-      build_native_forcing)
+function preflightCases(cases, source_dir, kwargs, window_enabled, ...
+      window_start, window_end, build_native_forcing)
    %PREFLIGHTCASES Validate every strict RetMIP case before staging begins.
    % Parse all protocol bundles first so a later malformed case cannot follow an
    % earlier case-root or manifest mutation.
    if kwargs.build_observations
       for k = 1:numel(cases)
-         c = clampCasePeriod(cases(k), requested_window);
-         files = retmipFiles(source_dir, c);
+         c = clampCasePeriod( ...
+            cases(k), window_enabled, window_start, window_end);
+         files = caseFiles(source_dir, c);
          prepareProtocolBundle(c, files);
       end
    end
@@ -328,9 +323,54 @@ function preflightCases(cases, source_dir, kwargs, requested_window, ...
       if ~available
          throwMissingNative(reason, family);
       end
-      c = clampCasePeriod(cases(k), requested_window);
+      c = clampCasePeriod(cases(k), window_enabled, window_start, window_end);
       buildNativeMet(family, string(assoc.source_id), resolved_dir, c.period);
    end
+end
+
+function s = stageCase(c, source_dir, cache_status, family_root, ...
+      input_root, kwargs, coverage, rcm_sources, window_enabled, window_start, ...
+      window_end, prior_case, build_native_forcing, dataset_family)
+   %STAGECASE Stage one requested case and return importer state.
+   c = clampCasePeriod(c, window_enabled, window_start, window_end);
+   entry = stageProtocolEntry( ...
+      c, source_dir, cache_status, family_root, input_root, ...
+      kwargs.promice_dir, kwargs.gcnet_dir, kwargs.samimi_dir, ...
+      kwargs.imau_dir, kwargs.dry_run, kwargs.build_observations, ...
+      kwargs.build_forcing, build_native_forcing, kwargs.overwrite_family, ...
+      kwargs.skip_missing, kwargs.overwrite, ...
+      kwargs.dt_out, prior_case, dataset_family);
+   leg = struct();
+   if ~kwargs.dry_run && kwargs.build_forcing && ~isempty(rcm_sources)
+      [t1, t2] = icemodel.verification.setup.periodBounds(c.period);
+      leg = icemodel.verification.setup.resolveLegWindows( ...
+         rcm_sources, coverage, t1, t2);
+   end
+   s = struct('case_id', string(c.case_id), 'storage_alias', ...
+      icemodel.verification.setup.rcmStorageAlias(dataset_family, c.case_id), ...
+      'point', [c.site_location.lat_wgs84, c.site_location.lon_wgs84], ...
+      'evaluation_file_rel', string(entry.evaluation_file), ...
+      'entry', entry, 'period', entry.period, ...
+      'colocation', entry.colocation, 'leg', leg, 'reuse_entry', false, ...
+      'dry_run', kwargs.dry_run);
+end
+
+function c = clampCasePeriod(c, window_enabled, window_start, window_end)
+   %CLAMPCASEPERIOD Intersect a RetMIP case period with the requested window.
+   c.period_is_clamped = false;
+   if ~window_enabled
+      return
+   end
+
+   [t1, t2] = icemodel.verification.setup.periodBounds(c.period);
+   t1 = max(t1, window_start);
+   t2 = min(t2, window_end);
+   if t2 < t1
+      error('icemodel:verification:importRetmip:emptyWindow', ...
+         'requested RetMIP window does not overlap %s', c.case_id)
+   end
+   c.period = icemodel.verification.setup.manifestWindow(t1, t2);
+   c.period_is_clamped = true;
 end
 
 function throwMissingNative(reason, family)
@@ -343,12 +383,12 @@ function throwMissingNative(reason, family)
       '%s', reason)
 end
 
-function entry = retmipCaseEntry(c, source_dir, cache_status, family_root, ...
+function entry = stageProtocolEntry(c, source_dir, cache_status, family_root, ...
       input_root, promice_dir, gcnet_dir, samimi_dir, imau_dir, dry_run, ...
       build_observations, build_forcing, build_native_forcing, ...
       overwrite_family, skip_missing, overwrite, dt_out, prior_case, ...
       dataset_family)
-   %RETMIPCASEENTRY Build and stage one RetMIP manifest case entry.
+   %STAGEPROTOCOLENTRY Build the protocol bundle and associated native entry.
    if ~dry_run && ~build_observations
       if isempty(prior_case)
          error('icemodel:verification:importRetmip:missingPriorCase', ...
@@ -376,7 +416,7 @@ function entry = retmipCaseEntry(c, source_dir, cache_status, family_root, ...
    files = struct('surface', "", 'profiles', strings(0, 1), ...
       'outputs', strings(0, 1));
    if ~dry_run
-      files = retmipFiles(source_dir, c);
+      files = caseFiles(source_dir, c);
    end
    evaluation_file = "";
    if ~dry_run
@@ -721,7 +761,16 @@ function [available, source_dir, reason] = nativeSourceStatus( ...
       case "imau"
          source_dir = icemodel.forcing.helpers.verificationSourceDir( ...
             imau_dir, "imau");
-         available = imauHourlyFilePresent(source_dir, station);
+         try
+            icemodel.forcing.helpers.locateImauHourlyFile(source_dir, station);
+            available = true;
+         catch err
+            if ~strcmp(err.identifier, ...
+                  'icemodel:forcing:locateImauHourlyFile:fileNotFound')
+               rethrow(err)
+            end
+            available = false;
+         end
          reason = "";
          if ~available
             reason = sprintf('missing IMAU hourly source product for %s under %s', ...
@@ -759,21 +808,6 @@ function [met, metadata, Data] = buildNativeMet(family, station, source_dir, ...
          [met, metadata, Data] = icemodel.forcing.buildImauHourlyMet( ...
             station, source_dir=source_dir, startdate=period.start, ...
             enddate=period.end, fillwithmissing=true);
-   end
-end
-
-function tf = imauHourlyFilePresent(source_dir, station)
-   %IMAUHOURLYFILEPRESENT Check that the requested hourly station exists.
-   try
-      icemodel.forcing.helpers.locateImauHourlyFile(source_dir, station);
-      tf = true;
-   catch err
-      if strcmp(err.identifier, ...
-            'icemodel:forcing:locateImauHourlyFile:fileNotFound')
-         tf = false;
-      else
-         rethrow(err)
-      end
    end
 end
 
@@ -824,7 +858,7 @@ function obs = nativeObservationMetadata(metadata, met, Data)
 end
 
 function note = caseNote(~, colocation)
-   %CASENOTE Explain the RetMIP protocol/native-source split for the manifest.
+   %CASENOTE Return the staged case description.
    note = "RetMIP protocol case; protocol userdata remains retmip_protocol.";
    if ~isfield(colocation.retmip, 'native_source')
       note = note + ...
@@ -847,8 +881,8 @@ function note = caseNote(~, colocation)
    note = char(note);
 end
 
-function files = retmipFiles(source_dir, c)
-   %RETMIPFILES Resolve protocol/profile/output files for one RetMIP case.
+function files = caseFiles(source_dir, c)
+   %CASEFILES Resolve protocol/profile/output files for one case.
    forcing_dirs = [fullfile(source_dir, "forcing"); source_dir];
    outputs_dirs = [fullfile(source_dir, "outputs"); source_dir];
    token = filenameToken(c.case_id);
@@ -1015,7 +1049,7 @@ function files = outputMatches(folders, token)
 end
 
 function variables = comparisonVariables(files)
-   %COMPARISONVARIABLES Return variables present in the protocol target bundle.
+   %COMPARISONVARIABLES Return staged comparison/eval axes.
    variables = ["tsfc", "melt", "snowf_subl"];
    for filename = reshape(string(files.profiles), 1, [])
       variables(end + 1) = string(profileName(filename)); %#ok<AGROW>

@@ -22,10 +22,14 @@ function names = firnCaseManifestFieldNames()
    %  observations.mat.
    %
    %  Fields
-   %    case_id               compact case id ("kanm")
+   %    case_id               stable compact evaluation identity used by the
+   %                          manifest, case directory, and run selection
+   %                          (for example "kanm" or "dye2_2016")
    %    case_type             "firn_observational"
-   %    site_id               canonical PROMICE station id ("KAN_M")
-   %    site_name             display name
+   %    site_id               dataset-native station, site, or protocol identity
+   %                          (for example "KAN_M" or "Dye-2_16"); it can differ
+   %                          from case_id
+   %    site_name             human-readable dataset-native display name
    %    surface_zone          glaciological zone (namelists.surfacezone)
    %    eval_target           capability descriptor array (namelists.evaltarget)
    %    permafrost_zone       permafrost extent class, ORTHOGONAL to surface_zone

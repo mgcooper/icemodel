@@ -113,51 +113,43 @@ function manifest = importPromiceSites(source_dir, kwargs)
    %        updates and are removed only by explicit family replacement.
    %    startdate, enddate : datetime / string. OPTIONAL explicit PROMICE
    %        met/eval window; pass both or neither. The DEFAULT (omitted) is ALL
-   %        AVAILABLE YEARS per station, read live from the L3 record - there
-   %        is no hidden study window. RACMO ignores this and
-   %        always uses its own on-disk coverage.
-   %    output_root : base output root selecting WHICH eval tree is written.
-   %        When set, eval manifest goes to <output_root>/eval and forcing/Data
-   %        to <output_root>/input. The normal verification target is
-   %        <repo>/data/eval (+ .../input). <repo>/demo/data is reserved for
-   %        deliberate legacy/demo comparisons or fixture-maintenance work.
-   %        DEFAULT (output_root unset): the roots resolve to the gitignored
-   %        top-level <repo>/data tree. Pass output_root=<repo>/demo/data only
-   %        when deliberately refreshing legacy/demo artifacts.
+   %        AVAILABLE YEARS per station, read live from the L3 record; there is
+   %        no hidden study window. Every selected leg is limited to the overlap
+   %        between this case window and its own on-disk coverage.
    %    promice_dir, mar_dir, merra_dir, racmo_dir, modis_dir : raw-source
-   %        directories for each model.
-   %    evaluation_data_root, input_data_root, icemodel_config_casename :
-   %        root resolution when output_root is unset.
+   %        directories for the native and gridded source builders.
+   %    output_root : string. Convenience root for eval and input artifacts.
+   %        When set, eval artifacts go to <output_root>/eval and runtime files
+   %        go to <output_root>/input.
+   %    evaluation_data_root, input_data_root, icemodel_config_casename : lower-
+   %        level root resolution when output_root is unset. With all roots
+   %        unset, the importer targets the gitignored top-level <repo>/data tree.
    %    dt_out : model-met output timestep (default "15m") for native and
    %        gridded forcing; pass "" to retain native model-met cadence.
    %        PROMICE userdata/Data remains at its native hourly cadence.
    %        Native met schema completion is fixed at the importer boundary:
    %        absent required channels are retained as NaN placeholders.
    %        Call buildPromiceMet directly for strict source-schema validation.
-   %    overwrite : logical (default false). Existing requested artifacts are
-   %        additive no-ops while missing artifacts/sources may be added. True
-   %        explicitly refreshes a requested site's own artifacts. Other sites
-   %        are never touched (see merge below).
-   %    overwrite_family : logical (default false). Force a FULL rewrite of the
-   %        family manifest from the requested sites alone, discarding other
-   %        committed cases. The DEFAULT is MERGE.
-   %    skip_missing : logical (default true). Record skip reasons and continue.
+   %    overwrite : logical (default false). Refresh requested case artifacts;
+   %        other cases are never touched.
+   %    overwrite_family : logical (default false). Replace the family manifest
+   %        from the requested cases alone. The default is merge.
+   %    skip_missing : logical (default true). Record source-local skips in
+   %        manifest.skipped instead of aborting.
    %    dry_run : logical (default false). Return the manifest shape without
-   %        writing eval/input artifacts or merging the family manifest.
-   %    build_forcing : logical (default false). When true, runtime artifacts for
-   %        forcing_sources are written. When false, no input/met or
-   %        input/userdata artifacts are written; only observations are staged.
-   %    build_observations : logical (default true). When false, reuse an
-   %        existing manifest case and observations.mat contract, then update
-   %        only requested forcing sources. This is a guarded fast path for
-   %        already-staged cases, not a way to create new cases.
+   %        reading source caches, writing artifacts, or merging the manifest.
+   %    build_forcing : logical (default false). Stage runtime artifacts for
+   %        forcing_sources. When false, only observations are staged.
+   %    build_observations : logical (default true). When false, requested cases
+   %        must already exist in the target manifest. Their observation entries
+   %        are reused while forcing_sources are attached without rebuilding the
+   %        observation artifact.
    %
    %  Incremental staging (MERGE by default)
-   %    Staging one site ADDS or UPDATES only that site's case entry in the
-   %    family manifest and PRESERVES every other site's committed case + files
-   %    byte for byte (icemodel.verification.setup.writeFamilyManifestMerge).
-   %    Re-staging the same site updates exactly its entry (idempotent). Set
-   %    overwrite_family=true only to deliberately rebuild the family root.
+   %    Staging one case adds or updates only that case in the family manifest
+   %    and preserves every other committed case and file. Re-staging the same
+   %    case updates exactly its entry. Set overwrite_family=true only to
+   %    deliberately rebuild the family root.
    %
    %  Returns
    %    manifest : struct  Family manifest also written to manifest.json.
@@ -196,15 +188,6 @@ function manifest = importPromiceSites(source_dir, kwargs)
       kwargs.build_observations (1, 1) logical = true
    end
 
-   % Preserve the established PROMICE-specific catch boundary for empty builds.
-   raw_forcing_sources = reshape(string(kwargs.forcing_sources), 1, []);
-   if kwargs.build_forcing ...
-         && all(strlength(strtrim(raw_forcing_sources)) == 0)
-      error('icemodel:verification:importPromiceSites:emptyForcingSources', ...
-         ['forcing_sources cannot be empty when build_forcing=true. ' ...
-         'Use build_forcing=false for observation-only staging.'])
-   end
-
    % Validate the optional clamp before any cache or staging side effect.
    [window_start, window_end, window_enabled] = ...
       icemodel.internal.pairedWindow( ...
@@ -240,7 +223,7 @@ function manifest = importPromiceSites(source_dir, kwargs)
    % Dry runs remain metadata-only; optional skips stay quiet while required
    % PROMICE products print their retrieval guidance before failing.
    needs_native_source = kwargs.build_observations || build_native_forcing;
-   kwargs.promice_dir = resolvePromiceDir(source_dir, kwargs.promice_dir);
+   kwargs.promice_dir = resolveSourceDir(source_dir, kwargs.promice_dir);
    if kwargs.dry_run
       kwargs.promice_dir = icemodel.forcing.helpers.verificationSourceDir( ...
          kwargs.promice_dir, dataset_family);
@@ -256,9 +239,9 @@ function manifest = importPromiceSites(source_dir, kwargs)
    if ~isempty(kwargs.case_ids)
       cases = reshape(kwargs.case_ids, 1, []);
    elseif ~kwargs.dry_run && ~kwargs.build_observations
-      cases = priorPromiceSites(manifest_file);
+      cases = priorCaseIds(manifest_file);
    else
-      cases = defaultPromiceSites(kwargs.promice_dir, kwargs.dry_run);
+      cases = defaultCaseIds(kwargs.promice_dir, kwargs.dry_run);
    end
    % PROMICE station IDs retain underscores; canonical manifest case IDs do not.
    requested_ids = lower(erase(cases, "_"));
@@ -301,9 +284,9 @@ function manifest = importPromiceSites(source_dir, kwargs)
          forcing_sources=reuse_sources, coverage=coverage, ...
          startdate=kwargs.startdate, enddate=kwargs.enddate);
    else
-      prior_cases = loadPriorPromiceCases(manifest_file, cases, kwargs);
+      prior_cases = loadPriorCases(manifest_file, cases, kwargs);
       proj = icemodel.forcing.helpers.psnProjection();
-      stage_callback = @(~, n) stagePromiceSite( ...
+      stage_callback = @(~, n) stageCase( ...
          cases(n), family_root, met_outdir, userdata_outdir, proj, aws_sites, ...
          window_enabled, window_start, window_end, coverage, rcm_sources, ...
          prior_cases, build_native_forcing, dataset_family, kwargs);
@@ -363,12 +346,13 @@ function s = emptyState()
       'comparison_variables', {strings(0, 1)}, ...
       'observation_variables', struct(), ...
       'surface_zone', "", 'eval_target', {strings(0, 1)}, ...
-      'permafrost_zone', "", 'notes', "", 'reuse_entry', false, ...
+      'permafrost_zone', "", 'eval_source', "", ...
+      'native_timestep', "", 'notes', "", 'reuse_entry', false, ...
       'dry_run', false);
 end
 
-function prior_cases = loadPriorPromiceCases(manifest_file, cases, kwargs)
-   %LOADPRIORPROMICECASES Read existing contracts for merge and fast updates.
+function prior_cases = loadPriorCases(manifest_file, cases, kwargs)
+   %LOADPRIORCASES Read existing contracts for merge and fast updates.
    prior_cases = struct([]);
    if kwargs.dry_run
       return
@@ -443,10 +427,10 @@ function assertPriorWindowCompatible(prior_case, kwargs)
    end
 end
 
-function s = stagePromiceSite(site, family_root, met_outdir, userdata_outdir, ...
+function s = stageCase(site, family_root, met_outdir, userdata_outdir, ...
       proj, aws_sites, window_enabled, window_start, window_end, coverage, ...
       rcm_sources, prior_cases, build_native_forcing, dataset_family, kwargs)
-   %STAGEPROMICESITE Stage one PROMICE site and return importer state.
+   %STAGECASE Stage one requested case and return importer state.
    case_id = lower(erase(site, "_"));
    prior_case = icemodel.verification.setup.priorCaseById( ...
       prior_cases, case_id);
@@ -462,7 +446,7 @@ function s = stagePromiceSite(site, family_root, met_outdir, userdata_outdir, ..
    else
       % Normal imports resolve source metadata before output writes so missing
       % files or empty windows remain whole-site skips.
-      [aws_meta, promice_start, promice_end] = resolvePromiceSiteMetadata( ...
+       [aws_meta, promice_start, promice_end] = resolveCaseMetadata( ...
          site, window_enabled, window_start, window_end, kwargs);
       lat = aws_meta.lat;
       lon = aws_meta.lon;
@@ -476,7 +460,7 @@ function s = stagePromiceSite(site, family_root, met_outdir, userdata_outdir, ..
          'lat_wgs84', lat, 'lon_wgs84', lon, ...
          'x_epsg3413', x3413, 'y_epsg3413', y3413, ...
          'elev_m', aws_meta.elev);
-      anchor = siteCatalogEntry(site, aws_sites);
+      anchor = caseCatalogEntry(site, aws_sites);
    end
    point = [lat, lon];
 
@@ -495,7 +479,7 @@ function s = stagePromiceSite(site, family_root, met_outdir, userdata_outdir, ..
 
    [colocation, comparison_variables, observation_variables, ...
       evaluation_file_rel] = ...
-      stageNativePromice(site, case_id, case_root, userdata_outdir, ...
+       stageNativeSource(site, case_id, case_root, userdata_outdir, ...
       met_outdir, promice_start, promice_end, prior_case, ...
       build_native_forcing, dataset_family, kwargs);
 
@@ -509,10 +493,11 @@ function s = stagePromiceSite(site, family_root, met_outdir, userdata_outdir, ..
       'observation_variables', observation_variables, ...
       'surface_zone', anchor.surface_zone, ...
       'eval_target', {string(anchor.eval_target)}, ...
-      'permafrost_zone', anchor.permafrost_zone, 'notes', anchor.note, ...
+      'permafrost_zone', anchor.permafrost_zone, ...
+      'eval_source', "promice_obs", 'native_timestep', "hourly", ...
+      'notes', anchor.note, ...
       'reuse_entry', false, ...
       'dry_run', kwargs.dry_run);
-   s.entry = promiceCaseEntry(s);
 end
 
 function anchor = priorCaseAnchor(prior_case)
@@ -526,10 +511,10 @@ end
 
 function [colocation, comparison_variables, observation_variables, ...
       evaluation_file_rel] = ...
-      stageNativePromice(site, case_id, case_root, userdata_outdir, ...
+      stageNativeSource(site, case_id, case_root, userdata_outdir, ...
       met_outdir, promice_start, promice_end, prior_case, ...
       build_native_forcing, dataset_family, kwargs)
-   %STAGENATIVEPROMICE Stage native PROMICE observations and requested forcing.
+   %STAGENATIVESOURCE Stage native observations and requested forcing.
    promice_data_files = strings(1, 0);
    % Dry runs and observation-reuse calls never enter the observation writer.
    write_observation = false;
@@ -585,7 +570,7 @@ function [colocation, comparison_variables, observation_variables, ...
    end
 
    preserve_prior_promice = ~kwargs.dry_run && ~build_native_forcing ...
-      && ~kwargs.overwrite_family && hasPriorPromiceLeg(prior_case);
+       && ~kwargs.overwrite_family && hasPriorNativeLeg(prior_case);
    if preserve_prior_promice
       % A merge refresh should add/update requested sources without erasing a
       % prior PROMICE leg merely because PROMICE was omitted from this call.
@@ -624,7 +609,7 @@ function [colocation, comparison_variables, observation_variables, ...
             promice_co.forcing_ready_reason = char(forcing_ready_reason);
             promice_co.forcing_complete_windows = forcing_complete_windows;
          catch met_err
-            if ~isSkippablePromiceMetError(met_err)
+             if ~isSkippableNativeBuildError(met_err)
                rethrow(met_err)
             end
             promice_co.met_files = strings(1, 0);
@@ -640,36 +625,6 @@ function [colocation, comparison_variables, observation_variables, ...
    end
 
    colocation = struct('promice', promice_co);
-end
-
-function entry = promiceCaseEntry(s)
-   %PROMICECASEENTRY Convert one PROMICE state record to a manifest case entry.
-   [forcing_sources, eval_sources] = ...
-      icemodel.verification.setup.colocationSourceLists(s.colocation);
-   if s.dry_run && isempty(eval_sources)
-      eval_sources = "promice_obs";
-   end
-
-   case_values = { ...
-      char(s.case_id)
-      'firn_observational'
-      char(s.site_id)
-      char(s.site_name)
-      char(s.surface_zone)
-      cellstr(s.eval_target)
-      char(s.permafrost_zone)
-      s.site_location
-      s.period
-      s.evaluation_file_rel
-      cellstr(forcing_sources(:))
-      cellstr(eval_sources(:))
-      cellstr(s.comparison_variables(:))
-      s.observation_variables
-      s.colocation
-      'hourly'
-      char(s.notes)};
-
-   entry = icemodel.verification.setup.makeFirnCaseManifestEntry(case_values);
 end
 
 function [comparison_variables, observation_variables] = ...
@@ -702,8 +657,8 @@ function [comparison_variables, observation_variables, evaluation_file_rel, ...
    end
 end
 
-function tf = hasPriorPromiceLeg(prior_case)
-   %HASPRIORPROMICELEG True when an existing manifest has a PROMICE leg.
+function tf = hasPriorNativeLeg(prior_case)
+   %HASPRIORNATIVELEG True when an existing manifest has a native source leg.
    tf = isfield(prior_case, 'colocation') ...
       && isfield(prior_case.colocation, 'promice') ...
       && isstruct(prior_case.colocation.promice);
@@ -726,8 +681,8 @@ function [ok, t1, t2] = priorCasePeriod(prior_case)
    ok = ~isnat(t1) && ~isnat(t2);
 end
 
-function tf = isSkippablePromiceMetError(err)
-   %ISSKIPPABLEPROMICEMETERROR True for absent-source PROMICE met failures.
+function tf = isSkippableNativeBuildError(err)
+   %ISSKIPPABLENATIVEBUILDERROR True for absent-source native met failures.
    ids = [
       "icemodel:forcing:readPromiceAws:sourceNotFound"
       "icemodel:forcing:readPromiceAws:stationNotFound"
@@ -736,8 +691,8 @@ function tf = isSkippablePromiceMetError(err)
    tf = any(string(err.identifier) == ids);
 end
 
-function sites = defaultPromiceSites(promice_dir, dry_run)
-   %DEFAULTPROMICESITES Resolve the default site list for import preflight.
+function sites = defaultCaseIds(promice_dir, dry_run)
+   %DEFAULTCASEIDS Resolve the default case-id list for import preflight.
    if dry_run
       catalog = icemodel.verification.setup.promiceSiteCatalog();
       sites = string({catalog.site});
@@ -746,8 +701,8 @@ function sites = defaultPromiceSites(promice_dir, dry_run)
    end
 end
 
-function sites = priorPromiceSites(manifest_file)
-   %PRIORPROMICESITES Return staged site ids without reading raw sources.
+function sites = priorCaseIds(manifest_file)
+   %PRIORCASEIDS Return staged site ids without reading raw sources.
    if ~isfile(manifest_file)
       error('icemodel:verification:importPromiceSites:missingPriorManifest', ...
          ['build_observations=false requires an existing PROMICE manifest: ' ...
@@ -770,9 +725,9 @@ function sites = priorPromiceSites(manifest_file)
 end
 
 function [aws_meta, promice_start, promice_end] = ...
-      resolvePromiceSiteMetadata(site, window_enabled, window_start, ...
+      resolveCaseMetadata(site, window_enabled, window_start, ...
       window_end, kwargs)
-   %RESOLVEPROMICESITEMETADATA Resolve source metadata or dry-run placeholders.
+   %RESOLVECASEMETADATA Resolve source metadata or dry-run placeholders.
    if kwargs.dry_run
       aws_meta = struct('lat', NaN, 'lon', NaN, 'elev', NaN);
       if window_enabled
@@ -817,8 +772,8 @@ function aws = readAwsSitesMetadata(promice_dir)
    aws = readtable(csv, 'TextType', 'string');
 end
 
-function anchor = siteCatalogEntry(site, aws_sites)
-   %SITECATALOGENTRY Resolve site_name/surface_zone/eval_target/note for a site.
+function anchor = caseCatalogEntry(site, aws_sites)
+   %CASECATALOGENTRY Resolve site_name/surface_zone/eval_target/note for a case.
    %
    % Curated and first-pass classifications both live in promiceSiteCatalog (the
    % single source of truth for surface_zone + eval_target). When a station is
@@ -869,8 +824,8 @@ function w = legReportWindows(leg, sources)
    end
 end
 
-function promice_dir = resolvePromiceDir(source_dir, promice_dir)
-   %RESOLVEPROMICEDIR Resolve the positional source_dir / promice_dir alias.
+function promice_dir = resolveSourceDir(source_dir, promice_dir)
+   %RESOLVESOURCEDIR Resolve the positional source_dir / native-dir alias.
    if source_dir ~= "" && promice_dir ~= "" && source_dir ~= promice_dir
       error('icemodel:verification:importPromiceSites:sourceAliasConflict', ...
          'source_dir and promice_dir refer to different PROMICE caches');

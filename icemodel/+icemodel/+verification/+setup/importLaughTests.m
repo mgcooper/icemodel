@@ -21,17 +21,27 @@ function manifest = importLaughTests(laugh_tests_source_dir, kwargs)
    %    laugh_tests_source_dir : string  Root of a local Laugh-Tests checkout.
    %
    %  Name-value
-   %    output_root : string  Base output root; eval artifacts go to
-   %        output_root/eval.
-   %    evaluation_data_root : string  Base evaluation-data root to stage into.
-   %    icemodel_config_casename : string  Config casename used when
-   %        evaluation_data_root is blank. Blank uses repo-local data/eval.
-   %    case_ids : string vector  Laugh-Tests cases to stage. Currently only
+   %    case_ids : string vector. Laugh-Tests cases to stage. Currently only
    %        "colbeck1976" is supported.
-   %    overwrite : logical  Refresh requested case artifacts (default false).
-   %    overwrite_family : logical  Replace the whole family (default false).
-   %    skip_missing : logical  Record source-local skips instead of failing.
-   %    dry_run : logical  Return metadata without source or output writes.
+   %    output_root : string. Convenience root for eval artifacts. When set,
+   %        eval artifacts go to <output_root>/eval.
+   %    evaluation_data_root, icemodel_config_casename : lower-level root
+   %        resolution when output_root is unset. With both unset, the importer
+   %        targets the gitignored top-level <repo>/data tree.
+   %    overwrite : logical (default false). Refresh requested case artifacts;
+   %        other cases are never touched.
+   %    overwrite_family : logical (default false). Replace the family manifest
+   %        from the requested cases alone. The default is merge.
+   %    skip_missing : logical (default false). Record source-local skips in
+   %        manifest.skipped instead of aborting. The default import is strict.
+   %    dry_run : logical (default false). Return the manifest shape without
+   %        reading source caches, writing artifacts, or merging the manifest.
+   %
+   %  Incremental staging (MERGE by default)
+   %    Staging one case adds or updates only that case in the family manifest
+   %    and preserves every other committed case and file. Re-staging the same
+   %    case updates exactly its entry. Set overwrite_family=true only to
+   %    deliberately rebuild the family root.
    %
    %  Returns
    %    manifest : struct  Family manifest also written to manifest.json.
@@ -81,7 +91,7 @@ function manifest = importLaughTests(laugh_tests_source_dir, kwargs)
       icemodel.helpers.ensureDirExists(family_root);
    end
 
-   stage_callback = @(~, n) stageLaughCase( ...
+   stage_callback = @(~, n) stageCase( ...
       cases(n), laugh_tests_source_dir, family_root, source_status, kwargs);
 
    % Stage each requested case into importer state.
@@ -128,19 +138,19 @@ function s = emptyState()
    s = struct('case_id', "", 'entry', struct());
 end
 
-function s = stageLaughCase(case_id, source_dir, family_root, source_status, ...
+function s = stageCase(case_id, source_dir, family_root, source_status, ...
       kwargs)
-   %STAGELAUGHCASE Stage one Laugh-Tests case and return importer state.
+   %STAGECASE Stage one requested case and return importer state.
    case_root = fullfile(family_root, case_id);
    evaluation_output_file = fullfile(case_root, "evaluation.mat");
    reference_output_file = fullfile(case_root, "reference.mat");
 
    % The manifest definition validates the requested case without reading raw
    % files; the build helper owns every source-specific read/normalization step.
-   case_values = dryRunLaughCaseValues(case_id);
+   case_values = dryRunCaseValues(case_id);
    if ~kwargs.dry_run
       % Real staging delegates the complete raw build after cache validation.
-      assertLaughSourceAvailable(source_status);
+      assertSourceAvailable(source_status);
       [~, targets, reference] = ...
          icemodel.verification.setup.buildLaughTestsArtifacts( ...
          source_dir, case_id);
@@ -164,8 +174,8 @@ function s = stageLaughCase(case_id, source_dir, family_root, source_status, ...
       'entry', icemodel.verification.setup.makeCaseManifestEntry(case_values));
 end
 
-function assertLaughSourceAvailable(status)
-   %ASSERTLAUGHSOURCEAVAILABLE Throw a stable per-case missing-source error.
+function assertSourceAvailable(status)
+   %ASSERTSOURCEAVAILABLE Throw a stable per-case missing-source error.
    if isempty(status) || all([status.present])
       return
    end
@@ -173,8 +183,8 @@ function assertLaughSourceAvailable(status)
       'Laugh-Tests source checkout is incomplete')
 end
 
-function case_values = dryRunLaughCaseValues(case_id)
-   %DRYRUNLAUGHCASEVALUES Return manifest values without reading raw files.
+function case_values = dryRunCaseValues(case_id)
+   %DRYRUNCASEVALUES Return manifest values without reading raw files.
    switch case_id
       case "colbeck1976"
          case_values = colbeckCaseValues();
