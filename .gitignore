@@ -36,22 +36,21 @@ data/input/userdata/*
 !data/verification/sumup/.gitkeep
 demo/data/output/
 
-# Demo data are generated fixtures except the spectral inputs, three small
-# canonical met files, and keepers for the desired empty directory skeleton.
-demo/data/**
-!demo/data/
-!demo/data/eval/
-!demo/data/eval/.gitkeep
-!demo/data/input/
-!demo/data/input/met/
-!demo/data/input/met/.gitkeep
-!demo/data/input/met/met_kanl_kanl_2015_1hr.mat
-!demo/data/input/met/met_kanm_kanm_2015_1hr.mat
-!demo/data/input/met/met_kanm_kanm_2016_1hr.mat
-!demo/data/input/spectral/
-!demo/data/input/spectral/**
-!demo/data/input/userdata/
-!demo/data/input/userdata/.gitkeep
+# --- Demo fixture data: release-asset flip (currently OFF) -------------------
+# The committed demo fixture .mat data are bundled by
+# icemodel.verification.setup.packFixtures and provisioned by fetchFixtures.
+# To perform the user-authorized release-asset flip tracked by icemodel-1ps.17,
+# activate the rules below only after the release asset and its manifest exist.
+# The family manifest.json files and .gitkeep placeholders remain committed.
+# demo/data/eval/**/*.mat
+# demo/data/input/met/**/*.mat
+# demo/data/input/userdata/**/*.mat
+# !demo/data/eval/**/manifest.json
+
+# The global MATLAB ignore pattern treats the MAR 3.11 directory suffix as a
+# numeric extension. Keep the committed demo product directory visible.
+!demo/data/input/met/mar3.11/
+!demo/data/input/met/mar3.11/**
 
 # Release-with-assets fixture bundle staging. packFixtures writes the versioned
 # archive + MANIFEST.json here; it is a build artifact and must never be

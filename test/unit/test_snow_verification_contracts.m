@@ -461,7 +461,7 @@ function fields = expectedFamilyManifestFields()
    %EXPECTEDFAMILYMANIFESTFIELDS Required top-level family-manifest fields.
 
    fields = {'dataset_family'; 'source_doi'; 'source_url'; ...
-      'source_version'; 'retrieval_date'; 'cases'};
+      'source_version'; 'retrieval_date'; 'cases'; 'skipped'};
 end
 
 function ids = expectedColbeckExperimentIds()

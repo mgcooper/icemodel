@@ -339,7 +339,7 @@ function test_colocated_files_resolve_on_disk(testCase)
    % (manifest.colocation) pointing at these individual files, NOT a bundle.
 
    input_root = icemodel.verification.helpers.inputDataRoot( ...
-      icemodel_config_casename="");
+      icemodel_config_casename="test");
    met_dir = fullfile(input_root, 'met');
    ud_dir = fullfile(input_root, 'userdata');
 
@@ -751,7 +751,7 @@ function test_accum_firn_colocation_files_resolve_on_disk(testCase)
    % standard icemodel input layout, exactly as the KAN fixtures do.
 
    input_root = icemodel.verification.helpers.inputDataRoot( ...
-      icemodel_config_casename="");
+      icemodel_config_casename="test");
    met_dir = fullfile(input_root, 'met');
    ud_dir = fullfile(input_root, 'userdata');
 
