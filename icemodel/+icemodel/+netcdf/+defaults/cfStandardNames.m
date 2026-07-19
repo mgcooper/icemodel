@@ -122,5 +122,5 @@ function r = repoRoot()
    %REPOROOT Repository root inferred from this file's location.
    here = fileparts(mfilename('fullpath'));
    % .../icemodel/+icemodel/+netcdf/+defaults -> up 4 to repo root
-   r = fileparts(fileparts(fileparts(fileparts(fileparts(here)))));
+   r = fileparts(fileparts(fileparts(fileparts(here))));
 end

@@ -627,6 +627,38 @@ function test_cfStandardNames_fixture_parses(testCase)
       "land_ice_temperature"], names)));
 end
 
+function test_cfStandardNames_offline_fallback_resolves_repo_fixture(testCase)
+   % A failed web fetch must resolve the committed fixture inside this repo.
+
+   stub_dir = string(tempname);
+   mkdir(stub_dir)
+   cleanup_dir = onCleanup(@() rmdir(stub_dir, 's'));
+   writeFailingWebread(stub_dir);
+   addpath(stub_dir, '-begin')
+   cleanup_path = onCleanup(@() rmpath(stub_dir));
+   clear icemodel.netcdf.defaults.cfStandardNames
+
+   testCase.verifyWarning(@() ...
+      icemodel.netcdf.defaults.cfStandardNames(refresh=true), ...
+      'icemodel:netcdf:cfStandardNames:usingFixture');
+
+   clear icemodel.netcdf.defaults.cfStandardNames
+   clear cleanup_path cleanup_dir
+end
+
+function writeFailingWebread(folder)
+   %WRITEFAILINGWEBREAD Shadow webread so the offline fallback is deterministic.
+
+   filename = fullfile(folder, 'webread.m');
+   fid = fopen(filename, 'w');
+   assert(fid > 0, 'could not create the webread test stub')
+   closer = onCleanup(@() fclose(fid));
+   fprintf(fid, 'function varargout = webread(varargin)\n');
+   fprintf(fid, 'error(''test:offline'', ''offline test stub'')\n');
+   fprintf(fid, 'end\n');
+   clear closer
+end
+
 %% stampMetadata embedding
 
 function test_stampMetadata_embeds_all_three(testCase)
