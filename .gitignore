@@ -1,37 +1,83 @@
 # icemodel stuff
+data/preview/*
+data/figures/*
+data/test/*
 data/input/*
 data/eval/*
 data/output/*
 data/verification/**
 !data/.gitkeep
+!data/test/
+!data/test/.gitkeep
 !data/eval/
 !data/eval/.gitkeep
 !data/input/
 !data/input/.gitkeep
 !data/input/met/
+data/input/met/*
 !data/input/met/.gitkeep
 !data/input/spectral/
+data/input/spectral/*
 !data/input/spectral/.gitkeep
 !data/input/userdata/
+data/input/userdata/*
 !data/input/userdata/.gitkeep
 !data/output/
 !data/output/.gitkeep
 !data/verification/
 !data/verification/.gitkeep
-!data/verification/snow/
-!data/verification/snow/.gitkeep
-!data/verification/snow/esm_snowmip/
-!data/verification/snow/esm_snowmip/.gitkeep
-!data/verification/snow/laugh_tests/
-!data/verification/snow/laugh_tests/.gitkeep
+!data/verification/esm_snowmip/
+!data/verification/esm_snowmip/.gitkeep
+!data/verification/laugh_tests/
+!data/verification/laugh_tests/.gitkeep
+!data/verification/promice/
+!data/verification/promice/.gitkeep
+!data/verification/sumup/
+!data/verification/sumup/.gitkeep
 demo/data/output/
+
+# --- Demo fixture data: release-asset flip (currently OFF) -------------------
+# The committed demo fixture .mat data are bundled by
+# icemodel.verification.setup.packFixtures and provisioned by fetchFixtures.
+# To perform the user-authorized release-asset flip tracked by icemodel-1ps.17,
+# activate the rules below only after the release asset and its manifest exist.
+# The family manifest.json files and .gitkeep placeholders remain committed.
+# demo/data/eval/**/*.mat
+# demo/data/input/met/**/*.mat
+# demo/data/input/userdata/**/*.mat
+# !demo/data/eval/**/manifest.json
+
+# The global MATLAB ignore pattern treats the MAR 3.11 directory suffix as a
+# numeric extension. Keep the committed demo product directory visible.
+!demo/data/input/met/mar3.11/
+!demo/data/input/met/mar3.11/**
+
+# Release-with-assets fixture bundle staging. packFixtures writes the versioned
+# archive + MANIFEST.json here; it is a build artifact and must never be
+# committed (the bundle is uploaded as a GitHub release asset instead).
+release-staging/
+
 test/artifacts/
 test/backups/
 test/baselines/profiler/
 test/benchmarks/profiler/
-test/interactive/data/
-test/interactive/figures/
+# test/interactive is organized into per-theme subfolders. Each theme commits
+# its SCRIPT(s) (*.m) and AUTHORED report(s) (specific .md) but ignores its
+# generated outputs: figures/ holds images, artifacts/ holds generated tables
+# (markdown/csv); outputs/ and data/ are other generated stores. The committed
+# .m/.md files are exempted by the !patterns below.
+test/interactive/**/figures/
+test/interactive/**/artifacts/
+test/interactive/**/outputs/
+test/interactive/**/data/
+test/interactive/**/*.png
+test/interactive/*.png
+!test/interactive/**/*.m
+!test/interactive/**/*.md
 icemodel/dependencies/requirements.mat
+
+# CF Standard Name Table cache (fetched by icemodel.netcdf.defaults.cfStandardNames)
+.cache/
 
 # vscode
 .vscode
@@ -40,6 +86,10 @@ icemodel/dependencies/requirements.mat
 *~
 .DS_Store
 Desktop.ini
+
+# Un-ignore icemodel source files caught by a global "*Zone*" ignore rule
+# (case-insensitive on macOS, so surfacezone.m / validateSurfaceZone.m match).
+!icemodel/**/*[Zz]one*.m
 
 # Thumbnail cache files
 ._*

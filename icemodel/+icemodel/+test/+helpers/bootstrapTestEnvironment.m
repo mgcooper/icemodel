@@ -24,6 +24,21 @@ function [rootdir, input_path, output_path, eval_path, cleanup] = ...
    % artifact, profiler, and archive directories stay off the MATLAB path.
    addCodeFolders(icemodel.getpath('test'))
 
+   % Add the staged test-data tree itself when it exists. Some direct unit
+   % runs and fixture loaders resolve bundled files relative to this folder,
+   % so keeping the parent directory on the MATLAB path avoids per-file
+   % bootstrap duplication while staying harmless when the tree is absent.
+   addTestDataFolder(fullfile(rootdir, 'data', 'test'))
+
+   % Wire the external dev-repo dependencies (exactremap, activelayer, and the
+   % matfunclib helpers activelayer needs) through the single central config
+   % function so they are never bootstrapped from arbitrary locations. This
+   % lets the conservative (area-weighted) remap tests and the Obu
+   % permafrost-zone analysis RUN instead of self-skipping. Each dependency is
+   % a clean no-op when already on the path or absent (the affected tests then
+   % skip cleanly, as before).
+   icemodel.dependencies();
+
    % Return a no-op cleanup by default so callers can always keep one handle
    % alive even when path/config installation is disabled.
    cleanup = onCleanup(@() []);
@@ -33,10 +48,37 @@ function [rootdir, input_path, output_path, eval_path, cleanup] = ...
       cfg = icemodel.config('casename', 'test', 'setenv', false);
    end
 
+   % Provision the demo fixture data on demand. This is the release-with-assets
+   % hook: today the committed fixtures are present, so fetchFixtures is a clean
+   % no-op (presence-only mode, no manifest yet). Once the user flips the demo
+   % .mat fixtures to a GitHub release asset (icemodel-1ps.17), the fixtures are
+   % gitignored and this call surfaces actionable download instructions instead
+   % of letting tests fail with a confusing missing-file error. strict=false +
+   % silent keeps it a pure no-op fallback that never aborts bootstrap on its
+   % own; the individual tests still fail clearly if a fixture they need is
+   % genuinely absent.
+   ensureFixtures();
+
    % Return the resolved canonical test paths for callers that need them.
    input_path = string(cfg.ICEMODEL_INPUT_PATH);
    output_path = string(cfg.ICEMODEL_OUTPUT_PATH);
    eval_path = string(cfg.ICEMODEL_EVAL_PATH);
+end
+
+function ensureFixtures()
+   %ENSUREFIXTURES Non-breaking demo-fixture provisioning hook.
+   %
+   % Calls fetchFixtures in the lenient mode (strict=false, silent=true) so it
+   % NEVER aborts the bootstrap: with the committed fixtures present it is a
+   % no-op, and after the release-asset flip it prints nothing here but leaves
+   % the actionable banner available to anyone who calls fetchFixtures directly.
+   % Any unexpected error in the hook is swallowed so the formal suite is not
+   % coupled to the optional provisioning path.
+   try
+      icemodel.verification.setup.fetchFixtures(strict=false, silent=true);
+   catch
+      % Provisioning is best-effort; a failure here must not break bootstrap.
+   end
 end
 
 function [cfg, cleanup] = installTestConfig()
@@ -71,5 +113,13 @@ function addCodeFolders(rootdir)
    folders = unique(string({files.folder}), 'stable');
    for n = 1:numel(folders)
       addpath(char(folders(n)))
+   end
+end
+
+function addTestDataFolder(rootdir)
+   %ADDTESTDATAFOLDER Add the staged test-data root when present.
+
+   if isfolder(rootdir)
+      addpath(char(rootdir))
    end
 end

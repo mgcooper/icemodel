@@ -23,7 +23,7 @@ function teardown(testCase)
 end
 
 function test_listcases_returns_expected_ids(testCase)
-   % LISTCASES should expose the curated smoke cases from committed demo/data.
+   % LISTCASES should expose the curated smoke cases from top-level data/eval.
 
    cases = icemodel.verification.listcases();
    ids = [cases.case_id];
@@ -51,9 +51,9 @@ function test_verification_namelists_expose_curated_selectors(testCase)
       "colbeck1976");
 
    % The richer site catalog is keyed by the same site-name namelist.
-   catalog = icemodel.verification.helpers.snowmipinfo();
+   catalog = icemodel.verification.setup.esmSnowmipSiteCatalog();
    testCase.verifyEqual(string({catalog.sitename})', expectedEsmCaseIds());
-   info_cdp = icemodel.verification.helpers.snowmipinfo("cdp");
+   info_cdp = icemodel.verification.setup.esmSnowmipSiteCatalog("cdp");
    testCase.verifyEqual(info_cdp.long_name, "Col de Porte");
 end
 
@@ -73,14 +73,70 @@ function test_each_site_stages_expected_comparison_variables(testCase)
          sprintf('snow_depth_m missing for %s', sitename));
    end
 
-   % Surface temperature is observed at WFJ (Weissfluhjoch). Losing it from
-   % comparison_variables is the original regression revision-request-5
-   % flagged. Pin it explicitly here; sites without a usable 'ts' channel
+   % Surface temperature is observed at WFJ (Weissfluhjoch). Pin it explicitly
+   % here; sites without a usable 'ts' channel
    % (e.g. sod) are expected to drop the variable and are excluded.
    wfj = icemodel.verification.loadmanifest("wfj");
    testCase.verifyTrue(ismember("surface_temp_C", ...
       string(wfj.comparison_variables)), ...
       'WFJ must stage surface_temp_C as a comparison variable');
+end
+
+function test_each_esm_case_carries_land_zone_seasonal_snow_target(testCase)
+   % Every ESM-SnowMIP case is an off-ice seasonal snowpack at a land site:
+   % surface_zone="land" (glaciological zone) and eval_target=["seasonal_snow"]
+   % (the capability the case exercises). seasonal_snow is NOT a zone - it moved
+   % to the eval_target descriptor.
+
+   zones = icemodel.verification.namelists.surfacezone();
+   targets = icemodel.verification.namelists.evaltarget();
+   testCase.verifyTrue(ismember("land", zones));
+   testCase.verifyFalse(ismember("seasonal_snow", zones));
+   testCase.verifyTrue(ismember("seasonal_snow", targets));
+
+   for sitename = expectedEsmCaseIds()'
+      manifest = icemodel.verification.loadmanifest(sitename);
+      testCase.verifyEqual(string(manifest.surface_zone), "land", ...
+         sprintf('%s surface_zone is not land', sitename));
+      testCase.verifyEqual(string(manifest.eval_target), "seasonal_snow", ...
+         sprintf('%s eval_target is not seasonal_snow', sitename));
+   end
+end
+
+function test_each_esm_case_carries_valid_permafrost_zone(testCase)
+   % Every ESM-SnowMIP case is an off-ice land site and carries a permafrost_zone
+   % (ORTHOGONAL to surface_zone) sampled by point-in-polygon from the Obu et al.
+   % (2019) permafrost-zone map: Sodankyla (boreal Lapland) is continuous, Senator
+   % Beck (Colorado alpine) discontinuous, Swamp Angel / Weissfluhjoch sporadic,
+   % Old Jack Pine isolated, and the remaining lower/mid-latitude sites fall
+   % outside any permafrost polygon -> none. The value must validate against the
+   % canonical namelist.
+
+   allowed = icemodel.verification.namelists.permafrostzone();
+   testCase.verifyTrue(ismember("none", allowed));
+   testCase.verifyTrue(ismember("isolated", allowed));
+
+   expectedByName = struct( ...
+      'sod', "continuous", 'snb', "discontinuous", ...
+      'swa', "sporadic",   'wfj', "sporadic", ...
+      'ojp', "isolated");
+
+   for sitename = expectedEsmCaseIds()'
+      manifest = icemodel.verification.loadmanifest(sitename);
+      testCase.verifyTrue(isfield(manifest, 'permafrost_zone'), ...
+         sprintf('%s missing permafrost_zone field', sitename));
+      pfz = string(manifest.permafrost_zone);
+      testCase.verifyTrue(ismember(pfz, allowed), ...
+         sprintf('%s permafrost_zone "%s" not in namelist', sitename, pfz));
+      key = char(lower(string(sitename)));
+      if isfield(expectedByName, key)
+         expected = expectedByName.(key);
+      else
+         expected = "none";
+      end
+      testCase.verifyEqual(pfz, expected, ...
+         sprintf('%s permafrost_zone mismatch', sitename));
+   end
 end
 
 function test_forcing_includes_rainf_snowf_passthrough(testCase)
@@ -112,31 +168,43 @@ function test_manifest_schema_helpers_are_setup_owned(testCase)
    testCase.verifyTrue(ismember("case_type", case_names));
 end
 
-function test_loadmanifest_resolves_demo_data_paths(testCase)
-   % LOADMANIFEST should resolve case files under the demo/data tree.
-   % Forcing is no longer in the manifest — it is staged under
-   % demo/data/input/met/ via the standard icemodel naming convention,
-   % so checks below cover only evaluation / reference paths.
+function test_loadmanifest_resolves_repo_data_paths(testCase)
+   % LOADMANIFEST should resolve committed demo fixtures or top-level staged files.
+   % Forcing is no longer in the manifest - it is staged under data/input/met/ via
+   % the standard icemodel naming convention, so checks below cover evaluation
+   % paths only.
 
    manifest = icemodel.verification.loadmanifest("cdp");
 
    testCase.verifyEqual(manifest.dataset_family, "esm_snowmip");
    testCase.verifyEqual(manifest.case_type, "esm_site");
    testCase.verifyTrue(contains(manifest.evaluation_path, ...
-      fullfile("demo", "data", "eval", "snow", "esm_snowmip", "cdp")));
+      fullfile("eval", "esm_snowmip", "cdp")));
+   testCase.verifyTrue(contains(manifest.evaluation_path, fullfile("data")) ...
+      || contains(manifest.evaluation_path, fullfile("demo", "data")));
    testCase.verifyTrue(exist(manifest.evaluation_path, 'file') == 2);
 end
 
-function test_comparecase_smoke_reference_writes_metrics(testCase)
-   % COMPARECASE should run from the committed smoke reference artifacts.
+function test_comparecase_metadata_only_writes_soft_metrics(testCase)
+   % COMPARECASE on a metadata-only esm_site case must run from the committed
+   % observations.mat obs bundle and report SOFT diagnostic metrics. With no
+   % bundled reference.mat smoke copy and no model candidate supplied, the
+   % default candidate is empty, so every comparison variable is reported as
+   % missing_candidate_variable - a per-variable diagnostic, never a hard fail.
 
    result = icemodel.verification.comparecase("cdp", ...
       "artifact_dir", testCase.TestData.tmpdir, ...
       "make_plot", false);
 
-   testCase.verifyEqual(unique(result.metrics.status), "ok");
+   testCase.verifyEqual(string(result.gate_mode), "soft");
    testCase.verifyTrue(exist(result.metrics_path, 'file') == 2);
    testCase.verifyGreaterThan(height(result.metrics), 0);
+
+   % The soft lane only emits the diagnostic status vocabulary; no hard marker.
+   allowed = ["ok"; "missing_target_variable"; ...
+      "missing_candidate_variable"; "no_overlap"];
+   testCase.verifyTrue(all(ismember(string(result.metrics.status), allowed)), ...
+      'esm soft gate produced an unexpected (hard) status');
 end
 
 function test_comparecase_handles_colbeck_bundle(testCase)
@@ -261,7 +329,34 @@ function test_plotcase_writes_figure_without_candidate(testCase)
       "output_file", outfile);
 
    testCase.verifyTrue(exist(outfile, 'file') == 2);
+   lines = findall(f, 'Type', 'Line');
+   testCase.verifyTrue(all(string(get(lines, 'Marker')) == "none"));
+   testCase.verifyEmpty(findall(f, 'Type', 'Line', 'LineStyle', 'none'));
    close(f)
+end
+
+function test_colbeck_compare_solutions_is_line_only(testCase)
+   % The dedicated four-way Colbeck driver shares the no-marker contract.
+   old_close = get(groot, 'DefaultFigureCloseRequestFcn');
+   restore_close = onCleanup(@() set(groot, ...
+      'DefaultFigureCloseRequestFcn', old_close));
+   set(groot, 'DefaultFigureCloseRequestFcn', @(~, ~) []);
+   before = findall(groot, 'Type', 'Figure');
+
+   icemodel.verification.colbeck.compareSolutions( ...
+      experiment_names="exp1", make_plot=true, save_plot=false, ...
+      plot_visible="off");
+   clear restore_close
+
+   after = findall(groot, 'Type', 'Figure');
+   is_new = arrayfun(@(candidate) ~any(candidate == before), after);
+   fig = after(is_new);
+   testCase.addTeardown(@() delete(fig(isgraphics(fig))));
+   testCase.verifyNumElements(fig, 1);
+   lines = findall(fig, 'Type', 'Line');
+   testCase.verifyNotEmpty(lines);
+   testCase.verifyTrue(all(string(get(lines, 'Marker')) == "none"));
+   testCase.verifyEmpty(findall(fig, 'Type', 'Line', 'LineStyle', 'none'));
 end
 
 function test_comparecase_writes_separate_scatter_for_site_cases(testCase)
@@ -308,7 +403,7 @@ function test_colbeck_evaluation_carries_two_target_sources(testCase)
 end
 
 function test_plot_timeseries_shows_sparse_points_with_markers(testCase)
-   % Sparse observation series should remain visible on a dense time axis.
+   % Generic sparse observation series should remain visible on a dense axis.
 
    % A short dense hourly axis with only three finite observations reproduces
    % the sparse SWE target pattern that originally rendered as a blank line.
@@ -327,9 +422,8 @@ function test_plot_timeseries_shows_sparse_points_with_markers(testCase)
    icemodel.plot.timeseries(time(:), values, axes=ax);
 
    lines = findall(ax, 'Type', 'line');
-   markers = string(get(lines, 'Marker'));
 
-   testCase.verifyTrue(any(markers ~= "none"));
+   testCase.verifyTrue(any(string(get(lines, 'Marker')) ~= "none"));
 end
 
 function ids = expectedCaseIds()
@@ -348,21 +442,26 @@ end
 
 function names = expectedDatasetFamilies()
    %EXPECTEDDATASETFAMILIES Dataset families currently staged for verification.
+   % snow/: esm_snowmip, laugh_tests. firn/source families include promice,
+   % sumup, retmip, imau, and research_site.
 
-   names = ["esm_snowmip"; "laugh_tests"];
+   names = ["esm_snowmip"; "laugh_tests"; "promice"; "sumup"; ...
+      "retmip"; "imau"; "research_site"];
 end
 
 function names = expectedCaseTypes()
    %EXPECTEDCASETYPES Verification case types used by manifests and runners.
+   % firn_observational is the soft-gated firn evaluation case type; the
+   % firn_analytical type is deferred with the Meyer-Hewitt namespace.
 
-   names = ["esm_site"; "synthetic_process"];
+   names = ["esm_site"; "synthetic_process"; "firn_observational"];
 end
 
 function fields = expectedFamilyManifestFields()
    %EXPECTEDFAMILYMANIFESTFIELDS Required top-level family-manifest fields.
 
    fields = {'dataset_family'; 'source_doi'; 'source_url'; ...
-      'source_version'; 'retrieval_date'; 'cases'};
+      'source_version'; 'retrieval_date'; 'cases'; 'skipped'};
 end
 
 function ids = expectedColbeckExperimentIds()

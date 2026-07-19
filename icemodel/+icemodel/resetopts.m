@@ -109,6 +109,11 @@ function opts = resetopts(opts, varargin)
       opts.metfname = {};
    end
 
+   if any(ismember(names, {'pathinput', 'pathuserdata', 'sitename', ...
+         'userdata'})) && ~ismember('userdatafname', names)
+      opts.userdatafname = {};
+   end
+
    opts.output_years = icemodel.outputYears(opts);
 
    if any(ismember(names, {'sitename'})) && ~ismember('output_profile', names)

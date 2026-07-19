@@ -10,16 +10,20 @@ function root = evaluationDataRoot(kwargs)
    % Inputs
    %  evaluation_data_root       Explicit base evaluation-data root. When this
    %                             is provided, it is returned unchanged.
-   %  icemodel_config_casename   Config casename used to resolve the default
+   %  icemodel_config_casename   Optional config casename used to resolve the
    %                             evaluation-data root without mutating config.
+   %                             Leave blank to use the repo top-level data
+   %                             tree, independent of ICEMODEL_DATA_PATH.
    %
    % Outputs
-   %  root   Base evaluation-data root. Verification-specific subfolders such
-   %         as `snow/` are appended by callers.
+   %  root   Base evaluation-data root. Dataset-family subfolders such as
+   %         `esm_snowmip/` or `promice/` are appended by callers as the next
+   %         path segment. The taxonomy is dataset-family-flat: there is no
+   %         intermediate `snow/` or `firn/` process-split level.
    %
    % Role
    %  Operational path helper shared by setup and normal workflow functions.
-   %  It owns only base eval-root resolution, not verification subfolders.
+   %  It owns base eval-root resolution; callers append the family folder.
 
    arguments
       kwargs.evaluation_data_root (1, 1) string = ""
@@ -33,13 +37,11 @@ function root = evaluationDataRoot(kwargs)
       return
    end
 
-   % Parse either the active-config ICEMODEL_EVAL_PATH or the default one.
+   % Use a repo-root default for staging workflows so importer output does not
+   % depend on the user's active ICEMODEL_DATA_PATH. A nonblank casename keeps
+   % the older committed-fixture path available for tests and demo reads.
    if isblanktext(kwargs.icemodel_config_casename)
-
-      % Return the current value of ICEMODEL_EVAL_PATH. Unless the caller has
-      % set ICEMODEL_EVAL_PATH to a custom location, this returns the default
-      % demo/data/eval path.
-      root = string(icemodel.getpath('eval'));
+      root = string(fullfile(icemodel.internal.fullpath('data'), 'eval'));
    else
 
       % Return the casename-specific value of ICEMODEL_EVAL_PATH without setting

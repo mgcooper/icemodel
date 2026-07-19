@@ -111,30 +111,69 @@ To swap out a variable in the input met file with a variable in a userdata file,
 
 ### 2. Met files
 
-The met (forcing data) file naming convention is:
+The met (forcing data) file naming convention has two forms:
 
-- `met_SITENAME_FORCINGS_YYYY_TIMESTEP`
+- per-year: `met_SITENAME_FORCINGS_YYYY_TIMESTEP`
+- window-stamped: `met_SITENAME_FORCINGS_YYYYMMDD_YYYYMMDD_TIMESTEP` (one file
+  spanning a full window; preferred when a run sets `opts.startdate` /
+  `opts.enddate`, e.g. for the verification suite)
+
+Here `FORCINGS` is the forcing-source label (a versioned climate product such
+as `mar3.11` / `merra2` / `racmo2.3p3`, a station such as `kanm`, the generic
+AWS source `promice`, or the ESM-SnowMIP family `esm_snowmip`). Met files
+therefore follow `met_<site>_<source>` across all families. The legacy
+per-station convention sets `FORCINGS == SITENAME`
+(e.g. `met_kanm_kanm_...`); the `kanl` / `kanm` station forcings are kept under
+this legacy naming and are deliberately not relabeled.
 
 Examples:
 
 - `met_kanm_kanm_2016_1hr.mat` specifies a met (forcing) data file for site KAN-M with KAN-M forcings for year 2016 at a 1-hour timestep.
 - `met_kanm_kanm_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with KAN-M forcings for year 2016 at a 15-minute timestep.
-- `met_kanm_merra_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with MERRA-2 forcings for year 2016 at a 15-minute timestep.
+- `met_kanm_merra2_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with MERRA-2 forcings for year 2016 at a 15-minute timestep.
+- `met_cdp_esm_snowmip_19940801_20140731_1hr.mat` specifies an ESM-SnowMIP
+  window-stamped met file for site `cdp` spanning 1994-2014 at a 1-hour timestep.
+
+Met files live under `input/met/`. Staging writes them into a per-source
+subfolder `input/met/<FORCINGS>/` so the flat `met/` directory does not sprawl
+as forcing sources accumulate. The runtime resolves `input/met/<FORCINGS>/`
+**first** and falls back to a flat `input/met/` path, so both layouts work and
+committed flat fixtures still load. (`icemodel.forcing.helpers.writemet` writes
+the subfolder; `icemodel.forcing.helpers.sourceSearchDirs` defines the
+subfolder-first search order shared by the runtime resolvers.)
+
+Repository writers default model met to a 15-minute timestep. Public met
+builders/importers expose `dt_out="15m"`; pass `dt_out=""` explicitly to retain
+the source's native model-met cadence. Repeated writes are additive no-ops for
+an existing target unless `overwrite=true` is requested. A broader
+window-stamped artifact also satisfies a narrower ordinary request.
 
 Each met file must contain a timetable object named `met` with one column for each forcing variable. See the example met file.
 
 ### 3. User data files
 
-The "userdata" file naming convention is:
+The "userdata" file naming convention has two forms:
 
-- `SITENAME_FORCINGS_YYYY`
+- per-year: `SITENAME_SOURCE_YYYY`
+- window-stamped: `SITENAME_SOURCE_YYYYMMDD_YYYYMMDD` (one file spanning a full
+  window; preferred and resolved when its encoded period brackets the run year)
 
-Note: at this time, hourly userdata files are supported, thus unlike the met file naming convention, there is no `TIMESTEP` file part.
+Repository userdata writers default to hourly artifacts. Source-native hourly
+data, including PROMICE, is unchanged; finer data is averaged into clock-hour
+bins, coarser data is linearly interpolated to hourly support, and wind
+direction uses circular aggregation/interpolation. Pass `dt_out=""` explicitly
+to retain native cadence. Unlike met filenames, userdata has no `TIMESTEP` file
+part; saved metadata records the source and output cadence policy.
 
 Examples:
 
-- `kanm_merra_2016.mat` specifies a user data file with MERRA-2 climate model forcings for the KAN-M weather station location for year 2016 on a 1-hr timestep.
+- `kanm_merra2_2016.mat` specifies a user data file with MERRA-2 climate model forcings for the KAN-M weather station location for year 2016 on a 1-hr timestep.
 - `kanm_modis_2016.mat` specifies a user data file with MODIS satellite albedo values for the KAN-M weather station location for year 2016 on a 1-hr timestep.
+
+As with met files, staging writes userdata into a per-source subfolder
+`input/userdata/<SOURCE>/` and the runtime resolves that subfolder first, with a
+flat `input/userdata/` fallback. (`icemodel.forcing.helpers.writeuserdata`
+writes the subfolder; the same `sourceSearchDirs` ordering applies.)
 
 Each userdata file must contain a timetable named `Data` with column names matching the met file column-naming conventions. See the example met file in `demo/data/input/`.
 
@@ -296,6 +335,56 @@ setup()
 ```
 
 Installation should only take a few seconds. If you encounter any issues, please [open an issue](https://github.com/mgcooper/icemodel/issues).
+
+### Optional external dependencies
+
+Running the model and the snow-verification workflow needs nothing beyond this
+repo. A few auxiliary workflows (building gridded-climate forcings, and the
+permafrost-zone site classification used by `icemodel.verification`) call out to
+external dev-repo toolboxes that are intentionally kept *out* of this repo:
+
+| Repo | Used by | Path added |
+| --- | --- | --- |
+| [`exactremap`](https://github.com/mgcooper/exactremap) | conservative (area-weighted) polygon remap in `icemodel.forcing.helpers.remapPolygon` | `exactremap/toolbox` |
+| [`activelayer`](https://github.com/mgcooper/activelayer) | Obu (UiO PEX) permafrost-zone reader `activelayer.readobuzones` used by site classification | `activelayer/toolbox` |
+| [`matfunclib`](https://github.com/mgcooper/matfunclib) | shared helpers `activelayer` depends on (`parseFileName`, `dealout`, ...) | `matfunclib` |
+
+These are wired by the single central function `icemodel.dependencies`, which
+the test bootstrap calls automatically. It resolves each repo root in this
+order, and is a clean no-op when a dependency is already on the path or absent:
+
+1. A dependency-specific environment variable:
+   `ICEMODEL_EXACTREMAP`, `ICEMODEL_ACTIVELAYER`, `ICEMODEL_MATFUNCLIB`.
+2. A shared projects-root variable `ICEMODEL_PROJECTS_ROOT`, joined with the
+   repo name (e.g. `$ICEMODEL_PROJECTS_ROOT/exactremap`).
+3. The sibling `projects/` layout (the parent folder of this repo).
+
+To use a non-default location, clone the repos and either set the env vars or
+clone them next to this repo. To add them to the path yourself:
+
+```matlab
+icemodel.dependencies()           % no-op for anything already on the path
+icemodel.dependencies(require=true)  % error if any dependency is missing
+```
+
+`matfunclib` must be on the path for `activelayer` to load.
+
+### Gridded raw-data source directories
+
+The gridded-climate forcing builders read large raw source archives that, like
+the dependency repos above, are kept *out* of this repo. Each builder resolves
+its source directory in this order: the explicit `source_dir` kwarg, then a
+builder-specific environment variable, then a machine-specific default path.
+Only the env var is portable; set it to point each builder at the local archive.
+
+| Builder | Environment variable |
+| --- | --- |
+| `icemodel.forcing.buildMarData` (MAR 3.11) | `ICEMODEL_MAR_DIR` |
+| `icemodel.forcing.buildMerraData` (MERRA-2) | `ICEMODEL_MERRA_DIR` |
+| `icemodel.forcing.buildRacmoData` (RACMO FGRN11) | `ICEMODEL_RACMO_DIR` |
+
+These are only needed to *rebuild* gridded forcing from the raw archives; the
+committed demo fixtures and the staged research forcing do not require them.
 
 ## Contribute
 

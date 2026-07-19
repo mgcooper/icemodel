@@ -15,10 +15,12 @@ function [start, count, collapse, inslab, loctype] = gridLocation( ...
    % (time x 1):
    %
    %  - location = [x y] (projected point, 1x2 metres):
-   %      method "nearest" (default) -> the single nearest cell.
+   %      method "nearest" (default) -> the single nearest valid cell.
    %      method "natural"           -> a padded neighbourhood collapsed by
    %                                    natural-neighbour interpolation at the
    %                                    point (icemodel.forcing.helpers.interpRcm).
+   %      When validmask is supplied, both point methods exclude masked cells;
+   %      without it, all finite grid cells remain eligible.
    %  - location = polyshape (vertices in EPSG:3413 metres):
    %      remap="conservative" (default) -> exact overlap-area-weighted remap
    %      via the exactremap toolbox (helpers.remapPolygon), honouring optional
@@ -59,12 +61,32 @@ function [start, count, collapse, inslab, loctype] = gridLocation( ...
          = "polygon"
       kwargs.missingvalue double = []
       kwargs.usegeocoords (1, 1) logical = false
+      kwargs.maxdistance (1, 1) double {mustBeNonnegative} = Inf
    end
 
    if isnumeric(location)
       assert(isequal(size(location), [1 2]), ...
          'point location must be a 1x2 projected [x y] in metres')
-      [~, idx] = min(hypot(X(:) - location(1), Y(:) - location(2)));
+      eligible = isfinite(X) & isfinite(Y);
+      if ~isempty(kwargs.validmask)
+         assert(isequal(size(kwargs.validmask), size(X)), ...
+            'icemodel:forcing:gridLocation:invalidMaskSize', ...
+            'validmask must match the X/Y grid size')
+         eligible = eligible & isfinite(kwargs.validmask) ...
+            & kwargs.validmask ~= 0;
+      end
+      if ~any(eligible(:))
+         error('icemodel:forcing:gridLocation:noValidPointCells', ...
+            'no valid grid cells are available for point sampling')
+      end
+      distance = hypot(X - location(1), Y - location(2));
+      distance(~eligible) = Inf;
+      [~, idx] = min(distance(:));
+      if distance(idx) > kwargs.maxdistance
+         error('icemodel:forcing:gridLocation:pointOutsideValidDomain', ...
+            ['nearest valid grid cell is %.0f m from the requested point, ' ...
+            'beyond the allowed %.0f m'], distance(idx), kwargs.maxdistance)
+      end
       [i, j] = ind2sub(size(X), idx);
       loctype = "point";
 
@@ -82,10 +104,20 @@ function [start, count, collapse, inslab, loctype] = gridLocation( ...
             pad = 2;
             [start, count, inslab] = paddedSlab(size(X), i, j, pad);
             [xn, yn] = slabCoords(X, Y, start, count);
+            valid = sliceOpt(eligible, ...
+               start(1):start(1) + count(1) - 1, ...
+               start(2):start(2) + count(2) - 1);
+            valid = valid(:);
+            if nnz(valid) < 3
+               error('icemodel:forcing:gridLocation:insufficientValidPointCells', ...
+                  ['natural point sampling needs at least three valid cells ' ...
+                  'in the local neighbourhood'])
+            end
             xq = location(1);
             yq = location(2);
             collapse = @(block) icemodel.forcing.helpers.interpRcm( ...
-               xn, yn, block, xq, yq, method="natural");
+               xn(valid), yn(valid), block(valid, :), xq, yq, ...
+               method="natural");
       end
 
    elseif isa(location, 'polyshape')

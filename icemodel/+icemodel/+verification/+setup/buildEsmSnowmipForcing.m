@@ -38,11 +38,11 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    %  Inputs
    %    sitename : string
    %        ESM-SnowMIP site code (e.g. "cdp"). See
-   %        icemodel.verification.helpers.snowmipinfo for the full
+   %        icemodel.verification.setup.esmSnowmipSiteCatalog for the full
    %        catalog and snowmipsite for the bare site-name namelist.
    %
    %  Name-value
-   %    source_dir : string (default data/verification/snow/esm_snowmip)
+   %    source_dir : string (default data/verification/esm_snowmip)
    %        Directory containing met_<kind>_<sitename>_*.nc and
    %        obs_insitu_<sitename>_*.nc files.
    %    met_kind : string (default "insitu")
@@ -81,7 +81,7 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    % See also: icemodel.verification.setup.importEsmSnowmip,
    %  icemodel.verification.setup.fetchEsmSnowmip,
    %  icemodel.verification.setup.readNetcdfTime,
-   %  icemodel.verification.setup.readObsChannel,
+   %  icemodel.verification.setup.readNetcdfVariable,
    %  icemodel.verification.setup.readBestSnowDepth,
    %  icemodel.vapor.relative_humidity_from_specific_humidity,
    %  icemodel.physicalConstant
@@ -89,14 +89,21 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    arguments
       sitename (1, 1) string ...
          {icemodel.verification.validators.mustBeSnowmipSite}
-      kwargs.source_dir (1, 1) string = defaultSourceDir()
+      kwargs.source_dir (1, 1) string = ""
       kwargs.met_kind   (1, 1) string {mustBeMember(kwargs.met_kind, ...
          ["insitu", "gswp3c"])} = "insitu"
       kwargs.startdate  = ""
       kwargs.enddate    = ""
    end
 
-   source_dir = kwargs.source_dir;
+   % Validate and normalize the optional interval before source discovery so
+   % malformed public input cannot be obscured by an unrelated file error.
+   [window_start, window_end, has_window] = ...
+      icemodel.internal.pairedWindow(kwargs.startdate, kwargs.enddate);
+
+   % Treat an explicit blank like omission; never reinterpret it as the CWD.
+   source_dir = icemodel.forcing.helpers.verificationSourceDir( ...
+      kwargs.source_dir, "esm_snowmip");
 
    % Locate the per-site met and obs files. Match the canonical naming
    % convention used by the upstream PANGAEA bundle:
@@ -109,27 +116,27 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
 
    % --- Read the source forcing channels -------------------------------
    met_time = icemodel.verification.setup.readNetcdfTime(metfile, 'time');
-   tair = double(ncread(metfile, 'Tair'));      % [K]
-   swdown = double(ncread(metfile, 'SWdown'));  % [W m-2]
-   lwdown = double(ncread(metfile, 'LWdown'));  % [W m-2]
-   wind = double(ncread(metfile, 'Wind'));      % [m s-1]
-   psfc = double(ncread(metfile, 'Psurf'));     % [Pa]
-   qair = double(ncread(metfile, 'Qair'));      % [kg kg-1]
-   rainf = double(ncread(metfile, 'Rainf'));    % [kg m-2 s-1]
-   snowf = double(ncread(metfile, 'Snowf'));    % [kg m-2 s-1]
+   tair = icemodel.verification.setup.readNetcdfVariable(metfile, "Tair");      % [K]
+   swdown = icemodel.verification.setup.readNetcdfVariable(metfile, "SWdown");  % [W m-2]
+   lwdown = icemodel.verification.setup.readNetcdfVariable(metfile, "LWdown");  % [W m-2]
+   wind = icemodel.verification.setup.readNetcdfVariable(metfile, "Wind");      % [m s-1]
+   psfc = icemodel.verification.setup.readNetcdfVariable(metfile, "Psurf");     % [Pa]
+   qair = icemodel.verification.setup.readNetcdfVariable(metfile, "Qair");      % [kg kg-1]
+   rainf = icemodel.verification.setup.readNetcdfVariable(metfile, "Rainf");    % [kg m-2 s-1]
+   snowf = icemodel.verification.setup.readNetcdfVariable(metfile, "Snowf");    % [kg m-2 s-1]
 
    % --- Read observation channels needed for forcing -------------------
    % ESM-SnowMIP sites are heterogeneous: boreal forest sites
    % (oas, obs, ojp) report snd_gap_auto / snd_gap1_auto in the
    % canopy gap rather than snd_auto; some sites lack albs entirely.
-   % readBestSnowDepth and readObsChannel(optional=true) hide that
+   % readBestSnowDepth and readNetcdfVariable(optional=true) hide that
    % variability so the rest of the builder can stay site-agnostic.
    obs_time  = icemodel.verification.setup.readNetcdfTime(obsfile, 'time');
    [snd_auto, snow_depth_source] = ...
       icemodel.verification.setup.readBestSnowDepth(obsfile);
-   snd_man = icemodel.verification.setup.readObsChannel(obsfile, "snd_man", ...
+   snd_man = icemodel.verification.setup.readNetcdfVariable(obsfile, "snd_man", ...
       optional=true, ntime=numel(obs_time));
-   albs = icemodel.verification.setup.readObsChannel(obsfile, "albs", ...
+   albs = icemodel.verification.setup.readNetcdfVariable(obsfile, "albs", ...
       optional=true, ntime=numel(obs_time));
 
    % If met and obs grids differ, align observations to met time. This
@@ -143,13 +150,8 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
 
    % --- Apply optional time-window subsetting --------------------------
    idx = true(numel(met_time), 1);
-   if ~strcmp(string(kwargs.startdate), "")
-      idx = idx & met_time >= ...
-         icemodel.verification.setup.ensureUtc(kwargs.startdate);
-   end
-   if ~strcmp(string(kwargs.enddate), "")
-      idx = idx & met_time <= ...
-         icemodel.verification.setup.ensureUtc(kwargs.enddate);
+   if has_window
+      idx = met_time >= window_start & met_time <= window_end;
    end
    if ~any(idx)
       error('icemodel:verification:buildEsmSnowmipForcing:emptyWindow', ...
@@ -201,18 +203,11 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
       'snow_depth_source', snow_depth_source, ...
       'albedo_policy', "observed daily albedo + snow/ground fallback", ...
       'precip_policy', "rainf and snowf stored separately; ppt = rainf + snowf");
+   metadata = icemodel.forcing.helpers.columnizeMetadata(metadata);
+   forcing.Properties.UserData = metadata;
 end
 
 %% Local helpers
-function pathname = defaultSourceDir()
-   %DEFAULTSOURCEDIR Default ESM-SnowMIP source-cache directory.
-   %
-   % Mirrors fetchEsmSnowmip's default cache layout:
-   %   <repo>/data/verification/snow/esm_snowmip/
-   pathname = string(fullfile(icemodel.getpath('data'), ...
-      'verification', 'snow', 'esm_snowmip'));
-end
-
 function pathname = locateUnique(source_dir, pattern)
    %LOCATEUNIQUE Glob-match a file in source_dir; error on miss / ambiguity.
    matches = dir(fullfile(source_dir, pattern));

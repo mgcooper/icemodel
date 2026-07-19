@@ -5,9 +5,9 @@ function candidate = runIcemodelSnowCandidate(case_manifest, kwargs)
    %  candidate = icemodel.verification.runIcemodelSnowCandidate(case_manifest, ...
    %     startdate=..., enddate=...)
    %
-   % This is the bridge agents should use while developing the snow model. It
-   % calls the normal icemodel entry point, receives ICE1/ICE2, then converts
-   % those outputs into the same candidate bundle consumed by comparecase.
+   % This bridge calls the normal icemodel entry point, receives ICE1/ICE2,
+   % then converts those outputs into the same candidate bundle consumed by
+   % comparecase.
    %
    % The function constructs opts via icemodel.test.helpers.setModelOptsForCase
    % using the case_id as both sitename and forcings, so the standard chain

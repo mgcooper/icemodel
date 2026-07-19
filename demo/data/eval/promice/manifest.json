@@ -1,0 +1,385 @@
+{
+  "dataset_family": "promice",
+  "source_doi": "",
+  "source_url": "https://promice.org",
+  "source_version": "colocated[promice+mar+merra+racmo]",
+  "retrieval_date": "08-Jul-2026",
+  "cases": [
+    {
+      "case_id": "kanl",
+      "case_type": "firn_observational",
+      "site_id": "KAN_L",
+      "site_name": "KAN-L",
+      "surface_zone": "ablation",
+      "eval_target": [
+        "seasonal_snow",
+        "bare_ice"
+      ],
+      "permafrost_zone": "none",
+      "site_location": {
+        "lat_wgs84": 67.09695086829153,
+        "lon_wgs84": -49.94707712063845,
+        "x_epsg3413": -216732.66778461527,
+        "y_epsg3413": -2503901.3503936823,
+        "elev_m": 667.7460764058525
+      },
+      "period": {
+        "start": "2008-09-01 20:00:00",
+        "end": "2026-06-01 15:00:00"
+      },
+      "evaluation_file": "kanl/observations.mat",
+      "forcing_sources": [
+        "promice",
+        "mar3.11",
+        "merra2"
+      ],
+      "eval_sources": [
+        "promice_obs"
+      ],
+      "comparison_variables": [
+        "ablation",
+        "snow_depth",
+        "tsfc",
+        "tice10m",
+        "tice1",
+        "tice2",
+        "tice3",
+        "tice4",
+        "tice5",
+        "tice6",
+        "tice7",
+        "tice8"
+      ],
+      "observation_variables": {
+        "subsurface_temperature_primary": "tice10m [K] (standardized 10 m below surface)",
+        "subsurface_temperature_string": "tice1..tice8 (raw string thermistors)",
+        "surface_ablation": "ablation [m, positive down]",
+        "snow_depth": "snow_depth [m]"
+      },
+      "colocation": {
+        "promice": {
+          "kind": "station_met_and_eval",
+          "staged": true,
+          "data_files": "promice/kanl_promice_20080901_20260601.mat",
+          "window": {
+            "start": "2008-09-01 20:00:00",
+            "end": "2026-06-01 15:00:00"
+          },
+          "met_files": "promice/met_kanl_promice_20080901_20260601_1hr.mat",
+          "forcing_ready": false,
+          "forcing_ready_reason": "required met placeholder channel(s): ppt"
+        },
+        "mar": {
+          "kind": "point_met",
+          "staged": true,
+          "source": "mar",
+          "source_id": "mar3.11",
+          "sample_method": "nearest",
+          "window": {
+            "start": "2009-01-01 00:00:00",
+            "end": "2019-12-31 23:59:59"
+          },
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "mar3.11/met_kanl_mar3.11_20090101_20191231_1hr.mat"
+        },
+        "merra": {
+          "kind": "point_met",
+          "staged": true,
+          "source": "merra",
+          "source_id": "merra2",
+          "sample_method": "nearest",
+          "window": {
+            "start": "2012-01-01 00:00:00",
+            "end": "2018-12-31 23:59:59"
+          },
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "merra2/met_kanl_merra2_20120101_20181231_1hr.mat"
+        }
+      },
+      "native_timestep": "daily",
+      "notes": "Lower ablation zone (~679 m); curated KAN_L recipe. KAN anchor. MODIS bare-ice freq=1.00."
+    },
+    {
+      "case_id": "kanm",
+      "case_type": "firn_observational",
+      "site_id": "KAN_M",
+      "site_name": "KAN-M",
+      "surface_zone": "ablation",
+      "eval_target": [
+        "seasonal_snow",
+        "bare_ice"
+      ],
+      "permafrost_zone": "none",
+      "site_location": {
+        "lat_wgs84": 67.06709573401974,
+        "lon_wgs84": -48.83734610406559,
+        "x_epsg3413": -168423.32107893252,
+        "y_epsg3413": -2510983.4822118757,
+        "elev_m": 1268.9033288544692
+      },
+      "period": {
+        "start": "2008-09-02 14:00:00",
+        "end": "2026-06-01 15:00:00"
+      },
+      "evaluation_file": "kanm/observations.mat",
+      "forcing_sources": [
+        "promice",
+        "mar3.11",
+        "merra2"
+      ],
+      "eval_sources": [
+        "promice_obs"
+      ],
+      "comparison_variables": [
+        "ablation",
+        "snow_depth",
+        "tsfc",
+        "tice10m",
+        "tice1",
+        "tice2",
+        "tice3",
+        "tice4",
+        "tice5",
+        "tice6",
+        "tice7",
+        "tice8"
+      ],
+      "observation_variables": {
+        "subsurface_temperature_primary": "tice10m [K] (standardized 10 m below surface)",
+        "subsurface_temperature_string": "tice1..tice8 (raw string thermistors)",
+        "surface_ablation": "ablation [m, positive down]",
+        "snow_depth": "snow_depth [m]"
+      },
+      "colocation": {
+        "promice": {
+          "kind": "station_met_and_eval",
+          "staged": true,
+          "data_files": "promice/kanm_promice_20080902_20260601.mat",
+          "window": {
+            "start": "2008-09-02 14:00:00",
+            "end": "2026-06-01 15:00:00"
+          },
+          "met_files": "promice/met_kanm_promice_20080902_20260601_1hr.mat",
+          "forcing_ready": false,
+          "forcing_ready_reason": "required met placeholder channel(s): ppt"
+        },
+        "mar": {
+          "kind": "point_met",
+          "staged": true,
+          "source": "mar",
+          "source_id": "mar3.11",
+          "sample_method": "nearest",
+          "window": {
+            "start": "2009-01-01 00:00:00",
+            "end": "2019-12-31 23:59:59"
+          },
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "mar3.11/met_kanm_mar3.11_20090101_20191231_1hr.mat"
+        },
+        "merra": {
+          "kind": "point_met",
+          "staged": true,
+          "source": "merra",
+          "source_id": "merra2",
+          "sample_method": "nearest",
+          "window": {
+            "start": "2012-01-01 00:00:00",
+            "end": "2018-12-31 23:59:59"
+          },
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "merra2/met_kanm_merra2_20120101_20181231_1hr.mat"
+        }
+      },
+      "native_timestep": "daily",
+      "notes": "Upper ablation / bare ice (~1272 m); curated KAN_M recipe. KAN anchor. MODIS bare-ice freq=1.00."
+    },
+    {
+      "case_id": "kanu",
+      "case_type": "firn_observational",
+      "site_id": "KAN_U",
+      "site_name": "KAN-U",
+      "surface_zone": "percolation",
+      "eval_target": [
+        "seasonal_snow",
+        "firn"
+      ],
+      "permafrost_zone": "none",
+      "site_location": {
+        "lat_wgs84": 67.00045840765831,
+        "lon_wgs84": -47.02720909947265,
+        "x_epsg3413": -89288.82198951262,
+        "y_epsg3413": -2522550.6903707683,
+        "elev_m": 1840.0789269495797
+      },
+      "period": {
+        "start": "2009-04-04 21:00:00",
+        "end": "2026-06-01 15:00:00"
+      },
+      "evaluation_file": "kanu/observations.mat",
+      "forcing_sources": [
+        "promice",
+        "mar3.11",
+        "merra2"
+      ],
+      "eval_sources": [
+        "promice_obs"
+      ],
+      "comparison_variables": [
+        "tsfc",
+        "tice10m",
+        "tice1",
+        "tice2",
+        "tice3",
+        "tice4",
+        "tice5",
+        "tice6",
+        "tice7",
+        "tice8"
+      ],
+      "observation_variables": {
+        "subsurface_temperature_primary": "tice10m [K] (standardized 10 m below surface)",
+        "subsurface_temperature_string": "tice1..tice8 (raw string thermistors)",
+        "surface_ablation": "ablation [m, positive down]",
+        "snow_depth": "snow_depth [m]"
+      },
+      "colocation": {
+        "promice": {
+          "kind": "station_met_and_eval",
+          "staged": true,
+          "data_files": "promice/kanu_promice_20090404_20260601.mat",
+          "window": {
+            "start": "2009-04-04 21:00:00",
+            "end": "2026-06-01 15:00:00"
+          },
+          "met_files": "promice/met_kanu_promice_20090404_20260601_1hr.mat",
+          "forcing_ready": false,
+          "forcing_ready_reason": "required met placeholder channel(s): ppt"
+        },
+        "mar": {
+          "kind": "point_met",
+          "staged": true,
+          "source": "mar",
+          "source_id": "mar3.11",
+          "sample_method": "nearest",
+          "window": {
+            "start": "2009-04-04 21:00:00",
+            "end": "2019-12-31 23:59:59"
+          },
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "mar3.11/met_kanu_mar3.11_20090101_20191231_1hr.mat"
+        },
+        "merra": {
+          "kind": "point_met",
+          "staged": true,
+          "source": "merra",
+          "source_id": "merra2",
+          "sample_method": "nearest",
+          "window": {
+            "start": "2012-01-01 00:00:00",
+            "end": "2018-12-31 23:59:59"
+          },
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "merra2/met_kanu_merra2_20120101_20181231_1hr.mat"
+        }
+      },
+      "native_timestep": "daily",
+      "notes": "Lower percolation zone (~1845 m); KAN anchor. MODIS bare-ice freq=0.00 (snow-covered surface); percolation by firn-core truth, consistent with SUMup density 0.2 km."
+    },
+    {
+      "case_id": "egp",
+      "case_type": "firn_observational",
+      "site_id": "EGP",
+      "site_name": "EGP",
+      "surface_zone": "accumulation",
+      "eval_target": [
+        "seasonal_snow",
+        "firn"
+      ],
+      "permafrost_zone": "none",
+      "site_location": {
+        "lat_wgs84": 75.62151864466415,
+        "lon_wgs84": -35.973961899732814,
+        "x_epsg3413": 245597.36584112883,
+        "y_epsg3413": -1546092.9424099096,
+        "elev_m": 2663.886020483991
+      },
+      "period": {
+        "start": "2014-05-17 20:00:00",
+        "end": "2026-06-01 15:00:00"
+      },
+      "evaluation_file": "egp/observations.mat",
+      "forcing_sources": [
+        "promice",
+        "mar3.11",
+        "merra2"
+      ],
+      "eval_sources": [
+        "promice_obs"
+      ],
+      "comparison_variables": [
+        "tsfc",
+        "tice10m",
+        "tice1",
+        "tice2",
+        "tice3",
+        "tice4",
+        "tice5",
+        "tice6",
+        "tice7",
+        "tice8"
+      ],
+      "observation_variables": {
+        "subsurface_temperature_primary": "tice10m [K] (standardized 10 m below surface)",
+        "subsurface_temperature_string": "tice1..tice8 (raw string thermistors)",
+        "surface_ablation": "ablation [m, positive down]",
+        "snow_depth": "snow_depth [m]"
+      },
+      "colocation": {
+        "promice": {
+          "kind": "station_met_and_eval",
+          "staged": true,
+          "data_files": "promice/egp_promice_20140517_20260601.mat",
+          "window": {
+            "start": "2014-05-17 20:00:00",
+            "end": "2026-06-01 15:00:00"
+          },
+          "met_files": "promice/met_egp_promice_20140517_20260601_1hr.mat",
+          "forcing_ready": false,
+          "forcing_ready_reason": "required met placeholder channel(s): ppt"
+        },
+        "mar": {
+          "kind": "point_met",
+          "staged": true,
+          "source": "mar",
+          "source_id": "mar3.11",
+          "sample_method": "nearest",
+          "window": {
+            "start": "2015-01-01 00:00:00",
+            "end": "2016-12-31 23:59:59"
+          },
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "mar3.11/met_egp_mar3.11_20150101_20161231_1hr.mat"
+        },
+        "merra": {
+          "kind": "point_met",
+          "staged": true,
+          "source": "merra",
+          "source_id": "merra2",
+          "sample_method": "nearest",
+          "window": {
+            "start": "2015-01-01 00:00:00",
+            "end": "2016-12-31 23:59:59"
+          },
+          "note": "Existing cached RCM met artifact overlaps this case period; no matching userdata/Data file was found.",
+          "met_files": "merra2/met_egp_merra2_20150101_20161231_1hr.mat"
+        }
+      },
+      "native_timestep": "daily",
+      "notes": "Accumulation interior (MODIS bare-ice freq=0.00, elev 2663 m; high-interior site, no SUMup firn co-location)."
+    }
+  ],
+  "skipped": [
+
+  ],
+  "schema": "metadata_only"
+}

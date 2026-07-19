@@ -81,13 +81,13 @@ function [met, checks] = metchecks(met, kwargs)
    % Clamp recognized variables to physical ranges.
    if kwargs.clamp
       if ismember("albedo", varnames)
-         met.albedo = min(max(met.albedo, 0.05), 0.98);
+         met.albedo = clampPresent(met.albedo, 0.05, 0.98);
       end
       if ismember("rh", varnames)
-         met.rh = min(max(met.rh, 5), 99.99);
+         met.rh = clampPresent(met.rh, 5, 99.99);
       end
       if ismember("wspd", varnames)
-         met.wspd = max(met.wspd, 0.1);
+         met.wspd = clampPresent(met.wspd, 0.1, Inf);
       end
       if ismember("wdir", varnames)
          met.wdir = wrapWindDirection(met.wdir);
@@ -97,15 +97,21 @@ function [met, checks] = metchecks(met, kwargs)
          % kelvin vs celsius from the series magnitude (legacy
          % convention; glacier surfaces are never near 100 C).
          if min(met.tsfc, [], 'omitnan') > 100
-            met.tsfc = min(met.tsfc, 273.16);
+            met.tsfc = clampPresent(met.tsfc, -Inf, 273.16);
          else
-            met.tsfc = min(met.tsfc, 0);
+            met.tsfc = clampPresent(met.tsfc, -Inf, 0);
          end
       end
    end
 end
 
 %% Local functions
+function data = clampPresent(data, lower, upper)
+   %CLAMPPRESENT Clamp non-NaN samples while preserving NaN placeholders.
+   valid = ~isnan(data);
+   data(valid) = min(max(data(valid), lower), upper);
+end
+
 function wdir = fillWindDirection(wdir)
    %FILLWINDDIRECTION Gap-fill a circular direction series [degrees].
    x = fillmissing(sind(wdir), 'linear', 'EndValues', 'nearest');

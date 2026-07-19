@@ -8,8 +8,8 @@ function names = familyManifestFieldNames()
    %
    % Role
    %  Setup helper used while constructing family manifests. These names remain
-   %  centralized because both supported importers write the same manifest
-   %  schema and should fail together if that schema changes.
+   %  centralized because every dataset-family importer writes the same family
+   %  schema and must fail together if that schema changes.
 
    names = { ...
       'dataset_family'
@@ -17,5 +17,6 @@ function names = familyManifestFieldNames()
       'source_url'
       'source_version'
       'retrieval_date'
-      'cases'};
+      'cases'
+      'skipped'};
 end

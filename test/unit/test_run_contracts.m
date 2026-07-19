@@ -49,6 +49,23 @@ function test_resetopts_updates_output_years_and_coupler_defaults(testCase)
    testCase.verifyEqual(opts.cpl_maxiter, 100);
 end
 
+function test_userdatafname_is_explicit_and_dependency_safe(testCase)
+   % Exact userdata paths normalize to a cell list and are cleared only when a
+   % dependent source/path changes without an explicit replacement in that call.
+   opts = icemodel.setopts('skinmodel', 'kanm', 2016, 'kanm');
+   testCase.verifyEmpty(opts.userdatafname);
+
+   opts = icemodel.resetopts(opts, 'userdatafname', "native_30m.mat");
+   opts = icemodel.configureRun(opts);
+   testCase.verifyEqual(opts.userdatafname, {'native_30m.mat'});
+
+   opts = icemodel.resetopts(opts, 'userdata', 'modis');
+   testCase.verifyEmpty(opts.userdatafname);
+   opts = icemodel.resetopts(opts, 'userdata', 'racmo2.3p3', ...
+      'userdatafname', "racmo_native.mat");
+   testCase.verifyEqual(string(opts.userdatafname), "racmo_native.mat");
+end
+
 function test_diagnostic_output_profile_extends_surface_contract(testCase)
    % The diagnostic output profile should extend the standard scalar surface
    % schema without changing the standard profile itself.

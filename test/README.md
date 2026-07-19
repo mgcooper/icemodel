@@ -84,34 +84,25 @@ Programmatic regression helpers:
 ## Which tool to use
 
 1. `run_test_bootstrap(...)`
-   - Use for first-time setup or full refreshes.
-   - This is the only tool that owns cleanup/backups of `test/artifacts` and
+   - First-time setup or full refresh / pre-release orchestration entry point.
+   - The only tool that owns cleanup/backups of `test/artifacts` and
      managed perf/regression baseline files.
-2. `build_regression_baseline(...)`
-   - Use to accept new rolling or versioned model-output baselines.
-   - This writes baseline files and does not produce compare artifacts.
-3. `build_perf_baseline(...)`
-   - Use to accept new rolling or versioned runtime baselines.
-   - This writes baseline files and does not produce compare artifacts.
-4. `snapshot_regression_baseline(...)`
-   - Use to freeze a release regression baseline from the current rolling
-     regression baseline.
-5. `snapshot_perf_baseline(...)`
-   - Use to freeze a release perf baseline from the current rolling perf
-     baseline.
-6. `run_regression_suite(...)`
-   - Use for normal compare runs against rolling or release regression
-     baselines.
-   - This writes artifacts under `test/artifacts/<yyyymmdd-HHMMSS>/`.
-7. `run_perf_suite(...)`
-   - Use for normal compare runs against rolling or release perf baselines.
-   - This writes artifacts under `test/artifacts/<yyyymmdd-HHMMSS>/`.
-   - By default it also runs the managed core benchmark suite and stores the
+2. `build_regression_baseline(...)` and `build_perf_baseline(...)`
+   - Rebuild/accept new rolling or versioned baselines.
+   - Writes baseline files; does not produce compare artifacts.
+3. `snapshot_regression_baseline(...)` and `snapshot_perf_baseline(...)`
+   - Freeze a release regression/perf baseline from the current rolling
+     regression/perf baseline.
+4. `run_regression_suite(...)` and `run_perf_suite(...)`
+   - Compare against existing rolling or release baselines
+   - Does not mutate baselines
+   - Writes artifacts under `test/artifacts/<yyyymmdd-HHMMSS>/`.
+   - `run_perf_suite` also runs the core benchmark suite and stores
      benchmark timing comparison alongside the formal perf artifact.
-8. `run_unit_suite(...)`
+5. `run_unit_suite(...)`
    - Use for folder-based unit-test discovery under `test/unit/`.
-   - Supports `debug=true` to stop on first failure for inspection.
-9. `run_benchmark_suite(...)`
+   - Use `debug=true` to stop on first failure for inspection.
+6. `run_benchmark_suite(...)`
    - Use for the formal benchmark suite under `test/benchmarks/`.
    - This remains the standalone component-benchmark runner.
    - By default it runs only the top-level benchmark files.
@@ -127,11 +118,11 @@ Programmatic regression helpers:
      file itself when the timing result motivated a code choice.
    - The rename/round history is reconciled into `RenameRoundTest.m` rather
      than split across separate manual scripts.
-10. `build_runoff_reference_from_runoff(...)`
-   - Use to refresh the static runoff reference data in `test/references/`.
+7.  `build_runoff_reference_from_runoff(...)`
+   - Refresh the static runoff reference data in `test/references/`.
    - This is separate from baseline management and requires the sibling
      `runoff` project.
-11. `validate_test_suite(...)`
+8.  `validate_test_suite(...)`
    - Use to exercise the public test-suite surface end to end without
      mutating managed baselines.
    - This validates signatures, Code Analyzer cleanliness, runner selector
@@ -146,6 +137,24 @@ Formal suites run from `icemodel` only and read these local files:
 2. references from `test/references/`
 
 They do not require `runoff` on path at execution time.
+
+The SUMup canonical identity-union regression is deliberately excluded from an
+ordinary regression pass by an assumption because it restages 47 observation
+cases from three multi-million-row NetCDF files. Before a canonical SUMup
+replacement, opt in explicitly and run only that file:
+
+```matlab
+addpath("icemodel")
+setenv("ICEMODEL_RUN_SUMUP_IDENTITY_UNION", "1")
+results = runtests("test/regression/test_sumup_identity_union.m");
+setenv("ICEMODEL_RUN_SUMUP_IDENTITY_UNION", "")
+assertSuccess(results)
+```
+
+The procedure uses a temporary root, pins all three source SHA-256 values,
+checks the 47-case plus external-Humphrey identity union and per-case exclusive
+contribution, verifies per-artifact duplicate counts, and runs artifact QA. It
+does not replace the canonical tree.
 
 Rolling baseline rebuilds automatically archive the prior managed MAT file
 and any saved profiler artifacts under `test/baselines/archive/` before the

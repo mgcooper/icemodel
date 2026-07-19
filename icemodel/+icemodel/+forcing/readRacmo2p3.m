@@ -3,6 +3,7 @@ function [data, units, Time] = readRacmo2p3(filename, varname, kwargs)
    %
    %  [data, units, Time] = icemodel.forcing.readRacmo2p3(filename, varname)
    %  [data, units, Time] = ... readRacmo2p3(_, start=[i j], count=[ni nj])
+   %  [blocks, units, Time] = ... readRacmo2p3(_, slabs={[i j;ni nj], ...})
    %
    % Reads one variable from a per-variable RACMO 2.3p3 FGRN11 NetCDF file
    % (optionally a spatial hyperslab) and converts the native units to
@@ -36,9 +37,17 @@ function [data, units, Time] = readRacmo2p3(filename, varname, kwargs)
    % Name-value
    %  start, count - optional grid hyperslab: start cell [i j] (1-based) and
    %                 extent [ni nj] over [rlon rlat]. Default reads the full grid.
+   %  slabs        - optional cell array of [start; count] 2x2 hyperslab specs
+   %                 ({[i j; ni nj], ...}). When given, the (multi-GB) file is
+   %                 OPENED ONCE and every listed hyperslab is read from the same
+   %                 open file, returning a cell array of blocks (one per slab)
+   %                 instead of a single matrix - the batch path that extracts
+   %                 many points from one variable file without re-opening it per
+   %                 point. start/count are ignored when slabs is given.
    %
    % Outputs
-   %  data  - (ncells x ntime) double in standard units, native grid order
+   %  data  - (ncells x ntime) double in standard units, native grid order;
+   %          OR, when slabs is given, a cell array {(ncells x ntime), ...}
    %  units - unit string after conversion
    %  Time  - UTC datetime axis (computed only when requested)
    %
@@ -50,52 +59,33 @@ function [data, units, Time] = readRacmo2p3(filename, varname, kwargs)
       varname (1, 1) string
       kwargs.start (1, :) double = []
       kwargs.count (1, :) double = []
+      kwargs.slabs cell = {}
    end
 
-   info = ncinfo(filename, varname);
-   dims = info.Size;
-   units = '';
-   has_units = strcmp({info.Attributes.Name}, 'units');
-   if any(has_units)
-      units = info.Attributes(has_units).Value;
-   end
+   [dims, native_units] = ncVarInfo(filename, varname);
 
-   % Assemble the read window: requested spatial hyperslab, singleton level,
-   % all times. RACMO variables are [rlon rlat height(=1) time].
-   if isempty(kwargs.start)
-      start = ones(1, numel(dims));
-      count = dims;
+   if isempty(kwargs.slabs)
+      [start, count] = slabWindow(dims, kwargs.start, kwargs.count);
+      data = convertSlab(double(squeeze( ...
+         ncread(filename, varname, start, count))), native_units, count);
    else
-      start = [kwargs.start, ones(1, numel(dims) - 2)];
-      count = [kwargs.count, dims(3:end)];
+      % Batch path: open once, read every listed hyperslab from the same ncid.
+      % RACMO files are the multi-GB subsurface product, so re-opening per
+      % point dominates a staging job - this opens the file exactly once.
+      ncid = netcdf.open(filename, 'NOWRITE');
+      cleanup = onCleanup(@() netcdf.close(ncid));
+      varid = netcdf.inqVarID(ncid, char(varname));
+      data = cell(size(kwargs.slabs));
+      for k = 1:numel(kwargs.slabs)
+         [start, count] = slabWindow(dims, ...
+            kwargs.slabs{k}(1, :), kwargs.slabs{k}(2, :));
+         data{k} = convertSlab( ...
+            double(squeeze(netcdf.getVar(ncid, varid, start - 1, count))), ...
+            native_units, count);
+      end
    end
-   data = double(squeeze(ncread(filename, varname, start, count)));
 
-   % Collapse to cells x time (cells flattened in native [rlon rlat] order).
-   ncells = prod(count(1:2));
-   data = reshape(data, ncells, []);
-
-   % Standard unit conversions (shared with readMar3p11; the RACMO archive
-   % posts mass fluxes as kg m-2 s-1 rather than MAR's mmWE/h).
-   switch units
-      case 'kg m-2 s-1'
-         data = data * 3600 / 1000;   % -> meters water equivalent per hour
-         units = 'mWE/h';
-      case 'mmWE/h'
-         data = data / 1000;
-         units = 'mWE/h';
-      case 'C'
-         data = data + 273.15;
-         units = 'K';
-      case 'g/kg'
-         data = data / 1000;
-         units = 'kg/kg';
-      case 'hPa'
-         data = data * 100;
-         units = 'Pa';
-      case 'W m-2'
-         units = 'W/m2';
-   end
+   units = convertUnits(native_units);
 
    if nargout >= 3
       Time = racmoTime(filename);
@@ -103,6 +93,73 @@ function [data, units, Time] = readRacmo2p3(filename, varname, kwargs)
 end
 
 %% Local functions
+function [dims, units] = ncVarInfo(filename, varname)
+   %NCVARINFO Variable dimensions and unit string from ncinfo.
+   info = ncinfo(filename, varname);
+   dims = info.Size;
+   units = '';
+   has_units = strcmp({info.Attributes.Name}, 'units');
+   if any(has_units)
+      units = info.Attributes(has_units).Value;
+   end
+end
+
+function [start, count] = slabWindow(dims, kstart, kcount)
+   %SLABWINDOW Read window: requested spatial hyperslab, singleton level, all
+   % times. RACMO variables are [rlon rlat height(=1) time].
+   if isempty(kstart)
+      start = ones(1, numel(dims));
+      count = dims;
+   else
+      start = [kstart, ones(1, numel(dims) - 2)];
+      count = [kcount, dims(3:end)];
+   end
+end
+
+function data = convertSlab(data, units, count)
+   %CONVERTSLAB Reshape to cells x time and convert to standard units.
+   % Shared by the ncread (single) and netcdf.getVar (batch) read paths.
+
+   % Collapse to cells x time (cells flattened in native [rlon rlat] order).
+   ncells = prod(count(1:2));
+   data = reshape(data, ncells, []);
+
+   % Standard unit conversions (shared with readMar3p11; the RACMO archive
+   % posts mass fluxes as kg m-2 s-1 rather than MAR's mmWE/h). The unit
+   % STRING is relabelled once at the top level by convertUnits.
+   switch units
+      case 'kg m-2 s-1'
+         data = data * 3600 / 1000;   % -> meters water equivalent per hour
+      case 'mmWE/h'
+         data = data / 1000;
+      case 'C'
+         data = data + 273.15;
+      case 'g/kg'
+         data = data / 1000;
+      case 'hPa'
+         data = data * 100;
+   end
+end
+
+function units = convertUnits(units)
+   %CONVERTUNITS Relabel a native RACMO unit string to its standard form.
+   % Mirrors the value scaling in convertSlab (data and label stay in sync).
+   switch units
+      case 'kg m-2 s-1'
+         units = 'mWE/h';
+      case 'mmWE/h'
+         units = 'mWE/h';
+      case 'C'
+         units = 'K';
+      case 'g/kg'
+         units = 'kg/kg';
+      case 'hPa'
+         units = 'Pa';
+      case 'W m-2'
+         units = 'W/m2';
+   end
+end
+
 function Time = racmoTime(filename)
    %RACMOTIME UTC datetime axis from the RACMO 'time' variable.
    t = double(ncread(filename, 'time'));

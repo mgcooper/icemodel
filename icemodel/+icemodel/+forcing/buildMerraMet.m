@@ -1,7 +1,8 @@
-function [met, metadata] = buildMerraMet(location, years, kwargs)
+function [met, metadata, Data] = buildMerraMet(location, years, kwargs)
    %BUILDMERRAMET Build an icemodel met timetable from MERRA-2 data.
    %
    %  [met, metadata] = icemodel.forcing.buildMerraMet(location, years)
+   %  [met, metadata, Data] = ... buildMerraMet(location, years)
    %  [met, metadata] = ... buildMerraMet(_, source_dir=..., modis_dir=..., ...
    %     dt_out="15m")
    %
@@ -13,55 +14,60 @@ function [met, metadata] = buildMerraMet(location, years, kwargs)
    % icemodel.forcing.helpers.writemet.
    %
    % Inputs
-   %  location - [lat lon] point or polyshape in EPSG:3413 meters
+   %  location - [lat lon] point, polyshape (EPSG:3413 m), or an Nx2 [lat lon]
+   %             list of points. A point list returns a 1xN cell of met
+   %             timetables (one per point); a single location returns one.
    %  years    - calendar years to extract
    %
    % Name-value
-   %  source_dir, modis_dir, fillgaps, method, remap : see
+   %  source_dir, modis_dir, method, remap : see
    %      icemodel.forcing.buildMerraData (method = point sampling;
    %      remap = "conservative" (default, exact overlap-area weighting via
    %      exactremap); "equal" = plain in-polygon cell-centre mean
-   %  dt_out : optional output timestep ("15m") resampled per calendar year
-   %           with icemodel.interpmet; default keeps hourly
+   %  fillgaps : opt in to legacy metchecks gap filling (default false)
+   %  dt_out : output timestep resampled with the interval-support shared helper;
+   %           default "15m", pass "" for native hourly
+   %  fillwithmissing : add absent required channels as NaN placeholders
+   %                    before met validation (default true)
    %
    % Outputs
    %  met      - met-contract timetable (hourly, or dt_out)
-   %  metadata - provenance from buildMerraData
+   %  metadata - finalized met metadata; exactly met.Properties.UserData
+   %  Data     - source Data timetable before conversion/resampling
    %
-   % Legacy: there was no MERRA met builder in runoff/ (MERRA was used for
-   % Data files only); this mirrors icemodel.forcing.buildMarMet so MERRA can
-   % drive a run directly.
+   % MERRA provides a structurally valid met-contract timetable, while native
+   % source gaps (including SNICEALB/albedo gaps) remain explicit by default.
+   % Callers that require direct-run forcing must separately establish strict
+   % forcing readiness or select a provenance-bearing repair policy. The
+   % companion Data builder remains available for auxiliary channels.
    %
    % See also: icemodel.forcing.buildMerraData, icemodel.forcing.data2met,
    %  icemodel.forcing.buildMarMet, icemodel.forcing.helpers.writemet,
-   %  icemodel.interpmet
+   %  icemodel.forcing.helpers.resampleMetTimestep
 
    arguments
       location
       years (1, :) double {mustBeInteger}
       kwargs.source_dir (1, 1) string = ""
       kwargs.modis_dir (1, 1) string = ""
-      kwargs.fillgaps (1, 1) logical = true
+      kwargs.fillgaps (1, 1) logical = false
       kwargs.method (1, 1) string {mustBeMember(kwargs.method, ...
          ["nearest", "natural"])} = "nearest"
       kwargs.remap (1, 1) string {mustBeMember(kwargs.remap, ...
          ["equal", "conservative"])} = "conservative"
-      kwargs.dt_out (1, 1) string = ""
+      kwargs.dt_out (1, 1) string = "15m"
+      kwargs.fillwithmissing (1, 1) logical = true
    end
 
-   [Data, metadata] = icemodel.forcing.buildMerraData(location, years, ...
+   % buildMerraData accepts a single location (returns one Data timetable) or a
+   % list of N points (Nx2 [lat lon], returns a 1xN cell of Data timetables).
+   % Build the source Data first, then apply the shared Data-to-met collection
+   % conversion. The returned shape mirrors Data: one timetable for one
+   % location and a 1xN cell for a point list.
+   [Data, ~] = icemodel.forcing.buildMerraData(location, years, ...
       source_dir=kwargs.source_dir, modis_dir=kwargs.modis_dir, ...
       fillgaps=kwargs.fillgaps, method=kwargs.method, remap=kwargs.remap);
 
-   met = icemodel.forcing.data2met(Data);
-
-   if kwargs.dt_out ~= ""
-      % icemodel.interpmet resamples one calendar year at a time.
-      parts = cell(numel(years), 1);
-      for n = 1:numel(years)
-         parts{n} = icemodel.interpmet( ...
-            met(year(met.Time) == years(n), :), char(kwargs.dt_out));
-      end
-      met = vertcat(parts{:});
-   end
+   [met, metadata] = icemodel.forcing.helpers.data2metCollection(Data, ...
+      dt_out=kwargs.dt_out, fillwithmissing=kwargs.fillwithmissing);
 end

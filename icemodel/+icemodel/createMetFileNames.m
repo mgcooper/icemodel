@@ -39,14 +39,9 @@ function metfname = createMetFileNames(opts)
       metname = sitename;
    end
 
-   switch opts.dt
-      case 900
-         dtstr = '15m.mat';
-      case 3600
-         dtstr = '1hr.mat';
-      otherwise
-         error('unsupported dt for met file naming: %g', opts.dt)
-   end
+   % Use the same closed cadence registry as the writer so every emitted file is
+   % discoverable, including the proven RetMIP/Samimi native 30-minute override.
+   dtstr = char(icemodel.forcing.helpers.metTimestepSuffix(opts.dt) + ".mat");
 
    % Prefer the window form when both startdate and enddate are set
    % (regardless of whether simyears is also set). The window form is
@@ -83,38 +78,32 @@ function name = findEnclosingMetFile(opts, metname, forcings, ...
       startdate, enddate, dtstr, exact_name)
    % Locate a staged multi-year met file whose encoded YYYYMMDD-YYYYMMDD
    % period contains the requested run window. Returns '' when no match.
+   % Delegates the glob/parse/bracket to the shared primitive
+   % icemodel.forcing.helpers.findEnclosingWindowFile (also used by
+   % icemodel.loadmet for userdata files).
 
+   name = '';
    if ~isfield(opts, 'pathinput') || isempty(opts.pathinput)
-      name = '';
       return
    end
-   met_dir = fullfile(opts.pathinput, 'met');
-   if ~isfolder(met_dir)
-      name = '';
-      return
-   end
-   if isfile(fullfile(met_dir, exact_name))
-      name = '';
-      return
-   end
-
-   pattern = ['met_' metname '_' forcings '_*_*_' dtstr];
-   d = dir(fullfile(met_dir, pattern));
-   tz = startdate.TimeZone;
-   for n = 1:numel(d)
-      tok = regexp(d(n).name, ...
-         ['^met_' regexptranslate('escape', [metname '_' forcings]) ...
-         '_(\d{8})_(\d{8})_'], 'tokens', 'once');
-      if isempty(tok)
+   met_base = fullfile(opts.pathinput, 'met');
+   prefix = ['met_' metname '_' forcings];
+   % Look in the per-source subfolder (met/<forcings>/) first, then the flat
+   % met dir, so a staged enclosing window file is found in either layout. The
+   % subfolder-first ordering is the shared sourceSearchDirs primitive.
+   for d = icemodel.forcing.helpers.sourceSearchDirs(met_base, forcings)
+      met_dir = d{1};
+      if ~isfolder(met_dir)
          continue
       end
-      file_start = datetime(tok{1}, 'InputFormat', 'yyyyMMdd', 'TimeZone', tz);
-      file_end = datetime(tok{2}, 'InputFormat', 'yyyyMMdd', ...
-         'TimeZone', tz) + hours(23);
-      if file_start <= startdate && file_end >= enddate
-         name = d(n).name;
+      if isfile(fullfile(met_dir, exact_name))
+         return   % exact file exists; caller uses exact_name (path resolved later)
+      end
+      enclosing = icemodel.forcing.helpers.findEnclosingWindowFile(met_dir, ...
+         prefix, ['_' dtstr], startdate, enddate);
+      if strlength(enclosing) > 0
+         name = char(enclosing);
          return
       end
    end
-   name = '';
 end

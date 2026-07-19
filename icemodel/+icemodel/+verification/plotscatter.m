@@ -11,7 +11,9 @@ function f = plotscatter(case_id, kwargs)
    arguments
       case_id (1, :) string
       kwargs.evaluation_data_root (1, 1) string = ""
-      kwargs.icemodel_config_casename (1, 1) string = "test"
+      kwargs.input_data_root (1, 1) string = ""
+      kwargs.icemodel_config_casename (1, 1) string = ""
+      kwargs.dataset_family (1, 1) string = ""
       kwargs.variables string = strings(0, 1)
       kwargs.candidate = []
       kwargs.candidate_file (1, 1) string = ""
@@ -21,9 +23,21 @@ function f = plotscatter(case_id, kwargs)
 
    manifest = icemodel.verification.loadmanifest(case_id, ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
-      "icemodel_config_casename", kwargs.icemodel_config_casename);
-   targets = icemodel.verification.helpers.loadArtifact( ...
-      manifest.evaluation_path, "targets");
+      "input_data_root", kwargs.input_data_root, ...
+      "icemodel_config_casename", kwargs.icemodel_config_casename, ...
+      "dataset_family", kwargs.dataset_family);
+   % The eval target is the data-only observations.mat bundle referenced via
+   % evaluation_path; only PROMICE fixtures staged before that contract fall
+   % back to reconstituting the PROMICE-obs target from the per-year userdata.
+   if isfield(manifest, 'evaluation_path') ...
+         && strlength(string(manifest.evaluation_path)) > 0 ...
+         && isfile(manifest.evaluation_path)
+      targets = icemodel.verification.helpers.loadArtifact( ...
+         manifest.evaluation_path, "targets");
+   else
+      targets = icemodel.verification.helpers.loadColocatedData( ...
+         manifest, "promice");
+   end
    if ~isfield(targets, 'format') && isfield(targets, 'numerical_summa')
       % Multi-source schema (e.g. colbeck1976): default to numerical_summa.
       targets = targets.numerical_summa;
