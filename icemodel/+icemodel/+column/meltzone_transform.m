@@ -1,5 +1,5 @@
 function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
-      dLdT, f_liq_min, f_liq_max, iM, ok, debug)
+      dLdT, f_liq_min, f_liq_max, iM, debug)
    %MELTZONE_TRANSFORM Apply the melt-zone temperature-enthalpy transform.
    %
    % This function uses the change in liquid fraction returned by the numerical
@@ -48,6 +48,9 @@ function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
    %  icemodel.column.liquid_fraction_function
    %
    %#codegen
+
+   % Initialize the transform result; the rejection checks below set it false.
+   ok = true;
 
    persistent Tf ro_ice ro_liq fcp TL TH
    if isempty(Tf)

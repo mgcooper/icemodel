@@ -184,6 +184,26 @@ function test_checksubstep_forces_advance_at_maxsubstep(testCase)
    testCase.verifyTrue(forced_advance);
 end
 
+function test_checksubstep_retries_failed_solve_from_checkpoint(testCase)
+   % Before maxsubstep, a rejected inner solve must restore the accepted
+   % checkpoint, shorten dt, and remain rejected so the caller retries.
+
+   [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new, ok, forced_advance] = ...
+      icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
+      [0.01; 0.01], 271, [270; 269], [0.8; 0.8], [0.02; 0.02], 0, 900, ...
+      900, 1, 10, 1, 4, 0, false, eps, false);
+
+   testCase.verifyFalse(ok);
+   testCase.verifyEqual(Ts, 271);
+   testCase.verifyEqual(T, [270; 269]);
+   testCase.verifyEqual(f_ice, [0.8; 0.8]);
+   testCase.verifyEqual(f_liq, [0.02; 0.02]);
+   testCase.verifyEqual(n_subfail, 1);
+   testCase.verifyEqual(substep, 2);
+   testCase.verifyEqual(dt_new, 450, 'AbsTol', 1e-12);
+   testCase.verifyFalse(forced_advance);
+end
+
 function test_checksubstep_clamps_overshot_failure_count(testCase)
    % Even if a caller enters checksubstep with an already-overshot failure
    % count, the timestep controller should clamp to the accepted dt_min state

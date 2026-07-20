@@ -383,6 +383,20 @@ function test_iceenbal_and_iceebsolve_converge_on_synthetic_column(testCase)
       s.ro_liq / s.ro_ice), 1 + 1e-9);
 end
 
+function test_iceenbal_routes_exhausted_budget_to_substep_recovery(testCase)
+   % A solve that uses its entire inner iteration budget must let the caller
+   % restore the checkpoint and reduce dt instead of accepting that iterate.
+
+   s = testCase.TestData.ice;
+   [~, ~, ~, ~, ok, iter] = icemodel.column.solve_column_enthalpy( ...
+      s.Ts, s.T, s.f_ice, s.f_liq, s.Fc, s.Fp, s.Sc, s.Sp, s.dz, ...
+      s.delz, s.fn, s.opts.dt, 1, s.tol, 1, s.alpha, ...
+      s.use_aitken, s.jumpmax, false);
+
+   testCase.verifyFalse(ok);
+   testCase.verifyEqual(iter, 1);
+end
+
 function test_robin_coupler_supports_monin_obukhov_on_synthetic_column(testCase)
    % The Robin coupler should accept the bulk-MO scheme and converge on the
    % synthetic ice state used by the shared solver tests.

@@ -96,7 +96,7 @@ function test_mztransform_updates_melt_zone_consistently(testCase)
 
    [T_new, f_ice_new, f_liq_new, ok] = ...
       icemodel.column.meltzone_transform(ro_liq * 0.002, T_old, f_liq, ...
-      f_wat, dLdT, f_liq_min, f_liq_max, true, true, false);
+      f_wat, dLdT, f_liq_min, f_liq_max, true, false);
 
    testCase.verifyTrue(ok);
    testCase.verifyGreaterThan(f_liq_new, f_liq);
@@ -124,7 +124,7 @@ function test_mztransform_allows_melt_zone_exit_to_frozen_branch(testCase)
 
    [T_new, f_ice_new, f_liq_new, ok] = ...
       icemodel.column.meltzone_transform(ro_liq * d_fliq, T_old, f_liq, ...
-      f_wat, dLdT, f_liq_min, f_liq_max, true, true, false);
+      f_wat, dLdT, f_liq_min, f_liq_max, true, false);
 
    testCase.verifyTrue(ok);
    testCase.verifyLessThan(T_new, TL);
@@ -151,7 +151,7 @@ function test_mztransform_rejects_large_freeze_out_overshoot(testCase)
 
    [T_new, ~, f_liq_new, ok] = icemodel.column.meltzone_transform( ...
       ro_liq * d_fliq, T_old, f_liq, f_wat, dLdT, f_liq_min, ...
-      f_liq_max, true, true, false);
+      f_liq_max, true, false);
 
    testCase.verifyFalse(ok);
    testCase.verifyLessThan(T_new, 0);
@@ -172,7 +172,7 @@ function test_mztransform_rejects_phase_skip(testCase)
 
    [~, ~, ~, ok] = icemodel.column.meltzone_transform(TH + 0.5, TL - 1.0, ...
       f_liq, f_wat, dLdT, f_liq_min, f_liq_max, ...
-      false, true, false);
+      false, false);
 
    testCase.verifyFalse(ok);
 end
