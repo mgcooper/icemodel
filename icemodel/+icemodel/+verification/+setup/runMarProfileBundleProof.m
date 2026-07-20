@@ -1,15 +1,12 @@
-% Run a bounded real-source MAR RO1 profile staging and visual-QA proof.
+function runMarProfileBundleProof()
+%RUNMARPROFILEBUNDLEPROOF Run bounded MAR profile staging and visual QA.
 %
 % Run from the repository root with:
-%   matlab -batch "run('test/tools/run_mar_profile_bundle_proof.m')"
+%   matlab -batch "icemodel.verification.setup.runMarProfileBundleProof()"
 %
 % The isolated staging root is deleted on completion. Only the compact proof
 % table and three profile figures remain under data/preview/qa.
 
-% RUN temporarily enters this script's directory, so bootstrap the package path
-% from the tracked file location before using the canonical root helper.
-bootstrap_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
-addpath(fullfile(bootstrap_root, 'icemodel'))
 repo_root = string(icemodel.internal.fullpath());
 
 % Resolve real source caches and allocate a disposable isolated stage.
@@ -116,3 +113,4 @@ movefile(temporary_csv, final_csv, 'f')
 fprintf('MAR profile proof passed for %d cases; output: %s\n', ...
    height(proof), final_csv)
 clear cleanup
+end

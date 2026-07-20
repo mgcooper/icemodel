@@ -76,16 +76,17 @@ delete an earlier valid product. Comparison and plotting group by both
 only over common midpoint depth support.
 
 Replay the source and grid audit with
-`test/tools/audit_mar_semantics_and_grid.m`.
+`icemodel.verification.setup.auditMarSemanticsAndGrid()`.
 Its durable variable, representative-site, and all-PROMICE mapping ledgers live
 under `data/preview/qa`.
 
 Replay the bounded three-case staging, comparison, plot, and artifact-audit proof
-with `test/tools/run_mar_profile_bundle_proof.m`. It writes only the compact
-profile proof table and two review figures under `data/preview/qa`; its isolated
+with `icemodel.verification.setup.runMarProfileBundleProof()`. It writes only the
+compact profile proof table and three review figures under `data/preview/qa`; its isolated
 temporary stage is removed after the checks finish.
 
 Run the complete focused gate with
-`matlab -batch "run('test/tools/run_mar_profile_validation.m')"`. The gate runs
+`matlab -batch "addpath('icemodel'); icemodel.verification.setup.runMarProfileValidation()"`.
+The gate runs
 the dedicated unit files, selected shared-path regressions, and both source-backed
 replays in dependency order.

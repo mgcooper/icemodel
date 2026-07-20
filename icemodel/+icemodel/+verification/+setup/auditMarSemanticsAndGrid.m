@@ -1,17 +1,13 @@
-% Audit MAR snow/firn semantics and point-grid mapping against source data.
+function auditMarSemanticsAndGrid()
+%AUDITMARSEMANTICSANDGRID Audit MAR semantics and point-grid mapping.
 %
 % Run from the repository root with:
-%   matlab -batch "run('test/tools/audit_mar_semantics_and_grid.m')"
+%   matlab -batch "icemodel.verification.setup.auditMarSemanticsAndGrid()"
 %
 % The audit is intentionally read-only for staged artifacts. It writes only
 % durable QA ledgers under data/preview/qa and fails if the current staged MAR
 % point identity or permanent-ice/tundra sector disagrees with the independent
 % source-grid reconstruction.
-
-% RUN temporarily enters this script's directory, so bootstrap the package path
-% from the tracked file location before using the canonical root helper.
-bootstrap_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
-addpath(fullfile(bootstrap_root, 'icemodel'))
 
 % Resolve repository-owned inputs and the documented MAR archive layout.
 repo_root = string(icemodel.internal.fullpath());
@@ -371,3 +367,4 @@ clear cleaner
 
 fprintf(['MAR audit passed: %d staged sites, %d variables, %d site-years; ' ...
    'outputs in %s\n'], height(mapping), height(ledger), height(statistics), output_dir)
+end

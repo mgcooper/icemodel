@@ -1,5 +1,5 @@
-function repair_racmo_sublimation_artifacts(candidate_root)
-   %REPAIR_RACMO_SUBLIMATION_ARTIFACTS Repair referenced RACMO artifacts.
+function repairRacmoSublimationArtifacts(candidate_root)
+   %REPAIRRACMOSUBLIMATIONARTIFACTS Repair referenced RACMO artifacts.
    %
    % Repairs only exact manifest-referenced RACMO userdata in the isolated
    % seasonal candidate and canonical repository roots. Compact pre/post hash,
@@ -10,8 +10,7 @@ function repair_racmo_sublimation_artifacts(candidate_root)
       candidate_root (1, 1) string
    end
 
-   driver_root = string(fileparts(mfilename('fullpath')));
-   repo_root = string(fileparts(fileparts(driver_root)));
+   repo_root = string(icemodel.internal.fullpath());
    data_root = fullfile(repo_root, "data");
    code_root = fullfile(repo_root, "icemodel");
    qa_root = fullfile(data_root, "preview", "qa");

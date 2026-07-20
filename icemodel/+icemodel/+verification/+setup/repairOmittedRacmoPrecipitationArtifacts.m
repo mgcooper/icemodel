@@ -1,11 +1,11 @@
-function repair_omitted_racmo_precipitation_artifacts()
-   %REPAIR_OMITTED_RACMO_PRECIPITATION_ARTIFACTS Repair five missed artifacts.
+function repairOmittedRacmoPrecipitationArtifacts()
+   %REPAIROMITTEDRACMOPRECIPITATIONARTIFACTS Repair five missed artifacts.
    %
    % Applies the existing RACMO precipitation/QC contract to the exact RetMIP
    % and IMAU manifest references omitted from the original PROMICE-scoped
    % write pass. Sublimation values and markers are deliberately untouched.
 
-   repo_root = string(fileparts(fileparts(fileparts(mfilename('fullpath')))));
+   repo_root = string(icemodel.internal.fullpath());
    data_root = fullfile(repo_root, "data");
    input_root = fullfile(data_root, "input");
    eval_root = fullfile(data_root, "eval");

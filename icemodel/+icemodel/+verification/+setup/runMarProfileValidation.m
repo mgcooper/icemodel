@@ -1,17 +1,13 @@
-% Run the focused MAR semantics, grid, and density-profile validation gate.
+function runMarProfileValidation()
+%RUNMARPROFILEVALIDATION Run the focused MAR profile validation gate.
 %
 % Run from the repository root with:
-%   matlab -batch "run('test/tools/run_mar_profile_validation.m')"
+%   matlab -batch "icemodel.verification.setup.runMarProfileValidation()"
 %
 % The gate runs the complete profile-reader/stager tests, the four shared-path
 % regressions touched by profile integration, the source/grid audit, and the
-% bounded two-case real-source artifact proof. It does not broadly restage RCM
+% bounded three-case real-source artifact proof. It does not broadly restage RCM
 % products.
-
-% RUN temporarily enters this script's directory, so bootstrap the package path
-% from the tracked file location before using the canonical root helper.
-bootstrap_root = fileparts(fileparts(fileparts(mfilename('fullpath'))));
-addpath(fullfile(bootstrap_root, 'icemodel'))
 repo_root = string(icemodel.internal.fullpath());
 
 % The two dedicated files are narrow enough to run completely.
@@ -42,7 +38,7 @@ for n = 1:size(selected, 1)
    hit = names == procedure | endsWith(names, "/" + procedure);
    assert(nnz(hit) == 1, ...
       'Focused test procedure was not uniquely resolved: %s', selected{n, 2})
-   suite(end + 1) = candidates(hit); %#ok<SAGROW>
+   suite(end + 1) = candidates(hit); %#ok<AGROW>
 end
 
 % Fail before touching durable QA outputs when any focused regression fails.
@@ -52,8 +48,9 @@ assert(all([results.Passed]), ...
 
 % Both replay scripts validate fully before promoting compact evidence under
 % data/preview/qa; the profile proof deletes its isolated stage on completion.
-run(fullfile(repo_root, 'test', 'tools', 'audit_mar_semantics_and_grid.m'))
-run(fullfile(repo_root, 'test', 'tools', 'run_mar_profile_bundle_proof.m'))
+icemodel.verification.setup.auditMarSemanticsAndGrid()
+icemodel.verification.setup.runMarProfileBundleProof()
 
 fprintf('MAR validation passed: %d focused tests plus both source-backed replays.\n', ...
    numel(results))
+end

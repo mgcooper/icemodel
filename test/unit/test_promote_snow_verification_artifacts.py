@@ -3,15 +3,24 @@
 from __future__ import annotations
 
 import json
-import sys
+import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
 
-sys.path.insert(0, str(Path(__file__).parent))
-import promote_snow_verification_artifacts as tool  # noqa: E402
+REPO_ROOT = Path(__file__).resolve().parents[2]
+TOOL_FILE = (
+    REPO_ROOT
+    / "icemodel/+icemodel/+verification/+setup/promote_snow_verification_artifacts.py"
+)
+SPEC = importlib.util.spec_from_file_location(
+    "promote_snow_verification_artifacts", TOOL_FILE
+)
+assert SPEC is not None and SPEC.loader is not None
+tool = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(tool)
 
 
 class PromotionToolTests(unittest.TestCase):
