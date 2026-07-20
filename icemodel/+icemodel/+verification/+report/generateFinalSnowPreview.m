@@ -1,9 +1,9 @@
-%GENERATE_FINAL_SNOW_PREVIEW Build canonical seasonal QA, figures, and readiness.
+function generateFinalSnowPreview()
+%GENERATEFINALSNOWPREVIEW Build canonical seasonal QA, figures, and readiness.
 % Reads promoted data/input and data/eval artifacts, then writes only the
 % canonical data/preview products consumed by the checked Quarto report.
 
-driver_root = fileparts(mfilename('fullpath'));
-repo_root = fileparts(fileparts(driver_root));
+repo_root = string(icemodel.internal.fullpath());
 data_root = fullfile(repo_root, "data");
 eval_root = fullfile(data_root, "eval");
 input_root = fullfile(data_root, "input");
@@ -129,4 +129,5 @@ catch err
    writelines(string(getReport(err, "extended", "hyperlinks", "off")), ...
       failed_file);
    rethrow(err)
+end
 end

@@ -291,26 +291,9 @@ def validate_report(
     qmd_text = qmd_content.decode("utf-8")
     validate_qmd_include(qmd, qmd_text, generated)
 
-    # The render must postdate every textual input and preserve the audited time.
+    # Use embedded QA identities instead of checkout-sensitive file mtimes.
     qa_time = generated_at.timestamp()
     firn_qa_time = firn_generated_at.timestamp()
-    require(
-        generated.stat().st_mtime
-        >= max(
-            qa_path.stat().st_mtime,
-            firn_qa_path.stat().st_mtime,
-            firn_index_path.stat().st_mtime,
-        ),
-        "generated include predates QA JSON or firn figure index",
-    )
-    newest_input = max(
-        generated.stat().st_mtime,
-        qa_path.stat().st_mtime,
-        firn_qa_path.stat().st_mtime,
-        firn_index_path.stat().st_mtime,
-        qmd.stat().st_mtime,
-    )
-    require(report.stat().st_mtime >= newest_input, "rendered report predates an input")
     generated_at_text = str(qa["generated_at"])
     firn_generated_at_text = str(firn_qa["generated_at"])
     timestamp_count = 1 if generated_at_text != firn_generated_at_text else 2
@@ -491,13 +474,13 @@ def validate_report(
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     """Parse canonical defaults plus isolated-preview overrides."""
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[4]
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--preview-root", type=Path, default=repo_root / "data/preview")
     parser.add_argument("--report", type=Path)
     parser.add_argument("--generated", type=Path)
     parser.add_argument("--qa", type=Path)
-    parser.add_argument("--qmd", type=Path, default=repo_root / "report/snow-artifact-qa.qmd")
+    parser.add_argument("--qmd", type=Path, default=Path(__file__).with_name("snow-artifact-qa.qmd"))
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
 

@@ -79,7 +79,8 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
             % Metrics with baseline lookup only (no delta pair).
             baseline_only = ["mean_Tice_numiter", "max_Tice_numiter", ...
-               "n_not_converged"];
+               "n_not_converged", "closure_seb_mae", ...
+               "closure_seb_rmse", "closure_seb_max_abs"];
             all_baseline_fields = [ ...
                string(delta_specs(:, 1)); baseline_only(:)];
 

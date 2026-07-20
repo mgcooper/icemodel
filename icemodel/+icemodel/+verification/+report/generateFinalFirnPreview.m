@@ -1,10 +1,10 @@
-%GENERATE_FINAL_FIRN_PREVIEW Build canonical firn QA and figure products.
+function generateFinalFirnPreview()
+%GENERATEFINALFIRNPREVIEW Build canonical firn QA and figure products.
 % Reads the promoted RetMIP, IMAU, SUMup, and research-site artifacts, then
 % writes only the canonical data/preview products consumed by the checked
 % combined snow-and-firn Quarto report.
 
-driver_root = fileparts(mfilename('fullpath'));
-repo_root = fileparts(fileparts(driver_root));
+repo_root = string(icemodel.internal.fullpath());
 data_root = fullfile(repo_root, "data");
 eval_root = fullfile(data_root, "eval");
 input_root = fullfile(data_root, "input");
@@ -120,4 +120,5 @@ catch err
    writelines(string(getReport(err, "extended", "hyperlinks", "off")), ...
       failed_file);
    rethrow(err)
+end
 end

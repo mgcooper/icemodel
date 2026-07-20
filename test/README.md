@@ -96,9 +96,15 @@ Programmatic regression helpers:
 4. `run_regression_suite(...)` and `run_perf_suite(...)`
    - Compare against existing rolling or release baselines
    - Does not mutate baselines
-   - Writes artifacts under `test/artifacts/<yyyymmdd-HHMMSS>/`.
+    - Writes artifacts under `test/artifacts/<yyyymmdd-HHMMSS>/`.
+    - Renders a self-contained Quarto HTML report with plots and a compact CSV
+      in the same directory; use `build_report=false` only for an artifact-only
+      diagnostic run.
    - `run_perf_suite` also runs the core benchmark suite and stores
      benchmark timing comparison alongside the formal perf artifact.
+   - Formal performance runs force the MATLAB profiler off. Whole-model
+     runtimes must stay inside the accepted two-sided tolerance band so an
+     unexplained speedup cannot hide an inflated or incomplete reference.
 5. `run_unit_suite(...)`
    - Use for folder-based unit-test discovery under `test/unit/`.
    - Use `debug=true` to stop on first failure for inspection.

@@ -1,5 +1,20 @@
 # Snow and firn visual-QA report
 
+## Report-layer ownership
+
+The test suite and verification suite share presentation code, not execution
+semantics. `test/` owns unit discovery, numerical/performance runners, managed
+baselines, and comparison artifacts. `icemodel.verification` owns scientific
+candidate/reference comparisons and artifact QA. This namespace owns the
+Quarto-facing presentation for both: the snow/firn scientific report below and
+`buildTestSuiteReport`, which turns saved regression/performance results into
+plots, compact CSV, generated QMD, and self-contained HTML without rerunning a
+model or changing a baseline.
+
+`run_regression_suite` and `run_perf_suite` render their reports beneath the
+same `test/artifacts/<run>/` directory as their MAT files. Pass
+`build_report=false` only for a deliberately artifact-only run.
+
 `snow-artifact-qa.qmd` renders one local HTML index for the accepted PROMICE,
 ESM-SnowMIP, and Laugh/Colbeck preview figures plus canonical RetMIP, IMAU,
 SUMup, and research-site firn figures. The Python generator validates both
@@ -68,14 +83,16 @@ For maintainers who need to reproduce the already-completed canonical figures
 and report, run from the repository root:
 
 ```sh
-python3 test/tools/test_generate_final_snow_preview.py
-matlab -batch "run('test/tools/generate_final_snow_preview.m')"
-python3 test/tools/test_generate_final_firn_preview.py
-matlab -batch "run('test/tools/generate_final_firn_preview.m')"
-python3 -m unittest report/test_build_snow_artifact_qa.py report/test_check_snow_artifact_qa.py
-python3 report/build_snow_artifact_qa.py
-quarto render report/snow-artifact-qa.qmd --output-dir ../data/preview/report
-python3 report/check_snow_artifact_qa.py
+python3 test/unit/test_generate_final_snow_preview.py
+matlab -batch "addpath('icemodel'); icemodel.verification.report.generateFinalSnowPreview()"
+python3 test/unit/test_generate_final_firn_preview.py
+matlab -batch "addpath('icemodel'); icemodel.verification.report.generateFinalFirnPreview()"
+python3 test/unit/test_build_snow_artifact_qa.py
+python3 test/unit/test_check_snow_artifact_qa.py
+python3 icemodel/+icemodel/+verification/+report/build_snow_artifact_qa.py
+quarto render icemodel/+icemodel/+verification/+report/snow-artifact-qa.qmd \
+  --output-dir ../../../../data/preview/report
+python3 icemodel/+icemodel/+verification/+report/check_snow_artifact_qa.py
 ```
 
 The promotion utility remains the durable recovery path for a future promotion.
@@ -84,7 +101,7 @@ If one is interrupted and leaves `promotion_transaction.json` or
 not delete either path manually. Resolve that sealed transaction first:
 
 ```sh
-python3 test/tools/promote_snow_verification_artifacts.py \
+python3 icemodel/+icemodel/+verification/+setup/promote_snow_verification_artifacts.py \
   --candidate-root sandbox/verification/icemodel-hfc.2.38/candidate \
   --repo-root . \
   --evidence-dir sandbox/verification/icemodel-hfc.2.38/evidence \

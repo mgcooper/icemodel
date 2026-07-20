@@ -4,20 +4,26 @@ from __future__ import annotations
 
 import contextlib
 import csv
-import importlib
+import importlib.util
 import io
 import json
 import os
-import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Import the sibling script without making report a production Python package.
-REPORT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(REPORT_DIR))
-checker = importlib.import_module("check_snow_artifact_qa")
+# Load the report checker from the MATLAB verification namespace without
+# treating its plus-prefixed package directories as Python packages.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+REPORT_FILE = (
+    REPO_ROOT
+    / "icemodel/+icemodel/+verification/+report/check_snow_artifact_qa.py"
+)
+SPEC = importlib.util.spec_from_file_location("check_snow_artifact_qa", REPORT_FILE)
+assert SPEC is not None and SPEC.loader is not None
+checker = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(checker)
 
 
 class SnowArtifactReportCheckerTest(unittest.TestCase):
@@ -252,7 +258,7 @@ class SnowArtifactReportCheckerTest(unittest.TestCase):
 
     @staticmethod
     def refresh_times(fixture: dict[str, object]) -> None:
-        """Restore a deterministic QA-to-render freshness sequence."""
+        """Restore deterministic QA and figure freshness timestamps."""
         base = int(fixture["base_time"])
         os.utime(Path(fixture["qa"]), (base + 10, base + 10))
         os.utime(Path(fixture["firn_qa"]), (base + 11, base + 11))
@@ -456,21 +462,14 @@ class SnowArtifactReportCheckerTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, pattern):
                     self.validate(fixture)
 
-    def test_rejects_stale_include_or_rendered_report(self) -> None:
-        """The include and HTML must postdate every evidence input they consume."""
-        fixture = self.make_fixture("stale-include")
+    def test_accepts_content_identical_checkout_timestamp_changes(self) -> None:
+        """Checkout-only input mtimes do not invalidate an exact report."""
+        fixture = self.make_fixture("checkout-times")
         base = int(fixture["base_time"])
         os.utime(Path(fixture["generated"]), (base + 9, base + 9))
-        with self.assertRaisesRegex(ValueError, "generated include predates QA"):
-            self.validate(fixture)
-
-        for key in ("qa", "firn_qa", "firn_index", "generated", "qmd"):
-            with self.subTest(newer_input=key):
-                fixture = self.make_fixture(f"stale-report-{key}")
-                input_time = Path(fixture[key]).stat().st_mtime
-                os.utime(Path(fixture["report"]), (input_time - 1, input_time - 1))
-                with self.assertRaisesRegex(ValueError, "rendered report predates"):
-                    self.validate(fixture)
+        os.utime(Path(fixture["report"]), (base + 10, base + 10))
+        os.utime(Path(fixture["qmd"]), (base + 100, base + 100))
+        self.validate(fixture)
 
     def test_qmd_prose_preserves_inline_multiplication(self) -> None:
         """Inline-code operators survive Markdown normalization for HTML checks."""

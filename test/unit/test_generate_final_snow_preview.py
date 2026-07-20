@@ -5,7 +5,10 @@ import unittest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DRIVER = REPO_ROOT / "test/tools/generate_final_snow_preview.m"
+DRIVER = (
+    REPO_ROOT
+    / "icemodel/+icemodel/+verification/+report/generateFinalSnowPreview.m"
+)
 
 
 class GenerateFinalSnowPreviewTests(unittest.TestCase):

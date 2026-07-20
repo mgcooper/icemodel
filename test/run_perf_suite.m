@@ -16,7 +16,7 @@ function results = run_perf_suite(kwargs)
    %
    % This function does not update baselines; it only runs the formal cases,
    % compares runtime to the requested baseline, and writes one artifact under
-   % test/artifacts/<run_name>/.
+   % test/artifacts/<run_name>/ plus a Quarto HTML summary for the combined run.
    %
    % By default it also runs the managed core benchmark suite and saves those
    % diagnostic timings alongside the formal perf artifact.
@@ -75,17 +75,20 @@ function results = run_perf_suite(kwargs)
 
       kwargs.run_name string ...
          = string.empty()
+
+      kwargs.build_report (1, 1) logical ...
+         = true
    end
 
    % Deal out arguments.
    [tier, smbmodel, solver, simyear, smoke_sites, full_sites, n_runs, ...
       tol_perf, include_benchmarks, benchmark_sampling_profile, ...
-      baseline_selector, run_name] = deal( ...
+      baseline_selector, run_name, build_report] = deal( ...
       kwargs.tier, kwargs.smbmodel, kwargs.solver, kwargs.simyear, ...
       reshape(kwargs.smoke_sites, [], 1), reshape(kwargs.full_sites, [], 1), ...
       kwargs.n_runs, kwargs.tol_perf, kwargs.include_benchmarks, ...
       kwargs.benchmark_sampling_profile, ...
-      kwargs.baseline, kwargs.run_name);
+      kwargs.baseline, kwargs.run_name, kwargs.build_report);
 
    % Resolve full path to the test/ dir.
    testdir = icemodel.getpath('test');
@@ -102,6 +105,9 @@ function results = run_perf_suite(kwargs)
    % when this entrypoint returns.
    [~, input_path, output_path, ~, suite_cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>
+
+   % Formal wall-clock timings must never inherit an interactive profiler.
+   profile off
 
    % Expand the requested formal model selector once at the entrypoint.
    models = icemodel.test.helpers.resolveRequestedSmbmodels(smbmodel);
@@ -127,6 +133,14 @@ function results = run_perf_suite(kwargs)
 
    % Display the results.
    icemodel.test.helpers.displayPerfResults(results)
+
+   % Render the saved comparison into the common report layer unless the
+   % caller explicitly requested an artifact-only run.
+   results.report_file = "";
+   if build_report
+      results.report_file = ...
+         icemodel.verification.report.buildTestSuiteReport("performance", results);
+   end
 end
 
 function results = runSingleModelPerfSuite(input_path, output_path, ...
@@ -179,6 +193,7 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
 
       % Compare the measured runtime to the accepted baseline row.
       ref_wall = nan;
+      floor_wall = nan;
       gate_wall = nan;
       passed_perf = valid;
       case_compare_reason = compare_reason;
@@ -195,9 +210,17 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
             else
                tol_case = tol_perf;
             end
-            gate_wall = ref_wall * (1 + tol_case);
-            passed_perf = passed_perf ...
-               && median(sample_times, 'omitnan') <= gate_wall;
+            if valid
+               [within_gate, floor_wall, gate_wall, gate_reason] = ...
+                  icemodel.test.helpers.performanceGate( ...
+                  median(sample_times, 'omitnan'), ref_wall, tol_case);
+               passed_perf = within_gate;
+               if ~within_gate
+                  case_compare_reason = gate_reason;
+               end
+            else
+               case_compare_reason = "performance samples are invalid";
+            end
          end
       else
          case_compare_reason = "case not found in compatible perf baseline";
@@ -256,6 +279,7 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       case_rows(r_case).min_wall_s = min(sample_times, [], 'omitnan');
       case_rows(r_case).max_wall_s = max(sample_times, [], 'omitnan');
       case_rows(r_case).ref_wall_s = ref_wall;
+      case_rows(r_case).floor_wall_s = floor_wall;
       case_rows(r_case).gate_wall_s = gate_wall;
       case_rows(r_case).baseline_compatible = baseline_compatible;
       case_rows(r_case).compare_reason = case_compare_reason;
@@ -446,4 +470,3 @@ function [compatible, reason] = perfBaselineCompatibility(baseline_meta)
          char(current_version), char(current_host));
    end
 end
-

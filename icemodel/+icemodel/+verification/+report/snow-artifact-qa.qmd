@@ -80,4 +80,4 @@ table { display: block; overflow-x: auto; white-space: nowrap; }
 </style>
 ```
 
-{{< include ../data/preview/report/figures.generated.md >}}
+{{< include ../../../../data/preview/report/figures.generated.md >}}

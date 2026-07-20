@@ -46,7 +46,10 @@ function S = summarizeIce1Metrics(ice1, met, refrow)
    S.stability_n_Tice_not_converged = S.n_not_converged;
    S.stability_n_Tsfc_not_converged = countFailures(ice1, vn, "Tsfc_converged");
 
-   seb_resid = extractPreferredSeries(ice1, ["Qbal", "balance"]);
+   % Prefer the diagnosed full surface residual. Qbal is retained only as a
+   % legacy fallback because postprocessing uses it for shortwave partition
+   % closure rather than the complete surface energy balance.
+   seb_resid = extractPreferredSeries(ice1, ["balance", "Qbal"]);
    if ~isempty(seb_resid)
       [S.closure_seb_mae, S.closure_seb_rmse, S.closure_seb_max_abs] = ...
          summarizeResidual(seb_resid);

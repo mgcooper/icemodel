@@ -5,24 +5,29 @@ from __future__ import annotations
 import contextlib
 import csv
 import hashlib
-import importlib
+import importlib.util
 import io
 import json
 import os
 import re
 import shutil
-import sys
 import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
 
-# Import the sibling script without making the report directory a production
-# Python package or suppressing import-order diagnostics inline.
-REPORT_DIR = Path(__file__).resolve().parent
-sys.path.insert(0, str(REPORT_DIR))
-report_builder = importlib.import_module("build_snow_artifact_qa")
+# Load the report implementation from the MATLAB verification namespace without
+# treating its plus-prefixed package directories as Python packages.
+REPO_ROOT = Path(__file__).resolve().parents[2]
+REPORT_FILE = (
+    REPO_ROOT
+    / "icemodel/+icemodel/+verification/+report/build_snow_artifact_qa.py"
+)
+SPEC = importlib.util.spec_from_file_location("build_snow_artifact_qa", REPORT_FILE)
+assert SPEC is not None and SPEC.loader is not None
+report_builder = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(report_builder)
 
 
 class BuildSnowArtifactQaTest(unittest.TestCase):
@@ -452,14 +457,14 @@ class BuildSnowArtifactQaTest(unittest.TestCase):
         """Keep every MATLAB figure writer on the documented export API."""
         prohibited = re.compile(r"\b(?:saveas|savefig|print)\s*\(")
         offenders = []
-        for path in sorted(REPORT_DIR.parent.rglob("*.m")):
+        for path in sorted(REPO_ROOT.rglob("*.m")):
             for number, line in enumerate(
                 path.read_text(encoding="utf-8").splitlines(), start=1
             ):
                 if prohibited.search(line):
-                    offenders.append(f"{path.relative_to(REPORT_DIR.parent)}:{number}")
+                    offenders.append(f"{path.relative_to(REPO_ROOT)}:{number}")
         self.assertEqual(offenders, [])
-        style = (REPORT_DIR.parent / "STYLE.local.md").read_text(encoding="utf-8")
+        style = (REPO_ROOT / "STYLE.local.md").read_text(encoding="utf-8")
         self.assertIn("Use `exportgraphics` for every saved MATLAB figure", style)
 
     def test_retired_geometry_figures_are_outside_report_inventory(self) -> None:

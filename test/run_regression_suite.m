@@ -17,7 +17,7 @@ function results = run_regression_suite(kwargs)
    %
    % This function does not update baselines; it only runs the formal cases,
    % compares core scalar outputs to the requested baseline, and writes one
-   % artifact under test/artifacts/<run_name>/.
+   % artifact and one Quarto HTML report under test/artifacts/<run_name>/.
    %
    % The optional solver filter accepts any subset of [1 2 3].
    %
@@ -55,14 +55,17 @@ function results = run_regression_suite(kwargs)
 
       kwargs.run_name string ...
          = string.empty()
+
+      kwargs.build_report (1, 1) logical ...
+         = true
    end
 
    % Deal out arguments.
    [tier, smbmodel, solver, simyear, smoke_sites, full_sites, baseline, ...
-      run_name] = deal(kwargs.tier, kwargs.smbmodel, ...
+      run_name, build_report] = deal(kwargs.tier, kwargs.smbmodel, ...
       kwargs.solver, kwargs.simyear, reshape(kwargs.smoke_sites, [], 1), ...
       reshape(kwargs.full_sites, [], 1), kwargs.baseline, ...
-      kwargs.run_name);
+      kwargs.run_name, kwargs.build_report);
 
    % Resolve full path to the test/ dir.
    testdir = icemodel.getpath('test');
@@ -75,6 +78,10 @@ function results = run_regression_suite(kwargs)
 
    % Expand the requested formal model selector once at the entrypoint.
    models = icemodel.test.helpers.resolveRequestedSmbmodels(smbmodel);
+
+   % Resolve one run directory before dispatching models so aggregate artifacts
+   % and their report always share the same review surface.
+   [~, ~, run_name] = icemodel.test.helpers.resolveRunStamp(run_name);
 
    % Build the unittest suite once, then run the canonical single-model flow
    % for each requested formal model.
@@ -93,6 +100,15 @@ function results = run_regression_suite(kwargs)
 
    % Display the results.
    icemodel.test.helpers.displayRegressionResults(results)
+
+   % Render the saved comparison into the common report layer unless the
+   % caller explicitly requested an artifact-only run.
+   results.report_file = "";
+   if build_report
+      results.report_file = ...
+         icemodel.verification.report.buildTestSuiteReport( ...
+         "regression", results);
+   end
 end
 
 function results = runSingleModelRegression(runner, suite, tier, smbmodel, ...

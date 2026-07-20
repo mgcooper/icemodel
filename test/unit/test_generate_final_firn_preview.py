@@ -5,8 +5,9 @@ import unittest
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DRIVER = REPO_ROOT / "test/tools/generate_final_firn_preview.m"
-REPORT_README = REPO_ROOT / "report/README.md"
+REPORT_ROOT = REPO_ROOT / "icemodel/+icemodel/+verification/+report"
+DRIVER = REPORT_ROOT / "generateFinalFirnPreview.m"
+REPORT_README = REPORT_ROOT / "README.md"
 
 
 class GenerateFinalFirnPreviewTests(unittest.TestCase):
@@ -91,19 +92,19 @@ class GenerateFinalFirnPreviewTests(unittest.TestCase):
     def test_report_sequence_checks_driver_before_rendering(self) -> None:
         """The documented combined workflow must run the focused driver test."""
         static_test = self.report_readme.index(
-            "python3 test/tools/test_generate_final_firn_preview.py"
+            "python3 test/unit/test_generate_final_firn_preview.py"
         )
         firn_render = self.report_readme.index(
-            "matlab -batch \"run('test/tools/generate_final_firn_preview.m')\""
+            "icemodel.verification.report.generateFinalFirnPreview()"
         )
         report_tests = self.report_readme.index(
-            "python3 -m unittest report/test_build_snow_artifact_qa.py"
+            "python3 test/unit/test_build_snow_artifact_qa.py"
         )
         report_build = self.report_readme.index(
-            "python3 report/build_snow_artifact_qa.py"
+            "python3 icemodel/+icemodel/+verification/+report/build_snow_artifact_qa.py"
         )
         report_check = self.report_readme.index(
-            "python3 report/check_snow_artifact_qa.py"
+            "python3 icemodel/+icemodel/+verification/+report/check_snow_artifact_qa.py"
         )
         self.assertLess(static_test, firn_render)
         self.assertLess(firn_render, report_tests)
