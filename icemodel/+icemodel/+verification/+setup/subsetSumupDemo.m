@@ -29,7 +29,7 @@ function [observations, provenance] = subsetSumupDemo(observations, point, kwarg
    %  Inputs
    %    observations : struct  full SUMup obs bundle from buildSumupObservations
    %                   (format="subsurface_profile_bundle"; density TABLE,
-   %                   subsurface_temperature TIMETABLE, accumulation TABLE).
+   %                   subsurface_temperature TIMETABLE, smb TABLE).
    %    point        : [lat lon] WGS84 query point.
    %
    %  Name-value
@@ -49,7 +49,7 @@ function [observations, provenance] = subsetSumupDemo(observations, point, kwarg
    arguments
       observations (1, 1) struct
       point (1, 2) double
-      kwargs.max_rows (1, 1) double {mustBePositive} = 500
+      kwargs.max_rows (1, 1) double {mustBePositive, mustBeInteger} = 500
    end
 
    proj = icemodel.forcing.helpers.psnProjection();
@@ -103,7 +103,8 @@ function [reduced, rec] = nearestProfile(tbl, proj, px, py, channel, max_rows)
    end
 
    if istt
-      span = [min(reduced.Time), max(reduced.Time)];
+      row_times = reduced.Properties.RowTimes;
+      span = [min(row_times), max(row_times)];
    elseif ismember("datetime", string(reduced.Properties.VariableNames))
       span = [min(reduced.datetime), max(reduced.datetime)];
    elseif ismember("start_date", string(reduced.Properties.VariableNames))
@@ -117,8 +118,8 @@ function [reduced, rec] = nearestProfile(tbl, proj, px, py, channel, max_rows)
       'name_key', uniq(best), ...
       'name', char(firstName(reduced)), ...
       'n_rows', height(reduced), ...
-      'datetime_start', char(string(span(1))), ...
-      'datetime_end', char(string(span(2))));
+      'datetime_start', char(timeText(span(1))), ...
+      'datetime_end', char(timeText(span(2))));
 end
 
 function nm = firstName(tbl)
@@ -127,5 +128,13 @@ function nm = firstName(tbl)
       nm = string(tbl.name(1));
    else
       nm = "";
+   end
+end
+
+function value = timeText(time)
+   %TIMETEXT Serialize an optional provenance bound without missing strings.
+   value = "";
+   if ~isnat(time)
+      value = string(time);
    end
 end
