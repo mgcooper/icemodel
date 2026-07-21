@@ -209,7 +209,7 @@ function test_resampleMetTimestep_preserves_single_sample(testCase)
    testCase.verifyEqual(native, source);
 end
 
-function test_promiceSourceCoverage_uses_repo_forcing_root(testCase)
+function test_rcmSourceCoverage_uses_repo_forcing_root(testCase)
    % Blank RCM source dirs should probe repo-local data/forcing, independent of
    % the active ICEMODEL_DATA_PATH configuration.
    old_data_path = getenv('ICEMODEL_DATA_PATH');
@@ -226,7 +226,7 @@ function test_promiceSourceCoverage_uses_repo_forcing_root(testCase)
       marker, mar_dir, had_mar_dir, forcing_dir, had_forcing_dir));
    fclose(fid);
 
-   coverage = icemodel.verification.setup.promiceSourceCoverage( ...
+   coverage = icemodel.verification.setup.rcmSourceCoverage( ...
       "mar", struct('mar', ""));
 
    testCase.verifyTrue(any(coverage.mar.years == 1999));

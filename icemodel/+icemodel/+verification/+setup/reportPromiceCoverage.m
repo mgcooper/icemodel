@@ -10,7 +10,7 @@ function report = reportPromiceCoverage(coverage, requested, leg_windows)
    % exactly where the requested window is NOT covered.
    %
    % Inputs
-   %  coverage     struct from icemodel.verification.setup.promiceSourceCoverage
+   %  coverage     struct from icemodel.verification.setup.rcmSourceCoverage
    %  requested    [year_start year_end] requested study window (years)
    %  leg_windows  struct keyed by model, each with .start/.end datetime (the
    %               actual per-leg window the driver will stage), or "skipped".
@@ -18,7 +18,7 @@ function report = reportPromiceCoverage(coverage, requested, leg_windows)
    % Outputs
    %  report  string : the rendered table (also printed to the command window)
    %
-   % See also: icemodel.verification.setup.promiceSourceCoverage,
+   % See also: icemodel.verification.setup.rcmSourceCoverage,
    %  icemodel.verification.setup.importPromiceSites
 
    arguments

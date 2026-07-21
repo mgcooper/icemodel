@@ -1,7 +1,7 @@
-function coverage = promiceSourceCoverage(sources, dirs)
-   %PROMICESOURCECOVERAGE Probe on-disk year coverage of each forcing source.
+function coverage = rcmSourceCoverage(sources, dirs)
+   %RCMSOURCECOVERAGE Probe on-disk year coverage of each forcing source.
    %
-   %  coverage = icemodel.verification.setup.promiceSourceCoverage( ...
+   %  coverage = icemodel.verification.setup.rcmSourceCoverage( ...
    %     sources, dirs)
    %
    % Probes the available calendar-year span of each requested forcing source
@@ -11,9 +11,9 @@ function coverage = promiceSourceCoverage(sources, dirs)
    % empty year set with a reason.
    %
    % Inputs
-   %  sources string vector subset of ["promice","mar","merra","racmo"].
+   %  sources string vector subset of ["mar","merra","racmo"].
    %  dirs    struct with the (possibly empty) source directory for each
-   %          model: dirs.promice, dirs.mar, dirs.merra, dirs.racmo. Empty
+   %          model: dirs.mar, dirs.merra, dirs.racmo. Empty
    %          fields fall back to each builder's reference layout (the same
    %          defaults the builders use).
    %

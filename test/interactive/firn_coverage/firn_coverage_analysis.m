@@ -73,7 +73,7 @@ function [T, mdfile] = firn_coverage_analysis(kwargs)
 
    % On-disk RCM coverage (years), probed once, for the per-leg overlap column.
    models = ["mar", "merra", "racmo"];
-   cov = icemodel.verification.setup.promiceSourceCoverage(models, ...
+   cov = icemodel.verification.setup.rcmSourceCoverage(models, ...
       struct('mar', "", 'merra', "", 'racmo', ""));
 
    % ---- Profile each candidate ----------------------------------------------

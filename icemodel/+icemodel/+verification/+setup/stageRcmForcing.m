@@ -82,7 +82,7 @@ function out = stageRcmForcing(points, kwargs)
    %        mode); default false (MERGE).
    %
    % See also: icemodel.verification.setup.resolveLegWindows,
-   %  icemodel.verification.setup.promiceSourceCoverage,
+   %  icemodel.verification.setup.rcmSourceCoverage,
    %  icemodel.verification.setup.importPromiceSites,
    %  icemodel.verification.setup.importSumup,
    %  icemodel.forcing.buildMarData, icemodel.forcing.data2met
@@ -559,7 +559,7 @@ function manifest = stageFromManifest(sources, kwargs)
    n = numel(cases);
 
    % Probe on-disk coverage once for the whole set (cheap, fail-early gate).
-   coverage = icemodel.verification.setup.promiceSourceCoverage(sources, ...
+   coverage = icemodel.verification.setup.rcmSourceCoverage(sources, ...
       struct('mar', kwargs.mar_dir, 'merra', kwargs.merra_dir, ...
       'racmo', kwargs.racmo_dir));
 

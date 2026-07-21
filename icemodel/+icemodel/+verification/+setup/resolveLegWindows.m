@@ -6,7 +6,7 @@ function leg = resolveLegWindows(sources, coverage, window_start, window_end)
    %
    %  Resolves, for each requested gridded source, the calendar window/years to
    %  stage by intersecting the requested met window with the source's on-disk
-   %  coverage (probed cheaply by promiceSourceCoverage). This is the FAIL-EARLY
+   %  coverage (probed cheaply by rcmSourceCoverage). This is the FAIL-EARLY
    %  gate: a source with no overlap is marked staged=false WITH A REASON before
    %  any NetCDF is opened, so an empty model/window is skipped without entering
    %  an expensive source build.
@@ -24,7 +24,7 @@ function leg = resolveLegWindows(sources, coverage, window_start, window_end)
    %    sources      : string vector subset of ["mar","merra","racmo"] (other
    %                   entries, e.g. "promice", are ignored - PROMICE is not a
    %                   gridded RCM leg).
-   %    coverage     : struct from promiceSourceCoverage (per-source year ranges).
+   %    coverage     : struct from rcmSourceCoverage (per-source year ranges).
    %    window_start : datetime/NaT requested met window start (NaT = unbounded).
    %    window_end   : datetime/NaT requested met window end (NaT = unbounded).
    %
@@ -33,7 +33,7 @@ function leg = resolveLegWindows(sources, coverage, window_start, window_end)
    %          struct('staged', logical, 'years', vector, 'start', datetime, ...
    %          'end', datetime, 'reason', string). Consume staged/years/start/end.
    %
-   % See also: icemodel.verification.setup.promiceSourceCoverage,
+   % See also: icemodel.verification.setup.rcmSourceCoverage,
    %  icemodel.verification.setup.stageRcmForcing,
    %  icemodel.verification.setup.importPromiceSites
 
