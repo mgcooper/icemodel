@@ -354,116 +354,83 @@ rcm = { ...
    "modis_dir", modis_dir};
 ```
 
-The durable update tools deliberately have non-overlapping scopes:
+Every lasting artifact-contract correction must be implemented in the canonical
+builder or importer, but accepted artifacts do not always require a full raw
+restage. The durable partial-repair tools have deliberately separate scopes:
 
-- `refreshManifestSourceLists(manifest_file)` rewrites only each case's
-  `forcing_sources` and `eval_sources` from its existing colocation graph. It
-  does not read or repair MAT artifacts, observations, schemas, metadata,
-  payload values, or time axes.
-- `repairRcmArtifactMetadata(...)` defaults to a dry run and repairs only
-  manifest-referenced RCM artifacts using its documented, source-aware transform
-  set. It preserves unrelated numeric payloads and time axes, writes atomically,
-  and reports an unprovable migration as restage-required. Changed source-grid
-  selection or point colocation always requires canonical restaging because it
-  changes the numeric payload rather than metadata alone.
-- `repairMetTimeSupport(files, ...)` owns the separate, narrow legacy model-met
-  time-grid repair. Observation/source-payload changes still use the canonical
-  importer or full restage.
+- refreshManifestSourceLists(manifest_file) rewrites only derived
+  forcing_sources and eval_sources from authoritative colocation state. It does
+  not read MAT files or rebuild observations.
+- repairRcmArtifactMetadata(...) inventories every current-product RCM cache file
+  when unscoped and reports files absent from current manifests as unmapped.
+  dataset_family restricts the run to exact family-manifest references, while
+  source_id filters the product inventory. The function defaults to a dry run,
+  synchronizes canonical metadata, validates preservation boundaries, replaces
+  files atomically, and reports pass-two identity. Its optional repair_function
+  callback is the extension seam for a
+  future bounded field/property migration after the same change is canonical in
+  the production builder. The caller must declare every variable and UserData
+  field or CustomProperty the callback may change; the coordinator rejects
+  time-axis, schema-order, and undeclared payload/property changes. New columns
+  must be appended after retained columns. Existing source or sampling identity
+  that conflicts with the current manifest is never repaired by restamping.
+- repairMetTimeSupport(files, ...) remains the explicit recovery path for
+  legacy 15-minute met files written with the old
+  linear_adjacent_finite_only policy. It proves native rows from saved
+  provenance, delegates the corrected hold to
+  icemodel.forcing.helpers.resampleMetTimestep, and preserves unrelated MAT
+  variables. It is not currently an arbitrary cadence converter.
+- stageRcmForcing manifest mode remains the additive path for cache
+  reattachment, deriving missing MAR/MERRA met from compatible Data, and staging
+  true misses.
 
-For a source-list-only policy update:
+Use repair only when the operation is manifest-selected or explicitly
+file-selected, dry-runnable, idempotent, atomic, and able to prove preservation
+of unrelated data. Observation changes, point/source-grid selection changes,
+unsupported cadence changes, and transformations without sufficient provenance
+still require canonical staging. Temporary incident wrappers may call the
+durable coordinator, but are removed after the migration; their scientific
+correction remains in the canonical builder.
 
-```matlab
-manifest = icemodel.verification.setup.refreshManifestSourceLists( ...
-   fullfile(data_root, "eval", "promice", "manifest.json"));
-```
+For a metadata-only RCM refresh:
 
-Current manifest-referenced RCM artifacts can receive the native daily delayed
-MAR `RU` / daily `SMB` correction and corrected GEUS MODIS albedo without
-restaging the full RCM payload. GEUS C6 files use an undocumented finite `999`
-missing-data sentinel; the shared reader masks every nonphysical albedo outside
-`[0, 1]` before interpolation or spatial aggregation. The repair reads only the
-needed source products, batches all referenced points per source year, writes
-each MAT file atomically, recomputes MODIS coverage from physical finite values,
-and preserves unrelated values and time axes. Always inspect the dry run,
-perform the bounded write, then require a source-light unchanged second dry run:
-
-```matlab
+~~~matlab
 dry = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-   dataset_family="promice", mar_dir=mar_dir, modis_dir=modis_dir);
-
+   dataset_family="promice", source_id="mar3.11");
 written = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-   dataset_family="promice", mar_dir=mar_dir, modis_dir=modis_dir, ...
-   dry_run=false);
-
+   dataset_family="promice", source_id="mar3.11", dry_run=false);
 second = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-   dataset_family="promice", mar_dir=mar_dir, modis_dir=modis_dir);
+   dataset_family="promice", source_id="mar3.11");
 assert(second.summary.unchanged == second.summary.total)
-assert(second.mar_source_reads == 0)
-assert(second.modis_source_reads == 0)
-```
+~~~
 
-The repair selects MAR sector 1 (`permanent_ice`) for the current PROMICE ice
-cells, divides each daily accumulation by 24, and holds the rate constant over
-the UTC day. Complete days must sum back to native daily `RU`/`SMB`; partial
-artifact-boundary days carry the same rate on available hours but skip the
-24-hour sum assertion. `Properties.UserData` and top-level
-`artifact_metadata` carry the identical `mar_qc_*` contract.
+A payload migration supplies
+[artifact, actions] = repair_function(artifact, context) plus
+allowed_variable_changes, allowed_metadata_changes,
+allowed_custom_property_changes, and/or allowed_table_property_changes. The
+callback contains only the temporary transform; manifest discovery, mutation
+bounds, hashing, atomic replacement, and convergence reporting stay reusable.
 
-MERRA-2 uses two time conventions at the source boundary. The reader preserves
-native snapshot times for instantaneous collections and native interval centers
-for time-averaged collections. `buildMerraData` consumes tavg1 and tavg3
-collections, relabels only those means to interval start, and holds them over
-their one- or three-hour support. `repairRcmArtifactMetadata` applies the same
-tavg3 support rule to manifest-referenced legacy MERRA userdata. A pre-proven
-artifact remains source-light; otherwise the first dry/write pass performs the
-bounded coordinate-only proof described below. Its actions distinguish
-`hold_merra_tavg3_support`, `stamp_merra_time_support`, and
-`stamp_merra_tavg3_source_grid`; a second dry run must report every selected
-artifact unchanged and zero MERRA source reads. The audit checks both canonical
-metadata and numeric block constancy for `runoff`, `albedo`, `snowd`, and `swe`,
-plus an exact native glc timestamp inventory, so stale markers cannot conceal a legacy
-linear ramp or an invented row at an omitted 3-hour source stamp. When an hourly
-legacy artifact lacks that proof, the repair reads only the small native `time`
-coordinate from every required daily glc file, requires exactly the official
-eight monotonic centers, and caches the resulting proof across all sites. A
-missing, duplicate, or malformed source day fails closed. A 15-minute MERRA met
-artifact is accepted only when its cadence, source-grid and resampling
-provenance, expected missing-value lower bounds, and numeric block constancy are
-already canonical; otherwise the repair reports `restage_required` and directs
-the caller to `repairMetTimeSupport`, which owns model-met recovery. Both repair
-writers retain unrelated top-level MAT variables during atomic replacement.
+For the proven legacy met-time repair:
 
-Legacy seasonal 15-minute met written with linear interpolation can be repaired
-from its recorded native rows without reopening PROMICE or ESM-SnowMIP sources:
-
-```matlab
-files = [ ...
-   string(fullfile({dir(fullfile(pwd, "data", "input", "met", ...
-      "promice", "*.mat")).folder}, ...
-      {dir(fullfile(pwd, "data", "input", "met", ...
-      "promice", "*.mat")).name})), ...
-   string(fullfile({dir(fullfile(pwd, "data", "input", "met", ...
-      "esm_snowmip", "*.mat")).folder}, ...
-      {dir(fullfile(pwd, "data", "input", "met", ...
-      "esm_snowmip", "*.mat")).name}))];
+~~~matlab
+files = [
+   "/absolute/path/to/met_site_source_20000101_20001231_15m.mat"
+   "/absolute/path/to/met_other_source_20000101_20001231_15m.mat"
+];
+assert(all(isfile(files)), "replace files with exact existing artifact paths")
 dry = icemodel.verification.setup.repairMetTimeSupport(files);
-written = icemodel.verification.setup.repairMetTimeSupport(files, dry_run=false);
+written = icemodel.verification.setup.repairMetTimeSupport( ...
+   files, dry_run=false);
 second = icemodel.verification.setup.repairMetTimeSupport(files);
 assert(second.summary.unchanged_count == second.summary.file_count)
-```
+~~~
 
-The helper accepts only explicit files, defaults to no-write, rewrites each file
-atomically, preserves source NaNs and omitted gaps, and includes the complete
-final native interval. Source-light legacy reconstruction is allowed only when
-the recorded native gap count is zero and the source cadence, source-row count,
-and old output-row count prove one exact regular grid. Ambiguous or omitted
-native timestamps fail closed and require a raw-source restage. MERRA glacier
-channels additionally need an exact native glc timestamp inventory: the helper
-re-holds proven hourly `runoff`/`albedo`/`snowd`/`swe` before 15-minute
-resampling and rejects an unproven MERRA artifact for full regeneration. Legacy
-files may carry provenance only in `met.Properties.UserData`; the repaired write
-adds synchronized top-level `artifact_metadata` while preserving auxiliary MAT
-variables.
+The current userdata writer supports explicit native cadence or canonical
+hourly output, not 15-minute userdata. A future userdata-cadence change must
+first be defined in writeuserdata; only then should the partial-repair
+orchestrator be extended to rewrite artifact filenames and manifest references
+under that canonical policy.
 
 Run all preview families and generate one-year figures. The preview artifacts
 are already clipped to the lesser of one year or the case period, but the plot

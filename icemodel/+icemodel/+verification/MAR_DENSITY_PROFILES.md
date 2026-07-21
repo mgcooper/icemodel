@@ -75,18 +75,7 @@ delete an earlier valid product. Comparison and plotting group by both
 `profile_id` and date, pair exact UTC calendar dates, and compare MAR with SUMup
 only over common midpoint depth support.
 
-Replay the source and grid audit with
-`icemodel.verification.setup.auditMarSemanticsAndGrid()`.
-Its durable variable, representative-site, and all-PROMICE mapping ledgers live
-under `data/preview/qa`.
-
-Replay the bounded three-case staging, comparison, plot, and artifact-audit proof
-with `icemodel.verification.setup.runMarProfileBundleProof()`. It writes only the
-compact profile proof table and three review figures under `data/preview/qa`; its isolated
-temporary stage is removed after the checks finish.
-
-Run the complete focused gate with
-`matlab -batch "addpath('icemodel'); icemodel.verification.setup.runMarProfileValidation()"`.
-The gate runs
-the dedicated unit files, selected shared-path regressions, and both source-backed
-replays in dependency order.
+The durable validation lives in `test_profile_groups.m` and
+`test_mar_density_profiles.m`. Accepted staged artifacts are checked by
+`icemodel.verification.auditArtifacts` and the standard verification reports;
+no source-path-specific replay driver is required.

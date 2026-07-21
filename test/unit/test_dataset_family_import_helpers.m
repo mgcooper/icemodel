@@ -1804,133 +1804,361 @@ function test_repairRcmArtifactMetadata_reports_ambiguous_alias(testCase)
 
    report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
       input_root, eval_root=eval_root);
-   statuses = string({report.records.status});
 
-   testCase.verifyTrue(any(statuses == "ambiguous"));
+   testCase.verifyEqual(string({report.records.status}), "ambiguous");
 end
 
-function test_repairRcmArtifactMetadata_accepts_yearly_referenced_artifact(testCase)
-   % Current demo fixtures can be yearly userdata files rather than windows.
-   eval_root = fullfile(testCase.TestData.tmp, 'repair-yearly-eval');
-   input_root = fullfile(testCase.TestData.tmp, 'repair-yearly-input');
-   rel = "mar3.11/case1_mar3.11_2012.mat";
-   writeTinyRepairManifest(eval_root, "promice", "case1", 67.0, -48.0, rel);
-   writeTaggedExistingData(fullfile(input_root, 'userdata', rel), ...
-      "nearest", [67, -48]);
-
-   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root);
-   statuses = string({report.records.status});
-
-   testCase.verifyTrue(any(statuses == "would_repair"));
-end
-
-function test_repairRcmArtifactMetadata_matches_tmp_symlink_scoped_keys(testCase)
-   % A /tmp-spelled family scope must match canonical /private/tmp dir results
-   % exactly without falling back to another family's artifact alias.
-   [~, token] = fileparts(tempname);
-   root_name = "icemodel-repair-path-" + string(token);
-   alias_root = fullfile("/tmp", root_name);
-   canonical_root = fullfile("/private/tmp", root_name);
-   mkdir(alias_root)
-   root_cleanup = onCleanup(@() rmdir(alias_root, 's'));
-   testCase.assumeTrue(isfolder(canonical_root));
-
-   % Keep the dry-run proof independent of any workstation MAR source setting.
-   prior_mar_dir = getenv('ICEMODEL_MAR_DIR');
-   env_cleanup = onCleanup(@() setenv('ICEMODEL_MAR_DIR', prior_mar_dir));
-   setenv('ICEMODEL_MAR_DIR', '');
-
-   % The selected manifest spelling contains a missing component plus '..'; the
-   % actual file and the out-of-scope RetMIP file both live in the canonical tree.
-   alias_eval = fullfile(alias_root, 'eval');
-   alias_input = fullfile(alias_root, 'input');
-   canonical_eval = fullfile(canonical_root, 'eval');
-   canonical_input = fullfile(canonical_root, 'input');
-   actual_rel = "mar3.11/case1_mar3.11_2012.mat";
-   manifest_rel = "mar3.11/not-created/../case1_mar3.11_2012.mat";
-   outside_rel = "mar3.11/case2_mar3.11_2012.mat";
-   writeTinyRepairManifest(alias_eval, "promice", "case1", ...
-      67.0, -48.0, manifest_rel);
-   writeTinyRepairManifest(alias_eval, "retmip", "case2", ...
-      68.0, -48.0, outside_rel);
-   selected_file = fullfile(alias_input, 'userdata', actual_rel);
-   outside_file = fullfile(alias_input, 'userdata', outside_rel);
-   writeBareExistingData(selected_file);
-   writeBareExistingData(outside_file);
-   selected_before = fileBytes(selected_file);
-   outside_before = fileBytes(outside_file);
-
-   % Alias and canonical roots must classify the identical exact PROMICE record
-   % while remaining source-light and leaving the lexical component nonexistent.
-   alias_report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      alias_input, eval_root=alias_eval, dataset_family="promice");
-   canonical_report = ...
-      icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      canonical_input, eval_root=canonical_eval, dataset_family="promice");
-   testCase.verifyEqual(numel(alias_report.records), 1);
-   testCase.verifyEqual(numel(canonical_report.records), 1);
-   testCase.verifyEqual(string({alias_report.records.filename}), ...
-      string({canonical_report.records.filename}));
-   testCase.verifyEqual(string({alias_report.records.status}), ...
-      string({canonical_report.records.status}));
-   testCase.verifyEqual(string(alias_report.records.actions), ...
-      string(canonical_report.records.actions));
-   testCase.verifyEqual(string(alias_report.records.status), "would_repair");
-   testCase.verifyEqual(string(alias_report.records.filename), ...
-      string(fullfile(canonical_input, 'userdata', actual_rel)));
-
-   % Family scoping and dry-run source-light behavior are part of the regression,
-   % not incidental consequences of matching one path spelling.
-   for report = {alias_report, canonical_report}
-      testCase.verifyEqual(report{1}.mar_source_reads, 0);
-      testCase.verifyEqual(report{1}.merra_source_reads, 0);
-      testCase.verifyEqual(report{1}.modis_source_reads, 0);
-   end
-   testCase.verifyEqual(fileBytes(selected_file), selected_before);
-   testCase.verifyEqual(fileBytes(outside_file), outside_before);
-   testCase.verifyFalse(isfolder(fullfile(alias_input, 'userdata', ...
-      'mar3.11', 'not-created')));
-   clear env_cleanup root_cleanup
-end
-
-function test_repairRcmArtifactMetadata_reports_exact_file_conflict(testCase)
-   % Exact manifest refs must not be overwritten when case locations disagree.
-   eval_root = fullfile(testCase.TestData.tmp, 'repair-conflict-eval');
-   input_root = fullfile(testCase.TestData.tmp, 'repair-conflict-input');
-   rel = "mar3.11/shared_mar3.11_2012.mat";
-   writeTinyRepairManifest(eval_root, "promice", "case1", 67.0, -48.0, rel);
-   writeTinyRepairManifest(eval_root, "retmip", "case2", 68.0, -48.0, rel);
-   writeTaggedExistingData(fullfile(input_root, 'userdata', rel), ...
-      "nearest", [67, -48]);
-
-   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root);
-   statuses = string({report.records.status});
-
-   testCase.verifyTrue(any(statuses == "ambiguous"));
-end
-
-function test_repairRcmArtifactMetadata_uses_manifest_sample_method(testCase)
-   % A manifest exact ref decides the missing sample_method during repair.
+function test_repairRcmArtifactMetadata_reports_ambiguous_alias_method(testCase)
+   % Alias fallback must not guess when one source has conflicting methods.
    eval_root = fullfile(testCase.TestData.tmp, 'repair-method-eval');
    input_root = fullfile(testCase.TestData.tmp, 'repair-method-input');
+   writeTinyRepairManifest(eval_root, "promice", "kanu", 67.0, -47.0, ...
+      "mar3.11/reference1_mar3.11_2012.mat", "nearest");
+   writeTinyRepairManifest(eval_root, "retmip", "kanu", 67.0, -47.0, ...
+      "mar3.11/reference2_mar3.11_2012.mat", "natural");
+   artifact = fullfile(input_root, 'userdata', 'mar3.11', ...
+      'kanu_mar3.11_2012.mat');
+   ensureParent(artifact);
+   touch(artifact);
+
+   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root);
+
+   testCase.verifyEqual(string({report.records.status}), "ambiguous");
+end
+
+function test_repairRcmArtifactMetadata_uses_agreed_alias_method(testCase)
+   % Alias fallback may stamp one source method when current manifests agree.
+   eval_root = fullfile(testCase.TestData.tmp, 'repair-method-agree-eval');
+   input_root = fullfile(testCase.TestData.tmp, 'repair-method-agree-input');
+   writeTinyRepairManifest(eval_root, "promice", "kanu", 67.0, -47.0, ...
+      "mar3.11/reference1_mar3.11_2012.mat", "natural");
+   writeTinyRepairManifest(eval_root, "retmip", "kanu", 67.0, -47.0, ...
+      "mar3.11/reference2_mar3.11_2012.mat", "natural");
+   artifact = fullfile(input_root, 'userdata', 'mar3.11', ...
+      'kanu_mar3.11_2012.mat');
+   writeBareExistingData(artifact);
+
+   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, dry_run=false);
+   loaded = load(artifact, 'artifact_metadata');
+
+   testCase.verifyEqual(string({report.records.status}), "repaired");
+   testCase.verifyEqual(string(loaded.artifact_metadata.sample_method), ...
+      "natural");
+end
+
+function test_repairRcmArtifactMetadata_preserves_exact_alias_keys(testCase)
+   % MATLAB identifier normalization must not merge distinct case aliases.
+   eval_root = fullfile(testCase.TestData.tmp, 'repair-alias-key-eval');
+   input_root = fullfile(testCase.TestData.tmp, 'repair-alias-key-input');
+   writeTinyRepairManifest(eval_root, "promice", "case-a", 67.0, -47.0, ...
+      "mar3.11/reference1_mar3.11_2012.mat", "natural");
+   writeTinyRepairManifest(eval_root, "retmip", "case_a", 68.0, -47.0, ...
+      "mar3.11/reference2_mar3.11_2012.mat", "natural");
+   artifact = fullfile(input_root, 'userdata', 'mar3.11', ...
+      'case-a_mar3.11_2012.mat');
+   writeBareExistingData(artifact);
+
+   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, dry_run=false);
+   loaded = load(artifact, 'artifact_metadata');
+
+   testCase.verifyEqual(string(report.records.status), "repaired");
+   testCase.verifyEqual(loaded.artifact_metadata.lat_wgs84, 67);
+end
+
+function test_repairRcmArtifactMetadata_syncs_metadata_atomically(testCase)
+   % Metadata-only repair preserves payloads, sidecars, and pass-two identity.
+   eval_root = fullfile(testCase.TestData.tmp, 'repair-metadata-eval');
+   input_root = fullfile(testCase.TestData.tmp, 'repair-metadata-input');
    rel = "mar3.11/case1_mar3.11_2012.mat";
    data_file = fullfile(input_root, 'userdata', rel);
    writeTinyRepairManifest(eval_root, "promice", "case1", 67.0, -48.0, ...
       rel, "natural");
    writeBareExistingData(data_file);
+   sidecar = "preserve me";
+   save(data_file, 'sidecar', '-append')
+   before = load(data_file, 'Data', 'sidecar');
+   before_bytes = fileBytes(data_file);
 
-   icemodel.verification.setup.repairRcmArtifactMetadata( ...
+   dry = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root);
+   testCase.verifyEqual(string(dry.records.status), "would_repair", ...
+      string(dry.records.reason));
+   testCase.verifyEqual(fileBytes(data_file), before_bytes);
+
+   written = icemodel.verification.setup.repairRcmArtifactMetadata( ...
       input_root, eval_root=eval_root, dry_run=false);
-   loaded = load(data_file, 'artifact_metadata');
-
+   loaded = load(data_file, 'Data', 'artifact_metadata', 'sidecar');
+   testCase.verifyEqual(string(written.records.status), "repaired");
+   testCase.verifyEqual(loaded.Data.Time, before.Data.Time);
+   testCase.verifyEqual(loaded.Data.tair, before.Data.tair);
+   testCase.verifyEqual(loaded.sidecar, before.sidecar);
    testCase.verifyEqual(string(loaded.artifact_metadata.sample_method), ...
       "natural");
+   testCase.verifyEqual(loaded.artifact_metadata.lat_wgs84, 67);
+   testCase.verifyEqual(loaded.artifact_metadata.lon_wgs84, -48);
+
+   second = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, dry_run=false);
+   testCase.verifyEqual(string(second.records.status), "unchanged");
+   testCase.verifyEqual(second.records.hash_before, second.records.hash_after);
+end
+
+function test_repairRcmArtifactMetadata_rejects_stale_sample_method(testCase)
+   % Existing sampling identity cannot be restamped over a manifest conflict.
+   eval_root = fullfile(testCase.TestData.tmp, 'repair-method-stale-eval');
+   input_root = fullfile(testCase.TestData.tmp, 'repair-method-stale-input');
+   rel = "mar3.11/case1_mar3.11_2012.mat";
+   data_file = fullfile(input_root, 'userdata', rel);
+   writeTinyRepairManifest(eval_root, "promice", "case1", 67.0, -48.0, ...
+      rel, "natural");
+   writeTaggedExistingData(data_file, "nearest", [67, -48]);
+   before = fileBytes(data_file);
+
+   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, dry_run=false);
+
+   testCase.verifyEqual(string(report.records.status), "restage_required");
+   testCase.verifyTrue(contains(string(report.records.reason), ...
+      "sample_method"));
+   testCase.verifyEqual(fileBytes(data_file), before);
+end
+
+function test_repairRcmArtifactMetadata_rejects_metadata_method_conflict(testCase)
+   % UserData and top-level sampling identities must not mask each other.
+   eval_root = fullfile(testCase.TestData.tmp, 'repair-method-conflict-eval');
+   input_root = fullfile(testCase.TestData.tmp, 'repair-method-conflict-input');
+   rel = "mar3.11/case1_mar3.11_2012.mat";
+   data_file = fullfile(input_root, 'userdata', rel);
+   writeTinyRepairManifest(eval_root, "promice", "case1", 67.0, -48.0, rel);
+   writeTaggedExistingData(data_file, "nearest", [67, -48]);
+   loaded = load(data_file, 'artifact_metadata');
+   artifact_metadata = loaded.artifact_metadata;
+   artifact_metadata.sample_method = 'natural';
+   save(data_file, 'artifact_metadata', '-append')
+   before = fileBytes(data_file);
+
+   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, dry_run=false);
+
+   testCase.verifyEqual(string(report.records.status), "restage_required");
+   testCase.verifyTrue(contains(string(report.records.reason), ...
+      "metadata copies"));
+   testCase.verifyEqual(fileBytes(data_file), before);
+end
+
+function test_repairRcmArtifactMetadata_rejects_malformed_top_metadata(testCase)
+   % Opaque top-level metadata cannot be replaced by a guessed struct contract.
+   eval_root = fullfile(testCase.TestData.tmp, 'repair-metadata-bad-eval');
+   input_root = fullfile(testCase.TestData.tmp, 'repair-metadata-bad-input');
+   rel = "mar3.11/case1_mar3.11_2012.mat";
+   data_file = fullfile(input_root, 'userdata', rel);
+   writeTinyRepairManifest(eval_root, "promice", "case1", 67.0, -48.0, rel);
+   writeBareExistingData(data_file);
+   artifact_metadata = "opaque";
+   save(data_file, 'artifact_metadata', '-append')
+   before = fileBytes(data_file);
+
+   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, dry_run=false);
+
+   testCase.verifyEqual(string(report.records.status), "error");
+   testCase.verifyTrue(contains(string(report.records.reason), ...
+      "must be a struct"));
+   testCase.verifyEqual(fileBytes(data_file), before);
+end
+
+function test_repairRcmArtifactMetadata_rejects_exact_source_mismatch(testCase)
+   % An exact path cannot override conflicting manifest/product identity.
+   eval_root = fullfile(testCase.TestData.tmp, 'repair-source-mismatch-eval');
+   input_root = fullfile(testCase.TestData.tmp, 'repair-source-mismatch-input');
+   rel = "mar3.11/case1_mar3.11_2012.mat";
+   data_file = fullfile(input_root, 'userdata', rel);
+   writeTinyRepairManifest(eval_root, "promice", "case1", 67.0, -48.0, ...
+      rel, "nearest", "merra2");
+   writeTaggedExistingData(data_file, "nearest", [67, -48]);
+
+   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, dataset_family="promice");
+
+   testCase.verifyEqual(string(report.records.status), "ambiguous");
+end
+
+function test_repairRcmArtifactMetadata_rejects_missing_exact_source(testCase)
+   % Current exact references require an explicit source-product identity.
+   eval_root = fullfile(testCase.TestData.tmp, 'repair-source-missing-eval');
+   input_root = fullfile(testCase.TestData.tmp, 'repair-source-missing-input');
+   rel = "mar3.11/case1_mar3.11_2012.mat";
+   data_file = fullfile(input_root, 'userdata', rel);
+   writeTinyRepairManifest(eval_root, "promice", "case1", 67.0, -48.0, ...
+      rel, "nearest", "");
+   writeTaggedExistingData(data_file, "nearest", [67, -48]);
+
+   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, dataset_family="promice");
+
+   testCase.verifyEqual(string(report.records.status), "ambiguous");
+end
+
+function test_repairRcmArtifactMetadata_runs_bounded_callback(testCase)
+   % A callback may add only declared fields while orchestration stays generic.
+   eval_root = fullfile(testCase.TestData.tmp, 'repair-callback-eval');
+   input_root = fullfile(testCase.TestData.tmp, 'repair-callback-input');
+   rel = "mar3.11/case1_mar3.11_2012.mat";
+   data_file = fullfile(input_root, 'userdata', rel);
+   writeTinyRepairManifest(eval_root, "promice", "case1", 67.0, -48.0, rel);
+   writeTaggedExistingData(data_file, "nearest", [67, -48]);
+   before = load(data_file, 'Data');
+
+   dry = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, ...
+      repair_function=@addDurableRepairField, ...
+      allowed_variable_changes="new_field", ...
+      allowed_metadata_changes="new_provenance", ...
+      allowed_custom_property_changes="RepairProvenance");
+   testCase.verifyEqual(string(dry.records.status), "would_repair", ...
+      string(dry.records.reason));
+   testCase.verifyEqual(string(dry.records.changed_variables), "new_field");
+   testCase.verifyTrue(ismember("add_new_field", ...
+      string(dry.records.actions)));
+   testCase.verifyFalse(ismember("new_field", ...
+      string(before.Data.Properties.VariableNames)));
+
+   icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, ...
+      repair_function=@addDurableRepairField, ...
+      allowed_variable_changes="new_field", ...
+      allowed_metadata_changes="new_provenance", ...
+      allowed_custom_property_changes="RepairProvenance", dry_run=false);
+   loaded = load(data_file, 'Data', 'artifact_metadata');
+   testCase.verifyEqual(loaded.Data.new_field, (1:height(loaded.Data))');
+   testCase.verifyEqual(string( ...
+      loaded.artifact_metadata.new_provenance), "test callback");
+   testCase.verifyEqual(string( ...
+      loaded.Data.Properties.CustomProperties.RepairProvenance), ...
+      "test callback");
+
+   second = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, ...
+      repair_function=@addDurableRepairField, ...
+      allowed_variable_changes="new_field", ...
+      allowed_metadata_changes="new_provenance", ...
+      allowed_custom_property_changes="RepairProvenance", dry_run=false);
+   testCase.verifyEqual(string(second.records.status), "unchanged");
+end
+
+function test_repairRcmArtifactMetadata_rejects_callback_scope_expansion(testCase)
+   % Undeclared payload and time changes fail closed without mutating the file.
+   eval_root = fullfile(testCase.TestData.tmp, 'repair-reject-eval');
+   input_root = fullfile(testCase.TestData.tmp, 'repair-reject-input');
+   rel = "mar3.11/case1_mar3.11_2012.mat";
+   data_file = fullfile(input_root, 'userdata', rel);
+   writeTinyRepairManifest(eval_root, "promice", "case1", 67.0, -48.0, rel);
+   writeTaggedExistingData(data_file, "nearest", [67, -48]);
+   before = fileBytes(data_file);
+
+   undeclared = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, ...
+      repair_function=@changeUndeclaredRepairField, ...
+      allowed_variable_changes="new_field");
+   testCase.verifyEqual(string(undeclared.records.status), "error");
+   testCase.verifyTrue(contains(string(undeclared.records.reason), ...
+      "undeclared variables"));
+
+   shifted = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, ...
+      repair_function=@changeRepairTime, ...
+      allowed_variable_changes="tair");
+   testCase.verifyEqual(string(shifted.records.status), "error");
+   testCase.verifyTrue(contains(string(shifted.records.reason), "time axis"));
+
+   reordered = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, ...
+      repair_function=@reorderRepairVariables, ...
+      allowed_variable_changes="*");
+   testCase.verifyEqual(string(reordered.records.status), "error");
+   testCase.verifyTrue(contains(string(reordered.records.reason), ...
+      "properties"));
+
+   prepended = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, ...
+      repair_function=@prependRepairVariable, ...
+      allowed_variable_changes="new_field");
+   testCase.verifyEqual(string(prepended.records.status), "error");
+   testCase.verifyTrue(contains(string(prepended.records.reason), ...
+      "properties"));
+
+   described = icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, ...
+      repair_function=@changeRepairDescription, ...
+      allowed_variable_changes="tair");
+   testCase.verifyEqual(string(described.records.status), "error");
+   testCase.verifyTrue(contains(string(described.records.reason), ...
+      "properties"));
+
+   allowed_description = ...
+      icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, ...
+      repair_function=@changeRepairDescription, ...
+      allowed_table_property_changes="Description");
+   testCase.verifyEqual(string(allowed_description.records.status), ...
+      "would_repair");
+
+   wildcard_grid = ...
+      icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, ...
+      repair_function=@changeProtectedGridProperty, ...
+      allowed_custom_property_changes="*");
+   testCase.verifyEqual(string(wildcard_grid.records.status), "error");
+   testCase.verifyTrue(contains(string(wildcard_grid.records.reason), ...
+      "properties"));
+
+   wildcard_units = ...
+      icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, ...
+      repair_function=@changeProtectedScalarUnits, ...
+      allowed_custom_property_changes="*");
+   testCase.verifyEqual(string(wildcard_units.records.status), "error");
+   testCase.verifyTrue(contains(string(wildcard_units.records.reason), ...
+      "properties"));
+
+   variable_metadata = ...
+      icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      input_root, eval_root=eval_root, ...
+      repair_function=@changeAllowedVariableUnits, ...
+      allowed_variable_changes="tair");
+   testCase.verifyEqual(string(variable_metadata.records.status), "error");
+   testCase.verifyTrue(contains(string(variable_metadata.records.reason), ...
+      "properties"));
+   testCase.verifyEqual(fileBytes(data_file), before);
+end
+
+function test_repairRcmArtifactMetadata_validates_callback_contract(testCase)
+   % Public argument validation prevents an unbounded or non-callable repair.
+   testCase.verifyError(@() ...
+      icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      repair_function="not callable", allowed_variable_changes="x"), ...
+      'icemodel:verification:repairRcmArtifactMetadata:badRepairFunction');
+   testCase.verifyError(@() ...
+      icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      repair_function=@addDurableRepairField), ...
+      'icemodel:verification:repairRcmArtifactMetadata:missingBoundary');
+   testCase.verifyError(@() ...
+      icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      repair_function=@addDurableRepairField, ...
+      allowed_custom_property_changes="Lat"), ...
+      'icemodel:verification:repairRcmArtifactMetadata:protectedProperty');
+   testCase.verifyError(@() ...
+      icemodel.verification.setup.repairRcmArtifactMetadata( ...
+      repair_function=@addDurableRepairField, ...
+      allowed_custom_property_changes="StandardNames"), ...
+      'icemodel:verification:repairRcmArtifactMetadata:protectedProperty');
 end
 
 function test_repairRcmArtifactMetadata_accepts_15m_met_artifact(testCase)
-   % Fifteen-minute RCM met files are current-cache artifacts too.
+   % Fifteen-minute RCM met files remain within the current artifact inventory.
    eval_root = fullfile(testCase.TestData.tmp, 'repair-15m-eval');
    input_root = fullfile(testCase.TestData.tmp, 'repair-15m-input');
    rel = "mar3.11/met_case1_mar3.11_20120101_20121231_15m.mat";
@@ -1941,456 +2169,48 @@ function test_repairRcmArtifactMetadata_accepts_15m_met_artifact(testCase)
 
    report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
       input_root, eval_root=eval_root);
-   statuses = string({report.records.status});
 
-   testCase.verifyTrue(any(statuses == "would_repair"));
+   testCase.verifyEqual(numel(report.records), 1);
+   testCase.verifyTrue(ismember(string(report.records.status), ...
+      ["unchanged", "would_repair"]));
 end
 
-function test_repairRcmArtifactMetadata_applies_mar_daily_idempotently(testCase)
-   % Native daily sector-1 RU/SMB repair applies only to hourly source Data.
-   % The paired 15-minute met payload must remain numerically byte-for-byte
-   % equivalent while generic metadata is synchronized, and pass two reads no RU/SMB.
-   eval_root = fullfile(testCase.TestData.tmp, 'repair-mar-daily-eval');
-   input_root = fullfile(testCase.TestData.tmp, 'repair-mar-daily-input');
-   mar_dir = fullfile(testCase.TestData.tmp, 'repair-mar-daily-source');
-   met_rel = "mar3.11/met_case1_mar3.11_20120101_20120102_15m.mat";
-   data_rel = "mar3.11/case1_mar3.11_20120101_20120102.mat";
-   met_file = fullfile(input_root, 'met', met_rel);
-   data_file = fullfile(input_root, 'userdata', data_rel);
-   writeTinyRepairPairManifest(eval_root, "case1", 67.0, -48.0, ...
-      met_rel, data_rel);
-   writeLegacyMarPair(met_file, data_file);
-   met_before = makeLegacyMarMet15m(met_file);
-   writeTinyMarDailySource(mar_dir, 2012);
-
-   dry = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      mar_dir=string(mar_dir));
-   testCase.verifyTrue(all(string({dry.records.status}) == "would_repair"));
-   is_met = contains(string({dry.records.filename}), filesep + "met" + filesep);
-   testCase.verifyEqual(nnz(is_met), 1);
-   testCase.verifyFalse(any(string(dry.records(is_met).actions) == ...
-      "apply_mar_daily_constrained_qc"));
-   testCase.verifyTrue(any(string(dry.records(~is_met).actions) == ...
-      "apply_mar_daily_constrained_qc"));
-   testCase.verifyEqual(dry.records(is_met).mar_qc_status, "not_applicable");
-   % RU and SMB are independent native variables, hence two source reads for
-   % the one Data payload; the met payload performs no additional native read.
-   testCase.verifyEqual(dry.mar_source_reads, 2);
-   testCase.verifyEqual(dry.mar_cached_series, 1);
-
-   written = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      mar_dir=string(mar_dir), dry_run=false);
-   testCase.verifyTrue(all(string({written.records.status}) == "repaired"));
-   loaded_met = load(met_file, 'met', 'artifact_metadata');
-   loaded_data = load(data_file, 'Data', 'artifact_metadata');
-   expected_runoff = [ones(24, 1) * 0.001; ones(24, 1) * 0.002];
-   expected_smb = -expected_runoff;
-   testCase.verifyEqual(loaded_met.met.Time, met_before.Time);
-   testCase.verifyEqual(loaded_met.met.Properties.VariableNames, ...
-      met_before.Properties.VariableNames);
-   testCase.verifyEqual(loaded_met.met.Variables, met_before.Variables, ...
-      'AbsTol', 0);
-   testCase.verifyEqual(loaded_data.Data.runoff, expected_runoff, ...
-      'AbsTol', 1e-12);
-   testCase.verifyEqual(loaded_data.Data.smb, expected_smb, ...
-      'AbsTol', 1e-12);
-   testCase.verifyEqual(loaded_data.Data.melt, (1:48)');
-   testCase.verifyEqual(loaded_met.met.Properties.UserData, ...
-      loaded_met.artifact_metadata);
-   testCase.verifyEqual(loaded_data.Data.Properties.UserData, ...
-      loaded_data.artifact_metadata);
-   testCase.verifyEqual(string( ...
-      loaded_data.artifact_metadata.mar_qc_method), ...
-      "daily_constrained_hourly");
-   testCase.verifyEqual(loaded_data.artifact_metadata.mar_qc_sector, 1);
-
-   second = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      mar_dir=string(mar_dir));
-   testCase.verifyTrue(all(string({second.records.status}) == "unchanged"));
-   testCase.verifyEqual(second.mar_source_reads, 0);
-end
-
-function test_repairRcmArtifactMetadata_aligns_overlong_mar_ledgers_source_light( ...
-      testCase)
-   % A clipped hourly Data/15-minute met pair with full-calendar provenance is
-   % repaired metadata-only, preserves all payload values, and is idempotent.
-   eval_root = fullfile(testCase.TestData.tmp, 'repair-mar-align-eval');
-   input_root = fullfile(testCase.TestData.tmp, 'repair-mar-align-input');
-   met_rel = "mar3.11/met_case1_mar3.11_20120110_20120112_15m.mat";
-   data_rel = "mar3.11/case1_mar3.11_20120110_20120112.mat";
-   met_file = fullfile(input_root, 'met', met_rel);
-   data_file = fullfile(input_root, 'userdata', data_rel);
-   writeTinyRepairPairManifest(eval_root, "case1", 67.0, -48.0, ...
-      met_rel, data_rel);
-   [data_before, met_before, sentinel] = ...
-      writeOverlongMarLedgerPair(met_file, data_file);
-
-   dry = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice");
-   testCase.verifyTrue(all(string({dry.records.status}) == "would_repair"));
-   testCase.verifyTrue(all(arrayfun(@(record) ...
-      any(string(record.actions) == "align_mar_daily_metadata"), ...
-      dry.records)));
-   testCase.verifyFalse(any(arrayfun(@(record) ...
-      any(string(record.actions) == "apply_mar_daily_constrained_qc"), ...
-      dry.records)));
-   testCase.verifyEqual(dry.mar_source_reads, 0);
-
-   written = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      dry_run=false);
-   testCase.verifyTrue(all(string({written.records.status}) == "repaired"));
-   data = load(data_file, 'Data', 'artifact_metadata', 'sentinel_payload');
-   derived = load(met_file, 'met', 'artifact_metadata', 'sentinel_payload');
-
-   % Numeric values, axes, variable classes/names, and unrelated MAT payloads
-   % are invariant; only timetable/top-level metadata is synchronized.
-   testCase.verifyEqual(data.Data.Time, data_before.Time);
-   testCase.verifyEqual(data.Data.Variables, data_before.Variables, 'AbsTol', 0);
-   testCase.verifyEqual(data.Data.Properties.VariableNames, ...
-      data_before.Properties.VariableNames);
-   testCase.verifyEqual(class(data.Data), class(data_before));
-   testCase.verifyEqual(derived.met.Time, met_before.Time);
-   testCase.verifyEqual(derived.met.Variables, met_before.Variables, 'AbsTol', 0);
-   testCase.verifyEqual(derived.met.Properties.VariableNames, ...
-      met_before.Properties.VariableNames);
-   testCase.verifyEqual(class(derived.met), class(met_before));
-   testCase.verifyEqual(data.sentinel_payload, sentinel);
-   testCase.verifyEqual(derived.sentinel_payload, sentinel);
-   testCase.verifyEqual(data.Data.Properties.UserData, data.artifact_metadata);
-   testCase.verifyEqual(derived.met.Properties.UserData, ...
-      derived.artifact_metadata);
-
-   % Jan 10/12 are partial, Jan 11 is complete. Both artifacts carry the same
-   % clipped native ledger while cumulative and non-day provenance survives.
-   for metadata = {data.artifact_metadata, derived.artifact_metadata}
-      md = metadata{1};
-      testCase.verifyEqual(md.mar_qc_runoff_day_status, uint8([3; 1; 3]));
-      testCase.verifyEqual(md.mar_qc_smb_day_status, uint8([3; 1; 3]));
-      testCase.verifyEqual(md.mar_diagnostic_melt_day_status, ...
-         uint8([3; 1; 3]));
-      testCase.verifyTrue(all(isnan( ...
-         md.mar_qc_runoff_daily_reference_mwe([1 3]))));
-      testCase.verifyTrue(all(isnan( ...
-         md.mar_diagnostic_melt_residual_mwe_day([1 3]))));
-      testCase.verifyEqual(md.mar_qc_complete_utc_day_count, 1);
-      testCase.verifyEqual(md.mar_qc_partial_utc_day_count, 2);
-      testCase.verifyEqual(md.mar_qc_replaced_runoff_count, 17);
-      testCase.verifyEqual(md.mar_qc_replaced_smb_count, 23);
-      testCase.verifyEqual(md.source_files, "full-mar-2012.nc");
-      testCase.verifyEqual(md.sentinel_policy, "preserve");
-   end
-
-   second = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice");
-   testCase.verifyTrue(all(string({second.records.status}) == "unchanged"));
-   testCase.verifyTrue(all(arrayfun(@(record) isempty(record.actions), ...
-      second.records)));
-   testCase.verifyEqual(second.mar_source_reads, 0);
-end
-
-function test_repairRcmArtifactMetadata_rejects_ambiguous_mar_ledger_axis( ...
-      testCase)
-   % Repair must not infer a calendar mapping when saved per-day vectors disagree.
-   eval_root = fullfile(testCase.TestData.tmp, 'repair-mar-ambiguous-eval');
-   input_root = fullfile(testCase.TestData.tmp, 'repair-mar-ambiguous-input');
-   met_rel = "mar3.11/met_case1_mar3.11_20120110_20120112_15m.mat";
-   data_rel = "mar3.11/case1_mar3.11_20120110_20120112.mat";
-   met_file = fullfile(input_root, 'met', met_rel);
-   data_file = fullfile(input_root, 'userdata', data_rel);
-   writeTinyRepairPairManifest(eval_root, "case1", 67.0, -48.0, ...
-      met_rel, data_rel);
-   writeOverlongMarLedgerPair(met_file, data_file);
-
-   % Corrupt both metadata copies consistently so parity is not the reason for
-   % failure; only the unresolvable source-day lengths should block repair.
-   for item = {met_file, 'met'; data_file, 'Data'}'
-      loaded = load(item{1});
-      artifact_metadata = loaded.artifact_metadata;
-      artifact_metadata.mar_qc_runoff_daily_reference_mwe(end) = [];
-      payload = loaded.(item{2});
-      payload.Properties.UserData = artifact_metadata;
-      loaded.(item{2}) = payload;
-      save(item{1}, '-struct', 'loaded')
-   end
-
-   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice");
-   statuses = string({report.records.status});
-   reasons = string({report.records.reason});
-   testCase.verifyTrue(all(statuses == "restage_required"), ...
-      strjoin(statuses + ":" + reasons, newline));
-   testCase.verifyTrue(all(contains(reasons, "ledger lengths disagree")));
-   testCase.verifyEqual(report.mar_source_reads, 0);
-end
-
-function test_repairRcmArtifactMetadata_signed_mar_rz_source_light( ...
-      testCase)
-   % Legacy roundoff-only RZ metadata is replaced on both artifact cadences
-   % without source reads or any numeric/time mutation, then remains idempotent.
-   eval_root = fullfile(testCase.TestData.tmp, 'repair-mar-rz-eval');
-   input_root = fullfile(testCase.TestData.tmp, 'repair-mar-rz-input');
-   met_rel = "mar3.11/met_case1_mar3.11_20120101_20120102_15m.mat";
-   data_rel = "mar3.11/case1_mar3.11_20120101_20120102.mat";
-   met_file = fullfile(input_root, 'met', met_rel);
-   data_file = fullfile(input_root, 'userdata', data_rel);
-   writeTinyRepairPairManifest(eval_root, "case1", 67.0, -48.0, ...
-      met_rel, data_rel);
-   [data_before, met_before] = writeLegacySignedMarPair(met_file, data_file);
-
-   dry = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice");
-   dry_status = string({dry.records.status});
-   dry_reason = string({dry.records.reason});
-   testCase.verifyEqual(dry_status, ["would_repair", "would_repair"], ...
-      strjoin(dry_status + ":" + dry_reason, newline));
-   testCase.verifyTrue(all(arrayfun(@(record) any(string(record.actions) ...
-      == "stamp_mar_refreeze_signed_metadata"), dry.records)));
-   testCase.verifyEqual(dry.mar_source_reads, 0);
-
-   written = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      dry_run=false);
-   written_status = string({written.records.status});
-   written_reason = string({written.records.reason});
-   testCase.verifyEqual(written_status, ["repaired", "repaired"], ...
-      strjoin(written_status + ":" + written_reason, newline));
-   loaded_data = load(data_file, 'Data', 'artifact_metadata');
-   loaded_met = load(met_file, 'met', 'artifact_metadata');
-   testCase.verifyEqual(loaded_data.Data.Properties.RowTimes, ...
-      data_before.Properties.RowTimes);
-   testCase.verifyEqual(loaded_data.Data.Variables, data_before.Variables, ...
-      'AbsTol', 0);
-   testCase.verifyEqual(loaded_met.met.Properties.RowTimes, ...
-      met_before.Properties.RowTimes);
-   testCase.verifyEqual(loaded_met.met.Variables, met_before.Variables, ...
-      'AbsTol', 0);
-   for item = {loaded_data, 'Data'; loaded_met, 'met'}'
-      metadata = item{1}.artifact_metadata;
-      payload = item{1}.(item{2});
-      testCase.verifyEqual(payload.Properties.UserData, metadata);
-      testCase.verifyEqual(string( ...
-         metadata.mar_diagnostic_refreeze_deposition_sign), ...
-         "native_signed_combined_term_preserved_not_pure_refreeze");
-      testCase.verifyEqual( ...
-         metadata.mar_diagnostic_refreeze_negative_day_count, 1);
-      testCase.verifyEqual( ...
-         metadata.mar_diagnostic_refreeze_negative_minimum_mwe_h, -2e-4);
-      testCase.verifyEqual( ...
-         metadata.mar_diagnostic_refreeze_material_negative_threshold_mwe_h, ...
-         1e-8);
-      testCase.verifyEqual( ...
-         metadata.mar_diagnostic_refreeze_material_negative_day_count, 1);
-      testCase.verifyEqual( ...
-         metadata.mar_diagnostic_refreeze_material_negative_minimum_mwe_h, ...
-         -2e-4);
-      testCase.verifyFalse(isfield(metadata, ...
-         'mar_diagnostic_refreeze_negative_tolerance_mwe_h'));
-   end
-
-   second = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice");
-   testCase.verifyEqual(string({second.records.status}), ...
-      ["unchanged", "unchanged"]);
-   testCase.verifyTrue(all(arrayfun(@(record) isempty(record.actions), ...
-      second.records)));
-   testCase.verifyEqual(second.mar_source_reads, 0);
-end
-
-function test_repairRcmArtifactMetadata_requires_restage_for_constant_daily_mar( ...
-      testCase)
-   % A formerly canonical constant-daily artifact cannot recover discarded
-   % hourly structure from RU/SMB alone and must not be relabelled as hybrid.
-   eval_root = fullfile(testCase.TestData.tmp, 'repair-mar-legacy-eval');
-   input_root = fullfile(testCase.TestData.tmp, 'repair-mar-legacy-input');
-   mar_dir = fullfile(testCase.TestData.tmp, 'repair-mar-legacy-source');
-   met_rel = "mar3.11/met_case1_mar3.11_20120101_20120102_1hr.mat";
-   data_rel = "mar3.11/case1_mar3.11_20120101_20120102.mat";
-   met_file = fullfile(input_root, 'met', met_rel);
-   data_file = fullfile(input_root, 'userdata', data_rel);
-   writeTinyRepairPairManifest(eval_root, "case1", 67.0, -48.0, ...
-      met_rel, data_rel);
-   writeLegacyMarPair(met_file, data_file);
-   writeTinyMarDailySource(mar_dir, 2012);
-
-   loaded = load(met_file);
-   loaded.artifact_metadata.mar_qc_method = 'native_daily';
-   loaded.met.Properties.UserData = loaded.artifact_metadata;
+function test_repairRcmArtifactMetadata_routes_legacy_met_repair(testCase)
+   % Legacy linear met support must remain owned by repairMetTimeSupport.
+   eval_root = fullfile(testCase.TestData.tmp, 'repair-legacy-met-eval');
+   input_root = fullfile(testCase.TestData.tmp, 'repair-legacy-met-input');
+   rel = "mar3.11/met_case1_mar3.11_2012_15m.mat";
+   met_file = fullfile(input_root, 'met', rel);
+   writeTinyRepairManifest(eval_root, "promice", "case1", 67.0, -48.0, ...
+      rel, "nearest");
+   writeTaggedExistingMet(met_file, "nearest", [67, -48]);
+   loaded = load(met_file, 'met', 'artifact_metadata');
+   loaded.met.Properties.UserData.met_resample_policy = ...
+      "linear_adjacent_finite_only";
    met = loaded.met;
-   artifact_metadata = loaded.artifact_metadata;
+   artifact_metadata = met.Properties.UserData;
    save(met_file, 'met', 'artifact_metadata')
-   loaded = load(data_file);
-   loaded.artifact_metadata.mar_qc_method = 'native_daily';
-   loaded.Data.Properties.UserData = loaded.artifact_metadata;
-   Data = loaded.Data;
-   artifact_metadata = loaded.artifact_metadata;
-   save(data_file, 'Data', 'artifact_metadata')
+   before = fileBytes(met_file);
 
    report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      mar_dir=string(mar_dir));
+      input_root, eval_root=eval_root, dry_run=false);
 
-   statuses = string({report.records.status});
-   reasons = string({report.records.reason});
-   is_met = contains(string({report.records.filename}), filesep + "met" + filesep);
-   diagnostic = strjoin(statuses + ":" + reasons, newline);
-   testCase.verifyEqual(nnz(is_met), 1);
-   testCase.verifyEqual(statuses(~is_met), "restage_required", diagnostic);
-   testCase.verifyTrue(contains(reasons(~is_met), "requires full restage"), ...
-      diagnostic);
-   testCase.verifyNotEqual(statuses(is_met), "restage_required", diagnostic);
-   testCase.verifyEqual(report.mar_source_reads, 0);
+   testCase.verifyEqual(string(report.records.status), "repair_required");
+   testCase.verifyTrue(contains(string(report.records.reason), ...
+      "repairMetTimeSupport"));
+   testCase.verifyEqual(report.summary.repair_required, 1);
+   testCase.verifyEqual(fileBytes(met_file), before);
 end
 
-function test_repairRcmArtifactMetadata_canonicalizes_racmo_idempotently(testCase)
-   % RACMO precip is renamed once while every unrelated value and time is kept.
-   eval_root = fullfile(testCase.TestData.tmp, 'repair-racmo-eval');
-   input_root = fullfile(testCase.TestData.tmp, 'repair-racmo-input');
-   rel = "racmo2.3p3/case1_racmo2.3p3_2012.mat";
-   data_file = fullfile(input_root, 'userdata', rel);
-   writeTinyRepairManifest(eval_root, "promice", "case1", 67.0, -48.0, rel);
-   writeLegacyRacmoData(data_file);
-
-   dry = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice");
-   testCase.verifyEqual(string(dry.records.status), "would_repair");
-   testCase.verifyTrue(ismember("rename_racmo_precip_to_ppt", ...
-      string(dry.records.actions)));
-
-   icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      dry_run=false);
-   loaded = load(data_file, 'Data', 'auxiliary');
-   testCase.verifyTrue(ismember("ppt", ...
-      string(loaded.Data.Properties.VariableNames)));
-   testCase.verifyFalse(ismember("precip", ...
-      string(loaded.Data.Properties.VariableNames)));
-   testCase.verifyEqual(loaded.Data.ppt, [1; 2] * 1e-6);
-   testCase.verifyEqual(loaded.Data.runoff, [3; 4]);
-   testCase.verifyEqual(loaded.auxiliary, ...
-      struct('label', "preserve", 'values', [1, 2, 3]));
-
-   second = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice");
-   testCase.verifyEqual(string(second.records.status), "unchanged");
-end
-
-function test_repairRcmArtifactMetadata_flips_marked_merra_once(testCase)
-   % An explicit legacy positive-upward marker is inverted and replaced by the
-   % canonical marker; the next pass must not invert the values again.
-   eval_root = fullfile(testCase.TestData.tmp, 'repair-merra-eval');
-   input_root = fullfile(testCase.TestData.tmp, 'repair-merra-input');
-   rel = "merra2/case1_merra2_2012.mat";
-   data_file = fullfile(input_root, 'userdata', rel);
-   writeTinyRepairManifest(eval_root, "promice", "case1", 67.0, -48.0, rel);
-   writeLegacyMerraData(data_file);
-
-   first = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      dry_run=false);
-   loaded = load(data_file, 'Data', 'artifact_metadata');
-   testCase.verifyEqual(string(first.records.merra_flux_orientation), ...
-      "positive_upward");
-   testCase.verifyEqual(loaded.Data.shf, [-10; 5]);
-   testCase.verifyEqual(loaded.Data.lhf, [-20; 4]);
-   testCase.verifyEqual( ...
-      string(loaded.artifact_metadata.merra_flux_sign_convention), ...
-      "positive_toward_surface");
-
-   second = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      dry_run=false);
-   reloaded = load(data_file, 'Data');
-   testCase.verifyEqual(string(second.records.status), "unchanged");
-   testCase.verifyEqual(reloaded.Data.shf, loaded.Data.shf);
-   testCase.verifyEqual(reloaded.Data.lhf, loaded.Data.lhf);
-end
-
-function test_repairRcmArtifactMetadata_caches_modis_and_is_idempotent(testCase)
-   % Paired met/Data artifacts at one point share one GEUS read; a current
-   % coverage marker makes the next pass source-light and non-mutating.
-   eval_root = fullfile(testCase.TestData.tmp, 'repair-modis-eval');
-   input_root = fullfile(testCase.TestData.tmp, 'repair-modis-input');
-   modis_dir = fullfile(testCase.TestData.tmp, ...
-      'scratch_2825_parent', 'repair-modis-source');
-   met_rel = "mar3.11/met_case1_mar3.11_20120101_20120102_1hr.mat";
-   data_rel = "mar3.11/case1_mar3.11_20120101_20120102.mat";
-   met_file = fullfile(input_root, 'met', met_rel);
-   data_file = fullfile(input_root, 'userdata', data_rel);
-   writeTinyRepairPairManifest(eval_root, "case1", 67.0, -48.0, ...
-      met_rel, data_rel);
-   writeBareModisPair(met_file, data_file);
-   writeTinyGeusModis(modis_dir, 2012, [0.5, 0.6]);
-
-   first = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      modis_dir=string(modis_dir), dry_run=false);
-   met_loaded = load(met_file, 'met');
-   data_loaded = load(data_file, 'Data');
-   testCase.verifyEqual(numel(first.records), 2);
-   testCase.verifyEqual(first.modis_source_reads, 1);
-   testCase.verifyGreaterThan(nnz(isfinite(met_loaded.met.modis)), 0);
-   testCase.verifyGreaterThan(nnz(isfinite(data_loaded.Data.modis)), 0);
-
-   second = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      modis_dir=string(modis_dir));
-   testCase.verifyTrue(all(string({second.records.status}) == "unchanged"));
-   testCase.verifyEqual(second.modis_source_reads, 0);
-end
-
-function test_repairRcmArtifactMetadata_batches_modis_points_by_year(testCase)
-   % Distinct requested sites in one source year come from one bounding GEUS
-   % read, not one full source-grid read per artifact or location.
-   eval_root = fullfile(testCase.TestData.tmp, 'repair-modis-batch-eval');
-   input_root = fullfile(testCase.TestData.tmp, 'repair-modis-batch-input');
-   modis_dir = fullfile(testCase.TestData.tmp, 'repair-modis-batch-source');
-   rel1 = "mar3.11/case1_mar3.11_2012.mat";
-   rel2 = "mar3.11/case2_mar3.11_2012.mat";
-   file1 = fullfile(input_root, 'userdata', rel1);
-   file2 = fullfile(input_root, 'userdata', rel2);
-   writeTinyTwoPointRepairManifest(eval_root, rel1, rel2);
-   writeBareExistingData(file1);
-   writeBareExistingData(file2);
-   writeTinyGeusModis(modis_dir, 2012, [0.5, 0.6]);
-
+function test_repairRcmArtifactMetadata_has_stable_empty_summary(testCase)
+   % An empty bounded inventory is a valid converged no-op.
    report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      modis_dir=string(modis_dir), dry_run=false);
-   loaded1 = load(file1, 'Data');
-   loaded2 = load(file2, 'Data');
+      fullfile(testCase.TestData.tmp, 'empty-input'), ...
+      eval_root=fullfile(testCase.TestData.tmp, 'empty-eval'));
 
-   testCase.verifyEqual(report.modis_source_reads, 1);
-   testCase.verifyEqual(report.modis_cached_series, 2);
-   testCase.verifyGreaterThan(nnz(isfinite(loaded1.Data.modis)), 0);
-   testCase.verifyGreaterThan(nnz(isfinite(loaded2.Data.modis)), 0);
-end
-
-function test_repairRcmArtifactMetadata_distinguishes_no_modis_coverage(testCase)
-   % An all-NaN temporary MODIS column outside the source years is removed and
-   % classified as absent coverage, not as a failed external read.
-   eval_root = fullfile(testCase.TestData.tmp, 'repair-modis-gap-eval');
-   input_root = fullfile(testCase.TestData.tmp, 'repair-modis-gap-input');
-   modis_dir = fullfile(testCase.TestData.tmp, 'repair-modis-gap-source');
-   rel = "mar3.11/case1_mar3.11_1999.mat";
-   data_file = fullfile(input_root, 'userdata', rel);
-   writeTinyRepairManifest(eval_root, "promice", "case1", 67.0, -48.0, rel);
-   writeAllNanModisData(data_file, 1999);
-   writeTinyGeusModis(modis_dir, 2012, [0.5, 0.6]);
-
-   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      modis_dir=string(modis_dir), dry_run=false);
-   loaded = load(data_file, 'Data');
-
-   testCase.verifyEqual(string(report.records.modis_status), ...
-      "no_source_coverage");
-   testCase.verifyFalse(ismember("modis", ...
-      string(loaded.Data.Properties.VariableNames)));
-   testCase.verifyEqual(report.modis_source_reads, 0);
+   testCase.verifyEqual(report.summary.total, 0);
+   testCase.verifyEqual(report.summary.unchanged, 0);
+   testCase.verifyEqual(report.summary.repair_required, 0);
 end
 
 function test_stageRcmForcing_marks_existing_sample_method(testCase)
@@ -3231,40 +3051,6 @@ function writeBadTaggedExistingData(data_file, method, point)
    save(data_file, 'notData', 'artifact_metadata')
 end
 
-function writeTinyRepairManifest(eval_root, family, case_id, lat, lon, ...
-      data_file, method)
-   %WRITETINYREPAIRMANIFEST Write a current-schema manifest for repair tests.
-   if nargin < 7
-      method = "nearest";
-   end
-   family_root = fullfile(eval_root, family);
-   if ~isfolder(family_root)
-      mkdir(family_root)
-   end
-   colocation = struct();
-   if strlength(string(data_file)) > 0
-      colocation.mar = struct('kind', 'point_met', 'staged', true, ...
-         'source', 'mar', 'source_id', 'mar3.11', ...
-         'data_files', {{char(data_file)}}, ...
-         'sample_method', char(method));
-   end
-   manifest = struct( ...
-      'dataset_family', char(family), ...
-      'source_doi', '', ...
-      'source_url', '', ...
-      'source_version', '', ...
-      'retrieval_date', '', ...
-      'cases', struct( ...
-      'case_id', char(case_id), ...
-      'site_location', struct('lat_wgs84', lat, 'lon_wgs84', lon), ...
-      'colocation', colocation), ...
-      'skipped', []);
-   fid = fopen(fullfile(family_root, 'manifest.json'), 'w');
-   cleaner = onCleanup(@() fclose(fid));
-   fprintf(fid, '%s\n', jsonencode(manifest));
-   clear cleaner
-end
-
 function writeBareExistingData(data_file)
    %WRITEBAREEXISTINGDATA Create a tiny Data artifact without metadata.
    Data = timetable((datetime(2012, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') ...
@@ -3273,273 +3059,6 @@ function writeBareExistingData(data_file)
 
    ensureParent(data_file);
    save(data_file, 'Data')
-end
-
-function writeLegacyRacmoData(data_file)
-   %WRITELEGACYRACMODATA Create a pre-canonical artifact with auxiliary payload.
-   Time = (datetime(2012, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') ...
-      + hours(0:1))';
-   Data = timetable(Time, [1; 2] * 1e-6, [3; 4], ...
-      'VariableNames', {'precip', 'runoff'});
-   auxiliary = struct('label', "preserve", 'values', [1, 2, 3]);
-   ensureParent(data_file);
-   save(data_file, 'Data', 'auxiliary')
-end
-
-function writeLegacyMerraData(data_file)
-   %WRITELEGACYMERRADATA Create an explicitly positive-upward MERRA artifact.
-   Time = (datetime(2012, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') ...
-      + hours(0:1))';
-   Data = timetable(Time, [10; -5], [20; -4], [260; 261], ...
-      'VariableNames', {'shf', 'lhf', 'tair'});
-   artifact_metadata = struct( ...
-      'merra_flux_sign_convention', 'positive_upward');
-   Data.Properties.UserData = artifact_metadata;
-   ensureParent(data_file);
-   save(data_file, 'Data', 'artifact_metadata')
-end
-
-function writeBareModisPair(met_file, data_file)
-   %WRITEBAREMODISPAIR Create paired artifacts sharing one location/time axis.
-   Time = (datetime(2012, 1, 1, 0, 0, 0, 'TimeZone', 'UTC'):hours(1): ...
-      datetime(2012, 1, 2, 23, 0, 0, 'TimeZone', 'UTC'))';
-   tair = 260 * ones(numel(Time), 1);
-   Data = timetable(Time, tair);
-   met = Data;
-   ensureParent(met_file);
-   ensureParent(data_file);
-   save(met_file, 'met')
-   save(data_file, 'Data')
-end
-
-function writeAllNanModisData(data_file, yyyy)
-   %WRITEALLNANMODISDATA Create a temporary all-NaN uncovered MODIS artifact.
-   Time = (datetime(yyyy, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') ...
-      + hours(0:1))';
-   Data = timetable(Time, [260; 261], nan(2, 1), ...
-      'VariableNames', {'tair', 'modis'});
-   ensureParent(data_file);
-   save(data_file, 'Data')
-end
-
-function writeTinyRepairPairManifest( ...
-      eval_root, case_id, lat, lon, met_file, data_file)
-   %WRITETINYREPAIRPAIRMANIFEST Reference paired met/Data repair fixtures.
-   family_root = fullfile(eval_root, 'promice');
-   if ~isfolder(family_root)
-      mkdir(family_root)
-   end
-   leg = struct('kind', 'point_met', 'staged', true, ...
-      'source', 'mar', 'source_id', 'mar3.11', ...
-      'met_files', {{char(met_file)}}, ...
-      'data_files', {{char(data_file)}}, ...
-      'sample_method', 'nearest');
-   manifest = struct( ...
-      'dataset_family', 'promice', ...
-      'source_doi', '', 'source_url', '', 'source_version', '', ...
-      'retrieval_date', '', ...
-      'cases', struct( ...
-      'case_id', char(case_id), ...
-      'site_location', struct('lat_wgs84', lat, 'lon_wgs84', lon), ...
-      'colocation', struct('mar', leg)), ...
-      'skipped', []);
-   fid = fopen(fullfile(family_root, 'manifest.json'), 'w');
-   cleaner = onCleanup(@() fclose(fid));
-   fprintf(fid, '%s\n', jsonencode(manifest));
-   clear cleaner
-end
-
-function writeTinyTwoPointRepairManifest(eval_root, data_file1, data_file2)
-   %WRITETINYTWOPOINTREPAIRMANIFEST Reference two distinct point artifacts.
-   family_root = fullfile(eval_root, 'promice');
-   if ~isfolder(family_root)
-      mkdir(family_root)
-   end
-   cases = repmat(struct(), 2, 1);
-   aliases = ["case1", "case2"];
-   locations = [67.0, -48.0; 68.0, -47.0];
-   files = [string(data_file1), string(data_file2)];
-   for k = 1:2
-      leg = struct('kind', 'point_met', 'staged', true, ...
-         'source', 'mar', 'source_id', 'mar3.11', ...
-         'data_files', {{char(files(k))}}, ...
-         'sample_method', 'nearest');
-      cases(k).case_id = char(aliases(k));
-      cases(k).site_location = struct( ...
-         'lat_wgs84', locations(k, 1), ...
-         'lon_wgs84', locations(k, 2));
-      cases(k).colocation = struct('mar', leg);
-   end
-   manifest = struct( ...
-      'dataset_family', 'promice', ...
-      'source_doi', '', 'source_url', '', 'source_version', '', ...
-      'retrieval_date', '', 'cases', cases, 'skipped', []);
-   fid = fopen(fullfile(family_root, 'manifest.json'), 'w');
-   cleaner = onCleanup(@() fclose(fid));
-   fprintf(fid, '%s\n', jsonencode(manifest));
-   clear cleaner
-end
-
-function writeLegacyMarPair(met_file, data_file)
-   %WRITELEGACYMARPAIR Create paired pre-native-daily MAR artifacts.
-   Time = (datetime(2012, 1, 1, 0, 0, 0, 'TimeZone', 'UTC'):hours(1): ...
-      datetime(2012, 1, 2, 23, 0, 0, 'TimeZone', 'UTC'))';
-   tair = 260 * ones(numel(Time), 1);
-   runoff = 9 * ones(numel(Time), 1);
-   smb = 8 * ones(numel(Time), 1);
-   melt = (1:numel(Time))';
-   Data = timetable(Time, tair, runoff, smb, melt);
-   met = Data(:, ["tair", "runoff"]);
-   artifact_metadata = struct('sample_method', 'nearest', ...
-      'lat_wgs84', 67, 'lon_wgs84', -48);
-   Data.Properties.UserData = artifact_metadata;
-   met.Properties.UserData = artifact_metadata;
-   ensureParent(met_file);
-   ensureParent(data_file);
-   save(met_file, 'met', 'artifact_metadata')
-   save(data_file, 'Data', 'artifact_metadata')
-end
-
-function met = makeLegacyMarMet15m(met_file)
-   %MAKELEGACYMARMET15M Expand the legacy hourly met payload without interpolation.
-   loaded = load(met_file, 'met', 'artifact_metadata');
-   source = loaded.met;
-   Time = (source.Time(1):minutes(15):source.Time(end) + minutes(45))';
-   values = repelem(source.Variables, 4, 1);
-   met = array2timetable(values, RowTimes=Time, ...
-      VariableNames=source.Properties.VariableNames);
-   artifact_metadata = loaded.artifact_metadata;
-   met.Properties.UserData = artifact_metadata;
-   save(met_file, 'met', 'artifact_metadata')
-end
-
-function [Data, met] = writeLegacySignedMarPair(met_file, data_file)
-   %WRITELEGACYSIGNEDMARPAIR Save paired RZ values under the old sign policy.
-   Time = (datetime(2012, 1, 1, 0, 0, 0, 'TimeZone', 'UTC'):hours(1): ...
-      datetime(2012, 1, 2, 23, 0, 0, 'TimeZone', 'UTC'))';
-   refreeze_deposition = [ ...
-      -2e-4 * ones(24, 1); 3e-4 * ones(24, 1)];
-   Data = timetable(Time, refreeze_deposition);
-   met_time = (Time(1):minutes(15):Time(end) + minutes(45))';
-   met = timetable(met_time, repelem(refreeze_deposition, 4), ...
-      VariableNames="refreeze_deposition");
-   artifact_metadata = struct('sample_method', 'nearest', ...
-      'lat_wgs84', 67, 'lon_wgs84', -48, ...
-      'mar_diagnostic_refreeze_deposition_sign', ...
-      'positive_gain_tiny_negative_roundoff_allowed', ...
-      'mar_diagnostic_refreeze_negative_tolerance_mwe_h', 1e-8);
-   Data.Properties.UserData = artifact_metadata;
-   met.Properties.UserData = artifact_metadata;
-   ensureParent(met_file);
-   ensureParent(data_file);
-   save(met_file, 'met', 'artifact_metadata')
-   save(data_file, 'Data', 'artifact_metadata')
-end
-
-function [Data, met, sentinel_payload] = ...
-      writeOverlongMarLedgerPair(met_file, data_file)
-   %WRITEOVERLONGMARLEDGERPAIR Save clipped payloads with full-2012 provenance.
-   Time = (datetime(2012, 1, 1, 0, 0, 0, 'TimeZone', 'UTC'):hours(1): ...
-      datetime(2012, 12, 31, 23, 0, 0, 'TimeZone', 'UTC'))';
-   n = numel(Time);
-   tair = 260 + zeros(n, 1);
-   runoff = 1e-3 + zeros(n, 1);
-   smb = -1e-3 + zeros(n, 1);
-   melt = 2e-3 + zeros(n, 1);
-   Data = timetable(Time, tair, runoff, smb, melt);
-
-   % Generate production-shaped whole-calendar RU/SMB and ME/MEH ledgers, then
-   % retain only a mid-day three-day window without altering that metadata.
-   replacements = struct('runoff', runoff, 'smb', smb);
-   [Data, artifact_metadata] = ...
-      icemodel.forcing.helpers.applyMarDailyQualityControl( ...
-      Data, replacements, sector=1);
-   artifact_metadata = icemodel.forcing.helpers.marDiagnosticMetadata( ...
-      Data, melt, artifact_metadata, sector=1);
-   artifact_metadata.mar_qc_replaced_runoff_count = 17;
-   artifact_metadata.mar_qc_replaced_smb_count = 23;
-   artifact_metadata.source_files = "full-mar-2012.nc";
-   artifact_metadata.sentinel_policy = "preserve";
-   keep = Time >= datetime(2012, 1, 10, 12, 0, 0, 'TimeZone', 'UTC') ...
-      & Time <= datetime(2012, 1, 12, 11, 0, 0, 'TimeZone', 'UTC');
-   Data = Data(keep, :);
-   Data.Properties.UserData = artifact_metadata;
-
-   % Derived met repeats each hourly rate over four interval-start samples while
-   % retaining the same overlong source ledger, matching the writer boundary.
-   met_time = (Data.Time(1):minutes(15):Data.Time(end) + minutes(45))';
-   values = repelem(Data{:, ["tair", "runoff"]}, 4, 1);
-   met = array2timetable(values, RowTimes=met_time, ...
-      VariableNames={'tair', 'runoff'});
-   met.Properties.UserData = artifact_metadata;
-   sentinel_payload = magic(3);
-   ensureParent(met_file);
-   ensureParent(data_file);
-   save(met_file, 'met', 'artifact_metadata', 'sentinel_payload')
-   save(data_file, 'Data', 'artifact_metadata', 'sentinel_payload')
-end
-
-function writeTinyMarDailySource(mar_dir, yyyy)
-   %WRITETINYMARDailySOURCE Create a two-cell MAR RU/SMB sector fixture.
-   if ~isfolder(mar_dir)
-      mkdir(mar_dir)
-   end
-   filename = fullfile(mar_dir, sprintf('MARv3.11-test-%d.nc', yyyy));
-   [LAT, LON] = ndgrid([67, 68], [-48, -47]);
-   static = zeros(2, 2);
-   surface = 4 * ones(2, 2);
-
-   % Coordinate variables share the LON dimension names because marGridInfo
-   % reconstructs the regular native grid from those named 1-D axes.
-   nccreate(filename, 'x', 'Dimensions', {'x', 2});
-   nccreate(filename, 'y', 'Dimensions', {'y', 2});
-   nccreate(filename, 'LON', 'Dimensions', {'x', 2, 'y', 2});
-   nccreate(filename, 'LAT', 'Dimensions', {'x', 2, 'y', 2});
-   nccreate(filename, 'SH', 'Dimensions', {'x', 2, 'y', 2});
-   nccreate(filename, 'SLO', 'Dimensions', {'x', 2, 'y', 2});
-   nccreate(filename, 'SRF', 'Dimensions', {'x', 2, 'y', 2});
-   ncwrite(filename, 'x', [0; 15]);
-   ncwrite(filename, 'y', [0; 15]);
-   ncwrite(filename, 'LON', LON);
-   ncwrite(filename, 'LAT', LAT);
-   ncwrite(filename, 'SH', static);
-   ncwrite(filename, 'SLO', static);
-   ncwrite(filename, 'SRF', surface);
-
-   % Sector 1 is permanent ice and sector 2 is tundra. Spatially uniform
-   % values keep the test focused on category selection and UTC-day expansion.
-   dimensions = {'x', 2, 'y', 2, 'SECTOR', 2, 'TIME', 2};
-   nccreate(filename, 'RU', 'Dimensions', dimensions);
-   nccreate(filename, 'SMB', 'Dimensions', dimensions);
-   runoff = zeros(2, 2, 2, 2);
-   runoff(:, :, 1, 1) = 24;
-   runoff(:, :, 1, 2) = 48;
-   runoff(:, :, 2, 1) = 240;
-   runoff(:, :, 2, 2) = 480;
-   ncwrite(filename, 'RU', runoff);
-   ncwrite(filename, 'SMB', -runoff);
-   ncwriteatt(filename, 'RU', 'units', 'mmWE/day');
-   ncwriteatt(filename, 'SMB', 'units', 'mmWE/day');
-end
-
-function writeTinyGeusModis(modis_dir, yyyy, daily_values)
-   %WRITETINYGEUSMODIS Create a two-cell/two-day GEUS-compatible NetCDF.
-   if ~isfolder(modis_dir)
-      mkdir(modis_dir)
-   end
-   filename = fullfile(modis_dir, sprintf( ...
-      'Greenland_Reflectivity_%d_5km_C6.nc', yyyy));
-   [X, Y] = ndgrid([0; 5000], [0, 5000]);
-   [lat, lon] = projinv( ...
-      icemodel.forcing.helpers.geusModisProjection(), X, Y);
-   nccreate(filename, 'lat', 'Dimensions', {'x', 2, 'y', 2});
-   nccreate(filename, 'lon', 'Dimensions', {'x', 2, 'y', 2});
-   nccreate(filename, 'albedo', ...
-      'Dimensions', {'x', 2, 'y', 2, 'time', numel(daily_values)});
-   ncwrite(filename, 'lat', lat);
-   ncwrite(filename, 'lon', lon);
-   values = repmat(reshape(daily_values, 1, 1, []), 2, 2, 1);
-   ncwrite(filename, 'albedo', values);
 end
 
 function writeBareExistingFiles(met_file, data_file)
@@ -3577,6 +3096,125 @@ function state = emptyProtocolWindow() %#ok<STOUT>
    %EMPTYPROTOCOLWINDOW Simulate a RetMIP protocol file with no window rows.
    error('icemodel:verification:importRetmip:emptyProtocolWindow', ...
       'no rows in requested window')
+end
+
+function writeTinyRepairManifest(eval_root, family, case_id, lat, lon, ...
+      data_file, method, source_id)
+   %WRITETINYREPAIRMANIFEST Write a current-schema manifest for repair tests.
+   if nargin < 7
+      method = "nearest";
+   end
+   if nargin < 8
+      source_id = "mar3.11";
+   end
+   family_root = fullfile(eval_root, family);
+   if ~isfolder(family_root)
+      mkdir(family_root)
+   end
+   colocation = struct();
+   if strlength(string(data_file)) > 0
+      kind = "data_files";
+      if contains(string(data_file), "met_")
+         kind = "met_files";
+      end
+       leg = struct('kind', 'point_met', 'staged', true, ...
+          'source', 'mar', 'source_id', char(source_id), ...
+         'sample_method', char(method));
+      leg.(kind) = {char(data_file)};
+      colocation.mar = leg;
+   end
+   manifest = struct( ...
+      'dataset_family', char(family), ...
+      'source_doi', '', ...
+      'source_url', '', ...
+      'source_version', '', ...
+      'retrieval_date', '', ...
+      'cases', struct( ...
+      'case_id', char(case_id), ...
+      'site_location', struct('lat_wgs84', lat, 'lon_wgs84', lon), ...
+      'colocation', colocation), ...
+      'skipped', []);
+   fid = fopen(fullfile(family_root, 'manifest.json'), 'w');
+   cleaner = onCleanup(@() fclose(fid));
+   fprintf(fid, '%s\n', jsonencode(manifest));
+   clear cleaner
+end
+
+function [Data, actions] = addDurableRepairField(Data, ~)
+   %ADDDURABLEREPAIRFIELD Model a future canonical additive field migration.
+   Data.new_field = (1:height(Data))';
+   metadata = Data.Properties.UserData;
+   if isempty(metadata)
+      metadata = struct();
+   end
+   metadata.new_provenance = "test callback";
+   Data.Properties.UserData = metadata;
+   if ~isprop(Data.Properties.CustomProperties, 'RepairProvenance')
+      Data = addprop(Data, 'RepairProvenance', 'table');
+   end
+   Data.Properties.CustomProperties.RepairProvenance = "test callback";
+   actions = ["add_new_field", "stamp_new_provenance"];
+end
+
+function [Data, actions] = changeUndeclaredRepairField(Data, ~)
+   %CHANGEUNDECLAREDREPAIRFIELD Model an accidental callback scope expansion.
+   Data.tair = Data.tair + 1;
+   actions = "change_tair";
+end
+
+function [Data, actions] = changeRepairTime(Data, ~)
+   %CHANGEREPAIRTIME Model a forbidden cadence/support mutation.
+   Data.Time = Data.Time + minutes(15);
+   actions = "shift_time";
+end
+
+function [Data, actions] = reorderRepairVariables(Data, ~)
+   %REORDERREPAIRVARIABLES Model an undeclared timetable-schema mutation.
+   Data = Data(:, end:-1:1);
+   actions = "reorder_variables";
+end
+
+function [Data, actions] = prependRepairVariable(Data, ~)
+   %PREPENDREPAIRVARIABLE Model a new column that shifts retained positions.
+   Data.new_field = (1:height(Data))';
+   Data = movevars(Data, "new_field", "Before", 1);
+   actions = "prepend_variable";
+end
+
+function [Data, actions] = changeRepairDescription(Data, ~)
+   %CHANGEREPAIRDESCRIPTION Model an undeclared table-level metadata mutation.
+   Data.Properties.Description = "changed by callback";
+   actions = "change_description";
+end
+
+function [Data, actions] = changeProtectedGridProperty(Data, ~)
+   %CHANGEPROTECTEDGRIDPROPERTY Model forbidden source-grid identity mutation.
+   if ~isprop(Data.Properties.CustomProperties, 'Lat')
+      Data = addprop(Data, 'Lat', 'table');
+   end
+   Data.Properties.CustomProperties.Lat = 0;
+   actions = "change_source_grid";
+end
+
+function [Data, actions] = changeProtectedScalarUnits(Data, ~)
+   %CHANGEPROTECTEDSCALARUNITS Model forbidden source-grid unit mutation.
+   if ~isprop(Data.Properties.CustomProperties, 'ScalarUnits')
+      Data = addprop(Data, 'ScalarUnits', 'table');
+   end
+   Data.Properties.CustomProperties.ScalarUnits = struct('X', 'wrong');
+   actions = "change_source_grid_units";
+end
+
+function [Data, actions] = changeAllowedVariableUnits(Data, ~)
+   %CHANGEALLOWEDVARIABLEUNITS Model non-payload mutation of an allowed field.
+   names = string(Data.Properties.VariableNames);
+   units = string(Data.Properties.VariableUnits);
+   if isempty(units)
+      units = strings(size(names));
+   end
+   units(names == "tair") = "not canonical";
+   Data.Properties.VariableUnits = cellstr(units);
+   actions = "change_units";
 end
 
 function ensureParent(filename)

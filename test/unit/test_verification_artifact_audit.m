@@ -935,10 +935,9 @@ function test_mar_reduced_source_fallback_warns_without_daily_constancy(testCase
    testCase.verifyFalse(any(codes == "mar_daily_constraint_inconsistent"));
 end
 
-function test_mar_ledger_semantics_block_repair_currentness(testCase)
-   % A finite reference cannot be called unverified on a complete day, and
-   % preserved hourly structure cannot survive a partial boundary. Audit rejects
-   % both; bounded alignment can repair only the deterministic boundary defect.
+function test_mar_ledger_semantics_are_audited(testCase)
+   % Audit rejects contradictory complete-day status and partial-boundary
+   % preservation without mutating the staged artifact.
    [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
    original = load(paths.mar_data, 'Data', 'artifact_metadata');
 
@@ -967,12 +966,6 @@ function test_mar_ledger_semantics_block_repair_currentness(testCase)
       input_data_root=input_root);
    testCase.verifyTrue(any(string({report.findings.code}) ...
       == "mar_qc_day_ledger_invalid"));
-   repair = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice");
-   record = repair.records(contains(string({repair.records.filename}), ...
-      "site_mar3.11"));
-   testCase.verifyEqual(string(record.mar_qc_status), "not_requested");
-
    % The fixture's first day is partial and therefore cannot be preserved.
    loaded = original;
    metadata = loaded.Data.Properties.UserData;
@@ -992,13 +985,6 @@ function test_mar_ledger_semantics_block_repair_currentness(testCase)
       input_data_root=input_root);
    testCase.verifyTrue(any(string({report.findings.code}) ...
       == "mar_qc_day_ledger_invalid"));
-   repair = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice");
-   record = repair.records(contains(string({repair.records.filename}), ...
-      "site_mar3.11"));
-   testCase.verifyEqual(string(record.mar_qc_status), "current");
-   testCase.verifyTrue(any(string(record.actions) == ...
-      "align_mar_daily_metadata"));
 end
 
 function test_unverified_merra_orientation_is_an_explicit_blocker(testCase)
@@ -1221,157 +1207,6 @@ function test_atomic_esm_runtime_met_is_audited_exactly(testCase)
    testCase.verifyFalse(isfield(manifest.cases, 'met_files'));
 end
 
-function test_repairRcmArtifactMetadata_repairs_racmo_subl_once(testCase)
-   % Legacy RACMO sublimation is negative for surface loss. The bounded repair
-   % must flip only that channel, stamp both conventions, and be byte-stable on
-   % pass two while the artifact audit enforces the durable contract.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
-   racmo_file = attachRacmoSublFixture(input_root, paths.manifest);
-   original = load(racmo_file, 'Data', 'artifact_metadata', 'auxiliary');
-   before = fileBytes(racmo_file);
-
-   audit = icemodel.verification.auditArtifacts( ...
-      families="promice", evaluation_data_root=eval_root, ...
-      input_data_root=input_root);
-   testCase.verifyTrue(any(string({audit.findings.code}) ...
-      == "racmo_subl_sign_unverified"));
-
-   sign_disabled = ...
-      icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      source_id="racmo2.3p3", repair_racmo_subl=false);
-   testCase.verifyEqual(string(sign_disabled.records.status), "unchanged");
-   testCase.verifyFalse(any(contains(string(sign_disabled.records.actions), ...
-      "racmo_subl")));
-
-   % The source filter must exclude every manifest reference when no source
-   % matches the requested identifier.
-   excluded = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      source_id="racmo9.9");
-   testCase.verifyEmpty(excluded.records);
-
-   dry = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      source_id="racmo2.3p3");
-   testCase.verifyEqual(string(dry.records.status), "would_repair");
-   testCase.verifyEqual(fileBytes(racmo_file), before);
-
-   first = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      source_id="racmo2.3p3", dry_run=false);
-   testCase.verifyEqual(string(first.records.status), "repaired");
-   testCase.verifyTrue(any(string(first.records.actions) ...
-      == "flip_racmo_subl_sign"));
-   testCase.verifyEqual(string(first.records.changed_variables), "subl");
-   expected_metadata = ["racmo_subl_native_sign_convention"; ...
-      "racmo_subl_sign_convention"];
-   testCase.verifyEqual(sort(string( ...
-      first.records.changed_metadata_fields(:))), sort(expected_metadata));
-   testCase.verifyTrue(first.records.unrelated_payload_preserved);
-   testCase.verifyEqual(strlength(first.records.hash_before), 64);
-   testCase.verifyEqual(strlength(first.records.hash_after), 64);
-   testCase.verifyNotEqual(first.records.hash_before, first.records.hash_after);
-   repaired = load(racmo_file, 'Data', 'artifact_metadata', 'auxiliary');
-   testCase.verifyEqual(repaired.Data.Time, original.Data.Time);
-   testCase.verifyEqual(repaired.Data.guard, original.Data.guard);
-   testCase.verifyEqual(repaired.Data.subl, -original.Data.subl);
-   testCase.verifyEqual(repaired.auxiliary, original.auxiliary);
-   testCase.verifyEqual(string( ...
-      repaired.artifact_metadata.racmo_subl_native_sign_convention), ...
-      "negative_loss_positive_deposition");
-   testCase.verifyEqual(string( ...
-      repaired.Data.Properties.UserData.racmo_subl_sign_convention), ...
-      "positive_loss_negative_deposition");
-
-   after_first = fileBytes(racmo_file);
-   second = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      source_id="racmo2.3p3", dry_run=false);
-   testCase.verifyEqual(string(second.records.status), "unchanged");
-   testCase.verifyEqual(second.records.hash_before, first.records.hash_after);
-   testCase.verifyEqual(second.records.hash_after, first.records.hash_after);
-   testCase.verifyEqual(fileBytes(racmo_file), after_first);
-
-   audit = icemodel.verification.auditArtifacts( ...
-      families="promice", evaluation_data_root=eval_root, ...
-      input_data_root=input_root);
-   testCase.verifyFalse(any(startsWith(string({audit.findings.code}), ...
-      "racmo_subl_sign")));
-end
-
-function test_racmo_subl_repair_rejects_ambiguous_markers(testCase)
-   % A partial, unknown, or nonscalar marker cannot prove whether the numeric
-   % sign was already changed. The repair must stop instead of double-flipping;
-   % RACMO artifacts without subl remain outside this contract.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
-   racmo_file = attachRacmoSublFixture(input_root, paths.manifest);
-   original = load(racmo_file, 'Data', 'artifact_metadata', 'auxiliary');
-
-   loaded = original;
-   loaded.artifact_metadata.racmo_subl_native_sign_convention = ...
-      'negative_loss_positive_deposition';
-   loaded.Data.Properties.UserData = loaded.artifact_metadata;
-   Data = loaded.Data;
-   artifact_metadata = loaded.artifact_metadata;
-   auxiliary = loaded.auxiliary;
-   save(racmo_file, 'Data', 'artifact_metadata', 'auxiliary')
-   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      source_id="racmo2.3p3");
-   testCase.verifyEqual(string(report.records.status), "restage_required");
-   testCase.verifyTrue(contains(string(report.records.reason), "incomplete"));
-
-   loaded.artifact_metadata.racmo_subl_native_sign_convention = ...
-      ["negative_loss_positive_deposition", "unknown"];
-   loaded.artifact_metadata.racmo_subl_sign_convention = ...
-      'positive_loss_negative_deposition';
-   loaded.Data.Properties.UserData = loaded.artifact_metadata;
-   Data = loaded.Data;
-   artifact_metadata = loaded.artifact_metadata;
-   save(racmo_file, 'Data', 'artifact_metadata', 'auxiliary')
-   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      source_id="racmo2.3p3");
-   testCase.verifyEqual(string(report.records.status), "restage_required");
-   testCase.verifyTrue(contains(string(report.records.reason), "scalar"));
-
-   % Recognized-but-wrong scalar metadata is an explicit QA error.
-   loaded.artifact_metadata.racmo_subl_native_sign_convention = 'unknown';
-   loaded.artifact_metadata.racmo_subl_sign_convention = 'unknown';
-   loaded.Data.Properties.UserData = loaded.artifact_metadata;
-   Data = loaded.Data;
-   artifact_metadata = loaded.artifact_metadata;
-   save(racmo_file, 'Data', 'artifact_metadata', 'auxiliary')
-   audit = icemodel.verification.auditArtifacts( ...
-      families="promice", evaluation_data_root=eval_root, ...
-      input_data_root=input_root);
-   testCase.verifyTrue(any(string({audit.findings.code}) ...
-      == "racmo_subl_sign_not_canonical"));
-
-   % A RACMO file with no subl channel is ignored by both repair and QA.
-   Data = removevars(original.Data, "subl");
-   artifact_metadata = original.artifact_metadata;
-   Data.Properties.UserData = artifact_metadata;
-   save(racmo_file, 'Data', 'artifact_metadata', 'auxiliary')
-   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      source_id="racmo2.3p3", dry_run=false);
-   testCase.verifyTrue(ismember(string(report.records.status), ...
-      ["repaired", "unchanged"]));
-   testCase.verifyFalse(any(contains(string(report.records.actions), ...
-      "racmo_subl")));
-   second = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      source_id="racmo2.3p3", dry_run=false);
-   testCase.verifyEqual(string(second.records.status), "unchanged");
-   audit = icemodel.verification.auditArtifacts( ...
-      families="promice", evaluation_data_root=eval_root, ...
-      input_data_root=input_root);
-   testCase.verifyFalse(any(startsWith(string({audit.findings.code}), ...
-      "racmo_subl_sign")));
-end
-
 function test_repairMetTimeSupport_dry_write_and_idempotence(testCase)
    % Legacy source rows are recoverable without raw data; dry-run is byte-stable.
    [~, ~, paths] = writeAuditTree(testCase.TestData.tmp);
@@ -1399,7 +1234,8 @@ function test_repairMetTimeSupport_dry_write_and_idempotence(testCase)
 
    written = icemodel.verification.setup.repairMetTimeSupport( ...
       paths.promice_met, dry_run=false);
-   repaired = load(paths.promice_met, 'met', 'artifact_metadata', 'auxiliary');
+   repaired = load(paths.promice_met, 'met', ...
+      'artifact_metadata', 'auxiliary');
    testCase.verifyEqual(written.summary.repaired_count, 1);
    testCase.verifyEqual(height(repaired.met), 4 * height(source));
    testCase.verifyEqual(repaired.met.Time(end), ...
@@ -1434,10 +1270,8 @@ function test_repairMetTimeSupport_rejects_missing_and_unknown(testCase)
       'icemodel:verification:repairMetTimeSupport:unsupportedPolicy');
 end
 
-function test_repairMetTimeSupport_rejects_invented_omitted_source_row(testCase)
-   % A legacy regular 15-minute grid can contain a finite row at an omitted
-   % native timestamp. More recovered grid rows than recorded source rows is not
-   % sufficient evidence for an exact source-light repair.
+function test_repairMetTimeSupport_rejects_invented_source_row(testCase)
+   % A finite row at an omitted native timestamp is not exact repair evidence.
    [~, ~, paths] = writeAuditTree(testCase.TestData.tmp);
    loaded = load(paths.promice_met, 'met');
    met = loaded.met(1:9, :);
@@ -1457,13 +1291,12 @@ function test_repairMetTimeSupport_rejects_invented_omitted_source_row(testCase)
 end
 
 function test_repairMetTimeSupport_rejects_recorded_source_gap(testCase)
-   % Even a row-count-compatible legacy payload is unrecoverable when provenance
-   % says the native source omitted a cadence interval.
+   % Recorded native gaps make the legacy interpolation unrecoverable exactly.
    [~, ~, paths] = writeAuditTree(testCase.TestData.tmp);
    loaded = load(paths.promice_met, 'met');
    source = loaded.met(1:4:end, :);
-   met = retime(source, (source.Time(1):minutes(15):source.Time(end))', ...
-      'linear');
+   met = retime(source, ...
+      (source.Time(1):minutes(15):source.Time(end))', 'linear');
    metadata = source.Properties.UserData;
    metadata.met_resample_policy = "linear_adjacent_finite_only";
    metadata.met_resample_source_row_count = height(source);
@@ -1478,33 +1311,27 @@ function test_repairMetTimeSupport_rejects_recorded_source_gap(testCase)
       'icemodel:verification:repairMetTimeSupport:ambiguousLegacyGrid');
 end
 
-function test_repairMetTimeSupport_rejects_unproven_merra_tavg3(testCase)
-   % Recovering hourly rows from legacy MERRA met is unsafe when no native glc
-   % inventory proves that the 00/03/... rows were not themselves interpolated.
-   filename = fullfile(testCase.TestData.tmp, ...
+function test_repairMetTimeSupport_protects_merra_tavg3_support(testCase)
+   % MERRA recovery requires explicit proof that hourly rows came from native
+   % three-hour source support; the old storage token routes through the same
+   % safety check.
+   current = fullfile(testCase.TestData.tmp, ...
       'met_site_merra2_20000101_20000101_15m.mat');
-   writeLegacyMerraMet(filename, false);
-
+   writeLegacyMerraMet(current, false);
    testCase.verifyError(@() ...
-      icemodel.verification.setup.repairMetTimeSupport(filename), ...
+      icemodel.verification.setup.repairMetTimeSupport(current), ...
       'icemodel:verification:repairMetTimeSupport:unprovenMerraSourceGrid');
-end
 
-function test_repairMetTimeSupport_detects_legacy_merra_label(testCase)
-   % The old `_merra_` storage token must route through MERRA safety even when
-   % its legacy UserData contains only generic met-resampling provenance.
-   filename = fullfile(testCase.TestData.tmp, ...
+   legacy = fullfile(testCase.TestData.tmp, ...
       'met_site_merra_20000101_20000101_15m.mat');
-   writeLegacyMerraMet(filename, false, false);
-
+   writeLegacyMerraMet(legacy, false, false);
    testCase.verifyError(@() ...
-      icemodel.verification.setup.repairMetTimeSupport(filename), ...
+      icemodel.verification.setup.repairMetTimeSupport(legacy), ...
       'icemodel:verification:repairMetTimeSupport:unprovenMerraSourceGrid');
 end
 
 function test_repairMetTimeSupport_reholds_proven_merra_tavg3(testCase)
-   % With an exact raw-grid proof, repair first restores each three-hour glc hold
-   % on hourly rows and only then repeats those hours onto the 15-minute grid.
+   % Proven native rows are held over their declared support before 15m output.
    filename = fullfile(testCase.TestData.tmp, ...
       'met_site_merra2_20000101_20000101_15m.mat');
    writeLegacyMerraMet(filename, true);
@@ -1522,108 +1349,45 @@ function test_repairMetTimeSupport_reholds_proven_merra_tavg3(testCase)
       repaired.artifact_metadata);
 end
 
-function test_repairRcmArtifactMetadata_accepts_current_15m_merra_met(testCase)
-   % Current 15-minute met has already crossed the resampling boundary; metadata
-   % repair must validate it without sending it through the hourly tavg3 helper.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
-   met_file = attachMerraMetFixture(input_root, paths.manifest, ...
-      "interval_start_zero_order_hold");
-   before = fileBytes(met_file);
-
-   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice");
-   filenames = string({report.records.filename});
-   is_met = endsWith(filenames, ...
-      "met_site_merra2_20000101_20000101_15m.mat");
-   testCase.assertEqual(nnz(is_met), 1, strjoin(filenames, newline));
-   record = report.records(is_met);
-
-   testCase.verifyEqual(string(record.status), "unchanged");
-   testCase.verifyEmpty(record.actions);
-   testCase.verifyEqual(fileBytes(met_file), before);
-end
-
-function test_repairRcmArtifactMetadata_proves_native_merra_grid_once(testCase)
-   % A legacy hourly ramp is repairable only after the native daily glc time axis
-   % proves every saved 3-hour source row; the durable proof makes pass two light.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
-   merra_dir = fullfile(testCase.TestData.tmp, 'merra-source');
-   writeTinyMerraGlcSource(merra_dir, datetime(2000, 1, 1, TimeZone="UTC"));
-   loaded = load(paths.merra_data, 'Data', 'artifact_metadata');
-   loaded.Data.runoff = (1:height(loaded.Data))';
-   loaded.Data.Properties.UserData = loaded.artifact_metadata;
-   Data = loaded.Data;
-   artifact_metadata = loaded.artifact_metadata;
-   auxiliary = struct('label', "preserve", 'values', [1, 2, 3]);
-   save(paths.merra_data, 'Data', 'artifact_metadata', 'auxiliary')
-
-   first = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      merra_dir=string(merra_dir), dry_run=false);
-   repaired = load(paths.merra_data, ...
-      'Data', 'artifact_metadata', 'auxiliary');
-   record = first.records(string({first.records.source_id}) == "merra2");
-
-   testCase.verifyEqual(string(record.status), "repaired");
-   testCase.verifyTrue(any(string(record.actions) ...
-      == "stamp_merra_tavg3_source_grid"));
-   testCase.verifyEqual(first.merra_source_reads, 1);
-   testCase.verifyEqual(repaired.Data.runoff, [1; 1; 1; 4]);
-   testCase.verifyEqual(repaired.auxiliary, auxiliary);
-   testCase.verifyTrue( ...
-      icemodel.forcing.helpers.hasProvenMerraTavg3SourceGrid( ...
-      repaired.Data, repaired.artifact_metadata));
-
-   second = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice", ...
-      merra_dir=string(merra_dir));
-   record = second.records(string({second.records.source_id}) == "merra2");
-   testCase.verifyEqual(string(record.status), "unchanged");
-   testCase.verifyEqual(second.merra_source_reads, 0);
-end
-
-function test_repairRcmArtifactMetadata_rejects_legacy_15m_merra_met(testCase)
-   % A linear-era 15-minute MERRA artifact cannot be treated as hourly Data; it
-   % must remain byte-stable and route to the dedicated met repair/restage path.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
-   met_file = attachMerraMetFixture(input_root, paths.manifest, ...
-      "linear_adjacent_finite_only");
-   before = fileBytes(met_file);
-
-   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice");
-   filenames = string({report.records.filename});
-   is_met = endsWith(filenames, ...
-      "met_site_merra2_20000101_20000101_15m.mat");
-   testCase.assertEqual(nnz(is_met), 1, strjoin(filenames, newline));
-   record = report.records(is_met);
-
-   testCase.verifyEqual(string(record.status), "restage_required");
-   testCase.verifyTrue(contains(string(record.reason), "repairMetTimeSupport"));
-   testCase.verifyEqual(fileBytes(met_file), before);
-end
-
-function test_repairRcmArtifactMetadata_rejects_bridged_15m_merra_met(testCase)
-   % Canonical-looking markers cannot override the source-derived missing-value
-   % lower bound when a 15-minute artifact has bridged omitted support.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
-   met_file = attachMerraMetFixture(input_root, paths.manifest, ...
-      "interval_start_zero_order_hold");
-   loaded = load(met_file, 'met', 'artifact_metadata');
-   loaded.artifact_metadata.met_resample_expected_missing_counts.runoff = 1;
-   loaded.met.Properties.UserData = loaded.artifact_metadata;
-   met = loaded.met;
-   artifact_metadata = loaded.artifact_metadata;
-   save(met_file, 'met', 'artifact_metadata')
-
-   report = icemodel.verification.setup.repairRcmArtifactMetadata( ...
-      input_root, eval_root=eval_root, dataset_family="promice");
-   filenames = string({report.records.filename});
-   record = report.records(endsWith(filenames, ...
-      "met_site_merra2_20000101_20000101_15m.mat"));
-
-   testCase.verifyEqual(string(record.status), "restage_required");
-   testCase.verifyTrue(contains(string(record.reason), "bridges"));
+function writeLegacyMerraMet(filename, proven, include_merra)
+   %WRITELEGACYMERRAMET Create an hourly-ramped legacy 15-minute MERRA artifact.
+   if nargin < 3
+      include_merra = true;
+   end
+   source_time = (datetime(2000, 1, 1, TimeZone="UTC"):hours(1): ...
+      datetime(2000, 1, 1, 3, 0, 0, TimeZone="UTC"))';
+   source = timetable((1:4)', RowTimes=source_time, ...
+      VariableNames="runoff");
+   legacy_time = (source_time(1):minutes(15):source_time(end))';
+   met = retime(source, legacy_time, 'linear');
+   metadata = struct( ...
+      'met_resample_policy', 'linear_adjacent_finite_only', ...
+      'met_resample_source_row_count', height(source), ...
+      'met_resample_source_cadence_seconds', 3600, ...
+      'met_resample_source_time_gap_count', 0, ...
+      'met_resample_expected_missing_counts', struct('runoff', 0));
+   if include_merra
+      % Current MERRA timing markers accompany the optional native-grid proof.
+      metadata.merra_source_time_coordinate = 'native_at_reader';
+      metadata.merra_time_relabel_policy = ...
+         'time_averaged_center_to_interval_start';
+      metadata.merra_time_upsample_policy = ...
+         'zero_order_hold_over_declared_support';
+      metadata.merra_collection_support_hours = ...
+         struct('slv', 1, 'rad', 1, 'flx', 1, 'glc', 3);
+   end
+   if proven
+      % The saved 00/03 UTC rows are independently present in native glc.
+      metadata.merra_tavg3_source_grid_policy = ...
+         'native_glc_timestamp_inventory';
+      metadata.merra_tavg3_expected_source_row_count = 2;
+      metadata.merra_tavg3_source_row_count = 2;
+      metadata.merra_tavg3_source_time_gap_count = 0;
+      metadata.merra_tavg3_missing_source_times = ...
+         NaT(0, 1, 'TimeZone', 'UTC');
+   end
+   met.Properties.UserData = metadata;
+   save(filename, 'met')
 end
 
 function [eval_root, input_root, protocol_file] = writeRetmipAuditTree(root)
@@ -2122,81 +1886,6 @@ function profile_file = attachMarProfileFixture(input_root, manifest_file)
    writeJson(manifest_file, manifest)
 end
 
-function racmo_file = attachRacmoSublFixture(input_root, manifest_file)
-   %ATTACHRACMOSUBLFIXTURE Add one legacy manifest-referenced RACMO artifact.
-   racmo_root = fullfile(input_root, "userdata", "racmo2.3p3");
-   mkdir(racmo_root)
-   times = (datetime(2000, 1, 1, 0, 0, 0, TimeZone="UTC"):hours(1): ...
-      datetime(2000, 1, 1, 3, 0, 0, TimeZone="UTC"))';
-   Data = timetable(times, [-0.002; -0.001; 0; 0.0005], ...
-      42 + (1:numel(times))', VariableNames={'subl', 'guard'});
-   Data = icemodel.forcing.helpers.stampMetadata(Data, strict=false);
-   metadata = struct('sample_method', 'nearest', ...
-      'lat_wgs84', 70, 'lon_wgs84', -40);
-   Data.Properties.UserData = metadata;
-   artifact_metadata = metadata;
-   auxiliary = struct('label', "preserve", 'values', [1, 2, 3]);
-   racmo_file = string(fullfile(racmo_root, ...
-      "site_racmo2.3p3_20000101_20000101.mat"));
-   save(racmo_file, 'Data', 'artifact_metadata', 'auxiliary')
-
-   % Add the exact path to the current manifest so source scoping never falls
-   % back to filename-token discovery.
-   manifest = jsondecode(fileread(manifest_file));
-   manifest.cases.colocation.racmo = struct( ...
-      'kind', 'point_met', 'staged', true, 'source', 'racmo', ...
-      'source_id', 'racmo2.3p3', 'sample_method', 'nearest', ...
-      'data_files', 'racmo2.3p3/site_racmo2.3p3_20000101_20000101.mat', ...
-      'window', struct('start', '2000-01-01 00:00:00', ...
-      'end', '2000-01-01 03:00:00'));
-   writeJson(manifest_file, manifest)
-end
-
-function met_file = attachMerraMetFixture(input_root, manifest_file, policy)
-   %ATTACHMERRAMETFIXTURE Add one manifest-referenced 15-minute MERRA met file.
-   met_root = fullfile(input_root, "met", "merra2");
-   mkdir(met_root)
-   met_time = (datetime(2000, 1, 1, 0, 0, 0, TimeZone="UTC"):minutes(15): ...
-      datetime(2000, 1, 1, 3, 45, 0, TimeZone="UTC"))';
-   met = timetable(ones(numel(met_time), 1), RowTimes=met_time, ...
-      VariableNames="runoff");
-   met = icemodel.forcing.helpers.stampMetadata(met, strict=false);
-   missing = NaT(0, 1, 'TimeZone', 'UTC');
-   metadata = struct( ...
-      'merra_source_time_coordinate', 'native_at_reader', ...
-      'merra_time_relabel_policy', ...
-      'time_averaged_center_to_interval_start', ...
-      'merra_time_upsample_policy', ...
-      'zero_order_hold_over_declared_support', ...
-       'merra_collection_support_hours', ...
-       struct('slv', 1, 'rad', 1, 'flx', 1, 'glc', 3), ...
-       'merra_tavg3_source_grid_policy', ...
-       'native_glc_timestamp_inventory', ...
-       'merra_tavg3_expected_source_row_count', 2, ...
-       'merra_tavg3_source_row_count', 2, ...
-       'merra_tavg3_source_time_gap_count', 0, ...
-       'merra_tavg3_missing_source_times', missing, ...
-       'met_resample_policy', char(policy), ...
-      'met_resample_expected_missing_counts', struct('runoff', 0), ...
-      'met_resample_time_semantics', 'interval_start', ...
-      'met_resample_support_end_exclusive', met_time(end) + minutes(15), ...
-      'sample_method', 'nearest', 'lat_wgs84', 70, 'lon_wgs84', -40);
-   met.Properties.UserData = metadata;
-   met_file = string(fullfile(met_root, ...
-      "met_site_merra2_20000101_20000101_15m.mat"));
-   saveMet(met_file, met)
-
-   % Add the exact met path to the existing MERRA leg used for file scoping.
-   manifest = jsondecode(fileread(manifest_file));
-   manifest.cases.site_location.lat_wgs84 = ...
-      manifest.cases.site_location.lat;
-   manifest.cases.site_location.lon_wgs84 = ...
-      manifest.cases.site_location.lon;
-   manifest.cases.colocation.merra.met_files = ...
-      'merra2/met_site_merra2_20000101_20000101_15m.mat';
-   writeJson(manifest_file, manifest)
-end
-
 function met_file = attachMarMetFixture(input_root, manifest_file, data_file)
    %ATTACHMARMETFIXTURE Add derived 15-minute MAR met with copied provenance.
    met_root = fullfile(input_root, "met", "mar3.11");
@@ -2258,63 +1947,6 @@ function counts = timetableMissingCounts(T)
          counts.(char(name)) = nnz(~isfinite(values));
       end
    end
-end
-
-function writeTinyMerraGlcSource(root, day)
-   %WRITETINYMERRAGLCSOURCE Create one official-shape daily native tavg3 file.
-   folder = fullfile(root, 'glc');
-   mkdir(folder)
-   filename = fullfile(folder, ...
-      "MERRA2_400.tavg3_2d_glc_Nx." + string(day, 'yyyyMMdd') + ".nc4");
-   nccreate(filename, 'RUNOFF', ...
-      'Dimensions', {'lon', 1, 'lat', 1, 'time', 8});
-   ncwrite(filename, 'RUNOFF', reshape(1:8, 1, 1, []));
-   ncwriteatt(filename, 'RUNOFF', 'units', 'kg m-2 s-1');
-   nccreate(filename, 'time', 'Dimensions', {'time', 8});
-   ncwrite(filename, 'time', (0:180:1260)');
-   ncwriteatt(filename, 'time', 'units', ...
-      "minutes since " + string(day + minutes(90), 'yyyy-MM-dd HH:mm:ss'));
-end
-
-function writeLegacyMerraMet(filename, proven, include_merra)
-   %WRITELEGACYMERRAMET Create an hourly-ramped legacy 15-minute MERRA artifact.
-   if nargin < 3
-      include_merra = true;
-   end
-   source_time = (datetime(2000, 1, 1, TimeZone="UTC"):hours(1): ...
-      datetime(2000, 1, 1, 3, 0, 0, TimeZone="UTC"))';
-   source = timetable((1:4)', RowTimes=source_time, ...
-      VariableNames="runoff");
-   legacy_time = (source_time(1):minutes(15):source_time(end))';
-   met = retime(source, legacy_time, 'linear');
-   metadata = struct( ...
-      'met_resample_policy', 'linear_adjacent_finite_only', ...
-      'met_resample_source_row_count', height(source), ...
-      'met_resample_source_cadence_seconds', 3600, ...
-      'met_resample_source_time_gap_count', 0, ...
-      'met_resample_expected_missing_counts', struct('runoff', 0));
-   if include_merra
-      % Current MERRA timing markers accompany the optional native-grid proof.
-      metadata.merra_source_time_coordinate = 'native_at_reader';
-      metadata.merra_time_relabel_policy = ...
-         'time_averaged_center_to_interval_start';
-      metadata.merra_time_upsample_policy = ...
-         'zero_order_hold_over_declared_support';
-      metadata.merra_collection_support_hours = ...
-         struct('slv', 1, 'rad', 1, 'flx', 1, 'glc', 3);
-   end
-   if proven
-      % The two saved 00/03 UTC rows are independently present in native glc.
-      metadata.merra_tavg3_source_grid_policy = ...
-         'native_glc_timestamp_inventory';
-      metadata.merra_tavg3_expected_source_row_count = 2;
-      metadata.merra_tavg3_source_row_count = 2;
-      metadata.merra_tavg3_source_time_gap_count = 0;
-      metadata.merra_tavg3_missing_source_times = ...
-         NaT(0, 1, 'TimeZone', 'UTC');
-   end
-   met.Properties.UserData = metadata;
-   save(filename, 'met')
 end
 
 function writeJson(pathname, value)
