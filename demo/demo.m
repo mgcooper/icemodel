@@ -13,10 +13,10 @@ clc
 % IceModel requires a met (forcing) file with the following naming convention:
 % ['met_' sitename '_' forcings '_' yearname '_' timestep '.mat']
 %
-% The example file included with this repo: 'met_KANM_KANM_2016_1hr.mat'
+% The example file included with this repo: 'met_kanm_kanm_2016_15m.mat'
 %
 % This met file contains a timetable with forcings from the KANM weather
-% station for year 2016 on a 1 hr timestep. Note the sitename and the
+% station for year 2016 on a 15 minute timestep. Note the sitename and the
 % forcings are the same in this example.
 %
 % To run icemodel (or skinmodel) for your site, create a metfile with the same
@@ -65,7 +65,8 @@ switch runcase
 
       % Example 2 - Replace KAN-M albedo with MODIS albedo
 
-      % Set the run configuration. Use the "userdata" option to swap the albedo.
+      % Set the run configuration. The "modis" source selects the MODIS column
+      % embedded in the primary 15-minute forcing; no separate asset is needed.
       saveflag = false;
       sitename = 'kanm';
       forcings = 'kanm';
@@ -98,7 +99,7 @@ switch runcase
       sitename = 'kanm';
       forcings = 'kanm';
       smbmodel = 'skinmodel';
-      userdata = 'merra';
+      userdata = 'merra2';
       uservars = 'tair';
       simyears = 2016:2016;
       backupflag = false;
