@@ -46,18 +46,23 @@ function test_buildpath(testCase)
       'Expected fullpath() to return foldername "demo".');
 end
 
-function test_config_test_alias_matches_demo_config(testCase)
-   %TEST_CONFIG_TEST_ALIAS_MATCHES_DEMO_CONFIG Verify the formal-suite test
-   %alias resolves to the same canonical demo workspace paths.
+function test_config_cases_resolve_owned_data_roots(testCase)
+   %TEST_CONFIG_CASES_RESOLVE_OWNED_DATA_ROOTS Verify the three scoped cases.
 
+   % Resolve without mutating the test process so the case mapping itself is the
+   % only behavior under test.
    demo_cfg = icemodel.config('casename', 'demo', 'setenv', false);
    test_cfg = icemodel.config('casename', 'test', 'setenv', false);
+   verification_cfg = icemodel.config( ...
+      'casename', 'verification', 'setenv', false);
 
-   testCase.verifyEqual(test_cfg.ICEMODEL_DATA_PATH, demo_cfg.ICEMODEL_DATA_PATH);
-   testCase.verifyEqual(test_cfg.ICEMODEL_INPUT_PATH, demo_cfg.ICEMODEL_INPUT_PATH);
-   testCase.verifyEqual(test_cfg.ICEMODEL_OUTPUT_PATH, demo_cfg.ICEMODEL_OUTPUT_PATH);
-   testCase.verifyEqual(test_cfg.ICEMODEL_EVAL_PATH, demo_cfg.ICEMODEL_EVAL_PATH);
-   testCase.verifyEqual(test_cfg.ICEMODEL_USERDATA_PATH, demo_cfg.ICEMODEL_USERDATA_PATH);
+   % Each case must own a distinct, centralized data root.
+   testCase.verifyEqual(string(demo_cfg.ICEMODEL_DATA_PATH), ...
+      string(icemodel.internal.fullpath('demo', 'data')));
+   testCase.verifyEqual(string(test_cfg.ICEMODEL_DATA_PATH), ...
+      string(icemodel.internal.fullpath('test', 'data')));
+   testCase.verifyEqual(string(verification_cfg.ICEMODEL_DATA_PATH), ...
+      string(icemodel.internal.fullpath('data')));
 end
 
 function test_getpath_demo_resolves_demo_root(testCase)

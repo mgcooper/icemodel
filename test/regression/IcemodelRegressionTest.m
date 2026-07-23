@@ -16,10 +16,13 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
    methods (TestMethodSetup)
       function configureCases(testCase)
-         % Install the canonical test config so direct class runs and
-         % runner-based runs see the same environment.
+         % Install the runner-selected data root when present. A direct class
+         % run leaves the selector blank and therefore retains the canonical
+         % test case default.
+         data_root = string(getenv('ICEMODEL_TEST_DATA_ROOT'));
          [~, ~, ~, ~, testCase.env_cleanup] = ...
-            icemodel.test.helpers.bootstrapTestEnvironment();
+            icemodel.test.helpers.bootstrapTestEnvironment( ...
+            data_root=data_root);
 
          % Resolve the case matrix, baseline, and runoff reference once
          % before the per-case compare loop.

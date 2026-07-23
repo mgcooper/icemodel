@@ -243,14 +243,16 @@ function [kwargs, do_setenv] = parseinputs(varargin)
       do_setenv = false;
    end
 
-   % Override the default options for the repo-local demo/test data tree.
-   % TEST is a readability alias used by the formal suite; it resolves to
-   % the same canonical demo/data workspace as DEMO.
-   if any(strcmp(parser.Results.casename, {'demo', 'test'}))
+   % Resolve each public workflow case to its single owned data tree.
+   if strcmp(parser.Results.casename, 'demo')
       default_data_path = icemodel.internal.fullpath('demo', 'data');
+   elseif strcmp(parser.Results.casename, 'test')
+      default_data_path = icemodel.internal.fullpath('test', 'data');
+   elseif strcmp(parser.Results.casename, 'verification')
+      default_data_path = icemodel.internal.fullpath('data');
    elseif ~isempty(parser.Results.casename)
       error(['CASENAME argument currently only supports options ', ...
-         '"DEMO" and "TEST"'])
+         '"DEMO", "TEST", and "VERIFICATION"'])
    else
       default_data_path = icemodel.internal.fullpath('data');
    end

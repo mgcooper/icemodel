@@ -10,6 +10,7 @@ function results = run_perf_suite(kwargs)
    %  results = run_perf_suite(simyear=2017, smoke_sites="kanm", ...
    %     full_sites=["kanm"; "kanl"])
    %  results = run_perf_suite(tier="full", baseline="v1.1")
+   %  results = run_perf_suite(data_root="/path/to/test/data")
    %
    % Use this for normal performance comparisons against an existing rolling or
    % release baseline.
@@ -26,6 +27,7 @@ function results = run_perf_suite(kwargs)
    % matrix carries only SIMYEAR.
    %
    % The optional solver filter accepts any subset of [1 2 3].
+   % DATA_ROOT overrides the default test case for isolated fixture comparisons.
    %
    % SMOKE_SITES and FULL_SITES are advanced overrides for the site lists
    % used by each formal tier. Most callers should leave them at the
@@ -78,6 +80,18 @@ function results = run_perf_suite(kwargs)
 
       kwargs.build_report (1, 1) logical ...
          = true
+
+      kwargs.data_root (1, 1) string ...
+         = ""
+   end
+
+   % Canonical formal runs require the published formal-core capability. This
+   % check never downloads; its missing-data error gives the exact opt-in fetch
+   % command. Explicit comparison candidates bypass manifest identity checks
+   % because PROMICE candidates intentionally differ from release fixtures.
+   if isblanktext(kwargs.data_root)
+      icemodel.verification.setup.fetchFixtures( ...
+         "v1.1", capabilities="formal-core", download=false);
    end
 
    % Deal out arguments.
@@ -104,7 +118,12 @@ function results = run_perf_suite(kwargs)
    % Keep the cleanup handle in scope so the caller's config is restored
    % when this entrypoint returns.
    [~, input_path, output_path, ~, suite_cleanup] = ...
-      icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>
+      icemodel.test.helpers.bootstrapTestEnvironment( ...
+      data_root=kwargs.data_root); %#ok<ASGLU>
+
+   % Carry the explicit candidate root through the unittest class's own setup.
+   % Blank keeps direct/default runs on the canonical test configuration.
+   data_root_cleanup = configurePerfDataRootEnv(kwargs.data_root); %#ok<NASGU>
 
    % Formal wall-clock timings must never inherit an interactive profiler.
    profile off
@@ -469,4 +488,15 @@ function [compatible, reason] = perfBaselineCompatibility(baseline_meta)
          'MATLAB %s on %s'], char(baseline_version), char(baseline_host), ...
          char(current_version), char(current_host));
    end
+end
+
+function cleanup = configurePerfDataRootEnv(data_root)
+   %CONFIGUREPERFDATAROOTENV Scope the runner-selected formal data root.
+
+   % The performance TestCase bootstraps once per measured case, so expose the
+   % outer runner selection explicitly and restore any interactive prior value.
+   name = 'ICEMODEL_TEST_DATA_ROOT';
+   old_value = getenv(name);
+   cleanup = onCleanup(@() setenv(name, old_value));
+   setenv(name, char(data_root));
 end

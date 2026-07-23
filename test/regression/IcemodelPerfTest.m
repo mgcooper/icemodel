@@ -8,10 +8,12 @@ classdef IcemodelPerfTest < matlab.perftest.TestCase
 
    methods (TestMethodSetup)
       function configureCases(testCase)
-         % Install the canonical test config before timing begins so direct
-         % class runs and runner-based runs see the same environment.
+         % Install the runner-selected data root before timing begins. A direct
+         % class run leaves the selector blank and uses the canonical test case.
+         data_root = string(getenv('ICEMODEL_TEST_DATA_ROOT'));
          [~, ~, ~, ~, testCase.env_cleanup] = ...
-            icemodel.test.helpers.bootstrapTestEnvironment();
+            icemodel.test.helpers.bootstrapTestEnvironment( ...
+            data_root=data_root);
          testCase.opts = buildCaseOpts();
       end
    end
