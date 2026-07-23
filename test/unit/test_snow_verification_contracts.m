@@ -4,13 +4,22 @@ function tests = test_snow_verification_contracts
 end
 
 function setup(testCase)
-   % Install the canonical test/demo config for the verification tests.
+   % Install the full verification config used by this top-level data suite.
 
-   [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
+   [~, ~, ~, evaluation_root, cleanup] = ...
+      icemodel.test.helpers.bootstrapTestEnvironment( ...
+      icemodel_config_casename="verification");
    testCase.TestData.cleanup = cleanup;
    testCase.TestData.tmpdir = tempname(fullfile( ...
       icemodel.getpath('test'), 'artifacts', 'tmp'));
    icemodel.helpers.ensureDirExists(testCase.TestData.tmpdir);
+
+   % The full ESM-SnowMIP archive is local scientific data, not a release
+   % fixture. A clean checkout must skip this archive contract explicitly.
+   testCase.assumeTrue(isfile(fullfile( ...
+      evaluation_root, 'esm_snowmip', 'manifest.json')), ...
+      ['Full snow-verification archive is not installed under the ' ...
+      'verification data root.'])
 end
 
 function teardown(testCase)
@@ -29,6 +38,26 @@ function test_listcases_returns_expected_ids(testCase)
    ids = [cases.case_id];
 
    testCase.verifyTrue(all(ismember(expectedCaseIds(), ids)));
+end
+
+function test_runner_discovers_only_the_selected_root_inventory(testCase)
+   % Initial discovery and later comparison must use one resolved root pair.
+
+   selected_root = fullfile(testCase.TestData.tmpdir, 'selected-inventory');
+   stageSelectedSnowInventory(selected_root, "cdp");
+
+   % The repository verification tree also contains WFJ. Requesting both ids
+   % proves a default-root discovery would return a second, unintended case.
+   results = run_snow_verification_suite( ...
+      cases=["cdp", "wfj"], data_root=selected_root, ...
+      candidate_provider=@selectedTargetCandidate, make_plots=false);
+
+   testCase.verifyEqual(numel(results.cases), 1)
+   testCase.verifyEqual(string(results.cases.case_id), "cdp")
+   selected_eval = string(fullfile(selected_root, 'eval'));
+   testCase.verifyTrue(startsWith( ...
+      string(results.cases.manifest_path), selected_eval + filesep))
+   testCase.verifyFalse(any(string(results.summary.case_id) == "wfj"))
 end
 
 function test_verification_namelists_expose_curated_selectors(testCase)
@@ -169,19 +198,20 @@ function test_manifest_schema_helpers_are_setup_owned(testCase)
 end
 
 function test_loadmanifest_resolves_repo_data_paths(testCase)
-   % LOADMANIFEST should resolve committed demo fixtures or top-level staged files.
+   % LOADMANIFEST should resolve full verification data from the top-level root.
    % Forcing is no longer in the manifest - it is staged under data/input/met/ via
    % the standard icemodel naming convention, so checks below cover evaluation
    % paths only.
 
    manifest = icemodel.verification.loadmanifest("cdp");
+   verification_root = string(icemodel.internal.fullpath("data"));
 
    testCase.verifyEqual(manifest.dataset_family, "esm_snowmip");
    testCase.verifyEqual(manifest.case_type, "esm_site");
    testCase.verifyTrue(contains(manifest.evaluation_path, ...
       fullfile("eval", "esm_snowmip", "cdp")));
-   testCase.verifyTrue(contains(manifest.evaluation_path, fullfile("data")) ...
-      || contains(manifest.evaluation_path, fullfile("demo", "data")));
+   testCase.verifyTrue(startsWith(string(manifest.evaluation_path), ...
+      verification_root + filesep));
    testCase.verifyTrue(exist(manifest.evaluation_path, 'file') == 2);
 end
 
@@ -343,7 +373,7 @@ function test_colbeck_compare_solutions_is_line_only(testCase)
    set(groot, 'DefaultFigureCloseRequestFcn', @(~, ~) []);
    before = findall(groot, 'Type', 'Figure');
 
-   icemodel.verification.colbeck.compareSolutions( ...
+   result = icemodel.verification.colbeck.compareSolutions( ...
       experiment_names="exp1", make_plot=true, save_plot=false, ...
       plot_visible="off");
    clear restore_close
@@ -357,6 +387,9 @@ function test_colbeck_compare_solutions_is_line_only(testCase)
    testCase.verifyNotEmpty(lines);
    testCase.verifyTrue(all(string(get(lines, 'Marker')) == "none"));
    testCase.verifyEmpty(findall(fig, 'Type', 'Line', 'LineStyle', 'none'));
+   expected_root = string(fullfile(icemodel.getpath('test'), 'data'));
+   testCase.verifyEqual(string(fileparts(result.evaluation_data_root)), ...
+      expected_root)
 end
 
 function test_comparecase_writes_separate_scatter_for_site_cases(testCase)
@@ -474,4 +507,41 @@ function names = expectedCoreSiteVariables()
    %EXPECTEDCORESITEVARIABLES Minimal site variables derived from model output.
 
    names = ["snow_depth_m"; "swe_kg_m2"; "surface_temp_C"];
+end
+
+function stageSelectedSnowInventory(data_root, case_id)
+   %STAGESELECTEDSNOWINVENTORY Copy one case into an isolated manifest tree.
+
+   source_family = fullfile(icemodel.internal.fullpath('data'), ...
+      'eval', 'esm_snowmip');
+   target_family = fullfile(data_root, 'eval', 'esm_snowmip');
+   icemodel.helpers.ensureDirExists(target_family)
+   icemodel.helpers.ensureDirExists(fullfile(data_root, 'input'))
+
+   % Filter the family manifest before copying its one selected case folder.
+   manifest = jsondecode(fileread(fullfile(source_family, 'manifest.json')));
+   entries = reshape(manifest.cases, [], 1);
+   keep = string({entries.case_id}) == case_id;
+   manifest.cases = entries(keep);
+   assert(isscalar(manifest.cases), 'selected snow fixture case is missing')
+   copyfile(fullfile(source_family, case_id), ...
+      fullfile(target_family, case_id))
+   writeJson(fullfile(target_family, 'manifest.json'), manifest)
+end
+
+function candidate = selectedTargetCandidate(case_manifest)
+   %SELECTEDTARGETCANDIDATE Reuse the isolated observation bundle as candidate.
+
+   candidate = icemodel.verification.helpers.loadArtifact( ...
+      case_manifest.evaluation_path, "targets");
+end
+
+function writeJson(filename, value)
+   %WRITEJSON Write one temporary manifest with deterministic indentation.
+
+   text = jsonencode(value, PrettyPrint=true);
+   fid = fopen(filename, 'w');
+   cleanup = onCleanup(@() fclose(fid));
+   fprintf(fid, '%s\n', text);
+   clear cleanup
 end

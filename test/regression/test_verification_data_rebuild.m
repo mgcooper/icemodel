@@ -34,8 +34,8 @@ function test_rebuild_laugh_tests_colbeck1976(testCase)
    testCase.assumeTrue(has_source, ...
       sprintf('Laugh-Tests source cache not present at %s', src));
 
-   % Rebuild into an isolated evaluation_data_root so the live
-   % demo/data tree is not perturbed by the test.
+   % Rebuild into an isolated evaluation_data_root so the top-level scientific
+   % verification archive is not perturbed by the test.
    eval_root = fullfile(testCase.TestData.tmp, 'eval');
    manifest = icemodel.verification.setup.importLaughTests(src, ...
       evaluation_data_root=string(eval_root), overwrite=true);

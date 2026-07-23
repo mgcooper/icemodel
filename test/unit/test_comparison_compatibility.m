@@ -116,6 +116,15 @@ function test_loadmanifest_carries_explicit_input_root_to_colocated_loader(testC
    testCase.verifyGreaterThan(height(bundle.data), 0);
 end
 
+function test_colocated_loader_rejects_unscoped_manifest(testCase)
+   % Ad hoc manifests must not silently read from the process-global data root.
+   manifest = struct('colocation', struct());
+
+   testCase.verifyError(@() ...
+      icemodel.verification.helpers.loadColocatedData(manifest, "promice"), ...
+      'icemodel:verification:loadColocatedData:missingInputRoot')
+end
+
 function test_colocated_loader_filters_to_leg_window(testCase)
    % Broad cached RCM/Data artifacts should expose only the staged overlap.
    input_root = fullfile(testCase.TestData.tmp, 'window-input');
@@ -152,11 +161,11 @@ function test_loadmanifest_normalizes_manifest_lists_to_columns(testCase)
    testCase.verifyEqual(size(manifest.eval_sources, 2), 1);
 end
 
-function test_comparecase_uses_explicit_input_root_for_default_candidate(testCase)
-   % The no-candidate smoke path should find RCM userdata under input_data_root.
-   input_root = fullfile(testCase.TestData.tmp, 'compare-input');
-   eval_root = writeCompatibilityTree( ...
-      fullfile(testCase.TestData.tmp, 'compare-eval'), input_root);
+function test_comparecase_forwards_data_root_to_candidate_and_plots(testCase)
+   % The whole-root path must reach candidate loading and both generated plots.
+   data_root = fullfile(testCase.TestData.tmp, 'compare-root');
+   input_root = fullfile(data_root, 'input');
+   eval_root = writeCompatibilityTree(data_root, input_root);
    writeTargetsPayload(fullfile(eval_root, 'research_site', 'all', ...
       'observations.mat'), "smb");
    manifest_file = fullfile(eval_root, 'research_site', 'manifest.json');
@@ -164,11 +173,14 @@ function test_comparecase_uses_explicit_input_root_for_default_candidate(testCas
    manifest.cases.reference_file = '';
    writeJson(manifest_file, manifest);
 
-   result = icemodel.verification.comparecase("all", ...
-      evaluation_data_root=eval_root, input_data_root=input_root, ...
-      dataset_family="research_site", make_plot=false);
+   result = icemodel.verification.comparecase("all", data_root=data_root, ...
+      dataset_family="research_site", ...
+      artifact_dir=fullfile(data_root, 'artifacts'), ...
+      make_plot=true, save_plot=true, plot_visible="off");
 
    testCase.verifyTrue(any(string(result.metrics.status) == "ok"));
+   testCase.verifyTrue(isfile(result.figure_path));
+   testCase.verifyTrue(isfile(result.scatter_figure_path));
 end
 
 function test_comparecase_uses_available_rcm_candidate_when_racmo_absent(testCase)

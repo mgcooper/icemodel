@@ -202,23 +202,20 @@ changes select a visible rewrite, and missing legacy facts remain
 unknown-compatible. This check reads only the already-staged MAT target during
 non-dry observation staging; dry runs do not gain artifact or raw-source reads.
 
-### Fixture release-with-assets tooling
+### v1.1 release-data tooling
 
-The heavy committed demo fixture `.mat` data can be moved out of version control
-into a versioned GitHub release asset that is fetched/verified on demand, keeping
-only the lean manifests + a fetcher committed:
+`test/assets/icemodel-v1.1-data-manifest.json` is the single source of truth for
+the required `formal-core` and `verification-showcase` capabilities and the
+optional `forcing-integration` capability. `fixtureFileList` selects manifest
+rows; `packFixtures` writes one archive per selected capability; and
+`fetchFixtures` verifies or transactionally installs selected archives.
 
-- `fixtureFileList` is the single source of truth for the bundled fixture-data
-  set (the `.mat` data only; `manifest.json` / `.gitkeep` stay committed).
-- `packFixtures(version)` bundles that set into a gitignored
-  `release-staging/icemodel-fixtures-<version>.tar.gz` + `.MANIFEST.json`
-  (per-file SHA-256), reporting the committed-vs-asset saving.
-- `fetchFixtures(version, ...)` verifies the on-disk fixtures against the bundle
-  manifest, optionally extracts a local archive, and prints download
-  instructions when missing (mirrors `fetchSumup`); it never auto-downloads.
-
-`fetchFixtures` is wired into `icemodel.test.helpers.bootstrapTestEnvironment` as
-a non-breaking no-op fallback.
+Calling `fetchFixtures("v1.1")` explicitly provisions the mandatory capabilities
+and downloads missing release archives. Callers that only verify canonical data
+must pass `download=false`; local manifest/archive overrides preserve offline
+operation. Missing mandatory data in network-free verification reports the exact
+MATLAB provisioning command. See `README_FIXTURES.md` for the trust-boundary
+contract.
 
 ### Source-cache layout
 
@@ -719,20 +716,20 @@ same mask.
 
 ### Top-level staging roots and demo data
 
-Normal verification staging targets the top-level `data/` tree. The `demo/data`
-tree is for runnable demo assets and narrow legacy comparisons only, not normal
-verification discovery, importers, forcing builders, or plotting. The legacy KAN
-met files may remain there until demo/test fixtures are migrated:
+Normal verification staging targets the top-level `data/` tree. The tracked
+`demo/data` tree serves only the three public examples and is not a
+verification discovery, import, forcing-builder, comparison, or plotting root.
+Formal KAN fixtures belong to the provisioned `test/data` capability:
 
 ```sh
-demo/data/input/met/met_kanl_kanl_2015_1hr.mat
-demo/data/input/met/met_kanm_kanm_2015_1hr.mat
-demo/data/input/met/met_kanm_kanm_2016_1hr.mat
+test/data/input/met/met_kanl_kanl_2015_15m.mat
+test/data/input/met/met_kanm_kanm_2015_15m.mat
+test/data/input/met/met_kanm_kanm_2016_15m.mat
 ```
 
-After the test configuration is migrated, standard unit tests should use
-temp/synthetic fixtures or top-level release-asset data explicitly. Demo scripts
-should target `demo/data` only through `config("demo")` or an explicit demo path.
+Standard unit tests must use temporary/synthetic fixtures or provisioned
+`test/data` explicitly. Demo scripts target `demo/data` only through
+`config("demo")`.
 
 ### PROMICE co-located firn staging (`importPromiceSites`)
 
@@ -778,10 +775,8 @@ model's surface-following temperature column at 10 m. See
 The `output_root` kwarg is the explicit staging-root switch: eval manifests go
 to `<output_root>/eval`, forcing/Data to `<output_root>/input`.
 `output_root=<repo>/data` (or the unset default, which resolves to the repo-root
-data tree) is the normal verification-data target. `output_root=<repo>/demo/data`
-is only for deliberate legacy/demo comparisons or fixture-packaging maintenance.
-The default never writes the demo tree unless `output_root` /
-`evaluation_data_root` is pointed at `demo/data` on purpose.
+data tree) is the normal verification-data target. Verification staging must
+not target `demo/data`; that tracked tree is limited to the public demo inputs.
 
 **Incremental staging (MERGE by default).** Staging one site **adds or updates
 only that site's case entry** in the family `manifest.json` and **preserves
@@ -814,15 +809,6 @@ Pass `overwrite_family=true` only to deliberately
 rebuild the entire family root from the requested sites alone.
 
 ```matlab
-% Legacy/demo refresh only: write the KAN_L/M/U transect into demo/data when
-% intentionally comparing against old artifacts. Omit startdate/enddate to use
-% each station's full available record; pass them only to restrict the window.
-icemodel.verification.setup.importPromiceSites( ...
-   case_ids=["KAN_L","KAN_M","KAN_U"], ...
-   output_root=icemodel.internal.fullpath("demo","data"), ...
-   forcing_sources="promice", build_forcing=true, ...
-   overwrite=true);
-
 % Observation-only full PROMICE refresh: ALL stations found under
 % data/verification/promice/hour, all available years, into the repo-root data/
 % tree (data/eval + data/input). With no `case_ids` the driver defaults to the
@@ -907,6 +893,10 @@ variables (`density`, `subsurface_temperature`, `smb`) to a
 `subsurface_profile_bundle` candidate. Density and temperature preserve every
 model time-by-depth column as dated tall rows; behavior stays soft (diagnostic,
 no hard gate).
+
+SUMup has no demo-local subset path. Full interactive verification uses the
+top-level `data/` archive; automated tests use isolated temporary roots and
+provisioned `test/data` capabilities.
 
 Use `matchObservations` when model development needs the actual paired values
 rather than only the report overview or aggregate `comparecase` metrics:

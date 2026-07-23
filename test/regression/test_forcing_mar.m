@@ -1,7 +1,7 @@
 function tests = test_forcing_mar
    %TEST_FORCING_MAR Verify the MAR forcing/Data builders.
    %
-   % Reads the staged MAR v3.11 NetCDF subset under data/test/forcing; skips
+   % Reads the staged MAR v3.11 NetCDF subset under test/data/forcing; skips
    % cleanly when absent.
    %
    % The durable gates here are (a) the met contract on a full hourly axis
@@ -23,16 +23,16 @@ function setupOnce(testCase)
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.bootstrap_cleanup = cleanup;
 
-   source_dir = string(fullfile(icemodel.internal.fullpath('data'), 'test', ...
-      'forcing', 'mar'));
+   cfg = icemodel.config('getenv', true);
+   forcing_root = string(fullfile(cfg.ICEMODEL_DATA_PATH, 'forcing'));
+   source_dir = fullfile(forcing_root, 'mar');
    testCase.assumeTrue(isfolder(source_dir) ...
       && ~isempty(dir(fullfile(source_dir, 'MARv3.11*.nc'))), ...
-      'MAR fixture data not available under data/test/forcing');
+      'MAR fixture data not available under test/data/forcing');
    testCase.TestData.source_dir = source_dir;
    testCase.TestData.year = 2012;
 
-   modis_dir = string(fullfile(icemodel.internal.fullpath('data'), 'test', ...
-      'forcing', 'geus', 'albedo', 'gris'));
+   modis_dir = fullfile(forcing_root, 'geus', 'albedo', 'gris');
    if ~isfolder(modis_dir)
       modis_dir = "";
    end

@@ -17,9 +17,11 @@ function report = auditArtifacts(kwargs)
    % artifact_qa.json and artifact_qa.md without changing staged data.
    %
    % Inputs
+   %  data_root              Whole data tree containing eval/ and input/.
    %  evaluation_data_root   Explicit eval/ root. Blank uses the verification
    %                         helper's repo-local default.
    %  input_data_root        Explicit input/ root paired with the eval tree.
+   %  icemodel_config_casename   Optional nonmutating config-case selector.
    %  families               Canonical dataset-family ids or "all".
    %  report_dir             Optional generated-output directory.
    %
@@ -32,8 +34,10 @@ function report = auditArtifacts(kwargs)
    %  icemodel.verification.setup.repairRcmArtifactMetadata
 
    arguments
+      kwargs.data_root (1, 1) string = ""
       kwargs.evaluation_data_root (1, 1) string = ""
       kwargs.input_data_root (1, 1) string = ""
+      kwargs.icemodel_config_casename (1, 1) string = ""
       kwargs.families (1, :) string ...
          {icemodel.verification.validators.mustBeDatasetFamilySelection} = "all"
       kwargs.report_dir (1, 1) string = ""
@@ -41,10 +45,12 @@ function report = auditArtifacts(kwargs)
 
    % Resolve roots without mutating global configuration. An explicit input root
    % is carried through listcases/comparisonCompatibility for portable manifests.
-   eval_root = icemodel.verification.helpers.evaluationDataRoot( ...
-      evaluation_data_root=kwargs.evaluation_data_root);
-   input_root = icemodel.verification.helpers.inputDataRoot( ...
-      input_data_root=kwargs.input_data_root);
+   [eval_root, input_root] = ...
+      icemodel.verification.setup.resolveStagingRoots( ...
+      data_root=kwargs.data_root, ...
+      evaluation_data_root=kwargs.evaluation_data_root, ...
+      input_data_root=kwargs.input_data_root, ...
+      icemodel_config_casename=kwargs.icemodel_config_casename);
 
    % Discover and validate manifests before using the operational readers. This
    % lets malformed or missing manifests become findings instead of aborting the

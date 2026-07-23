@@ -4,8 +4,10 @@
 % baselines, artifacts, and references without running any test suite.
 %
 % Prerequisites:
-%   Run icemodel.test.helpers.bootstrapTestEnvironment() first, or use fully
-%   qualified names (icemodel.test.helpers.*) as shown below.
+%   Keep the fifth output from bootstrapTestEnvironment in the workspace for
+%   the whole session, or use fully qualified names as shown below:
+%   [~, ~, ~, ~, bootstrap_cleanup] = ...
+%      icemodel.test.helpers.bootstrapTestEnvironment();
 
 import icemodel.test.helpers.*
 

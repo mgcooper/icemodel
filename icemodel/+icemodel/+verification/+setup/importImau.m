@@ -180,7 +180,7 @@ function manifest = importImau(source_dir, kwargs)
    end
 
    if ~kwargs.dry_run && ~kwargs.build_observations ...
-      && ~build_native_forcing
+         && ~build_native_forcing
       % Reuse the staged case entry so an RCM-only attachment does not require
       % observation or native-source caches.
       [state, alive, skipped] = ...

@@ -20,10 +20,9 @@ end
 function setup(testCase)
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.cleanup = cleanup;
-   % The committed SUMup verification source cache lives at the repo-root
-   % data/verification/sumup (whitelisted in .gitignore), independent of the
-   % test bootstrap's demo/data redirect. Resolve it from this test file's
-   % location: test/unit/<file>.m -> repo root is three levels up.
+   % The local SUMup source cache belongs to the top-level scientific archive
+   % under data/verification/sumup, independent of the scoped test/data root.
+   % Resolve it through the repository root rather than the active test config.
    testCase.TestData.cache = fullfile(icemodel.internal.fullpath(), ...
       'data', 'verification', 'sumup');
    % KAN_U: densest SUMup co-location (FirnCover / GC-Net KANU cores & pits).
@@ -90,7 +89,7 @@ function test_import_driver_obs_staged_when_forcing_throws(testCase)
 
    assumeCachePresent(testCase);
 
-   % Private eval / input roots so the committed demo tree is untouched.
+   % Private roots keep the top-level archive and provisioned test data untouched.
    tmp = tempname;
    mkdir(tmp);
    testCase.addTeardown(@() rmdir(tmp, 's'));
@@ -150,9 +149,10 @@ function test_import_driver_stages_forcing_legs_when_present(testCase)
    % file; RACMO writes Data only.
 
    assumeCachePresent(testCase);
-   mar_dir = string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'mar'));
-   merra_dir = string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'merra2'));
-   racmo_dir = string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'racmo'));
+   forcing_root = forcingFixtureRoot();
+   mar_dir = fullfile(forcing_root, 'mar');
+   merra_dir = fullfile(forcing_root, 'merra2');
+   racmo_dir = fullfile(forcing_root, 'racmo');
    testCase.assumeTrue( ...
       isfolder(mar_dir) && isfolder(merra_dir) && isfolder(racmo_dir), ...
       'MAR/MERRA/RACMO fixtures absent; skipping green-path test.');
@@ -239,12 +239,10 @@ function test_import_skips_pre_rcm_observations_before_writing(testCase)
    % all three legs before delegated staging so no unreferenced RCM file can be
    % left in the isolated input tree.
    assumeCachePresent(testCase);
-   mar_dir = string(fullfile(icemodel.internal.fullpath('data'), ...
-      'test', 'forcing', 'mar'));
-   merra_dir = string(fullfile(icemodel.internal.fullpath('data'), ...
-      'test', 'forcing', 'merra2'));
-   racmo_dir = string(fullfile(icemodel.internal.fullpath('data'), ...
-      'test', 'forcing', 'racmo'));
+   forcing_root = forcingFixtureRoot();
+   mar_dir = fullfile(forcing_root, 'mar');
+   merra_dir = fullfile(forcing_root, 'merra2');
+   racmo_dir = fullfile(forcing_root, 'racmo');
    testCase.assumeTrue( ...
       isfolder(mar_dir) && isfolder(merra_dir) && isfolder(racmo_dir), ...
       'MAR/MERRA/RACMO fixtures absent; skipping no-overlap test.');
@@ -295,8 +293,7 @@ function test_forcing_only_default_uses_each_staged_case_period(testCase)
    % An omitted forcing window belongs to each staged observation case. A
    % pre-RCM WEG-B case remains byte-logically unchanged while an overlapping
    % KAN-U case attaches MAR without reading the SUMup source cache.
-   mar_dir = string(fullfile(icemodel.internal.fullpath('data'), ...
-      'test', 'forcing', 'mar'));
+   mar_dir = fullfile(forcingFixtureRoot(), 'mar');
    testCase.assumeTrue(isfolder(mar_dir), ...
       'MAR source-light fixture absent; skipping forcing-only period test.');
 
@@ -373,8 +370,7 @@ end
 
 function test_reuse_path_restores_requested_prior_zero_overlap_leg(testCase)
    % A zero-overlap refresh cannot replace an existing staged leg with a skip.
-   mar_dir = string(fullfile(icemodel.internal.fullpath('data'), ...
-      'test', 'forcing', 'mar'));
+   mar_dir = fullfile(forcingFixtureRoot(), 'mar');
    testCase.assumeTrue(isfolder(mar_dir), ...
       'MAR source-light fixture absent; skipping prior-leg restore test.');
 
@@ -461,10 +457,9 @@ function test_unbounded_sumup_advertises_overlapping_short_rcm_legs(testCase)
    % convenience RCM build is still comparable over its overlap and should stay
    % advertised with a clipped window.
    assumeCachePresent(testCase);
-   mar_dir = string(fullfile(icemodel.internal.fullpath('data'), ...
-      'test', 'forcing', 'mar'));
-   merra_dir = string(fullfile(icemodel.internal.fullpath('data'), ...
-      'test', 'forcing', 'merra2'));
+   forcing_root = forcingFixtureRoot();
+   mar_dir = fullfile(forcing_root, 'mar');
+   merra_dir = fullfile(forcing_root, 'merra2');
    testCase.assumeTrue(isfolder(mar_dir) && isfolder(merra_dir), ...
       'MAR/MERRA fixtures absent; skipping source-list guard.');
 
@@ -772,4 +767,10 @@ function entry = sumupForcingOnlyEntry(case_id, site_id, point, period)
       'irregular'
       'SUMup forcing-only period fixture'};
    entry = icemodel.verification.setup.makeFirnCaseManifestEntry(values);
+end
+
+function root = forcingFixtureRoot()
+   %FORCINGFIXTUREROOT Resolve optional source fixtures from the active test case.
+   cfg = icemodel.config('getenv', true);
+   root = string(fullfile(cfg.ICEMODEL_DATA_PATH, 'forcing'));
 end

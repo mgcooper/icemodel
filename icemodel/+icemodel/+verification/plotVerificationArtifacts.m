@@ -118,7 +118,7 @@ function cases = familyCases(family, kwargs, evaluation_data_root)
 end
 
 function tf = usesDefaultManifestDiscovery(kwargs)
-   %USESDEFAULTMANIFESTDISCOVERY True when listcases should apply fallback roots.
+   %USESDEFAULTMANIFESTDISCOVERY True when listcases should resolve default roots.
    tf = kwargs.output_root == "" && kwargs.evaluation_data_root == "" ...
       && kwargs.input_data_root == "" ...
       && kwargs.icemodel_config_casename == "";

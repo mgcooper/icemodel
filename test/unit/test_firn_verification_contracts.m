@@ -1,8 +1,8 @@
 function tests = test_firn_verification_contracts
    %TEST_FIRN_VERIFICATION_CONTRACTS Verify the firn-evaluation contracts.
    %
-   % Exercises the firn_observational lane end to end against the committed
-   % co-located PROMICE firn fixtures under demo/data/eval/promice/:
+   % Exercises the firn_observational lane end to end against the staged
+   % co-located PROMICE firn fixtures under top-level data/eval/promice/:
    %   - listcases enumerates the firn family alongside the snow families;
    %   - each firn manifest's case_type validates against the namelist;
    %   - the candidate adapter resolves the declared comparison variables;
@@ -10,33 +10,43 @@ function tests = test_firn_verification_contracts
    %   - the co-located multi-model bundle (promice/mar/merra met + racmo Data)
    %     the manifest declares resolves on disk.
    %
-   % This suite must NOT vacuously pass: setupOnce asserts the committed firn
-   % fixture cases are present so a missing fixture tree fails the suite rather
-   % than silently skipping it.
+   % The full scientific archive is local-only. setupOnce skips clearly when it
+   % is absent, then asserts all expected cases when the archive is installed.
    tests = functiontests(localfunctions);
 end
 
 function setupOnce(testCase)
-   % Install the canonical test environment and require the committed firn
-   % fixtures to be present under the paired demo eval/input roots.
+   % Install the full verification environment and require the firn fixtures to
+   % be present under its paired top-level eval/input roots.
 
-   [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
+   [~, ~, ~, evaluation_root, cleanup] = ...
+      icemodel.test.helpers.bootstrapTestEnvironment( ...
+      icemodel_config_casename="verification");
    testCase.TestData.cleanup = cleanup;
 
    testCase.TestData.tmpdir = tempname(fullfile( ...
       icemodel.getpath('test'), 'artifacts', 'tmp'));
    icemodel.helpers.ensureDirExists(testCase.TestData.tmpdir);
 
+   % PROMICE and SUMup full-family manifests identify the local scientific
+   % archive required by every end-to-end contract in this file.
+   required_manifests = [ ...
+      fullfile(evaluation_root, 'promice', 'manifest.json')
+      fullfile(evaluation_root, 'sumup', 'manifest.json')];
+   testCase.assumeTrue(all(isfile(required_manifests)), ...
+      ['Full firn-verification archive is not installed under the ' ...
+      'verification data root.'])
+
    % The suite is only meaningful when the committed PROMICE firn anchors
    % enumerate, so require them explicitly. The KAN
-   % transect (kanl/kanm/kanu) is joined by the firn-accumulation demo fixture
+   % transect (kanl/kanm/kanu) is joined by the firn-accumulation fixture
    % egp (accumulation/dry-firn, 2015-2016) staged for CI firn-zone coverage
    % beyond the KAN ablation/percolation anchors.
    testCase.TestData.expected_firn_ids = ["kanl"; "kanm"; "kanu"];
    testCase.TestData.expected_accum_firn_ids = "egp";
 
    firn_cases = icemodel.verification.listcases(dataset_family="promice", ...
-      icemodel_config_casename="test");
+      icemodel_config_casename="verification");
    testCase.assertNotEmpty(firn_cases, ...
       'no committed promice firn cases enumerated; fixture tree missing');
    testCase.TestData.firn_cases = firn_cases;
@@ -49,7 +59,7 @@ function setupOnce(testCase)
    testCase.TestData.expected_sumup_ids = ["kanl"; "kanm"; "kanu"];
    testCase.TestData.expected_accum_sumup_ids = "egp";
    sumup_cases = icemodel.verification.listcases(dataset_family="sumup", ...
-      icemodel_config_casename="test");
+      icemodel_config_casename="verification");
    testCase.assertNotEmpty(sumup_cases, ...
       'no committed sumup firn cases enumerated under the fixture root');
    testCase.TestData.sumup_cases = sumup_cases;
@@ -84,7 +94,7 @@ function test_listcases_enumerates_firn_family_alongside_snow(testCase)
    % globs the firn root as well as the snow root.
 
    all_cases = icemodel.verification.listcases( ...
-      icemodel_config_casename="test");
+      icemodel_config_casename="verification");
    ids = [all_cases.case_id];
 
    % Firn cases enumerate alongside the snow lane.
@@ -108,7 +118,7 @@ function test_each_firn_case_type_validates(testCase)
    case_types = icemodel.verification.namelists.casetype();
    for id = testCase.TestData.expected_firn_ids'
       manifest = icemodel.verification.loadmanifest(id, ...
-         icemodel_config_casename="test");
+         icemodel_config_casename="verification");
       testCase.verifyEqual(string(manifest.case_type), "firn_observational", ...
          sprintf('%s is not firn_observational', id));
       testCase.verifyTrue(ismember(string(manifest.case_type), case_types), ...
@@ -133,7 +143,7 @@ function test_each_firn_case_carries_valid_surface_zone(testCase)
 
    for id = testCase.TestData.expected_firn_ids'
       manifest = icemodel.verification.loadmanifest(id, ...
-         icemodel_config_casename="test");
+         icemodel_config_casename="verification");
       zone = string(manifest.surface_zone);
       testCase.verifyTrue(ismember(zone, allowed), ...
          sprintf('%s surface_zone "%s" not in namelist', id, zone));
@@ -161,7 +171,7 @@ function test_each_firn_case_carries_valid_permafrost_zone(testCase)
 
    for id = testCase.TestData.expected_firn_ids'
       manifest = icemodel.verification.loadmanifest(id, ...
-         icemodel_config_casename="test");
+         icemodel_config_casename="verification");
       testCase.verifyTrue(isfield(manifest, 'permafrost_zone'), ...
          sprintf('%s missing permafrost_zone field', id));
       pfz = string(manifest.permafrost_zone);
@@ -190,7 +200,7 @@ function test_each_firn_case_carries_valid_eval_target(testCase)
 
    for id = testCase.TestData.expected_firn_ids'
       manifest = icemodel.verification.loadmanifest(id, ...
-         icemodel_config_casename="test");
+         icemodel_config_casename="verification");
       target = string(manifest.eval_target);
       testCase.verifyTrue(all(ismember(target, allowed)), ...
          sprintf('%s eval_target not in namelist', id));
@@ -210,11 +220,11 @@ function test_manifest_is_metadata_only(testCase)
 
    needed = icemodel.verification.setup.firnCaseManifestFieldNames();
    family_root = fileparts(icemodel.verification.loadmanifest("kanl", ...
-      icemodel_config_casename="test").manifest_path);
+      icemodel_config_casename="verification").manifest_path);
 
    for id = testCase.TestData.expected_firn_ids'
       manifest = icemodel.verification.loadmanifest(id, ...
-         icemodel_config_casename="test");
+         icemodel_config_casename="verification");
 
       % Metadata-only schema fields present.
       for f = ["period", "forcing_sources", "eval_sources", "colocation"]
@@ -251,7 +261,7 @@ function test_candidate_adapter_resolves_declared_firn_variables(testCase)
    % T(z,t) sampled from ice2.T at staged thermistor depths.
 
    manifest = icemodel.verification.loadmanifest("kanm", ...
-      icemodel_config_casename="test");
+      icemodel_config_casename="verification");
    vars = string(manifest.comparison_variables);
    vars = vars(ismember(vars, ["ablation", "snow_depth", "tsfc"]) ...
       | startsWith(vars, "tice"));
@@ -323,7 +333,7 @@ function test_comparecase_soft_gate_no_hard_fail(testCase)
    % case error.
 
    result = icemodel.verification.comparecase("kanl", ...
-      "icemodel_config_casename", "test", ...
+      "icemodel_config_casename", "verification", ...
       "artifact_dir", testCase.TestData.tmpdir, ...
       "make_plot", false);
 
@@ -350,13 +360,13 @@ function test_colocated_files_resolve_on_disk(testCase)
    % (manifest.colocation) pointing at these individual files, NOT a bundle.
 
    input_root = icemodel.verification.helpers.inputDataRoot( ...
-      icemodel_config_casename="test");
+      icemodel_config_casename="verification");
    met_dir = fullfile(input_root, 'met');
    ud_dir = fullfile(input_root, 'userdata');
 
    for id = testCase.TestData.expected_firn_ids'
       manifest = icemodel.verification.loadmanifest(id, ...
-         icemodel_config_casename="test");
+         icemodel_config_casename="verification");
       cf = manifest.colocation;
 
       % Met files and Data files resolve when a compatible leg declares them.
@@ -373,7 +383,7 @@ function test_sumup_cases_are_firn_observational(testCase)
    case_types = icemodel.verification.namelists.casetype();
    for id = testCase.TestData.expected_sumup_ids'
       manifest = icemodel.verification.loadmanifest(id, ...
-         dataset_family="sumup", icemodel_config_casename="test");
+         dataset_family="sumup", icemodel_config_casename="verification");
       testCase.verifyEqual(string(manifest.case_type), "firn_observational", ...
          sprintf('%s is not firn_observational', id));
       testCase.verifyTrue(ismember(string(manifest.case_type), case_types), ...
@@ -399,7 +409,7 @@ function test_sumup_cases_inherit_kan_zone_and_target(testCase)
 
    for id = testCase.TestData.expected_sumup_ids'
       manifest = icemodel.verification.loadmanifest(id, ...
-         dataset_family="sumup", icemodel_config_casename="test");
+         dataset_family="sumup", icemodel_config_casename="verification");
       exp = expected.(char(id));
       anchor = icemodel.verification.setup.promiceSiteCatalog(exp.site);
 
@@ -439,7 +449,7 @@ function test_bundled_eval_target_is_forcing_agnostic_data_only(testCase)
 
    % esm_snowmip cdp: timeseries obs bundle.
    esm = icemodel.verification.loadmanifest("cdp", ...
-      icemodel_config_casename="test");
+      icemodel_config_casename="verification");
    testCase.assertTrue(isfile(esm.evaluation_path), ...
       'cdp observations.mat missing on disk');
    esm_targets = icemodel.verification.helpers.loadArtifact( ...
@@ -455,7 +465,7 @@ function test_bundled_eval_target_is_forcing_agnostic_data_only(testCase)
    % SUMup KAN cases: subsurface_profile_bundle obs bundles.
    for id = testCase.TestData.expected_sumup_ids'
       su = icemodel.verification.loadmanifest(id, ...
-         dataset_family="sumup", icemodel_config_casename="test");
+         dataset_family="sumup", icemodel_config_casename="verification");
       testCase.assertTrue(isfile(su.evaluation_path), ...
          sprintf('%s sumup observations.mat missing on disk', id));
       su_targets = icemodel.verification.helpers.loadArtifact( ...
@@ -480,7 +490,7 @@ function test_forcing_sources_is_informational_not_load_bearing(testCase)
    for case_entry = reshape(testCase.TestData.firn_cases, 1, [])
       id = string(case_entry.case_id);
       manifest = icemodel.verification.loadmanifest(id, ...
-         dataset_family="promice", icemodel_config_casename="test");
+         dataset_family="promice", icemodel_config_casename="verification");
       testCase.verifyTrue(isfield(manifest, 'forcing_sources'), ...
          sprintf('%s missing forcing_sources', id));
       % It is a recorded id list (strings), not a data handle.
@@ -516,7 +526,7 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
    % the candidate is a subsurface_profile_bundle.
 
    manifest = icemodel.verification.loadmanifest("kanu", ...
-      dataset_family="sumup", icemodel_config_casename="test");
+      dataset_family="sumup", icemodel_config_casename="verification");
    vars = string(manifest.comparison_variables);
    testCase.assertTrue(ismember("density", vars));
    testCase.assertTrue(ismember("subsurface_temperature", vars));
@@ -569,7 +579,7 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
    % A short synthetic model snippet maps SMB but cannot compare against a full
    % annual SUMup interval until the candidate covers that interval.
    result = icemodel.verification.comparecase("kanu", ...
-      dataset_family="sumup", icemodel_config_casename="test", ...
+      dataset_family="sumup", icemodel_config_casename="verification", ...
       candidate=candidate, make_plot=false);
    smb_row = result.metrics(result.metrics.variable == "smb", :);
    testCase.verifyFalse(any(string(smb_row.status) == "ok"));
@@ -587,7 +597,7 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
       [observed_smb.start_date(idx); observed_smb.end_date(idx)], ...
       [0; 0], 'VariableNames', {'smb'}));
    result = icemodel.verification.comparecase("kanu", ...
-      dataset_family="sumup", icemodel_config_casename="test", ...
+      dataset_family="sumup", icemodel_config_casename="verification", ...
       candidate=sparse_candidate, make_plot=false);
    smb_row = result.metrics(result.metrics.variable == "smb", :);
    testCase.verifyFalse(any(string(smb_row.status) == "ok"));
@@ -597,7 +607,7 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
       repmat(interval_rate, numel(interval_time), 1), ...
       'VariableNames', {'smb'}));
    result = icemodel.verification.comparecase("kanu", ...
-      dataset_family="sumup", icemodel_config_casename="test", ...
+      dataset_family="sumup", icemodel_config_casename="verification", ...
       candidate=rcm_candidate, make_plot=false);
    smb_row = result.metrics(result.metrics.variable == "smb", :);
    testCase.verifyEqual(smb_row.rmse, 0, 'AbsTol', 1e-12);
@@ -689,18 +699,18 @@ function test_plotcase_plots_sumup_interval_smb(testCase)
 end
 
 function test_committed_accum_firn_fixtures_enumerate(testCase)
-   % The firn-accumulation demo fixture (egp, dry-firn) must enumerate alongside
+   % The firn-accumulation fixture (egp, dry-firn) must enumerate alongside
    % the KAN transect in BOTH the promice and sumup families, so CI carries
    % firn-zone dry-firn coverage beyond the KAN ablation/percolation anchors.
 
    promice_ids = [icemodel.verification.listcases( ...
-      dataset_family="promice", icemodel_config_casename="test").case_id];
+      dataset_family="promice", icemodel_config_casename="verification").case_id];
    testCase.verifyTrue(all(ismember( ...
       testCase.TestData.expected_accum_firn_ids, promice_ids)), ...
       'firn-accumulation promice fixture (egp) not enumerated');
 
    sumup_ids = [icemodel.verification.listcases( ...
-      dataset_family="sumup", icemodel_config_casename="test").case_id];
+      dataset_family="sumup", icemodel_config_casename="verification").case_id];
    testCase.verifyTrue(all(ismember( ...
       testCase.TestData.expected_accum_sumup_ids, sumup_ids)), ...
       'firn-accumulation sumup fixture (egp) not enumerated');
@@ -722,7 +732,7 @@ function test_all_committed_promice_fixtures_validate(testCase)
    for case_entry = reshape(testCase.TestData.firn_cases, 1, [])
       id = string(case_entry.case_id);
       manifest = icemodel.verification.loadmanifest(id, ...
-         dataset_family="promice", icemodel_config_casename="test");
+         dataset_family="promice", icemodel_config_casename="verification");
       anchor = icemodel.verification.setup.promiceSiteCatalog(manifest.site_id);
 
       testCase.verifyEqual(string(manifest.case_type), "firn_observational", ...
@@ -759,7 +769,7 @@ function test_accum_firn_fixtures_soft_gate_no_hard_fail(testCase)
       "missing_candidate_variable"; "no_overlap"];
    for id = testCase.TestData.expected_accum_firn_ids'
       result = icemodel.verification.comparecase(id, ...
-         "icemodel_config_casename", "test", ...
+         "icemodel_config_casename", "verification", ...
          "artifact_dir", testCase.TestData.tmpdir, "make_plot", false);
       testCase.verifyEqual(string(result.gate_mode), "soft", ...
          sprintf('%s is not soft-gated', id));
@@ -776,13 +786,13 @@ function test_accum_firn_colocation_files_resolve_on_disk(testCase)
    % standard icemodel input layout, exactly as the KAN fixtures do.
 
    input_root = icemodel.verification.helpers.inputDataRoot( ...
-      icemodel_config_casename="test");
+      icemodel_config_casename="verification");
    met_dir = fullfile(input_root, 'met');
    ud_dir = fullfile(input_root, 'userdata');
 
    for id = testCase.TestData.expected_accum_firn_ids'
       manifest = icemodel.verification.loadmanifest(id, ...
-         dataset_family="promice", icemodel_config_casename="test");
+         dataset_family="promice", icemodel_config_casename="verification");
       cf = manifest.colocation;
       verifyFilesResolve(testCase, met_dir, cf.promice.met_files, id, "promice met");
       verifyFilesResolve(testCase, ud_dir, cf.promice.data_files, id, "promice data");
@@ -799,7 +809,7 @@ function test_all_committed_sumup_fixtures_resolve(testCase)
    for case_entry = reshape(testCase.TestData.sumup_cases, 1, [])
       id = string(case_entry.case_id);
       manifest = icemodel.verification.loadmanifest(id, ...
-         dataset_family="sumup", icemodel_config_casename="test");
+         dataset_family="sumup", icemodel_config_casename="verification");
       testCase.verifyEqual(string(manifest.case_type), "firn_observational", ...
          sprintf('%s sumup case_type', id));
       testCase.verifyTrue(ismember(string(manifest.case_type), case_types), ...

@@ -2,7 +2,7 @@ function tests = test_forcing_racmo
    %TEST_FORCING_RACMO Verify the RACMO evaluation-Data builder.
    %
    % Reads the staged RACMO2.3p3 per-variable fixture subset under
-   % data/test/forcing; skips cleanly when absent.
+   % test/data/forcing; skips cleanly when absent.
    %
    % Note: the RACMO archive carries SMB components and surface fluxes
    % only (no air temperature / wind / humidity / pressure), so there is
@@ -24,11 +24,12 @@ function setupOnce(testCase)
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.cleanup = cleanup;
 
-   source_dir = string(fullfile(icemodel.internal.fullpath('data'), 'test', ...
-      'forcing', 'racmo'));
+   cfg = icemodel.config('getenv', true);
+   source_dir = string(fullfile( ...
+      cfg.ICEMODEL_DATA_PATH, 'forcing', 'racmo'));
    testCase.assumeTrue(isfolder(source_dir) ...
       && ~isempty(dir(fullfile(source_dir, '*.RACMO*.nc'))), ...
-      'RACMO fixture data not available under data/test/forcing');
+      'RACMO fixture data not available under test/data/forcing');
    testCase.TestData.source_dir = source_dir;
    testCase.TestData.year = 2012;
    [Data, metadata] = icemodel.forcing.buildRacmoData( ...
@@ -95,8 +96,9 @@ function test_buildRacmoData_self_consistent_with_raw_netcdf(testCase)
    swsd_file = metadata.source_files( ...
       contains(metadata.source_files, "swsd"));
    info = ncinfo(swsd_file, 'swsd');
+   grid_start = reshape(metadata.grid_start, 1, []);
    raw = squeeze(double(ncread(swsd_file, 'swsd', ...
-      [metadata.grid_start 1 1], [1 1 1 info.Size(4)])));
+      [grid_start 1 1], [1 1 1 info.Size(4)])));
    t = ncread(swsd_file, 'time');
    Time = datetime(1950, 1, 1, 'TimeZone', 'UTC') + days(double(t));
    raw = raw(year(Time) == testCase.TestData.year);

@@ -3231,8 +3231,11 @@ function test_modisAlbedoChannel_accepts_column_years(testCase)
    % still iterate one year at a time instead of building one impossible
    % multi-year filename pattern.
 
-   modis_dir = string(fullfile(icemodel.internal.fullpath('data'), 'test', ...
-      'forcing', 'geus', 'albedo', 'gris'));
+   % Resolve the scoped root installed by the test bootstrap so provisioned
+   % optional forcing data cannot be skipped behind the former data/test path.
+   config = icemodel.config('getenv', true);
+   modis_dir = string(fullfile(config.ICEMODEL_DATA_PATH, 'forcing', ...
+      'geus', 'albedo', 'gris'));
    testCase.assumeTrue(isfolder(modis_dir), ...
       'GEUS MODIS albedo source not available');
 

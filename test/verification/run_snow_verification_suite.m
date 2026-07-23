@@ -44,6 +44,12 @@ function results = run_snow_verification_suite(kwargs)
    %   in to the persisted-snapshot workflow. The runner only creates the
    %   <test>/artifacts/snow-verification/<run_name>/ directory when at
    %   least one artifact would be written.
+   %
+   % Data selection
+   %   DATA_ROOT selects one tree containing eval/ and input/. Otherwise explicit
+   %   leaf roots, ICEMODEL_CONFIG_CASENAME, then the verification case apply.
+   %   Suite execution rejects two explicit leaves with different parents
+   %   because DATA_PATH, USERDATA_PATH, and OUTPUT_PATH require one owner tree.
 
    arguments
       kwargs.cases (1, :) string ...
@@ -55,20 +61,32 @@ function results = run_snow_verification_suite(kwargs)
       kwargs.write_artifacts (1, 1) logical = false
       kwargs.run_icemodel (1, 1) logical = false
       kwargs.candidate_provider = []
+      kwargs.data_root (1, 1) string = ""
       kwargs.evaluation_data_root (1, 1) string = ""
+      kwargs.input_data_root (1, 1) string = ""
+      kwargs.icemodel_config_casename (1, 1) string = "verification"
       kwargs.artifact_root (1, 1) string = ""
       kwargs.startdate = NaT('TimeZone', 'UTC')
       kwargs.enddate = NaT('TimeZone', 'UTC')
    end
 
-   [run_name, run_dir, write_any_artifacts, kwargs, cleanup] = ...
+   [run_name, run_dir, write_any_artifacts, kwargs, cleanup, ...
+      evaluation_data_root, input_data_root] = ...
       resolveRunContext(kwargs);
 
-   % Select cases through the public catalog entry point so the runner stays
-   % dataset-family agnostic.
-   cases = icemodel.verification.listcases( ...
-      "evaluation_data_root", kwargs.evaluation_data_root);
+   % Discover cases from the exact pair selected for execution. Keeping these
+   % roots explicit prevents initial inventory lookup from consulting the
+   % repository default before the comparison loop enters its scoped config.
+   try
+      cases = icemodel.verification.listcases( ...
+         "evaluation_data_root", evaluation_data_root, ...
+         "input_data_root", input_data_root);
+   catch cause
+      requireShowcaseCapability(evaluation_data_root);
+      rethrow(cause)
+   end
    if isempty(cases)
+      requireShowcaseCapability(evaluation_data_root);
       error('no snow-verification cases available')
    end
 
@@ -89,7 +107,8 @@ function results = run_snow_verification_suite(kwargs)
 
       % Static compare-arg bundle shared by every dispatch branch below.
       compare_args = { ...
-         "evaluation_data_root", kwargs.evaluation_data_root, ...
+         "evaluation_data_root", evaluation_data_root, ...
+         "input_data_root", input_data_root, ...
          "artifact_dir", run_dir, ...
          "make_plot", kwargs.make_plots, ...
          "save_plot", kwargs.save_plots, ...
@@ -161,8 +180,16 @@ function results = run_snow_verification_suite(kwargs)
    delete(cleanup)
 end
 
+function requireShowcaseCapability(evaluation_data_root)
+   %REQUIRESHOWCASECAPABILITY Emit the exact offline provisioning repair.
+   data_root = string(fileparts(evaluation_data_root));
+   icemodel.verification.setup.fetchFixtures("v1.1", ...
+      capabilities="verification-showcase", root=data_root, download=false);
+end
+
 %%
-function [run_name, run_dir, write_any_artifacts, kwargs, cleanup] = ...
+function [run_name, run_dir, write_any_artifacts, kwargs, cleanup, ...
+      evaluation_data_root, input_data_root] = ...
       resolveRunContext(kwargs)
    %RESOLVERUNCONTEXT Resolve comparison window, flags, banner, env, and run_dir.
    %
@@ -225,9 +252,51 @@ function [run_name, run_dir, write_any_artifacts, kwargs, cleanup] = ...
       fprintf('=========================================\n\n');
    end
 
-   % Install the same test config used by unit tests so fresh-clone runs get the
-   % dependency paths and deterministic workspace setup before resolving cases.
-   [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
+   % Resolve one paired tree without mutating the caller's configuration. The
+   % explicit pair is forwarded below so no reader independently chooses a root.
+   [evaluation_data_root, input_data_root] = ...
+      icemodel.verification.setup.resolveStagingRoots( ...
+      data_root=kwargs.data_root, ...
+      evaluation_data_root=kwargs.evaluation_data_root, ...
+      input_data_root=kwargs.input_data_root, ...
+      icemodel_config_casename=kwargs.icemodel_config_casename);
+
+   % Read-only APIs can inspect an explicitly disjoint pair, but model execution
+   % also needs coherent data, userdata, and output roots. Reject that unsupported
+   % suite layout instead of silently assigning those dependent paths to one side.
+   has_explicit_pair = isblanktext(kwargs.data_root) ...
+      && ~isblanktext(kwargs.evaluation_data_root) ...
+      && ~isblanktext(kwargs.input_data_root);
+   if has_explicit_pair && string(fileparts(evaluation_data_root)) ...
+         ~= string(fileparts(input_data_root))
+      error([ ...
+         'icemodel:verification:runSnowVerificationSuite:', ...
+         'disjointDataRoots'], ...
+         ['Suite execution requires evaluation_data_root and ', ...
+         'input_data_root to share one parent data root.'])
+   end
+
+   % Install the selected suite scope for model execution. Explicit leaf roots
+   % use their eval parent as the base, then install the exact resolved leaves;
+   % bootstrap cleanup restores the complete caller configuration on exit/error.
+   has_explicit_leaf = isblanktext(kwargs.data_root) && ...
+      (~isblanktext(kwargs.evaluation_data_root) ...
+      || ~isblanktext(kwargs.input_data_root));
+   if ~isblanktext(kwargs.data_root)
+      [~, ~, ~, ~, cleanup] = ...
+         icemodel.test.helpers.bootstrapTestEnvironment( ...
+         data_root=kwargs.data_root);
+   elseif has_explicit_leaf
+      [~, ~, ~, ~, cleanup] = ...
+         icemodel.test.helpers.bootstrapTestEnvironment( ...
+         data_root=string(fileparts(evaluation_data_root)));
+      setenv('ICEMODEL_INPUT_PATH', input_data_root)
+      setenv('ICEMODEL_EVAL_PATH', evaluation_data_root)
+   else
+      [~, ~, ~, ~, cleanup] = ...
+         icemodel.test.helpers.bootstrapTestEnvironment( ...
+         icemodel_config_casename=kwargs.icemodel_config_casename);
+   end
 
    % Resolve the run-artifact directory only when at least one artifact will
    % be written. Otherwise leave it empty so callers using only interactive

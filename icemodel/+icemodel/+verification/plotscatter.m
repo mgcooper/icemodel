@@ -3,6 +3,10 @@ function f = plotscatter(case_id, kwargs)
    %
    %  f = icemodel.verification.plotscatter("wfj", candidate=candidate)
    %
+   % DATA_ROOT selects one tree containing eval/ and input/. Explicit leaf roots
+   % or ICEMODEL_CONFIG_CASENAME provide the same nonmutating scoped selection
+   % accepted by plotcase and comparecase.
+   %
    % This companion to plotcase is intentionally limited to time-series site
    % cases. Current synthetic-process cases such as Colbeck are better reviewed
    % as time-series/process panels until analytical profile or flux targets are
@@ -10,6 +14,7 @@ function f = plotscatter(case_id, kwargs)
 
    arguments
       case_id (1, :) string
+      kwargs.data_root (1, 1) string = ""
       kwargs.evaluation_data_root (1, 1) string = ""
       kwargs.input_data_root (1, 1) string = ""
       kwargs.icemodel_config_casename (1, 1) string = ""
@@ -22,6 +27,7 @@ function f = plotscatter(case_id, kwargs)
    end
 
    manifest = icemodel.verification.loadmanifest(case_id, ...
+      "data_root", kwargs.data_root, ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
       "input_data_root", kwargs.input_data_root, ...
       "icemodel_config_casename", kwargs.icemodel_config_casename, ...

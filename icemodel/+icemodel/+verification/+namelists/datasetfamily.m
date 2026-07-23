@@ -6,13 +6,13 @@ function dataset_families = datasetfamily()
    % Outputs
    %  dataset_families   Supported manifest dataset_family values. These are
    %                     the staged source-family folder names directly under
-   %                     demo/data/eval (family-flat taxonomy).
+   %                     the selected evaluation root (family-flat taxonomy).
    %
    % Role
    %  Canonical source-family list shared by setup importers, validators, and
    %  normal verification workflow filters. This is not a case type.
 
-   % Keep family ids aligned with committed folders under demo/data/eval.
+   % Keep family ids aligned with manifests under the selected evaluation root.
    % Families are flat: source families get their own folder and manifest, while
    % the physical regime (snow/firn) lives in per-case surface_zone metadata.
    dataset_families = [ ...

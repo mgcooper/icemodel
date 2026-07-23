@@ -5,6 +5,7 @@ function cases = listcases(kwargs)
    %  cases = icemodel.verification.listcases(dataset_family="esm_snowmip")
    %
    % Inputs
+   %  data_root                  Whole data tree containing eval/ and input/.
    %  evaluation_data_root       Base evaluation-data root. When blank, the
    %                             repo-local data/eval tree is used.
    %  icemodel_config_casename   Config casename used to resolve the default
@@ -21,6 +22,7 @@ function cases = listcases(kwargs)
    %  manifests and does not create or refresh staged data.
 
    arguments
+      kwargs.data_root (1, 1) string = ""
       kwargs.evaluation_data_root (1, 1) string = ""
       kwargs.input_data_root (1, 1) string = ""
       kwargs.icemodel_config_casename (1, 1) string = ""
@@ -28,11 +30,19 @@ function cases = listcases(kwargs)
          {icemodel.verification.validators.mustBeDatasetFamilyFilter} = ""
    end
 
+   % Resolve the paired roots once so manifest and input paths always come from
+   % the same selected tree unless the caller explicitly supplied both leaves.
+   [evaluation_data_root, input_data_root] = ...
+      icemodel.verification.setup.resolveStagingRoots( ...
+      data_root=kwargs.data_root, ...
+      evaluation_data_root=kwargs.evaluation_data_root, ...
+      input_data_root=kwargs.input_data_root, ...
+      icemodel_config_casename=kwargs.icemodel_config_casename);
+
    % Discover family manifests first; all later filters operate on manifest
    % contents so the function stays independent of any hard-coded case list.
    manifest_files = icemodel.verification.helpers.familyManifestFiles( ...
-      "evaluation_data_root", kwargs.evaluation_data_root, ...
-      "icemodel_config_casename", kwargs.icemodel_config_casename);
+      "evaluation_data_root", evaluation_data_root);
 
    % Read each family manifest, apply optional filters, and keep only families
    % that contribute at least one case.
@@ -44,7 +54,7 @@ function cases = listcases(kwargs)
          continue
       end
 
-      group = resolveFamilyCases(family, kwargs.input_data_root);
+      group = resolveFamilyCases(family, input_data_root);
       if isempty(group)
          continue
       end
@@ -147,7 +157,7 @@ function resolved = resolveCase(entry, family, input_data_root)
       input_data_root);
 
    % Resolve relative artifact paths at read time so manifests stay portable
-   % inside demo/data while workflow functions receive absolute paths. The firn
+   % across scoped data roots while workflow functions receive absolute paths. The firn
    % families bundle their eval target as observations.mat: promice references it
    % via evaluation_file, SUMup references it via colocation.sumup.obs_file, so
    % resolve that to evaluation_path when no evaluation_file is declared. (Legacy

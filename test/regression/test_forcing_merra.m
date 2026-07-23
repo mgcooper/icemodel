@@ -1,7 +1,7 @@
 function tests = test_forcing_merra
    %TEST_FORCING_MERRA Verify the MERRA-2 Data builder.
    %
-   % Reads the staged MERRA-2 daily fixture collection under data/test/forcing;
+   % Reads the staged MERRA-2 daily fixture collection under test/data/forcing;
    % skips cleanly when absent.
    %
    % Note on swd: the builder uses the raw SWGDN downwelling channel rather
@@ -21,11 +21,12 @@ function setupOnce(testCase)
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.bootstrap_cleanup = cleanup;
 
-   source_dir = string(fullfile(icemodel.internal.fullpath('data'), 'test', ...
-      'forcing', 'merra2'));
+   cfg = icemodel.config('getenv', true);
+   source_dir = string(fullfile( ...
+      cfg.ICEMODEL_DATA_PATH, 'forcing', 'merra2'));
    testCase.assumeTrue(~isempty(dir(fullfile(source_dir, "slv", ...
       "*_Nx.*.nc4*"))), ...
-      'MERRA-2 fixture data not available under data/test/forcing');
+      'MERRA-2 fixture data not available under test/data/forcing');
    testCase.TestData.source_dir = source_dir;
    testCase.TestData.year = 2012;
    testCase.TestData.n_source_days = numel(dir(fullfile(source_dir, "slv", ...

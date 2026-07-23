@@ -8,6 +8,7 @@ function manifest = loadmanifest(case_id, kwargs)
    %
    % Inputs
    %  case_id                    Case id to resolve from the staged manifests.
+%  data_root                  Whole data tree containing eval/ and input/.
 %  evaluation_data_root       Base evaluation-data root. When blank, the
 %                             repo-local data/eval tree is used.
 %  input_data_root            Optional paired input-data root. When blank,
@@ -31,6 +32,7 @@ function manifest = loadmanifest(case_id, kwargs)
 
    arguments
       case_id (1, :) string
+      kwargs.data_root (1, 1) string = ""
       kwargs.evaluation_data_root (1, 1) string = ""
       kwargs.input_data_root (1, 1) string = ""
       kwargs.icemodel_config_casename (1, 1) string = ""
@@ -41,6 +43,7 @@ function manifest = loadmanifest(case_id, kwargs)
    % operational path. An optional dataset_family narrows the search to one
    % family so the shared firn case ids (kanl/kanm/kanu) resolve unambiguously.
    cases = icemodel.verification.listcases( ...
+      "data_root", kwargs.data_root, ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
       "input_data_root", kwargs.input_data_root, ...
       "icemodel_config_casename", kwargs.icemodel_config_casename, ...
@@ -48,9 +51,12 @@ function manifest = loadmanifest(case_id, kwargs)
 
    % Give a path-aware error when no staged manifests are available.
    if isempty(cases)
-      evaluation_data_root = icemodel.verification.helpers.evaluationDataRoot( ...
-         "evaluation_data_root", kwargs.evaluation_data_root, ...
-         "icemodel_config_casename", kwargs.icemodel_config_casename);
+      [evaluation_data_root, ~] = ...
+         icemodel.verification.setup.resolveStagingRoots( ...
+         data_root=kwargs.data_root, ...
+         evaluation_data_root=kwargs.evaluation_data_root, ...
+         input_data_root=kwargs.input_data_root, ...
+         icemodel_config_casename=kwargs.icemodel_config_casename);
       error('no verification cases found under %s', evaluation_data_root)
    end
 

@@ -11,7 +11,7 @@ function tests = test_forcing_batch_equivalence
    % calls). Payload metadata is part of that equality contract. Lanes self-skip
    % when their staged fast fixtures are not on disk.
    %
-   % Reads the small fixture subset under data/test/forcing. This belongs in
+   % Reads the small fixture subset under test/data/forcing. This belongs in
    % regression because it exercises real RCM I/O and batch-vs-loop behavior,
    % not an isolated unit.
    tests = functiontests(localfunctions);
@@ -28,15 +28,17 @@ function setupOnce(testCase)
       67.0670, -48.8355;    % ~KAN_M
       67.0003, -47.0245];   % ~KAN_U
    testCase.TestData.year = 2012;
+   cfg = icemodel.config('getenv', true);
+   forcing_root = string(fullfile(cfg.ICEMODEL_DATA_PATH, 'forcing'));
 
    testCase.TestData.mar = firstWithData( ...
-      string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'mar')), ...
+      fullfile(forcing_root, 'mar'), ...
       @(p) ~isempty(dir(fullfile(p, "MARv3.11*.nc"))));
    testCase.TestData.merra = firstWithData( ...
-      string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'merra2')), ...
+      fullfile(forcing_root, 'merra2'), ...
       @(p) ~isempty(dir(fullfile(p, "slv", "*_Nx.*.nc4*"))));
    testCase.TestData.racmo = firstWithData( ...
-      string(fullfile(icemodel.internal.fullpath('data'), 'test', 'forcing', 'racmo')), ...
+      fullfile(forcing_root, 'racmo'), ...
       @(p) ~isempty(dir(fullfile(p, "*.RACMO23p3_*.nc"))));
 end
 
@@ -44,7 +46,7 @@ function test_mar_batch_equals_single_loop(testCase)
    % buildMarData/buildMarMet: a 3-point list equals the single-point loop.
    src = testCase.TestData.mar;
    testCase.assumeTrue(strlength(src) > 0, ...
-      'MAR fixture data not available under data/test/forcing');
+      'MAR fixture data not available under test/data/forcing');
    pts = testCase.TestData.points;
    yr = testCase.TestData.year;
 
@@ -65,7 +67,7 @@ function test_merra_batch_equals_single_loop(testCase)
    % buildMerraData/buildMerraMet: a 3-point list equals the single-point loop.
    src = testCase.TestData.merra;
    testCase.assumeTrue(strlength(src) > 0, ...
-      'MERRA-2 fixture data not available under data/test/forcing');
+      'MERRA-2 fixture data not available under test/data/forcing');
    pts = testCase.TestData.points;
    yr = testCase.TestData.year;
 
@@ -85,7 +87,7 @@ function test_racmo_batch_equals_single_loop(testCase)
    % buildRacmoData: a 3-point list equals the single-point loop.
    src = testCase.TestData.racmo;
    testCase.assumeTrue(strlength(src) > 0, ...
-      'RACMO fixture data not available under data/test/forcing');
+      'RACMO fixture data not available under test/data/forcing');
    pts = testCase.TestData.points;
    yr = testCase.TestData.year;
 
@@ -99,7 +101,7 @@ function test_single_point_still_returns_a_timetable(testCase)
    % 1x1 cell), preserving the legacy single-location contract.
    src = testCase.TestData.mar;
    testCase.assumeTrue(strlength(src) > 0, ...
-      'MAR fixture data not available under data/test/forcing');
+      'MAR fixture data not available under test/data/forcing');
    one = icemodel.forcing.buildMarData( ...
       testCase.TestData.points(1, :), testCase.TestData.year, source_dir=src);
    testCase.verifyTrue(istimetable(one));

@@ -13,8 +13,8 @@ function bundle = loadColocatedData(manifest, source, kwargs)
    %                   loads the eval target Data, used only for legacy fixtures
    %                   staged before the bundled observations.mat eval contract;
    %                   freshly staged cases bundle observations.mat instead.
-   %  input_data_root  Optional base input-data root. When blank, the standard
-   %                   chain (inputDataRoot) resolves it.
+   %  input_data_root  Optional base input-data root. When blank, the manifest
+   %                   must carry or imply its paired input root.
    %
    % Outputs
    %  bundle   Struct with the verification target/reference contract:
@@ -256,8 +256,10 @@ function input_root = resolveInputRoot(manifest, explicit_root)
       return
    end
 
-   % Fall back to the setup default for ad hoc structs without manifest paths.
-   input_root = icemodel.verification.helpers.inputDataRoot();
+   error('icemodel:verification:loadColocatedData:missingInputRoot', ...
+      ['Manifest does not identify its paired input root. Supply ', ...
+      'input_data_root or load a manifest with input_data_root, ', ...
+      'family_root, or manifest_path metadata.'])
 end
 
 function bundle = emptyBundle(note)

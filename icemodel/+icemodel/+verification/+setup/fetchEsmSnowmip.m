@@ -146,10 +146,9 @@ function pathname = defaultCacheDir()
    % <repo>/data/verification/<dataset_family>/. Resolve it with
    % icemodel.internal.fullpath('data') (always the repo-local data root), NOT
    % icemodel.getpath('data'): getpath returns the ICEMODEL_DATA_PATH env var,
-   % which the test/demo config (icemodel.config casename="test") SETS to
-   % demo/data - so under the active suite config getpath('data') points at
-   % demo/data, not the repo root. (When ICEMODEL_DATA_PATH is unset the two
-   % coincide via internal.fullpath.)
+   % which a scoped demo or test case sets to its owned data tree rather than
+   % the repo-root verification workspace. (When ICEMODEL_DATA_PATH is unset
+   % the two coincide via internal.fullpath.)
    pathname = string(fullfile(icemodel.internal.fullpath('data'), ...
       'verification', 'esm_snowmip'));
 end
