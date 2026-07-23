@@ -1,0 +1,1093 @@
+{
+  "schema_version": 1,
+  "version": "v1.1",
+  "archives": [
+    {
+      "capability": "formal-core",
+      "name": "icemodel-v1.1-formal-core.tar.gz",
+      "required": true,
+      "bytes": 4932910,
+      "sha256": "2163a16c54932a9bdc7cc59b79f713afc71f68031183ade4e095ecde57297bdb"
+    },
+    {
+      "capability": "verification-showcase",
+      "name": "icemodel-v1.1-verification-showcase.tar.gz",
+      "required": true,
+      "bytes": 121120,
+      "sha256": "3d03b49893c076bb9b12c9df4e775c6bdbb1562a191d66c53c5d0e971a61b865"
+    },
+    {
+      "capability": "forcing-integration",
+      "name": "icemodel-v1.1-forcing-integration.tar.gz",
+      "required": false,
+      "bytes": 829310841,
+      "sha256": "0344894e3fbf53a412b5748c6ff22604d651f64ab74e66c01449d867ce37b1cf"
+    }
+  ],
+  "files": [
+    {
+      "capability": "verification-showcase",
+      "path": "eval/laugh_tests/colbeck1976/evaluation.mat",
+      "required": true,
+      "bytes": 252376,
+      "sha256": "eaf5b30101c11d868cdfa158d31aaf38090e0850ea6f5edf958181c84916485a"
+    },
+    {
+      "capability": "verification-showcase",
+      "path": "eval/laugh_tests/colbeck1976/reference.mat",
+      "required": true,
+      "bytes": 138904,
+      "sha256": "e1310dd39d0c220fb8c9a6700c2d9926d28c8fc8fcc9867ba35c124cea37156c"
+    },
+    {
+      "capability": "verification-showcase",
+      "path": "eval/laugh_tests/manifest.json",
+      "required": true,
+      "bytes": 1505,
+      "sha256": "6de7a40f08371b0cd3f2fe9e5fae7fc71b3c02c6d3f98a3deee649521f41fb2a"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/FGRN11-topography_icemask.nc",
+      "required": false,
+      "bytes": 2.990052E+6,
+      "sha256": "ad82c73e051f4f499d0061a781557fc8e107099c1ac2772c9359fa730c7ae6a8"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/geus/albedo/gris/Greenland_Reflectivity_2012_5km_C6.nc",
+      "required": false,
+      "bytes": 2.3641752E+7,
+      "sha256": "63dfae3ab92d50b3d70a194acdf2eea98d70166c331f29932241858dbe4eede7"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/mar/MARv3.11-ERA5-15km-2012.nc",
+      "required": false,
+      "bytes": 3.53458057E+8,
+      "sha256": "101bbff30e497c8756c5b58dbab3f3f4be523d747447f2c7e252f3a4259e51ea"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120101.nc4.nc4",
+      "required": false,
+      "bytes": 2.361133E+6,
+      "sha256": "8824c9cef92aea05b94ace43e57cd30a308c89a875aead200dc1cb4101672b01"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120102.nc4.nc4",
+      "required": false,
+      "bytes": 2.367173E+6,
+      "sha256": "1b8f876770949b00f88092abee73458d0d94ef898cf30a366f5ab45f7f7be677"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120103.nc4.nc4",
+      "required": false,
+      "bytes": 2.376502E+6,
+      "sha256": "03e8b38af23510281717f7cbe30e5cc3a7cbdaf35b2a7695c1255db9419da5c0"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120104.nc4.nc4",
+      "required": false,
+      "bytes": 2.35232E+6,
+      "sha256": "e67d6c79d09211686418a42d3a10c970b6fafb1ef33e8502a5022419d3ad01ae"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120105.nc4.nc4",
+      "required": false,
+      "bytes": 2.359794E+6,
+      "sha256": "7b4a4d6ed496dfb54fb97b7478c2766d508f1eeeacc4ef145a58508fbf0c2004"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120106.nc4.nc4",
+      "required": false,
+      "bytes": 2.363618E+6,
+      "sha256": "28b3eb8efa268ff7cdf83882530fb816efb6781ea665a11e5cb00d889bb01274"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120107.nc4.nc4",
+      "required": false,
+      "bytes": 2.347331E+6,
+      "sha256": "1a18eb70bdcd13deaeff07ac3dd9a639d6b3cdca7be9f72ac74550675e413658"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120108.nc4.nc4",
+      "required": false,
+      "bytes": 2.356196E+6,
+      "sha256": "4ad7af6b890fb7b84674607b7245fd14bc4dc405407a4c9a9351baec1751c591"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120109.nc4.nc4",
+      "required": false,
+      "bytes": 2.368811E+6,
+      "sha256": "783fe6577f218b376fa3382f766d888c7d223cd228caed39d6a46322d6df0e1a"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120110.nc4.nc4",
+      "required": false,
+      "bytes": 2.353105E+6,
+      "sha256": "3cc37e4d089457c6c2151c5b88d49b17404191a3d12bae8090324c06c547cbd7"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120111.nc4.nc4",
+      "required": false,
+      "bytes": 2.369093E+6,
+      "sha256": "7849fac285b67d702ad60574e8a6c7887bd8bcbe92a8be17d6d8f690f89f77e8"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120112.nc4.nc4",
+      "required": false,
+      "bytes": 2.353871E+6,
+      "sha256": "4665ccc91fb526309cfeb591a42a3519db60f76893afedb6c7c255c3b8d2a5b9"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120113.nc4.nc4",
+      "required": false,
+      "bytes": 2.316669E+6,
+      "sha256": "d3783f18519d377f1e7d570a8df3cb6cef199aa659635b11bc7882d45dc3e5f0"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120114.nc4.nc4",
+      "required": false,
+      "bytes": 2.348154E+6,
+      "sha256": "8ede51020d5446f457838ffd293dd227204b01c6a03792fc3c69c6370307ab07"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120115.nc4.nc4",
+      "required": false,
+      "bytes": 2.384822E+6,
+      "sha256": "76754847640966d70f5c671bb9506b2b87b30d381de8239623e1ccb801bc6915"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120116.nc4.nc4",
+      "required": false,
+      "bytes": 2.387141E+6,
+      "sha256": "9b232ebf4acad3e71a7f1c9bf9aab3fa179968e34865d9cea755c2f47ac97437"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120117.nc4.nc4",
+      "required": false,
+      "bytes": 2.387064E+6,
+      "sha256": "abb08c45cb754e9dce944e7101ff8d33d25ad36b60ab85f5760775aedbf428b5"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120118.nc4.nc4",
+      "required": false,
+      "bytes": 2.39304E+6,
+      "sha256": "6f205d37df6fe0ffb62342bafa9d89fd2ab0d001ef201b61789a497379318dd0"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120119.nc4.nc4",
+      "required": false,
+      "bytes": 2.384114E+6,
+      "sha256": "72f9f6e45cbb1705bd111bfe059c5972ee05d9b2dede2e20c255b91503d5f6f0"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120120.nc4.nc4",
+      "required": false,
+      "bytes": 2.344726E+6,
+      "sha256": "5ccf34bde60b4ca6bf4f6bea0a926d4f16b006f916b47f1eddc1f47a242e22ec"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120121.nc4.nc4",
+      "required": false,
+      "bytes": 2.354789E+6,
+      "sha256": "dc89d83d2af7c7e996a5d93a98ac39925565047b5b24001edfb31f8c4531522d"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120122.nc4.nc4",
+      "required": false,
+      "bytes": 2.372955E+6,
+      "sha256": "095ed5e0979acf406f291955087205a6420d3d16981a955a8fb3a3632b954c6e"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120123.nc4.nc4",
+      "required": false,
+      "bytes": 2.354036E+6,
+      "sha256": "ab4adbcf7f5ffb809a7a988d06d36bafb4f09d2d8b6fd135d8a7b30e73adbdf9"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120124.nc4.nc4",
+      "required": false,
+      "bytes": 2.33894E+6,
+      "sha256": "02f45de582d182334b61799645e844421cf4c49e9e44b20ffa7a8790e5d2454d"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120125.nc4.nc4",
+      "required": false,
+      "bytes": 2.324581E+6,
+      "sha256": "4f0ae26f1be9069a23d7b040505c8240857d668a5b6b13f9ec05ad5bc6c3f941"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120126.nc4.nc4",
+      "required": false,
+      "bytes": 2.334823E+6,
+      "sha256": "406aaee959c36304a223695176ff1e7fa0161fdd89ba84362a3b3c26c000769f"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120127.nc4.nc4",
+      "required": false,
+      "bytes": 2.291465E+6,
+      "sha256": "109c1b8342e048d4b2b4fcad68c912530db3668986e267e5ff1408ef1132e60d"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120128.nc4.nc4",
+      "required": false,
+      "bytes": 2.231499E+6,
+      "sha256": "6b5efe2cf895f324c986b6339cf78e1b2317c2b210a9fbf126850b3b1d2d38ce"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120129.nc4.nc4",
+      "required": false,
+      "bytes": 2.287374E+6,
+      "sha256": "ba35edd3177162ee0ca5cf7f8de6e96dc472441d2946c3826cbbf382d81098f9"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120130.nc4.nc4",
+      "required": false,
+      "bytes": 2.315628E+6,
+      "sha256": "6b08ed7f9ea056607617c61b9180992b89626b6d6d964f2c09ae72e0dbd8651f"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/flx/MERRA2_400.tavg1_2d_flx_Nx.20120131.nc4.nc4",
+      "required": false,
+      "bytes": 2.302219E+6,
+      "sha256": "bb9aa43316e13a342dc1a2a3e72955ca2894f131c74b3baba18be73ec1b82871"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120101.nc4.nc4",
+      "required": false,
+      "bytes": 258898,
+      "sha256": "e54ee6b23c54a40aa6d63b8bd7f70840a5f6c29fccdaeca0dde2f80ec4b4bb0c"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120102.nc4.nc4",
+      "required": false,
+      "bytes": 258449,
+      "sha256": "c8d68f2158b81bfa971ca9fe41aceebd1f475dd313205a809b47e31127976159"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120103.nc4.nc4",
+      "required": false,
+      "bytes": 258528,
+      "sha256": "4abc970ac97831e95778629725c58ab67f46909052fcb14c4b8d3c8c80891327"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120104.nc4.nc4",
+      "required": false,
+      "bytes": 258802,
+      "sha256": "e1c83697f40dda6643d8c6a4fe5b245fdc695c02144d64d013fd5faa68e5d4aa"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120105.nc4.nc4",
+      "required": false,
+      "bytes": 258802,
+      "sha256": "7acd928a4ad730c83ea3e584fd7185433e46826352dc5d4bc5f91ea02eff8f1e"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120106.nc4.nc4",
+      "required": false,
+      "bytes": 259390,
+      "sha256": "7e005b9da5c2dee37294cd9bb954043cf1d7bf352f1febdb8863c8c04367471f"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120107.nc4.nc4",
+      "required": false,
+      "bytes": 259205,
+      "sha256": "71b6f3aac3aaac08c83d26435810e1101e6c4a68e27ab6755aaf61b3ea5997be"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120108.nc4.nc4",
+      "required": false,
+      "bytes": 260290,
+      "sha256": "47a1898b97e79c22c17e6d6671a4e3155762be7930f43b2e744a8e54ce972c91"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120109.nc4.nc4",
+      "required": false,
+      "bytes": 260020,
+      "sha256": "68a9b6926ced85dcb07f0db2b3adfd296d4bd24df1736cb9d857dfce61e5b208"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120110.nc4.nc4",
+      "required": false,
+      "bytes": 259167,
+      "sha256": "2fa7b278176b58a10af7c7c466dc6af3948ff3dc3ae47a03edb8e20596b5577d"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120111.nc4.nc4",
+      "required": false,
+      "bytes": 258875,
+      "sha256": "ee94d51b0d6a8440744faad692531648ba7997d06247f0b90857cc1e13feb295"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120112.nc4.nc4",
+      "required": false,
+      "bytes": 259424,
+      "sha256": "781dbbd882e04e1457f03b4d8d427e6231b279678790c84ee72601815a5a98d9"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120113.nc4.nc4",
+      "required": false,
+      "bytes": 261135,
+      "sha256": "9e2e53ff518e2af48d823851de7fe16f9860c53f287927672f3550b16a012d24"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120114.nc4.nc4",
+      "required": false,
+      "bytes": 261583,
+      "sha256": "1785dab8a37e4c7568c49fd21f10e54125c36fa7f7f8ef415a5c8fae17a99e3a"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120115.nc4.nc4",
+      "required": false,
+      "bytes": 260523,
+      "sha256": "d2013d6fb197aa30aa29a6824ba052a5b3e8a7beb72c0434da4e73cc678ae898"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120116.nc4.nc4",
+      "required": false,
+      "bytes": 261706,
+      "sha256": "28da418ec6732cfdd94fb2cb2b63a08bb0962e23cc410b61bfe30a6c1757f3ce"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120117.nc4.nc4",
+      "required": false,
+      "bytes": 261366,
+      "sha256": "8334a092222abc3ffbeb1ce6b0a8fdd6905b42b7ba09547605f6a0ea645531c2"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120118.nc4.nc4",
+      "required": false,
+      "bytes": 261021,
+      "sha256": "cb22d32a65126638943fd64f55a9d0d180bd2098d5a72764d5b7bad51ac2e9f7"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120119.nc4.nc4",
+      "required": false,
+      "bytes": 261168,
+      "sha256": "0dfa19bc435f43c78ed3456073411010e259339cad99846af4f6cfb9e5991158"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120120.nc4.nc4",
+      "required": false,
+      "bytes": 261766,
+      "sha256": "4325df625c23a74de6db295b9dac1f88c469e525ea24e1a2993ad3e20a2d0ff0"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120121.nc4.nc4",
+      "required": false,
+      "bytes": 261730,
+      "sha256": "413628ceb7a97624daab38806765791137ff57ea400eae2a6c4a37cce4708be7"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120122.nc4.nc4",
+      "required": false,
+      "bytes": 262395,
+      "sha256": "24b6d758af1a8e8904b36d93e783617583530e4c04abb3e1403ce76dc55e48ba"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120123.nc4.nc4",
+      "required": false,
+      "bytes": 262625,
+      "sha256": "c9d98b084da16ae6d1e0cec952fde7039adcfffe15d2d08bb38c385f505b71e6"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120124.nc4.nc4",
+      "required": false,
+      "bytes": 263694,
+      "sha256": "45edf31f65c121891ddf142e9ddc1a63893721fcf1ff75c03afaea47da9e111d"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120125.nc4.nc4",
+      "required": false,
+      "bytes": 262882,
+      "sha256": "6558515d282a3ffb22258780e1f8caf30b1e8db0341d918431d69939e7f6e8ec"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120126.nc4.nc4",
+      "required": false,
+      "bytes": 263058,
+      "sha256": "af5f400228a8f3eb405250075e5d295fb920738ae5cf6fc93bb285eb2984a8ac"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120127.nc4.nc4",
+      "required": false,
+      "bytes": 263457,
+      "sha256": "bbf8ec4b02a3f5dc8501173fc25079b62a4da462d43b84ef01d8c5e985dd6376"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120128.nc4.nc4",
+      "required": false,
+      "bytes": 265098,
+      "sha256": "2f1077763f5f71cd0d4d482740f66a948ffee3a927cf5dc7d5355f1ef3eaaae2"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120129.nc4.nc4",
+      "required": false,
+      "bytes": 266245,
+      "sha256": "f93720b5ae4e5a13b2fa8fb74da76c796e17e80844b18c37a9b915cc39c5edfc"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120130.nc4.nc4",
+      "required": false,
+      "bytes": 265111,
+      "sha256": "5a97ee399501cdb0b1bf35bf867c737a16a6cf98e525bc827e77871d3f8ea497"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/glc/MERRA2_400.tavg3_2d_glc_Nx.20120131.nc4.nc4",
+      "required": false,
+      "bytes": 266429,
+      "sha256": "3b69b002d529b4d9123ca0159adbb2c9aa6968aa957d453e67db04b797fe9b79"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120101.nc4.nc4",
+      "required": false,
+      "bytes": 984663,
+      "sha256": "da469e812c6ad8944a54168d69d2f0524fc60080fb118885bad7ad18f621efa7"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120102.nc4.nc4",
+      "required": false,
+      "bytes": 986132,
+      "sha256": "f52a57007b4c4b2297b3758e14f788649b7dafee7576d4ba6f2b964ba6d595cb"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120103.nc4.nc4",
+      "required": false,
+      "bytes": 987541,
+      "sha256": "cb81be96ae9560aa669b1daad8c5d09f8213bafded5639fd7a79f24e75af081d"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120104.nc4.nc4",
+      "required": false,
+      "bytes": 984780,
+      "sha256": "d4442d44e4b0fea436413907913a9570b2545434ea1668b3536b5c316feb7a24"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120105.nc4.nc4",
+      "required": false,
+      "bytes": 990191,
+      "sha256": "c3365e024abbd51f9627b20e23a1a5a2ba29dc479c29b4a5eb47d87613639020"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120106.nc4.nc4",
+      "required": false,
+      "bytes": 979470,
+      "sha256": "3803ca595d663a39ebb713018d3de81d4669e7160215c363766f19a69d148a36"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120107.nc4.nc4",
+      "required": false,
+      "bytes": 959680,
+      "sha256": "f968202c7bc12526413c0573ca9369b52a7f5bb524547f6518f5cd618bc47ea8"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120108.nc4.nc4",
+      "required": false,
+      "bytes": 967215,
+      "sha256": "17393817197441ce92d4268f05e500c8ad75c39d6416aadca96ca1a352efa288"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120109.nc4.nc4",
+      "required": false,
+      "bytes": 975231,
+      "sha256": "dbce123de80e70cd129e5a5eaf6aabda085d35efafadf305b970c3af1c5f165c"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120110.nc4.nc4",
+      "required": false,
+      "bytes": 980437,
+      "sha256": "cd89fd1898f27279496d26a1a7014a061beea189104af187e6258e8d7707b710"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120111.nc4.nc4",
+      "required": false,
+      "bytes": 986468,
+      "sha256": "11ceab6eba274d698b8f12fdb53b3716efc14e89ec7c43a567f2fb77451936ce"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120112.nc4.nc4",
+      "required": false,
+      "bytes": 977452,
+      "sha256": "1fa6e79d364d2d2a25904dae07b363d55e6280ada16613e3164aaa687adb83a8"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120113.nc4.nc4",
+      "required": false,
+      "bytes": 981386,
+      "sha256": "b36ddb4ed25837c1ca83b8160e1e74160dd812bb6d7b73cfde775b113fcb4a0f"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120114.nc4.nc4",
+      "required": false,
+      "bytes": 993172,
+      "sha256": "fd955774b89f6c5fc8a25fb54d0ca60e1ced1cfe8cbd859bd5b6964fb57c70fb"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120115.nc4.nc4",
+      "required": false,
+      "bytes": 990389,
+      "sha256": "326f6b879b8b1c67b959b5e7ec7f4e261552d3c1d041ca7847eb60dbc6f25040"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120116.nc4.nc4",
+      "required": false,
+      "bytes": 974763,
+      "sha256": "cb031ccb08affa985e8dca8f1d12d369cc99d1678fe45a4c18814f03ecddfcd2"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120117.nc4.nc4",
+      "required": false,
+      "bytes": 968552,
+      "sha256": "649b168cf0fb0efe6c35a7e3ce4de6f64f27c927e001d0e3f19e7c54890325e3"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120118.nc4.nc4",
+      "required": false,
+      "bytes": 986756,
+      "sha256": "69850c27d0941d2c9f2a8726e12c7759b2021c827b38613c0aecaaa5dfd1a682"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120119.nc4.nc4",
+      "required": false,
+      "bytes": 994312,
+      "sha256": "afe997eb21d569972f53e2c7a7561dcccea591dd252367f30642414c38c478a8"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120120.nc4.nc4",
+      "required": false,
+      "bytes": 983181,
+      "sha256": "b57e7676e2f6d3b4de7fe00955e60c2b366ab3b74e848c52eb23c197a2e10c9a"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120121.nc4.nc4",
+      "required": false,
+      "bytes": 990697,
+      "sha256": "7f92f3601c2708d28bd6883e1a55aaa7c5adab588b862d0fdbcfabce9dddc873"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120122.nc4.nc4",
+      "required": false,
+      "bytes": 993833,
+      "sha256": "c494e4d033e8ceca2d10de9eeb71e54f24920920161834d49fbf6457beb16847"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120123.nc4.nc4",
+      "required": false,
+      "bytes": 987042,
+      "sha256": "f396ef39e7b4b4825514140258b993766fd52758d1575956d701f00431608fda"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120124.nc4.nc4",
+      "required": false,
+      "bytes": 991985,
+      "sha256": "ded2bb460a73c2f9e5032ecce21ea46f34536681ec0bc64a3d2928cfc8d04a08"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120125.nc4.nc4",
+      "required": false,
+      "bytes": 998573,
+      "sha256": "4f883db24043db30793582e3b1b09a2c86dcf381d7acd71ca614301601c97c66"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120126.nc4.nc4",
+      "required": false,
+      "bytes": 1.014142E+6,
+      "sha256": "3589215aed694c9113cdad504bdd2b2f893369e12e1060bf35fa466aaedb9fb1"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120127.nc4.nc4",
+      "required": false,
+      "bytes": 1.016651E+6,
+      "sha256": "d5e4b9d0908f69429fd7424504a8788ff8461d5d4ea1b78a0ff0c98962e80369"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120128.nc4.nc4",
+      "required": false,
+      "bytes": 1.0103E+6,
+      "sha256": "39bab30b76b500b531997b0f421734cda4c36a00facd37b9c177bf439ecc6497"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120129.nc4.nc4",
+      "required": false,
+      "bytes": 1.011571E+6,
+      "sha256": "9a4d763f633005af76d0e620d2c757c86e7302cb70d15656128b2e2ff616a908"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120130.nc4.nc4",
+      "required": false,
+      "bytes": 1.01692E+6,
+      "sha256": "7d41ba11268396b65b9b168765070a3825495fa93a25461e2794d2e4477977f2"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/rad/MERRA2_400.tavg1_2d_rad_Nx.20120131.nc4.nc4",
+      "required": false,
+      "bytes": 1.015597E+6,
+      "sha256": "ecb1c1f8913bc72681819ba8cba36938b9e6024cea0b0642c8bc7f97ad859ecb"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120101.nc4.nc4",
+      "required": false,
+      "bytes": 1.610842E+6,
+      "sha256": "c4aff8ab1c2db28dc09292c4e9f971a77421ce346d385db2a8874a4d3216f8a9"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120102.nc4.nc4",
+      "required": false,
+      "bytes": 1.607579E+6,
+      "sha256": "e67cb494b6420146ec4044fcf9eed967f2de63fc0a70e79e30939716e7a47e7e"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120103.nc4.nc4",
+      "required": false,
+      "bytes": 1.605238E+6,
+      "sha256": "1a1547471a3bd40f54fb3bc8c993d4392bde4ac2bd262eb9d3047a70dd6f560f"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120104.nc4.nc4",
+      "required": false,
+      "bytes": 1.6016E+6,
+      "sha256": "bc67b2e4ec06c654e608ca453393b346035dceda6cd237c9327c9b8c8da441af"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120105.nc4.nc4",
+      "required": false,
+      "bytes": 1.604769E+6,
+      "sha256": "55ea58b47f9fbda2d2140c2ba59791730a24cd6cb212f2d73965520cbf1eb853"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120106.nc4.nc4",
+      "required": false,
+      "bytes": 1.593129E+6,
+      "sha256": "2737db30e12e8648d61657078b0f591580590d68186f995c88d6b716f0608ed7"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120107.nc4.nc4",
+      "required": false,
+      "bytes": 1.586766E+6,
+      "sha256": "a06fe112421118fba2664c79aa2bb02b56d14d936800619239bf2697d6517acb"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120108.nc4.nc4",
+      "required": false,
+      "bytes": 1.58716E+6,
+      "sha256": "d791729f1a38da6abbe2d65fc1fe7985f6c4d7eb69c1376b6b70867ea8db63e0"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120109.nc4.nc4",
+      "required": false,
+      "bytes": 1.593252E+6,
+      "sha256": "a655e59f0ec3e08b7a4bff10156071ba8959aff16537b03d9890716ca6fe22dd"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120110.nc4.nc4",
+      "required": false,
+      "bytes": 1.600372E+6,
+      "sha256": "21fbf50a4930a24645f1b4b17a0de69ea83833cffa82309528615eaf37e0f47a"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120111.nc4.nc4",
+      "required": false,
+      "bytes": 1.60295E+6,
+      "sha256": "bf601857a652c77346751dbfd6fc885cb11548b77c1758cac145c0b9c9dc67a5"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120112.nc4.nc4",
+      "required": false,
+      "bytes": 1.596743E+6,
+      "sha256": "33f4b8a2bff22eb18d22bb5b7a9fc61aa0dfb972a49cdfcc3fe68d93e7119c44"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120113.nc4.nc4",
+      "required": false,
+      "bytes": 1.590112E+6,
+      "sha256": "7b0f7c331fcd2b5584f827766f856b46804ae7f535a9012c24ae9f9188ddbb7d"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120114.nc4.nc4",
+      "required": false,
+      "bytes": 1.589933E+6,
+      "sha256": "8106e1d7476d61917edf047f684b73fb1cdfabc43fe4faa0040fa7e791aa9092"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120115.nc4.nc4",
+      "required": false,
+      "bytes": 1.591517E+6,
+      "sha256": "a7f1a204886aaf52cfa42ed6d9b7f9910b6276223d192bbb041c554d0277c306"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120116.nc4.nc4",
+      "required": false,
+      "bytes": 1.585596E+6,
+      "sha256": "50319a1298b7af41cd54c34db173fae3728b7dd88a23c1c899ced9f786b189a6"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120117.nc4.nc4",
+      "required": false,
+      "bytes": 1.582807E+6,
+      "sha256": "ac03d0afeb1ffd3cd41bc2bd446a9392dcc03f695d89ab9262316ef061af47ec"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120118.nc4.nc4",
+      "required": false,
+      "bytes": 1.596144E+6,
+      "sha256": "ede03193050a349a5818c326f757c6c9990d6aa404821d36b0e028294ea96855"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120119.nc4.nc4",
+      "required": false,
+      "bytes": 1.59703E+6,
+      "sha256": "f2d991fb5f7466f648192358eab1f718463ba233b936c42c999d104776f9d23c"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120120.nc4.nc4",
+      "required": false,
+      "bytes": 1.587238E+6,
+      "sha256": "62ea6e643e6f0fc7aa0901d7d3d3b38aaa7e4a71801a43c318f9405086e5cd36"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120121.nc4.nc4",
+      "required": false,
+      "bytes": 1.584122E+6,
+      "sha256": "6891c8d871a4586eecb415e7c203cc9411e85e9ab76fd18cb84e5a3aae2746af"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120122.nc4.nc4",
+      "required": false,
+      "bytes": 1.591225E+6,
+      "sha256": "7d3fe6262ceeecca0f68c0b32f373ef86b73e70e5544236ccd2e57c3352f3d88"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120123.nc4.nc4",
+      "required": false,
+      "bytes": 1.598616E+6,
+      "sha256": "968da0e46dfe8b834c77b36a99d5e7b9ab50fe56bf3964f2bd27040aa9bf023a"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120124.nc4.nc4",
+      "required": false,
+      "bytes": 1.597045E+6,
+      "sha256": "ba4f7cfc0a31671549ba7cd103d6c2c04bd6db2299d3114230c804537ad3a50f"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120125.nc4.nc4",
+      "required": false,
+      "bytes": 1.594407E+6,
+      "sha256": "5eb332b17a2b1c687a2e121f4fe7cbbfcac6bffaa4a43192a898f352f83efcb9"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120126.nc4.nc4",
+      "required": false,
+      "bytes": 1.605632E+6,
+      "sha256": "3ddfc8d7914887f999a3a260361fc449acb157186b5387391dcdb60624149640"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120127.nc4.nc4",
+      "required": false,
+      "bytes": 1.603022E+6,
+      "sha256": "8b466a210b4e0fa94f65b54d9b22444cb54bc4a90c7aa0da7b1ee4ded9002530"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120128.nc4.nc4",
+      "required": false,
+      "bytes": 1.590319E+6,
+      "sha256": "1dc2c154e6c04987536c927ae6efca04b3e477283f5358e7e2e6d569ff851a3a"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120129.nc4.nc4",
+      "required": false,
+      "bytes": 1.583503E+6,
+      "sha256": "0605246f48c64c147709dfbf9d099ebc2b1662b30b42141a4b75fc63935bede4"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120130.nc4.nc4",
+      "required": false,
+      "bytes": 1.581368E+6,
+      "sha256": "22730eb6694bf6bd2147a72306e236cad35a606945e84f864aece535a9eb748c"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/merra2/slv/MERRA2_400.tavg1_2d_slv_Nx.20120131.nc4.nc4",
+      "required": false,
+      "bytes": 1.590377E+6,
+      "sha256": "acf2d14b176091656e5ec940efe1fd45e9373bfd4140904fed7d0b7b3ace3ef3"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/racmo/latf.RACMO23p3_FGRN11_2012_2018.3H-004.nc",
+      "required": false,
+      "bytes": 4.514136E+7,
+      "sha256": "da2637030e4ed2e1aa5cee6d869a54ad50382fa932d81e5fa8d2c9219e376061"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/racmo/lwsd.RACMO23p3_FGRN11_2012_2018.3H-005.nc",
+      "required": false,
+      "bytes": 4.3222282E+7,
+      "sha256": "bf2aa64f315a884e7324074f26a1db831eea54a6b8b8f005013c0b4b164fc08f"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/racmo/lwsn.RACMO23p3_FGRN11_2012_2018.3H-010.nc",
+      "required": false,
+      "bytes": 5.1518288E+7,
+      "sha256": "fb5084b7bb38bcdb322c6cd8e345196ad140d1c991f3c50716b150b1a1e14e78"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/racmo/meltin.RACMO23p3_FGRN11_2012_2018.3H.nc",
+      "required": false,
+      "bytes": 3.190007E+6,
+      "sha256": "577f0fed8910561effcbbbc0152229fb47911851ee49ab97334e93348a9a328c"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/racmo/precip.RACMO23p3_FGRN11_2012_2018.3H-007.nc",
+      "required": false,
+      "bytes": 5.3793198E+7,
+      "sha256": "f8b28a0a27ac998579ec25bfbeead2b5bded089bc889e6810440943385ca3cd6"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/racmo/refreeze.RACMO23p3_FGRN11_2012_2018.3H.nc",
+      "required": false,
+      "bytes": 4.968887E+6,
+      "sha256": "8923d8c3a9d020aa5485539a8fa220cdf75dc6ffe83ee34d0a17877d22a7e658"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/racmo/runoff.RACMO23p3_FGRN11_2012_2018.3H.nc",
+      "required": false,
+      "bytes": 9.364954E+6,
+      "sha256": "d1ebecb706251c4d9f5bf4b846ee3e78ea8d12447d6cb23760fb4007317cadfc"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/racmo/senf.RACMO23p3_FGRN11_2012_2018.3H-009.nc",
+      "required": false,
+      "bytes": 4.9288814E+7,
+      "sha256": "65b5b3656e5550d6eb5b53e0c10e75106635aaaad736d86f14af316d8437f59f"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/racmo/smb.RACMO23p3_FGRN11_2012_2018.3H.nc",
+      "required": false,
+      "bytes": 1.4628016E+7,
+      "sha256": "dacb7fdf1a984c1ae7c58d9ba57584905d1afe9e15516f294c3716206a87beda"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/racmo/sndiv.RACMO23p3_FGRN11_2012_2018.3H.nc",
+      "required": false,
+      "bytes": 8.64737E+6,
+      "sha256": "6c5cb5beb24c207f5da90ef01a182041c5a97891bfe55d1cf5aef4fd2b689f8f"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/racmo/snowmelt.RACMO23p3_FGRN11_2012_2018.3H.nc",
+      "required": false,
+      "bytes": 3.435385E+6,
+      "sha256": "fa3945369d97cd448423987325529d2e6c7839897f577e03b3bdb7ffdae2d302"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/racmo/subl.RACMO23p3_FGRN11_2012_2018.3H.nc",
+      "required": false,
+      "bytes": 2.3993288E+7,
+      "sha256": "aa23a5db54c3f93fdcdfd6892680aec59224ce90de39ea289513a7cc63d58d46"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/racmo/swsd.RACMO23p3_FGRN11_2012_2018.3H.nc",
+      "required": false,
+      "bytes": 7.376762E+6,
+      "sha256": "da3574b9e65eb7c388f4a2360a9b074cbfb22783ac86afafce3383ae55741c4d"
+    },
+    {
+      "capability": "forcing-integration",
+      "path": "forcing/racmo/swsn.RACMO23p3_FGRN11_2012_2018.3H.nc",
+      "required": false,
+      "bytes": 7.108242E+6,
+      "sha256": "a99abcead822fa3d15865bdcd8bef2b383da3bafe48fd030196c7b329ee355ca"
+    },
+    {
+      "capability": "formal-core",
+      "path": "input/met/met_kanl_kanl_2015_15m.mat",
+      "required": true,
+      "bytes": 1.285326E+6,
+      "sha256": "34cf980967d26aa484cdf5f57487e7a73dc8c0c994fc99af7bfeaa21e7699768"
+    },
+    {
+      "capability": "formal-core",
+      "path": "input/met/met_kanl_kanl_2016_15m.mat",
+      "required": true,
+      "bytes": 1.254408E+6,
+      "sha256": "e1382a0f41aeda4bc35e494a5cb44633c9270af590266bb03a74c2a1f61f0fec"
+    },
+    {
+      "capability": "formal-core",
+      "path": "input/met/met_kanm_kanm_2015_15m.mat",
+      "required": true,
+      "bytes": 1.30165E+6,
+      "sha256": "2903a1e8118e3be1221f8d5aea7531091445d8697a8bbeb4f7b0aab1bc7e53fd"
+    },
+    {
+      "capability": "formal-core",
+      "path": "input/met/met_kanm_kanm_2016_15m.mat",
+      "required": true,
+      "bytes": 1.28521E+6,
+      "sha256": "2dd9cc9c01b3c7985cac34739acea666bc9c2bfd2b79cde63102125051109a17"
+    },
+    {
+      "capability": "formal-core",
+      "path": "input/spectral/kabs.mat",
+      "required": true,
+      "bytes": 1139,
+      "sha256": "cd2cd233542cf35393ea62f82f35d2ee9b0ffe0e6ca777b2287dee94a2579b66"
+    },
+    {
+      "capability": "formal-core",
+      "path": "input/spectral/kice.mat",
+      "required": true,
+      "bytes": 1137,
+      "sha256": "ea7672474e4cdc97608c084fb5757d546276e380edd3aceabcbc9086e706b5f3"
+    },
+    {
+      "capability": "formal-core",
+      "path": "input/spectral/mie.mat",
+      "required": true,
+      "bytes": 90736,
+      "sha256": "8837296c6051db96856c33892f1600449e7980df26ae4c727bd0e63696b2c269"
+    },
+    {
+      "capability": "formal-core",
+      "path": "input/spectral/solar.mat",
+      "required": true,
+      "bytes": 3849,
+      "sha256": "5232f3e27c720518786c59687188343043d318848acfd736154a4d80c031137e"
+    }
+  ]
+}

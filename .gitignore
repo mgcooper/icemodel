@@ -36,29 +36,20 @@ data/input/userdata/*
 !data/verification/sumup/.gitkeep
 demo/data/output/
 
-# --- Demo fixture data: release-asset flip (currently OFF) -------------------
-# The committed demo fixture .mat data are bundled by
-# icemodel.verification.setup.packFixtures and provisioned by fetchFixtures.
-# To perform the user-authorized release-asset flip tracked by icemodel-1ps.17,
-# activate the rules below only after the release asset and its manifest exist.
-# The family manifest.json files and .gitkeep placeholders remain committed.
-# demo/data/eval/**/*.mat
-# demo/data/input/met/**/*.mat
-# demo/data/input/userdata/**/*.mat
-# !demo/data/eval/**/manifest.json
+# The tracked demo tree contains only the six inputs used by the three public
+# examples. Verification and formal-test payloads belong under data/ and the
+# provisioned test/data capability, respectively.
 
-# The global MATLAB ignore pattern treats the MAR 3.11 directory suffix as a
-# numeric extension. Keep the committed demo product directory visible.
-!demo/data/input/met/mar3.11/
-!demo/data/input/met/mar3.11/**
-
-# Release-with-assets fixture bundle staging. packFixtures writes the versioned
-# archive + MANIFEST.json here; it is a build artifact and must never be
-# committed (the bundle is uploaded as a GitHub release asset instead).
+# Release-data staging. packFixtures writes versioned archives and the generated
+# data manifest here. These build artifacts must never be committed; publication
+# requires separate explicit approval.
 release-staging/
 
+# Release-provisioned formal, public-verification, and optional forcing payloads.
+test/data/
 test/artifacts/
 test/backups/
+test/baselines/archive/
 test/baselines/profiler/
 test/benchmarks/profiler/
 # test/interactive is organized into per-theme subfolders. Each theme commits
