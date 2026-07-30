@@ -120,6 +120,20 @@ function [met, cadence_s, gap_count, expected_missing] = ...
    rows_per_interval = round(cadence_s / 900);
    source_rows = round(seconds(source.Time - new_time(1)) / 900) + 1;
 
+   % The hold targets are channel-invariant: source row k owns the
+   % rows_per_interval output rows starting at source_rows(k), clipped to
+   % the output axis. Cadence validation guarantees whole-multiple steps,
+   % so target blocks never overlap and one vectorized scatter per channel
+   % assigns exactly what the former per-row loop assigned (that loop
+   % dominated the production driver profile at ~10^7 iterations per
+   % site, largely datetime numel dispatch inside the clip test).
+   n_out = numel(new_time);
+   target_rows = reshape(source_rows.' + (0:rows_per_interval - 1).', [], 1);
+   filled_from = repelem((1:height(source)).', rows_per_interval);
+   in_axis = target_rows >= 1 & target_rows <= n_out;
+   target_rows = target_rows(in_axis);
+   filled_from = filled_from(in_axis);
+
    expected_missing = struct();
    names = string(source.Properties.VariableNames);
    for name = reshape(names, 1, [])
@@ -130,15 +144,8 @@ function [met, cadence_s, gap_count, expected_missing] = ...
 
       % Initialize missing so omitted timestamp intervals stay unavailable. A
       % source row then fills exactly source_dt/15m rows, including NaN values.
-      held = nan([numel(new_time), size(values, 2)]);
-      for k = 1:height(source)
-         rows = source_rows(k) + (0:rows_per_interval - 1);
-         rows = rows(rows >= 1 & rows <= numel(new_time));
-         if isempty(rows)
-            continue
-         end
-         held(rows, :) = repmat(values(k, :), numel(rows), 1);
-      end
+      held = nan([n_out, size(values, 2)]);
+      held(target_rows, :) = values(filled_from, :);
       met.(char(name)) = held;
       expected_missing.(char(name)) = nnz(~isfinite(held));
    end
@@ -216,13 +223,18 @@ function summaries = yearlyResampleSummaries(met, source, cadence_s, gaps)
       return
    end
 
-   years_present = unique(year(met.Time));
+   % One full-axis year() evaluation serves both the year inventory and
+   % every per-year slice below; recomputing it inside the loop cost one
+   % O(axis) datetime pass per calendar year per resample and dominated
+   % the production driver profile alongside the hold loop.
+   met_years = year(met.Time);
+   years_present = unique(met_years);
    summaries = repmat(template, numel(years_present), 1);
    source_support_end = source.Time + seconds(cadence_s);
 
    for n = 1:numel(years_present)
       yyyy = years_present(n);
-      output = met(year(met.Time) == yyyy, :);
+      output = met(met_years == yyyy, :);
       support_start = output.Time(1);
       support_end = output.Time(end) + minutes(15);
 

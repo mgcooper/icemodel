@@ -4,6 +4,42 @@
 staged validation data and compare future model outputs against those targets.
 It is separate from the formal regression and performance suites.
 
+## Getting started
+
+Run MATLAB from the repository root and put the package on the path:
+
+```matlab
+addpath("icemodel")
+```
+
+The ordinary workflow is read-only:
+
+```matlab
+cases = icemodel.verification.listcases(dataset_family="promice");
+kanm = icemodel.verification.loadmanifest( ...
+   "kanm", dataset_family="promice");
+audit = icemodel.verification.auditArtifacts(families="promice");
+f = icemodel.verification.plotcase( ...
+   "kanm", dataset_family="promice", source="targets");
+```
+
+Choose the layer that matches the task:
+
+| Task | Entry point | Writes staged data? |
+|---|---|---|
+| List or load staged cases | `listcases`, `loadmanifest` | No |
+| Audit staged artifacts | `auditArtifacts` | No, unless `report_dir` is set |
+| Compare or plot a case | `comparecase`, `plotcase` | Only when an output path is set |
+| Import or refresh a family | `icemodel.verification.setup.import*` | Yes |
+| Build the gap-fill report | `icemodel.verification.report.buildGapFillReport` | Only generated preview outputs |
+
+Setup functions are deliberately separate from normal verification because they
+create or replace MAT artifacts and manifests. Start with
+[Normal workflow](#normal-workflow) for inspection, [Setup workflow](#setup-workflow)
+for staging, or
+[Produce a fresh PROMICE gap-fill report](#produce-a-fresh-promice-gap-fill-report)
+for the reconstruction/report sequence.
+
 ## Normal Workflow
 
 Use the top-level functions for ordinary verification runs:
@@ -153,6 +189,8 @@ Setup and refresh tooling lives under `icemodel.verification.setup`:
   met and the manifest runtime cadence are 15 minutes; explicit `dt_out=""`
   keeps both the met artifact and its manifest cadence hourly.
 - `importLaughTests` stages selected Laugh-Tests synthetic process cases.
+- `refreshPromiceMetIdentities` re-hashes native PROMICE met files already on
+  disk and updates only their manifest fingerprints.
 - `prepareCaseRoot`, `writeManifest`, `makeFamilyManifest`, `makeCaseManifestEntry`,
    and `metadataStruct` are setup helpers used by the importers.
 
@@ -175,6 +213,7 @@ The remaining public differences are source contracts, not aliases:
 | ESM-SnowMIP | `case_ids`, `dt_out` | Forcing and observations share one source window and stage atomically; there is no independently attachable RCM leg. |
 | Laugh Tests | `case_ids` | Each case is an atomic evaluation/reference experiment bundle with no runtime forcing artifact. |
 | PROMICE | `forcing_sources` may include native `"promice"` plus RCM ids | PROMICE owns both observations and an optional native AWS runtime leg. |
+| K-transect | PANGAEA.947483 annual datasets plus the series sensor-height workbook, and KAN_U/S9/S10 station selectors | Both cache products are required before staging because donor transfer requires measured height provenance. Annual children must match the requested station and carry their own valid DOI; low-speed wind direction is masked before DOI/citation metadata and sensor-height histories are merged for manifest staging. Durable manifests and staged observation metadata retain DOI plus source basenames and omit machine-local cache paths; the manifest pins each donor evaluation artifact's byte size and SHA-256 for reconstruction-time verification. |
 | RetMIP | protocol/native source directories | Protocol, Vandecrux, Samimi, PROMICE, and IMAU products require explicit family parsing before optional RCM attachment. |
 | IMAU | hourly AWS plus daily-QA cache | The daily product is provenance/QA, not another staged case inventory. |
 | SUMup | `points`, `anchors`, `years`, spatial radii | Cases are selected from geospatial observations rather than a fixed site catalog. |
@@ -734,28 +773,41 @@ Standard unit tests must use temporary/synthetic fixtures or provisioned
 ### PROMICE co-located firn staging (`importPromiceSites`)
 
 `importPromiceSites` stages PROMICE + MAR + MERRA-2 met + RACMO Data anchored on
-each PROMICE AWS site. The eval target IS bundled as a data-only
-`observations.mat` (the PROMICE-obs timeseries; same contract as
-ESM-SnowMIP/SUMup), referenced from the case `evaluation_file`. The manifest is
-**forcing-AGNOSTIC**: the FORCING is NOT bundled with the eval target and is NOT
-stipulated - any forcing file may be used at the site at runtime without
-rewriting `observations.mat`. Forcing/Data live in individual
-`<source>/met_<site>_<source>_<window>.mat` / window-stamped userdata files via
-the standard naming convention (`writemet`/`writeuserdata` stage into
-per-source/product subfolders such as `met/promice/`, `met/mar3.11/`, and
-`userdata/racmo2.3p3/`) and are recorded in the manifest `colocation` record by
-source id. `forcing_sources` declares the runnable met source ids used by runtime
-helpers; it must match the staged product ids when forcing is available. The
-per-leg windows are
-**decoupled**:
-PROMICE met/eval defaults to **all available years for each station** (read live
-from the L3 record, including partial years) and is **never gated by RCM
-coverage**; the MAR/MERRA met legs use the PROMICE window intersected with each
-source's on-disk availability, while the RACMO Data leg uses its own coverage
-(FGRN11 surface ~2012-2015, subsurface ~2012-2018) independently. A leg with no
-on-disk overlap is skipped-with-reason (recorded at `colocation.<model>`), and a
-requested-vs-actual coverage table is printed at the start of every run. Each
-leg's actual staged window is recorded at `colocation.<model>.window`.
+each PROMICE AWS site.
+
+The staged pieces remain separate:
+
+- **Evaluation target:** a data-only `observations.mat` containing the PROMICE
+  observation timetable, referenced by `evaluation_file`. It follows the same
+  target contract as ESM-SnowMIP and SUMup.
+- **Runtime forcing and Data:** individual
+  `<source>/met_<site>_<source>_<window>.mat` and window-stamped userdata files.
+  `writemet` and `writeuserdata` place them in per-source/product folders such
+  as `met/promice/`, `met/mar3.11/`, and `userdata/racmo2.3p3/`.
+- **Manifest:** a forcing-agnostic case record. Runtime forcing is not bundled
+  with or stipulated by the evaluation target, so another usable forcing can
+  be selected without rewriting `observations.mat`. The `colocation` record
+  identifies each staged source leg.
+- **Runtime source list:** `forcing_sources` declares runnable met product ids
+  and must match staged product ids when forcing is available.
+- **Native byte identity:** `colocation.promice.met_file_identities` records
+  each native met path, byte size, and SHA-256. Reconstruction verifies these
+  producer-owned bytes before a target or PROMICE donor supplies training
+  truth.
+
+Per-leg windows are decoupled:
+
+- PROMICE met and evaluation data default to every available year in each live
+  L3 station record, including partial years. RCM coverage never truncates this
+  window.
+- MAR and MERRA-2 met use the intersection of the PROMICE window and each
+  source's on-disk coverage.
+- RACMO Data uses its independent coverage: approximately 2012–2015 for FGRN11
+  surface data and 2012–2018 for subsurface data.
+- A leg with no on-disk overlap is skipped with a reason at
+  `colocation.<model>`.
+- Every run prints requested versus actual coverage, and
+  `colocation.<model>.window` records the staged result.
 
 RACMO is staged as eval/reference Data, NOT a met source: the available RACMO
 2.3p3 source files carry radiation (swd, lwd, derived albedo), turbulent fluxes
@@ -778,7 +830,9 @@ to `<output_root>/eval`, forcing/Data to `<output_root>/input`.
 data tree) is the normal verification-data target. Verification staging must
 not target `demo/data`; that tracked tree is limited to the public demo inputs.
 
-**Incremental staging (MERGE by default).** Staging one site **adds or updates
+#### Incremental staging (merge by default)
+
+Staging one site **adds or updates
 only that site's case entry** in the family `manifest.json` and **preserves
 every other site's committed case + staged files byte for byte** (shared helper
 `icemodel.verification.setup.writeFamilyManifestMerge`, used by the dataset
@@ -789,7 +843,9 @@ hand-added family fields like `schema: "metadata_only"` survive. Re-staging the
 same site updates exactly its entry (idempotent), and a stale `skipped[]` entry
 for a now-staged site clears while other sites' skips are preserved. So adding
 DY2/EGP into the family root that already holds the KAN fixtures never churns or
-drops them. A shorter same-identity refresh preserves the enclosing case/leg
+drops them.
+
+A shorter same-identity refresh preserves the enclosing case/leg
 window and its prior artifact references; an enclosing/equal rebuild replaces
 those references, while a partial extension retains both file sets supporting
 the overlapping union. A disjoint refresh is warned and leaves the prior scalar
@@ -800,8 +856,10 @@ replace rather than union unlike artifacts. Production `method` and manifest
 `sample_method` are one documented identity alias. Native producer
 `source_family`, `station`, `doi`, and `bundle_doi` fields compare by those exact
 spellings when both records provide them; missing legacy values remain unknown,
-and no additional cross-field aliases are implied. Known cadence is compared per
-artifact class, so incompatible met or Data refs replace rather than union while
+and no additional cross-field aliases are implied.
+
+Known cadence is compared per artifact class, so incompatible met or Data refs
+replace rather than union while
 a valid 15-minute-met/hourly-Data leg remains compatible. Durable filename cadence
 is used only when every ref in that class is unambiguous; unknown legacy names
 remain compatible. Source lists are derived again from the final colocation graph.
@@ -819,6 +877,123 @@ icemodel.verification.setup.importPromiceSites( ...
    build_forcing=false, ...
    overwrite=true);
 ```
+
+### Refresh PROMICE met fingerprints
+
+Reconstruction requires the native staged met bytes to match
+`data/eval/promice/manifest.json`. Older manifests may have `met_files` but no
+size/SHA-256 records. Refresh those records directly from the files already on
+disk:
+
+```matlab
+manifest = icemodel.verification.setup.refreshPromiceMetIdentities();
+```
+
+This is the POLICY A1/D-22 metadata-only path. It neither reads the raw PROMICE
+cache nor rebuilds met, userdata, or observations. For an alternate paired data
+tree:
+
+```matlab
+manifest = icemodel.verification.setup.refreshPromiceMetIdentities( ...
+   manifest_file="/path/to/data/eval/promice/manifest.json", ...
+   met_root="/path/to/data/input/met");
+```
+
+The command fails before writing when a declared met file is missing, escapes
+the selected met root, or has an ambiguous manifest entry.
+
+### Produce a fresh PROMICE gap-fill report
+
+The current report must be regenerated after reconstruction code changes
+because `buildGapFillReport` reads saved products; it never reruns the engine.
+Use this order:
+
+1. Refresh the native met fingerprints.
+2. Rebuild `promice_filled` products with the current engine.
+3. Render the report from those saved products.
+
+Install the PDF engine once with `quarto install tinytex`; the report builder
+then renders both PDF and HTML by default.
+
+For a focused scientific review:
+
+```matlab
+addpath("icemodel")
+icemodel.verification.setup.refreshPromiceMetIdentities();
+
+sites = ["kanl", "kanm", "kanu", "cen", "dy2", "egp", "fre"];
+for site = sites
+   icemodel.forcing.reconstruct.fillPromiceStation(site);
+end
+
+report = icemodel.verification.report.buildGapFillReport(sites=sites);
+```
+
+For the complete currently staged PROMICE cohort:
+
+```matlab
+addpath("icemodel")
+manifest_file = icemodel.internal.fullpath( ...
+   "data", "eval", "promice", "manifest.json");
+manifest = icemodel.verification.setup.refreshPromiceMetIdentities( ...
+   manifest_file=manifest_file);
+sites = string({manifest.cases.case_id});
+
+failures = struct("site", {}, "identifier", {}, "message", {});
+for site = sites
+   try
+      icemodel.forcing.reconstruct.fillPromiceStation(site);
+   catch err
+      failures(end + 1) = struct( ... %#ok<SAGROW>
+         "site", site, "identifier", string(err.identifier), ...
+         "message", string(err.message));
+   end
+end
+
+if ~isempty(failures)
+   disp(struct2table(failures))
+end
+
+% A non-product is acceptable only when production proves that no validated
+% proxy window exists or that the proxy and native spans do not overlap.
+% Station names are not hard-coded.
+expected_ids = [ ...
+   "icemodel:reconstruct:fillPromiceStation:noProxyWindow"; ...
+   "icemodel:reconstruct:fillPromiceStation:windowRecordDisjoint"];
+failure_sites = string({failures.site});
+failure_ids = string({failures.identifier});
+assert(all(ismember(failure_ids, expected_ids)), ...
+   "A station failed for a reason other than unavailable proxy coverage")
+
+report = icemodel.verification.report.buildGapFillReport();
+absent = report.absent_products;
+assert(isequal(sort(absent.site), sort(failure_sites(:))))
+assert(all(ismember(absent.reason, ...
+   ["noProxyWindow"; "windowRecordDisjoint"])))
+has_proxy = absent.reason == "windowRecordDisjoint";
+assert(all(absent.proxy_end(has_proxy) < absent.native_start(has_proxy) ...
+   | absent.native_end(has_proxy) < absent.proxy_start(has_proxy)))
+```
+
+The production driver transactionally replaces each station's filled met,
+plan, audit, readiness, and producer-manifest outputs. It refuses to publish
+any product containing a non-ready IceModel or snow-model station-year. The
+report builder independently verifies every missing product's native and proxy
+spans, rejects any absence that still has overlap, and then publishes figures,
+CSVs, QMD, PDF, and HTML as one rollback-safe transaction.
+The existing unfinished report remains available unless replacement succeeds.
+The main report contains the cohort results, scientific interpretation, and
+one overview per station. The companion detail report contains at most six
+method-diverse gap figures per station. This split keeps the main HTML
+responsive while retaining the full review evidence. The cohort-level
+`interpretation/` set and `gapfill_interpretation_catalog.csv` explain
+decision-sensitive outcomes with reproducible month-to-year windows, including
+the KANL SWD fill-geometry case, climatology variability, seam diagnostics,
+hourly disaggregation, long gaps, and residual missingness.
+See the
+[reconstruction README](../+forcing/+reconstruct/README.md#getting-started)
+and [report README](+report/README.md#promice-gap-fill-report) for detailed
+inputs, outputs, and policy gates.
 
 Each case carries THREE orthogonal descriptors, all single-sourced from
 `promiceSiteCatalog(site)`:
@@ -1012,13 +1187,22 @@ byte-deterministic for unchanged staged inputs.
 
 PROMICE staging preserves corrected source values and source gaps. The canonical
 model-forcing channels are `tair`, `swd`, `lwd`, `albedo`, `wspd`, `rh`, `psfc`,
-and `ppt`. A native met artifact has `forcing_ready=true` only when all eight are
-finite at every posting and its time coordinate is contiguous at the inferred
-native cadence. `forcing_sources` still records that the artifact exists and is
-selectable; it does not imply readiness. In particular, native PROMICE met keeps
-`ppt` as an intentional all-NaN placeholder and therefore remains unready until
-an explicit derived layer supplies precipitation or a different forcing leg is
-selected.
+and `ppt`. The generic staging-manifest field `forcing_ready` is true only when
+all eight are finite at every posting and the time coordinate is contiguous at
+the inferred native cadence. `forcing_sources` records that an artifact exists
+and is selectable; it does not imply that generic staging verdict. Native
+PROMICE keeps `ppt` as an intentional all-NaN placeholder and is therefore not a
+complete standalone forcing.
+
+Do not confuse that generic native-staging fact with the reconstructed product's
+POLICY A5 ledger:
+
+- `ready_icemodel` requires `tair`, `rh`, `wspd`, `psfc`, `swd`, `lwd`, and
+  `albedo`.
+- `ready_snowmodel` additionally requires total `ppt` or `snowf`.
+- `swu` is derived and never required. `rainf` is never required.
+- Both verdicts require zero residual missing values and scalar-valid samples
+  within that station-year's product span.
 
 `icemodel.verification.setup.metForcingReady` returns an inclusive table of
 complete contiguous windows as its third output. Each reported window has 100%
@@ -1049,10 +1233,13 @@ Completion is separate from the source artifact:
   selected window within RCM coverage. Preserve rate integrals/signs, cadence
   support, bounds, overlap diagnostics, model/product id, remap method, and a
   per-channel substitution mask in a new derived artifact.
-- Interpolation and statistical fills are not approved for canonical
-  verification forcing. They need a separately accepted maximum-gap rule and
-  held-out physical/conservation validation. They never rewrite the native
-  artifact; ARIMA/seasonality alone is not evidence.
+- Native PROMICE verification artifacts are never interpolated or rewritten.
+  The separately named `promice_filled` canonical runtime forcing may use only
+  the methods, maximum-gap rules, held-out gates, physical checks, provenance,
+  and contiguous audit contract approved in
+  `+forcing/+reconstruct/POLICY.md`. Ad hoc interpolation or statistical fills
+  outside that contract remain prohibited; ARIMA/seasonality alone is not
+  evidence.
 
 The current source audit separates coverage artifacts from source-reproduced
 extremes. KAN_M's largest daily SWD mean (2012-06-03) uses 18/24 hourly samples;

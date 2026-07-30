@@ -235,7 +235,8 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    % recover a transition as a coincident step. The window clamp uses the L3
    % record bounds (source_meta), so an install outside this station's record is
    % excluded.
-   info = icemodel.verification.setup.promiceSiteCatalog(site);
+   info = icemodel.verification.setup.promiceSiteCatalog(site, ...
+      source_dir=kwargs.source_dir);
    composing_stations = info.stations;
    [transition_times, transition_record] = ...
       icemodel.forcing.helpers.stationTransitionTimes(composing_stations, ...

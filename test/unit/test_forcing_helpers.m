@@ -146,6 +146,25 @@ function test_resampleMetTimestep_conserves_interval_means_for_model(testCase)
       "interval_start_zero_order_hold");
 end
 
+function test_step_observation_heights_selects_dynamic_or_scalar_values(testCase)
+   % The model boundary must scalarize dynamic PROMICE heights without
+   % changing scalar forcing-family heights or requiring unused RH geometry.
+   dynamic = struct('z_tair', [2.5; 2.4], ...
+      'z_wind', [2.5; 2.4], 'z_relh', [2.5; 2.4], 'z0_bulk', 1e-3);
+   returned = icemodel.surface.step_observation_heights(dynamic, 2);
+   testCase.verifyEqual(returned.z_tair, 2.4);
+   testCase.verifyEqual(returned.z_wind, 2.4);
+   testCase.verifyEqual(returned.z_relh, 2.4);
+
+   scalar = rmfield(dynamic, 'z_relh');
+   scalar.z_tair = 2;
+   scalar.z_wind = 10;
+   returned = icemodel.surface.step_observation_heights(scalar, 2);
+   testCase.verifyEqual(returned.z_tair, 2);
+   testCase.verifyEqual(returned.z_wind, 10);
+   testCase.verifyFalse(isfield(returned, 'z_relh'));
+end
+
 function test_resampleMetTimestep_accepts_two_row_hourly_cadence(testCase)
    % A compact contiguous hourly smoke source is a known application cadence.
    met = makeSyntheticMet( ...
@@ -417,6 +436,55 @@ function test_metfilename_roundtrip_with_createMetFileNames(testCase)
    testCase.verifyEqual(char(actual), expected{1});
 end
 
+function test_promice_filled_simyears_resolve_window_artifact(testCase)
+   % Simyear-only runtime requests must find the one published filled window.
+   root = testCase.TestData.outdir;
+   met_dir = fullfile(root, 'met', 'promice_filled');
+   mkdir(met_dir);
+   staged_name = 'met_kanm_promice_filled_20190101_20221231_15m.mat';
+   marker = true;
+   save(fullfile(met_dir, staged_name), 'marker');
+   opts = struct('sitename', 'kanm', 'forcings', 'promice_filled', ...
+      'simyears', [2020, 2021], 'dt', 900, 'pathinput', root);
+
+   % Prefer an enclosing published artifact, then the exact requested window.
+   names = icemodel.createMetFileNames(opts);
+   testCase.verifyEqual(names, {staged_name});
+   delete(fullfile(met_dir, staged_name));
+   names = icemodel.createMetFileNames(opts);
+   testCase.verifyEqual(names, ...
+      {'met_kanm_promice_filled_20200101_20211231_15m.mat'});
+   opts.dt = 3600;
+   testCase.verifyError(@() icemodel.createMetFileNames(opts), ...
+      'icemodel:createMetFileNames:unsupportedPromiceFilledCadence');
+end
+
+function test_precipitation_consistency_checks_mass_and_shape(testCase)
+   % The shared predicate must reject missing, negative, and unbalanced phases.
+   valid = icemodel.forcing.helpers.precipitationConsistency( ...
+      [0; 0.1; NaN; 0.1; 0.1], ...
+      [0; 0.04; 0; -0.01; 0.06], ...
+      [0; 0.06; 0; 0.11; 0.06]);
+   testCase.verifyEqual(valid, [true; true; false; false; false]);
+   testCase.verifyError(@() ...
+      icemodel.forcing.helpers.precipitationConsistency(0, [0; 0], 0), ...
+      'icemodel:forcing:precipitationConsistency:sizeMismatch');
+end
+
+function test_precipitation_validity_checks_partial_and_complete_splits(testCase)
+   % Missing phases are honest, but every finite partial split must still
+   % admit a nonnegative complement and every complete split must balance.
+   valid = icemodel.forcing.helpers.precipitationValidity( ...
+      [0.1; 0.1; NaN; -0.1; 0.1; 0.1; 0.1; NaN], ...
+      [0.04; 0.11; -0.01; NaN; 0.04; NaN; 0.04; NaN], ...
+      [NaN; NaN; NaN; NaN; 0.06; 0.11; 0.05; NaN]);
+   testCase.verifyEqual(valid, ...
+      [true; false; false; false; true; false; false; true]);
+   testCase.verifyError(@() ...
+      icemodel.forcing.helpers.precipitationValidity(0, [0; 0], 0), ...
+      'icemodel:forcing:precipitationValidity:sizeMismatch');
+end
+
 function test_promice_registered_as_forcing_source(testCase)
    % "promice" is an accepted forcings name (the generic PROMICE/GC-Net AWS
    % station-met source) and resolves through createMetFileNames to a
@@ -449,15 +517,16 @@ function test_promice_registered_as_forcing_source(testCase)
 end
 
 function test_promice_forcings_sets_boom_obs_heights(testCase)
-   % setopts with forcings="promice" sets the single-boom observation heights
-   % (T/RH and wind co-located on the upper boom), distinct from the climate-
-   % model "mar" path (z_wind=10), and z_relh tracks z_tair.
+   % PROMICE height defaults are unresolved NaN sentinels at setopts time:
+   % loadmet resolves them through the runtime POLICY A3 chain (measured ->
+   % interpolated -> nominal 2.6 m), so setopts itself must never bake in
+   % a height.
 
    opts = icemodel.setopts('icemodel', 'kanm', 2015, 'promice');
    testCase.verifyEqual(opts.forcings, 'promice');
-   testCase.verifyEqual(opts.z_tair, 2.6);
-   testCase.verifyEqual(opts.z_wind, 2.6);
-   testCase.verifyEqual(opts.z_relh, opts.z_tair);
+   testCase.verifyTrue(isnan(opts.z_tair));
+   testCase.verifyTrue(isnan(opts.z_wind));
+   testCase.verifyTrue(isnan(opts.z_relh));
 
    mar = icemodel.setopts('icemodel', 'kanm', 2015, 'mar');
    testCase.verifyEqual(mar.z_wind, 10.0);
@@ -1455,6 +1524,23 @@ end
 
 %% promiceShortwave
 
+function test_intervalMaximumSolarElevation_matches_support_samples(testCase)
+   % Interval geometry uses the same start/quarter/end support as the
+   % PROMICE darkness rule, for both hourly and half-hourly postings.
+   times = [ ...
+      datetime(2020, 3, 1, 0, 0, 0, 'TimeZone', 'UTC'); ...
+      datetime(2020, 3, 1, 1, 0, 0, 'TimeZone', 'UTC')];
+   for interval = [hours(1), minutes(30)]
+      sample_times = times + (0:0.25:1) .* interval;
+      expected = max(icemodel.forcing.helpers.solarElevation( ...
+         sample_times, 66.48, -42.50), [], 2);
+      returned = ...
+         icemodel.forcing.helpers.intervalMaximumSolarElevation( ...
+         times, 66.48, -42.50, interval);
+      testCase.verifyEqual(returned, expected, 'AbsTol', 1e-12);
+   end
+end
+
 function test_promiceShortwave_prefers_corrected_and_clamps_raw_fallback(testCase)
    % Corrected finite values win; raw values fill correction gaps; only a
    % remaining negative public fallback is zeroed; residual nonfinite source
@@ -1467,7 +1553,7 @@ function test_promiceShortwave_prefers_corrected_and_clamps_raw_fallback(testCas
    swu_cor = [NaN; -1; NaN; Inf];
    aws = timetable(Time, swd, swd_cor, swu, swu_cor);
 
-   [public_swd, public_swu, metadata] = ...
+   [public_swd, public_swu, metadata, masks] = ...
       icemodel.forcing.helpers.promiceShortwave(aws);
 
    testCase.verifyEqual(public_swd, [0; 0; 20; NaN]);
@@ -1489,6 +1575,12 @@ function test_promiceShortwave_prefers_corrected_and_clamps_raw_fallback(testCas
    testCase.verifyEqual(metadata.swu_corrected_negative_count, 1);
    testCase.verifyEqual(metadata.swu_raw_fallback_negative_count, 1);
    testCase.verifyEqual(metadata.swu_negative_clamped_count, 2);
+   testCase.verifyEqual(masks.swd_corrected_used, ...
+      [false; true; false; false]);
+   testCase.verifyEqual(masks.swd_raw_fallback, ...
+      [true; false; true; false]);
+   testCase.verifyEqual(masks.swd_negative_clamped, ...
+      [true; true; false; false]);
 end
 
 function test_promiceShortwave_fills_only_deep_civil_night_missing(testCase)
@@ -1508,7 +1600,7 @@ function test_promiceShortwave_fills_only_deep_civil_night_missing(testCase)
    swu_cor = nan(size(swu));
    aws = timetable(Time, swd, swd_cor, swu, swu_cor);
 
-   [public_swd, public_swu, metadata] = ...
+   [public_swd, public_swu, metadata, masks] = ...
       icemodel.forcing.helpers.promiceShortwave(aws, ...
       fill_darkness=true, latitude=67.09695086829153, ...
       longitude=-49.94707712063845);
@@ -1522,6 +1614,10 @@ function test_promiceShortwave_fills_only_deep_civil_night_missing(testCase)
    testCase.verifyEqual(metadata.swd_darkness_zero_filled_count, 1);
    testCase.verifyEqual(metadata.swd_remaining_missing_count, 2);
    testCase.verifyEqual(metadata.swu_darkness_zero_filled_count, 1);
+   testCase.verifyEqual(masks.swd_darkness_fill, ...
+      [true; false; false; false; false]);
+   testCase.verifyEqual(masks.swu_darkness_fill, ...
+      [true; false; false; false; false]);
    testCase.verifyTrue(contains(string( ...
       metadata.swd_darkness_fill_method), "NOAA"));
    testCase.verifyTrue(contains(string( ...

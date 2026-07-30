@@ -13,6 +13,44 @@ function teardown(testCase) %#ok<INUSD>
 
 end
 
+function test_ispathinside_containment_contract(testCase)
+   %TEST_ISPATHINSIDE_CONTAINMENT_CONTRACT Canonical containment predicate.
+   % The shared helper must accept root-equality and true descendants,
+   % reject siblings whose names merely share a prefix and dot-dot
+   % escapes, resolve symlinked roots, and stay well defined for
+   % nonexistent leaves under an existing root.
+   root = fullfile(tempdir, 'ipi_root');
+   sibling = fullfile(tempdir, 'ipi_root2');
+   mkdir(root);
+   mkdir(sibling);
+   cleaner = onCleanup(@() cellfun(@(d) rmdir(d, 's'), {root, sibling}));
+
+   % Root equality and a direct child are inside.
+   testCase.verifyTrue(icemodel.internal.isPathInside(root, root));
+   child = fullfile(root, 'a.mat');
+   testCase.verifyTrue(icemodel.internal.isPathInside(child, root));
+   % A sibling sharing the root's name prefix is outside.
+   testCase.verifyFalse(icemodel.internal.isPathInside( ...
+      fullfile(sibling, 'a.mat'), root));
+   % A dot-dot escape resolves outside the root.
+   testCase.verifyFalse(icemodel.internal.isPathInside( ...
+      fullfile(root, '..', 'ipi_root2', 'a.mat'), root));
+   % A nonexistent leaf under the root still resolves inside.
+   testCase.verifyTrue(icemodel.internal.isPathInside( ...
+      fullfile(root, 'missing', 'leaf.mat'), root));
+   % A symlinked alias of the root resolves to the same canonical root.
+   link = fullfile(tempdir, 'ipi_link');
+   if isfile(link) || isfolder(link)
+      delete(link);
+   end
+   status = system(sprintf('ln -s "%s" "%s"', root, link));
+   if status == 0
+      link_cleaner = onCleanup(@() delete(link));
+      testCase.verifyTrue(icemodel.internal.isPathInside( ...
+         fullfile(link, 'a.mat'), root));
+   end
+end
+
 function test_basepath(testCase)
    %TEST_BASEPATH Verify internal.basepath path composition.
    modelpath = fullfile(icemodel.internal.fullpath(), 'icemodel');

@@ -55,7 +55,8 @@ function [Data, metadata] = buildGcnetVandecruxData(station, kwargs)
          'GC-Net/Vandecrux surface file has no time coordinate: %s', filename)
    end
 
-   Time = regularizeHourlyAxis(icemodel.forcing.helpers.gcnetTime( ...
+   Time = icemodel.forcing.helpers.gcnetHourlyAxis( ...
+      icemodel.forcing.helpers.gcnetTime( ...
       double(ncread(filename, 'time')), ...
       icemodel.forcing.helpers.readNetcdfAttribute(filename, "time", ...
       "units")));
@@ -275,21 +276,6 @@ function map = channelMap()
       'subl', "sublimation", ...
       'smb', "SMB", ...
       'surface_height', "H_surf_obs");
-end
-
-function time = regularizeHourlyAxis(time)
-   %REGULARIZEHOURLYAXIS Use the documented hourly row-index time convention.
-   %
-   % The real Vandecrux surface files encode time as fractional days, but the
-   % coordinate drifts inside leap years and jumps at several year boundaries
-   % while the row count and endpoint still describe a continuous hourly series.
-   % The product is hourly, so met-building uses the unambiguous row-index axis.
-   time = time(:);
-   if numel(time) < 2
-      return
-   end
-   idx = 0:numel(time) - 1;
-   time = time(1) + hours(idx(:));
 end
 
 function dt_hours = timeStepHours(Time)

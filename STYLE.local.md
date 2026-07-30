@@ -50,6 +50,18 @@ Tests:
 - `n_` for counts.
 - `use_` for boolean feature toggles.
 
+## Single source of truth for parameters and namelists (non-negotiable)
+
+Every threshold, channel list, source mapping, or other tunable that a
+pipeline consumes must be defined in exactly one place: a central
+options function (e.g. `icemodel.forcing.reconstruct.setopts`), a
+`+namelists` function, or a dedicated single-source function (e.g.
+`physicalBounds`, `bucketEdges`, `rcmProductIds`). Functions must
+default their name-value arguments from that source, never restate the
+value inline. Hard-coded literals for policy-controlled quantities are
+review-blocking defects. Alias and identity mappings must be derived
+from the existing alias machinery, never re-declared locally.
+
 ## Sandbox new physics in production namespaces
 
 When developing a new feature that touches core `icemodel.m` physics,

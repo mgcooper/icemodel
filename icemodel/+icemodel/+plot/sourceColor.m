@@ -26,6 +26,11 @@ function colors = sourceColor(names)
       elseif contains(key, "mar3") || key == "mar" ...
             || startsWith(key, "mar ")
          colors(k, :) = [0.866 0.329 0];
+      elseif contains(key, "promice_filled") || contains(key, "filled")
+         % The gap-filled product needs its own stable identity beside
+         % native PROMICE purple so before/after overlays read at a
+         % glance.
+         colors(k, :) = [0.9290 0.6940 0.1250];
       elseif contains(key, "promice")
          colors(k, :) = [0.4940 0.1840 0.5560];
       elseif contains(key, "modis")

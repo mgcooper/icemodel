@@ -1,5 +1,84 @@
 # Snow and firn visual-QA report
 
+This package turns saved verification artifacts into reviewable PDF and HTML
+reports.
+It does not run the model, reconstruct forcing, or change baselines.
+
+## Getting started
+
+Install Quarto and its PDF engine once:
+
+```sh
+quarto install tinytex
+```
+
+### Render a PROMICE gap-fill report
+
+After generating fresh `promice_filled` products, render a focused report:
+
+```matlab
+addpath("icemodel")
+report = icemodel.verification.report.buildGapFillReport( ...
+   sites=["kanl", "kanm", "kanu"]);
+```
+
+Render the complete on-disk cohort with:
+
+```matlab
+report = icemodel.verification.report.buildGapFillReport();
+```
+
+The default is `sites="all"` and `render=true`. Use `render=false` to rebuild
+and inspect the figures, ledgers, CSVs, and generated QMD without invoking
+Quarto:
+
+```matlab
+report = icemodel.verification.report.buildGapFillReport( ...
+   sites=["kanl", "kanm"], render=false);
+```
+
+Default outputs are:
+
+| Output | Location |
+|---|---|
+| PDF | `data/preview/report/gapfill-report.pdf` |
+| HTML | `data/preview/report/gapfill-report.html` |
+| Generated QMD | `data/preview/report/gapfill-report.qmd` |
+| Method-detail PDF | `data/preview/report/gapfill-detail-report.pdf` |
+| Method-detail HTML | `data/preview/report/gapfill-detail-report.html` |
+| Method-detail QMD | `data/preview/report/gapfill-detail-report.qmd` |
+| Overview figures | `data/preview/figures/gapfill/overview/` |
+| Method-detail figures | `data/preview/figures/gapfill/detail/` |
+| Scientific-interpretation figures | `data/preview/figures/gapfill/interpretation/` |
+| Summary CSVs, figure ledger, and diagnostics | `data/preview/qa/gapfill/` |
+
+The main report contains the scientific Results and station overview
+appendix. The companion method-detail report contains the full set of
+station/channel/method gap panels and their per-station diagnostic tables;
+separating it keeps the main HTML responsive without discarding evidence.
+
+To rerender either generated QMD without rebuilding figures or ledgers:
+
+```sh
+quarto render data/preview/report/gapfill-report.qmd
+quarto render data/preview/report/gapfill-detail-report.qmd
+```
+
+Each command produces both PDF and HTML because both formats are declared in
+the QMD. Use `--to pdf` or `--to html` only when intentionally rebuilding one
+format.
+
+The builder reads saved artifacts only. If the reconstruction code or native
+manifest fingerprints changed, regenerate the products first; see the
+[verification README](../README.md#produce-a-fresh-promice-gap-fill-report).
+
+### Other reports
+
+- `buildTestSuiteReport` presents saved regression or performance results.
+- `generateFinalSnowPreview` and `generateFinalFirnPreview` reproduce the
+  accepted seasonal-snow and firn preview figures.
+- `snow-artifact-qa.qmd` is the combined accepted snow/firn artifact-QA index.
+
 ## Report-layer ownership
 
 The test suite and verification suite share presentation code, not execution
@@ -8,12 +87,96 @@ baselines, and comparison artifacts. `icemodel.verification` owns scientific
 candidate/reference comparisons and artifact QA. This namespace owns the
 Quarto-facing presentation for both: the snow/firn scientific report below and
 `buildTestSuiteReport`, which turns saved regression/performance results into
-plots, compact CSV, generated QMD, and self-contained HTML without rerunning a
+plots, compact CSV, generated QMD, and a rendered report without rerunning a
 model or changing a baseline.
 
 `run_regression_suite` and `run_perf_suite` render their reports beneath the
 same `test/artifacts/<run>/` directory as their MAT files. Pass
 `build_report=false` only for a deliberately artifact-only run.
+
+## PROMICE gap-fill report
+
+`buildGapFillReport` renders the reconstruction report from saved native,
+filled, plan, audit, and readiness artifacts.
+
+### Evidence and tables
+
+The builder writes an exact figure ledger and
+`gapfill_method_diagnostics.csv`. The diagnostics expose every candidate
+season × duration admission or denial, maximum validated duration, selection
+baseline and baseline RMSE, uncertainty status, one- and two-sigma coverage,
+and selection- and evaluation-year metric components.
+
+The Results section is also artifact-derived:
+
+- cohort readiness verdicts, including the relational-diagnostic policy;
+- fill volume by provenance family in `gapfill_fill_by_family.csv`;
+- cohort admission and held-out skill aggregates;
+- staged native stations without a filled product, including
+  `windowRecordDisjoint` refusals; and
+- a fixed scientific-interpretation catalog in
+  `gapfill_interpretation_catalog.csv`, with explicit selectors, status,
+  mechanism, policy basis, and absence rows; and
+- curated example figures with their selection rule stated in the report.
+
+Every reconstruction option and runtime donor-pool control (`donor_sites`,
+`use_ktransect`, and `use_gcnet`) appears in a complete, producer-pinned JSON
+block under Methods. The block must be identical across all selected plans.
+The appendix contains the complete readiness ledger, not a display-only prefix.
+
+### Figure organization
+
+Station figures follow POLICY D-31 and have matching report sections:
+
+- `overview/` contains one full-period, eight-channel figure per station.
+- `detail/` contains at most six windowed figures per station. Candidates are
+  interleaved by duration rank within channel × method-family groups; each
+  selected figure remains single-method and contains up to six representative
+  gaps for that method.
+- `interpretation/` contains the bounded cohort-level Results evidence:
+  KANL SWD fill geometry, the longest accepted gap, climatology variability,
+  boundary behavior, hourly disaggregation, and residual missingness. A
+  category with no material case remains in the catalog without a figure.
+
+Both appendix sections have clickable station links, and the figure ledger's
+`file` field records each subfolder-relative path. The table of contents and
+channel summaries retain sites and channels with no plotted segment, so figure
+availability cannot hide complete-native or unresolved data.
+
+Native curves are provenance-masked so legacy staged fills cannot masquerade as
+observations. Observed, raw-fallback, and source-backed negative-clamped
+shortwave codes remain native context; darkness and reconstructed codes do not.
+Each detail panel accents only its named method. Other fills in the context
+window are muted grey, derived by `methodFillLayers` from per-sample provenance
+and plan-audit spans. `gapfillFigureStyle` owns every report color.
+
+Each ledger row states whether true observed context exists before and after its
+exact filled segment. Gap spans and `gap_end` are end-exclusive, so plotted
+widths equal audited durations even for one-posting fills. Scientific
+interpretation figures use reproducible month-to-year windows and are ledgered
+separately from the per-station detail budget.
+
+### Input verification
+
+Before creating output, the builder:
+
+1. resolves producer-manifest paths relative to the selected data root;
+2. contains each artifact within its role-specific data or QA root;
+3. verifies the recorded size and SHA-256 for every native, filled, plan/audit,
+   and readiness artifact; and
+4. accepts proxy filenames as the product window only when each timetable and
+   their union cover every 15-minute posting continuously between the encoded
+   UTC bounds.
+
+The QMD and HTML link each machine-readable CSV at its actual QA location.
+
+### Publication transaction
+
+Figures, CSVs, QMD, and optional HTML are built in one isolated layout. All
+outputs must succeed before a rollback-safe transaction replaces the current
+publication. For selected sites, the transaction reconciles `overview/`,
+`detail/`, and `interpretation/`, removes obsolete selected-site and flat-layout
+PNGs, and leaves unrelated subset figures untouched.
 
 `snow-artifact-qa.qmd` renders one local HTML index for the accepted PROMICE,
 ESM-SnowMIP, and Laugh/Colbeck preview figures plus canonical RetMIP, IMAU,
@@ -123,9 +286,9 @@ canonical paths. Remove the local candidate only after the inventory is
 complete and the canonical report has been visually accepted.
 
 The Python report-index generator and checker use only the standard library, so
-they do not require a virtual environment or additional Python packages.
-`quarto` only needs to be on `PATH`; no Python execution engine is used by this
-report.
+they do not require a virtual environment or additional Python packages. No
+Python execution engine is used by this report. Quarto must be on `PATH`, and
+TinyTeX must be installed for PDF output.
 
 The ignored outputs are `data/preview/report/figures.generated.md`,
 `data/preview/report/snow-artifact-qa.html`, and Quarto support files. Open the

@@ -5,23 +5,21 @@ function [data, metadata] = readImauHourlyTable(filename)
    %
    % Role
    %  Source-specific parser for the Van Tiggelen et al. PANGAEA hourly IMAU
-   %  S21/S22/S23 files. It skips the PANGAEA metadata block, maps corrected
-   %  meteorological channels to icemodel-native names, and preserves source
-   %  metadata needed by staging/import manifests.
+   %  S21/S22/S23 files. The shared PANGAEA ingest skips the metadata block and
+   %  reads positional rows; this parser maps corrected meteorological channels
+   %  to icemodel-native names and preserves source metadata needed by
+   %  staging/import manifests.
 
    arguments
       filename (1, 1) string
    end
 
-   lines = readlines(filename);
-   header_idx = find(startsWith(lines, "Date/Time"), 1, 'first');
-   if isempty(header_idx)
-      error('icemodel:forcing:readImauHourlyTable:missingHeader', ...
-         'No Date/Time table header found in %s.', filename);
-   end
-
-   header = split(lines(header_idx), sprintf('\t')).';
-   raw = readRawTable(filename, header_idx + 1, numel(header));
+   % Shared PANGAEA ingest: positional rows, source labels, and the citation /
+   % DOI / Event(s) metadata. Keep this parser's established error id for a
+   % missing tabular section.
+   [raw, header, source] = icemodel.forcing.helpers.readPangaeaTab( ...
+      filename, site_id_pattern='\((S[0-9]+)\)', ...
+      missing_header_error_id='icemodel:forcing:readImauHourlyTable:missingHeader');
 
    % S22/S23 encode a missing derived surface temperature as -1273.05 degC.
    % Normalize that source sentinel before converting the physical values to K;
@@ -58,72 +56,16 @@ function [data, metadata] = readImauHourlyTable(filename)
 
    % Preserve source metadata and row-derived coordinate summaries for later
    % staging without pretending row-varying coordinates are one exact point.
-   metadata = sourceMetadata(filename, lines, header, data);
-end
-
-function raw = readRawTable(filename, first_data_line, n_columns)
-   %READRAWTABLE Read PANGAEA rows with stable positional column names.
-   opts = delimitedTextImportOptions('NumVariables', n_columns);
-   opts.Delimiter = '\t';
-   opts.DataLines = [first_data_line Inf];
-   opts.VariableNames = "col" + string(1:n_columns);
-   opts.VariableTypes = ["string", repmat("double", 1, n_columns - 1)];
-   opts.ExtraColumnsRule = 'ignore';
-   opts.EmptyLineRule = 'read';
-   opts.ConsecutiveDelimitersRule = 'split';
-   opts.LeadingDelimitersRule = 'ignore';
-   raw = readtable(filename, opts);
-end
-
-function metadata = sourceMetadata(filename, lines, header, data)
-   %SOURCEMETADATA Collect citation, DOI, event, and row-summary metadata.
-   text = strjoin(lines(1:find(startsWith(lines, "*/"), 1, 'first')), newline);
-   event = eventMetadata(text);
    metadata = struct( ...
-      'filename', string(filename), ...
-      'site_id', event.site_id, ...
-      'citation', icemodel.forcing.helpers.regexpOnce( ...
-      text, 'Citation:\s*(.*?)\n'), ...
-      'doi', icemodel.forcing.helpers.regexpOnce(text, ...
-      'Citation:.*?https://doi.org/([0-9.]+/PANGAEA\.[0-9]+)'), ...
-      'bundle_doi', icemodel.forcing.helpers.regexpOnce(text, ...
-      'bundled publication\].*?https://doi.org/([0-9.]+/PANGAEA\.[0-9]+)'), ...
+      'filename', source.filename, ...
+      'site_id', source.site_id, ...
+      'citation', source.citation, ...
+      'doi', source.doi, ...
+      'bundle_doi', source.bundle_doi, ...
       'raw_headers', header, ...
-      'event', event, ...
+      'event', source.event, ...
       'row_summary', rowSummary(data), ...
       'variables', string(data.Properties.VariableNames));
-end
-
-function event = eventMetadata(text)
-   %EVENTMETADATA Parse the PANGAEA Event(s) station line.
-   line = icemodel.forcing.helpers.regexpOnce( ...
-      text, 'Event\(s\):\s*(.*?)\n');
-   event = struct('site_id', "", 'event_id', "", 'lat_wgs84', NaN, ...
-      'lon_wgs84', NaN, 'elev_m', NaN, 'start', NaT, 'end', NaT);
-   event.start.TimeZone = 'UTC';
-   event.end.TimeZone = 'UTC';
-   if line == ""
-      return
-   end
-
-   event.event_id = icemodel.forcing.helpers.regexpOnce(line, '^([^\s]+)');
-   event.site_id = icemodel.forcing.helpers.regexpOnce( ...
-      line, '\((S[0-9]+)\)');
-   event.lat_wgs84 = str2double(icemodel.forcing.helpers.regexpOnce( ...
-      line, 'LATITUDE:\s*([-0-9.]+)'));
-   event.lon_wgs84 = str2double(icemodel.forcing.helpers.regexpOnce( ...
-      line, 'LONGITUDE:\s*([-0-9.]+)'));
-   event.elev_m = str2double(icemodel.forcing.helpers.regexpOnce( ...
-      line, 'ELEVATION:\s*([-0-9.]+)'));
-
-   stamps = regexp(line, 'DATE/TIME (?:START|END):\s*([0-9T:-]+)', ...
-      'tokens');
-   if numel(stamps) >= 1
-      event.start = parseTimestamp(stamps{1}{1});
-   end
-   if numel(stamps) >= 2
-      event.end = parseTimestamp(stamps{2}{1});
-   end
 end
 
 function summary = rowSummary(data)
@@ -136,10 +78,4 @@ function summary = rowSummary(data)
       'lon_min', min(data.lon_wgs84, [], 'omitnan'), ...
       'lon_median', median(data.lon_wgs84, 'omitnan'), ...
       'lon_max', max(data.lon_wgs84, [], 'omitnan'));
-end
-
-function time = parseTimestamp(text)
-   %PARSETIMESTAMP Convert PANGAEA ISO timestamps to UTC datetimes.
-   time = datetime(text, 'InputFormat', "yyyy-MM-dd'T'HH:mm:ss", ...
-      'TimeZone', 'UTC');
 end

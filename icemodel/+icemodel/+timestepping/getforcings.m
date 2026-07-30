@@ -17,8 +17,9 @@ function [tair, swd, lwd, albedo, wspd, psfc, ea, De, snow_depth] = ...
       tair, met.rh(metstep), liqflag);
 
    % Compute the bulk-richardson exchange coefficient
+   step_opts = icemodel.surface.step_observation_heights(opts, metstep);
    De = icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
-      wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
+      wspd, step_opts.z0_bulk, step_opts.z_tair, step_opts.z_wind);
 
    % Extract snow depth if it exists in the met data
    if isvariable('snow_depth', met)
