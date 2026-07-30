@@ -34,9 +34,10 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    %                    instead of rejecting the met build up front (default true)
    %
    % Outputs
-   %  met      - timetable: tair [K], swd, lwd [W m-2], albedo [-],
+   %  met      - timetable: tair [K], swd, swu, lwd [W m-2], albedo [-],
    %             wspd [m s-1], rh [%], psfc [Pa], rainf, snowf, ppt
-   %             [m s-1], plus pass-through wdir, tsfc, cfrac, shf, lhf
+   %             [m s-1], plus pass-through boom_height, wdir, tsfc, cfrac,
+   %             shf, lhf
    %  metadata - provenance: source file, station, lat/lon/elev, QA/QC
    %             gap counts, policies applied
    %
@@ -58,11 +59,23 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
       source_dir=kwargs.source_dir, timescale="hourly", ...
       startdate=kwargs.startdate, enddate=kwargs.enddate);
 
+   % Preserve known within-record station handovers with the met artifact
+   % as provenance for surface-height QC flags and for the future
+   % maintenance-visit registry refinement of the runtime interpolation
+   % rung (icemodel-1ps.16); the A3 chain itself may interpolate across
+   % handovers by design.
+   site_info = icemodel.verification.setup.promiceSiteCatalog(site, ...
+      source_dir=kwargs.source_dir);
+   [transition_times, transition_record] = ...
+      icemodel.forcing.helpers.stationTransitionTimes(site_info.stations, ...
+      window_start=source_meta.window_start, ...
+      window_end=source_meta.window_end, source_dir=kwargs.source_dir);
+
    % Public forcing uses the corrected pypromice shortwave product where
    % available and a nonnegative raw fallback otherwise. Missing values become
    % zero only when the complete source hour is below deep civil twilight;
    % readPromiceAws itself remains source-faithful and exposes both source pairs.
-   [public_swd, ~, shortwave_meta] = ...
+   [public_swd, public_swu, shortwave_meta] = ...
       icemodel.forcing.helpers.promiceShortwave(aws, fill_darkness=true, ...
       latitude=source_meta.lat, longitude=source_meta.lon, ...
       swd_source_file_observations_present= ...
@@ -111,9 +124,13 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    % channels as explicit placeholders so a runtime source swap can fill them.
    % lwd is excluded here - it has its own observed/estimated/absent handling
    % above.
-   forcing_channels = ["tair", "swd", "albedo", "wspd", "rh", "psfc"];
+   forcing_channels = ["tair", "albedo", "wspd", "rh", "psfc"];
    absent = forcing_channels(~ismember(forcing_channels, ...
       string(aws.Properties.VariableNames)));
+   if ~(shortwave_meta.swd_source_present ...
+         || shortwave_meta.swd_corrected_source_present)
+      absent(end + 1) = "swd";
+   end
    if ~isempty(absent) && ~kwargs.fillwithmissing
       error('icemodel:forcing:buildPromiceMet:missingForcing', ...
          'required forcing channel(s) absent at %s: %s (no met built)', ...
@@ -132,6 +149,7 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    met = timetable(Time);
    met.tair = channelOrNan(aws, "tair");
    met.swd = public_swd;
+   met.swu = public_swu;
    met.lwd = lwd;
 
    % Distinguish an observed albedo series from an intentional all-missing or
@@ -163,12 +181,16 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    met.ppt = nan(height(aws), 1);
 
    % Pass through the optional (non-forcing) diagnostics the station happens to
-   % carry (wind direction, surface temperature, cloud fraction, turbulent
-   % fluxes, ...). These are NOT forcings, so a station missing any of them
-   % (e.g. KAN_B has no cfrac) must still yield a met file. The canonical
-   % optional set is the single source of truth for what is a pass-through.
+   % carry (time-varying boom height, wind direction, surface temperature,
+   % cloud fraction, turbulent fluxes, ...). These are not required scalar
+   % meteorological channels, so a station missing any of them (e.g. KAN_B has
+   % no cfrac) must still yield a native met file. Boom height passes
+   % through as optional geometry: the runtime A3 fallback chain
+   % guarantees usable heights and never blocks a run (POLICY A3).
+   % The canonical optional set is the single source of truth for pass-through;
+   % rainf is handled explicitly below because it requires a unit conversion.
    [~, optional] = icemodel.forcing.helpers.metvariables();
-   for v = optional
+   for v = setdiff(optional, "rainf", 'stable')
       if ismember(v, string(aws.Properties.VariableNames))
          met.(v) = aws.(v);
       end
@@ -182,7 +204,7 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    has_rainf_source = ismember("rainf", string(aws.Properties.VariableNames));
    has_rainf_observations = has_rainf_source && any(isfinite(aws.rainf));
    if has_rainf_source
-      met.rainf = met.rainf * 1e-3 / 3600;
+      met.rainf = aws.rainf * 1e-3 / 3600;
    end
    if has_rainf_observations
       rainf_policy = ...
@@ -211,6 +233,13 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
 
    metadata = source_meta;
    metadata.checks = checks;
+   % Pin the raw bytes that define builder-derived support masks so later
+   % reconstruction cannot replay a changed file with coincidentally equal
+   % aggregate counts.
+   source_info = dir(string(source_meta.source_file));
+   metadata.source_size_bytes = source_info.bytes;
+   metadata.source_sha256 = ...
+      icemodel.verification.setup.fileSha256(source_meta.source_file);
 
    % Carry the corrected/raw shortwave selection and exact replacement counts
    % into the saved artifact contract, including the channel-specific swd
@@ -236,6 +265,9 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    metadata.lwd_estimated = lwd_estimated;
    metadata.lwd_placeholder = lwd_placeholder;
    metadata.lwd_policy = lwd_policy;
+   metadata.composing_stations = site_info.stations;
+   metadata.station_transition_times = transition_times;
+   metadata.station_transition_record = transition_record;
    metadata.gap_policy = ...
       "shortwave missing values become zero only for whole-hour deep civil " + ...
       "night; other source gaps preserved; no metchecks gap interpolation";

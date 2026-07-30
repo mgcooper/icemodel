@@ -35,9 +35,13 @@ function map = variables()
    % --- forcing / met channels --------------------------------------------
    'tair',   'air_temperature',                            'near-surface air temperature',                       'K'
    'tsfc',   'surface_temperature',                        'surface skin temperature',                           'K'
-   'swd',    'surface_downwelling_shortwave_flux_in_air',  'downwelling shortwave radiative flux',               'W m-2'
-   'swu',    'surface_upwelling_shortwave_flux_in_air',    'upwelling shortwave radiative flux',                 'W m-2'
-   'lwd',    'surface_downwelling_longwave_flux_in_air',   'downwelling longwave radiative flux',                'W m-2'
+    'swd',    'surface_downwelling_shortwave_flux_in_air',  'downwelling shortwave radiative flux',               'W m-2'
+    'swu',    'surface_upwelling_shortwave_flux_in_air',    'upwelling shortwave radiative flux',                 'W m-2'
+   % usr survives only as a legacy metadata alias (POLICY A16/D-24): staged
+   % artifacts written before the swu rename carry the pypromice source
+   % name, and their lookups still resolve here. New artifacts ship swu.
+    'usr',    'surface_upwelling_shortwave_flux_in_air',    'upwelling shortwave radiative flux',                 'W m-2'
+    'lwd',    'surface_downwelling_longwave_flux_in_air',   'downwelling longwave radiative flux',                'W m-2'
    'lwu',    'surface_upwelling_longwave_flux_in_air',     'upwelling longwave radiative flux',                  'W m-2'
    'swn',    'surface_net_downward_shortwave_flux',        'net downward shortwave radiative flux',              'W m-2'
    'lwn',    'surface_net_downward_longwave_flux',         'net downward longwave radiative flux',               'W m-2'
@@ -87,6 +91,26 @@ function map = variables()
    'step_correctable_flag', '', 'quality flag marking an UNAMBIGUOUS (correctable) step-shift (0=no, 1=yes)', '1'
    'step_magnitude',   '', 'signed magnitude of a detected surface-series step-shift at this sample (0 elsewhere)', 'm'
    'boom_height',      '', 'AWS boom height above the surface',               'm'
+   'boom_height_provenance', '', 'per-sample reconstruction provenance code for boom_height (see icemodel.forcing.reconstruct.provenanceCodes)', '1'
+   'height_rel',       '', 'K-transect acoustic height-ranger record (surface melt/snow height for AWS type 0; sensor-plus-snow height for AWS type 1)', 'm'
+   'ice_melt',         '', 'K-transect draw-wire cumulative ice melt (values decrease as melt occurs; type-1 AWS5/AWS6 only)', 'm'
+   'aws_type',         '', 'K-transect AWS generation flag (0=modular 2003-era type, 1=compact integrated type)', '1'
+   % --- gap-fill per-sample provenance (icemodel.forcing.reconstruct) ----
+   'tair_provenance',  '', 'per-sample reconstruction provenance code for tair (see icemodel.forcing.reconstruct.provenanceCodes)',  '1'
+   'rh_provenance',    '', 'per-sample reconstruction provenance code for rh (see icemodel.forcing.reconstruct.provenanceCodes)',    '1'
+   'wspd_provenance',  '', 'per-sample reconstruction provenance code for wspd (see icemodel.forcing.reconstruct.provenanceCodes)',  '1'
+   'psfc_provenance',  '', 'per-sample reconstruction provenance code for psfc (see icemodel.forcing.reconstruct.provenanceCodes)',  '1'
+   'swd_provenance',   '', 'per-sample reconstruction provenance code for swd (see icemodel.forcing.reconstruct.provenanceCodes)',   '1'
+   'swu_provenance',   '', 'per-sample reconstruction provenance code for swu (see icemodel.forcing.reconstruct.provenanceCodes)',   '1'
+   % usr_provenance mirrors the usr legacy alias above (POLICY A16/D-24):
+   % filled products staged before the swu rename carry it; new products
+   % ship swu_provenance.
+   'usr_provenance',   '', 'per-sample reconstruction provenance code for usr (see icemodel.forcing.reconstruct.provenanceCodes)',   '1'
+   'albedo_provenance', '', 'per-sample reconstruction provenance code for albedo (see icemodel.forcing.reconstruct.provenanceCodes)', '1'
+   'lwd_provenance',   '', 'per-sample reconstruction provenance code for lwd (see icemodel.forcing.reconstruct.provenanceCodes)',   '1'
+   'ppt_provenance',   '', 'per-sample reconstruction provenance code for ppt (see icemodel.forcing.reconstruct.provenanceCodes)',   '1'
+   'rainf_provenance', '', 'per-sample reconstruction provenance code for rainf (see icemodel.forcing.reconstruct.provenanceCodes)', '1'
+   'snowf_provenance', '', 'per-sample reconstruction provenance code for snowf (see icemodel.forcing.reconstruct.provenanceCodes)', '1'
    'stake_height',     '', 'ablation-stake height above the surface',         'm'
    'transducer_depth', '', 'sonic-ranger / transducer depth to the surface',  'm'
    'elev',             'height_above_mean_sea_level', 'elevation above mean sea level', 'm'

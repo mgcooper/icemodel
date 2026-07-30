@@ -4,8 +4,10 @@ function metfname = createMetFileNames(opts)
    %  metfname = icemodel.createMetFileNames(opts)
    %
    % Naming forms (the window form is preferred when both are available):
-   %   Per-year (simyears only):
+   %   Per-year (simyears only, except promice_filled):
    %     met_<met>_<forcings>_<YYYY>_<dt>.mat   (one file per simyear)
+   %   PROMICE filled (simyears only):
+   %     met_<met>_promice_filled_<YYYYMMDD>_<YYYYMMDD>_<dt>.mat
    %
    %   Window-stamped (opts.startdate / opts.enddate set):
    %     met_<met>_<forcings>_<YYYYMMDD>_<YYYYMMDD>_<dt>.mat   (single file)
@@ -41,7 +43,13 @@ function metfname = createMetFileNames(opts)
 
    % Use the same closed cadence registry as the writer so every emitted file is
    % discoverable, including the proven RetMIP/Samimi native 30-minute override.
-   dtstr = char(icemodel.forcing.helpers.metTimestepSuffix(opts.dt) + ".mat");
+   dt_tag = icemodel.forcing.helpers.metTimestepSuffix(opts.dt);
+   if strcmpi(forcings, 'promice_filled') && dt_tag ~= "15m"
+      error('icemodel:createMetFileNames:unsupportedPromiceFilledCadence', ...
+         ['promice_filled is published only at 15-minute cadence; ' ...
+         'set opts.dt to 900 seconds']);
+   end
+   dtstr = char(dt_tag + ".mat");
 
    % Prefer the window form when both startdate and enddate are set
    % (regardless of whether simyears is also set). The window form is
@@ -59,6 +67,26 @@ function metfname = createMetFileNames(opts)
 
       enclosing = findEnclosingMetFile(opts, metname, forcings, ...
          opts.startdate, opts.enddate, dtstr, exact_name);
+      if ~isempty(enclosing)
+         metfname = {enclosing};
+      else
+         metfname = {exact_name};
+      end
+      return
+   end
+
+   % The reconstructed PROMICE product publishes one transactional
+   % acceptance-window artifact, so simyear-only runs must discover that
+   % enclosing file rather than request per-year files that are never written.
+   if strcmpi(forcings, 'promice_filled') && ~isempty(simyears)
+      request_start = datetime(min(simyears), 1, 1, 'TimeZone', 'UTC');
+      request_end = datetime(max(simyears), 12, 31, 23, 59, 59, ...
+         'TimeZone', 'UTC');
+      exact_name = ['met_' metname '_' forcings '_' ...
+         char(request_start, 'yyyyMMdd') '_' ...
+         char(request_end, 'yyyyMMdd') '_' dtstr];
+      enclosing = findEnclosingMetFile(opts, metname, forcings, ...
+         request_start, request_end, dtstr, exact_name);
       if ~isempty(enclosing)
          metfname = {enclosing};
       else

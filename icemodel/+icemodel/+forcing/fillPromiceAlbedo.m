@@ -12,11 +12,12 @@ function albedo = fillPromiceAlbedo(albedo, Time, kwargs)
    %  1. Values outside [0, 1] are set missing.
    %  2. Leading/trailing gaps in each calendar year fill with the first/
    %     last valid value of that year; interior gaps fill linearly.
-   %  3. With fillwinter=true (default), November-February samples are
-   %     set to winter_albedo (default 0.8, a dry-snow value), because
-   %     the first/last valid values bounding the polar night are often
-   %     low late-summer values that would otherwise back-fill the
-   %     winter.
+   %  3. With fillwinter=true (default), winter-month samples are set to
+   %     winter_albedo (a dry-snow value; both the constant and the month
+   %     window come from icemodel.parameterLookup so the reconstruction
+   %     can detect exactly this stamp), because the first/last valid
+   %     values bounding the polar night are often low late-summer values
+   %     that would otherwise back-fill the winter.
    %
    % Inputs
    %  albedo - albedo series with winter gaps [-]
@@ -37,20 +38,23 @@ function albedo = fillPromiceAlbedo(albedo, Time, kwargs)
       albedo (:, 1) double
       Time (:, 1) datetime
       kwargs.fillwinter (1, 1) logical = true
-      kwargs.winter_albedo (1, 1) double = 0.8
+      kwargs.winter_albedo (1, 1) double = ...
+         icemodel.parameterLookup('promice_winter_albedo')
+      kwargs.winter_months (1, :) double = ...
+         icemodel.parameterLookup('promice_winter_albedo_months')
    end
 
    assert(numel(albedo) == numel(Time), ...
       'albedo and Time must have equal lengths')
 
-   albedo(albedo < 0 | albedo > 1) = NaN;
+   albedo(~icemodel.forcing.promiceAlbedoSourceValid(albedo)) = NaN;
 
    for yyyy = unique(year(Time))'
       inyear = year(Time) == yyyy;
       filled = fillmissing(albedo(inyear), 'linear', 'EndValues', 'nearest');
       if kwargs.fillwinter
          m = month(Time(inyear));
-         filled(m <= 2 | m >= 11) = kwargs.winter_albedo;
+         filled(ismember(m, kwargs.winter_months)) = kwargs.winter_albedo;
       end
       albedo(inyear) = filled;
    end

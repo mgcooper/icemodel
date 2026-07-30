@@ -127,10 +127,14 @@ function csv = locateStationsCsv(source_dir)
       source_dir = string(fullfile(icemodel.internal.fullpath('data'), ...
          'verification', 'promice'));
    end
-   % Accept either the promice root or a hour/ (day/) subdir's parent.
-   candidates = [ ...
-      fullfile(source_dir, 'AWS_stations_metadata.csv'); ...
-      fullfile(fileparts(char(source_dir)), 'AWS_stations_metadata.csv')];
+   % Accept a selected product root, or the parent only when the caller
+   % explicitly selected that product's hour/day subdirectory.
+   source_dir = strip(source_dir, 'right', filesep);
+   candidates = fullfile(source_dir, 'AWS_stations_metadata.csv');
+   [parent, leaf] = fileparts(char(source_dir));
+   if ismember(lower(string(leaf)), ["hour", "day"])
+      candidates(end + 1) = fullfile(parent, 'AWS_stations_metadata.csv');
+   end
    csv = "";
    for c = string(candidates(:)')
       if isfile(c)
