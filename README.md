@@ -47,7 +47,9 @@ Thanks for your interest. To get started, here's what we recommend:
 - Check the [system requirements](#system-requirements) and [installation guide](#installation-guide).
 - If you do not have a MATLAB license, you can run this software using a free MATLAB Online account: [![Open in MATLAB Online](https://www.mathworks.com/images/responsive/global/open-in-matlab-online.svg)](https://matlab.mathworks.com/open/github/v1?repo=mgcooper/icemodel&file=demo/demo.m)
 - The main program is `icemodel/icemodel.m`. Open the function to get a sense for the model structure.
-- Open and run Example 1 in `demo/demo.m`. This will run an `IceModel` simulation for the KAN_M weather station, located on the Greenland ice sheet, for year 2016 on a 1-hr timestep.
+- Open and run Example 1 in `demo/demo.m`. This runs the KAN_M weather-station
+  case on the Greenland ice sheet for 2016 using the retained 15-minute
+  forcing asset and a 15-minute model timestep.
 - Inspect the demo plot created by the call to `icemodel.plot.enbal`. The simulated energy fluxes should closely track the weather station values.
 - Set `saveflag=true` and re-run Example 1. Notice how the `demo/data/output` directory is created, and the model output is saved there.
 - Set `backupflag=true` and re-run Example 1. Notice how the files are backed-up. By default, saveflag and backupflag are both false.
@@ -65,7 +67,9 @@ To specify custom input and output directories, use the configuration function `
 - Type `edit icemodel.config` and press enter.
 - Read the detailed documentation to understand the model input and output directory structure, and how to set them programmatically.
 
-<!-- Note that in `demo.m` the `casename` argument is passed to the configuration function: `cfg = icemodel.config(casename="demo")`. This sets the data folders to `demo/data/input`, `demo/data/eval`, and `demo/data/output`. The `casename` argument to `icemodel.config` currently does not serve any other purpose. -->
+`demo.m` selects `icemodel.config(casename="demo")`, which scopes the run to
+the small tracked `demo/data` tree. The `test` and `verification` cases select
+their independently owned data roots.
 
 ### Runtime configuration: Specify model options
 
@@ -77,15 +81,24 @@ To set run-specific model options and parameters, open and edit the function `ic
 
 ## Input Data
 
-Example input files are in `demo/data/input`. These include the meteorological forcing data in `input/met`, inputs to the two-stream spectral model in `input/spectral`, and optional "user data" in `input/userdata`.
+The minimal example inputs are in `demo/data/input`: the KAN-M 2016
+15-minute forcing and MERRA-2 temperature-swap file under `input/met`, plus
+the two-stream tables under `input/spectral`. The MODIS example uses the
+column embedded in the primary forcing.
 
 The `spectral` directory contains values for the absorption coefficient of pure ice from Warren et al. 2008, in-situ absorption coefficients for glacier ice from Cooper et al. 2021, a downwelling solar spectrum for the Arctic atmosphere generated with `ATRAN` (Lord, 1991), and a library of mie-scattering coefficients as described in Cooper et al. 2021.
 
 ## User Data
 
-The `input/userdata` directory contains alternative model forcings that can be "swapped out" with the standard model forcings to test hypotheses about processes and model sensitivity. For instance, users can prepare input forcing data generated from observations, climate model output, or satellite remote sensing, and place these files in `userdata`. Unlike the forcing files in `input/met`, these files do not need to contain the complete set of model forcings.
+Custom workspaces may provide an `input/userdata` directory containing
+alternative model forcings that can be swapped into the standard forcing to
+test hypotheses about processes and model sensitivity. Unlike files in
+`input/met`, userdata files do not need to contain every model forcing.
 
-To swap out a variable in the input met file with a variable in a userdata file, set the `userdata` and `uservars` configuration parameters (see `demo/demo.m`). For example, setting `userdata="modis"` and `uservars="albedo"` would replace the albedo values in the input meteorological forcing file with modis albedo for the same time and location. This would require placing a file named `<sitename>_modis_<year>` (see [Naming Conventions](#naming-conventions)) in the `userdata` directory, containing a timetable named `Data` with a variable (column) named `albedo`.
+To swap a variable, set the `userdata` and `uservars` configuration
+parameters (see `demo/demo.m`). A source may be embedded in the primary
+forcing, as the demo MODIS column is, or supplied by a matching file in
+`input/met/<source>` or `input/userdata/<source>`.
 
 ## Summary
 
@@ -111,30 +124,70 @@ To swap out a variable in the input met file with a variable in a userdata file,
 
 ### 2. Met files
 
-The met (forcing data) file naming convention is:
+The met (forcing data) file naming convention has two forms:
 
-- `met_SITENAME_FORCINGS_YYYY_TIMESTEP`
+- per-year: `met_SITENAME_FORCINGS_YYYY_TIMESTEP`
+- window-stamped: `met_SITENAME_FORCINGS_YYYYMMDD_YYYYMMDD_TIMESTEP` (one file
+  spanning a full window; preferred when a run sets `opts.startdate` /
+  `opts.enddate`, e.g. for the verification suite)
+
+Here `FORCINGS` is the forcing-source label (a versioned climate product such
+as `mar3.11` / `merra2` / `racmo2.3p3`, a station such as `kanm`, the generic
+AWS source `promice`, or the ESM-SnowMIP family `esm_snowmip`). Met files
+therefore follow `met_<site>_<source>` across all families. The legacy
+per-station convention sets `FORCINGS == SITENAME`
+(e.g. `met_kanm_kanm_...`); the `kanl` / `kanm` station forcings are kept under
+this legacy naming and are deliberately not relabeled.
 
 Examples:
 
-- `met_kanm_kanm_2016_1hr.mat` specifies a met (forcing) data file for site KAN-M with KAN-M forcings for year 2016 at a 1-hour timestep.
 - `met_kanm_kanm_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with KAN-M forcings for year 2016 at a 15-minute timestep.
-- `met_kanm_merra_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with MERRA-2 forcings for year 2016 at a 15-minute timestep.
+- `met_kanm_merra2_20160101_20161231_15m.mat` specifies a window-stamped met
+  file for site KAN-M with MERRA-2 forcings throughout 2016 at a 15-minute
+  timestep.
+- `met_cdp_esm_snowmip_19940801_20140731_1hr.mat` specifies an ESM-SnowMIP
+  window-stamped met file for site `cdp` spanning 1994-2014 at a 1-hour timestep.
+
+Met files live under `input/met/`. Staging writes them into a per-source
+subfolder `input/met/<FORCINGS>/` so the flat `met/` directory does not sprawl
+as forcing sources accumulate. The runtime resolves `input/met/<FORCINGS>/`
+**first** and falls back to a flat `input/met/` path, so both layouts work and
+committed flat fixtures still load. (`icemodel.forcing.helpers.writemet` writes
+the subfolder; `icemodel.forcing.helpers.sourceSearchDirs` defines the
+subfolder-first search order shared by the runtime resolvers.)
+
+Repository writers default model met to a 15-minute timestep. Public met
+builders/importers expose `dt_out="15m"`; pass `dt_out=""` explicitly to retain
+the source's native model-met cadence. Repeated writes are additive no-ops for
+an existing target unless `overwrite=true` is requested. A broader
+window-stamped artifact also satisfies a narrower ordinary request.
 
 Each met file must contain a timetable object named `met` with one column for each forcing variable. See the example met file.
 
 ### 3. User data files
 
-The "userdata" file naming convention is:
+The "userdata" file naming convention has two forms:
 
-- `SITENAME_FORCINGS_YYYY`
+- per-year: `SITENAME_SOURCE_YYYY`
+- window-stamped: `SITENAME_SOURCE_YYYYMMDD_YYYYMMDD` (one file spanning a full
+  window; preferred and resolved when its encoded period brackets the run year)
 
-Note: at this time, hourly userdata files are supported, thus unlike the met file naming convention, there is no `TIMESTEP` file part.
+Repository userdata writers default to hourly artifacts. Source-native hourly
+data, including PROMICE, is unchanged; finer data is averaged into clock-hour
+bins, coarser data is linearly interpolated to hourly support, and wind
+direction uses circular aggregation/interpolation. Pass `dt_out=""` explicitly
+to retain native cadence. Unlike met filenames, userdata has no `TIMESTEP` file
+part; saved metadata records the source and output cadence policy.
 
 Examples:
 
-- `kanm_merra_2016.mat` specifies a user data file with MERRA-2 climate model forcings for the KAN-M weather station location for year 2016 on a 1-hr timestep.
+- `kanm_merra2_2016.mat` specifies a user data file with MERRA-2 climate model forcings for the KAN-M weather station location for year 2016 on a 1-hr timestep.
 - `kanm_modis_2016.mat` specifies a user data file with MODIS satellite albedo values for the KAN-M weather station location for year 2016 on a 1-hr timestep.
+
+As with met files, staging writes userdata into a per-source subfolder
+`input/userdata/<SOURCE>/` and the runtime resolves that subfolder first, with a
+flat `input/userdata/` fallback. (`icemodel.forcing.helpers.writeuserdata`
+writes the subfolder; the same `sourceSearchDirs` ordering applies.)
 
 Each userdata file must contain a timetable named `Data` with column names matching the met file column-naming conventions. See the example met file in `demo/data/input/`.
 
@@ -296,6 +349,56 @@ setup()
 ```
 
 Installation should only take a few seconds. If you encounter any issues, please [open an issue](https://github.com/mgcooper/icemodel/issues).
+
+### Optional external dependencies
+
+Running the model and the snow-verification workflow needs nothing beyond this
+repo. A few auxiliary workflows (building gridded-climate forcings, and the
+permafrost-zone site classification used by `icemodel.verification`) call out to
+external dev-repo toolboxes that are intentionally kept *out* of this repo:
+
+| Repo | Used by | Path added |
+| --- | --- | --- |
+| [`exactremap`](https://github.com/mgcooper/exactremap) | conservative (area-weighted) polygon remap in `icemodel.forcing.helpers.remapPolygon` | `exactremap/toolbox` |
+| [`activelayer`](https://github.com/mgcooper/activelayer) | Obu (UiO PEX) permafrost-zone reader `activelayer.readobuzones` used by site classification | `activelayer/toolbox` |
+| [`matfunclib`](https://github.com/mgcooper/matfunclib) | shared helpers `activelayer` depends on (`parseFileName`, `dealout`, ...) | `matfunclib` |
+
+These are wired by the single central function `icemodel.dependencies`, which
+the test bootstrap calls automatically. It resolves each repo root in this
+order, and is a clean no-op when a dependency is already on the path or absent:
+
+1. A dependency-specific environment variable:
+   `ICEMODEL_EXACTREMAP`, `ICEMODEL_ACTIVELAYER`, `ICEMODEL_MATFUNCLIB`.
+2. A shared projects-root variable `ICEMODEL_PROJECTS_ROOT`, joined with the
+   repo name (e.g. `$ICEMODEL_PROJECTS_ROOT/exactremap`).
+3. The sibling `projects/` layout (the parent folder of this repo).
+
+To use a non-default location, clone the repos and either set the env vars or
+clone them next to this repo. To add them to the path yourself:
+
+```matlab
+icemodel.dependencies()           % no-op for anything already on the path
+icemodel.dependencies(require=true)  % error if any dependency is missing
+```
+
+`matfunclib` must be on the path for `activelayer` to load.
+
+### Gridded raw-data source directories
+
+The gridded-climate forcing builders read large raw source archives that, like
+the dependency repos above, are kept *out* of this repo. Each builder resolves
+its source directory in this order: the explicit `source_dir` kwarg, then a
+builder-specific environment variable, then a machine-specific default path.
+Only the env var is portable; set it to point each builder at the local archive.
+
+| Builder | Environment variable |
+| --- | --- |
+| `icemodel.forcing.buildMarData` (MAR 3.11) | `ICEMODEL_MAR_DIR` |
+| `icemodel.forcing.buildMerraData` (MERRA-2) | `ICEMODEL_MERRA_DIR` |
+| `icemodel.forcing.buildRacmoData` (RACMO FGRN11) | `ICEMODEL_RACMO_DIR` |
+
+These are only needed to *rebuild* gridded forcing from the raw archives; the
+committed demo fixtures and the staged research forcing do not require them.
 
 ## Contribute
 

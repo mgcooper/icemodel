@@ -11,15 +11,17 @@ function results = run_regression_suite(kwargs)
    %  results = run_regression_suite(simyear=2017, smoke_sites="kanm", ...
    %     full_sites=["kanm"; "kanl"])
    %  results = run_regression_suite(tier="full", baseline="v1.1")
+   %  results = run_regression_suite(data_root="/path/to/test/data")
    %
    % Use this for normal regression comparisons against an existing rolling or
    % release baseline.
    %
    % This function does not update baselines; it only runs the formal cases,
    % compares core scalar outputs to the requested baseline, and writes one
-   % artifact under test/artifacts/<run_name>/.
+   % artifact and one Quarto HTML report under test/artifacts/<run_name>/.
    %
    % The optional solver filter accepts any subset of [1 2 3].
+   % DATA_ROOT overrides the default test case for isolated fixture comparisons.
    %
    % SMOKE_SITES and FULL_SITES are advanced overrides for the site lists
    % used by each formal tier. Most callers should leave them at the
@@ -55,14 +57,29 @@ function results = run_regression_suite(kwargs)
 
       kwargs.run_name string ...
          = string.empty()
+
+      kwargs.build_report (1, 1) logical ...
+         = true
+
+      kwargs.data_root (1, 1) string ...
+         = ""
+   end
+
+   % Canonical formal runs require the published formal-core capability. This
+   % check never downloads; its missing-data error gives the exact opt-in fetch
+   % command. Explicit comparison candidates bypass manifest identity checks
+   % because PROMICE candidates intentionally differ from release fixtures.
+   if isblanktext(kwargs.data_root)
+      icemodel.verification.setup.fetchFixtures( ...
+         "v1.1", capabilities="formal-core", download=false);
    end
 
    % Deal out arguments.
    [tier, smbmodel, solver, simyear, smoke_sites, full_sites, baseline, ...
-      run_name] = deal(kwargs.tier, kwargs.smbmodel, ...
+      run_name, build_report] = deal(kwargs.tier, kwargs.smbmodel, ...
       kwargs.solver, kwargs.simyear, reshape(kwargs.smoke_sites, [], 1), ...
       reshape(kwargs.full_sites, [], 1), kwargs.baseline, ...
-      kwargs.run_name);
+      kwargs.run_name, kwargs.build_report);
 
    % Resolve full path to the test/ dir.
    testdir = icemodel.getpath('test');
@@ -71,10 +88,15 @@ function results = run_regression_suite(kwargs)
    % Keep the cleanup handle in scope so the caller's config is restored
    % when this entrypoint returns.
    [~, ~, ~, ~, suite_cleanup] = ...
-      icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>
+      icemodel.test.helpers.bootstrapTestEnvironment( ...
+      data_root=kwargs.data_root); %#ok<ASGLU>
 
    % Expand the requested formal model selector once at the entrypoint.
    models = icemodel.test.helpers.resolveRequestedSmbmodels(smbmodel);
+
+   % Resolve one run directory before dispatching models so aggregate artifacts
+   % and their report always share the same review surface.
+   [~, ~, run_name] = icemodel.test.helpers.resolveRunStamp(run_name);
 
    % Build the unittest suite once, then run the canonical single-model flow
    % for each requested formal model.
@@ -85,7 +107,7 @@ function results = run_regression_suite(kwargs)
    % Run the canonical single-model workflow for each requested model.
    per_model = arrayfun(@(mdl) runSingleModelRegression( ...
       runner, suite, tier, mdl, solver, simyear, ...
-      smoke_sites, full_sites, baseline, run_name), ...
+      smoke_sites, full_sites, baseline, run_name, kwargs.data_root), ...
       models, 'UniformOutput', false);
 
    % Combine per-model results into a common struct and display.
@@ -93,17 +115,26 @@ function results = run_regression_suite(kwargs)
 
    % Display the results.
    icemodel.test.helpers.displayRegressionResults(results)
+
+   % Render the saved comparison into the common report layer unless the
+   % caller explicitly requested an artifact-only run.
+   results.report_file = "";
+   if build_report
+      results.report_file = ...
+         icemodel.verification.report.buildTestSuiteReport( ...
+         "regression", results);
+   end
 end
 
 function results = runSingleModelRegression(runner, suite, tier, smbmodel, ...
       solver, simyear, smoke_sites, full_sites, baseline, ...
-      run_name)
+      run_name, data_root)
    %RUNSINGLEMODELREGRESSION Configure one formal model regression run.
 
    % Provide the requested regression selection to the unittest class.
    selector_cleanup = configureRegressionSelectorEnv( ...
       tier, smbmodel, solver, simyear, smoke_sites, full_sites, ...
-      baseline, run_name); %#ok<NASGU>
+      baseline, run_name, data_root); %#ok<NASGU>
 
    % Run the formal regression class for this concrete smbmodel.
    test_result = runner.run(suite);
@@ -156,7 +187,7 @@ function results = combineRegressionResults(per_model)
 end
 
 function cleanup = configureRegressionSelectorEnv(tier, smbmodel, solver, ...
-      simyear, smoke_sites, full_sites, baseline, run_name)
+      simyear, smoke_sites, full_sites, baseline, run_name, data_root)
    %CONFIGUREREGRESSIONSELECTORENV Export one regression selection contract.
    %
    % This is file-local glue for the regression runner. The unittest class
@@ -172,7 +203,8 @@ function cleanup = configureRegressionSelectorEnv(tier, smbmodel, solver, ...
       "ICEMODEL_TEST_SMOKE_SITES"
       "ICEMODEL_TEST_FULL_SITES"
       "ICEMODEL_REGRESSION_BASELINE"
-      "ICEMODEL_TEST_RUN_NAME"];
+      "ICEMODEL_TEST_RUN_NAME"
+      "ICEMODEL_TEST_DATA_ROOT"];
    oldvals = arrayfun(@(name) string(getenv(name)), names, ...
       'UniformOutput', false);
 
@@ -185,6 +217,7 @@ function cleanup = configureRegressionSelectorEnv(tier, smbmodel, solver, ...
    setenv('ICEMODEL_TEST_FULL_SITES', char(join(full_sites, ',')));
    setenv('ICEMODEL_REGRESSION_BASELINE', char(baseline));
    setenv('ICEMODEL_TEST_RUN_NAME', char(run_name));
+   setenv('ICEMODEL_TEST_DATA_ROOT', char(data_root));
 
    % Restore the prior selector state when the runner returns.
    cleanup = onCleanup(@() restoreSelectorEnv(names, oldvals));

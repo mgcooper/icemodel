@@ -75,10 +75,19 @@ function opts = configureRun(opts)
    end
 
    if ~isfield(opts, 'metfname') || isempty(opts.metfname)
-      opts.metfname = fullfile(opts.pathinput, 'met', ...
+      opts.metfname = resolveMetPaths(opts.pathinput, opts.forcings, ...
          icemodel.createMetFileNames(opts));
    elseif ischar(opts.metfname) || isstring(opts.metfname)
       opts.metfname = cellstr(opts.metfname);
+   end
+
+   % Verification manifests can select an exact staged Data artifact when
+   % multiple cadence variants share one site/source identity. Keep this list
+   % caller-controlled; loadmet falls back to legacy name discovery when empty.
+   if ~isfield(opts, 'userdatafname') || isempty(opts.userdatafname)
+      opts.userdatafname = {};
+   elseif ischar(opts.userdatafname) || isstring(opts.userdatafname)
+      opts.userdatafname = cellstr(opts.userdatafname);
    end
 
    if ~isfield(opts, 'vars1') || isempty(opts.vars1) ...
@@ -282,6 +291,32 @@ function args = runWindowArgs(opts)
       return
    end
    args = {opts.startdate, opts.enddate};
+end
+
+function paths = resolveMetPaths(pathinput, forcings, names)
+   %RESOLVEMETPATHS Resolve met file names to full paths, family subfolder first.
+   % Prefer the per-source subfolder input/met/<forcings>/<name> (the staging
+   % layout that keeps met/ from sprawling); fall back to flat input/met/<name>
+   % so existing flat files still resolve. The forcings label IS the subfolder
+   % key, so no extra option is needed. The subfolder-first ordering is the
+   % shared icemodel.forcing.helpers.sourceSearchDirs primitive.
+
+   met_base = fullfile(pathinput, 'met');
+   search_dirs = icemodel.forcing.helpers.sourceSearchDirs(met_base, forcings);
+   names = cellstr(names);
+   paths = cell(1, numel(names));
+   for n = 1:numel(names)
+      % First directory holding the file wins; fall back to the flat path
+      % (the last candidate) so a missing file surfaces a clean load error.
+      paths{n} = fullfile(search_dirs{end}, names{n});
+      for d = 1:numel(search_dirs)
+         candidate = fullfile(search_dirs{d}, names{n});
+         if isfile(candidate)
+            paths{n} = candidate;
+            break
+         end
+      end
+   end
 end
 
 function opts = configureTimeWindow(opts)

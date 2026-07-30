@@ -7,10 +7,9 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
    %
    %  Reads one ESM-SnowMIP obs_insitu_<sitename>_*.nc file and returns
    %  the observed snow / surface variables as a verification-target
-   %  timetable. Variable mapping mirrors the existing schema used by
-   %  the cdp / wfj smoke fixtures so the broader verification harness
-   %  (comparecase, plotcase, runIcemodelSnowCandidate adapter) does
-   %  not need a per-site branch.
+   %  timetable. Variable mapping uses the verification-target schema consumed
+   %  by comparecase, plotcase, and the runIcemodelSnowCandidate adapter without
+   %  a per-site branch.
    %
    %  Observation contract: this builder stages every snow / surface
    %  channel that the upstream obs file makes available, so downstream
@@ -36,7 +35,7 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
    %                       against icemodel.verification.namelists.snowmipsite.
    %
    %  Name-value
-   %    source_dir : string (default data/verification/snow/esm_snowmip)
+   %    source_dir : string (default data/verification/esm_snowmip)
    %    startdate  : datetime or "" (default "")
    %    enddate    : datetime or "" (default "")
    %
@@ -50,17 +49,24 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
    %
    % See also: icemodel.verification.setup.buildEsmSnowmipForcing,
    %  icemodel.verification.setup.importEsmSnowmip,
-   %  icemodel.verification.setup.readObsChannel,
+   %  icemodel.verification.setup.readNetcdfVariable,
    %  icemodel.verification.setup.readBestSnowDepth
 
    arguments
       sitename (1, 1) string ...
          {icemodel.verification.validators.mustBeSnowmipSite}
-      kwargs.source_dir (1, 1) string = defaultSourceDir()
+      kwargs.source_dir (1, 1) string = ""
       kwargs.startdate  = ""
       kwargs.enddate    = ""
    end
-   source_dir = kwargs.source_dir;
+   % Validate and normalize the optional interval before source discovery so
+   % malformed public input cannot be obscured by an unrelated file error.
+   [window_start, window_end, has_window] = ...
+      icemodel.internal.pairedWindow(kwargs.startdate, kwargs.enddate);
+
+   % Treat an explicit blank like omission; never reinterpret it as the CWD.
+   source_dir = icemodel.forcing.helpers.verificationSourceDir( ...
+      kwargs.source_dir, "esm_snowmip");
 
    % Locate the obs file (one per site).
    pattern = sprintf('obs_insitu_%s_*.nc', sitename);
@@ -111,9 +117,9 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
 
    % SWE
    if has_swe
-      swe_auto = icemodel.verification.setup.readObsChannel( ...
+      swe_auto = icemodel.verification.setup.readNetcdfVariable( ...
          obsfile, "snw_auto", optional=true, ntime=ntime);
-      swe_man  = icemodel.verification.setup.readObsChannel( ...
+      swe_man  = icemodel.verification.setup.readNetcdfVariable( ...
          obsfile, "snw_man", optional=true, ntime=ntime);
       swe_kg_m2 = icemodel.verification.setup.preferPrimary(swe_auto, swe_man);
    else
@@ -122,25 +128,30 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
 
    % surface temperature
    if has_ts
-      ts = icemodel.verification.setup.readObsChannel(obsfile, "ts");
+      ts = icemodel.verification.setup.readNetcdfVariable(obsfile, "ts");
    else
       ts = nan(ntime, 1);
    end
 
    % albedo
    if has_albs
-      albs = icemodel.verification.setup.readObsChannel(obsfile, "albs");
+      albs = icemodel.verification.setup.readNetcdfVariable(obsfile, "albs");
    else
       albs = nan(ntime, 1);
    end
 
-   % Soil temperature is two-dimensional (sdepth x time). Sites
-   % without tsl produce zero soil-temperature columns rather than a
-   % placeholder NaN soil layer.
+   % MATLAB reads the native tsl dimensions as sdepth x time. Preserve that
+   % source orientation when normalizing singleton dimensions; each row must
+   % remain one physical soil depth, so this operation intentionally does not
+   % transpose the source data. Sites without tsl produce zero soil-temperature
+   % columns rather than a placeholder NaN soil layer.
    if has_tsl
-      tsl = icemodel.verification.setup.readObsChannel(obsfile, "tsl");
+      tsl = icemodel.verification.setup.readNetcdfVariable(obsfile, "tsl");
       tsl = reshape(tsl, [], ntime);
-      sdepth = double(ncread(obsfile, 'sdepth'));
+      % Source depths are stored as single precision in NetCDF. Round after
+      % conversion so JSON/MAT metadata records useful physical depths rather
+      % than binary floating-point noise such as 0.10000000149.
+      sdepth = round(double(ncread(obsfile, 'sdepth')), 4);
    else
       tsl = zeros(0, ntime);
       sdepth = zeros(0, 1);
@@ -153,20 +164,15 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
    variant_names = ["snd_auto", "snd_man", "snd_gap_auto", "snd_gap1_auto"];
    for c = variant_names
       if any(channels == c)
-         snd_variants.(c) = icemodel.verification.setup.readObsChannel( ...
+         snd_variants.(c) = icemodel.verification.setup.readNetcdfVariable( ...
             obsfile, c);
       end
    end
 
    % --- Optional time-window subset -----------------------------------
    idx = true(ntime, 1);
-   if ~strcmp(string(kwargs.startdate), "")
-      idx = idx & obs_time >= ...
-         icemodel.verification.setup.ensureUtc(kwargs.startdate);
-   end
-   if ~strcmp(string(kwargs.enddate), "")
-      idx = idx & obs_time <= ...
-         icemodel.verification.setup.ensureUtc(kwargs.enddate);
+   if has_window
+      idx = obs_time >= window_start & obs_time <= window_end;
    end
    if ~any(idx)
       error('icemodel:verification:buildEsmSnowmipObservations:emptyWindow', ...
@@ -249,10 +255,4 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
       'soil_depths_m', sdepth(:), ...
       'snow_depth_source', snow_depth_source, ...
       'swe_source', "snw_auto with snw_man fallback when available");
-end
-
-function pathname = defaultSourceDir()
-   %DEFAULTSOURCEDIR Default ESM-SnowMIP source-cache directory.
-   pathname = string(fullfile(icemodel.getpath('data'), ...
-      'verification', 'snow', 'esm_snowmip'));
 end

@@ -3,6 +3,16 @@
 Conventions specific to icemodel, extending the canonical `STYLE.md` (general +
 MATLAB). This file is project-owned — `--update` never overwrites it.
 
+## Project-local skill routing
+
+For numerical-regression or performance-baseline work, read and follow
+`.agents/skills/icemodel-baselines/SKILL.md` before acting.
+
+## Figure export
+
+Use `exportgraphics` for every saved MATLAB figure. Do not use `saveas`, `savefig`,
+or `print` for figure export; set `Resolution` appropriately (e.g., for rasters).
+
 ## Function naming (override of the canonical MATLAB rule)
 
 The canonical short-lowercase / camelCase-when-longer rule applies, with one

@@ -1,37 +1,74 @@
 # icemodel stuff
+data/preview/*
+data/figures/*
+data/test/*
 data/input/*
 data/eval/*
 data/output/*
 data/verification/**
 !data/.gitkeep
+!data/test/
+!data/test/.gitkeep
 !data/eval/
 !data/eval/.gitkeep
 !data/input/
 !data/input/.gitkeep
 !data/input/met/
+data/input/met/*
 !data/input/met/.gitkeep
 !data/input/spectral/
+data/input/spectral/*
 !data/input/spectral/.gitkeep
 !data/input/userdata/
+data/input/userdata/*
 !data/input/userdata/.gitkeep
 !data/output/
 !data/output/.gitkeep
 !data/verification/
 !data/verification/.gitkeep
-!data/verification/snow/
-!data/verification/snow/.gitkeep
-!data/verification/snow/esm_snowmip/
-!data/verification/snow/esm_snowmip/.gitkeep
-!data/verification/snow/laugh_tests/
-!data/verification/snow/laugh_tests/.gitkeep
+!data/verification/esm_snowmip/
+!data/verification/esm_snowmip/.gitkeep
+!data/verification/laugh_tests/
+!data/verification/laugh_tests/.gitkeep
+!data/verification/promice/
+!data/verification/promice/.gitkeep
+!data/verification/sumup/
+!data/verification/sumup/.gitkeep
 demo/data/output/
+
+# The tracked demo tree contains only the six inputs used by the three public
+# examples. Verification and formal-test payloads belong under data/ and the
+# provisioned test/data capability, respectively.
+
+# Release-data staging. packFixtures writes versioned archives and the generated
+# data manifest here. These build artifacts must never be committed; publication
+# requires separate explicit approval.
+release-staging/
+
+# Release-provisioned formal, public-verification, and optional forcing payloads.
+test/data/
 test/artifacts/
 test/backups/
+test/baselines/archive/
 test/baselines/profiler/
 test/benchmarks/profiler/
-test/interactive/data/
-test/interactive/figures/
+# test/interactive is organized into per-theme subfolders. Each theme commits
+# its SCRIPT(s) (*.m) and AUTHORED report(s) (specific .md) but ignores its
+# generated outputs: figures/ holds images, artifacts/ holds generated tables
+# (markdown/csv); outputs/ and data/ are other generated stores. The committed
+# .m/.md files are exempted by the !patterns below.
+test/interactive/**/figures/
+test/interactive/**/artifacts/
+test/interactive/**/outputs/
+test/interactive/**/data/
+test/interactive/**/*.png
+test/interactive/*.png
+!test/interactive/**/*.m
+!test/interactive/**/*.md
 icemodel/dependencies/requirements.mat
+
+# CF Standard Name Table cache (fetched by icemodel.netcdf.defaults.cfStandardNames)
+.cache/
 
 # vscode
 .vscode
@@ -40,6 +77,10 @@ icemodel/dependencies/requirements.mat
 *~
 .DS_Store
 Desktop.ini
+
+# Un-ignore icemodel source files caught by a global "*Zone*" ignore rule
+# (case-insensitive on macOS, so surfacezone.m / validateSurfaceZone.m match).
+!icemodel/**/*[Zz]one*.m
 
 # Thumbnail cache files
 ._*

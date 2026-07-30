@@ -8,10 +8,9 @@ function report_path = writeRunReport(run_dir, case_results, cases, kwargs)
    %
    %  Produces a single human-readable report at <run_dir>/report.md
    %  that ties the run's case-level metrics, comparison figures, and
-   %  scatter figures together. Designed for the snow-model
-   %  development feedback loop: an agent or developer can open this
-   %  one file after a run and immediately see (1) whether all cases
-   %  ran, (2) per-case metric headlines, and (3) where to find the
+   %  scatter figures together. Designed for the snow-model development
+   %  feedback loop: one file shows (1) whether all cases ran, (2) per-case
+   %  metric headlines, and (3) where to find the
    %  underlying figures and per-case CSVs.
    %
    %  Inputs
@@ -164,9 +163,9 @@ function window = caseWindow(cases, case_id)
    match = string({cases.case_id}) == string(case_id);
    if any(match)
       c = cases(find(match, 1));
-      if isfield(c, 'comparison_window') && isstruct(c.comparison_window)
-         window = sprintf("%s..%s", string(c.comparison_window.start), ...
-            string(c.comparison_window.end));
+      if isfield(c, 'period') && isstruct(c.period)
+         window = sprintf("%s..%s", string(c.period.start), ...
+            string(c.period.end));
       else
          window = "?";
       end

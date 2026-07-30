@@ -4,12 +4,10 @@
 cff-version: 1.2.0
 title: IceModel
 message: >-
-  If you use this software, please cite it using the 
-  metadata from the CITATION.cff file. If the CITATION.cff 
-  file is accessed from a release archive, the DOI and commit 
-  hash in the file reference the pre-release (labeled "alpha") 
-  immediately prior to the full release. Please cite using the 
-  full-release DOI as listed on Zenodo.
+  If you use this software, please cite it using the metadata
+  from this file. Use the version-specific DOI listed for this
+  release on Zenodo when available; the concept DOI below
+  resolves to all versions.
 type: software
 authors:
   - given-names: Matthew G
@@ -17,9 +15,6 @@ authors:
     orcid: 'https://orcid.org/0000-0002-0165-209X'
     affiliation: 'Pacific Northwest National Laboratory'
 identifiers:
-  - description: "The versioned DOI for the latest version of IceModel"
-    type: doi
-    value: 10.5281/zenodo.12659658
   - description: "The concept DOI representing all versions of IceModel"
     type: doi
     value: 10.5281/zenodo.11539329
@@ -38,6 +33,6 @@ keywords:
   - meltwater
   - albedo
 license: BSD-3-Clause
-commit: a3907bef386c94b71d8c171d245d2ef0073164f1
-version: 1.0.1
-date-released: '2024-07-04'
+commit: b7b94b119ad574afb94d7c3fefc1eab91462d467
+version: 1.1
+date-released: '2026-07-30'

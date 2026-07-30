@@ -1,0 +1,83 @@
+---
+title: "Snow and firn artifact visual QA"
+format:
+  html:
+    toc: true
+    toc-depth: 3
+    embed-resources: false
+---
+
+This report indexes the accepted PROMICE, ESM-SnowMIP, and Laugh/Colbeck
+seasonal-snow figures plus the canonical RetMIP, IMAU, SUMup, and research-site
+firn figures. Images remain linked beneath `data/preview/figures`; they are not
+copied or embedded in the report.
+
+For PROMICE, the generated section pairs every site with the manifest's native
+forcing-ready decision, its recorded complete windows, required-channel
+finite/missing-sample counts, and per-variable coverage for native PROMICE,
+MAR, MERRA-2, and RACMO artifacts. Before any readiness or coverage table is
+generated, every audited artifact's SHA-256 and byte size must match its current
+bytes on disk; the manifest decision therefore comes from the exact audited
+manifest. Figure captions distinguish native/readiness views from daily
+diagnostic reductions so plot aggregation is not mistaken for staged-data
+missingness.
+
+ESM-SnowMIP sections likewise report every staged-met variable directly from
+the artifact-QA channel ledger. In all tables, **missing samples** are individual
+absent values, **contiguous missing runs** are distinct uninterrupted sequences,
+and **longest missing run** is the maximum sequence length in samples. These
+three audit metrics remain separate. The generated status section links both
+`artifact_qa.md` for a concise audit summary and `artifact_qa.json` for the
+complete machine-readable evidence.
+
+The firn appendix is authorized independently by the four-family artifact-QA
+result and the exact MATLAB figure ledger. The final report gate requires all
+62 accepted seasonal cases and all 56 accepted firn cases, with the firn ledger
+equal to the nested firn PNG tree. The appendix is added only after canonical
+promotion and the two-pass additive-convergence proof complete.
+
+The PROMICE `energy_balance` figure is an observational diagnostic, not the
+model-forcing readiness gate. Native userdata derives `swn = swd - swu`,
+`lwn = lwd - lwu`, `netr = swn + lwn`, and `thf = shf + lhf`; its plotted daily
+means require every expected native posting. Runtime met instead derives net
+shortwave from the required forcing pair `swd * (1 - albedo)`. Therefore a
+missing complete-day observational `swn` can reflect missing upwelling radiation
+or the strict daily reduction even when a separate required met channel is
+available. Use each site's manifest decision and `met_forcing` coverage table to
+judge standalone forcing readiness; use native-support figures and userdata
+coverage to judge evaluation suitability.
+
+MAR userdata intentionally stores source radiation components rather than
+duplicating quantities that the runtime derives. For visual comparison only,
+the report reconstructs only missing `swn = swd * (1 - albedo)`, computes a
+missing `lwn = icemodel.surface.net_longwave_radiation(tsfc, lwd)`, and then
+forms a missing `netr = swn + lwn`. The longwave helper uses the same surface
+emissivity and Kelvin temperature convention as `icemodel.processmet`.
+Existing native terms are preserved; this in-memory display derivation records
+its provenance and does not add or alter a channel in the staged artifact.
+
+Daily albedo is a source-aware visual-QA reduction with three source contracts.
+Radiometer source adapters screen low-sun ratios first, and the shared
+family-neutral plotter then requires a complete timestamp grid with at least six
+valid hours before computing the ratio of reflected to incoming daily shortwave
+energy. Native MAR/MERRA-2 modeled surface-state albedo instead uses an
+exact-grid arithmetic finite-sample daily mean and retains scientifically valid
+polar-night coverage. RACMO/model-ratio albedo remains an energy ratio: it uses
+positive incoming shortwave as its weight without the radiometer six-hour gate,
+and an all-zero-SWD polar-night day remains undefined rather than fabricating a
+surface state. Native daily products without collocated shortwave retain their
+finite values. Raw staged `swd`, `swu`, and modeled `albedo` are not replaced by
+these plot reductions.
+
+```{=html}
+<style>
+/* Keep wide diagnostics readable while allowing long artifact captions to wrap. */
+figure { margin: 1.5rem 0 2.5rem; }
+figure img { width: 100%; height: auto; border: 1px solid #ddd; }
+figcaption { margin-top: 0.35rem; overflow-wrap: anywhere; }
+.figure-interpretation { color: #444; }
+table { display: block; overflow-x: auto; white-space: nowrap; }
+</style>
+```
+
+{{< include ../../../../data/preview/report/figures.generated.md >}}

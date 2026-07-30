@@ -50,9 +50,10 @@ function series = remapPolygon(X, Y, block, P, kwargs)
    %    X, Y is a mixed form that mis-aligns, so the caller's cells-by-time
    %    block is reshaped to a 3-D meshgrid-oriented array here.
    %
-   % Dependency: the exactremap toolbox must be on the MATLAB path
-   % (icemodel.internal.installRequiredFiles handles this in a later pass;
-   % until then add toolboxes/libraries/spatial/exactremap/toolbox).
+   % Dependency: the exactremap toolbox must be on the MATLAB path. It lives
+   % in a sibling dev repo (projects/exactremap,
+   % https://github.com/mgcooper/exactremap); the test bootstrap
+   % (icemodel.test.helpers.bootstrapTestEnvironment) adds it automatically.
    %
    % See also: exactremap, icemodel.forcing.helpers.gridLocation
 
@@ -73,8 +74,9 @@ function series = remapPolygon(X, Y, block, P, kwargs)
 
    if isempty(which('exactremap'))
       error('icemodel:forcing:remapPolygon:exactremapMissing', ...
-         ['the exactremap toolbox is not on the MATLAB path; add ' ...
-         'toolboxes/libraries/spatial/exactremap/toolbox'])
+         ['the exactremap toolbox is not on the MATLAB path; add the ' ...
+         'exactremap dev repo (projects/exactremap/toolbox, ' ...
+         'https://github.com/mgcooper/exactremap)'])
    end
 
    % Reorient ndgrid -> meshgrid if X increases predominantly down dim 1

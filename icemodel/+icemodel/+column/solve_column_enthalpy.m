@@ -33,7 +33,7 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
    % T_2 = nan(size(T));
 
    % Iterate to solve the nonlinear heat equation
-   ok = true;
+   ok = false;
    for iter = 0:maxiter-1
 
       % Update vapor density and derivative [kg m-3, kg m-3 K-1]
@@ -62,6 +62,7 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
 
       % Exit here so the state variables are updated on the final iteration
       if all(abs(T - T_iter) < tol)
+         ok = true;
          break
       end
 
@@ -72,11 +73,11 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
       T = icemodel.numerics.trisolve(-aN, aP, -aS, b);
 
       % Update the temperature-enthalpy relationship (corrector step)
-      [T, f_ice, f_liq, ok] = icemodel.column.meltzone_transform( ...
-         T, T_iter, f_liq, f_wat, dFdT, f_liq_min, f_liq_max, iM, ok, debug);
+      [T, f_ice, f_liq, ok_mz] = icemodel.column.meltzone_transform( ...
+         T, T_iter, f_liq, f_wat, dFdT, f_liq_min, f_liq_max, iM, debug);
 
       % If failure, return to the main program and shorten the timestep
-      if ~ok
+      if ~ok_mz
          if debug
             dumpIceEnbalFailure("mztransform_rejected_state", T, ...
                T_ice_old, T_iter, f_ice, f_liq, f_wat, k_eff, Sc, dt, ...
@@ -104,7 +105,12 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
       % end
    end
 
-   ok = iter < maxiter;
+   % Exhausting the loop is a failed solve even though the zero-based loop
+   % index is maxiter-1. The caller then restores the accepted checkpoint,
+   % shortens dt, and retains its bounded force-advance fallback.
+   if ~ok
+      iter = maxiter;
+   end
 
    if ~ok && debug
       dumpIceEnbalFailure("maxiter_nonconvergence", T, T_ice_old, ...

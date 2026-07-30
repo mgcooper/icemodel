@@ -5,8 +5,9 @@ function cases = listcases(kwargs)
    %  cases = icemodel.verification.listcases(dataset_family="esm_snowmip")
    %
    % Inputs
+   %  data_root                  Whole data tree containing eval/ and input/.
    %  evaluation_data_root       Base evaluation-data root. When blank, the
-   %                             path is resolved from icemodel.config.
+   %                             repo-local data/eval tree is used.
    %  icemodel_config_casename   Config casename used to resolve the default
    %                             evaluation-data root without mutating config.
    %  dataset_family             Optional family filter, for example
@@ -21,17 +22,27 @@ function cases = listcases(kwargs)
    %  manifests and does not create or refresh staged data.
 
    arguments
+      kwargs.data_root (1, 1) string = ""
       kwargs.evaluation_data_root (1, 1) string = ""
-      kwargs.icemodel_config_casename (1, 1) string = "test"
+      kwargs.input_data_root (1, 1) string = ""
+      kwargs.icemodel_config_casename (1, 1) string = ""
       kwargs.dataset_family (1, 1) string ...
          {icemodel.verification.validators.mustBeDatasetFamilyFilter} = ""
    end
 
+   % Resolve the paired roots once so manifest and input paths always come from
+   % the same selected tree unless the caller explicitly supplied both leaves.
+   [evaluation_data_root, input_data_root] = ...
+      icemodel.verification.setup.resolveStagingRoots( ...
+      data_root=kwargs.data_root, ...
+      evaluation_data_root=kwargs.evaluation_data_root, ...
+      input_data_root=kwargs.input_data_root, ...
+      icemodel_config_casename=kwargs.icemodel_config_casename);
+
    % Discover family manifests first; all later filters operate on manifest
    % contents so the function stays independent of any hard-coded case list.
    manifest_files = icemodel.verification.helpers.familyManifestFiles( ...
-      "evaluation_data_root", kwargs.evaluation_data_root, ...
-      "icemodel_config_casename", kwargs.icemodel_config_casename);
+      "evaluation_data_root", evaluation_data_root);
 
    % Read each family manifest, apply optional filters, and keep only families
    % that contribute at least one case.
@@ -43,7 +54,7 @@ function cases = listcases(kwargs)
          continue
       end
 
-      group = resolveFamilyCases(family);
+      group = resolveFamilyCases(family, input_data_root);
       if isempty(group)
          continue
       end
@@ -60,11 +71,40 @@ function cases = listcases(kwargs)
    end
 
    % Sort by case id so runner and test output are stable across filesystems.
-   % All families share one canonical case-entry schema, so vertcat works
-   % without harmonization.
-   cases = vertcat(selected_family_cases{1:n_families});
+   % Snow (esm_snowmip/laugh_tests) and firn (promice/sumup) families carry
+   % different case-entry schemas - the forcing-agnostic firn schema adds
+   % site_location, period, forcing_sources/eval_sources, and colocation - so
+   % harmonize the field set to a common union before
+   % vertcat, filling family-absent fields with []. This keeps the snow lane
+   % byte-identical while letting the firn families be enumerated alongside.
+   groups = selected_family_cases(1:n_families);
+   groups = harmonizeCaseFields(groups);
+   cases = vertcat(groups{:});
    [~, order] = sort([cases.case_id]);
    cases = cases(order);
+end
+
+function groups = harmonizeCaseFields(groups)
+   %HARMONIZECASEFIELDS Give every case group the same field set for vertcat.
+   %
+   % Collects the union of field names across all family groups (preserving
+   % first-seen order), then adds any missing field as [] to each struct so
+   % vertcat across heterogeneous family schemas succeeds.
+
+   all_fields = strings(0, 1);
+   for k = 1:numel(groups)
+      all_fields = union(all_fields, string(fieldnames(groups{k})), 'stable');
+   end
+
+   for k = 1:numel(groups)
+      group = groups{k};
+      missing = setdiff(all_fields, string(fieldnames(group)), 'stable');
+      for f = reshape(missing, 1, [])
+         [group.(f)] = deal([]);
+      end
+      % Reorder fields to the common union so vertcat sees identical order.
+      groups{k} = orderfields(group, cellstr(all_fields));
+   end
 end
 
 function tf = skipFamily(family, dataset_family)
@@ -74,7 +114,7 @@ function tf = skipFamily(family, dataset_family)
       family.dataset_family ~= dataset_family;
 end
 
-function cases = resolveFamilyCases(family)
+function cases = resolveFamilyCases(family, input_data_root)
    %RESOLVEFAMILYCASES Resolve one family's case entries.
    %
    % family.cases may arrive as a scalar struct (single-case families
@@ -84,19 +124,24 @@ function cases = resolveFamilyCases(family)
    % column even when only one case exists.
 
    entries = reshape(family.cases, [], 1);
+   if isempty(entries)
+      cases = struct([]);
+      return
+   end
    if isscalar(entries)
-      cases = resolveCase(entries, family);
+      cases = resolveCase(entries, family, input_data_root);
       return
    end
 
-   resolved_rows = repmat(resolveCase(entries(1), family), numel(entries), 1);
+   resolved_rows = repmat(resolveCase(entries(1), family, input_data_root), ...
+      numel(entries), 1);
    for n = 1:numel(entries)
-      resolved_rows(n) = resolveCase(entries(n), family);
+      resolved_rows(n) = resolveCase(entries(n), family, input_data_root);
    end
    cases = resolved_rows;
 end
 
-function resolved = resolveCase(entry, family)
+function resolved = resolveCase(entry, family, input_data_root)
    %RESOLVECASE Combine family metadata with one case entry.
 
    % Copy case-local metadata first, then add family-level provenance.
@@ -108,21 +153,68 @@ function resolved = resolveCase(entry, family)
    resolved.retrieval_date = family.retrieval_date;
    resolved.manifest_path = family.manifest_path;
    resolved.family_root = family.family_root;
+   resolved.input_data_root = resolvedInputRoot(family.family_root, ...
+      input_data_root);
 
    % Resolve relative artifact paths at read time so manifests stay portable
-   % inside demo/data while workflow functions receive absolute paths.
+   % across scoped data roots while workflow functions receive absolute paths. The firn
+   % families bundle their eval target as observations.mat: promice references it
+   % via evaluation_file, SUMup references it via colocation.sumup.obs_file, so
+   % resolve that to evaluation_path when no evaluation_file is declared. (Legacy
+   % promice fixtures predating the bundle leave both empty and fall back to the
+   % per-year userdata reconstitution downstream.)
    resolved.evaluation_path = resolveCasePath(family.family_root, entry, ...
       'evaluation_file');
+   if strlength(resolved.evaluation_path) == 0
+      resolved.evaluation_path = resolveObsFile(family.family_root, entry);
+   end
    resolved.reference_path = resolveCasePath(family.family_root, entry, ...
       'reference_file');
 end
 
+function input_root = resolvedInputRoot(family_root, input_data_root)
+   %RESOLVEDINPUTROOT Prefer explicit input roots over sibling inference.
+   if input_data_root ~= ""
+      input_root = char(input_data_root);
+   else
+      input_root = siblingInputRoot(family_root);
+   end
+end
+
+function input_root = siblingInputRoot(family_root)
+   %SIBLINGINPUTROOT Infer the paired input root from an eval family root.
+   eval_root = fileparts(string(family_root));
+   output_root = fileparts(eval_root);
+   input_root = char(fullfile(output_root, 'input'));
+end
+
+function pathname = resolveObsFile(family_root, entry)
+   %RESOLVEOBSFILE Resolve a SUMup case observation-bundle path.
+   %
+   % SUMup firn cases reference their committed observation profile bundle via
+   % colocation.sumup.obs_file (a family-root-relative path). Resolve it to an
+   % absolute path so workflow code receives the obs bundle the same way other
+   % families receive evaluation_file.
+
+   pathname = "";
+   if isfield(entry, 'colocation') && isstruct(entry.colocation) ...
+         && isfield(entry.colocation, 'sumup') ...
+         && isstruct(entry.colocation.sumup) ...
+         && isfield(entry.colocation.sumup, 'obs_file')
+      pathname = fullfile(family_root, string(entry.colocation.sumup.obs_file));
+   end
+end
+
 function pathname = resolveCasePath(family_root, entry, fieldname)
    %RESOLVECASEPATH Resolve one optional relative manifest path.
+   %
+   % An absent field or an empty relative path resolves to "" (no bundle).
+   % The firn families leave reference_file empty (esm_snowmip) or omit it
+   % entirely (promice/sumup); both must yield "" rather than the bare
+   % family_root so downstream existence checks fall through cleanly.
 
-   if isfield(entry, fieldname)
+   pathname = "";
+   if isfield(entry, fieldname) && strlength(string(entry.(fieldname))) > 0
       pathname = fullfile(family_root, entry.(fieldname));
-   else
-      pathname = "";
    end
 end

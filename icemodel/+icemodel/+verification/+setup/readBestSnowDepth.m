@@ -14,14 +14,14 @@ function [values, source] = readBestSnowDepth(pathname)
    %    values : double column [m]
    %    source : string identifying which channel was used
    %
-   % See also: icemodel.verification.setup.readObsChannel
+   % See also: icemodel.verification.setup.readNetcdfVariable
 
    info = ncinfo(pathname);
    names = string({info.Variables.Name});
    candidates = ["snd_auto", "snd_gap_auto", "snd_gap1_auto", "snd_man"];
    for c = candidates
       if any(names == c)
-         values = icemodel.verification.setup.readObsChannel(pathname, c);
+         values = icemodel.verification.setup.readNetcdfVariable(pathname, c);
          source = c;
          return
       end

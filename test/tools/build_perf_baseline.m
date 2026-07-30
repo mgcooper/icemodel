@@ -20,8 +20,8 @@ function PerfBaseline = build_perf_baseline(kwargs)
    % spinup year plus one retained output year when the case matrix carries
    % only SIMYEAR.
    %
-   % The saved MAT file also carries the managed core benchmark timings and,
-   % by default, a saved profiler report from a separate diagnostic rerun.
+   % The saved MAT file also carries the managed core benchmark timings.
+   % Profiler artifacts are an explicit, single-model diagnostic opt-in.
    %
    % A custom OUTPUT_FILE is supported only when SMBMODEL resolves to one
    % concrete formal model. Multi-model requests write the managed per-model
@@ -75,7 +75,7 @@ function PerfBaseline = build_perf_baseline(kwargs)
          = "default"
 
       kwargs.include_profile_artifacts (1, 1) logical ...
-         = true
+         = false
 
       kwargs.profile_history_size (1, 1) double {mustBeInteger, ...
          mustBePositive} ...
@@ -89,6 +89,9 @@ function PerfBaseline = build_perf_baseline(kwargs)
    % when this entrypoint returns.
    [~, ~, ~, ~, suite_cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>
+
+   % Baseline timings must never inherit an interactive profiler.
+   profile off
 
    % Deal out inputs.
    [baseline, baseline_tag, tier, smbmodel, solver, simyear, smoke_sites, ...
@@ -107,6 +110,14 @@ function PerfBaseline = build_perf_baseline(kwargs)
 
    % Expand the requested formal model selector once at the entrypoint.
    models = icemodel.test.helpers.resolveRequestedSmbmodels(smbmodel);
+
+   % Profiling more than one model in one process would warm code and data
+   % before the later model's timing pass. Keep that diagnostic isolated.
+   if include_profile_artifacts && numel(models) > 1
+      error("icemodel:test:profileRequiresSingleModel", ...
+         ['include_profile_artifacts=true requires one concrete smbmodel. ', ...
+         'Run each profiled model in a fresh MATLAB process.'])
+   end
 
    % A custom output file is only coherent for one concrete model build.
    if numel(models) > 1 && ~isblanktext(output_file)
@@ -141,6 +152,10 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
       "perf", baseline, baseline_tag, tier, smbmodel, output_file, simyear, ...
       solver, smoke_sites, full_sites);
    testdir = icemodel.getpath('test');
+
+   % Accepted wall-clock measurements must not inherit profiler state from an
+   % interactive session or a preceding diagnostic call.
+   profile off
 
    % Set up the formal perf class and one fixed-sample experiment that will
    % be reused across the accepted case matrix.

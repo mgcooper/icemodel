@@ -8,11 +8,15 @@ function result = comparecase(case_id, kwargs)
    %
    % Inputs
    %  case_id                    Staged verification case id.
-   %  evaluation_data_root       Base evaluation-data root. When blank, the
-   %                             path is resolved from icemodel.config.
-   %  icemodel_config_casename   Config casename used to resolve the default
-   %                             evaluation-data root without mutating config.
-   %  artifact_dir               Optional folder where metrics, aligned series,
+%  data_root                  Whole data tree containing eval/ and input/.
+%  evaluation_data_root       Base evaluation-data root. When blank, the
+%                             repo-local data/eval tree is used.
+%  input_data_root            Optional paired input-data root for staged
+%                             met/userdata artifacts.
+%  icemodel_config_casename   Config casename used to resolve the default
+%                             evaluation-data root without mutating config.
+%  dataset_family             Optional family filter for shared case ids.
+%  artifact_dir               Optional folder where metrics, aligned series,
    %                             and figures are written.
    %  candidate                  Optional in-memory candidate bundle.
    %  candidate_file             Optional MAT file containing `candidate` or
@@ -33,8 +37,11 @@ function result = comparecase(case_id, kwargs)
 
    arguments
       case_id (1, :) string
+      kwargs.data_root (1, 1) string = ""
       kwargs.evaluation_data_root (1, 1) string = ""
-      kwargs.icemodel_config_casename (1, 1) string = "test"
+      kwargs.input_data_root (1, 1) string = ""
+      kwargs.icemodel_config_casename (1, 1) string = ""
+      kwargs.dataset_family (1, 1) string = ""
       kwargs.artifact_dir (1, 1) string = ""
       kwargs.candidate = []
       kwargs.candidate_file (1, 1) string = ""
@@ -46,13 +53,30 @@ function result = comparecase(case_id, kwargs)
    % Resolve the case manifest first; all downstream artifact paths and
    % comparison variables come from this single contract.
    manifest = icemodel.verification.loadmanifest(case_id, ...
+      "data_root", kwargs.data_root, ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
-      "icemodel_config_casename", kwargs.icemodel_config_casename);
+      "input_data_root", kwargs.input_data_root, ...
+      "icemodel_config_casename", kwargs.icemodel_config_casename, ...
+      "dataset_family", kwargs.dataset_family);
 
    % Load the target and candidate bundles. With no candidate supplied, the
    % staged smoke reference is used so the suite runs before a snow model exists.
-   targets = icemodel.verification.helpers.loadArtifact( ...
-      manifest.evaluation_path, "targets");
+   % The eval target is a forcing-agnostic, data-only observations.mat bundle
+   % referenced via evaluation_file/evaluation_path (ESM-SnowMIP, SUMup, and
+   % freshly staged PROMICE cases); Snow/Colbeck cases load their evaluation.mat
+   % the same way. Only PROMICE fixtures staged before the observations.mat
+   % contract lack that file; they fall back to reconstituting the PROMICE-obs
+   % target on demand from the staged per-year userdata files the manifest
+   % declares.
+   if isfield(manifest, 'evaluation_path') ...
+         && strlength(string(manifest.evaluation_path)) > 0 ...
+         && isfile(manifest.evaluation_path)
+      targets = icemodel.verification.helpers.loadArtifact( ...
+         manifest.evaluation_path, "targets");
+   else
+      targets = icemodel.verification.helpers.loadColocatedData( ...
+         manifest, "promice");
+   end
 
    % Some cases stage multiple target sources keyed under one evaluation.mat
    % (e.g. colbeck1976 carries numerical_summa and analytical_clark2017).
@@ -75,9 +99,26 @@ function result = comparecase(case_id, kwargs)
          [metrics, aligned] = compareExperimentBundle( ...
             targets.experiments, candidate.experiments, ...
             manifest.comparison_variables);
+      case "subsurface_profile_bundle"
+         matches = icemodel.verification.matchObservations( ...
+            targets.data, candidate.data, ...
+            variables=string(manifest.comparison_variables));
+         metrics = matches.metrics;
+         aligned = matches.aligned;
+      case "retmip_protocol_bundle"
+         [metrics, aligned] = compareRetmipProtocolBundle( ...
+            targets.data, candidate.data, manifest.comparison_variables);
       otherwise
          error('unsupported verification target format: %s', targets.format)
    end
+
+   % Acceptance-gate mode is keyed by case_type, not by family. comparecase
+   % itself only emits diagnostic metrics (per-variable status + bias/RMSE);
+   % the hard PASS/FAIL tolerance gate lives in colbeck.compareSolutions for
+   % synthetic_process verification cases. firn_observational and esm_site are
+   % SOFT (diagnostic only) - they report metrics and never hard-fail here, so
+   % a missing or noisy firn observation lane cannot break the suite.
+   gate_mode = acceptanceGateMode(manifest);
 
    % Artifact writing is optional so the same function can serve interactive
    % checks and batch smoke-suite runs.
@@ -111,8 +152,11 @@ function result = comparecase(case_id, kwargs)
 
          f = icemodel.verification.plotcase( ...
             case_id, ...
+            "data_root", kwargs.data_root, ...
             "evaluation_data_root", kwargs.evaluation_data_root, ...
+            "input_data_root", kwargs.input_data_root, ...
             "icemodel_config_casename", kwargs.icemodel_config_casename, ...
+            "dataset_family", kwargs.dataset_family, ...
             "source", "compare", ...
             "candidate", candidate, ...
             "visible", kwargs.plot_visible, ...
@@ -133,9 +177,12 @@ function result = comparecase(case_id, kwargs)
 
          f = icemodel.verification.plotscatter( ...
             case_id, ...
-            "evaluation_data_root", kwargs.evaluation_data_root, ...
-            "icemodel_config_casename", kwargs.icemodel_config_casename, ...
-            "candidate", candidate, ...
+               "data_root", kwargs.data_root, ...
+               "evaluation_data_root", kwargs.evaluation_data_root, ...
+               "input_data_root", kwargs.input_data_root, ...
+               "icemodel_config_casename", kwargs.icemodel_config_casename, ...
+               "dataset_family", kwargs.dataset_family, ...
+               "candidate", candidate, ...
             "visible", kwargs.plot_visible, ...
             "output_file", scatter_figure_path);
 
@@ -150,10 +197,32 @@ function result = comparecase(case_id, kwargs)
       'case_id', case_id, ...
       'manifest', manifest, ...
       'metrics', metrics, ...
+      'aligned', aligned, ...
+      'gate_mode', gate_mode, ...
       'artifact_dir', artifact_dir, ...
       'metrics_path', metrics_path, ...
       'figure_path', figure_path, ...
       'scatter_figure_path', scatter_figure_path);
+end
+
+function gate_mode = acceptanceGateMode(manifest)
+   %ACCEPTANCEGATEMODE Classify a case's acceptance gate by case_type.
+   %
+   % "hard"        synthetic_process - formal RMSE tolerances apply (Colbeck;
+   %               gated in colbeck.compareSolutions, not here).
+   % "soft"        esm_site / firn_observational - diagnostic metrics only,
+   %               no hard PASS/FAIL. This is the firn observational contract:
+   %               report bias/RMSE/correlation, never gate the suite.
+   case_type = "";
+   if isfield(manifest, "case_type")
+      case_type = string(manifest.case_type);
+   end
+   switch case_type
+      case "synthetic_process"
+         gate_mode = "hard";
+      otherwise
+         gate_mode = "soft";
+   end
 end
 
 function [metrics, aligned] = compareTimeseriesBundle(target_tt, candidate_tt, ...
@@ -212,6 +281,195 @@ function [metrics, aligned] = compareExperimentBundle(targets, candidates, ...
 
    metrics = struct2table(rows);
    aligned = cell2struct(aligned_groups, target_names, 1);
+end
+
+function [metrics, aligned] = compareRetmipProtocolBundle(targets, candidates, ...
+      variable_names)
+   %COMPARERETMIPPROTOCOLBUNDLE Compare RetMIP protocol surface/profile axes.
+
+   n_vars = numel(variable_names);
+   rows = repmat(metricRowTemplate(), n_vars, 1);
+   aligned_cells = cell(n_vars, 1);
+   for n = 1:n_vars
+      [rows(n), aligned_cells{n}] = compareOneRetmipProtocolVariable( ...
+         targets, candidates, variable_names(n));
+   end
+
+   metrics = struct2table(rows);
+   aligned = cell2struct(aligned_cells, variable_names, 1);
+end
+
+function [row, aligned] = compareOneRetmipProtocolVariable(targets, ...
+      candidates, varname)
+   %COMPAREONERETMIPPROTOCOLVARIABLE Compare one RetMIP protocol axis.
+   row = metricRowTemplate();
+   row.variable = varname;
+   row.experiment = "";
+   aligned = table();
+
+   target_series = retmipProtocolSeries(targets, varname);
+   if isempty(target_series.values)
+      row.status = "missing_target_variable";
+      return
+   end
+   candidate_series = retmipProtocolSeries(candidates, varname);
+   if isempty(candidate_series.values)
+      row.status = "missing_candidate_variable";
+      return
+   end
+
+   [target, candidate, aligned] = alignComparableSeries( ...
+      target_series, candidate_series);
+
+   row.n = uint64(numel(target));
+   if isempty(target)
+      row.status = "no_overlap";
+      return
+   end
+
+   delta = candidate - target;
+   row.bias = mean(delta);
+   row.rmse = sqrt(mean(delta .^ 2));
+   if numel(target) > 1 && std(target) > 0 && std(candidate) > 0
+      C = corrcoef(target, candidate);
+      row.correlation = C(1, 2);
+   end
+   row.peak_target = max(target);
+   row.peak_candidate = max(candidate);
+   row.peak_error = row.peak_candidate - row.peak_target;
+   row.status = "ok";
+end
+
+function series = retmipProtocolSeries(bundle, varname)
+   %RETMIPPROTOCOLSERIES Extract one RetMIP axis with its comparison coordinate.
+   series = emptyComparableSeries();
+   if ~isstruct(bundle)
+      return
+   end
+   if isfield(bundle, 'surface')
+      series = tableVariableSeries(bundle.surface, retmipAliases(varname));
+   end
+   if ~isempty(series.values) || ~isfield(bundle, 'profiles') ...
+         || ~isstruct(bundle.profiles)
+      return
+   end
+   profiles = bundle.profiles;
+   names = fieldnames(profiles);
+   for k = 1:numel(names)
+      series = tableVariableSeries(profiles.(names{k}), retmipAliases(varname));
+      if ~isempty(series.values)
+         return
+      end
+   end
+end
+
+function aliases = retmipAliases(varname)
+   %RETMIPALIASES Return RetMIP protocol/profile column aliases.
+   switch string(varname)
+      case "density"
+         aliases = ["density", "density_kgm3", "rho"];
+      case "subsurface_temperature"
+         aliases = ["subsurface_temperature", "temp", "T"];
+      case "lwc"
+         aliases = ["lwc", "LWC", "liquid_water_content"];
+      otherwise
+         aliases = string(varname);
+   end
+end
+
+function series = tableVariableSeries(tbl, aliases)
+   %TABLEVARIABLESERIES Extract a numeric table column and its coordinate axis.
+   series = emptyComparableSeries();
+   if ~(istable(tbl) || istimetable(tbl))
+      return
+   end
+   names = string(tbl.Properties.VariableNames);
+   hit = aliases(find(ismember(aliases, names), 1));
+   if isempty(hit) || ~isnumeric(tbl.(char(hit)))
+      return
+   end
+   idx = find(names == hit, 1, 'first');
+   series.variable = string(hit);
+   if ~isempty(idx) && numel(tbl.Properties.VariableUnits) >= idx
+      series.units = string(tbl.Properties.VariableUnits{idx});
+   end
+   series.values = double(tbl.(char(hit))(:));
+   depth_hit = depthTableVariable(names);
+   if strlength(depth_hit) > 0 && isnumeric(tbl.(char(depth_hit))) ...
+         && numel(tbl.(char(depth_hit))) == numel(series.values)
+      % Profile bundles can be timetables with a depth column; compare those
+      % by profile depth, not by coincidental observation timestamps.
+      series.axis = double(tbl.(char(depth_hit))(:));
+      series.axis_kind = "depth";
+      return
+   end
+   if istimetable(tbl)
+      series.axis = tbl.Properties.RowTimes;
+      series.axis_kind = "time";
+      return
+   end
+   interval_hit = intervalTableVariables(tbl, names);
+   if all(strlength(interval_hit) > 0)
+      series.axis = [tbl.(char(interval_hit(1)))(:), ...
+         tbl.(char(interval_hit(2)))(:)];
+      series.axis_kind = "interval";
+      return
+   end
+   time_hit = datetimeTableVariable(tbl, names);
+   if strlength(time_hit) > 0
+      series.axis = tbl.(char(time_hit));
+      series.axis_kind = "time";
+      return
+   end
+end
+
+function series = emptyComparableSeries()
+   %EMPTYCOMPARABLESERIES Prototype for aligned soft-comparison values.
+   series = struct('values', [], 'axis', [], 'axis_kind', "", ...
+      'variable', "", 'units', "");
+end
+
+function [target, candidate, aligned] = alignComparableSeries( ...
+      target_series, candidate_series)
+   %ALIGNCOMPARABLESERIES Align values by their declared comparison axis.
+   [target, candidate, aligned] = ...
+      icemodel.verification.helpers.alignObservationSeries( ...
+      target_series, candidate_series);
+end
+
+function hit = intervalTableVariables(tbl, names)
+   %INTERVALTABLEVARIABLES Return start/end datetime columns for intervals.
+   hit = strings(1, 2);
+   if all(ismember(["start_date", "end_date"], names)) ...
+         && isdatetime(tbl.start_date) && isdatetime(tbl.end_date)
+      hit = ["start_date", "end_date"];
+   end
+end
+
+function hit = datetimeTableVariable(tbl, names)
+   %DATETIMETABLEVARIABLE Return the first datetime table variable.
+   hit = "";
+   preferred = ["time", "Time"];
+   preferred_hit = preferred(find(ismember(preferred, names), 1));
+   if ~isempty(preferred_hit) && isdatetime(tbl.(char(preferred_hit)))
+      hit = preferred_hit;
+      return
+   end
+   for n = 1:numel(names)
+      if isdatetime(tbl.(char(names(n))))
+         hit = names(n);
+         return
+      end
+   end
+end
+
+function hit = depthTableVariable(names)
+   %DEPTHTABLEVARIABLE Return the first recognized profile-depth column.
+   depth_names = ["depth", "midpoint", "z", "depth_m", "midpoint_m"];
+   hit = depth_names(find(ismember(depth_names, names), 1));
+   if isempty(hit)
+      hit = "";
+   end
 end
 
 function [row, sync_tt] = compareOneVariable(target_tt, candidate_tt, ...

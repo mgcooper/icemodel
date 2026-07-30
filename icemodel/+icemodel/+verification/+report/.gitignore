@@ -1,0 +1,4 @@
+# Keep local Python and Quarto scratch products out of the tracked report source.
+__pycache__/
+/.quarto/
+**/*.quarto_ipynb

@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# Stage small NetCDF source fixtures for fast RCM verification tests.
+#
+# This is a one-time maintainer script. It creates a source-like tree under
+# test/data/forcing so tests can point MAR/MERRA/RACMO/MODIS builders at small
+# files instead of the production archives. MAR and GEUS MODIS readers currently
+# infer timestamps from the filename year plus record count, so this script
+# stages a Jan-1 prefix window by default; change the readers before staging a
+# non-prefix month.
+
+set -euo pipefail
+
+# Keep paths configurable so the same script works with S03 or a local cache.
+repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+out_root="${ICEMODEL_TEST_NC_ROOT:-"$repo_root/test/data/forcing"}"
+year="${ICEMODEL_TEST_NC_YEAR:-2012}"
+days="${ICEMODEL_TEST_NC_DAYS:-31}"
+month="${ICEMODEL_TEST_NC_MONTH:-01}"
+mar_src="${ICEMODEL_MAR_SOURCE:-/Volumes/S03/DATA/greenland/mar3p11/RUH2}"
+merra_src="${ICEMODEL_MERRA_SOURCE:-/Volumes/S03/DATA/merra2/1hrly/ncfiles}"
+racmo_src="${ICEMODEL_RACMO_SOURCE:-/Volumes/S03/DATA/greenland/racmo2p3/subsurface}"
+racmo_topo="${ICEMODEL_RACMO_TOPO_SOURCE:-$(dirname "$racmo_src")/FGRN11-topography_icemask.nc}"
+modis_src="${ICEMODEL_MODIS_SOURCE:-/Volumes/S03/DATA/greenland/geus/albedo/gris}"
+
+# ncks is the only non-base tool needed; copying MERRA daily files uses cp.
+if ! command -v ncks >/dev/null 2>&1; then
+  echo "ncks not found. Install NCO first, e.g. 'brew install nco'." >&2
+  exit 127
+fi
+
+# Do not silently create misdated MAR/MODIS fixtures with the current readers.
+if [[ "$month" != "01" ]]; then
+  echo "Only January prefix windows are safe until MAR/MODIS readers use file time variables." >&2
+  exit 2
+fi
+
+# RACMO point and conservative-remap fixtures require the companion native-grid
+# topography and ice mask, so fail before creating a partial staged tree.
+if [[ ! -f "$racmo_topo" ]]; then
+  echo "Missing RACMO FGRN11 topography/mask source file: $racmo_topo" >&2
+  exit 1
+fi
+
+# Convert the prefix-day count into zero-based inclusive NetCDF record ranges.
+last_day=$((days - 1))
+printf -v yyyymm "%04d%02d" "$year" "$month"
+
+mar_out="$out_root/mar"
+merra_out="$out_root/merra2"
+racmo_out="$out_root/racmo"
+modis_out="$out_root/geus/albedo/gris"
+mkdir -p "$mar_out" "$merra_out" "$racmo_out" "$modis_out"
+
+# Keep the staged tree coherent when maintainers rerun the script with a
+# different year/window; stale files would otherwise expand the test window.
+rm -f "$mar_out"/MARv3.11-ERA5-15km-*.nc
+rm -f "$racmo_out"/*.RACMO*.nc
+rm -f "$modis_out"/Greenland_Reflectivity_*_5km_C6.nc
+
+# MAR is yearly with daily TIME records and hourly variables shaped with ATMXH.
+# Keep only variables used by buildMarData plus the grid/static fields it needs.
+mar_file="$mar_src/MARv3.11-ERA5-15km-$year.nc"
+mar_vars="LON,LAT,SH,SLO,SRF,TIME,TIME_bnds,TTH,QQH,UUH,VVH,SWDH,LWDH,ALH,SFH,RFH,MEH,RUH,SHFH,LHFH,SMBH,SHSN2,CC,ST,SP"
+if [[ ! -f "$mar_file" ]]; then
+  echo "Missing MAR source file: $mar_file" >&2
+  exit 1
+fi
+ncks -O -v "$mar_vars" -d TIME,0,"$last_day" \
+  "$mar_file" "$mar_out/$(basename "$mar_file")"
+
+# MERRA is already one file per day per collection. Copy the requested month
+# files exactly; buildMerraData will read only these daily files from the tree.
+for collection in slv rad flx glc; do
+  mkdir -p "$merra_out/$collection"
+  rm -f "$merra_out/$collection"/*_Nx.*.nc4*
+  shopt -s nullglob
+  files=("$merra_src/$collection"/*_Nx."$yyyymm"*.nc4*)
+  shopt -u nullglob
+  if (( ${#files[@]} != days )); then
+    echo "Expected $days MERRA $collection files for $yyyymm, found ${#files[@]}." >&2
+    exit 1
+  fi
+  cp -p "${files[@]}" "$merra_out/$collection/"
+done
+
+# RACMO is one multi-year file per variable. The archive starts in 2012, so the
+# shared January 2012 fixture is a prefix slice and needs no custom time offset.
+racmo_vars=(swsd lwsd swsn lwsn senf latf precip snowmelt runoff smb refreeze subl sndiv meltin)
+racmo_records=$((days * 8))
+racmo_last=$((racmo_records - 1))
+for var in "${racmo_vars[@]}"; do
+  shopt -s nullglob
+  matches=("$racmo_src/$var".RACMO*.nc)
+  shopt -u nullglob
+  if (( ${#matches[@]} != 1 )); then
+    echo "Expected one RACMO file for $var in $racmo_src, found ${#matches[@]}." >&2
+    exit 1
+  fi
+  ncks -O -d time,0,"$racmo_last" "${matches[0]}" "$racmo_out/$(basename "${matches[0]}")"
+done
+
+# RACMO conservative remap and elevation metadata use the required companion.
+cp -p "$racmo_topo" "$racmo_out/../$(basename "$racmo_topo")"
+
+# GEUS MODIS is one file per year with its day dimension named ncl2.
+modis_file="$modis_src/Greenland_Reflectivity_${year}_5km_C6.nc"
+if [[ ! -f "$modis_file" ]]; then
+  echo "Missing GEUS MODIS source file: $modis_file" >&2
+  exit 1
+fi
+ncks -O -v albedo,lat,lon,icemask,dem -d ncl2,0,"$last_day" \
+  "$modis_file" "$modis_out/$(basename "$modis_file")"
+
+echo "Staged fast NetCDF fixtures in $out_root"

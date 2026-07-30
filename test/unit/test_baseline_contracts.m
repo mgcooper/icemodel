@@ -153,6 +153,28 @@ function test_setModelOptsForCase_defaults_to_two_year_contract(testCase)
    testCase.verifyEqual(opts.output_years, 2016);
 end
 
+function test_summarizeIce1Metrics_prefers_full_surface_residual(testCase)
+   % Regression closure must use the diagnosed full SEB residual rather than
+   % the algebraically closed shortwave-partition identity from postprocess.
+
+   Time = datetime(2026, 1, 1) + hours(0:1)';
+   balance = [3; -4];
+   Qbal = zeros(2, 1);
+   ice1 = timetable(Time, balance, Qbal);
+
+   metrics = icemodel.test.helpers.summarizeIce1Metrics(ice1);
+   testCase.verifyEqual(metrics.closure_seb_mae, 3.5);
+   testCase.verifyEqual(metrics.closure_seb_rmse, sqrt(12.5), ...
+      AbsTol=1e-12);
+   testCase.verifyEqual(metrics.closure_seb_max_abs, 4);
+
+   % Keep compatibility with older outputs that expose only Qbal.
+   legacy = removevars(ice1, "balance");
+   legacy.Qbal = [1; -2];
+   legacy_metrics = icemodel.test.helpers.summarizeIce1Metrics(legacy);
+   testCase.verifyEqual(legacy_metrics.closure_seb_max_abs, 2);
+end
+
 function test_bootstrapTestEnvironment_restores_caller_config(testCase)
    % The suite bootstrap should install the canonical demo config for the
    % run, then restore the caller's previous config on cleanup.

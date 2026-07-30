@@ -3,6 +3,10 @@ function f = plotscatter(case_id, kwargs)
    %
    %  f = icemodel.verification.plotscatter("wfj", candidate=candidate)
    %
+   % DATA_ROOT selects one tree containing eval/ and input/. Explicit leaf roots
+   % or ICEMODEL_CONFIG_CASENAME provide the same nonmutating scoped selection
+   % accepted by plotcase and comparecase.
+   %
    % This companion to plotcase is intentionally limited to time-series site
    % cases. Current synthetic-process cases such as Colbeck are better reviewed
    % as time-series/process panels until analytical profile or flux targets are
@@ -10,8 +14,11 @@ function f = plotscatter(case_id, kwargs)
 
    arguments
       case_id (1, :) string
+      kwargs.data_root (1, 1) string = ""
       kwargs.evaluation_data_root (1, 1) string = ""
-      kwargs.icemodel_config_casename (1, 1) string = "test"
+      kwargs.input_data_root (1, 1) string = ""
+      kwargs.icemodel_config_casename (1, 1) string = ""
+      kwargs.dataset_family (1, 1) string = ""
       kwargs.variables string = strings(0, 1)
       kwargs.candidate = []
       kwargs.candidate_file (1, 1) string = ""
@@ -20,10 +27,23 @@ function f = plotscatter(case_id, kwargs)
    end
 
    manifest = icemodel.verification.loadmanifest(case_id, ...
+      "data_root", kwargs.data_root, ...
       "evaluation_data_root", kwargs.evaluation_data_root, ...
-      "icemodel_config_casename", kwargs.icemodel_config_casename);
-   targets = icemodel.verification.helpers.loadArtifact( ...
-      manifest.evaluation_path, "targets");
+      "input_data_root", kwargs.input_data_root, ...
+      "icemodel_config_casename", kwargs.icemodel_config_casename, ...
+      "dataset_family", kwargs.dataset_family);
+   % The eval target is the data-only observations.mat bundle referenced via
+   % evaluation_path; only PROMICE fixtures staged before that contract fall
+   % back to reconstituting the PROMICE-obs target from the per-year userdata.
+   if isfield(manifest, 'evaluation_path') ...
+         && strlength(string(manifest.evaluation_path)) > 0 ...
+         && isfile(manifest.evaluation_path)
+      targets = icemodel.verification.helpers.loadArtifact( ...
+         manifest.evaluation_path, "targets");
+   else
+      targets = icemodel.verification.helpers.loadColocatedData( ...
+         manifest, "promice");
+   end
    if ~isfield(targets, 'format') && isfield(targets, 'numerical_summa')
       % Multi-source schema (e.g. colbeck1976): default to numerical_summa.
       targets = targets.numerical_summa;

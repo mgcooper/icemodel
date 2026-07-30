@@ -18,6 +18,20 @@ function displayRegressionSummary(report)
       return
    end
 
+   % Accepted baseline tables contain current scalar values but no compare-only
+   % baseline columns. Display their compact stored contract directly.
+   vars = string(report.Properties.VariableNames);
+   if ~ismember("baseline_runoff_final", vars)
+      keep = intersect(["case_id", "runoff_final", "melt_final", ...
+         "runoff_eval", "melt_eval", "mean_Tice_numiter", ...
+         "max_Tice_numiter", "n_not_converged", "closure_seb_rmse", ...
+         "closure_seb_max_abs"], vars, 'stable');
+      if ~isempty(keep)
+         disp(report(:, keep))
+      end
+      return
+   end
+
    pairs = {
       'runoff_final', 'baseline_runoff_final', 'runoff_pct_delta', ...
          'runoff', 'baseline', 'pct_delta'
@@ -37,7 +51,6 @@ function displayRegressionSummary(report)
       baseline_label = pairs{k, 5};
       pct_label = pairs{k, 6};
 
-      vars = string(report.Properties.VariableNames);
       if ~all(ismember({current_var, baseline_var, pct_var}, vars))
          continue
       end

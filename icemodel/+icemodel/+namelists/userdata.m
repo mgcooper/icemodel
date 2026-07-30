@@ -3,5 +3,7 @@ function list = userdata()
 %
 %  list = icemodel.namelists.userdata()
 
-   list = ["mar"; "modis"; "merra"; "racmo"; "kanm"; "kanl"];
+   list = ["mar"; "mar3.11"; "modis"; "merra"; "merra2"; ...
+      "racmo"; "racmo2.3p3"; "kanm"; "kanl"; "promice"; ...
+      "gcnet"; "imau"; "retmip"; "esm_snowmip"];
 end

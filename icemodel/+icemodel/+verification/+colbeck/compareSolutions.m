@@ -27,11 +27,21 @@ function result = compareSolutions(kwargs)
    %                     candidate_source, experiment, variable, n, bias,
    %                     rmse, correlation, status)
    %      summary        Pass/fail printout from formal axes
+   %      evaluation_data_root / input_data_root  Resolved paired roots
+   %
+   %  DATA_ROOT selects one tree containing eval/ and input/. Explicit leaf roots
+   %  and ICEMODEL_CONFIG_CASENAME provide the same nonmutating selection used by
+   %  the other verification readers. The public no-argument call selects the
+   %  release-provisioned test case.
    %
    %  See also: icemodel.verification.colbeck.runCase,
    %    icemodel.verification.colbeck.analyticalSolution
 
    arguments
+      kwargs.data_root (1, 1) string = ""
+      kwargs.evaluation_data_root (1, 1) string = ""
+      kwargs.input_data_root (1, 1) string = ""
+      kwargs.icemodel_config_casename (1, 1) string = "test"
       kwargs.artifact_dir (1, 1) string = ""
       kwargs.experiment_names (1, :) string = ["exp1", "exp2", "exp3"]
       kwargs.make_plot (1, 1) logical = true
@@ -46,8 +56,20 @@ function result = compareSolutions(kwargs)
       'snow_liquid_water_storage_m', kwargs.tolerance_storage_m, ...
       'bottom_outflow_mps',          kwargs.tolerance_outflow_mps);
 
+   % Resolve one paired tree and preflight missing public assets without network
+   % access so clean checkouts receive the exact provisioning command.
+   [evaluation_data_root, input_data_root] = ...
+      icemodel.verification.setup.resolveStagingRoots( ...
+      data_root=kwargs.data_root, ...
+      evaluation_data_root=kwargs.evaluation_data_root, ...
+      input_data_root=kwargs.input_data_root, ...
+      icemodel_config_casename=kwargs.icemodel_config_casename);
+   requireShowcaseFiles(evaluation_data_root);
+
    % Load the case manifest and the cached target bundle (multi-source).
-   manifest = icemodel.verification.loadmanifest("colbeck1976");
+   manifest = icemodel.verification.loadmanifest("colbeck1976", ...
+      evaluation_data_root=evaluation_data_root, ...
+      input_data_root=input_data_root);
    targets = loadTargets(manifest);
 
    % Run the IceModel candidate in both numerical and analytical kinds.
@@ -92,8 +114,17 @@ function result = compareSolutions(kwargs)
       'candidates',    candidates, ...
       'metrics_table', metrics_table, ...
       'summary',       summary, ...
+      'evaluation_data_root', evaluation_data_root, ...
+      'input_data_root', input_data_root, ...
       'figure_path',   figure_path, ...
       'csv_path',      csv_path);
+end
+
+function requireShowcaseFiles(evaluation_data_root)
+   %REQUIRESHOWCASEFILES Verify every public showcase byte before loading it.
+   data_root = string(fileparts(evaluation_data_root));
+   icemodel.verification.setup.fetchFixtures("v1.1", ...
+      capabilities="verification-showcase", root=data_root, download=false);
 end
 
 %% Targets: load the cached multi-source bundle from evaluation.mat.
@@ -295,7 +326,7 @@ function [f, figure_path] = plotSolutions(targets, candidates, ...
          xlabel(ax, 'Time');
          ylabel(ax, '');
          if n == 1 && m == 1
-            legend(ax, 'show', 'Location', 'best');
+            legend(ax, 'show', 'Location', 'eastoutside');
          end
          grid(ax, 'on');
       end
@@ -322,5 +353,6 @@ function plotOneSeries(ax, tt, varname, display_name, line_style)
       return
    end
    icemodel.plot.timeseries(tt.Time, values, axes=ax, ...
-      display_name=string(display_name), line_style=line_style);
+      display_name=string(display_name), line_style=line_style, ...
+      marker_style='none');
 end
