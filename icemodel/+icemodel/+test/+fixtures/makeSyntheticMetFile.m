@@ -14,6 +14,12 @@ function [met, filepath] = makeSyntheticMetFile(simyear, kwargs)
       kwargs.include_modis (1, 1) logical = false
       kwargs.modis_varname (1, :) char = 'MODIS'
       kwargs.snow_depth = []
+      % Optional precipitation overrides: full-length vectors for the
+      % rainf/snowf split channels and a ppt replacement (e.g. all-NaN to
+      % exercise loadmet's runtime total-precip derivation).
+      kwargs.ppt = []
+      kwargs.rainf = []
+      kwargs.snowf = []
       kwargs.metdir (1, :) char = ''
    end
 
@@ -45,6 +51,17 @@ function [met, filepath] = makeSyntheticMetFile(simyear, kwargs)
       end
       met.snowd = snow_depth;
    end
+   % Precipitation overrides install after the base table so tests can
+   % model a split-only source (rainf/snowf present, ppt placeholder).
+   if ~isempty(kwargs.ppt)
+      met.ppt = checkLength(kwargs.ppt, kwargs.nsteps, 'ppt');
+   end
+   if ~isempty(kwargs.rainf)
+      met.rainf = checkLength(kwargs.rainf, kwargs.nsteps, 'rainf');
+   end
+   if ~isempty(kwargs.snowf)
+      met.snowf = checkLength(kwargs.snowf, kwargs.nsteps, 'snowf');
+   end
    if kwargs.include_modis
       % Mirror the albedo shape for optional synthetic userdata tests.
       modis = min(max(albedo - 0.05, 0.05), 0.95);
@@ -59,6 +76,14 @@ function [met, filepath] = makeSyntheticMetFile(simyear, kwargs)
          ['met_' kwargs.sitename '_' kwargs.forcings '_' int2str(simyear) ...
          '_' tag '.mat']);
       save(filepath, 'met');
+   end
+end
+
+function x = checkLength(x, nsteps, name)
+   %CHECKLENGTH Validate an override channel as a full-length column.
+   x = x(:);
+   if numel(x) ~= nsteps
+      error('%s must be length nsteps', name)
    end
 end
 

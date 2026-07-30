@@ -1,5 +1,6 @@
 function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
-      snow_depth] = initialize_surface_forcings(opts, fileiter)
+      snow_depth, opts, rainf, snowf] ...
+      = initialize_surface_forcings(opts, fileiter)
    %initialize_surface_forcings Load the meteorological forcing vectors.
    %
    %  [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time] ...
@@ -18,6 +19,18 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
    %  tppt   - precipitation wet-bulb temperature [K]
    %  time   - forcing timestamps [datetime]
    %  snow_depth - optional forcing snow depth [m]; NaN when unavailable
+   %  opts    - runtime options with time-varying PROMICE observation
+   %            heights resolved by icemodel.loadmet
+   %  rainf  - phase-source-selected liquid precipitation rate [m s^-1]
+   %  snowf  - phase-source-selected solid precipitation rate [m s^-1]
+   %
+   % The trailing rainf/snowf outputs expose the runtime precipitation
+   % phase selection (opts.precip_phase_source, POLICY A10/D-18): 'source'
+   % returns the met product's own split exactly as shipped; 'threshold'
+   % repartitions the canonical total ppt by air temperature. They are
+   % appended after OPTS so every existing caller is positionally
+   % unaffected, and per POLICY D-0b they feed no existing physics: the
+   % RAIN output stays zero until the advective-rain physics is finished.
    %
    %#codegen
 
@@ -25,9 +38,9 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
    % icemodel.configureRun / icemodel.setopts. If omitted, load and
    % concatenate all files listed in opts.metfname.
    if nargin < 2
-      met = icemodel.loadmet(opts);
+      [met, opts] = icemodel.loadmet(opts);
    else
-      met = icemodel.loadmet(opts, fileiter);
+      [met, opts] = icemodel.loadmet(opts, fileiter);
    end
 
    % Transfer the met data to vectors
@@ -45,17 +58,40 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
       snow_depth = nan(height(met), 1);
    end
 
-   % Rainfall forcing is ignored in the core time integration.
-   % Keep the zero-rain behavior explicit here until rain/snow/ppt forcing
-   % support is implemented consistently (Jordan 1991 requires special
-   % timestep shortening during accumulation events).
-   % When rain is eventually set from forcing data (typically in m/timestep),
-   % it must be converted to a rate in m s^-1 before being passed to
-   % advective_heat_flux, which expects ppt in m s^-1.
+   % Rainfall forcing is ignored in the core time integration. Keep the
+   % zero-rain behavior explicit until rain/snow/ppt forcing support is
+   % implemented consistently and enabled as a separate physics change
+   % (POLICY D-0b; the rainf/snowf outputs below carry the selected data
+   % split without entering the solver).
    rain = 0 * tair;
 
-   % TODO: support snowfall, and confirm if forcing files are consistent wrt
-   % rain/snow/ppt/prec variable names. The optional forcing-snow-depth hook
+   % Runtime precipitation phase selection (POLICY A10 / D-18). The option
+   % opts.precip_phase_source picks the rainf/snowf split exposed to
+   % snowfall-consuming callers; the resolution helper enforces the A10
+   % validity contract (nonnegative components summing to the total). The
+   % helper parses options and defaults outside the code-generation
+   % subset, so it stays behind the MATLAB-target boundary exactly like
+   % the readiness verifier in icemodel.loadmet; generated targets expose
+   % the honest unresolved sentinel until a generated consumer exists.
+   if coder.target('MATLAB')
+      % Cached options structs may predate the option; default to the
+      % product's own split (the icemodel.setopts default) so old structs
+      % keep their historical behavior.
+      phase_source = 'source';
+      if isfield(opts, 'precip_phase_source')
+         phase_source = opts.precip_phase_source;
+      end
+      [rainf, snowf] = icemodel.resolvePrecipPhase( ...
+         optionalMetColumn(met, 'ppt'), tair, ...
+         optionalMetColumn(met, 'rainf'), ...
+         optionalMetColumn(met, 'snowf'), phase_source);
+   else
+      rainf = nan(size(tair));
+      snowf = nan(size(tair));
+   end
+
+   % TODO: support rainfall and snowfall mass/state evolution. The optional
+   % snow-depth hook
    % used by the THF roughness selector is standardized separately as
    % `snow_depth`, but it does not imply a full snow-model mass/energy
    % treatment and may remain NaN in existing station datasets.
@@ -75,4 +111,18 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
       tppt(n) = icemodel.vapor.wet_bulb_temperature(tair(n), rh(n), psfc(n));
    end
 
+end
+
+%%
+function values = optionalMetColumn(met, name)
+   %OPTIONALMETCOLUMN Return a met column or an all-NaN placeholder.
+   %
+   % Absent channels stay honestly missing rather than zero-filled so the
+   % phase resolution never fabricates precipitation from a source that
+   % ships none.
+   if ismember(name, met.Properties.VariableNames)
+      values = met.(name);
+   else
+      values = nan(height(met), 1);
+   end
 end
