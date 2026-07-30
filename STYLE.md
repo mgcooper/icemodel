@@ -42,6 +42,28 @@ preference.
   never silently drop the detail a comment held.
 - Group operations logically.
 
+## User-facing prose
+
+Write for people who must understand and act on the result.
+Prefer clear, direct, active, and globally understandable language.
+Complete factual and structural editing before applying `$humanize-prose`.
+
+Apply this policy to comments, docstrings, documentation, Quarto narrative,
+draft handoffs, DesignSpecs, final reports, release notes, UI copy, and
+substantive final responses.
+Do not apply it to AGENTS or STYLE files, skill instructions, prompts,
+ExecPlans, Beads, configuration, logs, or machine-readable content.
+
+Every prose edit must preserve facts, requirements, normative strength,
+technical terminology, specificity, examples, causal explanations,
+limitations, citations, identifiers, commands, code, and protected structure.
+Comments and docstrings must retain the rationale and technical detail they
+carry.
+
+For Quarto, edit only source narrative.
+Do not alter YAML, executable cells, chunk options, equations, citations,
+cross-references, data, or generated HTML, PDF, and other rendered output.
+
 # MATLAB conventions
 
 Canonical conventions shared across MATLAB projects. These extend the language-agnostic
@@ -64,6 +86,14 @@ rules above. Opinionated, project-varying choices belong in `STYLE.local.md`.
   boundary is real.
 - No thin wrappers when function names change: update all call sites.
 - Close every function with an explicit `end`.
+
+## Shared tunables and mappings
+
+- Define every pipeline threshold, channel list, source mapping, alias, and other
+  policy-controlled tunable in one authoritative options, `+namelists`, or
+  dedicated function.
+- Derive name-value defaults, validators, aliases, and identity mappings from
+  that source. Do not repeat the governed literals or member lists in consumers.
 
 ## Formatting
 
