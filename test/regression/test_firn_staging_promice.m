@@ -71,7 +71,7 @@ function test_dry_run_uncataloged_site_uses_unknown_anchor(testCase)
    testCase.verifyEqual(numel(manifest.cases), 1);
    c = manifest.cases(1);
    leg_fields = ["kind", "staged", "eval_staged", ...
-      "met_files", "data_files", "window"];
+      "met_files", "met_file_identities", "data_files", "window"];
    testCase.verifyTrue(all(isfield(c.colocation.promice, leg_fields)));
    testCase.verifyEqual(string(c.case_id), "uncat999");
    testCase.verifyEqual(string(c.surface_zone), "unknown");
@@ -114,6 +114,13 @@ function test_native_promice_stage_uses_hourly_userdata_and_15m_met(testCase)
       c.colocation.promice.data_files{1});
    met_bundle = load(met_file, 'met');
    data_bundle = load(data_file, 'Data');
+   met_identity = c.colocation.promice.met_file_identities;
+   met_info = dir(met_file);
+   testCase.verifyEqual(string(met_identity.file), ...
+      string(c.colocation.promice.met_files));
+   testCase.verifyEqual(double(met_identity.size_bytes), met_info.bytes);
+   testCase.verifyEqual(string(met_identity.sha256), ...
+      icemodel.verification.setup.fileSha256(met_file));
 
    testCase.verifyTrue(endsWith(string(met_file), "_15m.mat"));
    testCase.verifyEqual(seconds(median(diff(met_bundle.met.Time))), 900);

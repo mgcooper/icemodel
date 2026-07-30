@@ -587,9 +587,10 @@ function [colocation, comparison_variables, observation_variables, ...
          icemodel.verification.setup.relpaths(promice_data_files, userdata_outdir);
       promice_co.window = icemodel.verification.setup.manifestWindow( ...
          promice_start, promice_end);
-      if kwargs.dry_run || ~build_native_forcing
-         promice_co.met_files = strings(1, 0);
-      else
+       if kwargs.dry_run || ~build_native_forcing
+          promice_co.met_files = strings(1, 0);
+          promice_co.met_file_identities = emptyMetFileIdentities();
+       else
          try
             promice_met = icemodel.forcing.buildPromiceMet(site, ...
                source_dir=kwargs.promice_dir, ...
@@ -603,17 +604,20 @@ function [colocation, comparison_variables, observation_variables, ...
             % select an existing exact or broader enclosing artifact.
             [forcing_ready, forcing_ready_reason, forcing_complete_windows] = ...
                icemodel.verification.setup.metArtifactReadiness(promice_met_files);
-            promice_co.met_files = ...
-               icemodel.verification.setup.relpaths(promice_met_files, met_outdir);
-            promice_co.forcing_ready = logical(forcing_ready);
+             promice_co.met_files = ...
+                icemodel.verification.setup.relpaths(promice_met_files, met_outdir);
+             promice_co.met_file_identities = ...
+                metFileIdentities(promice_met_files, met_outdir);
+             promice_co.forcing_ready = logical(forcing_ready);
             promice_co.forcing_ready_reason = char(forcing_ready_reason);
             promice_co.forcing_complete_windows = forcing_complete_windows;
          catch met_err
              if ~isSkippableNativeBuildError(met_err)
                rethrow(met_err)
             end
-            promice_co.met_files = strings(1, 0);
-            promice_co.met_skipped_reason = string(met_err.message);
+             promice_co.met_files = strings(1, 0);
+             promice_co.met_file_identities = emptyMetFileIdentities();
+             promice_co.met_skipped_reason = string(met_err.message);
          end
       end
 
@@ -625,6 +629,27 @@ function [colocation, comparison_variables, observation_variables, ...
    end
 
    colocation = struct('promice', promice_co);
+end
+
+function identities = metFileIdentities(files, met_outdir)
+   %METFILEIDENTITIES Pin staged native met bytes in the producer manifest.
+   files = reshape(string(files), [], 1);
+   relative = reshape( ...
+      icemodel.verification.setup.relpaths(files, met_outdir), [], 1);
+   identities = repmat(struct('file', "", 'size_bytes', NaN, ...
+      'sha256', ""), numel(files), 1);
+   for n = 1:numel(files)
+      info = dir(files(n));
+      identities(n).file = relative(n);
+      identities(n).size_bytes = info.bytes;
+      identities(n).sha256 = ...
+         icemodel.verification.setup.fileSha256(files(n));
+   end
+end
+
+function identities = emptyMetFileIdentities()
+   %EMPTYMETFILEIDENTITIES Return a typed empty producer-identity array.
+   identities = struct('file', {}, 'size_bytes', {}, 'sha256', {});
 end
 
 function [comparison_variables, observation_variables] = ...

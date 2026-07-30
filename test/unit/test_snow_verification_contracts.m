@@ -476,10 +476,11 @@ end
 function names = expectedDatasetFamilies()
    %EXPECTEDDATASETFAMILIES Dataset families currently staged for verification.
    % snow/: esm_snowmip, laugh_tests. firn/source families include promice,
-   % sumup, retmip, imau, and research_site.
+   % sumup, retmip, imau, research_site, and ktransect (the Smeets et al. 2022
+   % PANGAEA.947483 K-transect AWS series).
 
    names = ["esm_snowmip"; "laugh_tests"; "promice"; "sumup"; ...
-      "retmip"; "imau"; "research_site"];
+      "retmip"; "imau"; "research_site"; "ktransect"];
 end
 
 function names = expectedCaseTypes()

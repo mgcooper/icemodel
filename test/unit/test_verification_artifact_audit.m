@@ -65,6 +65,25 @@ function test_valid_tree_passes_writes_reports_and_remains_read_only(testCase)
    testCase.verifyGreaterThan(subl.maximum, 0);
 end
 
+function test_audit_rejects_precipitation_partition_mismatch(testCase)
+   % Artifact QA must use the same phase mass-balance predicate as readiness.
+   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   loaded = load(paths.promice_met, 'met');
+   met = loaded.met;
+   met.ppt(1) = 2e-8;
+   met.snowf(1) = 0;
+   met.Properties.UserData.met_resample_expected_missing_counts = ...
+      timetableMissingCounts(met);
+   saveMet(paths.promice_met, met);
+
+   report = icemodel.verification.auditArtifacts( ...
+      evaluation_data_root=eval_root, input_data_root=input_root, ...
+      families="promice", report_dir="");
+
+   testCase.verifyTrue(any(string({report.findings.code}) == ...
+      "precip_partition_mismatch"));
+end
+
 function test_audits_mar_profile_model_output_contract(testCase)
    % Optional MAR RO1 sidecars pass with complete schema/provenance and fail
    % when the public density-unit contract is altered.

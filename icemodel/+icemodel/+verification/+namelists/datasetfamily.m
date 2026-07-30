@@ -22,5 +22,6 @@ function dataset_families = datasetfamily()
       "sumup"
       "retmip"
       "imau"
-      "research_site"];
+      "research_site"
+      "ktransect"];
 end
