@@ -22,6 +22,7 @@
   - [System Requirements](#system-requirements)
   - [Installation Guide](#installation-guide)
   - [Contribute](#contribute)
+  - [Maintainer release workflow](#maintainer-release-workflow)
   - [How do I cite this?](#how-do-i-cite-this)
 
 ## Background
@@ -403,6 +404,65 @@ committed demo fixtures and the staged research forcing do not require them.
 ## Contribute
 
 If you find a bug, have a question, or want to contribute, feel free to open an [issue](https://github.com/mgcooper/icemodel/issues) or start a [discussion](https://github.com/mgcooper/icemodel/discussions).
+
+## Maintainer release workflow
+
+The release companion is maintainer-only and may use modern MATLAB features.
+It does not change the R2017a floor for the core model.
+
+1. Start on a clean `dev` branch with an unused release tag. Update and
+   validate `CITATION.cff`:
+
+   ```matlab
+   state = icemodel.internal.releaseMetadata("prepare", ...
+      version="1.2", date_released="2026-08-01");
+   ```
+
+   `prepare` checks the branch, the complete Git worktree, and the proposed
+   tag. It validates the staged CFF with `uvx cffconvert` before replacing the
+   live file.
+
+2. Review and commit the metadata change, then run
+   `$merge-dev-to-main-release`. That shared workflow performs only the local
+   no-fast-forward merge and annotated tag.
+
+3. Obtain separate authorization before you push the merge and tag or publish
+   the stable GitHub release. The MATLAB command never merges, tags, pushes,
+   publishes, or creates a pull request.
+
+4. Check the public GitHub and Zenodo records:
+
+   ```matlab
+   state = icemodel.internal.releaseMetadata("observe");
+   ```
+
+   `observe` polls for no more than ten minutes. It returns `ready`, `pending`,
+   or `error`; rerun it later after a `pending` result.
+
+5. After Zenodo exposes the version DOI, verify its version and concept lineage
+   and add both DOI identifiers to `CITATION.cff`:
+
+   ```matlab
+   state = icemodel.internal.releaseMetadata("finalize", ...
+      version_doi="10.5281/zenodo.RECORD_ID");
+   ```
+
+   `finalize` accepts only a public record under concept DOI
+   `10.5281/zenodo.11539329`, validates the updated CFF, and is safe to repeat.
+   Review and commit this follow-up metadata change separately.
+
+For v1.1, Zenodo reported error ID
+`5d74aee33a2b47529a84f5e611afbd33` with `401 Bad credentials`. GitHub was
+reauthorized on 2026-07-30, but that reauthorization alone does not prove that
+Zenodo ingested the release. Sync GitHub, confirm the repository is still
+[enabled in Zenodo](https://help.zenodo.org/docs/github/enable-repository/),
+and inspect the existing failed v1.1 release. If it is processing, keep using
+`observe`. If Zenodo offers retry or reprocessing, retry that same release. If
+it remains failed without a retry path, send the error ID to Zenodo support.
+Do not recreate tag v1.1, publish v1.1.1 as a trigger, or upload a separate
+record. Run `finalize` only after the
+[public concept query](https://zenodo.org/api/records?q=conceptrecid%3A11539329&sort=mostrecent&size=10)
+shows the v1.1 DOI.
 
 ## How do I cite this?
 
