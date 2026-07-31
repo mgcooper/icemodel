@@ -14,20 +14,18 @@ function info = gcnetVandecruxStationMetadata(station)
       'site_location', struct('lat_wgs84', NaN, 'lon_wgs84', NaN, ...
       'elev_m', NaN));
    info = repmat(proto, 1, numel(station));
+   % Identity and coordinates come from the single-source catalog (fed by
+   % the dataset's own Dataverse metadata); unknown stations keep the NaN
+   % prototype so callers can detect them.
+   catalog = icemodel.forcing.helpers.gcnetVandecruxCatalog();
+   names = string({catalog.station});
    for k = 1:numel(station)
       info(k).station = station(k);
-      switch station(k)
-         case "DYE_2"
-            info(k).aliases = ["DYE_2", "Dye_2", "DY2", ...
-               "dye2_long", "dye2"];
-            info(k).site_location = struct('lat_wgs84', 66.48, ...
-               'lon_wgs84', -46.28, 'elev_m', 2165);
-         case "Summit"
-            info(k).aliases = ["Summit", "SUM", "sum", "summit"];
-            info(k).site_location = struct('lat_wgs84', 72.58, ...
-               'lon_wgs84', -38.50, 'elev_m', 3254);
-      otherwise
-         info(k).aliases = station(k);
+      info(k).aliases = station(k);
+      match = find(names == station(k), 1);
+      if ~isempty(match)
+         info(k).aliases = catalog(match).aliases;
+         info(k).site_location = catalog(match).site_location;
       end
       info(k).site_location = icemodel.forcing.helpers.projectLocation( ...
          info(k).site_location);

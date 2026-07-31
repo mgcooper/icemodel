@@ -11,3 +11,7 @@ userdata, and observations use stable distinct role colors.
 `timeseries` preserves explicit NaNs and inserts a NaN midpoint when repeated
 cadence makes an omitted-time gap unambiguous. It does not infer gaps for
 two-point interval observations or irregular sparse series.
+
+`newFigure` creates the shared hidden, white, export-sized report frame;
+`markTimeSpan` adds legend-excluded interval boundaries; and `formatDuration`
+uses the shared hour/day/year labels for report figures and tables.

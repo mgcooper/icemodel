@@ -24,6 +24,8 @@ function manifest = buildDatasetFamilyManifest(state, alive, kwargs)
       kwargs.source_url (1, 1) string = ""
       kwargs.source_version (1, 1) string = ""
       kwargs.retrieval_date (1, 1) string = string(datetime('today'))
+      kwargs.citation (1, 1) string = ""
+      kwargs.license (1, 1) string = ""
       kwargs.overwrite_family (1, 1) logical = false
       kwargs.entry_callback = []
    end
@@ -52,7 +54,8 @@ function manifest = buildDatasetFamilyManifest(state, alive, kwargs)
 
    manifest = icemodel.verification.setup.makeFamilyManifest( ...
       kwargs.dataset_family, kwargs.source_doi, kwargs.source_url, ...
-      kwargs.source_version, kwargs.retrieval_date, cases, kwargs.skipped);
+      kwargs.source_version, kwargs.retrieval_date, cases, kwargs.skipped, ...
+      citation=kwargs.citation, license=kwargs.license);
 
    manifest = icemodel.verification.setup.writeFamilyManifestMerge( ...
       kwargs.manifest_file, manifest, requested_ids=kwargs.requested_ids, ...

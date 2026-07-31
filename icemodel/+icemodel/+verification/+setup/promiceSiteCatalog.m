@@ -1,8 +1,9 @@
-function info = promiceSiteCatalog(site)
+function info = promiceSiteCatalog(site, kwargs)
    %PROMICESITECATALOG Return the PROMICE source-site catalog.
    %
    %  info = icemodel.verification.setup.promiceSiteCatalog()
    %  info = icemodel.verification.setup.promiceSiteCatalog("KAN_M")
+   %  info = ...promiceSiteCatalog("KAN_M", source_dir=...)
    %
    %  Returns the curated source catalog of PROMICE automatic-weather-station anchor
    %  sites used to stage firn/snow-evaluation cases. With no arguments, returns
@@ -139,12 +140,13 @@ function info = promiceSiteCatalog(site)
 
    arguments
       site (1, 1) string = ""
+      kwargs.source_dir (1, 1) string = ""
    end
 
    % Canonical co-located model order. PROMICE is the station anchor; MAR and
    % MERRA are point met sources whose albedo is swapped downstream; RACMO is a
    % Data-only SMB/eval source (never met).
-   catalog = buildCatalog();
+   catalog = buildCatalog(kwargs.source_dir);
 
    if site == ""
       info = catalog;
@@ -156,14 +158,14 @@ function info = promiceSiteCatalog(site)
    if ~any(match)
       % Uncataloged station: fall back to the coarse first-pass heuristic so the
       % staging driver still gets a (flagged) zone for any L3 station id.
-      info = firstPassEntry(site);
+      info = firstPassEntry(site, kwargs.source_dir);
       return
    end
    info = catalog(match);
 end
 
 %% Local helpers
-function catalog = buildCatalog()
+function catalog = buildCatalog(source_dir)
    %BUILDCATALOG Hard-coded authoritative PROMICE catalog (see header provenance).
    %
    % Columns: site, case_id, long_name, surface_zone, eval_target,
@@ -232,7 +234,7 @@ function catalog = buildCatalog()
    };
 
    typemap = siteTypeMap();
-   stationmap = stationsMap();
+   stationmap = stationsMap(source_dir);
 
    n = size(rows, 1);
    catalog = repmat(emptyEntry(), 1, n);
@@ -305,10 +307,10 @@ function typemap = siteTypeMap()
    typemap = dictionary(string(pairs(:, 1)), string(pairs(:, 2)));
 end
 
-function stationmap = stationsMap()
+function stationmap = stationsMap(source_dir)
    %STATIONSMAP site_id -> composing-AWS string array, from the sites CSV.
    stationmap = configureDictionary("string", "cell");
-   csv = locateAwsCsv();
+   csv = locateAwsCsv(source_dir);
    if csv == "" || ~isfile(csv)
       return
    end
@@ -335,7 +337,7 @@ function eval_target = evalTarget(code)
    end
 end
 
-function entry = firstPassEntry(site)
+function entry = firstPassEntry(site, source_dir)
    %FIRSTPASSENTRY Coarse first-pass entry for an UNCATALOGED station.
    %
    % Used only when a station id is not in the hard-coded authoritative catalog.
@@ -343,7 +345,7 @@ function entry = firstPassEntry(site)
    % classifies with the legacy elevation-band heuristic, flagged "first_pass".
    loctype = "";
    elev = NaN;
-   csv = locateAwsCsv();
+   csv = locateAwsCsv(source_dir);
    if csv ~= "" && isfile(csv)
       T = readtable(csv, 'TextType', 'string');
       row = string(T.site_id) == site;
@@ -364,7 +366,7 @@ function entry = firstPassEntry(site)
    entry.case_id = lower(erase(site, "_"));
    entry.long_name = replace(site, "_", "-");
    entry.site_type = lookupSiteType(siteTypeMap(), site);
-   entry.stations = lookupStations(stationsMap(), site);
+   entry.stations = lookupStations(stationsMap(source_dir), site);
    entry.surface_zone = surface_zone;
    entry.eval_target = eval_target;
    entry.permafrost_zone = permafrost_zone;
@@ -431,8 +433,23 @@ function entry = emptyEntry()
       'note', "");
 end
 
-function csv = locateAwsCsv()
+function csv = locateAwsCsv(source_dir)
    %LOCATEAWSCSV Resolve AWS_sites_metadata.csv under the staged product.
-   csv = string(fullfile(icemodel.internal.fullpath('data'), ...
-      'verification', 'promice', 'AWS_sites_metadata.csv'));
+   if source_dir == ""
+      source_dir = string(fullfile(icemodel.internal.fullpath('data'), ...
+         'verification', 'promice'));
+   end
+   source_dir = strip(source_dir, 'right', filesep);
+   candidates = fullfile(source_dir, 'AWS_sites_metadata.csv');
+   [parent, leaf] = fileparts(char(source_dir));
+   if ismember(lower(string(leaf)), ["hour", "day"])
+      candidates(end + 1) = fullfile(parent, 'AWS_sites_metadata.csv');
+   end
+   csv = "";
+   for candidate = string(candidates(:)')
+      if isfile(candidate)
+         csv = candidate;
+         return
+      end
+   end
 end

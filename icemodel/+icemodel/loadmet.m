@@ -14,6 +14,23 @@ function [met, opts] = loadmet(opts, fileiter) %#codegen
       fileiter = 1:numel(opts.metfname);
    end
 
+   % The derived PROMICE product is runnable only when the configured filled
+   % met files carry the producer-manifest identity and cover every requested
+   % timestep in the requested window with the required forcing channels
+   % (POLICY A4); calendar-year ledger verdicts are bookkeeping, never the
+   % runtime gate. Table I/O stays outside this code-generation entry point;
+   % generated callers must pass an options struct prevalidated by the same
+   % public verifier.
+   if coder.target('MATLAB')
+      opts = icemodel.verifyPromiceFilledReadiness(opts, fileiter);
+   elseif strcmpi(string(opts.forcings), "promice_filled") ...
+         && ~icemodel.promiceFilledVerificationMatches(opts, fileiter)
+      error('icemodel:loadmet:promiceFilledNotReady', ...
+         ['generated promice_filled loading requires a prevalidated ' ...
+         'readiness verdict for the exact station, requested window, ' ...
+         'calendar, model, timestep, years, and met files']);
+   end
+
    % Load and post-process each requested file before concatenation so yearly
    % swap-source files remain aligned with the source met file year.
    metcell = cell(1, numel(fileiter));
@@ -29,28 +46,274 @@ function [met, opts] = loadmet(opts, fileiter) %#codegen
    end
 
    met = addCanonicalSnowDepth(met);
+   met = addCanonicalTotalPrecip(met);
+
+   % A fileiter subset is its own loading contract. Return only simulation
+   % years actually carried by the selected files so a valid annual load
+   % does not fail because unselected years remain in the caller's list.
+   if numel(fileiter) < numel(opts.metfname)
+      selected_years = intersect(opts.simyears(:), ...
+         unique(year(met.Time)), 'stable');
+      if isempty(selected_years)
+         error('selected met files do not cover any requested simulation year')
+      end
+      opts.simyears = selected_years(:).';
+      if isfield(opts, 'numyears')
+         opts.numyears = numel(selected_years);
+      end
+   end
 
    % Require the concatenated met data to cover every requested simulation
    % year, whether the source is one multi-year file or one file per year.
    if ~all(ismember(opts.simyears(:), unique(year(met.Time))))
       error('met data do not cover all requested simulation years')
    end
-   
+
+   % PROMICE turbulent exchange prefers the measured upper-boom height at
+   % every timestep. Invalid or missing geometry falls down the POLICY A3
+   % chain (measured -> interpolated -> nominal constant) with the outcome
+   % recorded in opts.boom_height_source, so geometry never blocks a run
+   % (D-0a).
+   opts = applyPromiceObservationHeights(met, opts);
    met.De ...
       = icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
       met.wspd, opts.z0_bulk, opts.z_tair, opts.z_wind);
 end
 
 %%
+function opts = applyPromiceObservationHeights(met, opts)
+   %APPLYPROMICEOBSERVATIONHEIGHTS Resolve time-varying PROMICE geometry.
+   %
+   % POLICY A3 (D-0a): boom height resolves measured -> interpolated ->
+   % nominal constant, each fallback step warned once and recorded in
+   % opts.boom_height_source / opts.boom_height_fraction_fallback, so
+   % optional-quality geometry never blocks a run. The boom_height >
+   % z0_bulk check validates measured samples only (A15); failures demote
+   % the sample into the fallback chain instead of erroring.
+   forcing = lower(string(opts.forcings));
+   is_canonical = ismember(forcing, ["promice", "promice_filled"]);
+   is_legacy_alias = ismember(forcing, ["kanm", "kanl"]);
+   if ~is_canonical && ~is_legacy_alias
+      return
+   end
+
+   % Single-source nominal install height: the chain's bottom rung.
+   nominal = icemodel.parameterLookup('promice_nominal_boom_height_m');
+
+   if ~ismember("boom_height", ...
+         string(met.Properties.VariableNames))
+      % Historical alias fixtures predate the boom channel; their scalar
+      % setopts geometry is already the nominal constant, so record the
+      % nominal source without a degradation warning and keep it.
+      if is_legacy_alias
+         opts.boom_height_source = 'nominal';
+         opts.boom_height_fraction_fallback = 1;
+         return
+      end
+      % Canonical PROMICE products without the channel land on the nominal
+      % rung for every sample; one warning identifies the site and files.
+      warnBoomFallback('icemodel:loadmet:promiceBoomHeightNominal', ...
+         ['no measured boom_height channel; applying the nominal ' ...
+         'constant'], height(met), height(met), opts);
+      opts = stampBoomHeights(opts, ...
+         repmat(nominal, height(met), 1), 'nominal', 1);
+      return
+   end
+
+   % Measured validity (A15): finite and strictly above z0_bulk. Invalid
+   % samples are demoted to the interpolated/nominal rungs below.
+   measured = met.boom_height;
+   valid = isfinite(measured) & measured > opts.z0_bulk;
+   n_invalid = nnz(~valid);
+   if n_invalid == 0
+      % Every requested sample is a valid measurement: no fallback.
+      opts = stampBoomHeights(opts, measured, 'measured', 0);
+      return
+   end
+
+   if ~any(valid)
+      % No valid measurement anywhere in the requested window: nominal.
+      warnBoomFallback('icemodel:loadmet:promiceBoomHeightNominal', ...
+         ['no valid measured boom_height samples; applying the nominal ' ...
+         'constant'], n_invalid, height(met), opts);
+      opts = stampBoomHeights(opts, ...
+         repmat(nominal, height(met), 1), 'nominal', 1);
+      return
+   end
+
+   % Interior invalid runs bridge linearly in time between neighboring
+   % valid measurements; leading/trailing runs extend the nearest valid
+   % measurement so the series ends never extrapolate a trend.
+   warnBoomFallback('icemodel:loadmet:promiceBoomHeightInterpolated', ...
+      'bridging invalid samples from neighboring valid measurements', ...
+      n_invalid, height(met), opts);
+   opts = stampBoomHeights(opts, ...
+      interpolateBoomHeights(measured, valid, ...
+      seconds(met.Time - met.Time(1))), ...
+      'interpolated', n_invalid / height(met));
+end
+
+function opts = stampBoomHeights(opts, boom_height, source, f_fallback)
+   %STAMPBOOMHEIGHTS Install resolved geometry and its provenance contract.
+   %
+   % All three observation heights share the upper boom on PROMICE
+   % stations; the source label and fallback fraction are the runtime
+   % record of which A3 rung produced the series.
+   opts.z_tair = boom_height;
+   opts.z_wind = boom_height;
+   opts.z_relh = boom_height;
+   opts.boom_height_source = source;
+   opts.boom_height_fraction_fallback = f_fallback;
+end
+
+function warnBoomFallback(identifier, action, n_affected, n_total, opts)
+   %WARNBOOMFALLBACK One POLICY A3 fallback warning naming site and files.
+   %
+   % Each fallback rung emits exactly one warning per load so degraded
+   % geometry is visible without flooding multi-year runs.
+   warning(identifier, ...
+      ['PROMICE boom_height fallback for site %s (%s): %s; %d of %d ' ...
+      'samples (%.1f%%) affected (POLICY A3)'], ...
+      lower(string(opts.sitename)), ...
+      strjoin(string(opts.metfname(:)), ', '), action, ...
+      n_affected, n_total, 100 * n_affected / n_total);
+end
+
+function resolved = interpolateBoomHeights(measured, valid, t)
+   %INTERPOLATEBOOMHEIGHTS Bridge invalid samples from valid neighbors.
+   resolved = measured;
+   idx_valid = find(valid);
+   if isscalar(idx_valid)
+      % One valid anchor cannot support interpolation; every other sample
+      % takes that nearest (only) measurement.
+      resolved(~valid) = measured(idx_valid);
+      return
+   end
+   % Linear bridge in elapsed time across interior gaps; interp1 leaves
+   % samples outside the valid support as NaN, which the nearest-end
+   % extensions below then fill.
+   resolved(~valid) = interp1(t(valid), measured(valid), t(~valid), 'linear');
+   % Leading/trailing invalid runs extend the nearest valid measurement.
+   resolved(1:idx_valid(1) - 1) = measured(idx_valid(1));
+   resolved(idx_valid(end) + 1:end) = measured(idx_valid(end));
+end
+
+%%
 function met = loadOneMetFile(opts, fileiter)
 
    % Load the met file
-   met = load(opts.metfname{fileiter}, 'met');
+   filename = opts.metfname{fileiter};
+   met = load(filename, 'met');
    met = met.met;
+   if coder.target('MATLAB')
+      forcing = lower(string(opts.forcings));
+      metadata = met.Properties.UserData;
+      [~, artifact_name] = fileparts(string(filename));
+      is_filled_artifact = contains(lower(string(artifact_name)), ...
+         "_promice_filled_") ...
+         || (isstruct(metadata) && isfield(metadata, 'gapfill_product') ...
+         && isscalar(string(metadata.gapfill_product)) ...
+         && string(metadata.gapfill_product) == "promice_filled");
+      % A derived payload must never bypass its readiness and provenance
+      % gates by reusing a verified options struct under an unrelated label.
+      if forcing ~= "promice_filled" && is_filled_artifact
+         error('icemodel:loadmet:promiceFilledIdentityMismatch', ...
+            ['promice_filled artifact was requested under forcing ' ...
+            'label %s: %s'], forcing, filename);
+      end
+      if forcing == "promice_filled"
+         validatePromiceFilledArtifact(filename, met, opts.sitename)
+      end
+   end
 
    met = prepareMetData(met, opts);
    if shouldSwapData(opts)
       met = swapMetData(met, opts);
+   end
+end
+
+function validatePromiceFilledArtifact(filename, met, site)
+   %VALIDATEPROMICEFILLEDARTIFACT Prove runtime product and station identity.
+   [~, name, extension] = fileparts(string(filename));
+   site = lower(string(site));
+   filename_ok = startsWith(lower(string(name)), ...
+      "met_" + site + "_promice_filled_") ...
+      && endsWith(lower(string(name)), "_15m") ...
+      && lower(string(extension)) == ".mat";
+
+   % The filled producer stamps both identities inside the artifact; neither
+   % a readiness ledger nor a caller-supplied path can substitute for them.
+    metadata = met.Properties.UserData;
+    identity_fields = ["gapfill_product", "gapfill_engine_version", ...
+       "gapfill_policy_sha256", "gapfill_donors", "gapfill_channels"];
+    planned_channels = strings(0, 0);
+    if isstruct(metadata) && isfield(metadata, 'gapfill_channels')
+       planned_channels = string(metadata.gapfill_channels);
+    end
+    product_ok = isstruct(metadata) ...
+       && all(isfield(metadata, identity_fields)) ...
+      && isscalar(string(metadata.gapfill_product)) ...
+      && string(metadata.gapfill_product) == "promice_filled" ...
+      && isscalar(string(metadata.gapfill_engine_version)) ...
+      && strlength(string(metadata.gapfill_engine_version)) > 0 ...
+       && isscalar(string(metadata.gapfill_policy_sha256)) ...
+       && ~isempty(regexp(char(string(metadata.gapfill_policy_sha256)), ...
+       '^[0-9a-f]{64}$', 'once')) ...
+       && isrow(planned_channels) ...
+       && all(strlength(planned_channels) > 0) ...
+       && numel(unique(planned_channels)) == numel(planned_channels);
+   site_ok = isstruct(metadata) && isfield(metadata, 'site') ...
+      && isscalar(string(metadata.site)) ...
+      && lower(string(metadata.site)) == site;
+    if ~(filename_ok && product_ok && site_ok)
+       error('icemodel:loadmet:promiceFilledIdentityMismatch', ...
+          'file is not the canonical promice_filled product for %s: %s', ...
+          site, filename);
+    end
+    if ~hasValidPromiceFilledProvenance(met, metadata)
+       error('icemodel:loadmet:promiceFilledProvenanceMismatch', ...
+          'file lacks complete canonical reconstruction provenance: %s', ...
+          filename);
+    end
+end
+
+function valid = hasValidPromiceFilledProvenance(met, metadata)
+    %HASVALIDPROMICEFILLEDPROVENANCE Verify registry and per-channel codes.
+    codes = icemodel.forcing.reconstruct.provenanceCodes();
+    variables = string(met.Properties.VariableNames);
+    channels = unique([string(metadata.gapfill_channels), ...
+       icemodel.forcing.reconstruct.icemodelRequiredChannels(), ...
+       icemodel.forcing.helpers.precipitationVariables()], 'stable');
+    if ismember("boom_height", variables)
+       channels(end + 1) = "boom_height";
+    end
+
+   % The embedded registry must be the canonical append-only registry.
+   valid = isstruct(metadata) && isfield(metadata, 'gapfill_registry') ...
+      && isequal(metadata.gapfill_registry, codes);
+   if ~valid
+      return
+   end
+
+   % Every product channel needs a uint8 code on every sample, with missing
+   % reserved exactly for nonfinite values.
+   allowed = struct2array(codes);
+   for channel = channels
+      provenance_name = channel + "_provenance";
+      if ~all(ismember([channel, provenance_name], variables))
+         valid = false;
+         return
+      end
+      values = met.(channel);
+      provenance = met.(provenance_name);
+      missing = ~isfinite(values);
+      if ~isa(provenance, 'uint8') ...
+            || any(~ismember(provenance, allowed)) ...
+            || any(provenance(missing) ~= codes.missing) ...
+            || any(provenance(~missing) == codes.missing)
+         valid = false;
+         return
+      end
    end
 end
 
@@ -80,6 +343,31 @@ function met = prepareMetData(met, opts)
    if isfield(opts, 'enddate') && ~isnat(opts.enddate)
       met = met(met.Time <= opts.enddate, :);
    end
+end
+
+%%
+function met = addCanonicalTotalPrecip(met)
+   %ADDCANONICALTOTALPRECIP Derive total precip from split components.
+
+   % Sources that ship rainf/snowf without ppt (or with a placeholder ppt)
+   % still expose one canonical total at runtime, so the runtime phase
+   % option and forcing-readiness logic never require a restage: each nonfinite
+   % ppt sample takes rainf + snowf where both components are finite, and
+   % finite ppt samples are never overwritten.
+   if ~(isvariable('rainf', met) && isvariable('snowf', met))
+      return
+   end
+   if isvariable('ppt', met)
+      ppt = met.ppt;
+   else
+      ppt = nan(height(met), 1);
+   end
+   derived = ~isfinite(ppt) & isfinite(met.rainf) & isfinite(met.snowf);
+   ppt(derived) = met.rainf(derived) + met.snowf(derived);
+   % A file carrying both split channels always exposes the canonical
+   % total — even when nothing was derivable (all-NaN placeholders) the
+   % column must exist so downstream contracts see one ppt channel.
+   met.ppt = ppt;
 end
 
 %%

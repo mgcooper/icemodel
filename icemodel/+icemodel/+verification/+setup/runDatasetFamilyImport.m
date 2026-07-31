@@ -31,6 +31,8 @@ function [manifest, state] = runDatasetFamilyImport(state, alive, kwargs)
       kwargs.source_url (1, 1) string = ""
       kwargs.source_version (1, 1) string = ""
       kwargs.retrieval_date (1, 1) string = string(datetime('today'))
+      kwargs.citation (1, 1) string = ""
+      kwargs.license (1, 1) string = ""
       kwargs.overwrite_family (1, 1) logical = false
       kwargs.overwrite (1, 1) logical = false
       kwargs.entry_callback = []
@@ -61,6 +63,7 @@ function [manifest, state] = runDatasetFamilyImport(state, alive, kwargs)
       source_doi=kwargs.source_doi, source_url=kwargs.source_url, ...
       source_version=kwargs.source_version, ...
       retrieval_date=kwargs.retrieval_date, ...
+      citation=kwargs.citation, license=kwargs.license, ...
       overwrite_family=kwargs.overwrite_family, ...
       entry_callback=kwargs.entry_callback);
    manifest = persist(state);

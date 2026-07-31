@@ -1,8 +1,60 @@
 # icemodel.forcing
 
-Forcing and evaluation-data builders for icemodel. Each gridded/AWS source has
-a `read*` (raw -> canonical channels), a `build*Met` (met-contract timetable),
-and a `build*Data` (evaluation/userdata timetable) function.
+Read raw gridded or AWS products, convert them to canonical icemodel channels,
+and build model-met or evaluation timetables.
+
+## Getting started
+
+Most source families follow the same three-layer pattern:
+
+| Layer | Purpose | Typical name |
+|---|---|---|
+| Reader | Preserve source values and map names/units | `read*` |
+| Met builder | Produce an in-memory model-forcing timetable | `build*Met` |
+| Data builder | Produce an evaluation/userdata timetable | `build*Data` |
+
+Run MATLAB from the repository root and put the package on the path:
+
+```matlab
+addpath("icemodel")
+```
+
+Inspect one PROMICE source and build its two canonical in-memory products:
+
+```matlab
+[aws, source_metadata] = icemodel.forcing.readPromiceAws("KAN_M");
+[met, met_metadata] = icemodel.forcing.buildPromiceMet("KAN_M");
+[Data, data_metadata] = icemodel.forcing.buildPromiceData("KAN_M");
+```
+
+Builders do not stage files by themselves. For ordinary verification staging,
+use the family importer:
+
+```matlab
+manifest = icemodel.verification.setup.importPromiceSites( ...
+   case_ids="KAN_M", forcing_sources="promice", ...
+   build_observations=true, build_forcing=true);
+```
+
+For a provenance-preserving runnable product, stage native inputs first and
+then use
+[`icemodel.forcing.reconstruct`](+reconstruct/README.md#getting-started).
+For verification manifests, family imports, artifact QA, and complete staging
+examples, see the
+[`icemodel.verification` README](../+verification/README.md#getting-started).
+
+### Output cadence in one minute
+
+- Model met writes default to 15 minutes.
+- Userdata writes default to one hour.
+- `dt_out=""` explicitly preserves native cadence.
+- Source rows are interval means over `[t,t+source_dt)`, not point samples.
+- Missing source intervals remain missing; resampling does not bridge outages.
+
+The detailed cadence, gap, reuse, and manifest rules are in
+[Model-met cadence and source gaps](#model-met-cadence-and-source-gaps).
+
+### Optional dependency
 
 The conservative (area-weighted) polygon remap in
 `icemodel.forcing.helpers.remapPolygon` needs the external
@@ -14,60 +66,83 @@ See the repo README "Optional external dependencies".
 
 ## Model-met cadence and source gaps
 
+### Model-met writes
+
 `icemodel.forcing.helpers.resampleMetTimestep` owns model-met resampling.
 Data-backed met builders use the shared
 `icemodel.forcing.helpers.data2metCollection` adapter; it preserves scalar or
 cell input shape, delegates the canonical channel conversion to `data2met`, and
-then applies the same resampling helper used by `writemet`. The writer emits
-15-minute files by default; `dt_out=""` is the explicit native-cadence override.
-The proven Samimi Dye-2 override is named `_30m.mat` and is discoverable by the
-standard runtime resolver; no other new native cadence is implied.
-Canonical source rows are interval-start means, so upsampling uses zero-order
-hold over `[t,t+source_dt)` rather than treating them as point samples. This
-preserves every interval integral, includes the complete final source interval,
-and leaves explicit NaNs and omitted-time gaps missing. Gap steps must span whole
-native intervals. Two-row sources support a finite 15-minute-multiple cadence up
-to one hour; longer lone steps fail closed because they cannot distinguish native
-cadence from an outage. Saved metadata records the
-exclusive support end and source-derived missing counts for
-`icemodel.verification.auditArtifacts`. For yearly output, the full native source
-is validated/resampled before calendar slicing so Jan 1 gaps remain explicit.
-Compact per-year summaries record overlapping source rows, intersecting source
-gaps, missing counts, and support bounds; each saved file replaces the parent
-aggregates with its matching summary. Guarded 15-minute input must carry valid
-summaries and constant cadence blocks or yearly writing fails closed. A native
-`dt_out=""` window write remains an exact no-op, while guarded yearly slices keep
-their rows and localize only the aggregate provenance. Source-row and gap counts
-are artifact-local overlap counts; a source interval crossing Jan 1 can belong to
-both adjacent summaries, so yearly counts are not necessarily additive.
+then applies the same resampling helper used by `writemet`.
+
+Cadence rules:
+
+- The writer emits 15-minute files by default.
+- `dt_out=""` is the explicit native-cadence override.
+- The proven Samimi Dye-2 override is named `_30m.mat` and is discoverable by
+  the standard runtime resolver; no other new native cadence is implied.
+
+Source-support rules:
+
+- Canonical rows are interval-start means. Upsampling uses zero-order hold over
+  `[t,t+source_dt)`, never point-sample interpolation.
+- This preserves every interval integral, includes the complete final source
+  interval, and leaves explicit NaNs and omitted-time gaps missing.
+- Gap steps must span whole native intervals.
+- Two-row sources can establish a finite 15-minute-multiple cadence up to one
+  hour. A longer lone step fails closed because it cannot distinguish native
+  cadence from an outage.
+
+Artifact provenance rules:
+
+- Saved metadata records the exclusive support end and source-derived missing
+  counts for `icemodel.verification.auditArtifacts`.
+- The complete native source is validated and resampled before yearly slicing,
+  so January 1 gaps remain explicit.
+- Each yearly file replaces parent aggregates with its own compact summary:
+  overlapping source rows, intersecting source gaps, missing counts, and
+  support bounds.
+- Guarded 15-minute input must carry valid summaries and constant cadence
+  blocks or yearly writing fails closed.
+- A native `dt_out=""` window write is an exact no-op. Guarded yearly slices
+  keep their rows and localize only aggregate provenance.
+- Source-row and gap counts are artifact-local overlap counts. An interval
+  crossing January 1 can belong to both adjacent summaries, so yearly counts
+  are not necessarily additive.
+
+### Userdata writes
 
 `writeuserdata` owns the analogous public userdata boundary. It defaults to
-hourly output while leaving already aligned hourly products unchanged. Finer
-native averages are aggregated into clock-hour means; coarser products are
-linearly interpolated to hourly support; wind direction is handled on the unit
-circle in both directions. Builders remain source-native, and `dt_out=""` is
-the explicit writer override for a deliberately native-cadence artifact. Saved
-metadata records the source cadence, output cadence, and resampling policy.
-Hourly userdata retains the legacy suffix-free name; native variants use an
-explicit cadence suffix such as `_30m`, including yearly files. A verification
-manifest's selected `data_files` are resolved into `opts.userdatafname`, which is
-authoritative in `loadmet`; this prevents legacy name discovery from choosing an
-hourly sibling when a native Data artifact was selected. A stale recorded path
-therefore fails at that exact path instead of silently falling back to a sibling.
-Manifest-selected `met_files` are also authoritative in verification runtime
-setup. A recorded file is selected only when its saved `met.Time` encloses the
-requested run. Otherwise, the existing recorded files that meet the run are
-sorted by saved support and must form one non-overlapping, gap-free list at one
-uniform saved cadence. Missing, overlapping, gapped, mixed-cadence, or
-noncovering explicit lists fail with their recorded paths before `configureRun`
-can invoke name-based discovery. Runtime `dt` comes from the selected saved Time
-cadence, not an earlier list member, filename suffix, or conflicting caller
-override. An explicit caller `dt` may repeat that authoritative saved cadence,
-but a different value fails with the recorded met paths; legacy cases without an
-explicit staged met list keep caller-override behavior. A 30-minute run that swaps
-channels from another source
-prefers 30-minute staged met, then falls back to compatible 15-minute and hourly
-met in that order.
+hourly output and leaves already aligned hourly products unchanged.
+
+- Finer native averages aggregate into clock-hour means.
+- Coarser products interpolate linearly to hourly support.
+- Wind direction uses the unit circle in both directions.
+- Builders remain source-native; `dt_out=""` deliberately preserves native
+  cadence.
+- Saved metadata records source cadence, output cadence, and resampling policy.
+- Hourly userdata keeps the legacy suffix-free name. Native variants, including
+  yearly files, use an explicit cadence suffix such as `_30m`.
+
+Manifest-selected paths are authoritative:
+
+- A selected `data_files` entry resolves to `opts.userdatafname`. `loadmet`
+  therefore cannot select an hourly sibling when the manifest selected native
+  Data. A stale path fails at that exact path.
+- A selected `met_files` entry is used only when its saved `met.Time` encloses
+  the requested run. Otherwise, eligible recorded files are sorted by saved
+  support and must form one non-overlapping, gap-free list at one uniform saved
+  cadence.
+- Missing, overlapping, gapped, mixed-cadence, or noncovering explicit lists
+  fail with their recorded paths before `configureRun` can use name-based
+  discovery.
+- Runtime `dt` comes from the selected saved time axis, not a prior list member,
+  filename suffix, or conflicting caller override. A caller may repeat that
+  cadence but may not change it. Legacy cases without explicit staged met keep
+  caller-override behavior.
+- A 30-minute run that swaps channels prefers 30-minute staged met, then
+  compatible 15-minute and hourly met.
+
+### Window reuse and pruning
 
 Window-named `writemet` and `writeuserdata` outputs are additive across repeated
 calls. A narrower request reuses an enclosing current artifact. When a newly
@@ -77,20 +152,25 @@ stale shorter files. Concrete source/product, schema, sampling-method, and point
 metadata must also agree for reuse or pruning; an exact-name conflict requires
 `overwrite=true`. Different sources, sites, cadences, identities, overlapping
 windows, and enclosing windows remain unchanged. Production `method` and repaired
-`sample_method` metadata are one documented sampling-identity alias. Both writers
+`sample_method` metadata are one documented sampling-identity alias.
+
+Both writers
 stamp the actual uniform payload cadence as `artifact_cadence_seconds`; correctly
 sampled legacy files without that top-level field are checked from their saved
 timetable, so a forged `_15m` suffix cannot authorize reuse or pruning.
+
 Both writers validate an existing exact target before considering a compatible
 broader window. Model-met writes return a compatible exact target because runtime
 met resolution also gives that name precedence; userdata may still return the
 widest compatible enclosing file after the exact target has passed validation.
+
 The pure scalar identity comparison is shared with manifest merging so family,
 source, source id, native `source_family`/`station`, product, DOI/bundle DOI,
 schema, relationship, and the documented method alias cannot drift between reuse
 and merge boundaries. Native producer keys compare by their exact production
 spellings; missing legacy values remain unknown-compatible, and no cross-key
 alias is invented beyond `method`/`sample_method`.
+
 `writemet` completes resampling, cadence derivation, channel validation, and
 guarded-year provenance checks before creating its per-source directory. Rejected
 input therefore leaves no empty artifact directory. `writeuserdata` already uses
@@ -355,6 +435,81 @@ precipitation. `snowf` and `ppt` remain all-NaN placeholders for runtime
 fill/source swapping, and `rainf` is also a placeholder when the station lacks
 the source channel. Native PROMICE artifacts are not runnable on precipitation
 alone until total precipitation is supplied by that later step.
+
+### Canonical reconstructed PROMICE forcing
+
+`icemodel.forcing.reconstruct.fillPromiceStation` builds the separately named
+`promice_filled` product, the canonical runnable PROMICE forcing, without
+modifying native artifacts. Method fitting uses held-out selection draws;
+the filled runtime product is published only on its guarded 15-minute support,
+so `createMetFileNames` rejects other runtime cadences.
+
+#### Reconstruction behavior
+
+Production enforces scalar and relational physical bounds and stamps every
+filled sample plus every contiguous audit segment. Residual state-channel
+outages use one aligned proxy source per whole outage. Precipitation adopts
+MAR total first and MERRA-2 total second, then resolves phases from finite
+native components (exact complements) or the proxy's own rain/snow split
+rescaled to the tapered total; samples with neither stay phase-unknown for
+the runtime `precip_phase_source` option (POLICY A10/D-18 — reconstruction
+never partitions by temperature, and phase channels are never adopted
+independently of their total).
+The native builder preserves selected corrected/raw upward shortwave as `swu`;
+an absent upward-shortwave source is not a strict-required channel because
+reconstruction derives it from the final operands;
+builder-inserted deep-darkness zeros retain the darkness provenance code;
+after all `swd` and albedo tiers finish, missing `swu` is derived as
+`albedo * swd` with dedicated per-sample provenance rather than independently
+interpolated or proxy-adopted.
+
+#### Input discovery and identity
+
+The selected native met directory also selects the enclosing data root for
+K-transect, GC-Net, proxy, and donor-inventory discovery; reconstruction never
+falls back to another data tree. Historical absolute PROMICE raw-source
+provenance is rebound only to one same-named source under that selected root,
+so a relocated data tree remains reproducible without following the old path;
+its builder-recorded byte size and SHA-256 must still match before raw support
+masks are replayed. Before any native target or PROMICE donor can train the
+planner, its staged MAT bytes must also match `met_file_identities` in that
+data root's upstream `eval/promice/manifest.json`.
+An empirical `lwd_policy` and `lwd_estimated` flag must agree; inconsistent
+metadata fails closed, while consistently flagged estimates re-enter the
+formal reconstruction pool as missing native observations.
+
+#### Runtime verification
+
+At runtime, `icemodel.loadmet` refuses `promice_filled` unless the station
+readiness ledger has exactly one `ready` row for every requested year; callers
+with noncanonical QA roots must set `opts.readiness_file`. The loader also
+requires the producer-manifest hash, canonical provenance registry, and complete
+typed provenance arrays for the producer-stamped reconstruction channel set.
+For generated loading, prevalidation is bound to the exact forcing label,
+station, simulation years, and met-file list; changing any of those inputs
+invalidates the stamp. A payload identified by its filename or metadata as
+`promice_filled` is rejected under every other forcing label.
+
+#### Observation geometry
+
+PROMICE native and filled met also carry
+the corrected upper-boom height. The product preserves every boom-height
+gap fail-closed (no capped fill, no donor/proxy geometry); geometry never
+grades readiness (POLICY A3/A5). At runtime `loadmet` resolves T/RH/wind
+observation geometry through the A3 fallback chain — measured samples
+where valid (finite and above the aerodynamic roughness), time-based
+interpolation across interior gaps (including station-composition
+handovers), and the nominal 2.6 m bottom rung — warning per fallback rung
+and recording the outcome in `opts.boom_height_source`; geometry never
+blocks a load or a run.
+The legacy `kanm`/`kanl` forcing aliases apply the same measured geometry
+whenever their met artifact carries `boom_height`; older alias fixtures without
+that channel retain their historical nominal geometry. The surface initializer
+passes finite reconstructed `rainf` into the model's precipitation-advection
+input and uses zero only when the liquid phase is absent or missing.
+The authoritative method and provenance contract is
+[`+reconstruct/POLICY.md`](+reconstruct/POLICY.md), with the namespace inventory
+in [`+reconstruct/README.md`](+reconstruct/README.md).
 
 ### Time convention (the one canonical rule)
 
