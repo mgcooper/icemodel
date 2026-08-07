@@ -1,37 +1,99 @@
 function ice1 = diagnose_column_runoff(ice1, ice2, opts)
    %DIAGNOSE_COLUMN_RUNOFF Diagnose cumulative runoff from column mass changes.
    %
+   % Runoff is a postprocessed water budget for the column reservoir, not a
+   % direct modeled flux (the column never drains during runtime). Per step the
+   % reservoir gains melt and condensation and loses refreezing, evaporation,
+   % and runoff. Condensation that exceeded the top cell's pore capacity never
+   % entered the reservoir at all, so it runs off here with no residence time.
+   %
+   % Refreezing is credited only up to the liquid supplied within a trailing
+   % opts.tlag window. That residence time prevents the column's whole
+   % accumulated meltwater from refreezing when the melt season ends, and it
+   % limits how much of a day's melt can refreeze overnight.
+   %
    %#codegen
 
    dz = opts.dz_thermal;
    df_liq = ice2.df_liq;
+   n_steps = size(df_liq, 2);
 
-   % partition runoff into melt/freeze
-   melt = zeros(size(df_liq,2), 1);
-   freeze = zeros(size(df_liq,2), 1);
-   for n = 1:size(df_liq,2)
-      melt(n) = sum(dz(1).*df_liq(df_liq(:,n)>0, n));
-      freeze(n) = sum(-dz(1).*df_liq(df_liq(:,n)<0, n));
+   % Partition melt/freeze phase change only. In budget_surface_mass_balance,
+   % df_liq is assigned before vapor exchange, so melt and refreezing here does
+   % not include evaporation or condensation.
+   melt = zeros(n_steps, 1);
+   freeze = zeros(n_steps, 1);
+   for n = 1:n_steps
+      melt(n) = sum(dz(1) .* df_liq(df_liq(:, n) > 0, n));
+      freeze(n) = sum(-dz(1) .* df_liq(df_liq(:, n) < 0, n));
    end
-   runoff = zeros(size(melt));
-   for n = 1+opts.tlag:length(melt)
-      meltsum = sum(melt(n-opts.tlag:n));
-      potrunoff = melt(n);
-      potfreeze = min(freeze(n),meltsum);
-      potfreeze = max(potfreeze,0.0);
-      if meltsum > 0.0
-         netrunoff = potrunoff-potfreeze;
-         runoff(n,1) = max(runoff(n-1)+netrunoff, 0.0);
-      else
-         runoff(n,1) = runoff(n-1) + potrunoff;
-      end
+
+   % Liquid vapor exchange, signed positive into the reservoir. In
+   % budget_surface_mass_balance, df_evp differences f_liq (after melt/freeze
+   % phase change), so it represents condensation and evaporation only;
+   % sublimation and deposition act directly on f_ice at each substep update.
+   vapor_liquid = liquidVaporSupply(ice2, dz, n_steps);
+
+   % Overflow is condensation the top cell's pore capacity rejected.
+   overflow = overflowSupply(ice1, dz, n_steps);
+
+   % Supply is liquid that arrives and can later refreeze. Evaporation removes
+   % liquid that would otherwise have run off, so it reduces runoff rather than
+   % the liquid available for refreezing.
+   supply = melt + max(vapor_liquid, 0.0);
+
+   runoff = zeros(n_steps, 1);
+   for n = 1 + opts.tlag:n_steps
+      supplysum = sum(supply(n - opts.tlag:n));
+      potfreeze = max(min(freeze(n), supplysum), 0.0);
+      netrunoff = melt(n) + vapor_liquid(n) + overflow(n) - potfreeze;
+      runoff(n, 1) = max(runoff(n - 1) + netrunoff, 0.0);
    end
+
    ice1.melt = cumsum(melt);           % cumulative melt
    ice1.runoff = runoff;               % cumulative runoff
    ice1.freeze = cumsum(freeze);       % cumulative freeze
 
-   % compute cumulative layer change if it's included in the output
+   % Cumulative mass removed by remeshing, in mwe. df_lyr is the
+   % water-equivalent fraction each merge exported, so scaling by the cell
+   % thickness gives mass. This is not surface-displacement: only removals of
+   % the top cell translate the grid downward.
    if isfield(ice2, 'df_lyr')
       ice1.dlayer = transpose(cumsum(sum(dz(:) .* ice2.df_lyr)));
    end
+end
+
+function values = liquidVaporSupply(ice2, dz, n_steps)
+   %LIQUIDVAPORSUPPLY Return signed liquid vapor exchange per step [m].
+
+   % Initialize an empty column.
+   values = zeros(n_steps, 1);
+
+   % Every icemodel output profile includes df_evp, but allowing its absence
+   % keeps reduced test payloads usable, so return a zero column in that case.
+   if ~isfield(ice2, 'df_evp')
+      return
+   end
+
+   % Otherwise integrate the liquid vapor exchange over the column in mwe.
+   values = reshape(sum(dz(1) .* ice2.df_evp, 1), [], 1);
+end
+
+function values = overflowSupply(ice1, dz, n_steps)
+   %OVERFLOWSUPPLY Return condensation overflow per step [m].
+   %
+   % ice1.df_rof is a top-cell liquid fraction, matching how df_liq and df_evp
+   % are stored, so it is scaled by the same control-volume thickness to compute
+   % runoff in mwe.
+
+   % Initialize a column of zeros.
+   values = zeros(n_steps, 1);
+
+   % Return a column of zeros to callers who don't have df_rof in their output.
+   if ~isfield(ice1, 'df_rof')
+      return
+   end
+
+   % Otherwise, compute the overflow from the top cell in mwe.
+   values = dz(1) .* reshape(double(ice1.df_rof), [], 1);
 end

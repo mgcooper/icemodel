@@ -6,7 +6,8 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
    % f_liq     = fraction of liquid water by volume in each control volume
    % d_rof     = condensation which exceeds control volume available porosity
    % d_pevp    = potential vapor-driven change in top-layer liquid fraction
-   % d_sbl_err = vapor-driven ice change which exceeds control-volume limits
+   % d_sbl_err = vapor-driven ice change which exceeds control-volume limits;
+   %             positive is rejected deposition, negative is unsatisfied subl
    % f_ice_min = minimum retained surface ice fraction before remeshing
    % f_res_por = residual liquid-water fraction per pore volume [-]
    %
@@ -101,8 +102,11 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
 
             f_liq = f_liq + d_aevp;
 
-            % Update d_pevp. This is "extra" condensation that converts to
-            % runoff. In practice this never occurs hence debug is disabled.
+            % Condensation beyond what the top cell's pore space can hold.
+            % The excess cannot be stored, so it leaves as runoff rather than
+            % being dropped: d_rof carries it to diagnose_column_runoff. This
+            % branch does fire in practice, so discarding it would lose real
+            % water from the budget.
             d_pevp = d_pevp - d_aevp_max;
             d_rof = d_rof + d_pevp;
 
@@ -119,7 +123,7 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
    end
 
    if debug == true && d_sbl_err > 0
-      fprintf('unsatisfied sublimation: %.6f\n', d_sbl_err)
+      fprintf('rejected deposition: %.6f\n', d_sbl_err)
    end
 end
 

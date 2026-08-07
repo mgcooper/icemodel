@@ -1,6 +1,6 @@
-function [T, f_ice, f_liq, d_liq, d_evp, d_sbl_err] = ...
+function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err] = ...
       budget_surface_mass_balance(T, f_ice, f_liq, xf_liq, d_pevp, d_liq, ...
-      d_evp, f_res_por, f_ice_min)
+      d_evp, d_rof, f_res_por, f_ice_min)
    %BUDGET_SURFACE_MASS_BALANCE Budget surface mass-balance increments.
    %
    % budget_surface_mass_balance updates the cumulative liquid-water and
@@ -15,6 +15,7 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_sbl_err] = ...
    %   d_pevp     - Potential surface vapor-driven liquid-fraction change [-].
    %   d_liq      - Accumulated liquid-water fraction change over the step [-].
    %   d_evp      - Accumulated vapor-driven fraction change over the step [-].
+   %   d_rof      - Accumulated condensation overflow over the step [-].
    %   f_res_por  - Residual liquid-water fraction per pore volume [-].
    %   f_ice_min  - Minimum retained surface ice fraction before remeshing [-].
    %
@@ -24,7 +25,8 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_sbl_err] = ...
    %   f_liq      - Updated column liquid-water fraction [-].
    %   d_liq      - Updated cumulative liquid-water fraction change [-].
    %   d_evp      - Updated cumulative vapor-driven fraction change [-].
-   %   d_sbl_err  - Unsatisfied vapor-driven ice change for debugging only [-].
+   %   d_rof      - Updated condensation overflow in liquid-water fraction [-].
+   %   d_sbl_err  - Signed unapplied vapor-driven ice-fraction change [-].
    %
    % Notes
    %   This routine does not merge thin layers. Call
@@ -54,16 +56,14 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_sbl_err] = ...
    % Reset past values for budgeting evap/condensation.
    xf_liq = f_liq;
 
-   % Excess condensation tracking disabled - use it to test if it occurrs in
-   % apply_surface_vapor_mass_change. It never did. Retain for future testing.
-   d_rof = 0;
-
    % Apply vapor mass exchange at the surface top layer.
-   [f_ice(1), f_liq(1), ~, d_sbl_err] = ...
+   [f_ice(1), f_liq(1), d_rof, d_sbl_err] = ...
       icemodel.surface.apply_surface_vapor_mass_change( ...
       f_ice(1), f_liq(1), d_rof, d_pevp, f_ice_min, f_res_por);
 
-   % Budget evap / subl.
+   % Budget evap / cond. This differences f_liq, so it only sees the liquid
+   % side of the vapor exchange. Sublimation and deposition change f_ice, so
+   % they do not show up here. Use the ledger's vapor_solid channel for those.
    d_evp = d_evp + f_liq - xf_liq;
 
    % Below here:

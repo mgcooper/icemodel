@@ -192,7 +192,10 @@ function [vars1, vars2] = defaultOutputVariables(opts)
             vars1 = {'Tsfc', 'Qm', 'Qe'};
             vars2 = {'Tice'};
          else
-            vars1 = {'Tsfc'};
+            % df_rof is a physical water flux the runoff budget consumes, so
+            % every icemodel profile carries it. Runoff must not depend on the
+            % chosen output profile.
+            vars1 = {'Tsfc', 'df_rof'};
             vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp'};
          end
 
@@ -204,23 +207,34 @@ function [vars1, vars2] = defaultOutputVariables(opts)
          if strcmp(opts.smbmodel, 'skinmodel')
             vars2 = {'Tice', 'f_ice', 'f_liq'};
          else
+            vars1 = [vars1, {'df_rof'}];
             vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp', 'df_lyr', ...
                'Sc', 'r_eff'};
          end
 
       case 'diagnostic'
+         % The diagnostic surface contract extends the standard one, so build
+         % it from the same leading fields rather than restating them. df_rof
+         % keeps its standard position so the extension stays a pure suffix.
          vars1 = ...
             {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
-            'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter', ...
-            'n_subfail', 'ea_atm', 'br_coefs_gamma', 'br_coefs_b1_num', ...
+            'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter'};
+         diagnostic_suffix = ...
+            {'n_subfail', 'ea_atm', 'br_coefs_gamma', 'br_coefs_b1_num', ...
             'br_coefs_b2_num', 'hv_atm', 'ro_sfc', ...
             'thf_es_sfc', 'thf_stability_factor', 'thf_z0m', 'thf_z0h', ...
             'thf_z0q', 'thf_u_star', 'thf_L', 'thf_Re', 'thf_numiter', ...
             'thf_scalar_exchange_Qh', 'thf_scalar_exchange_Qe'};
 
          if strcmp(opts.smbmodel, 'skinmodel')
+            vars1 = [vars1, diagnostic_suffix];
             vars2 = {'Tice', 'f_ice', 'f_liq'};
          else
+            % Mass-budget channels are opt-in diagnostic scalars. Appending
+            % them preserves every existing output position and keeps the
+            % standard/minimal contracts unchanged.
+            vars1 = [vars1, {'df_rof'}, diagnostic_suffix, ...
+               icemodel.column.budget_output_fields()];
             vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp', 'df_lyr', ...
                'Sc', 'r_eff'};
          end

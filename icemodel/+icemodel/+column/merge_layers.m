@@ -1,5 +1,5 @@
-function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = merge_layers( ...
-      T, f_ice, f_liq, Sc, Sp, j1, j2, d_liq, dz)
+function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
+      T, f_ice, f_liq, Sc, Sp, j1, j2, d_lyr, dz)
    %MERGE_LAYERS Combine two control volumes conserving state and sources.
    %
    % Combine two control volumes by equating the enthalpy of the two control
@@ -14,8 +14,13 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = merge_layers( ...
    %  f_ice - frozen fraction, volume of frozen water per cv volume
    %  ro_liq - liquid water intrinsic density, 1000 kg m-3
    %  ro_ice - frozen water intrinsic density, 917 kg m-3
+   %  d_lyr - accumulated merge-export diagnostic, water-equivalent fraction
    %
    % Outputs
+   %  d_lyr - d_lyr with this merge's exported mass added at index j1, as a
+   %          water-equivalent fraction the caller scales by dz to obtain
+   %          metres water equivalent. Combining two cells into one retains
+   %          their mean, so the remainder leaves the column.
    %
    % Description
    %
@@ -127,5 +132,19 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = merge_layers( ...
    % Invert T_dC to obtain f_liq from f_liq = f(f_wat, Tdc) (eq 67, Jordan).
    f_liq_C = f_wat_C / (1.0 + (fcp * Td_C) ^ 2.0);
    f_ice_C = (f_wat_C - f_liq_C) * ro_liq / ro_ice;
-   d_liq(j1) = d_liq(j1) + max(f_liq(j1) + f_liq(j2) - f_liq_C, 0);
+
+   % Accumulate the mass this merge removes from the column, as a water-
+   % equivalent fraction that the caller scales by dz. The two cells carry
+   % f_wat_12 of water equivalent between them, and the single surviving cell
+   % retains f_wat_C, so the difference leaves the column.
+   %
+   % The liquid-only difference is not the mass a merge removes, because it
+   % omits the solid export. That figure is still available as the ledger's
+   % collapse_export_liquid channel.
+   %
+   % The result is nonnegative by construction: f_wat_C is defined over two
+   % cell volumes, so it is exactly half of f_wat_12.
+   f_wat_12 = ro_ice / ro_liq * (f_ice(j1) + f_ice(j2)) ...
+      + f_liq(j1) + f_liq(j2);
+   d_lyr(j1) = d_lyr(j1) + (f_wat_12 - f_wat_C);
 end

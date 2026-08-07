@@ -32,8 +32,40 @@ Current migrated entry points:
 - `icemodel.column.updatestate`
 - `icemodel.column.bulk_thermal_conductivity`
 - `icemodel.column.firn_thermal_conductivity`
+- `icemodel.column.integrate_column_budget`
+  - integrates column solid mass, liquid mass, and optionally enthalpy from
+    `T`, `f_ice`, `f_liq`, and `dz`, on the solver's physical intrinsic-density
+    and physical-water MWE basis; `use_ro_glc` changes initialization fractions
+    only
+- `icemodel.column.budget_output_fields`
+- `icemodel.column.initialize_budget_state`
+  - returns the zeroed fixed-schema ledger a forcing step starts from
+- `icemodel.column.accumulate_phase_budget`
+- `icemodel.column.accumulate_vapor_budget`
+- `icemodel.column.accumulate_remesh_budget`
+  - the three accumulators update ledger state rather than returning standalone
+    event terms, which is why they are named `accumulate_*_budget`. They keep
+    the diagnostic ledger out of the timestep driver; call them once per
+    accepted substep, after the enthalpy solve, after the surface vapor
+    exchange, and after remeshing. One exception: `accumulate_vapor_budget`
+    ASSIGNS the condensation-overflow channel rather than adding to it, because
+    `d_rof` is reset once per forcing step and accumulated across substeps, so
+    it already arrives as the step total
 - `icemodel.column.budget_surface_mass_balance`
 - `icemodel.column.merge_thin_layers`
+  - three views of the same remeshing export, which nest rather than
+    duplicate. `df_lyr` (ice2, every profile) totals the mass all merges
+    removed, as a water-equivalent fraction the caller scales by `dz`.
+    `mass_budget_collapse_export_solid/liquid_mwe` (diagnostic profile) is that
+    same total split by phase, which the closure identities require.
+    `mass_budget_top_export_solid/liquid_mwe` is the surface-removal subset,
+    separated because interior merges move mass without lowering the grid.
+  - none of the three is a surface-loss comparator. A merge gives the joined
+    cell the MEAN of the pair it replaces, so removing a nearly empty top cell
+    still exports about half the pair's mass. The export therefore over-counts
+    what the removed cell held. The PROMICE ablation evaluation scores melt and
+    the runoff diagnostics instead, and it neither scores nor plots merge
+    export. `icemodel-pla` tracks the conserving remap that would fix this.
 - `icemodel.column.infiltration`
 - `icemodel.column.liquid_flux`
 - `icemodel.column.vapor_mass_transfer`
