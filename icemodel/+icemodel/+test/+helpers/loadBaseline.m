@@ -39,6 +39,8 @@ function [baseline, meta] = loadBaseline(kind, kwargs)
    % If the caller provided an explicit file, load it directly.
    if ~isblanktext(filename)
       [baseline, meta] = loadOneFile(kind, char(filename), simyear);
+      validateSelectorMetadata( ...
+         baseline, meta, baseline_type, baseline_tag, filename);
       baseline = backfillMetadata( ...
          baseline, baseline_type, baseline_tag, smbmodel);
       icemodel.test.helpers.printFilePath(filename, "load");
@@ -59,6 +61,8 @@ function [baseline, meta] = loadBaseline(kind, kwargs)
       baseline_tag=baseline_tag, simyear=simyear);
 
    [baseline, meta] = loadOneFile(kind, char(pathname), simyear);
+   validateSelectorMetadata( ...
+      baseline, meta, baseline_type, baseline_tag, pathname);
    baseline = backfillMetadata( ...
       baseline, baseline_type, baseline_tag, smbmodel);
 
@@ -118,6 +122,79 @@ function baseline = normalizeColumns(baseline)
          baseline.last_updated_utc, 'ConvertFrom', 'datenum', ...
          'TimeZone', 'UTC');
    end
+
+   % Frozen release tables use solver_mode. Add a canonical in-memory alias
+   % while retaining the legacy column and reject two disagreeing identities.
+   names = string(baseline.Properties.VariableNames);
+   if ismember("solver_mode", names)
+      legacy_solver = normalizeSolverColumn(baseline.solver_mode);
+      if ismember("solver", names)
+         current_solver = normalizeSolverColumn(baseline.solver);
+         if ~isequal(current_solver, legacy_solver)
+            error('icemodel:test:baselineSolverSchemaMismatch', ...
+               'Formal baseline solver and solver_mode columns disagree.')
+         end
+      else
+         baseline.solver = legacy_solver;
+      end
+   elseif ismember("solver", names)
+      baseline.solver = normalizeSolverColumn(baseline.solver);
+   end
+end
+
+function solver = normalizeSolverColumn(value)
+   %NORMALIZESOLVERCOLUMN Convert numeric or textual solver ids to doubles.
+   if isnumeric(value) || islogical(value)
+      solver = double(value);
+   else
+      solver = str2double(string(value));
+   end
+   if any(~isfinite(solver) | solver < 1 | fix(solver) ~= solver)
+      error('icemodel:test:baselineSolverSchemaMismatch', ...
+         'Formal baseline solver identity must contain positive integers.')
+   end
+end
+
+function validateSelectorMetadata( ...
+      baseline, meta, baseline_type, baseline_tag, pathname)
+   %VALIDATESELECTORMETADATA Reject persisted selector identity conflicts.
+   if isempty(baseline)
+      return
+   end
+
+   % Missing legacy fields remain eligible for backfill, but fields already
+   % persisted in the table must agree on every row with the requested file.
+   names = string(baseline.Properties.VariableNames);
+   if ismember("baseline_type", names)
+      assertSelectorValues( ...
+         baseline.baseline_type, baseline_type, "baseline_type", pathname);
+   end
+   if ismember("baseline_tag", names)
+      assertSelectorValues( ...
+         baseline.baseline_tag, baseline_tag, "baseline_tag", pathname);
+   end
+
+   % MAT metadata is independent evidence and must not be discarded merely
+   % because the row table is internally consistent or uses a legacy schema.
+   if isfield(meta, 'baseline_type')
+      assertSelectorValues( ...
+         meta.baseline_type, baseline_type, "meta.baseline_type", pathname);
+   end
+   if isfield(meta, 'baseline_tag')
+      assertSelectorValues( ...
+         meta.baseline_tag, baseline_tag, "meta.baseline_tag", pathname);
+   end
+end
+
+function assertSelectorValues(actual, expected, field, pathname)
+   %ASSERTSELECTORVALUES Compare normalized persisted selector tokens.
+   actual = lower(strtrim(string(actual)));
+   expected = lower(strtrim(string(expected)));
+   if any(ismissing(actual) | actual ~= expected, 'all')
+      error('icemodel:test:baselineSelectorIdentityMismatch', ...
+         'Saved %s in %s does not match requested selector %s.', ...
+         field, pathname, expected)
+   end
 end
 
 function baseline = backfillMetadata( ...
@@ -168,7 +245,10 @@ function baseline = loadAllModels(kind, baseline_type, baseline_tag, simyear)
    for i = 1:numel(idx)
 
       % Load one table and backfill the metadata table.
-      [tbl, ~] = loadOneFile(kind, char(pathnames{idx(i)}), simyear);
+      [tbl, tbl_meta] = loadOneFile( ...
+         kind, char(pathnames{idx(i)}), simyear);
+      validateSelectorMetadata(tbl, tbl_meta, baseline_type, ...
+         baseline_tag, pathnames{idx(i)});
       tbl = backfillMetadata(tbl, baseline_type, baseline_tag, models(idx(i)));
       tables{i} = tbl;
 

@@ -85,15 +85,6 @@ function results = run_perf_suite(kwargs)
          = ""
    end
 
-   % Canonical formal runs require the published formal-core capability. This
-   % check never downloads; its missing-data error gives the exact opt-in fetch
-   % command. Explicit comparison candidates bypass manifest identity checks
-   % because PROMICE candidates intentionally differ from release fixtures.
-   if isblanktext(kwargs.data_root)
-      icemodel.verification.setup.fetchFixtures( ...
-         "v1.1", capabilities="formal-core", download=false);
-   end
-
    % Deal out arguments.
    [tier, smbmodel, solver, simyear, smoke_sites, full_sites, n_runs, ...
       tol_perf, include_benchmarks, benchmark_sampling_profile, ...
@@ -110,6 +101,8 @@ function results = run_perf_suite(kwargs)
    % Resolve the requested baseline and shared batch run identifier.
    [baseline_type, baseline_tag] = ...
       icemodel.test.helpers.resolveBaselineSelector(baseline_selector);
+   baseline_policy = ...
+      icemodel.test.helpers.formalBaselinePolicy(baseline_selector);
 
    [run_date, run_id, run_name] = ...
       icemodel.test.helpers.resolveRunStamp(run_name);
@@ -119,11 +112,26 @@ function results = run_perf_suite(kwargs)
    % when this entrypoint returns.
    [~, input_path, output_path, ~, suite_cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment( ...
+      icemodel_config_casename=baseline_policy.config_case, ...
       data_root=kwargs.data_root); %#ok<ASGLU>
 
-   % Carry the explicit candidate root through the unittest class's own setup.
-   % Blank keeps direct/default runs on the canonical test configuration.
-   data_root_cleanup = configurePerfDataRootEnv(kwargs.data_root); %#ok<NASGU>
+   % Carry the configured root through the unittest class's nested setup. A
+   % caller-supplied root keeps precedence over the resolved verification root.
+   data_root = kwargs.data_root;
+   if isblanktext(data_root)
+      data_root = string(fileparts(input_path));
+   end
+
+
+   % Verify registered frozen-release capabilities without downloading before
+   % dispatch so missing or hash-drifted fixtures fail with one repair command.
+   if ~isempty(baseline_policy.required_fixture_capabilities)
+      icemodel.verification.setup.fetchFixtures( ...
+         baseline_policy.baseline_tag, ...
+         capabilities=baseline_policy.required_fixture_capabilities, ...
+         root=data_root, download=false);
+   end
+   data_root_cleanup = configurePerfDataRootEnv(data_root); %#ok<NASGU>
 
    % Formal wall-clock timings must never inherit an interactive profiler.
    profile off
@@ -172,7 +180,7 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    % Build the deterministic case list and load the matching managed baseline.
    cases = icemodel.test.helpers.getPerfCaseMatrix( ...
       tier=tier, smbmodel=smbmodel, solver=solver, simyear=simyear, ...
-      smoke_sites=smoke_sites, full_sites=full_sites);
+      baseline=baseline_tag, smoke_sites=smoke_sites, full_sites=full_sites);
 
    if isempty(cases)
       error('no performance cases matched tier=%s smbmodel=%s', tier, smbmodel)
@@ -187,6 +195,8 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    % Load the accepted baseline that matches this concrete formal model.
    [baseline, baseline_meta] = icemodel.test.helpers.loadBaseline("perf", ...
       smbmodel=smbmodel, baseline_tag=baseline_tag, simyear=benchmark_year);
+   icemodel.test.helpers.assertFormalBaselineForcing( ...
+      baseline, baseline_tag);
    [baseline_compatible, compare_reason] = perfBaselineCompatibility( ...
       baseline_meta);
 
@@ -211,39 +221,18 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       valid = perf_data.valid;
 
       % Compare the measured runtime to the accepted baseline row.
-      ref_wall = nan;
-      floor_wall = nan;
-      gate_wall = nan;
-      passed_perf = valid;
       case_compare_reason = compare_reason;
-      bid = icemodel.test.helpers.findCaseRow(baseline, string(c.case_id));
-      if ~baseline_compatible
-         passed_perf = valid;
-      elseif ~isempty(bid)
-         ref_wall = baseline.median_wall_s(bid);
-         if isfinite(ref_wall) && ref_wall > 0
-            if ismember('tol_perf', baseline.Properties.VariableNames) ...
-                  && isfinite(baseline.tol_perf(bid)) ...
-                  && baseline.tol_perf(bid) > 0
-               tol_case = baseline.tol_perf(bid);
-            else
-               tol_case = tol_perf;
-            end
-            if valid
-               [within_gate, floor_wall, gate_wall, gate_reason] = ...
-                  icemodel.test.helpers.performanceGate( ...
-                  median(sample_times, 'omitnan'), ref_wall, tol_case);
-               passed_perf = within_gate;
-               if ~within_gate
-                  case_compare_reason = gate_reason;
-               end
-            else
-               case_compare_reason = "performance samples are invalid";
-            end
-         end
+      if isempty(baseline) ...
+            || ~ismember('case_id', baseline.Properties.VariableNames)
+         bid = [];
       else
-         case_compare_reason = "case not found in compatible perf baseline";
+         bid = find(string(baseline.case_id) == string(c.case_id));
       end
+      [passed_perf, ref_wall, floor_wall, gate_wall, ...
+         case_compare_reason] = ...
+         icemodel.test.helpers.formalPerformanceVerdict( ...
+         valid, median(sample_times, 'omitnan'), baseline, bid, ...
+         baseline_compatible, tol_perf, case_compare_reason);
 
       % Save the per-sample timings for later inspection.
       for i = 1:height(samples)

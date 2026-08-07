@@ -5,6 +5,7 @@ function cases = getPerfCaseMatrix(kwargs)
    %  cases = icemodel.test.helpers.getPerfCaseMatrix(tier="full")
    %  cases = icemodel.test.helpers.getPerfCaseMatrix(smbmodel="skinmodel")
    %  cases = icemodel.test.helpers.getPerfCaseMatrix(solver=[1 3], simyear=2017)
+   %  cases = icemodel.test.helpers.getPerfCaseMatrix(baseline="v1.1")
    %  cases = icemodel.test.helpers.getPerfCaseMatrix(smoke_sites="kanm", ...
    %     full_sites=["kanm"; "kanl"])
    %
@@ -13,6 +14,7 @@ function cases = getPerfCaseMatrix(kwargs)
    %  smbmodel    - all | icemodel | skinmodel
    %  solver      - optional subset of [1 2 3]
    %  simyear     - single benchmark year used by the perf suite
+   %  baseline    - rolling or registered release-baseline selector
    %  smoke_sites - advanced override for the smoke-tier site list
    %  full_sites  - advanced override for the full-tier site list
    %
@@ -32,18 +34,20 @@ function cases = getPerfCaseMatrix(kwargs)
          {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} = "all"
       kwargs.solver {icemodel.validators.mustBeSolverFilter(kwargs.solver)} = []
       kwargs.simyear (1, 1) double {mustBeInteger, mustBePositive} = 2016
+      kwargs.baseline (1, :) string = "rolling"
       kwargs.smoke_sites string = "kanm"
       kwargs.full_sites string = ["kanm"; "kanl"]
    end
 
    % Deal out arguments.
-   [tier, smbmodel, solver, simyear, smoke_sites, full_sites] = deal( ...
+   [tier, smbmodel, solver, simyear, baseline, smoke_sites, full_sites] = deal( ...
       kwargs.tier, kwargs.smbmodel, kwargs.solver, kwargs.simyear, ...
-      reshape(kwargs.smoke_sites, [], 1), reshape(kwargs.full_sites, [], 1));
+      kwargs.baseline, reshape(kwargs.smoke_sites, [], 1), ...
+      reshape(kwargs.full_sites, [], 1));
 
    % Build the fixed smoke/full matrices once from the explicit inputs above.
-   smoke = makeCases("smoke", smoke_sites, simyear);
-   full = makeCases("full", full_sites, simyear);
+   smoke = makeCases("smoke", smoke_sites, simyear, baseline);
+   full = makeCases("full", full_sites, simyear, baseline);
 
    switch lower(char(tier))
       case 'smoke'
@@ -72,7 +76,7 @@ function cases = getPerfCaseMatrix(kwargs)
    end
 end
 
-function cases = makeCases(tier_name, sites, simyear)
+function cases = makeCases(tier_name, sites, simyear, baseline)
    %MAKECASES Expand one tier/site selection into the formal perf case rows.
    models = icemodel.namelists.smbmodel("test");
    rows = struct([]);
@@ -81,6 +85,8 @@ function cases = makeCases(tier_name, sites, simyear)
    % Each site/model pair contributes one row per supported solver.
    for isite = 1:numel(sites)
       sitename = sites(isite);
+      forcing = icemodel.test.helpers.getFormalForcing( ...
+         sitename=sitename, baseline=baseline);
       for imodel = 1:numel(models)
          smbmodel = models(imodel);
          solver_cases = formalSolversForModel(smbmodel);
@@ -93,7 +99,7 @@ function cases = makeCases(tier_name, sites, simyear)
             rows(k).family = "self";
             rows(k).smbmodel = smbmodel;
             rows(k).sitename = sitename;
-            rows(k).forcings = sitename;
+            rows(k).forcings = forcing;
             rows(k).userdata = "";
             rows(k).uservars = "";
             rows(k).simyear = simyear;

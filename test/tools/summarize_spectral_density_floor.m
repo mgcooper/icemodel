@@ -29,7 +29,8 @@ function report = summarize_spectral_density_floor(kwargs)
    % Install the canonical suite config once so the formal case uses the same
    % environment as the accepted regression/perf tooling.
    [~, ~, ~, ~, suite_cleanup] = ...
-      icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>
+      icemodel.test.helpers.bootstrapTestEnvironment( ...
+      icemodel_config_casename="verification"); %#ok<ASGLU>
 
    % Build and run one canonical formal smoke case, retaining the full formal
    % two-year contract so the density-floor audit sees the spinup evolution.

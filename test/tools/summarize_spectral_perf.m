@@ -39,7 +39,8 @@ function report = summarize_spectral_perf(kwargs)
    % Install the formal test config once so the synthetic fixtures and perf
    % runner share the same environment as the accepted test suite.
    [~, ~, ~, ~, suite_cleanup] = ...
-      icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>
+      icemodel.test.helpers.bootstrapTestEnvironment( ...
+      icemodel_config_casename="verification"); %#ok<ASGLU>
 
    % Measure the narrow kernel path first because it isolates the spectral
    % transforms from the rest of the model runtime.

@@ -147,6 +147,8 @@ function assets = regressionFigures(summary, asset_dir)
    vars = string(summary.Properties.VariableNames);
    delta_vars = intersect(["runoff_pct_delta", "melt_pct_delta", ...
       "runoff_eval_pct_delta", "melt_eval_pct_delta"], vars, 'stable');
+   delta_vars = delta_vars(arrayfun(@(name) ...
+      any(isfinite(summary.(name)), "all"), delta_vars));
 
    % Group all physical metrics in one figure so case-scale changes are obvious.
    if ~isempty(delta_vars) && height(summary) > 0
@@ -154,11 +156,15 @@ function assets = regressionFigures(summary, asset_dir)
       [fig, ax] = newReportFigure(height(summary));
       barh(ax, summary{:, delta_vars})
       grid(ax, "on")
-      xlabel(ax, "Change from accepted baseline (%)")
-      title(ax, "Numerical changes by formal case")
+      xlabel(ax, "Difference from accepted baseline (%; + means more)")
+      title(ax, "Change in runoff and melt")
       configureCaseAxis(ax, summary.case_id)
-      lgd = legend(ax, replace(delta_vars, "_pct_delta", ""), ...
-         Interpreter="none", Location="eastoutside");
+      labels = replace(delta_vars, ...
+         ["runoff_pct_delta", "melt_pct_delta", ...
+          "runoff_eval_pct_delta", "melt_eval_pct_delta"], ...
+         ["Full-run runoff", "Full-run melt", ...
+          "Evaluation-window runoff", "Evaluation-window melt"]);
+      lgd = legend(ax, labels, Location="eastoutside");
       formatReportLegend(lgd)
       exportAndClose(fig, file)
       assets(end + 1) = "report-assets/regression-percent-deltas.png";
@@ -167,17 +173,21 @@ function assets = regressionFigures(summary, asset_dir)
    % Plot iteration changes separately because they are counts, not percentages.
    iteration_vars = intersect(["mean_iteration_delta", ...
       "max_iteration_delta"], vars, 'stable');
+   iteration_vars = iteration_vars(arrayfun(@(name) ...
+      any(isfinite(summary.(name)), "all"), iteration_vars));
    if ~isempty(iteration_vars) && height(summary) > 0
       file = fullfile(asset_dir, "regression-iteration-deltas.png");
       [fig, ax] = newReportFigure(height(summary));
       barh(ax, summary{:, iteration_vars})
       xline(ax, 0, "k-")
       grid(ax, "on")
-      xlabel(ax, "Iteration-count change")
-      title(ax, "Solver iteration changes by formal case")
+      xlabel(ax, "Difference from accepted baseline (+ means more work)")
+      title(ax, "Change in solver iterations")
       configureCaseAxis(ax, summary.case_id)
-      lgd = legend(ax, replace(iteration_vars, "_", " "), ...
-         Interpreter="none", Location="eastoutside");
+      labels = replace(iteration_vars, ...
+         ["mean_iteration_delta", "max_iteration_delta"], ...
+         ["Mean iterations", "Maximum iterations"]);
+      lgd = legend(ax, labels, Location="eastoutside");
       formatReportLegend(lgd)
       exportAndClose(fig, file)
       assets(end + 1) = "report-assets/regression-iteration-deltas.png";
@@ -185,20 +195,56 @@ function assets = regressionFigures(summary, asset_dir)
 
    % Surface-residual statistics expose coupling and convergence problems
    % that cumulative runoff and melt totals can hide.
-   closure_vars = intersect(["closure_seb_rmse", ...
-      "baseline_closure_seb_rmse", "closure_seb_max_abs", ...
+   rmse_vars = intersect(["closure_seb_rmse", ...
+      "baseline_closure_seb_rmse"], vars, 'stable');
+   rmse_vars = rmse_vars(arrayfun(@(name) ...
+      any(isfinite(summary.(name)), "all"), rmse_vars));
+   max_vars = intersect(["closure_seb_max_abs", ...
       "baseline_closure_seb_max_abs"], vars, 'stable');
-   if ~isempty(closure_vars) && height(summary) > 0
+   max_vars = max_vars(arrayfun(@(name) ...
+      any(isfinite(summary.(name)), "all"), max_vars));
+   if (~isempty(rmse_vars) || ~isempty(max_vars)) && height(summary) > 0
       file = fullfile(asset_dir, "regression-seb-closure.png");
-      [fig, ax] = newReportFigure(height(summary));
-      barh(ax, summary{:, closure_vars})
-      grid(ax, "on")
-      xlabel(ax, "Surface-energy residual (W m^{-2})")
-      title(ax, "Surface-energy closure by formal case")
-      configureCaseAxis(ax, summary.case_id)
-      lgd = legend(ax, replace(closure_vars, "_", " "), ...
-         Interpreter="none", Location="eastoutside");
-      formatReportLegend(lgd)
+      [fig, placeholder] = newReportFigure(height(summary));
+      delete(placeholder)
+      n_panels = double(~isempty(rmse_vars)) + double(~isempty(max_vars));
+      fig.Position(3) = 900 * n_panels;
+      layout = tiledlayout(fig, 1, n_panels, ...
+         TileSpacing="compact", Padding="compact");
+
+      % Give typical and worst residuals separate scales so neither is hidden.
+      if ~isempty(rmse_vars)
+         ax = nexttile(layout);
+         barh(ax, summary{:, rmse_vars})
+         grid(ax, "on")
+         xlabel(ax, "Residual RMSE (W m^{-2})")
+         title(ax, "Typical residual")
+         configureCaseAxis(ax, summary.case_id)
+         labels = replace(rmse_vars, ...
+            ["closure_seb_rmse", "baseline_closure_seb_rmse"], ...
+            ["Current", "Accepted baseline"]);
+         lgd = legend(ax, labels, ...
+            Location="southoutside", Orientation="horizontal");
+         formatReportLegend(lgd)
+      end
+
+      % The maximum absolute residual exposes short-lived closure outliers.
+      if ~isempty(max_vars)
+         ax = nexttile(layout);
+         barh(ax, summary{:, max_vars})
+         grid(ax, "on")
+         xlabel(ax, "Maximum absolute residual (W m^{-2})")
+         title(ax, "Worst residual")
+         configureCaseAxis(ax, summary.case_id)
+         labels = replace(max_vars, ...
+            ["closure_seb_max_abs", "baseline_closure_seb_max_abs"], ...
+            ["Current", "Accepted baseline"]);
+         lgd = legend(ax, labels, ...
+            Location="southoutside", Orientation="horizontal");
+         formatReportLegend(lgd)
+      end
+      title(layout, "Surface-energy residuals (smaller is better)", ...
+         Color="k")
       exportAndClose(fig, file)
       assets(end + 1) = "report-assets/regression-seb-closure.png";
    end
@@ -362,7 +408,15 @@ function lines = reportMarkdown(title_text, suite_kind, results, summary, ...
       "**" + outcome + "** — " + string(height(summary)) + ...
          " formal case(s)."
       ""
-      reportMetadata(summary, suite_kind)
+      reportMetadata(summary, suite_kind, results)];
+
+   % Regression reports lead with the decision-relevant facts in plain language.
+   if suite_kind == "regression"
+      lines = [lines
+         ""
+         regressionExplanation(summary)];
+   end
+   lines = [lines
       ""
       "## Visual summary"
       ""];
@@ -384,7 +438,10 @@ function lines = reportMarkdown(title_text, suite_kind, results, summary, ...
    [~, csv_name, csv_ext] = fileparts(summary_file);
    lines = [lines
       ""
-      "## Compact results"
+      "## Summary table"
+      ""
+      "The field names match the downloadable CSV, which retains full stored " ...
+         + "numeric precision."
       ""
       markdownTable(summary)
       ""
@@ -400,19 +457,202 @@ function lines = reportMarkdown(title_text, suite_kind, results, summary, ...
    lines(end + 1) = "";
 end
 
-function lines = reportMetadata(summary, suite_kind)
+function lines = reportMetadata(summary, suite_kind, results)
    %REPORTMETADATA Format the small run identity block.
 
    vars = string(summary.Properties.VariableNames);
    lines = strings(0, 1);
    lines(end + 1, 1) = "- Suite: `" + suite_kind + "`";
    if ismember("tier", vars)
-      lines(end + 1, 1) = "- Tier: `" ...
-         + join(unique(string(summary.tier), 'stable'), ", ") + "`";
+      lines(end + 1, 1) = "- Tier: " + markdownCode( ...
+         join(unique(string(summary.tier), 'stable'), ", "));
    end
    if ismember("smbmodel", vars)
-      lines(end + 1, 1) = "- Models: `" ...
-         + join(unique(string(summary.smbmodel), 'stable'), ", ") + "`";
+      lines(end + 1, 1) = "- Models: " + markdownCode( ...
+         join(unique(string(summary.smbmodel), 'stable'), ", "));
+   end
+   % Combined model reports carry one metadata struct per model; run identity
+   % fields are shared, so the first struct is the report-level source.
+   meta = struct();
+   if isfield(results, "meta") && isstruct(results.meta) ...
+         && ~isempty(results.meta)
+      meta = results.meta(1);
+   end
+   if isfield(meta, "baseline_tag") ...
+         && strlength(string(meta.baseline_tag)) > 0
+      lines(end + 1, 1) = "- Accepted baseline: " ...
+         + markdownCode(string(meta.baseline_tag));
+   elseif isfield(meta, "baseline_type") ...
+         && strlength(string(meta.baseline_type)) > 0
+      lines(end + 1, 1) = "- Accepted baseline: " ...
+         + markdownCode(string(meta.baseline_type));
+   end
+   if isfield(meta, "input_path") ...
+         && strlength(string(meta.input_path)) > 0
+      lines(end + 1, 1) = "- Current input root: " ...
+         + markdownCode(string(meta.input_path));
+   end
+end
+
+function lines = regressionExplanation(summary)
+   %REGRESSIONEXPLANATION State the comparison result without test jargon.
+
+   lines = [ ...
+      "## What this means"
+      ""
+      "**The outcome above is a strict software regression check. A FAILED " ...
+         + "outcome means values exceeded the accepted baseline's tolerances " ...
+         + "or that a formal case could not complete. Scientific validity " ...
+         + "must be assessed separately against observations and physical " ...
+         + "constraints.**"
+      ""
+      "Positive runoff or melt percentages mean the current run produced " ...
+         + "more than the accepted baseline; negative percentages mean less. " ...
+         + "The figure shows whichever full-run or evaluation-window " ...
+         + "percentage changes are available and omits unavailable series."
+      ""
+      "This report is read-only. It did not accept or replace any baseline."
+      ""];
+   vars = string(summary.Properties.VariableNames);
+
+   % Summarize each model/site group so solver repetition does not hide the pattern.
+   if all(ismember(["smbmodel", "sitename"], vars))
+      metric_names = ["runoff_pct_delta", "melt_pct_delta", ...
+         "runoff_eval_pct_delta", "melt_eval_pct_delta"];
+      metric_labels = ["full-run runoff", "full-run melt", ...
+         "evaluation-window runoff", "evaluation-window melt"];
+      pairs = unique([string(summary.smbmodel), string(summary.sitename)], ...
+         'rows', 'stable');
+      group_lines = strings(size(pairs, 1), 1);
+      for k = 1:size(pairs, 1)
+         use = string(summary.smbmodel) == pairs(k, 1) ...
+            & string(summary.sitename) == pairs(k, 2);
+         model = replace(pairs(k, 1), ...
+            ["icemodel", "skinmodel"], ["IceModel", "SkinModel"]);
+         site = replace(upper(pairs(k, 2)), ...
+            ["KANM", "KANL"], ["KAN_M", "KAN_L"]);
+         n_cases = sum(use);
+         if n_cases == 1
+            case_text = "1 formal case";
+            count_label = "case";
+         else
+            case_text = string(n_cases) + " formal cases";
+            count_label = "cases";
+         end
+
+         % Treat every saved physical metric independently and name absences.
+         metric_text = strings(size(metric_names));
+         for m = 1:numel(metric_names)
+            values = [];
+            if ismember(metric_names(m), vars)
+               values = summary.(metric_names(m));
+               values = values(use);
+               values = values(isfinite(values));
+            end
+            if isempty(values)
+               value_range = "unavailable";
+            elseif isscalar(values)
+               value_range = string(sprintf("%+.2f%%", values));
+            else
+               value_range = string(sprintf("%+.2f%% to %+.2f%%", ...
+                  min(values), max(values)));
+            end
+            metric_text(m) = metric_labels(m) + " " + value_range ...
+               + " (" + string(numel(values)) + "/" + string(n_cases) ...
+               + " " + count_label + ")";
+         end
+         group_lines(k) = "- " + markdownCode(model) + " at " ...
+            + markdownCode(site) + ": " + join(metric_text, "; ") ...
+            + " across " + case_text + ".";
+      end
+      lines = [lines; group_lines];
+   end
+
+   % Report convergence and solver effort separately from physical totals.
+   if ismember("n_not_converged", vars)
+      counts = summary.n_not_converged;
+      saved = isfinite(counts);
+      if ~any(saved)
+         lines(end + 1, 1) = "- **Non-converged timesteps:** unavailable.";
+      else
+         lines(end + 1, 1) = "- **Non-converged timesteps:** " ...
+            + string(sum(counts(saved))) + " across cases with saved values " ...
+            + "(coverage " + string(sum(saved)) + "/" ...
+            + string(numel(counts)) + "; missing " ...
+            + string(sum(~saved)) + ").";
+      end
+   end
+   if all(ismember(["mean_iteration_delta", ...
+         "max_iteration_delta"], vars))
+      mean_delta = summary.mean_iteration_delta;
+      max_delta = summary.max_iteration_delta;
+      mean_delta = mean_delta(isfinite(mean_delta));
+      max_delta = max_delta(isfinite(max_delta));
+      if ~isempty(mean_delta) && ~isempty(max_delta)
+         lines(end + 1, 1) = "- **Solver effort:** mean iterations changed " ...
+            + string(sprintf("%+.2f to %+.2f", min(mean_delta), ...
+            max(mean_delta))) + "; maximum iterations changed " ...
+            + string(sprintf("%+.2f to %+.2f", min(max_delta), ...
+            max(max_delta))) + ".";
+      end
+   end
+
+   % Separate current closure quality from comparison evidence that may be absent.
+   current_closure = ["closure_seb_rmse", "closure_seb_max_abs"];
+   if all(ismember(current_closure, vars))
+      rmse = summary.closure_seb_rmse;
+      max_abs = summary.closure_seb_max_abs;
+      rmse = rmse(isfinite(rmse));
+      max_abs = max_abs(isfinite(max_abs));
+      if ~isempty(rmse) && ~isempty(max_abs)
+         lines(end + 1, 1) = "- **Current energy-balance residuals:** " ...
+            + "RMSE reached " + string(sprintf("%.2f", max(rmse))) ...
+            + " W m^-2; the worst absolute residual reached " ...
+            + string(sprintf("%.2f", max(max_abs))) + " W m^-2. " ...
+            + "Smaller is better.";
+      end
+   end
+   baseline_closure = ["baseline_closure_seb_rmse", ...
+      "baseline_closure_seb_max_abs"];
+   if all(ismember(baseline_closure, vars))
+      baseline_values = [summary.baseline_closure_seb_rmse; ...
+         summary.baseline_closure_seb_max_abs];
+      if ~any(isfinite(baseline_values))
+         lines(end + 1, 1) = "- **Closure comparison unavailable:** the " ...
+            + "accepted baseline has no saved surface-energy residuals, so " ...
+            + "the closure figure describes current runs only.";
+      end
+   end
+end
+
+function text = markdownCode(value)
+   %MARKDOWNCODE Wrap saved metadata in an inert Markdown code span.
+
+   % Use a longer fence than any saved backtick run so markup stays literal.
+   text = strtrim(regexprep(string(value), '\r\n|\r|\n', ' '));
+   runs = regexp(char(text), '`+', 'match');
+   fence_length = 1;
+   if ~isempty(runs)
+      fence_length = max(cellfun(@numel, runs)) + 1;
+   end
+   fence = string(repmat('`', 1, fence_length));
+   if startsWith(text, "`") || endsWith(text, "`")
+      text = fence + " " + text + " " + fence;
+   else
+      text = fence + text + fence;
+   end
+end
+
+function text = escapeMarkdownText(value)
+   %ESCAPEMARKDOWNTEXT Preserve arbitrary saved text without enabling markup.
+
+   text = regexprep(string(value), '\r\n|\r|\n', ' ');
+   punctuation = [92, 33:47, 58:64, 91, 93:96, 123:126];
+   escape = string(char(92));
+   % Escape backslash first, then every other ASCII punctuation character.
+   for k = 1:numel(punctuation)
+      token = string(char(punctuation(k)));
+      text = replace(text, token, escape + token);
    end
 end
 
@@ -456,7 +696,7 @@ function text = formatValue(value)
    else
       text = join(string(value), ", ");
    end
-   text = replace(replace(text, "|", "\|"), newline, " ");
+   text = escapeMarkdownText(text);
 end
 
 function caption = assetCaption(asset)

@@ -12,6 +12,8 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    %     smbmodel="icemodel", solver=[1 3])
    %  RegressionBaseline = build_regression_baseline(simyear=2017, ...
    %     smoke_sites="kanm", full_sites=["kanm"; "kanl"])
+   %  RegressionBaseline = build_regression_baseline( ...
+   %     data_root="/path/to/test/data")
    %
    % Use this when you want to accept new modeled outputs as a rolling or
    % versioned regression baseline. This writes baseline files only; it does
@@ -68,14 +70,27 @@ function RegressionBaseline = build_regression_baseline(kwargs)
          mustBePositive} ...
          = 25000000
 
-      kwargs.output_file string ...
-         = string.empty()
+       kwargs.output_file string ...
+          = string.empty()
+
+      kwargs.data_root (1, 1) string ...
+         = ""
    end
+
+   % Resolve the baseline-owned default tree before installing scoped config.
+   baseline_selector = kwargs.baseline_tag;
+   if isblanktext(baseline_selector)
+      baseline_selector = kwargs.baseline;
+   end
+   baseline_policy = ...
+      icemodel.test.helpers.formalBaselinePolicy(baseline_selector);
 
    % Keep the cleanup handle in scope so the caller's config is restored
    % when this entrypoint returns.
    [~, ~, ~, ~, suite_cleanup] = ...
-      icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>
+      icemodel.test.helpers.bootstrapTestEnvironment( ...
+      icemodel_config_casename=baseline_policy.config_case, ...
+      data_root=kwargs.data_root); %#ok<ASGLU>
 
    % Deal out arguments.
    [baseline, baseline_tag, tier, smbmodel, solver, simyear, smoke_sites, ...
@@ -171,6 +186,12 @@ function RegressionBaseline = buildSingleModelRegressionBaseline( ...
 
    % Convert the accepted case rows into the saved baseline table.
    RegressionBaseline = struct2table(vertcat(row_cells{:}));
+   selector = baseline_tag;
+   if baseline_type == "rolling"
+      selector = "rolling";
+   end
+   icemodel.test.helpers.assertFormalBaselineCandidate( ...
+      "regression", RegressionBaseline, cases, selector);
 
    % Record the build metadata alongside the accepted baseline values.
    meta = struct();
@@ -194,12 +215,6 @@ function RegressionBaseline = buildSingleModelRegressionBaseline( ...
    meta.host = string(computer);
    meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
 
-   % Rolling baselines are acceptance targets. Archive the prior managed
-   % state before overwriting it so older accepted outputs remain available.
-   if baseline_type == "rolling"
-      icemodel.test.helpers.archiveManagedBaseline(output_file, "regression");
-   end
-
    % Save profiler diagnostics in a separate rerun so the accepted baseline
    % state above stays independent from the profiling instrumentation.
    profile_summary = table();
@@ -209,6 +224,12 @@ function RegressionBaseline = buildSingleModelRegressionBaseline( ...
       [profile_summary, profile_meta, profile_artifacts] = ...
          icemodel.test.helpers.captureBaselineProfile( ...
          "regression", cases, output_file, history_size=profile_history_size);
+   end
+
+   % Archive only after every candidate and optional diagnostic has completed;
+   % no invalid or interrupted build may create a misleading acceptance event.
+   if baseline_type == "rolling"
+      icemodel.test.helpers.archiveManagedBaseline(output_file, "regression");
    end
 
    % Save the rolling or release regression baseline file.

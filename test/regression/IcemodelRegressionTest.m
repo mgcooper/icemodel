@@ -17,11 +17,14 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
    methods (TestMethodSetup)
       function configureCases(testCase)
          % Install the runner-selected data root when present. A direct class
-         % run leaves the selector blank and therefore retains the canonical
-         % test case default.
+         % run resolves the data case registered for its baseline selector.
          data_root = string(getenv('ICEMODEL_TEST_DATA_ROOT'));
+         baseline_selector = string(getenv('ICEMODEL_REGRESSION_BASELINE'));
+         baseline_policy = ...
+            icemodel.test.helpers.formalBaselinePolicy(baseline_selector);
          [~, ~, ~, ~, testCase.env_cleanup] = ...
             icemodel.test.helpers.bootstrapTestEnvironment( ...
+            icemodel_config_casename=baseline_policy.config_case, ...
             data_root=data_root);
 
          % Resolve the case matrix, baseline, and runoff reference once
@@ -55,11 +58,8 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          % Run each formal case, compare to baseline, and collect a report row.
          for icase = 1:height(cases)
             c = cases(icase, :);
-            opts = icemodel.test.helpers.setModelOptsForCase(c);
-
-            [ice1, ice2] = icemodel.test.helpers.runSmbModel(opts);
-            [ice1, ice2] = icemodel.postprocess( ...
-               ice1, ice2, opts, opts.output_years); %#ok<ASGLU>
+            [ice1, ice2, opts] = ...
+               icemodel.test.helpers.runModelCase(c); %#ok<ASGLU>
 
             % Summarize the retained output years against the matched runoff
             % reference row, if one exists for this formal case.
@@ -95,6 +95,9 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
             % Load the accepted baseline values for this case.
             bid = icemodel.test.helpers.findCaseRow(baseline, string(c.case_id));
+            case_passed = ~isempty(bid);
+            testCase.verifyNotEmpty(bid, ...
+               sprintf('baseline missing case=%s', c.case_id));
 
             % Populate the fields
             if ~isempty(bid)
@@ -103,10 +106,17 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
                end
                metric_names = string(fieldnames(S));
                for imetric = 1:numel(metric_names)
-                  actual = S.(metric_names(imetric));
-                  if isfinite(actual)
-                     testCase.checkAgainstBaseline(actual, ...
-                        baseline, bid, metric_names(imetric));
+                  metric = metric_names(imetric);
+                  actual = S.(metric);
+                  [compare_metric, evidence_passed, evidence_reason] = ...
+                     icemodel.test.helpers.formalRegressionMetricEvidence( ...
+                     actual, baseline, bid, metric, baseline_tag);
+                  testCase.verifyTrue(evidence_passed, evidence_reason);
+                  case_passed = case_passed && evidence_passed;
+                  if compare_metric && evidence_passed
+                     metric_passed = testCase.checkAgainstBaseline( ...
+                        actual, baseline, bid, metric);
+                     case_passed = case_passed && metric_passed;
                   end
                end
             end
@@ -123,6 +133,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             row.simyear = c.simyear;
             row.solver = c.solver;
             row = testCase.copyMetricFields(row, S);
+            row.passed = case_passed;
 
             for f = all_baseline_fields'
                row.("baseline_" + f) = base.(f);
@@ -165,17 +176,13 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          end
       end
 
-      function checkAgainstBaseline(testCase, actual, baseline, row, varname)
+      function passed = checkAgainstBaseline( ...
+            testCase, actual, baseline, row, varname)
          % Compare one scalar regression metric against the selected baseline.
-         if ~ismember(varname, baseline.Properties.VariableNames)
-            return
-         end
          expected = baseline.(varname)(row);
-         if ~isfinite(expected)
-            return
-         end
          tol = testCase.metricTolerance(char(varname), expected);
-         testCase.verifyLessThanOrEqual(abs(actual - expected), tol, ...
+         passed = abs(actual - expected) <= tol;
+         testCase.verifyTrue(passed, ...
             sprintf('baseline mismatch var=%s', varname));
       end
 
@@ -378,7 +385,7 @@ function info = buildRegressionCaseInfo()
    % Build the formal regression case matrix from the resolved selectors.
    cases = icemodel.test.helpers.getRegressionCaseMatrix( ...
       tier=tier, smbmodel=smbmodel, solver=solver, simyear=simyear, ...
-      smoke_sites=smoke_sites, full_sites=full_sites);
+      baseline=baseline_tag, smoke_sites=smoke_sites, full_sites=full_sites);
 
    assert(~isempty(cases), ...
       'regression case matrix is empty for tier=%s smbmodel=%s solver=[%s]', ...
@@ -387,6 +394,8 @@ function info = buildRegressionCaseInfo()
    % Load the accepted baseline and runoff reference for comparison.
    baseline = icemodel.test.helpers.loadBaseline("regression", ...
       smbmodel=smbmodel, baseline_tag=baseline_tag);
+   icemodel.test.helpers.assertFormalBaselineForcing( ...
+      baseline, baseline_tag);
    runoff_ref = icemodel.test.helpers.loadReference("runoff");
 
    % Pack everything into a single struct for testCoreRegression.
