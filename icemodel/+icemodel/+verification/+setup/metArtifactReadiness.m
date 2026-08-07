@@ -1,7 +1,8 @@
-function [tf, reason, complete_windows] = metArtifactReadiness(met_file)
+function [tf, reason, complete_windows, cadence_seconds] = ...
+      metArtifactReadiness(met_file)
    %METARTIFACTREADINESS Diagnose the exact saved scalar-window met artifact.
    %
-   %  [tf, reason, complete_windows] = ...
+   %  [tf, reason, complete_windows, cadence_seconds] = ...
    %     icemodel.verification.setup.metArtifactReadiness(met_file)
    %
    % Importers call this helper with the path returned by writemet, which may be
@@ -13,6 +14,8 @@ function [tf, reason, complete_windows] = metArtifactReadiness(met_file)
    % start_time/end_time strings and numeric sample_count. The caller's existing
    % scalar met_files field is the artifact link; no absolute path is duplicated
    % in each window record.
+   % CADENCE_SECONDS is the exact regular cadence derived from the saved payload,
+   % or NaN when the payload has fewer than two rows or no single cadence.
    %
    % See also: icemodel.forcing.helpers.writemet,
    %  icemodel.verification.setup.metForcingReady
@@ -57,6 +60,12 @@ function [tf, reason, complete_windows] = metArtifactReadiness(met_file)
       icemodel.forcing.helpers.validatemet(saved.met)
       [tf, reason, windows] = ...
          icemodel.verification.setup.metForcingReady(saved.met);
+
+      % Report cadence from the saved coordinate itself so downstream policy
+      % gates cannot be satisfied by a filename or stale metadata marker. The
+      % shared helper is the same rule the artifact writers and reuse checks use.
+      cadence_seconds = ...
+         icemodel.forcing.helpers.uniformCadenceSeconds(saved.met);
    catch err
       error('icemodel:verification:metArtifactReadiness:badPayload', ...
          'referenced saved met artifact %s is invalid: %s', ...
