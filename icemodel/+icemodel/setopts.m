@@ -529,6 +529,7 @@ function opts = initopts(smbmodel, sitename, simyears, forcings, ...
      opts.report_inputs_file = "";
      opts.promice_filled_readiness_verified = false;
       opts.promice_filled_manifest_verified = false;
+      opts.promice_filled_provenance_verified = false;
       opts.promice_filled_verified_forcing = '';
       opts.promice_filled_verified_site = '';
       opts.promice_filled_verified_simyears = [];

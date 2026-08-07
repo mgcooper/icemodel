@@ -1,16 +1,17 @@
 function opts = verifyPromiceFilledReadiness(opts, fileiter)
    %VERIFYPROMICEFILLEDREADINESS Gate derived PROMICE forcing by coverage.
    %
-   %  opts = icemodel.verifyPromiceFilledReadiness(opts) verifies the
+   %  opts = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts) verifies the
    %  producer-manifest identity of the configured promice_filled artifacts
-   %  and proves complete required-channel coverage of every requested
-   %  timestep between opts.startdate and opts.enddate (or the opts.simyears
-   %  span when no dates are set) directly against the filled met files'
-   %  samples (POLICY A4; water years and arbitrary windows are
-   %  first-class). The canonical product and runtime timestep are both
-   %  fixed at 15 minutes. Calendar-year ledger verdicts are producer
-   %  bookkeeping and never the runtime gate. The returned options are
-   %  marked for code-generation-safe loading.
+   %  and proves complete required-channel coverage plus exact current
+   %  policy/version/registry/channel provenance for every configured file.
+   %  Coverage spans each requested timestep between opts.startdate and
+   %  opts.enddate (or the opts.simyears span when no dates are set) directly
+   %  against the filled met files' samples (POLICY A4; water years and
+   %  arbitrary windows are first-class). The canonical product and runtime
+   %  timestep are both fixed at 15 minutes. Calendar-year ledger verdicts
+   %  are producer bookkeeping and never the runtime gate. The returned
+   %  options are marked for code-generation-safe loading.
    %
    % See also: icemodel.loadmet, icemodel.setopts
 
@@ -67,8 +68,12 @@ function opts = verifyPromiceFilledReadiness(opts, fileiter)
    % are never consulted here.
    verifyRequestedWindowCoverage(opts, site, met_files);
 
+   % These flags are the code-generation trust seam. Mint them only after the
+   % manifest, requested-window coverage, and exact artifact provenance have
+   % all passed on the MATLAB side.
    opts.promice_filled_readiness_verified = true;
    opts.promice_filled_manifest_verified = true;
+   opts.promice_filled_provenance_verified = true;
    opts.promice_filled_verified_forcing = char(string(opts.forcings));
    opts.promice_filled_verified_site = char(site);
    opts.promice_filled_verified_simyears = double(opts.simyears(:)).';
@@ -92,7 +97,10 @@ function opts = narrowRequestToSelectedFiles(opts, met_files)
             'file does not contain a nonempty met timetable: %s', ...
             met_files(k));
       end
-      times_by_file{k} = payload.met.Time;
+      % Match loadmet before narrowing UTC request bounds to selected files.
+      selected_times = payload.met.Time;
+      selected_times.TimeZone = 'UTC';
+      times_by_file{k} = selected_times;
    end
    times = vertcat(times_by_file{:});
    selected_years = intersect(double(opts.simyears(:)).', ...
@@ -133,6 +141,7 @@ function verifyRequestedWindowCoverage(opts, site, met_files)
    % file; per-file cells avoid growing arrays inside the loop.
    met_files = string(met_files(:));
    n_files = numel(met_files);
+   met_by_file = cell(n_files, 1);
    times_by_file = cell(n_files, 1);
    flags_by_file = cell(n_files, 1);
    precip_by_file = cell(n_files, 1);
@@ -199,6 +208,7 @@ function verifyRequestedWindowCoverage(opts, site, met_files)
             ppt, rainf, snowf);
          precip_ok = precip_ok & phase_ok;
       end
+      met_by_file{k} = met;
       times_by_file{k} = met.Time;
       flags_by_file{k} = flags;
       precip_by_file{k} = precip_ok;
@@ -207,17 +217,9 @@ function verifyRequestedWindowCoverage(opts, site, met_files)
    flags = vertcat(flags_by_file{:});
    precip_ok = vertcat(precip_by_file{:});
 
-   % Merge duplicate timestamps across files: a timestep is covered when
-   % any configured file covers it.
-   [times, ~, index] = unique(times);
-   merged = false(numel(times), size(flags, 2));
-   for c = 1:size(flags, 2)
-      merged(:, c) = accumarray(index, double(flags(:, c)), ...
-         [numel(times), 1], @max) > 0;
-   end
-   flags = merged;
-   precip_ok = accumarray(index, double(precip_ok), ...
-      [numel(times), 1], @max) > 0;
+   % Runtime concatenation retains every row, so coverage must reject an
+   % ambiguous cross-file interval start instead of silently unioning flags.
+   rejectOverlappingIntervalStarts(times, met_files);
 
    [window_start, window_end] = requestedWindow(opts);
    if numel(times) < 2
@@ -267,6 +269,13 @@ function verifyRequestedWindowCoverage(opts, site, met_files)
       covered = [covered, covered_precip];
    end
    if all(covered(:))
+      % Generated loading cannot inspect timetable UserData. Once the existing
+      % coverage gate passes, validate exact current policy/version, registry,
+      % site/product identity, and channel provenance before minting flags.
+      for k = 1:n_files
+         icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
+            met_files(k), met_by_file{k}, site)
+      end
       return
    end
 
@@ -291,6 +300,26 @@ function verifyRequestedWindowCoverage(opts, site, met_files)
       'promice_filled does not cover the requested window %s..%s for %s: %s', ...
       string(window_start), string(window_end), site, ...
       strjoin(problems(1:n_problems), '; '));
+end
+
+function rejectOverlappingIntervalStarts(times, met_files)
+   %REJECTOVERLAPPINGINTERVALSTARTS Refuse duplicate selected forcing rows.
+
+   % Count identical UTC interval starts across the complete selected file set.
+   [distinct_times, ~, groups] = unique(times);
+   counts = accumarray(groups, 1, [numel(distinct_times), 1]);
+   overlapping = distinct_times(counts > 1);
+   if isempty(overlapping)
+      return
+   end
+
+   % The verifier must fail before its generated-code trust flags can describe
+   % a runtime payload whose loadmet concatenation would contain duplicate rows.
+   error('icemodel:loadmet:promiceFilledIntervalOverlap', ...
+      ['selected promice_filled artifacts contain %d overlapping UTC ' ...
+      'interval-start row(s) (%s .. %s) across %d files'], ...
+      numel(overlapping), string(min(overlapping)), ...
+      string(max(overlapping)), numel(met_files));
 end
 
 function [window_start, window_end] = requestedWindow(opts)

@@ -204,6 +204,7 @@ function [filled, provenance, audit, denials] = lastResortProxies(filled, ...
            x = filled.(name);
            candidate = x;
            candidate(target) = chosen_values{c}(adopt);
+           unblended = candidate;
            adopted = false(numel(times), 1);
            adopted(target) = true;
            native = x;
@@ -231,6 +232,22 @@ function [filled, provenance, audit, denials] = lastResortProxies(filled, ...
                  icemodel.forcing.reconstruct.physicalValidity( ...
                  name, candidate(target), times(target), ...
                  latitude=kwargs.latitude, longitude=kwargs.longitude);
+           end
+           % Wind's positive floor is a runtime numerical contract. If
+           % optional seam optimization pushes any already-valid source
+           % posting outside that contract, retain the whole unblended
+           % source segment so its variability is not replaced by a calm
+           % clamp or a residual outage. Other channels keep the general
+           % post-blend refusal rule because their bounds are physical.
+           if name == "wspd" && any(~valid)
+              candidate(target) = unblended(target);
+              valid = ...
+                 icemodel.forcing.reconstruct.physicalValidity( ...
+                 name, candidate(target), times(target), ...
+                 latitude=kwargs.latitude, longitude=kwargs.longitude);
+              seam_note = string(seam_note) + ...
+                 ", seam blend crossed wind bounds; " + ...
+                 "prevalidated wind source retained";
            end
            denials.(name)(target(~valid)) = "post-blend seam rejection";
            target = target(valid);

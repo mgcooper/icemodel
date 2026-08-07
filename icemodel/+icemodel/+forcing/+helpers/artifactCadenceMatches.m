@@ -44,12 +44,9 @@ function tf = artifactCadenceMatches(filename, variable_name, expected_seconds)
    end
    saved = load(filename, char(variable_name));
    value = saved.(char(variable_name));
-   if ~istimetable(value) || height(value) < 2
+   if ~istimetable(value)
       return
    end
-   steps = seconds(diff(value.Time));
-   candidate = median(steps, 'omitnan');
-   tf = isfinite(candidate) && candidate > 0 ...
-      && all(isfinite(steps)) && all(abs(steps - candidate) < 1e-6) ...
-      && abs(candidate - expected_seconds) < 1e-6;
+   candidate = icemodel.forcing.helpers.uniformCadenceSeconds(value);
+   tf = isfinite(candidate) && abs(candidate - expected_seconds) < 1e-6;
 end

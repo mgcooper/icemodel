@@ -29,7 +29,10 @@ function bounds = physicalBounds(channel)
       case "rh"
          bounds = [5, 100];           % percent
       case "wspd"
-         bounds = [0, 60];            % m/s
+         % metchecks defines the valid forcing contract at 0.1 m/s. Keeping
+         % the same floor here prevents mean-preserving disaggregation from
+         % synthesizing singular calm-air rows from valid hourly postings.
+         bounds = [0.1, 60];          % m/s
       case "psfc"
          bounds = [60000, 108000];    % Pa
       case "swd"

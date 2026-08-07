@@ -122,7 +122,9 @@ Methods admit only through this validation harness:
   geometry.
 - `fitProxyCalibration` / `applyProxyCalibration` — tier 4 overlap bias
   calibration (additive for state channels; multiplicative for shortwave and
-  wind speed, preserving their shape and wind's nonnegative support).
+  wind speed, preserving their shape). Calibrated RH and wind candidates
+  clamp once into their shared scalar bounds with an audit flag, preventing a
+  fitted calm-wind ratio from crossing the 0.1 m/s runtime floor.
   Shortwave overlap is screened by target-station TOA rather than proxy
   magnitude; fitted proxy
   corrections persist in the station plan for calibrated last-resort use,
@@ -198,7 +200,10 @@ Methods admit only through this validation harness:
   neighbor never supplies support; an exactly continuous provenance change
   is not a seam.
 - `blendFallbackSeams` — applies that same taper to proxy, precipitation,
-  and constant fallback segments using the frozen native step scale.
+  and constant fallback segments using the frozen native step scale. If
+  that optional taper would push an already-valid last-resort wind segment
+  outside the runtime wind bounds, the untapered source segment is retained
+  with an audit note; other channels retain the general refusal rule.
 - `stationMethodPlan` — the per-station selection experiment: the
   policy geometry gate (`setopts`), deterministic selection draws created
   only from years with jointly finite core-channel support before fitting
@@ -252,7 +257,9 @@ Methods admit only through this validation harness:
   - **Cadence.** Guarded PROMICE 15-minute staging is collapsed to hourly
     source postings for planning and reconstruction. Observed values and their
     provenance remain exact held copies over the original four-sample support;
-    filled values use the policy-approved mean-preserving disaggregation. The
+    filled values use the policy-approved mean-preserving disaggregation. Wind
+    disaggregation enforces the same 0.1 m/s lower bound as `metchecks`, so a
+    valid hourly posting cannot synthesize singular calm quarter-hours. The
     canonical runtime artifact is published only at 15 minutes, and runtime
     discovery rejects every other `opts.dt`. When several staged windows
     exist, saved timetable coverage—not MAT-file size—selects the widest.

@@ -4,8 +4,10 @@ function tf = promiceFilledVerificationMatches(opts, fileiter) %#codegen
    % Generated loading cannot read the readiness ledger or producer manifest.
    % The MATLAB verifier therefore snapshots the exact forcing label, station,
    % requested window, calendar/model contract, simulation years, 15-minute
-   % timestep, and met-file list it checked; this predicate refuses a reused
-   % options struct after any of those runtime inputs change.
+   % timestep, and met-file list it checked. A separate provenance flag keeps
+   % options minted by the older manifest/coverage-only verifier out of the
+   % generated path; this predicate also refuses reuse after any runtime input
+   % changes.
    if nargin < 2 || isempty(fileiter)
       fileiter = 1:numel(opts.metfname);
    end
@@ -13,6 +15,7 @@ function tf = promiceFilledVerificationMatches(opts, fileiter) %#codegen
 
    tf = opts.promice_filled_readiness_verified ...
       && opts.promice_filled_manifest_verified ...
+      && opts.promice_filled_provenance_verified ...
       && strcmpi(opts.promice_filled_verified_forcing, opts.forcings) ...
       && strcmpi(opts.promice_filled_verified_site, opts.sitename) ...
       && isequal(opts.promice_filled_verified_simyears(:), opts.simyears(:)) ...
