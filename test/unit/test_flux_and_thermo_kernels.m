@@ -141,6 +141,27 @@ function test_stablefn_derivative_matches_finite_difference(testCase)
    end
 end
 
+function test_stability_factor_treats_zero_wind_as_calm_no_exchange(testCase)
+   % Exact calm air should keep the stability multiplier and its derivative
+   % finite so zero exchange prefactors remain a true no-op in every branch.
+
+   tair = 268.15;
+   T_sfc = [tair - 2; tair; tair + 2];
+   wspd = zeros(size(T_sfc));
+   [~, br_coefs] = ...
+      icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
+      0.0, 1e-3, 3.0, 3.0);
+
+   [stability, dstability] = ...
+      icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
+      T_sfc, tair, wspd, br_coefs);
+
+   testCase.verifyEqual(stability, ones(size(T_sfc)), 'AbsTol', 0);
+   testCase.verifyEqual(dstability, zeros(size(T_sfc)), 'AbsTol', 0);
+   testCase.verifyTrue(all(isfinite(stability)));
+   testCase.verifyTrue(all(isfinite(dstability)));
+end
+
 function test_stablefn_neutral_blend_matches_endpoint_formulas(testCase)
    % The near-neutral branch should linearly blend the stable and unstable
    % endpoint formulas across the configured transition width.

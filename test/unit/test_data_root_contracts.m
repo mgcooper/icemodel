@@ -77,8 +77,8 @@ function test_bootstrap_cleanup_runs_after_error(testCase)
    clear restore
 end
 
-function test_formal_classes_inherit_runner_data_root(testCase)
-   % Nested class setup must preserve the candidate root selected by its runner.
+function test_formal_classes_use_runner_root_or_verification_default(testCase)
+   % Nested setup must preserve an explicit root and resolve blank to verification.
 
    config_names = configNames();
    selector_names = ["ICEMODEL_TEST_DATA_ROOT"; ...
@@ -125,9 +125,26 @@ function test_formal_classes_inherit_runner_data_root(testCase)
       '_15m.mat')))
    perf_case.restoreConfig();
 
+   % Direct class setup has no outer root selector and therefore resolves the
+   % production verification tree that owns the official PROMICE forcing.
+   setenv('ICEMODEL_TEST_DATA_ROOT', '')
+   verification_root = fullfile(testCase.TestData.rootdir, 'data');
+   default_regression_case = IcemodelRegressionTest();
+   default_regression_case.configureCases();
+   testCase.verifyEqual(string(getenv('ICEMODEL_DATA_PATH')), ...
+      verification_root)
+   default_regression_case.restoreConfig();
+
+   default_perf_case = IcemodelPerfTest();
+   default_perf_case.configureCases();
+   testCase.verifyEqual(string(default_perf_case.opts.pathinput), ...
+      string(fullfile(verification_root, 'input')))
+   default_perf_case.restoreConfig();
+
    % Each nested cleanup restores the still-active outer runner selection.
    testCase.verifyEqual(string(getenv('ICEMODEL_DATA_PATH')), data_root)
-   clear outer_cleanup regression_case perf_case
+   clear outer_cleanup regression_case perf_case default_regression_case ...
+      default_perf_case
    clear restore
 end
 

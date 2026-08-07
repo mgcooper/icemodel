@@ -855,6 +855,28 @@ function test_set_model_opts_rejects_mixed_manifest_met_cadence(testCase)
       'icemodel:test:setModelOptsForCase:invalidManifestMetFiles');
 end
 
+function test_set_model_opts_rejects_manifest_artifact_path_escapes(testCase)
+   % Met and userdata records must reject every platform spelling that could
+   % leave their selected input subtree before any referenced bytes are loaded.
+
+   times = datetime(2012, 1, 1, [0; 1], 0, 0, 'TimeZone', 'UTC');
+   [c, ~] = makeManifestMetListCase(testCase, "path-escape", ...
+      {times}, times(1), times(end));
+   fields = ["met_files", "data_files"];
+   attacks = ["../../outside.mat", "..\..\outside.mat", ...
+      "/tmp/outside.mat", "C:\outside.mat"];
+
+   for field = fields
+      for attack = attacks
+         unsafe = c;
+         unsafe.colocation.mar.(char(field)) = {char(attack)};
+         testCase.verifyError( ...
+            @() icemodel.test.helpers.setModelOptsForCase(unsafe), ...
+            'icemodel:test:setModelOptsForCase:invalidManifestArtifactPath');
+      end
+   end
+end
+
 function test_retmip_candidate_adapter_returns_protocol_bundle(testCase)
    % RetMIP manifests compare against retmip_protocol_bundle targets, not the
    % SUMup-style subsurface_profile_bundle used by profile observations.

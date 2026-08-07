@@ -14,7 +14,7 @@ function tf = isPathInside(pathname, root)
    %  tf : logical scalar, true when pathname is root or inside it.
    %
    % See also: icemodel.forcing.reconstruct.fillPromiceStation,
-   %  icemodel.verifyPromiceFilledReadiness,
+   %  icemodel.forcing.reconstruct.verifyPromiceFilledReadiness,
    %  icemodel.verification.report.buildGapFillReport
 
    pathname = string(java.io.File(char(pathname)).getCanonicalPath());
