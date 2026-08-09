@@ -94,7 +94,7 @@ function split = validationSplit(years, kwargs)
 
    if kwargs.manifest_file ~= ""
       % Persist through a plain JSON write; the read path above is the
-      % replay contract. The canonical guard runs before directory creation.
+      % replay rules. The guard runs before any directory is created.
       cfg = icemodel.config('getenv', true);
       icemodel.forcing.reconstruct.assertNotEvaluationDestination( ...
          kwargs.manifest_file, string(cfg.ICEMODEL_EVAL_PATH));

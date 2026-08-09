@@ -87,7 +87,11 @@ function [met, checks] = metchecks(met, kwargs)
          met.rh = clampPresent(met.rh, 5, 99.99);
       end
       if ismember("wspd", varnames)
-         met.wspd = clampPresent(met.wspd, 0.1, Inf);
+         % Apply the wind floor so a reconstructed met file is accepted at
+         % runtime.
+         wspd_bounds = ...
+            icemodel.forcing.reconstruct.physicalBounds("wspd");
+         met.wspd = clampPresent(met.wspd, wspd_bounds(1), Inf);
       end
       if ismember("wdir", varnames)
          met.wdir = wrapWindDirection(met.wdir);
@@ -97,7 +101,8 @@ function [met, checks] = metchecks(met, kwargs)
          % kelvin vs celsius from the series magnitude (legacy
          % convention; glacier surfaces are never near 100 C).
          if min(met.tsfc, [], 'omitnan') > 100
-            met.tsfc = clampPresent(met.tsfc, -Inf, 273.16);
+            met.tsfc = clampPresent(met.tsfc, -Inf, ...
+               icemodel.physicalConstant('Tf'));
          else
             met.tsfc = clampPresent(met.tsfc, -Inf, 0);
          end

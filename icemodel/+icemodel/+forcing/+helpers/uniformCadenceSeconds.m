@@ -3,11 +3,10 @@ function cadence_seconds = uniformCadenceSeconds(value)
    %
    %  cadence_seconds = icemodel.forcing.helpers.uniformCadenceSeconds(value)
    %
-   % VALUE is a timetable. CADENCE_SECONDS is its single regular sample spacing
-   % in seconds, or NaN when VALUE has fewer than two rows or no single spacing.
-   % This is the one place the repository derives cadence from a saved time
-   % coordinate, so writers, reuse checks, and readiness gates cannot disagree
-   % about what counts as regular.
+   % VALUE is a timetable. CADENCE_SECONDS is its sample spacing in seconds, or
+   % NaN if the timetable has fewer than two rows or the spacing is not
+   % constant. Everything that needs a cadence calls this, so writers and
+   % readiness checks cannot disagree about what counts as regular.
 
    arguments
       value timetable

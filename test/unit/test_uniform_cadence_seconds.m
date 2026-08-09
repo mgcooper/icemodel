@@ -9,7 +9,7 @@ function tests = test_uniform_cadence_seconds
 end
 
 function value = payload(time)
-   %PAYLOAD Build a minimal timetable carrying only a time coordinate.
+   %PAYLOAD Build a timetable with just a time column.
    value = timetable(zeros(numel(time), 1), 'RowTimes', time, ...
       'VariableNames', {'tair'});
 end

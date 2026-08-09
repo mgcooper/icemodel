@@ -47,6 +47,10 @@ function opts = setopts(kwargs)
    %  seam_qa_min_reference_steps : minimum observed steps required in a
    %     season x solar-elevation band before the screen falls back to the
    %     season-wide reference.
+   %  seam_retain_unblended_channels : channels whose whole unblended source
+   %     segment is retained when the seam blend crosses their physical
+   %     bounds, instead of taking the general post-blend refusal. Wind is
+   %     listed because a calm clamp would replace real variability.
    %  seam_qa_max_passes : maximum one-posting synthetic-side repair
    %     iterations. Two passes resolve cascaded KANL boundaries without
    %     the extra distortion caused by a two-posting window.
@@ -146,6 +150,7 @@ function opts = setopts(kwargs)
          {mustBeInteger, mustBePositive} = 100
       kwargs.seam_qa_max_passes (1, 1) double ...
          {mustBeInteger, mustBeNonnegative} = 2
+      kwargs.seam_retain_unblended_channels (1, :) string = "wspd"
       kwargs.toa_dark_wm2 (1, 1) double {mustBePositive} = 10
       kwargs.max_donor_distance_km (1, 1) double {mustBePositive} = 60
       kwargs.max_donor_elev_diff_m (1, 1) double {mustBePositive} = 600
