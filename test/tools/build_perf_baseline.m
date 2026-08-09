@@ -102,10 +102,10 @@ function PerfBaseline = build_perf_baseline(kwargs)
    [~, input_path, ~, ~, suite_cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment( ...
       icemodel_config_casename=baseline_policy.config_case, ...
-      data_root=kwargs.data_root); %#ok<ASGLU>
+      data_root=kwargs.data_root);
 
    % The perf TestCase bootstraps each measured case, so retain the configured
-   % root in its established runner-to-class environment contract. A caller-
+   % root through the environment the runner sets for the class. A caller-
    % supplied root keeps precedence over the resolved verification root.
    data_root = kwargs.data_root;
    if isblanktext(data_root)
@@ -163,6 +163,9 @@ function PerfBaseline = build_perf_baseline(kwargs)
 
    % Collapse to a single table.
    PerfBaseline = vertcat(baselines{:});
+
+   % Restore the caller config now that this entrypoint is done.
+   delete(suite_cleanup)
 end
 
 function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...

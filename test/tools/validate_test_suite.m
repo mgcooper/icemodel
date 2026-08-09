@@ -8,7 +8,7 @@ function validate_test_suite(kwargs)
    % managed baselines. The validation pass checks signatures, Code Analyzer
    % cleanliness, top-level runner selector variants, per-file discovery, and
    % rolling build tools against temporary output files. Release lifecycle
-   % contracts are covered by focused unit tests without inventing a tag.
+   % rules are covered by focused unit tests without inventing a tag.
 
    arguments
 
@@ -145,7 +145,7 @@ function validate_test_suite(kwargs)
 
    % Exercise rolling builders against temporary outputs without mutating
    % managed baselines. Release tools require an explicitly registered tag and
-   % are covered by the focused baseline-contract unit suite above.
+   % are covered by the focused baseline unit suite above.
    runCase("tool/build-reg-rolling-temp", @() checkFile( ...
       build_regression_baseline(baseline="rolling", tier="smoke", ...
       smbmodel="skinmodel", include_profile_artifacts=false, ...

@@ -3,6 +3,26 @@ function tests = test_baseline_contracts
    tests = functiontests(localfunctions);
 end
 
+function setupOnce(testCase)
+   %SETUPONCE Put the baseline runners on the path.
+   %
+   % build_regression_baseline and build_perf_baseline live in test/tools and
+   % IcemodelRegressionTest in test/regression. Neither folder is on the path
+   % by default, so running this file on its own would otherwise report
+   % "Undefined function" instead of the contract error it is checking for.
+
+   root = icemodel.internal.fullpath();
+   original_path = path;
+   testCase.addTeardown(@() path(original_path));
+   folders = {fullfile(root, 'test', 'tools'), ...
+      fullfile(root, 'test', 'regression')};
+   for k = 1:numel(folders)
+      if isfolder(folders{k})
+         addpath(folders{k});
+      end
+   end
+end
+
 function test_resolveBaselineSelector_handles_rolling_and_release(testCase)
    % Cover the public selector contract for rolling and release baselines.
 
@@ -445,7 +465,7 @@ end
 function test_builder_shaped_regression_candidate_excludes_only_metadata(testCase)
    % The actual builder emits string baseline identity and a datetime beside
    % numeric metrics. Those registered fields must not be treated as metrics,
-   % while an unknown nonnumeric column must still fail the closed contract.
+   % while an unknown nonnumeric column must still be rejected.
    case_id = "icemodel_kanm_2016_solver1";
    cases = table(case_id, 'VariableNames', {'case_id'});
    row = struct( ...
@@ -617,7 +637,7 @@ function test_baseline_builders_forward_data_root_without_writing(testCase)
       baseline_tag="v1.1", data_root="", output_file=output_file), ...
       'icemodel:test:baselineDataRootObserved');
 
-   % An explicit root remains authoritative even for a release registration.
+   % An explicit root still wins, even for a release registration.
    setenv('ICEMODEL_EXPECTED_BUILDER_ARGUMENT_ROOT', selected_root);
    setenv('ICEMODEL_EXPECTED_BUILDER_RESOLVED_ROOT', selected_root);
    setenv('ICEMODEL_EXPECTED_BUILDER_KIND', 'regression');
@@ -668,8 +688,8 @@ function test_baseline_runners_select_registered_data_case_without_running(testC
    testCase.verifyError(@() regression_test.configureCases(), ...
       'icemodel:test:baselineRunnerRootObserved');
 
-   % An explicit root remains authoritative while the registered case stays
-   % visible to the central bootstrap contract.
+   % An explicit root still wins while the registered case stays
+   % visible to the central bootstrap.
    selected_root = fullfile(fixture_root, "selected-data");
    setenv('ICEMODEL_EXPECTED_RUNNER_ROOT', selected_root);
    verifyRunnerBootstrap(testCase, "v1.1", selected_root);
@@ -896,7 +916,7 @@ function test_loadReference_returns_nonempty_table(testCase)
 end
 
 function verifyCaseForcingMatches(testCase, cases, baseline)
-   %VERIFYCASEFORCINGMATCHES Match each case id and compare its forcing identity.
+   %VERIFYCASEFORCINGMATCHES Match each case id and compare its forcing hash.
 
    testCase.assertTrue(ismember('forcings', ...
       baseline.Properties.VariableNames));
@@ -922,7 +942,8 @@ function writeBuilderBootstrapStub(filename)
    %WRITEBUILDERBOOTSTRAPSTUB Intercept baseline setup before model execution.
 
    lines = [ ...
-      "function [rootdir, input_path, output_path, eval_path, cleanup] = bootstrapTestEnvironment(varargin)"
+      "function [rootdir, input_path, output_path, eval_path, " ...
+      + "cleanup] = bootstrapTestEnvironment(varargin)"
       "names = string(varargin(1:2:end));"
       "values = string(varargin(2:2:end));"
       "data_root = values(names == 'data_root');"
@@ -959,10 +980,11 @@ function writeBuilderResolverStub(filename)
 end
 
 function writeRunnerBootstrapStub(filename)
-   %WRITERUNNERBOOTSTRAPSTUB Stop public runners at their setup boundary.
+   %WRITERUNNERBOOTSTRAPSTUB Stop public runners after setup.
 
    lines = [ ...
-      "function [rootdir, input_path, output_path, eval_path, cleanup] = bootstrapTestEnvironment(varargin)"
+      "function [rootdir, input_path, output_path, eval_path, " ...
+      + "cleanup] = bootstrapTestEnvironment(varargin)"
       "names = string(varargin(1:2:end));"
       "values = string(varargin(2:2:end));"
       "data_root = values(names == 'data_root');"
@@ -992,7 +1014,7 @@ function verifyRunnerBootstrap(testCase, baseline, data_root)
 end
 
 function verifyFixtureCapabilityError(testCase, operation, data_root)
-   %VERIFYFIXTURECAPABILITYERROR Check the stable network-free repair contract.
+   %VERIFYFIXTURECAPABILITYERROR Check the repair path works without network access.
    try
       operation();
       testCase.verifyFail('expected incomplete frozen fixture capability');

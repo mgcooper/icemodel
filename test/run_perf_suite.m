@@ -131,7 +131,8 @@ function results = run_perf_suite(kwargs)
          capabilities=baseline_policy.required_fixture_capabilities, ...
          root=data_root, download=false);
    end
-   data_root_cleanup = configurePerfDataRootEnv(data_root); %#ok<NASGU>
+   % Hold the env restore for the rest of this function; cleared at the end.
+   data_root_cleanup = configurePerfDataRootEnv(data_root);
 
    % Formal wall-clock timings must never inherit an interactive profiler.
    profile off
@@ -168,6 +169,10 @@ function results = run_perf_suite(kwargs)
       results.report_file = ...
          icemodel.verification.report.buildTestSuiteReport("performance", results);
    end
+
+   % Restore the data-root environment now that every timing has been taken.
+   % An early error still restores it, because the object dies with the scope.
+   delete(data_root_cleanup)
 end
 
 function results = runSingleModelPerfSuite(input_path, output_path, ...

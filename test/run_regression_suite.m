@@ -145,7 +145,7 @@ function results = runSingleModelRegression(runner, suite, tier, smbmodel, ...
    %RUNSINGLEMODELREGRESSION Configure one formal model regression run.
 
    % Reject an unaccepted forcing transition before unittest dispatch so the
-   % top-level runner preserves the shared baseline-contract error identifier.
+   % top-level runner keeps the shared baseline error id.
    formal_baseline = icemodel.test.helpers.loadBaseline("regression", ...
       smbmodel=smbmodel, baseline_tag=baseline);
    icemodel.test.helpers.assertFormalBaselineForcing( ...
@@ -166,16 +166,16 @@ function results = runSingleModelRegression(runner, suite, tier, smbmodel, ...
       error('icemodel:test:regressionArtifactMissing', ...
          ['The regression test did not write its comparison artifact. ' ...
          'Inspect the unittest diagnostics above for the setup or test failure.'])
-    end
-    S = load(artifact_file, 'report', 'case_opts', 'meta');
+   end
+   S = load(artifact_file, 'report', 'case_opts', 'meta');
 
-    results = struct();
-    results.report = S.report;
+   results = struct();
+   results.report = S.report;
    results.case_opts = S.case_opts;
    results.meta = S.meta;
-    results.artifact_file = artifact_file;
-    results.test_result = test_result;
-    results.passed = all([test_result.Passed]);
+   results.artifact_file = artifact_file;
+   results.test_result = test_result;
+   results.passed = all([test_result.Passed]);
    if results.passed
       results.failed_cases = strings(0, 1);
    elseif any(~S.report.passed)

@@ -24,7 +24,7 @@ function report = audit_formal_substep_failures(kwargs)
    % Bootstrap the canonical test config once for the whole audit.
    [~, ~, ~, ~, suite_cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment( ...
-      icemodel_config_casename="verification"); %#ok<ASGLU>
+      icemodel_config_casename="verification");
 
    % Resolve the formal case matrix up front so the audit runs one canonical
    % single-case workflow at a time.
@@ -105,6 +105,9 @@ function report = audit_formal_substep_failures(kwargs)
 
    disp(report.summary(:, {'case_id', 'elapsed_s', ...
       'has_dt_min_warning', 'has_maxsubstep'}))
+
+   % Restore the caller config now that this entrypoint is done.
+   delete(suite_cleanup)
 end
 
 function excerpt = extractIssueExcerpt(txt)

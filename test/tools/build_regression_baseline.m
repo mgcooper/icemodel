@@ -90,7 +90,7 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    [~, ~, ~, ~, suite_cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment( ...
       icemodel_config_casename=baseline_policy.config_case, ...
-      data_root=kwargs.data_root); %#ok<ASGLU>
+      data_root=kwargs.data_root);
 
    % Deal out arguments.
    [baseline, baseline_tag, tier, smbmodel, solver, simyear, smoke_sites, ...
@@ -120,6 +120,9 @@ function RegressionBaseline = build_regression_baseline(kwargs)
 
    % Collapse to a single table.
    RegressionBaseline = vertcat(baselines{:});
+
+   % Restore the caller config now that this entrypoint is done.
+   delete(suite_cleanup)
 end
 
 function RegressionBaseline = buildSingleModelRegressionBaseline( ...
@@ -146,13 +149,10 @@ function RegressionBaseline = buildSingleModelRegressionBaseline( ...
       c = cases(icase, :);
       fprintf('Regression baseline case %d/%d: %s\n', ...
          icase, height(cases), c.case_id)
-      opts_run = icemodel.test.helpers.setModelOptsForCase(c);
-
-      % Run the case and postprocess the retained output years into the
-      % scalar metrics carried by the regression baseline.
-      [ice1, ice2] = icemodel.test.helpers.runSmbModel(opts_run);
-      [ice1, ~] = icemodel.postprocess( ...
-         ice1, ice2, opts_run, opts_run.output_years);
+      % Build the baseline through the same helper the comparison uses, so an
+      % accepted baseline can never be produced by a different code path than
+      % the suite that gates it.
+      [ice1, ~, opts_run] = icemodel.test.helpers.runModelCase(c);
 
       % Load the matched runoff reference row, if one exists, before
       % summarizing the retained yearly outputs.

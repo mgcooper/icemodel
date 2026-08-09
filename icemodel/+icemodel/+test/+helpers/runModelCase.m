@@ -5,7 +5,7 @@ function [ice1, ice2, opts] = runModelCase(c, varargin)
    %  [ice1, ice2, opts] = icemodel.test.helpers.runModelCase( ...
    %     case_manifest, startdate=..., enddate=...)
    %
-   % C accepts the same formal-row or verification-manifest contract as
+   % C accepts the same formal row or verification manifest as
    % setModelOptsForCase. Additional inputs are forwarded unchanged.
 
    % Keep case resolution, production dispatch, and canonical postprocessing

@@ -157,7 +157,8 @@ end
 
 function validateSelectorMetadata( ...
       baseline, meta, baseline_type, baseline_tag, pathname)
-   %VALIDATESELECTORMETADATA Reject persisted selector identity conflicts.
+   %VALIDATESELECTORMETADATA Error if the saved selector disagrees with the
+   % current one.
    if isempty(baseline)
       return
    end

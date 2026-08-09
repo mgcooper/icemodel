@@ -177,8 +177,11 @@ Programmatic regression helpers:
    - Chooses one longest summer interval with a 0.05 m trace-snow continuity
      threshold and a 0.01 m exposed-ice threshold for paired values; censored
      rows remain explicit rather than splitting or silently scoring snow cover.
-   - An empty selection is readiness-only; pass `write_artifacts=true` to
-     persist the ledger, summaries, and saved result bundle.
+   - An empty `case_ids` selection is readiness-only and writes no run
+     artifacts. To persist the ledger, summaries, and saved result bundle,
+     name the cases (or pass `case_ids="all"`) and set
+     `write_artifacts=true`. Setting `write_artifacts=true` with an empty
+     selection is an error.
    - Render the saved bundle with
      `icemodel.verification.report.buildAblationEvaluationReport(...)`; the
      report layer never reruns the model or rereads canonical science inputs.

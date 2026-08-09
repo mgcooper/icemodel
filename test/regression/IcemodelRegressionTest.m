@@ -58,8 +58,8 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          % Run each formal case, compare to baseline, and collect a report row.
          for icase = 1:height(cases)
             c = cases(icase, :);
-            [ice1, ice2, opts] = ...
-               icemodel.test.helpers.runModelCase(c); %#ok<ASGLU>
+            [ice1, ~, opts] = ...
+               icemodel.test.helpers.runModelCase(c);
 
             % Summarize the retained output years against the matched runoff
             % reference row, if one exists for this formal case.

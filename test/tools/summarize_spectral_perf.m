@@ -40,7 +40,7 @@ function report = summarize_spectral_perf(kwargs)
    % runner share the same environment as the accepted test suite.
    [~, ~, ~, ~, suite_cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment( ...
-      icemodel_config_casename="verification"); %#ok<ASGLU>
+      icemodel_config_casename="verification");
 
    % Measure the narrow kernel path first because it isolates the spectral
    % transforms from the rest of the model runtime.
@@ -85,6 +85,9 @@ function report = summarize_spectral_perf(kwargs)
       disp('Spectral direct-model output agreement:')
       disp(report.direct_model.accuracy)
    end
+
+   % Restore the caller config now that this entrypoint is done.
+   delete(suite_cleanup)
 end
 
 function report = summarizeSpectralKernelPerf(simyear)
