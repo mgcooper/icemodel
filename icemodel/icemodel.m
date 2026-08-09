@@ -43,8 +43,8 @@ function [ice1, ice2, opts] = icemodel(opts)
    opts = icemodel.prepareRunOutput(opts);
 
    % Verification can ask icemodel to return snow-model-like outputs before
-   % the production snow physics exists. Keep the bypass explicit and owned by
-   % the verification namespace so the normal solver path remains unchanged.
+   % the production snow physics exists. The bypass is used only by the
+   % verification namespace, so the normal solver path stays unchanged.
    if isfield(opts, 'verification_synthetic_snow') ...
          && opts.verification_synthetic_snow
       [ice1, ice2, opts] = icemodel.verification.syntheticSnowModelRun(opts);
@@ -53,8 +53,12 @@ function [ice1, ice2, opts] = icemodel(opts)
 
    TINY = 1e-8;
 
-   % Use the diagnostic output-profile for detailed mass budget outputs.
-   use_mass_budget = strcmpi(opts.output_profile, 'diagnostic');
+   % Both extra ledgers are diagnostic-only, so build them only there. They
+   % are named apart because they are separate diagnostics: narrowing one gate
+   % must not silently empty the other's channels.
+   use_diagnostic_profile = strcmp(opts.output_profile, 'diagnostic');
+   use_mass_budget = use_diagnostic_profile;
+   use_thf_diag = use_diagnostic_profile;
 
    % UNPACK SOLVER OPTS
    [solver, maxiter, tol, alpha, use_aitken, jumpmax, cpl_maxiter, ...
@@ -98,6 +102,12 @@ function [ice1, ice2, opts] = icemodel(opts)
       = icemodel.timestepping.resetsubstep(T_sfc, T_ice, f_ice, f_liq);
    force_advance_streak_dt = 0.0;
 
+   % Define the ledger and the handoffs the accumulators pass between each
+   % other. They are written and read inside `if use_mass_budget` blocks, and
+   % use_mass_budget is a runtime value, so they need a value on every path.
+   [mass_energy_budget, solid_p, liquid_p, phase_solid, phase_liquid, ...
+      vapor_solid, vapor_liquid] = icemodel.column.initialize_budget_state();
+
    %% START TIMESTEPS OVER YEARS
    for thisyear = 1:numyears
 
@@ -107,14 +117,13 @@ function [ice1, ice2, opts] = icemodel(opts)
          [dt_sum, n_subfail, ok_seb, ok_ieb, d_liq, d_evp, d_lyr, d_rof] ...
             = icemodel.timestepping.newtimestep(f_liq, solver);
 
-         % Initialize the forcing-step mass budget ledger. Storage, phase,
-         % vapor, and remesh changes are positive into the column. Overflow and
-         % collapse export are positive out; unapplied vapor retains
-         % rejected-input sign.
-         mass_budget = icemodel.column.initialize_budget_state();
+         % Zero the ledger for this forcing step and take its opening
+         % storage. The channels accumulate across substeps, so they have to
+         % start from zero again each step.
          if use_mass_budget
-            [mass_budget.mass_budget_solid_start_mwe, ...
-               mass_budget.mass_budget_liquid_start_mwe] = ...
+            mass_energy_budget = icemodel.column.initialize_budget_state();
+            [mass_energy_budget.mass_budget_solid_start_mwe, ...
+               mass_energy_budget.mass_budget_liquid_start_mwe] = ...
                icemodel.column.integrate_column_budget(T_ice, f_ice, f_liq, dz);
          end
 
@@ -185,11 +194,10 @@ function [ice1, ice2, opts] = icemodel(opts)
                continue
             end
 
-            % Checkpoint accepted thermodynamic phase change before applying
-            % any surface vapor exchange.
+            % Checkpoint melt/freeze phase change before surface vapor exchange.
             if use_mass_budget
-               [mass_budget, solid_p, liquid_p, phase_solid, phase_liquid] ...
-                  = icemodel.column.accumulate_phase_budget(mass_budget, ...
+               [mass_energy_budget, solid_p, liquid_p, phase_solid, phase_liquid] ...
+                  = icemodel.column.accumulate_phase_budget(mass_energy_budget, ...
                   xT_ice, xf_ice, xf_liq, T_ice, f_ice, f_liq, dz);
             end
 
@@ -207,11 +215,11 @@ function [ice1, ice2, opts] = icemodel(opts)
                T_ice, f_ice, f_liq, xf_liq, d_pevp, d_liq, d_evp, d_rof, ...
                f_res_por, f_ice_min);
 
-            % Checkpoint realized vapor exchange and its accepted input,
-            % overflow, and signed unapplied energy channels.
+            % Checkpoint realized vapor exchange and its input, overflow, and
+            % signed unapplied energy (d_sbl_err).
             if use_mass_budget
-               [mass_budget, vapor_solid, vapor_liquid] ...
-                  = icemodel.column.accumulate_vapor_budget(mass_budget, ...
+               [mass_energy_budget, vapor_solid, vapor_liquid] ...
+                  = icemodel.column.accumulate_vapor_budget(mass_energy_budget, ...
                   solid_p, liquid_p, T_ice, f_ice, f_liq, dz, ...
                   d_pevp, d_rof, d_sbl_err);
             end
@@ -226,8 +234,8 @@ function [ice1, ice2, opts] = icemodel(opts)
                % Accumulate the numerical remeshing, domain-exchange, and
                % discrete grid-translation ledgers, which stay separate from
                % the physical phase and vapor increments.
-               mass_budget = icemodel.column.accumulate_remesh_budget( ...
-                  mass_budget, remesh, phase_solid + vapor_solid, ...
+               mass_energy_budget = icemodel.column.accumulate_remesh_budget( ...
+                  mass_energy_budget, remesh, phase_solid + vapor_solid, ...
                   phase_liquid + vapor_liquid);
             else
                [T_ice, f_ice, f_liq, Sc, Sp, d_lyr, ~] ...
@@ -248,8 +256,8 @@ function [ice1, ice2, opts] = icemodel(opts)
          % Close the forcing-step storage endpoints after every accepted
          % substep, including any numerical remeshing/domain exchange.
          if use_mass_budget
-            [mass_budget.mass_budget_solid_end_mwe, ...
-               mass_budget.mass_budget_liquid_end_mwe] = ...
+            [mass_energy_budget.mass_budget_solid_end_mwe, ...
+               mass_energy_budget.mass_budget_liquid_end_mwe] = ...
                icemodel.column.integrate_column_budget( ...
                T_ice, f_ice, f_liq, dz);
          end
@@ -267,7 +275,8 @@ function [ice1, ice2, opts] = icemodel(opts)
             nu_air(metstep), H_h(metstep), H_e, hv_atm, br_coefs_step, ...
             liqflag, chi, T_ice, k_eff, dz, ro_sfc, snow_depth, step_opts);
 
-         if strcmp(opts.output_profile, 'diagnostic')
+         % Build a detailed thf diagnostic ledger if requested.
+         if use_thf_diag
             [~, ~, thf_diag] ...
                = icemodel.surface.diagnose_turbulent_heat_fluxes( ...
                icemodel.surface.physical_surface_temperature(T_sfc), ...
@@ -284,7 +293,11 @@ function [ice1, ice2, opts] = icemodel(opts)
 
             % Assemble one compile-time struct layout for every profile. The
             % output profile still selects the externally visible fields.
-            surface_state = mass_budget;
+            % Branching here would leave surface_state without a single
+            % inferable type for Coder, and would make a caller who names a
+            % mass_budget_* channel in vars1 outside the diagnostic profile
+            % hit unknownOutputField instead of reading the zeroed ledger.
+            surface_state = mass_energy_budget;
             surface_state.Tsfc = T_sfc;
             surface_state.Qm = Qm;
             surface_state.Qf = Qf;

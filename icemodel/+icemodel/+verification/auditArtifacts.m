@@ -1925,8 +1925,10 @@ function [channel, findings] = marChannelDiagnostics(channel, data, times, ...
    finite = isfinite(data) & imag(data) == 0;
    finite_values = real(data(finite));
    if ~isempty(finite_values)
-      channel.p01 = sampleQuantile(finite_values, 0.01);
-      channel.p99 = sampleQuantile(finite_values, 0.99);
+      channel.p01 = icemodel.verification.helpers.sampleQuantile( ...
+         finite_values, 0.01);
+      channel.p99 = icemodel.verification.helpers.sampleQuantile( ...
+         finite_values, 0.99);
    end
 
    % Time-axis counts remain useful for both contracts. Applied hybrid QC is
@@ -2597,20 +2599,6 @@ function tf = isRacmoSource(source)
    tf = ismember(lower(string(source)), ["racmo", "racmo2.3p3"]);
 end
 
-function value = sampleQuantile(values, probability)
-   %SAMPLEQUANTILE Linear-interpolated sample quantile without extra toolboxes.
-   values = sort(double(values(:)));
-   if isempty(values)
-      value = NaN;
-      return
-   end
-   position = 1 + (numel(values) - 1) * probability;
-   lower_index = floor(position);
-   upper_index = ceil(position);
-   fraction = position - lower_index;
-   value = values(lower_index) * (1 - fraction) ...
-      + values(upper_index) * fraction;
-end
 
 function value = timeString(t)
    %TIMESTRING Render a datetime in the portable manifest timestamp format.
@@ -2730,7 +2718,7 @@ function report = writeReports(report, report_dir)
 
    % JSON carries every stable record; Markdown stays compact for humans and
    % downstream Quarto inclusion.
-   writeText(json_path, jsonencode(report, PrettyPrint=true));
+   icemodel.verification.setup.writeJson(json_path, report);
    writeText(markdown_path, markdownReport(report));
 end
 

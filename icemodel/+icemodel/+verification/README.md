@@ -80,7 +80,7 @@ pair it replaces, so removing a nearly empty top cell still exports about half
 the pair's mass. Across the current cohort the series runs about 1.5 times melt,
 which measures the regridding rule rather than mass leaving the surface. Signed
 mass/energy ledgers and their
-non-cancelling throughput channels remain separate so numerical closure cannot
+non-cancelling gross channels remain separate so numerical closure cannot
 hide opposing remesh or domain exchanges.
 
 The orchestration entry point is
@@ -1413,6 +1413,21 @@ source rows and must not define a new on-disk contract.
   opts builder used by `runIcemodelSnowCandidate` is
   `icemodel.test.helpers.setModelOptsForCase`, which accepts both formal-case
   rows and verification manifests via input dispatch.
+- `helpers` also owns the small pieces more than one consumer needs, so they
+  cannot drift apart: `residualMetrics` (bias, MAE, RMSE, max error, and NSE
+  with one set of guards), `sampleQuantile`, `evaluationSeason` (the season
+  bounds readiness admits against and the runner evaluates against),
+  `ablationLedgerIncrements` (the per-interval solid-balance, surface-loss,
+  and solid-vapor-loss terms the comparator scores and the runner plots), and
+  `classifySnowDepth`.
+- `report` owns the pieces both report builders share: `markdownTable`,
+  `formatValue`, `markdownCode`, `escapeMarkdownText`, `sanitizeText`,
+  `safeLabel`, `formatReportAxes`, `configureCategoryAxis`, and
+  `exportAndClose`. Figures come from `icemodel.plot.newFigure` and spans from
+  `icemodel.plot.markTimeSpan`, so every report shares one export frame and
+  one span style.
+- `setup.writeJson` writes every readiness ledger, preview evidence, and QA
+  JSON, so they agree on UTF-8 and a trailing newline.
 - `setup` contains the consistently named family source catalogs listed above,
   their shared strict site-id selector (`selectSiteCatalogEntries`), and the
   canonical staged-case factories. RetMIP keeps alias-aware case selection in

@@ -37,12 +37,17 @@ Current migrated entry points:
     `T`, `f_ice`, `f_liq`, and `dz`, on the solver's physical intrinsic-density
     and physical-water MWE basis; `use_ro_glc` changes initialization fractions
     only
-- `icemodel.column.budget_output_fields`
+- `icemodel.namelists.budgetoutputs` (the ledger field list, in `+namelists`)
 - `icemodel.column.initialize_budget_state`
   - returns the zeroed fixed-schema ledger a forcing step starts from
 - `icemodel.column.accumulate_phase_budget`
 - `icemodel.column.accumulate_vapor_budget`
 - `icemodel.column.accumulate_remesh_budget`
+- `icemodel.column.initialize_remesh_ledger`
+  - returns the zeroed per-event remesh ledger. `merge_thin_layers` is its
+    only caller and returns the filled struct as its opt-in eighth output;
+    it lives here so that schema has one definition the tests can assert
+    against
   - the three accumulators update ledger state rather than returning standalone
     event terms, which is why they are named `accumulate_*_budget`. They keep
     the diagnostic ledger out of the timestep driver; call them once per
@@ -54,9 +59,10 @@ Current migrated entry points:
 - `icemodel.column.budget_surface_mass_balance`
 - `icemodel.column.merge_thin_layers`
   - three views of the same remeshing export, which nest rather than
-    duplicate. `df_lyr` (ice2, every profile) totals the mass all merges
+    duplicate. `df_lyr` (ice2, standard and diagnostic profiles) totals
+    the mass all merges
     removed, as a water-equivalent fraction the caller scales by `dz`.
-    `mass_budget_collapse_export_solid/liquid_mwe` (diagnostic profile) is that
+    `mass_budget_merge_export_solid/liquid_mwe` (diagnostic profile) is that
     same total split by phase, which the closure identities require.
     `mass_budget_top_export_solid/liquid_mwe` is the surface-removal subset,
     separated because interior merges move mass without lowering the grid.

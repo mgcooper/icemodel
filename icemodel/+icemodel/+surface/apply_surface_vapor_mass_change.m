@@ -49,9 +49,9 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
    % Initialize potential deposition that cannot be satisfied by the cv budget.
    d_sbl_err = 0;
 
-   % If a liquid film is present, partition vapor exchange through the liquid
-   % reservoir first. Otherwise route it directly to the ice phase so dry/cold
-   % deposition forms ice rather than spurious liquid water.
+   % If a liquid film is present, partition liquid vapor exchange first.
+   % Otherwise route the exchange straight to the ice phase, so dry or cold
+   % deposition forms ice instead of liquid water that is not there.
    if wetflag
 
       if d_pevp < 0 % evaporation
@@ -102,11 +102,10 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
 
             f_liq = f_liq + d_aevp;
 
-            % Condensation beyond what the top cell's pore space can hold.
-            % The excess cannot be stored, so it leaves as runoff rather than
-            % being dropped: d_rof carries it to diagnose_column_runoff. This
-            % branch does fire in practice, so discarding it would lose real
-            % water from the budget.
+            % Condensation beyond what the top cell's pore space can hold. The
+            % excess cannot be stored, so it leaves as runoff (d_rof sends it
+            % to diagnose_column_runoff). The excess is real water, so
+            % dropping it would break the budget.
             d_pevp = d_pevp - d_aevp_max;
             d_rof = d_rof + d_pevp;
 

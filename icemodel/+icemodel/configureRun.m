@@ -72,6 +72,11 @@ function opts = configureRun(opts)
 
    if ~isfield(opts, 'output_profile') || isempty(opts.output_profile)
       opts.output_profile = 'standard';
+   else
+      % Normalize once here. Consumers compare with strcmp, so without this
+      % an unnormalized 'Diagnostic' would build the diagnostic variable list
+      % and then write the thf_* columns as NaN.
+      opts.output_profile = lower(char(string(opts.output_profile)));
    end
 
    if ~isfield(opts, 'metfname') || isempty(opts.metfname)
@@ -200,9 +205,7 @@ function [vars1, vars2] = defaultOutputVariables(opts)
          end
 
       case 'standard'
-         vars1 = ...
-            {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
-            'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter'};
+         vars1 = icemodel.namelists.surfaceoutputs();
 
          if strcmp(opts.smbmodel, 'skinmodel')
             vars2 = {'Tice', 'f_ice', 'f_liq'};
@@ -213,18 +216,12 @@ function [vars1, vars2] = defaultOutputVariables(opts)
          end
 
       case 'diagnostic'
-         % The diagnostic surface contract extends the standard one, so build
-         % it from the same leading fields rather than restating them. df_rof
-         % keeps its standard position so the extension stays a pure suffix.
-         vars1 = ...
-            {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
-            'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter'};
+         % The diagnostic profile adds to the standard one, so it starts from
+         % the same fields. df_rof keeps its standard position so the
+         % extension stays a pure suffix.
+         vars1 = icemodel.namelists.surfaceoutputs();
          diagnostic_suffix = ...
-            {'n_subfail', 'ea_atm', 'br_coefs_gamma', 'br_coefs_b1_num', ...
-            'br_coefs_b2_num', 'hv_atm', 'ro_sfc', ...
-            'thf_es_sfc', 'thf_stability_factor', 'thf_z0m', 'thf_z0h', ...
-            'thf_z0q', 'thf_u_star', 'thf_L', 'thf_Re', 'thf_numiter', ...
-            'thf_scalar_exchange_Qh', 'thf_scalar_exchange_Qe'};
+            icemodel.namelists.surfaceoutputs('diagnostic_suffix');
 
          if strcmp(opts.smbmodel, 'skinmodel')
             vars1 = [vars1, diagnostic_suffix];
@@ -234,7 +231,7 @@ function [vars1, vars2] = defaultOutputVariables(opts)
             % them preserves every existing output position and keeps the
             % standard/minimal contracts unchanged.
             vars1 = [vars1, {'df_rof'}, diagnostic_suffix, ...
-               icemodel.column.budget_output_fields()];
+               icemodel.namelists.budgetoutputs()];
             vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp', 'df_lyr', ...
                'Sc', 'r_eff'};
          end

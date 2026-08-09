@@ -343,22 +343,15 @@ function [bias, rmse, nse] = computeSeriesGOF(ice1, met, varname)
    ref_tt = timetable(met.Time, ref, 'VariableNames', {'ref'});
    TT = synchronize(model_tt, ref_tt, 'intersection');
 
-   mask = isfinite(TT.model) & isfinite(TT.ref);
-   if nnz(mask) < 2
+   metrics = icemodel.verification.helpers.residualMetrics(TT.model, TT.ref);
+   if metrics.n_pairs < 2
+      % A goodness-of-fit summary over one sample is not a fit, so leave all
+      % three NaN rather than reporting a single residual as a statistic.
       return
    end
-
-   model = TT.model(mask);
-   ref = TT.ref(mask);
-   resid = model - ref;
-
-   bias = mean(resid);
-   rmse = sqrt(mean(resid .^ 2));
-
-   denom = sum((ref - mean(ref)) .^ 2);
-   if denom > 0
-      nse = 1 - sum(resid .^ 2) / denom;
-   end
+   bias = metrics.bias;
+   rmse = metrics.rmse;
+   nse = metrics.nse;
 end
 
 function [diff_value, pct_diff] = computeDiffAndPct(model_value, ref_value)

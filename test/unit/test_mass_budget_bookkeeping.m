@@ -1,5 +1,5 @@
 function tests = test_mass_budget_bookkeeping
-   %TEST_MASS_BUDGET_BOOKKEEPING Verify physical and remesh ledger contracts.
+   %TEST_MASS_BUDGET_BOOKKEEPING Verify the physical and remesh ledgers close.
    tests = functiontests(localfunctions);
 end
 
@@ -26,21 +26,21 @@ function test_budget_state_uses_documented_references(testCase)
    testCase.verifyEqual(enthalpy_j_m2, sum(H .* dz), 'AbsTol', 1e-9);
 end
 
-function test_budget_output_fields_are_one_partitioned_contract(testCase)
+function test_budgetoutputs_are_one_partitioned_contract(testCase)
    % Every diagnostic channel must belong to exactly one retime class.
 
-   first_fields = icemodel.column.budget_output_fields('first');
-   last_fields = icemodel.column.budget_output_fields('last');
-   sum_fields = icemodel.column.budget_output_fields('sum');
-   all_fields = icemodel.column.budget_output_fields();
+   first_fields = icemodel.namelists.budgetoutputs('first');
+   last_fields = icemodel.namelists.budgetoutputs('last');
+   sum_fields = icemodel.namelists.budgetoutputs('sum');
+   all_fields = icemodel.namelists.budgetoutputs();
 
    % The all-list order is the stable diagnostic-profile append order.
    testCase.verifyEqual(all_fields, [first_fields, last_fields, sum_fields]);
    testCase.verifyEqual(numel(unique(all_fields)), numel(all_fields));
    testCase.verifyEqual(numel(all_fields), 43);
    testCase.verifyError( ...
-      @() icemodel.column.budget_output_fields('median'), ...
-      'icemodel:column:budgetOutputFields:kind');
+      @() icemodel.namelists.budgetoutputs('median'), ...
+      'icemodel:namelists:budgetoutputs:kind');
 end
 
 function test_budget_ledger_is_fixed_codegen_schema(testCase)
@@ -48,12 +48,12 @@ function test_budget_ledger_is_fixed_codegen_schema(testCase)
    % remains synchronized with the MATLAB-side output registry.
 
    ledger = icemodel.column.initialize_budget_state();
-   budget_fields = icemodel.column.budget_output_fields('all');
+   budget_fields = icemodel.namelists.budgetoutputs('all');
    ledger_fields = transpose(fieldnames(ledger));
    ledger_values = struct2cell(ledger);
 
    % Exact order protects profile selection, while the value checks protect
-   % the scalar type and zero-reset contract used at each forcing step.
+   % the scalar type and the zero reset done at each forcing step.
    testCase.verifyEqual(ledger_fields, budget_fields);
    testCase.verifyTrue(all(cellfun( ...
       @(value) isa(value, 'double') && isequal(size(value), [1, 1]), ...
@@ -62,10 +62,12 @@ function test_budget_ledger_is_fixed_codegen_schema(testCase)
 
    % Keep runtime field-name construction out of the #codegen kernel. The
    % ordered field-name registry remains available only to MATLAB consumers.
+   % Coder rejects dynamic field names and cell2struct, so a source check is
+   % the only way to catch their reintroduction from a MATLAB-only suite.
    core_source = fileread(which('icemodel'));
    testCase.verifyFalse(contains(core_source, 'cell2struct'));
-   testCase.verifyFalse(contains(core_source, 'budget_output_fields'));
    testCase.verifyFalse(contains(core_source, 'surface_state.('));
+   testCase.verifyFalse(contains(core_source, 'budgetoutputs('));
 end
 
 function test_diagnostic_model_payload_matches_canonical_budget_registry(testCase)
@@ -81,7 +83,7 @@ function test_diagnostic_model_payload_matches_canonical_budget_registry(testCas
    % Exercise initialization, timestep accumulation, payload assembly, and
    % raw output storage instead of checking configuration declarations alone.
    [ice1, ~] = icemodel.test.helpers.runSmbModel(opts);
-   budget_fields = icemodel.column.budget_output_fields('all');
+   budget_fields = icemodel.namelists.budgetoutputs('all');
    payload_fields = transpose(fieldnames(ice1));
    payload_fields = payload_fields(startsWith(payload_fields, 'mass_budget_'));
 
@@ -205,8 +207,8 @@ end
 
 function test_runoff_credits_condensation_overflow(testCase)
    % Condensation the top cell could not store never entered the reservoir, so
-   % it runs off directly. It was previously computed and then discarded, which
-   % dropped that water out of the budget entirely.
+   % it runs off directly. Dropping it would take that water out of the budget
+   % entirely.
 
    opts = struct('dz_thermal', 0.04, 'tlag', 2);
    n_steps = 10;
@@ -261,18 +263,18 @@ function test_runoff_is_independent_of_output_profile(testCase)
    cleanup = onCleanup(@() ...
       icemodel.test.fixtures.cleanupSyntheticWorkspace(workspace));
 
-   for profile = ["minimal", "standard", "diagnostic"]
+   for output_profile = ["minimal", "standard", "diagnostic"]
       opts = icemodel.test.helpers.buildSyntheticOpts(workspace, ...
-         'icemodel', 2016, output_profile=char(profile), solver=1);
+         'icemodel', 2016, output_profile=char(output_profile), solver=1);
       testCase.verifyTrue(ismember('df_rof', opts.vars1), ...
-         sprintf('%s profile must carry df_rof', profile));
+         sprintf('%s profile must carry df_rof', output_profile));
    end
    clear cleanup
 end
 
 function test_d_lyr_carries_total_merge_export_not_liquid_only(testCase)
    % d_lyr must accumulate the full water-equivalent mass a merge removes.
-   % It previously recorded only the liquid difference, which is why the
+   % df_lyr carries solid plus liquid, which is why the
    % derived dlayer series could never be reconciled against melt and runoff.
 
    [T, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture([0.05; 0.6; 0.7]);
@@ -286,7 +288,7 @@ function test_d_lyr_carries_total_merge_export_not_liquid_only(testCase)
    % the merged cell's fractions.
    exported_mwe = sum(d_lyr_new) * dz;
    testCase.verifyEqual(exported_mwe, ...
-      diag.collapse_export_solid_mwe + diag.collapse_export_liquid_mwe, ...
+      diag.merge_export_solid_mwe + diag.merge_export_liquid_mwe, ...
       'AbsTol', 1e-15);
 
    % The liquid difference alone is strictly smaller, so the old definition
@@ -295,12 +297,12 @@ function test_d_lyr_carries_total_merge_export_not_liquid_only(testCase)
    testCase.verifyLessThan(liquid_only, exported_mwe);
 
    % The three export views must nest rather than duplicate: the top-removal
-   % channels are a subset of the all-merge collapse export, which in turn is
+   % channels are a subset of the all-merge merge export, which in turn is
    % what d_lyr totals. A future reader must be able to tell these apart.
    testCase.verifyLessThanOrEqual(diag.top_export_solid_mwe, ...
-      diag.collapse_export_solid_mwe + 1e-15);
+      diag.merge_export_solid_mwe + 1e-15);
    testCase.verifyLessThanOrEqual(diag.top_export_liquid_mwe, ...
-      diag.collapse_export_liquid_mwe + 1e-15);
+      diag.merge_export_liquid_mwe + 1e-15);
 end
 
 function test_interior_merge_exports_no_surface_mass(testCase)
@@ -317,9 +319,9 @@ function test_interior_merge_exports_no_surface_mass(testCase)
    testCase.verifyEqual(diag.top_export_solid_mwe, 0, 'AbsTol', 0);
    testCase.verifyEqual(diag.top_export_liquid_mwe, 0, 'AbsTol', 0);
 
-   % The interior event still contributes to the total collapse export, so the
+   % The interior event still contributes to the total merge export, so the
    % two channels are genuinely distinct rather than duplicates.
-   testCase.verifyGreaterThan(diag.collapse_export_solid_mwe, 0);
+   testCase.verifyGreaterThan(diag.merge_export_solid_mwe, 0);
 end
 
 function test_top_merge_counts_actual_grid_translation(testCase)
@@ -398,13 +400,13 @@ function test_full_diagnostic_grid_staircase_contracts_at_two_resolutions(testCa
       % budget-aware hourly retime used by downstream comparison and reporting.
       testCase.verifyEqual(ledger.mass_budget_remesh_solid_mwe, ...
          ledger.mass_budget_cloned_bottom_solid_mwe ...
-         - ledger.mass_budget_collapse_export_solid_mwe, 'AbsTol', 1e-15);
+         - ledger.mass_budget_merge_export_solid_mwe, 'AbsTol', 1e-15);
       testCase.verifyEqual(ledger.mass_budget_remesh_liquid_mwe, ...
          ledger.mass_budget_cloned_bottom_liquid_mwe ...
-         - ledger.mass_budget_collapse_export_liquid_mwe, 'AbsTol', 1e-15);
+         - ledger.mass_budget_merge_export_liquid_mwe, 'AbsTol', 1e-15);
       testCase.verifyEqual(ledger.mass_budget_remesh_enthalpy_j_m2, ...
          ledger.mass_budget_cloned_bottom_enthalpy_j_m2 ...
-         - ledger.mass_budget_collapse_export_enthalpy_j_m2, 'AbsTol', 1e-8);
+         - ledger.mass_budget_merge_export_enthalpy_j_m2, 'AbsTol', 1e-8);
 
       discrepancy(k) = abs(target_height - grid_height(k));
       testCase.verifyLessThanOrEqual(discrepancy(k), dz(k));
@@ -413,7 +415,7 @@ function test_full_diagnostic_grid_staircase_contracts_at_two_resolutions(testCa
    testCase.verifyLessThan(discrepancy(2), discrepancy(1));
 end
 
-function test_multi_event_remesh_retains_non_cancelling_throughput(testCase)
+function test_multi_event_remesh_retains_non_cancelling_gross(testCase)
    % Opposite-signed event exchanges must not disappear in the signed net.
 
    [T, f_ice, f_liq, Sc, Sp, d_lyr] = ...
@@ -423,16 +425,16 @@ function test_multi_event_remesh_retains_non_cancelling_throughput(testCase)
       T, f_ice, f_liq, Sc, Sp, 0.04, 0.0, d_lyr, 0.1);
 
    % The two top events exchange solid storage in opposite directions for this
-   % column, so event throughput must strictly exceed the absolute signed net.
+   % column, so event gross must strictly exceed the absolute signed net.
    testCase.verifyEqual(diag.top_deletion_count, 2);
    testCase.verifyGreaterThan( ...
-      diag.solid_throughput_mwe, abs(diag.solid_mwe));
+      diag.solid_gross_mwe, abs(diag.solid_mwe));
    testCase.verifyGreaterThanOrEqual( ...
-      diag.cloned_bottom_solid_throughput_mwe, ...
+      diag.cloned_bottom_solid_gross_mwe, ...
       abs(diag.cloned_bottom_solid_mwe));
    testCase.verifyGreaterThanOrEqual( ...
-      diag.collapse_export_solid_throughput_mwe, ...
-      abs(diag.collapse_export_solid_mwe));
+      diag.merge_export_solid_gross_mwe, ...
+      abs(diag.merge_export_solid_mwe));
    verifyRemeshIdentity(testCase, diag);
 end
 
@@ -450,10 +452,15 @@ function test_depleted_bottom_removal_matches_minimal_transition(testCase)
       icemodel.column.merge_thin_layers( ...
       T, f_ice, f_liq, Sc, Sp, 0.04, 0.0, d_lyr, 0.1);
 
-   % The deepest cell is removed and the surviving bottom state is cloned, so
-   % the returned column keeps the legacy clone/delete result on both paths.
+   % The deepest cell is removed, then the surviving bottom state is cloned.
+   % The removed cell must not come back: cloning before the deletion copied
+   % it into the column, so it stayed while the cell above it kept only half
+   % the pair's mass.
    testCase.verifyTrue(mask(end));
-   testCase.verifyEqual(f_ice_min_out(end), f_ice(end), 'AbsTol', 0);
+   testCase.verifyNotEqual(f_ice_min_out(end), f_ice(end));
+   testCase.verifyEqual(f_ice_min_out(end), f_ice_min_out(end - 1), ...
+      'AbsTol', 0);
+   testCase.verifyGreaterThanOrEqual(min(f_ice_min_out), 0.1);
    testCase.verifyEqual(T_diag, T_min);
    testCase.verifyEqual(f_ice_diag, f_ice_min_out);
    testCase.verifyEqual(f_liq_diag, f_liq_min);
@@ -521,24 +528,59 @@ function test_merge_prediction_uses_physical_vapor_basis(testCase)
    testCase.verifyEqual(mask, [true; false; false]);
 end
 
-function test_seven_output_merge_skips_scientific_storage_integration(testCase)
-   % Existing solver callers must not execute the opt-in eighth-output ledger.
+function test_merge_ledger_output_does_not_change_the_solver_outputs(testCase)
+   % The ledger is opt-in on the eighth output, so requesting it must leave
+   % the seven values existing solver callers read untouched.
 
    [T, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture([0.05; 0.6; 0.7]);
-   profile clear
-   cleanup = onCleanup(@() profile('off'));
-   profile on
+
+   % The ledger is opt-in on the eighth output. Two things follow, and this
+   % test pins both: the seven-output path must skip the ledger work, and
+   % asking for the ledger must not change the seven values.
    [~, ~, ~, ~, ~, ~, mask] = icemodel.column.merge_thin_layers( ...
       T, f_ice, f_liq, Sc, Sp, 0.04, 0.0, d_lyr, 0.1);
-   profile off
-   info = profile('info');
 
    % A real merge proves the early no-event return did not mask the branch.
-   names = string({info.FunctionTable.FunctionName});
    testCase.verifyTrue(any(mask));
-   testCase.verifyFalse(any(contains(names, 'budget_state')));
-   clear cleanup
+
+   % Skipping the ledger, not merely discarding it, is what matters: the
+   % solver takes the seven-output path on every accepted substep of every
+   % standard and minimal run, and the ledger costs three column integrations
+   % per merge event. Comparing the two calls below cannot see that, so the
+   % profiler is the only observable. Request exactly seven outputs, or this
+   % profiles nargout == 0 and an off-by-one in the gate slips through. The
+   % profiler status is saved and restored because a test must not clear a
+   % profiling run its caller started.
+   prior = profile('status');
+   restore_profiler = onCleanup(@() restoreProfiler(prior));
+   profile off
    profile clear
+   profile on
+   [~, ~, ~, ~, ~, ~, ~] = icemodel.column.merge_thin_layers( ...
+      T, f_ice, f_liq, Sc, Sp, 0.04, 0.0, d_lyr, 0.1);
+   profile off
+   called = string({profile('info').FunctionTable.FunctionName});
+   testCase.verifyFalse(any(contains(called, 'integrate_column_budget')));
+   testCase.verifyFalse(any(contains(called, 'initialize_remesh_ledger')));
+   clear restore_profiler
+
+   % The eighth output is the ledger, and requesting it must not change the
+   % seven values the solver path uses.
+   [T7, ice7, liq7, Sc7, Sp7, lyr7, mask7] = ...
+      icemodel.column.merge_thin_layers( ...
+      T, f_ice, f_liq, Sc, Sp, 0.04, 0.0, d_lyr, 0.1);
+   [T8, ice8, liq8, Sc8, Sp8, lyr8, mask8, ledger8] = ...
+      icemodel.column.merge_thin_layers( ...
+      T, f_ice, f_liq, Sc, Sp, 0.04, 0.0, d_lyr, 0.1);
+
+   testCase.verifyEqual(T8, T7);
+   testCase.verifyEqual(ice8, ice7);
+   testCase.verifyEqual(liq8, liq7);
+   testCase.verifyEqual(Sc8, Sc7);
+   testCase.verifyEqual(Sp8, Sp7);
+   testCase.verifyEqual(lyr8, lyr7);
+   testCase.verifyEqual(mask8, mask7);
+   testCase.verifyTrue(isstruct(ledger8));
 end
 
 function test_pending_flags_match_legacy_multi_event_result(testCase)
@@ -558,7 +600,7 @@ function test_pending_flags_match_legacy_multi_event_result(testCase)
       d_lyr_legacy, legacy_mask] = legacyMergeThinLayers( ...
       T, f_ice, f_liq, Sc, Sp, 0.04, 0.0, d_lyr, 0.1);
 
-   % Compare every seven-output contract value, including the original mask.
+   % Compare all seven outputs, including the original mask.
    testCase.verifyEqual(mask, [false; true; true]);
    testCase.verifyEqual(mask, legacy_mask);
    testCase.verifyEqual(T_new, T_legacy);
@@ -635,7 +677,7 @@ function test_hourly_retime_uses_budget_aggregation_classes(testCase)
       'VariableNames', {'ordinary_mean', ...
       'mass_budget_solid_start_mwe', 'mass_budget_solid_end_mwe', ...
       'mass_budget_phase_solid_mwe', ...
-      'mass_budget_phase_solid_throughput_mwe'});
+      'mass_budget_phase_solid_gross_mwe'});
 
    TT = icemodel.retimeHourlyFixedStep(TT);
 
@@ -645,7 +687,7 @@ function test_hourly_retime_uses_budget_aggregation_classes(testCase)
    testCase.verifyEqual(TT.mass_budget_solid_end_mwe, [23; 27]);
    testCase.verifyEqual(TT.mass_budget_phase_solid_mwe, [0; 0]);
    testCase.verifyEqual( ...
-      TT.mass_budget_phase_solid_throughput_mwe, [4; 4]);
+      TT.mass_budget_phase_solid_gross_mwe, [4; 4]);
 end
 
 function test_hourly_retime_preserves_variable_classes_and_double_precision(testCase)
@@ -676,18 +718,18 @@ function test_hourly_retime_accepts_unaligned_short_partial_bin(testCase)
       'VariableNames', {'ordinary_mean', ...
       'mass_budget_solid_start_mwe', 'mass_budget_solid_end_mwe', ...
       'mass_budget_phase_solid_mwe', ...
-      'mass_budget_phase_solid_throughput_mwe'});
+      'mass_budget_phase_solid_gross_mwe'});
 
    TT = icemodel.retimeHourlyFixedStep(TT);
 
-   % Native hourly bins retain endpoint and non-cancelling sum semantics.
+   % Native hourly bins keep endpoint values and sum without cancelling.
    testCase.verifyEqual(TT.Properties.RowTimes, ...
       datetime(2020, 1, 1, 'TimeZone', 'UTC'));
    testCase.verifyEqual(TT.ordinary_mean, 2);
    testCase.verifyEqual(TT.mass_budget_solid_start_mwe, 10);
    testCase.verifyEqual(TT.mass_budget_solid_end_mwe, 22);
    testCase.verifyEqual(TT.mass_budget_phase_solid_mwe, 2);
-   testCase.verifyEqual(TT.mass_budget_phase_solid_throughput_mwe, 4);
+   testCase.verifyEqual(TT.mass_budget_phase_solid_gross_mwe, 4);
 end
 
 function test_non_diagnostic_model_paths_omit_budget_channels(testCase)
@@ -708,7 +750,7 @@ function test_non_diagnostic_model_paths_omit_budget_channels(testCase)
       testCase.verifyEqual(transpose(fieldnames(ice1)), run_opts.vars1, ...
          profiles{n});
       testCase.verifyFalse(any(ismember(fieldnames(ice1), ...
-         icemodel.column.budget_output_fields())), profiles{n});
+         icemodel.namelists.budgetoutputs())), profiles{n});
       clear cleanup
    end
 end
@@ -767,48 +809,48 @@ function [T, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture(f_ice)
 end
 
 function verifyRemeshIdentity(testCase, diag)
-   %VERIFYREMESHIDENTITY Check R = B - O for every accepted remesh reference.
+   %VERIFYREMESHIDENTITY Check R = B - O for every accepted remesh event.
 
    testCase.verifyEqual(diag.solid_mwe, ...
-      diag.cloned_bottom_solid_mwe - diag.collapse_export_solid_mwe, ...
+      diag.cloned_bottom_solid_mwe - diag.merge_export_solid_mwe, ...
       'AbsTol', 1e-15);
    testCase.verifyEqual(diag.liquid_mwe, ...
-      diag.cloned_bottom_liquid_mwe - diag.collapse_export_liquid_mwe, ...
+      diag.cloned_bottom_liquid_mwe - diag.merge_export_liquid_mwe, ...
       'AbsTol', 1e-15);
    testCase.verifyEqual(diag.enthalpy_j_m2, ...
-      diag.cloned_bottom_enthalpy_j_m2 - diag.collapse_export_enthalpy_j_m2, ...
+      diag.cloned_bottom_enthalpy_j_m2 - diag.merge_export_enthalpy_j_m2, ...
       'AbsTol', 1e-8);
 
    % Event-level absolute accumulators must bound every corresponding net.
    testCase.verifyGreaterThanOrEqual( ...
-      diag.solid_throughput_mwe, abs(diag.solid_mwe));
+      diag.solid_gross_mwe, abs(diag.solid_mwe));
    testCase.verifyGreaterThanOrEqual( ...
-      diag.liquid_throughput_mwe, abs(diag.liquid_mwe));
+      diag.liquid_gross_mwe, abs(diag.liquid_mwe));
    testCase.verifyGreaterThanOrEqual( ...
-      diag.enthalpy_throughput_j_m2, abs(diag.enthalpy_j_m2));
+      diag.enthalpy_gross_j_m2, abs(diag.enthalpy_j_m2));
    testCase.verifyGreaterThanOrEqual( ...
-      diag.cloned_bottom_solid_throughput_mwe, ...
+      diag.cloned_bottom_solid_gross_mwe, ...
       abs(diag.cloned_bottom_solid_mwe));
    testCase.verifyGreaterThanOrEqual( ...
-      diag.cloned_bottom_liquid_throughput_mwe, ...
+      diag.cloned_bottom_liquid_gross_mwe, ...
       abs(diag.cloned_bottom_liquid_mwe));
    testCase.verifyGreaterThanOrEqual( ...
-      diag.cloned_bottom_enthalpy_throughput_j_m2, ...
+      diag.cloned_bottom_enthalpy_gross_j_m2, ...
       abs(diag.cloned_bottom_enthalpy_j_m2));
    testCase.verifyGreaterThanOrEqual( ...
-      diag.collapse_export_solid_throughput_mwe, ...
-      abs(diag.collapse_export_solid_mwe));
+      diag.merge_export_solid_gross_mwe, ...
+      abs(diag.merge_export_solid_mwe));
    testCase.verifyGreaterThanOrEqual( ...
-      diag.collapse_export_liquid_throughput_mwe, ...
-      abs(diag.collapse_export_liquid_mwe));
+      diag.merge_export_liquid_gross_mwe, ...
+      abs(diag.merge_export_liquid_mwe));
    testCase.verifyGreaterThanOrEqual( ...
-      diag.collapse_export_enthalpy_throughput_j_m2, ...
-      abs(diag.collapse_export_enthalpy_j_m2));
+      diag.merge_export_enthalpy_gross_j_m2, ...
+      abs(diag.merge_export_enthalpy_j_m2));
 end
 
 function [d_rof, d_sbl_err] = verifyVaporIdentity( ...
       testCase, f_ice, f_liq, d_pevp, f_ice_min, f_res_por)
-   %VERIFYVAPORIDENTITY Check the phase-aware accepted latent-energy identity.
+   %VERIFYVAPORIDENTITY Check the accepted latent-energy terms sum to the applied energy.
 
    [Tf, Ls, Lv, ro_ice, ro_liq] = icemodel.physicalConstant( ...
       'Tf', 'Ls', 'Lv', 'ro_ice', 'ro_liq');
@@ -907,8 +949,22 @@ function test_condensation_overflow_is_a_step_total_not_a_substep_sum(testCase)
    expected = overflow_fraction * dz;
    testCase.verifyEqual(returned, expected, AbsTol=1e-15)
 
-   % The throughput magnitude must match for the same reason.
+   % The gross magnitude must match for the same reason.
    testCase.verifyEqual( ...
-      ledger.mass_budget_condensation_overflow_throughput_mwe, ...
+      ledger.mass_budget_condensation_overflow_gross_mwe, ...
       expected, AbsTol=1e-15)
+end
+
+function restoreProfiler(prior)
+   %RESTOREPROFILER Put the profiler back the way the caller had it.
+   %
+   % A test must not clear a profiling run the caller started. profile('info')
+   % needs the data collected during the test, so the data cannot be preserved
+   % as well; restoring the on/off state is the most that can be given back.
+
+   profile off
+   profile clear
+   if strcmp(prior.ProfilerStatus, 'on')
+      profile on
+   end
 end

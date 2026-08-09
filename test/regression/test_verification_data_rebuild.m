@@ -210,7 +210,7 @@ end
 function test_esm_builders_enforce_paired_utc_window(testCase)
    % Both direct builders reject malformed pairs before source discovery.
    missing_source = fullfile(testCase.TestData.tmp, 'missing-esm-window-source');
-   error_id = 'icemodel:internal:pairedWindow:invalidWindow';
+   error_id = 'icemodel:pairedWindow:invalidWindow';
    missing_builders = { ...
       @(a, b) icemodel.verification.setup.buildEsmSnowmipForcing( ...
       "cdp", source_dir=missing_source, startdate=a, enddate=b)

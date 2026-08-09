@@ -305,7 +305,7 @@ function test_import_retmip_half_window_preserves_error_id(testCase)
    % RetMIP window validation should expose a catchable identifier.
    testCase.verifyError(@() icemodel.verification.setup.importRetmip( ...
       dry_run=true, startdate="2012-01-01"), ...
-      'icemodel:internal:pairedWindow:invalidWindow');
+      'icemodel:pairedWindow:invalidWindow');
 end
 
 function test_imau_forcing_only_fast_path_requires_manifest(testCase)
@@ -586,7 +586,7 @@ function test_import_imau_half_window_preserves_error_id(testCase)
    % IMAU window validation should match the other importers.
    testCase.verifyError(@() icemodel.verification.setup.importImau( ...
       dry_run=true, startdate="2014-01-01"), ...
-      'icemodel:internal:pairedWindow:invalidWindow');
+      'icemodel:pairedWindow:invalidWindow');
 end
 
 function test_native_builders_validate_window_before_missing_source_discovery(testCase)
@@ -606,7 +606,7 @@ function test_native_builders_validate_window_before_missing_source_discovery(te
 
    for k = 1:numel(calls)
       testCase.verifyError(calls{k}, ...
-         'icemodel:internal:pairedWindow:invalidWindow');
+         'icemodel:pairedWindow:invalidWindow');
    end
    testCase.verifyFalse(isfolder(missing_root));
 end
@@ -2901,7 +2901,7 @@ end
 function test_imau_hourly_builder_enforces_paired_utc_window(testCase)
    % The direct builder rejects every malformed pair and preserves zoned instants.
    cache = makeImauSourceCache(testCase.TestData.cache, "S21");
-   error_id = 'icemodel:internal:pairedWindow:invalidWindow';
+   error_id = 'icemodel:pairedWindow:invalidWindow';
    testCase.verifyError(@() icemodel.forcing.buildImauHourlyData( ...
       "S21", source_dir=cache, startdate="2014-04-12"), error_id);
    testCase.verifyError(@() icemodel.forcing.buildImauHourlyData( ...
@@ -3638,7 +3638,7 @@ function test_import_research_sites_invalid_window_precedes_root_resolution(test
    testCase.verifyError(@() ...
       icemodel.verification.setup.importResearchSites("", ...
       output_root=output_root, startdate="2012-01-01"), ...
-      'icemodel:internal:pairedWindow:invalidWindow');
+      'icemodel:pairedWindow:invalidWindow');
    testCase.verifyFalse(isfolder(output_root));
 end
 

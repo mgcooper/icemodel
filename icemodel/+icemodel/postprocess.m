@@ -221,9 +221,37 @@ function [ice1, ice2] = roundData(ice1, ice2)
 
    % Round legacy ice1 channels to five digits. Preserve diagnostic mass-budget
    % ledgers at solver precision so signed closure identities remain testable.
+   % Round one variable at a time. Brace EXTRACTION concatenates the selected
+   % columns into one array first, and the single-precision columns
+   % (Tsfc_converged, Tice_converged) promote the whole block to single, so
+   % every double channel would round at single precision. Brace ASSIGNMENT
+   % restores each variable's original class, which makes that invisible in
+   % the stored types.
    vars1 = ice1.Properties.VariableNames;
-   is_budget = ismember(vars1, icemodel.column.budget_output_fields());
-   ice1{:, vars1(~is_budget)} = round(ice1{:, vars1(~is_budget)}, 5);
+   is_budget = ismember(vars1, icemodel.namelists.budgetoutputs());
+
+   % df_rof is a per-step increment like ice2's df_liq/df_evp/df_lyr, so it
+   % keeps their 8-digit precision. Rounding it to five digits would zero the
+   % small overflow values the closure identities are checked against.
+   is_increment = icemodel.isIncrementChannel(vars1);
+   keep_precision = is_budget | is_increment;
+   round_names = vars1(~keep_precision);
+   increment_names = vars1(is_increment & ~is_budget);
+
+   % The isnumeric guards are defensive and are needed only by this
+   % per-variable form: round rejects a logical, where brace extraction used
+   % to widen one silently. retimeLogical can move a logical ice2 flag channel
+   % into ice1, though no shipped vars2 list currently names one.
+   for k = 1:numel(round_names)
+      if isnumeric(ice1.(round_names{k}))
+         ice1.(round_names{k}) = round(ice1.(round_names{k}), 5);
+      end
+   end
+   for k = 1:numel(increment_names)
+      if isnumeric(ice1.(increment_names{k}))
+         ice1.(increment_names{k}) = round(ice1.(increment_names{k}), 8);
+      end
+   end
 
    % Round the ice2 data
    fields = fieldnames(ice2);

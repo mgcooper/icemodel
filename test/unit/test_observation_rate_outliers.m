@@ -4,7 +4,7 @@ function tests = test_observation_rate_outliers
 end
 
 function summary = buildSummary(rates_mwe_per_day, site_ids, statuses)
-   % Build the minimal summary contract the diagnostic consumes. Every
+   % Build the summary columns the diagnostic reads. Every
    % site-year uses a 100-day window so the requested rate is exact.
    n = numel(rates_mwe_per_day);
    window_days = 100;
@@ -69,6 +69,34 @@ function test_incomplete_site_years_are_excluded(testCase)
       ["completed", "completed", "completed", "excluded"]), policy);
 
    testCase.verifyEqual(height(returned), 3)
+   testCase.verifyFalse(any(returned.rate_outlier_flag))
+end
+
+function test_net_accumulation_station_yields_no_ratio(testCase)
+   % Dividing by a negative station median would flip the comparison and
+   % publish the station's HIGHEST-ablation year as the outlier. A station
+   % that nets accumulation over its admitted years has no meaningful
+   % ablation-rate family, so every ratio is NaN and nothing is flagged.
+   policy = icemodel.verification.namelists.promiceAblationPolicy();
+   returned = icemodel.verification.observationRateOutliers( ...
+      buildSummary([-0.030, -0.032, -0.028], repmat("KAN_M", 1, 3), ...
+      repmat("completed", 1, 3)), policy);
+
+   testCase.verifyTrue(all(isnan(returned.rate_ratio_to_station_median)))
+   testCase.verifyFalse(any(returned.rate_outlier_flag))
+end
+
+function test_zero_median_station_yields_no_ratio(testCase)
+   % The other half of the same guard: a zero median divides to +/-Inf, which
+   % would be finite-tested as a ratio if the guard were relaxed to >=. The
+   % rates must straddle zero for that, since three zero rates divide to NaN
+   % under either form and would prove nothing.
+   policy = icemodel.verification.namelists.promiceAblationPolicy();
+   returned = icemodel.verification.observationRateOutliers( ...
+      buildSummary([0.03, 0.0, -0.03], repmat("KAN_M", 1, 3), ...
+      repmat("completed", 1, 3)), policy);
+
+   testCase.verifyTrue(all(isnan(returned.rate_ratio_to_station_median)))
    testCase.verifyFalse(any(returned.rate_outlier_flag))
 end
 

@@ -84,7 +84,7 @@ function report = writePromiceAblationReadiness(kwargs)
       'csv_sha256', ...
          icemodel.verification.setup.fileSha256(csv_file), ...
       'rows', table2struct(ledger));
-   writeJson(json_file, payload)
+   icemodel.verification.setup.writeJson(json_file, payload)
    report = struct('rows', ledger, 'policy', policy, 'summary', summary, ...
       'files', struct('csv', string(csv_file), 'json', string(json_file)));
 end
@@ -97,7 +97,7 @@ function observation = observationPayload(c, evaluation_data_root)
    if pathname == ""
       return
    end
-   if ~icemodel.internal.isPathInside(pathname, evaluation_data_root)
+   if ~icemodel.isPathInside(pathname, evaluation_data_root)
       observation.reason = ...
          "observation artifact escapes selected evaluation root";
       return
@@ -379,7 +379,8 @@ end
 
 function [row, reason] = observationStatus( ...
       row, observation, window_start, window_end, policy)
-   %OBSERVATIONSTATUS Audit target semantics, support, flags, and sensitivity.
+   %OBSERVATIONSTATUS Audit the target's measure, support, flags, and
+   % sensitivity.
    if ~observation.ok
       reason = observation.reason;
       return
@@ -439,37 +440,36 @@ function [row, reason] = observationStatus( ...
       row.finite_snow_count = numel(values);
       if ~isempty(values)
          row.snow_depth_min_m = values(1);
-         row.snow_depth_p01_m = sampleQuantile(values, 0.01);
-         row.snow_depth_p05_m = sampleQuantile(values, 0.05);
-         row.snow_depth_p50_m = sampleQuantile(values, 0.50);
+         row.snow_depth_p01_m = ...
+            icemodel.verification.helpers.sampleQuantile(values, 0.01);
+         row.snow_depth_p05_m = ...
+            icemodel.verification.helpers.sampleQuantile(values, 0.05);
+         row.snow_depth_p50_m = ...
+            icemodel.verification.helpers.sampleQuantile(values, 0.50);
       end
    end
 
    % Primary support excludes every detected step because this audit applies no
    % de-step. A correctable classification is evidence, not a correction.
-   support_values = data{:, cellstr(policy.support_flag_fields)};
-   direct_values = data{:, cellstr(policy.direct_zero_flag_fields)};
-   datum_values = data{:, cellstr(policy.datum_break_flag_fields)};
-   gap_values = data{:, cellstr(policy.ordinary_gap_flag_fields)};
-   metadata_values = data{:, cellstr(policy.metadata_only_flag_fields)};
-   detected = isfinite(datum_values(:, 2)) ...
-      & datum_values(:, 2) ~= 0;
-   correctable = isfinite(metadata_values) & metadata_values ~= 0;
-   unresolved = detected;
-   flags_finite = all(isfinite(support_values), 2);
-   direct = isfinite(data.(target)) ...
-      & flags_finite ...
-      & all(direct_values == 0, 2);
-   datum_intact = all(isfinite(datum_values) & datum_values == 0, 2);
-   row.gap_flag_count = nnz(any( ...
-      isfinite(gap_values) & gap_values ~= 0, 2));
-   row.station_transition_flag_count = ...
-      nnz(isfinite(datum_values(:, 1)) & datum_values(:, 1) ~= 0);
+   % One owner applies every flag rule, so this cannot drift from the
+   % comparator, the runner, or the report builder.
+   flag_fields = icemodel.verification.helpers.observationSupportFields( ...
+      target, policy);
+   support = icemodel.verification.helpers.classifyObservationSupport( ...
+      double(data{:, cellstr(flag_fields)}), flag_fields, target, policy);
+   detected = support.unresolved_step;
+   correctable = support.metadata_flagged;
+   direct = support.flag_clean;
+   datum_intact = support.datum_intact;
+   row.gap_flag_count = nnz(support.gap_flagged);
+   row.station_transition_flag_count = nnz(support.station_transition);
    row.step_detected_flag_count = nnz(detected);
    row.step_correctable_flag_count = nnz(correctable);
-   row.unresolved_step_flag_count = nnz(unresolved);
+   row.unresolved_step_flag_count = nnz(detected);
    row.direct_target_count = nnz(direct);
-   [season_start, season_end] = evaluationSeason(year(window_start), policy);
+   [season_start, season_end] = ...
+      icemodel.verification.helpers.evaluationSeason( ...
+      year(window_start), policy);
    in_season = data.Time >= season_start & data.Time <= season_end;
    season_data = data(in_season, :);
    season_direct = direct(in_season);
@@ -530,7 +530,8 @@ function [row, reason] = observationStatus( ...
          "observation timestamps are not a strictly increasing native whole-hour UTC coordinate";
    end
    first_finite = find(isfinite(all_data.(target)), 1);
-   if isempty(first_finite) || abs(all_data.(target)(first_finite)) > 1e-9
+   if isempty(first_finite) || abs(all_data.(target)(first_finite)) ...
+         > policy.zero_reference_tolerance_m
       reasons(end + 1, 1) = ...
          "target is not zero-referenced at its first finite sample";
    end
@@ -608,13 +609,6 @@ function window = longestWindow( ...
    end
 end
 
-function [first, last] = evaluationSeason(y, policy)
-   %EVALUATIONSEASON Return the fixed summertime display/evaluation bounds.
-   start_md = policy.evaluation_season_start_month_day;
-   end_md = policy.evaluation_season_end_month_day;
-   first = datetime(y, start_md(1), start_md(2), 'TimeZone', 'UTC');
-   last = datetime(y, end_md(1), end_md(2), 'TimeZone', 'UTC');
-end
 
 function [tf, reason] = forcingCoverage(forcing, window_start, window_end)
    %FORCINGCOVERAGE Test whether one actual complete window encloses a request.
@@ -789,17 +783,6 @@ function name = thresholdField(threshold, suffix)
       + "mm_" + suffix);
 end
 
-function value = sampleQuantile(sorted_values, probability)
-   %SAMPLEQUANTILE Compute a toolbox-free linear sample quantile.
-   position = 1 + (numel(sorted_values) - 1) * probability;
-   low = floor(position);
-   high = ceil(position);
-   value = sorted_values(low);
-   if high ~= low
-      value = value + (position - low) ...
-         * (sorted_values(high) - value);
-   end
-end
 
 function [first, last] = annualWindow(y, policy)
    %ANNUALWINDOW Return the full initialization year for one readiness row.
@@ -823,15 +806,4 @@ end
 function text = formatTime(value)
    %FORMATTIME Reuse the canonical manifest formatter for ledger timestamps.
    text = string(icemodel.verification.setup.formatManifestTime(value));
-end
-
-function writeJson(pathname, value)
-   %WRITEJSON Write deterministic pretty JSON with one trailing newline.
-   fid = fopen(pathname, 'w', 'n', 'UTF-8');
-   if fid < 0
-      error('icemodel:verification:promiceAblationReadiness:writeFailed', ...
-         'cannot open output file: %s', pathname)
-   end
-   cleanup = onCleanup(@() fclose(fid));
-   fprintf(fid, '%s\n', jsonencode(value, PrettyPrint=true));
 end

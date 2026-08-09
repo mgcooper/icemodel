@@ -530,9 +530,9 @@ function row = populateMetric(row, observed, modeled)
       row.status = "no_overlap";
       return
    end
-   delta = modeled - observed;
-   row.bias = mean(delta);
-   row.rmse = sqrt(mean(delta .^ 2));
+   metrics = icemodel.verification.helpers.residualMetrics(modeled, observed);
+   row.bias = metrics.bias;
+   row.rmse = metrics.rmse;
    if numel(observed) > 1 && std(observed) > 0 && std(modeled) > 0
       C = corrcoef(observed, modeled);
       row.correlation = C(1, 2);

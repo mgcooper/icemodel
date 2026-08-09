@@ -26,7 +26,7 @@ function [Data, metadata] = buildSamimiDye2Data(kwargs)
    % Reject malformed public windows before resolving or reading any workbook.
    % The shared mask validates again defensively when it applies the bounds.
    [window_start, window_end] = ...
-      icemodel.internal.pairedWindow(kwargs.startdate, kwargs.enddate);
+      icemodel.pairedWindow(kwargs.startdate, kwargs.enddate);
 
    source_dir = icemodel.forcing.helpers.verificationSourceDir( ...
       kwargs.source_dir, ["retmip", "samimi"]);

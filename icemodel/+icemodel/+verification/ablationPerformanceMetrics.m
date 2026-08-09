@@ -100,62 +100,65 @@ function [per_case, aggregate, diagnostics] = ablationPerformanceMetrics( ...
       result = site_results(k);
       [aligned, case_reason] = alignedPayload(result);
       for d = 1:n_diagnostics
-       for q = 1:n_densities
-         row = row + 1;
-         case_id(row) = string(result.case_id);
-         site_id(row) = string(result.site_id);
-         year(row) = double(result.year);
-         diagnostic(row) = diagnostics(d).name;
-         label(row) = diagnostics(d).label;
-         density_kg_m3(row) = densities(q);
-         if case_reason ~= ""
-            reason(row) = case_reason;
-            continue
-         end
-         if ~ismember(diagnostics(d).name, ...
-               string(aligned.Properties.VariableNames))
-            reason(row) = "aligned payload lacks " + diagnostics(d).name;
-            continue
-         end
-         observation = ...
-            aligned.observation_lowering_m * densities(q) / ro_liq;
-         model = aligned.(char(diagnostics(d).name));
-         finite = isfinite(observation) & isfinite(model);
-         if nnz(finite) < 2
-            reason(row) = "fewer than two finite aligned pairs";
-            continue
-         end
-         time = aligned.Time(finite);
-         observation = observation(finite);
-         model = model(finite);
-         residual = model - observation;
+         for q = 1:n_densities
+            row = row + 1;
+            case_id(row) = string(result.case_id);
+            site_id(row) = string(result.site_id);
+            year(row) = double(result.year);
+            diagnostic(row) = diagnostics(d).name;
+            label(row) = diagnostics(d).label;
+            density_kg_m3(row) = densities(q);
+            if case_reason ~= ""
+               reason(row) = case_reason;
+               continue
+            end
+            if ~ismember(diagnostics(d).name, ...
+                  string(aligned.Properties.VariableNames))
+               reason(row) = "aligned payload lacks " + diagnostics(d).name;
+               continue
+            end
+            observation = ...
+               aligned.observation_lowering_m * densities(q) / ro_liq;
+            model = aligned.(char(diagnostics(d).name));
+            finite = isfinite(observation) & isfinite(model);
+            if nnz(finite) < 2
+               reason(row) = "fewer than two finite aligned pairs";
+               continue
+            end
+            time = aligned.Time(finite);
+            observation = observation(finite);
+            model = model(finite);
 
-         % Increment pairs must be exactly one output step apart so a gap in
-         % the observation record cannot masquerade as a large hourly rate.
-         adjacent = diff(time) == kwargs.output_step;
-         d_observation = diff(observation);
-         d_model = diff(model);
-         d_observation = d_observation(adjacent);
-         d_model = d_model(adjacent);
-         d_residual = d_model - d_observation;
+            % Increment pairs must be exactly one output step apart so a gap in
+            % the observation record cannot masquerade as a large hourly rate.
+            adjacent = diff(time) == kwargs.output_step;
+            d_observation = diff(observation);
+            d_model = diff(model);
+            d_observation = d_observation(adjacent);
+            d_model = d_model(adjacent);
+            d_residual = d_model - d_observation;
 
-         scored(row) = true;
-         n_samples(row) = numel(observation);
-         n_increments(row) = numel(d_residual);
-         window_start(row) = time(1);
-         window_end(row) = time(end);
-         observation_endpoint_mwe(row) = observation(end);
-         model_endpoint_mwe(row) = model(end);
-         endpoint_error_mwe(row) = model(end) - observation(end);
-         cumulative_rmse_mwe(row) = sqrt(mean(residual .^ 2));
-         if isempty(d_residual)
-            continue
+            scored(row) = true;
+            n_samples(row) = numel(observation);
+            n_increments(row) = numel(d_residual);
+            window_start(row) = time(1);
+            window_end(row) = time(end);
+            observation_endpoint_mwe(row) = observation(end);
+            model_endpoint_mwe(row) = model(end);
+            endpoint_error_mwe(row) = model(end) - observation(end);
+            cumulative = icemodel.verification.helpers.residualMetrics( ...
+               model, observation);
+            cumulative_rmse_mwe(row) = cumulative.rmse;
+            if isempty(d_residual)
+               continue
+            end
+            step = icemodel.verification.helpers.residualMetrics( ...
+               d_model, d_observation);
+            bias_mwe(row) = step.bias;
+            mae_mwe(row) = step.mae;
+            rmse_mwe(row) = step.rmse;
+            nse(row) = step.nse;
          end
-         bias_mwe(row) = mean(d_residual);
-         mae_mwe(row) = mean(abs(d_residual));
-         rmse_mwe(row) = sqrt(mean(d_residual .^ 2));
-         nse(row) = nashSutcliffe(d_observation, d_model);
-       end
       end
    end
 
@@ -204,26 +207,14 @@ function [aligned, reason] = alignedPayload(result)
       reason = "case has no aligned comparison payload";
       return
    end
-   if ~ismember("observation_intact_mwe", ...
+   if ~ismember("observation_lowering_m", ...
          string(result.aligned.Properties.VariableNames))
-      reason = "aligned payload lacks observation_intact_mwe";
+      reason = "aligned payload lacks observation_lowering_m";
       return
    end
    aligned = result.aligned;
 end
 
-function value = nashSutcliffe(observation, model)
-   %NASHSUTCLIFFE Return the efficiency of MODEL against OBSERVATION.
-
-   % A constant observed series has no variance to explain, so the efficiency
-   % is undefined rather than zero or one.
-   denominator = sum((observation - mean(observation)) .^ 2);
-   if denominator <= 0
-      value = NaN;
-      return
-   end
-   value = 1 - sum((model - observation) .^ 2) / denominator;
-end
 
 function aggregate = aggregateMetrics(per_case, diagnostics, densities)
    %AGGREGATEMETRICS Collapse the per-case rows to one row per diagnostic
@@ -251,42 +242,46 @@ function aggregate = aggregateMetrics(per_case, diagnostics, densities)
 
    k = 0;
    for d = 1:numel(diagnostics)
-    for q = 1:numel(densities)
-      k = k + 1;
-      rows = per_case.diagnostic == diagnostics(d).name ...
-         & per_case.density_kg_m3 == densities(q);
-      scored = rows & per_case.scored;
-      diagnostic(k) = diagnostics(d).name;
-      label(k) = diagnostics(d).label;
-      density_kg_m3(k) = densities(q);
-      n_scored(k) = nnz(scored);
-      n_excluded(k) = nnz(rows & ~per_case.scored);
-      if n_scored(k) == 0
-         continue
-      end
-      endpoint = per_case.endpoint_error_mwe(scored);
-      median_endpoint_error_mwe(k) = median(endpoint);
-      mean_endpoint_error_mwe(k) = mean(endpoint);
-      mean_bias_mwe(k) = mean(per_case.bias_mwe(scored), 'omitnan');
-      mean_mae_mwe(k) = mean(per_case.mae_mwe(scored), 'omitnan');
-      mean_rmse_mwe(k) = mean(per_case.rmse_mwe(scored), 'omitnan');
+      for q = 1:numel(densities)
+         k = k + 1;
+         rows = per_case.diagnostic == diagnostics(d).name ...
+            & per_case.density_kg_m3 == densities(q);
+         scored = rows & per_case.scored;
+         diagnostic(k) = diagnostics(d).name;
+         label(k) = diagnostics(d).label;
+         density_kg_m3(k) = densities(q);
+         n_scored(k) = nnz(scored);
+         n_excluded(k) = nnz(rows & ~per_case.scored);
+         if n_scored(k) == 0
+            continue
+         end
+         endpoint = per_case.endpoint_error_mwe(scored);
+         median_endpoint_error_mwe(k) = median(endpoint);
+         mean_endpoint_error_mwe(k) = mean(endpoint);
+         mean_bias_mwe(k) = mean(per_case.bias_mwe(scored), 'omitnan');
+         mean_mae_mwe(k) = mean(per_case.mae_mwe(scored), 'omitnan');
+         mean_rmse_mwe(k) = mean(per_case.rmse_mwe(scored), 'omitnan');
 
-      % Pool the squared increment error by increment count so long site-years
-      % are not weighted the same as short ones in the headline number.
-      weights = per_case.n_increments(scored);
-      usable = weights > 0 & isfinite(per_case.rmse_mwe(scored));
-      case_rmse = per_case.rmse_mwe(scored);
-      if any(usable)
-         pooled_rmse_mwe(k) = sqrt(sum(weights(usable) ...
-            .* case_rmse(usable) .^ 2) / sum(weights(usable)));
-      end
-      median_nse(k) = median(per_case.nse(scored), 'omitnan');
+         % Pool the squared increment error by increment count so long site-years
+         % are not weighted the same as short ones in the headline number.
+         weights = per_case.n_increments(scored);
+         usable = weights > 0 & isfinite(per_case.rmse_mwe(scored));
+         case_rmse = per_case.rmse_mwe(scored);
+         if any(usable)
+            pooled_rmse_mwe(k) = sqrt(sum(weights(usable) ...
+               .* case_rmse(usable) .^ 2) / sum(weights(usable)));
+         end
+         median_nse(k) = median(per_case.nse(scored), 'omitnan');
 
-      % A tolerance count communicates practical agreement more directly than a
-      % mean error that opposite-signed cases can cancel.
-      observed = abs(per_case.observation_endpoint_mwe(scored));
-      n_within_tolerance(k) = nnz(abs(endpoint) <= tolerance * observed);
-    end
+         % A tolerance count communicates practical agreement more directly than a
+         % mean error that opposite-signed cases can cancel.
+         % Use the same signal floor as every other comparison in this policy.
+         % Without it, a site-year whose observed lowering nets to nearly zero
+         % makes any model look outside tolerance.
+         observed = max(abs(per_case.observation_endpoint_mwe(scored)), ...
+            policy.scientific.signal_floor_mwe);
+         n_within_tolerance(k) = nnz(abs(endpoint) <= tolerance * observed);
+      end
    end
 
    aggregate = table(diagnostic, label, density_kg_m3, n_scored, n_excluded, ...

@@ -86,9 +86,9 @@ function test_diagnostic_output_profile_extends_surface_contract(testCase)
       'thf_es_sfc', 'thf_stability_factor', 'thf_z0m', 'thf_z0h', ...
       'thf_z0q', 'thf_u_star', 'thf_L', 'thf_Re', 'thf_numiter', ...
       'thf_scalar_exchange_Qh', 'thf_scalar_exchange_Qe'}, ...
-      icemodel.column.budget_output_fields()];
+      icemodel.namelists.budgetoutputs()];
 
-   % Freeze the standard and minimal contracts exactly. Every icemodel profile
+   % Freeze the standard and minimal field lists. Every icemodel profile
    % carries df_rof because the runoff water budget consumes it, and a physical
    % diagnostic must not change with the chosen output profile.
    testCase.verifyEqual(opts_standard.vars1, ...
@@ -102,7 +102,7 @@ function test_diagnostic_output_profile_extends_surface_contract(testCase)
    testCase.verifyEqual(opts_minimal.vars2, ...
       {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp'});
 
-   % IceModel diagnostic output appends the canonical budget contract only.
+   % IceModel diagnostic output appends the budget channels only.
    testCase.verifyEqual(opts_standard.output_profile, 'standard');
    testCase.verifyEqual(opts_minimal.output_profile, 'minimal');
    testCase.verifyEqual(opts_diag.output_profile, 'diagnostic');
@@ -114,7 +114,7 @@ function test_diagnostic_output_profile_extends_surface_contract(testCase)
 
    % SkinModel has no column-remesh ledger and must not advertise these fields.
    testCase.verifyFalse(any(ismember(opts_skin_diag.vars1, ...
-      icemodel.column.budget_output_fields())));
+      icemodel.namelists.budgetoutputs())));
 end
 
 function test_turbulent_flux_option_defaults_follow_runtime_contract(testCase)

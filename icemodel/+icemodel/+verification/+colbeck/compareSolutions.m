@@ -242,8 +242,10 @@ function row = computeOnePair(target_tt, candidate_tt, varname)
    end
 
    % Standard scalar comparison metrics.
-   bias = mean(cand_vals - target_vals);
-   rmse = sqrt(mean((cand_vals - target_vals) .^ 2));
+   metrics = icemodel.verification.helpers.residualMetrics( ...
+      cand_vals, target_vals);
+   bias = metrics.bias;
+   rmse = metrics.rmse;
    if std(target_vals) > 0 && std(cand_vals) > 0 && n > 1
       cc = corrcoef(target_vals, cand_vals);
       correlation = cc(1, 2);

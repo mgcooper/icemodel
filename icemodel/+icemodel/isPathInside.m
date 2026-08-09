@@ -1,7 +1,7 @@
 function tf = isPathInside(pathname, root)
    %ISPATHINSIDE True when a canonical path resolves within a selected root.
    %
-   %  tf = icemodel.internal.isPathInside(pathname, root)
+   %  tf = icemodel.isPathInside(pathname, root)
    %
    % Role
    %  Single canonical-path containment predicate for every root-scoped

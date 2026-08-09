@@ -1,5 +1,5 @@
 function tests = test_promice_ablation_evaluation_runner
-   %TEST_PROMICE_ABLATION_EVALUATION_RUNNER Verify the cohort runner contract.
+   %TEST_PROMICE_ABLATION_EVALUATION_RUNNER Verify the cohort runner.
    tests = functiontests(localfunctions);
 end
 
@@ -115,7 +115,7 @@ function test_selected_run_pins_filled_forcing_and_half_open_boundary(testCase)
    testCase.verifyEqual( ...
       result.model_metadata.run_end_inclusive, display_end - minutes(15))
    testCase.verifyFalse(result.model_metadata.future_interval_executed)
-   sum_fields = icemodel.column.budget_output_fields('sum');
+   sum_fields = icemodel.namelists.budgetoutputs('sum');
    testCase.verifyEqual(model{end, sum_fields}, ...
       zeros(1, numel(sum_fields)), AbsTol=0)
    testCase.verifyEqual(model.mass_budget_solid_start_mwe(end), ...
@@ -351,7 +351,7 @@ end
 
 function test_negative_lowering_keeps_seasonal_density_band_ordered(testCase)
    % A direct exposed-ice dip below the common reference must swap density
-   % endpoints while preserving numeric lower/upper field semantics.
+   % endpoints while keeping the lower and upper fields numeric.
    fixture = isolatedFixture();
    cleanup = onCleanup(@() removeOwnedTree(fixture.root));
    observation_file = fullfile(fixture.eval_root, ...
@@ -631,8 +631,8 @@ function model = selectedModelProvider(manifest, row, run_start, run_end)
    assert(string(opts.report_inputs_file) ...
       == string(manifest.report_inputs_file))
    selected_root = string(fileparts(manifest.input_data_root));
-   assert(icemodel.internal.isPathInside(opts.readiness_file, selected_root))
-   assert(icemodel.internal.isPathInside( ...
+   assert(icemodel.isPathInside(opts.readiness_file, selected_root))
+   assert(icemodel.isPathInside( ...
       opts.report_inputs_file, selected_root))
 
    % Exercise the standard loadmet verifier against this alternate selected
@@ -649,7 +649,7 @@ function model = selectedModelProvider(manifest, row, run_start, run_end)
    n = numel(time);
    [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
    model = timetable('RowTimes', time);
-   fields = icemodel.column.budget_output_fields('all');
+   fields = icemodel.namelists.budgetoutputs('all');
    for k = 1:numel(fields)
       model.(fields{k}) = zeros(n, 1);
    end
@@ -666,7 +666,7 @@ function model = selectedModelProvider(manifest, row, run_start, run_end)
    model.mass_budget_phase_solid_mwe = -solid_loss;
    model.mass_budget_phase_liquid_mwe = solid_loss;
    model.mass_budget_remesh_liquid_mwe = -solid_loss;
-   model.mass_budget_collapse_export_liquid_mwe = solid_loss;
+   model.mass_budget_merge_export_liquid_mwe = solid_loss;
    deletion = time == evaluation_start;
    model.mass_budget_top_deletion_count(deletion) = 1;
    model.mass_budget_top_deletion_height_m(deletion) = 0.01;
@@ -718,7 +718,8 @@ function writeFixtureTree(eval_root, input_root)
       'source_url', 'https://promice.org', ...
       'source_version', 'synthetic', 'retrieval_date', '2026-08-04', ...
       'cases', cases, 'skipped', struct([]));
-   writeJson(fullfile(family_root, 'manifest.json'), manifest)
+   icemodel.verification.setup.writeJson( ...
+      fullfile(family_root, 'manifest.json'), manifest)
 
    % Only KAN_M receives producer-pinned forcing; KAN_L exercises retained
    % readiness exclusion without introducing another model execution.
@@ -789,7 +790,7 @@ function c = writeObservationCase( ...
 end
 
 function writeForcing(input_root, case_id, start_time, end_time)
-   %WRITEFORCING Save one complete filled payload and producer evidence.
+   %WRITEFORCING Save one filled met file and its producer evidence.
    data_root = string(fileparts(input_root));
    met_dir = fullfile(input_root, 'met', 'promice_filled');
    ledger_dir = fullfile(data_root, 'preview', 'qa', 'gapfill', 'ledger');
@@ -798,7 +799,7 @@ function writeForcing(input_root, case_id, start_time, end_time)
    mkdir(ledger_dir)
    mkdir(plans_dir)
 
-   % The actual 15-minute payload lets option resolution prove the authoritative
+   % The real 15-minute met file lets option resolution prove the
    % cadence and exact met path without invoking the production solver.
    time = (start_time:minutes(15):end_time).';
    n = numel(time);
@@ -816,7 +817,7 @@ function writeForcing(input_root, case_id, start_time, end_time)
    met.swu = met.albedo .* met.swd;
    met.boom_height = repmat(2.7, n, 1);
 
-   % Stamp the same product identity and per-channel provenance contract that
+   % Stamp the same product hash and per-channel provenance that
    % production loadmet validates after the root-scoped producer files pass.
    codes = icemodel.forcing.reconstruct.provenanceCodes();
    defaults = icemodel.forcing.reconstruct.setopts();
@@ -863,7 +864,8 @@ function writeForcing(input_root, case_id, start_time, end_time)
       'acceptance_window', struct( ...
          'start', char(formatTime(start_time)), ...
          'end', char(formatTime(end_time))));
-   writeJson(fullfile(plans_dir, case_id + "-report-inputs.json"), producer)
+   icemodel.verification.setup.writeJson( ...
+      fullfile(plans_dir, case_id + "-report-inputs.json"), producer)
 end
 
 function artifact = artifactRecord(role, path, pathname)
@@ -898,12 +900,4 @@ function text = formatTime(value)
    %FORMATTIME Format one UTC timestamp for portable JSON.
    value.TimeZone = 'UTC';
    text = string(value, 'yyyy-MM-dd HH:mm:ss');
-end
-
-function writeJson(pathname, value)
-   %WRITEJSON Write one deterministic synthetic JSON document.
-   fid = fopen(pathname, 'w', 'n', 'UTF-8');
-   assert(fid >= 0)
-   cleanup = onCleanup(@() fclose(fid));
-   fprintf(fid, '%s\n', jsonencode(value, PrettyPrint=true));
 end

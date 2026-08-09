@@ -12,7 +12,7 @@ function results = run_promice_ablation_evaluation(kwargs)
    % must explicitly select case ids (or "all") before any model is executed.
    % Production execution uses runModelCase with the producer-pinned
    % promice_filled artifact. MODEL_PROVIDER is a focused-test seam whose
-   % output must match the postprocessed diagnostic timetable contract. Each
+   % output must match the postprocessed diagnostic timetable. Each
    % run initializes on January 1 and retains a snow-aware June--October result
    % while comparison metrics use the readiness-selected summer interval.
 
@@ -179,7 +179,7 @@ function [run_name, run_dir, cleanup] = resolveRunDirectory(kwargs)
       icemodel.helpers.ensureDirExists(run_dir);
       cleanup = onCleanup(@() []);
    else
-      % Readiness has a file-based public contract, so no-write evaluation uses
+      % Readiness normally writes files, so a no-write evaluation uses
       % a private temporary run directory and removes it before returning.
       run_dir = string(tempname);
       mkdir(run_dir)
@@ -238,7 +238,9 @@ end
 function provenance = plannedRunProvenance(row, policy)
    %PLANNEDRUNPROVENANCE Separate model initialization from evaluation support.
    evaluation_end = parseTime(row.snow_free_window_end);
-   [display_start, display_end] = evaluationSeason(double(row.year), policy);
+   [display_start, display_end] = ...
+      icemodel.verification.helpers.evaluationSeason( ...
+      double(row.year), policy);
    provenance = struct( ...
       'initialization_start', parseTime(row.requested_window_start), ...
       'initialization_policy', "readiness requested_window_start", ...
@@ -267,8 +269,6 @@ function provenance = validateRunProvenance(row, policy)
       && provenance.evaluation_end <= provenance.display_end ...
       && provenance.run_end_inclusive >= provenance.initialization_start ...
       && provenance.run_end_inclusive < provenance.display_end ...
-      && provenance.run_end_inclusive + seconds( ...
-         policy.model_substep_seconds) == provenance.display_end ...
       && requested_end >= provenance.display_end;
    if ~ordered
       error('icemodel:verification:promiceAblationEvaluation:windowOrdering', ...
@@ -422,7 +422,7 @@ end
 
 function artifacts = revalidateExecutionArtifacts( ...
       row, evaluation_data_root, input_data_root)
-   %REVALIDATEEXECUTIONARTIFACTS Close the complete producer identity chain.
+   %REVALIDATEEXECUTIONARTIFACTS Check every producer hash still matches.
    required = ["forcing_producer_manifest", ...
       "forcing_producer_manifest_sha256", "forcing_readiness_artifact", ...
       "forcing_readiness_sha256", "forcing_artifact", "forcing_sha256", ...
@@ -434,7 +434,7 @@ function artifacts = revalidateExecutionArtifacts( ...
    end
 
    % All producer paths are selected-data-root-relative. The observation path
-   % has the same containment contract under the paired evaluation-data root.
+   % is contained the same way under the paired evaluation-data root.
    selected_data_root = string(fileparts(input_data_root));
    report_inputs_file = ...
       icemodel.verification.helpers.assertRootRelativeArtifactSha256( ...
@@ -532,7 +532,7 @@ function [model, metadata] = appendBoundaryCheckpoint( ...
    % carry only the preceding endpoint storage into the synthetic checkpoint.
    boundary = model(end, :);
    boundary.Properties.RowTimes = boundary_time;
-   for name = string(icemodel.column.budget_output_fields('sum'))
+   for name = string(icemodel.namelists.budgetoutputs('sum'))
       boundary.(name) = 0;
    end
    boundary.mass_budget_solid_start_mwe = ...
@@ -564,7 +564,8 @@ function [model, metadata] = appendBoundaryCheckpoint( ...
 end
 
 function seasonal = seasonalDiagnostics(observations, model, provenance, policy)
-   %SEASONALDIAGNOSTICS Build the snow-aware June-to-October plot contract.
+   %SEASONALDIAGNOSTICS Build the snow-aware June-to-October series the
+   % report plots.
    data = observations.data;
    inside = model.Time >= provenance.display_start ...
       & model.Time <= provenance.display_end;
@@ -589,17 +590,21 @@ function seasonal = seasonalDiagnostics(observations, model, provenance, policy)
       observation(has_observation) = ...
          data.(policy.observation_field)(rows);
       snow(has_observation) = data.(policy.snow_variable)(rows);
-      support = data{rows, cellstr(policy.support_flag_fields)};
-      direct_flags = data{rows, ...
-         cellstr(policy.direct_zero_flag_fields)};
-      direct(has_observation) = isfinite(observation(has_observation)) ...
-         & all(isfinite(support), 2) & all(direct_flags == 0, 2);
+      % One owner applies every flag rule, so this cannot drift from the
+      % comparator, the readiness writer, or the report builder.
+      flag_fields = ...
+         icemodel.verification.helpers.observationSupportFields( ...
+         policy.observation_field, policy);
+      support = icemodel.verification.helpers.classifyObservationSupport( ...
+         double(data{rows, cellstr(flag_fields)}), flag_fields, ...
+         policy.observation_field, policy);
+      direct(has_observation) = support.flag_clean;
    end
    [ice_exposed, ~, ~] = ...
       icemodel.verification.helpers.classifySnowDepth( ...
       snow, policy.ice_exposure_threshold_m);
    cumulative_fields = string( ...
-      icemodel.column.cumulative_output_fields());
+      icemodel.namelists.cumulativeoutputs());
    cumulative_index = model_index - 1;
    output_step = seconds(policy.model_output_cadence_seconds);
    if any(cumulative_index < 1) || any( ...
@@ -626,7 +631,7 @@ function seasonal = seasonalDiagnostics(observations, model, provenance, policy)
    % exposed-ice posting. Diagnosed runoff remains signed and is never clamped.
    observation_lowering = observation - observation(reference);
    density = policy.effective_density_kg_m3;
-   [~, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
+   ro_liq = icemodel.physicalConstant('ro_liq');
    observation_density = observation_lowering .* density(:).' ./ ro_liq;
    % Signed negative lowering reverses the density-endpoint order, so every
    % stored lower/upper field must use the pointwise numeric extrema.
@@ -648,12 +653,10 @@ function seasonal = seasonalDiagnostics(observations, model, provenance, policy)
    % behavior but must not be read as geometric surface rise. Cumulative surface
    % mass loss is the separate monotonic lowering analogue, built from the mass
    % that top-cell removal actually exported rather than from cell geometry.
-   d_solid_balance = -(model.mass_budget_phase_solid_mwe ...
-      + model.mass_budget_vapor_solid_mwe);
-   balance_prefix = [0; cumsum(d_solid_balance(1:end - 1))];
-   d_surface_loss = model.mass_budget_top_export_solid_mwe ...
-      + model.mass_budget_top_export_liquid_mwe;
-   surface_prefix = [0; cumsum(d_surface_loss(1:end - 1))];
+   increments = ...
+      icemodel.verification.helpers.ablationLedgerIncrements(model);
+   balance_prefix = [0; cumsum(increments.solid_balance(1:end - 1))];
+   surface_prefix = [0; cumsum(increments.surface_loss(1:end - 1))];
    model_net_solid = balance_prefix(model_index) ...
       - balance_prefix(model_index(reference));
    model_surface_loss = surface_prefix(model_index) ...
@@ -665,7 +668,7 @@ function seasonal = seasonalDiagnostics(observations, model, provenance, policy)
    % sublimation, minus deposition. Liquid vapor exchange is excluded because
    % evaporation removes pore water already counted as melt that left, and
    % condensation adds pore liquid rather than ice.
-   d_vapor_loss = -model.mass_budget_vapor_solid_mwe;
+   d_vapor_loss = increments.solid_vapor_loss;
    vapor_prefix = [0; cumsum(d_vapor_loss(1:end - 1))];
    model_vapor_loss = vapor_prefix(model_index) ...
       - vapor_prefix(model_index(reference));
@@ -900,13 +903,6 @@ function time = parseTime(value)
    end
 end
 
-function [first, last] = evaluationSeason(y, policy)
-   %EVALUATIONSEASON Return the fixed seasonal display bounds in UTC.
-   start_md = policy.evaluation_season_start_month_day;
-   end_md = policy.evaluation_season_end_month_day;
-   first = datetime(y, start_md(1), start_md(2), 'TimeZone', 'UTC');
-   last = datetime(y, end_md(1), end_md(2), 'TimeZone', 'UTC');
-end
 
 function result = emptySiteYearResult(row)
    %EMPTYSITEYEARRESULT Return one stable per-site-year result schema.

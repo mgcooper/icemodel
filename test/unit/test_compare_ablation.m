@@ -1,5 +1,5 @@
 function tests = test_compare_ablation
-   %TEST_COMPARE_ABLATION Verify the PROMICE ablation comparison contract.
+   %TEST_COMPARE_ABLATION Verify the PROMICE ablation comparison.
    tests = functiontests(localfunctions);
 end
 
@@ -40,8 +40,8 @@ function test_policy_is_fixed_and_reuses_budget_registry(testCase)
       [readiness.target_field, readiness.snow_variable, ...
       readiness.support_flag_fields]);
    testCase.verifyEqual(policy.required_model_fields, ...
-      string([icemodel.column.budget_output_fields('all'), ...
-      icemodel.column.cumulative_output_fields()]));
+      string([icemodel.namelists.budgetoutputs('all'), ...
+      icemodel.namelists.cumulativeoutputs()]));
    testCase.verifyEqual(policy.snow_continuity_threshold_m, 0.05);
    testCase.verifyEqual(policy.ice_exposure_threshold_m, 0.01);
    testCase.verifySubstring(policy.model_interval_convention, "[Time,Time+dt)");
@@ -184,14 +184,53 @@ function test_leading_flags_are_excluded_without_bridging(testCase)
       diagnostics.excluded.step_correctable_but_unresolved, 1);
 end
 
+function test_a_negative_correctable_flag_still_counts_as_flagged(testCase)
+   % step_correctable_but_unresolved used to test the raw flag column with
+   % > 0, so a malformed negative posting read as unflagged here while the
+   % readiness writer read the same posting as flagged and the two ledgers
+   % disagreed for the same site-year. classifyObservationSupport now governs
+   % both with one finite-and-nonzero rule, and a negative posting counts.
+
+   [observations, model] = makeInputs();
+   observations.data.surface_height_flag(1) = 1;
+   observations.data.station_transition_flag(2) = 1;
+   observations.data.step_detected_flag(3) = 1;
+   observations.data.step_correctable_flag(3) = -1;
+
+   [~, ~, diagnostics] = ...
+      icemodel.verification.compareAblation(observations, model);
+
+   testCase.verifyEqual(diagnostics.excluded.unresolved_step, 1);
+   testCase.verifyEqual( ...
+      diagnostics.excluded.step_correctable_but_unresolved, 1);
+end
+
+function test_a_nonfinite_correctable_flag_does_not_count_as_flagged(testCase)
+   % The other half of the same rule: NaN is missing data, not a raised flag,
+   % so the unresolved step is counted but not as correctable.
+
+   [observations, model] = makeInputs();
+   observations.data.surface_height_flag(1) = 1;
+   observations.data.station_transition_flag(2) = 1;
+   observations.data.step_detected_flag(3) = 1;
+   observations.data.step_correctable_flag(3) = NaN;
+
+   [~, ~, diagnostics] = ...
+      icemodel.verification.compareAblation(observations, model);
+
+   testCase.verifyEqual(diagnostics.excluded.unresolved_step, 1);
+   testCase.verifyEqual( ...
+      diagnostics.excluded.step_correctable_but_unresolved, 0);
+end
+
 function test_separate_domain_terms_prevent_cancellation(testCase)
-   % Equal cloned-bottom addition and collapse export close aggregate remeshing,
+   % Equal cloned-bottom addition and merge export close aggregate remeshing,
    % but each material solid-domain term must retain its own scientific scenario.
    [observations, model] = makeInputs();
    model.data.mass_budget_cloned_bottom_solid_mwe(2) = 0.1;
-   model.data.mass_budget_collapse_export_solid_mwe(2) = 0.1;
-   model.data.mass_budget_cloned_bottom_solid_throughput_mwe(2) = 0.1;
-   model.data.mass_budget_collapse_export_solid_throughput_mwe(2) = 0.1;
+   model.data.mass_budget_merge_export_solid_mwe(2) = 0.1;
+   model.data.mass_budget_cloned_bottom_solid_gross_mwe(2) = 0.1;
+   model.data.mass_budget_merge_export_solid_gross_mwe(2) = 0.1;
 
    [summary, ~, diagnostics] = ...
       icemodel.verification.compareAblation(observations, model);
@@ -207,13 +246,13 @@ function test_separate_domain_terms_prevent_cancellation(testCase)
       separate)));
 end
 
-function test_native_throughput_survives_hourly_cancellation(testCase)
-   % Native event throughput must remain visible when every hourly signed
+function test_native_gross_survives_hourly_cancellation(testCase)
+   % Native event gross must remain visible when every hourly signed
    % remesh term has cancelled to zero.
    [observations, model] = makeInputs();
-   model.data.mass_budget_remesh_solid_throughput_mwe(2) = 0.2;
-   model.data.mass_budget_cloned_bottom_solid_throughput_mwe(2) = 0.1;
-   model.data.mass_budget_collapse_export_solid_throughput_mwe(2) = 0.1;
+   model.data.mass_budget_remesh_solid_gross_mwe(2) = 0.2;
+   model.data.mass_budget_cloned_bottom_solid_gross_mwe(2) = 0.1;
+   model.data.mass_budget_merge_export_solid_gross_mwe(2) = 0.1;
 
    [summary, ~, diagnostics] = ...
       icemodel.verification.compareAblation(observations, model);
@@ -222,7 +261,7 @@ function test_native_throughput_survives_hourly_cancellation(testCase)
    material = diagnostics.materiality( ...
       diagnostics.materiality.channel == "remesh_solid", :);
    testCase.verifyEqual(material.signed_net_mwe, 0);
-   testCase.verifyEqual(material.throughput_mwe, 0.2);
+   testCase.verifyEqual(material.gross_mwe, 0.2);
    testCase.verifyTrue(material.material);
    identity = diagnostics.identities( ...
       diagnostics.identities.identity == "remesh_solid", :);
@@ -235,14 +274,14 @@ function test_liquid_storage_remains_diagnostic_only(testCase)
    [observations, model] = makeInputs();
    phase_liquid = model.data.mass_budget_phase_liquid_mwe;
    model.data.mass_budget_remesh_liquid_mwe(:) = 0;
-   model.data.mass_budget_collapse_export_liquid_mwe(:) = 0;
-   model.data.mass_budget_remesh_liquid_throughput_mwe(:) = 0;
-   model.data.mass_budget_collapse_export_liquid_throughput_mwe(:) = 0;
+   model.data.mass_budget_merge_export_liquid_mwe(:) = 0;
+   model.data.mass_budget_remesh_liquid_gross_mwe(:) = 0;
+   model.data.mass_budget_merge_export_liquid_gross_mwe(:) = 0;
    model.data.mass_budget_liquid_start_mwe = ...
       1 + [0; cumsum(phase_liquid(1:end - 1))];
    model.data.mass_budget_liquid_end_mwe = ...
       model.data.mass_budget_liquid_start_mwe + phase_liquid;
-   model.data.mass_budget_liquid_storage_throughput_mwe = ...
+   model.data.mass_budget_liquid_storage_gross_mwe = ...
       abs(phase_liquid);
 
    [summary, ~, diagnostics] = ...
@@ -262,10 +301,10 @@ function test_condensation_overflow_remains_diagnostic_only(testCase)
    [Lv, ro_liq] = icemodel.physicalConstant('Lv', 'ro_liq');
    overflow = 0.1;
    model.data.mass_budget_condensation_overflow_mwe(2) = overflow;
-   model.data.mass_budget_condensation_overflow_throughput_mwe(2) = overflow;
+   model.data.mass_budget_condensation_overflow_gross_mwe(2) = overflow;
    model.data.mass_budget_vapor_potential_j_m2(2) = ...
       ro_liq * Lv * overflow;
-   model.data.mass_budget_vapor_potential_throughput_j_m2(2) = ...
+   model.data.mass_budget_vapor_potential_gross_j_m2(2) = ...
       ro_liq * Lv * overflow;
 
    [summary, ~, diagnostics] = ...
@@ -294,19 +333,19 @@ function test_physical_dry_vapor_closes_fixed_mwe_identity(testCase)
    % Post one dry-sublimation event and carry its storage change through every
    % later checkpoint so both vapor energy and solid storage remain closed.
    model.data.mass_budget_vapor_solid_mwe(event_row) = vapor_solid_mwe;
-   model.data.mass_budget_vapor_solid_throughput_mwe(event_row) = ...
+   model.data.mass_budget_vapor_solid_gross_mwe(event_row) = ...
       abs(vapor_solid_mwe);
    model.data.mass_budget_vapor_potential_j_m2(event_row) = ...
       ro_liq * Lv * d_pevp;
-   model.data.mass_budget_vapor_potential_throughput_j_m2(event_row) = ...
+   model.data.mass_budget_vapor_potential_gross_j_m2(event_row) = ...
       abs(ro_liq * Lv * d_pevp);
    model.data.mass_budget_solid_end_mwe(event_row:end) = ...
       model.data.mass_budget_solid_end_mwe(event_row:end) + vapor_solid_mwe;
    model.data.mass_budget_solid_start_mwe(event_row + 1:end) = ...
       model.data.mass_budget_solid_start_mwe(event_row + 1:end) ...
       + vapor_solid_mwe;
-   model.data.mass_budget_solid_storage_throughput_mwe(event_row) = ...
-      model.data.mass_budget_solid_storage_throughput_mwe(event_row) ...
+   model.data.mass_budget_solid_storage_gross_mwe(event_row) = ...
+      model.data.mass_budget_solid_storage_gross_mwe(event_row) ...
       + abs(vapor_solid_mwe);
 
    [summary, ~, diagnostics] = ...
@@ -319,10 +358,10 @@ function test_physical_dry_vapor_closes_fixed_mwe_identity(testCase)
 end
 
 function test_exact_window_normalization_ignores_storage_path_length(testCase)
-   % The closure scale is |Delta q| plus physical-flux throughput. Storage
+   % The closure scale is |Delta q| plus physical-flux gross. Storage
    % path length is a separate materiality diagnostic and must not inflate it.
    [observations, model, increment] = makeInputs();
-   model.data.mass_budget_solid_storage_throughput_mwe(:) = 1e6;
+   model.data.mass_budget_solid_storage_gross_mwe(:) = 1e6;
 
    [~, ~, diagnostics] = ...
       icemodel.verification.compareAblation(observations, model);
@@ -363,14 +402,14 @@ function test_phase_mass_uses_combined_forcing_step_increment(testCase)
       model.data.mass_budget_phase_liquid_mwe + phase_error;
    model.data.mass_budget_remesh_liquid_mwe = ...
       model.data.mass_budget_remesh_liquid_mwe - phase_error;
-   model.data.mass_budget_collapse_export_liquid_mwe = ...
+   model.data.mass_budget_merge_export_liquid_mwe = ...
       -model.data.mass_budget_remesh_liquid_mwe;
-   model.data.mass_budget_phase_liquid_throughput_mwe = ...
+   model.data.mass_budget_phase_liquid_gross_mwe = ...
       abs(model.data.mass_budget_phase_liquid_mwe);
-   model.data.mass_budget_remesh_liquid_throughput_mwe = ...
+   model.data.mass_budget_remesh_liquid_gross_mwe = ...
       abs(model.data.mass_budget_remesh_liquid_mwe);
-   model.data.mass_budget_collapse_export_liquid_throughput_mwe = ...
-      abs(model.data.mass_budget_collapse_export_liquid_mwe);
+   model.data.mass_budget_merge_export_liquid_gross_mwe = ...
+      abs(model.data.mass_budget_merge_export_liquid_mwe);
 
    [~, ~, diagnostics] = ...
       icemodel.verification.compareAblation(observations, model);
@@ -402,7 +441,7 @@ function test_unverified_endpoint_scenarios_never_govern(testCase)
 end
 
 function test_failed_identity_blocks_physical_comparison(testCase)
-   % A storage residual above throughput tolerance must take precedence over a
+   % A storage residual above gross tolerance must take precedence over a
    % visually matching cumulative series.
    [observations, model] = makeInputs();
    model.data.mass_budget_solid_end_mwe(end - 1) = ...
@@ -567,7 +606,7 @@ end
 
 function test_time_window_and_support_errors_are_stable(testCase)
    % Duplicate times, disjoint bounds, and one eligible point each fail with a
-   % distinct contract error so readiness code can classify the reason.
+   % distinct error id so readiness code can classify the reason.
    [observations, model] = makeInputs();
    duplicate = observations;
    duplicate.data.Time(2) = duplicate.data.Time(1);
@@ -602,14 +641,14 @@ function test_nonfinite_ledger_and_endpoint_errors_are_stable(testCase)
       'icemodel:verification:compareAblation:badEndpointDeficit');
 end
 
-function test_negative_throughput_has_stable_error(testCase)
-   % Throughput is an absolute accepted-event total and cannot be negative.
+function test_negative_gross_has_stable_error(testCase)
+   % Gross is an absolute accepted-event total and cannot be negative.
    [observations, model] = makeInputs();
-   model.data.mass_budget_phase_solid_throughput_mwe(2) = -1;
+   model.data.mass_budget_phase_solid_gross_mwe(2) = -1;
 
    testCase.verifyError(@() icemodel.verification.compareAblation( ...
       observations, model), ...
-      'icemodel:verification:compareAblation:negativeThroughput');
+      'icemodel:verification:compareAblation:negativeGross');
 end
 
 function [observations, model, increment] = makeInputs()
@@ -635,7 +674,7 @@ function [observations, model, increment] = makeInputs()
    model_time = [time(1) - hours(1); time];
    n_model = numel(model_time);
    model.data = timetable('RowTimes', model_time);
-   fields = icemodel.column.budget_output_fields('all');
+   fields = icemodel.namelists.budgetoutputs('all');
    for k = 1:numel(fields)
       model.data.(fields{k}) = zeros(n_model, 1);
    end
@@ -652,12 +691,12 @@ function [observations, model, increment] = makeInputs()
    model.data.mass_budget_phase_solid_mwe = phase_solid;
    model.data.mass_budget_phase_liquid_mwe = phase_liquid;
    model.data.mass_budget_remesh_liquid_mwe = remesh_liquid;
-   model.data.mass_budget_collapse_export_liquid_mwe = -remesh_liquid;
-   model.data.mass_budget_solid_storage_throughput_mwe = solid_loss;
-   model.data.mass_budget_phase_solid_throughput_mwe = abs(phase_solid);
-   model.data.mass_budget_phase_liquid_throughput_mwe = abs(phase_liquid);
-   model.data.mass_budget_remesh_liquid_throughput_mwe = abs(remesh_liquid);
-   model.data.mass_budget_collapse_export_liquid_throughput_mwe = ...
+   model.data.mass_budget_merge_export_liquid_mwe = -remesh_liquid;
+   model.data.mass_budget_solid_storage_gross_mwe = solid_loss;
+   model.data.mass_budget_phase_solid_gross_mwe = abs(phase_solid);
+   model.data.mass_budget_phase_liquid_gross_mwe = abs(phase_liquid);
+   model.data.mass_budget_remesh_liquid_gross_mwe = abs(remesh_liquid);
+   model.data.mass_budget_merge_export_liquid_gross_mwe = ...
       abs(remesh_liquid);
    model.data.mass_budget_top_deletion_count([2, 4]) = 1;
    model.data.mass_budget_top_deletion_height_m([2, 4]) = 0.1;

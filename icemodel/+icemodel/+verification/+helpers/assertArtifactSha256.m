@@ -10,7 +10,8 @@ function assertArtifactSha256(pathname, expected_sha256)
    end
 
    % A readiness identity is usable only while both the artifact and its
-   % complete hash remain available at the execution boundary.
+   % complete hash remain available at the execution boundary, so a missing
+   % file or a truncated hash is a hard failure rather than a skipped check.
    if ~isfile(pathname)
       error('icemodel:verification:artifactIdentity:missing', ...
          'Pinned artifact is unavailable: %s', pathname)
@@ -20,8 +21,7 @@ function assertArtifactSha256(pathname, expected_sha256)
          'Pinned artifact has no valid SHA-256 identity: %s', pathname)
    end
 
-   % Rehash the current bytes so a readiness ledger cannot silently outlive
-   % the artifact version that it admitted.
+   % Rehash the file now so the ledger cannot admit a stale version.
    actual_sha256 = ...
       icemodel.verification.setup.fileSha256(pathname);
    if ~strcmpi(actual_sha256, expected_sha256)

@@ -5,12 +5,16 @@ function h = markTimeSpan(ax, t_start, t_end, kwargs)
    %
    % Role
    %  Single source of the span-annotation style report figures use to
-   %  highlight an interval (a filled gap, an event window): one
-   %  boundary line at each end, excluded from the legend so overlay
-   %  labels stay clean.
+   %  highlight an interval (a filled gap, an event window), excluded from
+   %  the legend so overlay labels stay clean.
+   %
+   %  style="lines" draws one boundary line at each end. style="fill" shades
+   %  the interval instead, for panels that highlight many spans at once and
+   %  would be unreadable with boundary lines.
    %
    % Returns
-   %  h : the two constant-line handles.
+   %  h : the two constant-line handles for style="lines", or the single
+   %      region handle for style="fill".
    %
    % See also: icemodel.plot.compareTimeseries, xline
 
@@ -20,6 +24,17 @@ function h = markTimeSpan(ax, t_start, t_end, kwargs)
       t_end (1, 1) datetime
       kwargs.line_style (1, :) char = ':'
       kwargs.color (1, 3) double = [0.4 0.4 0.4]
+      kwargs.style (1, 1) string {mustBeMember(kwargs.style, ...
+         ["lines", "fill"])} = "lines"
+      kwargs.face_alpha (1, 1) double {mustBeInRange( ...
+         kwargs.face_alpha, 0, 1)} = 0.12
+   end
+
+   if kwargs.style == "fill"
+      h = xregion(ax, t_start, t_end, 'FaceColor', kwargs.color, ...
+         'FaceAlpha', kwargs.face_alpha, 'EdgeColor', 'none');
+      h.HandleVisibility = 'off';
+      return
    end
 
    h = [ ...

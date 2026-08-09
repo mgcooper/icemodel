@@ -1,5 +1,5 @@
 function tests = test_promice_ablation_readiness
-   %TEST_PROMICE_ABLATION_READINESS Verify payload-derived cohort admission.
+   %TEST_PROMICE_ABLATION_READINESS Verify which site-years the readiness ledger admits.
    tests = functiontests(localfunctions);
 end
 
@@ -176,7 +176,8 @@ function test_inventory_hashes_and_no_write_path_are_machine_readable(testCase)
       report.summary.reconstruction_source_audit.reconstruction_write_call_count, ...
       0);
    testCase.verifyGreaterThanOrEqual( ...
-      report.summary.reconstruction_source_audit.runtime_evaluation_guard_call_count, ...
+      report.summary.reconstruction_source_audit ...
+      .runtime_evaluation_guard_call_count, ...
       2);
    testCase.verifyEqual( ...
       report.summary.reconstruction_source_audit.observation_write_match_count, 0);
@@ -408,7 +409,7 @@ function test_missing_surface_posting_remains_admissible(testCase)
    testCase.verifyGreaterThan(window_end, max(omitted_times));
 
    % The retained endpoints must still satisfy the same direct exposed-ice
-   % contract used by the production comparison, not merely bound a long gap.
+   % rule used by the production comparison, not merely bound a long gap.
    policy = icemodel.verification.namelists.promiceAblationReadiness();
    endpoints = ismember(targets.data.Time, [window_start; window_end]);
    support = targets.data{endpoints, ...
@@ -573,7 +574,7 @@ function test_requested_window_requires_canonical_period_containment(testCase)
    period_end = datetime(2019, 7, 9, 23, 0, 0, 'TimeZone', 'UTC');
    manifest.cases(ready_index).period = ...
       periodStruct(period_start, period_end);
-   writeJson(manifest_file, manifest)
+   icemodel.verification.setup.writeJson(manifest_file, manifest)
 
    report = icemodel.verification.setup.writePromiceAblationReadiness( ...
       evaluation_data_root=eval_root, ...
@@ -606,7 +607,7 @@ function test_observation_path_outside_selected_root_is_rejected(testCase)
    ready_index = find(string({manifest.cases.case_id}) == "ready");
    manifest.cases(ready_index).evaluation_file = ...
       char(fullfile("..", "..", "outside-observations.mat"));
-   writeJson(manifest_file, manifest)
+   icemodel.verification.setup.writeJson(manifest_file, manifest)
 
    report = icemodel.verification.setup.writePromiceAblationReadiness( ...
       evaluation_data_root=eval_root, ...
@@ -639,7 +640,7 @@ function test_forcing_artifact_path_outside_selected_root_is_rejected(testCase)
       fullfile("..", "outside-filled.mat"));
    producer.artifacts(filled_index).sha256 = char( ...
       icemodel.verification.setup.fileSha256(outside_file));
-   writeJson(manifest_file, producer)
+   icemodel.verification.setup.writeJson(manifest_file, producer)
 
    report = icemodel.verification.setup.writePromiceAblationReadiness( ...
       evaluation_data_root=testCase.TestData.eval_root, ...
@@ -699,7 +700,7 @@ function test_filled_payload_cadence_must_match_policy(testCase)
    save(filled_file, 'met', 'artifact_metadata')
    producer.artifacts(filled_index).sha256 = char( ...
       icemodel.verification.setup.fileSha256(filled_file));
-   writeJson(manifest_file, producer)
+   icemodel.verification.setup.writeJson(manifest_file, producer)
 
    % The generic structural check accepts a complete regular native cadence;
    % the PROMICE policy gate below is what must reject the 30-minute payload.
@@ -760,7 +761,7 @@ function test_forcing_readiness_is_requested_window_scoped(testCase)
       save(filled_file, 'met', 'artifact_metadata')
       producer.artifacts(filled_index).sha256 = char( ...
          icemodel.verification.setup.fileSha256(filled_file));
-      writeJson(manifest_file, producer)
+      icemodel.verification.setup.writeJson(manifest_file, producer)
 
       [whole_ready, ~, windows] = ...
          icemodel.verification.setup.metArtifactReadiness(filled_file);
@@ -792,7 +793,7 @@ function test_acceptance_window_must_match_payload_support(testCase)
       "plans", "ready-report-inputs.json");
    producer = jsondecode(fileread(manifest_file));
    producer.acceptance_window.start = '2019-01-01 00:15:00';
-   writeJson(manifest_file, producer)
+   icemodel.verification.setup.writeJson(manifest_file, producer)
 
    report = icemodel.verification.setup.writePromiceAblationReadiness( ...
       evaluation_data_root=testCase.TestData.eval_root, ...
@@ -833,7 +834,7 @@ function test_readiness_ledger_identity_must_match_site_and_window(testCase)
       writetable(ledger, readiness_file)
       producer.artifacts(readiness_index).sha256 = char( ...
          icemodel.verification.setup.fileSha256(readiness_file));
-      writeJson(manifest_file, producer)
+      icemodel.verification.setup.writeJson(manifest_file, producer)
 
       report = icemodel.verification.setup.writePromiceAblationReadiness( ...
          evaluation_data_root=testCase.TestData.eval_root, ...
@@ -865,7 +866,7 @@ function test_invalid_acceptance_window_identity_is_rejected(testCase)
       else
          producer.acceptance_window.start = '2020-01-01 00:00:00';
       end
-      writeJson(manifest_file, producer)
+      icemodel.verification.setup.writeJson(manifest_file, producer)
 
       report = icemodel.verification.setup.writePromiceAblationReadiness( ...
          evaluation_data_root=testCase.TestData.eval_root, ...
@@ -890,7 +891,7 @@ function test_incomplete_producer_artifact_schema_is_reported(testCase)
       "plans", "ready-report-inputs.json");
    producer = jsondecode(fileread(manifest_file));
    producer.artifacts = rmfield(producer.artifacts, 'sha256');
-   writeJson(manifest_file, producer)
+   icemodel.verification.setup.writeJson(manifest_file, producer)
 
    report = icemodel.verification.setup.writePromiceAblationReadiness( ...
       evaluation_data_root=testCase.TestData.eval_root, ...
@@ -992,7 +993,7 @@ end
 
 %% Fixture helpers
 function writeFixtureTree(eval_root, input_root)
-   %WRITEFIXTURETREE Create four cases spanning payload and readiness branches.
+   %WRITEFIXTURETREE Create four cases covering the met and readiness branches.
    family_root = fullfile(eval_root, "promice");
    mkdir(family_root)
    start_time = datetime(2019, 6, 1, 0, 0, 0, 'TimeZone', 'UTC');
@@ -1027,7 +1028,8 @@ function writeFixtureTree(eval_root, input_root)
       'source_url', '', 'source_version', 'synthetic', ...
       'retrieval_date', '2026-08-03', 'cases', cases, ...
       'skipped', struct([]));
-   writeJson(fullfile(family_root, "manifest.json"), manifest)
+   icemodel.verification.setup.writeJson( ...
+      fullfile(family_root, "manifest.json"), manifest)
 
    % Ready and ZACA carry valid, producer-pinned forcing so their observation
    % verdicts can differ without conflating product availability.
@@ -1038,7 +1040,7 @@ end
 
 function c = writeObservationCase( ...
       family_root, case_id, site_id, start_time, end_time, kind)
-   %WRITEOBSERVATIONCASE Save one actual targets.data payload and manifest row.
+   %WRITEOBSERVATIONCASE Save one targets.data file and its manifest row.
    times = (start_time:hours(1):end_time).';
    n = numel(times);
    if kind == "ablation"
@@ -1094,7 +1096,7 @@ function c = writeObservationCase( ...
 end
 
 function writeForcing(input_root, case_id, start_time, end_time)
-   %WRITEFORCING Save one filled payload plus its final producer evidence.
+   %WRITEFORCING Save one filled met file plus its producer evidence.
    data_root = string(fileparts(input_root));
    met_dir = fullfile(input_root, 'met', 'promice_filled');
    qa_root = fullfile(data_root, 'preview', 'qa', 'gapfill');
@@ -1164,7 +1166,7 @@ function writeForcing(input_root, case_id, start_time, end_time)
       'acceptance_window', struct( ...
       'start', char(formatTime(start_time)), ...
       'end', char(formatTime(end_time))));
-   writeJson(fullfile(plans_dir, ...
+   icemodel.verification.setup.writeJson(fullfile(plans_dir, ...
       case_id + "-report-inputs.json"), producer)
 end
 
@@ -1218,7 +1220,7 @@ function saveFilledArtifactAndRepin( ...
    save(met_file, 'met', 'artifact_metadata')
    producer.artifacts(filled_index) = artifactRecord( ...
       "filled", string(producer.artifacts(filled_index).path), met_file);
-   writeJson(manifest_file, producer)
+   icemodel.verification.setup.writeJson(manifest_file, producer)
 end
 
 function period = periodStruct(first, last)
@@ -1238,12 +1240,4 @@ function text = formatTime(value)
    %FORMATTIME Format one manifest timestamp explicitly in UTC.
    value.TimeZone = 'UTC';
    text = string(value, 'yyyy-MM-dd HH:mm:ss');
-end
-
-function writeJson(pathname, value)
-   %WRITEJSON Write one synthetic portable JSON artifact.
-   fid = fopen(pathname, 'w', 'n', 'UTF-8');
-   assert(fid >= 0)
-   cleanup = onCleanup(@() fclose(fid));
-   fprintf(fid, '%s\n', jsonencode(value, PrettyPrint=true));
 end

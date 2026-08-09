@@ -10,8 +10,9 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
    %  kernel. Physical constants (TL, TH, Lf, …), and thermodynamic parameters
    %  (f_ell_min, f_ell_max, ro_iwe, …) are fetched from
    %  icemodel.physicalConstant / icemodel.parameterLookup where needed.
+   %
    %  opts.use_ro_glc changes only the densities used to construct initial
-   %  phase fractions. Solver physics continues to use physical constants.
+   %  phase fractions. Solvers use persistent physical constants. See setopts.
    %
    %#codegen
 

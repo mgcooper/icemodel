@@ -1290,7 +1290,7 @@ function [observed, raw_albedo, resolved, swd_darkness, native_provenance] = ...
          ['staged %s shortwave records source selection but its raw source ' ...
          'file is unavailable: %s'], site, source_file)
    end
-   if ~icemodel.internal.isPathInside(source_file, data_root)
+   if ~icemodel.isPathInside(source_file, data_root)
       if legacy_albedo
          error( ...
             'icemodel:reconstruct:fillPromiceStation:albedoSourceOutsideRoot', ...
@@ -1421,7 +1421,7 @@ function source_file = resolveSourceFile(source_file, data_root)
    if source_file == ""
       return
    end
-   if isfile(source_file) && icemodel.internal.isPathInside(source_file, data_root)
+   if isfile(source_file) && icemodel.isPathInside(source_file, data_root)
       return
    end
 
@@ -1430,7 +1430,7 @@ function source_file = resolveSourceFile(source_file, data_root)
    recorded = java.io.File(char(source_file));
    if ~recorded.isAbsolute()
       candidate = string(fullfile(data_root, source_file));
-      if isfile(candidate) && icemodel.internal.isPathInside(candidate, data_root)
+      if isfile(candidate) && icemodel.isPathInside(candidate, data_root)
          source_file = candidate;
          return
       end
@@ -1649,7 +1649,7 @@ function donors = assembleDonors(site, met_dir, kwargs)
              leg = entry.colocation.ktransect;
              evaluation_file = fullfile(kt_root, ...
                 leg.evaluation_file);
-             if ~icemodel.internal.isPathInside(evaluation_file, kt_root)
+             if ~icemodel.isPathInside(evaluation_file, kt_root)
                 error(['icemodel:reconstruct:fillPromiceStation:' ...
                    'ktransectPathOutsideRoot'], ...
                    'K-transect donor path escapes the selected root: %s', ...
@@ -2691,7 +2691,7 @@ function met_file = writeArtifacts(site, filled, provenance, audit, ...
     [data_root, ~] = ...
        icemodel.forcing.reconstruct.selectedDataRoot(string(out_dir));
     for k = 1:numel(final_files)
-       if ~icemodel.internal.isPathInside(final_files(k), data_root)
+       if ~icemodel.isPathInside(final_files(k), data_root)
           error('icemodel:reconstruct:fillPromiceStation:artifactOutsideRoot', ...
              'report input must stay inside selected data root %s: %s', ...
              data_root, final_files(k));

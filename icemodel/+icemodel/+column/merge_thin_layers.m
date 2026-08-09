@@ -1,6 +1,5 @@
 function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask, remesh] = ...
-      merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz_therm, d_pevp, d_lyr, f_ice_min)
+      merge_thin_layers(T, f_ice, f_liq, Sc, Sp, dz_therm, d_pevp, d_lyr, f_ice_min)
    %MERGE_THIN_LAYERS Merge layers that fall below the retained ice floor.
    %
    % merge_thin_layers combines control volumes whose ice fraction is already
@@ -24,16 +23,18 @@ function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask, remesh] = ...
    %                     cells into one retains their mean.
    %   merge_mask      - Logical flag marking merge-eligible layers.
    %   remesh          - Optional event, signed storage-exchange, and absolute
-   %                     event-throughput ledger. Solid/liquid terms are metres
+   %                     event-gross ledger. Solid/liquid terms are metres
    %                     water equivalent and enthalpy terms are J m-2.
    %                     top_deletion_count counts removals of the surface cell,
    %                     the only ones that translate the fixed grid downward;
    %                     interior_merge_count counts every other removal.
-   %                     top_export_* is the mass a surface removal actually
-   %                     exports, which is the physical surface-loss quantity;
+   %                     top_export_* is the mass a surface removal exported.
+   %                     A merge keeps the mean of the pair, so this
+   %                     over-counts what the removed cell held and is not a
+   %                     surface mass flux;
    %                     the quantized top_deletion_height_m is grid geometry
    %                     and is never mass. Domain exchange closes as
-   %                     remesh = cloned_bottom - collapse_export.
+   %                     remesh = cloned_bottom - merge_export.
    %
    % See also: icemodel.column.merge_layer_indices,
    %  icemodel.column.merge_layers,
@@ -46,14 +47,16 @@ function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask, remesh] = ...
       [Ls, Lv, ro_ice, ro_liq] = icemodel.physicalConstant( ...
          'Ls', 'Lv', 'ro_ice', 'ro_liq');
    end
+
    % The eighth output opts into the diagnostic ledger. Existing seven-output
    % solver callers keep the state transition without allocating structs or
    % integrating column storage on every substep.
    use_remesh_ledger = nargout > 7;
+
    if use_remesh_ledger
       % Return a complete zero ledger when no merge occurs so callers never
       % infer events from the eligibility mask or from d_lyr.
-      remesh = zeroRemeshLedger();
+      remesh = icemodel.column.initialize_remesh_ledger();
    end
 
    % Flag layers that already violate the allowed minimum ice fraction or would
@@ -80,41 +83,46 @@ function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask, remesh] = ...
       end
 
       % Snapshot each actual event independently so opposite-signed exchanges
-      % cannot cancel before their absolute throughput is retained.
+      % cannot cancel before their absolute gross is retained.
       if use_remesh_ledger
          [solid_before, liquid_before, enthalpy_before] = ...
             icemodel.column.integrate_column_budget(T, f_ice, f_liq, dz_therm);
       end
 
-      % Merge the flagged layer with its nearest eligible neighbor.
+      % Flag merge layer indices.
       [j1, j2] = icemodel.column.merge_layer_indices(ji, f_ice);
+
+      % Merge the flagged layer with its nearest eligible neighbor.
       [T(j2), f_ice(j2), f_liq(j2), Sc(j2), Sp(j2), d_lyr] = ...
          icemodel.column.merge_layers(T, f_ice, f_liq, Sc, Sp, j1, j2, ...
          d_lyr, dz_therm);
 
-      % Count the boundary actually removed, not its pre-loop eligibility, and
-      % snapshot the post-merge bottom reservoir the clone below imports.
+      % Count the boundary actually removed, not its pre-loop eligibility.
       if use_remesh_ledger
          if j1 == 1
             remesh.top_deletion_count = remesh.top_deletion_count + 1;
          else
             remesh.interior_merge_count = remesh.interior_merge_count + 1;
          end
+      end
+
+      % Remove the merged layer, then preserve column length by repeating the
+      % deepest remaining state.
+      T = dropAndCloneBottom(T, j1);
+      Sc = dropAndCloneBottom(Sc, j1);
+      Sp = dropAndCloneBottom(Sp, j1);
+      f_ice = dropAndCloneBottom(f_ice, j1);
+      f_liq = dropAndCloneBottom(f_liq, j1);
+      do_merge = dropAndCloneBottom(do_merge, j1);
+
+      % Snapshot the bottom reservoir the clone imported.
+      if use_remesh_ledger
          [bottom_solid, bottom_liquid, bottom_enthalpy] = ...
             icemodel.column.integrate_column_budget( ...
             T(end), f_ice(end), f_liq(end), dz_therm);
       end
 
-      % Remove the merged layer and preserve column length by repeating the
-      % deepest remaining state at the bottom.
-      T = vertcat(T, T(end)); T(j1) = []; %#ok<*AGROW>
-      Sc = vertcat(Sc, Sc(end)); Sc(j1) = [];
-      Sp = vertcat(Sp, Sp(end)); Sp(j1) = [];
-      f_ice = vertcat(f_ice, f_ice(end)); f_ice(j1) = [];
-      f_liq = vertcat(f_liq, f_liq(end)); f_liq(j1) = [];
-      do_merge = vertcat(do_merge, do_merge(end)); do_merge(j1) = [];
-
-      % Close remesh = cloned_bottom - collapse_export for this event before
+      % Close remesh = cloned_bottom - merge_export for this event before
       % accumulating signed and absolute channels, so the ledger needs no
       % variable-length per-event arrays.
       if use_remesh_ledger
@@ -135,36 +143,6 @@ function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask, remesh] = ...
    end
 end
 
-function remesh = zeroRemeshLedger()
-   %ZEROREMESHLEDGER Return the fixed all-zero remesh event ledger layout.
-
-   % Declare every field literally so MATLAB Coder never constructs or extends
-   % the event ledger from runtime field names.
-   remesh = struct( ...
-      'top_deletion_count', 0, ...
-      'top_deletion_height_m', 0.0, ...
-      'top_export_solid_mwe', 0.0, ...
-      'top_export_liquid_mwe', 0.0, ...
-      'interior_merge_count', 0, ...
-      'solid_mwe', 0.0, ...
-      'liquid_mwe', 0.0, ...
-      'enthalpy_j_m2', 0.0, ...
-      'cloned_bottom_solid_mwe', 0.0, ...
-      'cloned_bottom_liquid_mwe', 0.0, ...
-      'cloned_bottom_enthalpy_j_m2', 0.0, ...
-      'collapse_export_solid_mwe', 0.0, ...
-      'collapse_export_liquid_mwe', 0.0, ...
-      'collapse_export_enthalpy_j_m2', 0.0, ...
-      'solid_throughput_mwe', 0.0, ...
-      'liquid_throughput_mwe', 0.0, ...
-      'enthalpy_throughput_j_m2', 0.0, ...
-      'cloned_bottom_solid_throughput_mwe', 0.0, ...
-      'cloned_bottom_liquid_throughput_mwe', 0.0, ...
-      'cloned_bottom_enthalpy_throughput_j_m2', 0.0, ...
-      'collapse_export_solid_throughput_mwe', 0.0, ...
-      'collapse_export_liquid_throughput_mwe', 0.0, ...
-      'collapse_export_enthalpy_throughput_j_m2', 0.0);
-end
 
 function remesh = accumulateMergeEvent(remesh, is_top_removal, ...
       event_solid, event_liquid, event_enthalpy, ...
@@ -180,8 +158,9 @@ function remesh = accumulateMergeEvent(remesh, is_top_removal, ...
    export_liquid = bottom_liquid - event_liquid;
    export_enthalpy = bottom_enthalpy - event_enthalpy;
 
-   % The surface-loss comparator needs the mass a top removal actually exports,
-   % separated from interior merges, which move mass without lowering the grid.
+   % Record the mass a top removal exported. A merge keeps the mean of the
+   % pair, so this over-counts what the removed cell held. It is kept separate
+   % from interior merges, which move mass without lowering the grid.
    if is_top_removal
       remesh.top_export_solid_mwe = ...
          remesh.top_export_solid_mwe + export_solid;
@@ -198,31 +177,43 @@ function remesh = accumulateMergeEvent(remesh, is_top_removal, ...
       remesh.cloned_bottom_liquid_mwe + bottom_liquid;
    remesh.cloned_bottom_enthalpy_j_m2 = ...
       remesh.cloned_bottom_enthalpy_j_m2 + bottom_enthalpy;
-   remesh.collapse_export_solid_mwe = ...
-      remesh.collapse_export_solid_mwe + export_solid;
-   remesh.collapse_export_liquid_mwe = ...
-      remesh.collapse_export_liquid_mwe + export_liquid;
-   remesh.collapse_export_enthalpy_j_m2 = ...
-      remesh.collapse_export_enthalpy_j_m2 + export_enthalpy;
+   remesh.merge_export_solid_mwe = ...
+      remesh.merge_export_solid_mwe + export_solid;
+   remesh.merge_export_liquid_mwe = ...
+      remesh.merge_export_liquid_mwe + export_liquid;
+   remesh.merge_export_enthalpy_j_m2 = ...
+      remesh.merge_export_enthalpy_j_m2 + export_enthalpy;
 
    % Absolute event activity keeps opposite-signed merges within one forcing
    % step from cancelling before temporal aggregation.
-   remesh.solid_throughput_mwe = ...
-      remesh.solid_throughput_mwe + abs(event_solid);
-   remesh.liquid_throughput_mwe = ...
-      remesh.liquid_throughput_mwe + abs(event_liquid);
-   remesh.enthalpy_throughput_j_m2 = ...
-      remesh.enthalpy_throughput_j_m2 + abs(event_enthalpy);
-   remesh.cloned_bottom_solid_throughput_mwe = ...
-      remesh.cloned_bottom_solid_throughput_mwe + abs(bottom_solid);
-   remesh.cloned_bottom_liquid_throughput_mwe = ...
-      remesh.cloned_bottom_liquid_throughput_mwe + abs(bottom_liquid);
-   remesh.cloned_bottom_enthalpy_throughput_j_m2 = ...
-      remesh.cloned_bottom_enthalpy_throughput_j_m2 + abs(bottom_enthalpy);
-   remesh.collapse_export_solid_throughput_mwe = ...
-      remesh.collapse_export_solid_throughput_mwe + abs(export_solid);
-   remesh.collapse_export_liquid_throughput_mwe = ...
-      remesh.collapse_export_liquid_throughput_mwe + abs(export_liquid);
-   remesh.collapse_export_enthalpy_throughput_j_m2 = ...
-      remesh.collapse_export_enthalpy_throughput_j_m2 + abs(export_enthalpy);
+   remesh.solid_gross_mwe = ...
+      remesh.solid_gross_mwe + abs(event_solid);
+   remesh.liquid_gross_mwe = ...
+      remesh.liquid_gross_mwe + abs(event_liquid);
+   remesh.enthalpy_gross_j_m2 = ...
+      remesh.enthalpy_gross_j_m2 + abs(event_enthalpy);
+   remesh.cloned_bottom_solid_gross_mwe = ...
+      remesh.cloned_bottom_solid_gross_mwe + abs(bottom_solid);
+   remesh.cloned_bottom_liquid_gross_mwe = ...
+      remesh.cloned_bottom_liquid_gross_mwe + abs(bottom_liquid);
+   remesh.cloned_bottom_enthalpy_gross_j_m2 = ...
+      remesh.cloned_bottom_enthalpy_gross_j_m2 + abs(bottom_enthalpy);
+   remesh.merge_export_solid_gross_mwe = ...
+      remesh.merge_export_solid_gross_mwe + abs(export_solid);
+   remesh.merge_export_liquid_gross_mwe = ...
+      remesh.merge_export_liquid_gross_mwe + abs(export_liquid);
+   remesh.merge_export_enthalpy_gross_j_m2 = ...
+      remesh.merge_export_enthalpy_gross_j_m2 + abs(export_enthalpy);
+end
+
+function values = dropAndCloneBottom(values, j1)
+   %DROPANDCLONEBOTTOM Remove cell j1 and repeat the deepest remaining cell.
+   %
+   % Assigning through values(:) keeps the column length fixed, so the arrays
+   % never grow and no AGROW suppression is needed.
+   %
+   %#codegen
+
+   kept = [values(1:j1 - 1); values(j1 + 1:end)];
+   values(:) = [kept; kept(end)];
 end

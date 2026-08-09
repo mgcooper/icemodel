@@ -133,18 +133,19 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
    f_liq_C = f_wat_C / (1.0 + (fcp * Td_C) ^ 2.0);
    f_ice_C = (f_wat_C - f_liq_C) * ro_liq / ro_ice;
 
-   % Accumulate the mass this merge removes from the column, as a water-
-   % equivalent fraction that the caller scales by dz. The two cells carry
-   % f_wat_12 of water equivalent between them, and the single surviving cell
-   % retains f_wat_C, so the difference leaves the column.
+   % Add the mass this merge removes, as a water-equivalent fraction the
+   % caller scales by dz. The two cells hold f_wat_12 between them and the
+   % surviving cell keeps half of it, because f_wat_C spreads m_wat_C over two
+   % cell volumes. So the merge removes half, which is never negative. That
+   % halving is exact only for a scalar dz, which is what every call site
+   % passes; the whole function assumes it, since m_wat_1 and m_wat_2 above,
+   % and so T_C and f_wat_C, are all wrong for a vector dz. A graded grid
+   % needs merge_layers revisited end to end.
    %
-   % The liquid-only difference is not the mass a merge removes, because it
-   % omits the solid export. That figure is still available as the ledger's
-   % collapse_export_liquid channel.
-   %
-   % The result is nonnegative by construction: f_wat_C is defined over two
-   % cell volumes, so it is exactly half of f_wat_12.
+   % This is solid plus liquid. The liquid-only difference is a different
+   % quantity and is not what a merge removes; it is in the ledger as
+   % merge_export_liquid_mwe.
    f_wat_12 = ro_ice / ro_liq * (f_ice(j1) + f_ice(j2)) ...
       + f_liq(j1) + f_liq(j2);
-   d_lyr(j1) = d_lyr(j1) + (f_wat_12 - f_wat_C);
+   d_lyr(j1) = d_lyr(j1) + f_wat_12 / 2;
 end

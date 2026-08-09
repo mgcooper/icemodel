@@ -19,8 +19,8 @@ function report_file = buildAblationEvaluationReport(results_file, kwargs)
       kwargs.output_dir (1, 1) string = ""
    end
 
-   % Load exactly one persisted result contract; provenance paths inside the
-   % struct are reported literally and are never opened by this layer.
+   % Load one saved results file. Paths stored inside it are printed as-is;
+   % this function never opens them.
    if ~isfile(results_file)
       error('icemodel:verification:report:missingAblationResults', ...
          'Saved ablation results are unavailable: %s', results_file)
@@ -77,7 +77,7 @@ function report_file = buildAblationEvaluationReport(results_file, kwargs)
    % Rendering is optional for focused tests and source review only.
    if kwargs.render
       command = "quarto render " ...
-         + icemodel.verification.helpers.shellQuote(qmd_file);
+         + icemodel.shellQuote(qmd_file);
       [status, output] = system(command);
       if status ~= 0
          error('icemodel:verification:report:quartoFailed', ...
@@ -95,7 +95,7 @@ function report_file = buildAblationEvaluationReport(results_file, kwargs)
 end
 
 function results = validateResults(results)
-   %VALIDATERESULTS Enforce the saved runner contract used by the renderer.
+   %VALIDATERESULTS Check the saved results have the fields the report needs.
 
    required = ["run_name", "readiness", "site_year_results", ...
       "summary", "nested_windows", "endpoint_perturbations", ...
@@ -124,7 +124,7 @@ function results = validateResults(results)
    end
 
    % Validate and normalize the saved observation registry even when no case
-   % completed, so readiness-only reports cannot bypass the policy contract.
+   % completed, so readiness-only reports cannot bypass the policy check.
    results.policy = validateObservationPolicy(results.policy);
    validateCompletedSeasonalPayloads( ...
       results.site_year_results, results.policy)
@@ -148,7 +148,8 @@ function results = validateResults(results)
 end
 
 function policy = validateObservationPolicy(policy)
-   %VALIDATEOBSERVATIONPOLICY Enforce the saved flag-partition contract.
+   %VALIDATEOBSERVATIONPOLICY Check the saved flag lists do not overlap or
+   % miss a field.
 
    partition_fields = ["observation_field", "required_observation_fields", ...
       "support_flag_fields", "direct_zero_flag_fields", ...
@@ -237,7 +238,7 @@ function policy = validateObservationPolicy(policy)
          'Saved policy does not match the fixed PROMICE ablation policy')
    end
 
-   % Downstream report code receives one row-oriented validated contract.
+   % Hand the report one validated policy struct with row-shaped fields.
    policy.observation_field = observation_field;
    policy.required_observation_fields = required_schema;
    policy.support_flag_fields = support_fields;
@@ -290,7 +291,8 @@ function tf = validMonthDay(value)
 end
 
 function validateCompletedSeasonalPayloads(site_results, policy)
-   %VALIDATECOMPLETEDSEASONALPAYLOADS Require one exact hourly display season.
+   %VALIDATECOMPLETEDSEASONALPAYLOADS Require one hourly season per
+   % completed site-year.
 
    required = ["observation_lowering_m", "observation_lower_mwe", ...
       "observation_upper_mwe", "observation_reference_mwe", ...
@@ -299,8 +301,6 @@ function validateCompletedSeasonalPayloads(site_results, policy)
       "model_layer_change_mwe", "model_surface_mass_loss_mwe", ...
       "model_ablation_proxy_mwe", "snow_depth_m", ...
       "ice_exposed", "direct_observation", "evaluation_window"];
-   start_month_day = policy.evaluation_season_start_month_day;
-   end_month_day = policy.evaluation_season_end_month_day;
    for k = 1:numel(site_results)
       result = site_results(k);
       if ~isfield(result, 'status') || string(result.status) ~= "completed"
@@ -323,10 +323,9 @@ function validateCompletedSeasonalPayloads(site_results, policy)
 
       % The persisted display payload must be the full inclusive policy grid;
       % exact equality also rejects duplicates, reordering, gaps, and truncation.
-      season_start = datetime(double(result.year), start_month_day(1), ...
-         start_month_day(2), 'TimeZone', 'UTC');
-      season_end = datetime(double(result.year), end_month_day(1), ...
-         end_month_day(2), 'TimeZone', 'UTC');
+      [season_start, season_end] = ...
+      icemodel.verification.helpers.evaluationSeason( ...
+      double(result.year), policy);
       expected_time = (season_start:hours(1):season_end)';
       if ~isequal(result.seasonal.Time, expected_time)
          error('icemodel:verification:report:invalidAblationSeasonal', ...
@@ -563,7 +562,7 @@ function values = numericColumn(table_value, candidates)
 end
 
 function summary = statusTable(synthesis)
-   %STATUSTABLE Aggregate exact outcome, status, reason, and failure identity.
+   %STATUSTABLE Aggregate outcome, status, reason, and error id.
 
    if height(synthesis) == 0
       summary = table(strings(0, 1), strings(0, 1), strings(0, 1), ...
@@ -815,7 +814,7 @@ function [identities, materiality, scenarios, density, exclusions] = ...
       if isfield(diagnostics, 'scenarios') && istable(diagnostics.scenarios)
          % A saved endpoint row cannot confer observation provenance on itself.
          % Keep its numeric sensitivity while enforcing the current comparator
-         % contract in exported tables and report aggregation.
+         % naming in exported tables and report aggregation.
          scenario_values = diagnostics.scenarios;
          endpoint_rows = string(scenario_values.role) == "endpoint";
          scenario_values.credible(endpoint_rows) = false;
@@ -881,7 +880,7 @@ function value = emptyMaterialityTable()
       strings(0, 1), zeros(0, 1), zeros(0, 1), zeros(0, 1), ...
       zeros(0, 1), false(0, 1), 'VariableNames', ...
       {'case_id', 'site_id', 'year', 'channel', 'signed_net_mwe', ...
-      'throughput_mwe', 'signed_ratio', 'throughput_ratio', 'material'});
+      'gross_mwe', 'signed_ratio', 'gross_ratio', 'material'});
 end
 
 function value = emptyScenarioTable()
@@ -1006,8 +1005,8 @@ function file = performanceScatterFigure(performance, asset_dir)
    n_columns = min(2, n);
    n_rows = ceil(n / n_columns);
    file = string(fullfile(asset_dir, "performance-endpoint-scatter.png"));
-   fig = figure(Visible='off', Color='w', ...
-      Position=[100 100 640 * n_columns 460 * n_rows]);
+   fig = icemodel.plot.newFigure(width=640 * n_columns, ...
+      height=460 * n_rows);
    layout = tiledlayout(fig, n_rows, n_columns, ...
       TileSpacing='compact', Padding='compact');
 
@@ -1035,7 +1034,7 @@ function file = performanceScatterFigure(performance, asset_dir)
             scored.model_endpoint_mwe(in), 44, colors(s, :), 'filled', ...
             MarkerFaceAlpha=0.75, DisplayName=sites(s));
       end
-      formatReportAxes(ax)
+      icemodel.verification.report.formatReportAxes(ax)
       grid(ax, 'on')
       axis(ax, 'square')
       xlim(ax, [0 limit])
@@ -1053,14 +1052,14 @@ function file = performanceScatterFigure(performance, asset_dir)
    end
    title(layout, ...
       "End-of-window cumulative model value versus measured lowering")
-   exportAndClose(fig, file)
+   icemodel.verification.report.exportAndClose(fig, file)
 end
 
 function file = performanceSummaryFigure(performance, summary, asset_dir)
    %PERFORMANCESUMMARYFIGURE Compare aggregate skill across all diagnostics.
 
    file = string(fullfile(asset_dir, "performance-summary.png"));
-   fig = figure(Visible='off', Color='w', Position=[100 100 1400 520]);
+   fig = icemodel.plot.newFigure(width=1400, height=520);
    layout = tiledlayout(fig, 1, 3, ...
       TileSpacing='compact', Padding='compact');
    labels = summary.label;
@@ -1109,7 +1108,7 @@ function file = performanceSummaryFigure(performance, summary, asset_dir)
    yline(ax, 0, '-', Color=[0.3 0.3 0.3], LineWidth=1.0)
    ylabel(ax, "Per-site-year endpoint error (m w.e.)")
    title(ax, "Per-case spread; the orange bar is the median")
-   exportAndClose(fig, file)
+   icemodel.verification.report.exportAndClose(fig, file)
 end
 
 function file = nestedFigure(nested, asset_dir)
@@ -1122,9 +1121,9 @@ function file = nestedFigure(nested, asset_dir)
       'ablation-nested-window-stability.png'));
    % Fixed dimensions keep the figure renderable for the full readiness-scale
    % nested cohort; the complete row inventory remains in the linked table.
-   fig = figure(Visible='off', Color='w', Position=[100 100 1100 650]);
+   fig = icemodel.plot.newFigure(width=1100, height=650);
    ax = axes(fig);
-   formatReportAxes(ax)
+   icemodel.verification.report.formatReportAxes(ax)
    hold(ax, 'on')
    group_key = string(nested.case_id) + " " + string(nested.year);
    groups = unique(group_key, 'stable');
@@ -1153,7 +1152,8 @@ function file = nestedFigure(nested, asset_dir)
          handle_visibility = 'on';
       end
       plot(ax, x, y(order), '-o', LineWidth=1.6, MarkerSize=6, ...
-         Color=colors(k, :), DisplayName=safeLabel(group_labels(k)), ...
+         Color=colors(k, :), ...
+         DisplayName=icemodel.verification.report.safeLabel(group_labels(k)), ...
          HandleVisibility=handle_visibility)
    end
 
@@ -1185,14 +1185,15 @@ function file = nestedFigure(nested, asset_dir)
       note = note + "; all-unavailable site-years: " ...
          + string(numel(unavailable_groups)) + " (see table)";
    end
-   text(ax, 0.01, 0.01, safeLabel(note), Units='normalized', ...
+   text(ax, 0.01, 0.01, icemodel.verification.report.safeLabel(note), ...
+      Units='normalized', ...
       VerticalAlignment='bottom', Interpreter='none', Color='k', ...
       FontSize=10)
    grid(ax, 'on')
    xlabel(ax, "Cumulative window duration (days)")
    ylabel(ax, "Model minus intact-ice observation (m w.e.)")
    title(ax, "Nested-window stability across saved site-years")
-   exportAndClose(fig, file)
+   icemodel.verification.report.exportAndClose(fig, file)
 end
 
 function file = endpointFigure(endpoint, asset_dir)
@@ -1200,7 +1201,7 @@ function file = endpointFigure(endpoint, asset_dir)
 
    file = string(fullfile(asset_dir, ...
       'ablation-endpoint-perturbation-stability.png'));
-   fig = figure(Visible='off', Color='w', Position=[100 100 1200 620]);
+   fig = icemodel.plot.newFigure(width=1200, height=620);
    layout = tiledlayout(fig, 1, 2, ...
       TileSpacing='compact', Padding='compact');
    plotEndpointPanel(nexttile(layout), endpoint, ...
@@ -1211,11 +1212,11 @@ function file = endpointFigure(endpoint, asset_dir)
       "End offset (days)")
    title(layout, "Endpoint-perturbation stability; KAN first, all saved sites", ...
       Color='k')
-   exportAndClose(fig, file)
+   icemodel.verification.report.exportAndClose(fig, file)
 end
 
 function plotEndpointPanel(ax, endpoint, axis_name, panel_title, x_label)
-   %PLOTENDPOINTPANEL Draw one boundary-offset family without filling gaps.
+   %PLOTENDPOINTPANEL Draw one set of window offsets, leaving gaps as gaps.
 
    offset = double(endpoint.perturbation_days_signed);
    represented = string(endpoint.perturbation_axis) == axis_name;
@@ -1243,7 +1244,8 @@ function plotEndpointPanel(ax, endpoint, axis_name, panel_title, x_label)
       label = string(endpoint.site_id(first)) + " " ...
          + string(endpoint.year(first));
       plot(ax, x, y(order), '-o', Color=colors(k, :), ...
-         LineWidth=1.5, MarkerSize=5, DisplayName=safeLabel(label), ...
+         LineWidth=1.5, MarkerSize=5, ...
+         DisplayName=icemodel.verification.report.safeLabel(label), ...
          HandleVisibility=visibility)
    end
    if plotted == 0
@@ -1262,7 +1264,7 @@ function plotEndpointPanel(ax, endpoint, axis_name, panel_title, x_label)
       + string(nnz(unavailable)) + "; see table", Units='normalized', ...
       VerticalAlignment='bottom', Interpreter='none', Color='k', ...
       FontSize=10)
-   formatReportAxes(ax)
+   icemodel.verification.report.formatReportAxes(ax)
    grid(ax, 'on')
    xlabel(ax, x_label)
    ylabel(ax, "Model minus intact-ice observation (m w.e.)")
@@ -1297,12 +1299,9 @@ function [file, caption] = siteFigure(result, asset_dir, file_stem, policy)
    % The scientific display is fixed to the common melt-season interval. Every
    % comparison curve is broken unless the saved row has exposed ice and direct
    % finite observation support.
-   start_month_day = policy.evaluation_season_start_month_day;
-   end_month_day = policy.evaluation_season_end_month_day;
-   season_start = datetime(double(result.year), start_month_day(1), ...
-      start_month_day(2), 'TimeZone', 'UTC');
-   season_end = datetime(double(result.year), end_month_day(1), ...
-      end_month_day(2), 'TimeZone', 'UTC');
+   [season_start, season_end] = ...
+      icemodel.verification.helpers.evaluationSeason( ...
+      double(result.year), policy);
    seasonal = sortrows(result.seasonal);
    season_rows = seasonal.Time >= season_start ...
       & seasonal.Time <= season_end;
@@ -1332,7 +1331,7 @@ function [file, caption] = siteFigure(result, asset_dir, file_stem, policy)
 
    file = string(fullfile(asset_dir, ...
       file_stem + "-cumulative-comparison.png"));
-   fig = figure(Visible='off', Color='w', Position=[100 100 1300 900]);
+   fig = icemodel.plot.newFigure(width=1300, height=900);
    layout = tiledlayout(fig, 2, 1, ...
       TileSpacing='compact', Padding='compact');
 
@@ -1343,7 +1342,8 @@ function [file, caption] = siteFigure(result, asset_dir, file_stem, policy)
    plotSeasonalPanel(ax, seasonal.Time, full_series, ...
       evaluation_highlight, snow_censored, unknown_or_missing, ...
       season_start, season_end, direct_support, policy)
-   title(ax, safeLabel(result.site_id) + " " + string(result.year) ...
+   title(ax, icemodel.verification.report.safeLabel(result.site_id) ...
+      + " " + string(result.year) ...
       + ": full season, pale blue marks the selected window", ...
       Interpreter='none')
    legend(ax, Location='best', Interpreter='tex')
@@ -1363,10 +1363,11 @@ function [file, caption] = siteFigure(result, asset_dir, file_stem, policy)
       unknown_or_missing & evaluation_highlight, ...
       window_start, window_end, window_support, policy)
    title(ax, "Selected snow-free evaluation window, rebased at its first row")
-   exportAndClose(fig, file)
+   icemodel.verification.report.exportAndClose(fig, file)
 
    % The caption names each quantity and states the central runoff limitation.
-   caption = safeLabel(result.site_id) + " " + string(result.year) ...
+   caption = icemodel.verification.report.safeLabel(result.site_id) ...
+      + " " + string(result.year) ...
       + ". Upper panel: the full " + seasonRangeText(policy) ...
       + "with the selected evaluation window shaded pale blue. Lower panel: " ...
       + "the same diagnostics cropped to that window and rebased at its " ...
@@ -1495,7 +1496,7 @@ function plotSeasonalPanel(ax, time, series, evaluation_highlight, ...
    plot(ax, time, series.model_balance, '-.', LineWidth=2.0, ...
       Color=[0.42 0.18 0.55], ...
       DisplayName='signed net solid balance (phase + vapor, can decrease)')
-   formatReportAxes(ax)
+   icemodel.verification.report.formatReportAxes(ax)
    grid(ax, 'on')
    xlim(ax, [lower_limit upper_limit])
    xlabel(ax, "UTC time")
@@ -1551,9 +1552,8 @@ function shadeSeasonalMask(ax, time, mask, lower_limit, upper_limit, ...
    starts = find(mask & [true; ~mask(1:end - 1)]);
    ends = find(mask & [~mask(2:end); true]);
    for k = 1:numel(starts)
-      region = xregion(ax, edges(starts(k)), edges(ends(k) + 1), ...
-         FaceColor=face_color, FaceAlpha=face_alpha, EdgeColor='none');
-      region.HandleVisibility = 'off';
+      icemodel.plot.markTimeSpan(ax, edges(starts(k)), edges(ends(k) + 1), ...
+         style="fill", color=face_color, face_alpha=face_alpha);
    end
 end
 
@@ -1570,17 +1570,18 @@ function support = observationSupport(result, policy)
       error('icemodel:verification:report:missingAblationObservations', ...
          'Completed results must retain their saved observation timetable')
    end
-   % VALIDATERESULTS has already normalized this saved contract, including for
+   % VALIDATERESULTS has already normalized these saved fields, including for
    % readiness-only runs; support classification only consumes it here.
    observation_field = string(policy.observation_field);
    snow_field = string(policy.snow_variable);
    ice_threshold = double(policy.ice_exposure_threshold_m);
-   support_fields = string(policy.support_flag_fields);
    zero_fields = string(policy.direct_zero_flag_fields);
    datum_fields = string(policy.datum_break_flag_fields);
    gap_fields = string(policy.ordinary_gap_flag_fields);
    names = string(data.Properties.VariableNames);
-   required = unique([observation_field, snow_field, support_fields], 'stable');
+   required = unique([ ...
+      icemodel.verification.helpers.observationSupportFields( ...
+      observation_field, policy), snow_field], 'stable');
    if ~all(ismember(required, names))
       error('icemodel:verification:report:missingAblationObservations', ...
          'Saved observations do not contain the policy-required fields')
@@ -1588,12 +1589,9 @@ function support = observationSupport(result, policy)
 
    % Classify every retained observation posting in the fixed display season;
    % the comparison-window label preserves the narrower evaluation selection.
-   start_month_day = policy.evaluation_season_start_month_day;
-   end_month_day = policy.evaluation_season_end_month_day;
-   season_start = datetime(double(result.year), start_month_day(1), ...
-      start_month_day(2), 'TimeZone', 'UTC');
-   season_end = datetime(double(result.year), end_month_day(1), ...
-      end_month_day(2), 'TimeZone', 'UTC');
+   [season_start, season_end] = ...
+      icemodel.verification.helpers.evaluationSeason( ...
+      double(result.year), policy);
    use = data.Time >= season_start & data.Time <= season_end;
    data = data(use, :);
    t0 = result.comparison.window_start;
@@ -1606,7 +1604,11 @@ function support = observationSupport(result, policy)
          'Saved snow field %s must be numeric or logical', snow_field)
    end
    snow_depth = double(snow_depth);
-   quality_fields = support_fields;
+   % The support rules read more than policy.support_flag_fields, so take the
+   % set from the owner rather than assuming the two coincide.
+   quality_fields = setdiff( ...
+      icemodel.verification.helpers.observationSupportFields( ...
+      observation_field, policy), observation_field, 'stable');
    quality = zeros(height(data), numel(quality_fields));
    for k = 1:numel(quality_fields)
       values = data.(quality_fields(k));
@@ -1617,15 +1619,22 @@ function support = observationSupport(result, policy)
       end
       quality(:, k) = double(values);
    end
-   quality_finite = all(isfinite(quality), 2);
+   % One owner applies every flag rule, so this cannot drift from the
+   % comparator, the readiness writer, or the runner. The quality matrix is
+   % still needed below to name which flags made a given posting unknown or
+   % flagged, so it is built here and passed in rather than rebuilt there.
+   [~, zero_index] = ismember(zero_fields, quality_fields);
+   support = icemodel.verification.helpers.classifyObservationSupport( ...
+      [double(raw), quality], [observation_field, quality_fields], ...
+      observation_field, policy);
+   quality_finite = support.quality_finite;
+   target_finite = support.target_finite;
 
    % Direct support requires finite zero-valued quality flags and exposed ice.
    % Finite flag-clean observations above the exposure threshold are retained
    % as snow-censored support rather than treated as direct ice lowering.
-   [~, zero_index] = ismember(zero_fields, quality_fields);
-   nonzero_flag = any(quality(:, zero_index) ~= 0, 2);
-   target_finite = isfinite(raw);
-   flag_clean = target_finite & quality_finite & ~nonzero_flag;
+   nonzero_flag = ~support.direct_flags_zero;
+   flag_clean = support.flag_clean;
    [ice_exposed, censored_snow, invalid_snow] = ...
       icemodel.verification.helpers.classifySnowDepth( ...
       snow_depth, ice_threshold);
@@ -1707,7 +1716,7 @@ function file = componentFigure(components, asset_dir)
    %COMPONENTFIGURE Plot signed physical solid-mass changes at fixed size.
 
    file = string(fullfile(asset_dir, 'ablation-signed-components.png'));
-   fig = figure(Visible='off', Color='w', Position=[100 100 1250 680]);
+   fig = icemodel.plot.newFigure(width=1250, height=680);
    ax = axes(fig);
    hold(ax, 'on')
    x = (1:height(components))';
@@ -1724,7 +1733,7 @@ function file = componentFigure(components, asset_dir)
       LineStyle='none', MarkerSize=6, Color=[0.10 0.32 0.64], ...
       DisplayName='net physical solid change')
    yline(ax, 0, 'k-', HandleVisibility='off')
-   formatReportAxes(ax)
+   icemodel.verification.report.formatReportAxes(ax)
    grid(ax, 'on')
    xlabel(ax, "Completed site-year")
    ylabel(ax, "Signed solid-mass change (m w.e.)")
@@ -1736,7 +1745,7 @@ function file = componentFigure(components, asset_dir)
       ax.TickLabelInterpreter = 'none';
    end
    legend(ax, Location='southoutside', Orientation='horizontal')
-   exportAndClose(fig, file)
+   icemodel.verification.report.exportAndClose(fig, file)
 end
 
 function file = closureFigure(tables, asset_dir)
@@ -1744,7 +1753,7 @@ function file = closureFigure(tables, asset_dir)
 
    file = string(fullfile(asset_dir, ...
       'ablation-closure-materiality.png'));
-   fig = figure(Visible='off', Color='w', Position=[100 100 1200 650]);
+   fig = icemodel.plot.newFigure(width=1200, height=650);
    layout = tiledlayout(fig, 1, 2, ...
       TileSpacing='compact', Padding='compact');
 
@@ -1799,7 +1808,7 @@ function file = closureFigure(tables, asset_dir)
             DisplayName='one or more saved forcing steps fail')
       end
       yline(ax, 0, 'r--', DisplayName='acceptance limit')
-      formatReportAxes(ax)
+      icemodel.verification.report.formatReportAxes(ax)
       grid(ax, 'on')
        xlabel(ax, "Completed site-year")
       ylabel(ax, "log10(max window ratio; step-failure sentinel)")
@@ -1809,7 +1818,7 @@ function file = closureFigure(tables, asset_dir)
       end
       if numel(groups) <= 24
          xticks(ax, 1:numel(groups))
-         xticklabels(ax, safeLabel(labels))
+         xticklabels(ax, icemodel.verification.report.safeLabel(labels))
          ax.TickLabelInterpreter = 'none';
       end
    else
@@ -1825,36 +1834,36 @@ function file = closureFigure(tables, asset_dir)
    if height(materiality) > 0
       channels = unique(string(materiality.channel), 'stable');
       maximum_signed = NaN(numel(channels), 1);
-      maximum_throughput = NaN(numel(channels), 1);
+      maximum_gross = NaN(numel(channels), 1);
       for k = 1:numel(channels)
          use = string(materiality.channel) == channels(k);
          signed = abs(materiality.signed_ratio(use));
-         throughput = materiality.throughput_ratio(use);
+         gross = materiality.gross_ratio(use);
          if any(isfinite(signed))
             maximum_signed(k) = max(signed(isfinite(signed)));
          end
-         if any(isfinite(throughput))
-            maximum_throughput(k) = max(throughput(isfinite(throughput)));
+         if any(isfinite(gross))
+            maximum_gross(k) = max(gross(isfinite(gross)));
          end
       end
-      barh(ax, [maximum_signed, maximum_throughput])
+      barh(ax, [maximum_signed, maximum_gross])
       channel_labels = replace(channels, "_", " ");
       channel_labels = replace(channel_labels, ...
          ["remesh", "merge delete", "cloned bottom", ...
          "condensation overflow", "unapplied vapor solid equivalent"], ...
          ["remeshing", "layer merge/delete", "cloned-bottom", ...
          "excess condensation", "unapplied vapor (solid equivalent)"]);
-      configureCategoryAxis(ax, channel_labels)
+      icemodel.verification.report.configureCategoryAxis(ax, channel_labels)
       xlabel(ax, "Maximum ratio to comparison signal G (dimensionless)")
       title(ax, "Channel-level accounting materiality")
-      legend(ax, ["absolute signed ratio", "throughput ratio"], ...
+      legend(ax, ["absolute signed ratio", "gross ratio"], ...
          Location='best')
    else
       axis(ax, 'off')
       text(ax, 0.5, 0.5, 'No saved materiality diagnostics', ...
          HorizontalAlignment='center', Color='k', FontSize=10)
    end
-   exportAndClose(fig, file)
+   icemodel.verification.report.exportAndClose(fig, file)
 end
 
 function file = synthesisFigure(synthesis, asset_dir)
@@ -1889,12 +1898,12 @@ function file = synthesisFigure(synthesis, asset_dir)
       difference = model - observation;
    end
    rows = (1:height(synthesis))';
-   labels = safeLabel(string(synthesis.site_id) + " " ...
+   labels = icemodel.verification.report.safeLabel(string(synthesis.site_id) + " " ...
       + string(synthesis.year));
 
    % The two panels show only physical comparisons and their signed differences;
    % operational status inventories stay in the linked machine-readable tables.
-   fig = figure(Visible='off', Color='w', Position=[100 100 1200 620]);
+   fig = icemodel.plot.newFigure(width=1200, height=620);
    layout = tiledlayout(fig, 1, 2, ...
       TileSpacing='compact', Padding='compact');
    ax = nexttile(layout);
@@ -1923,7 +1932,7 @@ function file = synthesisFigure(synthesis, asset_dir)
          Units='normalized', HorizontalAlignment='center', Color='k', ...
          FontSize=10)
    end
-   formatReportAxes(ax)
+   icemodel.verification.report.formatReportAxes(ax)
    grid(ax, 'on')
    xlabel(ax, "Observed intact-ice conversion (m w.e.)")
    ylabel(ax, "Model phase + vapor solid loss (m w.e.)")
@@ -1946,7 +1955,7 @@ function file = synthesisFigure(synthesis, asset_dir)
          Units='normalized', HorizontalAlignment='center', Color='k', ...
          FontSize=10)
    end
-   formatReportAxes(ax)
+   icemodel.verification.report.formatReportAxes(ax)
    grid(ax, 'on')
    xlabel(ax, "Completed selected site-year")
    ylabel(ax, "Model minus observation (m w.e.)")
@@ -1956,7 +1965,7 @@ function file = synthesisFigure(synthesis, asset_dir)
       xticklabels(ax, labels)
       ax.TickLabelInterpreter = 'none';
    end
-   exportAndClose(fig, file)
+   icemodel.verification.report.exportAndClose(fig, file)
 end
 
 function colors = stationColors(n_stations)
@@ -2155,7 +2164,7 @@ function lines = reportMarkdown(results, results_file, tables, files, ...
       "  C --> O[""Observed lowering conversion, m w.e.""]"
       "  A --> X[""Model-observation comparison""]"
       "  O --> X"
-      "  R[""Remeshing: clone minus collapse export""] --> G[""Secondary grid geometry""]"
+      "  R[""Remeshing: clone minus merge export""] --> G[""Secondary grid geometry""]"
       "  R -. ""closure only; excluded from plotted loss"" .-> A"
       "```"
       ""
@@ -2253,11 +2262,14 @@ function lines = reportMarkdown(results, results_file, tables, files, ...
       + "the per-site-year endpoint errors behind those aggregates.", ...
       "No site-year was scored, so no aggregate skill figure is available.")];
    lines = [lines; ""; "Aggregate metrics for every scored diagnostic:"; ""];
-   lines = [lines; markdownTable(tables.performance_summary); ""];
+   lines = [lines; ...
+      icemodel.verification.report.markdownTable(tables.performance_summary); ""];
    lines = [lines; "Per-site-year metrics, including every case that could " ...
       + "not be scored and the reason, are in " ...
-      + markdownCode(relativeName(files.performance)) + "; the aggregate " ...
-      + "rows are in " + markdownCode(relativeName(files.performance_summary)) ...
+      + icemodel.verification.report.markdownCode( ...
+      relativeName(files.performance)) + "; the aggregate " ...
+      + "rows are in " + icemodel.verification.report.markdownCode( ...
+      relativeName(files.performance_summary)) ...
       + "."; ""];
    lines = [lines;
        "### Cumulative ablation by site and year"
@@ -2341,7 +2353,7 @@ function lines = reportMarkdown(results, results_file, tables, files, ...
          + "placed at a categorical sentinel just above the limit. It is not a " ...
          + "measured step ratio because the worst step ratio is not saved. The " ...
          + "second panel is " ...
-         + "the maximum absolute signed and non-cancelling throughput ratio, " ...
+         + "the maximum absolute signed and non-cancelling gross ratio, " ...
          + "normalized by the saved comparison signal G, for each accounting " ...
          + "channel across site-years. Exact rows remain in CSV.", ...
           "No completed closure or materiality diagnostics were saved.")
@@ -2352,11 +2364,11 @@ function lines = reportMarkdown(results, results_file, tables, files, ...
        ""
        "Interpretable final classifications:"
        ""
-       markdownTable(directional)
+       icemodel.verification.report.markdownTable(directional)
        ""
        "Governing model-accounting sensitivity by case-year:"
        ""
-       markdownTable(drivers)
+       icemodel.verification.report.markdownTable(drivers)
        ""
        scenario_interpretation
        ""
@@ -2451,11 +2463,13 @@ function lines = reportMarkdown(results, results_file, tables, files, ...
          + "The builder did not reopen readiness inputs, canonical forcing, " ...
          + "observations, or model configuration paths."
       ""
-      "- Run name: " + markdownCode(string(results.run_name))
-      "- Results MAT: " + markdownCode(results_file)
-      "- Results MAT SHA-256: " + markdownCode(source_sha256)
+      "- Run name: " ...
+         + icemodel.verification.report.markdownCode(string(results.run_name))
+      "- Results MAT: " + icemodel.verification.report.markdownCode(results_file)
+      "- Results MAT SHA-256: " ...
+         + icemodel.verification.report.markdownCode(source_sha256)
       "- Saved policy version: " + policyVersion(results.policy)
-      "- Generated: " + markdownCode(generated)
+      "- Generated: " + icemodel.verification.report.markdownCode(generated)
       ""
       "### Machine-readable evidence"
       ""
@@ -2529,6 +2543,15 @@ function text = performanceVerdictText(summary)
       primary = max(all_scored.density_kg_m3);
    end
    scored = all_scored(all_scored.density_kg_m3 == primary, :);
+   if ~any(isfinite(scored.pooled_rmse_mwe))
+      % Every diagnostic was scored but none produced a finite pooled RMSE,
+      % which happens when no two eligible observations sit one output step
+      % apart. Ranking on NaN would name the same diagnostic best and worst.
+      text = "**Which diagnostic reproduces the measurements.** No " ...
+         + "diagnostic produced a finite pooled RMSE, so no ranking is " ...
+         + "available.";
+      return
+   end
    [~, best] = min(scored.pooled_rmse_mwe);
    [~, worst] = max(scored.pooled_rmse_mwe);
    text = "**Which diagnostic reproduces the measurements.** Ranked by " ...
@@ -2541,8 +2564,10 @@ function text = performanceVerdictText(summary)
       + compose('%+.3f', scored.median_endpoint_error_mwe(best)) ...
       + " m w.e., " + string(scored.n_within_tolerance(best)) + "/" ...
       + string(scored.n_scored(best)) + " site-years within " ...
-      + tolerance_pct + "% of the " ...
-      + "observed endpoint), and **" + scored.label(worst) + "** agrees " ...
+      + tolerance_pct + "% of the observed endpoint or of the " ...
+      + compose('%g', policy.scientific.signal_floor_mwe) ...
+      + " m w.e. signal floor, whichever is larger), and **" ...
+      + scored.label(worst) + "** agrees " ...
       + "worst (" + compose('%.3f', scored.pooled_rmse_mwe(worst)) ...
       + " m w.e. pooled RMSE, median endpoint error " ...
       + compose('%+.3f', scored.median_endpoint_error_mwe(worst)) ...
@@ -2577,6 +2602,10 @@ function text = densitySensitivityText(all_scored, primary)
       + "the observation while leaving the model untouched.";
    for k = 1:numel(others)
       rows = all_scored(all_scored.density_kg_m3 == others(k), :);
+      if ~any(isfinite(rows.pooled_rmse_mwe))
+         % No finite pooled RMSE at this density, so there is nothing to rank.
+         continue
+      end
       [~, best_other] = min(rows.pooled_rmse_mwe);
       text = text + " At " + compose('%g', others(k)) + " kg m^-3 the " ...
          + "best-agreeing diagnostic is **" + rows.label(best_other) ...
@@ -2737,14 +2766,14 @@ function text = residenceWindowText(options)
       text = "legacy trailing-window";
       return
    end
-   hours = options.tlag * options.dt / 3600;
-   text = "legacy " + compose('%g', hours) + "-hour";
+   residence_hours = options.tlag * options.dt / 3600;
+   text = "legacy " + compose('%g', residence_hours) + "-hour";
 end
 
 function options = firstCompletedModelOptions(results)
    %FIRSTCOMPLETEDMODELOPTIONS Model options of the first completed case.
    %
-   % Every case in a cohort runs under the same runtime contract, so the first
+   % Every case in a cohort runs with the same options, so the first
    % completed case describes the run for prose that names a model setting.
 
    completed = results.site_year_results( ...
@@ -3169,8 +3198,9 @@ function lines = provenanceLines(paths)
       value = string(paths.(names(k)));
       if isscalar(value) && strlength(value) > 0
          n_lines = n_lines + 1;
-         lines(n_lines) = "- " + escapeMarkdownText(names(k)) ...
-            + ": " + markdownCode(value);
+         lines(n_lines) = "- " ...
+            + icemodel.verification.report.escapeMarkdownText(names(k)) ...
+            + ": " + icemodel.verification.report.markdownCode(value);
       end
    end
    lines = lines(1:n_lines);
@@ -3183,7 +3213,7 @@ function text = policyVersion(policy)
    %POLICYVERSION Format the saved policy version or an honest absence.
 
    if isstruct(policy) && isfield(policy, 'version')
-      text = markdownCode(string(policy.version));
+      text = icemodel.verification.report.markdownCode(string(policy.version));
    else
       text = "unavailable";
    end
@@ -3227,97 +3257,7 @@ function lines = imageMarkdown(asset, caption)
    alt_text = replace(string(name), ["-", "_"], " ");
    lines = [""; "![" + alt_text + "](" ...
       + "report-assets/" + name + ext + ")"; ...
-      ""; "*" + escapeMarkdownText(caption) + "*"];
-end
-
-function lines = markdownTable(values)
-   %MARKDOWNTABLE Convert a compact table to inert Markdown.
-
-   vars = string(values.Properties.VariableNames);
-   if isempty(vars)
-      lines = "No tabular fields were saved.";
-      return
-   end
-   header = "| " + join(replace(vars, "_", " "), " | ") + " |";
-   divider = "| " + join(repmat("---", size(vars)), " | ") + " |";
-   lines = strings(height(values) + 2, 1);
-   lines(1:2) = [header; divider];
-   for row = 1:height(values)
-      cells = strings(size(vars));
-      for col = 1:numel(vars)
-         column = values.(vars(col));
-         cells(col) = formatValue(column(row, :));
-      end
-      lines(row + 2) = "| " + join(cells, " | ") + " |";
-   end
-end
-
-function text = formatValue(value)
-   %FORMATVALUE Format one scalar table value for Markdown.
-
-   if iscell(value)
-      value = value{1};
-   end
-   if isdatetime(value)
-      if isnat(value)
-         text = "NA";
-      else
-         text = string(value, "yyyy-MM-dd HH:mm:ss z");
-      end
-   elseif isnumeric(value)
-      if isempty(value) || ~isfinite(value)
-         text = "NA";
-      else
-         text = string(sprintf('%.5g', value));
-      end
-   elseif islogical(value)
-      text = string(value);
-   else
-      text = join(string(value), ", ");
-   end
-   text = escapeMarkdownText(text);
-end
-
-function text = markdownCode(value)
-   %MARKDOWNCODE Wrap sanitized saved metadata in an inert code span.
-
-   text = sanitizeText(value);
-   runs = regexp(char(text), '`+', 'match');
-   fence_length = 1;
-   if ~isempty(runs)
-      fence_length = max(cellfun(@numel, runs)) + 1;
-   end
-   fence = string(repmat('`', 1, fence_length));
-   if startsWith(text, "`") || endsWith(text, "`")
-      text = fence + " " + text + " " + fence;
-   else
-      text = fence + text + fence;
-   end
-end
-
-function text = escapeMarkdownText(value)
-   %ESCAPEMARKDOWNTEXT Preserve saved text without enabling markup or HTML.
-
-   text = sanitizeText(value);
-   punctuation = setdiff([92, 33:47, 58:64, 91, 93:96, 123:126], ...
-      [38, 59], 'stable');
-   escape = string(char(92));
-   % Ampersand and semicolon remain literal so SANITIZETEXT entities render as
-   % text instead of exposing raw HTML delimiters.
-   for k = 1:numel(punctuation)
-      % Escape backslash first, then every other ASCII punctuation character.
-      token = string(char(punctuation(k)));
-      text = replace(text, token, escape + token);
-   end
-end
-
-function text = sanitizeText(value)
-   %SANITIZETEXT Collapse controls and neutralize raw HTML delimiters.
-
-   text = strtrim(regexprep(string(value), '[\x00-\x1F\x7F]+', ' '));
-   text = replace(text, "&", "&amp;");
-   text = replace(text, "<", "&lt;");
-   text = replace(text, ">", "&gt;");
+      ""; "*" + icemodel.verification.report.escapeMarkdownText(caption) + "*"];
 end
 
 function name = safeFilename(value)
@@ -3330,11 +3270,6 @@ function name = safeFilename(value)
    end
 end
 
-function label = safeLabel(value)
-   %SAFELABEL Collapse control characters for MATLAB graphics text.
-
-   label = strtrim(regexprep(string(value), '[\x00-\x1F\x7F]+', ' '));
-end
 
 function name = relativeName(filename)
    %RELATIVENAME Return the output-local file name for a report link.
@@ -3350,42 +3285,9 @@ function configureDiagnosticAxis(ax, labels)
    % categories belong on x. configureCategoryAxis labels a reversed y axis for
    % the horizontal evidence rows elsewhere in this report.
    xticks(ax, 1:numel(labels))
-   xticklabels(ax, safeLabel(labels))
+   xticklabels(ax, icemodel.verification.report.safeLabel(labels))
    xlim(ax, [0.4, numel(labels) + 0.6])
    ax.TickLabelInterpreter = 'none';
    ax.XAxis.FontSize = 9;
-   formatReportAxes(ax)
-end
-
-function configureCategoryAxis(ax, labels)
-   %CONFIGURECATEGORYAXIS Label horizontal evidence rows without clipping.
-
-   yticks(ax, 1:numel(labels))
-   yticklabels(ax, safeLabel(labels))
-   ax.YDir = 'reverse';
-   ax.TickLabelInterpreter = 'none';
-   formatReportAxes(ax)
-end
-
-function formatReportAxes(ax)
-   %FORMATREPORTAXES Isolate exported graphics from interactive theme defaults.
-
-   ax.Color = 'w';
-   ax.XColor = 'k';
-   ax.YColor = 'k';
-   ax.GridColor = [0.65 0.65 0.65];
-   ax.GridAlpha = 0.25;
-   ax.FontSize = 11;
-   ax.Box = 'off';
-   ax.Title.Color = 'k';
-   ax.XLabel.Color = 'k';
-   ax.YLabel.Color = 'k';
-end
-
-function exportAndClose(fig, filename)
-   %EXPORTANDCLOSE Export one report figure and release graphics state.
-
-   cleanup = onCleanup(@() close(fig));
-   exportgraphics(fig, filename, Resolution=160)
-   clear cleanup
+   icemodel.verification.report.formatReportAxes(ax)
 end

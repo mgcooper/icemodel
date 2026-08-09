@@ -62,7 +62,7 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
    % Validate and normalize the optional interval before source discovery so
    % malformed public input cannot be obscured by an unrelated file error.
    [window_start, window_end, has_window] = ...
-      icemodel.internal.pairedWindow(kwargs.startdate, kwargs.enddate);
+      icemodel.pairedWindow(kwargs.startdate, kwargs.enddate);
 
    % Treat an explicit blank like omission; never reinterpret it as the CWD.
    source_dir = icemodel.forcing.helpers.verificationSourceDir( ...

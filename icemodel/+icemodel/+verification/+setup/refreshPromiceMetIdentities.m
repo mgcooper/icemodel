@@ -78,7 +78,7 @@ function manifest = refreshPromiceMetIdentities(kwargs)
          'sha256', ""), numel(declared), 1);
       for n = 1:numel(declared)
          filename = string(fullfile(met_root, declared(n)));
-         if ~icemodel.internal.isPathInside(filename, met_root)
+         if ~icemodel.isPathInside(filename, met_root)
             error(['icemodel:verification:refreshPromiceMetIdentities:' ...
                'artifactOutsideRoot'], ...
                'PROMICE staged met path escapes %s: %s', met_root, declared(n))

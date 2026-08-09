@@ -41,7 +41,13 @@ function rates = observationRateOutliers(summary, policy)
       end
    end
 
-   rate_ratio = observed_rate ./ station_median_rate;
+   % Dividing by a negative median would flip the comparison and flag the
+   % station's HIGHEST-ablation year. A station that nets accumulation over
+   % its admitted years has no meaningful ablation-rate family.
+   rate_ratio = NaN(size(observed_rate));
+   usable_median = station_median_rate > 0;
+   rate_ratio(usable_median) = observed_rate(usable_median) ...
+      ./ station_median_rate(usable_median);
    % A family needs enough members for its median to mean anything.
    has_family = station_scored_year_count ...
       >= policy.observation_rate_outlier_min_years;

@@ -54,7 +54,8 @@ function report_file = buildTestSuiteReport(suite_kind, results, kwargs)
 
    % Rendering is optional only for focused tests and report-source inspection.
    if kwargs.render
-      command = "quarto render " + shellQuote(qmd_file);
+      command = "quarto render " ...
+         + icemodel.shellQuote(qmd_file);
       [status, output] = system(command);
       if status ~= 0
          error("icemodel:verification:report:quartoFailed", ...
@@ -158,7 +159,7 @@ function assets = regressionFigures(summary, asset_dir)
       grid(ax, "on")
       xlabel(ax, "Difference from accepted baseline (%; + means more)")
       title(ax, "Change in runoff and melt")
-      configureCaseAxis(ax, summary.case_id)
+      icemodel.verification.report.configureCategoryAxis(ax, summary.case_id)
       labels = replace(delta_vars, ...
          ["runoff_pct_delta", "melt_pct_delta", ...
           "runoff_eval_pct_delta", "melt_eval_pct_delta"], ...
@@ -166,7 +167,7 @@ function assets = regressionFigures(summary, asset_dir)
           "Evaluation-window runoff", "Evaluation-window melt"]);
       lgd = legend(ax, labels, Location="eastoutside");
       formatReportLegend(lgd)
-      exportAndClose(fig, file)
+      icemodel.verification.report.exportAndClose(fig, file)
       assets(end + 1) = "report-assets/regression-percent-deltas.png";
    end
 
@@ -183,13 +184,13 @@ function assets = regressionFigures(summary, asset_dir)
       grid(ax, "on")
       xlabel(ax, "Difference from accepted baseline (+ means more work)")
       title(ax, "Change in solver iterations")
-      configureCaseAxis(ax, summary.case_id)
+      icemodel.verification.report.configureCategoryAxis(ax, summary.case_id)
       labels = replace(iteration_vars, ...
          ["mean_iteration_delta", "max_iteration_delta"], ...
          ["Mean iterations", "Maximum iterations"]);
       lgd = legend(ax, labels, Location="eastoutside");
       formatReportLegend(lgd)
-      exportAndClose(fig, file)
+      icemodel.verification.report.exportAndClose(fig, file)
       assets(end + 1) = "report-assets/regression-iteration-deltas.png";
    end
 
@@ -219,7 +220,7 @@ function assets = regressionFigures(summary, asset_dir)
          grid(ax, "on")
          xlabel(ax, "Residual RMSE (W m^{-2})")
          title(ax, "Typical residual")
-         configureCaseAxis(ax, summary.case_id)
+         icemodel.verification.report.configureCategoryAxis(ax, summary.case_id)
          labels = replace(rmse_vars, ...
             ["closure_seb_rmse", "baseline_closure_seb_rmse"], ...
             ["Current", "Accepted baseline"]);
@@ -235,7 +236,7 @@ function assets = regressionFigures(summary, asset_dir)
          grid(ax, "on")
          xlabel(ax, "Maximum absolute residual (W m^{-2})")
          title(ax, "Worst residual")
-         configureCaseAxis(ax, summary.case_id)
+         icemodel.verification.report.configureCategoryAxis(ax, summary.case_id)
          labels = replace(max_vars, ...
             ["closure_seb_max_abs", "baseline_closure_seb_max_abs"], ...
             ["Current", "Accepted baseline"]);
@@ -245,7 +246,7 @@ function assets = regressionFigures(summary, asset_dir)
       end
       title(layout, "Surface-energy residuals (smaller is better)", ...
          Color="k")
-      exportAndClose(fig, file)
+      icemodel.verification.report.exportAndClose(fig, file)
       assets(end + 1) = "report-assets/regression-seb-closure.png";
    end
 end
@@ -265,10 +266,10 @@ function assets = performanceFigures(summary, asset_dir, baseline_root)
       grid(ax, "on")
       xlabel(ax, "Wall time (s)")
       title(ax, "Current and accepted median runtime")
-      configureCaseAxis(ax, summary.case_id)
+      icemodel.verification.report.configureCategoryAxis(ax, summary.case_id)
       lgd = legend(ax, ["current", "accepted"], Location="eastoutside");
       formatReportLegend(lgd)
-      exportAndClose(fig, file)
+      icemodel.verification.report.exportAndClose(fig, file)
       assets(end + 1) = "report-assets/performance-current-reference.png";
    end
 
@@ -296,8 +297,8 @@ function assets = performanceFigures(summary, asset_dir, baseline_root)
       grid(ax, "on")
       xlabel(ax, "Runtime ratio")
       title(ax, "Runtime relative to accepted baseline")
-      configureCaseAxis(ax, summary.case_id)
-      exportAndClose(fig, file)
+      icemodel.verification.report.configureCategoryAxis(ax, summary.case_id)
+      icemodel.verification.report.exportAndClose(fig, file)
       assets(end + 1) = "report-assets/performance-runtime-ratio.png";
    end
 
@@ -308,8 +309,8 @@ function assets = performanceFigures(summary, asset_dir, baseline_root)
       cases = unique(history.case_id, 'stable');
       n_cols = 2;
       n_rows = ceil(numel(cases) / n_cols);
-      fig = figure(Visible="off", Color="w", ...
-         Position=[100 100 1300 max(720, 280 * n_rows)]);
+      fig = icemodel.plot.newFigure(width=1300, ...
+         height=max(720, 280 * n_rows));
       layout = tiledlayout(fig, n_rows, n_cols, ...
          TileSpacing="compact", Padding="compact");
       for k = 1:numel(cases)
@@ -320,10 +321,10 @@ function assets = performanceFigures(summary, asset_dir, baseline_root)
          grid(ax, "on")
          ylabel(ax, "Median wall time (s)")
          title(ax, cases(k), Interpreter="none")
-         formatReportAxes(ax)
+         icemodel.verification.report.formatReportAxes(ax)
       end
       title(layout, "Rolling performance baseline history", Color="k")
-      exportAndClose(fig, file)
+      icemodel.verification.report.exportAndClose(fig, file)
       assets(end + 1) = "report-assets/performance-history.png";
    end
 end
@@ -443,7 +444,7 @@ function lines = reportMarkdown(title_text, suite_kind, results, summary, ...
       "The field names match the downloadable CSV, which retains full stored " ...
          + "numeric precision."
       ""
-      markdownTable(summary)
+      icemodel.verification.report.markdownTable(summary)
       ""
       "[Download the compact CSV](" + csv_name + csv_ext + ")"];
 
@@ -464,11 +465,13 @@ function lines = reportMetadata(summary, suite_kind, results)
    lines = strings(0, 1);
    lines(end + 1, 1) = "- Suite: `" + suite_kind + "`";
    if ismember("tier", vars)
-      lines(end + 1, 1) = "- Tier: " + markdownCode( ...
+      lines(end + 1, 1) = "- Tier: " ...
+         + icemodel.verification.report.markdownCode( ...
          join(unique(string(summary.tier), 'stable'), ", "));
    end
    if ismember("smbmodel", vars)
-      lines(end + 1, 1) = "- Models: " + markdownCode( ...
+      lines(end + 1, 1) = "- Models: " ...
+         + icemodel.verification.report.markdownCode( ...
          join(unique(string(summary.smbmodel), 'stable'), ", "));
    end
    % Combined model reports carry one metadata struct per model; run identity
@@ -481,16 +484,16 @@ function lines = reportMetadata(summary, suite_kind, results)
    if isfield(meta, "baseline_tag") ...
          && strlength(string(meta.baseline_tag)) > 0
       lines(end + 1, 1) = "- Accepted baseline: " ...
-         + markdownCode(string(meta.baseline_tag));
+         + icemodel.verification.report.markdownCode(string(meta.baseline_tag));
    elseif isfield(meta, "baseline_type") ...
          && strlength(string(meta.baseline_type)) > 0
       lines(end + 1, 1) = "- Accepted baseline: " ...
-         + markdownCode(string(meta.baseline_type));
+         + icemodel.verification.report.markdownCode(string(meta.baseline_type));
    end
    if isfield(meta, "input_path") ...
          && strlength(string(meta.input_path)) > 0
       lines(end + 1, 1) = "- Current input root: " ...
-         + markdownCode(string(meta.input_path));
+         + icemodel.verification.report.markdownCode(string(meta.input_path));
    end
 end
 
@@ -561,8 +564,10 @@ function lines = regressionExplanation(summary)
                + " (" + string(numel(values)) + "/" + string(n_cases) ...
                + " " + count_label + ")";
          end
-         group_lines(k) = "- " + markdownCode(model) + " at " ...
-            + markdownCode(site) + ": " + join(metric_text, "; ") ...
+         group_lines(k) = "- " ...
+            + icemodel.verification.report.markdownCode(model) + " at " ...
+            + icemodel.verification.report.markdownCode(site) ...
+            + ": " + join(metric_text, "; ") ...
             + " across " + case_text + ".";
       end
       lines = [lines; group_lines];
@@ -625,79 +630,9 @@ function lines = regressionExplanation(summary)
    end
 end
 
-function text = markdownCode(value)
-   %MARKDOWNCODE Wrap saved metadata in an inert Markdown code span.
 
-   % Use a longer fence than any saved backtick run so markup stays literal.
-   text = strtrim(regexprep(string(value), '\r\n|\r|\n', ' '));
-   runs = regexp(char(text), '`+', 'match');
-   fence_length = 1;
-   if ~isempty(runs)
-      fence_length = max(cellfun(@numel, runs)) + 1;
-   end
-   fence = string(repmat('`', 1, fence_length));
-   if startsWith(text, "`") || endsWith(text, "`")
-      text = fence + " " + text + " " + fence;
-   else
-      text = fence + text + fence;
-   end
-end
 
-function text = escapeMarkdownText(value)
-   %ESCAPEMARKDOWNTEXT Preserve arbitrary saved text without enabling markup.
 
-   text = regexprep(string(value), '\r\n|\r|\n', ' ');
-   punctuation = [92, 33:47, 58:64, 91, 93:96, 123:126];
-   escape = string(char(92));
-   % Escape backslash first, then every other ASCII punctuation character.
-   for k = 1:numel(punctuation)
-      token = string(char(punctuation(k)));
-      text = replace(text, token, escape + token);
-   end
-end
-
-function lines = markdownTable(values)
-   %MARKDOWNTABLE Convert a compact scalar table to Markdown.
-
-   vars = string(values.Properties.VariableNames);
-   header = "| " + join(replace(vars, "_", " "), " | ") + " |";
-   divider = "| " + join(repmat("---", size(vars)), " | ") + " |";
-   lines = [header; divider];
-   for row = 1:height(values)
-      cells = strings(size(vars));
-      for col = 1:numel(vars)
-         column = values.(vars(col));
-         cells(col) = formatValue(column(row, :));
-      end
-      lines(end + 1) = "| " + join(cells, " | ") + " |"; %#ok<AGROW>
-   end
-end
-
-function text = formatValue(value)
-   %FORMATVALUE Format one scalar table value for Markdown.
-
-   if iscell(value)
-      value = value{1};
-   end
-   if isdatetime(value)
-      if isnat(value)
-         text = "NA";
-      else
-         text = string(value, "yyyy-MM-dd HH:mm:ss z");
-      end
-   elseif isnumeric(value)
-      if isempty(value) || ~isfinite(value)
-         text = "NA";
-      else
-         text = string(sprintf("%.5g", value));
-      end
-   elseif islogical(value)
-      text = string(value);
-   else
-      text = join(string(value), ", ");
-   end
-   text = escapeMarkdownText(text);
-end
 
 function caption = assetCaption(asset)
    %ASSETCAPTION Return a concise caption from one stable asset name.
@@ -706,47 +641,17 @@ function caption = assetCaption(asset)
    caption = replace(string(name), ["-", "_"], " ");
 end
 
-function exportAndClose(fig, filename)
-   %EXPORTANDCLOSE Export one report figure and release its graphics state.
-
-   cleanup = onCleanup(@() close(fig));
-   exportgraphics(fig, filename, Resolution=160)
-end
 
 function [fig, ax] = newReportFigure(n_rows)
    %NEWREPORTFIGURE Create a light report figure sized for its case rows.
 
    height_px = max(520, 58 * n_rows + 180);
-   fig = figure(Visible="off", Color="w", ...
-      Position=[100 100 1300 height_px]);
+   fig = icemodel.plot.newFigure(width=1300, height=height_px);
    ax = axes(fig);
-   formatReportAxes(ax)
+   icemodel.verification.report.formatReportAxes(ax)
 end
 
-function configureCaseAxis(ax, case_ids)
-   %CONFIGURECASEAXIS Label horizontal case bars without clipping identifiers.
 
-   yticks(ax, 1:numel(case_ids))
-   yticklabels(ax, string(case_ids))
-   ax.YDir = "reverse";
-   ax.TickLabelInterpreter = "none";
-   formatReportAxes(ax)
-end
-
-function formatReportAxes(ax)
-   %FORMATREPORTAXES Isolate exported figures from interactive theme defaults.
-
-   ax.Color = "w";
-   ax.XColor = "k";
-   ax.YColor = "k";
-   ax.GridColor = [0.65 0.65 0.65];
-   ax.GridAlpha = 0.25;
-   ax.FontSize = 11;
-   ax.Box = "off";
-   ax.Title.Color = "k";
-   ax.XLabel.Color = "k";
-   ax.YLabel.Color = "k";
-end
 
 function formatReportLegend(lgd)
    %FORMATREPORTLEGEND Isolate exported legends from interactive themes.
@@ -754,13 +659,4 @@ function formatReportLegend(lgd)
    lgd.Color = "w";
    lgd.TextColor = "k";
    lgd.EdgeColor = [0.75 0.75 0.75];
-end
-
-function quoted = shellQuote(value)
-   %SHELLQUOTE Quote one local path for the Quarto shell command.
-
-   assert(~contains(value, char(34)), ...
-      "icemodel:verification:report:unsupportedPath", ...
-      "Report paths containing double quotes are unsupported.")
-   quoted = string(sprintf('"%s"', char(value)));
 end

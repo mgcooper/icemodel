@@ -411,7 +411,7 @@ function verifyProducerManifest(filename, site, readiness_file, met_files)
    for k = 1:numel(relative_paths)
       relative_file = java.io.File(char(relative_paths(k)));
       candidate = string(fullfile(data_root, relative_paths(k)));
-      if relative_file.isAbsolute() || ~icemodel.internal.isPathInside(candidate, data_root)
+      if relative_file.isAbsolute() || ~icemodel.isPathInside(candidate, data_root)
          error('icemodel:loadmet:promiceFilledIdentityMismatch', ...
             'PROMICE producer manifest path escapes its selected root: %s', ...
             relative_paths(k));

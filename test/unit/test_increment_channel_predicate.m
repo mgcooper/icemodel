@@ -2,7 +2,7 @@ function tests = test_increment_channel_predicate
    %TEST_INCREMENT_CHANNEL_PREDICATE Cover the shared df_ channel predicate.
    %
    % retimeHourlyFixedStep and postprocess both decide aggregation with this
-   % predicate, and they pass different container types, so the shape contract
+   % predicate, and they pass different container types, so the return shape
    % matters as much as the rule.
    tests = functiontests(localfunctions);
 end

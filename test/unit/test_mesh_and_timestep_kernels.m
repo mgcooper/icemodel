@@ -290,3 +290,30 @@ function cleanupDebugFile(debug_file)
       delete(debug_file);
    end
 end
+
+function test_bottom_layer_merge_removes_it_and_conserves_mass(testCase)
+   % A deepest layer below f_ice_min must actually be removed. The clone that
+   % preserves column length is taken AFTER the deletion; taking it first
+   % copied the layer being removed back into the column, so the layer stayed
+   % while the one above it kept only half the pair's mass.
+
+   [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
+   dz = 0.04;
+   f_ice_min = 0.1;
+   T = [Tf - 1; Tf - 2; Tf - 3];
+   f_ice = [0.9; 0.8; 0.02];
+   f_liq = [0.01; 0.01; 0.0];
+   zeros_col = zeros(3, 1);
+
+   water_equivalent = @(fi, fl) sum(ro_ice / ro_liq * fi + fl) * dz;
+   expected = water_equivalent(f_ice, f_liq);
+
+   [~, returned_f_ice, returned_f_liq] = icemodel.column.merge_thin_layers( ...
+      T, f_ice, f_liq, zeros_col, zeros_col, dz, 0.0, zeros_col, f_ice_min);
+
+   testCase.verifyFalse(any(returned_f_ice < f_ice_min))
+   testCase.verifyEqual( ...
+      water_equivalent(returned_f_ice, returned_f_liq), expected, ...
+      AbsTol=1e-12)
+   testCase.verifyNumElements(returned_f_ice, 3)
+end

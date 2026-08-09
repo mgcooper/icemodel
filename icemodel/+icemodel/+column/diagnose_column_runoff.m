@@ -12,6 +12,9 @@ function ice1 = diagnose_column_runoff(ice1, ice2, opts)
    % accumulated meltwater from refreezing when the melt season ends, and it
    % limits how much of a day's melt can refreeze overnight.
    %
+   % Runoff is formally a "running total", not a cumulative sum: an hour whose
+   % evaporation exceeds its melt and overflow lowers it.
+   %
    %#codegen
 
    dz = opts.dz_thermal;
@@ -19,7 +22,7 @@ function ice1 = diagnose_column_runoff(ice1, ice2, opts)
    n_steps = size(df_liq, 2);
 
    % Partition melt/freeze phase change only. In budget_surface_mass_balance,
-   % df_liq is assigned before vapor exchange, so melt and refreezing here does
+   % df_liq is assigned before vapor exchange, so melt and refreezing here do
    % not include evaporation or condensation.
    melt = zeros(n_steps, 1);
    freeze = zeros(n_steps, 1);

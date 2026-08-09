@@ -11,6 +11,13 @@ function [hourly, bin_start, bin_end] = retimeHourlyFixedStep(TT)
    % irregular bins. BIN_START and BIN_END identify the inclusive raw-sample
    % bounds for each retained output row; zero bounds denote an empty native
    % timetable bin.
+   %
+   % The fixed path is written for code generation: every construct Coder
+   % rejects sits behind coder.target('MATLAB') and folds away. Nothing in
+   % this repository compiles it, so the directive below records that intent
+   % and lets the analyzer check it; it is not evidence of a completed build.
+   %
+   %#codegen
 
    % Return early on empty inputs so callers can stay simple.
    bin_start = zeros(0, 1);
@@ -20,12 +27,17 @@ function [hourly, bin_start, bin_end] = retimeHourlyFixedStep(TT)
       return
    end
 
-   % Use the fixed four-sample path whenever its complete 15-minute contract
+   % Use the fixed four-sample path whenever the full 15-minute spacing
    % holds. Generated code rejects all other grids before unsupported native
    % timetable retiming can enter the compiled call graph.
    if isFixedStepHourlyCompatible(TT.Properties.RowTimes)
       % Seed the output from the first sample in every block so timetable
-      % schema, metadata, and each variable's storage class stay independent.
+      % schema and metadata are preserved per variable. Storage class is
+      % preserved for floating-point variables only: the block mean widens an
+      % integer or logical variable to double, and the native fallback path
+      % below rejects those outright rather than widening them. Callers with
+      % logical channels must cast before retiming, as icemodel.postprocess
+      % does for Tsfc_converged and Tice_converged.
       n_samples = height(TT);
       n_hours = n_samples / 4;
       use_codegen_leap = ~coder.target('MATLAB') && n_hours == 8784;
@@ -80,7 +92,7 @@ function [hourly, bin_start, bin_end] = retimeHourlyFixedStep(TT)
 end
 
 function tf = isFixedStepHourlyCompatible(time)
-   %ISFIXEDSTEPHOURLYCOMPATIBLE Check the fixed-array retime contract.
+   %ISFIXEDSTEPHOURLYCOMPATIBLE Check the timetable can use the fixed retime path.
 
    % Four samples per hour, an hourly first label, and exact quarter-hour
    % spacing ensure reshape blocks equal MATLAB's native hourly bins.
@@ -143,12 +155,12 @@ function method = aggregationMethod(name)
    % 1 means mean, 2 sum, 3 first sample, and 4 last sample.
    method = 1;
    if icemodel.isIncrementChannel(name) ...
-         || matchesField(name, icemodel.column.budget_output_fields('sum'))
+         || matchesField(name, icemodel.namelists.budgetoutputs('sum'))
       method = 2;
-   elseif matchesField(name, icemodel.column.budget_output_fields('first'))
+   elseif matchesField(name, icemodel.namelists.budgetoutputs('first'))
       method = 3;
-   elseif matchesField(name, icemodel.column.budget_output_fields('last')) ...
-         || matchesField(name, icemodel.column.cumulative_output_fields())
+   elseif matchesField(name, icemodel.namelists.budgetoutputs('last')) ...
+         || matchesField(name, icemodel.namelists.cumulativeoutputs())
       method = 4;
    end
 end
@@ -175,15 +187,15 @@ function [hourly, bin_start, bin_end] = aggregateNativeBins(TT)
    vars = TT.Properties.VariableNames;
    hourly = retime(TT, 'hourly', 'mean');
    hourly = replaceAggregation( ...
-      hourly, TT, vars, icemodel.column.budget_output_fields('sum'), 'sum');
+      hourly, TT, vars, icemodel.namelists.budgetoutputs('sum'), 'sum');
    hourly = replaceAggregation(hourly, TT, vars, ...
       vars(icemodel.isIncrementChannel(vars)), 'sum');
    hourly = replaceAggregation(hourly, TT, vars, ...
-      icemodel.column.budget_output_fields('first'), 'firstvalue');
+      icemodel.namelists.budgetoutputs('first'), 'firstvalue');
    hourly = replaceAggregation(hourly, TT, vars, ...
-      icemodel.column.budget_output_fields('last'), 'lastvalue');
+      icemodel.namelists.budgetoutputs('last'), 'lastvalue');
    hourly = replaceAggregation(hourly, TT, vars, ...
-      icemodel.column.cumulative_output_fields(), 'lastvalue');
+      icemodel.namelists.cumulativeoutputs(), 'lastvalue');
    hourly = hourly(:, vars);
 
    % Record contiguous raw bounds for every native hourly label. RETIME may

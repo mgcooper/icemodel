@@ -1,7 +1,7 @@
 function tf = isIncrementChannel(names)
    %ISINCREMENTCHANNEL True for per-step increment channels.
    %
-   % Single source of truth for the df_ prefix convention. A df_ channel holds
+   % One place that defines the df_ prefix rule. A df_ channel holds
    % one forcing step's change, so retiming sums it over a bin; averaging an
    % increment would divide it by the samples per bin.
    %
@@ -18,6 +18,8 @@ function tf = isIncrementChannel(names)
    %
    % Outputs
    %  tf - true where the name is a per-step increment channel
+   %
+   %#codegen
 
    tf = startsWith(names, 'df_');
 end

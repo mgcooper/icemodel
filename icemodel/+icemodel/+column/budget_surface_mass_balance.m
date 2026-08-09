@@ -43,7 +43,7 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err] = ...
    % Positive values of d_liq indicate increasing water fraction:
    % d_liq > 0 = melt.
    % d_evp > 0 = condensation.
-   % d_con > 0 = condensation which exceeds top layer porosity.
+   % d_rof > 0 = condensation which exceeds top layer porosity.
    % d_liq < 0 = freeze.
    % d_evp < 0 = evaporation.
 
@@ -61,9 +61,9 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err] = ...
       icemodel.surface.apply_surface_vapor_mass_change( ...
       f_ice(1), f_liq(1), d_rof, d_pevp, f_ice_min, f_res_por);
 
-   % Budget evap / cond. This differences f_liq, so it only sees the liquid
-   % side of the vapor exchange. Sublimation and deposition change f_ice, so
-   % they do not show up here. Use the ledger's vapor_solid channel for those.
+   % Budget evap / cond. This differences f_liq, so it only captures liquid
+   % vapor exchange. Sublimation and deposition change f_ice, so they are not
+   % included in d_evp (use the ledger's vapor_solid channel for those).
    d_evp = d_evp + f_liq - xf_liq;
 
    % Below here:

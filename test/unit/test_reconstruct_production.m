@@ -3254,7 +3254,7 @@ function test_fill_station_keeps_hourly_wind_above_forcing_floor(testCase)
    testCase.verifyTrue(verified.promice_filled_readiness_verified);
 
    % Re-pin the deliberate corruption so identity verification succeeds and
-   % the rejection is specifically the runtime scalar-coverage contract.
+   % the rejection is specifically about scalar coverage at runtime.
    S = load(result.met_file, 'met');
    met = S.met;
    zero_sample = find(met.Properties.RowTimes == gap_time, 1);
@@ -3269,7 +3269,7 @@ end
 
 function test_producer_readiness_rejects_zero_wind(testCase)
    % A finite zero is not a missing value, but it is below the forcing
-   % contract. Producer readiness must identify the wind channel and refuse
+   % rule. Producer readiness must identify the wind channel and refuse
    % publication instead of allowing a zero-wind filled artifact downstream.
    root = testCase.TestData.root;
    site = "calm";
@@ -4277,7 +4277,7 @@ function test_shell_quote_preserves_literal_metacharacters(testCase)
    % process as one literal argument without expansion.
    value = "path with ' quote;$(printf injected);`printf bad`";
    command = "printf %s " + ...
-      icemodel.verification.helpers.shellQuote(value);
+      icemodel.shellQuote(value);
 
    [status, returned] = system(command);
 
