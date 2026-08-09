@@ -160,6 +160,32 @@ function test_stability_factor_treats_zero_wind_as_calm_no_exchange(testCase)
    testCase.verifyEqual(dstability, zeros(size(T_sfc)), 'AbsTol', 0);
    testCase.verifyTrue(all(isfinite(stability)));
    testCase.verifyTrue(all(isfinite(dstability)));
+
+   % The calm guard branches on isscalar(calm_mask), and a scalar wspd is what
+   % icemodel and skinmodel actually pass: both hand down wspd(metstep). The
+   % vector case above therefore exercises the branch production never takes,
+   % so pin the scalar branch against the same expectations, once broadcast
+   % over a vector T_sfc and once fully scalar.
+   [scalar_wind, dscalar_wind] = ...
+      icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
+      T_sfc, tair, 0.0, br_coefs);
+
+   testCase.verifyEqual(scalar_wind, ones(size(T_sfc)), 'AbsTol', 0);
+   testCase.verifyEqual(dscalar_wind, zeros(size(T_sfc)), 'AbsTol', 0);
+
+   [point, dpoint] = ...
+      icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
+      tair + 2, tair, 0.0, br_coefs);
+
+   testCase.verifyEqual(point, 1.0, 'AbsTol', 0);
+   testCase.verifyEqual(dpoint, 0.0, 'AbsTol', 0);
+
+   % A nonzero wind must not take the calm branch, or these assertions would
+   % pass for a guard that zeroed B1 and B2 unconditionally.
+   moving = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
+      tair + 2, tair, 3.0, br_coefs);
+
+   testCase.verifyNotEqual(moving, 1.0);
 end
 
 function test_stablefn_neutral_blend_matches_endpoint_formulas(testCase)

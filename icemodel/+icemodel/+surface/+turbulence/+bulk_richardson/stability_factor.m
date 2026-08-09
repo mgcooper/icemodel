@@ -60,9 +60,11 @@ function [stability, dstability] = stability_factor(T_sfc, tair, wspd, br_coefs)
    T_sfc_real = real(T_sfc);
 
    % Broadcast T_sfc against both forcings so every expanded evaluation array
-   % shares one shape.
-   state_shape = T_sfc + 0 * tair + 0 * wspd;
-   state_size = size(state_shape);
+   % shares one shape. Any T_sfc matching that shape works, including the
+   % vectorized call path and a complex-step derivative over an array; the
+   % solver happens to pass a scalar.
+   broadcast_shape = T_sfc + 0 * tair + 0 * wspd;
+   state_size = size(broadcast_shape);
    tair_eval = expand_input(tair, state_size);
    B1_eval = expand_input(B1, state_size);
    B2_eval = expand_input(B2, state_size);
