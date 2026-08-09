@@ -14,27 +14,23 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
 
    debug = opts.debug;
 
-   % Return ok_seb true to align coupler function contracts (no Ts solve here).
-   ok_seb = true;
-
    % Initial values for SEB linearization coefficients Fc, Fp.
    [Fc, Fp] = icemodel.surface.surface_flux_linearization( ...
       T_sfc, tair, swd, lwd, albedo, wspd, ppt, tppt, psfc, ea_atm, ...
       ro_atm, cv_atm, nu_air, H_h, H_e, hv_atm, br_coefs, liqflag, ...
       chi, ro_sfc, snow_depth, opts);
 
-   % Initial histories for the established Aitken fallback and bracketed
-   % fixed-point secant acceleration.
-   Ts_1 = nan;
-   Ts_2 = nan;
-   Ts_prev = nan;
-   cpl_res_prev = nan;
+   % Initial solver histories for acceleration.
+   hist = icemodel.couplers.initialize_coupler_history();
 
    % Initial values for convergence checks.
    ok_cpl = false;
    Ts_old = T_sfc;
    Ts_diag = T_sfc;
    seb_res = nan;
+
+   % Return ok_seb true to align coupler function signatures (no Ts solve here).
+   ok_seb = true;
 
    % Run outer Ts-T convergence loop (iterative block/Picard coupling).
    for cpliter = 1:cpl_maxiter
@@ -71,29 +67,27 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
          br_coefs, liqflag, chi, T_ice, k_eff, dz, ro_sfc, ...
          snow_depth, opts);
 
-      % Check convergence of the evaluated fixed-point map.
+      % Check convergence (bypass coupler if cpl_maxiter == 1).
       cpl_res = T_sfc - Ts_old;
       if (cpl_maxiter == 1) || ...
-            (abs(cpl_res) < cpl_Ts_tol ...
-            && abs(seb_res) < cpl_seb_tol)
+            (abs(cpl_res) < cpl_Ts_tol && abs(seb_res) < cpl_seb_tol)
          ok_cpl = true;
          break
       end
 
-      % Preserve the established Aitken/relaxation path outside a bracket.
-      Ts_0 = T_sfc;
-      Ts_fallback = icemodel.numerics.aitkenscalar(Ts_2, Ts_1, Ts_0, ...
-         Ts_old + cpl_alpha * cpl_res, cpl_jumpmax, cpl_aitken);
+      % Apply hybrid Aitken-secant step acceleration.
+      [T_sfc, hist] = icemodel.couplers.accelerate_coupler_iterate( ...
+         hist, Ts_old, T_sfc, cpl_alpha, cpl_jumpmax, cpl_aitken);
 
-      % Replace a bracketed noncontractive Picard step with a safeguarded root.
-      T_sfc = icemodel.numerics.secantscalar(Ts_prev, cpl_res_prev, ...
-         Ts_old, cpl_res, Ts_fallback, cpl_jumpmax, cpl_aitken);
-      Ts_2 = Ts_1;
-      Ts_1 = Ts_0;
-      Ts_prev = Ts_old;
-      cpl_res_prev = cpl_res;
+      % The accelerated iterate is the state carried into the next coupling
+      % sweep. Accept convergence here as well, so a stationary iterate cannot
+      % fall through the loop and fail spuriously at cpl_maxiter.
+      if abs(T_sfc - Ts_old) < cpl_Ts_tol && abs(seb_res) < cpl_seb_tol
+         ok_cpl = true;
+         break
+      end
 
-      % Keep the next column solve consistent with its carried temperature.
+      % Use the new T_sfc solution to update Fc, Fp for the next column solve.
       [Fc, Fp] = icemodel.surface.surface_flux_linearization( ...
          T_sfc, tair, swd, lwd, albedo, wspd, ppt, tppt, psfc, ...
          ea_atm, ro_atm, cv_atm, nu_air, H_h, H_e, hv_atm, ...

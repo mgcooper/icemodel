@@ -8,7 +8,7 @@ Current contents:
 - `secantscalar`
 - `fsearchzero`
 - `complexstep`
-- `complex_step_derivative`
+- `complexstep_derivative`
 - `sign_or_one`
 
 Rules:

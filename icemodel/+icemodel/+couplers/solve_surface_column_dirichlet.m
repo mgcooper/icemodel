@@ -8,11 +8,11 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
    %SOLVE_SURFACE_COLUMN_DIRICHLET Coupled icemodel Dirichlet SEB solve.
    %
    % Run an outer Ts-T Picard loop so the accepted Dirichlet surface state,
-   % top-node temperature, and conductive closure are mutually consistent at
-   % the end of a substep. Ts remains the internal solver boundary state here;
-   % physical diagnosed fluxes apply the accepted physical-surface
-   % contract downstream via icemodel.surface.physical_surface_temperature
-   % handled by icemodel.surface.diagnose_surface_fluxes.
+   % top-node temperature, and conductive closure are mutually consistent at the
+   % end of a substep. Ts is the internal solver boundary state here; physical
+   % diagnosed fluxes apply the physical-surface temperature downstream via
+   % icemodel.surface.physical_surface_temperature and
+   % icemodel.surface.diagnose_surface_fluxes.
    %
    %#codegen
 
@@ -33,9 +33,8 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
       ea_atm, ro_atm, cv_atm, nu_air, H_h, H_e, hv_atm, br_coefs, ...
       liqflag, chi, xT_ice, k_eff, dz, ro_sfc, snow_depth, opts);
 
-   % Initial past Picard iterates for Aitken acceleration.
-   Ts_1 = nan;
-   Ts_2 = nan;
+   % Initial solver histories for acceleration.
+   hist = icemodel.couplers.initialize_coupler_history();
 
    % Initial values for convergence checks.
    ok_cpl = false;
@@ -98,29 +97,26 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
 
       % Check convergence (bypass coupler if cpl_maxiter == 1).
       if (cpl_maxiter == 1) || ...
-            (abs(T_sfc - Ts_old) < cpl_Ts_tol ...
-            && seb_res < cpl_seb_tol)
+            (abs(T_sfc - Ts_old) < cpl_Ts_tol && seb_res < cpl_seb_tol)
          ok_cpl = true;
          break
       end
 
-      % Aitken acceleration w/ relaxation-fallback (on failure or ~cpl_aitken).
-      Ts_0 = T_sfc;
-      T_sfc = icemodel.numerics.aitkenscalar(Ts_2, Ts_1, Ts_0, ...
-         (1.0 - cpl_alpha) * Ts_old + cpl_alpha * T_sfc, ... % relaxation
-         cpl_jumpmax, cpl_aitken);
-      Ts_2 = Ts_1;
-      Ts_1 = Ts_0;
+      % Apply hybrid Aitken-secant step acceleration.
+      [T_sfc, hist] = icemodel.couplers.accelerate_coupler_iterate( ...
+         hist, Ts_old, T_sfc, cpl_alpha, cpl_jumpmax, cpl_aitken);
 
-      if abs(T_sfc - Ts_old) < cpl_Ts_tol ...
-            && seb_res < cpl_seb_tol
+      % Check convergence.
+      if abs(T_sfc - Ts_old) < cpl_Ts_tol && seb_res < cpl_seb_tol
          ok_cpl = true;
          break
       end
    end
 
-   % Debug dump on coupler failure.
-   if ~(ok_seb && ok_ieb && ok_cpl) && debug
+   % Dump the outer failure only when neither inner dump ran. Both inner
+   % dumps write the same debug file, so without this the outer snapshot
+   % overwrites the inner-solver state that was being captured.
+   if debug && ok_seb && ok_ieb && ~ok_cpl
       dumpIceEbSolveDirichletFailure( ...
          "coupler_nonconvergence", T_sfc, Ts_diag, Ts_old, T_ice, ...
          f_ice, f_liq, k_eff, Sc, dt, cpliter, cpl_maxiter, ...
