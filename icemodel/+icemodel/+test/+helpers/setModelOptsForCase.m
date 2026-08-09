@@ -37,6 +37,11 @@ function opts = setModelOptsForCase(c, kwargs)
    %       no staged met path is available ("hourly" -> 3600).
    %   startdate / enddate : datetime, default NaT. Verification-manifest only.
    %       Explicit runtime window; defaults to the manifest's bounded period.
+   %   output_profile : optional output-profile override for either case shape.
+   %
+   % Verification manifests can also carry root-validated readiness_file and
+   % report_inputs_file fields. These producer identities are forwarded to
+   % loadmet with the selected staged input paths.
    %
    % See also: icemodel.setopts, icemodel.createMetFileNames,
    %  icemodel.verification.runIcemodelSnowCandidate
@@ -49,6 +54,7 @@ function opts = setModelOptsForCase(c, kwargs)
       kwargs.dt double = []
       kwargs.startdate = NaT('TimeZone', 'UTC')
       kwargs.enddate = NaT('TimeZone', 'UTC')
+      kwargs.output_profile (1, 1) string = ""
    end
 
    % Accept either a one-row case table or an equivalent scalar struct.
@@ -65,6 +71,13 @@ function opts = setModelOptsForCase(c, kwargs)
       opts = optsFromVerificationManifest(c, kwargs);
    else
       opts = optsFromFormalCase(c, kwargs);
+   end
+
+   % Scientific verification can request the diagnostic checkpoint ledger
+   % while formal regression keeps the unchanged standard-profile default.
+   if strlength(kwargs.output_profile) > 0
+      opts = icemodel.resetopts( ...
+         opts, 'output_profile', char(kwargs.output_profile));
    end
 end
 
@@ -136,6 +149,20 @@ function opts = optsFromVerificationManifest(case_manifest, kwargs)
          'userdata')), ...
          'metfname', metfname, ...
          'userdatafname', userdatafname}];
+   end
+
+   % A scientific runner can pin the producer verifier artifacts alongside the
+   % met payload. The runner owns path confinement; this shared builder preserves
+   % those exact paths so loadmet cannot fall back to repository-local defaults.
+   if isfield(case_manifest, 'readiness_file') ...
+         && strlength(string(case_manifest.readiness_file)) > 0
+      overrides = [overrides, {'readiness_file', ...
+         char(string(case_manifest.readiness_file))}];
+   end
+   if isfield(case_manifest, 'report_inputs_file') ...
+         && strlength(string(case_manifest.report_inputs_file)) > 0
+      overrides = [overrides, {'report_inputs_file', ...
+         char(string(case_manifest.report_inputs_file))}];
    end
 
    % Build the finalized runtime contract once with the selected scoped paths.
@@ -459,8 +486,25 @@ function paths = stagedManifestArtifactFiles(case_manifest, forcing_source, ...
    if isempty(files)
       return
    end
-   candidates = arrayfun(@(file) fullfile(string(input_root), folder, file), ...
-      files, UniformOutput=false);
+   % Manifest entries are relative to their artifact subtree. Reject absolute,
+   % parent-relative, and symlink-resolved escapes before any caller can load
+   % bytes outside the configured input root.
+   artifact_root = string(fullfile(input_root, folder));
+   candidates = cell(size(files));
+   for n = 1:numel(files)
+      file = replace(files(n), "\", "/");
+      segments = split(file, "/");
+      candidate = string(fullfile(artifact_root, file));
+      is_absolute = java.io.File(char(file)).isAbsolute() ...
+         || ~isempty(regexp(char(file), '^[A-Za-z]:', 'once'));
+      if is_absolute || any(segments == "..") ...
+            || ~icemodel.isPathInside(candidate, artifact_root)
+         error('icemodel:test:setModelOptsForCase:invalidManifestArtifactPath', ...
+            'recorded %s entry must remain relative to %s: %s', ...
+            field, artifact_root, files(n))
+      end
+      candidates{n} = candidate;
+   end
    % Preserve every recorded path; family-specific callers may select a proven
    % covering member but never replace this manifest whitelist with discovery.
    paths = cellfun(@char, candidates, UniformOutput=false);

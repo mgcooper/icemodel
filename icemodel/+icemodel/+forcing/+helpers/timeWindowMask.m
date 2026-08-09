@@ -3,7 +3,7 @@ function keep = timeWindowMask(Time, startdate, enddate)
 
    % Enforce the same paired-window contract at every public builder that uses
    % this helper, then leave the all-available path independent of source bounds.
-   [t0, t1, has_window] = icemodel.internal.pairedWindow(startdate, enddate);
+   [t0, t1, has_window] = icemodel.pairedWindow(startdate, enddate);
    keep = true(size(Time));
    if has_window
       keep = Time >= t0 & Time <= t1;

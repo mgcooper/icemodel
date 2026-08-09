@@ -98,7 +98,7 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    % Validate and normalize the optional interval before source discovery so
    % malformed public input cannot be obscured by an unrelated file error.
    [window_start, window_end, has_window] = ...
-      icemodel.internal.pairedWindow(kwargs.startdate, kwargs.enddate);
+      icemodel.pairedWindow(kwargs.startdate, kwargs.enddate);
 
    filename = locateStationFile(site, kwargs.source_dir, kwargs.timescale);
 

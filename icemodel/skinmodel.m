@@ -66,8 +66,8 @@ function [ice1, ice2, opts] = skinmodel(opts)
          [dt_sum, n_subfail, ok_seb, ok_ieb] ...
             = icemodel.timestepping.newtimestep(f_liq, solver);
 
-         % Scalarize time-varying observation geometry and its corresponding
-         % bulk-Richardson coefficients at the forcing-step boundary.
+         % Scalarize time-varying met observation heights and corresponding
+         % bulk-Richardson coefficients prior to each forcing step.
          step_opts = icemodel.surface.step_observation_heights(opts, metstep);
          br_coefs_step = br_coefs(min(metstep, size(br_coefs, 1)), :);
 

@@ -1,0 +1,79 @@
+function assertFormalBaselineForcing(baseline, baseline_selector)
+   %ASSERTFORMALBASELINEFORCING Verify a baseline's registered forcing identity.
+   %
+   %  icemodel.test.helpers.assertFormalBaselineForcing( ...
+   %     baseline, "v1.1")
+   %
+   % Formal case ids intentionally omit the forcing product. Check the saved
+   % station and forcing columns before case-id matching so a baseline produced
+   % with one forcing cannot be compared with, or snapshotted as, another.
+
+   if isempty(baseline)
+      return
+   end
+
+   policy = icemodel.test.helpers.formalBaselinePolicy(baseline_selector);
+   required = ["sitename", "forcings"];
+   if ~all(ismember(required, string(baseline.Properties.VariableNames)))
+      if policy.baseline_type == "rolling"
+         error('icemodel:test:rollingBaselineForcingAcceptanceRequired', ...
+            ['The rolling baseline predates explicit forcing provenance. ', ...
+            'Accept a new rolling baseline for the official forcing before ', ...
+            'comparison.'])
+      end
+      error('icemodel:test:baselineForcingIdentityMissing', ...
+         'Formal baseline must record sitename and forcings before comparison.')
+   end
+
+   % When canonical case identity is present, require it to agree with the
+   % saved model/site/year/solver columns before any case-id join occurs.
+   identity = ["case_id", "smbmodel", "sitename", "simyear", "solver"];
+   names = string(baseline.Properties.VariableNames);
+   if ~all(ismember(identity, names))
+      error('icemodel:test:baselineCaseIdentityMissing', ...
+         ['Formal baseline must record case_id, smbmodel, sitename, ', ...
+         'simyear, and solver before comparison.'])
+   end
+
+   expected_case_id = strings(height(baseline), 1);
+   for row = 1:height(baseline)
+      expected_case_id(row) = icemodel.test.helpers.makeFormalCaseId( ...
+         string(baseline.smbmodel(row)), string(baseline.sitename(row)), ...
+         double(baseline.simyear(row)), double(baseline.solver(row)));
+   end
+   saved_case_id = icemodel.test.helpers.normalizeFormalCaseId( ...
+      string(baseline.case_id));
+   if numel(unique(saved_case_id)) ~= height(baseline)
+      error('icemodel:test:baselineCaseIdentityDuplicate', ...
+         'Formal baseline case_id values must be unique before comparison.')
+   end
+   mismatch = saved_case_id ~= expected_case_id;
+   if any(mismatch)
+      row = find(mismatch, 1);
+      error('icemodel:test:baselineCaseIdentityMismatch', ...
+         'Formal baseline case_id %s does not match saved identity %s.', ...
+         string(baseline.case_id(row)), expected_case_id(row))
+   end
+
+   expected = arrayfun(@(site) ...
+      icemodel.test.helpers.getFormalForcing( ...
+      sitename=site, baseline=baseline_selector), ...
+      string(baseline.sitename));
+   actual = string(baseline.forcings);
+   mismatch = actual ~= expected;
+   if any(mismatch)
+      row = find(mismatch, 1);
+      if policy.baseline_type == "rolling"
+         error('icemodel:test:rollingBaselineForcingAcceptanceRequired', ...
+            ['The rolling baseline for site %s records %s, but the official ', ...
+            'formal forcing is %s. Accept a new rolling baseline before ', ...
+            'comparison.'], string(baseline.sitename(row)), actual(row), ...
+            expected(row))
+      end
+      error('icemodel:test:baselineForcingIdentityMismatch', ...
+         ['Formal baseline forcing mismatch for site %s: saved %s, ', ...
+         'expected %s for selector %s.'], ...
+         string(baseline.sitename(row)), actual(row), expected(row), ...
+         baseline_selector)
+   end
+end

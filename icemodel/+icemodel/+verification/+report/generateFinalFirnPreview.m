@@ -111,7 +111,7 @@ try
       'figure_count', numel(pngs), 'summary_rows', height(summary), ...
       'audit_error_count', audit.summary.error_count, ...
       'audit_blocker_count', audit.summary.blocker_count);
-   writelines(string(jsonencode(evidence, PrettyPrint=true)), complete_file);
+   icemodel.verification.setup.writeJson(complete_file, evidence);
 catch err
    % Failed runs may not retain a stale or partially written success marker.
    if isfile(complete_file)

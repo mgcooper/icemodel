@@ -74,13 +74,13 @@ function varargout = postprocess(ice1, ice2, opts, varargin)
    ice1 = struct2table(ice1);
    ice1 = table2timetable(ice1, 'RowTimes', time);
 
-   % Retime 15 min data to hourly using the fixed-step reshape helper.
-   % opts.dt == 900 guarantees the cadence; the helper only needs the sample
-   % count to be divisible by 4 and the first sample aligned to the hour.
+   % Retime 15-minute data to hourly values with per-channel aggregation.
+   % Native timetable bins preserve variable classes and partial windows.
    if opts.dt == 900
-      ice1 = icemodel.retimeHourlyFixedStep(ice1);
-      [ice1, ice2] = retimeLogical(ice1, ice2);
-      ice2 = retimeIce2(ice2, ice1.Time);
+      [ice1, bin_start, bin_end] = ...
+         icemodel.retimeHourlyFixedStep(ice1);
+      [ice1, ice2] = retimeLogical(ice1, ice2, bin_start, bin_end);
+      ice2 = retimeIce2(ice2, bin_start, bin_end);
    end
 
    % Round the data to save disk space, retaining necessary precision
@@ -142,39 +142,46 @@ function [ice1, ice2] = subsetOutput(ice1, ice2, ii)
 end
 
 %%
-function ice2 = retimeIce2(ice2, Time)
+function ice2 = retimeIce2(ice2, bin_start, bin_end)
+   %RETIMEICE2 Aggregate subsurface outputs over the surface hourly bins.
 
    % Get the field names of ice2
    fields = fieldnames(ice2);
 
-   % Initialize temporary arrays to retime ice2
+   % Allocate one subsurface column per surface bin so every channel shares
+   % the retained output boundaries, including partial and empty native bins.
+   n_bins = numel(bin_start);
    tmp = struct();
    for n = 1:numel(fields)
-      tmp.(fields{n}) = nan(size(ice2.Tice, 1), numel(Time));
+      tmp.(fields{n}) = nan(size(ice2.Tice, 1), n_bins);
    end
    % Replace Z, if this is not a legacy grid run
    if isfield(ice2, 'Z')
       tmp.Z = ice2.Z;
    end
 
-   % Loop over each hour
-   for n = 1:numel(Time)
-      % this works b/c we know it's fifteen minute data
-      i1 = n*4-3;
-      i2 = n*4;
+   % Decide each field's rule once. Every df_ channel is a per-step increment,
+   % so it sums; errH is a residual and also sums; everything else averages.
+   % Z is the depth grid and is copied, not aggregated.
+   do_sum = icemodel.isIncrementChannel(fields) | strcmp(fields, 'errH');
+   skip = strcmp(fields, 'Z');
 
-      % Iterate over fields to apply appropriate retime method
+   % Aggregate the exact raw samples assigned to each native hourly bin.
+   for n = 1:n_bins
+      if bin_start(n) == 0
+         continue
+      end
+      ii = bin_start(n):bin_end(n);
+
       for m = 1:numel(fields)
+         if skip(m)
+            continue
+         end
          thisfield = fields{m};
-         switch thisfield
-            case {'Z'} % might need {'Z', 'LCflag'} and other logicals/etc
-               continue
-            case {'Tice', 'f_ice', 'f_liq', 'k_eff', 'k_vap', 'ro_sno', 'cp_sno'}
-               tmp.(thisfield)(:, n) = mean(ice2.(thisfield)(:, i1:i2), 2);
-            case {'df_liq', 'df_evp', 'df_lyr', 'errH'}
-               tmp.(thisfield)(:, n) = sum(ice2.(thisfield)(:, i1:i2), 2);
-            otherwise % assume averaging is correct
-               tmp.(thisfield)(:, n) = mean(ice2.(thisfield)(:, i1:i2), 2);
+         if do_sum(m)
+            tmp.(thisfield)(:, n) = sum(ice2.(thisfield)(:, ii), 2);
+         else
+            tmp.(thisfield)(:, n) = mean(ice2.(thisfield)(:, ii), 2);
          end
       end
    end
@@ -182,19 +189,23 @@ function ice2 = retimeIce2(ice2, Time)
 end
 
 %%
-function [ice1, ice2] = retimeLogical(ice1, ice2)
-   % Retime logical flags
+function [ice1, ice2] = retimeLogical( ...
+      ice1, ice2, bin_start, bin_end)
+   %RETIMELOGICAL Aggregate logical flags over the surface hourly bins.
 
-   % 2-d logical
+   % Collapse each two-dimensional flag with the same native bin membership
+   % used for numeric subsurface outputs, then retain its surface-layer flag.
    fields = fieldnames(ice2);
    for n = 1:numel(fields)
       thisfield = fields{n};
       if islogical(ice2.(thisfield)(1, 1))
-         flag = false(size(ice2.f_ice));
-         idx = 0;
-         for mm = 1:4:size(ice2.(thisfield), 2) - 3
-            idx = idx+1;
-            flag(:, idx) = sum(ice2.(thisfield)(:, mm:mm+3), 2) > 0;
+         flag = false(size(ice2.(thisfield), 1), numel(bin_start));
+         for mm = 1:numel(bin_start)
+            if bin_start(mm) == 0
+               continue
+            end
+            ii = bin_start(mm):bin_end(mm);
+            flag(:, mm) = any(ice2.(thisfield)(:, ii), 2);
          end
          ice1.(thisfield) = transpose(flag(1, :));
          ice2 = rmfield(ice2, thisfield);
@@ -208,9 +219,39 @@ end
 %%
 function [ice1, ice2] = roundData(ice1, ice2)
 
-   % Round the ice1 data to five digits
-   ice1{:, ice1.Properties.VariableNames} = ...
-      round(ice1{:, ice1.Properties.VariableNames}, 5);
+   % Round legacy ice1 channels to five digits. Preserve diagnostic mass-budget
+   % ledgers at solver precision so signed closure identities remain testable.
+   % Round one variable at a time. Brace EXTRACTION concatenates the selected
+   % columns into one array first, and the single-precision columns
+   % (Tsfc_converged, Tice_converged) promote the whole block to single, so
+   % every double channel would round at single precision. Brace ASSIGNMENT
+   % restores each variable's original class, which makes that invisible in
+   % the stored types.
+   vars1 = ice1.Properties.VariableNames;
+   is_budget = ismember(vars1, icemodel.namelists.budgetoutputs());
+
+   % df_rof is a per-step increment like ice2's df_liq/df_evp/df_lyr, so it
+   % keeps their 8-digit precision. Rounding it to five digits would zero the
+   % small overflow values the closure identities are checked against.
+   is_increment = icemodel.isIncrementChannel(vars1);
+   keep_precision = is_budget | is_increment;
+   round_names = vars1(~keep_precision);
+   increment_names = vars1(is_increment & ~is_budget);
+
+   % The isnumeric guards are defensive and are needed only by this
+   % per-variable form: round rejects a logical, where brace extraction used
+   % to widen one silently. retimeLogical can move a logical ice2 flag channel
+   % into ice1, though no shipped vars2 list currently names one.
+   for k = 1:numel(round_names)
+      if isnumeric(ice1.(round_names{k}))
+         ice1.(round_names{k}) = round(ice1.(round_names{k}), 5);
+      end
+   end
+   for k = 1:numel(increment_names)
+      if isnumeric(ice1.(increment_names{k}))
+         ice1.(increment_names{k}) = round(ice1.(increment_names{k}), 8);
+      end
+   end
 
    % Round the ice2 data
    fields = fieldnames(ice2);

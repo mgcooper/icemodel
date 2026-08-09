@@ -339,7 +339,7 @@ function [patched, relation] = mergeWindowField(existing, patched, fieldname)
       return
    end
    try
-      [old_start, old_end, old_enabled] = icemodel.internal.pairedWindow( ...
+      [old_start, old_end, old_enabled] = icemodel.pairedWindow( ...
          old_window.start, old_window.end);
    catch
       % Legacy non-datetime sentinels cannot define enclosing coverage.
@@ -355,7 +355,7 @@ function [patched, relation] = mergeWindowField(existing, patched, fieldname)
 
    new_window = patched.(fieldname);
    try
-      [new_start, new_end, new_enabled] = icemodel.internal.pairedWindow( ...
+      [new_start, new_end, new_enabled] = icemodel.pairedWindow( ...
          new_window.start, new_window.end);
    catch
       % Do not let an ordinary malformed patch destroy valid durable coverage.
@@ -786,7 +786,7 @@ function tf = windowNarrows(existing_window, incoming_window)
       return
    end
    try
-      [old_start, old_end, old_enabled] = icemodel.internal.pairedWindow( ...
+      [old_start, old_end, old_enabled] = icemodel.pairedWindow( ...
          existing_window.start, existing_window.end);
    catch
       % Legacy non-datetime sentinel periods are not comparable coverage.
@@ -799,7 +799,7 @@ function tf = windowNarrows(existing_window, incoming_window)
          return
       end
       try
-         [~, ~, new_enabled] = icemodel.internal.pairedWindow( ...
+         [~, ~, new_enabled] = icemodel.pairedWindow( ...
             incoming_window.start, incoming_window.end);
          tf = new_enabled;
       catch
@@ -813,7 +813,7 @@ function tf = windowNarrows(existing_window, incoming_window)
       return
    end
    try
-      [new_start, new_end, new_enabled] = icemodel.internal.pairedWindow( ...
+      [new_start, new_end, new_enabled] = icemodel.pairedWindow( ...
          incoming_window.start, incoming_window.end);
       tf = ~new_enabled || new_start > old_start || new_end < old_end;
    catch

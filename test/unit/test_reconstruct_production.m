@@ -24,6 +24,31 @@ function teardown(testCase)
    clear testCase.TestData.cleanup
 end
 
+function test_driver_rejects_evaluation_output_roots_before_loading(testCase)
+   % Output and QA destinations are guarded before missing inputs or cleanup
+   % paths can create, replace, or retire anything beneath data/eval.
+   root = testCase.TestData.root;
+   eval_root = fullfile(root, 'eval');
+   safe_out = fullfile(root, 'met', 'promice_filled');
+   safe_qa = fullfile(root, 'qa-safe');
+   protected_out = fullfile(eval_root, 'forcing');
+   protected_qa = fullfile(eval_root, 'qa');
+
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.fillPromiceStation("tsta", ...
+      met_dir=fullfile(root, 'met', 'promice'), ...
+      out_dir=protected_out, qa_dir=safe_qa, write=true), ...
+      ['icemodel:reconstruct:' ...
+      'assertNotEvaluationDestination:protectedPath']);
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.fillPromiceStation("tsta", ...
+      met_dir=fullfile(root, 'met', 'promice'), ...
+      out_dir=safe_out, qa_dir=protected_qa, write=true), ...
+      ['icemodel:reconstruct:' ...
+      'assertNotEvaluationDestination:protectedPath']);
+   testCase.verifyFalse(isfolder(eval_root));
+end
+
 %% stationMethodPlan
 
 function test_plan_admits_near_donor_and_gates_far_donor(testCase)
@@ -993,10 +1018,8 @@ function test_fill_station_writes_canonical_artifacts(testCase)
     testCase.verifyEqual(string(metadata.site), "tsta");
     testCase.verifyEqual(string(metadata.gapfill_engine_version), ...
        string(icemodel.internal.version()));
-    policy_file = fullfile(icemodel.internal.fullpath, 'icemodel', ...
-       '+icemodel', '+forcing', '+reconstruct', 'POLICY.md');
      testCase.verifyEqual(string(metadata.gapfill_policy_sha256), ...
-        icemodel.verification.setup.fileSha256(policy_file));
+        icemodel.forcing.reconstruct.policySha256());
      testCase.verifyEqual(string(metadata.gapfill_donors), "dsta");
      testCase.verifyEqual(string(metadata.gapfill_channels), ...
         string({result.plan.channels.channel}));
@@ -2783,6 +2806,51 @@ function test_last_resort_rejects_taper_beyond_lwd_bound(testCase)
       "seam capped at validity bound")));
 end
 
+function test_last_resort_retains_valid_wind_when_seam_crosses_floor(testCase)
+   % A taper derived from the first proxy posting can push later, smaller
+   % wind values below the runtime floor. The whole already-valid source
+   % segment must survive unblended rather than become a residual outage.
+   times = (datetime(2020, 1, 1, 'TimeZone', 'UTC') + hours(0:99)).';
+   n = numel(times);
+   gap = (41:52).';
+   wspd = 1 + zeros(n, 1);
+   wspd(40) = 0.1;
+   wspd(gap) = NaN;
+   filled = timetable(times, wspd, 'VariableNames', {'wspd'});
+   codes = icemodel.forcing.reconstruct.provenanceCodes();
+   code = repmat(codes.observed, n, 1);
+   code(gap) = codes.missing;
+   provenance = timetable(times, code, 'VariableNames', {'wspd'});
+   audit = table('Size', [0 7], 'VariableTypes', {'cellstr', ...
+      'datetime', 'datetime', 'double', 'cellstr', 'cellstr', 'cellstr'}, ...
+      'VariableNames', {'channel', 'start_time', 'end_time', ...
+      'duration_hours', 'method', 'detail', 'context_id'});
+   audit.start_time.TimeZone = 'UTC';
+   audit.end_time.TimeZone = 'UTC';
+   proxy_wspd = 1 + zeros(n, 1);
+   proxy_wspd(gap) = [2; 2; 0.2 + zeros(numel(gap) - 2, 1)];
+   proxy = struct('series', timetable(times, proxy_wspd, ...
+      'VariableNames', {'wspd'}), 'name', "mar", 'code_name', "mar");
+   native = timetable(times, 1 + zeros(n, 1), ...
+      'VariableNames', {'wspd'});
+
+   [returned, returned_provenance, returned_audit, denials] = ...
+      icemodel.forcing.reconstruct.lastResortProxies( ...
+      filled, provenance, audit, proxy, codes, ...
+      icemodel.forcing.reconstruct.setopts(required_channels="wspd"), ...
+      native=native);
+
+   bounds = icemodel.forcing.reconstruct.physicalBounds("wspd");
+   testCase.verifyEqual(returned.wspd(gap), proxy_wspd(gap), ...
+      'AbsTol', 1e-12);
+   testCase.verifyGreaterThanOrEqual(min(returned.wspd(gap)), bounds(1));
+   testCase.verifyEqual(returned_provenance.wspd(gap), ...
+      repmat(codes.mar, numel(gap), 1));
+   testCase.verifyEqual(denials.wspd(gap), strings(numel(gap), 1));
+   testCase.verifyTrue(any(contains(string(returned_audit.detail), ...
+      "prevalidated wind source retained")));
+end
+
 function test_last_resort_clamps_calibrated_rh_into_bounds(testCase)
    % D-27: an overlap correction can push humidity above 100 percent;
    % that excess is calibration arithmetic, not physics, so the corrected
@@ -3102,6 +3170,149 @@ function test_fill_station_reconstructs_hourly_then_restores_support(testCase)
       & report.figure_ledger.method == "bounded_interp", :);
    testCase.verifyEqual(hours(report_row.gap_end - report_row.gap_start), ...
       report_row.duration_hours, 'AbsTol', 1e-12);
+end
+
+function test_fill_station_keeps_hourly_wind_above_forcing_floor(testCase)
+   % A near-floor hourly MAR reconstruction must disaggregate smoothly
+   % without creating a sub-floor quarter-hour, while retaining the hourly
+   % posting mean. The published product must pass the runtime sample gate;
+   % a deliberately re-pinned zero-wind mutation must fail that same gate.
+   root = testCase.TestData.root;
+   site = "wind";
+   writeFixtureStation(root, site, 0, 0, false);
+   filename = fullfile(root, 'met', 'promice', ...
+      'met_wind_promice_20200101_20211231_15m.mat');
+   S = load(filename, 'met');
+   hourly = S.met(1:4:end, :);
+   hourly.Properties.DimensionNames{1} = 'Time';
+   hourly.Properties.UserData = rmfield(hourly.Properties.UserData, ...
+      {'met_resample_policy', 'met_resample_source_cadence_seconds'});
+   gap_time = hourly.Properties.RowTimes(100);
+   hourly.wspd(99:101) = NaN;
+   met = icemodel.forcing.helpers.resampleMetTimestep(hourly, "15m");
+   % Complete precipitation keeps the producer verdict focused on wind.
+   met.ppt(:) = 0;
+   met.rainf(:) = 0;
+   met.snowf(:) = 0;
+   save(filename, 'met');
+   recordNativeMetIdentity(root, site, filename);
+
+   % Disable overlap calibration and seam tapering so a three-posting outage
+   % adopts the exact in-bounds MAR sentinel at its center. The adjacent MAR
+   % postings retain high winds and force disaggregation to exercise its floor.
+   writeFixtureMar(root, site);
+   mar_file = fullfile(root, 'met', 'mar3.11', ...
+      'met_wind_mar3.11_20200101_20211231_15m.mat');
+   S = load(mar_file, 'mar_met');
+   mar_met = S.mar_met;
+   proxy_support = mar_met.Properties.RowTimes >= gap_time ...
+      & mar_met.Properties.RowTimes < gap_time + hours(1);
+   mar_met.wspd(proxy_support) = 0.12;
+   save(mar_file, 'mar_met');
+   default_opts = icemodel.forcing.reconstruct.setopts();
+   opts = icemodel.forcing.reconstruct.setopts( ...
+      required_channels="wspd", core_channels="wspd", ...
+      plan_channels=default_opts.plan_channels, ...
+      interp_channels=string.empty(1, 0), ...
+      last_resort_proxies=true, blend_hours=0, ...
+      min_overlap_hours=1e9, plan_n_gaps=1, seed=4);
+   out_dir = fullfile(root, 'met', 'promice_filled');
+   qa_dir = fullfile(root, 'qa-wind');
+   result = icemodel.forcing.reconstruct.fillPromiceStation(site, ...
+      met_dir=fullfile(root, 'met', 'promice'), out_dir=out_dir, ...
+      qa_dir=qa_dir, donor_sites=string.empty(1, 0), ...
+      use_ktransect=false, use_gcnet=false, opts=opts);
+
+   % D-30 and A15 together require four finite, MAR-stamped samples whose
+   % exact mean is the source posting and whose minimum is the wind floor.
+   support = result.filled.Properties.RowTimes >= gap_time ...
+      & result.filled.Properties.RowTimes < gap_time + hours(1);
+   quarter = result.filled.wspd(support);
+   codes = icemodel.forcing.reconstruct.provenanceCodes();
+   wind_bounds = icemodel.forcing.reconstruct.physicalBounds("wspd");
+   testCase.verifyEqual(nnz(support), 4);
+   testCase.verifyTrue(all(isfinite(quarter)));
+   testCase.verifyEqual(result.provenance.wspd(support), ...
+      repmat(codes.mar, 4, 1));
+   testCase.verifyGreaterThan(numel(unique(quarter)), 1);
+   testCase.verifyEqual(mean(quarter), 0.12, 'AbsTol', 1e-9);
+   testCase.verifyEqual(min(quarter), wind_bounds(1), 'AbsTol', 1e-12);
+   testCase.verifyTrue(all(quarter >= wind_bounds(1) ...
+      & quarter <= wind_bounds(2)));
+
+   % The transaction's own ledger and manifest let this focused producer
+   % fixture exercise the runtime gate without duplicating runtime scaffolding.
+   runtime_opts = struct('forcings', "promice_filled", ...
+      'sitename', site, 'dt', 900, 'metfname', result.met_file, ...
+      'readiness_file', fullfile(qa_dir, 'ledger', ...
+      'wind-readiness.csv'), ...
+      'report_inputs_file', fullfile(qa_dir, 'plans', ...
+      'wind-report-inputs.json'), 'simyears', year(gap_time), ...
+      'startdate', gap_time, 'enddate', gap_time, ...
+      'calendar_type', 'gregorian', 'smbmodel', 'icemodel');
+   verified = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(runtime_opts);
+   testCase.verifyTrue(verified.promice_filled_readiness_verified);
+
+   % Re-pin the deliberate corruption so identity verification succeeds and
+   % the rejection is specifically about scalar coverage at runtime.
+   S = load(result.met_file, 'met');
+   met = S.met;
+   zero_sample = find(met.Properties.RowTimes == gap_time, 1);
+   met.wspd(zero_sample) = 0;
+   save(result.met_file, 'met');
+   refreshReportInputArtifact(runtime_opts.report_inputs_file, ...
+      "filled", root);
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(runtime_opts), ...
+      'icemodel:loadmet:promiceFilledWindowUncovered');
+end
+
+function test_producer_readiness_rejects_zero_wind(testCase)
+   % A finite zero is not a missing value, but it is below the forcing
+   % rule. Producer readiness must identify the wind channel and refuse
+   % publication instead of allowing a zero-wind filled artifact downstream.
+   root = testCase.TestData.root;
+   site = "calm";
+   writeFixtureStation(root, site, 0, 0, false);
+   filename = fullfile(root, 'met', 'promice', ...
+      'met_calm_promice_20200101_20211231_15m.mat');
+   S = load(filename, 'met');
+   met = S.met;
+   posting_start = met.Properties.RowTimes(397);
+   support = met.Properties.RowTimes >= posting_start ...
+      & met.Properties.RowTimes < posting_start + hours(1);
+   met.wspd(support) = 0;
+   % Supply a complete zero-precipitation split so wind is the only
+   % readiness failure in the candidate product.
+   met.ppt(:) = 0;
+   met.rainf(:) = 0;
+   met.snowf(:) = 0;
+   save(filename, 'met');
+   recordNativeMetIdentity(root, site, filename);
+   opts = icemodel.forcing.reconstruct.setopts( ...
+      required_channels="wspd", core_channels="wspd", ...
+      plan_channels="wspd", interp_channels="wspd", ...
+      last_resort_proxies=false, plan_n_gaps=1, seed=4);
+
+   % write=false exposes the diagnostic ledger; write=true must enforce it.
+   fill_args = {site, 'met_dir', fullfile(root, 'met', 'promice'), ...
+      'out_dir', fullfile(root, 'met', 'promice_filled'), ...
+      'qa_dir', fullfile(root, 'qa-calm'), ...
+      'donor_sites', string.empty(1, 0), 'use_ktransect', false, ...
+      'use_gcnet', false, 'opts', opts};
+   result = icemodel.forcing.reconstruct.fillPromiceStation( ...
+      fill_args{:}, write=false);
+   affected = result.readiness.year == year(posting_start);
+   testCase.verifyEqual(nnz(affected), 1);
+   testCase.verifyEqual(string( ...
+      result.readiness.verdict_icemodel(affected)), "not_forcing_ready");
+   testCase.verifyThat(string(result.readiness.reason_icemodel(affected)), ...
+      matlab.unittest.constraints.ContainsSubstring("wspd"));
+   testCase.verifyGreaterThan( ...
+      result.readiness.worst_residual_invalid(affected), 0);
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.fillPromiceStation(fill_args{:}), ...
+      'icemodel:reconstruct:fillPromiceStation:notForcingReady');
 end
 
 function test_fill_station_retries_swd_on_delivered_axis(testCase)
@@ -4066,7 +4277,7 @@ function test_shell_quote_preserves_literal_metacharacters(testCase)
    % process as one literal argument without expansion.
    value = "path with ' quote;$(printf injected);`printf bad`";
    command = "printf %s " + ...
-      icemodel.verification.helpers.shellQuote(value);
+      icemodel.shellQuote(value);
 
    [status, returned] = system(command);
 

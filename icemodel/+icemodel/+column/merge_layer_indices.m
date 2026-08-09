@@ -5,9 +5,12 @@ function [j1, j2] = merge_layer_indices(ji, f_ice)
 
    j1 = ji; % first layer to merge
 
-   % Combine the top layer with the bottom layer
+   % The top and bottom boundaries have only one eligible neighbor.
    if j1 == 1
       j2 = j1 + 1;
+
+   elseif j1 == numel(f_ice)
+      j2 = j1 - 1;
 
       % Combine any other layer with its thinnest neighbor that is > 0
    else

@@ -5,9 +5,10 @@ Purpose: generic math algorithms shared across model domains.
 Current contents:
 - `trisolve`
 - `aitkenscalar`
+- `secantscalar`
 - `fsearchzero`
 - `complexstep`
-- `complex_step_derivative`
+- `complexstep_derivative`
 - `sign_or_one`
 
 Rules:

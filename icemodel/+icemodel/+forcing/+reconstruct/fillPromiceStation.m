@@ -101,6 +101,19 @@ function result = fillPromiceStation(site, kwargs)
    modis_dir = defaultPath(kwargs.modis_dir, repo, ...
       fullfile('data', 'input', 'userdata', 'modis'));
 
+   % Reject protected destinations before any failure path can retire stale
+   % artifacts or any producer path can create directories. Protect both the
+   % data tree selected by met_dir and the active configured evaluation root.
+   if kwargs.write
+      data_root = ...
+         icemodel.forcing.reconstruct.selectedDataRoot(string(met_dir));
+      cfg = icemodel.config('getenv', true);
+      evaluation_roots = [string(fullfile(data_root, 'eval')); ...
+         string(cfg.ICEMODEL_EVAL_PATH)];
+      icemodel.forcing.reconstruct.assertNotEvaluationDestination( ...
+         [string(out_dir); string(qa_dir)], evaluation_roots);
+   end
+
    % Target: staged native met plus its point from the artifact metadata.
    % The winter-albedo mask marks the native builder's constant stamp as
    % missing so methods fill those samples with honest provenance.
@@ -1277,7 +1290,7 @@ function [observed, raw_albedo, resolved, swd_darkness, native_provenance] = ...
          ['staged %s shortwave records source selection but its raw source ' ...
          'file is unavailable: %s'], site, source_file)
    end
-   if ~icemodel.internal.isPathInside(source_file, data_root)
+   if ~icemodel.isPathInside(source_file, data_root)
       if legacy_albedo
          error( ...
             'icemodel:reconstruct:fillPromiceStation:albedoSourceOutsideRoot', ...
@@ -1408,7 +1421,7 @@ function source_file = resolveSourceFile(source_file, data_root)
    if source_file == ""
       return
    end
-   if isfile(source_file) && icemodel.internal.isPathInside(source_file, data_root)
+   if isfile(source_file) && icemodel.isPathInside(source_file, data_root)
       return
    end
 
@@ -1417,7 +1430,7 @@ function source_file = resolveSourceFile(source_file, data_root)
    recorded = java.io.File(char(source_file));
    if ~recorded.isAbsolute()
       candidate = string(fullfile(data_root, source_file));
-      if isfile(candidate) && icemodel.internal.isPathInside(candidate, data_root)
+      if isfile(candidate) && icemodel.isPathInside(candidate, data_root)
          source_file = candidate;
          return
       end
@@ -1636,7 +1649,7 @@ function donors = assembleDonors(site, met_dir, kwargs)
              leg = entry.colocation.ktransect;
              evaluation_file = fullfile(kt_root, ...
                 leg.evaluation_file);
-             if ~icemodel.internal.isPathInside(evaluation_file, kt_root)
+             if ~icemodel.isPathInside(evaluation_file, kt_root)
                 error(['icemodel:reconstruct:fillPromiceStation:' ...
                    'ktransectPathOutsideRoot'], ...
                    'K-transect donor path escapes the selected root: %s', ...
@@ -2616,9 +2629,8 @@ function met_file = writeArtifacts(site, filled, provenance, audit, ...
      ud.gapfill_product = char(family + "_filled");
      ud.gapfill_channels = string({plan.channels.channel});
      ud.gapfill_engine_version = string(icemodel.internal.version());
-    policy_file = fullfile(fileparts(mfilename('fullpath')), 'POLICY.md');
     ud.gapfill_policy_sha256 = ...
-       icemodel.verification.setup.fileSha256(policy_file);
+       icemodel.forcing.reconstruct.policySha256();
     ud.gapfill_donors = donor_sites(:).';
     met.Properties.UserData = ud;
 
@@ -2679,7 +2691,7 @@ function met_file = writeArtifacts(site, filled, provenance, audit, ...
     [data_root, ~] = ...
        icemodel.forcing.reconstruct.selectedDataRoot(string(out_dir));
     for k = 1:numel(final_files)
-       if ~icemodel.internal.isPathInside(final_files(k), data_root)
+       if ~icemodel.isPathInside(final_files(k), data_root)
           error('icemodel:reconstruct:fillPromiceStation:artifactOutsideRoot', ...
              'report input must stay inside selected data root %s: %s', ...
              data_root, final_files(k));

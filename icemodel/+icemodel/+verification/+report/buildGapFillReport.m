@@ -2689,7 +2689,7 @@ end
 function [pdf_file, html_file] = renderQmd(qmd_file)
    %RENDERQMD Render PDF and HTML report formats beside the preview tree.
    [status, output] = system("quarto render " + ...
-      icemodel.verification.helpers.shellQuote(qmd_file) + " --to all");
+      icemodel.shellQuote(qmd_file) + " --to all");
    if status ~= 0
       error('icemodel:report:buildGapFillReport:renderFailed', ...
          'quarto render failed: %s', output);
@@ -2732,7 +2732,7 @@ function inputs = verifySiteInputs(site, qa_dir, filled_dir)
             '%s report-input path must be relative: %s', site, relative);
       end
       pathname = string(fullfile(data_root, relative));
-      if ~icemodel.internal.isPathInside(pathname, data_root)
+      if ~icemodel.isPathInside(pathname, data_root)
          error('icemodel:report:buildGapFillReport:inputPathOutsideRoot', ...
             '%s report-input path escapes selected root %s: %s', ...
             site, data_root, relative);
@@ -2751,7 +2751,7 @@ function inputs = verifySiteInputs(site, qa_dir, filled_dir)
                 'icemodel:report:buildGapFillReport:inputIdentityMismatch', ...
                 'unknown %s report-input role for %s', role, site);
        end
-      if ~icemodel.internal.isPathInside(pathname, allowed_root)
+      if ~icemodel.isPathInside(pathname, allowed_root)
          error('icemodel:report:buildGapFillReport:inputPathOutsideRoot', ...
             '%s %s artifact is outside selected root %s: %s', ...
             site, role, allowed_root, pathname);

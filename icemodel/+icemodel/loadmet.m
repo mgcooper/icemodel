@@ -22,13 +22,16 @@ function [met, opts] = loadmet(opts, fileiter) %#codegen
    % generated callers must pass an options struct prevalidated by the same
    % public verifier.
    if coder.target('MATLAB')
-      opts = icemodel.verifyPromiceFilledReadiness(opts, fileiter);
+      opts = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness( ...
+         opts, fileiter);
    elseif strcmpi(string(opts.forcings), "promice_filled") ...
-         && ~icemodel.promiceFilledVerificationMatches(opts, fileiter)
+         && ~icemodel.forcing.reconstruct.promiceFilledVerificationMatches( ...
+            opts, fileiter)
       error('icemodel:loadmet:promiceFilledNotReady', ...
-         ['generated promice_filled loading requires a prevalidated ' ...
-         'readiness verdict for the exact station, requested window, ' ...
-         'calendar, model, timestep, years, and met files']);
+         ['generated promice_filled loading requires prevalidated ' ...
+         'readiness, manifest, and canonical artifact provenance for the ' ...
+         'exact station, requested window, calendar, model, timestep, ' ...
+         'years, and met files']);
    end
 
    % Load and post-process each requested file before concatenation so yearly
@@ -222,7 +225,8 @@ function met = loadOneMetFile(opts, fileiter)
             'label %s: %s'], forcing, filename);
       end
       if forcing == "promice_filled"
-         validatePromiceFilledArtifact(filename, met, opts.sitename)
+         icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
+            filename, met, opts.sitename)
       end
    end
 
@@ -232,94 +236,13 @@ function met = loadOneMetFile(opts, fileiter)
    end
 end
 
-function validatePromiceFilledArtifact(filename, met, site)
-   %VALIDATEPROMICEFILLEDARTIFACT Prove runtime product and station identity.
-   [~, name, extension] = fileparts(string(filename));
-   site = lower(string(site));
-   filename_ok = startsWith(lower(string(name)), ...
-      "met_" + site + "_promice_filled_") ...
-      && endsWith(lower(string(name)), "_15m") ...
-      && lower(string(extension)) == ".mat";
-
-   % The filled producer stamps both identities inside the artifact; neither
-   % a readiness ledger nor a caller-supplied path can substitute for them.
-    metadata = met.Properties.UserData;
-    identity_fields = ["gapfill_product", "gapfill_engine_version", ...
-       "gapfill_policy_sha256", "gapfill_donors", "gapfill_channels"];
-    planned_channels = strings(0, 0);
-    if isstruct(metadata) && isfield(metadata, 'gapfill_channels')
-       planned_channels = string(metadata.gapfill_channels);
-    end
-    product_ok = isstruct(metadata) ...
-       && all(isfield(metadata, identity_fields)) ...
-      && isscalar(string(metadata.gapfill_product)) ...
-      && string(metadata.gapfill_product) == "promice_filled" ...
-      && isscalar(string(metadata.gapfill_engine_version)) ...
-      && strlength(string(metadata.gapfill_engine_version)) > 0 ...
-       && isscalar(string(metadata.gapfill_policy_sha256)) ...
-       && ~isempty(regexp(char(string(metadata.gapfill_policy_sha256)), ...
-       '^[0-9a-f]{64}$', 'once')) ...
-       && isrow(planned_channels) ...
-       && all(strlength(planned_channels) > 0) ...
-       && numel(unique(planned_channels)) == numel(planned_channels);
-   site_ok = isstruct(metadata) && isfield(metadata, 'site') ...
-      && isscalar(string(metadata.site)) ...
-      && lower(string(metadata.site)) == site;
-    if ~(filename_ok && product_ok && site_ok)
-       error('icemodel:loadmet:promiceFilledIdentityMismatch', ...
-          'file is not the canonical promice_filled product for %s: %s', ...
-          site, filename);
-    end
-    if ~hasValidPromiceFilledProvenance(met, metadata)
-       error('icemodel:loadmet:promiceFilledProvenanceMismatch', ...
-          'file lacks complete canonical reconstruction provenance: %s', ...
-          filename);
-    end
-end
-
-function valid = hasValidPromiceFilledProvenance(met, metadata)
-    %HASVALIDPROMICEFILLEDPROVENANCE Verify registry and per-channel codes.
-    codes = icemodel.forcing.reconstruct.provenanceCodes();
-    variables = string(met.Properties.VariableNames);
-    channels = unique([string(metadata.gapfill_channels), ...
-       icemodel.forcing.reconstruct.icemodelRequiredChannels(), ...
-       icemodel.forcing.helpers.precipitationVariables()], 'stable');
-    if ismember("boom_height", variables)
-       channels(end + 1) = "boom_height";
-    end
-
-   % The embedded registry must be the canonical append-only registry.
-   valid = isstruct(metadata) && isfield(metadata, 'gapfill_registry') ...
-      && isequal(metadata.gapfill_registry, codes);
-   if ~valid
-      return
-   end
-
-   % Every product channel needs a uint8 code on every sample, with missing
-   % reserved exactly for nonfinite values.
-   allowed = struct2array(codes);
-   for channel = channels
-      provenance_name = channel + "_provenance";
-      if ~all(ismember([channel, provenance_name], variables))
-         valid = false;
-         return
-      end
-      values = met.(channel);
-      provenance = met.(provenance_name);
-      missing = ~isfinite(values);
-      if ~isa(provenance, 'uint8') ...
-            || any(~ismember(provenance, allowed)) ...
-            || any(provenance(missing) ~= codes.missing) ...
-            || any(provenance(~missing) == codes.missing)
-         valid = false;
-         return
-      end
-   end
-end
-
 %%
 function met = prepareMetData(met, opts)
    %PREPAREMETDATA remove leap inds, trim to simyears, check for bad data
+
+   % Normalize staged wall times before any calendar classification. This
+   % keeps year/leap filtering in the same UTC frame as readiness coverage.
+   met.Time.TimeZone = 'UTC';
 
    % remove leap inds if the met data is on a leap-year calendar
    if strcmp('noleap', opts.calendar_type)
@@ -329,8 +252,6 @@ function met = prepareMetData(met, opts)
 
    % subset the met file to the requested simyears
    met = met(ismember(year(met.Time), opts.simyears), :);
-
-   met.Time.TimeZone = 'UTC';
 
    % Optional explicit datetime-window override. When opts.startdate
    % and/or opts.enddate are set, narrow the met data to the

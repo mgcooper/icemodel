@@ -129,7 +129,7 @@ function result = packFixtures(version, kwargs)
       'version', version, ...
       'archives', archives, ...
       'files', selection.files);
-   writeJson(work_manifest_file, manifest);
+   writeManifestJson(work_manifest_file, manifest);
 
    % Promote the complete artifact set as one rollback-protected transaction.
    promoteArtifacts([work_archive_files; work_manifest_file], outputs, ...
@@ -397,12 +397,14 @@ function createArchive(archive_file, paths, root)
       members = [ancestorDirectories(paths); paths];
       quoted_members = strings(numel(members), 1);
       for k = 1:numel(members)
-         quoted_members(k) = shellQuote(members(k));
+         quoted_members(k) = ...
+            icemodel.shellQuote(members(k));
       end
       command = "COPYFILE_DISABLE=1 /usr/bin/tar --format ustar " ...
          + "--uid 0 --gid 0 --uname root --gname root " ...
          + "--no-recursion --options gzip:!timestamp -czf " ...
-         + shellQuote(archive_file) + " -C " + shellQuote(root) + " -- " ...
+         + icemodel.shellQuote(archive_file) ...
+         + " -C " + icemodel.shellQuote(root) + " -- " ...
          + strjoin(quoted_members, " ");
       [status, message] = system(char(command));
       if status ~= 0
@@ -431,12 +433,6 @@ function directories = ancestorDirectories(files)
    directories = unique(directories);
 end
 
-function quoted = shellQuote(pathname)
-   %SHELLQUOTE Quote one path for the fixed native macOS tar command.
-   quote = char(39);
-   escaped = strrep(char(pathname), quote, [quote '"' quote '"' quote]);
-   quoted = string([quote escaped quote]);
-end
 
 function pathname = underRoot(root, relpath)
    %UNDERROOT Convert a validated relative POSIX path to a local path.
@@ -444,18 +440,17 @@ function pathname = underRoot(root, relpath)
    pathname = string(fullfile(root, parts{:}));
 end
 
-function writeJson(pathname, data)
-   %WRITEJSON Write deterministic pretty JSON with array shape preserved.
+function writeManifestJson(pathname, data)
+   %WRITEMANIFESTJSON Write the release-data manifest.
+   %
+   % Only the array reshaping is specific to this manifest: cell-wrapping
+   % keeps single-element archive and file lists encoded as JSON arrays rather
+   % than collapsing to scalars. The write itself is the shared writer.
+
    payload = data;
    payload.archives = num2cell(payload.archives);
    payload.files = num2cell(payload.files);
-   fid = fopen(pathname, 'w');
-   if fid < 0
-      error('icemodel:verification:packFixtures:cannotWrite', ...
-         'Cannot write release-data manifest: %s', pathname)
-   end
-   cleaner = onCleanup(@() fclose(fid));
-   fwrite(fid, jsonencode(payload, PrettyPrint=true), 'char');
+   icemodel.verification.setup.writeJson(pathname, payload);
 end
 
 function reportSaving(result)

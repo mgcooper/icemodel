@@ -6,7 +6,8 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
    % f_liq     = fraction of liquid water by volume in each control volume
    % d_rof     = condensation which exceeds control volume available porosity
    % d_pevp    = potential vapor-driven change in top-layer liquid fraction
-   % d_sbl_err = vapor-driven ice change which exceeds control-volume limits
+   % d_sbl_err = vapor-driven ice change which exceeds control-volume limits;
+   %             positive is rejected deposition, negative is unsatisfied subl
    % f_ice_min = minimum retained surface ice fraction before remeshing
    % f_res_por = residual liquid-water fraction per pore volume [-]
    %
@@ -48,9 +49,9 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
    % Initialize potential deposition that cannot be satisfied by the cv budget.
    d_sbl_err = 0;
 
-   % If a liquid film is present, partition vapor exchange through the liquid
-   % reservoir first. Otherwise route it directly to the ice phase so dry/cold
-   % deposition forms ice rather than spurious liquid water.
+   % If a liquid film is present, partition liquid vapor exchange first.
+   % Otherwise route the exchange straight to the ice phase, so dry or cold
+   % deposition forms ice instead of liquid water that is not there.
    if wetflag
 
       if d_pevp < 0 % evaporation
@@ -101,8 +102,10 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
 
             f_liq = f_liq + d_aevp;
 
-            % Update d_pevp. This is "extra" condensation that converts to
-            % runoff. In practice this never occurs hence debug is disabled.
+            % Condensation beyond what the top cell's pore space can hold. The
+            % excess cannot be stored, so it leaves as runoff (d_rof sends it
+            % to diagnose_column_runoff). The excess is real water, so
+            % dropping it would break the budget.
             d_pevp = d_pevp - d_aevp_max;
             d_rof = d_rof + d_pevp;
 
@@ -119,7 +122,7 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
    end
 
    if debug == true && d_sbl_err > 0
-      fprintf('unsatisfied sublimation: %.6f\n', d_sbl_err)
+      fprintf('rejected deposition: %.6f\n', d_sbl_err)
    end
 end
 

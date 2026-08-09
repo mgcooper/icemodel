@@ -27,7 +27,7 @@ function [Data, metadata] = buildImauHourlyData(station, kwargs)
    % Reject malformed public windows before resolving or reading any source file.
    % The shared mask validates again defensively when it applies the bounds.
    [window_start, window_end] = ...
-      icemodel.internal.pairedWindow(kwargs.startdate, kwargs.enddate);
+      icemodel.pairedWindow(kwargs.startdate, kwargs.enddate);
 
    station = canonicalStation(station);
    source_dir = icemodel.forcing.helpers.verificationSourceDir( ...

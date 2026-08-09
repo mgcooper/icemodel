@@ -143,6 +143,23 @@ function test_split_manifest_persists_and_wins(testCase)
       'icemodel:reconstruct:validationSplit:stationMismatch');
 end
 
+function test_split_manifest_cannot_write_into_evaluation_root(testCase)
+   % The public persistence seam must fail before creating an eval artifact.
+   eval_root = fullfile(testCase.TestData.tmp, 'eval');
+   manifest_file = fullfile(eval_root, 'splits', 'kanm.json');
+   old_eval = getenv('ICEMODEL_EVAL_PATH');
+   cleanup = onCleanup(@() setenv('ICEMODEL_EVAL_PATH', old_eval));
+   setenv('ICEMODEL_EVAL_PATH', eval_root);
+
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.validationSplit(2009:2023, ...
+      station="kanm", seed=1, manifest_file=manifest_file), ...
+      ['icemodel:reconstruct:' ...
+      'assertNotEvaluationDestination:protectedPath']);
+   testCase.verifyFalse(isfile(manifest_file));
+   clear cleanup
+end
+
 function test_split_manifest_rejects_overlap_and_stale_years(testCase)
    % A persisted replay may win over a new seed, but it cannot overlap its
    % protocol sets or reference a year outside the current station record.
@@ -755,6 +772,11 @@ function test_physical_bounds_registry(testCase)
    % Known channels return [lower upper]; unknown channels fail loudly.
    returned = icemodel.forcing.reconstruct.physicalBounds("tair");
    testCase.verifyEqual(returned, [193, 300]);
+   testCase.verifyEqual( ...
+      icemodel.forcing.reconstruct.physicalBounds("wspd"), [0.1, 60]);
+   policy_file = fullfile(fileparts(which( ...
+      'icemodel.forcing.reconstruct.physicalBounds')), 'POLICY.md');
+   testCase.verifySubstring(fileread(policy_file), 'wspd [0.1, 60]');
    testCase.verifyError(@() ...
       icemodel.forcing.reconstruct.physicalBounds("nope"), ...
       'icemodel:reconstruct:physicalBounds:unknownChannel');
@@ -769,6 +791,9 @@ function test_scalar_validity_uses_physical_bounds(testCase)
    swd = icemodel.forcing.reconstruct.scalarValidity( ...
       "swd", [0; 500; Inf; -1]);
    testCase.verifyEqual(swd, [true; true; false; false]);
+   wspd = icemodel.forcing.reconstruct.scalarValidity( ...
+      "wspd", [0; 0.099; 0.1; 5; 60; 60.1]);
+   testCase.verifyEqual(wspd, [false; false; true; true; true; false]);
 end
 
 function test_solar_elevation_bands_contract(testCase)

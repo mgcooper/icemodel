@@ -68,14 +68,21 @@ function calibration = fitProxyCalibration(times, x_obs, x_model, channel, kwarg
    multiplicative = ismember(channel, ["swd", "swu", "wspd"]);
    in_years = ismember(year(times), kwargs.fit_years);
    overlap = in_years & isfinite(x_obs) & isfinite(x_model);
+   if multiplicative
+      % A multiplicative correction divides by the model value, so a zero or
+      % negative denominator cannot contribute a finite ratio. Screening every
+      % multiplicative channel, not only shortwave, keeps n_overlap honest:
+      % a pair that cannot produce a finite ratio must not be counted as
+      % usable overlap, or the fit advertises support it does not have.
+      overlap = overlap & x_model > 0;
+   end
    if ismember(channel, ["swd", "swu"])
       if numel(kwargs.target_toa) ~= numel(times)
          error('icemodel:reconstruct:fitProxyCalibration:targetToaRequired', ...
             ['target_toa must contain one target-station irradiance ' ...
             'value per time for shortwave calibration']);
       end
-      overlap = overlap & kwargs.target_toa >= kwargs.min_light_wm2 ...
-         & x_model > 0;
+      overlap = overlap & kwargs.target_toa >= kwargs.min_light_wm2;
    end
 
    season = icemodel.forcing.reconstruct.seasonOf(times);
@@ -170,5 +177,13 @@ function value = oneCorrection(obs, model, multiplicative)
       value = median(obs ./ model, 'omitnan');
    else
       value = median(obs - model, 'omitnan');
+   end
+
+   % The denominator screen above should make this unreachable, but a stored
+   % or malformed record must never propagate a nonfinite correction into a
+   % candidate. Falling back to the identity keeps the estimate equal to the
+   % proxy rather than turning finite input into Inf or NaN.
+   if ~isfinite(value)
+      value = identityCorrection(multiplicative);
    end
 end

@@ -327,9 +327,9 @@ function [row, aligned] = compareOneRetmipProtocolVariable(targets, ...
       return
    end
 
-   delta = candidate - target;
-   row.bias = mean(delta);
-   row.rmse = sqrt(mean(delta .^ 2));
+   metrics = icemodel.verification.helpers.residualMetrics(candidate, target);
+   row.bias = metrics.bias;
+   row.rmse = metrics.rmse;
    if numel(target) > 1 && std(target) > 0 && std(candidate) > 0
       C = corrcoef(target, candidate);
       row.correlation = C(1, 2);
@@ -510,9 +510,10 @@ function [row, sync_tt] = compareOneVariable(target_tt, candidate_tt, ...
 
    % Core all-case metrics: bias, RMSE, optional correlation, peak amplitude,
    % and peak timing.
-   delta = sync_tt.candidate - sync_tt.target;
-   row.bias = mean(delta);
-   row.rmse = sqrt(mean(delta .^ 2));
+   metrics = icemodel.verification.helpers.residualMetrics( ...
+      sync_tt.candidate, sync_tt.target);
+   row.bias = metrics.bias;
+   row.rmse = metrics.rmse;
    if height(sync_tt) > 1 && std(sync_tt.target) > 0 && std(sync_tt.candidate) > 0
       C = corrcoef(sync_tt.target, sync_tt.candidate);
       row.correlation = C(1, 2);

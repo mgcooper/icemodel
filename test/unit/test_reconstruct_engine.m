@@ -1117,6 +1117,79 @@ function test_proxy_recovers_additive_bias(testCase)
    testCase.verifyEqual(returned, obs, 'AbsTol', 1e-12);
 end
 
+function test_proxy_zero_denominator_never_counts_as_overlap(testCase)
+   % A multiplicative correction divides by the model value, so a zero
+   % denominator cannot produce a finite ratio and must not be counted as
+   % usable overlap. Counting it would let a fit advertise support it lacks
+   % and hand a nonfinite correction to every downstream consumer.
+   series = icemodel.test.fixtures.makeReconstructSeries();
+   times = series.Properties.RowTimes;
+   model = 5 * ones(numel(times), 1);
+   obs = 2 * model;
+
+   % Mixed denominators: half the record is unusable, the rest is a clean 2x.
+   model(1:2:end) = 0;
+   calibration = icemodel.forcing.reconstruct.fitProxyCalibration( ...
+      times, obs, model, "wspd", fit_years=year(times(1)));
+
+   testCase.verifyEqual(calibration.n_overlap, nnz(model > 0));
+   testCase.verifyTrue(isfinite(calibration.corrections.JJA));
+   testCase.verifyEqual(calibration.corrections.JJA, 2, 'AbsTol', 1e-12);
+
+   % An all-zero denominator leaves no usable overlap at all, so the record
+   % must be the recorded identity rather than a nonfinite correction.
+   calibration_none = icemodel.forcing.reconstruct.fitProxyCalibration( ...
+      times, obs, zeros(numel(times), 1), "wspd", ...
+      fit_years=year(times(1)));
+   testCase.verifyEqual(calibration_none.n_overlap, 0);
+   testCase.verifyTrue(calibration_none.identity);
+   testCase.verifyEqual(calibration_none.corrections.JJA, 1, 'AbsTol', 0);
+end
+
+function test_proxy_zero_observed_wind_stays_finite(testCase)
+   % A zero observed value is a legitimate numerator, so it must still yield a
+   % finite ratio rather than being confused with a zero denominator.
+   series = icemodel.test.fixtures.makeReconstructSeries();
+   times = series.Properties.RowTimes;
+   model = 4 * ones(numel(times), 1);
+   obs = zeros(numel(times), 1);
+
+   calibration = icemodel.forcing.reconstruct.fitProxyCalibration( ...
+      times, obs, model, "wspd", fit_years=year(times(1)));
+
+   testCase.verifyEqual(calibration.n_overlap, numel(times));
+   testCase.verifyEqual(calibration.corrections.JJA, 0, 'AbsTol', 1e-12);
+
+   % The calibrated estimate is finite and the shared bounds clamp it onto the
+   % runtime wind floor rather than emitting a zero the solver cannot use.
+   [returned, clamped] = icemodel.forcing.reconstruct.applyProxyCalibration( ...
+      calibration, times, model);
+   testCase.verifyTrue(all(isfinite(returned)));
+   testCase.verifyTrue(all(clamped));
+   bounds = icemodel.forcing.reconstruct.physicalBounds("wspd");
+   testCase.verifyEqual(returned, bounds(1) * ones(size(returned)), ...
+      'AbsTol', 1e-12);
+end
+
+function test_proxy_nonfinite_stored_correction_cannot_reach_output(testCase)
+   % A malformed persisted record must not turn finite proxy input into Inf.
+   % Leaving those samples missing makes the denial name the real cause.
+   series = icemodel.test.fixtures.makeReconstructSeries();
+   times = series.Properties.RowTimes;
+   model = 5 * ones(numel(times), 1);
+
+   calibration = icemodel.forcing.reconstruct.fitProxyCalibration( ...
+      times, 2 * model, model, "wspd", fit_years=year(times(1)));
+   for name = ["DJF", "MAM", "JJA", "SON"]
+      calibration.corrections.(char(name)) = Inf;
+   end
+
+   returned = icemodel.forcing.reconstruct.applyProxyCalibration( ...
+      calibration, times, model);
+   testCase.verifyTrue(all(isnan(returned)));
+   testCase.verifyFalse(any(isinf(returned)));
+end
+
 function test_proxy_multiplicative_swd_ratio(testCase)
    % Shortwave calibrates by ratio only where target TOA is meaningful,
    % regardless of a bright proxy during target-station darkness.
@@ -1153,8 +1226,9 @@ function test_proxy_multiplicative_swd_ratio(testCase)
 end
 
 function test_proxy_multiplicative_wind_preserves_support(testCase)
-   % Wind speed scales by a positive overlap ratio instead of subtracting
-   % an additive bias that can turn physically valid low winds negative.
+   % Wind speed scales by a positive overlap ratio, but any calibrated calm
+   % sample below the forcing floor clamps once at the shared calibration
+   % boundary and reports that adjustment.
    series = icemodel.test.fixtures.makeReconstructSeries();
    times = series.Properties.RowTimes;
    model = linspace(0.1, 10, height(series)).';
@@ -1162,12 +1236,16 @@ function test_proxy_multiplicative_wind_preserves_support(testCase)
 
    calibration = icemodel.forcing.reconstruct.fitProxyCalibration( ...
       times, obs, model, "wspd", fit_years=2020);
-   returned = icemodel.forcing.reconstruct.applyProxyCalibration( ...
+   [returned, clamped] = ...
+      icemodel.forcing.reconstruct.applyProxyCalibration( ...
       calibration, times, model);
 
    testCase.verifyEqual(calibration.mode, "multiplicative");
-   testCase.verifyEqual(returned, obs, 'AbsTol', 1e-12);
-   testCase.verifyGreaterThanOrEqual(min(returned), 0);
+   wind_bounds = icemodel.forcing.reconstruct.physicalBounds("wspd");
+   expected = min(max(obs, wind_bounds(1)), wind_bounds(2));
+   testCase.verifyEqual(returned, expected, 'AbsTol', 1e-12);
+   testCase.verifyEqual(clamped, obs < wind_bounds(1));
+   testCase.verifyGreaterThanOrEqual(min(returned), wind_bounds(1));
 end
 
 function test_proxy_seasonal_fallback_to_annual(testCase)

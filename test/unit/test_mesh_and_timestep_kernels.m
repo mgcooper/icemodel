@@ -46,6 +46,21 @@ function test_layerinds_selects_expected_merge_neighbors(testCase)
    testCase.verifyEqual(j2_nonzero, 1);
 end
 
+function test_layerinds_merges_the_bottom_layer_upward(testCase)
+   % The bottom layer has no layer below it, so it must merge with the one
+   % above. Without this branch the interior path reads f_ice(j1 + 1) past the
+   % end of the column.
+
+   [j1, j2] = icemodel.column.merge_layer_indices(3, [0.4; 0.3; 0.0]);
+   testCase.verifyEqual([j1 j2], [3 2]);
+
+   % A nonzero bottom layer takes the same path, since the choice is forced by
+   % the boundary rather than by the neighbour thicknesses.
+   [j1_solid, j2_solid] = ...
+      icemodel.column.merge_layer_indices(3, [0.4; 0.3; 0.2]);
+   testCase.verifyEqual([j1_solid j2_solid], [3 2]);
+end
+
 function test_trisolve_matches_backslash(testCase)
    % The tridiagonal solver should reproduce MATLAB's dense solve on a
    % compact reference system.
@@ -230,7 +245,7 @@ function test_checksubstep_debug_dump_records_force_advance_context(testCase)
    % triggered force advance and the projected cross-timestep streak.
 
    debug_file = [tempname '.mat'];
-   cleanup = onCleanup(@() cleanupDebugFile(debug_file)); %#ok<NASGU>
+   cleanup = onCleanup(@() cleanupDebugFile(debug_file));
    setenv('ICEMODEL_DEBUG_MAXSUBSTEP_FILE', debug_file);
 
    icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
@@ -274,4 +289,31 @@ function cleanupDebugFile(debug_file)
    if exist(debug_file, 'file') == 2
       delete(debug_file);
    end
+end
+
+function test_bottom_layer_merge_removes_it_and_conserves_mass(testCase)
+   % A deepest layer below f_ice_min must actually be removed. The clone that
+   % preserves column length is taken AFTER the deletion; taking it first
+   % copied the layer being removed back into the column, so the layer stayed
+   % while the one above it kept only half the pair's mass.
+
+   [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
+   dz = 0.04;
+   f_ice_min = 0.1;
+   T = [Tf - 1; Tf - 2; Tf - 3];
+   f_ice = [0.9; 0.8; 0.02];
+   f_liq = [0.01; 0.01; 0.0];
+   zeros_col = zeros(3, 1);
+
+   water_equivalent = @(fi, fl) sum(ro_ice / ro_liq * fi + fl) * dz;
+   expected = water_equivalent(f_ice, f_liq);
+
+   [~, returned_f_ice, returned_f_liq] = icemodel.column.merge_thin_layers( ...
+      T, f_ice, f_liq, zeros_col, zeros_col, dz, 0.0, zeros_col, f_ice_min);
+
+   testCase.verifyFalse(any(returned_f_ice < f_ice_min))
+   testCase.verifyEqual( ...
+      water_equivalent(returned_f_ice, returned_f_liq), expected, ...
+      AbsTol=1e-12)
+   testCase.verifyNumElements(returned_f_ice, 3)
 end

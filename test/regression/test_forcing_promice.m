@@ -98,7 +98,7 @@ end
 function test_promice_builders_enforce_paired_utc_window(testCase)
    % Both public products share one paired-window boundary through the reader.
    source_dir = testCase.TestData.source_dir;
-   error_id = 'icemodel:internal:pairedWindow:invalidWindow';
+   error_id = 'icemodel:pairedWindow:invalidWindow';
    missing_source = fullfile(source_dir, 'missing-window-precedence');
    testCase.verifyError(@() icemodel.forcing.buildPromiceMet("KAN_M", ...
       source_dir=missing_source, startdate="2015-06-01"), error_id);

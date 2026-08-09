@@ -513,7 +513,10 @@ end
 function output = runGit(project_dir, arguments)
    %RUNGIT Run one read-only Git query in the candidate project.
 
-   command = "git -C " + shellQuote(project_dir) + " " + arguments;
+   % --no-pager: a configured pager writes terminal escape codes into the
+   % captured output, and a non-empty result here reads as a dirty worktree.
+   command = "git --no-pager -C " + icemodel.shellQuote(project_dir) ...
+      + " " + arguments;
    [status, text] = system(command);
    if status ~= 0
       error('icemodel:internal:releaseMetadata:gitFailed', ...
@@ -525,7 +528,8 @@ end
 function validateCff(filename)
    %VALIDATECFF Run the repository's CFF schema validator.
 
-   command = "uvx cffconvert --validate --infile " + shellQuote(filename);
+   command = "uvx cffconvert --validate --infile " ...
+      + icemodel.shellQuote(filename);
    [status, text] = system(command);
    if status ~= 0
       error('icemodel:internal:releaseMetadata:cffInvalid', ...
@@ -616,21 +620,4 @@ function validateZenodoDoi(doi, field_name)
       error('icemodel:internal:releaseMetadata:doiInvalid', ...
          '%s is not a Zenodo DOI: %s', field_name, doi)
    end
-end
-
-function quoted = shellQuote(value)
-   %SHELLQUOTE Protect one path from the host command shell.
-
-   value = char(string(value));
-   if ispc
-      if contains(value, '%')
-         error('icemodel:internal:releaseMetadata:unsafeWindowsPath', ...
-            'Release command paths cannot contain %% on Windows')
-      end
-      quoted = string([char(34), value, char(34)]);
-      return
-   end
-   embedded_quote = char([39, 34, 39, 34, 39]);
-   value = strrep(value, char(39), embedded_quote);
-   quoted = string([char(39), value, char(39)]);
 end

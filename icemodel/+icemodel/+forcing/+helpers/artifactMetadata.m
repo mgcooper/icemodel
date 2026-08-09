@@ -22,11 +22,9 @@ function metadata = artifactMetadata(value)
 
    % Derive the actual saved cadence rather than trusting a filename or caller
    % marker. This top-level copy lets later reuse/prune checks remain source-light.
-   if istimetable(value) && height(value) >= 2
-      steps = seconds(diff(value.Time));
-      cadence = median(steps, 'omitnan');
-      if isfinite(cadence) && cadence > 0 ...
-            && all(isfinite(steps)) && all(abs(steps - cadence) < 1e-6)
+   if istimetable(value)
+      cadence = icemodel.forcing.helpers.uniformCadenceSeconds(value);
+      if isfinite(cadence)
          metadata.artifact_cadence_seconds = cadence;
       elseif isfield(metadata, 'artifact_cadence_seconds')
          metadata = rmfield(metadata, 'artifact_cadence_seconds');

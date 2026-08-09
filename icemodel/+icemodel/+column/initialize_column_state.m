@@ -11,6 +11,9 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
    %  (f_ell_min, f_ell_max, ro_iwe, …) are fetched from
    %  icemodel.physicalConstant / icemodel.parameterLookup where needed.
    %
+   %  opts.use_ro_glc changes only the densities used to construct initial
+   %  phase fractions. Solvers use persistent physical constants. See setopts.
+   %
    %#codegen
 
    debug = false;
@@ -94,11 +97,6 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
          ice2.(opts.vars2{n}) = nan(JJ, maxiter);
       end
    end
-
-   % diags.Tflag = false(maxiter,1);
-   % diags.LCflag = false(maxiter,1);
-   % A1 = ones(JJ_therm,1);
-   % A = spdiags([A1,A1,A1],-1:1,JJ_therm,JJ_therm);
 
    function plot_T_init(T, Z, Ta, Ts)
       figure; hold on

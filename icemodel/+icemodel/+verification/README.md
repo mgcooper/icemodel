@@ -30,6 +30,9 @@ Choose the layer that matches the task:
 | List or load staged cases | `listcases`, `loadmanifest` | No |
 | Audit staged artifacts | `auditArtifacts` | No, unless `report_dir` is set |
 | Compare or plot a case | `comparecase`, `plotcase` | Only when an output path is set |
+| Audit PROMICE ablation readiness | `setup.writePromiceAblationReadiness` | Yes, to the selected report directory |
+| Compare PROMICE cumulative ablation | `compareAblation` | No |
+| Render saved PROMICE ablation results | `report.buildAblationEvaluationReport` | Only generated report outputs |
 | Import or refresh a family | `icemodel.verification.setup.import*` | Yes |
 | Build the gap-fill report | `icemodel.verification.report.buildGapFillReport` | Only generated preview outputs |
 
@@ -39,6 +42,89 @@ create or replace MAT artifacts and manifests. Start with
 for staging, or
 [Produce a fresh PROMICE gap-fill report](#produce-a-fresh-promice-gap-fill-report)
 for the reconstruction/report sequence.
+
+## PROMICE ablation evaluation
+
+PROMICE ablation evaluation begins with a machine-readable readiness ledger,
+not a model run. The ledger independently records forcing, snow-input,
+evaluation-target, and candidate status for every canonical case-year and pins
+the exact `promice_filled` artifact used by admitted rows:
+
+```matlab
+readiness = ...
+   icemodel.verification.setup.writePromiceAblationReadiness( ...
+   evaluation_data_root=eval_root, input_data_root=input_root, ...
+   output_dir=report_dir);
+```
+
+`icemodel.verification.compareAblation` compares an admitted observation
+interval with diagnostic model output on exact common support. The formal
+budget quantity is cumulative net physical solid loss from the modeled phase
+and solid-vapor terms in metres water equivalent; it excludes remeshing and
+domain exchange. The seasonal diagnostic contract also retains legacy
+cumulative melt, the six-hour melt/refreeze runoff proxy, refreezing, and
+top-layer deletion. Observed surface lowering is reported as geometry and as a
+shaded 600--900 kg m^-3 sensitivity range with a solid 870 kg m^-3 reference
+line inside it; 600 kg m^-3 is not an intact glacier-ice density. The band and
+its reference come from `promiceAblationPolicy`, which records the supporting
+measurements. Numeric band edges are ordered pointwise because their density
+identity reverses for negative signed lowering. The sign of the
+model-observation difference reverses across the band, so the report states
+that these data do not determine whether the model over- or under-predicts.
+Top-layer deletion height is a secondary quantized geometry diagnostic;
+`dlayer` is not surface displacement.
+
+Cumulative merge export is retained in the mass ledger for closure checking but
+is neither scored nor plotted. A merge gives the joined cell the mean of the
+pair it replaces, so removing a nearly empty top cell still exports about half
+the pair's mass. Across the current cohort the series runs about 1.5 times melt,
+which measures the regridding rule rather than mass leaving the surface. Signed
+mass/energy ledgers and their
+non-cancelling gross channels remain separate so numerical closure cannot
+hide opposing remesh or domain exchanges.
+
+The orchestration entry point is
+`test/verification/run_promice_ablation_evaluation.m`. An empty `case_ids`
+selection writes readiness only; model execution requires explicit case ids or
+`"all"`. Every executed case uses `icemodel.test.helpers.runModelCase`, the
+same setup, solver, and postprocessing path used by formal regression. The
+runner preserves all admitted and excluded ledger rows and writes fixed
+30/60/90-day plus longest-window diagnostics when exact endpoints exist. It
+also predeclares start `+1/+3/+7` day and end `-1/-3/-7` day endpoint
+perturbations, retaining unavailable rows and reasons instead of shortening a
+requested window. Requesting `write_artifacts=true` without a case selection is
+an error: a readiness-only run would otherwise leave a populated run directory
+and a renderable report describing zero site-years.
+
+`icemodel.verification.ablationPerformanceMetrics` scores every diagnostic
+against the measured lowering, once per density in the policy band so the
+sensitivity is visible rather than hidden by one choice. Scores use per-step
+increments, and the report ranks diagnostics at the policy reference density.
+`icemodel.verification.observationRateOutliers` flags any site-year whose
+observed ablation rate falls far below the same station's own median. The
+readiness gates reject only flagged transitions and unresolved steps, so an
+unflagged compressed record passes admission and then reads as a model error.
+The flag is a visible caveat in `observation-rate-outliers.csv` and the
+report, and never an exclusion: dropping inconvenient observations would
+improve apparent model skill.
+
+Each production case initializes at the readiness row's requested calendar-year
+start and retains a compact June 1--October 1 seasonal payload. The selected
+comparison is the single longest interval in that season: snow up to 0.05 m may
+preserve continuity, but paired observation and model rows require finite snow
+depth at or below 0.01 m. Trace-snow and unknown-snow rows remain visible as
+censored gaps. The readiness hashes retain provenance for the full source
+artifacts. This is zero-spinup preconditioning and does not add production snow
+physics, so the scientific report must retain that limitation when interpreting
+thermal, liquid-storage, or refreezing behavior.
+
+`icemodel.verification.report.buildAblationEvaluationReport` is a pure consumer
+of the runner's saved `results.mat`. It does not reopen canonical observations,
+forcing, or model inputs. It exports compact scientific tables and figures,
+an inspectable QMD source, and an optional self-contained HTML report. The
+cross-site graphic contains only completed selected site-years; readiness,
+selection, exclusions, and model-run accounting remain concise appendix prose
+with linked CSV evidence rather than a cohort-count graphic.
 
 ## Normal Workflow
 
@@ -1327,6 +1413,21 @@ source rows and must not define a new on-disk contract.
   opts builder used by `runIcemodelSnowCandidate` is
   `icemodel.test.helpers.setModelOptsForCase`, which accepts both formal-case
   rows and verification manifests via input dispatch.
+- `helpers` also owns the small pieces more than one consumer needs, so they
+  cannot drift apart: `residualMetrics` (bias, MAE, RMSE, max error, and NSE
+  with one set of guards), `sampleQuantile`, `evaluationSeason` (the season
+  bounds readiness admits against and the runner evaluates against),
+  `ablationLedgerIncrements` (the per-interval solid-balance, surface-loss,
+  and solid-vapor-loss terms the comparator scores and the runner plots), and
+  `classifySnowDepth`.
+- `report` owns the pieces both report builders share: `markdownTable`,
+  `formatValue`, `markdownCode`, `escapeMarkdownText`, `sanitizeText`,
+  `safeLabel`, `formatReportAxes`, `configureCategoryAxis`, and
+  `exportAndClose`. Figures come from `icemodel.plot.newFigure` and spans from
+  `icemodel.plot.markTimeSpan`, so every report shares one export frame and
+  one span style.
+- `setup.writeJson` writes every readiness ledger, preview evidence, and QA
+  JSON, so they agree on UTF-8 and a trailing newline.
 - `setup` contains the consistently named family source catalogs listed above,
   their shared strict site-id selector (`selectSiteCatalogEntries`), and the
   canonical staged-case factories. RetMIP keeps alias-aware case selection in

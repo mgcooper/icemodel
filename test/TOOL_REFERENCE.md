@@ -127,9 +127,16 @@ Key options:
 - `simyear`
   - canonical retained output year
 - `baseline`
-  - usually `rolling`
+  - usually `rolling`; this selects the official `promice_filled` forcing
+  - explicit `v1.1` comparisons retain the frozen baseline's historical
+    station forcing (`kanm` or `kanl`)
+  - other release tags must have an explicitly registered forcing identity
 - `smoke_sites`, `full_sites`
   - advanced site overrides
+- `data_root`
+  - explicit test-data tree override and always authoritative
+  - blank uses the baseline registration's tree: verification data for
+    rolling, historical `test/data` for frozen v1.1
 
 Important runtime contract:
 
@@ -183,6 +190,8 @@ Important note:
 
 - the measured region in the formal perf class is the model call only
 - it does not include report formatting, baseline loading, or runner overhead
+- `data_root` has the same explicit-override and verification-default contract
+  as `run_regression_suite`
 - formal perf cases currently use the same canonical runtime contract as
   regression: for `simyear=2016`, the runtime contract is `[2015 2016]` with
   `n_spinup_years = 1`
@@ -200,6 +209,10 @@ Use when:
 - you want the top-level full refresh / pre-release workflow
 
 This is broader than the individual runners above.
+
+The bootstrap refreshes rolling baselines but preserves registered immutable
+releases whose forcing differs from rolling. Baseline cleanup never deletes
+release MAT files.
 
 ## Baseline Management
 
@@ -226,6 +239,10 @@ Notes:
 - writes baseline files
 - does not compare against an older baseline
 - rolling builds archive the previous managed baseline first
+- direct versioned builds never overwrite an existing release file
+- the build selector and case matrix share one forcing-identity contract;
+  rolling uses `promice_filled`, while registered releases retain their
+  historical identity
 - by default the rebuilt baselines use the formal 2-year contract:
   retained year plus one leading spinup year
 
@@ -250,6 +267,9 @@ Notes:
 
 - writes baseline files
 - also stores managed benchmark baselines in the same perf MAT file
+- the build selector and case matrix use the same explicit forcing-identity
+  contract as the regression builder
+- direct versioned builds never overwrite an existing release file
 - by default the rebuilt baselines use the formal 2-year contract:
   retained year plus one leading spinup year
 
@@ -268,6 +288,13 @@ Purpose:
 Use snapshots when:
 
 - you want an immutable release baseline
+- the target release file does not already exist
+- the source is an accepted current rolling baseline
+- the rolling source also records the forcing identity registered for the new tag
+
+Existing release files are never overwritten. A new tag must first register
+its forcing identity; the snapshot then copies only a compatible rolling
+baseline.
 
 ## Spectral / Postprocess Study Tools
 

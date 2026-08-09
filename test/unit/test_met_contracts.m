@@ -117,8 +117,9 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
        metadata = met.Properties.UserData;
        metadata.site = string(opts.sitename);
        metadata.gapfill_product = "promice_filled";
-       metadata.gapfill_engine_version = "test";
-        metadata.gapfill_policy_sha256 = string(repmat('a', 1, 64));
+       metadata.gapfill_engine_version = string(icemodel.internal.version());
+        metadata.gapfill_policy_sha256 = ...
+           icemodel.forcing.reconstruct.policySha256();
         metadata.gapfill_donors = string.empty(1, 0);
         metadata.gapfill_channels = defaults.plan_channels;
         metadata.gapfill_registry = codes;
@@ -134,6 +135,20 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
     writePromiceRuntimeManifest(opts);
    S = load(opts.metfname{1}, 'met');
    canonical_met = S.met;
+   met = canonical_met;
+    met.Properties.UserData.gapfill_policy_sha256 = ...
+       string(repmat('a', 1, 64));
+    save(opts.metfname{1}, 'met');
+    writePromiceRuntimeManifest(opts);
+   testCase.verifyError(@() icemodel.loadmet(opts), ...
+      'icemodel:loadmet:promiceFilledIdentityMismatch');
+   met = canonical_met;
+    met.Properties.UserData = rmfield( ...
+       met.Properties.UserData, 'gapfill_policy_sha256');
+    save(opts.metfname{1}, 'met');
+    writePromiceRuntimeManifest(opts);
+   testCase.verifyError(@() icemodel.loadmet(opts), ...
+      'icemodel:loadmet:promiceFilledIdentityMismatch');
    met = canonical_met;
     met.Properties.UserData.gapfill_product = "promice";
     save(opts.metfname{1}, 'met');
@@ -183,27 +198,30 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
     met = canonical_met;
     met.rainf(1) = met.ppt(1) + 1;
     met.snowf(1) = NaN;
+    met.snowf_provenance(1) = codes.missing;
     save(opts.metfname{1}, 'met');
     writePromiceRuntimeManifest(opts);
     testCase.verifyError(@() ...
-       icemodel.verifyPromiceFilledReadiness(snow_opts, []), ...
+       icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(snow_opts, []), ...
        'icemodel:loadmet:promiceFilledWindowUncovered');
     met = canonical_met;
     met.rainf(1) = NaN;
+    met.rainf_provenance(1) = codes.missing;
     met.snowf(1) = met.ppt(1) + 1;
     save(opts.metfname{1}, 'met');
     writePromiceRuntimeManifest(opts);
     testCase.verifyError(@() ...
-       icemodel.verifyPromiceFilledReadiness(snow_opts, []), ...
+       icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(snow_opts, []), ...
        'icemodel:loadmet:promiceFilledWindowUncovered');
     % A nonnegative partial split at or below total remains admissible.
     met = canonical_met;
     met.rainf(1) = 0.5 * met.ppt(1);
     met.snowf(1) = NaN;
+    met.snowf_provenance(1) = codes.missing;
     save(opts.metfname{1}, 'met');
     writePromiceRuntimeManifest(opts);
     testCase.verifyWarningFree(@() ...
-       icemodel.verifyPromiceFilledReadiness(snow_opts, []));
+       icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(snow_opts, []));
     met = canonical_met;
     save(opts.metfname{1}, 'met');
     writePromiceRuntimeManifest(opts);
@@ -292,7 +310,7 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
        opts_out.smbmodel);
     testCase.verifyEqual(opts_out.promice_filled_verified_dt, opts_out.dt);
     testCase.verifyTrue( ...
-       icemodel.promiceFilledVerificationMatches(opts_out));
+       icemodel.forcing.reconstruct.promiceFilledVerificationMatches(opts_out));
     % A requested file subset verifies only the bytes it will load. An
     % unselected file whose bytes no longer match the producer manifest
     % cannot poison a valid partial load.
@@ -308,54 +326,54 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
     testCase.verifyEqual(partial_out.startdate, min(first_payload.met.Time));
     testCase.verifyEqual(partial_out.enddate, max(first_payload.met.Time));
     testCase.verifyTrue( ...
-       icemodel.promiceFilledVerificationMatches(partial_out, 1));
+       icemodel.forcing.reconstruct.promiceFilledVerificationMatches(partial_out, 1));
     testCase.verifyFalse( ...
-       icemodel.promiceFilledVerificationMatches(partial_out));
+       icemodel.forcing.reconstruct.promiceFilledVerificationMatches(partial_out));
     met = second_intact;
     save(opts.metfname{2}, 'met');
     met = full_met;
     changed = opts_out;
     changed.promice_filled_readiness_verified = false;
     testCase.verifyFalse( ...
-       icemodel.promiceFilledVerificationMatches(changed));
+       icemodel.forcing.reconstruct.promiceFilledVerificationMatches(changed));
     changed = opts_out;
     changed.promice_filled_manifest_verified = false;
     testCase.verifyFalse( ...
-       icemodel.promiceFilledVerificationMatches(changed));
+       icemodel.forcing.reconstruct.promiceFilledVerificationMatches(changed));
     changed = opts_out;
     changed.sitename = 'other';
     testCase.verifyFalse( ...
-       icemodel.promiceFilledVerificationMatches(changed));
+       icemodel.forcing.reconstruct.promiceFilledVerificationMatches(changed));
     changed = opts_out;
     changed.simyears = [changed.simyears(:).', 2016];
     testCase.verifyFalse( ...
-       icemodel.promiceFilledVerificationMatches(changed));
+       icemodel.forcing.reconstruct.promiceFilledVerificationMatches(changed));
     changed = opts_out;
      changed.metfname{1} = [changed.metfname{1} '.other'];
      testCase.verifyFalse( ...
-        icemodel.promiceFilledVerificationMatches(changed));
+        icemodel.forcing.reconstruct.promiceFilledVerificationMatches(changed));
      changed = opts_out;
     changed.forcings = 'promice';
     testCase.verifyFalse( ...
-       icemodel.promiceFilledVerificationMatches(changed));
+       icemodel.forcing.reconstruct.promiceFilledVerificationMatches(changed));
     testCase.verifyError(@() icemodel.loadmet(changed), ...
        'icemodel:loadmet:promiceFilledIdentityMismatch');
     changed = opts_out;
     changed.enddate = changed.enddate - minutes(15);
     testCase.verifyFalse( ...
-       icemodel.promiceFilledVerificationMatches(changed));
+       icemodel.forcing.reconstruct.promiceFilledVerificationMatches(changed));
     changed = opts_out;
     changed.calendar_type = 'standard';
     testCase.verifyFalse( ...
-       icemodel.promiceFilledVerificationMatches(changed));
+       icemodel.forcing.reconstruct.promiceFilledVerificationMatches(changed));
     changed = opts_out;
     changed.smbmodel = 'snowmodel';
     testCase.verifyFalse( ...
-       icemodel.promiceFilledVerificationMatches(changed));
+       icemodel.forcing.reconstruct.promiceFilledVerificationMatches(changed));
     changed = opts_out;
     changed.dt = 1800;
     testCase.verifyFalse( ...
-       icemodel.promiceFilledVerificationMatches(changed));
+       icemodel.forcing.reconstruct.promiceFilledVerificationMatches(changed));
     testCase.verifyError(@() icemodel.loadmet(changed), ...
        'icemodel:loadmet:promiceFilledCadenceMismatch');
      testCase.verifyEqual(opts_out.z_tair, expected, 'AbsTol', 1e-12);
@@ -493,7 +511,7 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
    save(first_file, 'met');
    writePromiceRuntimeManifest(opts);
    testCase.verifyError(@() ...
-      icemodel.verifyPromiceFilledReadiness(opts), ...
+      icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts), ...
       'icemodel:loadmet:promiceFilledWindowUncovered');
 
    % A complete but phase-shifted file is not the canonical 15-minute
@@ -503,7 +521,7 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
    save(first_file, 'met');
    writePromiceRuntimeManifest(opts);
    testCase.verifyError(@() ...
-      icemodel.verifyPromiceFilledReadiness(opts), ...
+      icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts), ...
       'icemodel:loadmet:promiceFilledCadenceMismatch');
    met = met_intact1;
    save(first_file, 'met');
@@ -516,7 +534,7 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
    save(hole_file, 'met');
    writePromiceRuntimeManifest(opts);
    try
-      icemodel.verifyPromiceFilledReadiness(opts);
+      icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts);
       testCase.verifyFail('expected a scalar-bound refusal');
    catch ME
       testCase.verifyEqual(ME.identifier, ...
@@ -534,7 +552,7 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
    writePromiceRuntimeManifest(opts);
    snow_opts = opts;
    snow_opts.smbmodel = 'snowmodel';
-   returned = icemodel.verifyPromiceFilledReadiness(snow_opts);
+   returned = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(snow_opts);
    testCase.verifyTrue(returned.promice_filled_readiness_verified);
    % Scalar-valid precipitation is still unusable when a complete source
    % split violates A10; the runtime gate must fail before the default
@@ -547,7 +565,7 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
    save(hole_file, 'met');
    writePromiceRuntimeManifest(opts);
    try
-      icemodel.verifyPromiceFilledReadiness(snow_opts);
+      icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(snow_opts);
       testCase.verifyFail('expected a precipitation-identity refusal');
    catch ME
       testCase.verifyEqual(ME.identifier, ...
@@ -568,10 +586,70 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
    snow_opts = opts;
    snow_opts.smbmodel = 'snowmodel';
    testCase.verifyError( ...
-      @() icemodel.verifyPromiceFilledReadiness(snow_opts), ...
+      @() icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(snow_opts), ...
       'icemodel:loadmet:promiceFilledWindowUncovered');
-   returned = icemodel.verifyPromiceFilledReadiness(opts);
+   returned = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts);
    testCase.verifyTrue(returned.promice_filled_readiness_verified);
+   clear cleaner
+end
+
+function test_overlapping_promice_filled_files_are_rejected(testCase)
+   % The MATLAB verifier and loader must reject duplicate interval starts
+   % before code-generation trust flags can describe the selected artifacts.
+   [workspace, opts, ~] = makeCodegenPromiceFixture();
+   cleaner = onCleanup(@() ...
+      icemodel.test.fixtures.cleanupSyntheticWorkspace(workspace));
+   original_file = opts.metfname{1};
+   overlap_file = fullfile(workspace.metdir, sprintf( ...
+      'met_%s_promice_filled_20150101_20150101_overlap_15m.mat', ...
+      opts.sitename));
+   copyfile(original_file, overlap_file)
+   opts.metfname = {original_file, overlap_file};
+   writePromiceRuntimeManifest(opts)
+
+   identifier = 'icemodel:loadmet:promiceFilledIntervalOverlap';
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts), identifier);
+   testCase.verifyFalse(opts.promice_filled_readiness_verified);
+   testCase.verifyFalse(opts.promice_filled_manifest_verified);
+   testCase.verifyFalse(opts.promice_filled_provenance_verified);
+   testCase.verifyError(@() icemodel.loadmet(opts), identifier);
+   clear cleaner
+end
+
+function test_file_subset_normalizes_selected_times_before_bounds(testCase)
+   % A selected file's staged coordinate must enter the UTC comparison frame
+   % before fileiter narrows the verified request and loadmet filters rows.
+   [workspace, opts, canonical_met] = makeCodegenPromiceFixture();
+   cleaner = onCleanup(@() ...
+      icemodel.test.fixtures.cleanupSyntheticWorkspace(workspace));
+   selected_file = opts.metfname{1};
+   unselected_file = fullfile(workspace.metdir, sprintf( ...
+      'met_%s_promice_filled_20150102_20150102_15m.mat', ...
+      opts.sitename));
+   copyfile(selected_file, unselected_file)
+   opts.metfname = {selected_file, unselected_file};
+
+   variants = ["unzoned", "non-utc"];
+   for variant = variants
+      met = canonical_met;
+      if variant == "unzoned"
+         met.Time.TimeZone = '';
+      else
+         met.Time.TimeZone = 'America/New_York';
+      end
+      artifact_metadata = met.Properties.UserData;
+      save(selected_file, 'met', 'artifact_metadata')
+      writePromiceRuntimeManifest(opts)
+
+      [loaded, verified] = icemodel.loadmet(opts, 1);
+      testCase.verifyEqual(string(loaded.Time.TimeZone), "UTC");
+      testCase.verifyTrue(all(loaded.Time == canonical_met.Time));
+      testCase.verifyEqual(verified.startdate, opts.startdate);
+      testCase.verifyEqual(verified.enddate, opts.enddate);
+      testCase.verifyTrue( ...
+         icemodel.forcing.reconstruct.promiceFilledVerificationMatches(verified, 1));
+   end
    clear cleaner
 end
 
@@ -581,8 +659,63 @@ function test_readiness_rejects_unsafe_station_token(testCase)
       'sitename', "../escape", 'simyears', 2020);
 
    testCase.verifyError(@() ...
-      icemodel.verifyPromiceFilledReadiness(opts), ...
+      icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts), ...
       'icemodel:reconstruct:mustBeStationToken:invalidToken');
+end
+
+function test_codegen_flags_require_canonical_artifact_provenance(testCase)
+   % A ready ledger and freshly repinned manifest cannot mint generated-code
+   % trust after the artifact policy or required provenance becomes invalid.
+   [workspace, opts, canonical_met] = makeCodegenPromiceFixture();
+   cleaner = onCleanup(@() ...
+      icemodel.test.fixtures.cleanupSyntheticWorkspace(workspace));
+   filename = opts.metfname{1};
+
+   % The canonical MATLAB preparation path mints all three trust flags, and
+   % generated loading's codegen-compatible predicate accepts that exact opts.
+   verified = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts);
+   testCase.verifyTrue(verified.promice_filled_readiness_verified);
+   testCase.verifyTrue(verified.promice_filled_manifest_verified);
+   testCase.verifyTrue(verified.promice_filled_provenance_verified);
+   testCase.verifyTrue(icemodel.forcing.reconstruct.promiceFilledVerificationMatches(verified));
+   legacy = verified;
+   legacy.promice_filled_provenance_verified = false;
+   testCase.verifyFalse(icemodel.forcing.reconstruct.promiceFilledVerificationMatches(legacy));
+
+   % Re-pin each deliberate artifact corruption so the refusal proves the
+   % provenance gate, not a stale producer-manifest digest. The ready ledger
+   % remains unchanged and therefore cannot rescue either payload.
+   variants = ["stale-policy", "missing-channel"];
+   identifiers = ["icemodel:loadmet:promiceFilledIdentityMismatch", ...
+      "icemodel:loadmet:promiceFilledProvenanceMismatch"];
+   for k = 1:numel(variants)
+      met = canonical_met;
+      if variants(k) == "stale-policy"
+         met.Properties.UserData.gapfill_policy_sha256 = ...
+            string(repmat('a', 1, 64));
+      else
+         met = removevars(met, 'lwd_provenance');
+      end
+      artifact_metadata = met.Properties.UserData;
+      save(filename, 'met', 'artifact_metadata')
+      writePromiceRuntimeManifest(opts)
+
+      testCase.verifyError(@() ...
+         icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts), identifiers(k));
+      testCase.verifyFalse(opts.promice_filled_readiness_verified);
+      testCase.verifyFalse(opts.promice_filled_manifest_verified);
+      testCase.verifyFalse(opts.promice_filled_provenance_verified);
+      testCase.verifyFalse(icemodel.forcing.reconstruct.promiceFilledVerificationMatches(opts));
+   end
+
+   % Restoring and repinning the canonical bytes retains the supported path.
+   met = canonical_met;
+   artifact_metadata = met.Properties.UserData;
+   save(filename, 'met', 'artifact_metadata')
+   writePromiceRuntimeManifest(opts)
+   restored = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts);
+   testCase.verifyTrue(icemodel.forcing.reconstruct.promiceFilledVerificationMatches(restored));
+   clear cleaner
 end
 
 function test_initforcings_keeps_finite_precip_out_of_solver(testCase)
@@ -1404,9 +1537,86 @@ function test_loadresults_preserves_diagnostic_output_profile_fields(testCase)
       'thf_L', 'thf_Re', 'thf_numiter'}, ice1.Properties.VariableNames)));
    testCase.verifyTrue(all(isfinite(ice1.ro_sfc)));
    testCase.verifyTrue(all(isfinite(ice1.thf_u_star)));
-   testCase.verifyTrue(all(isfinite(ice1.thf_L)));
-   testCase.verifyTrue(all(isfinite(ice1.thf_numiter)));
-   testCase.verifyEqual(unique(year(met.Time))', 2016);
+    testCase.verifyTrue(all(isfinite(ice1.thf_L)));
+    testCase.verifyTrue(all(isfinite(ice1.thf_numiter)));
+
+    % Diagnostic saves must keep every step-ledger channel and its
+    % signed storage, remesh, geometry, and phase-aware vapor identities.
+    budget_fields = icemodel.namelists.budgetoutputs();
+    testCase.verifyTrue(all(ismember( ...
+       budget_fields, ice1.Properties.VariableNames)));
+    testCase.verifyTrue(all(isfinite(ice1{:, budget_fields}), 'all'));
+
+    % Every absolute-gross channel is nonnegative and bounds its signed
+    % forcing-step net after accepted substeps and remesh events are accumulated.
+    gross_fields = budget_fields(contains(budget_fields, '_gross_'));
+    testCase.verifyGreaterThanOrEqual(ice1{:, gross_fields}, 0);
+
+    solid_delta = ice1.mass_budget_solid_end_mwe ...
+       - ice1.mass_budget_solid_start_mwe;
+    liquid_delta = ice1.mass_budget_liquid_end_mwe ...
+       - ice1.mass_budget_liquid_start_mwe;
+    testCase.verifyEqual(solid_delta, ...
+       ice1.mass_budget_phase_solid_mwe ...
+       + ice1.mass_budget_vapor_solid_mwe ...
+       + ice1.mass_budget_remesh_solid_mwe, 'AbsTol', 1e-10);
+    testCase.verifyEqual(liquid_delta, ...
+       ice1.mass_budget_phase_liquid_mwe ...
+       + ice1.mass_budget_vapor_liquid_mwe ...
+       + ice1.mass_budget_remesh_liquid_mwe, 'AbsTol', 1e-10);
+    testCase.verifyGreaterThanOrEqual( ...
+       ice1.mass_budget_solid_storage_gross_mwe + 1e-12, ...
+       abs(solid_delta));
+    testCase.verifyGreaterThanOrEqual( ...
+       ice1.mass_budget_liquid_storage_gross_mwe + 1e-12, ...
+       abs(liquid_delta));
+
+    signed_gross_pairs = { ...
+       'mass_budget_phase_solid_mwe', ...
+       'mass_budget_phase_solid_gross_mwe'; ...
+       'mass_budget_phase_liquid_mwe', ...
+       'mass_budget_phase_liquid_gross_mwe'; ...
+       'mass_budget_vapor_solid_mwe', ...
+       'mass_budget_vapor_solid_gross_mwe'; ...
+       'mass_budget_vapor_liquid_mwe', ...
+       'mass_budget_vapor_liquid_gross_mwe'; ...
+       'mass_budget_remesh_solid_mwe', ...
+       'mass_budget_remesh_solid_gross_mwe'; ...
+       'mass_budget_remesh_liquid_mwe', ...
+       'mass_budget_remesh_liquid_gross_mwe'; ...
+       'mass_budget_vapor_potential_j_m2', ...
+       'mass_budget_vapor_potential_gross_j_m2'; ...
+       'mass_budget_unapplied_vapor_j_m2', ...
+       'mass_budget_unapplied_vapor_gross_j_m2'};
+    for n = 1:size(signed_gross_pairs, 1)
+       % A single tolerance only absorbs binary roundoff in the comparison.
+       signed_name = signed_gross_pairs{n, 1};
+       gross_name = signed_gross_pairs{n, 2};
+       testCase.verifyGreaterThanOrEqual( ...
+          ice1.(gross_name) + 1e-8, abs(ice1.(signed_name)));
+    end
+    testCase.verifyEqual(ice1.mass_budget_remesh_solid_mwe, ...
+       ice1.mass_budget_cloned_bottom_solid_mwe ...
+       - ice1.mass_budget_merge_export_solid_mwe, 'AbsTol', 1e-10);
+    testCase.verifyEqual(ice1.mass_budget_remesh_liquid_mwe, ...
+       ice1.mass_budget_cloned_bottom_liquid_mwe ...
+       - ice1.mass_budget_merge_export_liquid_mwe, 'AbsTol', 1e-10);
+    testCase.verifyEqual(ice1.mass_budget_remesh_enthalpy_j_m2, ...
+       ice1.mass_budget_cloned_bottom_enthalpy_j_m2 ...
+       - ice1.mass_budget_merge_export_enthalpy_j_m2, 'AbsTol', 1e-6);
+
+    [Ls, Lv, ro_liq] = icemodel.physicalConstant('Ls', 'Lv', 'ro_liq');
+    vapor_accounted = ro_liq * ( ...
+       Ls * ice1.mass_budget_vapor_solid_mwe ...
+       + Lv * ice1.mass_budget_vapor_liquid_mwe ...
+       + Lv * ice1.mass_budget_condensation_overflow_mwe) ...
+       + ice1.mass_budget_unapplied_vapor_j_m2;
+    testCase.verifyEqual(ice1.mass_budget_vapor_potential_j_m2, ...
+       vapor_accounted, 'AbsTol', 2e-5);
+    testCase.verifyEqual(ice1.mass_budget_top_deletion_height_m, ...
+       opts.dz_thermal * ice1.mass_budget_top_deletion_count, ...
+       'AbsTol', 1e-12);
+    testCase.verifyEqual(unique(year(met.Time))', 2016);
 end
 
 function test_postprocess_explicit_met_return_is_hourly(testCase)
@@ -1428,6 +1638,117 @@ function test_postprocess_explicit_met_return_is_hourly(testCase)
 
    testCase.verifyEqual(height(ice1_pp), 24);
    testCase.verifyEqual(height(met_pp), 24);
+   clear cleanup
+end
+
+function test_quarter_hour_diagnostic_postprocess_preserves_budget_contract(testCase)
+   % Hourly diagnostic output must retain double ledgers and closure identities.
+
+   localws = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
+      configure=true, nsteps=8, dt_seconds=900);
+   cleanup = onCleanup(@() icemodel.test.fixtures.cleanupSyntheticWorkspace( ...
+      localws));
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      localws, 'icemodel', 2016, dt=900, solver=1, ...
+      output_profile='diagnostic', testname='diagnostic_retime');
+   [ice1_raw, ice2_raw, opts] = icemodel.test.helpers.runSmbModel(opts);
+   met = icemodel.loadmet(opts);
+
+   [ice1, ~] = icemodel.postprocess(ice1_raw, ice2_raw, opts, ...
+      met.swd, met.lwd, met.albedo, met.Time);
+
+   % Every ledger stays double even though convergence flags remain single.
+   budget_fields = icemodel.namelists.budgetoutputs();
+   for n = 1:numel(budget_fields)
+      testCase.verifyClass(ice1.(budget_fields{n}), 'double');
+   end
+   testCase.verifyClass(ice1.Tice_converged, 'single');
+
+   % Sum/first/last hourly aggregation preserves the signed checkpoint closure.
+   solid_delta = ice1.mass_budget_solid_end_mwe ...
+      - ice1.mass_budget_solid_start_mwe;
+   liquid_delta = ice1.mass_budget_liquid_end_mwe ...
+      - ice1.mass_budget_liquid_start_mwe;
+   testCase.verifyEqual(solid_delta, ...
+      ice1.mass_budget_phase_solid_mwe ...
+      + ice1.mass_budget_vapor_solid_mwe ...
+      + ice1.mass_budget_remesh_solid_mwe, 'AbsTol', 1e-10);
+   testCase.verifyEqual(liquid_delta, ...
+      ice1.mass_budget_phase_liquid_mwe ...
+      + ice1.mass_budget_vapor_liquid_mwe ...
+      + ice1.mass_budget_remesh_liquid_mwe, 'AbsTol', 1e-10);
+   testCase.verifyGreaterThanOrEqual( ...
+      ice1.mass_budget_solid_storage_gross_mwe + 1e-12, ...
+      abs(solid_delta));
+   testCase.verifyGreaterThanOrEqual( ...
+      ice1.mass_budget_liquid_storage_gross_mwe + 1e-12, ...
+      abs(liquid_delta));
+   clear cleanup
+end
+
+function test_postprocess_three_row_partial_bin_aligns_subsurface_and_logical(testCase)
+   % A partial native hour must use all available samples for every output.
+
+   localws = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
+      configure=true, nsteps=3, dt_seconds=900);
+   cleanup = onCleanup(@() icemodel.test.fixtures.cleanupSyntheticWorkspace( ...
+      localws));
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      localws, 'icemodel', 2016, dt=900, solver=1, ...
+      output_profile='minimal', testname='partial_hour_retime');
+   [ice1_raw, ice2_raw, opts] = icemodel.test.helpers.runSmbModel(opts);
+   met = icemodel.loadmet(opts);
+
+   % Seed every layer with values whose three-sample mean and logical union
+   % are unambiguous after hourly postprocessing.
+   n_layers = size(ice2_raw.Tice, 1);
+   ice2_raw.bin_sentinel = repmat([1, 2, 3], n_layers, 1);
+   ice2_raw.bin_flag = repmat(logical([0, 1, 0]), n_layers, 1);
+   [ice1, ice2] = icemodel.postprocess(ice1_raw, ice2_raw, opts, ...
+      met.swd, met.lwd, met.albedo, met.Time);
+
+   % The subsurface mean and logical flag must occupy the same sole surface
+   % bin rather than being dropped because a fourth sample is unavailable.
+   expected_time = dateshift(met.Time(1), 'start', 'hour');
+   testCase.verifyEqual(ice1.Properties.RowTimes, expected_time);
+   testCase.verifyEqual(ice2.bin_sentinel, 2 * ones(n_layers, 1));
+   testCase.verifyClass(ice1.bin_flag, 'logical');
+   testCase.verifyTrue(ice1.bin_flag);
+   clear cleanup
+end
+
+function test_postprocess_unaligned_bins_align_subsurface_and_logical(testCase)
+   % Unaligned samples must follow native hourly boundaries for every output.
+
+   localws = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
+      configure=true, nsteps=4, dt_seconds=900);
+   cleanup = onCleanup(@() icemodel.test.fixtures.cleanupSyntheticWorkspace( ...
+      localws));
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      localws, 'icemodel', 2016, dt=900, solver=1, ...
+      output_profile='minimal', testname='unaligned_hour_retime');
+   [ice1_raw, ice2_raw, opts] = icemodel.test.helpers.runSmbModel(opts);
+   met = icemodel.loadmet(opts);
+
+   % Shift the first three samples into one partial hour and the final sample
+   % two hours later. The native result includes one intervening empty bin.
+   shifted_time = met.Time(1) + minutes([15; 30; 45; 120]);
+   n_layers = size(ice2_raw.Tice, 1);
+   ice2_raw.bin_sentinel = repmat([1, 2, 3, 100], n_layers, 1);
+   ice2_raw.bin_flag = repmat(logical([0, 1, 0, 1]), n_layers, 1);
+   [ice1, ice2] = icemodel.postprocess(ice1_raw, ice2_raw, opts, ...
+      met.swd, met.lwd, met.albedo, shifted_time);
+
+   % Surface labels, subsurface means, and logical unions must all preserve the
+   % first partial bin, the empty hour, and the final one-sample bin.
+   expected_time = dateshift(shifted_time(1), 'start', 'hour') ...
+      + hours((0:2)');
+   testCase.verifyEqual(ice1.Properties.RowTimes, expected_time);
+   testCase.verifyEqual(ice2.bin_sentinel(:, [1, 3]), ...
+      repmat([2, 100], n_layers, 1));
+   testCase.verifyTrue(all(isnan(ice2.bin_sentinel(:, 2)), 'all'));
+   testCase.verifyClass(ice1.bin_flag, 'logical');
+   testCase.verifyEqual(ice1.bin_flag, [true; false; true]);
    clear cleanup
 end
 
@@ -1454,9 +1775,117 @@ function test_retimeHourlyFixedStep_matches_legacy_hourly_mean(testCase)
    fixed = icemodel.retimeHourlyFixedStep(ice1_tt);
 
    testCase.verifyEqual(fixed.Time, legacy.Time);
-   testCase.verifyEqual(double(fixed{:,:}), double(legacy{:,:}), ...
-      'AbsTol', 5e-5);
+   variables = legacy.Properties.VariableNames;
+   for n = 1:numel(variables)
+      % Compare each channel independently so table concatenation cannot hide
+      % a double-to-single conversion in either result.
+      name = variables{n};
+      testCase.verifyClass(fixed.(name), class(legacy.(name)));
+      testCase.verifyEqual(fixed.(name), legacy.(name), 'AbsTol', 5e-5);
+   end
    clear cleanup
+end
+
+function test_retimeHourlyFixedStep_uses_cumulative_endpoint_state(testCase)
+   % Cumulative diagnostics retain the final native state; ordinary channels
+   % retain the established hourly mean.
+
+   time = datetime(2016, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') ...
+      + minutes((0:7)' * 15);
+   cumulative = [1:4, 11:14]';
+   ordinary = [2:2:8, 20:2:26]';
+   input = timetable(cumulative, cumulative + 100, cumulative + 200, ...
+      cumulative + 300, ordinary, 'RowTimes', time, ...
+      'VariableNames', [icemodel.namelists.cumulativeoutputs(), ...
+      {'ordinary'}]);
+
+   [hourly, bin_start, bin_end] = ...
+      icemodel.retimeHourlyFixedStep(input);
+
+   % The aligned 15-minute grid exercises the fixed-array branch and exposes
+   % the same four-sample bounds consumed by subsurface postprocessing.
+   testCase.verifyEqual(bin_start, [1; 5]);
+   testCase.verifyEqual(bin_end, [4; 8]);
+   testCase.verifyEqual(icemodel.namelists.cumulativeoutputs(), ...
+      {'melt', 'runoff', 'freeze', 'dlayer'});
+   testCase.verifyEqual(hourly{:, ...
+      icemodel.namelists.cumulativeoutputs()}, ...
+      [4, 104, 204, 304; 14, 114, 214, 314]);
+   testCase.verifyEqual(hourly.ordinary, [5; 23]);
+end
+
+function test_retimeHourlyFixedStep_preserves_irregular_native_bins(testCase)
+   % An aligned row count must not trigger fixed aggregation when gaps make the
+   % native grid irregular; cumulative channels still retain each bin endpoint.
+
+   time = datetime(2016, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') ...
+      + minutes([0; 15; 45; 60; 75; 180; 195; 210]);
+   cumulative = transpose(1:8);
+   ordinary = 10 * cumulative;
+   input = timetable(cumulative, ordinary, 'RowTimes', time, ...
+      'VariableNames', {'melt', 'ordinary'});
+
+   [hourly, bin_start, bin_end] = ...
+      icemodel.retimeHourlyFixedStep(input);
+
+   % Native hourly labels and raw bounds retain every irregular sample without
+   % allowing the fixed four-row reshape to cross either hour boundary.
+   expected_time = datetime(2016, 1, 1, (0:3)', 0, 0, ...
+      'TimeZone', 'UTC');
+   testCase.verifyEqual(hourly.Properties.RowTimes, expected_time);
+   testCase.verifyEqual(bin_start, [1; 4; 0; 6]);
+   testCase.verifyEqual(bin_end, [3; 5; 0; 8]);
+   testCase.verifyEqual(hourly.melt([1; 2; 4]), [3; 5; 8]);
+   testCase.verifyTrue(isnan(hourly.melt(3)));
+   testCase.verifyEqual(hourly.ordinary([1; 2; 4]), [20; 45; 70]);
+   testCase.verifyTrue(isnan(hourly.ordinary(3)));
+end
+
+function test_retimeHourlyFixedStep_sums_increment_channels(testCase)
+   % Every df_ channel holds one forcing step's change, so aggregation sums it.
+   % Averaging one would divide it by the samples per bin, turning an hourly
+   % overflow depth into a quarter of the water that ran off.
+
+   % Aligned fixed-array path: four unit increments become one hourly four.
+   time = datetime(2016, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') ...
+      + minutes((0:7)' * 15);
+   df_rof = ones(8, 1);
+   ordinary = ones(8, 1);
+   hourly = icemodel.retimeHourlyFixedStep( ...
+      timetable(df_rof, ordinary, 'RowTimes', time));
+   testCase.verifyEqual(hourly.df_rof, [4; 4]);
+   testCase.verifyEqual(hourly.ordinary, [1; 1]);
+
+   % Native irregular path must apply the same class, not the default mean.
+   time = datetime(2016, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') ...
+      + minutes([0; 15; 45; 60]);
+   df_rof = ones(4, 1);
+   ordinary = ones(4, 1);
+   hourly = icemodel.retimeHourlyFixedStep( ...
+      timetable(df_rof, ordinary, 'RowTimes', time));
+   testCase.verifyEqual(hourly.df_rof, [3; 1]);
+   testCase.verifyEqual(hourly.ordinary, [1; 1]);
+end
+
+function test_retimeHourlyFixedStep_matches_native_missing_values(testCase)
+   % Fixed-array aggregation must retain RETIME's nonmissing mean, sum, and
+   % endpoint selection rather than treating a missing edge as the bin value.
+
+   time = datetime(2016, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') ...
+      + minutes((0:3)' * 15);
+   values = [NaN; 2; 3; NaN];
+   input = timetable(values, values, values, values, values, ...
+      'RowTimes', time, 'VariableNames', {'ordinary', 'melt', ...
+      'mass_budget_solid_start_mwe', 'mass_budget_solid_end_mwe', ...
+      'mass_budget_phase_solid_mwe'});
+
+   hourly = icemodel.retimeHourlyFixedStep(input);
+
+   testCase.verifyEqual(hourly.ordinary, 2.5);
+   testCase.verifyEqual(hourly.melt, 3);
+   testCase.verifyEqual(hourly.mass_budget_solid_start_mwe, 2);
+   testCase.verifyEqual(hourly.mass_budget_solid_end_mwe, 3);
+   testCase.verifyEqual(hourly.mass_budget_phase_solid_mwe, 5);
 end
 
 function ice1_tt = rawIce1ToTimetable(ice1_raw, time)
@@ -1485,6 +1914,69 @@ function ice1_hourly = legacyHourlyMean(ice1_tt)
    ice1_hourly = retime(ice1_tt, 'hourly', 'mean');
    ice1_hourly = ice1_hourly(~(month(ice1_hourly.Time) == 2 ...
       & day(ice1_hourly.Time) == 29), :);
+end
+
+function [workspace, opts, met] = makeCodegenPromiceFixture()
+   %MAKECODEGENPROMICEFIXTURE Build one canonical pre-codegen forcing input.
+   workspace = icemodel.test.fixtures.makeSyntheticWorkspace( ...
+      2015, configure=false, nsteps=96, dt_seconds=900);
+   opts = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2015);
+   opts.forcings = 'promice_filled';
+   opts.userdata = 'promice_filled';
+   opts.readiness_file = fullfile(workspace.metdir, 'readiness.csv');
+   opts.report_inputs_file = fullfile(workspace.metdir, ...
+      'report-inputs.json');
+   opts.startdate = datetime(2015, 1, 1, 0, 0, 0, 'TimeZone', 'UTC');
+   opts.enddate = datetime(2015, 1, 1, 23, 45, 0, 'TimeZone', 'UTC');
+
+   % Keep the bookkeeping ledger explicitly ready; the test proves it cannot
+   % substitute for artifact policy and per-channel provenance.
+   ledger = table(string(opts.sitename), 2015, "ready", "ready", ...
+      'VariableNames', {'site', 'year', ...
+      'verdict_icemodel', 'verdict_snowmodel'});
+   writetable(ledger, opts.readiness_file)
+
+   % Promote the native synthetic file into the exact filled-product payload
+   % shape consumed by the MATLAB verifier before generated execution.
+   loaded = load(opts.metfname{1}, 'met');
+   met = loaded.met;
+   met.Time = opts.startdate + minutes(15) * (0:height(met) - 1)';
+   met.swu = met.albedo .* met.swd;
+   met.rainf = zeros(height(met), 1);
+   met.snowf = zeros(height(met), 1);
+   met.boom_height = repmat(2.7, height(met), 1);
+   codes = icemodel.forcing.reconstruct.provenanceCodes();
+   defaults = icemodel.forcing.reconstruct.setopts();
+   channels = unique([defaults.plan_channels, ...
+      icemodel.forcing.helpers.precipitationVariables(), ...
+      "boom_height"], 'stable');
+   for channel = channels
+      provenance = repmat(codes.observed, height(met), 1);
+      provenance(~isfinite(met.(channel))) = codes.missing;
+      met.(channel + "_provenance") = provenance;
+   end
+
+   % Stamp the same current identity that the production reconstruction
+   % writer records before creating the manifest-pinned file.
+   metadata = met.Properties.UserData;
+   metadata.site = string(opts.sitename);
+   metadata.gapfill_registry = codes;
+   metadata.gapfill_seed = 1;
+   metadata.gapfill_product = "promice_filled";
+   metadata.gapfill_channels = defaults.plan_channels;
+   metadata.gapfill_engine_version = string(icemodel.internal.version());
+   metadata.gapfill_policy_sha256 = ...
+      icemodel.forcing.reconstruct.policySha256();
+   metadata.gapfill_donors = string.empty(1, 0);
+   met.Properties.UserData = metadata;
+   artifact_metadata = icemodel.forcing.helpers.artifactMetadata(met);
+   met.Properties.UserData = artifact_metadata;
+   filename = fullfile(workspace.metdir, sprintf( ...
+      'met_%s_promice_filled_20150101_20150101_15m.mat', opts.sitename));
+   save(filename, 'met', 'artifact_metadata')
+   opts.metfname = {filename};
+   writePromiceRuntimeManifest(opts)
 end
 
 function writePromiceRuntimeManifest(opts)

@@ -1,5 +1,5 @@
-function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = merge_layers( ...
-      T, f_ice, f_liq, Sc, Sp, j1, j2, d_liq, dz)
+function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
+      T, f_ice, f_liq, Sc, Sp, j1, j2, d_lyr, dz)
    %MERGE_LAYERS Combine two control volumes conserving state and sources.
    %
    % Combine two control volumes by equating the enthalpy of the two control
@@ -14,8 +14,13 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = merge_layers( ...
    %  f_ice - frozen fraction, volume of frozen water per cv volume
    %  ro_liq - liquid water intrinsic density, 1000 kg m-3
    %  ro_ice - frozen water intrinsic density, 917 kg m-3
+   %  d_lyr - accumulated merge-export diagnostic, water-equivalent fraction
    %
    % Outputs
+   %  d_lyr - d_lyr with this merge's exported mass added at index j1, as a
+   %          water-equivalent fraction the caller scales by dz to obtain
+   %          metres water equivalent. Combining two cells into one retains
+   %          their mean, so the remainder leaves the column.
    %
    % Description
    %
@@ -127,5 +132,20 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_liq] = merge_layers( ...
    % Invert T_dC to obtain f_liq from f_liq = f(f_wat, Tdc) (eq 67, Jordan).
    f_liq_C = f_wat_C / (1.0 + (fcp * Td_C) ^ 2.0);
    f_ice_C = (f_wat_C - f_liq_C) * ro_liq / ro_ice;
-   d_liq(j1) = d_liq(j1) + max(f_liq(j1) + f_liq(j2) - f_liq_C, 0);
+
+   % Add the mass this merge removes, as a water-equivalent fraction the
+   % caller scales by dz. The two cells hold f_wat_12 between them and the
+   % surviving cell keeps half of it, because f_wat_C spreads m_wat_C over two
+   % cell volumes. So the merge removes half, which is never negative. That
+   % halving is exact only for a scalar dz, which is what every call site
+   % passes; the whole function assumes it, since m_wat_1 and m_wat_2 above,
+   % and so T_C and f_wat_C, are all wrong for a vector dz. A graded grid
+   % needs merge_layers revisited end to end.
+   %
+   % This is solid plus liquid. The liquid-only difference is a different
+   % quantity and is not what a merge removes; it is in the ledger as
+   % merge_export_liquid_mwe.
+   f_wat_12 = ro_ice / ro_liq * (f_ice(j1) + f_ice(j2)) ...
+      + f_liq(j1) + f_liq(j2);
+   d_lyr(j1) = d_lyr(j1) + f_wat_12 / 2;
 end

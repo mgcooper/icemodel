@@ -56,6 +56,15 @@ function [estimate, clamped] = applyProxyCalibration( ...
       if ~any(in_season)
          continue
       end
+
+      % A persisted or hand-edited record could still carry a nonfinite
+      % correction. Applying it would turn finite proxy input into Inf or NaN,
+      % which downstream validity checks would then refuse as if the PROXY were
+      % unusable. Skipping the season leaves those samples missing instead, so
+      % the denial names the real cause.
+      if ~use_bins && ~isfinite(calibration.corrections.(char(name)))
+         continue
+      end
       if use_bins
          % Each sample scales by its own elevation band's ratio, so the
          % twilight and shoulder regimes get their fitted corrections
@@ -78,9 +87,16 @@ function [estimate, clamped] = applyProxyCalibration( ...
    % sources plus a positive ratio exceed 100% and previously refused
    % adoption (SWC lost 4.5% of rh). Clamping ONCE here covers every
    % consumer (method tier and last resort alike).
+   % D-51 (2026-08-05) extends the same rule to wspd: a sub-unity wind ratio
+   % can move a valid 0.1 m/s proxy posting below the runtime floor (TAS_L
+   % 2010 lost four samples that way). The second output keeps every clamped
+   % sample auditable.
    clamped = false(size(estimate));
-   if isfield(calibration, 'channel') && string(calibration.channel) == "rh"
-      bounds = icemodel.forcing.reconstruct.physicalBounds("rh");
+   bounded_calibration = isfield(calibration, 'channel') ...
+      && ismember(string(calibration.channel), ["rh", "wspd"]);
+   if bounded_calibration
+      bounds = icemodel.forcing.reconstruct.physicalBounds( ...
+         string(calibration.channel));
       finite = isfinite(estimate);
       clamped = finite ...
          & (estimate < bounds(1) | estimate > bounds(2));

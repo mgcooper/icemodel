@@ -35,6 +35,34 @@ function test_skinmodel_reduced_run_stays_bounded(testCase)
    testCase.verifyEqual(height(ice1_pp), workspace.nsteps / 4);
 end
 
+function test_shared_model_case_path_returns_postprocessed_output(testCase)
+   % The shared formal-case path should resolve, run, and postprocess one case.
+
+   workspace = testCase.TestData.workspace;
+   c = struct( ...
+      'smbmodel', "icemodel", ...
+      'sitename', string(workspace.sitename), ...
+      'forcings', string(workspace.forcings), ...
+      'userdata', "", ...
+      'uservars', "", ...
+      'simyears', workspace.simyears, ...
+      'n_spinup_years', 0, ...
+      'solver', 0);
+
+   [ice1, ice2, opts] = icemodel.test.helpers.runModelCase( ...
+      c, output_profile="diagnostic");
+
+   % Diagnostic profiles contain intentionally unavailable scheme-specific
+   % fields, so verify the shared physical and mass-ledger outputs directly.
+   testCase.verifyTrue(all(isfinite(ice1.tsfc)));
+   testCase.verifyTrue(all(isfinite(ice2.Tice), 'all'));
+   testCase.verifyTrue(all(isfinite(ice1.mass_budget_solid_start_mwe)));
+   testCase.verifyTrue(all(isfinite(ice1.mass_budget_solid_end_mwe)));
+   testCase.verifyEqual(height(ice1), workspace.nsteps / 4);
+   testCase.verifyEqual(opts.output_years, workspace.simyears);
+   testCase.verifyEqual(string(opts.output_profile), "diagnostic");
+end
+
 function test_icemodel_reduced_runs_stay_bounded_across_solver_modes(testCase)
    % Run the icemodel across all supported solver modes to make sure the
    % reduced synthetic case remains finite and bounded in each branch.
