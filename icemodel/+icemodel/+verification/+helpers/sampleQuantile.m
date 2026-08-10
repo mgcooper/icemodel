@@ -3,8 +3,7 @@ function value = sampleQuantile(values, probability)
    %
    %  value = icemodel.verification.helpers.sampleQuantile(values, probability)
    %
-   % Sorts internally and returns NaN for empty input, so callers do not each
-   % have to decide those two things.
+   % Sorts internally and returns NaN for empty input.
    %
    % Inputs
    %  values      - sample values, any shape

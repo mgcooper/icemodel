@@ -29,17 +29,16 @@ function manifest = writeFamilyManifestMerge(manifest_file, manifest, kwargs)
    %      Newly added cases are appended after preserved existing cases.
    %    * Family-level fields the new manifest does not carry (e.g. a hand-added
    %      "schema" descriptor) are PRESERVED from the existing manifest, so a
-   %      re-stage never silently drops them.
+   %      re-stage never drops them.
    %    * skipped[]: skip records for the REQUESTED ids are recomputed from the
    %      new manifest; skip records for OTHER ids are preserved. Re-staging a
    %      site that now succeeds clears its stale skip entry.
    %
-   %  overwrite_family=true forces a full rewrite from manifest.cases alone
-   %  (legacy whole-family behavior), discarding any prior cases and family
-   %  fields. When that rewrite actually removes prior cases, coverage, sources,
-   %  artifact references, skipped records, or extension fields, this helper
-   %  emits an overwriteFamily warning. Use only to deliberately rebuild a
-   %  family root from scratch.
+   %  overwrite_family=true forces a full rewrite from manifest.cases alone,
+   %  discarding any prior cases and family fields. When that rewrite removes
+   %  prior cases, coverage, sources, artifact references, skipped records, or
+   %  extension fields, this helper emits an overwriteFamily warning. Use it
+   %  only to rebuild a family root from scratch.
    %
    %  Inputs
    %    manifest_file : string  destination eval/<family>/manifest.json path.
@@ -303,9 +302,9 @@ function patched = mergeCasePatch(existing, incoming)
          old_leg, new_leg, coverage_relation);
    end
 
-   % Derive source labels from the final graph so retained/unioned legs cannot
-   % drift from forcing_sources or eval_sources. Keep incoming extension labels
-   % that are not represented by a standard colocation leg.
+   % Derive source labels from the final graph, so forcing_sources and
+   % eval_sources describe the retained and unioned legs. Keep incoming
+   % extension labels that no standard colocation leg represents.
    if isfield(existing, 'forcing_sources') ...
          || isfield(incoming, 'forcing_sources') ...
          || isfield(existing, 'eval_sources') ...
@@ -709,8 +708,8 @@ function [cadence, known] = artifactFilenameCadence(reference, kind)
       return
    end
 
-   % Hourly userdata intentionally retain the suffix-free legacy grammar;
-   % native variants carry minute or raw-second suffixes.
+   % Hourly userdata filenames carry no cadence suffix; native variants carry a
+   % minute or raw-second suffix.
    if ~isempty(regexp(name, ...
          "^.+_(?:\d{4}|\d{8}_\d{8})\.mat$", "once"))
       cadence = 3600;
@@ -984,8 +983,8 @@ function s = alignFields(s, ref)
    %ALIGNFIELDS Ensure struct s carries exactly the ref field set.
    %
    % A mismatch in the field SET (not just order) between a preserved case and a
-   % touched case would otherwise break concatenation; surface it instead of
-   % silently fabricating fields.
+   % touched case breaks concatenation. Raise an error rather than fabricating
+   % the missing fields.
    have = fieldnames(s);
    if ~isempty(setxor(have, ref))
       error('icemodel:verification:writeFamilyManifestMerge:fieldMismatch', ...

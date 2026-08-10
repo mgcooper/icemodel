@@ -11,9 +11,9 @@ function [filled, provenance, audit, denials] = lastResortProxies(filled, ...
     %  after method composition take one proxy source per whole outage.
     %  The first catalog source that covers the whole outage wins; if none
     %  does, the first source with any usable values supplies a partial fill.
-    %  A later source never fills leftovers inside the same outage, so spans
-   %  keeping thermodynamically coupled channels consistent with each
-   %  other — a guarantee per-channel method composition cannot make.
+    %  A later source never fills leftovers inside the same outage, so one
+   %  span keeps thermodynamically coupled channels consistent with each
+   %  other, which per-channel method composition cannot guarantee.
    %  Native and method-filled samples are never overwritten; each
     %  adoption appends one audit row per contiguous channel/source segment.
    %
@@ -169,9 +169,8 @@ function [filled, provenance, audit, denials] = lastResortProxies(filled, ...
           % once the hourly posting expands over its quarter-hour
           % support (the KAN_M 2011-03-22 class: one bright MAR hour
           % between unfillable samples). One posting between holes
-          % carries no usable structure — it is a rendering artifact,
-          % not information — so such runs are refused and recorded as
-          % final-tier denials. A record edge counts as missing: no
+          % carries no usable structure, so such runs are refused and
+          % recorded as final-tier denials. A record edge counts as missing: no
           % support exists beyond it either.
           adopt_global = false(numel(times), 1);
           adopt_global(idx(adopt)) = true;
@@ -347,10 +346,9 @@ function [source, calibrated, clamp_mask] = calibratedChannel(plan, ...
     %CALIBRATEDCHANNEL Apply the planner's persisted overlap correction.
     % When no usable overlap calibration exists (the station never
     % observed the channel alongside this source), the raw aligned values
-    % adopt IDENTITY — refusing them left megasample in-bounds gaps
+    % adopt IDENTITY: refusing them leaves megasample in-bounds gaps
     % unfilled at stations like DY2 and SWC. The caller stamps such
-    % adoptions low-confidence in the audit (POLICY A11/D-25); the
-    % low-confidence flag, not a refusal, is the honesty mechanism.
+    % adoptions low-confidence in the audit (POLICY A11/D-25).
     calibrated = false;
     source = alignedChannel(proxy, channel, times);
     % Per-sample record of D-27 clamping for the audit note.
@@ -375,12 +373,11 @@ function [source, calibrated, clamp_mask] = calibratedChannel(plan, ...
        return
     end
     calibrated = true;
-    % D-27: the clamp itself lives ONCE inside applyProxyCalibration (an
-    % overlap correction pushing humidity past its bounds is calibration
-    % ARITHMETIC, not physics — refusing candidates left SWC 4.5% of rh
-    % unfilled, and the method tier consumes the same function). The
-    % second output reports where clamping occurred so the caller can
-    % audit-note it.
+    % D-27: applyProxyCalibration applies the clamp, and the method tier
+    % consumes the same function (an overlap correction pushing humidity
+    % past its bounds is calibration ARITHMETIC, not physics; refusing
+    % those candidates leaves SWC 4.5% of rh unfilled). The second output
+    % reports where clamping occurred so the caller can audit-note it.
     if channel == "swd" && ~isempty(target_elevation)
        % D-28 elevation bins correct the shoulder bias at the last-resort
        % tier just as they do for admitted proxy methods.

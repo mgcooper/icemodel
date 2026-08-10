@@ -25,8 +25,8 @@ function test_saved_results_render_complete_scientific_report(testCase)
       icemodel.verification.report.buildAblationEvaluationReport( ...
       results_file, render=false, output_dir=output_folder);
 
-   % The report is a pure consumer: deliberately nonexistent saved provenance
-   % paths do not prevent source, table, or figure generation.
+   % The report is a pure consumer: nonexistent saved provenance paths do not
+   % prevent source, table, or figure generation.
    verifyEqual(testCase, report_file, fullfile(output_folder, ...
       'promice-ablation-evaluation-report.html'))
    expected_tables = ["report-readiness.csv", "report-summary.csv", ...
@@ -46,8 +46,7 @@ function test_saved_results_render_complete_scientific_report(testCase)
 
    % Every table written beside the report must also be linked from it. A
    % table that exists on disk but is unreachable from the document is
-   % invisible to a reader, which is how a new artifact silently goes
-   % unreported.
+   % invisible to a reader, so a new artifact could go unreported.
    report_text = string(fileread(fullfile(output_folder, ...
       'promice-ablation-evaluation-report.qmd')));
    for name = expected_tables
@@ -89,7 +88,7 @@ function test_saved_results_render_complete_scientific_report(testCase)
       'ablation-cohort-attrition.png')))
 
    % The finalized nonrecursive manifest byte-pins the source MAT and every
-   % generated artifact; render=false deliberately has no HTML row.
+   % generated artifact; render=false produces no HTML row.
    manifest_file = fullfile(output_folder, ...
       'report-artifact-sha256.csv');
    verifyTrue(testCase, isfile(manifest_file))
@@ -104,9 +103,8 @@ function test_saved_results_render_complete_scientific_report(testCase)
    verifyFalse(testCase, any(manifest.artifact_path ...
       == "report-artifact-sha256.csv"))
 
-   % Every exported figure must be hashed. A hardcoded manifest field list once
-   % let new figures ship unhashed, so assert coverage against the asset
-   % directory itself rather than against a second hand-maintained list.
+   % Every exported figure must be hashed. Coverage is checked against the
+   % asset directory, so a new figure cannot ship unhashed.
    exported_assets = dir(fullfile(output_folder, 'report-assets', '*.png'));
    verifyEqual(testCase, ...
       sort("report-assets/" + string({exported_assets.name})'), ...
@@ -159,29 +157,26 @@ function test_saved_results_render_complete_scientific_report(testCase)
    verifySubstring(testCase, source, "Liquid storage, reported separately")
    verifySubstring(testCase, source, "1 June through 1 October")
 
-   % The rendered document, not the builder source, is what a reader acts on.
-   % Pin the claim a silent rewording would corrupt: that the balance is
-   % declared signed and able to decrease. A reader who loses that reads a
-   % falling curve as surface lowering, which is the error this report exists
-   % to prevent.
+   % The rendered document, not the builder source, is what a reader acts on,
+   % so this checks the document text directly: it must state the balance is
+   % signed and able to decrease. Without that wording, a falling curve could
+   % be misread as surface lowering.
    verifySubstring(testCase, source, "signed net solid balance")
    verifySubstring(testCase, source, "can decrease")
 
-   % These four pin the ABSENCE of a plotting construct, which leaves no
-   % signature in the rendered document, so the builder source is the only
-   % place the claim can be checked. The rest of the source assertions this
-   % test used to carry were replaced by rendered-document checks above;
-   % these have no rendered equivalent.
+   % These four checks pin the absence of a plotting construct. An absence
+   % leaves no signature in the rendered document, so the builder source is
+   % the only place these claims can be checked.
    builder_source = fileread(which( ...
       'icemodel.verification.report.buildAblationEvaluationReport'));
 
-   % Two panels, one unit family. A secondary metre axis must not return: it
-   % invites reading quantized grid translation as exported mass.
+   % Two panels, one unit family. A secondary metre axis would put quantized
+   % grid translation on the same plot as exported mass.
    verifySubstring(testCase, builder_source, "tiledlayout(fig, 2, 1")
    verifyFalse(testCase, contains(builder_source, "yyaxis"))
 
-   % A cummax clamp would hide a decreasing signed balance, which is exactly
-   % the behaviour the "can decrease" wording above exists to explain.
+   % A cummax clamp would hide a decreasing signed balance, which is the
+   % behaviour the "can decrease" wording above documents.
    verifyFalse(testCase, contains(builder_source, "cummax("))
 
    % The density band is plotted low endpoint first regardless of the order
@@ -217,7 +212,8 @@ function test_saved_results_render_complete_scientific_report(testCase)
       "not a continuous surface prediction")
 
    % The report must state the mass-versus-geometry distinction explicitly,
-   % because conflating them is what made the earlier comparator wrong.
+   % because conflating grid geometry with mass over-counts what the top cell
+   % actually held.
    verifySubstring(testCase, source, ...
       "grid geometry rather than mass")
    verifySubstring(testCase, source, ...
@@ -314,8 +310,9 @@ function test_saved_results_render_complete_scientific_report(testCase)
 
    % Merge export must NOT be drawn beside melt. Merges average the joined
    % pair, so the export over-counts what the top cell held and runs above
-   % melt; plotting it as a mass-loss curve reads as a model result. The
-   % rendered document is the evidence: no site caption may announce it.
+   % melt; plotting it as a mass-loss curve could be mistaken for a model
+   % result. The rendered document is the evidence: no site caption may
+   % announce it.
    verifyFalse(testCase, contains(source, ...
       "cumulative surface mass loss"))
 
@@ -735,8 +732,8 @@ function test_invalid_saved_contract_is_rejected(testCase)
       scalar_file, render=false), ...
       'icemodel:verification:report:invalidAblationResults')
 
-   % Exercise malformed partitions and reject drift from every fixed scientific
-   % value that governs report interpretation.
+   % Exercise malformed partitions and check that every fixed scientific
+   % value governing report interpretation is validated.
    valid = syntheticResults();
    invalid_policies = cell(17, 1);
    invalid_policies{1} = rmfield(valid.policy, ...
@@ -992,8 +989,8 @@ function results = syntheticResults()
       'observation_sensitivity_max_mwe', 'model_solid_loss_mwe', ...
       'model_minus_observation_mwe', 'relative_difference'});
 
-   % Policy fields used by the report are saved with the result and therefore
-   % cannot drift with later repository changes.
+   % The report reads policy fields from the saved result, so the fixture
+   % stores the policy alongside the data.
    results.policy = ...
       icemodel.verification.namelists.promiceAblationPolicy();
    results.run_name = "synthetic<script>unsafe</script>";
@@ -1011,7 +1008,7 @@ function results = largeUnavailableResults(results)
    %LARGEUNAVAILABLERESULTS Expand the fixture to production-scale empty rows.
 
    % Preserve every operational outcome separately across the 904-row
-   % readiness inventory while deliberately leaving no scientific completion.
+   % readiness inventory while leaving no scientific completion.
    n_rows = 904;
    template = results.summary(2, :);
    results.summary = template(ones(n_rows, 1), :);

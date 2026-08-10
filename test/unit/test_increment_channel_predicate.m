@@ -48,6 +48,6 @@ end
 function test_postprocess_sum_rule_keeps_the_errH_exception(testCase)
    % errH is a residual that sums even though it is not a df_ channel. The
    % predicate must not absorb that exception, or the one caller that needs
-   % it would silently lose it.
+   % it would lose it.
    testCase.verifyFalse(icemodel.isIncrementChannel('errH'))
 end

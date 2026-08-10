@@ -45,8 +45,8 @@ function report_file = buildAblationEvaluationReport(results_file, kwargs)
    end
    results = validateResults(saved.results);
 
-   % Keep all derived report artifacts together unless the caller deliberately
-   % selects another output directory for focused inspection.
+   % All derived report artifacts land beside the results file unless the
+   % caller selects another output directory for focused inspection.
    output_dir = kwargs.output_dir;
    if output_dir == ""
       output_dir = string(fileparts(results_file));
@@ -223,12 +223,10 @@ function policy = validateObservationPolicy(policy)
    canonical = ...
       icemodel.verification.namelists.promiceAblationPolicy();
 
-   % Compare the VALUES that govern results, not the prose that explains them.
-   % A whole-struct comparison meant that rewording a citation invalidated
-   % every saved cohort and forced a multi-hour re-run before any report could
-   % render, which pressures an author to leave documentation wrong. The
-   % guarantee that matters is unchanged: a report still cannot describe a run
-   % whose policy values differ from the current namelist.
+   % Compare the VALUES that govern results, not the prose that explains them,
+   % so rewording a citation does not invalidate a saved cohort. A report
+   % cannot describe a run whose policy values differ from the current
+   % namelist.
    invalid_fixed_policy = ~isequaln( ...
       strippedPolicyValues(policy, canonical), ...
       strippedPolicyValues(canonical, canonical));
@@ -257,9 +255,8 @@ end
 function values = strippedPolicyValues(policy, canonical)
    %STRIPPEDPOLICYVALUES Drop explanatory fields before comparing policies.
    %
-   % The namelist names its own documentation fields, so this never restates
-   % the list. A saved policy predating a documentation field simply lacks it,
-   % which is why removal is guarded by isfield.
+   % The namelist names its own documentation fields. A saved policy that
+   % lacks one of them is valid, so removal is guarded by isfield.
 
    values = policy;
    documentation_fields = canonical.documentation_fields;
@@ -427,11 +424,10 @@ function manifest = writeReportArtifactManifest(results_file, qmd_file, ...
    table_roles = "table_" + table_fields;
    table_paths = arrayfun(@relativeName, table_files);
 
-   % Figure paths retain their output-local report-assets prefix. Captions are
-   % deliberately excluded because they are already embedded in the QMD/HTML.
-   % Caption fields hold prose, not paths, so they are the only exclusions.
-   % Deriving the rest from the struct keeps a newly added figure from silently
-   % escaping the hash manifest.
+   % Figure paths retain their output-local report-assets prefix. Caption
+   % fields hold prose rather than paths and are already embedded in the
+   % QMD/HTML, so they are the only excluded asset fields; every other field
+   % of the struct is hashed.
    asset_fields = string(fieldnames(assets))';
    asset_fields = asset_fields(~endsWith(asset_fields, "_caption"));
    figure_file_parts = cell(numel(asset_fields), 1);
@@ -1277,8 +1273,8 @@ function [file, caption] = siteFigure(result, asset_dir, file_stem, policy)
    % The figure carries two panels. The upper panel keeps the full June-to-
    % October season and marks the selected evaluation window. The lower panel
    % crops to that window and rebases every series at its first row. Both panels
-   % use metres water equivalent on a single axis, because mixing a geometric
-   % metre axis into the same frame invites reading grid translation as mass.
+   % use metres water equivalent on a single axis; a geometric metre axis in the
+   % same frame would put grid translation and mass on one scale.
 
    required = ["observation_lowering_m", "observation_lower_mwe", ...
       "observation_upper_mwe", "observation_reference_mwe", ...
@@ -1605,7 +1601,7 @@ function support = observationSupport(result, policy)
    end
    snow_depth = double(snow_depth);
    % The support rules read more than policy.support_flag_fields, so take the
-   % set from the owner rather than assuming the two coincide.
+   % set from observationSupportFields.
    quality_fields = setdiff( ...
       icemodel.verification.helpers.observationSupportFields( ...
       observation_field, policy), observation_field, 'stable');
@@ -1619,10 +1615,9 @@ function support = observationSupport(result, policy)
       end
       quality(:, k) = double(values);
    end
-   % One owner applies every flag rule, so this cannot drift from the
-   % comparator, the readiness writer, or the runner. The quality matrix is
+   % classifyObservationSupport applies every flag rule. The quality matrix is
    % still needed below to name which flags made a given posting unknown or
-   % flagged, so it is built here and passed in rather than rebuilt there.
+   % flagged, so it is built here and passed in.
    [~, zero_index] = ismember(zero_fields, quality_fields);
    support = icemodel.verification.helpers.classifyObservationSupport( ...
       [double(raw), quality], [observation_field, quality_fields], ...
@@ -1648,9 +1643,9 @@ function support = observationSupport(result, policy)
    flagged = target_finite & quality_finite & nonzero_flag;
    unknown = target_finite & ~quality_finite;
 
-   % Unknown quality takes precedence over flag comparisons so NaN and Inf can
-   % never silently become direct support. Per-row reasons retain the fields that
-   % made a posting unknown or explicitly flagged.
+   % Unknown quality takes precedence over flag comparisons so NaN and Inf
+   % never become direct support. Per-row reasons retain the fields that made a
+   % posting unknown or explicitly flagged.
    support_class = repmat("nonfinite_target", height(data), 1);
    support_class(direct) = "direct";
    support_class(snow_censored) = "snow_censored";
@@ -2244,9 +2239,8 @@ function lines = reportMarkdown(results, results_file, tables, files, ...
        performanceVerdictText(tables.performance_summary)
        ""];
 
-   % Scoring comes before the curve gallery: the question this report exists to
-   % answer is which diagnostic reproduces the measurements, not what the
-   % curves look like.
+   % Scoring comes before the curve gallery so the ranking of which diagnostic
+   % reproduces the measurements appears ahead of the per-site figures.
    lines = [lines; figureOrEmpty(assets.performance_scatter, ...
       "End-of-window cumulative modeled value against measured lowering " ...
       + "converted at the " ...
@@ -2275,8 +2269,8 @@ function lines = reportMarkdown(results, results_file, tables, files, ...
        "### Cumulative ablation by site and year"
        ""];
 
-   % Each result subsection states an honest empty state when saved evidence is
-   % absent rather than manufacturing a plot or conclusion.
+   % Each result subsection states an explicit empty state when saved evidence
+   % is absent, instead of emitting a plot or conclusion.
    if isempty(assets.site)
       lines(end + 1, 1) = ...
          "No site-year completed, so no cumulative scientific comparison is available.";
@@ -2519,15 +2513,13 @@ end
 function text = performanceVerdictText(summary)
    %PERFORMANCEVERDICTTEXT State which diagnostic best matches the observations.
 
-   % The tolerance and ranking density are policy-owned;
-   % ablationPerformanceMetrics uses the same values, so this sentence must not
-   % restate a literal.
+   % The tolerance and ranking density come from the policy;
+   % ablationPerformanceMetrics scores against the same values.
    policy = icemodel.verification.namelists.promiceAblationPolicy();
    tolerance_pct = compose('%g', ...
       100 * policy.scientific.endpoint_tolerance_fraction);
 
-   % A reader must not have to infer the answer from a curve gallery, so the
-   % ranking is stated in prose with the number that produced it.
+   % The ranking is stated in prose together with the number that produced it.
    all_scored = summary(summary.n_scored > 0, :);
    if isempty(all_scored)
       text = "No site-year could be scored against its observations, so " ...
@@ -2650,9 +2642,8 @@ end
 function text = directionalConsensusText(scored)
    %DIRECTIONALCONSENSUSTEXT Warn when the ranking looks like compensating error.
 
-   % When every diagnostic misses the same way, the ranking is measuring how
-   % much each one subtracts rather than which is physically right. Saying so
-   % is the difference between a ranking and a conclusion.
+   % When every diagnostic misses the same way, the ranking measures how much
+   % each one subtracts rather than which is physically right.
    n_low = nnz(scored.median_endpoint_error_mwe < 0);
    n_high = nnz(scored.median_endpoint_error_mwe > 0);
    if n_low == 0 || n_high == 0 || min(n_low, n_high) > 1
@@ -2717,9 +2708,8 @@ end
 function text = mergeExportScaleText(results)
    %MERGEEXPORTSCALETEXT Measure how far merge export exceeds melt.
    %
-   % Quoting a remembered ratio would restate numbers from a different cohort
-   % whenever the report is rebuilt from another results file, so the scale of
-   % the regridding artifact is measured from the run being reported.
+   % The scale of the regridding artifact is measured from the run being
+   % reported, so the quoted ratio always belongs to this results file.
 
    completed = results.site_year_results( ...
       string({results.site_year_results.status}) == "completed");
@@ -2758,8 +2748,8 @@ end
 function text = residenceWindowText(options)
    %RESIDENCEWINDOWTEXT Describe the runoff diagnostic's trailing window.
    %
-   % The window is opts.tlag * opts.dt, a model option, so it is read from the
-   % run being reported instead of restated as a literal in prose.
+   % The window is opts.tlag * opts.dt, so it is read from the model options
+   % of the run being reported.
 
    if ~isstruct(options) || ~isfield(options, 'tlag') ...
          || ~isfield(options, 'dt')
@@ -2790,9 +2780,7 @@ function text = rateSkillText(scored)
 
    % Endpoint agreement and rate agreement are different claims, and a
    % quantized series can win the first while failing the second badly. The
-   % verdict must follow the numbers rather than assert a fixed conclusion,
-   % because a cohort where the model tracks the hourly rate well would
-   % otherwise be described as failing it.
+   % verdict below follows the computed NSE rather than a fixed conclusion.
    best_nse = max(scored.median_nse);
    if ~isfinite(best_nse)
       text = "";
@@ -2800,8 +2788,7 @@ function text = rateSkillText(scored)
    end
 
    % NSE > 0 means the diagnostic beats the observed mean as a predictor of
-   % per-step increments. Below zero it does not, which is the case worth
-   % calling out explicitly.
+   % per-step increments. At or below zero it does not.
    if best_nse > 0.5
       verdict = " Rate agreement is good as well as cumulative: the best " ...
          + "median Nash-Sutcliffe efficiency on per-step increments is " ...

@@ -392,9 +392,8 @@ function results = combinePerfResults(per_model)
    end
 
    % Extract each returned field once, then concatenate the per-model pieces.
-   % This helper exists because the aggregate struct carries both table-like
-   % fields and scalar pass/fail metadata that cannot be collapsed with a
-   % single blind vertcat call.
+   % The aggregate struct carries both table-like fields and scalar pass/fail
+   % metadata, which a single vertcat cannot collapse.
    case_summary = cellfun(@(s) s.case_summary, per_model, ...
       'UniformOutput', false);
    sample_detail = cellfun(@(s) s.sample_detail, per_model, ...

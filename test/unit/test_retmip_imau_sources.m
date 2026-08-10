@@ -1443,7 +1443,7 @@ end
 
 function test_gcnet_inventory_ignores_partial_and_ambiguous_files(testCase)
    % Tolerant inventory must not revive a containing basename or choose between
-   % two normalized copies that fetch status has deliberately left unresolved.
+   % two normalized copies that fetch status leaves unresolved as ambiguous.
    cache = fullfile(testCase.TestData.cache, 'gcnet-inventory-ambiguous');
    first = fullfile(cache, 'package-a');
    second = fullfile(cache, 'package-b');
@@ -4737,8 +4737,8 @@ function cache = makeGcnetCache(root)
    touch(fullfile(simulated, ...
       "Simulated_firn_density_temperature_liquid_water.xml"));
 
-   % Station files are deliberately split across product folders to exercise
-   % recursive validation rather than flat-cache-only matching.
+   % Station files are split across product folders to exercise recursive
+   % validation rather than flat-cache-only matching.
    for station = ["DYE_2", "Summit"]
       touch(fullfile(surface, station + "_surface.nc"));
       touch(fullfile(firn_temperature, station + "_T_firn_obs.nc"));

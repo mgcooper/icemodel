@@ -36,7 +36,7 @@ function manifest = importSumup(source_dir, kwargs)
    %  RCM forcing can be built later, independently, on the staged manifest.
    %  forcing_sources selects RCM sources requested by the current call.
    %  Ordinary calls preserve omitted existing legs; overwrite_family=true
-   %  deliberately replaces the whole family state.
+   %  replaces the whole family state.
    %
    %  Source: SUMup_2025 is read from the LOCAL verification cache
    %  (data/verification/sumup, NSIDC G02288); the files are committed there, so
@@ -108,7 +108,7 @@ function manifest = importSumup(source_dir, kwargs)
    %    Staging one case adds or updates only that case in the family manifest
    %    and preserves every other committed case and file. Re-staging the same
    %    case updates exactly its entry. Set overwrite_family=true only to
-   %    deliberately rebuild the family root.
+   %    rebuild the family root.
    %
    %  Colocation architecture: SUMup observations are staged first as the
    %    bundled data-only observations.mat eval target. Co-located RCM forcing
@@ -398,8 +398,8 @@ function s = stageCase(point, n, source_dir, family_root, proj, ...
 
    obs_file = "observations.mat";
    if ~kwargs.dry_run
-      % Stop a quiet, importer-level cache miss before the standalone builder's
-      % strict fetch can print its user-facing retrieval banner.
+      % Fail on an importer-level cache miss before the standalone builder's
+      % strict fetch prints its user-facing retrieval banner.
       assertSourceAvailable(source_status);
       % Observations are the primary target and are never blocked by forcing.
       [observations, obs_meta] = ...
@@ -654,8 +654,8 @@ function [points, requested_ids] = deduplicateCatalogPoints( ...
    % Multiple staged source families can describe the same logical anchor with
    % slightly different coordinates. The default catalog path should stage one
    % SUMup case per resolved id; explicit points/case_ids still surface
-   % duplicates through the manifest merge validator. MATLAB's stable indices
-   % replace the former hand-maintained seen list without changing first-id wins.
+   % duplicates through the manifest merge validator. The "stable" unique keeps
+   % the first occurrence of each id.
    [~, first_rows] = unique(requested_ids, "stable");
    keep = false(1, numel(requested_ids));
    keep(first_rows) = true;
@@ -894,8 +894,8 @@ end
 function leg = skipNonoverlappingLeg(leg, period)
    %SKIPNONOVERLAPPINGLEG Reject a zero-overlap RCM leg before staging.
    %
-   % resolveLegWindows intentionally returns the source's all-available window
-   % for an unbounded SUMup import. Each SUMup point has its own observation
+   % resolveLegWindows returns the source's all-available window for an
+   % unbounded SUMup import. Each SUMup point has its own observation
    % period, however, so reject only zero-overlap points before an RCM builder
    % can write orphan files. Partially overlapping points retain the shared
    % maximum source window for efficient batching; the later colocation clamp

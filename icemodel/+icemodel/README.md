@@ -27,9 +27,8 @@ than part of solving the physics:
 - **Utilities shared by namespaces that must not depend on each other.**
   `shellQuote` is the one such case: `+internal` needs it to build git and
   cffconvert commands, and `+verification` needs it for fixture packing and
-  the report builders. Neither may depend on the other, so their one shared
-  helper sits here rather than in either. This is a narrow exception to the
-  rule below, not a general one.
+  the report builders. Neither namespace may depend on the other, so their
+  shared helper sits here.
 
 ## What does not belong here
 

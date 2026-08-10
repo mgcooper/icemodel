@@ -9,20 +9,17 @@ function [ledger, solid_p, liquid_p, phase_solid, phase_liquid, ...
    % The optional outputs are the zeroed handoffs the accumulators pass between
    % each other within a substep: accumulate_phase_budget produces solid_p and
    % liquid_p for accumulate_vapor_budget, and both produce the signed
-   % increments accumulate_remesh_budget needs to close gross storage. They
-   % are not ledger fields and are overwritten on the first substep; they are
-   % returned here so the solver gets its codegen predeclarations from the one
-   % function that owns this budget's initial state, rather than restating
-   % seven zeros at the call site.
+   % increments accumulate_remesh_budget needs to close gross storage. They are
+   % not ledger fields and are overwritten on the first substep; returning them
+   % here gives the solver its codegen predeclarations.
    %
    % Storage, phase, vapor, and remesh changes are positive into the column.
    % Overflow and merge export are positive out; unapplied vapor retains
    % rejected-input sign.
    %
    % Codegen builds the struct from the field list written out below, so the
-   % order here is what the kernel compiles against. budgetoutputs
-   % holds the same names for the output and retiming code, and a test checks
-   % the two lists still match.
+   % order here is what the kernel compiles against. budgetoutputs holds the
+   % same names for the output and retiming code.
    %
    %#codegen
 

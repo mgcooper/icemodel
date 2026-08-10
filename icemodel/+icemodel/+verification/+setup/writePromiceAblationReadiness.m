@@ -241,14 +241,13 @@ function forcing = forcingPayload(c, input_data_root, policy)
    end
    try
       loaded = load(filled_file, 'met');
-      % Reuse the runtime's strongest product/provenance gate so scientific
-      % readiness cannot admit a stale policy, engine, registry, or channel
-      % ledger that the model itself would reject.
+      % Apply the same runtime product/provenance gate the model uses, so a
+      % stale policy, engine, registry, or channel ledger is rejected here too.
       icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
          filled_file, loaded.met, case_id)
-      % Whole-artifact readiness is intentionally not the cohort gate: a
-      % requested year is admissible only when forcingCoverage below finds one
-      % complete contiguous window that encloses that exact annual request.
+      % Whole-artifact readiness is not the cohort gate: a requested year is
+      % admissible only when forcingCoverage below finds one complete
+      % contiguous window that encloses that exact annual request.
       [~, payload_reason, forcing.windows, payload_cadence_seconds] = ...
          icemodel.verification.setup.metArtifactReadiness(filled_file);
       forcing.ledger = readtable(readiness_file, TextType='string');
@@ -450,9 +449,9 @@ function [row, reason] = observationStatus( ...
    end
 
    % Primary support excludes every detected step because this audit applies no
-   % de-step. A correctable classification is evidence, not a correction.
-   % One owner applies every flag rule, so this cannot drift from the
-   % comparator, the runner, or the report builder.
+   % de-step. A correctable classification is evidence, not a correction. The
+   % flag rules come from classifyObservationSupport, which the comparator, the
+   % runner, and the report builder also call.
    flag_fields = icemodel.verification.helpers.observationSupportFields( ...
       target, policy);
    support = icemodel.verification.helpers.classifyObservationSupport( ...

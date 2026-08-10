@@ -38,8 +38,8 @@ function test_over_prediction_has_positive_signed_error(testCase)
    per_case = icemodel.verification.ablationPerformanceMetrics(results);
 
    % A constant offset shifts the level but not the rate, so it shows up in
-   % the endpoint error and cancels out of the increments. This is exactly why
-   % the two are reported separately.
+   % the endpoint error and cancels out of the increments; the two are
+   % reported separately.
    rows = per_case.case_id == "perfect" ...
       & per_case.diagnostic == "model_runoff_mwe" ...
       & per_case.density_kg_m3 == scoringDensity();
@@ -96,8 +96,8 @@ function test_pooled_rmse_weights_by_sample_count(testCase)
       & aggregate.density_kg_m3 == scoringDensity());
    testCase.verifyEqual(pooled, expected, 'AbsTol', 1e-12);
 
-   % Guard against the assertion going vacuous again: pooling must span more
-   % than one case, the weights must differ, and the error must be nonzero.
+   % Guard against the assertion being vacuous: pooling must span more than
+   % one case, the weights must differ, and the error must be nonzero.
    testCase.verifyGreaterThan(nnz(rows), 1);
    testCase.verifyGreaterThan(numel(unique(weights)), 1);
    testCase.verifyGreaterThan(max(per_case.rmse_mwe(rows)), 0);
@@ -111,8 +111,9 @@ end
 function density = scoringDensity()
    %SCORINGDENSITY Dense endpoint of the policy band, used by the fixtures.
    %
-   % Derived rather than restated so a policy band change surfaces as a real
-   % failure instead of every filter silently selecting zero rows.
+   % Read from the policy rather than written as a literal, so a band change
+   % fails the tests instead of leaving every fixture filter matching zero
+   % rows.
 
    policy = icemodel.verification.namelists.promiceAblationPolicy();
    density = policy.effective_density_kg_m3(end);

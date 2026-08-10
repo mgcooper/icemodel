@@ -126,9 +126,9 @@ k_vap_jordan = Ls * De .* drov_dT_buck;
 %[text] Incorrect (Liston): $k\_v = \\frac{D\_e L\_s}{R\_v T}\\frac{de\_s}{dT}$ (missing $-e\_s/T$)
 k_vap_liston = Ls * De ./ (Rv * T) .* des_dT_buck;
 %%
-%[text] The original error was attempting to reconcile the two by substituting $\\rho\_v bc/(c+T\_d)^2 = d\\rho\_v/dT + \\rho\_v/T$ into the Liston expression:
+%[text] The incorrect reconciliation substitutes $\\rho\_v bc/(c+T\_d)^2 = d\\rho\_v/dT + \\rho\_v/T$ into the Liston expression:
 k_vap_wrong = Ls * De .* (drov_dT_buck + rov_buck ./ T);
-%[text] This gives Liston's answer, not Jordan's. The error is that Liston's formula was used as the starting point.
+%[text] This gives Liston's answer, not Jordan's, because Liston's formula is the starting point.
 %%
 %[text] Verify: Liston's formula equals the incorrect reconciliation
 assert(max(abs(k_vap_wrong - k_vap_liston)) < 1e-10, ...
@@ -170,7 +170,7 @@ k_vap_sntherm = Ls * De .* drov_dT_jordan;
 %[text] The second derivatives (for Newton solvers):
 %[text] $\\frac{d^2 e\_s}{dT^2} = \\frac{e\_s}{T^2}\\left\[\\left(c-1\\right)\\left(c - \\frac{2b}{T}\\right) + \\frac{b^2}{T^2}\\right\]$
 %[text] $\\frac{d^2 \\rho\_v}{dT^2} = \\frac{\\rho\_v}{T^2}\\left\[(c-2)\\left(c-1-\\frac{2b}{T}\\right) + \\frac{b^2}{T^2}\\right\]$
-%[text] Note: the Ambaum derivatives are simpler than Buck's for higher orders. Buck's $d^2 e\_s/dT^2$ involves $(c+T\_d)^3$ denominators, while Ambaum's involves only powers of $T$.
+%[text] The Ambaum derivatives are simpler than Buck's for higher orders. Buck's $d^2 e\_s/dT^2$ involves $(c+T\_d)^3$ denominators, while Ambaum's involves only powers of $T$.
 %%
 %[text] ### Symbolic verification of derivatives
 %[text] The symbolic derivatives confirm the analytical expressions.
@@ -229,7 +229,7 @@ title('Vapor heat transfer coefficient (Jordan compact form)') %[output:83d4516c
 %[text] where $c^\* = c - T\_f$ (the Celsius-offset form).
 %[text] The second derivative of vapor density:
 %[text] $\\frac{d^2\\rho\_v}{dT^2} = \\frac{\\rho\_v}{T}\\left(\\frac{1}{T} - \\frac{2}{c^\* + T}\\right) + \\frac{d\\rho\_v}{dT}\\left(\\frac{1}{\\rho\_v}\\frac{d\\rho\_v}{dT} - \\frac{2}{c^\* + T}\\right)$
-%[text] Note: the second derivative expressed in terms of $e\_s$ (minimum operations, implemented in icemodel.vapor.saturation_vapor_pressure):
+%[text] The second derivative expressed in terms of $e\_s$ (minimum operations, implemented in icemodel.vapor.saturation_vapor_pressure):
 %[text] $\\frac{d^2\\rho\_v}{dT^2} = \\frac{1}{R\_v T}\\left\[\\frac{de\_s}{dT}\\left(\\frac{1}{e\_s}\\frac{de\_s}{dT} - \\frac{2}{c^\*}\\right) - \\frac{2}{T}\\left(\\frac{de\_s}{dT} - \\frac{e\_s}{T}\\right)\\right\]$
 %%
 %[text] ## References

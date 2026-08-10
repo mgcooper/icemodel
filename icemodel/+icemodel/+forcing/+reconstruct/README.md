@@ -59,8 +59,8 @@ retained unmodified as the provenance source.
   `2026-07-23-promice-gap-filling-and-ktransect`.
 - Every filled sample carries a `uint8` provenance code and every contiguous
   segment has an audit row.
-- `setopts` is the single source for scalar knobs, channel lists, and proxy
-  source mappings. Dedicated functions own per-channel bounds, admission caps,
+- `setopts` defines the scalar knobs, channel lists, and proxy source
+  mappings. Dedicated functions define per-channel bounds, admission caps,
   precipitation names, and bucket edges.
 - Every required non-precipitation output is planned. Precipitation is excluded
   from the statistical method set at option validation and at the direct

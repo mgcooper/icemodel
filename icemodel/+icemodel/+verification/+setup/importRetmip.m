@@ -14,7 +14,7 @@ function manifest = importRetmip(source_dir, kwargs)
    %    products are safely persisted.
    %    forcing_sources selects runtime sources requested by the current call.
    %    Ordinary calls preserve omitted existing legs; overwrite_family=true
-   %    deliberately replaces the whole family state.
+   %    replaces the whole family state.
    %    build_observations=false is a guarded non-dry fast path: requested cases
    %    must already exist in the target manifest, whose observation entry is
    %    reused while selected forcing is attached.
@@ -90,7 +90,7 @@ function manifest = importRetmip(source_dir, kwargs)
    %    Staging one case adds or updates only that case in the family manifest
    %    and preserves every other committed case and file. Re-staging the same
    %    case updates exactly its entry. Set overwrite_family=true only to
-   %    deliberately rebuild the family root.
+   %    rebuild the family root.
    %
    %  Returns
    %    manifest : struct  Final or dry-run family manifest.

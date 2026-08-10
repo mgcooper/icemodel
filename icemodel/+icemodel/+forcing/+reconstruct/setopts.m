@@ -5,16 +5,14 @@ function opts = setopts(kwargs)
    %  opts = icemodel.forcing.reconstruct.setopts(blend_hours=3)
    %
    % Role
-   %  Single source of every scalar knob and channel list the
-   %  reconstruction pipeline consumes. Engine functions default their
-   %  own name-value arguments from this function and the production
-   %  driver passes one opts struct down, so each parameter is defined
-   %  exactly once. Per-channel physical bounds, admission bias caps,
-   %  and gap-duration bucket edges stay with their dedicated
-   %  single-source functions (physicalBounds, admissionGate,
-   %  bucketEdges); this function owns the scalar knobs, the channel
-   %  namelists, and the proxy-source catalog derived from the repo's
-   %  canonical alias map.
+   %  Defines every scalar knob and channel list the reconstruction
+   %  pipeline consumes. Engine functions default their own name-value
+   %  arguments from this function and the production driver passes one
+   %  opts struct down. Per-channel physical bounds, admission bias
+   %  caps, and gap-duration bucket edges live in physicalBounds,
+   %  admissionGate, and bucketEdges. This function supplies the scalar
+   %  knobs, the channel namelists, and the proxy-source catalog derived
+   %  from the repo's canonical alias map.
    %
    % Name-value (all optional; defaults are the approved policy values)
    %  required_channels : channels the ready_icemodel verdict must
@@ -31,8 +29,8 @@ function opts = setopts(kwargs)
    %     interpolation; unsupported channels are rejected at construction.
    %  proxy_sources : short RCM family labels, in adoption-preference
    %     order. Only MAR and MERRA are complete-meteorology fallbacks;
-   %     storage directories and provenance identities are derived, never
-   %     restated (see proxyCatalog).
+   %     proxyCatalog resolves each label to its storage directory and
+   %     provenance identity.
    %  cap_hours : tier-1 interior interpolation cap (wall-clock hours),
    %     at most the adopted six-hour policy ceiling.
    %  cap_hours_by_channel : per-channel tier-1 cap overrides (POLICY
@@ -139,8 +137,7 @@ function opts = setopts(kwargs)
       % Per-channel tier-1 cap overrides (POLICY B3/D-21): a struct whose
       % fields name interp channels and whose values replace cap_hours for
       % that channel only. Defaults empty = every channel uses cap_hours.
-      % The default SWD override is supported by the D-39 held-out
-      % evidence. Any future extension still needs its own evidence.
+      % The SWD override rests on the D-39 held-out evidence.
       kwargs.cap_hours_by_channel (1, 1) struct = struct()
       kwargs.jump_factor (1, 1) double {mustBePositive} = 3
       kwargs.blend_hours (1, 1) double {mustBeNonnegative} = 6
@@ -240,9 +237,9 @@ function opts = setopts(kwargs)
          'channels have no tier-1 interpolation policy: %s', ...
          strjoin(unsupported_interpolation, ', '));
    end
-   % Materialize evidenced defaults only after the caller's interpolation
-   % schema is valid. A deliberately narrower schema must not inherit an
-   % irrelevant override, and an explicit caller value wins.
+   % Apply the evidenced defaults only after the caller's interpolation
+   % schema is valid. A narrower schema takes no override for a channel it
+   % excludes, and an explicit caller value wins.
    defaults = defaultInterpolationOverrides();
    for f = string(fieldnames(defaults)).'
       if ismember(f, kwargs.interp_channels) ...
@@ -268,9 +265,8 @@ function opts = setopts(kwargs)
    end
    opts = kwargs;
    opts.proxy_sources = proxy_sources;
-   % The catalog is derived, never restated: storage tokens come from the
-   % repo's canonical alias map and provenance identities from the
-   % published code registry.
+   % Storage tokens come from the repo's canonical alias map and
+   % provenance identities from the published code registry.
    opts.proxy_catalog = proxyCatalog(opts.proxy_sources);
 end
 

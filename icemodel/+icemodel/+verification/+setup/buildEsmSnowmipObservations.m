@@ -140,11 +140,10 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
       albs = nan(ntime, 1);
    end
 
-   % MATLAB reads the native tsl dimensions as sdepth x time. Preserve that
-   % source orientation when normalizing singleton dimensions; each row must
-   % remain one physical soil depth, so this operation intentionally does not
-   % transpose the source data. Sites without tsl produce zero soil-temperature
-   % columns rather than a placeholder NaN soil layer.
+   % MATLAB reads the native tsl dimensions as sdepth x time. The reshape
+   % normalizes singleton dimensions while preserving that orientation, so
+   % each row stays one physical soil depth. Sites without tsl produce zero
+   % soil-temperature columns rather than a placeholder NaN soil layer.
    if has_tsl
       tsl = icemodel.verification.setup.readNetcdfVariable(obsfile, "tsl");
       tsl = reshape(tsl, [], ntime);

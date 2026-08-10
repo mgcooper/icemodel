@@ -69,8 +69,9 @@ function [Data, metadata] = buildGcnetVandecruxData(station, kwargs)
 
    % The source posts hourly timestep amounts for mass terms. Convert snowfall
    % to the met-contract m s-1 rate and mass diagnostics to mWE/h rates. The
-   % actual files are hourly, but deriving dt from the coordinate makes the
-   % policy explicit for fixtures and future source revisions.
+   % files are hourly, but the timestep comes from the time coordinate
+   % rather than a fixed hour, so
+   % fixtures and other source postings convert with their own cadence.
    dt_hours = timeStepHours(Time);
    dt_seconds = dt_hours * 3600;
 
@@ -172,7 +173,8 @@ function [Data, metadata] = buildGcnetVandecruxData(station, kwargs)
    [Data, checks] = icemodel.forcing.helpers.metchecks(Data, ...
       fillgaps=kwargs.fillgaps);
 
-   % Keep the output stable and labelled through the canonical metadata map.
+   % Emit the mapped channels in a fixed column order and stamp the
+   % canonical metadata.
    preferred = ["tair", "tsfc", "swd", "swu", "lwd", "lwu", "swn", ...
       "lwn", "netr", "shf", "lhf", "thf", "albedo", "rh", "wspd", ...
       "psfc", "rainf", "snowf", "melt", "subl", "smb", "surface_height"];

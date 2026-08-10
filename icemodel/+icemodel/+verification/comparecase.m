@@ -64,10 +64,9 @@ function result = comparecase(case_id, kwargs)
    % The eval target is a forcing-agnostic, data-only observations.mat bundle
    % referenced via evaluation_file/evaluation_path (ESM-SnowMIP, SUMup, and
    % freshly staged PROMICE cases); Snow/Colbeck cases load their evaluation.mat
-   % the same way. Only PROMICE fixtures staged before the observations.mat
-   % contract lack that file; they fall back to reconstituting the PROMICE-obs
-   % target on demand from the staged per-year userdata files the manifest
-   % declares.
+   % the same way. Older PROMICE fixtures lack that file; they fall back to
+   % reconstituting the PROMICE-obs target on demand from the staged per-year
+   % userdata files the manifest declares.
    if isfield(manifest, 'evaluation_path') ...
          && strlength(string(manifest.evaluation_path)) > 0 ...
          && isfile(manifest.evaluation_path)

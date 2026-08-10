@@ -32,8 +32,8 @@ function result = packFixtures(version, kwargs)
       kwargs.silent (1, 1) logical = false
    end
 
-   % Parse selection through the shared manifest gate so list, pack, and fetch
-   % cannot disagree about capability membership or install paths.
+   % Parse selection through the shared manifest gate, which defines capability
+   % membership and install paths for list, pack, and fetch.
    [~, selection] = icemodel.verification.setup.fixtureFileList( ...
       capabilities=kwargs.capabilities, root=kwargs.root, ...
       manifest=kwargs.manifest);
@@ -53,7 +53,7 @@ function result = packFixtures(version, kwargs)
    end
 
    % Verify source bytes against the authoritative file rows before producing
-   % any artifact; packaging must never silently bless source drift.
+   % any artifact, so a source that no longer matches the manifest fails here.
    [missing, mismatched] = verifyFiles(kwargs.root, selection.files);
    if ~isempty(missing) || ~isempty(mismatched)
       error('icemodel:verification:packFixtures:sourceMismatch', ...
@@ -88,8 +88,8 @@ function result = packFixtures(version, kwargs)
          'Pass overwrite=true to replace them.'], kwargs.staging_dir)
    end
 
-   % Build every artifact outside the final staging tree. A later archive or
-   % manifest failure therefore cannot leave partial outputs that poison retry.
+   % Build every artifact outside the final staging tree, so a later archive or
+   % manifest failure leaves no partial outputs in the staging directory.
    work_dir = makeWorkDir(kwargs.staging_dir);
    cleaner = onCleanup(@() removeTree(work_dir));
    work_archive_files = fullfile(work_dir, ...
@@ -136,8 +136,8 @@ function result = packFixtures(version, kwargs)
       kwargs.staging_dir, work_dir);
    clear cleaner
 
-   % Preserve the historical scalar fields for one-capability callers while
-   % exposing vectors for the normal multi-capability v1.1 pack.
+   % Keep the scalar fields for one-capability callers while exposing vectors
+   % for the normal multi-capability v1.1 pack.
    result = struct( ...
       'version', version, ...
       'capabilities', selection.capabilities, ...

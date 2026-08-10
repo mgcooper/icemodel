@@ -49,8 +49,8 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err] = ...
 
    % Compute delta f_liq.
    %
-   % Note, the only process which affects f_liq between d_liq assignments here
-   % is phase change (icemodel.column.solve_column_enthalpy).
+   % The only process which affects f_liq between d_liq assignments here is
+   % phase change (icemodel.column.solve_column_enthalpy).
    d_liq = d_liq + f_liq - xf_liq;
 
    % Reset past values for budgeting evap/condensation.

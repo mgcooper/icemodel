@@ -5,9 +5,8 @@ function tf = promiceFilledVerificationMatches(opts, fileiter) %#codegen
    % The MATLAB verifier therefore snapshots the exact forcing label, station,
    % requested window, calendar/model contract, simulation years, 15-minute
    % timestep, and met-file list it checked. A separate provenance flag keeps
-   % options minted by the older manifest/coverage-only verifier out of the
-   % generated path; this predicate also refuses reuse after any runtime input
-   % changes.
+   % options minted by a manifest/coverage-only verifier out of the generated
+   % path. This predicate refuses reuse after any runtime input changes.
    if nargin < 2 || isempty(fileiter)
       fileiter = 1:numel(opts.metfname);
    end

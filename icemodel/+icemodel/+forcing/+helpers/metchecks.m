@@ -12,9 +12,8 @@ function [met, checks] = metchecks(met, kwargs)
    %  2. Gap-fills each variable by linear interpolation with
    %     nearest-value end fill. Wind direction (wdir) is circular, so it
    %     is filled through its unit-vector components rather than
-   %     linearly. (The legacy runoff metchecks linear-filled wdir, which
-   %     corrupts fills that cross the 360/0 wrap; the component fill is
-   %     an intentional fix, recorded in the +forcing README.)
+   %     linearly; a linear fill corrupts gaps that cross the 360/0 wrap. The
+   % component fill is written up in the +forcing README.
    %  3. Clamps recognized variables to the legacy physical ranges:
    %
    %        albedo   [0.05, 0.98]   [-]

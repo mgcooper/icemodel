@@ -71,8 +71,8 @@ function [summary, aligned, diagnostics, policy] = compareAblation( ...
    observation_fields = policy.required_observation_fields;
    snow_values = obs_values(:, ...
       observation_fields == policy.snow_variable);
-   % One owner applies every flag rule, so this cannot drift from the
-   % readiness writer, the runner, or the report builder.
+   % classifyObservationSupport applies the PROMICE flag rules and returns the
+   % row-shaped support masks used below.
    support = icemodel.verification.helpers.classifyObservationSupport( ...
       obs_values, observation_fields, policy.observation_field, policy);
    metadata_flagged = support.metadata_flagged;
@@ -402,7 +402,7 @@ function identities = closureIdentities(ledger, policy, Ls, Lv, ro_liq)
       - ledger.mass_budget_liquid_start_mwe;
 
    % Four checkpoint mass identities retain solid, liquid, phase, and total
-   % storage views even though the total identity is intentionally redundant.
+   % storage views. The total identity is redundant with the other three.
    rows(1) = identityRow("solid_storage", "mwe", ...
       d_s, step_d_s, p_s + v_s + r_s, p_s_q + v_s_q + r_s_q, ...
       policy, 1);
@@ -643,8 +643,8 @@ function counts = exclusionCounts(in_window, eligible, obs_finite, ...
    %
    % metadata_flagged arrives as a logical mask from
    % classifyObservationSupport, so it is already finite-and-nonzero and must
-   % not be re-tested with > 0. That rule is shared with the readiness
-   % writer, so a malformed negative posting counts as flagged in both.
+   % not be re-tested with > 0. A malformed negative posting therefore counts
+   % as flagged.
    counts = struct( ...
       'gap_bridged', nnz(in_window & gap_bridged), ...
       'station_transition', nnz(in_window & station_transition), ...

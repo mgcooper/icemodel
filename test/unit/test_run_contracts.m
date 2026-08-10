@@ -164,9 +164,9 @@ function test_configureRun_preserves_forcing_snow_depth_override(testCase)
 end
 
 function test_configureRun_guards_monin_obukhov_solver_contract(testCase)
-   % The bulk-MO scheme requires seb_solver=2 and should be accepted by the
-   % current Dirichlet and Robin solver paths. configureRun now coerces the
-   % surface solver to seb_solver=2 with a warning instead of erroring.
+   % The bulk-MO scheme requires seb_solver=2 and is accepted by the current
+   % Dirichlet and Robin solver paths. configureRun coerces the surface
+   % solver to seb_solver=2 and issues a warning.
 
    workspace = testCase.TestData.workspace;
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
@@ -324,8 +324,8 @@ end
 
 function test_incompatible_simyears_and_window_errors(testCase)
    % A window that touches calendar years not covered by SIMYEARS is a
-   % caller error; the canonicalization step refuses to silently widen
-   % SIMYEARS or trim the window.
+   % caller error; the canonicalization step refuses to widen SIMYEARS or
+   % trim the window.
 
    testCase.verifyError(@() icemodel.setopts( ...
       'icemodel', 'kanm', [2015 2016], 'kanm', ...

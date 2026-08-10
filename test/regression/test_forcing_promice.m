@@ -691,7 +691,7 @@ function test_buildPromiceData_reads_l3_evaluation_channels(testCase)
 
    % Ablation: cumulative surface lowering, positive-down, monotone-ish, with
    % a physically plausible multi-year magnitude (KAN_L lowers ~57 m over the
-   % window; the homegrown derivation inflated multi-year totals).
+   % window).
    ab = Data.ablation(isfinite(Data.ablation));
    testCase.verifyGreaterThan(numel(ab), 1000);
    testCase.verifyEqual(ab(1), 0, 'AbsTol', 1e-6);   % zeroed at window start
@@ -767,9 +767,9 @@ function test_buildPromiceData_keeps_wholly_masked_tice10m_contract(testCase)
 end
 
 function test_buildPromiceData_gap_flag_from_sensors_not_just_z_nan(testCase)
-   % The improved gap flag is sensor-derived: it must catch slope-bridged
-   % samples (all surface sensors NaN but z finite) that the old z-NaN-only
-   % heuristic missed. MIT has thousands of such samples, so the new
+   % The gap flag is sensor-derived: it catches slope-bridged samples (all
+   % surface sensors NaN but z finite), not just samples where z itself is
+   % NaN. MIT has thousands of such samples, so the sensor-derived
    % gap-flagged count must EXCEED the bare z-NaN count.
 
    [Data, metadata] = icemodel.forcing.buildPromiceData("MIT", ...
@@ -782,8 +782,8 @@ function test_buildPromiceData_gap_flag_from_sensors_not_just_z_nan(testCase)
 
    names = string(Data.Properties.VariableNames);
    testCase.verifyTrue(ismember("surface_height_flag", names));
-   % The sensor-derived gap count must strictly exceed the z-NaN-only count
-   % (slope-bridged segments are now flagged too).
+   % The sensor-derived gap count must strictly exceed the z-NaN-only count:
+   % slope-bridged segments are flagged too.
    testCase.verifyGreaterThan(metadata.gap_flagged_samples, z_nan_only);
 end
 

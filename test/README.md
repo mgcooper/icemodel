@@ -25,9 +25,8 @@ Operator-facing usage notes for the public runners and study tools live in:
    - component benchmarks and selected exploratory microbenchmarks
    - top-level benchmark files are the core kernel benchmarks run by default
    - opt-in microbenchmarks can live in subfolders such as `benchmarks/micro/`
-   - representative core benchmark files now live in:
-     `SebKernelPerfTest.m`, `ColumnKernelPerfTest.m`,
-     and `SpectralKernelPerfTest.m`
+   - the core benchmark files are `SebKernelPerfTest.m`,
+     `ColumnKernelPerfTest.m`, and `SpectralKernelPerfTest.m`
 7. `tools/`
    - explicit build/snapshot utilities
 8. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/+icemodel/+test/+helpers/`
@@ -150,8 +149,7 @@ Programmatic regression helpers:
      current sampling budget even though the benchmark itself remained valid.
    - Benchmark-specific interpretation notes should live with the benchmark
      file itself when the timing result motivated a code choice.
-   - The rename/round history is reconciled into `RenameRoundTest.m` rather
-     than split across separate manual scripts.
+   - The rename/round benchmarks live in `RenameRoundTest.m`.
 7.  `build_runoff_reference_from_runoff(...)`
    - Refresh the static runoff reference data in `test/references/`.
    - This is separate from baseline management and requires the sibling
@@ -175,8 +173,9 @@ Programmatic regression helpers:
       is not intact glacier-ice density, and the numeric band edges are
       ordered pointwise for signed lowering.
    - Chooses one longest summer interval with a 0.05 m trace-snow continuity
-     threshold and a 0.01 m exposed-ice threshold for paired values; censored
-     rows remain explicit rather than splitting or silently scoring snow cover.
+     threshold and a 0.01 m exposed-ice threshold for paired values. Censored
+     rows stay explicit: the interval is not split, and snow-covered rows are
+     not scored.
    - An empty `case_ids` selection is readiness-only and writes no run
      artifacts. To persist the ledger, summaries, and saved result bundle,
      name the cases (or pass `case_ids="all"`) and set
@@ -198,8 +197,8 @@ Formal suites run from `icemodel` only and read these local files:
 
 They do not require `runoff` on path at execution time.
 
-The SUMup canonical identity-union regression is deliberately excluded from an
-ordinary regression pass by an assumption because it restages 47 observation
+The SUMup canonical identity-union regression is excluded from an ordinary
+regression pass by an assumption because it restages 47 observation
 cases from three multi-million-row NetCDF files. Before a canonical SUMup
 replacement, opt in explicitly and run only that file:
 

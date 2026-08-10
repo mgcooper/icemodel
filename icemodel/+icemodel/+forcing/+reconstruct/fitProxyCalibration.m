@@ -53,8 +53,8 @@ function calibration = fitProxyCalibration(times, x_obs, x_model, channel, kwarg
       kwargs.target_elevation (:, 1) double = zeros(0, 1)
    end
 
-   % A supplied elevation vector must cover the axis exactly; a silent
-   % length mismatch would disable the binned fit without any signal.
+   % A supplied elevation vector must cover the axis exactly; a length
+   % mismatch would disable the binned fit.
    if ~isempty(kwargs.target_elevation) ...
          && numel(kwargs.target_elevation) ~= numel(times)
       error('icemodel:reconstruct:fitProxyCalibration:targetElevationSize', ...

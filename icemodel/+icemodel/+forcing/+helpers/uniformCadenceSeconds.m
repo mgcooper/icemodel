@@ -5,8 +5,7 @@ function cadence_seconds = uniformCadenceSeconds(value)
    %
    % VALUE is a timetable. CADENCE_SECONDS is its sample spacing in seconds, or
    % NaN if the timetable has fewer than two rows or the spacing is not
-   % constant. Everything that needs a cadence calls this, so writers and
-   % readiness checks cannot disagree about what counts as regular.
+   % constant.
 
    arguments
       value timetable

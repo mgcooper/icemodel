@@ -19,13 +19,12 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %  Stages the requested ESM-SnowMIP site cases under the resolved
    %  data/eval/esm_snowmip/<sitename>/ tree. All 10 reference sites are
    %  supported; the per-site forcing and observation artifacts are produced by
-   %  the reusable builders buildEsmSnowmipForcing / buildEsmSnowmipObservations
-   %  so the same conversion path is used for staging and for any future
-   %  on-the-fly icemodel run.
-   %  This importer intentionally has no forcing_sources/build_observations split:
-   %  each site's source forcing and observations share one requested window and
-   %  are staged as one atomic ESM-SnowMIP case conversion. There is no optional
-   %  RCM attachment path to refresh independently.
+   %  the reusable builders buildEsmSnowmipForcing / buildEsmSnowmipObservations,
+   %  the same conversion path an on-the-fly icemodel run would use.
+   %  There is no forcing_sources/build_observations split: each site's source
+   %  forcing and observations share one requested window and are staged as one
+   %  atomic ESM-SnowMIP case conversion, with no optional RCM attachment path
+   %  to refresh independently.
    %
    %  Window resolution
    %    - With no startdate / enddate, each site stages the full source record
@@ -257,7 +256,7 @@ function s = stageCase(sitename, source_dir, family_root, input_root, ...
    end
 
    % Forcing-agnostic schema: evaluation_file references observations.mat and
-   % reference_file is empty because the old smoke reference was redundant.
+   % reference_file is empty because this family stages no reference series.
    % native_timestep records the staged model-met cadence used by standard
    % runtime filename resolution, not the raw hourly source cadence.
    staged_timestep = kwargs.dt_out;
@@ -298,12 +297,14 @@ end
 function permafrost_zone = casePermafrostZone(sitename)
    %CASEPERMAFROSTZONE Obu et al. (2019) extent per SnowMIP site.
    %
+   % Obu et al. (2019) supersedes the Brown et al. (1997) map used for the v1
+   % permafrost_zone values, so staged v1 values will not always match.
+   %
    % Hard-coded results of a point-in-polygon test of the Obu et al. (2019) ESA
    % GlobPermafrost / UiO PEX permafrost-zone map at each ESM-SnowMIP site
    % (test/interactive/site_classification/classify_site_facies.m). All ten sites are off-ice land
    % surfaces. Sites outside any permafrost polygon -> "none". Vocabulary:
-   % icemodel.verification.namelists.permafrostzone. Replaces the v1 Brown et al.
-   % (1997) source.
+   % icemodel.verification.namelists.permafrostzone.
    switch lower(string(sitename))
       case "sod"   % Sodankyla, boreal Lapland
          permafrost_zone = "continuous";

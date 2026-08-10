@@ -24,9 +24,8 @@ function result = fillPromiceStation(site, kwargs)
    %
    % Name-value
    %  opts : reconstruction options struct from
-   %     icemodel.forcing.reconstruct.setopts — the single source of the
-   %     channel lists, thresholds, proxy-source order, and seed this
-   %     driver consumes.
+   %     icemodel.forcing.reconstruct.setopts, holding the channel lists,
+   %     thresholds, proxy-source order, and seed this driver consumes.
    %  family : staged native product family token (default "promice").
    %     Derives the met_dir default data/input/met/<family>, the native
    %     target grammar met_<site>_<family>_*_15m.mat, the producer
@@ -132,8 +131,8 @@ function result = fillPromiceStation(site, kwargs)
           icemodel.forcing.reconstruct.acceptanceWindow( ...
           site, met_dir=met_dir, location=location, opts=opts);
     catch exception
-       % A malformed or internally disjoint proxy inventory invalidates the
-       % old A6 product just as surely as an empty or record-disjoint window.
+       % A malformed or internally disjoint proxy inventory invalidates any
+       % published A6 product, as an empty or record-disjoint window does.
        if kwargs.write && startsWith(string(exception.identifier), ...
              "icemodel:reconstruct:acceptanceWindow:")
           retirePublishedArtifacts(site, out_dir, qa_dir, family);
@@ -394,7 +393,7 @@ function result = fillPromiceStation(site, kwargs)
    % admitted, proxy, and constant tier. A staged series with no swu
    % column at all still ships the derived product (POLICY B10): the
    % channel is created empty so the derivation owns every sample instead
-   % of being silently skipped and branding swu wholly missing. SWU is not
+   % of being skipped and branding swu wholly missing. SWU is not
    % a forcing-plan channel, so an existing native column must explicitly
    % carry its native provenance into this dependent-channel pass.
    names_now = string(filled.Properties.VariableNames);
@@ -837,8 +836,7 @@ function quarters = disaggregatePostings(values, disaggregate, bounds, n_slots)
    end
    % Postings the redistribution cannot settle (every sample pinned at a
    % bound, or a posting itself outside bounds) fall back to exact held
-   % copies — trivially mean-preserving and never worse than the
-   % pre-D-30 repetition behavior.
+   % copies, which are trivially mean-preserving.
    bad = ~(abs(v - mean(S, 2)) <= 1e-9 * max(1, abs(v))) ...
       | any(~isfinite(S), 2);
    S(bad, :) = repmat(v(bad), 1, n_slots);
@@ -847,10 +845,9 @@ end
 
 function bounds = disaggregationBounds(channel)
    %DISAGGREGATIONBOUNDS Clamp limits for one disaggregated channel.
-   % The scalar registry is the single source (A15); precipitation
-   % components share the total's entry because they are the same
-   % nonnegative accumulation quantity and hold no registry row of
-   % their own.
+   % Limits come from the A15 scalar registry; precipitation components
+   % share the total's entry because they are the same nonnegative
+   % accumulation quantity and hold no registry row of their own.
    if ismember(channel, icemodel.forcing.helpers.precipitationVariables())
       channel = "ppt";
    end
@@ -860,10 +857,10 @@ end
 function [filled, provenance, audit] = closeResidualShortGaps( ...
       filled, provenance, audit, native, codes, opts, location)
    %CLOSERESIDUALSHORTGAPS Bridge short slivers exposed by later tiers.
-   % The public fillShortGaps implementation remains the single source of
-   % interpolation physics. This orchestration pass only supplies the
-   % completed series as candidate anchors while freezing seam scales to
-   % the untouched native record.
+   % The public fillShortGaps implementation holds the interpolation
+   % physics. This orchestration pass only supplies the completed series as
+   % candidate anchors while freezing seam scales to the untouched native
+   % record.
    names = string(filled.Properties.VariableNames);
    native_names = string(native.Properties.VariableNames);
    channels = intersect(opts.interp_channels, names, 'stable');
@@ -972,8 +969,7 @@ end
 function [series, location, winter_mask, filename, native_provenance, ...
       flat_run_findings] = loadStationMet(met_dir, site, opts, family)
    %LOADSTATIONMET Load one staged native met timetable and its point.
-   % The PROMICE native builder historically filled every albedo gap and
-   % selected
+   % The PROMICE native builder fills every albedo gap and selects
    % missing deep-night shortwave as physical zero. Where the source NetCDF
    % is recorded, replay the builder selection to distinguish observations
    % from both classes of derived values; only observations may fit or seed
@@ -1068,8 +1064,8 @@ function [series, location, winter_mask, filename, native_provenance, ...
          'lon_wgs84', ud.site_location.lon_wgs84, ...
          'elev_m', ud.site_location.elev_m);
    else
-      % No usable location form: keep the legacy failure shape (the same
-      % top-level field access the pre-family loader made).
+      % No usable location form: read the top-level fields directly so the
+      % failure names the missing lat_wgs84, lon_wgs84, or elev_m.
       location = struct('lat_wgs84', ud.lat_wgs84, ...
          'lon_wgs84', ud.lon_wgs84, 'elev_m', ud.elev_m);
    end
@@ -1449,8 +1445,8 @@ function verifyNativeMetIdentity(filename, data_root, site, family)
    % its colocation.<family> staged-met leg (bead icemodel-g1n.49); the
    % identity rules below are family-neutral.
    manifest_file = fullfile(data_root, 'eval', char(family), 'manifest.json');
-   % Family label used by every message here; promice keeps its historical
-   % uppercase spelling because upper() reproduces it exactly.
+   % Family label used by every message here; upper() reproduces the
+   % PROMICE spelling exactly.
    family_label = upper(family);
    if ~isfile(manifest_file)
       error(['icemodel:reconstruct:fillPromiceStation:' ...
@@ -1859,8 +1855,8 @@ function proxies = loadStagedProxies(site, location, catalog, selected_files)
    %LOADSTAGEDPROXIES Load the canonical staged per-site RCM proxy met.
    % ACCEPTANCEWINDOW has already validated and pinned the per-source file
    % set: the widest anchor plus any span extenders (POLICY A6). Consume
-   % only those pinned paths so discovery cannot drift from the producer
-   % manifest. The anchor owns every sample inside its own span; extender
+   % only those pinned paths, which are the producer manifest's own
+   % selection. The anchor owns every sample inside its own span; extender
    % files contribute rows strictly outside it, restricted to the
    % anchor's channels so the source series keeps one schema.
    slots = cell(numel(catalog), 1);
@@ -1936,8 +1932,7 @@ function proxies = loadStagedProxies(site, location, catalog, selected_files)
          end
          combined = sortrows([combined; extra]);
       end
-      % The merged source must carry exactly one row per posting; a
-      % duplicate means the dedup contract above regressed, and silent
+      % The merged source must carry exactly one row per posting;
       % duplicates would let file order decide which value wins.
       if numel(unique(combined.Properties.RowTimes)) ~= height(combined)
          error(['icemodel:reconstruct:fillPromiceStation:' ...
@@ -1962,8 +1957,8 @@ function [filled, provenance, audit] = adoptModisAlbedo( ...
     % POLICY A11/B12 (activated by D-15): GEUS C6 daily albedo is an
     % albedo-only observational source ranking ahead of the RCM proxies in
     % the last-resort order. The staged artifact attaches through
-    % icemodel.forcing.modisToMetCadence — the single daily->met-cadence
-    % conversion path — so no second interpolation rule can drift. A site
+    % icemodel.forcing.modisToMetCadence, which holds the daily->met-cadence
+    % conversion rule. A site
     % with no staged artifact (or none with usable retrievals) simply
     % leaves the gap for the RCM tier; absence is not an error because
     % bedrock sites legitimately stage no_source_coverage artifacts.
@@ -2056,7 +2051,7 @@ function [filled, provenance, audit] = adoptPrecip(filled, provenance, ...
     % Normalize pre-existing precipitation before any adoption. Native rain
     % is the protected observation (A10), including a finite invalid value:
     % retain it so the publication boundary refuses the source defect rather
-    % than silently replacing an observation. Invalid totals and snow phases
+    % than replacing an observation. Invalid totals and snow phases
     % re-enter as missing so a valid proxy split can replace them.
     invalid_total = isfinite(ppt) ...
        & ~icemodel.forcing.reconstruct.scalarValidity("ppt", ppt);
@@ -2442,8 +2437,8 @@ function readiness = readinessLedger(site, native, filled, plan, opts, location)
 
       % Grade the icemodel set once; the snowmodel verdict reuses it and
       % appends the snowfall-input and phase-identity requirements.
-      % Grading is deliberately SCALAR-only (A15/D-28): completeness plus
-      % the physicalBounds registry, never the relational rules.
+      % Grading is SCALAR-only (A15/D-28): completeness plus the
+      % physicalBounds registry, never the relational rules.
       invalid_after = strings(numel(required) + 2, 1);
       n_invalid = 0;
       worst_residual = 0;
@@ -2466,8 +2461,8 @@ function readiness = readinessLedger(site, native, filled, plan, opts, location)
       % Relational DIAGNOSTICS (A15/D-28): the fraction of scalar-valid
       % samples that exceed the paired rule, reported beside the
       % verdicts but never allowed to flip one. The swd check reuses
-      % physicalValidity so the diagnostic and the candidate gate can
-      % never disagree about the ceiling.
+      % physicalValidity, so the diagnostic and the candidate gate apply
+      % the same ceiling.
       relational_notes = strings(2, 1);
       n_relational = 0;
       worst_relational = 0;
@@ -2486,8 +2481,7 @@ function readiness = readinessLedger(site, native, filled, plan, opts, location)
          end
       end
       % swu is derived and never required (A5/B10), so the diagnostic
-      % gates on PRODUCT presence — the required-set gate left this
-      % branch dead in every policy-default run (review pass 9).
+      % gates on PRODUCT presence rather than on the required set.
       if ismember("swu", names)
          values = filled.swu(in_year);
          swd_reference = nan(size(values));
@@ -2578,8 +2572,8 @@ end
 
 function invalid = scalarInvalid(channel, values)
    %SCALARINVALID Finite-and-in-scalar-bounds failure mask for one channel.
-   % Verdict grading is deliberately scalar-only (POLICY A15/D-28), and
-   % the shared registry keeps the bound values single-sourced.
+   % Verdict grading is scalar-only (POLICY A15/D-28); the bound values
+   % come from the shared registry.
    invalid = ~icemodel.forcing.reconstruct.scalarValidity(channel, values);
 end
 
@@ -2612,8 +2606,7 @@ function met_file = writeArtifacts(site, filled, provenance, audit, ...
    % honesty): every provenance column whose channel ships in the met
    % timetable ships beside it, so channels stamped outside plan.channels
    % (adopted precipitation, boom_height, and the driver-created swu that
-   % deriveUpwardShortwave fills) always carry their codes instead of
-   % depending on per-list attachment that once skipped them.
+   % deriveUpwardShortwave fills) always carry their codes.
    met = filled;
    for name = string(provenance.Properties.VariableNames)
       if ismember(name, string(met.Properties.VariableNames))

@@ -190,7 +190,8 @@ function rows = intervalSourceRows(observation_table, aligned)
       return
    end
 
-   % Older aligned tables did not retain their source row explicitly.
+   % An aligned table without a source_row column requires a lookup on the
+   % exact interval bounds.
    rows = zeros(height(aligned), 1);
    for n = 1:height(aligned)
       rows(n) = find(observation_table.start_date == aligned.start_date(n) ...

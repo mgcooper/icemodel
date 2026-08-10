@@ -26,7 +26,7 @@ function pathname = assertRootRelativeArtifactSha256( ...
          relative_path)
    end
 
-   % Reuse the shared hash check once the path is known to be ours.
+   % Check the file bytes once the path is known to be inside the root.
    icemodel.verification.helpers.assertArtifactSha256( ...
       pathname, expected_sha256);
 end

@@ -149,9 +149,7 @@ function RegressionBaseline = buildSingleModelRegressionBaseline( ...
       c = cases(icase, :);
       fprintf('Regression baseline case %d/%d: %s\n', ...
          icase, height(cases), c.case_id)
-      % Build the baseline through the same helper the comparison uses, so an
-      % accepted baseline can never be produced by a different code path than
-      % the suite that gates it.
+      % Build the baseline through the same helper the comparison suite uses.
       [ice1, ~, opts_run] = icemodel.test.helpers.runModelCase(c);
 
       % Load the matched runoff reference row, if one exists, before
@@ -226,8 +224,7 @@ function RegressionBaseline = buildSingleModelRegressionBaseline( ...
          "regression", cases, output_file, history_size=profile_history_size);
    end
 
-   % Archive only after every candidate and optional diagnostic has completed;
-   % no invalid or interrupted build may create a misleading acceptance event.
+   % Archive only after every candidate and optional diagnostic has completed.
    if baseline_type == "rolling"
       icemodel.test.helpers.archiveManagedBaseline(output_file, "regression");
    end

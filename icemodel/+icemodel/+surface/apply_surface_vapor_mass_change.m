@@ -13,9 +13,9 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
    %
    %#codegen
 
-   % Clarify the CV budget for a future refactor that accounts for f_bub. For
-   % glacier ice or any medium w/closed pores, "availableCapacity" is a misnomer
-   % if f_por is defined as 1-f_ice since it does not account for f_bub.
+   % Reference definitions for the control-volume budget. For glacier ice or
+   % any medium w/closed pores, "availableCapacity" is a misnomer if f_por is
+   % defined as 1-f_ice since it does not account for f_bub.
    %
    % Canonical definitions for snow:
    %
@@ -60,7 +60,7 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
             % only residual water exists, send d_pevp to sublimation
 
             if debug == true
-               fprintf('metstep = %d, f_liq(1) < f_res\n', metstep)
+               fprintf('f_liq(1) < f_res, d_pevp sent to sublimation\n')
             end
 
          elseif abs(d_pevp) <= (f_liq_top - f_res) % availWater >= evap
@@ -140,8 +140,8 @@ function [f_ice, d_sbl_err] = sublimation(d_pevp, f_ice, f_liq, f_ice_min, ...
    %
    % d_psbl = d_pevp * (Lv * ro_liq) / (Ls * ro_ice)
    %
-   % Note: in icemodel, ro_air_Lv is set to ro_air * Lv or ro_air * Ls depending
-   % on liqflag, so Qe is already computed wrt to them. That way evap/subl are
+   % In icemodel, ro_air_Lv is set to ro_air * Lv or ro_air * Ls depending on
+   % liqflag, so Qe is already computed wrt to them. That way evap/subl are
    % computed using the same formula: e = Qe / ro_air_Lv * dt / dz.
    %
    % The conversion here conserves heat when the surface latent heat flux, Qe,
@@ -186,8 +186,8 @@ function [f_ice, d_sbl_err] = sublimation(d_pevp, f_ice, f_liq, f_ice_min, ...
       return
    end
 
-   % Note: layer combination is based on f_ice, so requiring f_ice_top < 0
-   % should suffice (rather than <f_ice_min). If f_ice(1) + d_psbl < 0, it will
+   % Layer combination is based on f_ice, so requiring f_ice_top < 0 should
+   % suffice (rather than <f_ice_min). If f_ice(1) + d_psbl < 0, it will
    % error, otherwise the layers will combine if f_ice(1) + d_psbl < f_min.
 
    % Budget sublimation

@@ -238,10 +238,10 @@ function [ice1, ice2] = roundData(ice1, ice2)
    round_names = vars1(~keep_precision);
    increment_names = vars1(is_increment & ~is_budget);
 
-   % The isnumeric guards are defensive and are needed only by this
-   % per-variable form: round rejects a logical, where brace extraction used
-   % to widen one silently. retimeLogical can move a logical ice2 flag channel
-   % into ice1, though no shipped vars2 list currently names one.
+   % The isnumeric guards are needed only by this per-variable form, because
+   % round rejects a logical column. retimeLogical can
+   % move a logical ice2 flag channel into ice1, though no shipped vars2 list
+   % currently names one.
    for k = 1:numel(round_names)
       if isnumeric(ice1.(round_names{k}))
          ice1.(round_names{k}) = round(ice1.(round_names{k}), 5);

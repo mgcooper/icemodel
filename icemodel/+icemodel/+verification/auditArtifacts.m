@@ -373,8 +373,8 @@ function [artifacts, findings] = omittedMetArtifacts(c, discovered, input_root)
    artifacts = repmat(discovered(1), 0, 1);
    findings = repmat(emptyFinding(), 0, 1);
 
-   % Comparison discovery intentionally omits RCM met files. Preserve manifest
-   % authority by adding only each staged leg's exact recorded paths.
+   % Comparison discovery omits RCM met files. Preserve manifest authority by
+   % adding only each staged leg's exact recorded paths.
    if isfield(c, 'colocation') && isstruct(c.colocation)
       names = string(fieldnames(c.colocation));
       for name = reshape(names, 1, [])
@@ -408,7 +408,7 @@ function [artifacts, findings] = omittedMetArtifacts(c, discovered, input_root)
       end
    end
 
-   % Atomic ESM manifests deliberately have no forcing leg. Resolve their one
+   % Atomic ESM manifests have no forcing leg. Resolve their one
    % runnable met artifact through the same standard chain as a model run, but
    % never override a future explicit met declaration.
    found_kinds = [string({discovered.kind}), string({artifacts.kind})];
@@ -901,7 +901,7 @@ function [channels, findings, times, cadence] = inspectTable(T, table_path, ...
          channel.maximum = max(real_values, [], 'all');
       end
 
-      % Canonical metadata is checked through the single existing variable map.
+      % Canonical metadata is checked against the canonical variable map.
       [canonical, expected_unit] = canonicalUnit(name, T, units);
       compatible_units = expected_unit;
       if is_event_bundle && name == "subsurface_temperature"
@@ -1129,7 +1129,7 @@ function findings = validateArtifactPeriod(record, times, period)
       tolerance = max(tolerance, record.cadence_seconds);
    end
    if ismember(record.kind, ["met", "userdata"])
-      % Cached forcing artifacts may intentionally enclose a narrower manifest
+      % Cached forcing artifacts may enclose a narrower manifest
       % leg. They are valid when they cover the full leg; downstream loading
       % subsets them to the declared window.
       if seconds(actual_start - expected_start) > tolerance ...
@@ -1843,8 +1843,8 @@ function findings = marDiagnosticChecks(T, metadata, record)
    end
 
    % Recompute the daily ME/MEH ledger from the staged artifact. This is the
-   % only cross-product identity enforced: SUH/SU and RZ/pure refreeze remain
-   % deliberately non-equivalent.
+   % only cross-product identity enforced: SUH/SU and RZ/pure refreeze are not
+   % equivalent quantities.
    day_status = uint8(metadata.mar_diagnostic_melt_day_status(:));
    reference = double(metadata.mar_diagnostic_melt_daily_reference_mwe(:));
    residual = double(metadata.mar_diagnostic_melt_residual_mwe_day(:));
@@ -2253,7 +2253,7 @@ function findings = promiceThermistorChecks(T, metadata, record)
    end
 
    % The canonical target must be source-identical where accepted and missing
-   % wherever QC is nonzero. This catches silent edits and unmasked failures.
+   % wherever QC is nonzero. This catches edited values and unmasked failures.
    accepted = flag == 0;
    if any(isfinite(target(~accepted))) ...
          || ~isequaln(target(accepted), source(accepted))

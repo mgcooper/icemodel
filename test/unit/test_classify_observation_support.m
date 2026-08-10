@@ -1,13 +1,12 @@
 function tests = test_classify_observation_support
    %TEST_CLASSIFY_OBSERVATION_SUPPORT Flag-support rules for observation rows.
    %
-   % icemodel.verification.helpers.classifyObservationSupport is the single
-   % owner of how a PROMICE observation row is judged supported. Four consumers
-   % read it: the comparator, the readiness writer, the evaluation runner, and
-   % the report builder. Before it existed each re-derived these masks, and the
-   % collapses only agreed while every policy flag list had exactly one member.
-   % These tests pin the rules at list lengths above one, which is where the
-   % old duplicated code would have diverged.
+   % icemodel.verification.helpers.classifyObservationSupport judges whether a
+   % PROMICE observation row is supported; the comparator, the readiness
+   % writer, the evaluation runner, and the report builder all call it. These
+   % tests pin the rules at flag-list lengths above one, since a per-row
+   % collapse and a per-matrix count only agree when every list has exactly
+   % one member.
 
    tests = functiontests(localfunctions);
 end
@@ -17,7 +16,7 @@ function policy = fixturePolicy()
    %
    % The real policy lists mostly have one member today. Testing at one member
    % cannot distinguish a per-row collapse from a per-matrix count, so the
-   % fixture deliberately uses two.
+   % fixture uses two.
 
    policy = struct( ...
       'support_flag_fields', ["s1", "s2", "g1", "g2", "m1", "m2"], ...
@@ -58,8 +57,8 @@ function test_clean_row_is_directly_supported(testCase)
 end
 
 function test_a_nonfinite_target_is_not_flag_clean(testCase)
-   % flag_clean must carry the target's finiteness, because three of the four
-   % consumers compose it that way and one composed it without.
+   % flag_clean must carry the target's finiteness, not just the flags, so a
+   % row with a missing target is never reported as flag_clean.
 
    returned = classify([NaN, 0, 0, 0, 0, 0, 0, 0, 0]);
    verifyFalse(testCase, returned.target_finite)
@@ -71,10 +70,10 @@ function test_a_nonfinite_target_is_not_flag_clean(testCase)
 end
 
 function test_a_nonfinite_direct_flag_is_not_a_zero_flag(testCase)
-   % NaN == 0 is false, so a naive all(values == 0) would already reject this
-   % row. The isfinite term matters for the set-flag tests below, and stating
-   % it here keeps direct_flags_zero true on its own rather than by relying on
-   % quality_finite to have caught it first.
+   % NaN == 0 is already false, so all(values == 0) alone rejects this row.
+   % The isfinite term matters for the set-flag masks below, where without it
+   % a NaN would read as a raised flag. Testing it here keeps
+   % direct_flags_zero correct on its own rather than via quality_finite.
 
    returned = classify([1.5, NaN, 0, 0, 0, 0, 0, 0, 0]);
    verifyFalse(testCase, returned.quality_finite)
@@ -83,8 +82,8 @@ function test_a_nonfinite_direct_flag_is_not_a_zero_flag(testCase)
 end
 
 function test_a_set_flag_in_the_second_list_member_is_seen(testCase)
-   % The whole point of collapsing per row: a flag set only in the second
-   % member of a multi-member list must still register.
+   % A flag set only in the second member of a multi-member list must still
+   % register as raised.
 
    gap_second = classify([1.5, 0, 0, 0, 1, 0, 0, 0, 0]);
    verifyTrue(testCase, gap_second.gap_flagged)
@@ -103,9 +102,8 @@ function test_nonfinite_is_not_a_set_flag_but_negative_is(testCase)
    verifyFalse(testCase, nonfinite.station_transition)
    verifyFalse(testCase, nonfinite.unresolved_step)
 
-   % A finite negative posting is malformed rather than missing, and does
-   % count as set: excluding the row is the conservative direction. This pins
-   % the rule rather than leaving it to be inferred from the guard.
+   % A finite negative posting is malformed rather than missing, and counts
+   % as set; excluding the row is the conservative direction.
    negative = classify([1.5, 0, 0, -1, 0, 0, 0, 0, 0]);
    verifyTrue(testCase, negative.gap_flagged)
 end
@@ -150,8 +148,8 @@ function test_masks_are_row_shaped_for_a_multi_row_matrix(testCase)
 end
 
 function test_a_missing_column_is_rejected(testCase)
-   % Silently dropping a column would make an all() or any() collapse answer a
-   % narrower question than the caller asked, with no error.
+   % A missing column must raise, rather than let an all() or any() collapse
+   % compute over fewer columns than the caller asked for.
 
    verifyError(testCase, @() ...
       icemodel.verification.helpers.classifyObservationSupport( ...

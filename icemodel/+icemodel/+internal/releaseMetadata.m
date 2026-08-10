@@ -123,7 +123,7 @@ function result = observeRelease(version, repository, concept_doi, ...
    version_doi = "";
 
    % A valid but incomplete public state is resumable. Malformed or failed
-   % public reads return an error result instead of masquerading as pending.
+   % public reads return an error result rather than a pending one.
    while true
       elapsed = max(0, clock() - started);
       if elapsed >= timeout_seconds

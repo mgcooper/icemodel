@@ -7,10 +7,10 @@ function report = summarize_spectral_perf(kwargs)
    % This diagnostic reports:
    %  1. kernel timings for the inlined, exact, and lookup paths
    %  2. direct whole-model timings for exact vs lookup
-   %  3. agreement metrics against the historical inlined path using the same
-   %     scalar summary semantics as the formal regression suite
+   %  3. agreement metrics against the inlined path using the same scalar
+   %     summary semantics as the formal regression suite
    %
-   % The kernel section preserves all three variants (inlined, exact, lookup)
+   % The kernel section includes all three variants (inlined, exact, lookup)
    % because those functions are called directly. The direct-model section
    % compares only exact vs lookup via opts.lookup_k_bulk.
 

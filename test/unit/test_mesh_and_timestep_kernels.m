@@ -20,8 +20,8 @@ function test_cvmesh_uniform_and_exponential_layout(testCase)
 end
 
 function test_interp1_nearest_preserves_expected_spectral_remap(testCase)
-   % The spectral density remap now uses direct nearest-neighbor interp1, so
-   % verify the expected shape and values on a compact controlled example.
+   % The spectral density remap uses direct nearest-neighbor interp1; verify
+   % the expected shape and values on a compact controlled example.
 
    ro_sno = interp1([0.2; 0.6; 1.0], [300; 400; 500], [0.1; 0.5; 0.9], ...
       'nearest', 'extrap');
@@ -293,9 +293,9 @@ end
 
 function test_bottom_layer_merge_removes_it_and_conserves_mass(testCase)
    % A deepest layer below f_ice_min must actually be removed. The clone that
-   % preserves column length is taken AFTER the deletion; taking it first
-   % copied the layer being removed back into the column, so the layer stayed
-   % while the one above it kept only half the pair's mass.
+   % preserves column length must be taken AFTER the deletion; taking it
+   % first would copy the removed layer back into the column, leaving the
+   % layer above it with only half the pair's mass.
 
    [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
    dz = 0.04;

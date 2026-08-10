@@ -524,7 +524,7 @@ end
 
 function test_shortgaps_albedo_override_closes_day_scale_sliver(testCase)
    % D-41: albedo seam remnants use the observed-only-supported
-   % 30-hour linear bridge and cannot silently widen beyond it.
+   % 30-hour linear bridge; a wider cap is rejected.
    times = (datetime(2020, 7, 1, 0, 0, 0, 'TimeZone', 'UTC'): ...
       hours(1):datetime(2020, 7, 2, 3, 0, 0, ...
       'TimeZone', 'UTC')).';
@@ -816,8 +816,8 @@ function test_elevation_psfc_barometric(testCase)
    % Pressure follows the barometric factor, with the scale height taken
    % from the fallback temperature by default and a supplied coincident
    % temperature when the caller has one.
-   % Constants come from the canonical physical-constant source so the
-   % expectation can never drift from the implementation.
+   % Constants come from the canonical physical-constant source shared with
+   % the implementation.
    [Rd, g] = icemodel.physicalConstant('Rd', 'gravity');
    x = [80000; 82000];
    returned = icemodel.forcing.reconstruct.elevationAdjust("psfc", x, 1000);
@@ -1013,8 +1013,8 @@ function test_swd_donor_transfer_uses_station_specific_csi(testCase)
 end
 
 function test_donor_apply_one_sample_respects_lag(testCase)
-   % A singleton application axis supports a zero-lag transfer but cannot
-   % silently treat a fitted nonzero lag as zero.
+   % A singleton application axis supports a zero-lag transfer but returns
+   % NaN rather than treating a fitted nonzero lag as zero.
    time = datetime(2020, 1, 1, 'TimeZone', 'UTC');
    model = struct('kind', "linear", 'slope', 2, 'intercept', 1);
    models = struct('DJF', model, 'MAM', model, 'JJA', model, 'SON', model);
@@ -1450,7 +1450,7 @@ end
 
 function test_provenance_registry_values(testCase)
    % The registry is the append-only published mapping; any renumbering
-   % would silently re-label staged products, so pin every value.
+   % would re-label staged products, so every value is pinned here.
    returned = icemodel.forcing.reconstruct.provenanceCodes();
    expected = struct( ...
       'observed', uint8(0), ...
@@ -1495,7 +1495,7 @@ end
 %% reconstructSeries
 
 function test_reconstruct_composes_tiers_with_provenance(testCase)
-   % Three deliberate summer gaps compose through the tiers: a 3 h gap
+   % Three summer gaps compose through the tiers: a 3 h gap
    % fills by tier-1 interpolation, a 12 h gap by the first admitted
    % method (donor), and a 48 h gap by climatology after the donor
    % declines; stratum-restricted decoys never fire outside their
@@ -1963,8 +1963,8 @@ function test_reconstruct_darkness_zero_fills_swd_nights(testCase)
    % below civil twilight are KNOWN zeros. A multi-day March swd outage
    % with no admitted methods gets its deep-dark samples zero-filled with
    % the darkness provenance code, while twilight-band and daylight
-   % samples stay honestly missing — decomposed into per-day fragments
-   % for the bucketed methods (none here).
+   % samples stay missing, decomposed into per-day fragments for the
+   % bucketed methods (none here).
    series = icemodel.test.fixtures.makeReconstructSeries();
    times = series.Properties.RowTimes;
    codes = icemodel.forcing.reconstruct.provenanceCodes();
@@ -2004,8 +2004,8 @@ function test_reconstruct_darkness_zero_fills_swd_nights(testCase)
    testCase.verifyEqual(returned(dark), zeros(numel(dark), 1));
    testCase.verifyEqual(result.provenance.swd(dark), ...
       repmat(codes.darkness, numel(dark), 1));
-   % Twilight and daylight samples stay missing — twilight is left to
-   % the fill tiers (none admitted here), never hard-zeroed.
+   % Twilight and daylight samples stay missing; twilight is left to
+   % the fill tiers (none admitted here) rather than hard-zeroed.
    testCase.verifyTrue(all(~isfinite(returned(light))));
    testCase.verifyEqual(result.provenance.swd(light), ...
       repmat(codes.missing, numel(light), 1));
@@ -2019,9 +2019,9 @@ end
 
 function test_reconstruct_darkness_leaves_twilight_to_methods(testCase)
    % D-28 twilight handling: samples between civil twilight and sunrise
-   % are NOT known zeros — stations measure real diffuse light there —
-   % so an admitted method (not the darkness pre-pass) fills them, while
-   % deep darkness still zero-fills first.
+   % are not known zeros, because stations measure real diffuse light
+   % there, so an admitted method (not the darkness pre-pass) fills them,
+   % while deep darkness still zero-fills first.
    series = icemodel.test.fixtures.makeReconstructSeries();
    times = series.Properties.RowTimes;
    codes = icemodel.forcing.reconstruct.provenanceCodes();
@@ -2059,8 +2059,9 @@ function test_reconstruct_darkness_leaves_twilight_to_methods(testCase)
    testCase.verifyEqual(returned(dark), zeros(numel(dark), 1));
    testCase.verifyEqual(result.provenance.swd(dark), ...
       repmat(codes.darkness, numel(dark), 1));
-   % Twilight samples carry the METHOD's finite fill and provenance —
-   % values may be seam-blended, so provenance is the honest witness.
+   % Twilight samples carry the method's finite fill and provenance;
+   % values may be seam-blended, so provenance records which method
+   % produced each value.
    testCase.verifyTrue(all(isfinite(returned(twilight))));
    testCase.verifyEqual(result.provenance.swd(twilight), ...
       repmat(codes.mar, numel(twilight), 1));
@@ -2096,7 +2097,7 @@ function test_reconstruct_wholly_missing_shortwave_keeps_known_darkness(testCase
 end
 
 function test_reconstruct_rejects_unknown_channel(testCase)
-   % Channels missing from the series fail loudly instead of silently
+   % Channels missing from the series raise an error instead of
    % composing nothing.
    series = icemodel.test.fixtures.makeReconstructSeries();
    codes = icemodel.forcing.reconstruct.provenanceCodes();
@@ -2212,8 +2213,8 @@ end
 function test_physical_validity_accepts_precomputed_geometry(testCase)
     % Hot-loop callers pass axis-sliced precomputed solar geometry; the
     % verdict and both per-sample limits must match the internally
-    % computed path exactly, and wrong-length vectors must be refused
-    % rather than silently recomputed.
+    % computed path exactly, and wrong-length vectors must raise an
+    % error rather than being recomputed.
     times = datetime(2020, 3, 21, 'TimeZone', 'UTC') + hours(0:23).';
     values = 120 * ones(numel(times), 1);
     toa = icemodel.forcing.reconstruct.toaIrradiance(times, 67.0, -48.8);

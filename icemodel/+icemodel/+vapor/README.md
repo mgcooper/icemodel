@@ -22,5 +22,3 @@ Contents:
 Rules:
 - keep general thermodynamic transforms here
 - keep column microstructure transport, such as `vapor_mass_transfer`, in `icemodel.column`
-
-Migration status: active vapor thermodynamics and atmosphere-surface conversion helpers now live here.

@@ -32,9 +32,9 @@ function assertFormalBaselineCandidate(kind, candidate, cases, selector)
    % candidates additionally require valid samples and positive timing state.
    switch kind
       case "regression"
-         % Keep this a closed metadata allowlist. In particular, baseline_tag
-         % is a persisted build identity, not a numerical regression metric;
-         % any other unregistered column is still validated as a metric.
+         % Closed metadata allowlist. baseline_tag is a persisted build
+         % identity, not a numerical regression metric; every column not
+         % listed here is validated as a metric.
          metadata = ["case_id", "tier", "baseline_type", "baseline_tag", ...
             "smbmodel", "sitename", "forcings", "simyear", "solver", ...
             "last_updated_utc"];

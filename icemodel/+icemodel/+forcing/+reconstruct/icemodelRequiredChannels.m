@@ -4,11 +4,11 @@ function channels = icemodelRequiredChannels()
    %  channels = icemodel.forcing.reconstruct.icemodelRequiredChannels()
    %
    % Role
-   %  Single source of the A5 ready_icemodel channel set, consumed by the
+   %  Defines the A5 ready_icemodel channel set, consumed by the
    %  reconstruction ledger default (reconstruct.setopts
    %  required_channels) and the runtime forcing gate
-   %  (icemodel.forcing.reconstruct.verifyPromiceFilledReadiness) so the two can never
-   %  silently diverge. swu is derived and never required (A5/A16/B10);
+   %  (icemodel.forcing.reconstruct.verifyPromiceFilledReadiness).
+   %  swu is derived and never required (A5/A16/B10);
    %  rainf is never required (rain inclusion is a model option, D-0b);
    %  snowfall input (ppt OR snowf) is graded separately by the
    %  ready_snowmodel verdict, never here.
@@ -19,7 +19,6 @@ function channels = icemodelRequiredChannels()
    % See also: icemodel.forcing.reconstruct.setopts,
    %  icemodel.forcing.reconstruct.verifyPromiceFilledReadiness
 
-   % Keep this explicit so an A5 change is a deliberate policy edit made
-   % exactly once.
+   % The A5 forcing channels, written out explicitly.
    channels = ["tair", "rh", "wspd", "psfc", "swd", "lwd", "albedo"];
 end

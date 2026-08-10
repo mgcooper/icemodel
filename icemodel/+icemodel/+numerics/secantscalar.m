@@ -7,7 +7,7 @@ function [x_next, ok] = secantscalar(x_prev, r_prev, x, r, ...
    %
    % Acts only when the last two residuals bracket a root, meaning both are
    % finite and nonzero with opposite signs. Otherwise the caller's fallback
-   % is returned unchanged, so early iterations behave as if this were absent.
+   % is returned unchanged, so early iterations proceed on the fallback alone.
    % A step further than jumpmax from x is clamped to x +/- jumpmax. The
    % fallback is returned only if the clamped step leaves the bracket.
    %

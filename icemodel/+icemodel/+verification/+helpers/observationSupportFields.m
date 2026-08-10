@@ -4,20 +4,15 @@ function fields = observationSupportFields(target_field, policy)
    % fields = icemodel.verification.helpers.observationSupportFields( ...
    %    target_field, policy)
    %
-   % The single owner of which columns
-   % icemodel.verification.helpers.classifyObservationSupport needs, so every
-   % consumer extracts the same set. Each used to build this union by hand,
-   % which put the drift one level above the rules rather than removing it: a
-   % new flag list added to the policy would have reached only the call sites
-   % somebody remembered to update, and the others would have raised
-   % missingField for some site-years and not others.
+   % Returns the columns
+   % icemodel.verification.helpers.classifyObservationSupport reads.
    %
    % promiceAblationPolicy derives required_observation_fields from this, so
    % the comparator gets the set through the policy; the readiness writer, the
    % evaluation runner, and the report builder call it directly.
    %
    % The target column comes first, then every flag group in policy order.
-   % Duplicates are dropped because the policy lists deliberately overlap.
+   % Duplicates are dropped because the policy lists overlap.
    %
    % Inputs
    %  target_field - name of the target observation column.

@@ -9,8 +9,8 @@ function [baseline_type, baseline_tag, output_file, input_path, ...
    %     baseline, baseline_tag, tier, smbmodel, output_file, simyear, ...
    %     solver, smoke_sites, full_sites)
    %
-   % This helper centralizes the common build-time setup shared by
-   % `build_perf_baseline` and `build_regression_baseline`:
+   % Performs the build-time setup used by `build_perf_baseline` and
+   % `build_regression_baseline`:
    %  1. resolve rolling vs release baseline naming
    %  2. locate the repo root and read the already-installed test config
    %  3. load the canonical formal case matrix for the requested suite

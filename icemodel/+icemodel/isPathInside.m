@@ -4,10 +4,10 @@ function tf = isPathInside(pathname, root)
    %  tf = icemodel.isPathInside(pathname, root)
    %
    % Role
-   %  Single canonical-path containment predicate for every root-scoped
-   %  artifact check (reconstruction driver, runtime readiness gate,
-   %  report builder). Canonicalization through java.io.File resolves
-   %  symlinks and relative segments so escapes cannot hide behind
+   %  Canonical-path containment predicate for root-scoped artifact checks
+   %  (reconstruction driver, runtime readiness gate, report builder).
+   %  Canonicalization through java.io.File resolves symlinks and relative
+   %  segments, so a path that escapes the root cannot hide behind
    %  aliasing.
    %
    % Returns

@@ -2,8 +2,8 @@ function tests = test_plot_helpers
    %TEST_PLOT_HELPERS Cover the shared report-figure helpers.
    %
    % Report builders share these so figures look the same and stay out of the
-   % legend. markTimeSpan gained a fill style for panels that highlight many
-   % spans at once, where boundary lines would be unreadable.
+   % legend. markTimeSpan supports a fill style for panels that highlight
+   % many spans at once, where boundary lines would be unreadable.
    tests = functiontests(localfunctions);
 end
 
@@ -38,8 +38,8 @@ function test_fill_style_draws_one_shaded_region(testCase)
 end
 
 function test_unknown_style_is_rejected(testCase)
-   % The style set is closed, so a typo fails instead of silently drawing the
-   % default.
+   % The style set is closed, so a typo raises an error instead of drawing
+   % the default.
    ax = scratchAxes(testCase);
    t0 = datetime(2019, 7, 1);
    testCase.verifyError(@() icemodel.plot.markTimeSpan(ax, t0, ...

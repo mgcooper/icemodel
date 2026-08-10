@@ -4,9 +4,9 @@ function h = markTimeSpan(ax, t_start, t_end, kwargs)
    %  h = icemodel.plot.markTimeSpan(ax, t1, t2)
    %
    % Role
-   %  Single source of the span-annotation style report figures use to
-   %  highlight an interval (a filled gap, an event window), excluded from
-   %  the legend so overlay labels stay clean.
+   %  Draws the span annotation report figures use to highlight an interval
+   %  (a filled gap, an event window). The annotation is excluded from the
+   %  legend so overlay labels stay clean.
    %
    %  style="lines" draws one boundary line at each end. style="fill" shades
    %  the interval instead, for panels that highlight many spans at once and
