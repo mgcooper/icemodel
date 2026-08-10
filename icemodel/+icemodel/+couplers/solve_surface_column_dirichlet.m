@@ -106,11 +106,11 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
       [T_sfc, hist] = icemodel.couplers.accelerate_coupler_iterate( ...
          hist, Ts_old, T_sfc, cpl_alpha, cpl_jumpmax, cpl_aitken);
 
-      % Check convergence.
-      if abs(T_sfc - Ts_old) < cpl_Ts_tol && seb_res < cpl_seb_tol
-         ok_cpl = true;
-         break
-      end
+      % The accelerated iterate is not accepted here: its residual has not been
+      % evaluated, and T_ice and k_eff belong to the sweep that produced the
+      % pre-acceleration iterate. It is tested on the next sweep against its
+      % own column solve.
+      % solve.
    end
 
    % Dump the outer failure only when neither inner dump ran. Both inner

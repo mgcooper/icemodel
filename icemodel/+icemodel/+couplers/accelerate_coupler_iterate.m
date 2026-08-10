@@ -2,8 +2,7 @@ function [Ts_next, hist] = accelerate_coupler_iterate( ...
       hist, Ts_old, Ts_new, cpl_alpha, cpl_jumpmax, cpl_aitken)
    %ACCELERATE_COUPLER_ITERATE Accelerate one surface-temperature Picard step.
    %
-   % Every coupler runs the same Picard loop on T_sfc and accelerates it the
-   % same way, so the acceleration lives here instead of in each solver.
+   % Accelerates the Picard loop on T_sfc that every coupler runs.
    %
    % Two stages. Aitken (with relaxation as its fallback) handles the ordinary
    % case. Then, when the last two residuals bracket a root, the secant step
