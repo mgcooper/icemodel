@@ -9,7 +9,7 @@ function forcing = getFormalForcing(kwargs)
    % Frozen release comparisons retain the forcing identity with which their
    % accepted rows were produced. Release tags must be registered in
    % formalBaselinePolicy before their case matrices can run, so a new tag
-   % cannot silently inherit an unrelated forcing product.
+   % cannot inherit an unrelated forcing product.
 
    arguments
       kwargs.sitename (1, 1) string = ""

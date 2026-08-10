@@ -11,7 +11,7 @@ function manifest = importImau(source_dir, kwargs)
    %    case inventory.
    %    forcing_sources selects runtime sources requested by the current call.
    %    Ordinary calls preserve omitted existing legs; overwrite_family=true
-   %    deliberately replaces the whole family state.
+   %    replaces the whole family state.
    %    build_observations=false is a guarded non-dry fast path: requested cases
    %    must already exist in the target manifest, whose observation entry is
    %    reused while selected forcing is attached.
@@ -83,7 +83,7 @@ function manifest = importImau(source_dir, kwargs)
    %    Staging one case adds or updates only that case in the family manifest
    %    and preserves every other committed case and file. Re-staging the same
    %    case updates exactly its entry. Set overwrite_family=true only to
-   %    deliberately rebuild the family root.
+   %    rebuild the family root.
    %
    %  Returns
    %    manifest : struct  Final or dry-run family manifest.
@@ -322,8 +322,8 @@ function state = stageCase(site, source_dir, cache_status, family_root, ...
       daily_qa = prior_case.colocation.daily_qa;
    end
 
-   % A native-only refresh defaults to the staged observation window instead of
-   % silently widening the runtime artifact to the full source record.
+   % A native-only refresh defaults to the staged observation window rather
+   % than widening the runtime artifact to the full source record.
    build_start = window_start;
    build_end = window_end;
    if ~window_enabled && ~kwargs.build_observations

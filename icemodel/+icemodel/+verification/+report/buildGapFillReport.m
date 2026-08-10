@@ -37,8 +37,8 @@ function report = buildGapFillReport(kwargs)
    %  Detail figures plot ONLY
    %  the filled period plus context: each side's pad equals the filled
    %  period, floored at min_context_days and capped at max_context_days
-   %  — never the full record; the station overview is the one deliberate
-   %  full-period exception. Each detail panel accents ONLY its own
+   %  — never the full record; the station overview is the one full-period
+   %  exception. Each detail panel accents ONLY its own
    %  method; fills by any other method in the context window render
    %  muted grey, keyed by the per-sample provenance registry and the
    %  plan audit (POLICY D-31).
@@ -285,8 +285,8 @@ function subs = figureSubfolders()
    %FIGURESUBFOLDERS Canonical figure subfolder names for the split layout.
    % POLICY D-31: overview and detail figures live in separate folders and
    % report sections. Scientific Results figures use a third folder so they
-   % do not inflate either station appendix set. One named source keeps
-   % staging, export, ledger paths, transaction, and QMD links coherent.
+   % do not inflate either station appendix set. Staging, export, ledger
+   % paths, the install transaction, and QMD links all read these names.
    subs = struct('overview', "overview", 'detail', "detail", ...
       'interpretation', "interpretation");
 end
@@ -553,8 +553,8 @@ function [rows, summary_rows, diagnostics, family_row] = siteFigures( ...
    audit = A.audit_record;
    diagnostics = methodDiagnostics(site, A.plan_record);
    % The per-family fill volume derives from the shipped provenance
-   % channels, the registry the engine stamps, so the Results table can
-   % never disagree with the product (POLICY D-31 Results contract).
+   % channels, the registry the engine stamps, so the Results table reports
+   % the product's own codes (POLICY D-31 Results contract).
    family_row = siteFillFamilies(site, filled);
 
    % Composition refusal rows (method 'unfilled') explain residual gaps;
@@ -654,8 +654,7 @@ end
 
 function channels = provenanceChannels(filled)
    %PROVENANCECHANNELS Science channels shipping a paired provenance column.
-   % One derivation shared by the figure scope and the fill-by-family
-   % summary so the two can never diverge.
+   % The figure scope and the fill-by-family summary both read this list.
    names = string(filled.Properties.VariableNames);
    provenance_names = names(endsWith(names, "_provenance"));
    channels = erase(provenance_names, "_provenance");
@@ -664,10 +663,9 @@ end
 
 function families = fillFamilyNames()
    %FILLFAMILYNAMES Reconstruction family names from the provenance registry.
-   % The provenance code registry is the single source of family names
-   % (STYLE.local SSOT rule); observed-equivalent codes (observed plus the
-   % raw/clamped shortwave measurements, POLICY A7) and the missing
-   % sentinel are report layers, not fill families.
+   % Family names come from the provenance code registry. Observed-equivalent
+   % codes (observed plus the raw/clamped shortwave measurements, POLICY A7)
+   % and the missing sentinel are report layers, not fill families.
    codes = icemodel.forcing.reconstruct.provenanceCodes();
    names = reshape(string(fieldnames(codes)), 1, []);
    families = names(~ismember(names, ["observed", "raw_shortwave", ...
@@ -983,8 +981,8 @@ function mask = methodSampleMask(times, method_audit)
    % reconstruction axis, but the delivered product repeats each posting
    % over its quarter-hour support — closed-bounds containment would
    % strand the last posting's +15/+30/+45 rows in the "other methods"
-   % layer (review pass 9). Span containment mirrors gapFigure's
-   % duration-based window instead.
+   % layer. Span containment mirrors gapFigure's duration-based window
+   % instead.
    mask = false(numel(times), 1);
    for k = 1:height(method_audit)
       mask = mask | (times >= method_audit.start_time(k) ...
@@ -1012,8 +1010,8 @@ function row = overviewFigure(site, filled, fig_dir)
       & ismember(channels + "_provenance", names));
    times = filled.Properties.RowTimes;
    style = icemodel.verification.report.gapfillFigureStyle();
-   % The point budget prevents exportgraphics from silently returning a
-   % white canvas for long records with eight densely populated axes.
+   % The point budget prevents exportgraphics from returning a white canvas
+   % for long records with eight densely populated axes.
    hourly_step = round(hours(1) / median(diff(times)));
    budget_step = ceil(height(filled) / style.max_overview_points);
    step = max([1, hourly_step, budget_step]);
@@ -1168,7 +1166,7 @@ function absent = sitesWithoutProducts(inputs, filled_dir, opts, ...
    end
 
    % Derived tokens feed report text; validate them like every other public
-   % station token so stray files fail loudly, never silently.
+   % station token so a stray file raises an error.
    icemodel.forcing.reconstruct.mustBeStationToken(absent_sites);
    rows = cell(numel(absent_sites), 1);
    for k = 1:numel(absent_sites)
@@ -1451,9 +1449,8 @@ end
 
 function verdicts = verdictSummary(readiness)
    %VERDICTSUMMARY Count station-years and stations per policy verdict.
-   % The counts derive from the same policy_verdict column the executive
-   % summary sentence uses, so the table and the sentence can never
-   % disagree.
+   % The counts derive from the policy_verdict column that the executive
+   % summary sentence also reads.
    names = {'policy_verdict', 'station_years', 'stations'};
    if isempty(readiness)
       verdicts = table('Size', [0 3], 'VariableTypes', ...
@@ -1478,8 +1475,7 @@ function admission = admissionSummary(method_diagnostics)
    % 100 * (1 - selection_rmse / selection_baseline_rmse) — the same
    % baseline-relative criterion the admission gate enforces. The family
    % token is the audit/registry label prefix (the part before ':' in
-   % names such as "donor:aws10"; plain labels are their own family), so
-   % no alias mapping is restated here.
+   % names such as "donor:aws10"; plain labels are their own family).
    names = {'channel', 'family', 'admitted_strata', ...
       'denied_candidates', 'median_improvement_pct'};
    if isempty(method_diagnostics)
@@ -2002,7 +1998,7 @@ function [window_start, window_end] = interpretationWindow(times, ...
 end
 
 function defaults = interpretationFigureDefaults()
-   %INTERPRETATIONFIGUREDEFAULTS Single source of diagnostic view spans.
+   %INTERPRETATIONFIGUREDEFAULTS View spans for the interpretation figures.
    defaults = struct('min_days', 90, 'max_days', 366, ...
       'cadence_zoom_days', 3, 'swd_zoom_days', 30);
 end
@@ -2186,8 +2182,8 @@ function qmd_file = writeQmd(report_dir, qa_dir, fig_dir, ...
    cleaner = onCleanup(@() fclose(fid));
    w = @(varargin) fprintf(fid, [varargin{1} '\n'], varargin{2:end});
 
-   % Every summary count derives from the policy verdict explicitly so
-   % the plain-language result and the ledger can never disagree.
+   % Every summary count derives from the policy_verdict column, the same
+   % column the readiness ledger reports.
    n_ready = nnz(readiness.policy_verdict == "ready");
     n_blocked = nnz(readiness.policy_verdict == "not_forcing_ready");
     n_out = nnz(readiness.policy_verdict == "out_of_policy_window");

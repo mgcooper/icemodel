@@ -5,12 +5,13 @@ function rates = observationRateOutliers(summary, policy)
    % An observation record can be systematically compressed without tripping
    % any readiness gate, because the gates only reject FLAGGED transitions and
    % unresolved steps. An unflagged sensor or datum problem passes admission
-   % and then reads as a model error. Comparing each station against its own
-   % distribution catches that without penalising genuinely low-melt sites.
+   % and appears in the comparison as a model error. Comparing each station
+   % against its own distribution catches that without penalising genuinely
+   % low-melt sites.
    %
-   % The flag is a caveat, never an exclusion. Silently dropping the flagged
-   % site-years would improve apparent model skill by deleting inconvenient
-   % observations, so the decision to exclude stays with the reader.
+   % The flag is a caveat, never an exclusion. Dropping the flagged site-years
+   % would raise apparent model skill by removing observations, so the decision
+   % to exclude stays with the reader.
 
    completed = string(summary.status) == "completed";
    case_id = string(summary.case_id(completed));

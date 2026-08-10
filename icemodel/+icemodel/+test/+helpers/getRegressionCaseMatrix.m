@@ -9,7 +9,7 @@ function cases = getRegressionCaseMatrix(kwargs)
    %  cases = icemodel.test.helpers.getRegressionCaseMatrix(smoke_sites="kanm", ...
    %     full_sites=["kanm"; "kanl"])
    %
-   % The formal regression matrix is intentionally compact and stable.
+   % The formal regression matrix is compact and stable.
    % SMOKE_SITES and FULL_SITES are advanced overrides for the site lists
    % used by each tier when you want to probe a different matrix without
    % editing helper code.

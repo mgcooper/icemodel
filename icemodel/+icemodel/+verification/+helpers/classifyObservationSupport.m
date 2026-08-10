@@ -5,18 +5,12 @@ function support = classifyObservationSupport( ...
    % support = icemodel.verification.helpers.classifyObservationSupport( ...
    %    values, field_names, target_field, policy)
    %
-   % One owner of how a PROMICE observation row is judged supported. The
-   % comparator, the readiness writer, the evaluation runner, and the report
-   % builder all consume the same flag lists out of promiceAblationReadiness,
-   % and each used to re-derive these masks locally. That let them drift: a
-   % second entry in any flag list would have made the readiness writer and the
-   % comparator count different row sets for the same site-year, silently,
-   % because collapsing a flag matrix to one flag per row is only equivalent to
-   % testing it directly while the list has exactly one member.
+   % Applies the PROMICE flag rules that decide whether an observation row is
+   % supported. Callers pass the observation matrix and the policy; the
+   % returned masks are row-shaped logicals they combine as they need.
    %
-   % This is the flag counterpart of
-   % icemodel.verification.helpers.classifySnowDepth, which already owns the
-   % snow half of the same admission rule.
+   % The snow half of the same admission rule is in
+   % icemodel.verification.helpers.classifySnowDepth.
    %
    % Inputs
    %  values       - numeric row-by-field observation matrix. Callers holding
@@ -42,15 +36,12 @@ function support = classifyObservationSupport( ...
    %    station_transition  the station-transition flag is finite and nonzero
    %    unresolved_step     the unresolved-step flag is finite and nonzero
    %
-   % Callers compose these. The comparator's notion of direct support adds
-   % exposed ice, the readiness writer's adds a finite target, and the report
-   % builder's adds both; none of those combinations belongs here, because each
-   % is a question about a particular consumer rather than about the flags.
+   % Callers compose these masks. The comparator's notion of direct support
+   % adds exposed ice, the readiness writer's adds a finite target, and the
+   % report builder's adds both.
    %
    % Callers holding a table get the column set from
-   % icemodel.verification.helpers.observationSupportFields rather than
-   % rebuilding the union by hand, so adding a flag list to the policy reaches
-   % every consumer at once.
+   % icemodel.verification.helpers.observationSupportFields.
    %
    % See also: icemodel.verification.helpers.observationSupportFields,
    %  icemodel.verification.helpers.classifySnowDepth,
@@ -64,8 +55,8 @@ function support = classifyObservationSupport( ...
    end
 
    % Select every group by name. The policy lists overlap and are ordered
-   % differently from each other, so positional indexing would silently swap
-   % two flags' meanings the moment either list changed.
+   % differently from each other, so positional indexing would not line each
+   % flag up with its meaning.
    support_values = selectColumns(values, field_names, ...
       policy.support_flag_fields);
    direct_values = selectColumns(values, field_names, ...
@@ -86,19 +77,19 @@ function support = classifyObservationSupport( ...
    support.target_finite = all(isfinite(target_values), 2);
    support.quality_finite = all(isfinite(support_values), 2);
 
-   % A nonfinite direct-zero flag is not a zero flag, so the finiteness test
-   % has to carry it; quality_finite covers that for the flags that are also
-   % support flags, and this keeps the rule true on its own.
+   % A nonfinite direct-zero flag is not a zero flag, so this test checks
+   % finiteness as well. quality_finite covers only the direct-zero flags that
+   % are also support flags.
    support.direct_flags_zero = ...
       all(isfinite(direct_values) & direct_values == 0, 2);
    support.flag_clean = support.target_finite ...
       & support.quality_finite & support.direct_flags_zero;
    support.datum_intact = all(isfinite(datum_values) & datum_values == 0, 2);
 
-   % isfinite first on every set-flag test. Without it a NaN or an Inf reads
-   % as a set flag and inflates the counts these masks feed. A finite negative
-   % posting is malformed rather than missing, and does count as set: the
-   % conservative direction is to exclude the row rather than admit it.
+   % Every set-flag test checks isfinite first: a NaN or an Inf means missing
+   % data, not a set flag, and would inflate the counts these masks feed. A
+   % finite negative posting is malformed rather than missing and does count as
+   % set, which excludes the row.
    support.gap_flagged = anySetFlag(gap_values);
    support.metadata_flagged = anySetFlag(metadata_values);
    support.station_transition = anySetFlag(transition_values);
@@ -108,8 +99,8 @@ end
 function selected = selectColumns(values, field_names, wanted)
    %SELECTCOLUMNS Take the named columns, erroring on any that is absent.
    %
-   % A missing column would otherwise reduce the matrix silently and make an
-   % all() or any() collapse answer a different question than the caller asked.
+   % A missing column would narrow the matrix and make an all() or any()
+   % collapse answer a different question than the caller asked.
 
    wanted = string(wanted);
    [found, where] = ismember(wanted, field_names);
@@ -124,8 +115,8 @@ end
 function flagged = anySetFlag(values)
    %ANYSETFLAG Collapse a flag matrix to one finite nonzero flag per row.
    %
-   % Collapsing per row rather than counting the matrix keeps a count a row
-   % count as soon as a policy list carries more than one field.
+   % Collapsing per row keeps the result a row count when a policy list carries
+   % more than one field.
 
    flagged = any(isfinite(values) & values ~= 0, 2);
 end

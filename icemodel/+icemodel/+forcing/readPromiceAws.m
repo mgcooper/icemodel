@@ -11,8 +11,8 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    % names, units, levels, and physical ranges follow the product variable
    % dictionary (data/verification/promice/AWS_variables.csv).
    %
-   % This is NOT limited to the legacy met subset: every L3 channel useful
-   % for snow/firn/ice model forcing and evaluation is mapped to a canonical
+   % The mapping is not limited to the minimal met subset: every L3 channel
+   % useful for snow/firn/ice model forcing and evaluation maps to a canonical
    % icemodel name (one name per channel). Housekeeping/diagnostic channels
    % (battery voltage, fan current, raw per-timestep GPS lat/lon, radiation-
    % sensor temperature) are intentionally not mapped.
@@ -485,7 +485,7 @@ function [clean, flag] = qualityControlTice10m(aws, timescale)
       end
    end
 
-   % Materialize every discontinuity decision in the canonical masked target.
+   % Apply every discontinuity decision to the canonical masked target.
    clean(flag > 0) = NaN;
 end
 

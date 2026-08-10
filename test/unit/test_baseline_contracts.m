@@ -101,8 +101,8 @@ function test_frozen_v11_baselines_normalize_without_mutation(testCase)
 end
 
 function test_loadBaseline_rejects_solver_and_selector_conflicts(testCase)
-   % Existing persisted identity must never be silently replaced by requested
-   % selector metadata or a canonical alias derived from another column.
+   % Existing persisted identity must never be replaced by requested selector
+   % metadata or a canonical alias derived from another column.
    filepath = [tempname '.mat'];
    cleanup = onCleanup(@() deleteIfExists(filepath));
    RegressionBaseline = table( ...
@@ -248,7 +248,7 @@ end
 
 function test_unregistered_release_forcing_is_rejected(testCase)
    % New release tags require an explicit forcing registration; they must not
-   % silently inherit the rolling product or the v1.1 station aliases.
+   % inherit the rolling product or the v1.1 station aliases by default.
 
    testCase.verifyError(@() ...
       icemodel.test.helpers.getRegressionCaseMatrix( ...

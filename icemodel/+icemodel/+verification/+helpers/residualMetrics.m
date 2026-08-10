@@ -3,10 +3,9 @@ function metrics = residualMetrics(model, observation)
    %
    %  metrics = icemodel.verification.helpers.residualMetrics(model, obs)
    %
-   % One place that defines how this repository scores a modeled series
-   % against an observed one, so the diagnostics, the regression summaries,
-   % and the ablation evaluation cannot drift apart on the definitions or on
-   % the guards.
+   % Defines how this repository scores a modeled series against an observed
+   % one. The diagnostics, the regression summaries, and the ablation
+   % evaluation all score through it.
    %
    % Pairs where either side is not finite are dropped. A single remaining
    % pair still gives an exact bias, MAE, RMSE, and max error; only NSE needs
@@ -14,9 +13,9 @@ function metrics = residualMetrics(model, observation)
    % have zero variance, since the denominator is zero and the skill score is
    % undefined rather than infinite.
    %
-   % NSE here is the standard form, with the OBSERVED mean in the
-   % denominator. Note that matfunclib's nashsutcliffe defaults to a modified
-   % form using the model mean, so the two are not interchangeable.
+   % NSE here is the standard form, with the OBSERVED mean in the denominator.
+   % matfunclib's nashsutcliffe defaults to a modified form using the model
+   % mean, so the two are not interchangeable.
    %
    % Inputs
    %  model       - modeled values

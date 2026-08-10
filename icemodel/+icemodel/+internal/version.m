@@ -12,14 +12,14 @@ function str = version(new)
    % ICEMODEL.INTERNAL.REFERENCE
 
    % Cache the persisted version so ordinary runtime calls do not reread the
-   % citation file, while preserving the established override/reset contract.
+   % citation file. The override and reset branches below update the cache.
    persistent current
    if isempty(current) || nargin == 1 && strcmp('reset', new)
-      % Discard an override before reading so a failed reset cannot leave stale
-      % process state masking a missing or malformed sole version source.
+      % Discard an override before reading so a failed reset cannot leave
+      % stale process state in place of a missing or malformed version source.
       current = [];
-      % Resolve from this installed package rather than the newer fullpath
-      % helper so version lookup retains the documented MATLAB R2017a floor.
+      % Resolve from this installed package rather than the fullpath helper,
+      % so version lookup stays within the documented MATLAB R2017a floor.
       internal_dir = fileparts(mfilename('fullpath'));
       package_dir = fileparts(internal_dir);
       toolbox_dir = fileparts(package_dir);

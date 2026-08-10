@@ -274,8 +274,8 @@ end
 
 function test_d_lyr_carries_total_merge_export_not_liquid_only(testCase)
    % d_lyr must accumulate the full water-equivalent mass a merge removes.
-   % df_lyr carries solid plus liquid, which is why the
-   % derived dlayer series could never be reconciled against melt and runoff.
+   % df_lyr carries solid plus liquid, which is why the derived dlayer series
+   % cannot be reconciled against melt and runoff.
 
    [T, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture([0.05; 0.6; 0.7]);
    dz = 0.04;
@@ -291,14 +291,14 @@ function test_d_lyr_carries_total_merge_export_not_liquid_only(testCase)
       diag.merge_export_solid_mwe + diag.merge_export_liquid_mwe, ...
       'AbsTol', 1e-15);
 
-   % The liquid difference alone is strictly smaller, so the old definition
-   % cannot satisfy the identity above.
+   % The liquid difference alone is strictly smaller than the total export,
+   % so a liquid-only accounting cannot satisfy the identity above.
    liquid_only = max(f_liq(1) + f_liq(2) - f_liq(1), 0) * dz;
    testCase.verifyLessThan(liquid_only, exported_mwe);
 
-   % The three export views must nest rather than duplicate: the top-removal
-   % channels are a subset of the all-merge merge export, which in turn is
-   % what d_lyr totals. A future reader must be able to tell these apart.
+   % The three export views nest rather than duplicate: the top-removal
+   % channels are a subset of the all-merge export, which in turn is what
+   % d_lyr totals.
    testCase.verifyLessThanOrEqual(diag.top_export_solid_mwe, ...
       diag.merge_export_solid_mwe + 1e-15);
    testCase.verifyLessThanOrEqual(diag.top_export_liquid_mwe, ...
@@ -543,14 +543,14 @@ function test_merge_ledger_output_does_not_change_the_solver_outputs(testCase)
    % A real merge proves the early no-event return did not mask the branch.
    testCase.verifyTrue(any(mask));
 
-   % Skipping the ledger, not merely discarding it, is what matters: the
+   % Skipping the ledger, not merely discarding it, must be verified: the
    % solver takes the seven-output path on every accepted substep of every
    % standard and minimal run, and the ledger costs three column integrations
-   % per merge event. Comparing the two calls below cannot see that, so the
-   % profiler is the only observable. Request exactly seven outputs, or this
-   % profiles nargout == 0 and an off-by-one in the gate slips through. The
-   % profiler status is saved and restored because a test must not clear a
-   % profiling run its caller started.
+   % per merge event. Comparing the two calls below cannot see whether the
+   % ledger path ran, so the profiler is the only observable. This call
+   % requests exactly seven outputs; profiling nargout == 0 here would miss
+   % an off-by-one in the gate. The profiler status is saved and restored
+   % because a test must not clear a profiling run its caller started.
    prior = profile('status');
    restore_profiler = onCleanup(@() restoreProfiler(prior));
    profile off
@@ -923,16 +923,16 @@ end
 function test_condensation_overflow_is_a_step_total_not_a_substep_sum(testCase)
    % d_rof is reset once per forcing step and then accumulated across
    % substeps, unlike d_pevp and d_sbl_err which are per-substep. The ledger
-   % must therefore record the running total, not add it on every accepted
-   % substep. Adding it once per substep inflated the overflow channel and the
-   % vapor closure identity by the substep count.
+   % must therefore record the running total: adding it on every accepted
+   % substep would inflate the overflow channel and the vapor closure
+   % identity by the substep count.
 
    dz = 0.04;
    n_substeps = 4;
    overflow_fraction = 1e-4;
 
    % One overflow event on the first substep, then three quiet substeps that
-   % still carry the accumulated total forward, which is the real failure mode.
+   % still carry the accumulated total forward.
    ledger = icemodel.column.initialize_budget_state();
    d_rof = 0.0;
    for n = 1:n_substeps

@@ -276,7 +276,7 @@ function test_readCffVersion(testCase)
    testCase.verifyEqual(icemodel.internal.readCffVersion(cffpath), '2.5');
 
    % A missing, duplicate, empty, or partially quoted version must fail with a
-   % specific contract error instead of silently choosing a value.
+   % specific contract error rather than resolve to an unintended value.
    writeText(cffpath, 'cff-version: 1.2.0');
    testCase.verifyError( ...
       @() icemodel.internal.readCffVersion(cffpath), ...

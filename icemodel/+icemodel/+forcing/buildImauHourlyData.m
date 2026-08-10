@@ -81,7 +81,8 @@ function [Data, metadata] = buildImauHourlyData(station, kwargs)
    % minimal met contract still comes from data2met at the met boundary. Keep
    % raw swd/swu intact, but do not publish derived balances for bright samples
    % where both the invalid source floor and the raw flux ratio show a collapsed
-   % reflected-shortwave channel. A separately plausible raw balance survives.
+   % reflected-shortwave channel. A raw balance that remains plausible on its
+   % own is kept.
    Data.swn = Data.swd - Data.swu;
    raw_shortwave_ratio = Data.swu ./ Data.swd;
    invalid_shortwave_balance = source_floor & Data.swd >= 10 ...
@@ -153,7 +154,7 @@ function station = canonicalStation(station)
 end
 
 function Data = orderDataColumns(Data)
-   %ORDERDATACOLUMNS Keep IMAU Data files stable and metadata-mapped.
+   %ORDERDATACOLUMNS Put IMAU Data columns in the canonical channel order.
    preferred = ["tair", "rh", "wspd", "wdir", "psfc", "swd", "swu", ...
       "lwd", "lwu", "swn", "lwn", "netr", "albedo", "tsfc", ...
       "boom_height", "surface_height", "rainf", "snowf"];

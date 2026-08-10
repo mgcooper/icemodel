@@ -138,7 +138,7 @@ AWS source `promice`, or the ESM-SnowMIP family `esm_snowmip`). Met files
 therefore follow `met_<site>_<source>` across all families. The legacy
 per-station convention sets `FORCINGS == SITENAME`
 (e.g. `met_kanm_kanm_...`); the `kanl` / `kanm` station forcings are kept under
-this legacy naming and are deliberately not relabeled.
+this legacy naming and are not relabeled.
 
 Examples:
 
@@ -356,7 +356,7 @@ Installation should only take a few seconds. If you encounter any issues, please
 Running the model and the snow-verification workflow needs nothing beyond this
 repo. A few auxiliary workflows (building gridded-climate forcings, and the
 permafrost-zone site classification used by `icemodel.verification`) call out to
-external dev-repo toolboxes that are intentionally kept *out* of this repo:
+external dev-repo toolboxes that are kept *out* of this repo:
 
 | Repo | Used by | Path added |
 | --- | --- | --- |

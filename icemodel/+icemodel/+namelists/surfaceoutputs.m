@@ -9,12 +9,12 @@ function fields = surfaceoutputs(kind)
    %                       writes (the default)
    %   'diagnostic_suffix' the channels the diagnostic profile appends
    %
-   % configureRun composes vars1 from these. It keeps the composition because
-   % the run, not the profile, decides model-specific additions such as
-   % df_rof for icemodel but not skinmodel, and where they sit in the order.
+   % configureRun composes vars1 from these lists. It adds the model-specific
+   % channels, such as df_rof for icemodel but not skinmodel, and sets where
+   % they sit in the order.
    %
-   % Adding a standard channel here reaches both profiles, so the diagnostic
-   % profile cannot silently fall short of the standard one.
+   % A channel added to the standard list appears in both the standard and
+   % diagnostic profiles.
 
    if nargin == 0
       kind = 'standard';

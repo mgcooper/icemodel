@@ -7,8 +7,8 @@ function version = readCffVersion(cffpath)
    %
    % See also: ICEMODEL.INTERNAL.VERSION
 
-   % Accept the character paths used by the legacy runtime as well as scalar
-   % strings without requiring syntax newer than the supported MATLAB floor.
+   % Accept both character paths and scalar strings without requiring syntax
+   % newer than the supported MATLAB floor.
    if isstring(cffpath)
       if ~isscalar(cffpath)
          error('icemodel:internal:readCffVersion:InvalidPath', ...

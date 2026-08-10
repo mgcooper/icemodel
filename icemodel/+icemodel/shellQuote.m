@@ -3,14 +3,13 @@ function quoted = shellQuote(value)
    %
    %  quoted = icemodel.shellQuote(value)
    %
-   % Anything that builds a command string for system() needs this, so it sits
-   % at the runtime level rather than under one consumer. Report rendering,
-   % fixture packing, and release preflight all call it.
+   % Callers that build a command string for system() use this. Report
+   % rendering, fixture packing, and release preflight all call it.
    %
    % On POSIX the value is wrapped in single quotes and any embedded single
    % quote is closed, escaped, and reopened, so no character is interpreted.
    % On Windows double quotes are the only option, and cmd still expands %VAR%
-   % inside them, so a percent sign is rejected rather than silently expanded.
+   % inside them, so a percent sign is rejected rather than expanded.
    %
    % Inputs
    %  value - path or argument to quote

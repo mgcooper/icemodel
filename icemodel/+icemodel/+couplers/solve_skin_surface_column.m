@@ -110,10 +110,11 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = ...
       % Apply the physical surface temperature.
       Ts = icemodel.surface.physical_surface_temperature(Ts_accel);
 
-      if abs(Ts - Ts_old) < cpl_Ts_tol && seb_res < cpl_seb_tol
-         ok_cpl = true;
-         break
-      end
+      % The accelerated iterate is not accepted here: its residual has not been
+      % evaluated, and T_ice and k_eff belong to the sweep that produced the
+      % pre-acceleration iterate. It is tested on the next sweep against its
+      % own column solve.
+      % solve.
    end
 
    % Dump the outer failure only when neither inner dump ran. Both inner

@@ -185,11 +185,9 @@ function test_leading_flags_are_excluded_without_bridging(testCase)
 end
 
 function test_a_negative_correctable_flag_still_counts_as_flagged(testCase)
-   % step_correctable_but_unresolved used to test the raw flag column with
-   % > 0, so a malformed negative posting read as unflagged here while the
-   % readiness writer read the same posting as flagged and the two ledgers
-   % disagreed for the same site-year. classifyObservationSupport now governs
-   % both with one finite-and-nonzero rule, and a negative posting counts.
+   % classifyObservationSupport treats any finite, nonzero
+   % step_correctable_flag posting as flagged, so a negative value still
+   % counts.
 
    [observations, model] = makeInputs();
    observations.data.surface_height_flag(1) = 1;
@@ -702,8 +700,8 @@ function [observations, model, increment] = makeInputs()
    model.data.mass_budget_top_deletion_height_m([2, 4]) = 0.1;
    model.data.mass_budget_top_deletion_count(end) = 99;
    model.data.mass_budget_top_deletion_height_m(end) = 9.9;
-   % Exported mass is deliberately unequal to the quantized cell height so a
-   % comparator that confused the two would fail.
+   % Exported mass is a separate accounting channel from the quantized cell
+   % height, so the fixture gives it a different value.
    model.data.mass_budget_top_export_solid_mwe([2, 4]) = 0.03;
    model.data.mass_budget_top_export_liquid_mwe([2, 4]) = 0.01;
    model.data.mass_budget_top_export_solid_mwe(end) = 5.5;

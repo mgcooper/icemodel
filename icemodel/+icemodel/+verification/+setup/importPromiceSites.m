@@ -15,7 +15,7 @@ function manifest = importPromiceSites(source_dir, kwargs)
    %    manifest; not part of normal verification runs.
    %    forcing_sources selects runtime sources requested by the current call.
    %    Ordinary calls preserve omitted existing legs; overwrite_family=true
-   %    deliberately replaces the whole family state.
+   %    replaces the whole family state.
    %    build_observations=false is a guarded non-dry fast path: requested cases
    %    must already exist in the target manifest, whose observation entry is
    %    reused while selected forcing is attached.
@@ -149,7 +149,7 @@ function manifest = importPromiceSites(source_dir, kwargs)
    %    Staging one case adds or updates only that case in the family manifest
    %    and preserves every other committed case and file. Re-staging the same
    %    case updates exactly its entry. Set overwrite_family=true only to
-   %    deliberately rebuild the family root.
+   %    rebuild the family root.
    %
    %  Returns
    %    manifest : struct  Family manifest also written to manifest.json.
@@ -621,9 +621,9 @@ function [colocation, comparison_variables, observation_variables, ...
          end
       end
 
-      % A native leg is staged only when at least one real runtime artifact is
-      % selectable. This deliberately keeps a one-sample Data-only leg staged
-      % when PROMICE met construction is inapplicable.
+      % A native leg is staged when at least one runtime artifact is
+      % selectable, so a Data-only leg still counts as staged when PROMICE met
+      % construction is inapplicable.
       promice_co.staged = ~isempty(promice_co.data_files) ...
          || ~isempty(promice_co.met_files);
    end
@@ -800,9 +800,9 @@ end
 function anchor = caseCatalogEntry(site, aws_sites)
    %CASECATALOGENTRY Resolve site_name/surface_zone/eval_target/note for a case.
    %
-   % Curated and first-pass classifications both live in promiceSiteCatalog (the
-   % single source of truth for surface_zone + eval_target). When a station is
-   % not cataloged there (e.g. a brand-new L3 station absent from the AWS CSV),
+   % Curated and first-pass classifications both live in promiceSiteCatalog,
+   % which defines surface_zone and eval_target. When a station is not
+   % cataloged there (e.g. a brand-new L3 station absent from the AWS CSV),
    % fall back to "unknown" so the manifest still validates.
    try
       info = icemodel.verification.setup.promiceSiteCatalog(site);

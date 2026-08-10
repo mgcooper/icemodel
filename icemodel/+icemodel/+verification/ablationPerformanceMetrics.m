@@ -13,8 +13,8 @@ function [per_case, aggregate, diagnostics] = ablationPerformanceMetrics( ...
    %
    % PER_CASE has one row per completed case and scored diagnostic. AGGREGATE
    % collapses those rows to one row per diagnostic. DIAGNOSTICS is the ordered
-   % list of scored model channels with their display labels, which is the one
-   % source consumers use so a channel cannot be scored under two names.
+   % list of scored model channels with their display labels; consumers read
+   % their names and labels from it.
    %
    % Density is an explicit scoring axis, not a fixed choice. Every diagnostic
    % is scored once per density in policy.effective_density_kg_m3, against the
@@ -43,7 +43,7 @@ function [per_case, aggregate, diagnostics] = ablationPerformanceMetrics( ...
    % otherwise lump several hours into one increment and understate the rate.
    %
    % Cases that are incomplete, or whose aligned payload cannot support a
-   % metric, are retained with a stated reason rather than dropped silently.
+   % metric, are retained with a stated reason rather than dropped.
    %
    % See also: icemodel.verification.compareAblation
 
@@ -175,8 +175,8 @@ function diagnostics = performanceDiagnostics()
 
    % Every scored channel is a cumulative metres-water-equivalent series that a
    % reader could plausibly compare against measured lowering. They answer
-   % different physical questions, which is exactly what the scoring exposes.
-   % model_surface_mass_loss_mwe is deliberately NOT scored. It measures the
+   % different physical questions.
+   % model_surface_mass_loss_mwe is NOT scored. It measures the
    % mass merge_layers destroys, not ablation: a merge keeps the mean of the
    % two cells in one cell, so removing an empty top cell still deletes mass
    % from the cell below. See icemodel-4nv.
@@ -274,10 +274,9 @@ function aggregate = aggregateMetrics(per_case, diagnostics, densities)
          median_nse(k) = median(per_case.nse(scored), 'omitnan');
 
          % A tolerance count communicates practical agreement more directly than a
-         % mean error that opposite-signed cases can cancel.
-         % Use the same signal floor as every other comparison in this policy.
-         % Without it, a site-year whose observed lowering nets to nearly zero
-         % makes any model look outside tolerance.
+         % mean error that opposite-signed cases can cancel. The policy signal
+         % floor bounds the denominator: without it, a site-year whose observed
+         % lowering nets to nearly zero makes any model look outside tolerance.
          observed = max(abs(per_case.observation_endpoint_mwe(scored)), ...
             policy.scientific.signal_floor_mwe);
          n_within_tolerance(k) = nnz(abs(endpoint) <= tolerance * observed);

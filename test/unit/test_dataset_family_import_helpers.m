@@ -1242,7 +1242,7 @@ function test_runDatasetFamilyImport_persists_reused_rcm_readiness(testCase)
    state = helperState();
    state.colocation.merra = existingLeg("merra");
 
-   % Seed the exact pre-fix manifest shape: staged files without readiness.
+   % Seed a legacy manifest shape: staged files without readiness fields.
    icemodel.verification.setup.buildDatasetFamilyManifest( ...
       state, true, dataset_family="helper", manifest_file=manifest_file, ...
       requested_ids="case1", source_url="test", source_version="v1", ...
@@ -2990,8 +2990,8 @@ function writeTaggedExistingMet(met_file, method, point)
       + hours(0:1))';
    artifact_metadata = currentRacmoCacheMetadata(method, point);
 
-   % Cache reuse now validates and diagnoses the exact selected met bytes, so
-   % this fixture must model a structurally valid saved forcing artifact.
+   % Cache reuse validates and diagnoses the exact selected met bytes, so this
+   % fixture must model a structurally valid saved forcing artifact.
    required = icemodel.forcing.helpers.metvariables();
    met = array2timetable(ones(numel(time), numel(required)), ...
       RowTimes=time, VariableNames=cellstr(required));

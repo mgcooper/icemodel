@@ -80,8 +80,8 @@ function [hourly, bin_start, bin_end] = retimeHourlyFixedStep(TT)
          '15-minute bins'])
    end
 
-   % Match the legacy interpreted-MATLAB behavior that drops synthetic Feb 29
-   % rows. The fixed generated path already excludes that interval above.
+   % Interpreted MATLAB drops the synthetic Feb 29 rows here. The fixed
+   % generated path already excludes that interval above.
    if coder.target('MATLAB')
       keep = ~(month(hourly.Properties.RowTimes) == 2 ...
          & day(hourly.Properties.RowTimes) == 29);
@@ -182,8 +182,8 @@ end
 function [hourly, bin_start, bin_end] = aggregateNativeBins(TT)
    %AGGREGATENATIVEBINS Preserve MATLAB behavior on non-fixed time grids.
 
-   % Preserve the established mean for ordinary channels, then replace the
-   % canonical budget and cumulative classes with their required reductions.
+   % Ordinary channels use the mean; the canonical budget and cumulative
+   % classes then replace it with their required reductions.
    vars = TT.Properties.VariableNames;
    hourly = retime(TT, 'hourly', 'mean');
    hourly = replaceAggregation( ...

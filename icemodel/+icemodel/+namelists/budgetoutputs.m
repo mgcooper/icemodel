@@ -4,9 +4,9 @@ function fields = budgetoutputs(kind)
    %  fields = icemodel.namelists.budgetoutputs()
    %  fields = icemodel.namelists.budgetoutputs(kind)
    %
-   % KIND is 'all', 'first', 'last', or 'sum'. The aggregation classes are the
-   % single source used by diagnostic output configuration and 15-minute to
-   % hourly retiming. Start storage uses the first sample, end storage uses the
+   % KIND is 'all', 'first', 'last', or 'sum'. Diagnostic output configuration
+   % and 15-minute to hourly retiming both use these aggregation classes.
+   % Start storage uses the first sample, end storage uses the
    % last sample, and signed step increments, energies, heights, and counts sum.
    % Storage, phase, vapor, and remesh changes are positive into the column.
    % MWE channels use physical intrinsic phase densities and physical
@@ -29,9 +29,9 @@ function fields = budgetoutputs(kind)
    % exactly half the pair's total water. The per-phase split is not
    % guaranteed individually: merge_layers re-derives f_liq_C from the merged
    % temperature, so the liquid share is a solve result rather than a mean.
-   % It is positive across the realistic states checked, which is why there is
-   % no separate absolute-gross channel, but a consumer that sums the liquid
-   % channel alone should not assume a sign.
+   % It is positive across the realistic states checked, so no separate
+   % absolute-gross channel exists. The liquid channel summed on its own
+   % carries no guaranteed sign.
 
    if nargin == 0
       kind = 'all';

@@ -1,12 +1,9 @@
 function tf = isIncrementChannel(names)
    %ISINCREMENTCHANNEL True for per-step increment channels.
    %
-   % One place that defines the df_ prefix rule. A df_ channel holds
-   % one forcing step's change, so retiming sums it over a bin; averaging an
-   % increment would divide it by the samples per bin.
-   %
-   % startsWith is the rule, and it lives here rather than in each consumer so
-   % retiming and postprocessing cannot drift apart on what counts.
+   % A channel is an increment channel when its name starts with df_. Such a
+   % channel holds one forcing step's change, so retiming sums it over a bin;
+   % averaging an increment would divide it by the samples per bin.
    %
    % Accepts a char row, a string, or an array of either, and returns a
    % logical of the same shape so both scalar and vectorized callers can use

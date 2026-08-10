@@ -170,7 +170,7 @@ function test_rebuild_esm_snowmip_smoke_sites(testCase)
             'AbsTol', 1e-12);
       end
 
-      % Metadata-only: the redundant smoke reference.mat is no longer written.
+      % Metadata-only: reference.mat is not written for the smoke sites.
       verifyTrue(testCase, ...
          exist(fullfile(case_dir, 'reference.mat'), 'file') == 0, ...
          sprintf('%s reference.mat should not be written (metadata-only)', ...
@@ -279,8 +279,7 @@ function test_esm_default_import_uses_full_source_bounds(testCase)
    testCase.assumeTrue(has_source, ...
       sprintf('ESM-SnowMIP source cache not present at %s', src));
 
-   % Derive the expected CDP bounds directly from the unwindowed builders so a
-   % regression back to the one-year smoke window cannot satisfy this check.
+   % Derive the expected CDP bounds directly from the unwindowed builders.
    [forcing_tt, ~] = ...
       icemodel.verification.setup.buildEsmSnowmipForcing( ...
       "cdp", source_dir=src);
@@ -306,8 +305,8 @@ function test_esm_default_import_uses_full_source_bounds(testCase)
    verifyEqual(testCase, string(manifest.cases.period.end), ...
       string(icemodel.verification.setup.formatManifestTime(source_end)));
 
-   % Keep this test meaningful by proving the full source bounds extend beyond
-   % the short metadata-only preview used by dry_run.
+   % The full source bounds extend beyond the short metadata-only preview
+   % used by dry_run.
    [smoke_start, smoke_end] = ...
       icemodel.verification.helpers.default_smoke_window("cdp");
    verifyLessThan(testCase, source_start, smoke_start);
@@ -432,7 +431,7 @@ function test_esm_output_root_stages_eval_and_input(testCase)
 end
 
 function test_esm_default_missing_cache_errors(testCase)
-   % Default imports should fail at cache validation instead of silently rewriting
+   % Default imports should fail at cache validation instead of rewriting
    % requested cases into skipped manifest entries.
    src = fullfile(testCase.TestData.tmp, 'strict-empty-esm-cache');
    mkdir(src);

@@ -1092,7 +1092,7 @@ function test_fill_station_writes_canonical_artifacts(testCase)
     testCase.verifyTrue(all(ismember(string(result.audit.context_id), ...
        string(result.plan.audit_contexts.context_id))));
     % The caller's extreme overlap requirement reaches the planner: no
-    % donor transfer may survive by silently reverting to defaults.
+    % donor transfer may survive by reverting to defaults.
     names = strings(0, 1);
     for c = 1:numel(result.plan.channels)
        names = [names; ...
@@ -1522,7 +1522,7 @@ function test_proxy_window_inside_guarded_posting_keeps_boundary(testCase)
 end
 
 function test_window_union_includes_same_source_extender(testCase)
-   % POLICY A6: a wider-duration file must not silently drop a staged
+   % POLICY A6: a wider-duration file must not drop a staged
    % sibling that extends coverage (the production EGP case, where a
    % long 2012-2018-style file outlasted the record-start file and cost
    % the product its staged 2019). Here the 18-month anchor is widest
@@ -1747,8 +1747,8 @@ function test_raw_albedo_mask_removes_every_legacy_fill(testCase)
 end
 
 function test_legacy_albedo_requires_raw_source(testCase)
-   % Silently treating a legacy-filled albedo artifact as observed is less
-   % safe than refusing a stale/missing raw-source provenance link.
+   % Treating a legacy-filled albedo artifact as observed is less safe than
+   % refusing a stale or missing raw-source provenance link.
    root = testCase.TestData.root;
    writeFixtureStation(root, "tsta", 0, 0, false);
    filename = fullfile(root, 'met', 'promice', ...
@@ -2172,7 +2172,7 @@ end
 
 function test_donor_legacy_albedo_requires_raw_source(testCase)
    % A corrupt donor source link is an integrity failure, not a reason to
-   % silently omit that donor and continue with lower tiers.
+   % omit that donor and continue with lower tiers.
    root = testCase.TestData.root;
    writeFixtureStation(root, "tsta", 0, 0, true);
    writeFixtureStation(root, "dsta", 0.05, -20, false);
@@ -2441,7 +2441,7 @@ end
 
 function test_gcnet_donor_requires_channel_origin_flags(testCase)
    % Origin masks remain per channel, and an unflagged LRin channel cannot
-   % silently treat reconstructed values as native observations.
+   % treat reconstructed values as native observations.
    filename = writeGcnetDonorFixture(testCase.TestData.root);
 
    donor = icemodel.forcing.helpers.readGcnetDonor(string(filename));

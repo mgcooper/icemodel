@@ -32,8 +32,8 @@ function [state, alive, skipped] = reuseDatasetFamilyCases( ...
       kwargs.overwrite_family (1, 1) logical = false
    end
 
-   % Normalize both optional windows before any manifest existence/read check.
-   % Malformed public input therefore wins without touching staged state.
+   % Normalize both optional windows before any manifest existence/read check,
+   % so malformed input fails before staged state is touched.
    [request_start, request_end, has_request] = ...
       icemodel.pairedWindow( ...
       kwargs.startdate, kwargs.enddate);

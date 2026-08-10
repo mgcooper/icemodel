@@ -28,8 +28,8 @@ function [estimate, clamped] = applyProxyCalibration( ...
       kwargs.target_elevation (:, 1) double = zeros(0, 1)
    end
 
-   % A supplied elevation vector must cover the axis exactly; a silent
-   % length mismatch would quietly disable the binned correction.
+   % A supplied elevation vector must cover the axis exactly; a length
+   % mismatch would disable the binned correction.
    if ~isempty(kwargs.target_elevation) ...
          && numel(kwargs.target_elevation) ~= numel(x_model)
       error('icemodel:reconstruct:applyProxyCalibration:targetElevationSize', ...
@@ -37,11 +37,10 @@ function [estimate, clamped] = applyProxyCalibration( ...
          'model sample when supplied']);
    end
 
-   % Backward-compatible schema guard (D-28): only version-2 swd records
-   % carry elevation-binned ratios, detected by field presence rather
-   % than a version comparison so any legacy single-ratio record — and
-   % any binned record applied by an elevation-less caller — falls back
-   % to the per-season scalar exactly as before.
+   % Schema guard (D-28): only version-2 swd records carry elevation-binned
+   % ratios, detected by field presence rather than a version comparison.
+   % A single-ratio record, or a binned record applied by a caller without
+   % station geometry, falls back to the per-season scalar.
    use_bins = isfield(calibration, 'binned_corrections') ...
       && ~isempty(kwargs.target_elevation);
    if use_bins
@@ -83,10 +82,10 @@ function [estimate, clamped] = applyProxyCalibration( ...
    end
 
    % D-27 (user ruling 2026-07-27): a correction that pushes rh past its
-   % physical bounds is calibration arithmetic, not physics — near-saturation
-   % sources plus a positive ratio exceed 100% and previously refused
-   % adoption (SWC lost 4.5% of rh). Clamping ONCE here covers every
-   % consumer (method tier and last resort alike).
+   % physical bounds is calibration arithmetic, not physics. Near-saturation
+   % sources plus a positive ratio can exceed 100%, which without a clamp
+   % refuses the candidate (SWC lost 4.5% of rh). Clamping here covers every
+   % consumer, method tier and last resort alike.
    % D-51 (2026-08-05) extends the same rule to wspd: a sub-unity wind ratio
    % can move a valid 0.1 m/s proxy posting below the runtime floor (TAS_L
    % 2010 lost four samples that way). The second output keeps every clamped

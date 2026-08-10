@@ -7,8 +7,8 @@ function [tf, reason, complete_windows, cadence_seconds] = ...
    %
    % Importers call this helper with the path returned by writemet, which may be
    % a newly written file, an exact no-overwrite reuse, or a broader enclosing
-   % reuse. Readiness must describe those referenced bytes rather than the
-   % request timetable that happened to precede the writer call.
+   % reuse. Readiness describes the bytes in that referenced file, not the
+   % request timetable passed to the writer.
    %
    % COMPLETE_WINDOWS is a JSON-portable struct column with UTC ISO-8601
    % start_time/end_time strings and numeric sample_count. The caller's existing
@@ -24,8 +24,8 @@ function [tf, reason, complete_windows, cadence_seconds] = ...
       met_file string
    end
 
-   % The current importer contract is intentionally one naming="window" file.
-   % Reject vectors explicitly instead of inventing unused cross-file semantics.
+   % The importer contract is one naming="window" file, so a vector of paths
+   % has no defined meaning here.
    if ~isscalar(met_file)
       error('icemodel:verification:metArtifactReadiness:scalarWindowRequired', ...
          'met_file must name one scalar-window artifact')
@@ -61,9 +61,9 @@ function [tf, reason, complete_windows, cadence_seconds] = ...
       [tf, reason, windows] = ...
          icemodel.verification.setup.metForcingReady(saved.met);
 
-      % Report cadence from the saved coordinate itself so downstream policy
-      % gates cannot be satisfied by a filename or stale metadata marker. The
-      % shared helper is the same rule the artifact writers and reuse checks use.
+      % Report cadence from the saved time coordinate itself, so downstream
+      % policy gates read the payload rather than a filename or a stale
+      % metadata marker.
       cadence_seconds = ...
          icemodel.forcing.helpers.uniformCadenceSeconds(saved.met);
    catch err
@@ -87,8 +87,8 @@ function text = isoUtc(value)
    %ISOUTC Format one finite manifest diagnostic timestamp explicitly in UTC.
 
    value = icemodel.verification.setup.ensureUtc(value);
-   % ensureUtc attaches UTC to naive values but intentionally preserves an
-   % existing zone. Convert that zoned instant before appending the literal Z.
+   % ensureUtc attaches UTC to naive values and preserves an existing zone.
+   % Convert that zoned instant to UTC before appending the literal Z.
    value.TimeZone = 'UTC';
    text = string(value, "yyyy-MM-dd'T'HH:mm:ss'Z'");
 end

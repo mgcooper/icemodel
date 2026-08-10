@@ -39,7 +39,7 @@ function test_bootstrap_data_root_precedence_and_cleanup(testCase)
    mkdir(fullfile(data_root, 'input'))
    mkdir(fullfile(data_root, 'eval'))
 
-   % An invalid case is deliberately ignored because DATA_ROOT has precedence.
+   % An invalid case is ignored because DATA_ROOT has precedence.
    [~, input_path, output_path, eval_path, cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment( ...
       data_root=data_root, icemodel_config_casename="ignored");
@@ -69,7 +69,8 @@ function test_bootstrap_cleanup_runs_after_error(testCase)
    mkdir(fullfile(data_root, 'input'))
    mkdir(fullfile(data_root, 'eval'))
 
-   % The local helper keeps cleanup in its stack frame, then fails deliberately.
+   % The local helper keeps cleanup in its stack frame, then fails so cleanup
+   % is exercised during error unwinding.
    testCase.verifyError(@() failAfterBootstrap(data_root), ...
       'test:dataRoots:forcedFailure')
    testCase.verifyEqual(currentRawConfig(names), caller_values)
@@ -98,7 +99,8 @@ function test_formal_classes_use_runner_root_or_verification_default(testCase)
    testCase.verifyClass(outer_cleanup, 'onCleanup')
    setenv('ICEMODEL_TEST_DATA_ROOT', data_root)
 
-   % Regression setup previously replaced this outer root with test/data.
+   % Regression setup must preserve this outer root rather than switching to
+   % test/data.
    regression_case = IcemodelRegressionTest();
    regression_case.configureCases();
    testCase.verifyEqual(string(getenv('ICEMODEL_DATA_PATH')), data_root)
@@ -255,8 +257,8 @@ function test_family_manifest_helper_data_root_precedence_and_isolation(testCase
    leaf_files = icemodel.verification.helpers.familyManifestFiles( ...
       evaluation_data_root=fullfile(ignored_root, 'eval'));
    testCase.verifyEqual(leaf_files, string(ignored_file))
-   % The minimal demo root intentionally has no evaluation manifests, and the
-   % helper must not fall back to populated test or verification roots.
+   % The minimal demo root has no evaluation manifests, and the helper must
+   % not fall back to populated test or verification roots.
    testCase.verifyEmpty( ...
       icemodel.verification.helpers.familyManifestFiles( ...
       icemodel_config_casename="demo"))
@@ -348,7 +350,7 @@ function test_colbeck_rejects_mismatched_showcase_bytes(testCase)
       source_paths(k) = fixturePath(source_root, files(k));
    end
 
-   % The public archive is intentionally ignored; a clean checkout skips this
+   % The public archive is not required; a clean checkout skips this
    % integration fixture while the synthetic provisioning tests remain active.
    testCase.assumeTrue(all(isfile(source_paths)), ...
       "Public showcase is not provisioned. Run: " ...

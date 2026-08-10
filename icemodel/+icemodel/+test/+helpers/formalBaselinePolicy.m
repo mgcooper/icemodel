@@ -15,7 +15,7 @@ function policy = formalBaselinePolicy(baseline_selector)
    policy.baseline_type = baseline_type;
    policy.baseline_tag = baseline_tag;
 
-   % Rolling suites use the modern verification tree and one forcing product
+   % Rolling suites use the verification data tree and one forcing product
    % for every formal station.
    if baseline_type == "rolling"
       policy.config_case = "verification";

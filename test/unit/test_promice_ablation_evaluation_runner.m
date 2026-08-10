@@ -461,7 +461,7 @@ function test_invalid_selection_and_provider_fail_before_execution(testCase)
 
    % Readiness-only runs are legitimate, but asking them to write artifacts
    % would leave a populated run directory and a renderable report describing
-   % zero site-years, which reads like a completed cohort evaluation.
+   % zero site-years, misrepresenting the run as a completed cohort evaluation.
    testCase.verifyError(@() run_promice_ablation_evaluation( ...
       base{:}, write_artifacts=true, model_provider=@unexpectedProvider), ...
       'icemodel:verification:promiceAblationEvaluation:emptySelection')

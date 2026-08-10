@@ -4,8 +4,8 @@ function [passed, ref_wall, floor_wall, gate_wall, reason] = ...
    %FORMALPERFORMANCEVERDICT Evaluate one formal timing comparison row.
    %
    % Compatible baselines fail closed unless exactly one finite positive
-   % reference row exists. Incompatible environments retain the established
-   % validity-only result because their timings are intentionally not compared.
+   % reference row exists. Incompatible environments return a validity-only
+   % result because their timings are not comparable.
 
    [ref_wall, floor_wall, gate_wall] = deal(nan);
    reason = string(compatibility_reason);

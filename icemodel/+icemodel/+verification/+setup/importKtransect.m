@@ -12,7 +12,7 @@ function manifest = importKtransect(source_dir, kwargs)
    %    header alongside the series DOI.
    %    forcing_sources selects runtime sources requested by the current call.
    %    Ordinary calls preserve omitted existing legs; overwrite_family=true
-   %    deliberately replaces the whole family state.
+   %    replaces the whole family state.
    %    build_observations=false is a guarded non-dry fast path: requested cases
    %    must already exist in the target manifest, whose observation entry is
    %    reused while selected forcing is attached.
@@ -85,7 +85,7 @@ function manifest = importKtransect(source_dir, kwargs)
    %    Staging one case adds or updates only that case in the family manifest
    %    and preserves every other committed case and file. Re-staging the same
    %    case updates exactly its entry. Set overwrite_family=true only to
-   %    deliberately rebuild the family root.
+   %    rebuild the family root.
    %
    %  Returns
    %    manifest : struct  Final or dry-run family manifest.
@@ -157,8 +157,8 @@ function manifest = importKtransect(source_dir, kwargs)
    prior_cases = struct([]);
    coverage = struct();
    reuse_sources = strings(1, 0);
-   % Dry runs deliberately preserve the caller's (possibly empty) source
-   % token without resolving or touching the cache.
+   % Dry runs keep the caller's (possibly empty) source token without
+   % resolving or touching the cache.
    resolved_source_dir = source_dir;
 
    if ~kwargs.dry_run
@@ -329,8 +329,8 @@ function state = stageCase(site, source_dir, cache_status, family_root, ...
          'target K-transect manifest.'], case_id);
    end
 
-   % A native-only refresh defaults to the staged observation window instead of
-   % silently widening the runtime artifact to the full source record.
+   % A native-only refresh defaults to the staged observation window rather
+   % than widening the runtime artifact to the full source record.
    build_start = window_start;
    build_end = window_end;
    if ~window_enabled && ~kwargs.build_observations
@@ -513,7 +513,7 @@ function colocation = nativeColocation(metadata, met_files, data_files, ...
    % children pins every annual child DOI actually merged into this case so the
    % manifest satisfies the series-plus-children DOI pinning requirement.
     % DOI records are the durable raw-source identity. Local cache paths are
-    % deliberately absent because they do not survive relocation or sharing.
+    % omitted because they do not survive relocation or sharing.
     ktransect = struct('kind', 'annual_aws_met_and_eval', 'staged', true, ...
        'doi', char(metadata.doi), ...
       'bundle_doi', char(metadata.bundle_doi), ...

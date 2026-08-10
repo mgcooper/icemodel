@@ -73,8 +73,8 @@ function opts = setModelOptsForCase(c, kwargs)
       opts = optsFromFormalCase(c, kwargs);
    end
 
-   % Scientific verification can request the diagnostic checkpoint ledger
-   % while formal regression keeps the unchanged standard-profile default.
+   % Scientific verification can request the diagnostic checkpoint ledger;
+   % formal regression keeps the standard-profile default.
    if strlength(kwargs.output_profile) > 0
       opts = icemodel.resetopts( ...
          opts, 'output_profile', char(kwargs.output_profile));
@@ -399,7 +399,7 @@ function [paths, dt_seconds] = stagedManifestMetFiles(case_manifest, forcing_sou
       cadences(n) = cadence;
    end
 
-   % Prefer one saved artifact that encloses the complete runtime. This retains
+   % Prefer one saved artifact that encloses the complete runtime, picked by
    % the deterministic widest/latest/path policy without loading list siblings.
    covering = starts <= window_start & ends >= window_end;
    if any(covering)
@@ -522,7 +522,7 @@ function dt_seconds = resolveTimestep(case_manifest, dt_override, ...
 
    if ~isempty(staged_dt)
       % Explicit manifest met is authoritative. A caller may restate its saved
-      % cadence, but cannot silently configure a different model timestep.
+      % cadence, but cannot configure a different model timestep.
       if ~isempty(dt_override) && (~isscalar(dt_override) ...
             || ~isfinite(dt_override) || dt_override ~= staged_dt)
          error('icemodel:test:setModelOptsForCase:metCadenceConflict', ...
@@ -562,8 +562,8 @@ function label = metFileTimestepLabel( ...
    label = "";
    files = reshape(string(selected_met_files), 1, []);
    if isempty(files)
-      % Legacy/no-root manifests have no resolved absolute path, so retain the
-      % declared-leg fallback used before exact-path selection was available.
+      % Legacy/no-root manifests have no resolved absolute path, so fall back
+      % to the met files recorded on the declared colocation leg.
       files = recordedManifestArtifactFiles( ...
          case_manifest, forcing_source, "met_files");
    end

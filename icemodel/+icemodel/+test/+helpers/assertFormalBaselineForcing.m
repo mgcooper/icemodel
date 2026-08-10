@@ -4,9 +4,9 @@ function assertFormalBaselineForcing(baseline, baseline_selector)
    %  icemodel.test.helpers.assertFormalBaselineForcing( ...
    %     baseline, "v1.1")
    %
-   % Formal case ids intentionally omit the forcing product. Check the saved
-   % station and forcing columns before case-id matching so a baseline produced
-   % with one forcing cannot be compared with, or snapshotted as, another.
+   % Formal case ids omit the forcing product. Check the saved station and
+   % forcing columns before case-id matching so a baseline produced with one
+   % forcing cannot be compared with, or snapshotted as, another.
 
    if isempty(baseline)
       return

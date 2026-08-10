@@ -21,7 +21,7 @@ function [stability, dstability] = stability_factor(T_sfc, tair, wspd, br_coefs)
    % For unstable, the absolute value of the Richardson number is implicit
    % because T_sfc>tair implies T_sfc-tair>0, see Appendix of Liston et al 1999
    %
-   % Legacy implementation, for comparison with notes.
+   % Scalar branch form, for comparison with the notes.
    %
    %  if T_sfc < tair % Stable case
    %

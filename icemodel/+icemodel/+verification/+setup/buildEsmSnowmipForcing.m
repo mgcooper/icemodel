@@ -159,9 +159,8 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    end
 
    % --- Convert to icemodel-native forcing variables -------------------
-   % Specific humidity -> relative humidity via the canonical icemodel
-   % vapor kernel (Romps / Ambaum). Centralising this avoids site-specific
-   % humidity formulas drifting across importers.
+   % Specific humidity -> relative humidity via the icemodel vapor kernel
+   % (Romps / Ambaum).
    rh = icemodel.vapor.relative_humidity_from_specific_humidity( ...
       qair(idx), psfc(idx), tair(idx));
 

@@ -77,10 +77,10 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %     'standard'   the default. Adds the surface energy-balance terms and
    %                  the convergence counters.
    %     'diagnostic' adds the turbulent-flux internals, and for icemodel the
-   %                  per-forcing-step mass and energy ledger. The ledger is
-   %                  what makes the closure identities checkable, and it is
-   %                  only built for this profile, so a standard run does not
-   %                  build or write it.
+   %                  per-forcing-step mass and energy ledger. The closure
+   %                  identities are evaluated from that ledger, which only
+   %                  this profile builds, so a standard run does not build
+   %                  or write it.
    %
    %  The channel lists live in icemodel.namelists.surfaceoutputs and
    %  icemodel.namelists.budgetoutputs; icemodel.configureRun assembles the
@@ -384,7 +384,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
       case 'kanl'
          % PROMICE/GC-Net single-boom nominal install height (matches the
-         % generic 'promice' path; single-sourced in parameterLookup). When the
+         % generic 'promice' path; defined in parameterLookup). When the
          % met file carries the time-varying boom_height channel,
          % icemodel.loadmet replaces this scalar through the
          % +reconstruct/POLICY.md A3 measured -> interpolated -> nominal
@@ -395,7 +395,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
       case 'kanm'
          % PROMICE/GC-Net single-boom nominal install height (matches the
-         % generic 'promice' path; single-sourced in parameterLookup).
+         % generic 'promice' path; defined in parameterLookup).
          % When the met file carries the time-varying boom_height channel,
          % icemodel.loadmet replaces this scalar through the POLICY A3
          % measured -> interpolated -> nominal fallback chain.
@@ -411,7 +411,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
          % Native PROMICE AWS station met (met_<site>_promice) and the
          % gap-filled product (met_<site>_promice_filled). T/RH and wind share
          % the upper boom, whose height changes as the surface evolves. NaN is
-         % an intentional unresolved sentinel: icemodel.loadmet replaces it with
+         % the unresolved sentinel: icemodel.loadmet replaces it with
          % the per-timestep boom-height series resolved through the
          % +reconstruct/POLICY.md A3 fallback hierarchy (measured ->
          % interpolated -> nominal constant), recording the outcome in
@@ -590,7 +590,7 @@ function [z_tair, z_wind] = retmipObservationHeights(sitename)
          z_wind = 10.0;
       case {"kanu", "kan"}
          % KAN_U follows the PROMICE single-boom nominal install height
-         % (single-sourced in parameterLookup).
+         % (defined in parameterLookup).
          z_tair = icemodel.parameterLookup('promice_nominal_boom_height_m');
          z_wind = z_tair;
       otherwise

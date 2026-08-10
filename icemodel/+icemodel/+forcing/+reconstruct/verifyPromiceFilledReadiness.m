@@ -33,7 +33,7 @@ function opts = verifyPromiceFilledReadiness(opts, fileiter)
    end
 
    % Resolve the producer ledger without placing table I/O in loadmet's
-   % code-generation surface. The ledger no longer gates the run (A4) but
+   % code-generation surface. The ledger does not gate the run (A4) but
    % remains a required, manifest-pinned bookkeeping artifact.
    readiness_file = "";
    if isfield(opts, 'readiness_file')
@@ -217,8 +217,9 @@ function verifyRequestedWindowCoverage(opts, site, met_files)
    flags = vertcat(flags_by_file{:});
    precip_ok = vertcat(precip_by_file{:});
 
-   % Runtime concatenation retains every row, so coverage must reject an
-   % ambiguous cross-file interval start instead of silently unioning flags.
+   % Runtime concatenation retains every row, so coverage rejects an
+   % ambiguous cross-file interval start rather than unioning flags across
+   % duplicate rows.
    rejectOverlappingIntervalStarts(times, met_files);
 
    [window_start, window_end] = requestedWindow(opts);
@@ -269,9 +270,10 @@ function verifyRequestedWindowCoverage(opts, site, met_files)
       covered = [covered, covered_precip];
    end
    if all(covered(:))
-      % Generated loading cannot inspect timetable UserData. Once the existing
-      % coverage gate passes, validate exact current policy/version, registry,
-      % site/product identity, and channel provenance before minting flags.
+      % Generated loading cannot inspect timetable UserData. After the
+      % coverage gate passes, validate exact current policy/version,
+      % registry, site/product identity, and channel provenance before
+      % minting flags.
       for k = 1:n_files
          icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
             met_files(k), met_by_file{k}, site)
@@ -352,10 +354,10 @@ end
 function channels = icemodelRequiredChannels()
    %ICEMODELREQUIREDCHANNELS POLICY A5 runtime forcing channel set.
    %
-   % The set itself lives once in the reconstruct namespace SSOT so the
-   % runtime gate and the ledger default can never silently diverge; the
-   % gate keeps this thin accessor because callers must not tune it the
-   % way reconstruct.setopts required_channels can be tuned per product.
+   % The channel set is defined in the reconstruct namespace and shared with
+   % the ledger default. The runtime gate reads it through this accessor
+   % because, unlike reconstruct.setopts required_channels, the gate's set
+   % is not tunable per product.
    channels = icemodel.forcing.reconstruct.icemodelRequiredChannels();
 end
 
@@ -363,9 +365,9 @@ function tf = requiresSnowfallForcing(smbmodel)
    %REQUIRESSNOWFALLFORCING True when the smbmodel consumes precip mass.
    %
    % POLICY A5: ready_icemodel requires the seven forcing channels; a snow
-   % model additionally requires finite total ppt OR snowf. The two
-   % historical models keep the D-0b zero-rain contract and consume no
-   % precipitation mass, so any other smbmodel is treated as
+   % model additionally requires finite total ppt OR snowf. The icemodel
+   % and skinmodel entry points keep the D-0b zero-rain contract and consume
+   % no precipitation mass, so any other smbmodel is treated as
    % snowfall-consuming and gates on the wider set.
    tf = ~ismember(lower(string(smbmodel)), ["icemodel", "skinmodel"]);
 end

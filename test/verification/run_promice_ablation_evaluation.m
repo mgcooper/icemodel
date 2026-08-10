@@ -199,8 +199,8 @@ function requested = requestedRows(rows, case_ids, years)
    requested = false(height(rows), 1);
    case_ids = lower(case_ids);
 
-   % An omitted selection is the deliberate readiness-only mode: report which
-   % site-years are admissible without launching the model.
+   % An omitted selection is readiness-only mode: report which site-years are
+   % admissible without launching the model.
    if isempty(case_ids)
       return
    end
@@ -320,7 +320,7 @@ function [result, nested, perturbations] = evaluateRow( ...
       model, display_end, provenance, source, policy);
 
    % The primary comparison must retain the readiness-selected direct endpoints;
-   % moving either endpoint would silently change the scientific window.
+   % moving either endpoint would change the scientific window.
    [comparison, aligned, diagnostics] = ...
       icemodel.verification.compareAblation( ...
       observations, model, window_start=t0, window_end=t1);
@@ -590,8 +590,8 @@ function seasonal = seasonalDiagnostics(observations, model, provenance, policy)
       observation(has_observation) = ...
          data.(policy.observation_field)(rows);
       snow(has_observation) = data.(policy.snow_variable)(rows);
-      % One owner applies every flag rule, so this cannot drift from the
-      % comparator, the readiness writer, or the report builder.
+      % Apply the PROMICE flag rules that decide whether an observation row
+      % is supported.
       flag_fields = ...
          icemodel.verification.helpers.observationSupportFields( ...
          policy.observation_field, policy);
@@ -649,8 +649,8 @@ function seasonal = seasonalDiagnostics(observations, model, provenance, policy)
    model_layer_change = model_layer_change - model_layer_change(reference);
 
    % Interval ledgers become state-at-time prefixes. The signed net-solid curve
-   % is deliberately not made monotonic: decreases expose refreezing/storage
-   % behavior but must not be read as geometric surface rise. Cumulative surface
+   % is not made monotonic: decreases expose refreezing/storage behavior but
+   % must not be read as geometric surface rise. Cumulative surface
    % mass loss is the separate monotonic lowering analogue, built from the mass
    % that top-cell removal actually exported rather than from cell geometry.
    increments = ...
@@ -781,7 +781,7 @@ function rows = endpointPerturbationDiagnostics( ...
       requested_end = records(k).requested_window_end;
 
       % A planned perturbation remains visible even if it collapses a short
-      % primary interval; it is never shortened or silently omitted.
+      % primary interval; it is never shortened or omitted.
       if isnat(requested_start) || isnat(requested_end) ...
             || requested_start >= requested_end
          records(k).reason = ...

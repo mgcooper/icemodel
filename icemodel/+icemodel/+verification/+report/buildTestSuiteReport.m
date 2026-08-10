@@ -340,6 +340,7 @@ function history = loadPerformanceHistory(baseline_root, requested_cases)
    % Load only managed rolling baseline MAT files, excluding profiler sidecars.
    files = dir(fullfile(baseline_root, "**", ...
       "perf_baseline_*_rolling_*.mat"));
+   collected = cell(numel(files), 1);
    for k = 1:numel(files)
       filename = fullfile(files(k).folder, files(k).name);
       saved = load(filename, "PerfBaseline");
@@ -368,8 +369,9 @@ function history = loadPerformanceHistory(baseline_root, requested_cases)
       rows = table(timestamp, string(baseline.case_id), ...
          double(baseline.median_wall_s), ...
          VariableNames=["timestamp_utc", "case_id", "median_wall_s"]);
-      history = [history; rows]; %#ok<AGROW>
+      collected{k} = rows;
    end
+   history = [history; vertcat(collected{:})];
 
    % Restrict the plot to the cases in the current comparison and valid samples.
    if ~isempty(history)

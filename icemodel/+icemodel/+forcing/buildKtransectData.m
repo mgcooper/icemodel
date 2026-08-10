@@ -104,7 +104,7 @@ function [Data, metadata] = buildKtransectData(station, kwargs)
    Data.snowf = nan(height(Data), 1);
 
    % The source has no albedo channel; publish only the screened radiometer
-   % ratio so low-sun and low-light noise never masquerades as albedo.
+   % ratio so low-sun and low-light noise is not reported as albedo.
    [Data.albedo, albedo_qc_counts] = icemodel.forcing.helpers.sourceAlbedo( ...
       Data.swd, Data.swu, Time=Data.Time, ...
       latitude=location.lat_wgs84, longitude=location.lon_wgs84);
@@ -221,8 +221,8 @@ function raw = mergeAnnualParts(parts, station)
    end
    raw = vertcat(parts{:});
 
-   % Overlapping annual children would silently double-count samples through
-   % retime; refuse rather than deduplicate.
+   % Overlapping annual children would double-count samples through retime;
+   % refuse rather than deduplicate.
    if numel(unique(raw.time)) ~= height(raw)
       error('icemodel:forcing:buildKtransectData:overlappingAnnualFiles', ...
          'duplicate timestamps across %s annual files', station)
@@ -346,7 +346,7 @@ function map = channelMap()
 end
 
 function Data = orderDataColumns(Data)
-   %ORDERDATACOLUMNS Keep K-transect Data files stable and metadata-mapped.
+   %ORDERDATACOLUMNS Put K-transect Data columns in the canonical order.
    preferred = ["tair", "rh", "wspd", "wdir", "psfc", "swd", "swu", ...
       "lwd", "lwu", "swn", "lwn", "netr", "albedo", "height_rel", ...
       "ice_melt", "aws_type", "rainf", "snowf"];

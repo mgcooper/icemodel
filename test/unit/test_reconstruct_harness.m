@@ -344,7 +344,7 @@ end
 
 function test_metrics_score_known_errors(testCase)
    % A constructed reconstruction yields exact bias/RMSE/coverage and flags
-   % the deliberate bound violation and boundary jump.
+   % the injected bound violation and boundary jump.
    series = icemodel.test.fixtures.makeReconstructSeries();
    draws = icemodel.forcing.reconstruct.syntheticMissingness(series, ...
       "tair", seededRuns(), years=2020, seed=7, n_gaps=3);
@@ -658,7 +658,7 @@ end
 
 function test_census_daylight_cut_ignores_night_shortwave(testCase)
    % With the site point supplied, nighttime-missing swd is not outage;
-   % only the deliberate daytime gap counts.
+   % only the injected daytime gap counts.
    series = icemodel.test.fixtures.makeReconstructSeries();
    elevation = icemodel.forcing.helpers.solarElevation( ...
       series.Properties.RowTimes, 67.0, -48.8);

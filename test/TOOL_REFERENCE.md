@@ -434,7 +434,7 @@ Use when:
 
 - evaluating postprocess runtime only
 
-This is intentionally separate from the spectral bootstrap.
+This is separate from the spectral bootstrap.
 
 ### `audit_formal_substep_failures`
 

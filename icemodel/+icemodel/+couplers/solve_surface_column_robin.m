@@ -60,17 +60,19 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
       T_sfc = (Fc + a1 * T_ice(1)) / (a1 - Fp);
       Ts_diag = T_sfc;
 
-      % Diagnose SEB residual.
-      seb_res = icemodel.surface.surface_energy_balance_residual( ...
+      % Diagnose SEB residual. Take the magnitude here, as the Dirichlet and
+      % skin couplers do.
+      seb_res = abs( ...
+         icemodel.surface.surface_energy_balance_residual( ...
          T_sfc, tair, swd, lwd, albedo, wspd, ppt, tppt, psfc, ...
          ea_atm, ro_atm, cv_atm, nu_air, H_h, H_e, hv_atm, ...
          br_coefs, liqflag, chi, T_ice, k_eff, dz, ro_sfc, ...
-         snow_depth, opts);
+         snow_depth, opts));
 
       % Check convergence (bypass coupler if cpl_maxiter == 1).
       cpl_res = T_sfc - Ts_old;
       if (cpl_maxiter == 1) || ...
-            (abs(cpl_res) < cpl_Ts_tol && abs(seb_res) < cpl_seb_tol)
+            (abs(cpl_res) < cpl_Ts_tol && seb_res < cpl_seb_tol)
          ok_cpl = true;
          break
       end
@@ -79,13 +81,11 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
       [T_sfc, hist] = icemodel.couplers.accelerate_coupler_iterate( ...
          hist, Ts_old, T_sfc, cpl_alpha, cpl_jumpmax, cpl_aitken);
 
-      % The accelerated iterate is the state carried into the next coupling
-      % sweep. Accept convergence here as well, so a stationary iterate cannot
-      % fall through the loop and fail spuriously at cpl_maxiter.
-      if abs(T_sfc - Ts_old) < cpl_Ts_tol && abs(seb_res) < cpl_seb_tol
-         ok_cpl = true;
-         break
-      end
+      % The accelerated iterate is not accepted here: its residual has not been
+      % evaluated, and T_ice and k_eff belong to the sweep that produced the
+      % pre-acceleration iterate. It is tested on the next sweep against its
+      % own column solve.
+      % solve.
 
       % Use the new T_sfc solution to update Fc, Fp for the next column solve.
       [Fc, Fp] = icemodel.surface.surface_flux_linearization( ...

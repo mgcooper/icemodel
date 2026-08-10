@@ -19,8 +19,8 @@ function split = validationSplit(years, kwargs)
    %  persisted, schema-verified, and replayed deterministically) only
    %  while it remains a disjoint,
    %  complete partition of the current record years. A missing file is
-   %  created from this call's split. Callers change a persisted split only by
-   %  deleting the manifest deliberately.
+   %  created from this call's split. Deleting the manifest is the only way
+   %  to change a persisted split.
    %
    % Name-value
    %  station : string. Station identity recorded in the manifest; a loaded
@@ -48,7 +48,7 @@ function split = validationSplit(years, kwargs)
    end
    mustBeInRange(kwargs.selection_fraction, 0, 1, 'exclusive')
 
-   % A persisted manifest is the source of truth for replays.
+   % A persisted manifest is replayed instead of recomputing the split.
    if kwargs.manifest_file ~= "" && isfile(kwargs.manifest_file)
       try
          split = jsondecode(fileread(kwargs.manifest_file));
@@ -93,8 +93,8 @@ function split = validationSplit(years, kwargs)
       'years_evaluation', sort(order(n_selection + 1:end)));
 
    if kwargs.manifest_file ~= ""
-      % Persist through a plain JSON write; the read path above is the
-      % replay rules. The guard runs before any directory is created.
+      % Persist through a plain JSON write; the read path above replays it.
+      % The destination guard runs before any directory is created.
       cfg = icemodel.config('getenv', true);
       icemodel.forcing.reconstruct.assertNotEvaluationDestination( ...
          kwargs.manifest_file, string(cfg.ICEMODEL_EVAL_PATH));

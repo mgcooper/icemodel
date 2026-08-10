@@ -6,8 +6,8 @@ function [window_start, window_end, enabled] = pairedWindow(startdate, enddate)
    %
    % Blank bounds disable the window and return UTC-zoned NaT values. A
    % supplied window must contain both finite scalar bounds in chronological
-   % order. Keeping this rule in one place lets forcing builders and
-   % verification importers check their inputs the same way.
+   % order. Forcing builders and verification importers call this at their
+   % public boundary to check an optional window.
 
    % Determine endpoint presence before parsing so half-window errors are
    % independent of whether callers use strings, chars, or datetimes.

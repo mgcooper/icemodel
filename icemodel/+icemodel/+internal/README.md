@@ -23,14 +23,13 @@ API, no compatibility promise."
 Their convention scopes it by *ownership*: a `+internal` sits beside the public
 code it serves and holds that code's implementation details. This repository
 scopes it by *purpose* instead, using it for toolbox management across the whole
-project. That is a deliberate difference, kept because the alternative would
-scatter version and install code through the tree.
+project. The alternative would scatter version and install code through the
+tree.
 
 Version handling:
 
 - `CITATION.cff` is the persisted software-version source.
-- `version` caches that value and retains its process-local override and reset
-  behavior.
+- `version` caches that value and provides a process-local override and reset.
 - `readCffVersion` keeps the version-loading path compatible with the core
   model's documented MATLAB floor.
 

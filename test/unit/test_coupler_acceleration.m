@@ -8,7 +8,7 @@ function tests = test_coupler_acceleration
 end
 
 function test_initialized_history_starts_empty(testCase)
-   % NaN means no history, which is what makes the first iteration fall back
+   % NaN means no history, so the first iteration falls back
    % to plain relaxation.
    returned = icemodel.couplers.initialize_coupler_history();
 
@@ -72,13 +72,12 @@ function test_bracketing_residuals_take_a_secant_step(testCase)
 end
 
 function test_aitken_extrapolates_when_no_bracket_exists(testCase)
-   % The Aitken stage is the one that runs on ordinary iterations, and no
-   % other test asserts it changes the iterate. Seed three iterates with
-   % same-sign residuals so no bracket exists and the secant returns the
-   % Aitken result as its fallback; a swapped argument order into
-   % aitkenscalar, which takes (Ts_2, Ts_1, Ts_new, fallback), would leave
-   % every other test in this file green while degrading all three couplers
-   % to plain relaxation.
+   % The only assertion that the Aitken stage changes the iterate at all.
+   % icemodel.numerics.aitkenscalar takes (Ts_2, Ts_1, Ts_new, fallback); a
+   % swapped argument order there degrades all three couplers to plain
+   % relaxation, and no other test in this file would fail.
+   % Seed three iterates with same-sign residuals so no bracket exists and
+   % the secant stage returns the Aitken extrapolation as its fallback.
    hist = icemodel.couplers.initialize_coupler_history();
    hist.Ts_2 = 271.0;
    hist.Ts_1 = 272.0;

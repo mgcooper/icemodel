@@ -55,7 +55,7 @@ function [ice1, ice2, opts] = icemodel(opts)
 
    % Both extra ledgers are diagnostic-only, so build them only there. They
    % are named apart because they are separate diagnostics: narrowing one gate
-   % must not silently empty the other's channels.
+   % must not empty the other's channels.
    use_diagnostic_profile = strcmp(opts.output_profile, 'diagnostic');
    use_mass_budget = use_diagnostic_profile;
    use_thf_diag = use_diagnostic_profile;
@@ -225,15 +225,19 @@ function [ice1, ice2, opts] = icemodel(opts)
             end
 
             % REMESH THIN LAYERS AFTER THE MASS-BALANCE UPDATE
+            % The eighth output builds the per-event remesh ledger. Requesting
+            % it on every call costs about 6 us per substep, which measured as
+            % +18% on a model year (63.7 s to 75.1 s, kanm 2016 solver 1), so
+            % the seven-output form is used unless the ledger is wanted.
             if use_mass_budget
                [T_ice, f_ice, f_liq, Sc, Sp, d_lyr, ~, remesh] ...
                   = icemodel.column.merge_thin_layers( ...
                   T_ice, f_ice, f_liq, Sc, Sp, dz(1), d_pevp, d_lyr, ...
                   f_ice_min);
 
-               % Accumulate the numerical remeshing, domain-exchange, and
-               % discrete grid-translation ledgers, which stay separate from
-               % the physical phase and vapor increments.
+               % Numerical remeshing, domain exchange, and discrete grid
+               % translation are tracked apart from the physical phase and
+               % vapor increments.
                mass_energy_budget = icemodel.column.accumulate_remesh_budget( ...
                   mass_energy_budget, remesh, phase_solid + vapor_solid, ...
                   phase_liquid + vapor_liquid);

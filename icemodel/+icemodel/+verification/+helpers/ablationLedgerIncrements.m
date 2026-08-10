@@ -4,9 +4,8 @@ function increments = ablationLedgerIncrements(ledger)
    %  increments = ...
    %     icemodel.verification.helpers.ablationLedgerIncrements(ledger)
    %
-   % The comparator scores these and the runner plots them. Defining them once
-   % keeps the scored quantity and the plotted curve the same quantity; each
-   % caller still applies its own prefix and rebasing convention.
+   % The comparator scores these terms and the runner plots them. Each caller
+   % applies its own prefix and rebasing convention.
    %
    % solid_balance is signed: it falls when refreezing exceeds melt, so it must
    % not be read as geometric surface rise.

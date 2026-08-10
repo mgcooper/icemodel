@@ -17,9 +17,7 @@ Rules:
 - own column physics here rather than in root all-caps files
 - keep runtime control in `icemodel.timestepping`, not here
 
-Migration status: phase-1 state / enthalpy / thermodynamics migration is
-complete; phase 2 mass-transfer, mesh, and runoff helpers are active.
-Current migrated entry points:
+Entry points:
 - `icemodel.column.shortwave_source_term`
 - `icemodel.column.initialize_column_state`
 - `icemodel.column.solve_column_enthalpy`
@@ -45,9 +43,7 @@ Current migrated entry points:
 - `icemodel.column.accumulate_remesh_budget`
 - `icemodel.column.initialize_remesh_ledger`
   - returns the zeroed per-event remesh ledger. `merge_thin_layers` is its
-    only caller and returns the filled struct as its opt-in eighth output;
-    it lives here so that schema has one definition the tests can assert
-    against
+    only caller and returns the filled struct as its opt-in eighth output
   - the three accumulators update ledger state rather than returning standalone
     event terms, which is why they are named `accumulate_*_budget`. They keep
     the diagnostic ledger out of the timestep driver; call them once per

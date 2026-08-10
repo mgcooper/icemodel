@@ -64,7 +64,7 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
       'icemodel:loadmet:promiceFilledNotReady');
 
    % Write a producer-schema ledger whose verdicts are all non-ready plus
-   % the pinning manifest. Verdict strings no longer gate the runtime: the
+   % the pinning manifest. Verdict strings do not gate the runtime: the
    % dateless request spans two full calendar years that the one-day
    % fixtures cannot cover, so the refusal is the window-coverage gate.
    site = repmat(string(opts.sitename), 2, 1);
@@ -312,7 +312,7 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
     testCase.verifyTrue( ...
        icemodel.forcing.reconstruct.promiceFilledVerificationMatches(opts_out));
     % A requested file subset verifies only the bytes it will load. An
-    % unselected file whose bytes no longer match the producer manifest
+    % unselected file whose bytes do not match the producer manifest
     % cannot poison a valid partial load.
     full_met = met;
     second_payload = load(opts.metfname{2}, 'met');
@@ -420,7 +420,7 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
          'icemodel:loadmet:promiceFilledIdentityMismatch');
    end
 
-   % A nonfinite sample and a measured value at or below z0_bulk no longer
+   % A nonfinite sample and a measured value at or below z0_bulk do not
    % block the run even when the ledger is stale: both demote into the
    % interpolated rung with one warning (POLICY A3), and the bridged
    % series feeds every observation height.
@@ -1215,7 +1215,7 @@ end
 
 function test_loadmet_explicit_userdata_requires_covering_support(testCase)
    % An existing explicit artifact outside the requested support must fail
-   % clearly instead of silently retiming/extrapolating the wrong Data variant.
+   % instead of retiming/extrapolating the wrong Data variant.
    workspace = testCase.TestData.workspace;
    Time = (datetime(2015, 1, 1, 'TimeZone', 'UTC'):hours(1): ...
       datetime(2015, 1, 1, 23, 0, 0, 'TimeZone', 'UTC'))';
@@ -1442,8 +1442,8 @@ function test_loadmet_errors_when_only_daily_userdata_swap_available(testCase)
 end
 
 function test_loadmet_errors_when_userdata_file_lacks_Data(testCase)
-   % Corrupt userdata files should fail loudly instead of silently falling
-   % back to the met data.
+   % Corrupt userdata files must raise an error instead of falling back to
+   % the met data.
 
    workspace = testCase.TestData.workspace;
    filepath = fullfile(workspace.userdatadir, 'kanm_modis_2016.mat');

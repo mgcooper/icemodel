@@ -4,9 +4,7 @@ function [first, last] = evaluationSeason(y, policy)
    %  [first, last] = icemodel.verification.helpers.evaluationSeason(y, policy)
    %
    % Readiness admits a site-year against this season and the runner evaluates
-   % it against the same one, so both call this rather than each building the
-   % bounds from the policy. Two definitions could admit a site-year on one
-   % window and evaluate it on another.
+   % it against the same season.
    %
    % Inputs
    %  y      - calendar year

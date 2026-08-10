@@ -105,9 +105,9 @@ function opts = applyPromiceObservationHeights(met, opts)
 
    if ~ismember("boom_height", ...
          string(met.Properties.VariableNames))
-      % Historical alias fixtures predate the boom channel; their scalar
-      % setopts geometry is already the nominal constant, so record the
-      % nominal source without a degradation warning and keep it.
+      % Alias fixtures carry no boom channel, and their scalar setopts
+      % geometry is already the nominal constant, so record the nominal
+      % source without a degradation warning and keep it.
       if is_legacy_alias
          opts.boom_height_source = 'nominal';
          opts.boom_height_fraction_fallback = 1;
@@ -375,8 +375,8 @@ end
 %%
 function Data = loadExternalSwapData(opts, thisyear, mettime)
    %LOADEXTERNALSWAPDATA Load a met-preferred external swap source.
-   % The public option is still named USERDATA for backward compatibility, but
-   % the selected value is a source label. Prefer met/<source>/ files because
+   % The public option is named USERDATA, but the selected value is a source
+   % label. Prefer met/<source>/ files because
    % forcing-channel swaps are meteorological data; fall back to legacy
    % userdata/<source>/ Data files only when no matching met file is staged.
 
@@ -605,8 +605,8 @@ function filepath = selectExplicitUserdataFile(files, mettime)
    durations = nan(numel(candidates), 1);
    n_enclosing = 0;
    for n = 1:numel(candidates)
-      % Explicit manifest paths are authoritative; corrupt referenced files
-      % should surface their load error instead of silently selecting a sibling.
+      % Explicit manifest paths are authoritative, so a corrupt referenced
+      % file raises its load error rather than yielding to a sibling.
       saved = load(candidates(n), 'Data');
       if ~isfield(saved, 'Data') || ~istimetable(saved.Data) ...
             || isempty(saved.Data)
@@ -629,7 +629,7 @@ function filepath = selectExplicitUserdataFile(files, mettime)
          strjoin(candidates, ', '))
    end
 
-   % Match legacy enclosing-window selection: widest support, then lexical path.
+   % Enclosing-window selection order: widest support, then lexical path.
    enclosing = enclosing(1:n_enclosing);
    durations = durations(1:n_enclosing);
    rank = table(-durations, enclosing, ...

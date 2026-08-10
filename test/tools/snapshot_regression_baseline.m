@@ -8,7 +8,7 @@ function RegressionBaseline = snapshot_regression_baseline(kwargs)
    % the current rolling baseline into a versioned release file. A custom
    % OUTPUT_FILE is supported only when SMBMODEL resolves to one concrete
    % formal model. Existing release files remain immutable even when the
-   % legacy OVERWRITE option is true.
+   % OVERWRITE option is true.
 
    arguments (Input)
 

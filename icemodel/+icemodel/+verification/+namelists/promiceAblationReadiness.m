@@ -9,8 +9,7 @@ function policy = promiceAblationReadiness()
    % but comparison rows require at most 0.01 m so modeled values are censored
    % wherever the observed height record may not represent exposed ice.
 
-   % Keep target and flag roles in one registry so readiness, comparison, and
-   % reporting cannot quietly count support a different way.
+   % Target and flag roles read by readiness, comparison, and reporting.
    target_field = "ablation";
    support_flag_fields = [ ...
       "surface_height_flag", "station_transition_flag", ...

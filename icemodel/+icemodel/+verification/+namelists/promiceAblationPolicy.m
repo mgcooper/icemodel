@@ -6,8 +6,8 @@ function policy = promiceAblationPolicy
    % The values are declared before any KAN result is inspected. They must not
    % be tuned by site or after viewing evaluation outcomes.
 
-   % Reuse the production diagnostic field registry so the comparator cannot
-   % drift from the closure bookkeeping emitted by IceModel.
+   % The readiness registry supplies the target, snow, and flag field names
+   % that the comparator scores against.
    readiness = ...
       icemodel.verification.namelists.promiceAblationReadiness();
    policy = struct( ...
@@ -135,11 +135,10 @@ function policy = promiceAblationPolicy
             "with a measured 870 kg m^-3 reference inside it; " + ...
             "600 kg m^-3 is not an intact glacier-ice density."));
 
-   % These fields explain the policy; they do not govern any result. The
-   % report validator compares saved against current policy to guarantee a
-   % report never describes a run that used different VALUES, and rewording an
-   % explanation must not invalidate a multi-hour cohort. Listed here so the
-   % validator derives the set instead of restating it.
+   % These fields explain the policy; they do not govern any result. The report
+   % validator compares saved against current policy so a report never
+   % describes a run that used different VALUES, and rewording an explanation
+   % must not invalidate a multi-hour cohort.
    policy.documentation_fields = ["effective_density_role", ...
       "observation_rate_outlier_role", "rationale"];
 end
@@ -150,8 +149,7 @@ function fields = insertAfterTarget(support_fields, snow_variable)
    % observationSupportFields returns the target first and then the flag
    % groups. Saved readiness and evaluation artifacts store the observation
    % columns as target, snow, flags, so the snow variable is spliced back into
-   % second place rather than appended. Deriving the flag set from its owner
-   % and fixing the order here keeps both properties.
+   % second place rather than appended.
 
    fields = [support_fields(1), string(snow_variable), support_fields(2:end)];
 end
