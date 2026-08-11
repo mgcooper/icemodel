@@ -22,7 +22,7 @@ D_e_expr = D_e0 * (T / T_f) ^ n %[output:3437fefe]
 if method == "buck" %[output:group:360166a3]
    % Note - it doesn't matter if symbolically c is replaced with c - Tf, b/c c
    % is only involved in this expression and is isolated from all other terms,
-   % but use the c + T version for consistency with the latex notes. 
+   % but use the c + T version for consistency with the latex notes.
    % e_s_expr = e_s0 * exp(b * T_d_expr / (c + T_d_expr))
    e_s_expr = e_s0 * exp(b * T_d_expr / (c + T)) %[output:4f3b72fd]
 elseif method == "ambaum"
@@ -62,7 +62,7 @@ d2_e_s_dT2_expr = diff(e_s_expr, T, 2);
 % (de_s_dT * (de_s_dT .* T ./ e_s - 2 * (T ./ cstar + 1)) + 2 * es ./ T) ./ (Rv * T.^2)
 %%
 %[text] ## Useful substitution definitions
-%[text] These definitions are for Buck with $c^\* = c - T\_f$.  $\\sigma$ numbering may differ from output depending on order of operations. 
+%[text] These definitions are for Buck with $c^\* = c - T\_f$.  $\\sigma$ numbering may differ from output depending on order of operations.
 %[text] $\\sigma\_1 = \\left( \\frac{ b }{ c^\* + T} - \\frac{ b\[T - T\_f\] }{ \[c^\* + T\]^2 } \\right)$
 %[text] $\\quad = \\left( \\frac{ bc }{ \[c^\* + T \]^2} \\right)$
 %[text] $\\quad = \\left( \\frac{ 1 }{ e\_s } \\frac{ de\_s }{ dT } \\right)$
@@ -100,7 +100,7 @@ end
 % dkdT = k_vap * (n ./ T + drov_dT ./ ro_vap - 2 ./ (c + T - Tf)) + Lv * De .* ro_vap .* (1 ./ T - 2 ./ (c + T - Tf)) ./ T; % 18
 % dkdT = k_vap * (n ./ T + drov_dT ./ ro_vap - 2 ./ (c + T - Tf)) + k_vap .* ro_vap .* (1 ./ T - 2 ./ (c + T - Tf)) ./ (T .* drov_dT); % 18
 %%
-%[text] This section experimented with subbing in (n-1) but it doesn't work as intended. 
+%[text] This section experimented with subbing in (n-1) but it doesn't work as intended.
 % d_k_v_dT = subs(d_k_v_dT_expr, n_m1_expr, n_m1)
 % Can't sub in D_e after nm1, but rho_v works but there's no benefit:
 % d_k_v_dT = subs(d_k_v_dT, rho_v_expr, rho_v)
@@ -160,14 +160,14 @@ diff(exp(b/T), T) %[output:7877f4b3]
 %%
 % NOTE: The only functional difference between Romps and Ambaum is Romps uses
 % cv_liq whereas Ambaum uses cp_liq in the exponent on (T/To). I think Ambaum
-% addresses this on page 4253, top right. 
+% addresses this on page 4253, top right.
 
 % Based on Ambaum's Fig 4, it appears fine to compute wrt water or solid, it
-% will only make a large difference at low temperatures, 
+% will only make a large difference at low temperatures,
 % Since RH is likely relative to water, and mar definitely was computed wrt
-% water, for the surface 
+% water, for the surface
 
-% Ambaum key points: 
+% Ambaum key points:
 % - Recommended values are for the entire range -60-100oC
 % - Recommended values set cp_liq = 4220 and optimize cp_vap = 2040
 % - Figure 3 shows less error with the actual triple point cp_vap = 1888
@@ -180,8 +180,8 @@ diff(exp(b/T), T) %[output:7877f4b3]
 % But his recommended value for cp_ice - cp_vap is 212, so the triple point
 % value of cp_vap over ice must be:
 % - cp_vap = cp_ice - 212 = 2097 - 212 = 1885
-% 
-% 
+%
+%
 
 % Ambaum Eq. 13-15 and 17-19:
 % cp_liq = 4220;     % Triple-point value, this is fixed
@@ -200,12 +200,12 @@ diff(exp(b/T), T) %[output:7877f4b3]
 % Ambaum got 1888.2 at the triple point, and says this value yields a value
 % for cp_liq "fairly close to its measured triple point value". NOTE: it is
 % not correct to compute cp_liq = 2180 + cp_vap = 4059, because the value
-% 2180 was selected by Ambaum to give cp_vap = 2040. 
+% 2180 was selected by Ambaum to give cp_vap = 2040.
 % Thus cp_liq = 2180 + 2040 = 4220, almost identical to my value 4218.
 
 % Ambaum says at low temperatures, the best fit is for the actual triple
 % point value of cp_vap, not the one above, which produces better results
-% over a larger temperature range up to 100oC. 
+% over a larger temperature range up to 100oC.
 %
 % Ambaum's triple-point values:
 % cp_vap = 1888.2;
@@ -219,7 +219,7 @@ diff(exp(b/T), T) %[output:7877f4b3]
 % Regarding ice, Ambaum mentions that the derivation assumes "the heat
 % capacity at constant pressure is constant over the temperature range of
 % interest" which is not good for ice, but they start with that assumption
-% then check the result and find good accuracy. 
+% then check the result and find good accuracy.
 
 
 
@@ -254,7 +254,7 @@ diff(exp(b/T), T) %[output:7877f4b3]
 % % Convert to specific heat capacity (J/kg.K)
 % cv_vap = cv_molar / (molar_mass_water_vapor / 1000); % molar mass to kg/mol
 
-   
+
 
 
 %[appendix]{"version":"1.0"}

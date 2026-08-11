@@ -123,22 +123,22 @@ function result = fillPromiceStation(site, kwargs)
       reconstructionAxis(staged_series, winter_albedo_mask, ...
       staged_provenance);
 
-    % Validate and select the acceptance-window proxy files first, then load
-    % exactly that pinned set in catalog adoption-preference order. A missing
-    % staged proxy is recorded, not fatal — other tiers still plan.
-    try
-       [acceptance_window, proxy_window_files] = ...
-          icemodel.forcing.reconstruct.acceptanceWindow( ...
-          site, met_dir=met_dir, location=location, opts=opts);
-    catch exception
-       % A malformed or internally disjoint proxy inventory invalidates any
-       % published A6 product, as an empty or record-disjoint window does.
-       if kwargs.write && startsWith(string(exception.identifier), ...
-             "icemodel:reconstruct:acceptanceWindow:")
-          retirePublishedArtifacts(site, out_dir, qa_dir, family);
-       end
-       rethrow(exception)
-    end
+   % Validate and select the acceptance-window proxy files first, then load
+   % exactly that pinned set in catalog adoption-preference order. A missing
+   % staged proxy is recorded, not fatal — other tiers still plan.
+   try
+      [acceptance_window, proxy_window_files] = ...
+         icemodel.forcing.reconstruct.acceptanceWindow( ...
+         site, met_dir=met_dir, location=location, opts=opts);
+   catch exception
+      % A malformed or internally disjoint proxy inventory invalidates any
+      % published A6 product, as an empty or record-disjoint window does.
+      if kwargs.write && startsWith(string(exception.identifier), ...
+            "icemodel:reconstruct:acceptanceWindow:")
+         retirePublishedArtifacts(site, out_dir, qa_dir, family);
+      end
+      rethrow(exception)
+   end
 
    % POLICY A6/D-17: validated staged proxy met defines the complete product
    % span. An empty proxy inventory defines no product span; it is not
@@ -189,58 +189,58 @@ function result = fillPromiceStation(site, kwargs)
    % Donor pool under the role contract; the plan applies the geometry gate.
    donors = assembleDonors(site, met_dir, kwargs);
 
-    proxies = loadStagedProxies(site, location, opts.proxy_catalog, ...
-       proxy_window_files);
+   proxies = loadStagedProxies(site, location, opts.proxy_catalog, ...
+      proxy_window_files);
 
-    % Keep split creation private until the complete artifact transaction
-    % publishes. Seed a temporary replay copy from the prior committed split.
-    split_manifest = "";
-    split_file = "";
-    if kwargs.write
-       split_file = fullfile(qa_dir, 'splits', site + "-split.json");
-       split_manifest = string(tempname) + ".json";
-       split_cleanup = onCleanup(@() removeArtifactPath(split_manifest));
-       if isfile(split_file)
-          copyfile(split_file, split_manifest);
-       end
-    end
+   % Keep split creation private until the complete artifact transaction
+   % publishes. Seed a temporary replay copy from the prior committed split.
+   split_manifest = "";
+   split_file = "";
+   if kwargs.write
+      split_file = fullfile(qa_dir, 'splits', site + "-split.json");
+      split_manifest = string(tempname) + ".json";
+      split_cleanup = onCleanup(@() removeArtifactPath(split_manifest));
+      if isfile(split_file)
+         copyfile(split_file, split_manifest);
+      end
+   end
 
-    % Selection experiment and admitted-method plan (albedo plans with the
+   % Selection experiment and admitted-method plan (albedo plans with the
    % non-interpolating method set; swu follows albedo*swd downstream).
    plan = icemodel.forcing.reconstruct.stationMethodPlan(target, donors, ...
-       proxies, seed=opts.seed, channels=opts.plan_channels, ...
-       core_channels=opts.core_channels, ...
+      proxies, seed=opts.seed, channels=opts.plan_channels, ...
+      core_channels=opts.core_channels, ...
       n_gaps=opts.plan_n_gaps, knot_candidates=opts.knot_candidates, ...
       max_donors=opts.max_donors, ...
-       max_donor_distance_km=opts.max_donor_distance_km, ...
-       max_donor_elev_diff_m=opts.max_donor_elev_diff_m, ...
-       selection_fraction=opts.selection_fraction, ...
-       min_overlap_hours=opts.min_overlap_hours, ...
-       max_lag_hours=opts.max_lag_hours, ...
-       min_lag_gain=opts.min_lag_gain, ...
-       max_extrapolation_fraction=opts.max_extrapolation_fraction, ...
-       rmse_improvement=opts.rmse_improvement, ...
-       min_variability_ratio=opts.min_variability_ratio, ...
-       max_variability_ratio=opts.max_variability_ratio, ...
-       min_coverage=opts.min_coverage, lapse_rate=opts.lapse_rate, ...
-       elevation_threshold_m=opts.elevation_threshold_m, ...
-       tair_for_pressure=opts.tair_for_pressure, ...
-       min_season_samples=opts.min_season_samples, ...
-       climatology_window_days=opts.climatology_window_days, ...
-       climatology_min_support=opts.climatology_min_support, ...
-       synthetic_context_hours=opts.synthetic_context_hours, ...
-       cap_hours=opts.cap_hours, ...
-       cap_hours_by_channel=opts.cap_hours_by_channel, ...
-       jump_factor=opts.jump_factor, ...
-       toa_dark_wm2=opts.toa_dark_wm2, ...
-       split_manifest=split_manifest);
-    % Persist central options plus resolved runtime donor controls so later
-    % reports describe this run, not live defaults or a different donor pool.
-    producer_options = opts;
-    producer_options.donor_sites = kwargs.donor_sites;
-    producer_options.use_ktransect = kwargs.use_ktransect;
-    producer_options.use_gcnet = kwargs.use_gcnet;
-    plan.reconstruction_options = producer_options;
+      max_donor_distance_km=opts.max_donor_distance_km, ...
+      max_donor_elev_diff_m=opts.max_donor_elev_diff_m, ...
+      selection_fraction=opts.selection_fraction, ...
+      min_overlap_hours=opts.min_overlap_hours, ...
+      max_lag_hours=opts.max_lag_hours, ...
+      min_lag_gain=opts.min_lag_gain, ...
+      max_extrapolation_fraction=opts.max_extrapolation_fraction, ...
+      rmse_improvement=opts.rmse_improvement, ...
+      min_variability_ratio=opts.min_variability_ratio, ...
+      max_variability_ratio=opts.max_variability_ratio, ...
+      min_coverage=opts.min_coverage, lapse_rate=opts.lapse_rate, ...
+      elevation_threshold_m=opts.elevation_threshold_m, ...
+      tair_for_pressure=opts.tair_for_pressure, ...
+      min_season_samples=opts.min_season_samples, ...
+      climatology_window_days=opts.climatology_window_days, ...
+      climatology_min_support=opts.climatology_min_support, ...
+      synthetic_context_hours=opts.synthetic_context_hours, ...
+      cap_hours=opts.cap_hours, ...
+      cap_hours_by_channel=opts.cap_hours_by_channel, ...
+      jump_factor=opts.jump_factor, ...
+      toa_dark_wm2=opts.toa_dark_wm2, ...
+      split_manifest=split_manifest);
+   % Persist central options plus resolved runtime donor controls so later
+   % reports describe this run, not live defaults or a different donor pool.
+   producer_options = opts;
+   producer_options.donor_sites = kwargs.donor_sites;
+   producer_options.use_ktransect = kwargs.use_ktransect;
+   producer_options.use_gcnet = kwargs.use_gcnet;
+   plan.reconstruction_options = producer_options;
    if kwargs.write
       % Blocked triage plans bypass validationSplit, while ordinary plans may
       % have loaded an existing replay. In both cases stage the exact split
@@ -260,34 +260,34 @@ function result = fillPromiceStation(site, kwargs)
       interp_channels=opts.interp_channels, cap_hours=opts.cap_hours, ...
       cap_hours_by_channel=opts.cap_hours_by_channel, ...
       jump_factor=opts.jump_factor, blend_hours=opts.blend_hours, ...
-       toa_dark_wm2=opts.toa_dark_wm2, ...
-       max_validation_duration_factor= ...
-       opts.max_validation_duration_factor, ...
-       native_provenance=native_provenance);
+      toa_dark_wm2=opts.toa_dark_wm2, ...
+      max_validation_duration_factor= ...
+      opts.max_validation_duration_factor, ...
+      native_provenance=native_provenance);
    filled = composed.series;
    provenance = composed.provenance;
    audit = composed.audit;
 
-    codes = icemodel.forcing.reconstruct.provenanceCodes();
-    % Instrument geometry has no donor/proxy tier. Staged station metadata
-    % does not contain a complete maintenance-visit registry, so every gap
-    % remains missing in the product; the runtime fallback chain (measured
-    % -> interpolated -> nominal, POLICY A3) owns geometry, and gaps never
-    % grade readiness.
-    [filled, provenance, audit] = fillBoomHeight( ...
-       filled, provenance, audit, codes);
+   codes = icemodel.forcing.reconstruct.provenanceCodes();
+   % Instrument geometry has no donor/proxy tier. Staged station metadata
+   % does not contain a complete maintenance-visit registry, so every gap
+   % remains missing in the product; the runtime fallback chain (measured
+   % -> interpolated -> nominal, POLICY A3) owns geometry, and gaps never
+   % grade readiness.
+   [filled, provenance, audit] = fillBoomHeight( ...
+      filled, provenance, audit, codes);
 
-    % Staged MODIS daily albedo holds first position in albedo's
-    % last-resort order (POLICY A11/B12): residual albedo gaps adopt the
-    % satellite observation before any RCM value, attached through the
-    % single daily->met-cadence helper, bounds-checked, seam-blended, and
-    % stamped with the modis provenance code.
-    if opts.use_modis_albedo
-       [filled, provenance, audit] = adoptModisAlbedo( ...
-          filled, provenance, audit, site, modis_dir, series, codes, opts);
-    end
+   % Staged MODIS daily albedo holds first position in albedo's
+   % last-resort order (POLICY A11/B12): residual albedo gaps adopt the
+   % satellite observation before any RCM value, attached through the
+   % single daily->met-cadence helper, bounds-checked, seam-blended, and
+   % stamped with the modis provenance code.
+   if opts.use_modis_albedo
+      [filled, provenance, audit] = adoptModisAlbedo( ...
+         filled, provenance, audit, site, modis_dir, series, codes, opts);
+   end
 
-    % Last-resort proxy adoption: residual missing required-channel
+   % Last-resort proxy adoption: residual missing required-channel
    % samples take aligned proxy values in catalog order, bounds-checked
    % and audited. Adopting whole outage spans from one proxy source
    % keeps thermodynamically coupled channels (tair/rh/lwd and their
@@ -296,13 +296,13 @@ function result = fillPromiceStation(site, kwargs)
    % Final-tier denial notes stay empty when the tier is disabled; the
    % audit reconciliation then keeps the provisional reasons untouched.
    last_resort_denials = struct();
-    if opts.last_resort_proxies
-        [filled, provenance, audit, last_resort_denials] = ...
-             icemodel.forcing.reconstruct.lastResortProxies(filled, ...
-            provenance, audit, proxies, codes, opts, ...
-            latitude=location.lat_wgs84, longitude=location.lon_wgs84, ...
-             native=series, plan=plan);
-     end
+   if opts.last_resort_proxies
+      [filled, provenance, audit, last_resort_denials] = ...
+         icemodel.forcing.reconstruct.lastResortProxies(filled, ...
+         provenance, audit, proxies, codes, opts, ...
+         latitude=location.lat_wgs84, longitude=location.lon_wgs84, ...
+         native=series, plan=plan);
+   end
 
    % Re-run the same physically aware bounded interpolation after the
    % source ladder. Long native outages can leave only a few refused seam
@@ -339,11 +339,11 @@ function result = fillPromiceStation(site, kwargs)
       end
    end
 
-    % Precipitation policy adoption follows the state-channel last resort;
-    % phases come from native components, exact complements, or the proxy's
-    % own split — never a reconstruction-time partition (POLICY A10/D-18).
-     [filled, provenance, audit] = adoptPrecip( ...
-        filled, provenance, audit, proxies, codes, opts, series);
+   % Precipitation policy adoption follows the state-channel last resort;
+   % phases come from native components, exact complements, or the proxy's
+   % own split — never a reconstruction-time partition (POLICY A10/D-18).
+   [filled, provenance, audit] = adoptPrecip( ...
+      filled, provenance, audit, proxies, codes, opts, series);
 
    % Winter-albedo fallback (POLICY B13/D-15a): masked winter samples no
    % method, MODIS, or proxy filled take a bounded seasonal BRIDGE — a
@@ -354,37 +354,37 @@ function result = fillPromiceStation(site, kwargs)
    % unphysical step edges the bare constant produced.
    if any(winter_albedo_mask) && ismember("albedo", ...
          string(provenance.Properties.VariableNames))
-       x = filled.albedo;
-       restore = winter_albedo_mask & ~isfinite(x);
-       if any(restore)
-          candidate = x;
-          % Bridge across every remaining missing sample using the finite
-          % neighbors as anchors; applying only at restore keeps other
-          % residual gaps untouched by this fallback.
-          bridged = fillmissing(x, 'linear', 'EndValues', 'none');
-          candidate(restore) = max(bridged(restore), ...
-             opts.native_winter_albedo);
-          % Single-sided winters with no usable bridge anchor fall back to
-          % the floor alone.
-          candidate(restore & ~isfinite(candidate)) = ...
-             opts.native_winter_albedo;
-          [candidate, seam_note] = ...
-             icemodel.forcing.reconstruct.blendFallbackSeams( ...
-             filled.Properties.RowTimes, series.albedo, x, candidate, ...
-             restore, jump_factor=opts.jump_factor, ...
-             blend_hours=opts.blend_hours);
-          x(restore) = candidate(restore);
-          filled.albedo = x;
+      x = filled.albedo;
+      restore = winter_albedo_mask & ~isfinite(x);
+      if any(restore)
+         candidate = x;
+         % Bridge across every remaining missing sample using the finite
+         % neighbors as anchors; applying only at restore keeps other
+         % residual gaps untouched by this fallback.
+         bridged = fillmissing(x, 'linear', 'EndValues', 'none');
+         candidate(restore) = max(bridged(restore), ...
+            opts.native_winter_albedo);
+         % Single-sided winters with no usable bridge anchor fall back to
+         % the floor alone.
+         candidate(restore & ~isfinite(candidate)) = ...
+            opts.native_winter_albedo;
+         [candidate, seam_note] = ...
+            icemodel.forcing.reconstruct.blendFallbackSeams( ...
+            filled.Properties.RowTimes, series.albedo, x, candidate, ...
+            restore, jump_factor=opts.jump_factor, ...
+            blend_hours=opts.blend_hours);
+         x(restore) = candidate(restore);
+         filled.albedo = x;
          code = provenance.albedo;
          code(restore) = codes.constant;
          provenance.albedo = code;
-          t = filled.Properties.RowTimes;
-           rows = icemodel.forcing.reconstruct.auditSegments(t, restore, ...
-              "albedo", "winter_albedo_bridge", ...
-              "seasonal bridge floored at the dry-snow value" + ...
-              string(seam_note));
-          audit = [audit; cell2table(vertcat(rows{:}), ...
-             'VariableNames', audit.Properties.VariableNames)];
+         t = filled.Properties.RowTimes;
+         rows = icemodel.forcing.reconstruct.auditSegments(t, restore, ...
+            "albedo", "winter_albedo_bridge", ...
+            "seasonal bridge floored at the dry-snow value" + ...
+            string(seam_note));
+         audit = [audit; cell2table(vertcat(rows{:}), ...
+            'VariableNames', audit.Properties.VariableNames)];
       end
    end
 
@@ -526,10 +526,10 @@ function result = fillPromiceStation(site, kwargs)
             'failed: %s'], site, strjoin(details, "; "));
       end
       met_file = writeArtifacts(site, filled, provenance, audit, ...
-          plan, readiness, seam_quality, flat_run_findings, out_dir, qa_dir, ...
-          codes, native_file, ...
-          acceptance_window, proxy_window_files, split_manifest, split_file, ...
-          unique(string({donors.station}), 'stable'), family);
+         plan, readiness, seam_quality, flat_run_findings, out_dir, qa_dir, ...
+         codes, native_file, ...
+         acceptance_window, proxy_window_files, split_manifest, split_file, ...
+         unique(string({donors.station}), 'stable'), family);
       clear split_cleanup
    end
    result = struct('site', site, 'plan', plan, 'filled', filled, ...
@@ -1024,24 +1024,24 @@ function [series, location, winter_mask, filename, native_provenance, ...
    if ismember("usr_provenance", staged_names)
       series = renamevars(series, "usr_provenance", "swu_provenance");
    end
-    ud = series.Properties.UserData;
-    % Identity may ride ud.site (the PROMICE staging grammar) or ud.station
-    % (the IMAU staging grammar); either token must normalize to the
-    % requested site (bead icemodel-g1n.49).
-    has_site = isstruct(ud) && isfield(ud, 'site') ...
-       && (ischar(ud.site) || (isstring(ud.site) && isscalar(ud.site)));
-    has_station = isstruct(ud) && isfield(ud, 'station') ...
-       && (ischar(ud.station) ...
-       || (isstring(ud.station) && isscalar(ud.station)));
-    identity = "";
-    if has_site
-       identity = string(ud.site);
-    elseif has_station
-       identity = string(ud.station);
-    end
-    if (~has_site && ~has_station) || ...
-          icemodel.forcing.helpers.normalizedFileToken(identity) ~= ...
-          icemodel.forcing.helpers.normalizedFileToken(site)
+   ud = series.Properties.UserData;
+   % Identity may ride ud.site (the PROMICE staging grammar) or ud.station
+   % (the IMAU staging grammar); either token must normalize to the
+   % requested site (bead icemodel-g1n.49).
+   has_site = isstruct(ud) && isfield(ud, 'site') ...
+      && (ischar(ud.site) || (isstring(ud.site) && isscalar(ud.site)));
+   has_station = isstruct(ud) && isfield(ud, 'station') ...
+      && (ischar(ud.station) ...
+      || (isstring(ud.station) && isscalar(ud.station)));
+   identity = "";
+   if has_site
+      identity = string(ud.site);
+   elseif has_station
+      identity = string(ud.station);
+   end
+   if (~has_site && ~has_station) || ...
+         icemodel.forcing.helpers.normalizedFileToken(identity) ~= ...
+         icemodel.forcing.helpers.normalizedFileToken(site)
       found_site = "<missing>";
       if has_site || has_station
          found_site = identity;
@@ -1050,16 +1050,16 @@ function [series, location, winter_mask, filename, native_provenance, ...
          ['native met metadata must identify the requested station %s; ' ...
          'found %s'], site, found_site);
    end
-    if isstruct(ud) && isfield(ud, 'gapfill_product')
-       error('icemodel:reconstruct:fillPromiceStation:nativeIdentityMismatch', ...
-          'native met input for %s identifies a reconstructed product', site);
-    end
-    % PROMICE met metadata names the point lat/lon; accept the top-level
-    % wgs84 spelling other families use, and the site_location struct the
-    % IMAU staging writes — its top-level metadata carries lat_wgs84 and
-    % lon_wgs84 but no elev_m, so the complete point lives only in the
-    % struct form (bead icemodel-g1n.49) — so donors and non-promice
-    % targets load through the same path.
+   if isstruct(ud) && isfield(ud, 'gapfill_product')
+      error('icemodel:reconstruct:fillPromiceStation:nativeIdentityMismatch', ...
+         'native met input for %s identifies a reconstructed product', site);
+   end
+   % PROMICE met metadata names the point lat/lon; accept the top-level
+   % wgs84 spelling other families use, and the site_location struct the
+   % IMAU staging writes — its top-level metadata carries lat_wgs84 and
+   % lon_wgs84 but no elev_m, so the complete point lives only in the
+   % struct form (bead icemodel-g1n.49) — so donors and non-promice
+   % targets load through the same path.
    if isfield(ud, 'lat')
       location = struct('lat_wgs84', ud.lat, 'lon_wgs84', ud.lon, ...
          'elev_m', ud.elev);
@@ -1121,100 +1121,100 @@ function [series, location, winter_mask, filename, native_provenance, ...
       series.lwd(:) = NaN;
    end
 
-    % PROMICE-only builder machinery (bead icemodel-g1n.49): the raw-source
-    % replay, the raw-fallback shortwave QC, and the winter-albedo stamp
-    % recovery all reconstruct decisions the PROMICE builder is known to
-    % have made (legacy albedo fills, source-selected shortwave). Other
-    % families' staging pipelines carry no such builder state to replay.
-    if family == "promice"
-       [observed, raw_albedo, resolved, swd_darkness, native_provenance] = ...
-          sourcePromiceMasks( ...
-          series, site, ...
-          icemodel.forcing.reconstruct.selectedDataRoot(met_dir), location);
-       if any(swd_darkness)
-          series.swd(swd_darkness) = NaN;
-       end
-       codes = icemodel.forcing.reconstruct.provenanceCodes();
-       if isfield(native_provenance, 'swu')
-          swu_darkness = native_provenance.swu == codes.darkness;
-          series.swu(swu_darkness) = NaN;
-       end
+   % PROMICE-only builder machinery (bead icemodel-g1n.49): the raw-source
+   % replay, the raw-fallback shortwave QC, and the winter-albedo stamp
+   % recovery all reconstruct decisions the PROMICE builder is known to
+   % have made (legacy albedo fills, source-selected shortwave). Other
+   % families' staging pipelines carry no such builder state to replay.
+   if family == "promice"
+      [observed, raw_albedo, resolved, swd_darkness, native_provenance] = ...
+         sourcePromiceMasks( ...
+         series, site, ...
+         icemodel.forcing.reconstruct.selectedDataRoot(met_dir), location);
+      if any(swd_darkness)
+         series.swd(swd_darkness) = NaN;
+      end
+      codes = icemodel.forcing.reconstruct.provenanceCodes();
+      if isfield(native_provenance, 'swu')
+         swu_darkness = native_provenance.swu == codes.darkness;
+         series.swu(swu_darkness) = NaN;
+      end
 
-       % A15 hard limits apply at EVERY tier, including the builder's
-       % raw-pyranometer fallback: the fallback exists to prefer raw over
-       % nothing (A7), never to ship impossible incident energy, yet the
-       % GC-Net-legacy cohort carries ~41k code-13 samples above the swd
-       % ceiling with an evening-shifted diurnal signature (e.g. 945-962
-       % W/m2 at ~1.6x TOA). Gate the raw-fallback support through the same
-       % candidate validity rule the fill tiers obey; failing samples turn
-       % MISSING so later tiers may fill them honestly. The staged native
-       % artifact is untouched — only this run's working series drops them.
-       % swd gates first so the swu pairing test sees the post-gate swd: a
-       % raw swd proven impossible cannot vouch for its paired raw swu.
-       for name = ["swd", "swu"]
-          if ~isfield(native_provenance, name) ...
-                || ~ismember(name, string(series.Properties.VariableNames))
-             continue
-          end
-          is_raw = native_provenance.(name) == codes.raw_shortwave;
-          if ~any(is_raw)
-             continue
-          end
-           if name == "swd"
-              valid = icemodel.forcing.reconstruct.physicalValidity("swd", ...
-                 series.swd, series.Properties.RowTimes, ...
-                 latitude=location.lat_wgs84, longitude=location.lon_wgs84, ...
-                 interval=median(diff(series.Properties.RowTimes)));
-          else
-             valid = icemodel.forcing.reconstruct.physicalValidity("swu", ...
-                series.swu, series.Properties.RowTimes, swd=series.swd);
-          end
-          drop = is_raw & ~valid;
-          series.(name)(drop) = NaN;
-          native_provenance.(name)(drop) = codes.missing;
-       end
+      % A15 hard limits apply at EVERY tier, including the builder's
+      % raw-pyranometer fallback: the fallback exists to prefer raw over
+      % nothing (A7), never to ship impossible incident energy, yet the
+      % GC-Net-legacy cohort carries ~41k code-13 samples above the swd
+      % ceiling with an evening-shifted diurnal signature (e.g. 945-962
+      % W/m2 at ~1.6x TOA). Gate the raw-fallback support through the same
+      % candidate validity rule the fill tiers obey; failing samples turn
+      % MISSING so later tiers may fill them honestly. The staged native
+      % artifact is untouched — only this run's working series drops them.
+      % swd gates first so the swu pairing test sees the post-gate swd: a
+      % raw swd proven impossible cannot vouch for its paired raw swu.
+      for name = ["swd", "swu"]
+         if ~isfield(native_provenance, name) ...
+               || ~ismember(name, string(series.Properties.VariableNames))
+            continue
+         end
+         is_raw = native_provenance.(name) == codes.raw_shortwave;
+         if ~any(is_raw)
+            continue
+         end
+         if name == "swd"
+            valid = icemodel.forcing.reconstruct.physicalValidity("swd", ...
+               series.swd, series.Properties.RowTimes, ...
+               latitude=location.lat_wgs84, longitude=location.lon_wgs84, ...
+               interval=median(diff(series.Properties.RowTimes)));
+         else
+            valid = icemodel.forcing.reconstruct.physicalValidity("swu", ...
+               series.swu, series.Properties.RowTimes, swd=series.swd);
+         end
+         drop = is_raw & ~valid;
+         series.(name)(drop) = NaN;
+         native_provenance.(name)(drop) = codes.missing;
+      end
 
-       winter_mask = false(height(series), 1);
-       if ismember("albedo", string(series.Properties.VariableNames))
-          m = month(series.Properties.RowTimes);
-          stamped = ismember(m, opts.native_winter_months) ...
-             & series.albedo == opts.native_winter_albedo;
-          if resolved
-             source_match = observed & series.albedo == raw_albedo;
-             legacy_fill = isfinite(series.albedo) ...
-                & (~observed | (stamped & ~source_match));
-             winter_mask = stamped & legacy_fill;
-             series.albedo(legacy_fill) = NaN;
-          elseif any(isfinite(series.albedo))
-             error( ...
-                'icemodel:reconstruct:fillPromiceStation:missingAlbedoProvenance', ...
-                ['staged %s has finite albedo without verifiable raw-source ' ...
-                'provenance'], site)
-          end
-       end
-    else
-       % Non-promice albedo-provenance policy (bead icemodel-g1n.49): the
-       % promice fail-closed missingAlbedoProvenance rule exists because
-       % the PROMICE builder is known to have injected legacy winter fills
-       % that must be proven absent by raw-source replay. IMAU and
-       % K-transect staging has no such fill history, so finite native
-       % albedo ships as observed, no raw replay runs, and the winter
-       % stamp mask stays all-false.
-       native_provenance = struct();
-       winter_mask = false(height(series), 1);
-    end
-    % Screen PROMICE sensor-burial/rime signatures before this working
-    % copy can train a method, set a seam scale, or act as a donor. The
-    % staged artifact remains byte-identical; implicated samples become
-    % reconstructable missing values with a persisted evidence table.
-    flat_run_findings = table();
-    if family == "promice"
-       [series, native_provenance, flat_run_findings] = ...
-          maskFlatRunFindings(series, native_provenance, location);
-    end
-    verifyNativeMetIdentity(filename, ...
-       icemodel.forcing.reconstruct.selectedDataRoot(met_dir), site, family);
- end
+      winter_mask = false(height(series), 1);
+      if ismember("albedo", string(series.Properties.VariableNames))
+         m = month(series.Properties.RowTimes);
+         stamped = ismember(m, opts.native_winter_months) ...
+            & series.albedo == opts.native_winter_albedo;
+         if resolved
+            source_match = observed & series.albedo == raw_albedo;
+            legacy_fill = isfinite(series.albedo) ...
+               & (~observed | (stamped & ~source_match));
+            winter_mask = stamped & legacy_fill;
+            series.albedo(legacy_fill) = NaN;
+         elseif any(isfinite(series.albedo))
+            error( ...
+               'icemodel:reconstruct:fillPromiceStation:missingAlbedoProvenance', ...
+               ['staged %s has finite albedo without verifiable raw-source ' ...
+               'provenance'], site)
+         end
+      end
+   else
+      % Non-promice albedo-provenance policy (bead icemodel-g1n.49): the
+      % promice fail-closed missingAlbedoProvenance rule exists because
+      % the PROMICE builder is known to have injected legacy winter fills
+      % that must be proven absent by raw-source replay. IMAU and
+      % K-transect staging has no such fill history, so finite native
+      % albedo ships as observed, no raw replay runs, and the winter
+      % stamp mask stays all-false.
+      native_provenance = struct();
+      winter_mask = false(height(series), 1);
+   end
+   % Screen PROMICE sensor-burial/rime signatures before this working
+   % copy can train a method, set a seam scale, or act as a donor. The
+   % staged artifact remains byte-identical; implicated samples become
+   % reconstructable missing values with a persisted evidence table.
+   flat_run_findings = table();
+   if family == "promice"
+      [series, native_provenance, flat_run_findings] = ...
+         maskFlatRunFindings(series, native_provenance, location);
+   end
+   verifyNativeMetIdentity(filename, ...
+      icemodel.forcing.reconstruct.selectedDataRoot(met_dir), site, family);
+end
 
 function [series, native_provenance, findings] = ...
       maskFlatRunFindings(series, native_provenance, location)
@@ -1258,13 +1258,13 @@ function [observed, raw_albedo, resolved, swd_darkness, native_provenance] = ...
    legacy_albedo = isstruct(metadata) ...
       && isfield(metadata, 'albedo_policy') ...
       && contains(string(metadata.albedo_policy), "fillPromiceAlbedo");
-    mask_names = ["swd_raw_fallback", "swd_negative_clamped", ...
-       "swd_darkness_fill", "swu_raw_fallback", "swu_negative_clamped", ...
-       "swu_darkness_fill"];
-    count_fields = ["swd_raw_fallback_count", ...
-       "swd_negative_clamped_count", "swd_darkness_zero_filled_count", ...
-       "swu_raw_fallback_count", "swu_negative_clamped_count", ...
-       "swu_darkness_zero_filled_count"];
+   mask_names = ["swd_raw_fallback", "swd_negative_clamped", ...
+      "swd_darkness_fill", "swu_raw_fallback", "swu_negative_clamped", ...
+      "swu_darkness_fill"];
+   count_fields = ["swd_raw_fallback_count", ...
+      "swd_negative_clamped_count", "swd_darkness_zero_filled_count", ...
+      "swu_raw_fallback_count", "swu_negative_clamped_count", ...
+      "swu_darkness_zero_filled_count"];
    counts = zeros(size(count_fields));
    for k = 1:numel(count_fields)
       if isstruct(metadata) && isfield(metadata, count_fields(k))
@@ -1314,16 +1314,16 @@ function [observed, raw_albedo, resolved, swd_darkness, native_provenance] = ...
       && isfield(metadata, 'source_sha256') ...
       && isscalar(string(metadata.source_sha256)) ...
       && strlength(string(metadata.source_sha256)) == 64;
-    % Legacy artifacts predate raw-byte pins. Their staged bytes must still
-    % pass producer-manifest verification before loadStationMet returns, while
-    % the support replay below binds the current raw file to every relevant
-    % derived mask. Newer artifacts carry pins, which remain strict when present.
-    if has_source_pin ...
-          && (source_info.bytes ~= double(metadata.source_size_bytes) ...
-          || icemodel.verification.setup.fileSha256(source_file) ...
-          ~= lower(string(metadata.source_sha256)))
-       error(['icemodel:reconstruct:fillPromiceStation:' ...
-          'rawSourceIdentityMismatch'], ...
+   % Legacy artifacts predate raw-byte pins. Their staged bytes must still
+   % pass producer-manifest verification before loadStationMet returns, while
+   % the support replay below binds the current raw file to every relevant
+   % derived mask. Newer artifacts carry pins, which remain strict when present.
+   if has_source_pin ...
+         && (source_info.bytes ~= double(metadata.source_size_bytes) ...
+         || icemodel.verification.setup.fileSha256(source_file) ...
+         ~= lower(string(metadata.source_sha256)))
+      error(['icemodel:reconstruct:fillPromiceStation:' ...
+         'rawSourceIdentityMismatch'], ...
          'staged %s raw-source bytes do not match builder metadata: %s', ...
          site, source_file);
    end
@@ -1339,9 +1339,9 @@ function [observed, raw_albedo, resolved, swd_darkness, native_provenance] = ...
       % Reuse the canonical forward-support resampler so a finite hourly
       % observation owns exactly its four quarter-hour samples.
       raw_mask = timetable(raw.Properties.RowTimes, ...
-          double(icemodel.forcing.promiceAlbedoSourceValid(raw.albedo)), ...
-          raw.albedo, ...
-          'VariableNames', {'observed', 'albedo'});
+         double(icemodel.forcing.promiceAlbedoSourceValid(raw.albedo)), ...
+         raw.albedo, ...
+         'VariableNames', {'observed', 'albedo'});
       support = icemodel.forcing.helpers.resampleMetTimestep(raw_mask, "15m");
       [tf, loc] = ismember(series.Properties.RowTimes, ...
          support.Properties.RowTimes);
@@ -1379,35 +1379,35 @@ function [observed, raw_albedo, resolved, swd_darkness, native_provenance] = ...
       end
    end
 
-    % Carry source-selection provenance over the builder's forward-held
-    % quarter-hour support. A clamp overrides raw or darkness when masks
-    % overlap. The staged series already carries canonical names (the read
-    % boundary renamed any legacy usr), so mask and channel names coincide.
+   % Carry source-selection provenance over the builder's forward-held
+   % quarter-hour support. A clamp overrides raw or darkness when masks
+   % overlap. The staged series already carries canonical names (the read
+   % boundary renamed any legacy usr), so mask and channel names coincide.
    codes = icemodel.forcing.reconstruct.provenanceCodes();
    for name = ["swd", "swu"]
       if ~ismember(name, string(series.Properties.VariableNames))
          continue
       end
-       raw_mask = timetable(raw.Properties.RowTimes, ...
-          double(masks.(name + "_raw_fallback")), ...
-          double(masks.(name + "_negative_clamped")), ...
-          double(masks.(name + "_darkness_fill")), ...
-          'VariableNames', ...
-          {'raw_fallback', 'negative_clamped', 'darkness_fill'});
+      raw_mask = timetable(raw.Properties.RowTimes, ...
+         double(masks.(name + "_raw_fallback")), ...
+         double(masks.(name + "_negative_clamped")), ...
+         double(masks.(name + "_darkness_fill")), ...
+         'VariableNames', ...
+         {'raw_fallback', 'negative_clamped', 'darkness_fill'});
       support = icemodel.forcing.helpers.resampleMetTimestep(raw_mask, "15m");
       [tf, loc] = ismember(series.Properties.RowTimes, ...
          support.Properties.RowTimes);
       code = repmat(codes.observed, height(series), 1);
-       raw_fallback = false(height(series), 1);
-       negative_clamped = false(height(series), 1);
-       darkness_fill = false(height(series), 1);
-       raw_fallback(tf) = support.raw_fallback(loc(tf)) == 1;
-       negative_clamped(tf) = support.negative_clamped(loc(tf)) == 1;
-       darkness_fill(tf) = support.darkness_fill(loc(tf)) == 1;
-       finite = isfinite(series.(name));
-       code(raw_fallback & finite) = codes.raw_shortwave;
-       code(darkness_fill & finite) = codes.darkness;
-       code(negative_clamped & finite) = codes.clamped_shortwave;
+      raw_fallback = false(height(series), 1);
+      negative_clamped = false(height(series), 1);
+      darkness_fill = false(height(series), 1);
+      raw_fallback(tf) = support.raw_fallback(loc(tf)) == 1;
+      negative_clamped(tf) = support.negative_clamped(loc(tf)) == 1;
+      darkness_fill(tf) = support.darkness_fill(loc(tf)) == 1;
+      finite = isfinite(series.(name));
+      code(raw_fallback & finite) = codes.raw_shortwave;
+      code(darkness_fill & finite) = codes.darkness;
+      code(negative_clamped & finite) = codes.clamped_shortwave;
       native_provenance.(name) = code;
    end
 
@@ -1491,54 +1491,54 @@ function verifyNativeMetIdentity(filename, data_root, site, family)
    end
 
    entry = cases(match_case);
-    valid_leg = isfield(entry, 'colocation') ...
-       && isstruct(entry.colocation) ...
-       && isfield(entry.colocation, char(family)) ...
-       && isstruct(entry.colocation.(char(family)));
-    if ~valid_leg
-       error(['icemodel:reconstruct:fillPromiceStation:' ...
-          'missingNativeArtifactIdentity'], ...
-          '%s producer manifest has no staged met leg for %s', ...
-          family_label, site);
-    end
+   valid_leg = isfield(entry, 'colocation') ...
+      && isstruct(entry.colocation) ...
+      && isfield(entry.colocation, char(family)) ...
+      && isstruct(entry.colocation.(char(family)));
+   if ~valid_leg
+      error(['icemodel:reconstruct:fillPromiceStation:' ...
+         'missingNativeArtifactIdentity'], ...
+         '%s producer manifest has no staged met leg for %s', ...
+         family_label, site);
+   end
 
-    [~, stem, ext] = fileparts(filename);
-    basename = string(stem) + string(ext);
-    leg = entry.colocation.(char(family));
-    has_identities = isfield(leg, 'met_file_identities') ...
-       && isstruct(leg.met_file_identities) ...
-       && ~isempty(leg.met_file_identities);
-    if ~has_identities
-       if family == "promice"
-          error(['icemodel:reconstruct:fillPromiceStation:' ...
-             'missingNativeArtifactIdentity'], ...
-             ['PROMICE producer manifest has no size+SHA-256 staged met ' ...
-             'identity for %s; refresh the manifest before reconstruction'], ...
-             site);
-       end
-       % Legacy manifests pin the canonical staged path but predate per-file
-       % hashes. Preserve that identity contract for non-PROMICE families;
-       % A1/D-22 requires every PROMICE target and donor to take the
-       % byte-strict branch below.
-       if ~isfield(leg, 'met_files')
-          error(['icemodel:reconstruct:fillPromiceStation:' ...
-             'missingNativeArtifactIdentity'], ...
-             '%s producer manifest has no staged met identity for %s', ...
-             family_label, site);
-       end
-       declared = replace(string(leg.met_files), "\", "/");
-       match_file = declared == basename | endsWith(declared, "/" + basename);
-       if nnz(match_file) ~= 1
-          error(['icemodel:reconstruct:fillPromiceStation:' ...
-             'missingNativeArtifactIdentity'], ...
-             '%s producer manifest has no unique staged path for %s', ...
-             family_label, filename);
-       end
-       return
-    end
+   [~, stem, ext] = fileparts(filename);
+   basename = string(stem) + string(ext);
+   leg = entry.colocation.(char(family));
+   has_identities = isfield(leg, 'met_file_identities') ...
+      && isstruct(leg.met_file_identities) ...
+      && ~isempty(leg.met_file_identities);
+   if ~has_identities
+      if family == "promice"
+         error(['icemodel:reconstruct:fillPromiceStation:' ...
+            'missingNativeArtifactIdentity'], ...
+            ['PROMICE producer manifest has no size+SHA-256 staged met ' ...
+            'identity for %s; refresh the manifest before reconstruction'], ...
+            site);
+      end
+      % Legacy manifests pin the canonical staged path but predate per-file
+      % hashes. Preserve that identity contract for non-PROMICE families;
+      % A1/D-22 requires every PROMICE target and donor to take the
+      % byte-strict branch below.
+      if ~isfield(leg, 'met_files')
+         error(['icemodel:reconstruct:fillPromiceStation:' ...
+            'missingNativeArtifactIdentity'], ...
+            '%s producer manifest has no staged met identity for %s', ...
+            family_label, site);
+      end
+      declared = replace(string(leg.met_files), "\", "/");
+      match_file = declared == basename | endsWith(declared, "/" + basename);
+      if nnz(match_file) ~= 1
+         error(['icemodel:reconstruct:fillPromiceStation:' ...
+            'missingNativeArtifactIdentity'], ...
+            '%s producer manifest has no unique staged path for %s', ...
+            family_label, filename);
+      end
+      return
+   end
 
-    identities = leg.met_file_identities;
-    declared = replace(string({identities.file}), "\", "/");
+   identities = leg.met_file_identities;
+   declared = replace(string({identities.file}), "\", "/");
    match_file = declared == basename | endsWith(declared, "/" + basename);
    if nnz(match_file) ~= 1
       error(['icemodel:reconstruct:fillPromiceStation:' ...
@@ -1570,8 +1570,8 @@ function donors = assembleDonors(site, met_dir, kwargs)
    % Canonical staged met lives at <data_root>/input/met/<family>; every
    % donor family must stay inside that same selected root. Fixture and
    % caller-selected roots may omit the canonical input/ layer.
-    [data_root, met_root] = ...
-       icemodel.forcing.reconstruct.selectedDataRoot(met_dir);
+   [data_root, met_root] = ...
+      icemodel.forcing.reconstruct.selectedDataRoot(met_dir);
 
    % Station-donor family set (bead icemodel-g1n.49): PROMICE is the only
    % staged station-donor registry today, so every target family — promice
@@ -1617,19 +1617,19 @@ function donors = assembleDonors(site, met_dir, kwargs)
    promice_cells = cell(numel(donor_sites), 1);
    for k = 1:numel(donor_sites)
       try
-          [d_staged, d_location, d_winter_mask, ~, d_provenance, ~] = ...
-             loadStationMet(donor_met_dir, donor_sites(k), kwargs.opts, ...
-             "promice");
-          [d_series, ~, ~, ~] = reconstructionAxis( ...
-             d_staged, d_winter_mask, d_provenance);
+         [d_staged, d_location, d_winter_mask, ~, d_provenance, ~] = ...
+            loadStationMet(donor_met_dir, donor_sites(k), kwargs.opts, ...
+            "promice");
+         [d_series, ~, ~, ~] = reconstructionAxis( ...
+            d_staged, d_winter_mask, d_provenance);
       catch err
          if ismember(string(err.identifier), [ ...
-                "icemodel:reconstruct:fillPromiceStation:missingAlbedoSource"
-                "icemodel:reconstruct:fillPromiceStation:missingRawAlbedo"
-                 "icemodel:reconstruct:fillPromiceStation:rawSourceIdentityMismatch"
-                 "icemodel:reconstruct:fillPromiceStation:missingNativeArtifactIdentity"
-                 "icemodel:reconstruct:fillPromiceStation:nativeArtifactIdentityMismatch"
-                 "icemodel:reconstruct:fillPromiceStation:unverifiedNativeCadence"])
+               "icemodel:reconstruct:fillPromiceStation:missingAlbedoSource"
+               "icemodel:reconstruct:fillPromiceStation:missingRawAlbedo"
+               "icemodel:reconstruct:fillPromiceStation:rawSourceIdentityMismatch"
+               "icemodel:reconstruct:fillPromiceStation:missingNativeArtifactIdentity"
+               "icemodel:reconstruct:fillPromiceStation:nativeArtifactIdentityMismatch"
+               "icemodel:reconstruct:fillPromiceStation:unverifiedNativeCadence"])
             rethrow(err)
          end
          continue
@@ -1647,72 +1647,72 @@ function donors = assembleDonors(site, met_dir, kwargs)
       kt_root = fullfile(data_root, 'eval', 'ktransect');
       kt_manifest = fullfile(kt_root, 'manifest.json');
       if isfile(kt_manifest)
-          kt = jsondecode(fileread(kt_manifest));
-          kt_cells = cell(numel(kt.cases), 1);
-          for k = 1:numel(kt.cases)
-             entry = kt.cases(k);
-             leg = entry.colocation.ktransect;
-             evaluation_file = fullfile(kt_root, ...
-                leg.evaluation_file);
-             if ~icemodel.isPathInside(evaluation_file, kt_root)
-                error(['icemodel:reconstruct:fillPromiceStation:' ...
-                   'ktransectPathOutsideRoot'], ...
-                   'K-transect donor path escapes the selected root: %s', ...
-                   evaluation_file);
-             end
-              required = ["doi", "bundle_doi", "license", "children"];
-              info = dir(evaluation_file);
-              has_size = isfield(leg, 'evaluation_size_bytes');
-              has_hash = isfield(leg, 'evaluation_sha256');
-              has_pin = has_size && has_hash;
-              invalid_pin = xor(has_size, has_hash);
-              if ~isempty(info) && has_pin
-                 invalid_pin = ...
-                    info.bytes ~= double(leg.evaluation_size_bytes) ...
-                    || icemodel.verification.setup.fileSha256(evaluation_file) ...
-                    ~= lower(string(leg.evaluation_sha256));
-              end
-              if isempty(info) || ~all(isfield(leg, required)) || invalid_pin
-                 error(['icemodel:reconstruct:fillPromiceStation:' ...
-                    'ktransectArtifactIdentityMismatch'], ...
-                    'K-transect donor identity does not match its manifest: %s', ...
-                    evaluation_file);
-              end
-             obs = load(evaluation_file);
-             if ~isfield(obs, 'targets') || ~isstruct(obs.targets) ...
-                   || ~isfield(obs.targets, 'data') ...
-                   || ~istimetable(obs.targets.data) ...
-                   || ~isfield(obs.targets, 'metadata')
-                error(['icemodel:reconstruct:fillPromiceStation:' ...
-                   'ktransectArtifactIdentityMismatch'], ...
-                   'K-transect donor artifact has an invalid schema: %s', ...
-                   evaluation_file);
-             end
-             metadata = obs.targets.data.Properties.UserData;
-             if ~ktransectSourceIdentity( ...
-                   obs.targets.metadata, leg, entry.site_id) ...
-                   || ~ktransectSourceIdentity(metadata, leg, entry.site_id)
-                error(['icemodel:reconstruct:fillPromiceStation:' ...
-                   'ktransectIdentityMismatch'], ...
-                   ['K-transect donor source identity does not match ' ...
-                   'manifest site %s.'], string(entry.site_id));
-             end
-             metadata_station = "";
-             if isstruct(metadata) && isfield(metadata, 'station') ...
-                   && (ischar(metadata.station) ...
-                   || (isstring(metadata.station) && isscalar(metadata.station)))
-                metadata_station = string(metadata.station);
-             end
-              if ~strcmpi(metadata_station, string(entry.site_id))
-                error(['icemodel:reconstruct:fillPromiceStation:' ...
-                   'ktransectIdentityMismatch'], ...
-                   ['K-transect donor metadata station %s does not match ' ...
-                   'manifest site %s.'], metadata_station, ...
-                    string(entry.site_id));
-              end
-              location = ktransectLocation(entry.site_location, ...
-                 obs.targets.metadata, metadata, entry.site_id);
-              has_heights = isstruct(metadata) ...
+         kt = jsondecode(fileread(kt_manifest));
+         kt_cells = cell(numel(kt.cases), 1);
+         for k = 1:numel(kt.cases)
+            entry = kt.cases(k);
+            leg = entry.colocation.ktransect;
+            evaluation_file = fullfile(kt_root, ...
+               leg.evaluation_file);
+            if ~icemodel.isPathInside(evaluation_file, kt_root)
+               error(['icemodel:reconstruct:fillPromiceStation:' ...
+                  'ktransectPathOutsideRoot'], ...
+                  'K-transect donor path escapes the selected root: %s', ...
+                  evaluation_file);
+            end
+            required = ["doi", "bundle_doi", "license", "children"];
+            info = dir(evaluation_file);
+            has_size = isfield(leg, 'evaluation_size_bytes');
+            has_hash = isfield(leg, 'evaluation_sha256');
+            has_pin = has_size && has_hash;
+            invalid_pin = xor(has_size, has_hash);
+            if ~isempty(info) && has_pin
+               invalid_pin = ...
+                  info.bytes ~= double(leg.evaluation_size_bytes) ...
+                  || icemodel.verification.setup.fileSha256(evaluation_file) ...
+                  ~= lower(string(leg.evaluation_sha256));
+            end
+            if isempty(info) || ~all(isfield(leg, required)) || invalid_pin
+               error(['icemodel:reconstruct:fillPromiceStation:' ...
+                  'ktransectArtifactIdentityMismatch'], ...
+                  'K-transect donor identity does not match its manifest: %s', ...
+                  evaluation_file);
+            end
+            obs = load(evaluation_file);
+            if ~isfield(obs, 'targets') || ~isstruct(obs.targets) ...
+                  || ~isfield(obs.targets, 'data') ...
+                  || ~istimetable(obs.targets.data) ...
+                  || ~isfield(obs.targets, 'metadata')
+               error(['icemodel:reconstruct:fillPromiceStation:' ...
+                  'ktransectArtifactIdentityMismatch'], ...
+                  'K-transect donor artifact has an invalid schema: %s', ...
+                  evaluation_file);
+            end
+            metadata = obs.targets.data.Properties.UserData;
+            if ~ktransectSourceIdentity( ...
+                  obs.targets.metadata, leg, entry.site_id) ...
+                  || ~ktransectSourceIdentity(metadata, leg, entry.site_id)
+               error(['icemodel:reconstruct:fillPromiceStation:' ...
+                  'ktransectIdentityMismatch'], ...
+                  ['K-transect donor source identity does not match ' ...
+                  'manifest site %s.'], string(entry.site_id));
+            end
+            metadata_station = "";
+            if isstruct(metadata) && isfield(metadata, 'station') ...
+                  && (ischar(metadata.station) ...
+                  || (isstring(metadata.station) && isscalar(metadata.station)))
+               metadata_station = string(metadata.station);
+            end
+            if ~strcmpi(metadata_station, string(entry.site_id))
+               error(['icemodel:reconstruct:fillPromiceStation:' ...
+                  'ktransectIdentityMismatch'], ...
+                  ['K-transect donor metadata station %s does not match ' ...
+                  'manifest site %s.'], metadata_station, ...
+                  string(entry.site_id));
+            end
+            location = ktransectLocation(entry.site_location, ...
+               obs.targets.metadata, metadata, entry.site_id);
+            has_heights = isstruct(metadata) ...
                && isfield(metadata, 'sensor_heights') ...
                && isstruct(metadata.sensor_heights) ...
                && isscalar(metadata.sensor_heights) ...
@@ -1733,20 +1733,20 @@ function donors = assembleDonors(site, met_dir, kwargs)
                   'provenance; admitted without height annotation ' ...
                   '(POLICY A3)'], string(entry.site_id));
             end
-             % Half-hourly K-transect donors aggregate to hourly BEFORE
-             % transfer (DesignSpec Resolution 4): all donor channels here
-             % are states or flux densities, so the hourly mean is the
-             % correct per-variable-class rule.
-             kt_series = hourlyStateMean(obs.targets.data);
-             % K-transect albedo is the screened ratio of the station's own
-             % coincident measured shortwave components. A ratio of two
-             % simultaneous measurements is itself a measurement product
-             % (all albedo is), so it remains donor-eligible under the
-             % measurement-only donor rule (POLICY A8); only
-             % reconstructed/gap-filled values are barred.
-              kt_cells{k} = struct('series', kt_series, ...
-                 'station', string(entry.site_id), 'family', "ktransect", ...
-                 'location', location, 'observed_mask', []);
+            % Half-hourly K-transect donors aggregate to hourly BEFORE
+            % transfer (DesignSpec Resolution 4): all donor channels here
+            % are states or flux densities, so the hourly mean is the
+            % correct per-variable-class rule.
+            kt_series = hourlyStateMean(obs.targets.data);
+            % K-transect albedo is the screened ratio of the station's own
+            % coincident measured shortwave components. A ratio of two
+            % simultaneous measurements is itself a measurement product
+            % (all albedo is), so it remains donor-eligible under the
+            % measurement-only donor rule (POLICY A8); only
+            % reconstructed/gap-filled values are barred.
+            kt_cells{k} = struct('series', kt_series, ...
+               'station', string(entry.site_id), 'family', "ktransect", ...
+               'location', location, 'observed_mask', []);
          end
          donor_cells = [donor_cells; kt_cells];
       end
@@ -1765,18 +1765,18 @@ function donors = assembleDonors(site, met_dir, kwargs)
       donor_cells = [donor_cells; gc_cells(~cellfun(@isempty, gc_cells))];
    end
 
-    if isempty(donor_cells)
-       donors = struct('series', {}, 'station', {}, 'family', {}, ...
-          'location', {}, 'observed_mask', {});
-    else
-       donors = vertcat(donor_cells{:});
-       donor_tokens = icemodel.forcing.helpers.normalizedFileToken( ...
-          icemodel.forcing.helpers.gcnetVandecruxStation( ...
-          string({donors.station})));
-       target_token = icemodel.forcing.helpers.normalizedFileToken( ...
-          icemodel.forcing.helpers.gcnetVandecruxStation(site));
-       donors = donors(donor_tokens ~= target_token);
-    end
+   if isempty(donor_cells)
+      donors = struct('series', {}, 'station', {}, 'family', {}, ...
+         'location', {}, 'observed_mask', {});
+   else
+      donors = vertcat(donor_cells{:});
+      donor_tokens = icemodel.forcing.helpers.normalizedFileToken( ...
+         icemodel.forcing.helpers.gcnetVandecruxStation( ...
+         string({donors.station})));
+      target_token = icemodel.forcing.helpers.normalizedFileToken( ...
+         icemodel.forcing.helpers.gcnetVandecruxStation(site));
+      donors = donors(donor_tokens ~= target_token);
+   end
 end
 
 function tf = ktransectSourceIdentity(metadata, leg, site_id)
@@ -1962,283 +1962,283 @@ end
 
 function [filled, provenance, audit] = adoptModisAlbedo( ...
       filled, provenance, audit, site, modis_dir, native, codes, opts)
-    %ADOPTMODISALBEDO Fill residual albedo from staged MODIS daily userdata.
-    % POLICY A11/B12 (activated by D-15): GEUS C6 daily albedo is an
-    % albedo-only observational source ranking ahead of the RCM proxies in
-    % the last-resort order. The staged artifact attaches through
-    % icemodel.forcing.modisToMetCadence, which holds the daily->met-cadence
-    % conversion rule. A site
-    % with no staged artifact (or none with usable retrievals) simply
-    % leaves the gap for the RCM tier; absence is not an error because
-    % bedrock sites legitimately stage no_source_coverage artifacts.
-    if ~ismember("albedo", string(filled.Properties.VariableNames))
-       return
-    end
-    hits = dir(fullfile(modis_dir, sprintf('%s_modis_*_86400s.mat', site)));
-    if isempty(hits)
-       return
-    end
-    % The staging layer writes one artifact per site; the newest wins if a
-    % regeneration ever leaves two.
-    [~, newest] = max([hits.datenum]);
-    S = load(fullfile(hits(newest).folder, hits(newest).name));
-    if ~isfield(S, 'Data') || ~istimetable(S.Data) ...
-          || ~ismember("albedo", string(S.Data.Properties.VariableNames))
-       return
-    end
+   %ADOPTMODISALBEDO Fill residual albedo from staged MODIS daily userdata.
+   % POLICY A11/B12 (activated by D-15): GEUS C6 daily albedo is an
+   % albedo-only observational source ranking ahead of the RCM proxies in
+   % the last-resort order. The staged artifact attaches through
+   % icemodel.forcing.modisToMetCadence, which holds the daily->met-cadence
+   % conversion rule. A site
+   % with no staged artifact (or none with usable retrievals) simply
+   % leaves the gap for the RCM tier; absence is not an error because
+   % bedrock sites legitimately stage no_source_coverage artifacts.
+   if ~ismember("albedo", string(filled.Properties.VariableNames))
+      return
+   end
+   hits = dir(fullfile(modis_dir, sprintf('%s_modis_*_86400s.mat', site)));
+   if isempty(hits)
+      return
+   end
+   % The staging layer writes one artifact per site; the newest wins if a
+   % regeneration ever leaves two.
+   [~, newest] = max([hits.datenum]);
+   S = load(fullfile(hits(newest).folder, hits(newest).name));
+   if ~isfield(S, 'Data') || ~istimetable(S.Data) ...
+         || ~ismember("albedo", string(S.Data.Properties.VariableNames))
+      return
+   end
 
-    times = filled.Properties.RowTimes;
-    [candidate, support] = icemodel.forcing.modisToMetCadence( ...
-       S.Data.albedo, S.Data.Properties.RowTimes, times);
-    needs = ~isfinite(filled.albedo);
-    valid = support & icemodel.forcing.reconstruct.physicalValidity( ...
-       "albedo", candidate, times);
-    adopt = needs & valid;
-    if ~any(adopt)
-       return
-    end
+   times = filled.Properties.RowTimes;
+   [candidate, support] = icemodel.forcing.modisToMetCadence( ...
+      S.Data.albedo, S.Data.Properties.RowTimes, times);
+   needs = ~isfinite(filled.albedo);
+   valid = support & icemodel.forcing.reconstruct.physicalValidity( ...
+      "albedo", candidate, times);
+   adopt = needs & valid;
+   if ~any(adopt)
+      return
+   end
 
-    % Seam-blend the adoption against the native record like every other
-    % fallback, then keep only post-blend-valid samples.
-    x = filled.albedo;
-    full_candidate = x;
-    full_candidate(adopt) = candidate(adopt);
-    native_albedo = x;
-    if ismember("albedo", string(native.Properties.VariableNames))
-       native_albedo = native.albedo;
-    end
-    [blended, seam_note] = ...
-       icemodel.forcing.reconstruct.blendFallbackSeams( ...
-       times, native_albedo, x, full_candidate, adopt, ...
-       jump_factor=opts.jump_factor, blend_hours=opts.blend_hours);
-    target = find(adopt);
-    post_valid = icemodel.forcing.reconstruct.physicalValidity( ...
-       "albedo", blended(target), times(target));
-    target = target(post_valid);
-    if isempty(target)
-       return
-    end
-    adopted = false(numel(times), 1);
-    adopted(target) = true;
-    x(target) = blended(target);
-    filled.albedo = x;
-    code = provenance.albedo;
-    code(target) = codes.modis;
-    provenance.albedo = code;
-    rows = icemodel.forcing.reconstruct.auditSegments( ...
-       times, adopted, "albedo", "modis:daily_albedo", ...
-       "staged GEUS C6 daily albedo, linear to cadence" ...
-       + string(seam_note));
-    if ~isempty(rows)
-       audit = [audit; cell2table(vertcat(rows{:}), ...
-          'VariableNames', audit.Properties.VariableNames)];
-    end
+   % Seam-blend the adoption against the native record like every other
+   % fallback, then keep only post-blend-valid samples.
+   x = filled.albedo;
+   full_candidate = x;
+   full_candidate(adopt) = candidate(adopt);
+   native_albedo = x;
+   if ismember("albedo", string(native.Properties.VariableNames))
+      native_albedo = native.albedo;
+   end
+   [blended, seam_note] = ...
+      icemodel.forcing.reconstruct.blendFallbackSeams( ...
+      times, native_albedo, x, full_candidate, adopt, ...
+      jump_factor=opts.jump_factor, blend_hours=opts.blend_hours);
+   target = find(adopt);
+   post_valid = icemodel.forcing.reconstruct.physicalValidity( ...
+      "albedo", blended(target), times(target));
+   target = target(post_valid);
+   if isempty(target)
+      return
+   end
+   adopted = false(numel(times), 1);
+   adopted(target) = true;
+   x(target) = blended(target);
+   filled.albedo = x;
+   code = provenance.albedo;
+   code(target) = codes.modis;
+   provenance.albedo = code;
+   rows = icemodel.forcing.reconstruct.auditSegments( ...
+      times, adopted, "albedo", "modis:daily_albedo", ...
+      "staged GEUS C6 daily albedo, linear to cadence" ...
+      + string(seam_note));
+   if ~isempty(rows)
+      audit = [audit; cell2table(vertcat(rows{:}), ...
+         'VariableNames', audit.Properties.VariableNames)];
+   end
 end
 
 function [filled, provenance, audit] = adoptPrecip(filled, provenance, ...
       audit, proxies, codes, opts, native)
-    %ADOPTPRECIP Adopt proxy total precipitation and its source phase split.
-    % Proxy order is the policy order (MAR, then MERRA-2). NO partitioning
-    % happens at reconstruction (POLICY A10/D-18): finite native components
-    % are preserved; a missing complement derives by exact arithmetic from
-    % the total; both-missing phases adopt the PROXY'S OWN split scaled to
-    % the tapered total when the source provides one, and otherwise stay
-    % missing for the runtime phase option to resolve.
-    times = filled.Properties.RowTimes;
-    required = icemodel.forcing.helpers.precipitationVariables();
-    if ~all(ismember(required, string(filled.Properties.VariableNames)))
-       return
-    end
+   %ADOPTPRECIP Adopt proxy total precipitation and its source phase split.
+   % Proxy order is the policy order (MAR, then MERRA-2). NO partitioning
+   % happens at reconstruction (POLICY A10/D-18): finite native components
+   % are preserved; a missing complement derives by exact arithmetic from
+   % the total; both-missing phases adopt the PROXY'S OWN split scaled to
+   % the tapered total when the source provides one, and otherwise stay
+   % missing for the runtime phase option to resolve.
+   times = filled.Properties.RowTimes;
+   required = icemodel.forcing.helpers.precipitationVariables();
+   if ~all(ismember(required, string(filled.Properties.VariableNames)))
+      return
+   end
 
-    ppt = filled.ppt;
-    rain = filled.rainf;
-    snow = filled.snowf;
-    ppt_code = initialProvenance(provenance, "ppt", ppt, codes);
-    rain_code = initialProvenance(provenance, "rainf", rain, codes);
-    snow_code = initialProvenance(provenance, "snowf", snow, codes);
+   ppt = filled.ppt;
+   rain = filled.rainf;
+   snow = filled.snowf;
+   ppt_code = initialProvenance(provenance, "ppt", ppt, codes);
+   rain_code = initialProvenance(provenance, "rainf", rain, codes);
+   snow_code = initialProvenance(provenance, "snowf", snow, codes);
 
-    % Normalize pre-existing precipitation before any adoption. Native rain
-    % is the protected observation (A10), including a finite invalid value:
-    % retain it so the publication boundary refuses the source defect rather
-    % than replacing an observation. Invalid totals and snow phases
-    % re-enter as missing so a valid proxy split can replace them.
-    invalid_total = isfinite(ppt) ...
-       & ~icemodel.forcing.reconstruct.scalarValidity("ppt", ppt);
-    invalid_snow = isfinite(snow) & snow < 0;
-    ppt(invalid_total) = NaN;
-    snow(invalid_snow) = NaN;
-    ppt_code(invalid_total) = codes.missing;
-    snow_code(invalid_snow) = codes.missing;
+   % Normalize pre-existing precipitation before any adoption. Native rain
+   % is the protected observation (A10), including a finite invalid value:
+   % retain it so the publication boundary refuses the source defect rather
+   % than replacing an observation. Invalid totals and snow phases
+   % re-enter as missing so a valid proxy split can replace them.
+   invalid_total = isfinite(ppt) ...
+      & ~icemodel.forcing.reconstruct.scalarValidity("ppt", ppt);
+   invalid_snow = isfinite(snow) & snow < 0;
+   ppt(invalid_total) = NaN;
+   snow(invalid_snow) = NaN;
+   ppt_code(invalid_total) = codes.missing;
+   snow_code(invalid_snow) = codes.missing;
 
-    finite_total = icemodel.forcing.reconstruct.scalarValidity("ppt", ppt);
-    rain_exceeds_total = finite_total & isfinite(rain) & rain > ppt;
-    ppt(rain_exceeds_total) = NaN;
-    ppt_code(rain_exceeds_total) = codes.missing;
-    snow(rain_exceeds_total) = NaN;
-    snow_code(rain_exceeds_total) = codes.missing;
-    finite_total = icemodel.forcing.reconstruct.scalarValidity("ppt", ppt);
-    snow_exceeds_total = finite_total & isfinite(snow) & snow > ppt;
-    snow(snow_exceeds_total) = NaN;
-    snow_code(snow_exceeds_total) = codes.missing;
-    full_split = finite_total & isfinite(rain) & isfinite(snow);
-    inconsistent = full_split ...
-       & ~icemodel.forcing.helpers.precipitationConsistency( ...
-       ppt, rain, snow);
-    snow(inconsistent) = NaN;
-    snow_code(inconsistent) = codes.missing;
-    no_total_pair = ~isfinite(ppt) & isfinite(rain) & isfinite(snow);
-    snow(no_total_pair) = NaN;
-    snow_code(no_total_pair) = codes.missing;
+   finite_total = icemodel.forcing.reconstruct.scalarValidity("ppt", ppt);
+   rain_exceeds_total = finite_total & isfinite(rain) & rain > ppt;
+   ppt(rain_exceeds_total) = NaN;
+   ppt_code(rain_exceeds_total) = codes.missing;
+   snow(rain_exceeds_total) = NaN;
+   snow_code(rain_exceeds_total) = codes.missing;
+   finite_total = icemodel.forcing.reconstruct.scalarValidity("ppt", ppt);
+   snow_exceeds_total = finite_total & isfinite(snow) & snow > ppt;
+   snow(snow_exceeds_total) = NaN;
+   snow_code(snow_exceeds_total) = codes.missing;
+   full_split = finite_total & isfinite(rain) & isfinite(snow);
+   inconsistent = full_split ...
+      & ~icemodel.forcing.helpers.precipitationConsistency( ...
+      ppt, rain, snow);
+   snow(inconsistent) = NaN;
+   snow_code(inconsistent) = codes.missing;
+   no_total_pair = ~isfinite(ppt) & isfinite(rain) & isfinite(snow);
+   snow(no_total_pair) = NaN;
+   snow_code(no_total_pair) = codes.missing;
 
-    % A finite total plus ONE finite component determines the other by
-    % exact arithmetic — that complement is bookkeeping, not partitioning,
-    % so it is the only phase derivation reconstruction performs here
-    % (POLICY A10/D-18). Both-missing phases wait for a proxy source split
-    % or the runtime phase option.
-    finite_total = icemodel.forcing.reconstruct.scalarValidity("ppt", ppt);
-    rain_missing = ~isfinite(rain);
-    snow_missing = ~isfinite(snow);
-    candidate_rain = rain;
-    candidate_snow = snow;
-    only_rain = ~rain_missing & snow_missing;
-    only_snow = rain_missing & ~snow_missing;
-    candidate_snow(only_rain) = ppt(only_rain) - rain(only_rain);
-    candidate_rain(only_snow) = ppt(only_snow) - snow(only_snow);
-    complement = (only_rain | only_snow) & finite_total ...
-       & candidate_rain >= 0 & candidate_snow >= 0;
-    rain(complement & rain_missing) = candidate_rain(complement & ...
-       rain_missing);
-    snow(complement & snow_missing) = candidate_snow(complement & ...
-       snow_missing);
-    rain_code(complement & rain_missing) = ppt_code(complement & ...
-       rain_missing);
-    snow_code(complement & snow_missing) = ppt_code(complement & ...
-       snow_missing);
-    rain_rows = icemodel.forcing.reconstruct.auditSegments( ...
-       times, complement & rain_missing, "rainf", ...
-       "complement:total_minus_snow", "derived rain complement");
-    snow_rows = icemodel.forcing.reconstruct.auditSegments( ...
-       times, complement & snow_missing, "snowf", ...
-       "complement:total_minus_rain", "derived snow complement");
-    rows = [rain_rows; snow_rows];
+   % A finite total plus ONE finite component determines the other by
+   % exact arithmetic — that complement is bookkeeping, not partitioning,
+   % so it is the only phase derivation reconstruction performs here
+   % (POLICY A10/D-18). Both-missing phases wait for a proxy source split
+   % or the runtime phase option.
+   finite_total = icemodel.forcing.reconstruct.scalarValidity("ppt", ppt);
+   rain_missing = ~isfinite(rain);
+   snow_missing = ~isfinite(snow);
+   candidate_rain = rain;
+   candidate_snow = snow;
+   only_rain = ~rain_missing & snow_missing;
+   only_snow = rain_missing & ~snow_missing;
+   candidate_snow(only_rain) = ppt(only_rain) - rain(only_rain);
+   candidate_rain(only_snow) = ppt(only_snow) - snow(only_snow);
+   complement = (only_rain | only_snow) & finite_total ...
+      & candidate_rain >= 0 & candidate_snow >= 0;
+   rain(complement & rain_missing) = candidate_rain(complement & ...
+      rain_missing);
+   snow(complement & snow_missing) = candidate_snow(complement & ...
+      snow_missing);
+   rain_code(complement & rain_missing) = ppt_code(complement & ...
+      rain_missing);
+   snow_code(complement & snow_missing) = ppt_code(complement & ...
+      snow_missing);
+   rain_rows = icemodel.forcing.reconstruct.auditSegments( ...
+      times, complement & rain_missing, "rainf", ...
+      "complement:total_minus_snow", "derived rain complement");
+   snow_rows = icemodel.forcing.reconstruct.auditSegments( ...
+      times, complement & snow_missing, "snowf", ...
+      "complement:total_minus_rain", "derived snow complement");
+   rows = [rain_rows; snow_rows];
 
-    edge = diff([false; ~isfinite(ppt); false]);
-    starts = find(edge == 1);
-    stops = find(edge == -1) - 1;
+   edge = diff([false; ~isfinite(ppt); false]);
+   starts = find(edge == 1);
+   stops = find(edge == -1) - 1;
    % One adoption block per outage, buffered against the outage list and
    % stacked once after the scan.
    gap_row_blocks = repmat({cell(0, 1)}, numel(starts), 1);
-    for g = 1:numel(starts)
-       idx = (starts(g):stops(g)).';
-       chosen = 0;
-       fallback = 0;
-       chosen_source = nan(numel(idx), 1);
-       chosen_mask = false(numel(idx), 1);
-       fallback_source = nan(numel(idx), 1);
-       fallback_mask = false(numel(idx), 1);
-       chosen_rain_proxy = nan(numel(idx), 1);
-       chosen_snow_proxy = nan(numel(idx), 1);
-       fallback_rain_proxy = nan(numel(idx), 1);
-       fallback_snow_proxy = nan(numel(idx), 1);
-       for p = 1:numel(proxies)
-          [source, proxy_rain, proxy_snow, adopt] = ...
-             precipProxyPlan(proxies(p), times, idx, rain, snow);
-          if any(adopt) && fallback == 0
-             fallback = p;
-             fallback_source = source;
-             fallback_mask = adopt;
-             fallback_rain_proxy = proxy_rain;
-             fallback_snow_proxy = proxy_snow;
-          end
-          if all(adopt)
-             chosen = p;
-             chosen_source = source;
-             chosen_mask = adopt;
-             chosen_rain_proxy = proxy_rain;
-             chosen_snow_proxy = proxy_snow;
-             break
-          end
-       end
-       if chosen == 0
-          chosen = fallback;
-          chosen_source = fallback_source;
-          chosen_mask = fallback_mask;
-          chosen_rain_proxy = fallback_rain_proxy;
-          chosen_snow_proxy = fallback_snow_proxy;
-       end
-       if chosen == 0
-          continue
-       end
+   for g = 1:numel(starts)
+      idx = (starts(g):stops(g)).';
+      chosen = 0;
+      fallback = 0;
+      chosen_source = nan(numel(idx), 1);
+      chosen_mask = false(numel(idx), 1);
+      fallback_source = nan(numel(idx), 1);
+      fallback_mask = false(numel(idx), 1);
+      chosen_rain_proxy = nan(numel(idx), 1);
+      chosen_snow_proxy = nan(numel(idx), 1);
+      fallback_rain_proxy = nan(numel(idx), 1);
+      fallback_snow_proxy = nan(numel(idx), 1);
+      for p = 1:numel(proxies)
+         [source, proxy_rain, proxy_snow, adopt] = ...
+            precipProxyPlan(proxies(p), times, idx, rain, snow);
+         if any(adopt) && fallback == 0
+            fallback = p;
+            fallback_source = source;
+            fallback_mask = adopt;
+            fallback_rain_proxy = proxy_rain;
+            fallback_snow_proxy = proxy_snow;
+         end
+         if all(adopt)
+            chosen = p;
+            chosen_source = source;
+            chosen_mask = adopt;
+            chosen_rain_proxy = proxy_rain;
+            chosen_snow_proxy = proxy_snow;
+            break
+         end
+      end
+      if chosen == 0
+         chosen = fallback;
+         chosen_source = fallback_source;
+         chosen_mask = fallback_mask;
+         chosen_rain_proxy = fallback_rain_proxy;
+         chosen_snow_proxy = fallback_snow_proxy;
+      end
+      if chosen == 0
+         continue
+      end
 
-       % One source owns the whole outage; later proxies never fill leftovers.
-       % Taper its total before resolving the source split so the phase
-       % identity remains exact.
-       adopted = false(numel(times), 1);
-       adopted(idx(chosen_mask)) = true;
-       candidate = ppt;
-       candidate(adopted) = chosen_source(chosen_mask);
-       [candidate, seam_note] = ...
-          icemodel.forcing.reconstruct.blendFallbackSeams( ...
-          times, native.ppt, ppt, candidate, adopted, ...
-          jump_factor=opts.jump_factor, blend_hours=opts.blend_hours);
-       chosen_source(chosen_mask) = candidate(adopted);
-       post_blend_conflict = chosen_mask ...
-          & precipitationPhaseConflict( ...
-          chosen_source, rain(idx), snow(idx));
-       chosen_mask(post_blend_conflict) = false;
-       [chosen_rain, chosen_snow, phase_known] = sourceSplit( ...
-          chosen_source, chosen_rain_proxy, chosen_snow_proxy, ...
-          rain(idx), snow(idx));
-       target = idx(chosen_mask);
-       rain_missing = ~isfinite(rain(idx));
-       snow_missing = ~isfinite(snow(idx));
-       % Phases fill only where the source split (or a complement) exists;
-       % the total still adopts on its own so the runtime phase option can
-       % resolve any phase-unknown samples (POLICY A10/D-18).
-       derived_rain = chosen_mask & rain_missing & phase_known;
-       derived_snow = chosen_mask & snow_missing & phase_known;
-       source_code = codes.(char(proxies(chosen).code_name));
-       ppt(target) = chosen_source(chosen_mask);
-       ppt_code(target) = source_code;
-       rain(idx(derived_rain)) = chosen_rain(derived_rain);
-       snow(idx(derived_snow)) = chosen_snow(derived_snow);
-       rain_code(idx(derived_rain)) = source_code;
-       snow_code(idx(derived_snow)) = source_code;
+      % One source owns the whole outage; later proxies never fill leftovers.
+      % Taper its total before resolving the source split so the phase
+      % identity remains exact.
+      adopted = false(numel(times), 1);
+      adopted(idx(chosen_mask)) = true;
+      candidate = ppt;
+      candidate(adopted) = chosen_source(chosen_mask);
+      [candidate, seam_note] = ...
+         icemodel.forcing.reconstruct.blendFallbackSeams( ...
+         times, native.ppt, ppt, candidate, adopted, ...
+         jump_factor=opts.jump_factor, blend_hours=opts.blend_hours);
+      chosen_source(chosen_mask) = candidate(adopted);
+      post_blend_conflict = chosen_mask ...
+         & precipitationPhaseConflict( ...
+         chosen_source, rain(idx), snow(idx));
+      chosen_mask(post_blend_conflict) = false;
+      [chosen_rain, chosen_snow, phase_known] = sourceSplit( ...
+         chosen_source, chosen_rain_proxy, chosen_snow_proxy, ...
+         rain(idx), snow(idx));
+      target = idx(chosen_mask);
+      rain_missing = ~isfinite(rain(idx));
+      snow_missing = ~isfinite(snow(idx));
+      % Phases fill only where the source split (or a complement) exists;
+      % the total still adopts on its own so the runtime phase option can
+      % resolve any phase-unknown samples (POLICY A10/D-18).
+      derived_rain = chosen_mask & rain_missing & phase_known;
+      derived_snow = chosen_mask & snow_missing & phase_known;
+      source_code = codes.(char(proxies(chosen).code_name));
+      ppt(target) = chosen_source(chosen_mask);
+      ppt_code(target) = source_code;
+      rain(idx(derived_rain)) = chosen_rain(derived_rain);
+      snow(idx(derived_snow)) = chosen_snow(derived_snow);
+      rain_code(idx(derived_rain)) = source_code;
+      snow_code(idx(derived_snow)) = source_code;
 
-       % Every filled precipitation channel gets contiguous audit rows.
+      % Every filled precipitation channel gets contiguous audit rows.
       adoption_items = {["ppt", "total"], ["rainf", "derived rain"], ...
          ["snowf", "derived snow"]};
       item_blocks = repmat({cell(0, 1)}, 1, numel(adoption_items));
       for it = 1:numel(adoption_items)
          pair = adoption_items{it};
-          local_mask = chosen_mask;
-          if pair(1) == "rainf"
-             local_mask = derived_rain;
-          elseif pair(1) == "snowf"
-             local_mask = derived_snow;
-          end
-          mask = false(numel(times), 1);
-          mask(idx(local_mask)) = true;
-           segment_rows = icemodel.forcing.reconstruct.auditSegments( ...
-              times, mask, pair(1), ...
-              "proxy:" + proxies(chosen).name + ":precip_adoption", ...
-              pair(2) + string(seam_note));
+         local_mask = chosen_mask;
+         if pair(1) == "rainf"
+            local_mask = derived_rain;
+         elseif pair(1) == "snowf"
+            local_mask = derived_snow;
+         end
+         mask = false(numel(times), 1);
+         mask(idx(local_mask)) = true;
+         segment_rows = icemodel.forcing.reconstruct.auditSegments( ...
+            times, mask, pair(1), ...
+            "proxy:" + proxies(chosen).name + ":precip_adoption", ...
+            pair(2) + string(seam_note));
          item_blocks{it} = segment_rows;
-       end
+      end
       gap_row_blocks{g} = vertcat(cell(0, 1), item_blocks{:});
-    end
+   end
    rows = vertcat(rows, gap_row_blocks{:});
 
-    filled.ppt = ppt;
-    filled.rainf = rain;
-    filled.snowf = snow;
-    provenance.ppt = ppt_code;
-    provenance.rainf = rain_code;
-    provenance.snowf = snow_code;
-    % Optional phase gaps are legitimate at runtime, but they are still
-    % shipped missing values and the final report must explain every one.
-    % Record the post-adoption state directly because precipitation never
-    % enters the statistically planned provisional-unfilled ledger.
+   filled.ppt = ppt;
+   filled.rainf = rain;
+   filled.snowf = snow;
+   provenance.ppt = ppt_code;
+   provenance.rainf = rain_code;
+   provenance.snowf = snow_code;
+   % Optional phase gaps are legitimate at runtime, but they are still
+   % shipped missing values and the final report must explain every one.
+   % Record the post-adoption state directly because precipitation never
+   % enters the statistically planned provisional-unfilled ledger.
    unfilled_items = { ...
       ["ppt", "no valid staged proxy total precipitation value"], ...
       ["rainf", "source rain phase unavailable; runtime phase option required"], ...
@@ -2246,128 +2246,128 @@ function [filled, provenance, audit] = adoptPrecip(filled, provenance, ...
    unfilled_blocks = repmat({cell(0, 1)}, 1, numel(unfilled_items));
    for it = 1:numel(unfilled_items)
       pair = unfilled_items{it};
-       name = pair(1);
-       values = filled.(name);
-       missing = ~isfinite(values);
-       segment_rows = icemodel.forcing.reconstruct.auditSegments( ...
-          times, missing, name, "unfilled", ...
-          "final tier: " + pair(2), context_id="precip_adoption");
+      name = pair(1);
+      values = filled.(name);
+      missing = ~isfinite(values);
+      segment_rows = icemodel.forcing.reconstruct.auditSegments( ...
+         times, missing, name, "unfilled", ...
+         "final tier: " + pair(2), context_id="precip_adoption");
       unfilled_blocks{it} = segment_rows;
-    end
+   end
    rows = vertcat(rows, unfilled_blocks{:});
-    if ~isempty(rows)
-       audit = [audit; cell2table(vertcat(rows{:}), ...
-          'VariableNames', audit.Properties.VariableNames)];
-    end
+   if ~isempty(rows)
+      audit = [audit; cell2table(vertcat(rows{:}), ...
+         'VariableNames', audit.Properties.VariableNames)];
+   end
 end
 
 function [source, proxy_rain, proxy_snow, adopt] = ...
       precipProxyPlan(proxy, times, idx, rain, snow)
-    %PRECIPPROXYPLAN Test one proxy as the sole source for one ppt outage.
-    % Returns the aligned total plus the proxy's own phase split (NaN when
-    % the source ships no split; a rain channel absent beside ppt+snowf
-    % derives as the exact complement per D-31) so adoption can rescale
-    % the source fraction instead of partitioning (POLICY A10/D-18).
-    aligned = alignProxyChannel(proxy, "ppt", times);
-    source = aligned(idx);
-    aligned_rain = alignProxyChannel(proxy, "rainf", times);
-    proxy_rain = aligned_rain(idx);
-    aligned_snow = alignProxyChannel(proxy, "snowf", times);
-    proxy_snow = aligned_snow(idx);
-    % Staged MERRA-2 ships the total (PRECTOTCORR -> ppt) and snowfall
-    % (PRECSNOCORR -> snowf) but no rain channel — that is the staged
-    % channel inventory, not missing physics. The source's own split is
-    % still fully determined, so derive the missing component as the
-    % exact complement ppt - snowf, floored at zero against sub-epsilon
-    % source inconsistency, so adoptions ship a full split instead of
-    % phase-unknown samples (POLICY D-31). Subtraction propagates NaN,
-    % so samples without both operands stay phase-unknown.
-    proxy_names = string(proxy.series.Properties.VariableNames);
-    if ~ismember("rainf", proxy_names) ...
-          && all(ismember(["ppt", "snowf"], proxy_names))
-       complement = source - proxy_snow;
-       complement(complement < 0) = 0;
-       proxy_rain = complement;
-    end
-    valid = icemodel.forcing.reconstruct.physicalValidity( ...
-       "ppt", source, times(idx));
-    % A finite native component larger than the candidate total is a
-    % conflict with the observation. Two finite native phases must also
-    % sum to the candidate total; otherwise preserving them beside that
-    % total would publish an impossible phase identity. The observations
-    % win and that sample refuses adoption (the C24 native-preserving veto).
-    rain_native = rain(idx);
-    snow_native = snow(idx);
-    conflict = precipitationPhaseConflict( ...
-       source, rain_native, snow_native);
-    adopt = valid & ~conflict;
+   %PRECIPPROXYPLAN Test one proxy as the sole source for one ppt outage.
+   % Returns the aligned total plus the proxy's own phase split (NaN when
+   % the source ships no split; a rain channel absent beside ppt+snowf
+   % derives as the exact complement per D-31) so adoption can rescale
+   % the source fraction instead of partitioning (POLICY A10/D-18).
+   aligned = alignProxyChannel(proxy, "ppt", times);
+   source = aligned(idx);
+   aligned_rain = alignProxyChannel(proxy, "rainf", times);
+   proxy_rain = aligned_rain(idx);
+   aligned_snow = alignProxyChannel(proxy, "snowf", times);
+   proxy_snow = aligned_snow(idx);
+   % Staged MERRA-2 ships the total (PRECTOTCORR -> ppt) and snowfall
+   % (PRECSNOCORR -> snowf) but no rain channel — that is the staged
+   % channel inventory, not missing physics. The source's own split is
+   % still fully determined, so derive the missing component as the
+   % exact complement ppt - snowf, floored at zero against sub-epsilon
+   % source inconsistency, so adoptions ship a full split instead of
+   % phase-unknown samples (POLICY D-31). Subtraction propagates NaN,
+   % so samples without both operands stay phase-unknown.
+   proxy_names = string(proxy.series.Properties.VariableNames);
+   if ~ismember("rainf", proxy_names) ...
+         && all(ismember(["ppt", "snowf"], proxy_names))
+      complement = source - proxy_snow;
+      complement(complement < 0) = 0;
+      proxy_rain = complement;
+   end
+   valid = icemodel.forcing.reconstruct.physicalValidity( ...
+      "ppt", source, times(idx));
+   % A finite native component larger than the candidate total is a
+   % conflict with the observation. Two finite native phases must also
+   % sum to the candidate total; otherwise preserving them beside that
+   % total would publish an impossible phase identity. The observations
+   % win and that sample refuses adoption (the C24 native-preserving veto).
+   rain_native = rain(idx);
+   snow_native = snow(idx);
+   conflict = precipitationPhaseConflict( ...
+      source, rain_native, snow_native);
+   adopt = valid & ~conflict;
 end
 
 function [candidate_rain, candidate_snow, phase_known] = ...
       sourceSplit(total, proxy_rain, proxy_snow, rain_native, snow_native)
-    %SOURCESPLIT Resolve phase components without any partitioning.
-    % Order of truth: finite native components; then the exact complement
-    % from the adopted total; then the proxy's OWN split rescaled so its
-    % phase FRACTION survives the seam taper of the total. Samples with
-    % none of those stay phase-unknown for the runtime option
-    % (POLICY A10/D-18).
-    candidate_rain = rain_native;
-    candidate_snow = snow_native;
-    rain_missing = ~isfinite(rain_native);
-    snow_missing = ~isfinite(snow_native);
-    only_rain = ~rain_missing & snow_missing;
-    only_snow = rain_missing & ~snow_missing;
-    both_missing = rain_missing & snow_missing;
-    candidate_snow(only_rain) = total(only_rain) - rain_native(only_rain);
-    candidate_rain(only_snow) = total(only_snow) - snow_native(only_snow);
+   %SOURCESPLIT Resolve phase components without any partitioning.
+   % Order of truth: finite native components; then the exact complement
+   % from the adopted total; then the proxy's OWN split rescaled so its
+   % phase FRACTION survives the seam taper of the total. Samples with
+   % none of those stay phase-unknown for the runtime option
+   % (POLICY A10/D-18).
+   candidate_rain = rain_native;
+   candidate_snow = snow_native;
+   rain_missing = ~isfinite(rain_native);
+   snow_missing = ~isfinite(snow_native);
+   only_rain = ~rain_missing & snow_missing;
+   only_snow = rain_missing & ~snow_missing;
+   both_missing = rain_missing & snow_missing;
+   candidate_snow(only_rain) = total(only_rain) - rain_native(only_rain);
+   candidate_rain(only_snow) = total(only_snow) - snow_native(only_snow);
 
-    % Rescale the source split onto the tapered total: the source's phase
-    % fraction is physical information; its absolute magnitudes are not
-    % once the seam taper adjusts the total.
-    proxy_total = proxy_rain + proxy_snow;
-    scalable = both_missing & isfinite(proxy_total) & proxy_total > 0 ...
-       & isfinite(total);
-    frac = proxy_rain(scalable) ./ proxy_total(scalable);
-    candidate_rain(scalable) = frac .* total(scalable);
-    candidate_snow(scalable) = (1 - frac) .* total(scalable);
-    % A zero source total with a finite adopted total carries no fraction
-    % information; a zero adopted total splits to exact zeros.
-    zero_total = both_missing & isfinite(total) & total == 0;
-    candidate_rain(zero_total) = 0;
-    candidate_snow(zero_total) = 0;
+   % Rescale the source split onto the tapered total: the source's phase
+   % fraction is physical information; its absolute magnitudes are not
+   % once the seam taper adjusts the total.
+   proxy_total = proxy_rain + proxy_snow;
+   scalable = both_missing & isfinite(proxy_total) & proxy_total > 0 ...
+      & isfinite(total);
+   frac = proxy_rain(scalable) ./ proxy_total(scalable);
+   candidate_rain(scalable) = frac .* total(scalable);
+   candidate_snow(scalable) = (1 - frac) .* total(scalable);
+   % A zero source total with a finite adopted total carries no fraction
+   % information; a zero adopted total splits to exact zeros.
+   zero_total = both_missing & isfinite(total) & total == 0;
+   candidate_rain(zero_total) = 0;
+   candidate_snow(zero_total) = 0;
 
-    phase_known = isfinite(candidate_rain) & isfinite(candidate_snow) ...
-       & candidate_rain >= 0 & candidate_snow >= 0;
+   phase_known = isfinite(candidate_rain) & isfinite(candidate_snow) ...
+      & candidate_rain >= 0 & candidate_snow >= 0;
 end
 
 function conflict = precipitationPhaseConflict(total, rain, snow)
-    %PRECIPITATIONPHASECONFLICT Protect finite native phase observations.
-    both = isfinite(rain) & isfinite(snow);
-    consistent = icemodel.forcing.helpers.precipitationConsistency( ...
-       total, rain, snow);
-    conflict = (isfinite(rain) & rain > total) ...
-       | (isfinite(snow) & snow > total) ...
-       | (both & ~consistent);
+   %PRECIPITATIONPHASECONFLICT Protect finite native phase observations.
+   both = isfinite(rain) & isfinite(snow);
+   consistent = icemodel.forcing.helpers.precipitationConsistency( ...
+      total, rain, snow);
+   conflict = (isfinite(rain) & rain > total) ...
+      | (isfinite(snow) & snow > total) ...
+      | (both & ~consistent);
 end
 
 function code = initialProvenance(provenance, channel, values, codes)
-    %INITIALPROVENANCE Preserve existing codes or initialize native/missing.
-    if ismember(channel, string(provenance.Properties.VariableNames))
-       code = provenance.(channel);
-       return
-    end
-    code = repmat(codes.missing, numel(values), 1);
-    code(isfinite(values)) = codes.observed;
+   %INITIALPROVENANCE Preserve existing codes or initialize native/missing.
+   if ismember(channel, string(provenance.Properties.VariableNames))
+      code = provenance.(channel);
+      return
+   end
+   code = repmat(codes.missing, numel(values), 1);
+   code(isfinite(values)) = codes.observed;
 end
 
 function source = alignProxyChannel(proxy, channel, times)
-    %ALIGNPROXYCHANNEL Align one staged proxy channel to the target axis.
-    source = nan(numel(times), 1);
-    if ~ismember(channel, string(proxy.series.Properties.VariableNames))
-       return
-    end
-    [tf, loc] = ismember(times, proxy.series.Properties.RowTimes);
-    source(tf) = proxy.series.(channel)(loc(tf));
+   %ALIGNPROXYCHANNEL Align one staged proxy channel to the target axis.
+   source = nan(numel(times), 1);
+   if ~ismember(channel, string(proxy.series.Properties.VariableNames))
+      return
+   end
+   [tf, loc] = ismember(times, proxy.series.Properties.RowTimes);
+   source(tf) = proxy.series.(channel)(loc(tf));
 end
 
 function [filled, provenance, audit] = fillBoomHeight( ...
@@ -2487,10 +2487,10 @@ function readiness = readinessLedger(site, native, filled, plan, opts, location)
       worst_relational = 0;
       if ismember("swd", required) && ismember("swd", present)
          values = filled.swd(in_year);
-          ceiling_ok = icemodel.forcing.reconstruct.physicalValidity( ...
-             "swd", values, times(in_year), ...
-             latitude=location.lat_wgs84, longitude=location.lon_wgs84, ...
-             interval=median(diff(times)));
+         ceiling_ok = icemodel.forcing.reconstruct.physicalValidity( ...
+            "swd", values, times(in_year), ...
+            latitude=location.lat_wgs84, longitude=location.lon_wgs84, ...
+            interval=median(diff(times)));
          frac = mean(~scalarInvalid("swd", values) & ~ceiling_ok);
          worst_relational = max(worst_relational, frac);
          if frac > 0
@@ -2633,18 +2633,18 @@ function met_file = writeArtifacts(site, filled, provenance, audit, ...
       end
    end
    ud = met.Properties.UserData;
-     % Runtime identity uses the canonical compact token, not the
-     % separator-bearing display name inherited from native metadata.
-     ud.site = site;
-     ud.gapfill_registry = codes;
-     ud.gapfill_seed = plan.split.seed;
-     ud.gapfill_product = char(family + "_filled");
-     ud.gapfill_channels = string({plan.channels.channel});
-     ud.gapfill_engine_version = string(icemodel.internal.version());
-    ud.gapfill_policy_sha256 = ...
-       icemodel.forcing.reconstruct.policySha256();
-    ud.gapfill_donors = donor_sites(:).';
-    met.Properties.UserData = ud;
+   % Runtime identity uses the canonical compact token, not the
+   % separator-bearing display name inherited from native metadata.
+   ud.site = site;
+   ud.gapfill_registry = codes;
+   ud.gapfill_seed = plan.split.seed;
+   ud.gapfill_product = char(family + "_filled");
+   ud.gapfill_channels = string({plan.channels.channel});
+   ud.gapfill_engine_version = string(icemodel.internal.version());
+   ud.gapfill_policy_sha256 = ...
+      icemodel.forcing.reconstruct.policySha256();
+   ud.gapfill_donors = donor_sites(:).';
+   met.Properties.UserData = ud;
 
    % Stage through the canonical writer so metadata and window naming match
    % every other met artifact without exposing a partial final product.
@@ -2695,38 +2695,38 @@ function met_file = writeArtifacts(site, filled, provenance, audit, ...
    n_proxy = numel(proxy_window_files);
    roles = ["native"; "filled"; "plan"; "readiness"; ...
       repmat("proxy_window", n_proxy, 1)];
-    final_files = [string(native_file); string(met_file); ...
-       string(plan_file); string(readiness_file); proxy_window_files(:)];
-    hash_files = [string(native_file); staged_met_file; ...
-       string(staged_plan_file); string(staged_readiness_file); ...
-       proxy_window_files(:)];
-    [data_root, ~] = ...
-       icemodel.forcing.reconstruct.selectedDataRoot(string(out_dir));
-    for k = 1:numel(final_files)
-       if ~icemodel.isPathInside(final_files(k), data_root)
-          error('icemodel:reconstruct:fillPromiceStation:artifactOutsideRoot', ...
-             'report input must stay inside selected data root %s: %s', ...
-             data_root, final_files(k));
-       end
-    end
-    relative_files = icemodel.verification.setup.relpaths( ...
-       final_files, data_root);
-    artifacts = repmat(struct('role', "", 'path', "", 'bytes', 0, ...
-       'sha256', ""), numel(final_files), 1);
-    for k = 1:numel(final_files)
-       info = dir(hash_files(k));
-       artifacts(k) = struct('role', roles(k), 'path', relative_files(k), ...
-          'bytes', info.bytes, 'sha256', ...
-          icemodel.verification.setup.fileSha256(hash_files(k)));
+   final_files = [string(native_file); string(met_file); ...
+      string(plan_file); string(readiness_file); proxy_window_files(:)];
+   hash_files = [string(native_file); staged_met_file; ...
+      string(staged_plan_file); string(staged_readiness_file); ...
+      proxy_window_files(:)];
+   [data_root, ~] = ...
+      icemodel.forcing.reconstruct.selectedDataRoot(string(out_dir));
+   for k = 1:numel(final_files)
+      if ~icemodel.isPathInside(final_files(k), data_root)
+         error('icemodel:reconstruct:fillPromiceStation:artifactOutsideRoot', ...
+            'report input must stay inside selected data root %s: %s', ...
+            data_root, final_files(k));
+      end
+   end
+   relative_files = icemodel.verification.setup.relpaths( ...
+      final_files, data_root);
+   artifacts = repmat(struct('role', "", 'path', "", 'bytes', 0, ...
+      'sha256', ""), numel(final_files), 1);
+   for k = 1:numel(final_files)
+      info = dir(hash_files(k));
+      artifacts(k) = struct('role', roles(k), 'path', relative_files(k), ...
+         'bytes', info.bytes, 'sha256', ...
+         icemodel.verification.setup.fileSha256(hash_files(k)));
    end
    window = struct('start', ...
       icemodel.verification.setup.formatManifestTime( ...
       acceptance_window(1)), 'end', ...
       icemodel.verification.setup.formatManifestTime( ...
       acceptance_window(2)));
-    manifest = struct('site', site, ...
-       'path_base', "selected_data_root", 'artifacts', artifacts, ...
-       'acceptance_window', window);
+   manifest = struct('site', site, ...
+      'path_base', "selected_data_root", 'artifacts', artifacts, ...
+      'acceptance_window', window);
    manifest_file = fullfile(qa_dir, 'plans', ...
       sprintf('%s-report-inputs.json', site));
    staged_manifest_file = fullfile(stage_qa_dir, 'plans', ...
@@ -2739,12 +2739,12 @@ function met_file = writeArtifacts(site, filled, provenance, audit, ...
    % Back up every destination, install the complete staged set, and restore
    % all prior artifacts if any move fails. Superseded met windows participate
    % in the same transaction rather than being pruned early by writemet.
-    sources = [staged_met_file; string(staged_plan_file); ...
-       string(staged_summary_file); string(staged_readiness_file); ...
-       string(staged_manifest_file); string(staged_split_file)];
-    destinations = [string(met_file); string(plan_file); ...
-       string(summary_file); string(readiness_file); string(manifest_file); ...
-       string(split_file)];
+   sources = [staged_met_file; string(staged_plan_file); ...
+      string(staged_summary_file); string(staged_readiness_file); ...
+      string(staged_manifest_file); string(staged_split_file)];
+   destinations = [string(met_file); string(plan_file); ...
+      string(summary_file); string(readiness_file); string(manifest_file); ...
+      string(split_file)];
    prior = dir(fullfile(out_dir, sprintf( ...
       'met_%s_%s_filled_*.mat', site, family)));
    stale = string(fullfile({prior.folder}, {prior.name})).';

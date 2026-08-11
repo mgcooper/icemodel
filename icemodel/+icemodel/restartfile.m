@@ -1,10 +1,10 @@
 function filepath = restartfile(opts, simyear)
-%RESTARTFILE Return the canonical restart-state file path for a run/year.
-%
-%  filepath = icemodel.restartfile(opts, simyear)
-%
-% Restart files live under opts.pathrestart, which by default is:
-%  opts.pathoutput/restart
+   %RESTARTFILE Return the canonical restart-state file path for a run/year.
+   %
+   %  filepath = icemodel.restartfile(opts, simyear)
+   %
+   % Restart files live under opts.pathrestart, which by default is:
+   %  opts.pathoutput/restart
 
    arguments
       opts struct

@@ -284,7 +284,7 @@ function ice2 = roundUsingIntersectPersistent(ice2)
 end
 
 function ice2lookup = createIce2Lookup()
-%CREATEICE2LOOKUP Define the field-to-rounding-precision lookup table.
+   %CREATEICE2LOOKUP Define the field-to-rounding-precision lookup table.
    ice2lookup = {
       'f_ice', 5; 'f_liq', 5; 'k_vap', 5; 'k_eff', 5; ...
       'Tice', 3; 'h_melt', 3; 'h_freeze', 3; ...

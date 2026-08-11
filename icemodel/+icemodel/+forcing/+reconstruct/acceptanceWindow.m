@@ -62,35 +62,35 @@ function [window, proxy_files] = acceptanceWindow(site, kwargs)
    % Union span across every staged window file of every catalog source.
    % Validate each artifact before its filename tokens widen the policy window.
    % A stale or mislabeled narrow file is as unsafe as the widest one.
-    catalog = kwargs.opts.proxy_catalog;
-    window = NaT(1, 2, 'TimeZone', 'UTC');
+   catalog = kwargs.opts.proxy_catalog;
+   window = NaT(1, 2, 'TimeZone', 'UTC');
    % Per-source selections collect in cells because one source can pin
    % several files: the widest file plus any span extenders (POLICY A6 -
    % staged met must widen the product, never shrink it).
-    source_files = cell(numel(catalog), 1);
-    source_sample_coverage = cell(numel(catalog), 1);
+   source_files = cell(numel(catalog), 1);
+   source_sample_coverage = cell(numel(catalog), 1);
    % The staged-inventory coverage collects per source in the same way, so
    % the union concatenates once after the catalog loop.
    staged_sample_coverage = cell(numel(catalog), 1);
-    for k = 1:numel(catalog)
-       hits = [];
-        for d = icemodel.forcing.helpers.sourceSearchDirs( ...
-              met_root, catalog(k).storage)
-          candidates = dir(fullfile(d{1}, sprintf( ...
-             'met_%s_%s_*_15m.mat', site, catalog(k).storage)));
-          valid_name = false(numel(candidates), 1);
-          for h = 1:numel(candidates)
-             valid_name(h) = ~isempty(regexp(candidates(h).name, ...
-                '_(\d{8})_(\d{8})_15m\.mat$', 'once'));
-          end
-          if any(valid_name)
-             hits = candidates(valid_name);
-             break
-          end
-        end
-        valid_hit = false(numel(hits), 1);
-        hit_sample_windows = NaT(numel(hits), 2, 'TimeZone', 'UTC');
-        for h = 1:numel(hits)
+   for k = 1:numel(catalog)
+      hits = [];
+      for d = icemodel.forcing.helpers.sourceSearchDirs( ...
+            met_root, catalog(k).storage)
+         candidates = dir(fullfile(d{1}, sprintf( ...
+            'met_%s_%s_*_15m.mat', site, catalog(k).storage)));
+         valid_name = false(numel(candidates), 1);
+         for h = 1:numel(candidates)
+            valid_name(h) = ~isempty(regexp(candidates(h).name, ...
+               '_(\d{8})_(\d{8})_15m\.mat$', 'once'));
+         end
+         if any(valid_name)
+            hits = candidates(valid_name);
+            break
+         end
+      end
+      valid_hit = false(numel(hits), 1);
+      hit_sample_windows = NaT(numel(hits), 2, 'TimeZone', 'UTC');
+      for h = 1:numel(hits)
          tokens = regexp(hits(h).name, ...
             '_(\d{8})_(\d{8})_15m\.mat$', 'tokens', 'once');
          if isempty(tokens)
@@ -109,71 +109,71 @@ function [window, proxy_files] = acceptanceWindow(site, kwargs)
          end
          t0 = datetime(tokens{1}, 'InputFormat', 'yyyyMMdd', ...
             'TimeZone', 'UTC');
-          t1 = datetime(tokens{2}, 'InputFormat', 'yyyyMMdd', ...
-             'TimeZone', 'UTC');
-          proxy_times = proxy.Properties.RowTimes;
-          valid_support = false;
-          if numel(proxy_times) >= 2
-             endpoint_dates = dateshift(proxy_times([1, end]), ...
-                'start', 'day');
-             valid_support = isequal(endpoint_dates(:).', [t0, t1]) ...
-                && all(diff(proxy_times) == minutes(15)) ...
-                && all(mod(minute(proxy_times), 15) == 0 ...
-                & second(proxy_times) == 0);
-          end
-          if ~valid_support
-             error(['icemodel:reconstruct:acceptanceWindow:' ...
-                'proxyWindowMismatch'], ...
-                ['staged proxy timetable endpoint dates, 15-minute ' ...
-                'cadence, or UTC quarter-hour grid do not match the ' ...
-                'filename window for %s: %s'], ...
-                site, proxy_file);
+         t1 = datetime(tokens{2}, 'InputFormat', 'yyyyMMdd', ...
+            'TimeZone', 'UTC');
+         proxy_times = proxy.Properties.RowTimes;
+         valid_support = false;
+         if numel(proxy_times) >= 2
+            endpoint_dates = dateshift(proxy_times([1, end]), ...
+               'start', 'day');
+            valid_support = isequal(endpoint_dates(:).', [t0, t1]) ...
+               && all(diff(proxy_times) == minutes(15)) ...
+               && all(mod(minute(proxy_times), 15) == 0 ...
+               & second(proxy_times) == 0);
+         end
+         if ~valid_support
+            error(['icemodel:reconstruct:acceptanceWindow:' ...
+               'proxyWindowMismatch'], ...
+               ['staged proxy timetable endpoint dates, 15-minute ' ...
+               'cadence, or UTC quarter-hour grid do not match the ' ...
+               'filename window for %s: %s'], ...
+               site, proxy_file);
          end
          valid_hit(h) = true;
          hit_sample_windows(h, :) = proxy_times([1, end]);
-        end
+      end
       % Every validated file of this source counts toward the staged
       % inventory, whether or not the selection below picks it.
       staged_sample_coverage{k} = hit_sample_windows(valid_hit, :);
-        if any(valid_hit)
-           % The widest file anchors the source. Validated siblings that
-           % extend coverage beyond it join the selection, so a staged
-           % year is never dropped just because a file with a wider
-           % duration exists (POLICY A6: staging more proxy met widens
-           % the product). Interior overlap still belongs to the anchor.
-           spans = hit_sample_windows(:, 2) - hit_sample_windows(:, 1);
-           spans(~valid_hit) = -Inf;
-           [~, widest] = max(spans);
-           extend = valid_hit ...
-              & (hit_sample_windows(:, 1) ...
-              < hit_sample_windows(widest, 1) ...
-              | hit_sample_windows(:, 2) ...
-              > hit_sample_windows(widest, 2));
-           extend(widest) = false;
-           picked = [widest; find(extend)];
-           names = strings(numel(picked), 1);
-           for f = 1:numel(picked)
-              names(f) = string(fullfile(hits(picked(f)).folder, ...
-                 hits(picked(f)).name));
-           end
-           source_files{k} = names;
-           source_sample_coverage{k} = hit_sample_windows(picked, :);
-        end
-     end
-     proxy_files = unique(vertcat(strings(0, 1), ...
-        source_files{:}), 'stable');
-     selected_sample_coverage = vertcat( ...
-        NaT(0, 2, 'TimeZone', 'UTC'), source_sample_coverage{:});
+      if any(valid_hit)
+         % The widest file anchors the source. Validated siblings that
+         % extend coverage beyond it join the selection, so a staged
+         % year is never dropped just because a file with a wider
+         % duration exists (POLICY A6: staging more proxy met widens
+         % the product). Interior overlap still belongs to the anchor.
+         spans = hit_sample_windows(:, 2) - hit_sample_windows(:, 1);
+         spans(~valid_hit) = -Inf;
+         [~, widest] = max(spans);
+         extend = valid_hit ...
+            & (hit_sample_windows(:, 1) ...
+            < hit_sample_windows(widest, 1) ...
+            | hit_sample_windows(:, 2) ...
+            > hit_sample_windows(widest, 2));
+         extend(widest) = false;
+         picked = [widest; find(extend)];
+         names = strings(numel(picked), 1);
+         for f = 1:numel(picked)
+            names(f) = string(fullfile(hits(picked(f)).folder, ...
+               hits(picked(f)).name));
+         end
+         source_files{k} = names;
+         source_sample_coverage{k} = hit_sample_windows(picked, :);
+      end
+   end
+   proxy_files = unique(vertcat(strings(0, 1), ...
+      source_files{:}), 'stable');
+   selected_sample_coverage = vertcat( ...
+      NaT(0, 2, 'TimeZone', 'UTC'), source_sample_coverage{:});
    sample_coverage = vertcat( ...
       NaT(0, 2, 'TimeZone', 'UTC'), staged_sample_coverage{:});
-    if isempty(sample_coverage)
-       return
-    end
+   if isempty(sample_coverage)
+      return
+   end
 
-     % Reject sub-day holes in the staged inventory and in the exact files that
-     % reconstruction selects. Filename dates alone cannot prove continuity.
-     continuousWindow(sample_coverage, site, minutes(15));
-     window = continuousWindow(selected_sample_coverage, site, minutes(15));
+   % Reject sub-day holes in the staged inventory and in the exact files that
+   % reconstruction selects. Filename dates alone cannot prove continuity.
+   continuousWindow(sample_coverage, site, minutes(15));
+   window = continuousWindow(selected_sample_coverage, site, minutes(15));
 end
 
 function window = continuousWindow(coverage, site, adjacency)

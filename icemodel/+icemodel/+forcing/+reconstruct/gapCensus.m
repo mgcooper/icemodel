@@ -141,14 +141,14 @@ function census = gapCensus(series, kwargs)
       starts = find(d == 1);
       stops = find(d == -1) - 1;
       run_hours = (stops - starts + 1) * dt_hours;
-       buckets = icemodel.forcing.reconstruct.gapDurationBucket( ...
-          run_hours, kwargs.edges_hours);
-       % Count the assigned right-closed bucket IDs themselves; histcounts
-       % uses the opposite boundary convention at exact policy edges.
-       valid_buckets = isfinite(buckets);
-       counts = accumarray(buckets(valid_buckets), ...
-          ones(nnz(valid_buckets), 1), ...
-          [numel(kwargs.edges_hours) - 1, 1]).';
+      buckets = icemodel.forcing.reconstruct.gapDurationBucket( ...
+         run_hours, kwargs.edges_hours);
+      % Count the assigned right-closed bucket IDs themselves; histcounts
+      % uses the opposite boundary convention at exact policy edges.
+      valid_buckets = isfinite(buckets);
+      counts = accumarray(buckets(valid_buckets), ...
+         ones(nnz(valid_buckets), 1), ...
+         [numel(kwargs.edges_hours) - 1, 1]).';
 
       % Samples the configured interior cap can fix versus samples needing
       % a donor or proxy tier (sized by the POLICY B3 tier-1 cap).

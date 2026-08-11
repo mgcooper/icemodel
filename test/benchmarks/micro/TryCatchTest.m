@@ -41,7 +41,7 @@ classdef TryCatchTest < matlab.perftest.TestCase
 end
 
 function c = trycatchWithHandling(a, b)
-%TRYCATCHWITHHANDLING Execute the `catch ME` branch under test.
+   %TRYCATCHWITHHANDLING Execute the `catch ME` branch under test.
 
    try
       c = a - b;
@@ -51,7 +51,7 @@ function c = trycatchWithHandling(a, b)
 end
 
 function c = trycatchWithoutHandling(a, b)
-%TRYCATCHWITHOUTHANDLING Execute the bare `catch` branch under test.
+   %TRYCATCHWITHOUTHANDLING Execute the bare `catch` branch under test.
 
    try
       c = a - b;

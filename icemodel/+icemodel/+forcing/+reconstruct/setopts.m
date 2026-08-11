@@ -85,11 +85,11 @@ function opts = setopts(kwargs)
    %     barometric pressure elevation adjustment.
    %  min_season_samples : overlap samples a season needs for its own
    %     proxy calibration before falling back to the annual fit.
-    %  rain_snow_transition_temperature_k : air-temperature threshold the
-    %     RUNTIME 'threshold' phase option uses to partition the product's
-    %     total precipitation (POLICY A10/D-18; reconstruction itself
-    %     never partitions).
-    %  native_winter_albedo, native_winter_months : the winter-albedo
+   %  rain_snow_transition_temperature_k : air-temperature threshold the
+   %     RUNTIME 'threshold' phase option uses to partition the product's
+   %     total precipitation (POLICY A10/D-18; reconstruction itself
+   %     never partitions).
+   %  native_winter_albedo, native_winter_months : the winter-albedo
    %     stamp of the native PROMICE builder (from
    %     icemodel.parameterLookup). A sample that holds exactly this
    %     constant in one of these months is a legacy fill, not an
@@ -170,11 +170,11 @@ function opts = setopts(kwargs)
       kwargs.min_native_core_coverage (1, 1) double = 0.30
       kwargs.lapse_rate (1, 1) double = -0.0060
       kwargs.elevation_threshold_m (1, 1) double {mustBePositive} = 100
-       kwargs.tair_for_pressure (1, 1) double {mustBePositive} = 255
-       kwargs.min_season_samples (1, 1) double {mustBePositive} = 300
-       kwargs.rain_snow_transition_temperature_k (1, 1) double ...
-          {mustBePositive} = icemodel.physicalConstant('Tf')
-       kwargs.native_winter_albedo (1, 1) double = ...
+      kwargs.tair_for_pressure (1, 1) double {mustBePositive} = 255
+      kwargs.min_season_samples (1, 1) double {mustBePositive} = 300
+      kwargs.rain_snow_transition_temperature_k (1, 1) double ...
+         {mustBePositive} = icemodel.physicalConstant('Tf')
+      kwargs.native_winter_albedo (1, 1) double = ...
          icemodel.parameterLookup('promice_winter_albedo')
       kwargs.native_winter_months (1, :) double = ...
          icemodel.parameterLookup('promice_winter_albedo_months')

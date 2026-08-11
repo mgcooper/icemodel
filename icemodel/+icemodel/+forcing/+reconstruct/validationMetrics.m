@@ -19,10 +19,10 @@ function metrics = validationMetrics(truth, filled, gaps, series, channel, kwarg
    %  provenance : optional numeric method code per sample. Finite filled
    %     samples must carry a finite non-missing code for complete
    %     provenance accounting.
-    %  jump_factor : boundary-jump multiplier over the local median absolute
-    %     step (POLICY B6; Section-C default 3).
-    %  latitude, longitude : station geometry required for the shortwave
-    %     top-of-atmosphere bound.
+   %  jump_factor : boundary-jump multiplier over the local median absolute
+   %     step (POLICY B6; Section-C default 3).
+   %  latitude, longitude : station geometry required for the shortwave
+   %     top-of-atmosphere bound.
    %
    % Returns
    %  metrics : struct with fields
@@ -49,10 +49,10 @@ function metrics = validationMetrics(truth, filled, gaps, series, channel, kwarg
       channel (1, 1) string
       kwargs.sigma (:, 1) double = nan(0, 1)
       kwargs.provenance (:, 1) double = nan(0, 1)
-       kwargs.jump_factor (1, 1) double {mustBePositive} = ...
-          icemodel.forcing.reconstruct.setopts().jump_factor
-       kwargs.latitude (1, 1) double = NaN
-       kwargs.longitude (1, 1) double = NaN
+      kwargs.jump_factor (1, 1) double {mustBePositive} = ...
+         icemodel.forcing.reconstruct.setopts().jump_factor
+      kwargs.latitude (1, 1) double = NaN
+      kwargs.longitude (1, 1) double = NaN
    end
    if numel(truth) ~= numel(filled)
       error('icemodel:reconstruct:validationMetrics:sizeMismatch', ...
@@ -73,21 +73,21 @@ function metrics = validationMetrics(truth, filled, gaps, series, channel, kwarg
 
    times = series.Properties.RowTimes;
    x = series.(channel);
-    % The local step scale sets the size of an acceptable boundary jump.
+   % The local step scale sets the size of an acceptable boundary jump.
    % POLICY B6 keys that scale to the station and the season. This code
    % calls the shared helper, so the engine tiers reject the same jumps
    % that these metrics score as violations.
    season_scale = icemodel.forcing.reconstruct.stepScale(times, x);
 
    % Map each truth/filled sample to its gap row so strata aggregate cleanly.
-    sample_gap = zeros(numel(truth), 1);
-    sample_index = zeros(numel(truth), 1);
+   sample_gap = zeros(numel(truth), 1);
+   sample_index = zeros(numel(truth), 1);
    sample_cursor = 0;
    jump_violation = false(height(gaps), 1);
    for g = 1:height(gaps)
-       idx = find(times >= gaps.start_time(g) & times <= gaps.end_time(g));
-       sample_gap(sample_cursor + 1:sample_cursor + numel(idx)) = g;
-       sample_index(sample_cursor + 1:sample_cursor + numel(idx)) = idx;
+      idx = find(times >= gaps.start_time(g) & times <= gaps.end_time(g));
+      sample_gap(sample_cursor + 1:sample_cursor + numel(idx)) = g;
+      sample_index(sample_cursor + 1:sample_cursor + numel(idx)) = idx;
       sample_cursor = sample_cursor + numel(idx);
       % Boundary jump: the step between the last native sample before the
       % gap (and first after) and the adjacent filled sample.
@@ -102,16 +102,16 @@ function metrics = validationMetrics(truth, filled, gaps, series, channel, kwarg
       if after <= numel(x) && isfinite(x(after)) && isfinite(last_fill)
          jumps(2) = abs(last_fill - x(after));
       end
-       measurable = isfinite(jumps);
-       jump_violation(g) = ~any(measurable) ...
-          || any(jumps(measurable) > kwargs.jump_factor * ...
-          season_scale.(char(gaps.season(g))));
+      measurable = isfinite(jumps);
+      jump_violation(g) = ~any(measurable) ...
+         || any(jumps(measurable) > kwargs.jump_factor * ...
+         season_scale.(char(gaps.season(g))));
    end
-    if sample_cursor ~= numel(truth)
+   if sample_cursor ~= numel(truth)
       error('icemodel:reconstruct:validationMetrics:gapSampleMismatch', ...
          'gap table spans %d samples but truth has %d', ...
          sample_cursor, numel(truth));
-    end
+   end
 
    % Duration authorization needs a complete held-out gap, not merely a
    % finite fragment somewhere inside a longer draw. Partial coverage still
@@ -123,22 +123,22 @@ function metrics = validationMetrics(truth, filled, gaps, series, channel, kwarg
    end
    max_complete_gap_hours = max([gaps.duration_hours(complete_gap); 0]);
 
-    % One shared validator makes metrics and production reject the same
-    % scalar and relational violations.
-    sample_times = times(sample_index);
-    if channel == "swu"
-       physical_valid = icemodel.forcing.reconstruct.physicalValidity( ...
-          channel, filled, sample_times, swd=series.swd(sample_index));
-    else
-       physical_valid = icemodel.forcing.reconstruct.physicalValidity( ...
-          channel, filled, sample_times, latitude=kwargs.latitude, ...
-          longitude=kwargs.longitude, interval=median(diff(times)));
-    end
+   % One shared validator makes metrics and production reject the same
+   % scalar and relational violations.
+   sample_times = times(sample_index);
+   if channel == "swu"
+      physical_valid = icemodel.forcing.reconstruct.physicalValidity( ...
+         channel, filled, sample_times, swd=series.swd(sample_index));
+   else
+      physical_valid = icemodel.forcing.reconstruct.physicalValidity( ...
+         channel, filled, sample_times, latitude=kwargs.latitude, ...
+         longitude=kwargs.longitude, interval=median(diff(times)));
+   end
 
-     overall = scoreSubset(truth, filled, kwargs.sigma, kwargs.provenance, ...
-       physical_valid, jump_violation, sample_gap, ...
-       true(numel(truth), 1), ...
-       true(height(gaps), 1));
+   overall = scoreSubset(truth, filled, kwargs.sigma, kwargs.provenance, ...
+      physical_valid, jump_violation, sample_gap, ...
+      true(numel(truth), 1), ...
+      true(height(gaps), 1));
 
    % Per-stratum rows over the bucket x season combinations present.
    [strata, ~, stratum_of_gap] = unique(gaps(:, {'bucket', 'season'}), 'rows');
@@ -146,9 +146,9 @@ function metrics = validationMetrics(truth, filled, gaps, series, channel, kwarg
    for s = 1:height(strata)
       gap_in = stratum_of_gap == s;
       sample_in = ismember(sample_gap, find(gap_in));
-        stratum_rows{s} = scoreSubset(truth, filled, kwargs.sigma, ...
-           kwargs.provenance, physical_valid, ...
-           jump_violation, sample_gap, sample_in, gap_in);
+      stratum_rows{s} = scoreSubset(truth, filled, kwargs.sigma, ...
+         kwargs.provenance, physical_valid, ...
+         jump_violation, sample_gap, sample_in, gap_in);
    end
    by_stratum = [strata, vertcat(stratum_rows{:})];
 
@@ -227,15 +227,15 @@ function row = scoreSubset(truth, filled, sigma, provenance, physical_valid, ...
       provenance_accounting = mean(isfinite(p(have)) & p(have) ~= 255);
    end
 
-     valid = physical_valid(sample_in);
-     row = table(nnz(sample_in), mean(have), mean(err), sqrt(mean(err.^2)), ...
-        correlation, variability_ratio, within_gap_observed_spread, ...
-        typical_magnitude, ...
-        nnz(have & ~valid), mean(jump_violation(gap_in)), sigma1, sigma2, ...
-        provenance_accounting, ...
-       'VariableNames', {'n', 'coverage', 'bias', 'rmse', ...
-       'correlation', 'variability_ratio', 'within_gap_observed_spread', ...
-       'typical_magnitude', ...
-       'bound_violations', 'boundary_jump_rate', 'sigma1_coverage', ...
+   valid = physical_valid(sample_in);
+   row = table(nnz(sample_in), mean(have), mean(err), sqrt(mean(err.^2)), ...
+      correlation, variability_ratio, within_gap_observed_spread, ...
+      typical_magnitude, ...
+      nnz(have & ~valid), mean(jump_violation(gap_in)), sigma1, sigma2, ...
+      provenance_accounting, ...
+      'VariableNames', {'n', 'coverage', 'bias', 'rmse', ...
+      'correlation', 'variability_ratio', 'within_gap_observed_spread', ...
+      'typical_magnitude', ...
+      'bound_violations', 'boundary_jump_rate', 'sigma1_coverage', ...
       'sigma2_coverage', 'provenance_accounting'});
 end

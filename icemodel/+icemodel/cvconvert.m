@@ -1,6 +1,6 @@
 function varargout = cvconvert(varargin)
    %CVCONVERT Convert between control volume properties.
-   % 
+   %
    % Convert constituent volume properties among several dimensions including
    % mass, volume fraction, bulk density, total density, and volume in each CV.
    %
@@ -10,7 +10,7 @@ function varargout = cvconvert(varargin)
    % using the control volumes in CV and the required physical constants in
    % CONSTS.
    %
-   % Inputs: 
+   % Inputs:
    % convertFrom - String indicating the dimension of the input quantities
    %               ('mass', 'volumefraction', 'bulkdensity', 'totaldensity', or
    %               'volume').
@@ -18,12 +18,12 @@ function varargout = cvconvert(varargin)
    %             ('mass', 'volumefraction', 'bulkdensity', 'totaldensity', or
    %             'volume').
    % dz - Scalar or vector indicating the CV size(s). CV - Vector or matrix of
-   % constants (i.e., densities, heat capacities) needed for conversions. 
+   % constants (i.e., densities, heat capacities) needed for conversions.
    % varargin - One or more vectors or matrices, each corresponding to a
    % constituent, with elements representing the constituent's quantity in the
    % dimension specified by convertFrom.
    %
-   % Outputs: 
+   % Outputs:
    % varargout - One or more vectors or matrices, each corresponding to a
    % constituent, with elements representing the constituent's quantity in the
    % dimension specified by convertTo.
@@ -31,11 +31,11 @@ function varargout = cvconvert(varargin)
    % 'volumefraction' and 'bulkdensity' require the total volume or mass. This
    % function takes that total as the sum of the inputs.
    %
-   % Example: 
+   % Example:
    % [m_liq, m_ice] = icemodel.cvconvert( ...
-   %    'volumefraction', 'mass', dz, [ro_liq, ro_ice], f_liq, f_ice); 
+   %    'volumefraction', 'mass', dz, [ro_liq, ro_ice], f_liq, f_ice);
    % This converts the volume fractions of liquid and ice into their
-   % corresponding masses. 
+   % corresponding masses.
    %
    % See also: icemodel, cvpropertylist
 

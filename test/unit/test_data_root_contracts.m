@@ -293,11 +293,11 @@ function test_public_readers_forward_data_root(testCase)
    calls = { ...
       @() icemodel.verification.loadmanifest("colbeck1976", data_root=data_root)
       @() icemodel.verification.comparecase("colbeck1976", ...
-         data_root=data_root, make_plot=false)
+      data_root=data_root, make_plot=false)
       @() icemodel.verification.plotcase("colbeck1976", ...
-         data_root=data_root, visible="off")
+      data_root=data_root, visible="off")
       @() icemodel.verification.plotscatter("cdp", ...
-         data_root=data_root, visible="off")};
+      data_root=data_root, visible="off")};
    for n = 1:numel(calls)
       message = errorMessage(calls{n});
       testCase.verifySubstring(message, expected_eval)

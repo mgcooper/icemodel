@@ -275,9 +275,9 @@ function colocation = stageOneSource(src, points, legspec, colocation, kwargs)
       % Per point: clip to its own window and write only the outputs that were
       % not already covered. A write failure degrades only that point's leg.
       for j = 1:numel(gidx)
-          k = gidx(j);
-          L = legspec(k).(srcc);
-          try
+         k = gidx(j);
+         L = legspec(k).(srcc);
+         try
             % MAR builders stamp per-day provenance on the whole source-year
             % axis. Preserve that exact axis before the case window removes rows.
             if src == "mar"

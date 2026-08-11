@@ -200,48 +200,48 @@ function test_plan_denies_wind_donor_that_does_not_beat_mar(testCase)
 end
 
 function test_plan_fits_without_selection_draw_leakage(testCase)
-    % Changing only held-out selection observations must not change fitted
-    % donor parameters or the climatology estimate.
-    [target, donor] = syntheticPair(0.05, -20);
-    seed = 11;
-    first = icemodel.forcing.reconstruct.stationMethodPlan(target, ...
-       donor, emptyProxies(), channels="tair", seed=seed);
-    census = icemodel.forcing.reconstruct.gapCensus(target.series, ...
-       channels="tair", latitude=target.location.lat_wgs84, ...
-       longitude=target.location.lon_wgs84);
-    planned = census.runs.bucket >= 2 ...
-       & census.runs.bucket < numel( ...
-       icemodel.forcing.reconstruct.bucketEdges());
-    stratum = census.runs(find(planned, 1), :);
-    bucket = stratum.bucket;
-    season = stratum.season;
-    seasons = ["DJF", "MAM", "JJA", "SON"];
-    season_index = find(seasons == season, 1);
-    draw = icemodel.forcing.reconstruct.syntheticMissingness( ...
-       target.series, "tair", census.runs, ...
-       years=first.split.years_selection, ...
-       seed=seed + 100 * bucket + 1000 * season_index, ...
-       n_gaps=icemodel.forcing.reconstruct.setopts().plan_n_gaps, ...
-       bucket=bucket, season=season);
-    changed = target;
-    changed.series.tair(draw.mask) = changed.series.tair(draw.mask) + 0.25;
-    second = icemodel.forcing.reconstruct.stationMethodPlan(changed, ...
-       donor, emptyProxies(), channels="tair", seed=seed);
+   % Changing only held-out selection observations must not change fitted
+   % donor parameters or the climatology estimate.
+   [target, donor] = syntheticPair(0.05, -20);
+   seed = 11;
+   first = icemodel.forcing.reconstruct.stationMethodPlan(target, ...
+      donor, emptyProxies(), channels="tair", seed=seed);
+   census = icemodel.forcing.reconstruct.gapCensus(target.series, ...
+      channels="tair", latitude=target.location.lat_wgs84, ...
+      longitude=target.location.lon_wgs84);
+   planned = census.runs.bucket >= 2 ...
+      & census.runs.bucket < numel( ...
+      icemodel.forcing.reconstruct.bucketEdges());
+   stratum = census.runs(find(planned, 1), :);
+   bucket = stratum.bucket;
+   season = stratum.season;
+   seasons = ["DJF", "MAM", "JJA", "SON"];
+   season_index = find(seasons == season, 1);
+   draw = icemodel.forcing.reconstruct.syntheticMissingness( ...
+      target.series, "tair", census.runs, ...
+      years=first.split.years_selection, ...
+      seed=seed + 100 * bucket + 1000 * season_index, ...
+      n_gaps=icemodel.forcing.reconstruct.setopts().plan_n_gaps, ...
+      bucket=bucket, season=season);
+   changed = target;
+   changed.series.tair(draw.mask) = changed.series.tair(draw.mask) + 0.25;
+   second = icemodel.forcing.reconstruct.stationMethodPlan(changed, ...
+      donor, emptyProxies(), channels="tair", seed=seed);
 
-    names1 = string({first.channels(1).methods.name});
-    names2 = string({second.channels(1).methods.name});
-    donor1 = find(startsWith(names1, "donor:dsta"), 1);
-    donor2 = find(startsWith(names2, "donor:dsta"), 1);
-    testCase.assertNotEmpty(donor1);
-    testCase.assertNotEmpty(donor2);
-    testCase.verifyEqual(first.channels(1).methods(donor1).parameters, ...
-       second.channels(1).methods(donor2).parameters);
-    climatology1 = find(names1 == "climatology", 1);
-    climatology2 = find(names2 == "climatology", 1);
-    testCase.assertNotEmpty(climatology1);
-    testCase.assertNotEmpty(climatology2);
-    testCase.verifyEqual(first.channels(1).methods(climatology1).estimate, ...
-       second.channels(1).methods(climatology2).estimate);
+   names1 = string({first.channels(1).methods.name});
+   names2 = string({second.channels(1).methods.name});
+   donor1 = find(startsWith(names1, "donor:dsta"), 1);
+   donor2 = find(startsWith(names2, "donor:dsta"), 1);
+   testCase.assertNotEmpty(donor1);
+   testCase.assertNotEmpty(donor2);
+   testCase.verifyEqual(first.channels(1).methods(donor1).parameters, ...
+      second.channels(1).methods(donor2).parameters);
+   climatology1 = find(names1 == "climatology", 1);
+   climatology2 = find(names2 == "climatology", 1);
+   testCase.assertNotEmpty(climatology1);
+   testCase.assertNotEmpty(climatology2);
+   testCase.verifyEqual(first.channels(1).methods(climatology1).estimate, ...
+      second.channels(1).methods(climatology2).estimate);
 end
 
 function test_plan_supports_role_reversal(testCase)
@@ -611,27 +611,27 @@ function test_fill_station_keeps_ktransect_in_selected_data_root(testCase)
          'elev_m', 1200);
       evaluation_rel = fullfile('aws9', 'observations.mat');
       leg = ktransectLeg(evaluation_file, evaluation_rel, expected_metadata);
-       entry = struct('site_id', 'AWS9', 'site_location', location, ...
-          'colocation', struct('ktransect', leg));
-       manifest = struct('cases', entry);
-       writeJsonFixture(fullfile(kt_root, 'manifest.json'), manifest);
+      entry = struct('site_id', 'AWS9', 'site_location', location, ...
+         'colocation', struct('ktransect', leg));
+      manifest = struct('cases', entry);
+      writeJsonFixture(fullfile(kt_root, 'manifest.json'), manifest);
 
-       testCase.verifyError(@() ...
+      testCase.verifyError(@() ...
          icemodel.forcing.reconstruct.fillPromiceStation("tsta", ...
          met_dir=met_dir, donor_sites=string.empty(1, 0), ...
          use_ktransect=true, use_gcnet=false, write=false), ...
          ['icemodel:reconstruct:fillPromiceStation:' ...
          'ktransectIdentityMismatch']);
-       donor.Properties.UserData = expected_metadata;
-       targets.data = donor;
-       targets.metadata = expected_metadata;
-       save(evaluation_file, 'targets');
-       legacy_leg = ...
-          ktransectLeg(evaluation_file, evaluation_rel, expected_metadata);
-       legacy_leg = rmfield(legacy_leg, ...
-          {'evaluation_size_bytes', 'evaluation_sha256'});
-       entry.colocation.ktransect = legacy_leg;
-       manifest.cases = entry;
+      donor.Properties.UserData = expected_metadata;
+      targets.data = donor;
+      targets.metadata = expected_metadata;
+      save(evaluation_file, 'targets');
+      legacy_leg = ...
+         ktransectLeg(evaluation_file, evaluation_rel, expected_metadata);
+      legacy_leg = rmfield(legacy_leg, ...
+         {'evaluation_size_bytes', 'evaluation_sha256'});
+      entry.colocation.ktransect = legacy_leg;
+      manifest.cases = entry;
       writeJsonFixture(fullfile(kt_root, 'manifest.json'), manifest);
       % POLICY A3: absent sensor-height provenance downgrades the donor
       % with a warning; it never aborts the fill. Reaching this warning
@@ -719,10 +719,10 @@ function test_fill_station_keeps_measured_ktransect_albedo_eligible(testCase)
    station_file = fullfile(met_dir, ...
       'met_tsta_promice_20200101_20211231_15m.mat');
    S = load(station_file, 'met');
-    met = S.met;
-    met.albedo(30001:30144) = NaN;
-    save(station_file, 'met');
-    recordNativeMetIdentity(data_root, "tsta", station_file);
+   met = S.met;
+   met.albedo(30001:30144) = NaN;
+   save(station_file, 'met');
+   recordNativeMetIdentity(data_root, "tsta", station_file);
 
    kt_root = fullfile(data_root, 'eval', 'ktransect');
    case_root = fullfile(kt_root, 'aws9');
@@ -739,26 +739,26 @@ function test_fill_station_keeps_measured_ktransect_albedo_eligible(testCase)
       'elev_m', 1200);
    evaluation_rel = fullfile('aws9', 'observations.mat');
    leg = ktransectLeg(evaluation_file, evaluation_rel, metadata);
-    entry = struct('site_id', 'AWS9', 'site_location', location, ...
-       'colocation', struct('ktransect', leg));
-    manifest_file = fullfile(kt_root, 'manifest.json');
-    mismatched = entry;
-    mismatched.site_location.lat_wgs84 = ...
-       mismatched.site_location.lat_wgs84 + 1;
-    writeJsonFixture(manifest_file, struct('cases', mismatched));
-    opts = icemodel.forcing.reconstruct.setopts( ...
-       required_channels="albedo", core_channels="albedo", ...
-       plan_channels="albedo", interp_channels=string.empty(1, 0), ...
-       last_resort_proxies=false, plan_n_gaps=1, seed=9);
+   entry = struct('site_id', 'AWS9', 'site_location', location, ...
+      'colocation', struct('ktransect', leg));
+   manifest_file = fullfile(kt_root, 'manifest.json');
+   mismatched = entry;
+   mismatched.site_location.lat_wgs84 = ...
+      mismatched.site_location.lat_wgs84 + 1;
+   writeJsonFixture(manifest_file, struct('cases', mismatched));
+   opts = icemodel.forcing.reconstruct.setopts( ...
+      required_channels="albedo", core_channels="albedo", ...
+      plan_channels="albedo", interp_channels=string.empty(1, 0), ...
+      last_resort_proxies=false, plan_n_gaps=1, seed=9);
 
-    testCase.verifyError(@() ...
-       icemodel.forcing.reconstruct.fillPromiceStation("tsta", ...
-       met_dir=met_dir, donor_sites=string.empty(1, 0), ...
-       use_ktransect=true, use_gcnet=false, write=false, opts=opts), ...
-       ['icemodel:reconstruct:fillPromiceStation:' ...
-       'ktransectIdentityMismatch']);
-    writeJsonFixture(manifest_file, struct('cases', entry));
-    result = icemodel.forcing.reconstruct.fillPromiceStation("tsta", ...
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.fillPromiceStation("tsta", ...
+      met_dir=met_dir, donor_sites=string.empty(1, 0), ...
+      use_ktransect=true, use_gcnet=false, write=false, opts=opts), ...
+      ['icemodel:reconstruct:fillPromiceStation:' ...
+      'ktransectIdentityMismatch']);
+   writeJsonFixture(manifest_file, struct('cases', entry));
+   result = icemodel.forcing.reconstruct.fillPromiceStation("tsta", ...
       met_dir=met_dir, donor_sites=string.empty(1, 0), ...
       use_ktransect=true, use_gcnet=false, write=false, opts=opts);
 
@@ -814,7 +814,7 @@ function test_fill_station_requires_native_metadata_site(testCase)
       icemodel.forcing.reconstruct.fillPromiceStation("tsta", ...
       met_dir=met_dir, donor_sites=string.empty(1, 0), ...
       use_ktransect=false, use_gcnet=false, write=false), ...
-       'icemodel:reconstruct:fillPromiceStation:nativeIdentityMismatch');
+      'icemodel:reconstruct:fillPromiceStation:nativeIdentityMismatch');
 end
 
 function test_fill_station_accepts_normalized_native_metadata_site(testCase)
@@ -888,7 +888,7 @@ function test_fill_station_validates_proxy_metadata_identity(testCase)
       icemodel.forcing.reconstruct.fillPromiceStation("tsta", ...
       met_dir=met_dir, donor_sites=string.empty(1, 0), ...
       use_ktransect=false, use_gcnet=false, write=false), ...
-       'icemodel:reconstruct:acceptanceWindow:proxyIdentityMismatch');
+      'icemodel:reconstruct:acceptanceWindow:proxyIdentityMismatch');
 end
 
 function test_fill_station_loads_only_acceptance_selected_proxy(testCase)
@@ -950,158 +950,158 @@ end
 function test_fill_station_writes_canonical_artifacts(testCase)
    % The driver plans, fills, adopts MAR precip, and ships through the
    % canonical writer with provenance channels and readiness verdicts.
-     root = testCase.TestData.root;
-     writeFixtureStation(root, "tsta", 0, 0, true);
-     writeFixtureStation(root, "dsta", 0.05, -20, false);
-     native_file = fullfile(root, 'met', 'promice', ...
-        'met_tsta_promice_20200101_20211231_15m.mat');
-      native = load(native_file, 'met');
-      met = native.met;
-      met.Properties.UserData.site = "T_STA";
-      precip_samples = [49; 53; 57];
-      met.ppt(precip_samples) = [0.2; 0.3; 0.3];
-      met.rainf(precip_samples(2)) = 0.1;
-      met.snowf(precip_samples(3)) = 0.2;
-      % An inconsistent finite native pair must preserve rain, discard
-      % snow, then adopt the proxy total and reconstruct its exact
-      % complement on the delivered quarter-hour support.
-      met.rainf(205:208) = 0.04;
-      met.snowf(205:208) = 0.04;
-      % Gap the upward shortwave so the shipped product must exercise the
-      % post-tier derivation and carry its provenance column (A7/B10).
-      met.swu(5001:5012) = NaN;
-      save(native_file, 'met');
-     recordNativeMetIdentity(root, "tsta", native_file);
-     writeFixtureMar(root, "tsta");
-    completeFixtureMarPrecip(root, "tsta");
-    writeFixtureMerraPrecipPatch(root, "tsta");
+   root = testCase.TestData.root;
+   writeFixtureStation(root, "tsta", 0, 0, true);
+   writeFixtureStation(root, "dsta", 0.05, -20, false);
+   native_file = fullfile(root, 'met', 'promice', ...
+      'met_tsta_promice_20200101_20211231_15m.mat');
+   native = load(native_file, 'met');
+   met = native.met;
+   met.Properties.UserData.site = "T_STA";
+   precip_samples = [49; 53; 57];
+   met.ppt(precip_samples) = [0.2; 0.3; 0.3];
+   met.rainf(precip_samples(2)) = 0.1;
+   met.snowf(precip_samples(3)) = 0.2;
+   % An inconsistent finite native pair must preserve rain, discard
+   % snow, then adopt the proxy total and reconstruct its exact
+   % complement on the delivered quarter-hour support.
+   met.rainf(205:208) = 0.04;
+   met.snowf(205:208) = 0.04;
+   % Gap the upward shortwave so the shipped product must exercise the
+   % post-tier derivation and carry its provenance column (A7/B10).
+   met.swu(5001:5012) = NaN;
+   save(native_file, 'met');
+   recordNativeMetIdentity(root, "tsta", native_file);
+   writeFixtureMar(root, "tsta");
+   completeFixtureMarPrecip(root, "tsta");
+   writeFixtureMerraPrecipPatch(root, "tsta");
 
-    opts = icemodel.forcing.reconstruct.setopts( ...
-       seed=13, min_overlap_hours=1e9);
-    result = icemodel.forcing.reconstruct.fillPromiceStation("tsta", ...
-       met_dir=fullfile(root, 'met', 'promice'), ...
+   opts = icemodel.forcing.reconstruct.setopts( ...
+      seed=13, min_overlap_hours=1e9);
+   result = icemodel.forcing.reconstruct.fillPromiceStation("tsta", ...
+      met_dir=fullfile(root, 'met', 'promice'), ...
       out_dir=fullfile(root, 'met', 'promice_filled'), ...
       qa_dir=fullfile(root, 'qa'), ...
-       donor_sites="dsta", use_ktransect=false, use_gcnet=false, ...
-       opts=opts);
+      donor_sites="dsta", use_ktransect=false, use_gcnet=false, ...
+      opts=opts);
 
-    % Canonical writemet naming under the forcings token directory.
-    testCase.verifyTrue(isfile(result.met_file));
-    testCase.verifyTrue(contains(result.met_file, "promice_filled"));
-    producer = jsondecode(fileread(fullfile(root, 'qa', 'plans', ...
-       'tsta-report-inputs.json')));
-    testCase.verifyEqual(string(producer.path_base), ...
-       "selected_data_root");
-    testCase.verifyTrue(all(arrayfun(@(record) ...
-       ~java.io.File(char(record.path)).isAbsolute(), ...
-       producer.artifacts)));
-    testCase.verifyFalse(contains(string(jsonencode(producer)), root));
-    S = load(result.met_file);
+   % Canonical writemet naming under the forcings token directory.
+   testCase.verifyTrue(isfile(result.met_file));
+   testCase.verifyTrue(contains(result.met_file, "promice_filled"));
+   producer = jsondecode(fileread(fullfile(root, 'qa', 'plans', ...
+      'tsta-report-inputs.json')));
+   testCase.verifyEqual(string(producer.path_base), ...
+      "selected_data_root");
+   testCase.verifyTrue(all(arrayfun(@(record) ...
+      ~java.io.File(char(record.path)).isAbsolute(), ...
+      producer.artifacts)));
+   testCase.verifyFalse(contains(string(jsonencode(producer)), root));
+   S = load(result.met_file);
    met = S.met;
    testCase.verifyTrue(ismember("tair_provenance", ...
       string(met.Properties.VariableNames)));
-    codes = icemodel.forcing.reconstruct.provenanceCodes();
-     % Both-missing native phases stay missing at reconstruction (POLICY
-     % A10/D-18); only single-missing complements derive by arithmetic.
-     testCase.verifyTrue(isnan(met.rainf(precip_samples(1))));
-     testCase.verifyTrue(isnan(met.snowf(precip_samples(1))));
-     testCase.verifyEqual(met.rainf(precip_samples(2:3)), [0.1; 0.1], ...
-        'AbsTol', 1e-12);
-     testCase.verifyEqual(met.snowf(precip_samples(2:3)), [0.2; 0.2], ...
-        'AbsTol', 1e-12);
-    testCase.verifyTrue(any(string(result.audit.method) == ...
-       "complement:total_minus_rain"));
-    testCase.verifyTrue(any(string(result.audit.method) == ...
-       "complement:total_minus_snow"));
-    testCase.verifyTrue(any(met.tair_provenance == codes.observed));
-    metadata = met.Properties.UserData;
-    testCase.verifyEqual(string(metadata.site), "tsta");
-    testCase.verifyEqual(string(metadata.gapfill_engine_version), ...
-       string(icemodel.internal.version()));
-     testCase.verifyEqual(string(metadata.gapfill_policy_sha256), ...
-        icemodel.forcing.reconstruct.policySha256());
-     testCase.verifyEqual(string(metadata.gapfill_donors), "dsta");
-     testCase.verifyEqual(string(metadata.gapfill_channels), ...
-        string({result.plan.channels.channel}));
+   codes = icemodel.forcing.reconstruct.provenanceCodes();
+   % Both-missing native phases stay missing at reconstruction (POLICY
+   % A10/D-18); only single-missing complements derive by arithmetic.
+   testCase.verifyTrue(isnan(met.rainf(precip_samples(1))));
+   testCase.verifyTrue(isnan(met.snowf(precip_samples(1))));
+   testCase.verifyEqual(met.rainf(precip_samples(2:3)), [0.1; 0.1], ...
+      'AbsTol', 1e-12);
+   testCase.verifyEqual(met.snowf(precip_samples(2:3)), [0.2; 0.2], ...
+      'AbsTol', 1e-12);
+   testCase.verifyTrue(any(string(result.audit.method) == ...
+      "complement:total_minus_rain"));
+   testCase.verifyTrue(any(string(result.audit.method) == ...
+      "complement:total_minus_snow"));
+   testCase.verifyTrue(any(met.tair_provenance == codes.observed));
+   metadata = met.Properties.UserData;
+   testCase.verifyEqual(string(metadata.site), "tsta");
+   testCase.verifyEqual(string(metadata.gapfill_engine_version), ...
+      string(icemodel.internal.version()));
+   testCase.verifyEqual(string(metadata.gapfill_policy_sha256), ...
+      icemodel.forcing.reconstruct.policySha256());
+   testCase.verifyEqual(string(metadata.gapfill_donors), "dsta");
+   testCase.verifyEqual(string(metadata.gapfill_channels), ...
+      string({result.plan.channels.channel}));
    % The seeded 3 h tair gap fills in tier 1.
    testCase.verifyTrue(any(met.tair_provenance == codes.bounded_interp));
    % MAR precipitation adoption stamps code 4 on placeholder samples.
    testCase.verifyTrue(any(met.ppt_provenance == codes.mar));
-    testCase.verifyTrue(ismember("boom_height_provenance", ...
-       string(met.Properties.VariableNames)));
-    testCase.verifyTrue(all(isnan(met.boom_height(5001:5012))));
-    testCase.verifyTrue(all(met.boom_height_provenance(5001:5012) == ...
-       codes.missing));
-    % Union-driven provenance attachment (A7): the derived upward-shortwave
-    % channel ships its provenance column, and the seeded gap carries the
-    % algebraic derivation code with values equal to albedo * swd (B10).
-    testCase.verifyTrue(ismember("swu_provenance", ...
-       string(met.Properties.VariableNames)));
-    testCase.verifyTrue(all(met.swu_provenance(5001:5012) == ...
-       codes.derived_shortwave));
-    derived = met.swu_provenance == codes.derived_shortwave;
-    testCase.verifyEqual(met.swu(derived), ...
-       met.albedo(derived) .* met.swd(derived), 'AbsTol', 1e-12);
-    testCase.verifyTrue(all(isfinite(met.ppt(met.ppt_provenance == ...
-       codes.mar))));
-    adopted = met.ppt_provenance == codes.mar;
-    testCase.verifyEqual(met.ppt(adopted), ...
-       met.rainf(adopted) + met.snowf(adopted), 'AbsTol', 1e-12);
-     testCase.verifyTrue(all(ismember(met.rainf_provenance(adopted), ...
-        [codes.observed, codes.mar])));
-     testCase.verifyTrue(all(met.snowf_provenance(adopted) == codes.mar));
-     support = (205:208).';
-     testCase.verifyEqual(met.rainf(support), 0.04 + zeros(4, 1), ...
-        'AbsTol', 1e-12);
-     testCase.verifyTrue(all( ...
-        icemodel.forcing.helpers.precipitationConsistency( ...
-        met.ppt(support), met.rainf(support), met.snowf(support))));
-     testCase.verifyGreaterThan(numel(unique(met.ppt(support))), 1);
-     testCase.verifyEqual(met.rainf_provenance(support), ...
-        repmat(codes.observed, 4, 1));
-     testCase.verifyEqual(met.ppt_provenance(support), ...
-        repmat(codes.mar, 4, 1));
-     testCase.verifyEqual(met.snowf_provenance(support), ...
-        repmat(codes.mar, 4, 1));
-     testCase.verifyFalse(any(met.ppt_provenance == codes.merra2));
-    precip_audit = startsWith(string(result.audit.method), ...
-       "proxy:mar:precip_adoption");
-     testCase.verifyTrue(any(precip_audit));
-    % Final audit rows must not retain the provisional tair outage after
-    % the MAR last-resort tier has filled it.
-    testCase.verifyFalse(any(string(result.audit.method) == "unfilled" ...
-       & string(result.audit.channel) == "tair"));
+   testCase.verifyTrue(ismember("boom_height_provenance", ...
+      string(met.Properties.VariableNames)));
+   testCase.verifyTrue(all(isnan(met.boom_height(5001:5012))));
+   testCase.verifyTrue(all(met.boom_height_provenance(5001:5012) == ...
+      codes.missing));
+   % Union-driven provenance attachment (A7): the derived upward-shortwave
+   % channel ships its provenance column, and the seeded gap carries the
+   % algebraic derivation code with values equal to albedo * swd (B10).
+   testCase.verifyTrue(ismember("swu_provenance", ...
+      string(met.Properties.VariableNames)));
+   testCase.verifyTrue(all(met.swu_provenance(5001:5012) == ...
+      codes.derived_shortwave));
+   derived = met.swu_provenance == codes.derived_shortwave;
+   testCase.verifyEqual(met.swu(derived), ...
+      met.albedo(derived) .* met.swd(derived), 'AbsTol', 1e-12);
+   testCase.verifyTrue(all(isfinite(met.ppt(met.ppt_provenance == ...
+      codes.mar))));
+   adopted = met.ppt_provenance == codes.mar;
+   testCase.verifyEqual(met.ppt(adopted), ...
+      met.rainf(adopted) + met.snowf(adopted), 'AbsTol', 1e-12);
+   testCase.verifyTrue(all(ismember(met.rainf_provenance(adopted), ...
+      [codes.observed, codes.mar])));
+   testCase.verifyTrue(all(met.snowf_provenance(adopted) == codes.mar));
+   support = (205:208).';
+   testCase.verifyEqual(met.rainf(support), 0.04 + zeros(4, 1), ...
+      'AbsTol', 1e-12);
+   testCase.verifyTrue(all( ...
+      icemodel.forcing.helpers.precipitationConsistency( ...
+      met.ppt(support), met.rainf(support), met.snowf(support))));
+   testCase.verifyGreaterThan(numel(unique(met.ppt(support))), 1);
+   testCase.verifyEqual(met.rainf_provenance(support), ...
+      repmat(codes.observed, 4, 1));
+   testCase.verifyEqual(met.ppt_provenance(support), ...
+      repmat(codes.mar, 4, 1));
+   testCase.verifyEqual(met.snowf_provenance(support), ...
+      repmat(codes.mar, 4, 1));
+   testCase.verifyFalse(any(met.ppt_provenance == codes.merra2));
+   precip_audit = startsWith(string(result.audit.method), ...
+      "proxy:mar:precip_adoption");
+   testCase.verifyTrue(any(precip_audit));
+   % Final audit rows must not retain the provisional tair outage after
+   % the MAR last-resort tier has filled it.
+   testCase.verifyFalse(any(string(result.audit.method) == "unfilled" ...
+      & string(result.audit.channel) == "tair"));
    % One context-id block per planned channel, stacked once after the loop.
    plan_id_blocks = cell(numel(result.plan.channels), 1);
-    for c = 1:numel(result.plan.channels)
+   for c = 1:numel(result.plan.channels)
       plan_id_blocks{c} = string( ...
-          {result.plan.channels(c).methods.audit_context_id}).';
-    end
+         {result.plan.channels(c).methods.audit_context_id}).';
+   end
    plan_ids = vertcat(strings(0, 1), plan_id_blocks{:});
-    used_plan_context = startsWith(string(result.audit.context_id), ...
-       string(result.audit.channel) + ":candidate-");
-    testCase.verifyTrue(all(ismember( ...
-       string(result.audit.context_id(used_plan_context)), plan_ids)));
-    fixed_ids = string({result.plan.fixed_methods.audit_context_id}).';
-    fixed_names = string({result.plan.fixed_methods.name}).';
-    used_fixed_context = ismember(string(result.audit.method), fixed_names);
-    testCase.verifyTrue(any(used_fixed_context));
-    testCase.verifyTrue(all(ismember( ...
-       string(result.audit.context_id(used_fixed_context)), fixed_ids)));
-    testCase.verifyEqual(height(result.plan.audit_contexts), ...
-       numel(unique(string(result.audit.context_id))));
-    testCase.verifyTrue(all(ismember(string(result.audit.context_id), ...
-       string(result.plan.audit_contexts.context_id))));
+   used_plan_context = startsWith(string(result.audit.context_id), ...
+      string(result.audit.channel) + ":candidate-");
+   testCase.verifyTrue(all(ismember( ...
+      string(result.audit.context_id(used_plan_context)), plan_ids)));
+   fixed_ids = string({result.plan.fixed_methods.audit_context_id}).';
+   fixed_names = string({result.plan.fixed_methods.name}).';
+   used_fixed_context = ismember(string(result.audit.method), fixed_names);
+   testCase.verifyTrue(any(used_fixed_context));
+   testCase.verifyTrue(all(ismember( ...
+      string(result.audit.context_id(used_fixed_context)), fixed_ids)));
+   testCase.verifyEqual(height(result.plan.audit_contexts), ...
+      numel(unique(string(result.audit.context_id))));
+   testCase.verifyTrue(all(ismember(string(result.audit.context_id), ...
+      string(result.plan.audit_contexts.context_id))));
    % The caller's extreme overlap requirement reaches the planner: no donor
    % transfer may survive by reverting to defaults. One method-name block per
    % planned channel, stacked once after the loop.
    name_blocks = cell(numel(result.plan.channels), 1);
-    for c = 1:numel(result.plan.channels)
+   for c = 1:numel(result.plan.channels)
       name_blocks{c} = ...
          string({result.plan.channels(c).methods.name}).';
-    end
+   end
    names = vertcat(strings(0, 1), name_blocks{:});
-    testCase.verifyFalse(any(startsWith(names, "donor:")));
+   testCase.verifyFalse(any(startsWith(names, "donor:")));
    % Native samples are byte-identical to the input where observed.
    native = load(fullfile(root, 'met', 'promice', ...
       'met_tsta_promice_20200101_20211231_15m.mat'));
@@ -1310,8 +1310,8 @@ function test_winter_albedo_stamp_reenters_as_fillable(testCase)
    % input, fills them through the tiers/last resort, and restores the
    % constant with the constant code only where nothing better fills —
    % none may ship labeled observed.
-    root = testCase.TestData.root;
-    writeFixtureStation(root, "tsta", 0, 0, true);
+   root = testCase.TestData.root;
+   writeFixtureStation(root, "tsta", 0, 0, true);
    % Stamp one winter month with the exact constant, as the native
    % builder does.
    f = fullfile(root, 'met', 'promice', ...
@@ -1327,21 +1327,21 @@ function test_winter_albedo_stamp_reenters_as_fillable(testCase)
    raw_albedo(month(raw_times) == 12 & year(raw_times) == 2020) = NaN;
    source_file = writeRawPromiceAlbedo( ...
       root, "tsta", raw_times, raw_albedo);
-    met = pinRawSource(met, source_file);
-    save(f, 'met');
-    recordNativeMetIdentity(root, "tsta", f);
+   met = pinRawSource(met, source_file);
+   save(f, 'met');
+   recordNativeMetIdentity(root, "tsta", f);
 
    result = icemodel.forcing.reconstruct.fillPromiceStation("tsta", ...
-       met_dir=fullfile(root, 'met', 'promice'), ...
-       out_dir=fullfile(root, 'met', 'promice_filled'), ...
-       qa_dir=fullfile(root, 'qa'), ...
-       donor_sites=string.empty(1, 0), use_ktransect=false, ...
-       use_gcnet=false, ...
-       write=false, opts=icemodel.forcing.reconstruct.setopts( ...
-       required_channels=["tair", "albedo"], core_channels="tair", ...
-       plan_channels=["tair", "albedo"], interp_channels="tair", ...
-       climatology_min_support=1e9, last_resort_proxies=false, ...
-       plan_n_gaps=1, seed=13));
+      met_dir=fullfile(root, 'met', 'promice'), ...
+      out_dir=fullfile(root, 'met', 'promice_filled'), ...
+      qa_dir=fullfile(root, 'qa'), ...
+      donor_sites=string.empty(1, 0), use_ktransect=false, ...
+      use_gcnet=false, ...
+      write=false, opts=icemodel.forcing.reconstruct.setopts( ...
+      required_channels=["tair", "albedo"], core_channels="tair", ...
+      plan_channels=["tair", "albedo"], interp_channels="tair", ...
+      climatology_min_support=1e9, last_resort_proxies=false, ...
+      plan_n_gaps=1, seed=13));
 
    codes = icemodel.forcing.reconstruct.provenanceCodes();
    in_year = year(result.filled.Properties.RowTimes) == 2020;
@@ -1349,26 +1349,26 @@ function test_winter_albedo_stamp_reenters_as_fillable(testCase)
       & month(result.filled.Properties.RowTimes) == 12;
    % Every stamped sample is finite with NON-observed provenance.
    testCase.verifyTrue(all(isfinite(result.filled.albedo(stamped))));
-    testCase.verifyTrue(all(result.provenance.albedo(stamped) ...
-       == codes.constant));
-    % The bridge audits under its own method; it meets the anchors
-    % continuously so no seam note is expected here.
-    bridge_audit = string(result.audit.method) == ...
-       "winter_albedo_bridge";
-    testCase.verifyTrue(any(contains(string( ...
-       result.audit.detail(bridge_audit)), "seasonal bridge")));
-    % The bridge interior never dips below the dry-snow floor (POLICY
-    % B13/D-15a); the seam blend may taper the few edge samples toward
-    % the adjoining observations.
-    interior = stamped ...
-       & day(result.filled.Properties.RowTimes) >= 5 ...
-       & day(result.filled.Properties.RowTimes) <= 25;
-    testCase.verifyTrue(all(result.filled.albedo(interior) ...
-       >= stamp - 1e-12));
+   testCase.verifyTrue(all(result.provenance.albedo(stamped) ...
+      == codes.constant));
+   % The bridge audits under its own method; it meets the anchors
+   % continuously so no seam note is expected here.
+   bridge_audit = string(result.audit.method) == ...
+      "winter_albedo_bridge";
+   testCase.verifyTrue(any(contains(string( ...
+      result.audit.detail(bridge_audit)), "seasonal bridge")));
+   % The bridge interior never dips below the dry-snow floor (POLICY
+   % B13/D-15a); the seam blend may taper the few edge samples toward
+   % the adjoining observations.
+   interior = stamped ...
+      & day(result.filled.Properties.RowTimes) >= 5 ...
+      & day(result.filled.Properties.RowTimes) <= 25;
+   testCase.verifyTrue(all(result.filled.albedo(interior) ...
+      >= stamp - 1e-12));
    % Genuinely observed albedo elsewhere keeps observed provenance.
-    testCase.verifyTrue(any(result.provenance.albedo(~stamped) ...
-       == codes.observed));
-    testCase.verifyFalse(isfolder(fullfile(root, 'qa', 'splits')));
+   testCase.verifyTrue(any(result.provenance.albedo(~stamped) ...
+      == codes.observed));
+   testCase.verifyFalse(isfolder(fullfile(root, 'qa', 'splits')));
 end
 
 function test_window_bounds_product_to_staged_proxy_span(testCase)
@@ -1649,10 +1649,10 @@ function test_boom_height_gaps_fail_closed_without_visit_registry(testCase)
    met.boom_height(5001:5012) = NaN;
    metadata = met.Properties.UserData;
    metadata.station_transition_times = ...
-       met.Properties.RowTimes(8005);
-    met.Properties.UserData = metadata;
-    save(filename, 'met');
-    recordNativeMetIdentity(root, "tsta", filename);
+      met.Properties.RowTimes(8005);
+   met.Properties.UserData = metadata;
+   save(filename, 'met');
+   recordNativeMetIdentity(root, "tsta", filename);
 
    opts = icemodel.forcing.reconstruct.setopts( ...
       required_channels="tair", core_channels="tair", ...
@@ -1684,42 +1684,42 @@ function test_raw_albedo_mask_removes_every_legacy_fill(testCase)
       'met_tsta_promice_20200101_20211231_15m.mat');
    S = load(filename, 'met');
    met = S.met;
-    raw_times = met.Properties.RowTimes(1:4:end);
-    raw_albedo = nan(numel(raw_times), 1);
-    stamp = icemodel.parameterLookup('promice_winter_albedo');
-    raw_albedo(1000) = 0.7;
-    raw_albedo(1100) = stamp;
-    raw_albedo(5000) = 0.7;
-    raw_albedo(5001) = 2;
-    raw_albedo(5100) = 0;
-    raw_albedo(5200) = 1;
+   raw_times = met.Properties.RowTimes(1:4:end);
+   raw_albedo = nan(numel(raw_times), 1);
+   stamp = icemodel.parameterLookup('promice_winter_albedo');
+   raw_albedo(1000) = 0.7;
+   raw_albedo(1100) = stamp;
+   raw_albedo(5000) = 0.7;
+   raw_albedo(5001) = 2;
+   raw_albedo(5100) = 0;
+   raw_albedo(5200) = 1;
    source_file = writeRawPromiceAlbedo(root, "tsta", ...
       raw_times, raw_albedo);
 
    % Simulate the legacy builder: every missing source value became finite,
    % the summer observation stays raw, and the winter observation is overwritten.
    met.albedo(:) = 0.6;
-    winter_overwritten = met.Properties.RowTimes >= raw_times(1000) ...
-       & met.Properties.RowTimes < raw_times(1000) + hours(1);
-    native_constant_support = met.Properties.RowTimes >= raw_times(1100) ...
-       & met.Properties.RowTimes < raw_times(1100) + hours(1);
-    observed_support = met.Properties.RowTimes >= raw_times(5000) ...
+   winter_overwritten = met.Properties.RowTimes >= raw_times(1000) ...
+      & met.Properties.RowTimes < raw_times(1000) + hours(1);
+   native_constant_support = met.Properties.RowTimes >= raw_times(1100) ...
+      & met.Properties.RowTimes < raw_times(1100) + hours(1);
+   observed_support = met.Properties.RowTimes >= raw_times(5000) ...
       & met.Properties.RowTimes < raw_times(5000) + hours(1);
-    invalid_support = met.Properties.RowTimes >= raw_times(5001) ...
-       & met.Properties.RowTimes < raw_times(5001) + hours(1);
-    zero_support = met.Properties.RowTimes >= raw_times(5100) ...
-       & met.Properties.RowTimes < raw_times(5100) + hours(1);
-    one_support = met.Properties.RowTimes >= raw_times(5200) ...
-       & met.Properties.RowTimes < raw_times(5200) + hours(1);
-    met.albedo(observed_support) = 0.7;
-    met.albedo(zero_support) = 0;
-    met.albedo(one_support) = 1;
-    met.albedo(winter_overwritten | native_constant_support) = stamp;
+   invalid_support = met.Properties.RowTimes >= raw_times(5001) ...
+      & met.Properties.RowTimes < raw_times(5001) + hours(1);
+   zero_support = met.Properties.RowTimes >= raw_times(5100) ...
+      & met.Properties.RowTimes < raw_times(5100) + hours(1);
+   one_support = met.Properties.RowTimes >= raw_times(5200) ...
+      & met.Properties.RowTimes < raw_times(5200) + hours(1);
+   met.albedo(observed_support) = 0.7;
+   met.albedo(zero_support) = 0;
+   met.albedo(one_support) = 1;
+   met.albedo(winter_overwritten | native_constant_support) = stamp;
    met = pinRawSource(met, source_file);
-    met.Properties.UserData.albedo_policy = ...
-       "albedo from PROMICE L3 albedo; fillPromiceAlbedo(fillwinter=1)";
-    save(filename, 'met');
-    recordNativeMetIdentity(root, "tsta", filename);
+   met.Properties.UserData.albedo_policy = ...
+      "albedo from PROMICE L3 albedo; fillPromiceAlbedo(fillwinter=1)";
+   save(filename, 'met');
+   recordNativeMetIdentity(root, "tsta", filename);
 
    opts = icemodel.forcing.reconstruct.setopts( ...
       required_channels="albedo", core_channels="tair", ...
@@ -1734,16 +1734,16 @@ function test_raw_albedo_mask_removes_every_legacy_fill(testCase)
    codes = icemodel.forcing.reconstruct.provenanceCodes();
    testCase.verifyTrue(all(result.provenance.albedo(observed_support) ...
       == codes.observed));
-    testCase.verifyFalse(any(result.provenance.albedo(winter_overwritten) ...
-       == codes.observed));
-    testCase.verifyTrue(all(result.provenance.albedo(native_constant_support) ...
-       == codes.observed));
-    testCase.verifyEqual(result.filled.albedo(native_constant_support), ...
-       repmat(stamp, nnz(native_constant_support), 1));
-    testCase.verifyFalse(any(result.provenance.albedo(invalid_support) ...
-       == codes.observed));
-    testCase.verifyTrue(all(result.provenance.albedo( ...
-       zero_support | one_support) == codes.observed));
+   testCase.verifyFalse(any(result.provenance.albedo(winter_overwritten) ...
+      == codes.observed));
+   testCase.verifyTrue(all(result.provenance.albedo(native_constant_support) ...
+      == codes.observed));
+   testCase.verifyEqual(result.filled.albedo(native_constant_support), ...
+      repmat(stamp, nnz(native_constant_support), 1));
+   testCase.verifyFalse(any(result.provenance.albedo(invalid_support) ...
+      == codes.observed));
+   testCase.verifyTrue(all(result.provenance.albedo( ...
+      zero_support | one_support) == codes.observed));
    invented = find(~observed_support, 1);
    testCase.verifyNotEqual(result.provenance.albedo(invented), ...
       codes.observed);
@@ -1804,12 +1804,12 @@ function test_legacy_albedo_source_rebinds_after_root_relocation(testCase)
    selected_raw = fullfile(selected, 'raw');
    mkdir(selected_met);
    mkdir(selected_raw);
-    copyfile(original, selected_met);
-    copyfile(recorded_source, selected_raw);
-    selected_file = fullfile(selected_met, ...
-       'met_tsta_promice_20200101_20211231_15m.mat');
-    recordNativeMetIdentity(selected, "tsta", selected_file);
-    writeFixtureMar(selected, "tsta");
+   copyfile(original, selected_met);
+   copyfile(recorded_source, selected_raw);
+   selected_file = fullfile(selected_met, ...
+      'met_tsta_promice_20200101_20211231_15m.mat');
+   recordNativeMetIdentity(selected, "tsta", selected_file);
+   writeFixtureMar(selected, "tsta");
 
    returned = icemodel.forcing.reconstruct.fillPromiceStation("tsta", ...
       met_dir=selected_met, donor_sites=string.empty(1, 0), ...
@@ -1834,7 +1834,7 @@ function test_raw_promice_replay_rejects_changed_source_bytes(testCase)
       met_dir=fullfile(root, 'met', 'promice'), ...
       donor_sites=string.empty(1, 0), use_ktransect=false, ...
       use_gcnet=false, write=false), ...
-       'icemodel:reconstruct:fillPromiceStation:rawSourceIdentityMismatch');
+      'icemodel:reconstruct:fillPromiceStation:rawSourceIdentityMismatch');
 end
 
 function test_promice_native_without_byte_identity_is_rejected(testCase)
@@ -1896,10 +1896,10 @@ function test_estimated_native_lwd_reenters_as_fillable(testCase)
    S = load(filename, 'met');
    met = S.met;
    met.Properties.UserData.lwd_estimated = true;
-    met.Properties.UserData.lwd_policy = ...
-       "lwd estimated from tair and vapor pressure";
-    save(filename, 'met');
-    recordNativeMetIdentity(root, "tsta", filename);
+   met.Properties.UserData.lwd_policy = ...
+      "lwd estimated from tair and vapor pressure";
+   save(filename, 'met');
+   recordNativeMetIdentity(root, "tsta", filename);
 
    opts = icemodel.forcing.reconstruct.setopts( ...
       required_channels="lwd", core_channels="tair", ...
@@ -1947,36 +1947,36 @@ function test_builder_darkness_zero_reenters_reconstruction(testCase)
    S = load(filename, 'met');
    met = S.met;
    raw_times = met.Properties.RowTimes(1:4:end);
-    raw_swd = met.swd(1:4:end);
-    raw_swu = met.swu(1:4:end);
-    raw_swd(1) = NaN;
-    raw_swd(2) = -1;
-    raw_swu(1) = NaN;
-    source_file = writeRawPromiceAlbedo(root, "tsta", raw_times, ...
-       met.albedo(1:4:end), raw_swd, raw_swu);
+   raw_swd = met.swd(1:4:end);
+   raw_swu = met.swu(1:4:end);
+   raw_swd(1) = NaN;
+   raw_swd(2) = -1;
+   raw_swu(1) = NaN;
+   source_file = writeRawPromiceAlbedo(root, "tsta", raw_times, ...
+      met.albedo(1:4:end), raw_swd, raw_swu);
    met.swd(1:4) = 0;
    met.swd(5:8) = 0;
    metadata = met.Properties.UserData;
    metadata.swd_raw_fallback_count = nnz(isfinite(raw_swd));
    metadata.swd_negative_clamped_count = 1;
    metadata.swd_darkness_zero_filled_count = 1;
-    metadata.swu_raw_fallback_count = nnz(isfinite(raw_swu));
-    metadata.swu_negative_clamped_count = 0;
-    metadata.swu_darkness_zero_filled_count = 1;
-    metadata.swd_source_file_observations_present = true;
-    metadata.swu_source_file_observations_present = true;
-    source_info = dir(source_file);
-    metadata.source_file = source_file;
-    metadata.source_size_bytes = source_info.bytes;
-    metadata.source_sha256 = ...
-       icemodel.verification.setup.fileSha256(source_file);
-    met.Properties.UserData = metadata;
-    save(filename, 'met');
-    recordNativeMetIdentity(root, "tsta", filename);
+   metadata.swu_raw_fallback_count = nnz(isfinite(raw_swu));
+   metadata.swu_negative_clamped_count = 0;
+   metadata.swu_darkness_zero_filled_count = 1;
+   metadata.swd_source_file_observations_present = true;
+   metadata.swu_source_file_observations_present = true;
+   source_info = dir(source_file);
+   metadata.source_file = source_file;
+   metadata.source_size_bytes = source_info.bytes;
+   metadata.source_sha256 = ...
+      icemodel.verification.setup.fileSha256(source_file);
+   met.Properties.UserData = metadata;
+   save(filename, 'met');
+   recordNativeMetIdentity(root, "tsta", filename);
 
    opts = icemodel.forcing.reconstruct.setopts( ...
-       required_channels=["swd", "swu"], core_channels="swd", ...
-       plan_channels=["swd", "swu"], interp_channels="swd", ...
+      required_channels=["swd", "swu"], core_channels="swd", ...
+      plan_channels=["swd", "swu"], interp_channels="swd", ...
       last_resort_proxies=false, plan_n_gaps=1, seed=3);
    result = icemodel.forcing.reconstruct.fillPromiceStation("tsta", ...
       met_dir=fullfile(root, 'met', 'promice'), ...
@@ -1990,17 +1990,17 @@ function test_builder_darkness_zero_reenters_reconstruction(testCase)
       repmat(codes.darkness, 4, 1));
    testCase.verifyEqual(result.provenance.swd(5:8), ...
       repmat(codes.clamped_shortwave, 4, 1));
-    testCase.verifyEqual(result.provenance.swd(9:12), ...
-       repmat(codes.raw_shortwave, 4, 1));
-    testCase.verifyEqual(result.filled.swu(1:4), zeros(4, 1));
-    testCase.verifyEqual(result.provenance.swu(1:4), ...
-       repmat(codes.derived_shortwave, 4, 1));
-    testCase.verifyEqual(result.provenance.swu(5:8), ...
-       repmat(codes.raw_shortwave, 4, 1));
-    testCase.verifyTrue(any(string(result.audit.channel) == "swd" ...
-       & string(result.audit.method) == "darkness_zero"));
-    testCase.verifyTrue(any(string(result.audit.channel) == "swu" ...
-       & string(result.audit.method) == "derived_shortwave"));
+   testCase.verifyEqual(result.provenance.swd(9:12), ...
+      repmat(codes.raw_shortwave, 4, 1));
+   testCase.verifyEqual(result.filled.swu(1:4), zeros(4, 1));
+   testCase.verifyEqual(result.provenance.swu(1:4), ...
+      repmat(codes.derived_shortwave, 4, 1));
+   testCase.verifyEqual(result.provenance.swu(5:8), ...
+      repmat(codes.raw_shortwave, 4, 1));
+   testCase.verifyTrue(any(string(result.audit.channel) == "swd" ...
+      & string(result.audit.method) == "darkness_zero"));
+   testCase.verifyTrue(any(string(result.audit.channel) == "swu" ...
+      & string(result.audit.method) == "derived_shortwave"));
 end
 
 function test_raw_fallback_shortwave_gated_by_validity(testCase)
@@ -2102,9 +2102,9 @@ function test_missing_swu_derives_after_swd_and_albedo(testCase)
    gap = (5001:5012).';
    expected = met.albedo(gap) .* met.swd(gap);
    met.swu(gap) = NaN;
-    native_swu = met.swu(1);
-    save(filename, 'met');
-    recordNativeMetIdentity(root, "tsta", filename);
+   native_swu = met.swu(1);
+   save(filename, 'met');
+   recordNativeMetIdentity(root, "tsta", filename);
 
    opts = icemodel.forcing.reconstruct.setopts( ...
       required_channels="swu", core_channels="tair", ...
@@ -2205,9 +2205,9 @@ function test_readiness_counts_absent_core_channel_as_missing(testCase)
       'met_tsta_promice_20200101_20211231_15m.mat');
    S = load(filename, 'met');
    met = S.met;
-    met.psfc = [];
-    save(filename, 'met');
-    recordNativeMetIdentity(root, "tsta", filename);
+   met.psfc = [];
+   save(filename, 'met');
+   recordNativeMetIdentity(root, "tsta", filename);
    opts = icemodel.forcing.reconstruct.setopts( ...
       required_channels="tair", core_channels="psfc", ...
       plan_channels="tair", interp_channels="tair", ...
@@ -2250,17 +2250,17 @@ function test_readiness_splits_scalar_and_relational_violations(testCase)
    met.swd(daylight(1)) = 1e6;
    met.swu(daylight(2)) = met.swd(daylight(2)) + 1;
    met.ppt(:) = 0;
-    met.ppt(daylight(2)) = -1;
-    save(filename, 'met');
-    recordNativeMetIdentity(root, "tsta", filename);
-    proxy_file = fullfile(root, 'met', 'mar3.11', ...
-       'met_tsta_mar3.11_20200101_20211231_15m.mat');
-    S = load(proxy_file, 'mar_met');
-    mar_met = S.mar_met;
-    mar_met.ppt(daylight(2)) = NaN;
-    mar_met.rainf(daylight(2)) = NaN;
-    mar_met.snowf(daylight(2)) = NaN;
-    save(proxy_file, 'mar_met');
+   met.ppt(daylight(2)) = -1;
+   save(filename, 'met');
+   recordNativeMetIdentity(root, "tsta", filename);
+   proxy_file = fullfile(root, 'met', 'mar3.11', ...
+      'met_tsta_mar3.11_20200101_20211231_15m.mat');
+   S = load(proxy_file, 'mar_met');
+   mar_met = S.mar_met;
+   mar_met.ppt(daylight(2)) = NaN;
+   mar_met.rainf(daylight(2)) = NaN;
+   mar_met.snowf(daylight(2)) = NaN;
+   save(proxy_file, 'mar_met');
    opts = icemodel.forcing.reconstruct.setopts( ...
       required_channels=["swd", "swu", "ppt"], core_channels="tair", ...
       plan_channels=["swd", "swu"], interp_channels="swd", ...
@@ -2312,9 +2312,9 @@ function test_readiness_rejects_inconsistent_precipitation_phase(testCase)
    met.rainf(:) = 0;
    met.snowf(:) = 0;
    met.ppt(101) = 0.1;
-    met.rainf(101) = 0.2;
-    save(filename, 'met');
-    recordNativeMetIdentity(root, "tsta", filename);
+   met.rainf(101) = 0.2;
+   save(filename, 'met');
+   recordNativeMetIdentity(root, "tsta", filename);
    opts = icemodel.forcing.reconstruct.setopts( ...
       required_channels="tair", core_channels="tair", ...
       plan_channels="tair", interp_channels="tair", ...
@@ -2349,9 +2349,9 @@ function test_nonready_station_refuses_publication(testCase)
    met = S.met;
    midpoint = floor(height(met) / 2);
    met.tair((midpoint + 1):end) = NaN;
-    met.rh(1:midpoint) = NaN;
-    save(filename, 'met');
-    recordNativeMetIdentity(root, "tsta", filename);
+   met.rh(1:midpoint) = NaN;
+   save(filename, 'met');
+   recordNativeMetIdentity(root, "tsta", filename);
    opts = icemodel.forcing.reconstruct.setopts( ...
       required_channels="tair", core_channels=["tair", "rh"], ...
       plan_channels="tair", interp_channels="tair", ...
@@ -2558,32 +2558,32 @@ function test_last_resort_adopts_bounded_proxy_values(testCase)
       'code_name', "mar");
    second = nan(n, 1);
    second([45 46]) = 261;
-    proxies(2) = struct('series', timetable(times, second, ...
-       'VariableNames', {'tair'}), 'name', "merra2", ...
-       'code_name', "merra2");
-    opts = icemodel.forcing.reconstruct.setopts();
-    native = timetable(times, 260 + zeros(n, 1), ...
-       'VariableNames', {'tair'});
-    calibration = icemodel.forcing.reconstruct.fitProxyCalibration( ...
-       times, native.tair, p_tair, "tair", fit_years=2020);
-    calibration.source = "mar";
-    channel_plan = struct('channel', "tair", ...
-       'proxy_calibrations', struct('source', "mar", ...
-       'parameters', calibration));
-    plan = struct('channels', channel_plan);
+   proxies(2) = struct('series', timetable(times, second, ...
+      'VariableNames', {'tair'}), 'name', "merra2", ...
+      'code_name', "merra2");
+   opts = icemodel.forcing.reconstruct.setopts();
+   native = timetable(times, 260 + zeros(n, 1), ...
+      'VariableNames', {'tair'});
+   calibration = icemodel.forcing.reconstruct.fitProxyCalibration( ...
+      times, native.tair, p_tair, "tair", fit_years=2020);
+   calibration.source = "mar";
+   channel_plan = struct('channel', "tair", ...
+      'proxy_calibrations', struct('source', "mar", ...
+      'parameters', calibration));
+   plan = struct('channels', channel_plan);
 
-    [returned, prov, audit_out, denials] = ...
-       icemodel.forcing.reconstruct.lastResortProxies(filled, ...
-       provenance, audit, proxies, codes, opts, native=native, plan=plan);
+   [returned, prov, audit_out, denials] = ...
+      icemodel.forcing.reconstruct.lastResortProxies(filled, ...
+      provenance, audit, proxies, codes, opts, native=native, plan=plan);
 
    % Adopted samples carry the proxy value and code; poisoned samples
    % stay missing; finite samples are untouched.
    expected = [41:44, 47:60].';
-    testCase.verifyTrue(all(isfinite(returned.tair(expected))));
-    testCase.verifyEqual(returned.tair([41; 60]), [260; 260], ...
-       'AbsTol', 1e-12);
-     testCase.verifyEqual(returned.tair(47:54), ...
-        260 + zeros(8, 1), 'AbsTol', 1e-12);
+   testCase.verifyTrue(all(isfinite(returned.tair(expected))));
+   testCase.verifyEqual(returned.tair([41; 60]), [260; 260], ...
+      'AbsTol', 1e-12);
+   testCase.verifyEqual(returned.tair(47:54), ...
+      260 + zeros(8, 1), 'AbsTol', 1e-12);
    testCase.verifyEqual(prov.tair(expected), ...
       repmat(codes.mar, numel(expected), 1));
    testCase.verifyTrue(all(isnan(returned.tair([45 46]))));
@@ -2593,10 +2593,10 @@ function test_last_resort_adopts_bounded_proxy_values(testCase)
    % Two rows record the two actually contiguous adopted segments.
    row = audit_out(strcmp(audit_out.method, ...
       'proxy:mar:last_resort'), :);
-     testCase.verifyEqual(height(row), 2);
-     testCase.verifyEqual(row.duration_hours, [4; 14]);
-     testCase.verifyTrue(all(contains(string(row.detail), ...
-        "whole-outage source")));
+   testCase.verifyEqual(height(row), 2);
+   testCase.verifyEqual(row.duration_hours, [4; 14]);
+   testCase.verifyTrue(all(contains(string(row.detail), ...
+      "whole-outage source")));
    testCase.verifyFalse(any(strcmp(audit_out.method, ...
       'proxy:merra2:last_resort')));
    % Final-tier denial notes: the poisoned samples the chosen source
@@ -2633,21 +2633,21 @@ function test_last_resort_rejects_post_blend_outside_validity(testCase)
    proxy_swd = 0.5 * toa;
    proxy_swd(gap) = 0;
    proxy = struct('series', timetable(times, proxy_swd, ...
-       'VariableNames', {'swd'}), 'name', "mar", 'code_name', "mar");
-    calibration = icemodel.forcing.reconstruct.fitProxyCalibration( ...
-       times, swd, proxy.series.swd, "swd", fit_years=2020, ...
-       target_toa=toa);
-    calibration.source = "mar";
-    channel_plan = struct('channel', "swd", ...
-       'proxy_calibrations', struct('source', "mar", ...
-       'parameters', calibration));
-    plan = struct('channels', channel_plan);
+      'VariableNames', {'swd'}), 'name', "mar", 'code_name', "mar");
+   calibration = icemodel.forcing.reconstruct.fitProxyCalibration( ...
+      times, swd, proxy.series.swd, "swd", fit_years=2020, ...
+      target_toa=toa);
+   calibration.source = "mar";
+   channel_plan = struct('channel', "swd", ...
+      'proxy_calibrations', struct('source', "mar", ...
+      'parameters', calibration));
+   plan = struct('channels', channel_plan);
 
-    [returned, returned_provenance, returned_audit, denials] = ...
-       icemodel.forcing.reconstruct.lastResortProxies( ...
-       filled, provenance, audit, proxy, codes, ...
-       icemodel.forcing.reconstruct.setopts(required_channels="swd"), ...
-       latitude=0, longitude=0, plan=plan);
+   [returned, returned_provenance, returned_audit, denials] = ...
+      icemodel.forcing.reconstruct.lastResortProxies( ...
+      filled, provenance, audit, proxy, codes, ...
+      icemodel.forcing.reconstruct.setopts(required_channels="swd"), ...
+      latitude=0, longitude=0, plan=plan);
 
    testCase.verifyTrue(isnan(returned.swd(gap)));
    testCase.verifyEqual(returned_provenance.swd(gap), codes.missing);
@@ -3098,19 +3098,19 @@ function test_fill_station_reconstructs_hourly_then_restores_support(testCase)
    filename = fullfile(root, 'met', 'promice', ...
       'met_hour_promice_20200101_20211231_15m.mat');
    S = load(filename, 'met');
-    hourly = S.met(1:4:end, :);
-    hourly.Properties.DimensionNames{1} = 'Time';
-    hourly.Properties.UserData = rmfield(hourly.Properties.UserData, ...
-       {'met_resample_policy', 'met_resample_source_cadence_seconds'});
-    gap_time = hourly.Properties.RowTimes(100);
+   hourly = S.met(1:4:end, :);
+   hourly.Properties.DimensionNames{1} = 'Time';
+   hourly.Properties.UserData = rmfield(hourly.Properties.UserData, ...
+      {'met_resample_policy', 'met_resample_source_cadence_seconds'});
+   gap_time = hourly.Properties.RowTimes(100);
    hourly.tair(100) = NaN;
-    met = icemodel.forcing.helpers.resampleMetTimestep(hourly, "15m");
-    met.ppt(:) = 0;
-    met.rainf(:) = 0;
-    met.snowf(:) = 0;
-    save(filename, 'met');
-    recordNativeMetIdentity(root, "hour", filename);
-    writeFixtureMar(root, "hour");
+   met = icemodel.forcing.helpers.resampleMetTimestep(hourly, "15m");
+   met.ppt(:) = 0;
+   met.rainf(:) = 0;
+   met.snowf(:) = 0;
+   save(filename, 'met');
+   recordNativeMetIdentity(root, "hour", filename);
+   writeFixtureMar(root, "hour");
 
    opts = icemodel.forcing.reconstruct.setopts( ...
       required_channels="tair", core_channels="tair", ...
@@ -3655,9 +3655,9 @@ function test_report_builds_ledgered_figures_and_qmd(testCase)
       datetime(2020, 6, 2, 'TimeZone', 'UTC');
    met.swd(partial_day) = 900;
    met.swd(find(partial_day, 1)) = NaN;
-    met.swd(complete_day) = 800;
-    save(egp_file, 'met');
-    recordNativeMetIdentity(root, "egp", egp_file);
+   met.swd(complete_day) = 800;
+   save(egp_file, 'met');
+   recordNativeMetIdentity(root, "egp", egp_file);
    writeFixtureMar(root, "tsta");
    completeFixtureMarPrecip(root, "tsta");
    writeFixtureMerraPrecipPatch(root, "tsta");
@@ -3807,11 +3807,11 @@ function test_report_builds_ledgered_figures_and_qmd(testCase)
    results_text = extractBefore(extractAfter(text, "# Results"), ...
       "## Summary tables");
    testCase.verifyTrue(contains(results_text, "[!["));
-    testCase.verifyFalse(contains(results_text, newline + "!["));
-    testCase.verifyTrue(contains(text, '"blend_hours"'));
-    testCase.verifyTrue(contains(text, '"donor_sites"'));
-    testCase.verifyTrue(contains(text, '"use_ktransect"'));
-    testCase.verifyTrue(contains(text, '"use_gcnet"'));
+   testCase.verifyFalse(contains(results_text, newline + "!["));
+   testCase.verifyTrue(contains(text, '"blend_hours"'));
+   testCase.verifyTrue(contains(text, '"donor_sites"'));
+   testCase.verifyTrue(contains(text, '"use_ktransect"'));
+   testCase.verifyTrue(contains(text, '"use_gcnet"'));
    testCase.verifyFalse(contains(text, "../figures/figures/"));
    testCase.verifyTrue(contains(text, "../figures/"));
    % Every preview links from the report that owns its display class.
@@ -3841,17 +3841,17 @@ function test_report_builds_ledgered_figures_and_qmd(testCase)
    testCase.verifyTrue(contains(text, ...
       "over persistence for gaps up to 6 h and station day-of-year climatology"));
    testCase.verifyTrue(contains(text, "within 0.63--1.37"));
-    testCase.verifyTrue(contains(text, "and 82% coverage"));
-    testCase.verifyTrue(contains(text, ...
-       "No staged-proxy acceptance window is available for"));
-    for csv = ["gapfill_summary.csv", "gapfill_method_diagnostics.csv", ...
-          "gapfill_interpretation_catalog.csv", ...
-          "gapfill_residual_gaps.csv", ...
-          "gapfill_readiness_blockers.csv", ...
-          "gapfill_absent_products.csv", ...
-          "promice_filled_readiness.csv", "gapfill_figure_ledger.csv"]
-       testCase.verifyTrue(contains(text, "../qa/" + csv));
-    end
+   testCase.verifyTrue(contains(text, "and 82% coverage"));
+   testCase.verifyTrue(contains(text, ...
+      "No staged-proxy acceptance window is available for"));
+   for csv = ["gapfill_summary.csv", "gapfill_method_diagnostics.csv", ...
+         "gapfill_interpretation_catalog.csv", ...
+         "gapfill_residual_gaps.csv", ...
+         "gapfill_readiness_blockers.csv", ...
+         "gapfill_absent_products.csv", ...
+         "promice_filled_readiness.csv", "gapfill_figure_ledger.csv"]
+      testCase.verifyTrue(contains(text, "../qa/" + csv));
+   end
    testCase.verifyFalse(contains(text, ...
       "covers the previously blocking KANM/KANL"));
    testCase.verifyTrue(all(ismember(["segments_shown", ...
@@ -3948,12 +3948,12 @@ function test_report_builds_ledgered_figures_and_qmd(testCase)
       escaped_manifest = jsondecode(fileread(tsta_manifest_file));
       escaped_index = find(string({escaped_manifest.artifacts.role}) ...
          == escaped_role, 1);
-       escaped_record = escaped_manifest.artifacts(escaped_index);
-       [~, ~, extension] = fileparts(escaped_record.path);
-       escaped_file = fullfile(outside_dir, escaped_role + extension);
-       copyfile(fullfile(root, escaped_record.path), escaped_file);
-       escaped_manifest.artifacts(escaped_index).path = fullfile( ...
-          "outside-report-inputs", escaped_role + extension);
+      escaped_record = escaped_manifest.artifacts(escaped_index);
+      [~, ~, extension] = fileparts(escaped_record.path);
+      escaped_file = fullfile(outside_dir, escaped_role + extension);
+      copyfile(fullfile(root, escaped_record.path), escaped_file);
+      escaped_manifest.artifacts(escaped_index).path = fullfile( ...
+         "outside-report-inputs", escaped_role + extension);
       writeJsonFixture(tsta_manifest_file, escaped_manifest);
       testCase.verifyError(@() ...
          icemodel.verification.report.buildGapFillReport(sites="tsta", ...
@@ -3971,11 +3971,11 @@ function test_report_builds_ledgered_figures_and_qmd(testCase)
    native_index = find(string({identity_manifest.artifacts.role}) ...
       == "native");
    original_native = identity_manifest.artifacts(native_index);
-    identity_manifest.artifacts(native_index).path = fullfile( ...
-       'met', 'promice', ...
-       'met_dsta_promice_20200101_20211231_15m.mat');
-    writeJsonFixture(tsta_manifest_file, identity_manifest);
-    refreshReportInputArtifact(tsta_manifest_file, "native", root);
+   identity_manifest.artifacts(native_index).path = fullfile( ...
+      'met', 'promice', ...
+      'met_dsta_promice_20200101_20211231_15m.mat');
+   writeJsonFixture(tsta_manifest_file, identity_manifest);
+   refreshReportInputArtifact(tsta_manifest_file, "native", root);
    testCase.verifyError(@() ...
       icemodel.verification.report.buildGapFillReport(sites="tsta", ...
       render=false, ...
@@ -3993,11 +3993,11 @@ function test_report_builds_ledgered_figures_and_qmd(testCase)
    proxy_index = find(string({identity_manifest.artifacts.role}) ...
       == "proxy_window", 1);
    original_proxy = identity_manifest.artifacts(proxy_index);
-    identity_manifest.artifacts(proxy_index).path = fullfile( ...
-       'met', 'mar3.11', ...
-       'met_dsta_mar3.11_20200101_20211231_15m.mat');
-    writeJsonFixture(tsta_manifest_file, identity_manifest);
-    refreshReportInputArtifact(tsta_manifest_file, "proxy_window", root);
+   identity_manifest.artifacts(proxy_index).path = fullfile( ...
+      'met', 'mar3.11', ...
+      'met_dsta_mar3.11_20200101_20211231_15m.mat');
+   writeJsonFixture(tsta_manifest_file, identity_manifest);
+   refreshReportInputArtifact(tsta_manifest_file, "proxy_window", root);
    testCase.verifyError(@() ...
       icemodel.verification.report.buildGapFillReport(sites="tsta", ...
       render=false, ...
@@ -4043,7 +4043,7 @@ function test_report_builds_ledgered_figures_and_qmd(testCase)
    save(plan_file, 'plan_record', 'audit_record');
    manifest_file = fullfile(root, 'qa', 'plans', ...
       'dsta-report-inputs.json');
-    refreshReportInputArtifact(manifest_file, "plan", root);
+   refreshReportInputArtifact(manifest_file, "plan", root);
    testCase.verifyError(@() ...
       icemodel.verification.report.buildGapFillReport( ...
       sites=["tsta", "dsta"], render=false, ...
@@ -4054,13 +4054,13 @@ function test_report_builds_ledgered_figures_and_qmd(testCase)
       'icemodel:report:buildGapFillReport:inconsistentPolicy');
    plan_record = original_plan;
    save(plan_file, 'plan_record', 'audit_record');
-    refreshReportInputArtifact(manifest_file, "plan", root);
+   refreshReportInputArtifact(manifest_file, "plan", root);
    % An option outside the headline prose is still rendered in the complete
    % Methods record and therefore must be producer-identical.
    plan_record = original_plan;
    plan_record.reconstruction_options.blend_hours = 3;
    save(plan_file, 'plan_record', 'audit_record');
-    refreshReportInputArtifact(manifest_file, "plan", root);
+   refreshReportInputArtifact(manifest_file, "plan", root);
    testCase.verifyError(@() ...
       icemodel.verification.report.buildGapFillReport( ...
       sites=["tsta", "dsta"], render=false, ...
@@ -4071,7 +4071,7 @@ function test_report_builds_ledgered_figures_and_qmd(testCase)
       'icemodel:report:buildGapFillReport:inconsistentPolicy');
    plan_record = original_plan;
    save(plan_file, 'plan_record', 'audit_record');
-    refreshReportInputArtifact(manifest_file, "plan", root);
+   refreshReportInputArtifact(manifest_file, "plan", root);
 
    % A report rerun must fail before changing outputs if any consumed
    % artifact no longer matches the producer-recorded byte identity.
@@ -4107,143 +4107,143 @@ function test_acceptance_window_derives_from_staged_proxies(testCase)
       datetime(2021, 12, 31, 23, 45, 0, 'TimeZone', 'UTC')];
    testCase.verifyEqual(returned, expected);
    testCase.verifyEqual(numel(files), 1);
-    testCase.verifyTrue(endsWith(files, ...
-       'met_tsta_mar3.11_20200101_20211231_15m.mat'));
+   testCase.verifyTrue(endsWith(files, ...
+      'met_tsta_mar3.11_20200101_20211231_15m.mat'));
 
-    % The same proxy remains discoverable from a flat selected met root.
-    proxy_file = files(1);
-    flat_file = fullfile(root, 'met', ...
-       'met_tsta_mar3.11_20200101_20211231_15m.mat');
-    copyfile(proxy_file, flat_file);
-    delete(proxy_file);
+   % The same proxy remains discoverable from a flat selected met root.
+   proxy_file = files(1);
+   flat_file = fullfile(root, 'met', ...
+      'met_tsta_mar3.11_20200101_20211231_15m.mat');
+   copyfile(proxy_file, flat_file);
+   delete(proxy_file);
 
-    % A malformed remnant in the preferred source directory must not hide
-    % the valid flat-layout fallback artifact.
-    malformed_file = fullfile(fileparts(proxy_file), ...
-       'met_tsta_mar3.11_malformed_15m.mat');
-    S = load(flat_file, 'mar_met');
-    mar_met = S.mar_met;
-    save(malformed_file, 'mar_met');
-    [flat_window, flat_files] = ...
-       icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
-       met_dir=fullfile(root, 'met'), location=location);
-    testCase.verifyEqual(flat_window, expected);
-    testCase.verifyEqual(string(flat_files), string(flat_file));
-    delete(malformed_file);
+   % A malformed remnant in the preferred source directory must not hide
+   % the valid flat-layout fallback artifact.
+   malformed_file = fullfile(fileparts(proxy_file), ...
+      'met_tsta_mar3.11_malformed_15m.mat');
+   S = load(flat_file, 'mar_met');
+   mar_met = S.mar_met;
+   save(malformed_file, 'mar_met');
+   [flat_window, flat_files] = ...
+      icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
+      met_dir=fullfile(root, 'met'), location=location);
+   testCase.verifyEqual(flat_window, expected);
+   testCase.verifyEqual(string(flat_files), string(flat_file));
+   delete(malformed_file);
 
-    % Filename bounds cannot claim days absent from the saved timetable.
-    valid_file = flat_files(1);
-     S = load(valid_file, 'mar_met');
-     mar_met = S.mar_met;
-     complete_mar = mar_met;
+   % Filename bounds cannot claim days absent from the saved timetable.
+   valid_file = flat_files(1);
+   S = load(valid_file, 'mar_met');
+   mar_met = S.mar_met;
+   complete_mar = mar_met;
 
-     % Filename tokens identify boundary dates; the returned window pins the
-     % exact timetable endpoints rather than inventing the missing hours.
-     mar_met = complete_mar(3:end - 2, :);
-     save(valid_file, 'mar_met');
-     partial_window = ...
-        icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
-        met_dir=fullfile(root, 'met'), location=location);
-     testCase.verifyEqual(partial_window, ...
-        mar_met.Properties.RowTimes([1, end]).');
+   % Filename tokens identify boundary dates; the returned window pins the
+   % exact timetable endpoints rather than inventing the missing hours.
+   mar_met = complete_mar(3:end - 2, :);
+   save(valid_file, 'mar_met');
+   partial_window = ...
+      icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
+      met_dir=fullfile(root, 'met'), location=location);
+   testCase.verifyEqual(partial_window, ...
+      mar_met.Properties.RowTimes([1, end]).');
 
-     mar_met = mar_met(day(mar_met.Properties.RowTimes) ~= 1 ...
-        | month(mar_met.Properties.RowTimes) ~= 1 ...
-        | year(mar_met.Properties.RowTimes) ~= 2020, :);
-    save(valid_file, 'mar_met');
-    testCase.verifyError(@() ...
-       icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
-       met_dir=fullfile(root, 'met'), location=location), ...
-       'icemodel:reconstruct:acceptanceWindow:proxyWindowMismatch');
-    mar_met = complete_mar;
-    save(valid_file, 'mar_met');
-    mar_met(100, :) = [];
-    save(valid_file, 'mar_met');
-    testCase.verifyError(@() ...
-       icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
-       met_dir=fullfile(root, 'met'), location=location), ...
-       'icemodel:reconstruct:acceptanceWindow:proxyWindowMismatch');
-     mar_met = complete_mar;
-     save(valid_file, 'mar_met');
-     mar_met.Properties.RowTimes = ...
-        mar_met.Properties.RowTimes + minutes(7);
-     save(valid_file, 'mar_met');
-     testCase.verifyError(@() ...
-        icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
-        met_dir=fullfile(root, 'met'), location=location), ...
-        'icemodel:reconstruct:acceptanceWindow:proxyWindowMismatch');
-     mar_met = complete_mar;
-     save(valid_file, 'mar_met');
+   mar_met = mar_met(day(mar_met.Properties.RowTimes) ~= 1 ...
+      | month(mar_met.Properties.RowTimes) ~= 1 ...
+      | year(mar_met.Properties.RowTimes) ~= 2020, :);
+   save(valid_file, 'mar_met');
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
+      met_dir=fullfile(root, 'met'), location=location), ...
+      'icemodel:reconstruct:acceptanceWindow:proxyWindowMismatch');
+   mar_met = complete_mar;
+   save(valid_file, 'mar_met');
+   mar_met(100, :) = [];
+   save(valid_file, 'mar_met');
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
+      met_dir=fullfile(root, 'met'), location=location), ...
+      'icemodel:reconstruct:acceptanceWindow:proxyWindowMismatch');
+   mar_met = complete_mar;
+   save(valid_file, 'mar_met');
+   mar_met.Properties.RowTimes = ...
+      mar_met.Properties.RowTimes + minutes(7);
+   save(valid_file, 'mar_met');
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
+      met_dir=fullfile(root, 'met'), location=location), ...
+      'icemodel:reconstruct:acceptanceWindow:proxyWindowMismatch');
+   mar_met = complete_mar;
+   save(valid_file, 'mar_met');
 
-     % A one-row same-day artifact has matching endpoint dates but cannot
-     % prove continuous 15-minute support.
-     delete(valid_file);
-     one_row_file = fullfile(fileparts(valid_file), ...
-        'met_tsta_mar3.11_20200101_20200101_15m.mat');
-     mar_met = complete_mar(1, :);
-     save(one_row_file, 'mar_met');
-     testCase.verifyError(@() ...
-        icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
-        met_dir=fullfile(root, 'met'), location=location), ...
-        'icemodel:reconstruct:acceptanceWindow:proxyWindowMismatch');
-     delete(one_row_file);
-     mar_met = complete_mar;
-     save(valid_file, 'mar_met');
+   % A one-row same-day artifact has matching endpoint dates but cannot
+   % prove continuous 15-minute support.
+   delete(valid_file);
+   one_row_file = fullfile(fileparts(valid_file), ...
+      'met_tsta_mar3.11_20200101_20200101_15m.mat');
+   mar_met = complete_mar(1, :);
+   save(one_row_file, 'mar_met');
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
+      met_dir=fullfile(root, 'met'), location=location), ...
+      'icemodel:reconstruct:acceptanceWindow:proxyWindowMismatch');
+   delete(one_row_file);
+   mar_met = complete_mar;
+   save(valid_file, 'mar_met');
 
-    % Adjacent same-source files are all pinned: the widest anchors and
-    % the sibling extending before it joins, so the window covers every
-    % staged span reconstruction loads (POLICY A6).
-    delete(valid_file);
-    first_file = fullfile(fileparts(valid_file), ...
-       'met_tsta_mar3.11_20200101_20200630_15m.mat');
-    mar_met = complete_mar(complete_mar.Properties.RowTimes < ...
-       datetime(2020, 7, 1, 'TimeZone', 'UTC'), :);
-    save(first_file, 'mar_met');
-    second_file = fullfile(fileparts(valid_file), ...
-       'met_tsta_mar3.11_20200701_20211231_15m.mat');
-    mar_met = complete_mar(complete_mar.Properties.RowTimes >= ...
-       datetime(2020, 7, 1, 'TimeZone', 'UTC'), :);
-    save(second_file, 'mar_met');
-    [selected_window, selected_files] = ...
-       icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
-       met_dir=fullfile(root, 'met'), location=location);
-    testCase.verifyEqual(selected_window, [ ...
-       datetime(2020, 1, 1, 'TimeZone', 'UTC'), ...
-       datetime(2021, 12, 31, 23, 45, 0, 'TimeZone', 'UTC')]);
-    testCase.verifyEqual(sort(string(selected_files)), ...
-       sort([string(first_file); string(second_file)]));
+   % Adjacent same-source files are all pinned: the widest anchors and
+   % the sibling extending before it joins, so the window covers every
+   % staged span reconstruction loads (POLICY A6).
+   delete(valid_file);
+   first_file = fullfile(fileparts(valid_file), ...
+      'met_tsta_mar3.11_20200101_20200630_15m.mat');
+   mar_met = complete_mar(complete_mar.Properties.RowTimes < ...
+      datetime(2020, 7, 1, 'TimeZone', 'UTC'), :);
+   save(first_file, 'mar_met');
+   second_file = fullfile(fileparts(valid_file), ...
+      'met_tsta_mar3.11_20200701_20211231_15m.mat');
+   mar_met = complete_mar(complete_mar.Properties.RowTimes >= ...
+      datetime(2020, 7, 1, 'TimeZone', 'UTC'), :);
+   save(second_file, 'mar_met');
+   [selected_window, selected_files] = ...
+      icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
+      met_dir=fullfile(root, 'met'), location=location);
+   testCase.verifyEqual(selected_window, [ ...
+      datetime(2020, 1, 1, 'TimeZone', 'UTC'), ...
+      datetime(2021, 12, 31, 23, 45, 0, 'TimeZone', 'UTC')]);
+   testCase.verifyEqual(sort(string(selected_files)), ...
+      sort([string(first_file); string(second_file)]));
 
-    % Adjacent filename dates cannot conceal a sub-day gap between the
-    % exact timetable supports.
-    S = load(first_file, 'mar_met');
-    first_mar = S.mar_met;
-    mar_met = first_mar(1:end - 24, :);
-    save(first_file, 'mar_met');
-    testCase.verifyError(@() ...
-       icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
-       met_dir=fullfile(root, 'met'), location=location), ...
-       'icemodel:reconstruct:acceptanceWindow:proxyCoverageGap');
-    mar_met = first_mar;
-    save(first_file, 'mar_met');
+   % Adjacent filename dates cannot conceal a sub-day gap between the
+   % exact timetable supports.
+   S = load(first_file, 'mar_met');
+   first_mar = S.mar_met;
+   mar_met = first_mar(1:end - 24, :);
+   save(first_file, 'mar_met');
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
+      met_dir=fullfile(root, 'met'), location=location), ...
+      'icemodel:reconstruct:acceptanceWindow:proxyCoverageGap');
+   mar_met = first_mar;
+   save(first_file, 'mar_met');
 
-    % Individually complete files cannot define one scalar window across an
-    % unstaged day in their union.
-    delete(second_file);
-    second_file = fullfile(fileparts(valid_file), ...
-       'met_tsta_mar3.11_20200702_20211231_15m.mat');
-    mar_met = complete_mar(complete_mar.Properties.RowTimes >= ...
-       datetime(2020, 7, 2, 'TimeZone', 'UTC'), :);
-    save(second_file, 'mar_met');
-    testCase.verifyError(@() ...
-       icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
-       met_dir=fullfile(root, 'met'), location=location), ...
-       'icemodel:reconstruct:acceptanceWindow:proxyCoverageGap');
-    delete(first_file);
-    delete(second_file);
-    mar_met = complete_mar;
-    save(valid_file, 'mar_met');
+   % Individually complete files cannot define one scalar window across an
+   % unstaged day in their union.
+   delete(second_file);
+   second_file = fullfile(fileparts(valid_file), ...
+      'met_tsta_mar3.11_20200702_20211231_15m.mat');
+   mar_met = complete_mar(complete_mar.Properties.RowTimes >= ...
+      datetime(2020, 7, 2, 'TimeZone', 'UTC'), :);
+   save(second_file, 'mar_met');
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.acceptanceWindow("tsta", ...
+      met_dir=fullfile(root, 'met'), location=location), ...
+      'icemodel:reconstruct:acceptanceWindow:proxyCoverageGap');
+   delete(first_file);
+   delete(second_file);
+   mar_met = complete_mar;
+   save(valid_file, 'mar_met');
 
-    none = icemodel.forcing.reconstruct.acceptanceWindow("ghost", ...
+   none = icemodel.forcing.reconstruct.acceptanceWindow("ghost", ...
       met_dir=fullfile(root, 'met', 'promice'), location=location);
    testCase.verifyTrue(all(isnat(none)));
 
@@ -4272,7 +4272,7 @@ function test_report_errors_without_products(testCase)
       qa_dir=fullfile(root, 'qa'), ...
       fig_dir=fullfile(root, 'figures'), ...
       report_dir=fullfile(root, 'report')), ...
-       'icemodel:report:buildGapFillReport:noFilledProducts');
+      'icemodel:report:buildGapFillReport:noFilledProducts');
 end
 
 function test_shell_quote_preserves_literal_metacharacters(testCase)
@@ -4426,27 +4426,27 @@ function writeFixtureStation(root, site, dlat, delev, with_gaps, with_proxy)
    raw_times = met.Properties.RowTimes(1:4:end);
    source_file = writeRawPromiceAlbedo(root, site, raw_times, ...
       met.albedo(1:4:end));
-    source_info = dir(source_file);
-    ud = struct('site', site, 'lat', 67.0 + dlat, 'lon', -48.8, ...
-       'elev', 1200 + delev, 'source_file', source_file, ...
-       'met_resample_policy', ...
-       met.Properties.UserData.met_resample_policy, ...
-       'met_resample_source_cadence_seconds', ...
-       met.Properties.UserData.met_resample_source_cadence_seconds, ...
-       'source_size_bytes', source_info.bytes, ...
+   source_info = dir(source_file);
+   ud = struct('site', site, 'lat', 67.0 + dlat, 'lon', -48.8, ...
+      'elev', 1200 + delev, 'source_file', source_file, ...
+      'met_resample_policy', ...
+      met.Properties.UserData.met_resample_policy, ...
+      'met_resample_source_cadence_seconds', ...
+      met.Properties.UserData.met_resample_source_cadence_seconds, ...
+      'source_size_bytes', source_info.bytes, ...
       'source_sha256', ...
       icemodel.verification.setup.fileSha256(source_file), ...
       'albedo_policy', ...
       "albedo from PROMICE L3 albedo; fillPromiceAlbedo(fillwinter=1)");
-    met.Properties.UserData = ud;
-    filename = fullfile(root, 'met', 'promice', sprintf( ...
-       'met_%s_promice_20200101_20211231_15m.mat', site));
-    save(filename, 'met');
-    recordNativeMetIdentity(root, site, filename);
-    if with_proxy
-       writeFixtureMar(root, site, dlat);
-    end
- end
+   met.Properties.UserData = ud;
+   filename = fullfile(root, 'met', 'promice', sprintf( ...
+      'met_%s_promice_20200101_20211231_15m.mat', site));
+   save(filename, 'met');
+   recordNativeMetIdentity(root, site, filename);
+   if with_proxy
+      writeFixtureMar(root, site, dlat);
+   end
+end
 
 function writeFixtureFamilyStation(root, site, family, with_gaps, ...
       cadence_seconds)
@@ -4693,8 +4693,8 @@ function refreshReportInputArtifact(manifest_file, role, data_root)
    %REFRESHREPORTINPUTARTIFACT Re-pin one deliberately mutated test artifact.
    manifest = jsondecode(fileread(manifest_file));
    match = find(string({manifest.artifacts.role}) == role, 1);
-    pathname = string(fullfile(data_root, ...
-       manifest.artifacts(match).path));
+   pathname = string(fullfile(data_root, ...
+      manifest.artifacts(match).path));
    info = dir(pathname);
    manifest.artifacts(match).bytes = info.bytes;
    manifest.artifacts(match).sha256 = ...
@@ -4773,14 +4773,14 @@ function filename = writeRawPromiceAlbedo(root, site, times, albedo, swd, swu)
       "hours since " + string(times(1), 'yyyy-MM-dd HH:mm:ss'));
    nccreate(filename, 'albedo', 'Dimensions', {'time', n});
    ncwrite(filename, 'albedo', albedo);
-    if nargin >= 5
-       nccreate(filename, 'dsr', 'Dimensions', {'time', n});
-       ncwrite(filename, 'dsr', swd);
-    end
-    if nargin >= 6
-       nccreate(filename, 'usr', 'Dimensions', {'time', n});
-       ncwrite(filename, 'usr', swu);
-    end
+   if nargin >= 5
+      nccreate(filename, 'dsr', 'Dimensions', {'time', n});
+      ncwrite(filename, 'dsr', swd);
+   end
+   if nargin >= 6
+      nccreate(filename, 'usr', 'Dimensions', {'time', n});
+      ncwrite(filename, 'usr', swu);
+   end
    ncwriteatt(filename, '/', 'site_id', upper(site));
    ncwriteatt(filename, '/', 'latitude', 67);
    ncwriteatt(filename, '/', 'longitude', -48.8);

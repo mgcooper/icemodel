@@ -24,9 +24,9 @@ function [x, filled, audit] = fillShortGaps(times, x, channel, kwargs)
    %     six hours ordinarily, nine for SWD and RH, and 30 for albedo.
    %  latitude, longitude : site point, required for the swd CSI variant.
    %  jump_factor : boundary-jump multiplier (POLICY B6).
-    %  blend_hours : seam-blend taper window (POLICY B6).
+   %  blend_hours : seam-blend taper window (POLICY B6).
    %  toa_dark_wm2 : irradiance threshold below which a sample counts as
-    %     dark in the swd CSI mask.
+   %     dark in the swd CSI mask.
    %  allow_swd_flux_fallback : false by default. The post-final D-32
    %     pass sets true, so residual SWD gaps with no defined CSI use a
    %     capped flux-linear bridge. A run of at least two postings may
@@ -37,8 +37,8 @@ function [x, filled, audit] = fillShortGaps(times, x, channel, kwargs)
    %     relation. Only SWD within its D-49 nine-hour cap, and D-48 RH
    %     within its evidence-backed nine-hour cap, may cross a
    %     calendar-season boundary.
-    %  step_scale : optional native-only scale frozen by the orchestrator
-    %     before any reconstruction values are inserted.
+   %  step_scale : optional native-only scale frozen by the orchestrator
+   %     before any reconstruction values are inserted.
    %  Defaults come from the central
    %  icemodel.forcing.reconstruct.setopts contract.
    %
@@ -67,10 +67,10 @@ function [x, filled, audit] = fillShortGaps(times, x, channel, kwargs)
          icemodel.forcing.reconstruct.setopts().jump_factor
       kwargs.blend_hours (1, 1) double {mustBeNonnegative} = ...
          icemodel.forcing.reconstruct.setopts().blend_hours
-       kwargs.toa_dark_wm2 (1, 1) double {mustBePositive} = ...
-          icemodel.forcing.reconstruct.setopts().toa_dark_wm2
-       kwargs.allow_swd_flux_fallback (1, 1) logical = false
-       kwargs.step_scale (1, 1) struct = struct()
+      kwargs.toa_dark_wm2 (1, 1) double {mustBePositive} = ...
+         icemodel.forcing.reconstruct.setopts().toa_dark_wm2
+      kwargs.allow_swd_flux_fallback (1, 1) logical = false
+      kwargs.step_scale (1, 1) struct = struct()
    end
 
    % SWU has no independent tier-1 path: it follows albedo*swd downstream.
@@ -249,21 +249,21 @@ function [x, filled, audit] = fillShortGaps(times, x, channel, kwargs)
          end
 
          % Fill only the natively missing samples; never touch finite data.
-       x(target) = candidate_fill;
-       filled(target) = true;
-       method = "bounded_interp";
+         x(target) = candidate_fill;
+         filled(target) = true;
+         method = "bounded_interp";
          detail = sprintf('linear, cap %.3g h', kwargs.cap_hours);
          if use_csi
             detail = sprintf('csi-linear, cap %.3g h', kwargs.cap_hours);
          end
          detail = [detail seam_note]; %#ok<AGROW>
-       segment = false(numel(times), 1);
-       segment(target) = true;
-       rows = icemodel.forcing.reconstruct.auditSegments( ...
-          times, segment, channel, method, detail);
-       audit = [audit; rows]; %#ok<AGROW>
+         segment = false(numel(times), 1);
+         segment(target) = true;
+         rows = icemodel.forcing.reconstruct.auditSegments( ...
+            times, segment, channel, method, detail);
+         audit = [audit; rows]; %#ok<AGROW>
       end
-    end
+   end
 
    % CSI has no denominator near darkness. On the D-32 post-final pass only,
    % retry the still-missing short SWD slivers in flux space. Real KANL

@@ -7,7 +7,7 @@ function [S, E] = chunkgridcell(firstcell, finalcell, numjob, whichjob)
    % numjob = 2;
    % whichjob = 1;
    % [~, E] = icemodel.chunkgridcell(firstcell, finalcell, numjob, whichjob);
-   
+
    numcell = (finalcell - firstcell) + 1;
 
    % This repeats the split of icemodel/mar and icemodel/modis into two

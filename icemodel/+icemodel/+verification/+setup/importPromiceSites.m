@@ -450,7 +450,7 @@ function s = stageCase(site, family_root, met_outdir, userdata_outdir, ...
    else
       % Normal imports resolve source metadata before output writes so missing
       % files or empty windows remain whole-site skips.
-       [aws_meta, promice_start, promice_end] = resolveCaseMetadata( ...
+      [aws_meta, promice_start, promice_end] = resolveCaseMetadata( ...
          site, window_enabled, window_start, window_end, kwargs);
       lat = aws_meta.lat;
       lon = aws_meta.lon;
@@ -483,7 +483,7 @@ function s = stageCase(site, family_root, met_outdir, userdata_outdir, ...
 
    [colocation, comparison_variables, observation_variables, ...
       evaluation_file_rel] = ...
-       stageNativeSource(site, case_id, case_root, userdata_outdir, ...
+      stageNativeSource(site, case_id, case_root, userdata_outdir, ...
       met_outdir, promice_start, promice_end, prior_case, ...
       build_native_forcing, dataset_family, kwargs);
 
@@ -574,7 +574,7 @@ function [colocation, comparison_variables, observation_variables, ...
    end
 
    preserve_prior_promice = ~kwargs.dry_run && ~build_native_forcing ...
-       && ~kwargs.overwrite_family && hasPriorNativeLeg(prior_case);
+      && ~kwargs.overwrite_family && hasPriorNativeLeg(prior_case);
    if preserve_prior_promice
       % A merge refresh should add/update requested sources without erasing a
       % prior PROMICE leg merely because PROMICE was omitted from this call.
@@ -591,10 +591,10 @@ function [colocation, comparison_variables, observation_variables, ...
          icemodel.verification.setup.relpaths(promice_data_files, userdata_outdir);
       promice_co.window = icemodel.verification.setup.manifestWindow( ...
          promice_start, promice_end);
-       if kwargs.dry_run || ~build_native_forcing
-          promice_co.met_files = strings(1, 0);
-          promice_co.met_file_identities = emptyMetFileIdentities();
-       else
+      if kwargs.dry_run || ~build_native_forcing
+         promice_co.met_files = strings(1, 0);
+         promice_co.met_file_identities = emptyMetFileIdentities();
+      else
          try
             promice_met = icemodel.forcing.buildPromiceMet(site, ...
                source_dir=kwargs.promice_dir, ...
@@ -608,20 +608,20 @@ function [colocation, comparison_variables, observation_variables, ...
             % select an existing exact or broader enclosing artifact.
             [forcing_ready, forcing_ready_reason, forcing_complete_windows] = ...
                icemodel.verification.setup.metArtifactReadiness(promice_met_files);
-             promice_co.met_files = ...
-                icemodel.verification.setup.relpaths(promice_met_files, met_outdir);
-             promice_co.met_file_identities = ...
-                metFileIdentities(promice_met_files, met_outdir);
-             promice_co.forcing_ready = logical(forcing_ready);
+            promice_co.met_files = ...
+               icemodel.verification.setup.relpaths(promice_met_files, met_outdir);
+            promice_co.met_file_identities = ...
+               metFileIdentities(promice_met_files, met_outdir);
+            promice_co.forcing_ready = logical(forcing_ready);
             promice_co.forcing_ready_reason = char(forcing_ready_reason);
             promice_co.forcing_complete_windows = forcing_complete_windows;
          catch met_err
-             if ~isSkippableNativeBuildError(met_err)
+            if ~isSkippableNativeBuildError(met_err)
                rethrow(met_err)
             end
-             promice_co.met_files = strings(1, 0);
-             promice_co.met_file_identities = emptyMetFileIdentities();
-             promice_co.met_skipped_reason = string(met_err.message);
+            promice_co.met_files = strings(1, 0);
+            promice_co.met_file_identities = emptyMetFileIdentities();
+            promice_co.met_skipped_reason = string(met_err.message);
          end
       end
 

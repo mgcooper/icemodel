@@ -490,8 +490,8 @@ function [Time, tsl] = writeEsmSoilTemperatureFixture(pathname)
    Time = datetime(2001, 1, 1, 0:4, 0, 0, 'TimeZone', 'UTC')';
    sdepth = single([0.1; 0.5; 1.0]);
    tsl = [101 102 103 104 105; ...
-          201 202 203 204 205; ...
-          301 302 303 304 305];
+      201 202 203 204 205; ...
+      301 302 303 304 305];
 
    % Encode dimensions in the same order as the bundled ESM-SnowMIP files.
    nccreate(pathname, 'time', 'Dimensions', {'time', numel(Time)});
@@ -507,9 +507,9 @@ end
 
 function tf = laughTestsCheckoutComplete(src)
    required = ["test_cases/input_data/colbeck1976/colbeck1976_forcing.nc";
-               "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp1_G1-1_timestep.nc";
-               "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp2_G1-1_timestep.nc";
-               "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp3_G1-1_timestep.nc"];
+      "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp1_G1-1_timestep.nc";
+      "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp2_G1-1_timestep.nc";
+      "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp3_G1-1_timestep.nc"];
    tf = exist(char(src), 'dir') == 7;
    for i = 1:numel(required)
       tf = tf && exist(char(fullfile(src, required(i))), 'file') == 2;
@@ -518,9 +518,9 @@ end
 
 function tf = esmSnowmipCacheComplete(src)
    required = ["met_insitu_cdp_1994_2014.nc";
-               "obs_insitu_cdp_1994_2014.nc";
-               "met_insitu_wfj_1996_2016.nc";
-               "obs_insitu_wfj_1996_2016.nc"];
+      "obs_insitu_cdp_1994_2014.nc";
+      "met_insitu_wfj_1996_2016.nc";
+      "obs_insitu_wfj_1996_2016.nc"];
    tf = exist(char(src), 'dir') == 7;
    for i = 1:numel(required)
       tf = tf && exist(char(fullfile(src, required(i))), 'file') == 2;

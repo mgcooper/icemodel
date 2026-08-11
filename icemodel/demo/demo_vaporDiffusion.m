@@ -1,5 +1,5 @@
 %[text] # Compute the vapor heat diffusion coefficient
-%[text] This demonstrates how to compute the diffusion of heat by water vapor 
+%[text] This demonstrates how to compute the diffusion of heat by water vapor
 %[text] Note: The goal was to eliminate the redundant GETGAMMA, GETKVAPOR, GETKTHERMAL, then I realized GETGAMMA is a concise way to get the effective conductivity combining the preferred kthermal from GETKTHERMAL with kvapor, but it should call those functions. Also, VAPORHEAT should replace GETKVAPOR, unless GETKVAPOR becomes a selection function like GETKTHERMAL, but refactoring VAPORHEAT was slightly more complicated than anticipated b/c I need to 1) determine the optimal input/output parsing including a nargout check that circumvents drovdT if only kvap is requested, and 2) determine if (1) is possible or if drovdT is actually required in particular the meltzone indices which GETKVAPOR does not check afaik.
 %[text] This demo did succeed in documenting the Yen's diffusivity enhancement section which was commented out at the bottom of GETGAMMA or GETKVAPOR. The notes at the end of VAPORHEAT need to be incorporated here.
 %%
@@ -8,14 +8,14 @@
 %[text] [Mayer](https://en.wikipedia.org/wiki/Julius_Robert_von_Mayer)'s relation relates the specific gas constant to the specific heat capacities for a calorically perfect gas and a thermally perfect gas:
 %[text] $R = C\_p - C\_v$
 %[text] where $C\_p$ is the [specific heat capacity](https://en.wikipedia.org/wiki/Specific_heat_capacity) for a constant pressure and $C\_v$ is the specific heat capacity for a constant volume.
-%[text] 
+%[text]
 %[text] for water vapor dry air
-%[text] 
+%[text]
 %%
 %[text] ## SNTHERM verus ICEMODEL
 %[text] Note: The confusion in my code stems from two definitions of $k\_v$:
 %[text] Liston (Equation 3): $k\_v = \\frac{D\_e L\_s}{R\_v T} \\frac{de\_s}{dT}$
-%[text] Jordan (In text above Equation 63): $k\_v = D\_e L\_s \\frac{d\\rho\_v}{dT}$ 
+%[text] Jordan (In text above Equation 63): $k\_v = D\_e L\_s \\frac{d\\rho\_v}{dT}$
 %[text] If following Jordan, then evaluating the derivative of vapor density yields:
 %[text] $\\frac{d\\rho\_v}{dT} = \\frac{1}{R\_v T} \\left(\\frac{de\_s}{dT} - \\frac{e\_s}{T}\\right)$
 %[text] Plugging into $k\_v$:
@@ -49,7 +49,7 @@
 %[text] Or from $\\rho\_v$:
 %[text] $\\frac{d\\rho\_v}{dT} = \\rho\_v \\left(\\frac{b \\, c}{\[c \\, + T\_d\]^2} - \\frac{1}{T}\\right)$
 % d_ro_vap = ro_vap .* (b * c ./ (c + T - Tf) .^ 2 - 1 ./ T);
-%[text] because both of $\\rho\_v$ and $\\frac{d\\rho\_v}{dT}$ are needed in other steps. The formulas above are designed to avoid computing $\\frac{de\_s}{dT}$, but if that term is computed, then the direct formula can be used as well: 
+%[text] because both of $\\rho\_v$ and $\\frac{d\\rho\_v}{dT}$ are needed in other steps. The formulas above are designed to avoid computing $\\frac{de\_s}{dT}$, but if that term is computed, then the direct formula can be used as well:
 %[text] $\\frac{d\\rho\_v}{dT} = \\frac{1}{R\_v T} \\left(\\frac{de\_s}{dT} - \\frac{e\_s}{T}\\right)$
 % d_ro_vap = (d_es - es / T) / (Rv * T);
 %[text] Or in terms of $\\rho\_v$:
@@ -57,7 +57,7 @@
 %[text] $\\quad = \\frac{1}{R\_v T}\\frac{de\_s}{dT} - \\frac{\\rho\_v}{T}$
 % d_ro_vap = d_es / (Rv * T) - ro_vap / T;
 %[text] Once $\\frac{d\\rho\_v}{dT}$ is computed, $k\_v$ can be computed directly:
-%[text] $k\_v = D\_e L\_s \\frac{d\\rho\_v}{dT}$ 
+%[text] $k\_v = D\_e L\_s \\frac{d\\rho\_v}{dT}$
 k_vap = Ls * De .* dro_vapdT;
 %[text] But, if $\\rho\_v$ and $\\frac{d\\rho\_v}{dT}$ are not needed, then it can be more direct to compute $k\_v$ from $e\_s$ and its derivative. Also, to clarify the different forms I've used, below I show them using the a, b, c coefficients.
 %[text] Following Liston: $k\_v = D\_e L\_s \\rho\_v \\left(\\frac{b \\, c}{\[c \\, + T\_d\]^2} \\right)$
@@ -65,7 +65,7 @@ k_vap = Ls * De .* dro_vapdT;
 %    * ro_vap * b * c ./ (c + T - Tf) .^ 2; % des/dT [Pa K-1]
 %[text] Following Jordan: $k\_v = D\_e L\_s \\rho\_v \\left(\\frac{b \\, c}{\[c \\, + T\_d\]^2} - \\frac{1}{T}\\right)$
 k_vap = De * Ls * ro_vap .* ...
-   (b * c ./ (c + T - Tf) .^ 2 - 1 ./ T); 
+   (b * c ./ (c + T - Tf) .^ 2 - 1 ./ T);
 %%
 %[text] ## Diffusivity
 %[text] Just noting briefly that the model can take up to 10 sec longer to run if Jordan's nd = 6 is used versus Anderson's nd = 14, but there is no impact on the solution and $k\_v$ is a negligible contributor to $k\_e$ except in very rare cases, I think when both the ice and liquid content are very low in winter due to sublimation.
@@ -113,7 +113,7 @@ k_vap = De * Ls * ro_vap .* ...
 %[text] $k\_v = \\alpha T^{n-2} \\left(\\frac{\\beta}{T} - 1\\right) \\exp\\left\[-\\frac{\\beta}{T}\\right\]$
 %[text] And with $n=2$:
 %[text] $k\_v = \\alpha T^4 \\left(\\frac{\\beta - T}{T}\\right) \\exp\\left\[-\\frac{\\beta}{T}\\right\]$
-%[text] Which seems like a sensible expression. The $T^4$ suggests there might be a radiative explanation underlying the process. 
+%[text] Which seems like a sensible expression. The $T^4$ suggests there might be a radiative explanation underlying the process.
 nd = 6;
 Tf = 273.16;
 Ls = 2.834e6;
@@ -133,13 +133,13 @@ ylabel('Vapor Heat Transfer Coefficient [W m^{-1} K^{-1}]') %[output:3f95b03e]
 
 % This is what I had in GETKVAPOR just in case it differs in any way from alpha
 % above
-   % Could pre-define alpha:
-   %
-   % alpha = 9e-5 * Ls * A * exp(Ls / (Rv * Tf)) / (Tf ^ 14 * Rv);
-   % k_vap = alpha * T ^ 12 * (Ls ./ (Rv * T) - 1) .* exp(-Ls ./ (Rv * T));
+% Could pre-define alpha:
+%
+% alpha = 9e-5 * Ls * A * exp(Ls / (Rv * Tf)) / (Tf ^ 14 * Rv);
+% k_vap = alpha * T ^ 12 * (Ls ./ (Rv * T) - 1) .* exp(-Ls ./ (Rv * T));
 %%
 % In practice when combined with the volumetric fractions it contributes very
-% little ... 
+% little ...
 
 g_ice = ro_ice * f_ice;
 theta = 1 ./ (1 + exp(-0.04 * (g_ice - 450.0)));
@@ -161,69 +161,69 @@ histogram(k_vap(:) ./ k_eff(:))
 %%
 %[text] Cut out of VAPORHEAT after I finished reconciling and retained the basic structure of VAPORHEAT by adding the same ai,bi,ci aw, bw,cw stuff from icemodel.vapor.saturation_vapor_pressure, but below are ideas for how to use icemodel.vapor.saturation_vapor_pressure
 % Alternative but correct definitions:
-   %
-   % Following Jordan, using vapor pressure:
-   % k_vap = De * Ls ./ (Rv * T) ...
-   %   .* (bi * ci .* es ./ (ci + T - Tf) .^ 2 ... % ∂es/∂T
-   %   - es ./ T);
-   % 
-   % Following Liston, using vapor pressure:
-   % k_vap = De * Ls ./ (Rv * T) ...
-   %   .* (bi * ci .* es ./ (ci + T - Tf) .^ 2;    % ∂es/∂T
-   %
-   % Following Jordan, using vapor density:
-   % k_vap = De * Ls ...
-   %    * ro_vap .* (bi * ci ./ (ci + T - Tf) .^ 2 - 1 ./ T); % ∂ρv/∂T
-   %
-   % Following Liston, using vapor density
-   % k_vap = De * Ls  ...
-   %    * ro_vap * bi * ci ./ (ci + T - Tf) .^ 2; % 1/RvT * ∂es/∂T
-   
-   
-   % % This is here purely to simplify the reading as much as possible:
-   % 
-   % N = numel(T);
-   % nd = 6;
-   % 
-   % De_Ls = Ls * 9.0e-5 * (T / Tf) .^ nd;
-   % k_vap = zeros(N, 1);
-   % rovap = zeros(N, 1);
-   % dv_dT = zeros(N, 1);
-   % 
-   % for n = 1:N
-   %    [es,des] = icemodel.vapor.saturation_vapor_pressure(T(n), f_liq(n) > f_liq_phase_switch_threshold);
-   %    rovap(n) = es / (Rv * T(n));
-   %    dv_dT(n) = (des - es / T(n)) / (Rv * T(n));
-   %    k_vap(n) = De_Ls(n) * dv_dT(n);
-   % end
-   
-   % % And this is how I might actually implement it:
-   % N = numel(T);
-   % De_Ls = Ls * 9.0e-5 * (T / Tf) .^ 14;
-   % k_vap = zeros(N, 1);
-   % ro_vap = zeros(N, 1);
-   % d_ro_vap = zeros(N, 1);
-   % 
-   % for n = 1:N
-   %
-   %    [es, d_es] = icemodel.vapor.saturation_vapor_pressure(T(n), f_liq(n) > f_liq_phase_switch_threshold);
-   % 
-   %    ro_vap(n) = es / (Rv * T(n));
-   %    d_ro_vap(n) = (d_es - es / T(n)) / (Rv * T(n));
-   % 
-   %    k_vap(n) = De_Ls(n) * d_ro_vap(n);
-   % 
-   %    % Equivalently:
-   %    % d_ro_vap(n) = d_es / (Rv * T(n)) - ro_vap(n) / T(n);
-   % end
-   % 
-   % % dro_vapdT = ro_vap .* (b * c ./ (c + T - Tf) .^ 2 - 1 ./ T);
+%
+% Following Jordan, using vapor pressure:
+% k_vap = De * Ls ./ (Rv * T) ...
+%   .* (bi * ci .* es ./ (ci + T - Tf) .^ 2 ... % ∂es/∂T
+%   - es ./ T);
+%
+% Following Liston, using vapor pressure:
+% k_vap = De * Ls ./ (Rv * T) ...
+%   .* (bi * ci .* es ./ (ci + T - Tf) .^ 2;    % ∂es/∂T
+%
+% Following Jordan, using vapor density:
+% k_vap = De * Ls ...
+%    * ro_vap .* (bi * ci ./ (ci + T - Tf) .^ 2 - 1 ./ T); % ∂ρv/∂T
+%
+% Following Liston, using vapor density
+% k_vap = De * Ls  ...
+%    * ro_vap * bi * ci ./ (ci + T - Tf) .^ 2; % 1/RvT * ∂es/∂T
+
+
+% % This is here purely to simplify the reading as much as possible:
+%
+% N = numel(T);
+% nd = 6;
+%
+% De_Ls = Ls * 9.0e-5 * (T / Tf) .^ nd;
+% k_vap = zeros(N, 1);
+% rovap = zeros(N, 1);
+% dv_dT = zeros(N, 1);
+%
+% for n = 1:N
+%    [es,des] = icemodel.vapor.saturation_vapor_pressure(T(n), f_liq(n) > f_liq_phase_switch_threshold);
+%    rovap(n) = es / (Rv * T(n));
+%    dv_dT(n) = (des - es / T(n)) / (Rv * T(n));
+%    k_vap(n) = De_Ls(n) * dv_dT(n);
+% end
+
+% % And this is how I might actually implement it:
+% N = numel(T);
+% De_Ls = Ls * 9.0e-5 * (T / Tf) .^ 14;
+% k_vap = zeros(N, 1);
+% ro_vap = zeros(N, 1);
+% d_ro_vap = zeros(N, 1);
+%
+% for n = 1:N
+%
+%    [es, d_es] = icemodel.vapor.saturation_vapor_pressure(T(n), f_liq(n) > f_liq_phase_switch_threshold);
+%
+%    ro_vap(n) = es / (Rv * T(n));
+%    d_ro_vap(n) = (d_es - es / T(n)) / (Rv * T(n));
+%
+%    k_vap(n) = De_Ls(n) * d_ro_vap(n);
+%
+%    % Equivalently:
+%    % d_ro_vap(n) = d_es / (Rv * T(n)) - ro_vap(n) / T(n);
+% end
+%
+% % dro_vapdT = ro_vap .* (b * c ./ (c + T - Tf) .^ 2 - 1 ./ T);
 %%
 %[text] ## SNTHERM
-%[text] See the latex doc for detailed description, copy here eventually. 
+%[text] See the latex doc for detailed description, copy here eventually.
 %%
 syms T L_v R_v T_f a b c
-% syms rho_v e_s 
+% syms rho_v e_s
 T_d = T - T_f;
 e_s = a * exp(b * T_d / (c + T_d)) %[output:5e8fdf4d]
 rho_v = e_s / (R_v * T) %[output:4cbfbaa0]
@@ -374,10 +374,10 @@ k_vap = Ls * De ./ (Rv * T) .* desi_dT; % [W m-1 K-1]
 % CkT           = d_ro_vap_sat_dT   (previously undefined in Glen's model)
 % desi_dT       = dPvk_sat_dT       (undefined in Jordan)
 %                                   (could call this dPvap_sat_dT)
-% 
+%
 % Uvap          = -Deos * (T / Tf) ^ n * CkT * dT / dz
 %               = -Deos * (T / Tf) ^ n * dbvdT * dT / dz
-% 
+%
 % From GETGAMMA:
 % kvap          = De0 * (T / Tfp) ^ n * Ls / (Rv * T) * desi/dT
 
@@ -410,7 +410,7 @@ dT(JJ)      =   0.0;
 Uvapor      =   -De * d_ro_vap_dT .* dT / dz;
 
 % Jordan defines De0 in the front matter:
-De0 = 9.2e-5; 
+De0 = 9.2e-5;
 
 % PICK UP on equation 21, the remaining expressions for mass fluxes, involving
 % melt/evap I think, and the condition that frac_liq be below a threshold for

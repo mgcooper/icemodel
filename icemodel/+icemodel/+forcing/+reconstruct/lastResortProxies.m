@@ -8,29 +8,29 @@ function [filled, provenance, audit, denials] = lastResortProxies(filled, ...
    %
    % Role
    %  The policy's final tier: required-channel samples still missing
-    %  after method composition take one proxy source per whole outage.
-    %  The first catalog source that covers the whole outage wins; if none
-    %  does, the first source with any usable values supplies a partial fill.
-    %  A later source never fills leftovers inside the same outage, so one
+   %  after method composition take one proxy source per whole outage.
+   %  The first catalog source that covers the whole outage wins; if none
+   %  does, the first source with any usable values supplies a partial fill.
+   %  A later source never fills leftovers inside the same outage, so one
    %  span keeps thermodynamically coupled channels consistent with each
    %  other, which per-channel method composition cannot guarantee.
    %  Native and method-filled samples are never overwritten; each
-    %  adoption appends one audit row per contiguous channel/source segment.
+   %  adoption appends one audit row per contiguous channel/source segment.
    %
    % Inputs
-    %  filled : composed timetable (post reconstructSeries).
+   %  filled : composed timetable (post reconstructSeries).
    %  provenance : matching per-channel uint8 code timetable.
    %  audit : segment-audit table to append adoption rows to.
-    %  proxies : proxy struct array (series, name, code_name) in
-    %     adoption-preference order. A source/channel with a persisted
-    %     overlap calibration adopts corrected values; without one the raw
-    %     values adopt identity and are stamped low-confidence in the
-    %     audit (POLICY A11/D-25).
+   %  proxies : proxy struct array (series, name, code_name) in
+   %     adoption-preference order. A source/channel with a persisted
+   %     overlap calibration adopts corrected values; without one the raw
+   %     values adopt identity and are stamped low-confidence in the
+   %     audit (POLICY A11/D-25).
    %  codes : provenanceCodes() registry.
-    %  opts : reconstruction options (required_channels).
-    %  latitude, longitude : station geometry for the shortwave bound.
-    %  native : pre-reconstruction timetable used only for seam step scales.
-    %  plan : stationMethodPlan output containing persisted proxy corrections.
+   %  opts : reconstruction options (required_channels).
+   %  latitude, longitude : station geometry for the shortwave bound.
+   %  native : pre-reconstruction timetable used only for seam step scales.
+   %  plan : stationMethodPlan output containing persisted proxy corrections.
    %
    % Returns
    %  filled, provenance, audit : the adopted product, codes, and rows.

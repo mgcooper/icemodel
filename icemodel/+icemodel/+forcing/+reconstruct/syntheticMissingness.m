@@ -82,18 +82,18 @@ function draws = syntheticMissingness(series, channel, runs, kwargs)
 
    % Insertions live only in the requested years and season, on finite
    % samples, away from the series edges by the context margin.
-    x = series.(channel);
-    eligible = isfinite(x) & ismember(year(times), kwargs.years);
-    if channel == "swd"
-       if ~(isfinite(kwargs.latitude) && isfinite(kwargs.longitude))
-          error(['icemodel:reconstruct:syntheticMissingness:' ...
-             'missingSolarGeometry'], ...
-             'SWD validation draws require latitude and longitude');
-       end
-       toa = icemodel.forcing.reconstruct.toaIrradiance( ...
-          times, kwargs.latitude, kwargs.longitude);
-       eligible = eligible & toa >= kwargs.toa_dark_wm2;
-    end
+   x = series.(channel);
+   eligible = isfinite(x) & ismember(year(times), kwargs.years);
+   if channel == "swd"
+      if ~(isfinite(kwargs.latitude) && isfinite(kwargs.longitude))
+         error(['icemodel:reconstruct:syntheticMissingness:' ...
+            'missingSolarGeometry'], ...
+            'SWD validation draws require latitude and longitude');
+      end
+      toa = icemodel.forcing.reconstruct.toaIrradiance( ...
+         times, kwargs.latitude, kwargs.longitude);
+      eligible = eligible & toa >= kwargs.toa_dark_wm2;
+   end
    if ~isempty(kwargs.season)
       eligible = eligible & ismember( ...
          icemodel.forcing.reconstruct.seasonOf(times), kwargs.season);
