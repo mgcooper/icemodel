@@ -43,7 +43,7 @@ For verification manifests, family imports, artifact QA, and complete staging
 examples, see the
 [`icemodel.verification` README](../+verification/README.md#getting-started).
 
-### Output cadence in one minute
+### Output cadence summary
 
 - Model met writes default to 15 minutes.
 - Userdata writes default to one hour.
@@ -154,22 +154,22 @@ metadata must also agree for reuse or pruning; an exact-name conflict requires
 windows, and enclosing windows remain unchanged. Production `method` and repaired
 `sample_method` metadata are one documented sampling-identity alias.
 
-Both writers
-stamp the actual uniform payload cadence as `artifact_cadence_seconds`; correctly
-sampled legacy files without that top-level field are checked from their saved
-timetable, so a forged `_15m` suffix cannot authorize reuse or pruning.
+Both writers stamp the actual uniform payload cadence as
+`artifact_cadence_seconds`. A correctly sampled legacy file without that
+top-level field is checked from its saved timetable. A forged `_15m` suffix
+therefore cannot authorize reuse or pruning.
 
 Both writers validate an existing exact target before considering a compatible
 broader window. Model-met writes return a compatible exact target because runtime
 met resolution also gives that name precedence; userdata may still return the
 widest compatible enclosing file after the exact target has passed validation.
 
-The pure scalar identity comparison is shared with manifest merging so family,
-source, source id, native `source_family`/`station`, product, DOI/bundle DOI,
-schema, relationship, and the documented method alias cannot drift between reuse
-and merge boundaries. Native producer keys compare by their exact production
-spellings; missing legacy values remain unknown-compatible, and no cross-key
-alias is invented beyond `method`/`sample_method`.
+Manifest merging uses the same scalar identity comparison, so the reuse and
+merge boundaries apply one rule to family, source, source id, native
+`source_family`/`station`, product, DOI/bundle DOI, schema, relationship, and
+the documented method alias. Native producer keys compare by their exact
+production spellings. A missing legacy value stays unknown-compatible, and the
+comparison adds no cross-key alias beyond `method`/`sample_method`.
 
 `writemet` completes resampling, cadence derivation, channel validation, and
 guarded-year provenance checks before creating its per-source directory. Rejected
@@ -194,9 +194,10 @@ sample.
 `*_T_firn_obs.nc` firn-temperature observation products for Dye-2 and Summit.
 It preserves the source `T_firn`/`Depth` names and DOI provenance while exposing
 canonical `subsurface_temperature` [K] and `depth` [m] matrices shaped
-time-by-level. The reader windows NetCDF payload reads after reading the small
-time coordinate, so tests and staging checks do not need to load the full source
-array unless the caller requests the full product.
+time-by-level. The reader reads the small time coordinate first, then reads
+only the requested window of the NetCDF payload. Tests and staging checks
+therefore do not load the full source array unless the caller asks for the full
+product.
 
 Source policy is explicit: `LRin` is source-filled regional-climate-model
 longwave, not an observed GC-Net longwave sensor. The builder records both the
@@ -310,8 +311,8 @@ manufactured as long time-series panels.
 Daily MAR state diagnostics (`SHSN2`, `CC`, `ST`, and `SP`) use linear
 interpolation only inside their native support. Before the first and after the
 last daily sample of a separately processed year they hold the nearest endpoint,
-rather than extrapolating the last slope. Cloud fraction additionally enforces
-the source and output range `[0,1]`, preventing the former December 31 overshoot.
+rather than extrapolating the last slope. Cloud fraction also enforces the
+source and output range `[0,1]`, which prevents a December 31 overshoot.
 
 MAR `snowd` remains `SHSN2`, whose source definition is "Snow Pack Height above
 Ice". It is never replaced by `SHSN3`, which is total multilayer snow/firn
@@ -325,17 +326,18 @@ and checked by `icemodel.verification.auditArtifacts`.
 ## RACMO point selection and ice mask
 
 `buildRacmoData` applies the companion FGRN11 topography mask to point sampling
-and conservative polygon extraction. A point uses the nearest cell whose fractional `IceMask`
-rounds to ice (fraction at least 0.5; `Promicemask > 0` when `IceMask` is
-unavailable). The valid cell must also lie within one native grid diagonal of
-the requested point. Otherwise the point is explicitly unavailable: verification
-staging does not substitute a distant inland cell or preserve an older off-mask
-artifact. Natural-neighbour point interpolation excludes masked cells from its
-local neighbourhood; conservative polygon remapping uses the same mask. Point
-sampling fails closed when the companion topography/mask file is absent. A
-legacy point artifact without `racmo_ice_mask_applied` and
-`racmo_point_max_distance_m` provenance is not cache-compatible; one canonical
-restage is required because metadata repair cannot change its sampled payload.
+and conservative polygon extraction. A point uses the nearest cell whose
+fractional `IceMask` rounds to ice (fraction at least 0.5; `Promicemask > 0`
+when `IceMask` is unavailable). The valid cell must also lie within one native
+grid diagonal of the requested point. Otherwise the point is explicitly
+unavailable: verification staging does not substitute a distant inland cell or
+preserve an older off-mask artifact. Natural-neighbour point interpolation
+excludes masked cells from its local neighbourhood; conservative polygon
+remapping uses the same mask. Point sampling fails closed when the companion
+topography/mask file is absent. A legacy point artifact without
+`racmo_ice_mask_applied` and `racmo_point_max_distance_m` provenance is not
+cache-compatible; one canonical restage is required because metadata repair
+cannot change its sampled payload.
 
 ## RACMO precipitation numerical undershoot
 
@@ -350,8 +352,8 @@ time, and unrelated channels are unchanged.
 
 Artifacts record the source variable, normalization stage, input minimum, and
 replacement count in `racmo_ppt_qc_*` metadata. The exact-reference repair path
-uses the same helper, so a second dry run is unchanged and source-light rather
-than silently relaxing the generic nonnegative precipitation QA bound.
+uses the same helper, so a second dry run is unchanged and source-light. The
+repair does not relax the generic nonnegative precipitation QA bound.
 
 ## GEUS MODIS albedo coverage provenance
 
@@ -455,13 +457,13 @@ rescaled to the tapered total; samples with neither stay phase-unknown for
 the runtime `precip_phase_source` option (POLICY A10/D-18 — reconstruction
 never partitions by temperature, and phase channels are never adopted
 independently of their total).
-The native builder preserves selected corrected/raw upward shortwave as `swu`;
-an absent upward-shortwave source is not a strict-required channel because
-reconstruction derives it from the final operands;
-builder-inserted deep-darkness zeros retain the darkness provenance code;
-after all `swd` and albedo tiers finish, missing `swu` is derived as
-`albedo * swd` with dedicated per-sample provenance rather than independently
-interpolated or proxy-adopted.
+The native builder preserves selected corrected/raw upward shortwave as `swu`.
+An absent upward-shortwave source is not a strict-required channel, because
+reconstruction derives it from the final operands. Builder-inserted
+deep-darkness zeros retain the darkness provenance code. After all `swd` and
+albedo tiers finish, the reconstruction derives missing `swu` as `albedo * swd`
+with dedicated per-sample provenance. It does not interpolate `swu` on its own
+and does not adopt it from a proxy.
 
 #### Input discovery and identity
 
@@ -496,11 +498,11 @@ PROMICE native and filled met also carry
 the corrected upper-boom height. The product preserves every boom-height
 gap fail-closed (no capped fill, no donor/proxy geometry); geometry never
 grades readiness (POLICY A3/A5). At runtime `loadmet` resolves T/RH/wind
-observation geometry through the A3 fallback chain — measured samples
-where valid (finite and above the aerodynamic roughness), time-based
-interpolation across interior gaps (including station-composition
-handovers), and the nominal 2.6 m bottom rung — warning per fallback rung
-and recording the outcome in `opts.boom_height_source`; geometry never
+observation geometry through the A3 fallback chain. The rungs are measured
+samples where valid (finite and above the aerodynamic roughness), time-based
+interpolation across interior gaps (including station-composition handovers),
+and the nominal 2.6 m bottom rung. `loadmet` warns for each fallback rung it
+uses and records the outcome in `opts.boom_height_source`. Geometry never
 blocks a load or a run.
 The legacy `kanm`/`kanl` forcing aliases apply the same measured geometry
 whenever their met artifact carries `boom_height`; older alias fixtures without
@@ -511,10 +513,10 @@ The authoritative method and provenance contract is
 [`+reconstruct/POLICY.md`](+reconstruct/POLICY.md), with the namespace inventory
 in [`+reconstruct/README.md`](+reconstruct/README.md).
 
-### Time convention (the one canonical rule)
+### Time convention
 
-**Canonical convention (single source of truth): a forcing/eval hourly value
-represents the interval `[t, t+dt)` and is LABELLED AT THE INTERVAL-START `t`.**
+**Canonical convention: a forcing/eval hourly value represents the interval
+`[t, t+dt)` and is LABELLED AT THE INTERVAL-START `t`.**
 This matches PROMICE ("the timestamp of the hourly averages indicate the start
 of the averaged hour") and the model's own `[t, t+dt)` implicit integration. The
 convention is applied **at the builder, where the source stamping is known** —
@@ -526,10 +528,10 @@ epoch, so `epoch + hours(t)` reproduces the bin-START stamp exactly;
 `readPromiceAws` snaps with `dateshift('start','hour')` defensively (idempotent,
 not a re-bin) and returns a UTC axis. `buildPromiceMet` / `buildPromiceData`
 inherit this axis unchanged. icemodel's met/Data axis is this **same bin-START
-hourly grid (UTC)**: the timestepping loop treats a met row's `Time` as the
-forcing valid AT that timestamp and integrates forward over `[t, t+dt)`, so a
-START-of-hour averaged forcing is the correct mean to drive that step and **no
-half-hour recentring is applied or needed**.
+hourly grid (UTC)**. The timestepping loop treats a met row's `Time` as the
+forcing valid AT that timestamp and integrates forward over `[t, t+dt)`. A
+START-of-hour averaged forcing is therefore the correct mean to drive that
+step, and **no half-hour recentring is applied or needed**.
 
 #### Comparison protocol (cumulative/flux vs instantaneous state)
 
@@ -571,12 +573,12 @@ The gridded met builders carry their native stamping; only PROMICE is snapped:
   alignment and policy metadata alone cannot prove that a legacy regularizer did
   not invent a value at an omitted native source stamp.
 
-### Ablation vs accumulation channel semantics (the core rule)
+### Ablation and accumulation channel rules
 
 `buildPromiceData` branches on the **presence of `z_ice_surf`** in the L3 file
 (the operational ablation-site signal; recorded in
 `metadata.site_surface_type`, and agreeing with the readme Table 1 "Site type"
-surfaced via `promiceSiteCatalog`):
+provided by `promiceSiteCatalog`):
 
 - **Ablation sites** (z_ice_surf present): two surface channels —
   - `ablation` [m, +down] = `-(z_ice_surf - z_ice_surf(window start))`,
@@ -602,7 +604,7 @@ initial station installation** (readme). Before comparing to a simulation,
 **subtract the window-start value** of the surface-height channel (the builder
 already zeroes `ablation`/`surface_height` at the first finite window sample).
 
-### What is GEUS-provided vs ours (we flag, never silently fix)
+### What GEUS provides and what we add (we flag, we do not fix)
 
 The authoritative GEUS L3 product provides **all QC, manual flagging/fixing, and
 gap-filling** (slope-bridging the surface height across sensor outages), the
@@ -610,9 +612,9 @@ multi-sensor `z_surf_combined`, the `z_ice_surf` re-derivation, `snow_height`,
 the depth-tagged thermistor string, and the standardized 10 m `t_i_10m`. **We
 provide only**: read the L3 channels; derive per `site_type`
 (`ablation`/`surface_height`); clamp `snow_depth >= 0`; unit conversions; and
-per-sample FLAGS. **No GEUS data value is modified** — we flag, never silently
-fix. The one correction (de-stepping) is an opt-in transform applied at analysis
-time, never baked into the staged data (see below).
+per-sample FLAGS. **No GEUS data value is modified** — we flag, we do not fix.
+The one correction (de-stepping) is an opt-in transform applied at analysis
+time, never written into the staged data (see below).
 
 ### Gap flag (sensor-derived; trend usable, exclude only RATE diagnostics)
 
@@ -627,12 +629,12 @@ gap are unreliable.
 surface series is finite **but every underlying L3 surface-ranging sensor**
 (`transducer_depth`, `boom_height`, `stake_height` as available) **is NaN** —
 i.e. the value is slope-interpolated, not measured. Leading/trailing samples
-(before first / after last finite surface value) are flagged too. The old
-heuristic flagged only samples where the surface value itself was NaN, which
-**missed the slope-bridged segments** (the surface is finite there, manufactured
-by interpolation) — e.g. MIT: ~6.8k slope-bridged samples the old flag missed.
+(before first / after last finite surface value) are flagged too. A NaN surface
+value is not the only bridged case: inside a slope-bridged segment the surface
+value is finite but made by interpolation. At MIT about 6.8k samples are
+slope-bridged in this way.
 
-**Comparison guidance (revised):**
+**Comparison guidance:**
 
 - **CUMULATIVE and visual comparison use the FULL series** (the trend is
   preserved through gaps; do NOT drop gap-bridged samples from a cumulative or
@@ -641,30 +643,30 @@ by interpolation) — e.g. MIT: ~6.8k slope-bridged samples the old flag missed.
   `surface_height_flag == 1` segments.
 
 Daily retime aggregates the flag by `max`. Data are FLAGGED, never deleted.
-`metadata.gap_flagged_samples` records the count. (The daily `max` can spread a
-flag to a whole day touched by one bridged hour; the sensor-derived flag now
-fires on far fewer, genuinely-bridged samples, so the figure markers no longer
-overlay observed samples.)
+`metadata.gap_flagged_samples` records the count. The daily `max` can flag a
+whole day that contains one bridged hour. The sensor-derived flag fires only on
+genuinely bridged samples, so the figure markers do not overlay observed
+samples.
 
 ### Station-transition flag and de-stepping (opt-in correction)
 
-A PROMICE **site** can merge several **stations** (AWS); at a handover the
+A PROMICE **site** can merge several **stations** (AWS). At a handover the
 surface or subsurface series can carry an expected discrete offset — a **step**,
-not a NaN, so the gap flag never sees it. `buildPromiceData` stages two further
-flag families:
+not a NaN, so the gap flag does not detect it. `buildPromiceData` stages two
+further flag families:
 
 - `station_transition_flag` marks samples within a station-handover window. The
   staged product carries only a SITE-level install date (not per-station
-  handover dates), so this flag is currently inert; the FACT that a site merges
-  multiple AWS is recorded in `metadata.is_multistation` /
-  `metadata.composing_stations` (from `promiceSiteCatalog.stations`).
+  handover dates), so this flag is inert. `metadata.is_multistation` and
+  `metadata.composing_stations` (from `promiceSiteCatalog.stations`) record
+  that a site merges multiple AWS.
 - `step_detected_flag`, `step_correctable_flag`, `step_magnitude` stage the
   de-stepping DETECTION run by `icemodel.forcing.destepSurface` in `detect`
-  mode. Detection scores each single-timestep jump (between adjacent finite
-  samples; a gap interior is interpolation, not a step) on multiple evidence
-  lines — rate-implausible magnitude (gate), gross single-step implausibility,
-  station-transition coincidence, and melt-season inconsistency — and classifies
-  it **UNAMBIGUOUS** (magnitude + a corroborating line) or **AMBIGUOUS**
+  mode. Detection scores each single-timestep jump between adjacent finite
+  samples; a gap interior is interpolation, not a step. The evidence lines are
+  rate-implausible magnitude (gate), gross single-step implausibility,
+  station-transition coincidence, and melt-season inconsistency. A jump is
+  **UNAMBIGUOUS** (magnitude + a corroborating line) or **AMBIGUOUS**
   (magnitude alone). Ambiguous steps are flagged, never corrected.
 
 **The staged `.mat` is faithful** (raw surface values + the flags). The
@@ -678,12 +680,12 @@ staged data stays unaltered). See `test/interactive/promice_qaqc/figures/`
 ### Thermistors (subsurface temperature) and the tice10m comparison protocol
 
 - `tice10m` [K] is the **PRIMARY** subsurface-temperature evaluation channel.
-  It is GEUS's **standardized 10 m-BELOW-the-EVOLVING-SURFACE** temperature: GEUS
-  builds it by tracking each thermistor's **time-dependent depth below the
-  current surface** (`d_t_i_*`, which changes as the surface ablates or
-  accumulates), discarding surfaced thermistors, and depth-interpolating the
-  surviving subsurface string to 10 m below the **current** surface at each time
-  step (`t_i_10m`). It is therefore a **moving (Lagrangian) 10 m depth**, not a
+  It is GEUS's **standardized 10 m-BELOW-the-EVOLVING-SURFACE** temperature.
+  GEUS tracks each thermistor's **time-dependent depth below the current
+  surface** (`d_t_i_*`, which changes as the surface ablates or accumulates).
+  GEUS then discards surfaced thermistors and depth-interpolates the surviving
+  subsurface string to 10 m below the **current** surface at each time step
+  (`t_i_10m`). It is therefore a **moving (Lagrangian) 10 m depth**, not a
   fixed 10 m from installation.
 
   **Model sampling protocol:** the model must be sampled at **10 m below its OWN
@@ -727,10 +729,12 @@ corroborated stays AMBIGUOUS (flagged, not corrected).
 
 ### Diagnostics
 
-`test/interactive/promice_qaqc/plot_promice_eval.m` regenerates per-site figures and the QA
-summary into the gitignored `test/interactive/promice_qaqc/figures/` (site-type surface
-channel; surface-height with gap-bridged samples in red, station-transition
-windows in green, detected steps marked unambiguous/ambiguous; `tice10m`
-heavy-black primary over the thermistor string). `promice_site_cause_classification.md`
-there is the manual cause classification, and `promice_step_screening.md` is the
-all-site step-screening table.
+`test/interactive/promice_qaqc/plot_promice_eval.m` regenerates the per-site
+figures and the QA summary into the gitignored
+`test/interactive/promice_qaqc/figures/`. The figures show the site-type
+surface channel, the surface height with gap-bridged samples in red,
+station-transition windows in green, and detected steps marked unambiguous or
+ambiguous. They also draw `tice10m` as a heavy black primary line over the
+thermistor string. In the same directory,
+`promice_site_cause_classification.md` is the manual cause classification, and
+`promice_step_screening.md` is the all-site step-screening table.

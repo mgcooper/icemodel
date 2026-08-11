@@ -334,7 +334,7 @@ report = summarize_spectral_perf( ...
 Key options:
 
 - `include_full_model`
-  - master switch for the whole-model sections
+  - main switch for the whole-model sections
 - `include_direct_model`
   - include direct `tic/toc` whole-model timings
 - `n_direct_runs`

@@ -61,7 +61,7 @@ The examples in `demo.m` run IceModel in its "SkinModel" surface energy balance 
 
 ### Global configuration: Specify workspace paths
 
-The model data directories default to the top-level folders under `data/` (note that the `.gitignore` in this repo ignores `data/input/`, `data/eval/`, and `data/output/`).
+The model data directories default to the top-level folders under `data/` (the `.gitignore` in this repo ignores `data/input/`, `data/eval/`, and `data/output/`).
 
 To specify custom input and output directories, use the configuration function `icemodel/+icemodel/config.m`. In your matlab terminal:
 
@@ -150,8 +150,8 @@ Examples:
   window-stamped met file for site `cdp` spanning 1994-2014 at a 1-hour timestep.
 
 Met files live under `input/met/`. Staging writes them into a per-source
-subfolder `input/met/<FORCINGS>/` so the flat `met/` directory does not sprawl
-as forcing sources accumulate. The runtime resolves `input/met/<FORCINGS>/`
+subfolder `input/met/<FORCINGS>/`, so the flat `met/` directory does not fill
+with files as forcing sources accumulate. The runtime resolves `input/met/<FORCINGS>/`
 **first** and falls back to a flat `input/met/` path, so both layouts work and
 committed flat fixtures still load. (`icemodel.forcing.helpers.writemet` writes
 the subfolder; `icemodel.forcing.helpers.sourceSearchDirs` defines the
@@ -159,8 +159,8 @@ subfolder-first search order shared by the runtime resolvers.)
 
 Repository writers default model met to a 15-minute timestep. Public met
 builders/importers expose `dt_out="15m"`; pass `dt_out=""` explicitly to retain
-the source's native model-met cadence. Repeated writes are additive no-ops for
-an existing target unless `overwrite=true` is requested. A broader
+the source's native model-met cadence. A repeated write leaves an existing
+target unchanged unless you pass `overwrite=true`. A broader
 window-stamped artifact also satisfies a narrower ordinary request.
 
 Each met file must contain a timetable object named `met` with one column for each forcing variable. See the example met file.
@@ -205,7 +205,7 @@ ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/restart/restart_FORCINGS_forcings_USERDAT
 
 Here, `ICEMODEL_OUTPUT_PATH` is an environment variable set by the `icemodel.config` function, the lowercase "forcings" is a string literal used to join the `FORCINGS` and `USERDATA` string variables, and `SITENAME`, `SMBMODEL`, `FORCINGS`, `USERDATA`, and `USERVARS` are parameters passed to the `icemodel.setopts` function (either directly or indirectly via the helper function `icemodel.run.point`). One `YYYY` folder is created for each year in the `SIMYEARS` parameter passed to `icemodel.setopts`.
 
-Note that the `ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY` subfolders are generated automatically when the model run starts if they do not exist. If `opts.saverestart` is enabled, a sibling `restart/` folder is also created under the same run output directory and stores one year-boundary restart file per saved year.
+The `ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY` subfolders are created automatically when the model run starts if they do not exist. If `opts.saverestart` is enabled, a sibling `restart/` folder is also created under the same run output directory and stores one year-boundary restart file per saved year.
 
 Example: An IceModel simulation for the KAN-M weather station location for years 2015:2016 using MERRA forcings, with `userdata='modis'` and `uservars='albedo'` will produce the following output files:
 
@@ -316,7 +316,7 @@ Warren S G and Brandt R E 2008 *Optical constants of ice from the ultraviolet to
 - Runs on Windows 10, tested on R2017a.
 <!-- - Runs in Octave on MacOS Sonoma (Intel silicon), using Octave version 9.2. -->
 
-*Note that the main program `icemodel/icemodel.m` and core +icemodel namespace functions (i.e., functions called in the `icemodel.m` call stack) are written in a minimalist matlab style: all functions are compatible with code generation, all numerical methods employ custom hand-written solvers, and there are no toolbox dependencies or modern matlab conveniences such as `arguments` input parsers.
+*The main program `icemodel/icemodel.m` and the core +icemodel namespace functions (that is, functions called in the `icemodel.m` call stack) are written in a minimalist matlab style: all functions are compatible with code generation, all numerical methods employ custom hand-written solvers, and there are no toolbox dependencies or modern matlab conveniences such as `arguments` input parsers.
 
 Exceptions to this style include non-core-physics namespace functions (e.g. `icemodel/+icemodel/+helpers`), which by convention are helper functions not required by the numerical model. The `demo.m` script uses a modern matlab approach including name=value syntax (requires >=R2021a). The `arguments` parser used in `icemodel.run.point` requires >=R2019b. For users running pre-R2019b, see `demo/demo_pre_R2019.m`.
 
@@ -366,7 +366,8 @@ external dev-repo toolboxes that are kept *out* of this repo:
 
 These are wired by the single central function `icemodel.dependencies`, which
 the test bootstrap calls automatically. It resolves each repo root in this
-order, and is a clean no-op when a dependency is already on the path or absent:
+order, and it changes nothing when a dependency is already on the path or
+absent:
 
 1. A dependency-specific environment variable:
    `ICEMODEL_EXACTREMAP`, `ICEMODEL_ACTIVELAYER`, `ICEMODEL_MATFUNCLIB`.

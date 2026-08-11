@@ -95,7 +95,7 @@ Programmatic regression helpers:
 
 1. `run_test_bootstrap(...)`
    - First-time setup or full refresh / pre-release orchestration entry point.
-   - The only tool that owns cleanup/backups of `test/artifacts` and
+   - The only tool that cleans up and backs up `test/artifacts` and the
      managed perf/regression baseline files.
    - Cleanup removes mutable rolling MAT files only. Registered immutable
      releases such as v1.1 are loaded for release checks, not snapshotted from

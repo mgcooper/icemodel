@@ -55,9 +55,9 @@ Entry points:
 - `icemodel.column.budget_surface_mass_balance`
 - `icemodel.column.merge_thin_layers`
   - three views of the same remeshing export, which nest rather than
-    duplicate. `df_lyr` (ice2, standard and diagnostic profiles) totals
-    the mass all merges
-    removed, as a water-equivalent fraction the caller scales by `dz`.
+    duplicate. `df_lyr` (ice2, standard and diagnostic profiles) totals the
+    mass that all merges removed, as a water-equivalent fraction the caller
+    scales by `dz`.
     `mass_budget_merge_export_solid/liquid_mwe` (diagnostic profile) is that
     same total split by phase, which the closure identities require.
     `mass_budget_top_export_solid/liquid_mwe` is the surface-removal subset,

@@ -204,9 +204,9 @@ results = run_snow_verification_suite(write_artifacts=true, save_plots=true);
 Comparison figures include the time-series overlay plus target-versus-candidate
 scatter figures with a 1:1 reference line and fitted linear trend. Scatter
 figures are separate from the time-series figure and are only produced for
-time-series site cases, not the current Colbeck experiment bundle. The scatter
-are generated with `icemodel.plot.scatterplot`. The timeseries plots are generated
-with `icemodel.plot.timeseries`.
+time-series site cases, not the current Colbeck experiment bundle.
+`icemodel.plot.scatterplot` generates the scatter figures, and
+`icemodel.plot.timeseries` generates the time-series plots.
 
 ## Time-window policy
 
@@ -216,11 +216,11 @@ The same vocabulary applies at both staging and runtime:
 - **Staging** (`importEsmSnowmip`): with no explicit window, each requested
   site stages its full forcing/observation source record. Pass `startdate` /
   `enddate` kwargs together to stage a shorter shared window. A metadata-only
-  `dry_run` uses the site's one-year `default_smoke_window` without reading the
+  `dry_run` uses the site's one-year `esmSnowmipWaterYear` without reading the
   source cache or writing artifacts.
 - **Runtime** (`run_snow_verification_suite`): with no explicit
   window and a single ESM-SnowMIP case, the runner narrows to that
-  site's `default_smoke_window`. Pass `startdate` / `enddate` to
+  site's `esmSnowmipWaterYear`. Pass `startdate` / `enddate` to
   override; the staged window remains the upper bound.
 - **Default suite call**: `run_snow_verification_suite()` (no args)
   runs Col de Porte (cdp) over its smoke window. CDP is the most
@@ -229,8 +229,8 @@ The same vocabulary applies at both staging and runtime:
   runs fast.
 
 When the staged window is wider than the runtime window, comparecase
-subsets the staged target on the fly via `opts.startdate` /
-`opts.enddate` — no re-staging required.
+subsets the staged target at read time via `opts.startdate` /
+`opts.enddate`. No re-staging is required.
 
 ## ESM-SnowMIP sites
 
@@ -271,7 +271,7 @@ Setup and refresh tooling lives under `icemodel.verification.setup`:
 - `importEsmSnowmip` stages all 10 ESM-SnowMIP site cases via the builders.
   With no explicit window, each site uses its full source record; pass paired
   `startdate` / `enddate` values to stage a shorter window. Metadata-only dry
-  runs keep the short per-site `default_smoke_window` preview. Default staged
+  runs keep the short per-site `esmSnowmipWaterYear` preview. Default staged
   met and the manifest runtime cadence are 15 minutes; explicit `dt_out=""`
   keeps both the met artifact and its manifest cadence hourly.
 - `importLaughTests` stages selected Laugh-Tests synthetic process cases.
@@ -489,7 +489,7 @@ restage. The durable partial-repair tools have separate scopes:
   source_id filters the product inventory. The function defaults to a dry run,
   synchronizes canonical metadata, validates preservation boundaries, replaces
   files atomically, and reports pass-two identity. Its optional repair_function
-  callback is the extension seam for a
+  callback is the extension point for a
   future bounded field/property migration after the same change is canonical in
   the production builder. The caller must declare every variable and UserData
   field or CustomProperty the callback may change; the coordinator rejects
@@ -719,7 +719,7 @@ not a snow-depth alias; `snow_depth` remains nonnegative physical snow height.
 The plotted `tice10m` is the canonical staged 10 m ice/firn temperature channel,
 not a value synthesized by the renderer. Profile legends use family-facing
 observation labels and split a small, explicit `name` identity set into separate
-colors; profile collections without such an identity remain one honest series.
+colors; profile collections without such an identity remain one series.
 `plotFirnArtifacts` forwards the same option as a compatibility wrapper, but new
 workflow examples should use the family-neutral `plotVerificationArtifacts`.
 
@@ -928,8 +928,8 @@ and untouched cases re-encode identically (raw decode, no field reordering);
 hand-added family fields like `schema: "metadata_only"` survive. Re-staging the
 same site updates exactly its entry (idempotent), and a stale `skipped[]` entry
 for a now-staged site clears while other sites' skips are preserved. So adding
-DY2/EGP into the family root that already holds the KAN fixtures never churns or
-drops them.
+DY2/EGP into the family root that already holds the KAN fixtures never rewrites
+or drops them.
 
 A shorter same-identity refresh preserves the enclosing case/leg
 window and its prior artifact references; an enclosing/equal rebuild replaces
@@ -1407,8 +1407,8 @@ source rows and must not define a new on-disk contract.
 - `helpers` contains normal workflow helpers for path discovery (`evaluationDataRoot`,
   `inputDataRoot`, `esmRuntimeMetFiles`), manifest reads, artifact loading, candidate
   resolution, metric schema definition, the per-run markdown report writer
-  (`writeRunReport`), the per-site default window (`default_smoke_window`), and
-  per-site default window (`default_smoke_window`). The standard-contract
+  (`writeRunReport`), and the per-site default window
+  (`esmSnowmipWaterYear`). The standard-contract
   opts builder used by `runIcemodelSnowCandidate` is
   `icemodel.test.helpers.setModelOptsForCase`, which accepts both formal-case
   rows and verification manifests via input dispatch.
@@ -1431,7 +1431,7 @@ source rows and must not define a new on-disk contract.
   their shared strict site-id selector (`selectSiteCatalogEntries`), and the
   canonical staged-case factories. RetMIP keeps alias-aware case selection in
   `retmipCaseCatalog`; PROMICE retains its documented first-pass fallback and
-  ESM-SnowMIP retains its scalar site lookup because those semantics differ.
+  ESM-SnowMIP retains its scalar site lookup because those behaviors differ.
 - `namelists` contains canonical selector lists for dataset families, case ids,
   case types, surface zones (`surfacezone`, the per-case physical-regime
   vocabulary stamped onto case manifests), the ESM-SnowMIP site-name namelist
@@ -1458,10 +1458,11 @@ The per-case folder layout is split by `case_type`:
   `firn_observational`) are FORCING-AGNOSTIC: the case folder stores one
   data-only `observations.mat` bundle (the eval target). The manifest is
   forcing-agnostic - it records which forcing/eval sources are available (by id,
-  informational only), but the forcing is NOT bundled and NOT stipulated, so any
-  forcing usable at runtime without rewriting `observations.mat`. No bundled
-  `reference.mat` smoke copy is written — the default candidate, with no model
-  output supplied, falls through to the soft diagnostic lane. Forcing always
+  informational only), but the forcing is NOT bundled and NOT stipulated. You
+  can therefore use any forcing that runs at runtime without rewriting
+  `observations.mat`. No bundled `reference.mat` smoke copy is written. With no
+  model output supplied, the default candidate falls through to the soft
+  diagnostic path. Forcing always
   lives separately under per-source subfolders `data/input/met/<source>/` and
   `data/input/userdata/<source>/` (standard icemodel naming via
   `writemet`/`writeuserdata`), never in the eval folder. (Older PROMICE demo

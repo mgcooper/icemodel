@@ -32,9 +32,9 @@ builder?**
 | KAN_M | 3260  | 177      | 0.9299 | -1.207   | 4.496    | 12.750        | 23.796           | -11.046        | -46.4  | 31-Dec-2018       |
 
 The full-record difference is a slowly COMPOUNDING multi-year datum/scaling
-drift (the difference curve steps down each summer and is flat each winter,
-max divergence at the END of the record), not a single discontinuity. It is the
-right sign/character for a surface-height-channel / datum change between the
+drift, not a single discontinuity. The difference curve steps down each summer
+and is flat each winter, and the divergence is largest at the END of the record.
+That sign and shape match a surface-height-channel or datum change between the
 L3-based new builder and the older legacy artifact.
 
 ## Targeted melt-season windows (rebaselined to window start `t1`)
@@ -60,14 +60,14 @@ from legacy to new over THAT window.
 melt season the new and legacy series agree to within a few centimetres of bias
 and RMSE and correlate at r >= 0.97 (r >= 0.998 for the Jul-start windows). The
 large full-record divergence is a compounding multi-year datum drift that does
-NOT live inside any one season; once each series is rebaselined to the window
-start it cancels out almost entirely.
+NOT occur inside any one season. Once each series is rebaselined to the window
+start, that drift cancels almost entirely.
 
 - **Jul1-Oct1 windows (the cleanest melt-season span): negligible.** Bias and
   RMSE are <= 0.08 m, total-ablation difference <= 0.05 m (<= 8% at KAN_M where
   the seasonal total is small, <= 2.4% at KAN_L). A GOF computed against the new
   reference instead of the legacy one would shift by far less than the model's
-  own error. Historical Jul-Oct evaluations stand.
+  own error. Historical Jul-Oct evaluations remain valid.
 
 - **Jun1-Oct1 windows: a small, sign-consistent early-June offset.** The new
   series lags the legacy by ~0.25 m bias in 2015 (both sites) because the legacy
@@ -76,10 +76,11 @@ start it cancels out almost entirely.
   This is ~9% of the 2015 KAN_L window total and ~29% of the small 2015 KAN_M
   window total; the 2016 Jun-Oct windows agree to within 0.13-0.15 m (<= 6.5%).
   An evaluation starting 1 June 2015 could shift by up to ~0.25 m of reference
-  ablation; this is the only case where the choice of reference is worth noting,
-  and even there it is a season-start datum effect, not a model-relevant change.
+  ablation. This is the only case where the choice of reference changes the
+  result, and even there it is a season-start datum effect, not a
+  model-relevant change.
 
-**Bottom line for the research:** the new `buildPromiceData` ablation can replace
+**Conclusion for the research:** the new `buildPromiceData` ablation can replace
 the legacy staged artifact as the melt-season GOF reference with NO material
 effect on historical KAN_L / KAN_M evaluations, provided the window is
 rebaselined to its start (which the legacy `plotPromice 'refstart'` workflow
@@ -102,9 +103,10 @@ timing or noise difference:
    (raw SR50 / pressure-transducer surface height or an earlier processing level)
    that registers more total lowering per season.
 2. **Reinstall / offset handling at KAN_M.** The lower KAN_M full-record
-   correlation reflects a station reinstall / datum reset the two pipelines zero
-   differently. This is a KAN_M data-history artifact, not a builder bug, and it
-   washes out inside the rebaselined melt-season windows (r >= 0.966 there).
+   correlation reflects a station reinstall / datum reset that the two pipelines
+   zero differently. This is a KAN_M data-history artifact, not a builder bug,
+   and it disappears inside the rebaselined melt-season windows (r >= 0.966
+   there).
 3. **Gap / winter bridging.** A small contributor (7 days excluded at KAN_L; 177
    at KAN_M, mostly winter), not the main driver of the full-record offset.
 
@@ -114,10 +116,11 @@ This pass did NOT run the icemodel itself over the windows. The
 `+icemodel/+verification` runners (`runIcemodelSnowCandidate`,
 `candidateFromIcemodelOutput`, the `+setup` namelists) are built for the Colbeck
 snow-verification cases, not for a KAN_L / KAN_M melt-season ablation run, so
-staging a real model run over these windows is not a quick drop-in. Per the task
-this is optional and was not allowed to block the required data-vs-data
-deliverable. The model-vs-legacy-obs-vs-new-obs overlay is left as a follow-up:
-the intended path is a standalone interactive script that loads saved icemodel
-output for the window and overlays modeled cumulative ablation onto the two obs
-series produced here (the figure already plots legacy vs new; adding a third
-modeled line is a small extension once a saved run exists).
+staging a real model run over these windows is not a simple substitution. The
+task marks this run as optional, and it must not block the required
+data-vs-data deliverable. The model-vs-legacy-obs-vs-new-obs overlay remains a
+follow-up. The intended path is a standalone interactive script that loads
+saved icemodel output for the window and overlays modeled cumulative ablation
+onto the two obs series produced here. The figure already plots legacy versus
+new, so adding a third modeled line is a small extension once a saved run
+exists.

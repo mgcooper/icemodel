@@ -1,6 +1,7 @@
 # icemodel.vapor
 
-Purpose: vapor thermodynamics and atmosphere-surface vapor conversions shared across domains.
+Purpose: vapor thermodynamics and atmosphere-surface vapor conversions that
+every domain shares.
 
 Public entry points:
 - `icemodel.vapor.saturation_vapor_pressure`

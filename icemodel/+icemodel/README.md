@@ -1,9 +1,9 @@
 # icemodel
 
-The top-level namespace is the runtime layer: everything needed to configure a
-run, feed it, run it, and get results back out. Physics lives in the
-sub-namespaces (`+column`, `+surface`, `+couplers`, `+vapor`, `+radiation`,
-`+numerics`); this level orchestrates them.
+The top-level namespace is the runtime layer. It holds everything needed to
+configure a run, feed it, run it, and get results back out. The sub-namespaces
+(`+column`, `+surface`, `+couplers`, `+vapor`, `+radiation`, `+numerics`) hold
+the physics. This level orchestrates them.
 
 ## What belongs here
 

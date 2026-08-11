@@ -1,6 +1,7 @@
 # icemodel.surface
 
-Purpose: public surface-energy, surface-state, and surface mass-diagnostic contracts.
+Purpose: public surface-energy, surface-state, and surface mass-diagnostic
+contracts.
 
 Public entrypoints:
 - `diagnose_turbulent_heat_fluxes`

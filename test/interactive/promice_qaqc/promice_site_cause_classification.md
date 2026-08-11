@@ -5,10 +5,10 @@ Companion to `promice_eval_summary.md` (auto-generated metrics),
 `promice_eval_<site>.png` figures. This file is the manual interpretation layer
 explaining each per-site behaviour and stating what the builders do about it.
 
-## Flagging philosophy (what is GEUS vs ours)
+## Flagging responsibilities (what is GEUS and what is ours)
 
-We preserve the authoritative GEUS series and ATTACH per-sample flags; we never
-silently edit data. Concretely:
+We preserve the authoritative GEUS series and ATTACH per-sample flags. We never
+edit the data itself. Concretely:
 
 - **GEUS provides** all QC, manual flagging/fixing, gap-filling (slope-bridging
   the surface height across sensor outages), the multi-sensor `z_surf_combined`,
@@ -20,7 +20,7 @@ silently edit data. Concretely:
   per-sample flags. The GEUS `t_i_10m` value is preserved unchanged as
   `tice10m_source`; canonical `tice10m` masks explicitly flagged thermistor
   discontinuities while `tice10m_qc_flag` retains the reason. No source value
-  is overwritten or silently corrected.
+  is overwritten or corrected.
 
 The cross-site audit supports a 1 K exactly-hourly discontinuity threshold
 (P99.9 is 0.349733 K across 2,303,336 finite pairs). Both endpoints are masked;
@@ -39,7 +39,7 @@ UNAMBIGUOUS steps are corrected by default at consumption.
 
 A site is treated as an ablation site when its L3 file ships `z_ice_surf` (the
 OPERATIONAL authority used by `buildPromiceData`). This agrees with the readme
-Table 1 "Site type" surfaced by `promiceSiteCatalog.site_type`. Both are
+Table 1 "Site type" reported by `promiceSiteCatalog.site_type`. Both are
 documented and consistent; the operational `z_ice_surf`-presence test is the one
 the builder branches on. (Marginal local glaciers whose L3 file ships no
 `z_ice_surf` — e.g. ZAC_A, WEG_B — screen operationally as accumulation even
@@ -80,12 +80,12 @@ period should be unaffected by the gaps."* Therefore:
 | KAN_U | accumulation (percolation) | surface reference; thermistor QC required | Net `surface_height` -0.5..+7.6 m. `site_type`=Accumulation, `surface_zone`=percolation (firn-core truth). A few >1 m single-hour glitches in `z_surf_combined` are flagged unambiguous. The independent 10 m screen masks the transient 2018-08-28 jump and marks the isolated tice8-driven 2022-09-03 level shift unreviewed through the native 2022-11-02 depth reset; the raw GEUS target remains in `tice10m_source`. |
 | LYN_L | ablation | rapid rise then flat | A short local-glacier record: an early observed ablation segment (~0.1 m, real), then the record reaches a gap / record-end and flatlines. The flat tail is gap-bridged and flagged; the ablation magnitude is real. Remains authoritative GEUS data. |
 | LYN_T | ablation | rapid rise then flat | Same pattern as LYN_L; record ends 2024-04, much of it gap-bridged and flagged. SHORT/SPARSE flags fire. |
-| MIT  | ablation | ~12 m step early | Two ~5.9 m single-hour jumps at 2009-08-11/12 (~11.9 m total): grossly implausible, single-station (no merge), so an installation/sensor jump. These are the UNAMBIGUOUS correctable steps: the default `destepSurface` transform levels them at analysis time; the staged series stays faithful. |
-| NUK_K | ablation | early bad thermistor; late-2024 step at a gap | Surfaced/early-install thermistor readings are removed by the depth<=0 discard + the [-80,1] clamp; `tice10m` is primary. The late-2024 surface step sits in a gap-flagged segment. Residual warm-share is early-record near-melt, flagged for the eye. |
+| MIT  | ablation | ~12 m step early | Two ~5.9 m single-hour jumps at 2009-08-11/12 (~11.9 m total): physically implausible, single-station (no merge), so an installation/sensor jump. These are the UNAMBIGUOUS correctable steps: the default `destepSurface` transform levels them at analysis time; the staged series stays faithful. |
+| NUK_K | ablation | early bad thermistor; late-2024 step at a gap | Surfaced/early-install thermistor readings are removed by the depth<=0 discard + the [-80,1] clamp; `tice10m` is primary. The late-2024 surface step sits in a gap-flagged segment. Residual warm-share is early-record near-melt, flagged for review. |
 | NUK_L | ablation | snow spike late 2011 | Ablation to ~98 m (low-elevation margin, plausible). The 2011 snow spike (max ~1.9 m) is within range and is real remaining GEUS noise; `snow_depth` is clamped >= 0, the spike is flagged, not deleted. |
 | QAS_L | ablation | 2009 spike | `snow_max` 6.87 m fires SNOW_HIGH; ablation to ~98 m is real (very low elevation). Spike flagged, not deleted. |
 | QAS_U | ablation | apparent step late 2023 | The apparent ~2 m offset spans a long gap (~0.03 m/day), so it is NOT a discrete step — the GAP flag covers it, and step detection correctly does NOT flag it. QAS_U is a known merge (QAS_Uv3/QAS_U), but with no staged per-station handover date the transition evidence cannot confirm a step here. Reported honestly, not auto-corrected. |
-| SCO_U | ablation | snow step late 2025 | A near-real-time data artefact in the still-updating record; the readme notes recent values are recomputed after the next station visit. `snow_depth` clamped >= 0; flagged for the eye. |
+| SCO_U | ablation | snow step late 2025 | A near-real-time data artefact in the still-updating record; the readme notes recent values are recomputed after the next station visit. `snow_depth` clamped >= 0; flagged for review. |
 
 ## How to regenerate
 

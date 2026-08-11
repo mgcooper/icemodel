@@ -1,6 +1,6 @@
 # icemodel.radiation
 
-Purpose: optical properties and radiative-transfer machinery.
+Purpose: optical properties and radiative transfer.
 
 Public entry points:
 - `icemodel.radiation.initialize_spectral_model`
@@ -17,10 +17,10 @@ Public entry points:
 Contents:
 - extinction and scattering property assembly
 - solar forcing helpers
-- two-stream solver machinery
+- the two-stream solver
 
 Rules:
 - keep general radiation algorithms here
 - keep column-owned absorbed shortwave assembly in `icemodel.column`
 
-Migration status: active optical and two-stream helpers now live here.
+Status: the active optical and two-stream helpers live here.

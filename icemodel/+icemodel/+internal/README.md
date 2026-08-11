@@ -5,8 +5,8 @@ release metadata, install support, and citation. It is not model code and not a
 public API. Nothing here should be needed to configure or run the model.
 
 Runtime helpers belong one level up, in `icemodel` (see its README). If a
-function is used while running a case, it does not belong here even if it feels
-like a utility.
+function runs while a case runs, it does not belong here, even if it looks like
+a utility.
 
 One exception: `fullpath` resolves the repository root and is called from
 `icemodel.config` and `icemodel.getpath` while running a case. It stays here
@@ -17,8 +17,8 @@ over 100 call sites depend on the current name.
 
 MathWorks uses `+internal` as a convention rather than a language feature. The
 only special treatment is that tooling hides it: it does not appear in tab
-completion, `help` listings, or documentation search. The signal is "not public
-API, no compatibility promise."
+completion, `help` listings, or documentation search. It means "not public API,
+no compatibility promise."
 
 Their convention scopes it by *ownership*: a `+internal` sits beside the public
 code it serves and holds that code's implementation details. This repository

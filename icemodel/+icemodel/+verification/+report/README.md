@@ -82,7 +82,7 @@ manifest fingerprints changed, regenerate the products first; see the
 ## Report-layer ownership
 
 The test suite and verification suite share presentation code, not execution
-semantics. `test/` owns unit discovery, numerical/performance runners, managed
+behavior. `test/` owns unit discovery, numerical/performance runners, managed
 baselines, and comparison artifacts. `icemodel.verification` owns scientific
 candidate/reference comparisons and artifact QA. This namespace owns the
 Quarto-facing presentation for both: the snow/firn scientific report below and
@@ -143,8 +143,8 @@ Both appendix sections have clickable station links, and the figure ledger's
 channel summaries retain sites and channels with no plotted segment, so figure
 availability cannot hide complete-native or unresolved data.
 
-Native curves are provenance-masked so legacy staged fills cannot masquerade as
-observations. Observed, raw-fallback, and source-backed negative-clamped
+Native curves are provenance-masked so a legacy staged fill cannot appear as an
+observation. Observed, raw-fallback, and source-backed negative-clamped
 shortwave codes remain native context; darkness and reconstructed codes do not.
 Each detail panel accents only its named method. Other fills in the context
 window are muted grey, derived by `methodFillLayers` from per-sample provenance
@@ -224,10 +224,9 @@ modified.
 Optional QA and output overrides must remain beneath the selected preview
 root's `qa/` and `report/` directories.
 
-Only `data/preview/figures/` is the canonical figure namespace. Historical
-direct family directories were never report inputs and were removed after the
-combined report was accepted. Do not recreate them; plots from current QA and
-plotting code belong beneath `data/preview/figures/`.
+Only `data/preview/figures/` is the canonical figure namespace. Direct family
+directories are not report inputs and do not exist. Do not recreate them; plots
+from current QA and plotting code belong beneath `data/preview/figures/`.
 
 The concise PROMICE model-development handoff is
 `data/preview/qa/promice_snow_model_ready_site_years.csv`; the corresponding

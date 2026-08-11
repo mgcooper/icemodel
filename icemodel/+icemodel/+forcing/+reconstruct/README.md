@@ -49,7 +49,7 @@ Use `met_dir`, `modis_dir`, `out_dir`, and `qa_dir` together when operating on
 an alternate data tree. The selected native met directory determines the
 enclosing data root; reconstruction never falls back to another tree.
 
-## Contract at a glance
+## Contract summary
 
 This family-generic engine produces `promice_filled`, the canonical runnable
 PROMICE forcing. Native PROMICE is incomplete for most station-years and is
@@ -59,7 +59,7 @@ retained unmodified as the provenance source.
   `2026-07-23-promice-gap-filling-and-ktransect`.
 - Every filled sample carries a `uint8` provenance code and every contiguous
   segment has an audit row.
-- `setopts` defines the scalar knobs, channel lists, and proxy source
+- `setopts` defines the scalar options, channel lists, and proxy source
   mappings. Dedicated functions define per-channel bounds, admission caps,
   precipitation names, and bucket edges.
 - Every required non-precipitation output is planned. Precipitation is excluded
@@ -84,8 +84,8 @@ Methods admit only through this validation harness:
   daylight-only shortwave option, `bucketEdges` strata assigned by the
   right-closed `gapDurationBucket` convention).
 - `validationSplit` — persisted whole-year selection/evaluation split
-  (a schema-valid manifest wins only while it remains a disjoint, complete
-  partition of the current record years).
+  (the engine uses a schema-valid manifest only while it remains a disjoint,
+  complete partition of the current record years).
 - `syntheticMissingness` — blocked synthetic gaps drawn from the real
   run-length distribution, inserted only into observed spans; time-sorted.
 - `validationMetrics` — bias/RMSE/correlation/within-gap observed spread and
@@ -128,7 +128,8 @@ Methods admit only through this validation harness:
   Shortwave overlap is screened by target-station TOA rather than proxy
   magnitude; fitted proxy
   corrections persist in the station plan for calibrated last-resort use,
-  whether or not the candidate wins an admitted stratum, but zero-overlap
+  whether or not the candidate is selected for an admitted stratum, but
+  zero-overlap
   corrections are ineligible for both competition and last resort.
   `lwdEstimator` is
   the calibrated empirical lwd candidate.

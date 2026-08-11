@@ -11,8 +11,8 @@ Shared:
 - `accelerate_coupler_iterate` accelerates one Picard step on T_sfc, and all
   three solvers call it. It applies Aitken with relaxation as the fallback,
   then a safeguarded secant step when the last two residuals bracket a root.
-- `initialize_coupler_history` returns the empty iterate history that accelerator
-  expects.
+- `initialize_coupler_history` returns the empty iterate history that the
+  accelerator expects.
 
 Rules:
 - own Picard/Aitken and cross-domain convergence logic here
