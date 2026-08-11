@@ -20,7 +20,7 @@ function results = run_snow_verification_suite(kwargs)
    %
    % Default behaviour
    %   With no arguments, runs Col de Porte (cdp) over its
-   %   default_smoke_window. CDP is the most canonical / widely-cited
+   %   esmSnowmipWaterYear. CDP is the most canonical / widely-cited
    %   ESM-SnowMIP snow verification site (Menard 2019 ESSD), and a single
    %   site / single year keeps interactive runs fast. Override via cases=
    %   to select other sites and / or startdate / enddate to narrow the
@@ -204,7 +204,7 @@ function [run_name, run_dir, write_any_artifacts, kwargs, cleanup, ...
    end
 
    % Resolve the runtime comparison window. With no explicit dates and a
-   % single ESM-SnowMIP site, default to that site's default_smoke_window
+   % single ESM-SnowMIP site, default to that site's esmSnowmipWaterYear
    % so interactive runs match the staged smoke fixture without the
    % caller having to know per-site dates. With multiple cases or
    % non-ESM-SnowMIP cases (e.g. colbeck1976), let comparecase use the
@@ -214,7 +214,7 @@ function [run_name, run_dir, write_any_artifacts, kwargs, cleanup, ...
          && ismember(kwargs.cases, ...
          icemodel.verification.namelists.snowmipsite())
       [kwargs.startdate, kwargs.enddate] = ...
-         icemodel.verification.helpers.default_smoke_window(kwargs.cases);
+         icemodel.verification.helpers.esmSnowmipWaterYear(kwargs.cases);
    end
 
    % Visible plots imply we want to create the figure.

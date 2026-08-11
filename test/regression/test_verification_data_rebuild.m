@@ -308,7 +308,7 @@ function test_esm_default_import_uses_full_source_bounds(testCase)
    % The full source bounds extend beyond the short metadata-only preview
    % used by dry_run.
    [smoke_start, smoke_end] = ...
-      icemodel.verification.helpers.default_smoke_window("cdp");
+      icemodel.verification.helpers.esmSnowmipWaterYear("cdp");
    verifyLessThan(testCase, source_start, smoke_start);
    verifyGreaterThan(testCase, source_end, smoke_end);
 
@@ -332,7 +332,7 @@ function test_esm_dry_run_does_not_write_staging_tree(testCase)
    verifyEqual(testCase, string(manifest.cases.case_id), "cdp");
    verifyEqual(testCase, string(manifest.cases.native_timestep), "15m");
    [smoke_start, smoke_end] = ...
-      icemodel.verification.helpers.default_smoke_window("cdp");
+      icemodel.verification.helpers.esmSnowmipWaterYear("cdp");
    verifyEqual(testCase, string(manifest.cases.period.start), ...
       string(icemodel.verification.setup.formatManifestTime(smoke_start)));
    verifyEqual(testCase, string(manifest.cases.period.end), ...

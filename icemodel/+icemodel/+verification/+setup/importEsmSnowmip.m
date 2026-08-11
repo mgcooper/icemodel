@@ -85,7 +85,7 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %    icemodel.verification.setup.buildEsmSnowmipObservations,
    %    icemodel.verification.namelists.snowmipsite,
    %    icemodel.verification.setup.esmSnowmipSiteCatalog,
-   %    icemodel.verification.helpers.default_smoke_window
+   %    icemodel.verification.helpers.esmSnowmipWaterYear
 
    arguments
       source_dir (1, 1) string = ""
@@ -250,7 +250,7 @@ function s = stageCase(sitename, source_dir, family_root, input_root, ...
          'obs_file', char(fullfile(sitename, "observations.mat"))});
    else
       [window_start, window_end] = ...
-         icemodel.verification.helpers.default_smoke_window(sitename);
+         icemodel.verification.helpers.esmSnowmipWaterYear(sitename);
       comparison_variables = dryRunComparisonVariables();
       observation_variables = dryRunObservationVariables(sitename);
    end
@@ -302,9 +302,10 @@ function permafrost_zone = casePermafrostZone(sitename)
    %
    % Hard-coded results of a point-in-polygon test of the Obu et al. (2019) ESA
    % GlobPermafrost / UiO PEX permafrost-zone map at each ESM-SnowMIP site
-   % (test/interactive/site_classification/classify_site_facies.m). All ten sites are off-ice land
-   % surfaces. Sites outside any permafrost polygon -> "none". Vocabulary:
-   % icemodel.verification.namelists.permafrostzone.
+   % (test/interactive/site_classification/classify_site_facies.m). All ten
+   % sites are off-ice land surfaces. A site outside every permafrost polygon
+   % gets "none". Vocabulary: icemodel.verification.namelists.permafrostzone.
+
    switch lower(string(sitename))
       case "sod"   % Sodankyla, boreal Lapland
          permafrost_zone = "continuous";
@@ -325,14 +326,13 @@ function vars = obsComparisonVariables(obs_tt)
    % Returns a string column with the canonical ordering:
    %   snow_depth_m, swe_kg_m2, surface_temp_C, soil_temp_<k>_C
    %
-   % A canonical variable is included when its column exists in the
-   % staged obs timetable. The obs builder
-   % (buildEsmSnowmipObservations) decides which canonical columns to
-   % stage based on upstream NetCDF channel availability, so a simple
-   % presence check is sufficient here. Sparseness within the staged
-   % window is preserved on the comparison axis (plotcase renders
-   % sparse markers); never-observed variables are absent and never
-   % appear as comparison rows.
+   % A canonical variable is included when its column exists in the staged obs
+   % timetable. The obs builder (buildEsmSnowmipObservations) decides which
+   % canonical columns to stage from the upstream NetCDF channels, so a presence
+   % check is enough here. Gaps inside the staged window stay on the comparison
+   % axis, and plotcase draws them as sparse markers. A variable that was never
+   % observed is absent and never becomes a comparison row.
+
    present = string(obs_tt.Properties.VariableNames);
    canonical = ["snow_depth_m"; "swe_kg_m2"; "surface_temp_C"];
    soil = reshape(present(startsWith(present, "soil_temp_")), [], 1);
