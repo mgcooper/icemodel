@@ -6,10 +6,10 @@ function [x, filled, audit] = fillTwilightClimatology( ...
    %     icemodel.forcing.reconstruct.fillTwilightClimatology( ...
    %     times, x, native, latitude, longitude)
    %
-   % A single still-missing civil-twilight posting with exactly one
-   % adjacent all-interval darkness posting uses the existing station
-   % day-of-year/posting climatology. The untouched native series is the
-   % only support pool; finite input samples are never modified.
+   % This function fills a missing civil-twilight posting when exactly one
+   % neighbouring posting is dark for the whole interval. The fill value
+   % comes from the station day-of-year and posting climatology. Only the
+   % native series supplies support, and a finite input sample never changes.
 
    arguments
       times datetime

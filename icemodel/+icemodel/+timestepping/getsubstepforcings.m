@@ -8,11 +8,11 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, ppt, tppt, De, ea] ...
    % When opts.met_substep_interp is false or dt_sum == 0, returns the current
    % timestep value with no interpolation.
    %
-   % NOTE: This function was written for experiments with substep-averaged flux
-   % diagnostics under sudden forcing transitions (e.g. no-leap calendar
-   % boundaries). It is not currently called in production runs. To activate,
-   % interpolate _s variants into solve_surface_energy_balance and recompute ea
-   % before diagnose_surface_energy_balance.
+   % This function supports experiments with substep-averaged flux diagnostics
+   % under sudden forcing transitions, such as no-leap calendar boundaries.
+   % Production runs do not call it. To use it, interpolate the _s variants
+   % into solve_surface_energy_balance and recompute ea before
+   % diagnose_surface_energy_balance.
    %
    %#codegen
 

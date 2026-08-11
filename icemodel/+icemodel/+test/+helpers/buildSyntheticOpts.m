@@ -1,7 +1,8 @@
 function opts = buildSyntheticOpts(workspace, smbmodel, simyears, kwargs)
    %BUILDSYNTHETICOPTS Build resolved OPTS for synthetic unit-test runs.
    %
-   %  opts = icemodel.test.helpers.buildSyntheticOpts(workspace, "skinmodel", 2016)
+   %  opts = icemodel.test.helpers.buildSyntheticOpts( ...
+   %     workspace, "skinmodel", 2016)
 
    arguments
       workspace struct
@@ -58,7 +59,7 @@ function opts = buildSyntheticOpts(workspace, smbmodel, simyears, kwargs)
       workspace.forcings, kwargs.userdata, kwargs.uservars, ...
       kwargs.testname, kwargs.saveflag, kwargs.backupflag, setopts_args{:});
 
-   % Prefer the fixture timestep unless the caller overrode it explicitly.
+   % Prefer the fixture timestep unless the caller overrides it explicitly.
    dt_value = kwargs.dt;
    if ~isfinite(dt_value)
       dt_value = workspace.dt_seconds;

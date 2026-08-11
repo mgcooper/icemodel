@@ -1,5 +1,5 @@
 function tests = test_promice_ablation_readiness
-   %TEST_PROMICE_ABLATION_READINESS Verify which site-years the readiness ledger admits.
+   %TEST_PROMICE_ABLATION_READINESS Verify the site-years the ledger admits.
    tests = functiontests(localfunctions);
 end
 
@@ -425,8 +425,9 @@ function test_missing_surface_posting_remains_admissible(testCase)
 end
 
 function test_absent_target_table_metadata_excludes_only_that_case(testCase)
-   % Empty optional timetable metadata arrays must create a row-level semantic
-   % exclusion while the remaining canonical cohort is still audited/written.
+   % Empty optional timetable metadata arrays must create a row-level
+   % exclusion, while the rest of the canonical cohort is still audited and
+   % written.
    properties = ["VariableUnits", "VariableDescriptions"];
    expected = ["target units are not m", ...
       "target description does not identify geometric lowering"];

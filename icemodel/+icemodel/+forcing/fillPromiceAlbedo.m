@@ -12,12 +12,12 @@ function albedo = fillPromiceAlbedo(albedo, Time, kwargs)
    %  1. Values outside [0, 1] are set missing.
    %  2. Leading/trailing gaps in each calendar year fill with the first/
    %     last valid value of that year; interior gaps fill linearly.
-   %  3. With fillwinter=true (default), winter-month samples are set to
-   %     winter_albedo (a dry-snow value; both the constant and the month
-   %     window come from icemodel.parameterLookup so the reconstruction
-   %     can detect exactly this stamp), because the first/last valid
-   %     values bounding the polar night are often low late-summer values
-   %     that would otherwise back-fill the winter.
+   %  3. With fillwinter=true (default), this function sets winter-month
+   %     samples to winter_albedo, a dry-snow value. The constant and the
+   %     month window both come from icemodel.parameterLookup, so the
+   %     reconstruction can detect this exact stamp. Without this step the
+   %     first and last valid values around the polar night, often low
+   %     late-summer values, would back-fill the winter.
    %
    % Inputs
    %  albedo - albedo series with winter gaps [-]
@@ -26,10 +26,10 @@ function albedo = fillPromiceAlbedo(albedo, Time, kwargs)
    % Outputs
    %  albedo - gap-free albedo series [-]
    %
-   % Legacy: reimplements runoff/functions/fillPromiceAlbedo.m (retained,
-   % unchanged, as the legacy reference). Operates on a vector + Time instead
-   % of the legacy matrix + header; fixes the legacy `nyears` undefined-
-   % variable bug; drops the legacy plot option.
+   % Legacy: this function reimplements runoff/functions/fillPromiceAlbedo.m.
+   % The original stays unchanged as the legacy reference. This version takes a
+   % vector and Time instead of the legacy matrix and header, fixes the legacy
+   % `nyears` undefined-variable bug, and has no plot option.
    %
    % See also: icemodel.forcing.buildPromiceMet,
    %  icemodel.forcing.helpers.metchecks

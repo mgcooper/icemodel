@@ -3,8 +3,8 @@ function tests = test_fetch_sumup
    %
    % SUMup is access-gated (NASA Earthdata, NSIDC G02288), so the real data
    % is never on disk in CI. This suite exercises fetchSumup against an empty
-   % cache: strict=true must error with the missing-sources id, strict=false
-   % must return the cache dir, and the helper must create the cache dir so a
+   % cache. strict=true must error with the missing-sources id. strict=false
+   % must return the cache dir. The helper must create the cache dir, so a
    % user can drop files into a path that already exists. Empty and invalid
    % variable selectors also exercise the shared non-mutating fetch contract.
    tests = functiontests(localfunctions);

@@ -44,8 +44,8 @@ function results = run_test_bootstrap(kwargs)
    %
    % Notes:
    %  - This bootstrap does not rebuild test/references/runoff_reference.mat.
-   %  - smbmodel="all" is virtual: it rebuilds per-model files for each formal
-   %    model and runs the union of those cases.
+   %  - smbmodel="all" is an aggregate selector. It rebuilds the per-model
+   %    files for each formal model and runs the union of those cases.
    %  - SMOKE_SITES and FULL_SITES are advanced overrides for the site lists
    %    used by each formal tier.
    %  - The optional solver filter accepts any subset of [1 2 3].

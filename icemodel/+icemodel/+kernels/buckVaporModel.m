@@ -1,6 +1,6 @@
 function [es, des_dT, ro_vap, dro_vapdT, k_vap, T_dew] = buckVaporModel( ...
       T, Tf, liqflag, rh)
-   %BUCKVAPORMODEL Buck (1981) vapor model — self-contained reference archive.
+   %BUCKVAPORMODEL Buck (1981) vapor model, a self-contained reference archive.
    %
    %  Self-contained implementation of the Buck (1981) empirical vapor model,
    %  including saturation vapor pressure, vapor density, vapor thermal
@@ -15,17 +15,17 @@ function [es, des_dT, ro_vap, dro_vapdT, k_vap, T_dew] = buckVaporModel( ...
    %  where (al, bl, cl) are over liquid and (ai, bi, ci) are over ice, and
    %  Tf = 273.16 is the triple point temperature.
    %
-   %  This is an empirical fit to experimental data, distinct from the
+   %  This is an empirical fit to experimental data. It differs from the
    %  Rankine-Kirchhoff form es = a * exp(b/T) * T^c used in production
-   %  (see icemodel.vapor.saturation_vapor_pressure). Buck's formula can equivalently be written in absolute
-   %  Kelvin as es = A * exp(B*T/(C'+T)) with C' = C + Tf, but the original
-   %  Celsius-offset form is retained here to match the published coefficients.
+   %  (see icemodel.vapor.saturation_vapor_pressure). Buck's formula can also
+   %  be written in absolute Kelvin as es = A * exp(B*T/(C'+T)) with
+   %  C' = C + Tf. This file keeps the original Celsius-offset form to match
+   %  the published coefficients.
    %
-   %  Note: temperatures for Buck's equations are in deg C, and vapor
-   %  pressures are in mb. Here they have been converted so the calculations
-   %  are done with temperatures in K, and vapor pressures in Pa. (1 mb =
-   %  100 Pa). Curves ew1 and ei2 are adopted for water and ice, respectively
-   %  (See Buck Eq. 3,8 and Table 2).
+   %  Note: Buck's equations use temperatures in deg C and vapor pressures in
+   %  mb. This function converts them, so it computes with temperatures in K
+   %  and vapor pressures in Pa (1 mb = 100 Pa). It uses curves ew1 and ei2
+   %  for water and ice (see Buck Eq. 3,8 and Table 2).
    %
    %  [ES, DES_DT] = buckVaporModel(...) Also computes the derivative of
    %  saturation vapor pressure with respect to temperature.
@@ -42,7 +42,8 @@ function [es, des_dT, ro_vap, dro_vapdT, k_vap, T_dew] = buckVaporModel( ...
    %  dew point temperature in Kelvins from relative humidity [%].
    %
    %  This is the archived Buck (1981) implementation. Production code uses
-   %  Ambaum (2020) / Romps (2021) via icemodel.vapor.saturation_vapor_pressure / icemodel.parameterLookup.
+   %  Ambaum (2020) / Romps (2021) through
+   %  icemodel.vapor.saturation_vapor_pressure and icemodel.parameterLookup.
    %
    %  Derivative chain summary (Buck):
    %

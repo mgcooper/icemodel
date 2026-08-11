@@ -6,16 +6,16 @@ function sites = ktransectSiteCatalog(site_ids)
    %
    % Role
    %  The K-transect verification inventory is the Smeets et al. (2022)
-   %  PANGAEA.947483 annual AWS5/AWS6/AWS9/AWS10 series. Coordinates are left
-   %  unset until parsed from source files so this source catalog does not
-   %  pretend to be a geodetic source of truth: the ablation-zone stations move
-   %  with the ice flow and the staged point comes from the per-year event
-   %  coordinates. Staged cases are normalized separately through
-   %  icemodel.verification.setup.makeFirnCaseManifestEntry.
+   %  PANGAEA.947483 annual AWS5/AWS6/AWS9/AWS10 series. Coordinates stay
+   %  unset until the parser reads them from the source files, because this
+   %  catalog is not a geodetic reference: the ablation-zone stations move
+   %  with the ice flow, and the staged point comes from the per-year event
+   %  coordinates. icemodel.verification.setup.makeFirnCaseManifestEntry
+   %  normalizes staged cases separately.
    %
    %  Station aliases (AWS9/S9, AWS10/S10, KAN_U proximity) are hypotheses
-   %  tracked in icemodel.verification.setup.ktransectAliasCrosswalk, not
-   %  associations baked into this catalog.
+   %  tracked in icemodel.verification.setup.ktransectAliasCrosswalk. They are
+   %  not associations recorded in this catalog.
 
    arguments
       site_ids (1, :) string = strings(1, 0)

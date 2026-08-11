@@ -51,8 +51,8 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
          % Create an empty lookup table for the exact path.
          testCase.k_bulk_lookup_empty = struct([]);
 
-         % Verify that the exact functions path reproduces the historical
-         % inlined path before timing either branch.
+         % Verify that the exact functions path reproduces the inlined path
+         % before timing either branch.
          [Sc_inlined, chi_inlined] = SPECTRALSOURCETERM_INLINE(s.swd, ...
             s.albedo, s.I0, s.dz_spect, s.tau_N, s.tau_S, s.solar_dwavel, ...
             s.dz, testCase.ro_sno, testCase.z_nodes, testCase.z_nodes_spect);
@@ -83,7 +83,8 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
          s = testCase.state;
          batch_size = 32;
 
-         % Compute the bulk extinction coefficients and verify they're finite
+         % Compute the bulk extinction coefficients and verify that they are
+         % finite.
          k_bulk_out = icemodel.radiation.bulk_extinction_coefficients( ...
             s.dz_spect, testCase.ro_sno_spect, s.tau_N, s.tau_S, s.solar_dwavel);
          testCase.assertTrue(all(isfinite(k_bulk_out)));
@@ -146,7 +147,7 @@ classdef SpectralKernelPerfTest < matlab.perftest.TestCase
       end
 
       function testSourceTermInlined(testCase)
-         % Benchmark the historical inlined spectral source-term implementation.
+         % Benchmark the inlined spectral source-term implementation.
          s = testCase.state;
          batch_size = 256;
 

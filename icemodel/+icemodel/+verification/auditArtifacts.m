@@ -1,5 +1,5 @@
 function report = auditArtifacts(kwargs)
-   %AUDITARTIFACTS Read-only QA/QC for manifest-referenced verification artifacts.
+   %AUDITARTIFACTS Read-only QA/QC for manifest-referenced artifacts.
    %
    %  report = icemodel.verification.auditArtifacts( ...
    %     evaluation_data_root=eval_root, input_data_root=input_root, ...
@@ -10,11 +10,11 @@ function report = auditArtifacts(kwargs)
    % the exact runtime-resolved met artifact for atomic ESM-SnowMIP cases. It
    % checks manifest/schema consistency, artifact payload and metadata shape,
    % time axes and periods, canonical names and units, physical ranges,
-   % placeholder semantics, contiguous missing runs, immutable file identity,
-   % and source-specific MERRA, MAR, RACMO, MODIS, and PROMICE contracts. Returned
-   % records are deterministic struct arrays suitable for plotting or report
-   % generation. Supplying REPORT_DIR is the only write path; it emits
-   % artifact_qa.json and artifact_qa.md without changing staged data.
+   % placeholder rules, contiguous missing runs, immutable file identity, and
+   % source-specific MERRA, MAR, RACMO, MODIS, and PROMICE contracts. The
+   % returned records are deterministic struct arrays, suitable for plotting
+   % or report generation. REPORT_DIR is the only write path. It writes
+   % artifact_qa.json and artifact_qa.md, and changes no staged data.
    %
    % Inputs
    %  data_root              Whole data tree containing eval/ and input/.
@@ -1513,8 +1513,9 @@ function findings = metResampleChecks(T, metadata, record)
       return
    end
 
-   % The output must include the complete final source interval without crossing
-   % its exclusive support boundary. A linear-era artifact ends 45 minutes early.
+   % The output must include the complete final source interval, and must not
+   % cross its exclusive support boundary. An artifact built by linear
+   % interpolation ends 45 minutes early.
    support_end = metadata.met_resample_support_end_exclusive;
    if ~isdatetime(support_end) || ~isscalar(support_end) ...
          || isnat(support_end) ...
@@ -1599,8 +1600,8 @@ function findings = merraChecks(T, metadata, record)
           "MERRA timestamp provenance is not the native-center to start/hold policy");
    end
 
-   % A legacy value at a 00/03/... stamp is not necessarily native: an old
-   % regularizer could have invented it across an omitted glc source interval.
+   % A value at a 00/03/... stamp is not necessarily native. A regularizer can
+   % create such a value across an omitted glc source interval.
    if ~icemodel.forcing.helpers.hasProvenMerraTavg3SourceGrid(T, metadata)
       findings(end + 1) = finding("error", ...
          "merra_tavg3_source_grid_unproven", record.dataset_family, ...

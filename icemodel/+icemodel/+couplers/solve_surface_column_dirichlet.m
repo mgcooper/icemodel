@@ -7,10 +7,11 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
       cpl_alpha, cpl_aitken, cpl_jumpmax, ro_sfc, snow_depth, opts)
    %SOLVE_SURFACE_COLUMN_DIRICHLET Coupled icemodel Dirichlet SEB solve.
    %
-   % Run an outer Ts-T Picard loop so the accepted Dirichlet surface state,
-   % top-node temperature, and conductive closure are mutually consistent at the
-   % end of a substep. Ts is the internal solver boundary state here; physical
-   % diagnosed fluxes apply the physical-surface temperature downstream via
+   % Run an outer Ts-T Picard loop. The loop makes the accepted Dirichlet
+   % surface state, the top-node temperature, and the conductive closure
+   % consistent with each other at the end of a substep. Ts is the internal
+   % solver boundary state here. Downstream, the diagnosed fluxes use the
+   % physical surface temperature from
    % icemodel.surface.physical_surface_temperature and
    % icemodel.surface.diagnose_surface_fluxes.
    %
@@ -114,8 +115,8 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
    end
 
    % Dump the outer failure only when neither inner dump ran. Both inner
-   % dumps write the same debug file, so without this the outer snapshot
-   % overwrites the inner-solver state that was being captured.
+   % dumps write the same debug file, so the outer snapshot would overwrite
+   % the inner-solver state.
    if debug && ok_seb && ok_ieb && ~ok_cpl
       dumpIceEbSolveDirichletFailure( ...
          "coupler_nonconvergence", T_sfc, Ts_diag, Ts_old, T_ice, ...

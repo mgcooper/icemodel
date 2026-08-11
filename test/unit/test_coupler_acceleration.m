@@ -65,7 +65,7 @@ function test_bracketing_residuals_take_a_secant_step(testCase)
       hist, Ts_old, Ts_new, 0.5, 100.0, true);
 
    % The secant root of (270, +2) and (274, -2) is 272, which is not the
-   % relaxed step, so this proves the secant stage actually fired.
+   % relaxed step, so this shows that the secant stage ran.
    relaxed = Ts_old + 0.5 * (Ts_new - Ts_old);
    testCase.verifyEqual(returned, 272.0, AbsTol=1e-9)
    testCase.verifyNotEqual(round(returned, 6), round(relaxed, 6))

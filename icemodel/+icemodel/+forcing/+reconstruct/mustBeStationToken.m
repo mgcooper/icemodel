@@ -1,9 +1,9 @@
 function mustBeStationToken(tokens)
    %MUSTBESTATIONTOKEN Require canonical lowercase alphanumeric station IDs.
    %
-   %  Used at public reconstruction/report boundaries before station tokens
-   %  enter globs or output paths. Sentinel values such as "auto" and "all"
-   %  must be handled by callers before invoking this validator.
+   %  Public reconstruction and report boundaries call this validator before
+   %  station tokens enter globs or output paths. A caller must handle the
+   %  sentinel values "auto" and "all" before it calls this validator.
 
    tokens = string(tokens);
    valid = arrayfun(@(token) ~isempty(regexp(char(token), ...

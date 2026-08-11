@@ -96,7 +96,7 @@ function test_census_bounds_to_observed_record(testCase)
 end
 
 function test_census_rejects_unknown_channel(testCase)
-   % Unknown channels fail loudly instead of censusing nothing.
+   % An unknown channel raises an error instead of censusing nothing.
    testCase.verifyError(@() icemodel.forcing.reconstruct.gapCensus( ...
       icemodel.test.fixtures.makeReconstructSeries(), channels="nope"), ...
       'icemodel:reconstruct:gapCensus:unknownChannel');
@@ -665,9 +665,9 @@ function test_census_daylight_cut_ignores_night_shortwave(testCase)
    swd = max(0, 600 * sind(max(elevation(:), 0)));
    swd(elevation(:) <= 0) = NaN;                 % night screening pattern
    series.swd = swd;
-   % Mask six CONTIGUOUS daylight hours — midsummer midday at 67 N is
-   % guaranteed daylight, so the gap cannot straddle a night (which would
-   % correctly census as two runs).
+   % Mask six CONTIGUOUS daylight hours. Midsummer midday at 67 N is always
+   % daylight, so the gap cannot cross a night, which would correctly census
+   % as two runs.
    times = series.Properties.RowTimes;
    gap_idx = find(times >= datetime(2020, 6, 21, 9, 0, 0, ...
       'TimeZone', 'UTC') & times <= datetime(2020, 6, 21, 14, 0, 0, ...
@@ -723,7 +723,7 @@ end
 
 function test_metrics_reject_malformed_inputs(testCase)
    % Size mismatches, unsorted gap tables, and gap/sample disagreements all
-   % fail loudly rather than mis-scoring.
+   % raise an error rather than mis-scoring.
    series = icemodel.test.fixtures.makeReconstructSeries();
    draws = icemodel.forcing.reconstruct.syntheticMissingness(series, ...
       "tair", seededRuns(), years=2020, seed=13, n_gaps=3);
@@ -750,7 +750,7 @@ end
 
 function test_gate_relative_wspd_cap_and_unknown_channel(testCase)
    % The wspd cap widens to 10% of the typical magnitude when supplied, and
-   % unknown channels fail loudly.
+   % an unknown channel raises an error.
    row = table(100, 1.0, 1.4, 1.0, 1.0, 1.0, 1.0, 0, 0.0, ...
        NaN, NaN, 1.0, ...
        'VariableNames', {'n', 'coverage', 'bias', 'rmse', 'correlation', ...
@@ -769,7 +769,7 @@ function test_gate_relative_wspd_cap_and_unknown_channel(testCase)
 end
 
 function test_physical_bounds_registry(testCase)
-   % Known channels return [lower upper]; unknown channels fail loudly.
+   % Known channels return [lower upper]; an unknown channel raises an error.
    returned = icemodel.forcing.reconstruct.physicalBounds("tair");
    testCase.verifyEqual(returned, [193, 300]);
    testCase.verifyEqual( ...
@@ -876,12 +876,12 @@ function test_plan_prefers_calibrated_proxy_over_climatology_for_swd(testCase)
       & buckets == 1, 1);
    testCase.assertNotEmpty(proxy_index);
    testCase.assertNotEmpty(clim_index);
-   % Climatology genuinely out-skills the proxy on the periodic truth,
-   % so pure skill ranking would list it first...
+   % Climatology out-skills the proxy on the periodic truth, so pure skill
+   % ranking would list climatology first.
    testCase.verifyGreaterThan( ...
       methods(clim_index).selection.fractional_improvement, ...
       methods(proxy_index).selection.fractional_improvement);
-   % ...but the D-29 swap lists the calibrated proxy first in the walk
+   % The D-29 swap instead lists the calibrated proxy first in the walk
    % order the engine consumes.
    testCase.verifyLessThan(proxy_index, clim_index);
    % The persisted calibration registry carries the version-2 binned

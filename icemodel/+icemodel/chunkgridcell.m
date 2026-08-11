@@ -1,7 +1,6 @@
 function [S, E] = chunkgridcell(firstcell, finalcell, numjob, whichjob)
 
-   % Decided not to complete this function, but this is how it would have been
-   % called from rungrid_1:
+   % This function is incomplete. rungrid_1 would call it like this:
    %
    % firstcell = 1;
    % finalcell = numel(gridnums);
@@ -11,7 +10,7 @@ function [S, E] = chunkgridcell(firstcell, finalcell, numjob, whichjob)
    
    numcell = (finalcell - firstcell) + 1;
 
-   % This replicates how I divided icemodel/mar and icemodel/modis into two
+   % This repeats the split of icemodel/mar and icemodel/modis into two
    % equal chunks each:
    switch whichjob
       case 1

@@ -2,12 +2,13 @@ function [surf_mlt, surf_frz, surf_sub, surf_con, surf_rof] = diagnose_surface_a
       Qm, Qe, Qf, surf_mlt, surf_frz, surf_rof, surf_sub, surf_con, dt, opts)
    %DIAGNOSE_SURFACE_ABLATION Diagnose cumulative surface ablation terms.
    %
-   % note:
+   % The sublimation terms are:
    % isubl = -Qe/(Ls*row)*dt [m w.e.]
    % hsubl = isubl*row/roi   [m i.e.]
    % fsubl = hsubl/ht = isubl*row/roi/ht; (see f_ice update in code above)
-   % Inputs are cumulative state variables plus the current timestep fluxes.
-   % Physical constants are owned internally so callers only pass dt and opts.
+   % The inputs are the cumulative state variables and the fluxes of the
+   % current timestep. This function reads its own physical constants, so the
+   % caller passes only dt and opts.
    %
    % See also:
    %
@@ -22,10 +23,10 @@ function [surf_mlt, surf_frz, surf_sub, surf_con, surf_rof] = diagnose_surface_a
    % add these back to replicate the original behavior if needed
    % f_ice, f_liq, imelt, isubl
 
-   % All the liquid fluxes are added to surf_runoff. Each individual flux is
-   % saved as a cumulative sum. Runoff is calculated as a post-process step
-   % (see SURF_RUNOFF), which accounts for condensation and melt available for
-   % runoff
+   % This function adds every liquid flux to surf_runoff and saves each flux
+   % as a cumulative sum. A post-processing step computes runoff (see
+   % SURF_RUNOFF). That step accounts for the condensation and the melt that
+   % are available for runoff.
 
    % These are not needed unless they are returned as in the original behavior
    %imelt = 0.0;

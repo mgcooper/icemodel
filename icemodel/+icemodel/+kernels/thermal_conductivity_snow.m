@@ -5,9 +5,8 @@ function k_sno = thermal_conductivity_snow(T, f_ice, ro_ice, ro_sno, reference)
    %
    % Description:
    %  Returns snow or porous-ice thermal conductivity k_sno [W m-1 K-1]
-   %  using one of the archived literature/reference selectors listed
-   %  below. This is the archived multi-option thermal conductivity
-   %  function. Production code uses `icemodel.column.firn_thermal_conductivity`
+   %  using one of the archived reference selectors listed below.
+   %  Production code uses `icemodel.column.firn_thermal_conductivity`
    %  (Calonne 2019 Eq. 5 only).
    %
    % Inputs:

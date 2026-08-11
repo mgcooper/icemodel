@@ -8,8 +8,8 @@ function [data, meta] = loadArtifact(kind, kwargs)
    %  data = icemodel.test.helpers.loadArtifact("perf", ...
    %     filename="/path/to/file.mat")
    %
-   % Without RUN_NAME, the most recent artifact run is loaded. The loaded
-   % file path is printed to the console.
+   % Without RUN_NAME, the function loads the most recent artifact run. It
+   % prints the loaded file path to the console.
 
    arguments
       kind (1, :) string {mustBeMember( ...

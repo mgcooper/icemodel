@@ -3,8 +3,9 @@ function info = gcnetVandecruxStationMetadata(station)
    %
    %  info = icemodel.forcing.helpers.gcnetVandecruxStationMetadata("dye2")
    %
-   % Fetch, inventory, and builders share this metadata so aliases and station
-   % coordinates cannot drift between discovery and staged artifacts.
+   % Fetch, inventory, and the builders share this metadata. They therefore use
+   % the same aliases and station coordinates for discovery and for the staged
+   % artifacts.
    arguments
       station (1, :) string
    end
@@ -14,9 +15,9 @@ function info = gcnetVandecruxStationMetadata(station)
       'site_location', struct('lat_wgs84', NaN, 'lon_wgs84', NaN, ...
       'elev_m', NaN));
    info = repmat(proto, 1, numel(station));
-   % Identity and coordinates come from the single-source catalog (fed by
-   % the dataset's own Dataverse metadata); unknown stations keep the NaN
-   % prototype so callers can detect them.
+   % The catalog supplies the identity and the coordinates. The catalog comes
+   % from the dataset's own Dataverse metadata. An unknown station keeps the
+   % NaN prototype, so callers can detect it.
    catalog = icemodel.forcing.helpers.gcnetVandecruxCatalog();
    names = string({catalog.station});
    for k = 1:numel(station)

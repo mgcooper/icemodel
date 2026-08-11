@@ -53,7 +53,7 @@ function result = packFixtures(version, kwargs)
    end
 
    % Verify source bytes against the authoritative file rows before producing
-   % any artifact, so a source that no longer matches the manifest fails here.
+   % any artifact, so a source that does not match the manifest fails here.
    [missing, mismatched] = verifyFiles(kwargs.root, selection.files);
    if ~isempty(missing) || ~isempty(mismatched)
       error('icemodel:verification:packFixtures:sourceMismatch', ...
@@ -97,8 +97,8 @@ function result = packFixtures(version, kwargs)
    work_manifest_file = fullfile(work_dir, ...
       "icemodel-" + version + "-data-manifest.json");
 
-   % Package each capability independently so the optional forcing archive
-   % never burdens users who need only formal and showcase data.
+   % Package each capability on its own, so a user who needs only formal and
+   % showcase data does not have to download the optional forcing archive.
    archives = repmat(archiveTemplate(), numel(selection.archives), 1);
    source_bytes = zeros(numel(selection.archives), 1);
    archive_bytes = zeros(numel(selection.archives), 1);

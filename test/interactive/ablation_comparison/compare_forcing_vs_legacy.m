@@ -5,22 +5,23 @@ function results = compare_forcing_vs_legacy(options)
    %  results = compare_forcing_vs_legacy(builders=["mar"])
    %  results = compare_forcing_vs_legacy(legacy_root="/path/to/runoff/data")
    %
-   %  User-facing comparison of the current icemodel.forcing builders against the
-   %  pre-refactor LEGACY ak4 forcing artifacts staged under the runoff project.
-   %  This is NOT part of the formal unit suite: it depends on legacy artifacts
-   %  (runoff/data/icemodel/...) and S03 raw-source archives that are not durable
-   %  fixtures, so it lives in test/interactive and is run by hand.
+   %  User-facing comparison of the current icemodel.forcing builders against
+   %  the LEGACY ak4 forcing artifacts staged under the runoff project.
+   %  This is NOT part of the formal unit suite. It depends on legacy artifacts
+   %  (runoff/data/icemodel/...) and S03 raw-source archives, which are not
+   %  durable fixtures. It therefore lives in test/interactive, and you run it
+   %  by hand.
    %
    %  The checks are STATISTICAL agreement (correlation + bias), not cell-exact
-   %  equality, because the legacy cell selection (ncrowcol nearest-match on a
-   %  curvilinear grid; catchment-interpolated point for MERRA) cannot be
-   %  reproduced cell-for-cell by the current single-cell builders. The thresholds
-   %  here mirror the gates the formal forcing tests carried before the
-   %  legacy comparison was moved out (owning ExecPlan 2026-06-12 forcing-builder).
+   %  equality. The current single-cell builders cannot reproduce the legacy
+   %  cell selection cell-for-cell (ncrowcol nearest-match on a curvilinear
+   %  grid; catchment-interpolated point for MERRA). The thresholds here match
+   %  the gates of the formal forcing tests (owning ExecPlan 2026-06-12
+   %  forcing-builder).
    %
-   %  Each builder returns a struct with the per-channel correlation / bias and a
-   %  logical pass flag; a builder whose legacy artifact or raw source is missing
-   %  is reported as skipped rather than failed.
+   %  Each builder returns a struct with the per-channel correlation and bias
+   %  and a logical pass flag. A builder whose legacy artifact or raw source is
+   %  missing counts as skipped, not failed.
    %
    %  Options:
    %    builders     which comparisons to run (default ["mar","merra"])
@@ -56,12 +57,12 @@ end
 function r = compareMar(legacy_root)
    %COMPAREMAR buildMarMet vs the legacy ak4 MAR artifact.
    %
-   % The legacy ak4 artifacts cannot be reproduced cell-exactly: their cell
+   % No run can reproduce the legacy ak4 artifacts cell-exactly. Their cell
    % selection came from ncrowcol's independent row/column nearest-match on a
-   % curvilinear grid (stored Lat/Lon metadata are mutually inconsistent), and no
-   % single cell of the current MAR archive reproduces the stored series (best
-   % whole-year match deviates 6.4 K in tair). The gate is therefore statistical
-   % agreement at the one-cell-offset scale.
+   % curvilinear grid, and the stored Lat/Lon metadata disagree with each
+   % other. No single cell of the current MAR archive reproduces the stored
+   % series: the best whole-year match deviates 6.4 K in tair. The gate is
+   % therefore statistical agreement at the one-cell-offset scale.
 
    r = struct("skipped", true, "passed", false, "reason", "", "stats", struct());
 
@@ -102,10 +103,11 @@ end
 function r = compareMerra(legacy_root)
    %COMPAREMERRA buildMerraData vs the legacy ak4_merra artifact.
    %
-   % Nearest cell vs the legacy catchment-interpolated point; rh additionally
-   % carries the vapor-kernel change; swd carries the SWGDN-vs-SWGNT decision
-   % (the legacy artifact derived swd as SWGNT/(1-SNICEALB), inflating it). The
-   % gate is correlation per channel plus a small tair bias.
+   % This compares the nearest cell against the legacy catchment-interpolated
+   % point. rh also carries the vapor-kernel change. swd carries the
+   % SWGDN-vs-SWGNT decision: the legacy artifact derived swd as
+   % SWGNT/(1-SNICEALB), which inflated it. The gate is correlation per
+   % channel plus a small tair bias.
 
    r = struct("skipped", true, "passed", false, "reason", "", "stats", struct());
 

@@ -1,9 +1,10 @@
 function mustBeSnowmipSite(sitename)
-   %MUSTBESNOWMIPSITE Validate sitename against the canonical ESM-SnowMIP namelist.
+   %MUSTBESNOWMIPSITE Validate sitename against the canonical ESM-SnowMIP
+   % namelist.
    %
-   %  Used in arguments blocks where the namelist function cannot be
-   %  called directly (MATLAB validation funcs allow only literals or
-   %  previously declared args).
+   %  Use this validator in arguments blocks that cannot call the namelist
+   %  function directly. A MATLAB validation function accepts only literals
+   %  or arguments declared earlier in the same block.
 
    valid = icemodel.verification.namelists.snowmipsite();
    if ~ismember(sitename, valid)

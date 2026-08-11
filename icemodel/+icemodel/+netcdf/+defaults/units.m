@@ -12,9 +12,9 @@ function out = units(whichdata)
       '00:00:00', ...      placeholder, replaced with 'seconds since YYYY-01-01 00:00:00' in code
       };
 
-   % Note: the placeholder 00:00:00 must remain the time units string. If
-   % getdefaults is refactored to access fieldnames then it won't matter. But as
-   % of now, a strcmp is used to replace that unit with the formatted YYYY string
+   % The placeholder 00:00:00 must stay as the time units string, because the
+   % code finds it with strcmp and replaces it with the formatted
+   % 'seconds since YYYY-01-01 00:00:00' string.
 
    % Define the variable units
    switch whichdata

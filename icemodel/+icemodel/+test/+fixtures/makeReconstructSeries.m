@@ -4,14 +4,14 @@ function series = makeReconstructSeries()
    %  series = icemodel.test.fixtures.makeReconstructSeries()
    %
    % Shared fixture for the reconstruction suites: one leap year of
-   % hourly samples with smooth seasonal + diurnal structure, so
-   % boundary-jump scales stay sane and every suite exercises the same
+   % hourly samples with smooth seasonal and diurnal structure, so
+   % boundary-jump scales stay small and every suite uses the same
    % series shape.
 
    times = (datetime(2020, 1, 1, 'TimeZone', 'UTC') + ...
       hours(0:24 * 366 - 1)).';
    doy = day(times, 'dayofyear');
-   % Smooth seasonal + diurnal structure keeps boundary-jump scales sane.
+   % Smooth seasonal and diurnal structure keeps boundary-jump scales small.
    tair = 255 + 15 * sin(2 * pi * (doy - 30) / 366) + ...
       2 * sin(2 * pi * hour(times) / 24);
    rh = 80 + 10 * sin(2 * pi * doy / 366);

@@ -4,8 +4,8 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err] = ...
    %BUDGET_SURFACE_MASS_BALANCE Budget surface mass-balance increments.
    %
    % budget_surface_mass_balance updates the cumulative liquid-water and
-   % vapor-driven mass-change increments over the current full step using the
-   % already-updated phase state from the latest substep solve.
+   % vapor-driven mass-change increments over the current full step. It uses
+   % the phase state that the latest substep solve already updated.
    %
    % Inputs
    %   T          - Column temperature state [K].

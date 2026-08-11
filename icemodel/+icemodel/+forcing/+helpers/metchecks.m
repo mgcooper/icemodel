@@ -4,16 +4,16 @@ function [met, checks] = metchecks(met, kwargs)
    %  [met, checks] = icemodel.forcing.helpers.metchecks(met)
    %  [met, checks] = ... metchecks(met, fillgaps=false, clamp=false)
    %
-   % METCHECKS is the standard QA/QC pass every forcing builder applies
-   % before a met or Data timetable is written:
+   % METCHECKS is the standard QA/QC pass that every forcing builder applies
+   % before it writes a met or Data timetable:
    %
    %  1. Counts NaN and complex-valued samples per variable. The counts
    %     are returned in CHECKS so builders can record data provenance.
    %  2. Gap-fills each variable by linear interpolation with
-   %     nearest-value end fill. Wind direction (wdir) is circular, so it
-   %     is filled through its unit-vector components rather than
-   %     linearly; a linear fill corrupts gaps that cross the 360/0 wrap. The
-   % component fill is written up in the +forcing README.
+   %     nearest-value end fill. Wind direction (wdir) is circular, so this
+   %     function fills it through its unit-vector components, not
+   %     linearly. A linear fill corrupts a gap that crosses the 360/0
+   %     wrap. The +forcing README describes the component fill.
    %  3. Clamps recognized variables to the legacy physical ranges:
    %
    %        albedo   [0.05, 0.98]   [-]
@@ -22,7 +22,7 @@ function [met, checks] = metchecks(met, kwargs)
    %        wdir     wrapped to (0, 360]
    %        tsfc     <= 273.16 when in kelvin, <= 0 when in celsius
    %
-   %     Unrecognized variables are gap-filled but never clamped.
+   %     This function gap-fills an unrecognized variable but never clamps it.
    %
    % Inputs
    %  met - timetable holding any subset of the met-contract variables

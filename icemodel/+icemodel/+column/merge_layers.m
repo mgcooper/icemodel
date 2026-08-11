@@ -133,17 +133,17 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
    f_liq_C = f_wat_C / (1.0 + (fcp * Td_C) ^ 2.0);
    f_ice_C = (f_wat_C - f_liq_C) * ro_liq / ro_ice;
 
-   % Add the mass this merge removes, as a water-equivalent fraction the caller
-   % scales by dz. The two cells hold f_wat_12 between them and the surviving
-   % cell keeps half of it, because f_wat_C spreads m_wat_C over two cell
-   % volumes. The merge therefore removes half, which is never negative. That
-   % halving is exact only for a scalar dz, which every call site
-   % passes. The whole function assumes it, because m_wat_1 and m_wat_2 above,
-   % and so T_C and f_wat_C, are all wrong for a vector dz. A graded grid needs
-   % merge_layers revisited end to end.
+   % Add the mass this merge removes, as a water-equivalent fraction that the
+   % caller scales by dz. The two cells hold f_wat_12 between them, and the
+   % surviving cell keeps half of it, because f_wat_C spreads m_wat_C over two
+   % cell volumes. The merge removes the other half, which is never negative.
+   % The halving is exact only for a scalar dz. Every call site passes a scalar
+   % dz, and the whole function assumes one. For a vector dz, m_wat_1, m_wat_2,
+   % T_C, and f_wat_C are all wrong. A graded grid needs a full revision of
+   % merge_layers.
    %
    % f_wat_12 is solid plus liquid. The liquid-only export is a separate
-   % quantity, recorded in the ledger as merge_export_liquid_mwe.
+   % quantity. The ledger records it as merge_export_liquid_mwe.
    f_wat_12 = ro_ice / ro_liq * (f_ice(j1) + f_ice(j2)) ...
       + f_liq(j1) + f_liq(j2);
    d_lyr(j1) = d_lyr(j1) + f_wat_12 / 2;

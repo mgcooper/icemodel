@@ -10,18 +10,17 @@ function [varnames, varsize] = getvarinfo(filepath, datafile, gridcell)
       gridcell (1, 1) double {mustBeNumeric}
    end
 
-   % Nominally varsize is designed to catch the case where ice2 files have
-   % different Z within the same year. However, since datasize is set here by
-   % loading one test file, this won't actually catch the case where the size
-   % changes from file to file.
+   % varsize is meant to catch the case where ice2 files have different Z
+   % within the same year. This function sets the size from one loaded test
+   % file, so it does not catch a size change from file to file.
    %
-   % The value is used in getchunksize, but needs to also be used in defdimid,
-   % or a method to
+   % getchunksize uses the value. defdimid must use it too, or get it
+   % another way.
    %
-   % If each individual ice2 file is written to an nc file, this would
-   % need to be updated in writeice2. If multiple ice2 files are written
-   % to one nc file, then the supplied opts.dz/Z should be used and
-   % possibly NOFILL removed to account for different sized arrays.
+   % If the code writes each ice2 file to its own nc file, writeice2 must
+   % update this. If the code writes multiple ice2 files to one nc file,
+   % use the supplied opts.dz/Z, and possibly remove NOFILL, to allow
+   % different array sizes.
 
    tmp = load(fullfile( ...
       filepath, [datafile '_' num2str(gridcell) '.mat'])).(datafile);

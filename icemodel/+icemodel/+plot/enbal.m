@@ -5,9 +5,9 @@ function varargout = enbal(ice1, met, varargin)
    %  H = icemodel.plot.enbal(ice1, met, ice1b)
    %  H = icemodel.plot.enbal(ice1, met, ice1b, 'labels', {'A', 'B'})
    %
-   % Plots a 7-variable surface energy balance timeseries (7-day moving
-   % mean of daily averages). Each variable is assigned a distinct color;
-   % line style encodes the data source:
+   % This function plots a 7-variable surface energy balance timeseries.
+   % The values are a 7-day moving mean of daily averages. Each variable
+   % has its own color. The line style shows the data source:
    %
    %   Observations (met):   solid  (–)
    %   Model A (ice1):       dashed (- -)   [dotted when ice1b is absent]
@@ -71,7 +71,7 @@ function varargout = enbal(ice1, met, varargin)
             plot(ice1b.Time, movmean(ice1b.(vars{n}), win), ':', ...
                'Color', colors(n, :), 'LineWidth', 1.2);
          else
-            % Single model: dotted (original behavior).
+            % Single model: dotted.
             plot(ice1.Time, movmean(ice1.(vars{n}), win), ':', ...
                'Color', colors(n, :));
          end

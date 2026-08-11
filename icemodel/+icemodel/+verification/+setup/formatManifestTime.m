@@ -3,11 +3,11 @@ function text = formatManifestTime(value)
    %
    %  text = icemodel.verification.setup.formatManifestTime(value)
    %
-   % Manifest periods are read by humans and by staging helpers that compare
-   % windows across preserved artifacts. MATLAB's default string conversion can
-   % omit the clock for midnight values, so this helper writes every finite
-   % bound as yyyy-MM-dd HH:mm:ss while preserving blank / NaT values for
-   % intentionally unbounded periods.
+   % People read manifest periods, and so do staging helpers that compare
+   % windows across preserved artifacts. MATLAB's default string conversion
+   % can omit the clock for midnight values. This helper therefore writes
+   % every finite bound as yyyy-MM-dd HH:mm:ss. It keeps blank and NaT values
+   % for periods that are unbounded on purpose.
 
    if isstring(value) || ischar(value)
       if all(strlength(string(value)) == 0)

@@ -1,5 +1,5 @@
 
-% Note: these are pre-teardown of spectral_variant
+% These calls run before the teardown of spectral_variant.
 
 % Defaults
 results = run_spectral_study_bootstrap( ...

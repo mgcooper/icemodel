@@ -262,8 +262,9 @@ function [run_name, run_dir, write_any_artifacts, kwargs, cleanup, ...
       icemodel_config_casename=kwargs.icemodel_config_casename);
 
    % Read-only APIs can inspect an explicitly disjoint pair, but model execution
-   % also needs coherent data, userdata, and output roots. Reject that unsupported
-   % suite layout instead of silently assigning those dependent paths to one side.
+   % also needs coherent data, userdata, and output roots. Reject that
+   % unsupported suite layout instead of assigning those dependent paths to
+   % one side.
    has_explicit_pair = isblanktext(kwargs.data_root) ...
       && ~isblanktext(kwargs.evaluation_data_root) ...
       && ~isblanktext(kwargs.input_data_root);

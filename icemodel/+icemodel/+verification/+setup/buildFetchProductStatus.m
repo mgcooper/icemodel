@@ -5,8 +5,9 @@ function status = buildFetchProductStatus(cache_dir, products, registry, ...
    %  status = icemodel.verification.setup.buildFetchProductStatus( ...
    %     cache_dir, products, registry, row_builder)
    %
-   % The shared loop owns registry lookup and preallocation. The supplied row
-   % builder retains only family-specific file matching and provenance fields.
+   % The shared loop does the registry lookup and the preallocation. The
+   % supplied row builder handles only the family-specific file matching and
+   % the provenance fields.
 
    arguments
       cache_dir (1, 1) string

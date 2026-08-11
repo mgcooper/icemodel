@@ -1445,7 +1445,7 @@ function [lower_limit, upper_limit] = seasonalWindowLimits( ...
    %SEASONALWINDOWLIMITS Return the plotted x-limits of the selected window.
 
    % Fall back to the full season when no window row survives, so the panel
-   % still renders with an honest axis instead of an empty frame.
+   % still renders with a valid axis instead of an empty frame.
    if ~any(highlight)
       lower_limit = season_start;
       upper_limit = season_end;
@@ -2684,7 +2684,7 @@ function text = observationRateCaveatText(rates, policy)
       return
    end
 
-   % Naming the site-years keeps the caveat actionable; the reader decides.
+   % Name the site-years so the reader can act on the caveat.
    labels = strings(height(flagged), 1);
    for k = 1:height(flagged)
       labels(k) = flagged.site_id(k) + " " + compose('%d', flagged.year(k)) ...
@@ -3197,7 +3197,8 @@ function lines = provenanceLines(paths)
 end
 
 function text = policyVersion(policy)
-   %POLICYVERSION Format the saved policy version or an honest absence.
+   %POLICYVERSION Format the saved policy version, or state that it is
+   % unavailable.
 
    if isstruct(policy) && isfield(policy, 'version')
       text = icemodel.verification.report.markdownCode(string(policy.version));

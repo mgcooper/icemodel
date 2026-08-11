@@ -37,7 +37,7 @@ function info = promiceSiteCatalog(site, kwargs)
    %                    Ablation sites ship z_ice_surf + snow_height; the
    %                    others ship only z_surf_combined. buildPromiceData
    %                    branches on z_ice_surf presence, which agrees with
-   %                    this field. NOTE site_type (data-product class) and
+   %                    this field. site_type (data-product class) and
    %                    surface_zone (glaciological facies) are distinct:
    %                    KAN_U is site_type=Accumulation (no z_ice_surf) but
    %                    surface_zone=percolation (firn-core truth).
@@ -59,15 +59,16 @@ function info = promiceSiteCatalog(site, kwargs)
    %  Site coordinates are NOT stored here: they are read live from the L3
    %  NetCDF metadata by readPromiceAws (latitude / longitude variables) and
    %  converted to EPSG:3413 by the staging driver, so the committed catalog
-   %  never drifts from the source files.
+   %  always matches the source files.
    %
    %  ===========================================================================
    %  CLASSIFICATION PROVENANCE (AUTHORITATIVE - data-derived, hard-coded)
    %  ---------------------------------------------------------------------------
    %  The surface_zone and permafrost_zone values below are HARD-CODED results of
    %  spatially sampling three reference datasets at each site's installation
-   %  lon/lat. The analysis tool is test/interactive/site_classification/classify_site_facies.m (which
-   %  requires /Volumes/S03); its results are baked in here so the committed
+   %  lon/lat. The analysis tool is
+   %  test/interactive/site_classification/classify_site_facies.m, which
+   %  requires /Volumes/S03. Its results are hard-coded here so the committed
    %  catalog has NO S03 runtime dependency. Re-run that tool to refresh.
    %
    %  surface_zone (PRIMARY signal: MODIS end-of-summer BARE-ICE EXTENT 2000-2018,
@@ -83,10 +84,9 @@ function info = promiceSiteCatalog(site, kwargs)
    %    SUMup density co-location:
    %      SUMup_2025 density profile <= 15 km -> percolation (firn observed)
    %      otherwise                           -> accumulation (facies unresolved)
-   %    (A former elev >= 2500 m & f_bare==0 -> dry_snow branch was removed: the
-   %    elevation cutoff did not generalize, so the three former dry_snow sites
-   %    EGP/NAE/SDM collapse to accumulation. "dry_snow" stays in the surfacezone
-   %    vocabulary but is currently unused.)
+   %    (There is no dry_snow branch: an elev >= 2500 m & f_bare == 0 cutoff did
+   %    not generalize, so EGP, NAE, and SDM classify as accumulation.
+   %    "dry_snow" stays in the surfacezone vocabulary, but no site uses it.)
    %    This method REPRODUCES the KAN anchors: KAN_L f_bare=1.00 -> ablation,
    %    KAN_M 1.00 -> ablation. KAN_U f_bare=0.00 reads snow-covered at the surface
    %    every year and the surface signal alone would call it accumulation; it is
@@ -105,9 +105,10 @@ function info = promiceSiteCatalog(site, kwargs)
    %    activelayer.readobuzones' parsing); an off-ice site outside all permafrost
    %    polygons -> "none" (permafrost-free ground).
    %
-   %    NOTE: the Obu shapefile is read through activelayer.readobuzones (the
+   %    The Obu shapefile is read through activelayer.readobuzones (the
    %    production reader; variant="wgs"), not shaperead directly. The analysis
-   %    tool test/interactive/site_classification/classify_site_facies.m derives these values via
+   %    tool test/interactive/site_classification/classify_site_facies.m
+   %    derives these values through
    %    that reader; activelayer + its matfunclib helper dependencies are placed
    %    on the path by icemodel.test.helpers.bootstrapTestEnvironment. Replaces
    %    the v1 Brown et al. (1997) source.

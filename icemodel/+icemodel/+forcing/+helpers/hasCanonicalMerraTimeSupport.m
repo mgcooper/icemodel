@@ -3,10 +3,10 @@ function tf = hasCanonicalMerraTimeSupport(metadata)
    %
    %  tf = icemodel.forcing.helpers.hasCanonicalMerraTimeSupport(metadata)
    %
-   % Validates the shared reader/application contract used by MERRA builders,
-   % repair tooling, and artifact QA: native coordinates at the reader boundary,
-   % center-to-start relabeling only for averaged collections, zero-order hold,
-   % and declared 1/1/1/3-hour collection support.
+   % MERRA builders, repair tooling, and artifact QA share one time contract.
+   % This function checks all four parts of it: native coordinates at the
+   % reader boundary, center-to-start relabeling for averaged collections
+   % only, zero-order hold, and declared collection support of 1/1/1/3 hours.
 
    required = ["merra_source_time_coordinate", ...
       "merra_time_relabel_policy", "merra_time_upsample_policy", ...
@@ -17,7 +17,7 @@ function tf = hasCanonicalMerraTimeSupport(metadata)
       return
    end
 
-   % Reject malformed scalar/string policy values before comparing vocabulary.
+   % Reject a policy value that is not a scalar string before the comparison.
    source_coordinate = string(metadata.merra_source_time_coordinate);
    relabel_policy = string(metadata.merra_time_relabel_policy);
    upsample_policy = string(metadata.merra_time_upsample_policy);

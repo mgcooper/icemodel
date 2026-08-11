@@ -9,8 +9,8 @@ function [solid_mwe, liquid_mwe, enthalpy_j_m2] = ...
    %
    % solid_mwe and liquid_mwe are positive storage depths in metres water
    % equivalent. enthalpy_j_m2 is the column integral of the solver's
-   % bulk_enthalpy measure, using its documented dry-mixture reference and
-   % omitting vapor, so remeshing is compared on one fixed material basis.
+   % bulk_enthalpy measure. It uses the documented dry-mixture reference and
+   % omits vapor, so remeshing compares on one fixed material basis.
    %
    % All MWE outputs use the solver's physical intrinsic phase densities and
    % physical liquid-water density as the fixed reference. The use_ro_glc
@@ -21,8 +21,8 @@ function [solid_mwe, liquid_mwe, enthalpy_j_m2] = ...
    %
    %#codegen
 
-   % Cache the constants. In the diagnostic profile this is called once per
-   % accepted substep from each accumulator, plus once per merge event, and
+   % Cache the constants. In the diagnostic profile, each accumulator calls
+   % this once per accepted substep, plus once per merge event, and
    % physicalConstant rebuilds its whole table on every call.
    persistent ro_ice ro_liq
    if isempty(ro_ice)

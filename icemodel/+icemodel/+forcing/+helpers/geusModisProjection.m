@@ -11,7 +11,7 @@ function proj = geusModisProjection()
    % is documented in the accompanying MapProjektion.txt: Polar Stereographic
    % on a sphere (radius 6 370 000 m), latitude of true scale 71N, central
    % meridian 39W, on a 301 x 561 grid of 5 km cells. There is no standard
-   % EPSG code for this frame, so it is built from a WKT string.
+   % EPSG code for this frame, so this function builds it from a WKT string.
    %
    % See also: icemodel.forcing.readGeusModis,
    %  icemodel.forcing.helpers.psnProjection, projfwd, projinv

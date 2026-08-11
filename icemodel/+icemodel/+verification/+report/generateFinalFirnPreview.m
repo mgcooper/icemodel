@@ -78,8 +78,9 @@ try
       dataset_family=families, figure_root=figure_root, ...
       save_figs=true, overwrite=true, visible=false);
 
-   % The ledger is accepted only when it is a one-to-one inventory of nonempty,
-   % unique canonical PNGs. This catches stale figures and incomplete renders.
+   % This code accepts the ledger only when it is a one-to-one inventory of
+   % nonempty, unique canonical PNGs. That check catches stale figures and
+   % incomplete renders.
    pngs = dir(fullfile(figure_root, "**", "*.png"));
    png_paths = fullfile(string({pngs.folder}), string({pngs.name}))';
    ledger_paths = string(summary.figure_file);
@@ -99,7 +100,8 @@ try
    save(fullfile(qa_root, "final_firn_preview_summary.mat"), ...
       "summary", "audit");
 
-   % Seal a small reproducibility record for the subsequent report build/check.
+   % Write a small reproducibility record for the report build and check that
+   % follow.
    completed = datetime("now", TimeZone="UTC");
    evidence = struct( ...
       'started_at', string(started), 'completed_at', string(completed), ...
@@ -113,7 +115,7 @@ try
       'audit_blocker_count', audit.summary.blocker_count);
    icemodel.verification.setup.writeJson(complete_file, evidence);
 catch err
-   % Failed runs may not retain a stale or partially written success marker.
+   % A failed run must not leave a stale or partly written success marker.
    if isfile(complete_file)
       delete(complete_file)
    end

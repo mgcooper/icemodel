@@ -1,6 +1,7 @@
 function [Ts, T, f_ice, f_liq, dt_sum, dt_new] = updatesubstep( ...
       Ts, T, f_ice, f_liq, dt_FULL_STEP, dt_sum, dt_new, TINY)
-   % Checkpoint the accepted state and advance time within the full step.
+   %UPDATESUBSTEP Checkpoint the accepted state and advance time within the
+   % full step.
    %
    %  [Ts, T, f_ice, f_liq, dt_sum, dt_new] = ...
    %     icemodel.timestepping.updatesubstep( ...
@@ -14,10 +15,10 @@ function [Ts, T, f_ice, f_liq, dt_sum, dt_new] = updatesubstep( ...
    %   3. Adjusts dt_new to exactly complete the full step without
    %      overshooting.
    %
-   % Surface running state (liqflag, ro_sfc, hv_atm, H_e, f_res_por)
-   % is no longer computed here. Those quantities are derived at
-   % substep entry by icemodel.surface.update_surface_state so that
-   % they are always consistent with the current forcing step and
+   % This function does not compute the surface running state
+   % (liqflag, ro_sfc, hv_atm, H_e, f_res_por).
+   % icemodel.surface.update_surface_state derives those quantities at
+   % substep entry, so they always match the current forcing step and
    % column state.
    %
    % See also:

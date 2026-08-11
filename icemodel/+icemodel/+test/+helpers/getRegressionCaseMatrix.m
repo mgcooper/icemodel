@@ -10,9 +10,8 @@ function cases = getRegressionCaseMatrix(kwargs)
    %     full_sites=["kanm"; "kanl"])
    %
    % The formal regression matrix is compact and stable.
-   % SMOKE_SITES and FULL_SITES are advanced overrides for the site lists
-   % used by each tier when you want to probe a different matrix without
-   % editing helper code.
+   % SMOKE_SITES and FULL_SITES override the site list of each tier. Use them
+   % to test a different matrix without an edit to the helper code.
    arguments
       kwargs.tier (1, :) string ...
          {icemodel.validators.mustBeTestTierName(kwargs.tier)} = "smoke"

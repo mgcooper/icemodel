@@ -6,9 +6,9 @@ function [observations, metadata] = buildGcnetVandecruxFirnTemperature(station, 
    %     station, source_dir=..., startdate=..., enddate=...)
    %
    % Reads the Vandecrux/GC-Net firn-temperature observation product
-   % (<station>_T_firn_obs.nc) into a structured observation payload. The source
-   % variables `T_firn` and `Depth` are preserved in metadata while the returned
-   % payload exposes canonical `subsurface_temperature` [K] and `depth` [m]
+   % (<station>_T_firn_obs.nc) into a structured observation payload. The
+   % metadata keeps the source variables `T_firn` and `Depth`. The returned
+   % payload gives canonical `subsurface_temperature` [K] and `depth` [m]
    % matrices shaped time x level.
    %
    % See also: icemodel.verification.setup.gcnetInventory,
@@ -21,8 +21,8 @@ function [observations, metadata] = buildGcnetVandecruxFirnTemperature(station, 
       kwargs.enddate = ""
    end
 
-   % Reject malformed public windows before resolving or reading any source file.
-   % The shared mask validates again defensively when it applies the bounds.
+   % Reject malformed public windows before this code resolves or reads any
+   % source file. The shared mask checks the bounds again when it applies them.
    [window_start, window_end] = ...
       icemodel.pairedWindow(kwargs.startdate, kwargs.enddate);
 

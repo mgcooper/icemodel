@@ -11,9 +11,9 @@ function [z0h, z0q] = scalar_roughness_lengths(Re, z0m, use_snow_closure)
    %   Andreas (2002) over snow/firn
    %   Smeets and van den Broeke (2008) over rough bare ice
    %
-   % The friction velocity u_* and the associated roughness Reynolds number
-   % Re_* are diagnosed by the parent bulk-MO solver before this helper is
-   % called. This helper owns only the scalar roughness closure itself.
+   % The parent bulk-MO solver diagnoses the friction velocity u_* and the
+   % roughness Reynolds number Re_* before it calls this helper. This helper
+   % computes only the scalar roughness closure.
    %
    %#codegen
 
@@ -32,9 +32,9 @@ function [z0h, z0q] = scalar_roughness_lengths(Re, z0m, use_snow_closure)
          'thf_bulk_smeets_a2');
    end
 
-   % When the roughness Reynolds number collapses to zero, turbulent exchange
-   % also collapses. Return a tiny fallback scalar roughness so downstream
-   % logarithms remain defined if the diagnostic state is inspected later.
+   % A roughness Reynolds number of zero or less means there is no turbulent
+   % exchange. Return a very small fallback scalar roughness so that later
+   % logarithms of the diagnostic state stay defined.
    if real(Re) <= 0
       z0h = z0_fallback;
       z0q = z0_fallback;

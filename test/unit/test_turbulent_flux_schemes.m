@@ -190,8 +190,8 @@ function test_bulk_richardson_scalar_exchange_weakens_rough_ice_fluxes(testCase)
 end
 
 function test_bulk_richardson_scalar_exchange_noop_for_calm_air(testCase)
-   % The scalar-exchange experiment should degrade gracefully when the
-   % current De contract provides no usable aerodynamic signal.
+   % The scalar-exchange experiment must stay finite when the current De
+   % contract gives no usable aerodynamic signal.
 
    [cv_air, roLs] = icemodel.physicalConstant('cv_air', 'roLs');
 
@@ -359,8 +359,8 @@ function test_monin_obukhov_respects_surface_phase_switch(testCase)
 end
 
 function test_monin_obukhov_cold_state_remains_continuous(testCase)
-   % The cold stable bulk-MO replay state that used to trip the 2015
-   % spinup run should vary smoothly across small Ts perturbations.
+   % This cold stable bulk-MO replay state comes from the 2015 spinup run.
+   % Its fluxes must vary smoothly across small Ts perturbations.
 
    opts_vanas = icemodel.test.helpers.buildSyntheticOpts( ...
       testCase.TestData.workspace, 'icemodel', 2016, solver=1, ...

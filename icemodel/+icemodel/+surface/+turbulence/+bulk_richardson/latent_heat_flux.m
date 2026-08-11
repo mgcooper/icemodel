@@ -14,10 +14,10 @@ function [Qe, dQe_dT_sfc] = latent_heat_flux(es_sfc, ea_atm, H_e, stability, ...
    % the local moist-air density ro_atm rather than the dry-air reference
    % density, giving a physically consistent moist-air correction.
    %
-   % When the derivative is requested, provide the temperature derivatives of
-   % both the surface saturation vapor pressure and the stability factor so the
-   % returned derivative is the full dQe/dT_sfc used in the newton solve rather
-   % than only the fixed-stability partial used in the linearization.
+   % Pass the temperature derivatives of the surface saturation vapor pressure
+   % and of the stability factor when you request the derivative output. The
+   % function then returns the full dQe/dT_sfc that the newton solve needs,
+   % not the fixed-stability partial derivative that the linearization uses.
    %
    % See also: icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux
    %

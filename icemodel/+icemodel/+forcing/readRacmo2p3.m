@@ -5,17 +5,18 @@ function [data, units, Time] = readRacmo2p3(filename, varname, kwargs)
    %  [data, units, Time] = ... readRacmo2p3(_, start=[i j], count=[ni nj])
    %  [blocks, units, Time] = ... readRacmo2p3(_, slabs={[i j;ni nj], ...})
    %
-   % Reads one variable from a per-variable RACMO 2.3p3 FGRN11 NetCDF file
-   % (optionally a spatial hyperslab) and converts the native units to
-   % icemodel-standard ones. Mirrors icemodel.forcing.readMar3p11 / the
-   % legacy runoff readRacmo2p3, so the gridded-source readers share a
-   % contract: a cells-by-time block (cells flattened in native grid order,
-   % matching the X, Y grids from the same file and gridLocation's column-
-   % major slab), the unit string, and the UTC time axis.
+   % This function reads one variable, and an optional spatial hyperslab,
+   % from a per-variable RACMO 2.3p3 FGRN11 NetCDF file. It converts the
+   % native units to icemodel-standard units. It follows
+   % icemodel.forcing.readMar3p11 and the legacy runoff readRacmo2p3, so the
+   % gridded-source readers share one contract: a cells-by-time block (cells
+   % flattened in native grid order, matching the X, Y grids from the same
+   % file and gridLocation's column-major slab), the unit string, and the
+   % UTC time axis.
    %
    % RACMO per-variable files are dimensioned [rlon rlat height(=1) time]
-   % on the rotated-pole FGRN11 grid, posted 3-hourly. The singleton height
-   % level is squeezed out.
+   % on the rotated-pole FGRN11 grid, posted 3-hourly. This function removes
+   % the singleton height level.
    %
    % Unit conversions (native -> standard):
    %    kg m-2 s-1 -> mWE/h   (mass fluxes: runoff, melt, precip, ...)
@@ -25,10 +26,11 @@ function [data, units, Time] = readRacmo2p3(filename, varname, kwargs)
    %    hPa        -> Pa
    %    W m-2      -> W/m2    (label only)
    %
-   % NOTE on mass fluxes: kg m-2 s-1 is converted to meters water equivalent
-   % per HOUR (x3600/1000), i.e. it represents the 3-hourly-mean rate. To
-   % accumulate, either keep 3-hourly posting and multiply by 3 before
-   % cumsum, or interpolate to hourly first (buildRacmoData does the latter).
+   % Mass fluxes: this function converts kg m-2 s-1 to meters water
+   % equivalent per HOUR (x3600/1000), so the value is the 3-hourly-mean
+   % rate. To accumulate, keep the 3-hourly posting and multiply by 3 before
+   % cumsum, or interpolate to hourly first. buildRacmoData interpolates to
+   % hourly.
    %
    % Inputs
    %  filename - RACMO per-variable NetCDF (e.g. runoff.RACMO23p3_..._3H.nc)
@@ -38,12 +40,13 @@ function [data, units, Time] = readRacmo2p3(filename, varname, kwargs)
    %  start, count - optional grid hyperslab: start cell [i j] (1-based) and
    %                 extent [ni nj] over [rlon rlat]. Default reads the full grid.
    %  slabs        - optional cell array of [start; count] 2x2 hyperslab specs
-   %                 ({[i j; ni nj], ...}). When given, the (multi-GB) file is
-   %                 OPENED ONCE and every listed hyperslab is read from the same
-   %                 open file, returning a cell array of blocks (one per slab)
-   %                 instead of a single matrix - the batch path that extracts
-   %                 many points from one variable file without re-opening it per
-   %                 point. start/count are ignored when slabs is given.
+   %                 ({[i j; ni nj], ...}). With slabs, this function OPENS the
+   %                 (multi-GB) file ONCE and reads every listed hyperslab from
+   %                 that open file. It returns a cell array of blocks, one per
+   %                 slab, instead of a single matrix. This batch path extracts
+   %                 many points from one variable file and does not re-open the
+   %                 file for each point. This function ignores start and count
+   %                 when you give slabs.
    %
    % Outputs
    %  data  - (ncells x ntime) double in standard units, native grid order;
@@ -118,15 +121,15 @@ end
 
 function data = convertSlab(data, units, count)
    %CONVERTSLAB Reshape to cells x time and convert to standard units.
-   % Shared by the ncread (single) and netcdf.getVar (batch) read paths.
+   % The ncread (single) and netcdf.getVar (batch) read paths both use this.
 
    % Collapse to cells x time (cells flattened in native [rlon rlat] order).
    ncells = prod(count(1:2));
    data = reshape(data, ncells, []);
 
    % Standard unit conversions (shared with readMar3p11; the RACMO archive
-   % posts mass fluxes as kg m-2 s-1 rather than MAR's mmWE/h). The unit
-   % STRING is relabelled once at the top level by convertUnits.
+   % posts mass fluxes as kg m-2 s-1 rather than MAR's mmWE/h). convertUnits
+   % relabels the unit STRING once at the top level.
    switch units
       case 'kg m-2 s-1'
          data = data * 3600 / 1000;   % -> meters water equivalent per hour

@@ -2,7 +2,8 @@ function source_dir = finishFetchStatus(cache_dir, status, kwargs)
    %FINISHFETCHSTATUS Apply the shared fetch status/strict/silent contract.
    %
    % Fetchers build dataset-specific status rows and retrieval banners, then
-   % delegate the common completion, strict-error, and partial-cache return flow.
+   % delegate the common completion, strict-error, and partial-cache return
+   % flow to this function.
 
    arguments
       cache_dir (1, 1) string
@@ -22,8 +23,8 @@ function source_dir = finishFetchStatus(cache_dir, status, kwargs)
       return
    end
 
-   % Strict failures always print retrieval guidance; silent suppresses only
-   % optional, non-strict cache probes.
+   % A strict failure always prints retrieval guidance. The silent option
+   % suppresses only optional, non-strict cache probes.
    if (~kwargs.silent || kwargs.strict) && ~isempty(kwargs.banner_callback)
       kwargs.banner_callback(cache_dir, status, missing);
    end

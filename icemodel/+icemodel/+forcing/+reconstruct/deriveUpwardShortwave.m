@@ -8,8 +8,8 @@ function [filled, provenance, audit] = deriveUpwardShortwave( ...
    %
    % Role
    %  Enforce the policy ordering rule swu = albedo * swd only after both
-   %  operand channels have completed reconstruction. Native finite swu is
-   %  preserved; unresolved operands leave swu missing.
+   %  operand channels have completed reconstruction. The function keeps
+   %  native finite swu. Unresolved operands leave swu missing.
    %
    % See also: icemodel.forcing.reconstruct.fillPromiceStation,
    %  icemodel.forcing.reconstruct.provenanceCodes

@@ -3,9 +3,9 @@ function T_sfc = physical_surface_temperature(T_sfc)
    %
    %  T_sfc = icemodel.surface.physical_surface_temperature(T_sfc)
    %
-   % Returns min(T_sfc, Tf). The solver may produce temperatures above Tf
-   % as an internal iterate; this function enforces the physical constraint
-   % before any surface flux evaluation.
+   % Returns min(T_sfc, Tf). The solver can produce temperatures above Tf as
+   % an internal iterate. This function applies the physical constraint before
+   % any surface flux evaluation.
    %
    % See also: icemodel.surface.diagnose_melt_freeze_energy,
    %           icemodel.surface.solve_surface_energy_balance

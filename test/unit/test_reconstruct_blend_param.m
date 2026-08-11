@@ -1,10 +1,10 @@
 classdef test_reconstruct_blend_param < matlab.unittest.TestCase
    %TEST_RECONSTRUCT_BLEND_PARAM Parameterized seam-blend coverage.
    %
-   % Sweeps the seam-blend regimes the scalar-cased suite cannot cover
-   % combinatorially: run lengths spanning the single-sample,
+   % This class sweeps the seam-blend regimes that the scalar-cased suite
+   % cannot cover in combination: run lengths for the single-sample,
    % shorter-than-taper, boundary (exactly two taper windows), and
-   % disjoint-ramp regimes, crossed with offset directions. Every
+   % disjoint-ramp regimes, crossed with both offset directions. Every
    % combination must fill with the offset method and land both anchored
    % seams inside the per-run jump limit.
 

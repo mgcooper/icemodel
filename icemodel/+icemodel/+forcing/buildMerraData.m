@@ -30,22 +30,23 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    % time-averaged collections to the INTERVAL START and holds each mean over
    % its declared support. The source reader preserves native coordinates.
    %
-   % Legacy: reimplements runoff/functions/saveMerraData.m (the original
-   % retained, unchanged, as the legacy reference workflow). Note the legacy
-   % code reconstructed swd as SWGNT/(1-SNICEALB); this builder reads the
-   % native SWGDN downwelling flux directly.
+   % Legacy: reimplements runoff/functions/saveMerraData.m, which stays
+   % unchanged as the legacy reference workflow. The legacy code reconstructs
+   % swd as SWGNT/(1-SNICEALB). This builder reads the native SWGDN
+   % downwelling flux directly.
    %
-   % The available period is whatever days exist in the source
-   % directory - the calendar derives from the files themselves (this
-   % replaces the legacy hardcoded 2008-2020 calendar).
+   % The available period is whatever days exist in the source directory. The
+   % calendar derives from the files themselves, not from a hardcoded
+   % 2008-2020 period.
    %
    % Inputs
    %  location - [lat lon] point, polyshape (EPSG:3413 m), or an Nx2 [lat lon]
    %             list of points. A point list returns a 1xN cell of Data
-   %             timetables (metadata a 1xN struct array); the inventory, grid,
-   %             and ice mask are read ONCE and every daily file opened ONCE,
-   %             slicing each point's hyperslab from that single open. N=1 is
-   %             the single-point path.
+   %             timetables, and metadata as a 1xN struct array. The builder
+   %             reads the inventory, the grid, and the ice mask ONCE. It also
+   %             opens each daily file ONCE, and slices every point's
+   %             hyperslab from that one open file. N=1 is the single-point
+   %             path.
    %  years    - calendar years to extract
    %
    % Name-value
@@ -242,10 +243,10 @@ function blocks = readChannelSeries(coll, ncname, slabs, stamps)
    % flattened column-major over each point's hyperslab, matching
    % gridLocation's collapse). The caller applies each point's collapse and
    % support-aware hold using the validated interval-start axis.
-   % Per-file hyperslab read + standard-unit conversion + fill-masking is
-   % delegated to the shared reader icemodel.forcing.readMerra2 (so mass
-   % fluxes arrive already in mWE/h); this loop opens each daily file ONCE
-   % (reading EVERY point's hyperslab from that open). A single point is just a
+   % The shared reader icemodel.forcing.readMerra2 does the per-file hyperslab
+   % read, the standard-unit conversion, and the fill-masking, so mass fluxes
+   % arrive already in mWE/h. This loop opens each daily file ONCE, and reads
+   % EVERY point's hyperslab from that open file. A single point is a
    % one-element slab list.
    n_files = numel(coll.files);
    npts = numel(slabs);
@@ -271,8 +272,9 @@ end
 function starts = averagedIntervalStarts(coll, support_hours)
    %AVERAGEDINTERVALSTARTS Validate native centers and relabel tavg support.
    % The official tavg1/tavg3 coordinates are centered at support/2 and repeat
-   % at the support cadence. Decode every daily coordinate so a malformed middle
-   % file or filename/native-day mismatch cannot acquire a synthetic proof.
+   % at the support cadence. Decode every daily coordinate, so that a
+   % malformed middle file, or a filename that disagrees with the native day,
+   % cannot pass this check.
    expected_offsets = hours((support_hours / 2):support_hours: ...
       (24 - support_hours / 2))';
    starts = NaT(numel(coll.files) * numel(expected_offsets), 1, ...
@@ -439,8 +441,9 @@ function [Data, metadata] = finalizeMerraData(Data, site, slab, years, ...
 
    [Data, checks] = icemodel.forcing.helpers.metchecks(Data, ...
       fillgaps=kwargs.fillgaps);
-   % Attach optional MODIS only after generic gap filling so missing source years
-   % remain missing even for direct builder calls that request filled met inputs.
+   % Attach optional MODIS only after generic gap filling, so a missing source
+   % year stays missing even when a direct builder call requests filled met
+   % inputs.
    if isfield(modis_metadata, 'modis_coverage_years') ...
          && ~isempty(modis_metadata.modis_coverage_years)
       Data.modis = modis;
@@ -461,9 +464,9 @@ function [Data, metadata] = finalizeMerraData(Data, site, slab, years, ...
    Data = icemodel.forcing.helpers.attachLocationMetadata( ...
       Data, location_metadata);
 
-   % Finalize the exact record returned to the caller and persisted on Data.
-   % Starting from the accumulated source proof avoids parallel public and
-   % payload metadata records that can silently drift apart.
+   % Finalize the exact record returned to the caller and stored on Data. It
+   % starts from the accumulated source proof, so the public record and the
+   % payload record always hold the same values.
    metadata = artifact_metadata;
    metadata.source_dir = source_dir;
    metadata.collections = collections';

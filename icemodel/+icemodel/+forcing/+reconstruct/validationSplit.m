@@ -8,19 +8,19 @@ function split = validationSplit(years, kwargs)
    %
    % Role
    %  Deterministic whole-year SELECTION / EVALUATION partition for the
-   %  held-out validation protocol (gap-fill policy):
-   %  fitting and method admission use selection years only; reported final
-   %  numbers come from evaluation years only; the same observations never
-   %  both select a method and grade it. Whole calendar years are the split
-   %  unit so seasonal autocorrelation cannot leak across the boundary.
+   %  held-out validation protocol (gap-fill policy). Fitting and method
+   %  admission use the selection years only. The reported final numbers come
+   %  from the evaluation years only. The same observations never both select
+   %  a method and grade it. The split unit is a whole calendar year, so
+   %  seasonal autocorrelation does not cross the boundary.
    %
-   %  With manifest_file set, a persisted manifest WINS over recomputation:
-   %  an existing, schema-valid file is replayed (POLICY B7 — the split is
-   %  persisted, schema-verified, and replayed deterministically) only
-   %  while it remains a disjoint,
-   %  complete partition of the current record years. A missing file is
-   %  created from this call's split. Deleting the manifest is the only way
-   %  to change a persisted split.
+   %  With manifest_file set, a persisted manifest takes priority over
+   %  recomputation. This function replays an existing, schema-valid file
+   %  (POLICY B7 - the split is persisted, schema-verified, and replayed
+   %  deterministically), but only while that file stays a disjoint, complete
+   %  partition of the current record years. A missing file is created from
+   %  this call's split. Deleting the manifest is the only way to change a
+   %  persisted split.
    %
    % Name-value
    %  station : string. Station identity recorded in the manifest; a loaded

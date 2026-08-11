@@ -1,6 +1,8 @@
 function tests = test_verification_data_rebuild
-   %TEST_VERIFICATION_DATA_REBUILD End-to-end validation that the staged
-   %  verification artifacts can be rebuilt from local native source data.
+   %TEST_VERIFICATION_DATA_REBUILD Rebuild the staged verification artifacts.
+   %
+   %  Checks end to end that the staged verification artifacts can be rebuilt
+   %  from local native source data.
    %
    %  Both ESM-SnowMIP and Laugh-Tests source caches are optional. Each
    %  test case probes the corresponding fetch helper in non-strict mode

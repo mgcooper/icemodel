@@ -13,17 +13,17 @@ function manifest = importKtransect(source_dir, kwargs)
    %    forcing_sources selects runtime sources requested by the current call.
    %    Ordinary calls preserve omitted existing legs; overwrite_family=true
    %    replaces the whole family state.
-   %    build_observations=false is a guarded non-dry fast path: requested cases
-   %    must already exist in the target manifest, whose observation entry is
-   %    reused while selected forcing is attached.
+   %    build_observations=false is a guarded path that writes artifacts.
+   %    Requested cases must already exist in the target manifest. The call
+   %    reuses each case's observation entry and attaches the selected forcing.
    %
    %  Default roots
    %    source_dir="" reads <repo>/data/verification/ktransect. With no
    %    output_root, observations go to
    %    <repo>/data/eval/ktransect/<case_id>/observations.mat and native
    %    met/userdata go to <repo>/data/input/{met,userdata}/ktransect/.
-   %    Explicit source_dir, output_root, evaluation_data_root, and
-   %    input_data_root overrides are honored as-is.
+   %    The importer uses explicit source_dir, output_root,
+   %    evaluation_data_root, and input_data_root values without change.
    %
    %  Met and userdata
    %    Model met defaults to dt_out="15m"; pass dt_out="" for native cadence.
@@ -197,8 +197,9 @@ function manifest = importKtransect(source_dir, kwargs)
          startdate=kwargs.startdate, enddate=kwargs.enddate);
    else
       % Validate caches only when building observations or native runtime files.
-      % Dry runs remain metadata-only; optional skips stay quiet while required
-      % K-transect products print their retrieval guidance before failing.
+      % Dry runs read metadata only. An optional product prints nothing when
+      % it is missing. A required K-transect product prints its retrieval
+      % guidance and then fails.
       cache_status = struct();
       if ~kwargs.dry_run
          strict_cache = ~kwargs.skip_missing;

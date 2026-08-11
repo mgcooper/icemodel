@@ -3,10 +3,10 @@ function tf = hasProvenMerraTavg3SourceGrid(T, metadata)
    %
    %  tf = icemodel.forcing.helpers.hasProvenMerraTavg3SourceGrid(T, metadata)
    %
-   % Validates the durable native-grid proof used to recover legacy MERRA glc
-   % channels. The proof records every absent UTC 00/03/... source stamp, so a
-   % saved value at an omitted source time cannot be mistaken for a native row.
-   % Artifacts without runoff/albedo/snowd/swe do not consume tavg3 and require
+   % Validates the durable native-grid proof that recovers MERRA glc channels.
+   % The proof records every absent UTC 00/03/... source stamp. A saved value at
+   % an omitted source time therefore cannot pass as a native row.
+   % Artifacts without runoff/albedo/snowd/swe do not consume tavg3 and need
    % no glacier-collection grid proof.
 
    tf = istimetable(T) && isstruct(metadata) && isscalar(metadata);

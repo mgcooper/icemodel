@@ -28,12 +28,12 @@ function [start, count, collapse, inslab, loctype] = gridLocation( ...
    %      of in-polygon cell centres (no external dependency, the interim
    %      fallback when exactremap is unavailable).
    %
-   % The "natural" point option exists because near steep terrain (e.g. the
-   % Greenland western slope) a station sits between cells of differing model
-   % elevation, and nearest-cell extraction yields a step discontinuity at
-   % cell boundaries; natural-neighbour blends the surrounding cells
-   % continuously. (Note: this is horizontal blending only; it does not
-   % lapse-correct to the station elevation.)
+   % The "natural" point option exists for steep terrain, such as the
+   % Greenland western slope. There a station sits between cells with
+   % different model elevations, and nearest-cell extraction gives a step
+   % discontinuity at the cell boundaries. Natural-neighbour blends the
+   % surrounding cells continuously. This blending is horizontal only. It does
+   % not lapse-correct to the station elevation.
    %
    % Outputs
    %  start, count - hyperslab start [i j] (1-based) and extent [ni nj]

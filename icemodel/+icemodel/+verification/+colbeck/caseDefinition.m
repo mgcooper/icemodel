@@ -10,10 +10,10 @@ function def = caseDefinition()
    %        candidate, and verification target packaging.
    %
    % Role
-   %  Single source of truth for Colbeck 1976 case constants. Analytical and
-   %  numerical solvers must consume this definition rather than duplicate
-   %  values. The struct intentionally keeps fields flat and named with units so
-   %  downstream code does not need to translate values.
+   %  Defines the Colbeck 1976 case constants. Analytical and numerical
+   %  solvers must consume this definition and must not duplicate values. The
+   %  struct keeps fields flat and names them with units, so downstream code
+   %  does not translate values.
    %
    % References
    %  Clark, M. P., et al. (2021): The numerical implementation of land

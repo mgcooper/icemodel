@@ -39,7 +39,7 @@ function manifest = refreshPromiceMetIdentities(kwargs)
          'Staged met root does not exist: %s', met_root)
    end
 
-   % Decode and validate the one structural field this targeted repair owns.
+   % Decode and validate the one structural field this targeted repair needs.
    manifest = jsondecode(fileread(manifest_file));
    if ~isstruct(manifest) || ~isfield(manifest, 'cases') ...
          || ~isstruct(manifest.cases) || isempty(manifest.cases)

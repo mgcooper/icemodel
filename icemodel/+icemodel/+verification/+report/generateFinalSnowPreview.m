@@ -51,8 +51,8 @@ try
          "Promoted manifest still depends on /private/tmp: %s", manifest_file);
    end
 
-   % First-class QA runs before rendering so actionable artifact defects do not
-   % waste a complete 62-case figure pass.
+   % Run QA before rendering so an artifact defect does not waste a complete
+   % 62-case figure pass.
    if ~isfolder(qa_root)
       mkdir(qa_root)
    end

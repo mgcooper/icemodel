@@ -3,9 +3,9 @@ function sha256 = policySha256()
    %
    %  sha256 = icemodel.forcing.reconstruct.policySha256()
    %
-   % Producers and consumers both call this, so a staged promice_filled
-   % artifact is accepted only under the policy text that the running code
-   % ships.
+   % Producers and consumers both call this function, so a staged
+   % promice_filled artifact is valid only under the policy text that the
+   % running code ships.
 
    % Resolve POLICY.md beside this helper so callers cannot substitute a
    % workspace-relative or current-directory-dependent policy file.

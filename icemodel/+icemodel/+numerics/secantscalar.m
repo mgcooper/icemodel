@@ -5,11 +5,12 @@ function [x_next, ok] = secantscalar(x_prev, r_prev, x, r, ...
    %  [x_next, ok] = icemodel.numerics.secantscalar(x_prev, r_prev, x, r, ...
    %     x_fallback, jumpmax, use_secant)
    %
-   % Acts only when the last two residuals bracket a root, meaning both are
-   % finite and nonzero with opposite signs. Otherwise the caller's fallback
-   % is returned unchanged, so early iterations proceed on the fallback alone.
-   % A step further than jumpmax from x is clamped to x +/- jumpmax. The
-   % fallback is returned only if the clamped step leaves the bracket.
+   % This function acts only when the last two residuals bracket a root, that
+   % is, both are finite and nonzero with opposite signs. In every other case
+   % it returns the caller's fallback unchanged, so early iterations run on
+   % the fallback alone. It clamps a step further than jumpmax from x to
+   % x +/- jumpmax. It returns the fallback only when the clamped step leaves
+   % the bracket.
    %
    % Inputs
    %  x_prev      - iterate from the previous call
@@ -22,7 +23,7 @@ function [x_next, ok] = secantscalar(x_prev, r_prev, x, r, ...
    %
    % Outputs
    %  x_next - the secant or bisection step, or x_fallback
-   %  ok     - true when a safeguarded step was taken
+   %  ok     - true when the function takes a safeguarded step
    %
    % See also: icemodel.numerics.aitkenscalar
    %

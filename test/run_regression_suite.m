@@ -16,7 +16,7 @@ function results = run_regression_suite(kwargs)
    % Use this for normal regression comparisons against an existing rolling or
    % release baseline.
    %
-   % This function does not update baselines; it only runs the formal cases,
+   % This function does not update baselines. It runs the formal cases,
    % compares core scalar outputs to the requested baseline, and writes one
    % artifact and one Quarto HTML report under test/artifacts/<run_name>/.
    %
@@ -75,7 +75,7 @@ function results = run_regression_suite(kwargs)
    % Resolve full path to the test/ dir.
    testdir = icemodel.getpath('test');
 
-   % The baseline registration owns the default data tree as well as forcing.
+   % The baseline registration defines the default data tree and the forcing.
    % An explicit DATA_ROOT still takes precedence inside the bootstrap helper.
    baseline_policy = ...
       icemodel.test.helpers.formalBaselinePolicy(baseline);
@@ -96,7 +96,8 @@ function results = run_regression_suite(kwargs)
    end
 
    % Verify registered frozen-release capabilities without downloading before
-   % dispatch so missing or hash-drifted fixtures fail with one repair command.
+   % dispatch. A missing fixture, or a fixture whose hash changed, then fails
+   % with one repair command.
    if ~isempty(baseline_policy.required_fixture_capabilities)
       icemodel.verification.setup.fetchFixtures( ...
          baseline_policy.baseline_tag, ...

@@ -5,28 +5,29 @@ function opts = setopts(kwargs)
    %  opts = icemodel.forcing.reconstruct.setopts(blend_hours=3)
    %
    % Role
-   %  Defines every scalar knob and channel list the reconstruction
-   %  pipeline consumes. Engine functions default their own name-value
-   %  arguments from this function and the production driver passes one
-   %  opts struct down. Per-channel physical bounds, admission bias
-   %  caps, and gap-duration bucket edges live in physicalBounds,
-   %  admissionGate, and bucketEdges. This function supplies the scalar
-   %  knobs, the channel namelists, and the proxy-source catalog derived
-   %  from the repo's canonical alias map.
+   %  Defines every scalar parameter and channel list that the
+   %  reconstruction pipeline uses. Engine functions default their own
+   %  name-value arguments from this function, and the production driver
+   %  passes one opts struct down. The per-channel physical bounds, the
+   %  admission bias caps, and the gap-duration bucket edges belong to
+   %  physicalBounds, admissionGate, and bucketEdges. This function
+   %  supplies the scalar parameters, the channel namelists, and the
+   %  proxy-source catalog that comes from the repo alias map.
    %
    % Name-value (all optional; defaults are the approved policy values)
    %  required_channels : channels the ready_icemodel verdict must
    %     complete (POLICY A5): the seven-channel icemodel set. Snowfall
    %     input (ppt OR snowf) is graded separately by the ready_snowmodel
    %     verdict, and swu is derived (B10), never required.
-   %  core_channels : native state channels the low-coverage confidence
-   %     advisory grades; they never replace the readiness verdict.
+   %  core_channels : native state channels that the low-coverage
+   %     confidence advisory grades. They never replace the readiness
+   %     verdict.
    %  plan_channels : channels the selection experiment plans methods for
    %     (precipitation is adopted per POLICY A10, never planned; swu
    %     follows albedo*swd downstream). Every required non-precipitation
    %     channel must appear here so the product carries its provenance.
    %  interp_channels : channels eligible for tier-1 bounded
-   %     interpolation; unsupported channels are rejected at construction.
+   %     interpolation. This function rejects an unsupported channel.
    %  proxy_sources : short RCM family labels, in adoption-preference
    %     order. Only MAR and MERRA are complete-meteorology fallbacks;
    %     proxyCatalog resolves each label to its storage directory and
@@ -45,10 +46,11 @@ function opts = setopts(kwargs)
    %  seam_qa_min_reference_steps : minimum observed steps required in a
    %     season x solar-elevation band before the screen falls back to the
    %     season-wide reference.
-   %  seam_retain_unblended_channels : channels whose whole unblended source
-   %     segment is retained when the seam blend crosses their physical
-   %     bounds, instead of taking the general post-blend refusal. Wind is
-   %     listed because a calm clamp would replace real variability.
+   %  seam_retain_unblended_channels : channels that keep their whole
+   %     unblended source segment when the seam blend crosses their
+   %     physical bounds, instead of taking the general post-blend
+   %     refusal. The list holds wind because a calm clamp would replace
+   %     real variability.
    %  seam_qa_max_passes : maximum one-posting synthetic-side repair
    %     iterations. Two passes resolve cascaded KANL boundaries without
    %     the extra distortion caused by a two-posting window.
@@ -87,11 +89,12 @@ function opts = setopts(kwargs)
     %     RUNTIME 'threshold' phase option uses to partition the product's
     %     total precipitation (POLICY A10/D-18; reconstruction itself
     %     never partitions).
-    %  native_winter_albedo, native_winter_months : the native PROMICE
-   %     builder's winter-albedo stamp (from icemodel.parameterLookup);
-   %     samples carrying exactly this constant in these months are
-   %     legacy fills, not observations, and re-enter the engine as
-   %     missing so methods fill them with honest provenance.
+    %  native_winter_albedo, native_winter_months : the winter-albedo
+   %     stamp of the native PROMICE builder (from
+   %     icemodel.parameterLookup). A sample that holds exactly this
+   %     constant in one of these months is a legacy fill, not an
+   %     observation. It enters the engine as missing, so a method fills
+   %     it and records the correct provenance.
    %  plan_n_gaps : synthetic validation gaps the planner draws per
    %     stratum (duration bucket x season) and split.
    %  knot_candidates : monotone piecewise knot counts the donor-transfer
@@ -239,7 +242,7 @@ function opts = setopts(kwargs)
    end
    % Apply the evidenced defaults only after the caller's interpolation
    % schema is valid. A narrower schema takes no override for a channel it
-   % excludes, and an explicit caller value wins.
+   % excludes, and an explicit caller value takes precedence.
    defaults = defaultInterpolationOverrides();
    for f = string(fieldnames(defaults)).'
       if ismember(f, kwargs.interp_channels) ...

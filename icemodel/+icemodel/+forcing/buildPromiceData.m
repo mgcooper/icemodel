@@ -5,19 +5,19 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    %  [Data, metadata] = ... buildPromiceData(site, source_dir=..., ...
    %     startdate=..., enddate=..., frequency="daily")
    %
-   % Reads the station's pypromice L3 hourly NetCDF and assembles the
-   % observational channels used to evaluate icemodel output and to feed the
+   % Reads the station's pypromice L3 hourly NetCDF. It assembles the
+   % observational channels that evaluate icemodel output and that feed the
    % met-swap (userdata) mechanism: the surface energy balance terms, derived
    % net fluxes, the QC'd L3 surface-height channels, and the ice-temperature
-   % string. Location metadata attaches as table CustomProperties so the
-   % result can be written with icemodel.forcing.helpers.writeuserdata.
+   % string. Location metadata attaches as table CustomProperties, so
+   % icemodel.forcing.helpers.writeuserdata can write the result.
    %
-   % SITE-TYPE BRANCHING (the core correctness rule, per the product readme):
-   % z_ice_surf and snow_height (as a true snow-over-ice depth) are provided
-   % ONLY at ABLATION sites; accumulation-zone sites ship only z_surf_combined
-   % (a cumulative net-surface height relative to installation that never
-   % returns to zero). The builder branches on the PRESENCE of z_ice_surf in
-   % the L3 file (the operational ablation-site signal), which is recorded in
+   % SITE-TYPE BRANCHING (a correctness rule from the product readme): only
+   % ABLATION sites carry z_ice_surf and snow_height (a true snow-over-ice
+   % depth). Accumulation-zone sites ship only z_surf_combined, a cumulative
+   % net-surface height relative to installation that never returns to zero.
+   % The builder branches on the PRESENCE of z_ice_surf in the L3 file, which
+   % is the operational ablation-site signal. It records the result in
    % metadata.site_surface_type:
    %
    %  ABLATION sites (z_ice_surf present):
@@ -29,65 +29,69 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    %
    %  ACCUMULATION / percolation / bedrock sites (no z_ice_surf):
    %    surface_height = z_surf_combined - z_surf_combined(window start), a
-   %                 net surface-height change (positive UP); this is NOT an
-   %                 ablation channel and is NOT relabeled as one. No ablation
-   %                 or snow_depth channel is fabricated for these sites.
+   %                 net surface-height change (positive UP). This is NOT an
+   %                 ablation channel and the builder does NOT relabel it as
+   %                 one. The builder adds no ablation or snow_depth channel
+   %                 at these sites.
    %
-   % SURFACE FLAGS (we flag, never silently fix): companion per-sample flag
-   % channels attach to whichever surface-height-derived channel the site carries
-   % (ablation at ablation sites, surface_height at accumulation sites). Data are
-   % FLAGGED, never deleted, and the staged values are the raw GEUS series.
+   % SURFACE FLAGS. The builder flags data and never edits it. Companion
+   % per-sample flag channels attach to whichever surface-height-derived
+   % channel the site carries (ablation at ablation sites, surface_height at
+   % accumulation sites). The staged values are the raw GEUS series.
    %  - surface_height_flag (0/1): gap-bridged mask derived from the underlying
-   %    L3 sensors (a sample is gap-bridged when the surface value is finite but
-   %    every surface-ranging sensor is NaN -> slope-interpolated, not measured;
-   %    see icemodel.forcing.helpers.surfaceFlags). Per the readme the cumulative
-   %    TREND is preserved through gaps; only per-timestep RATE diagnostics should
-   %    exclude flag==1 samples (cumulative/visual comparison uses the full
-   %    series).
+   %    L3 sensors. A sample is gap-bridged when the surface value is finite
+   %    but every surface-ranging sensor is NaN, so the value is
+   %    slope-interpolated, not measured (see
+   %    icemodel.forcing.helpers.surfaceFlags). Per the readme, the cumulative
+   %    TREND survives the gaps. Only per-timestep RATE diagnostics should
+   %    exclude flag==1 samples. Cumulative and visual comparison use the full
+   %    series.
    %  - station_transition_flag (0/1): marks station-handover windows (a step,
    %    not a NaN, so the gap flag never sees it). Populated from the per-station
    %    install dates in AWS_stations_metadata.csv (within-record handovers only;
    %    see icemodel.forcing.helpers.stationTransitionTimes); all-zero when the
-   %    CSV is absent. A detected step coincident with such a window also gains
+   %    CSV is absent. A detected step inside such a window also gains
    %    the 'station_transition' evidence line in icemodel.forcing.destepSurface.
-   %    metadata.is_multistation records the merge fact; metadata.
-   %    station_transition_times / station_transition_record carry the dates.
+   %    metadata.is_multistation records the merge fact. The fields
+   %    metadata.station_transition_times and
+   %    metadata.station_transition_record carry the dates.
    %  - step_detected_flag / step_correctable_flag / step_magnitude: the staged
    %    de-stepping DETECTION (icemodel.forcing.destepSurface in detect mode).
-   %    The CORRECTION is opt-in at analysis time (default: unambiguous only),
-   %    never baked into the staged data.
+   %    The CORRECTION is opt-in at analysis time (default: unambiguous only).
+   %    The builder never writes the correction into the staged data.
    %
    % Ice temperatures: tice1..ticeN from the L3 t_i_* string (surfaced
    % thermistors discarded, clamped to the dictionary physical range in
    % icemodel.forcing.readPromiceAws) plus tice10m, the PRIMARY standardized
    % 10 m subsurface-temperature evaluation channel. The paired dtice1..dticeN
-   % channels preserve each sensor's evolving depth. tice10m_source preserves
-   % GEUS's unmodified derived value and tice10m_qc_flag records the explicit
-   % discontinuity review; the canonical tice10m masks flagged endpoints.
+   % channels keep the evolving depth of each sensor. tice10m_source keeps the
+   % unmodified GEUS derived value, and tice10m_qc_flag records the explicit
+   % discontinuity review. The canonical tice10m masks flagged endpoints.
    %
    % tice10m COMPARISON PROTOCOL (the primary subsurface channel). tice10m is
-   % GEUS's standardized 10 m-BELOW-the-EVOLVING-SURFACE temperature: GEUS
-   % tracks each thermistor's time-dependent depth below the CURRENT surface
-   % (d_t_i_*), discards surfaced thermistors, and depth-interpolates the
-   % surviving string to 10 m below the current surface at each time step. It is
-   % a MOVING (Lagrangian) 10 m depth, not a fixed 10 m from installation. To
-   % compare, the model must be sampled at 10 m BELOW ITS OWN CURRENT SURFACE -
-   % a moving Lagrangian depth at ablation sites where the surface lowers - NOT
-   % at a fixed 10 m from the run start. tice10m is the PRIMARY subsurface
-   % comparison channel; the raw tice1..N string needs the per-sensor d_t_i_N
-   % depths to place each reading and is SECONDARY / diagnostic.
+   % the standardized GEUS temperature 10 m BELOW the EVOLVING SURFACE. GEUS
+   % tracks the time-dependent depth of each thermistor below the CURRENT
+   % surface (d_t_i_*), discards surfaced thermistors, and depth-interpolates
+   % the remaining string to 10 m below the current surface at each time step.
+   % This is a MOVING (Lagrangian) 10 m depth, not a fixed 10 m from
+   % installation. To compare, sample the model at 10 m BELOW ITS OWN CURRENT
+   % SURFACE, NOT at a fixed 10 m from the run start. At ablation sites, where
+   % the surface lowers, that sample depth also moves. tice10m is the PRIMARY
+   % subsurface comparison channel. The raw tice1..N string needs the
+   % per-sensor d_t_i_N depths to place each reading, so it is SECONDARY and
+   % diagnostic.
    %
-   % Radiation policy: public swd/swu prefer pypromice's tilt/bias-corrected
-   % dsr_cor/usr_cor values, fall back to the raw measurement where corrected
-   % values are unavailable, and clamp any remaining finite negative selected
-   % value to zero. readPromiceAws still exposes the source-faithful raw and
-   % corrected channels, while artifact metadata records exact selection counts.
+   % Radiation policy: public swd/swu prefer the tilt/bias-corrected
+   % dsr_cor/usr_cor values from pypromice, fall back to the raw measurement
+   % where corrected values are unavailable, and clamp any remaining finite
+   % negative selected value to zero. readPromiceAws still exposes the
+   % source-faithful raw and corrected channels, and artifact metadata records
+   % the exact selection counts.
    %
-   % Gap policy: only missing shortwave intervals wholly below deep civil night
-   % become physical zero. Other missing observations stay missing so
-   % evaluations remain honest; the physical-range clamps of metchecks are still
-   % applied. The surface-height channel additionally carries the gap flag
-   % described above.
+   % Gap policy: only missing shortwave intervals that lie wholly below deep
+   % civil night become physical zero. Other missing observations stay
+   % missing. metchecks still applies the physical-range clamps. The
+   % surface-height channel also carries the gap flag described above.
    %
    % Inputs
    %  site - station id ("KAN_M" or compact alias "kanm")
@@ -134,10 +138,10 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
       startdate=kwargs.startdate, enddate=kwargs.enddate);
 
    % Use one corrected-first shortwave selection for observational Data and the
-   % met builder. Missing radiation is derived as zero only when the complete
-   % source hour is below deep civil twilight; daylight/twilight outages stay
-   % missing. Only channels represented by the source product are added, so an
-   % absent observational channel remains absent instead of becoming data.
+   % met builder. Missing radiation becomes zero only when the complete source
+   % hour lies below deep civil twilight. Daylight and twilight outages stay
+   % missing. The builder adds only channels that the source product carries,
+   % so an absent observational channel stays absent.
    [public_swd, public_swu, shortwave_meta] = ...
       icemodel.forcing.helpers.promiceShortwave(aws, fill_darkness=true, ...
       latitude=source_meta.lat, longitude=source_meta.lon, ...
@@ -184,9 +188,9 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    if has("swd") && has("swu")
       aws.swn = aws.swd - aws.swu;
 
-      % Net shortwave cannot be negative at the surface. Preserve the selected
-      % component observations, but mark their physically inconsistent derived
-      % net flux missing so evaluation totals do not consume bad radiometry.
+      % Net shortwave cannot be negative at the surface. Keep the selected
+      % component observations, but set their derived net flux to missing, so
+      % evaluation totals do not use physically inconsistent radiometry.
       invalid_swn = isfinite(aws.swn) & aws.swn < 0;
       swn_negative_invalid_count = nnz(invalid_swn);
       aws.swn(invalid_swn) = NaN;
@@ -207,13 +211,12 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    awsnames0 = string(aws.Properties.VariableNames);
    is_ablation = ismember("z_ice_surf", awsnames0);
 
-   % The underlying L3 surface-ranging sensors (transducer/boom/stake) used to
-   % derive the gap flag from FIRST PRINCIPLES: a sample is gap-bridged (slope-
-   % interpolated, not measured) when every one of these is NaN yet the surface
-   % series is finite. Whichever are present on this station are gathered into a
-   % matrix for surfaceFlags (z_ice_surf is re-computed by GEUS from z_pt_cor,
-   % the transducer, falling back to the stake sonic ranger; the boom adds the
-   % accumulation-site surface ranging).
+   % The underlying L3 surface-ranging sensors (transducer/boom/stake) give the
+   % gap flag: a sample is gap-bridged (slope-interpolated, not measured) when
+   % every one of these sensors is NaN and the surface series is finite. The
+   % sensors present at this station go into one matrix for surfaceFlags. GEUS
+   % recomputes z_ice_surf from z_pt_cor, the transducer, and falls back to the
+   % stake sonic ranger. The boom adds the accumulation-site surface ranging.
    sensor_names = intersect(["transducer_depth", "boom_height", ...
       "stake_height"], awsnames0, 'stable');
    if isempty(sensor_names)
@@ -224,16 +227,17 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    end
 
    % Known station-handover times for the station-transition flag. The
-   % composing-station NAMES come from the curated catalog; their per-station
-   % install DATES come from AWS_stations_metadata.csv (the GEUS thredds product,
-   % staged alongside the L3 NetCDFs). stationTransitionTimes maps each composing
-   % station to its install date and keeps only WITHIN-RECORD handovers (an
-   % install strictly after the record start; the founding station's install
-   % begins the record, it is not a handover within it). With the CSV present the
-   % flag is now populated; without it transition_times stays empty (all-zero
-   % flag) and the merge FACT is still recorded in metadata so destepSurface can
-   % recover a transition as a coincident step. The window clamp uses the L3
-   % record bounds (source_meta), so an install outside this station's record is
+   % composing-station NAMES come from the curated catalog. Their per-station
+   % install DATES come from AWS_stations_metadata.csv, the GEUS thredds
+   % product staged beside the L3 NetCDFs. stationTransitionTimes maps each
+   % composing station to its install date and keeps only WITHIN-RECORD
+   % handovers, that is, an install strictly after the record start. The
+   % install of the founding station begins the record, so it is not a handover
+   % within the record. With the CSV present, the flag carries those dates.
+   % Without the CSV, transition_times stays empty and the flag is all zero.
+   % The merge FACT still reaches metadata, so destepSurface can recover a
+   % transition as a step at the same time. The window clamp uses the L3 record
+   % bounds (source_meta), so an install outside this station's record is
    % excluded.
    info = icemodel.verification.setup.promiceSiteCatalog(site, ...
       source_dir=kwargs.source_dir);
@@ -276,10 +280,10 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    else
       surface_meta.site_surface_type = "accumulation";
 
-      % Accumulation / percolation / bedrock sites ship no z_ice_surf: emit
+      % Accumulation, percolation, and bedrock sites ship no z_ice_surf. Emit
       % z_surf_combined as a NET surface-height channel (positive up), NOT an
-      % ablation channel. No snow_depth is fabricated (snow_height here is not
-      % a true snow-over-ice depth).
+      % ablation channel. Add no snow_depth channel, because snow_height here
+      % is not a true snow-over-ice depth.
       if ismember("z_surf_combined", awsnames0)
          z = aws.z_surf_combined;
          first = find(isfinite(z), 1);
@@ -310,12 +314,13 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
          "step_correctable_flag", "step_magnitude"];
    end
 
-   % Attach the per-sample flag channels (faithful masks; we modify no GEUS
-   % data). surface_height_flag is the gap-bridged mask (now sensor-derived);
-   % station_transition_flag marks station-handover windows; the step_* channels
-   % are the staged de-stepping detection (step_detected/correctable + signed
-   % magnitude), so the staged .mat is faithful and de-stepping is applied opt-in
-   % at analysis time via icemodel.forcing.destepSurface.
+   % Attach the per-sample flag channels. They are masks, and this code changes
+   % no GEUS data. surface_height_flag is the sensor-derived gap-bridged mask.
+   % station_transition_flag marks station-handover windows. The step_*
+   % channels are the staged de-stepping detection (step_detected,
+   % step_correctable, and the signed magnitude). The staged .mat therefore
+   % matches the source, and a caller applies de-stepping at analysis time
+   % through icemodel.forcing.destepSurface.
    aws.surface_height_flag = sflags.gap;
    aws.station_transition_flag = sflags.station_transition;
    aws.step_detected_flag = step_flags.step_detected;
@@ -351,9 +356,9 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    dtice = awsnames(~cellfun('isempty', ...
       regexp(cellstr(awsnames), '^dtice\d+$', 'once')));
    dtice = dtice(arrayfun(@(v) any(isfinite(aws.(v))), dtice));
-   % Keep the canonical channel even when a surgical window is wholly masked;
-   % dropping it would break the source/target/flag contract precisely where QC
-   % has determined that no canonical samples are usable.
+   % Keep the canonical channel even when a mask covers a whole window.
+   % Dropping it would break the source/target/flag contract in the case where
+   % QC found that no canonical samples are usable.
    tice10m = awsnames(awsnames == "tice10m");
    tice10m_diagnostics = intersect(["tice10m_source", ...
       "tice10m_qc_flag"], awsnames, 'stable');
@@ -372,11 +377,11 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
       fillgaps=false);
 
    if kwargs.frequency == "daily"
-      % Daily means for the physical channels; the 0/1 flag channels aggregate
-      % by MAX so a day touched by any flagged hour stays flagged (a mean would
-      % blur the binary mask into a meaningless fraction). step_magnitude keeps
-      % the day's largest-magnitude signed jump (max over |.|), so the daily
-      % series still reports the size of any step that day.
+      % Daily means for the physical channels. The 0/1 flag channels aggregate
+      % by MAX, so a day with any flagged hour stays flagged. A mean would turn
+      % the binary mask into a fraction. step_magnitude keeps the signed jump
+      % of largest magnitude in the day (max over |.|), so the daily series
+      % still reports the size of any step that day.
       flag_channels = intersect(["surface_height_flag", ...
          "station_transition_flag", "step_detected_flag", ...
          "step_correctable_flag", "tice10m_qc_flag"], ...
@@ -460,15 +465,15 @@ function [Data, metadata] = buildPromiceData(site, kwargs)
    metadata.steps_detected = surface_meta.steps_detected;
    metadata.steps_correctable = surface_meta.steps_correctable;
    metadata.step_record = surface_meta.step_record;
-   % Flagging philosophy: we preserve the authoritative GEUS series and ATTACH
-   % per-sample flags; we never silently edit data. The gap-bridged surface
-   % height keeps a valid CUMULATIVE/visual trend (readme: "the surface height
-   % trend over the entire period should be unaffected by the gaps"); only per-
-   % timestep RATE diagnostics through a gap are unreliable, so RATE-based
-   % scoring flags/excludes surface_height_flag==1 segments while cumulative and
+   % Flagging rule: keep the GEUS series as delivered and ATTACH per-sample
+   % flags. This code never edits the data. The gap-bridged surface height
+   % keeps a valid CUMULATIVE and visual trend (readme: "the surface height
+   % trend over the entire period should be unaffected by the gaps"). Only
+   % per-timestep RATE diagnostics through a gap are unreliable, so RATE-based
+   % scoring flags or excludes surface_height_flag==1 segments. Cumulative and
    % visual comparison use the FULL series. station_transition_flag marks known
-   % AWS-handover windows. The step_* channels stage de-stepping DETECTION only;
-   % the de-stepping CORRECTION is opt-in at analysis time via
+   % AWS-handover windows. The step_* channels stage de-stepping DETECTION
+   % only. The de-stepping CORRECTION is opt-in at analysis time through
    % icemodel.forcing.destepSurface (default: correct UNAMBIGUOUS steps only).
    metadata.gap_policy = ["no temporal interpolation (observational); " ...
       "missing shortwave is zero only for whole-hour deep civil night; " ...
@@ -486,8 +491,8 @@ end
 function m = maxAbs(x)
    %MAXABS The signed value of largest magnitude in x (0 if x is empty/all-NaN).
    %
-   % Used to aggregate the signed step_magnitude channel to daily resolution: a
-   % day's step is summarised by its largest-magnitude jump, keeping the sign.
+   % Aggregates the signed step_magnitude channel to daily resolution. The step
+   % of one day is its jump of largest magnitude, and the sign stays.
    x = x(isfinite(x));
    if isempty(x)
       m = 0;

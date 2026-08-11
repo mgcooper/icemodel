@@ -13,17 +13,17 @@ function map = variables()
    %    unit          : canonical unit string
    %    is_cf         : true when standard_name is in the official CF table
    %
-   % This is the ONE source of truth that replaces the per-dataset hand maps
-   % in icemodel.netcdf.defaults.{standardnames,longnames,units} and the
-   % duplicated unit list in icemodel.forcing.helpers.variableUnits, which is
-   % now a thin wrapper over this map. Access a single channel with
+   % This map is the ONE authoritative definition. It backs the per-dataset
+   % maps in icemodel.netcdf.defaults.{standardnames,longnames,units} and the
+   % unit list in icemodel.forcing.helpers.variableUnits, which is a thin
+   % wrapper over this map. Access a single channel with
    % icemodel.netcdf.defaults.variable(name).
    %
-   % CF standard names here are validated programmatically against the
-   % official table (icemodel.netcdf.defaults.cfStandardNames); see the
-   % validatecf=true path of icemodel.netcdf.defaults.variable. Where a
-   % channel has no official CF name (model diagnostics, instrument
-   % channels), standard_name is '' and is_cf is false.
+   % icemodel.netcdf.defaults.variable validates the CF standard names here
+   % against the official table (icemodel.netcdf.defaults.cfStandardNames) on
+   % its validatecf=true path. Where a channel has no official CF name (model
+   % diagnostics, instrument channels), standard_name is '' and is_cf is
+   % false.
    %
    % See also: icemodel.netcdf.defaults.variable,
    %  icemodel.netcdf.defaults.cfStandardNames,
@@ -37,9 +37,9 @@ function map = variables()
    'tsfc',   'surface_temperature',                        'surface skin temperature',                           'K'
     'swd',    'surface_downwelling_shortwave_flux_in_air',  'downwelling shortwave radiative flux',               'W m-2'
     'swu',    'surface_upwelling_shortwave_flux_in_air',    'upwelling shortwave radiative flux',                 'W m-2'
-   % usr survives only as a legacy metadata alias (POLICY A16/D-24): staged
-   % artifacts written before the swu rename carry the pypromice source
-   % name, and their lookups still resolve here. New artifacts ship swu.
+   % usr is a metadata alias only (POLICY A16/D-24). Staged artifacts that
+   % carry the pypromice source name resolve their lookups here. New
+   % artifacts ship swu.
     'usr',    'surface_upwelling_shortwave_flux_in_air',    'upwelling shortwave radiative flux',                 'W m-2'
     'lwd',    'surface_downwelling_longwave_flux_in_air',   'downwelling longwave radiative flux',                'W m-2'
    'lwu',    'surface_upwelling_longwave_flux_in_air',     'upwelling longwave radiative flux',                  'W m-2'
@@ -102,8 +102,8 @@ function map = variables()
    'psfc_provenance',  '', 'per-sample reconstruction provenance code for psfc (see icemodel.forcing.reconstruct.provenanceCodes)',  '1'
    'swd_provenance',   '', 'per-sample reconstruction provenance code for swd (see icemodel.forcing.reconstruct.provenanceCodes)',   '1'
    'swu_provenance',   '', 'per-sample reconstruction provenance code for swu (see icemodel.forcing.reconstruct.provenanceCodes)',   '1'
-   % usr_provenance mirrors the usr legacy alias above (POLICY A16/D-24):
-   % filled products staged before the swu rename carry it; new products
+   % usr_provenance mirrors the usr alias above (POLICY A16/D-24). Staged
+   % filled products that carry it resolve their lookups here. New products
    % ship swu_provenance.
    'usr_provenance',   '', 'per-sample reconstruction provenance code for usr (see icemodel.forcing.reconstruct.provenanceCodes)',   '1'
    'albedo_provenance', '', 'per-sample reconstruction provenance code for albedo (see icemodel.forcing.reconstruct.provenanceCodes)', '1'

@@ -1,13 +1,14 @@
 function varargout = create(filename, createMode, kwargs, ncprops, ncatts)
-   %CREATE Create a new NetCDF file with specified properties and global attributes.
+   %CREATE Create a new NetCDF file with the given properties and global
+   % attributes.
    %
    %  NCID = ICEMODEL.NETCDF.CREATE(FILENAME, OPTS, NCPROPS)
    %
    % Description
    %
-   %  The function creates a new NetCDF file based on the specified format, fill
-   %  mode, and global attributes. It handles the file backup if it already
-   %  exists and applies best practices for NetCDF creation.
+   %  The function creates a new NetCDF file from the given format, fill
+   %  mode, and global attributes. It backs up the file first if the file
+   %  already exists.
    %
    % Input Arguments
    %
@@ -15,11 +16,15 @@ function varargout = create(filename, createMode, kwargs, ncprops, ncatts)
    %  opts     - Structure with options affecting file creation behavior:
    %     opts.makebackups - Logical flag to backup the file if it exists.
    %
-   %  ncprops  - Structure with properties and global attributes for the NetCDF file:
-   %     createMode      - Format of the NetCDF file.
-   %     ncprops.fillMode    - Fill mode for the NetCDF file, controlling prefill behavior.
-   %     ncprops.comment     - User-supplied comment to include in the file's global attributes.
-   %     Plus preferences set by icemodel.netcdf.config for title, Conventions, institution, source, references, and contact.
+   %  ncprops  - Structure with properties and global attributes for the
+   %     NetCDF file:
+   %     createMode       - Format of the NetCDF file.
+   %     ncprops.fillMode - Fill mode for the NetCDF file. It controls
+   %        prefill behavior.
+   %     ncprops.comment  - User-supplied comment for the file's global
+   %        attributes.
+   %     icemodel.netcdf.config also sets title, Conventions, institution,
+   %     source, references, and contact.
    %
    % Output Arguments
    %
@@ -48,13 +53,12 @@ function varargout = create(filename, createMode, kwargs, ncprops, ncatts)
    arguments
       filename (1, :) char
 
-      % Note: this follows netcdf.create syntax, but netcdf.setDefaultFormat
-      % is set in makencfile which negates the need to specify this, and could
-      % lead to conflicting settings. However, it is not that simple, because I
-      % think they are sometimes exclusive and sometimes not e.g. default format
-      % may be NC_FORMAT_NETCDF4 but createMode could be 'NOCLOBBER', see the
-      % bitwise OR options to specify two cmodes. For now, I am using NETCDF4
-      % which is consistent with default NC_FORMAT_NETCDF4.
+      % This argument follows netcdf.create syntax. makencfile also calls
+      % netcdf.setDefaultFormat, so the two settings can conflict. The two
+      % are sometimes exclusive and sometimes not. For example, the default
+      % format may be NC_FORMAT_NETCDF4 while createMode is 'NOCLOBBER'. See
+      % the bitwise OR options for giving two cmodes. This default is
+      % NETCDF4, which agrees with the default NC_FORMAT_NETCDF4.
       createMode (1, :) char {mustBeMember(createMode, ...
          {'NOCLOBBER', 'CLOBBER', 'SHARE', '64BIT_OFFSET', ...
          'NETCDF4', 'CLASSIC_MODEL'})} = 'NETCDF4'

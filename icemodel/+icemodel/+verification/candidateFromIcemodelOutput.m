@@ -32,13 +32,13 @@ end
 function candidate = firnCandidateFromIce1(ice1, ice2, opts, case_manifest)
    %FIRNCANDIDATEFROMICE1 Map ICE1/ICE2 fields to firn verification targets.
    %
-   % Firn-observational cases compare against PROMICE station Data. The
-   % comparison axes the staged manifests declare are the surface-energy /
-   % ablation series (ablation, snow_depth, tsfc) plus the subsurface
-   % thermistor profile (tice1..tice8 = T(z,t) sampled at thermistor depths)
-   % and, when staged, density rho(z,t) and smb (surface mass balance). Variables
-   % are mapped only as far as the staged cases require; porosity / saturation /
-   % runoff are deferred with the firn physics.
+   % Firn-observational cases compare against PROMICE station Data. The staged
+   % manifests declare these comparison axes: the surface-energy and ablation
+   % series (ablation, snow_depth, tsfc), the subsurface thermistor profile
+   % (tice1..tice8 = T(z,t) sampled at the thermistor depths), and, when
+   % staged, density rho(z,t) and smb (surface mass balance). This function
+   % maps only the variables that the staged cases need. Porosity, saturation,
+   % and runoff wait for the firn physics.
 
    if ~isfield(ice1, "Time")
       error('icemodel output ice1 must contain Time for firn verification')
@@ -108,9 +108,10 @@ function candidate = firnProfileCandidateFromIce2(ice1, ice2, opts, case_manifes
    % SUMup firn cases compare against firn observation profiles: a density
    % profile rho(z) and a subsurface temperature profile T(z,t). icemodel
    % carries these as column state in ice2 (T = column temperature [K], f_liq /
-   % density depending on the run). Map only the axes the staged case declares;
-   % an axis whose source column is unavailable is left out so it is reported as
-   % a missing-candidate diagnostic (soft gate), never fabricated. The candidate
+   % density depending on the run). This function maps only the axes that the
+   % staged case declares. It omits an axis whose source column is absent, so
+   % the report marks that axis as a missing candidate (soft gate). The
+   % function never invents a value for it. The candidate
    % format is "subsurface_profile_bundle", matching the observation target so
    % the soft firn comparison can align them by depth.
 
@@ -225,8 +226,8 @@ function tbl = datedProfileTable(values, dz, model_times, varname, unit)
    end
 
    % Model column state is depth-by-time. A single stored column retains the
-   % first corresponding output timestamp; multi-column histories must map
-   % one-to-one to the model time axis so no profile can be silently discarded.
+   % first corresponding output timestamp. A multi-column history must map
+   % one-to-one onto the model time axis, so this function discards no profile.
    model_times = icemodel.verification.setup.ensureUtc(model_times(:));
    n_profiles = size(values, 2);
    if n_profiles == 1
@@ -265,8 +266,9 @@ function values = ticeFromIce2(ice2, opts, case_manifest, k)
    % Returns Celsius column-T at depth manifest.observation_variables
    % .thermistor_depths_m(k), or [] when the depth/grid is unavailable.
    % Mirrors soilTempFromIce2 (esm_site soil temps) for the firn thermistor
-   % string. When the manifest does not record explicit depths, the function
-   % returns [] so the variable is reported as missing rather than fabricated.
+   % string. When the manifest records no explicit depths, the function
+   % returns [], so the report marks the variable as missing. The function
+   % never invents a value.
 
    values = [];
    if ~isfield(ice2, 'T') || isempty(ice2.T)

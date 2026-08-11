@@ -4,14 +4,14 @@ function report = repairMetTimeSupport(files, kwargs)
    %  report = icemodel.verification.setup.repairMetTimeSupport(files)
    %  report = ... repairMetTimeSupport(files, dry_run=false)
    %
-   % Reconstructs cached native rows from explicitly selected 15-minute met
-   % files stamped by the legacy `linear_adjacent_finite_only` policy only when
-   % their provenance proves a complete regular native grid, then delegates the
-   % corrected interval-start hold to
-   % icemodel.forcing.helpers.resampleMetTimestep. The default is read-only.
-   % A write replaces only the named MAT file through a sibling temporary file;
-   % no manifest discovery, raw-source read, or unrelated artifact mutation is
-   % performed here.
+   % Reconstructs cached native rows from the 15-minute met files that the
+   % caller names. It handles only files stamped by the legacy
+   % `linear_adjacent_finite_only` policy, and only when their provenance
+   % proves a complete regular native grid. It then passes the corrected
+   % interval-start hold to icemodel.forcing.helpers.resampleMetTimestep. The
+   % default is read-only. A write replaces only the named MAT file, through a
+   % sibling temporary file. This function performs no manifest discovery, no
+   % raw-source read, and no change to any other artifact.
    %
    % Inputs
    %  files   - explicit existing met MAT-file paths
@@ -151,9 +151,10 @@ function source = recoverSourceRows(met, metadata, filename)
          'legacy met source cadence/row count is invalid: %s', filename)
    end
 
-   % An omitted native timestamp cannot be distinguished safely from a finite
-   % row invented by the old regular output grid. Fail closed unless both the
-   % recorded gap count and exact output-row identity prove a complete grid.
+   % This code cannot separate an omitted native timestamp from a finite row
+   % that the old regular output grid added. Raise an error unless the
+   % recorded gap count and the exact output-row identity both prove a
+   % complete grid.
    cadence_ratio = cadence_s / 900;
    expected_output_count = (source_count - 1) * cadence_ratio + 1;
    if gap_count ~= 0 || height(met) ~= expected_output_count

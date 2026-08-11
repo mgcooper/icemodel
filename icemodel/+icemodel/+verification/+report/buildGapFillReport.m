@@ -6,42 +6,43 @@ function report = buildGapFillReport(kwargs)
    %     sites="kanm", render=false)
    %
    % Role
-   %  The `.5` report generator (DesignSpec report contract): renders from
-   %  SAVED artifacts only — the filled met products, their native
-   %  counterparts, the per-site plan summaries, readiness ledgers, and
-   %  audit sidecars — never rerunning a model or the engine. It writes
-   %  each station's appendix figure set — one 8x1 full-period overview
-   %  (POLICY A14/D-19) into the dedicated overview/ subfolder, and the
-   %  a bounded method-diverse set of windowed before/after detail figures
-   %  into the sibling detail/ subfolder (POLICY A14/D-31), and a small
-   %  cohort-level scientific-interpretation set into interpretation/ —
-   %  all beneath the
-   %  data/preview/figures/gapfill/ namespace (outside the accepted
-   %  seasonal/firn ledgers), a figure ledger that must reconcile exactly,
-   %  compact summary CSVs, and two QMDs. The main report's fixed
-   %  structure is Executive
-   %  Summary, Background, Methods, Results, Summary, Appendices. The
-   %  appendix embeds only station overview figures. A companion detail
-   %  report embeds the method/gap figures and their per-station tables;
-   %  both reports have clickable station links. Results carries the
-   %  cohort verdict table,
-   %  the provenance-derived fill volume per method family, the
-   %  admission/held-out skill aggregate, and the stations without any
-   %  filled product, all from saved artifacts. Results also publishes an
-   %  exhaustive residual-gap table, every non-ready station-year with its
-   %  reason, and independently verified native/proxy spans for stations
-   %  without products; unexplained product absence blocks publication.
-   %  The Results interpretation
-   %  catalog states each declared category's reproducible selector,
-   %  status, mechanism, policy basis, and figure (or explicit absence).
-   %  Detail figures plot ONLY
-   %  the filled period plus context: each side's pad equals the filled
-   %  period, floored at min_context_days and capped at max_context_days
-   %  — never the full record; the station overview is the one full-period
-   %  exception. Each detail panel accents ONLY its own
-   %  method; fills by any other method in the context window render
-   %  muted grey, keyed by the per-sample provenance registry and the
-   %  plan audit (POLICY D-31).
+   %  The `.5` report generator (DesignSpec report contract). It renders from
+   %  SAVED artifacts only: the filled met products, their native
+   %  counterparts, the per-site plan summaries, the readiness ledgers, and
+   %  the audit sidecars. It never reruns a model or the engine.
+   %
+   %  It writes each station's appendix figure set. One 8x1 full-period
+   %  overview (POLICY A14/D-19) goes into the dedicated overview/ subfolder.
+   %  A bounded, method-diverse set of windowed before/after detail figures
+   %  goes into the sibling detail/ subfolder (POLICY A14/D-31). A small
+   %  cohort-level scientific-interpretation set goes into interpretation/.
+   %  All three sit beneath the data/preview/figures/gapfill/ namespace,
+   %  outside the accepted seasonal/firn ledgers. It also writes a figure
+   %  ledger that must reconcile exactly, compact summary CSVs, and two QMDs.
+   %
+   %  The main report has a fixed structure: Executive Summary, Background,
+   %  Methods, Results, Summary, Appendices. The appendix embeds only station
+   %  overview figures. A companion detail report embeds the method/gap
+   %  figures and their per-station tables. Both reports have clickable
+   %  station links.
+   %
+   %  Results carries the cohort verdict table, the provenance-derived fill
+   %  volume per method family, the admission/held-out skill aggregate, and
+   %  the stations without any filled product, all from saved artifacts.
+   %  Results also publishes an exhaustive residual-gap table, every non-ready
+   %  station-year with its reason, and independently verified native/proxy
+   %  spans for stations without products. An unexplained missing product
+   %  blocks publication. The Results interpretation catalog states each
+   %  declared category's reproducible selector, status, mechanism, policy
+   %  basis, and figure, or its explicit absence.
+   %
+   %  Detail figures plot ONLY the filled period plus context. Each side's pad
+   %  equals the filled period, floored at min_context_days and capped at
+   %  max_context_days, and never covers the full record. The station overview
+   %  is the one full-period exception. Each detail panel accents ONLY its own
+   %  method. Fills by any other method in the context window render muted
+   %  grey, keyed by the per-sample provenance registry and the plan audit
+   %  (POLICY D-31).
    %
    % Name-value
    %  sites : site tokens to include (default "all" = every site with a
@@ -506,12 +507,12 @@ end
 
 function readiness = applyAcceptanceWindow(readiness, sites, inputs)
    %APPLYACCEPTANCEWINDOW Add producer-pinned policy columns to the ledger.
-   % One window lookup per site; a year overlaps the window when any part
-   % of the calendar year falls inside it. Absolute verdicts pass
-   % through; only not_forcing_ready years wholly outside the window
-   % become out_of_policy_window. The policy view grades run readiness,
-   % so it derives from the icemodel verdict; the snowmodel verdict
-   % (POLICY A5) rides along untouched in its own column.
+   % One window lookup per site. A year overlaps the window when any part
+   % of the calendar year falls inside it. Absolute verdicts pass through.
+   % Only a not_forcing_ready year wholly outside the window becomes
+   % out_of_policy_window. The policy view grades run readiness, so it
+   % derives from the icemodel verdict. The snowmodel verdict (POLICY A5)
+   % stays unchanged in its own column.
    window_start = NaT(height(readiness), 1, 'TimeZone', 'UTC');
    window_end = NaT(height(readiness), 1, 'TimeZone', 'UTC');
    policy = string(readiness.verdict_icemodel);
@@ -557,13 +558,13 @@ function [rows, summary_rows, diagnostics, family_row] = siteFigures( ...
    % the product's own codes (POLICY D-31 Results contract).
    family_row = siteFillFamilies(site, filled);
 
-   % Composition refusal rows (method 'unfilled') explain residual gaps;
-   % they are not fills, so example figures and fill totals must exclude
-   % them — the summary instead counts them per channel. Darkness
-   % zero-fill rows ARE fills but summarize a record-spanning set of
-   % night samples, so plotting one as an "example gap" would violate
-   % the report's windowed-figure contract; they stay in the totals and
-   % out of the figure pool.
+   % Composition refusal rows (method 'unfilled') explain residual gaps.
+   % They are not fills, so example figures and fill totals must exclude
+   % them. The summary counts them per channel instead. Darkness zero-fill
+   % rows ARE fills, but they summarize a record-spanning set of night
+   % samples. Plotting one as an "example gap" would break the report's
+   % windowed-figure contract, so they stay in the totals and out of the
+   % figure pool.
    method_names = string(audit.method);
    is_fill = ~ismember(method_names, ["unfilled", "native_context"]);
    % Record-spanning summary rows (darkness zero-fill, the winter-albedo
@@ -885,7 +886,7 @@ function row = gapFigure(site, channel, seg, method_audit, native, ...
    % panel's own method (accent), other methods' fills (muted context),
    % and observed samples, keyed by the shipped provenance channel plus
    % the audit spans of this method. The provenance column is a product
-   % contract; a detail figure without it must fail loudly.
+   % contract, so a detail figure without it must raise an error.
    provenance_name = channel + "_provenance";
    if ~ismember(provenance_name, string(filled.Properties.VariableNames))
       error('icemodel:report:buildGapFillReport:missingProvenance', ...
@@ -994,15 +995,16 @@ end
 function row = overviewFigure(site, filled, fig_dir)
    %OVERVIEWFIGURE Render the eight-channel full-period station overview.
    % POLICY A14/D-19: each station's appendix leads with ONE full-period
-   % overview — the science channels stacked 8x1 — so a reviewer sees
-   % every fill in the context of the whole record before the windowed
-   % detail figures. Observed samples draw dark; filled samples overlay
-   % in the shared accent color. Hourly-or-coarser decimation keeps
-   % multi-decade 15-minute records renderable without changing the
-   % full-period visual story; detail figures retain local resolution.
-   % The D-19 eight-channel layout: the A5 seven-channel SSOT plus the
-   % derived swu (B10 — planned nowhere, shipped everywhere), filtered to
-   % the channels the product actually carries with provenance.
+   % overview, the science channels stacked 8x1, so a reviewer sees every
+   % fill in the context of the whole record before the windowed detail
+   % figures. Observed samples draw dark, and filled samples overlay in
+   % the shared accent color. Hourly-or-coarser decimation keeps
+   % multi-decade 15-minute records renderable without changing what the
+   % full-period figure shows. Detail figures keep local resolution.
+   % The D-19 eight-channel layout is the A5 seven-channel canonical set
+   % plus the derived swu (B10: no plan produces it, but every product
+   % ships it), filtered to the channels the product carries with
+   % provenance.
    channels = [icemodel.forcing.reconstruct.icemodelRequiredChannels(), ...
       "swu"];
    names = string(filled.Properties.VariableNames);
@@ -1603,8 +1605,8 @@ function [catalog, rows] = scientificInterpretations(sites, inputs, ...
       end
    end
 
-   % A positive diagnostic rate is materially present; an all-zero cohort
-   % remains an explicit absent row rather than a contrived example.
+   % A positive diagnostic rate is real evidence. An all-zero cohort stays
+   % an explicit absent row instead of an invented example.
    boundary = max([diagnostics.selection_boundary_jump_rate, ...
       diagnostics.evaluation_boundary_jump_rate], [], 2, 'omitnan');
    boundary_rows = find(admitted & isfinite(boundary) & boundary > 0);

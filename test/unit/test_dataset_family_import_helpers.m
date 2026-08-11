@@ -1,5 +1,5 @@
 function tests = test_dataset_family_import_helpers
-   %TEST_DATASET_FAMILY_IMPORT_HELPERS Verify neutral dataset-family staging glue.
+   %TEST_DATASET_FAMILY_IMPORT_HELPERS Verify the shared staging helpers.
    tests = functiontests(localfunctions);
 end
 
@@ -1267,8 +1267,8 @@ function test_runDatasetFamilyImport_persists_reused_rcm_readiness(testCase)
       persisted.cases.colocation.merra, 'forcing_ready'));
    before = fileBytes(manifest_file);
 
-   % The same public replay now observes semantically identical diagnostics
-   % across JSON types and must leave the durable manifest byte-identical.
+   % The same public replay now sees diagnostics that mean the same across
+   % JSON types, and it must leave the durable manifest byte-identical.
    manifest = icemodel.test.helpers.captureExpectedWarning(testCase, run, ...
       'icemodel:verification:stageRcmForcing:existingWindowFile');
    testCase.verifyFalse(logical( ...
@@ -2954,7 +2954,7 @@ end
 
 function writeTaggedExistingFiles( ...
       met_file, data_file, method, point, missing_albedo)
-   %WRITETAGGEDEXISTINGFILES Create tiny staged RCM artifacts with method metadata.
+   %WRITETAGGEDEXISTINGFILES Create tiny staged RCM artifacts with metadata.
    if nargin < 4
       point = [67, -48];
    end

@@ -7,11 +7,12 @@ function [ledger, vapor_solid, vapor_liquid] = accumulate_vapor_budget( ...
    %     ledger, solid_p, liquid_p, T, f_ice, f_liq, dz, ...
    %     d_pevp, d_rof, d_sbl_err)
    %
-   % Call this once per accepted substep, immediately after
-   % icemodel.column.budget_surface_mass_balance applies the vapor exchange, so
-   % the storage change is separated from the potential input and from the two
-   % amounts the top control volume could not accept: condensation beyond its
-   % pore capacity, and deposition the control volume had no energy to apply.
+   % Call this once per accepted substep, right after
+   % icemodel.column.budget_surface_mass_balance applies the vapor exchange.
+   % This keeps the storage change apart from the potential input and from the
+   % two amounts the top control volume cannot accept. Those two amounts are
+   % condensation above the pore capacity, and deposition the control volume
+   % has no energy to apply.
    %
    % Inputs
    %   ledger              - Forcing-step ledger with the phase channels
@@ -45,16 +46,16 @@ function [ledger, vapor_solid, vapor_liquid] = accumulate_vapor_budget( ...
    [solid_v, liquid_v] = icemodel.column.integrate_column_budget( ...
       T, f_ice, f_liq, dz);
 
-   % Difference the post- and pre-budget_surface_mass_balance totals on one
-   % fixed storage basis, so the increment cannot absorb a change of reference
-   % density. This call and the one that produced solid_p and liquid_p in
-   % accumulate_phase_budget must therefore use the same densities.
+   % Subtract the pre-budget_surface_mass_balance totals from the post totals on
+   % one fixed storage basis, so the increment holds no change of reference
+   % density. This call and the call that produced solid_p and liquid_p in
+   % accumulate_phase_budget must use the same densities.
    vapor_solid = solid_v - solid_p;
    vapor_liquid = liquid_v - liquid_p;
 
-   % The potential input and the rejected exchanges are energies, not storage:
-   % d_pevp and d_sbl_err are top-layer fractions scaled by their latent heats,
-   % and the condensation overflow is a liquid depth the column did not store.
+   % The potential input and the rejected exchanges are energies, not storage.
+   % d_pevp and d_sbl_err are top-layer fractions scaled by their latent heats.
+   % The condensation overflow is a liquid depth the column does not store.
    vapor_potential = ro_liq * Lv * d_pevp * dz(1);
    unapplied_vapor = ro_ice * Ls * d_sbl_err * dz(1);
 

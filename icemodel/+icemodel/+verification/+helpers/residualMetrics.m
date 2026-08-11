@@ -7,11 +7,11 @@ function metrics = residualMetrics(model, observation)
    % one. The diagnostics, the regression summaries, and the ablation
    % evaluation all score through it.
    %
-   % Pairs where either side is not finite are dropped. A single remaining
-   % pair still gives an exact bias, MAE, RMSE, and max error; only NSE needs
-   % spread, so it alone is NaN there. NSE is also NaN when the observations
-   % have zero variance, since the denominator is zero and the skill score is
-   % undefined rather than infinite.
+   % This function drops a pair when either side is not finite. A single
+   % remaining pair still gives an exact bias, MAE, RMSE, and max error. Only
+   % NSE needs spread, so only NSE is NaN there. NSE is also NaN when the
+   % observations have zero variance, because the denominator is zero and the
+   % skill score is undefined rather than infinite.
    %
    % NSE here is the standard form, with the OBSERVED mean in the denominator.
    % matfunclib's nashsutcliffe defaults to a modified form using the model

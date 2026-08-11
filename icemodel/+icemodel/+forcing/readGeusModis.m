@@ -16,17 +16,17 @@ function [albedo, Time, selection] = readGeusModis( ...
    %  - location = [lat lon] rows (points, degrees): each row yields the
    %    grid cell nearest that point (method "nearest", default) or a
    %    natural-neighbour blend of the surrounding cells at the point
-   %    (method "natural"). Passing every station at once builds the grid
-   %    geometry once and reads ONE covering albedo hyperslab per file,
-   %    which is how multi-station staging (stageModisAlbedo) avoids
-   %    per-station re-reads of the same yearly NetCDF.
-   %  - location = polyshape (vertices in EPSG:3413 metres): the MODIS
-   %    cells are averaged over the polygon. remap="conservative" (default)
-   %    is the exact overlap-area-weighted catchment mean via the exactremap
-   %    toolbox (helpers.remapPolygon), matching the legacy readGeusModis
-   %    ALBavgInPoly ROI mean; remap="equal" is a plain in-polygon
-   %    cell-centre mean. The remap runs in the GEUS 5 km polar-stereographic
-   %    frame (the grid is regular there).
+   %    (method "natural"). Pass every station at once, and the function
+   %    builds the grid geometry once and reads ONE covering albedo
+   %    hyperslab per file. Multi-station staging (stageModisAlbedo) uses
+   %    this to avoid a per-station re-read of the same yearly NetCDF.
+   %  - location = polyshape (vertices in EPSG:3413 metres): the function
+   %    averages the MODIS cells over the polygon. remap="conservative"
+   %    (default) is the exact overlap-area-weighted catchment mean from the
+   %    exactremap toolbox (helpers.remapPolygon), which matches the legacy
+   %    readGeusModis ALBavgInPoly ROI mean. remap="equal" is a plain
+   %    in-polygon cell-centre mean. The remap runs in the GEUS 5 km
+   %    polar-stereographic frame, where the grid is regular.
    %
    % Inputs
    %  filename - GEUS reflectivity NetCDF for one year
@@ -39,9 +39,9 @@ function [albedo, Time, selection] = readGeusModis( ...
    %
    % Outputs
    %  albedo    - daily albedo series, one column per requested point (one
-   %              column for a polygon) [-]; undocumented finite 999
-   %              sentinels and other nonphysical samples are returned as
-   %              NaN
+   %              column for a polygon) [-]. The function returns the
+   %              undocumented finite 999 sentinels and other nonphysical
+   %              samples as NaN
    %  Time      - UTC daily datetime axis (Jan 1 of the file year onward)
    %  selection - 1 x ncolumns struct of cell-selection provenance: the
    %              sampling method, hyperslab start/count indices into the
@@ -72,11 +72,11 @@ function [albedo, Time, selection] = readGeusModis( ...
    grid_sha256 = coordinateGridSha256(LAT, LON);
 
    % Project the GEUS 5 km grid into its native polar-stereographic frame
-   % (sphere, true scale 71N, central meridian 39W; see geusModisProjection),
-   % where the 5 km posting is axis-aligned and uniform, then rebuild exactly
-   % regular axes via linspace (a sub-metre correction over the 5 km cell) so
-   % the conservative remap operates on a perfectly regular grid - the GEUS
-   % analogue of the MAR Xnat/Ynat axes.
+   % (sphere, true scale 71N, central meridian 39W; see geusModisProjection).
+   % The 5 km posting is axis-aligned and uniform in that frame. Then rebuild
+   % exactly regular axes with linspace, a sub-metre correction over the 5 km
+   % cell, so the conservative remap runs on a regular grid. These axes are
+   % the GEUS analogue of the MAR Xnat/Ynat axes.
    geus = icemodel.forcing.helpers.geusModisProjection();
    [Xp, Yp] = projfwd(geus, LAT, LON);
    xax = linspace(mean(Xp(1, :)), mean(Xp(end, :)), size(Xp, 1)).';
@@ -120,11 +120,11 @@ function [albedo, Time, selection] = readGeusModis( ...
    ndays = info.Size(end);
 
    % Read ONE bounding hyperslab that covers every query over the two grid
-   % dimensions and all days, then slice each query's block from memory and
-   % flatten the cells column-major (cells x time) so the gridLocation
-   % collapse handle reduces it to the target series exactly as it does for
-   % the MAR / RACMO / MERRA channels. For a single query this is the same
-   % read as the original per-target hyperslab.
+   % dimensions and all days. Then slice each query's block from memory and
+   % flatten the cells column-major (cells x time). The gridLocation collapse
+   % handle then reduces it to the target series as it does for the MAR,
+   % RACMO, and MERRA channels. For a single query this is the same read as
+   % the per-target hyperslab.
    union_start = min(starts, [], 1);
    union_count = max(starts + counts, [], 1) - union_start;
    union_block = ncread(filename, 'albedo', ...

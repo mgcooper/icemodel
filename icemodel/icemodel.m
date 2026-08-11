@@ -1,5 +1,5 @@
 function [ice1, ice2, opts] = icemodel(opts)
-   % ICEMODEL Simulate the phase change process in glacier ice.
+   %ICEMODEL Simulate the phase change process in glacier ice.
    %
    % This function models the phase change process in melting glacier ice. It
    % uses iterative processes to update the temperature, liquid and ice fraction
@@ -28,8 +28,8 @@ function [ice1, ice2, opts] = icemodel(opts)
    %         near-surface atmosphere. Contains one value per timestep.
    % ice2  - 2-dimensional data storing variables defined on the subsurface ice
    %         column control volume mesh. Contains one column per timestep.
-   % opts  - Finalized runtime configuration after icemodel.configureRun() has
-   %         applied the last non-negotiable pre-execution updates.
+   % opts  - Finalized runtime configuration after icemodel.configureRun()
+   %         applies the required pre-execution updates.
    %
    % See also: skinmodel, icemodel.setopts
    %
@@ -170,7 +170,8 @@ function [ice1, ice2, opts] = icemodel(opts)
                   cpl_aitken, cpl_jumpmax, ro_sfc, snow_depth, step_opts);
             end
 
-            % Hitting max coupling iterations without ok_cpl is a substep fail.
+            % Reaching the maximum coupling iterations without ok_cpl is a
+            % substep failure.
             ok = ok_seb && ok_ieb && ok_cpl;
 
             % CHECK SUBSTEP FAILURE (shorten dt and restart substep on failure)

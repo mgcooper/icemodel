@@ -4,16 +4,16 @@ function ice1 = diagnose_column_runoff(ice1, ice2, opts)
    % Runoff is a postprocessed water budget for the column reservoir, not a
    % direct modeled flux (the column never drains during runtime). Per step the
    % reservoir gains melt and condensation and loses refreezing, evaporation,
-   % and runoff. Condensation that exceeded the top cell's pore capacity never
-   % entered the reservoir at all, so it runs off here with no residence time.
+   % and runoff. Condensation above the top cell's pore capacity never
+   % enters the reservoir, so it runs off here with no residence time.
    %
-   % Refreezing is credited only up to the liquid supplied within a trailing
-   % opts.tlag window. That residence time prevents the column's whole
-   % accumulated meltwater from refreezing when the melt season ends, and it
+   % This function credits refreezing only up to the liquid supplied within a
+   % trailing opts.tlag window. That residence time stops the column's whole
+   % accumulated meltwater from refreezing when the melt season ends. It also
    % limits how much of a day's melt can refreeze overnight.
    %
-   % Runoff is formally a "running total", not a cumulative sum: an hour whose
-   % evaporation exceeds its melt and overflow lowers it.
+   % Runoff is a running total, not a cumulative sum. An hour whose evaporation
+   % exceeds its melt and overflow lowers the total.
    %
    %#codegen
 
@@ -72,8 +72,8 @@ function values = liquidVaporSupply(ice2, dz, n_steps)
    % Initialize an empty column.
    values = zeros(n_steps, 1);
 
-   % Every icemodel output profile includes df_evp, but allowing its absence
-   % keeps reduced test payloads usable, so return a zero column in that case.
+   % Every icemodel output profile includes df_evp. Reduced test payloads can
+   % omit it, so return a zero column when the field is missing.
    if ~isfield(ice2, 'df_evp')
       return
    end

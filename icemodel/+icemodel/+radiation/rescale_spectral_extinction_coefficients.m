@@ -1,5 +1,5 @@
 function k_ext = rescale_spectral_extinction_coefficients(k_ext, kabs, kice, wavel)
-   %rescale_spectral_extinction_coefficients Scale extinction coefficients by an absorption profile.
+   %rescale_spectral_extinction_coefficients Scale extinction by absorption.
    %
    %  k_ext = icemodel.radiation.rescale_spectral_extinction_coefficients( ...
    %     k_ext, kabs, kice, wavel)

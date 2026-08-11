@@ -3,11 +3,11 @@ function case_id = normalizeFormalCaseId(case_id)
    %
    %  case_id = icemodel.test.helpers.normalizeFormalCaseId(case_id)
    %
-   % Older saved perf/regression baselines encoded suite prefixes (smoke_/full_/
-   % reg_) and used `_bcN` for the solver index. Normalize those forms so current
-   % loaders can still match legacy baseline rows.
-   % Normalize each saved identifier independently so mixed legacy/current
-   % baseline files can still be loaded and matched.
+   % Older saved perf/regression baselines encoded suite prefixes
+   % (smoke_/full_/reg_) and used `_bcN` for the solver index. Normalize those
+   % forms so current loaders can match legacy baseline rows.
+   % Normalize each saved identifier on its own, so a baseline file that mixes
+   % legacy and current identifiers still loads and matches.
    case_id = string(case_id);
    for i = 1:numel(case_id)
       s = case_id(i);

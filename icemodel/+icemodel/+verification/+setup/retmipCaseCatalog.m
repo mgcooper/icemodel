@@ -6,12 +6,12 @@ function cases = retmipCaseCatalog(case_ids)
    %
    % Role
    %  RetMIP protocol-case inventory used by fetch/import tests and staging
-   %  helpers. It remains a case catalog because aliases and protocol windows
+   %  helpers. It is a case catalog because aliases and protocol windows
    %  describe cases rather than physical sites. Staged cases are normalized
    %  separately through icemodel.verification.setup.makeFirnCaseManifestEntry.
-   %  The
-   %  source associations are metadata only; they do not imply forcing has been
-   %  staged or that protocol variables belong in a normal icemodel met file.
+   %  The source associations are metadata only. They do not imply that forcing
+   %  has been staged, or that protocol variables belong in a normal icemodel
+   %  met file.
 
    arguments
       case_ids (1, :) string = strings(1, 0)
@@ -44,8 +44,8 @@ function cases = retmipCaseCatalog(case_ids)
       "2014-12-02 21:00:00", 66.1812, -39.0435, 1563, ...
       "unknown", ["fa", "Firn Aquifer (FA)", "FA"])];
 
-   % A caller can request a subset by canonical id or protocol alias; fail early
-   % on unknown ids so manifests cannot silently drift from the protocol table.
+   % A caller can request a subset by canonical id or protocol alias. Fail on
+   % an unknown id, so a manifest cannot differ from the protocol table.
    if ~isempty(case_ids)
       keep = false(size(cases));
       missing = strings(1, numel(case_ids));
@@ -62,7 +62,8 @@ function cases = retmipCaseCatalog(case_ids)
       end
       missing = missing(1:n_missing);
       if ~isempty(missing)
-         % Preserve the established identifier across the catalog rename.
+         % The error identifier keeps the retmipCaseMetadata name that
+         % callers and tests already match.
          error('icemodel:verification:retmipCaseMetadata:unknownCase', ...
             'unknown RetMIP case id(s): %s', strjoin(missing, ', '));
       end

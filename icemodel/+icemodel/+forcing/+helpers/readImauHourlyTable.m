@@ -6,9 +6,9 @@ function [data, metadata] = readImauHourlyTable(filename)
    % Role
    %  Source-specific parser for the Van Tiggelen et al. PANGAEA hourly IMAU
    %  S21/S22/S23 files. The shared PANGAEA ingest skips the metadata block and
-   %  reads positional rows; this parser maps corrected meteorological channels
-   %  to icemodel-native names and preserves source metadata needed by
-   %  staging/import manifests.
+   %  reads positional rows. This parser then maps the corrected meteorological
+   %  channels to icemodel-native names and keeps the source metadata that
+   %  staging and import manifests need.
 
    arguments
       filename (1, 1) string
@@ -54,8 +54,9 @@ function [data, metadata] = readImauHourlyTable(filename)
       data.wire_length = raw.col27;
    end
 
-   % Preserve source metadata and row-derived coordinate summaries for later
-   % staging without pretending row-varying coordinates are one exact point.
+   % Keep the source metadata and the row-derived coordinate summaries for
+   % later staging. The coordinates vary by row, so the summary reports
+   % ranges instead of one exact point.
    metadata = struct( ...
       'filename', source.filename, ...
       'site_id', source.site_id, ...

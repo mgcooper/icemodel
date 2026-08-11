@@ -22,7 +22,7 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(Ts, ...
    % Thermal conductivity without vapor diffusion (skinmodel).
    k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, 0);
 
-   % Vapor density derivative excluded from enthalpy budget (skinmodel).
+   % The enthalpy budget excludes the vapor density derivative (skinmodel).
    drovdT = 0;
 
    % To reinstate vapor-aware conductivity and enthalpy:
@@ -30,7 +30,7 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(Ts, ...
    % k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq, drovdT);
    % k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, k_vap);
    %
-   % Note: same update is required within iterations, see solve_column_enthalpy.
+   % The iterations need the same update. See solve_column_enthalpy.
 
    % Initial past Picard iterates for Aitken-acceleration
    % T_1 = nan(size(T));

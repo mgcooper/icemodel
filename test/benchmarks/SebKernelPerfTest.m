@@ -135,12 +135,12 @@ function batch_size = sebBenchmarkBatchSize(seb_solver)
 
    switch seb_solver
       case 1
-         % The secant/newton variant stays quick enough that it still needs
-         % a large batch to stay above framework precision.
+         % The secant/newton variant is fast, so it needs a large batch to
+         % stay above framework clock precision.
          batch_size = 2048;
       case 2
-         % The constrained solve is similarly quick once the setup state is
-         % fixed, so batch it aggressively as well.
+         % The constrained solve is also fast once the setup state is fixed,
+         % so it uses the same large batch.
          batch_size = 2048;
       otherwise
          % The fallback solver is also fast relative to the framework

@@ -3,9 +3,9 @@ function files = fetchProductFiles(cache_dir, patterns, kwargs)
    %
    %  files = icemodel.verification.setup.fetchProductFiles(cache_dir, patterns)
    %
-   % Patterns are relative to cache_dir and may include recursive globs. Optional
-   % exclusions keep product-specific filename rules in callers while sharing the
-   % filesystem collection and de-duplication behavior.
+   % Patterns are relative to cache_dir and can include recursive globs. The
+   % optional exclusions leave the product-specific filename rules with the
+   % callers, while this function collects and de-duplicates the files.
 
    arguments
       cache_dir (1, 1) string

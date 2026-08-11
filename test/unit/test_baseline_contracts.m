@@ -312,7 +312,7 @@ function test_obsolete_rolling_forcing_requires_acceptance(testCase)
 end
 
 function test_formal_baseline_case_identity_is_checked(testCase)
-   % A case id must not allow one site's metrics to masquerade as another.
+   % A case id must not let the metrics of one site pass as another site's.
 
    baseline = table("icemodel_kanm_2016_solver1", "icemodel", ...
       "kanm", 2016, 1, "promice_filled", ...
@@ -637,7 +637,7 @@ function test_baseline_builders_forward_data_root_without_writing(testCase)
       baseline_tag="v1.1", data_root="", output_file=output_file), ...
       'icemodel:test:baselineDataRootObserved');
 
-   % An explicit root still wins, even for a release registration.
+   % An explicit root still takes precedence, even for a release registration.
    setenv('ICEMODEL_EXPECTED_BUILDER_ARGUMENT_ROOT', selected_root);
    setenv('ICEMODEL_EXPECTED_BUILDER_RESOLVED_ROOT', selected_root);
    setenv('ICEMODEL_EXPECTED_BUILDER_KIND', 'regression');
@@ -688,7 +688,7 @@ function test_baseline_runners_select_registered_data_case_without_running(testC
    testCase.verifyError(@() regression_test.configureCases(), ...
       'icemodel:test:baselineRunnerRootObserved');
 
-   % An explicit root still wins while the registered case stays
+   % An explicit root still takes precedence, while the registered case stays
    % visible to the central bootstrap.
    selected_root = fullfile(fixture_root, "selected-data");
    setenv('ICEMODEL_EXPECTED_RUNNER_ROOT', selected_root);

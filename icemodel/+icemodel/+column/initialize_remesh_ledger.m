@@ -1,9 +1,9 @@
 function remesh = initialize_remesh_ledger()
    %INITIALIZE_REMESH_LEDGER Zeroed remesh event ledger.
    %
-   % Defines the remesh event schema. merge_thin_layers is the only caller; the
-   % solver receives this struct as that function's eighth output and does not
-   % predeclare it.
+   % Defines the remesh event schema. merge_thin_layers is the only caller.
+   % The solver receives this struct as the eighth output of merge_thin_layers
+   % and does not predeclare it.
    %
    %#codegen
 

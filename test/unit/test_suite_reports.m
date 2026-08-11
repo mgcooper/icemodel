@@ -174,7 +174,7 @@ function test_report_requires_artifact_path_without_output_override(testCase)
 end
 
 function test_display_regression_summary_displays_accepted_baseline(testCase)
-   % Baseline tables must not be skipped for lacking compare columns.
+   % The display must show a baseline table that has no compare columns.
 
    fixture = regressionResults();
    baseline = fixture.report;

@@ -3,9 +3,9 @@ function simyears = outputYears(opts)
    %
    %  simyears = icemodel.outputYears(opts)
    %
-   % OPTS.SIMYEARS lists the forcing years in run order. The first
-   % OPTS.N_SPINUP_YEARS years are run only for spinup and are excluded from
-   % saved/postprocessed output.
+   % OPTS.SIMYEARS lists the forcing years in run order. The model runs the
+   % first OPTS.N_SPINUP_YEARS years only for spinup, and the saved and
+   % postprocessed output excludes them.
 
    simyears = opts.simyears(opts.n_spinup_years+1:end);
 end

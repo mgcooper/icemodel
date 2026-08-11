@@ -1,5 +1,6 @@
 function Tdew = dew_point_temperature(T, rh, liqflag)
-   %dew_point_temperature Dew point temperature from air temperature and humidity.
+   %DEW_POINT_TEMPERATURE Dew point temperature from air temperature and
+   % relative humidity.
    %
    %  Tdew = icemodel.vapor.dew_point_temperature(T, rh)
    %  Tdew = icemodel.vapor.dew_point_temperature(T, rh, liqflag)

@@ -49,10 +49,11 @@ function cases = normalizeCaseEntries(cases)
          end
       end
 
-      % String-array fields. comparison_variables is shared by both schemas;
-      % eval_target / forcing_sources / eval_sources are the forcing-agnostic
-      % firn descriptors. jsondecode renders a single-element array as a scalar char
-      % and a multi-element array as a cellstr, so coerce both to a string array.
+      % String-array fields. Both schemas share comparison_variables. The
+      % fields eval_target, forcing_sources, and eval_sources are the
+      % forcing-agnostic firn descriptors. jsondecode returns a one-element
+      % array as a char row and a longer array as a cellstr, so convert both
+      % to a string array.
       array_fields = ["comparison_variables", "eval_target", ...
          "forcing_sources", "eval_sources"];
       for jfield = 1:numel(array_fields)
@@ -68,9 +69,9 @@ function cases = normalizeCaseEntries(cases)
             normalizeObservationVariables(cases(icase).observation_variables);
       end
 
-      % Manifest periods carry the case comparison/evaluation window. Legacy
-      % committed fallback manifests used comparison_window before period became
-      % canonical, so normalize that read-side compatibility here.
+      % Manifest periods carry the case comparison and evaluation window. Some
+      % committed fallback manifests name that field comparison_window, so map
+      % it to period when period is absent.
       if ~isfield(cases(icase), 'period') ...
             && isfield(cases(icase), 'comparison_window')
          cases(icase).period = cases(icase).comparison_window;

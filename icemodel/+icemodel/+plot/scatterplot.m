@@ -4,10 +4,11 @@ function out = scatterplot(x, y, kwargs)
    %  out = icemodel.plot.scatterplot(x, y)
    %  out = icemodel.plot.scatterplot({x1, x2}, {y1, y2}, display_name=names)
    %
-   % This helper owns the common "candidate versus target" scatter contract:
-   % finite-pair filtering, point clouds, one 1:1 reference line, one linear
-   % least-squares fit per series, and a legend built from the plotted fit
-   % handles. Callers can reuse it without open-coding the same plot mechanics.
+   % This helper draws the shared "candidate versus target" scatter plot. It
+   % filters to finite pairs, draws the point clouds, draws one 1:1 reference
+   % line, fits one linear least-squares line per series, and builds the legend
+   % from the plotted fit handles. Callers reuse it instead of repeating the
+   % same plotting code.
 
    arguments
       x

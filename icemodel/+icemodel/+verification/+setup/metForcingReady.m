@@ -3,11 +3,11 @@ function [tf, reason, complete_windows] = metForcingReady(met)
    %
    % Verification importers may stage met files with explicit all-NaN
    % placeholders so missing channels can be filled later. Such artifacts are
-   % useful cache/data products, but they should not be advertised as runnable
-   % forcing sources until every required met channel has finite data on one
-   % regular time axis. COMPLETE_WINDOWS reports inclusive contiguous runs where
-   % every required channel is finite; callers choose the scientifically useful
-   % run length rather than inheriting a hidden minimum-duration threshold.
+   % useful cache/data products, but they must not count as runnable forcing
+   % sources until every required met channel has finite data on one regular
+   % time axis. COMPLETE_WINDOWS reports inclusive contiguous runs where every
+   % required channel is finite. The caller chooses the useful run length,
+   % because this function applies no minimum-duration threshold.
 
    arguments
       met timetable

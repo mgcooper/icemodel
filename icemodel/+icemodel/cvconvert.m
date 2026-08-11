@@ -7,7 +7,7 @@ function varargout = cvconvert(varargin)
    % Syntax:
    % [out1, ..., outN] = cvconvert(FROM, TO, CV, CONSTS, in1, ..., inN) Converts
    % numeric values in1, ..., inN from their value in FROM to their value in TO
-   % using the control volumes in CV and the rquired physical constants in 
+   % using the control volumes in CV and the required physical constants in
    % CONSTS.
    %
    % Inputs: 
@@ -28,8 +28,8 @@ function varargout = cvconvert(varargin)
    % constituent, with elements representing the constituent's quantity in the
    % dimension specified by convertTo.
    %
-   % Note: 'volumefraction' and 'bulkdensity' require the total volume or mass,
-   % which is assumed to be the sum of the inputs.
+   % 'volumefraction' and 'bulkdensity' require the total volume or mass. This
+   % function takes that total as the sum of the inputs.
    %
    % Example: 
    % [m_liq, m_ice] = icemodel.cvconvert( ...

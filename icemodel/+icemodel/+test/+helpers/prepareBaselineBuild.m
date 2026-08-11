@@ -44,8 +44,8 @@ function [baseline_type, baseline_tag, output_file, input_path, ...
       icemodel.test.helpers.resolveBaselineBuild(kind, baseline, baseline_tag, ...
       smbmodel, output_file, simyear);
 
-   % Release baselines are immutable regardless of whether they are reached
-   % through the snapshot or direct versioned-build entrypoint.
+   % A release baseline is immutable. This holds for the snapshot entry point
+   % and for the direct versioned-build entry point.
    if baseline_type == "release"
       icemodel.test.helpers.assertNewReleaseBaselineTarget(output_file);
    end

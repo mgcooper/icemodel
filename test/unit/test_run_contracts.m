@@ -112,7 +112,7 @@ function test_diagnostic_output_profile_extends_surface_contract(testCase)
       diagnostic_suffix);
    testCase.verifyEqual(opts_diag.vars2, opts_standard.vars2);
 
-   % SkinModel has no column-remesh ledger and must not advertise these fields.
+   % SkinModel has no column-remesh ledger and must not declare these fields.
    testCase.verifyFalse(any(ismember(opts_skin_diag.vars1, ...
       icemodel.namelists.budgetoutputs())));
 end
@@ -258,7 +258,7 @@ function test_getpath_builds_restart_path_without_blank_parts(testCase)
 end
 
 function test_setpath_remains_a_compatibility_alias(testCase)
-   % SETPATH should continue to match GETPATH while older callers migrate.
+   % SETPATH must return the same paths as GETPATH.
 
    returned = icemodel.setpath('restart', 'kanm', 'skinmodel', '', [], ...
       'case01');

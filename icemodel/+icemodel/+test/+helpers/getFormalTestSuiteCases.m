@@ -16,11 +16,12 @@ function cases = getFormalTestSuiteCases()
    %    result_field  : generated field name used in run_test_bootstrap results
    %
    % Notes:
-   %  - This is the single source of truth for the possible formal suite cases
-   %    used by `run_test_bootstrap`.
-   %  - These are not the underlying model run cases. Model/site/year/solver
-   %    combinations are defined separately by `icemodel.test.helpers.getPerfCaseMatrix`
-   %    and `icemodel.test.helpers.getRegressionCaseMatrix`.
+   %  - This helper defines the possible formal suite cases that
+   %    `run_test_bootstrap` uses.
+   %  - These are not the underlying model run cases. The model, site, year,
+   %    and solver combinations are defined separately by
+   %    `icemodel.test.helpers.getPerfCaseMatrix` and
+   %    `icemodel.test.helpers.getRegressionCaseMatrix`.
    %  - The helper returns regression cases first, then perf cases. Within each
    %    suite, the ordering is:
    %       1. rolling baseline build
@@ -30,8 +31,8 @@ function cases = getFormalTestSuiteCases()
    %
    % Why this exists:
    %  - `run_test_bootstrap` needs one canonical definition of the formal suite
-   %    lifecycle so adding or removing a suite-level case later is a one-file
-   %    edit.
+   %    lifecycle. Adding or removing a suite-level case is then an edit to
+   %    this file only.
    %  - The generated `result_field` values keep bootstrap result names
    %    consistent with the case metadata instead of maintaining a second
    %    hand-written list.

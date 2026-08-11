@@ -5,16 +5,15 @@ function estimate = lwdEstimator(tair, rh)
    %
    % Role
    %  The policy's empirical lwd candidate (per-variable table, lwd proxy
-   %  (c)): a clear-sky Brutsaert (1975) effective emissivity from vapor
-   %  pressure and air temperature, epsilon = 1.24 (ea_hPa / T)^(1/7),
-   %  applied as lwd = epsilon * sigma * T^4. This is a deliberately
-   %  uncalibrated physical form: it competes in the empirical-estimator
-   %  tier (POLICY B1) only AFTER passing
-   %  through the same overlap calibration as the model proxies
-   %  (fitProxyCalibration), which absorbs the cloud contribution the
-   %  clear-sky form omits. Clean-room from the published formulation; no
-   %  legacy coefficients are reused (none were recoverable — POLICY
-   %  compatibility audit).
+   %  (c)). It uses the clear-sky Brutsaert (1975) effective emissivity from
+   %  vapor pressure and air temperature, epsilon = 1.24 (ea_hPa / T)^(1/7),
+   %  applied as lwd = epsilon * sigma * T^4. The form is uncalibrated on
+   %  purpose. It competes in the empirical-estimator tier (POLICY B1) only
+   %  AFTER it passes through the same overlap calibration as the model
+   %  proxies (fitProxyCalibration). That calibration supplies the cloud
+   %  contribution the clear-sky form omits. This code follows the published
+   %  formulation and uses no coefficients from other sources, because the
+   %  POLICY compatibility audit found none.
    %
    % Inputs
    %  tair : air temperature, K.

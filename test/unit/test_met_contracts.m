@@ -313,7 +313,7 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
        icemodel.forcing.reconstruct.promiceFilledVerificationMatches(opts_out));
     % A requested file subset verifies only the bytes it will load. An
     % unselected file whose bytes do not match the producer manifest
-    % cannot poison a valid partial load.
+    % cannot invalidate a valid partial load.
     full_met = met;
     second_payload = load(opts.metfname{2}, 'met');
     second_intact = second_payload.met;
@@ -664,15 +664,16 @@ function test_readiness_rejects_unsafe_station_token(testCase)
 end
 
 function test_codegen_flags_require_canonical_artifact_provenance(testCase)
-   % A ready ledger and freshly repinned manifest cannot mint generated-code
-   % trust after the artifact policy or required provenance becomes invalid.
+   % A ready ledger and a freshly repinned manifest cannot restore
+   % generated-code trust after the artifact policy or the required
+   % provenance becomes invalid.
    [workspace, opts, canonical_met] = makeCodegenPromiceFixture();
    cleaner = onCleanup(@() ...
       icemodel.test.fixtures.cleanupSyntheticWorkspace(workspace));
    filename = opts.metfname{1};
 
-   % The canonical MATLAB preparation path mints all three trust flags, and
-   % generated loading's codegen-compatible predicate accepts that exact opts.
+   % The canonical MATLAB preparation path sets all three trust flags, and
+   % the codegen-compatible check in generated loading accepts that exact opts.
    verified = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts);
    testCase.verifyTrue(verified.promice_filled_readiness_verified);
    testCase.verifyTrue(verified.promice_filled_manifest_verified);

@@ -6,7 +6,7 @@ function [Data, metadata] = buildSamimiDye2Data(kwargs)
    %
    % Reads the Samimi/Marshall Dye-2 summer 2016 AWS workbook and maps the
    % native columns onto icemodel's canonical forcing/userdata names. The source
-   % record is half-hourly and remains native here. Shared artifact writers own
+   % record is half-hourly and stays native here. Shared artifact writers set
    % the public 15-minute met and hourly userdata output cadences.
    %
    % Source precipitation policy: this workbook has no precipitation channel.

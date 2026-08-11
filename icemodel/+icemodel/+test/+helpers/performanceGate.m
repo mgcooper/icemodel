@@ -22,8 +22,8 @@ function [passed, lower_wall_s, upper_wall_s, reason] = ...
       && current_wall_s <= upper_wall_s;
    reason = "";
 
-   % Explain the failing side so an agent can distinguish slowdown from a
-   % suspiciously fast measurement without retaining runner chatter.
+   % Explain the failing side, so an agent can tell a slowdown from a
+   % measurement that is too fast. Keep the message free of runner output.
    if current_wall_s < lower_wall_s
       reason = sprintf( ...
          'runtime %.6g s is below the accepted %.6g-%.6g s band', ...

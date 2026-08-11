@@ -1,6 +1,5 @@
 function RegressionBaseline = build_regression_baseline(kwargs)
-   %BUILD_REGRESSION_BASELINE Build rolling or versioned icemodel regression
-   %baselines.
+   %BUILD_REGRESSION_BASELINE Build rolling or versioned regression baselines.
    %
    %  RegressionBaseline = build_regression_baseline(baseline="rolling")
    %  RegressionBaseline = build_regression_baseline(baseline_tag="v1.1")
@@ -31,8 +30,8 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    % baseline files under test/baselines/.
    %
    % The optional solver filter accepts any subset of [1 2 3].
-   % The formal comparison year and smoke/full site selections are explicit
-   % here rather than buried in the regression case matrix helper.
+   % The formal comparison year and the smoke/full site selections are
+   % explicit here, not inside the regression case-matrix helper.
 
    arguments (Input)
 

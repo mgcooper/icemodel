@@ -11,11 +11,11 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    % names, units, levels, and physical ranges follow the product variable
    % dictionary (data/verification/promice/AWS_variables.csv).
    %
-   % The mapping is not limited to the minimal met subset: every L3 channel
-   % useful for snow/firn/ice model forcing and evaluation maps to a canonical
-   % icemodel name (one name per channel). Housekeeping/diagnostic channels
-   % (battery voltage, fan current, raw per-timestep GPS lat/lon, radiation-
-   % sensor temperature) are intentionally not mapped.
+   % The mapping covers more than the minimal met subset. Every L3 channel
+   % useful for snow, firn, and ice model forcing or evaluation maps to one
+   % canonical icemodel name. The mapping omits the housekeeping and
+   % diagnostic channels: battery voltage, fan current, raw per-timestep GPS
+   % latitude and longitude, and radiation-sensor temperature.
    %
    % Forcing channels (NetCDF -> output, with the unit change applied):
    %    t_u [degC] -> tair [K]         p_u [hPa] -> psfc [Pa]
@@ -102,20 +102,21 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
 
    filename = locateStationFile(site, kwargs.source_dir, kwargs.timescale);
 
-   % TIME CONVENTION (governs all model-vs-observation alignment downstream):
-   % the pypromice L3 hourly timestamp is the START of the averaged hour (see
-   % the product readme, "Temporal averaging": "the timestamp of the hourly
-   % averages indicate the start of the averaged hour"). The file encodes it
-   % as integer hours (0,1,2,...) since a station epoch in the time:units
-   % attribute, so epoch+hours(t) reproduces the bin-START stamp exactly; the
-   % dateshift('start','hour') below is an idempotent snap that guards against
-   % sub-hour epoch jitter, not a re-binning. icemodel's met/Data axis is this
-   % same bin-START hourly grid (UTC). icemodel.loadmet / the timestepping
-   % loop treat a met row's Time as the forcing valid AT that timestamp and
-   % integrate forward over [t, t+dt); a START-of-hour averaged forcing is the
-   % correct mean to drive the [t, t+1h) step, so no half-hour shift is needed
-   % and none is applied. When comparing a simulation to these observations,
-   % align on this START-of-hour stamp (do not recentre to the hour middle).
+   % TIME CONVENTION. This rule governs all model-versus-observation alignment
+   % downstream. The pypromice L3 hourly timestamp is the START of the averaged
+   % hour (product readme, "Temporal averaging": "the timestamp of the hourly
+   % averages indicate the start of the averaged hour"). The file encodes the
+   % time as integer hours (0,1,2,...) since a station epoch given in the
+   % time:units attribute, so epoch+hours(t) reproduces the bin-START stamp
+   % exactly. The dateshift('start','hour') call below snaps sub-hour epoch
+   % jitter to the hour. It repeats without effect and does not re-bin the
+   % data. The icemodel met and Data axis uses this same bin-START hourly grid
+   % in UTC. icemodel.loadmet and the timestepping loop read a met row's Time
+   % as the forcing valid AT that timestamp, then integrate forward over
+   % [t, t+dt). A START-of-hour averaged forcing is the correct mean for the
+   % [t, t+1h) step, so this code applies no half-hour shift. When you compare
+   % a simulation with these observations, align on this START-of-hour stamp
+   % and do not recentre to the middle of the hour.
    Time = readTimeAxis(filename, kwargs.timescale);
 
    info = ncinfo(filename);
@@ -213,19 +214,19 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
       aws.shum = aws.shum / 1000;                 % g/kg -> kg/kg
    end
 
-   % Ice-temperature string: t_i_1..t_i_N [degC] -> tice1..ticeN [K], clamped
-   % to the dictionary physical range (-80..1 C) before the K offset, so out-
-   % of-range thermistor spikes never reach the evaluation axis. The raw
-   % string is depth-tagged via d_t_i_N [m] (time-dependent depth BELOW the
-   % surface, positive downward) and a SURFACED thermistor (depth <= 0, the
-   % sensor at/above the surface as the firn melts out at ablation sites) is
-   % discarded per the product readme: its tice sample is set NaN so only
-   % genuine subsurface temperatures reach the evaluation axis. (GEUS already
-   % discards most surfaced readings upstream, so the depth gate is defensive,
-   % but it is enforced here so the icemodel channel is self-consistently
-   % depth-clean regardless of source vintage.) Where a depth tag is NaN the
-   % temperature is kept (still a subsurface reading; the depth is merely
-   % unestimated) and dticeN carries NaN for that sample.
+   % Ice-temperature string: t_i_1..t_i_N [degC] -> tice1..ticeN [K]. Clamp to
+   % the dictionary physical range (-80..1 C) before the K offset, so an
+   % out-of-range thermistor spike never reaches the evaluation axis. The raw
+   % string carries a depth tag d_t_i_N [m], the time-dependent depth BELOW
+   % the surface, positive downward. A SURFACED thermistor has depth <= 0,
+   % which means the sensor sits at or above the surface as the firn melts out
+   % at an ablation site. The product readme says to discard it, so its tice
+   % sample becomes NaN and only subsurface temperatures reach the evaluation
+   % axis. GEUS already discards most surfaced readings upstream, so this
+   % depth gate is a second check. It runs here so the icemodel channel is
+   % depth-clean for every source version. When a depth tag is NaN, the code
+   % keeps the temperature, because the sample is still a subsurface reading
+   % with an unknown depth, and dticeN carries NaN for that sample.
    icerange = [-80, 1];   % [degC], from AWS_variables.csv (t_i_*)
    nice = 0;
    while ismember(sprintf('t_i_%d', nice + 1), available)
@@ -242,14 +243,15 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
       aws.(sprintf('tice%d', nice)) = v + Tf;
    end
 
-   % Preserve GEUS's derived t_i_10m verbatim (apart from degC -> K) and expose
-   % one conservative canonical target. The source processor documents that
-   % noisy-thermistor filtering is disabled; a 45-site audit of 2.30 million
-   % consecutive hourly pairs found a 99.9th-percentile change of 0.350 C, while
-   % known KAN_U sensor failures jump 5.23 and 6.90 C in one hour. Therefore a
-   % >1 C consecutive-hour change is an impossible 10 m thermal response, not
-   % seasonal evolution. Both endpoints are masked so no plot or scorer bridges
-   % the discontinuity; the source channel and a review-status flag remain.
+   % Keep GEUS's derived t_i_10m unchanged apart from degC -> K, and add one
+   % conservative canonical target. The source processor documents that
+   % noisy-thermistor filtering is off. A 45-site audit of 2.30 million
+   % consecutive hourly pairs found a 99.9th-percentile change of 0.350 C,
+   % while known KAN_U sensor failures jump 5.23 and 6.90 C in one hour. A
+   % change above 1 C between consecutive hours is therefore an impossible
+   % 10 m thermal response, not seasonal evolution. This code masks both
+   % endpoints so no plot or scorer draws a line across the discontinuity. The
+   % source channel and a review-status flag stay in the output.
    if ismember('t_i_10m', available)
       aws.tice10m_source = double(ncread(filename, 't_i_10m')) + Tf;
       [aws.tice10m, aws.tice10m_qc_flag] = ...
@@ -257,10 +259,11 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    end
 
    % Record radiation support before applying the requested window. Builders
-   % need whole-file status so an outage-only surgical build makes the same
-   % geometry-derived darkness decision as a broader build containing finite
-   % source samples. A genuinely absent or whole-file all-missing channel stays
-   % distinguishable from a locally all-missing slice of an observed record.
+   % need the whole-file status, so a build of one outage window makes the
+   % same geometry-derived darkness decision as a wider build that contains
+   % finite source samples. This also separates an absent channel, or a
+   % channel that is missing across the whole file, from a window of an
+   % observed record that happens to be all missing.
    full_names = string(aws.Properties.VariableNames);
    swd_source_file_present = ismember("swd", full_names);
    swd_corrected_source_file_present = ismember("swd_cor", full_names);
@@ -451,13 +454,13 @@ function [clean, flag] = qualityControlTice10m(aws, timescale)
       end
       flag(first:first + 1) = max(flag(first:first + 1), code);
 
-      % A large isolated sensor jump can create a persistent derived-target
-      % level shift even after its first missing endpoint. Extend the mask only
-      % when the evidence is unusually strong: at least three comparable native
-      % sensors, exactly one >1 K jump from within 2 m of the 10 m target,
-      % stable other sensors/support/depths, and no return to the pre-jump level
-      % within 24 hours. The next >0.5 m reset of the offending sensor starts a
-      % new independently configured epoch.
+      % A large isolated sensor jump can shift the derived target level for a
+      % long time, past its first missing endpoint. Extend the mask only when
+      % every one of these conditions holds: at least three comparable native
+      % sensors, exactly one jump above 1 K from a sensor within 2 m of the
+      % 10 m target, no change in the other sensors, their support, or their
+      % depths, and no return to the pre-jump level within 24 hours. The next
+      % depth reset of that sensor above 0.5 m starts a new epoch.
       offender_index = NaN;
       offender_near_target = false;
       if comparable > 0

@@ -23,9 +23,9 @@ function displayPerfResults(results)
 
    % --- Case summary ---
 
-   % Select display columns using intersect for forward-compatible column
-   % selection: intersect returns only columns present in the table, so new
-   % columns added to case_summary in the future do not break display.
+   % Select the display columns with intersect. intersect returns only the
+   % columns that exist in the table, so a new case_summary column does not
+   % break the display.
    keep = intersect(["case_id", "median_wall_s", "ref_wall_s", ...
       "floor_wall_s", "gate_wall_s", "baseline_compatible", ...
       "passed_perf"], ...

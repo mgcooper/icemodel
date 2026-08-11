@@ -89,7 +89,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             all_baseline_fields = [ ...
                string(delta_specs(:, 1)); baseline_only(:)];
 
-            % Initialize fields nan
+            % Initialize every baseline field to NaN.
             base = struct();
             for f = all_baseline_fields'
                base.(f) = nan;
@@ -232,7 +232,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
       end
 
       function saveArtifacts(~, report, case_opts, meta)
-         %saveArtifacts Save the regression comparison artifact for one run.
+         %SAVEARTIFACTS Save the regression comparison artifact for one run.
 
          % Build the canonical artifact path.
          artifact_file = icemodel.test.helpers.artifactFilePath( ...

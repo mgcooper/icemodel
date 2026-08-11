@@ -1,5 +1,5 @@
 function mesh(Z, dz, growth_factor)
-   % Plot the nodes and edges of an exponential grid.
+   %MESH Plot the nodes and edges of an exponential grid.
    %
    % Parameters:
    %   Z (float): Total depth of the grid.

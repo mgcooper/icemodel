@@ -4,12 +4,12 @@ classdef RenameRoundTest < matlab.perftest.TestCase
    % This benchmark consolidates the legacy rename/round timing work into one
    % formal perftest target that uses synthetic but schema-representative data.
    %
-   % Legacy note:
+   % Scope:
    %  - older exploratory variants included a script-based benchmark and a
    %    separate `time_roundData` helper that used real `ice1/ice2` outputs.
-   %  - this reconciled benchmark does not use real data; the real-data note
-   %    is preserved in the helper comments below where it affected the code
-   %    choice, especially for postprocess-style rounding.
+   %  - this benchmark does not use real data. The helper comments below keep
+   %    the real-data findings where they affected the code choice, especially
+   %    for postprocess-style rounding.
    %  - rounding is still active in the current production path:
    %    `icemodel.postprocess` calls `roundData(...)`.
 
@@ -172,11 +172,11 @@ end
 function renamed = renameUsingIsmember(ice1, oldvars, newvars)
    % Rename using `ismember`.
    %
-   % Historical note:
-   %  - the function-based benchmark generally favored `ismember` slightly.
-   %  - the old script-based benchmark once suggested `intersect` was nearly
-   %    2x faster, but that result was treated cautiously because script scope
-   %    and data reuse may have biased the measurement.
+   % Measurements:
+   %  - the function-based benchmark favored `ismember` by a small margin.
+   %  - the script-based benchmark once measured `intersect` as nearly 2x
+   %    faster. That result is doubtful, because script scope and data reuse
+   %    can bias the measurement.
    renamed = renamevars(ice1, ...
       oldvars(ismember(oldvars, ice1.Properties.VariableNames)), ...
       newvars(ismember(oldvars, ice1.Properties.VariableNames)));
@@ -185,10 +185,10 @@ end
 function renamed = renameUsingIntersect(ice1, oldvars, newvars)
    % Rename using `intersect`.
    %
-   % Historical note:
-   %  - this remained competitive and occasionally won on some runs, but the
-   %    function-based benchmark usually made the gap look small enough that
-   %    readability and consistency mattered more than the raw timing edge.
+   % Measurements:
+   %  - this variant stayed competitive and won on some runs. In the
+   %    function-based benchmark the gap was small, so readability and
+   %    consistency matter more than the timing.
    [repvars, idx] = intersect(oldvars, ice1.Properties.VariableNames);
    renamed = renamevars(ice1, repvars, newvars(idx));
 end
@@ -196,13 +196,12 @@ end
 function ice2 = roundUsingSwitch(ice2)
    % Round using a `switch` over the available fields.
    %
-   % Historical note:
+   % Measurements:
    %  - this was one of the original generic round implementations.
-   %  - this is also the pattern currently used in `icemodel.postprocess`
-   %    inside `roundData(...)`.
-   %  - the old real-data `time_roundData` comparison put the analogous
-   %    switch-based postprocess rounder behind the direct-field variant but
-   %    still close enough that the difference was mainly directional.
+   %  - `icemodel.postprocess` uses this pattern inside `roundData(...)`.
+   %  - the real-data `time_roundData` comparison ranked the equivalent
+   %    switch-based postprocess rounder behind the direct-field variant. The
+   %    gap was small, so the result shows direction only.
    fields = fieldnames(ice2);
    for mm = 1:numel(fields)
       thisfield = fields{mm};
@@ -222,10 +221,10 @@ end
 function ice2 = roundUsingIsmember(ice2, ice2lookup)
    % Round using `ismember` to select from the precision lookup.
    %
-   % Historical note:
-   %  - the old script-based benchmark often favored this rounding path.
-   %  - the function-based benchmark usually kept it very close to the other
-   %    generic lookup variants rather than showing a decisive win.
+   % Measurements:
+   %  - the script-based benchmark often favored this rounding path.
+   %  - the function-based benchmark kept it very close to the other generic
+   %    lookup variants, with no decisive win.
    lookup = ice2lookup(ismember(ice2lookup(:, 1), fieldnames(ice2)), :);
    for n = 1:size(lookup, 1)
       ice2.(lookup{n, 1}) = round(ice2.(lookup{n, 1}), lookup{n, 2});
@@ -235,10 +234,9 @@ end
 function ice2 = roundUsingIntersect(ice2, ice2lookup)
    % Round using `intersect` to select from the precision lookup.
    %
-   % Historical note:
-   %  - this often landed near or slightly ahead of the other generic lookup
-   %    methods, but the spread was usually small enough to treat as a
-   %    directional result rather than a decisive rule.
+   % Measurements:
+   %  - this variant landed near or a little ahead of the other generic lookup
+   %    methods. The spread was small, so the result shows direction only.
    [fields, idx] = intersect(ice2lookup(:, 1), fieldnames(ice2));
    for n = 1:numel(fields)
       ice2.(fields{n}) = round(ice2.(fields{n}), ice2lookup{idx(n), 2});
@@ -248,11 +246,11 @@ end
 function ice2 = roundUsingIsmemberPersistent(ice2)
    % Round using `ismember` with a persistent precision lookup.
    %
-   % Historical note:
-   %  - this variant came from the broader exploratory timing script rather
-   %    than the original function-based benchmark.
-   %  - it was preserved because the script-based comparison tested the
-   %    persistent variants explicitly; in practice it stayed close to the
+   % Measurements:
+   %  - this variant comes from the broader exploratory timing script, not
+   %    from the original function-based benchmark.
+   %  - it stays here because the script-based comparison tested the
+   %    persistent variants explicitly. In practice it stayed close to the
    %    non-persistent lookup methods.
    persistent ice2lookup
    if isempty(ice2lookup)
@@ -268,12 +266,12 @@ end
 function ice2 = roundUsingIntersectPersistent(ice2)
    % Round using `intersect` with a persistent precision lookup.
    %
-   % Historical note:
-   %  - this was also preserved from the exploratory timing script so the
-   %    full set of compared generic rounders still exists in the formal
-   %    benchmark.
-   %  - like the other persistent variant, it usually stayed close to the
-   %    non-persistent methods rather than clearly dominating them.
+   % Measurements:
+   %  - this variant also comes from the exploratory timing script, so the
+   %    formal benchmark still holds the full set of compared generic
+   %    rounders.
+   %  - like the other persistent variant, it stayed close to the
+   %    non-persistent methods and did not clearly beat them.
    persistent ice2lookup
    if isempty(ice2lookup)
       ice2lookup = createIce2Lookup();

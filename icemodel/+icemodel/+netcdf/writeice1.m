@@ -1,10 +1,10 @@
 function writeice1(ncid, datapath, varnames, dimdata, xtype, smbmodel)
-   %WRITEICE1 Write ice1 data to icemodel nc file
+   %WRITEICE1 Write ice1 data to an icemodel nc file.
    %
    % WRITEICE1(NCID, VARS, DATA)
    %
-   % The access pattern is: [gridcell, timestep], thus:
-   % start = [n-1 0], count = [1 nhrs].
+   % The access pattern is [gridcell, timestep], so
+   % start = [n-1 0] and count = [1 nhrs].
    %
    % See also: icemodel.netcdf.writeice2
 

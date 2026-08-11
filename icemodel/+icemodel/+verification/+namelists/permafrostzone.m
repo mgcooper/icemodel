@@ -8,12 +8,12 @@ function permafrost_zones = permafrostzone()
    %                     the permafrost EXTENT class of the ground a verification
    %                     case sits on, using the standard IPA extent codes
    %                     sampled from the Obu et al. (2019) permafrost-zone map
-   %                     (the v1 Brown et al. 1997 source was replaced).
+   %                     (not the v1 Brown et al. 1997 source).
    %
    % Role
    %  Canonical permafrost-zone vocabulary shared by the setup importers (which
    %  stamp permafrost_zone onto case manifests) and validators. permafrost_zone
-   %  is ORTHOGONAL to surface_zone: surface_zone records the glaciological
+   %  is INDEPENDENT of surface_zone: surface_zone records the glaciological
    %  substrate REGIME ("where on the ice/off-ice transect"), permafrost_zone
    %  records the permafrost extent of the GROUND. An ice-sheet case sits on ice,
    %  not permafrost ground, so it carries "none"; an off-ice land/tundra case

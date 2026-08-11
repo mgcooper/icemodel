@@ -14,11 +14,11 @@ function increments = ablationLedgerIncrements(ledger)
    % joined cell the mean of the pair, so this over-counts what the removed
    % cell held and is not a surface mass flux.
    %
-   % solid_vapor_loss is sublimation minus deposition. Runoff cannot see it,
-   % because sublimated ice never becomes liquid, so adding it to runoff gives
-   % a continuous ablation proxy. Liquid vapor exchange stays out: evaporation
-   % removes pore water that runoff already counted as melt that left, and
-   % condensation adds pore liquid rather than ice.
+   % solid_vapor_loss is sublimation minus deposition. Runoff does not include
+   % it, because sublimated ice never becomes liquid. Adding it to runoff
+   % therefore gives a continuous ablation proxy. This term excludes liquid
+   % vapor exchange: evaporation removes pore water that runoff already counted
+   % as melt that left, and condensation adds pore liquid, not ice.
    %
    % Inputs
    %  ledger - model rows carrying the mass_budget_* channels

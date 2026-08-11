@@ -8,11 +8,10 @@ function [valid, lower_limit, upper_limit] = physicalValidity( ...
    %     "swu", values, times, swd=swd)
    %
    % Static channel limits come from physicalBounds. Downwelling shortwave
-   % additionally cannot exceed the configured multiple of
-   % top-of-atmosphere irradiance
-   % (with a small absolute night-noise floor on the ceiling and a civil
-   % twilight allowance — POLICY D-28), and upward shortwave cannot exceed
-   % the paired downwelling value.
+   % also cannot exceed the configured multiple of top-of-atmosphere
+   % irradiance. That ceiling carries a small absolute night-noise floor and
+   % a civil twilight allowance (POLICY D-28). Upward shortwave cannot
+   % exceed the paired downwelling value.
    %
    % Name-value
    %  latitude, longitude : site point, required for the swd solar ceiling.
@@ -32,10 +31,10 @@ function [valid, lower_limit, upper_limit] = physicalValidity( ...
    %  valid : logical mask, one entry per sample.
    %  lower_limit, upper_limit : per-sample effective bounds actually
    %     enforced (scalar registry bounds tightened by the relational
-   %     ceiling where one applies). Callers that must CAP an estimate at
-   %     the validity limit instead of rejecting it — the seam-blend
-   %     fix-up in lastResortProxies — read these so the limit stays
-   %     single-sourced here.
+   %     ceiling where one applies). Some callers must CAP an estimate at
+   %     the validity limit instead of rejecting it, such as the seam-blend
+   %     fix-up in lastResortProxies. Those callers read these outputs, so
+   %     this function defines the limit.
 
    arguments
       channel (1, 1) string
@@ -67,15 +66,15 @@ function [valid, lower_limit, upper_limit] = physicalValidity( ...
    upper_limit = repmat(bounds(2), numel(values), 1);
 
    if channel == "swd"
-      % Solar geometry is required to prove the policy's daylight ceiling;
-      % refusing unknown geometry is safer than admitting unbounded flux.
+      % The daylight ceiling of the policy needs solar geometry. Reject
+      % unknown geometry rather than admit an unbounded flux.
       if ~(isfinite(kwargs.latitude) && isfinite(kwargs.longitude))
          error('icemodel:reconstruct:physicalValidity:missingSolarGeometry', ...
             'swd validity requires latitude and longitude');
       end
-      % Precomputed geometry (see the docstring) short-circuits the NOAA
-      % evaluation; a wrong-length vector is refused because silently
-      % recomputing would hide the caller's slicing bug.
+      % Precomputed geometry (see the docstring) replaces the NOAA
+      % evaluation. Reject a vector of the wrong length, because a
+      % recomputation here would hide a slicing bug in the caller.
       toa = kwargs.toa;
       if isempty(toa)
          toa = icemodel.forcing.reconstruct.toaIrradiance(times, ...
@@ -86,32 +85,30 @@ function [valid, lower_limit, upper_limit] = physicalValidity( ...
             'precomputed toa must contain one value per sample');
       end
       % Pyranometers report small positive thermal-offset noise in
-      % darkness, so a bare 1.05x ceiling brands every polar-night
-      % sample invalid (EGP winters carry 0.4-1.4 W/m2 at TOA = 0). A
-      % noise floor on the ceiling admits instrument reality while still
-      % rejecting garbage; like the lwd floor, the bound VALUE is a
+      % darkness, so a bare 1.05x ceiling marks every polar-night sample
+      % invalid (EGP winters carry 0.4-1.4 W/m2 at TOA = 0). A noise floor
+      % on the ceiling accepts that instrument behavior and still rejects
+      % unphysical values. Like the lwd floor, the bound VALUE is a
       % parameter-level choice under the A15/D-25 principle (ratified as
       % D-28: the 5 W/m2 term is a minimum CEILING in darkness, never a
       % floor on data).
       bands = icemodel.forcing.reconstruct.solarElevationBands();
       ceiling = max(bands.toa_ceiling_multiplier * toa, ...
          bands.toa_ceiling_floor_wm2);
-       % Civil twilight (the complete posting reaches between 0 deg and
-       % the civil-twilight boundary) scatters real diffuse irradiance of
-       % order 8-28 W/m2
-      % onto the surface while the geometric TOA model reads exactly
-      % zero: that light crossed the atmosphere and IS incident energy,
-      % so the ceiling admits up to 50 W/m2 there instead of branding
-      % genuine dusk/dawn samples invalid (POLICY D-28; the 50 W/m2
-      % allowance is a Section-C-style parameter sized above the
-      % observed twilight range). Elevation comes from the same NOAA
-      % solar geometry toaIrradiance itself uses, and the boundary comes
-      % from the solarElevationBands single source, so the darkness
-      % pre-pass, the binned calibration, and this ceiling can never
-      % disagree about where twilight is.
-       % Use the maximum over the posting support, matching PROMICE staging
-       % and darkness reconstruction. A posting that begins in deep night
-       % but enters twilight must not be judged from its start instant.
+      % Civil twilight (the complete posting reaches between 0 deg and the
+      % civil-twilight boundary) scatters real diffuse irradiance of order
+      % 8-28 W/m2 onto the surface, while the geometric TOA model reads
+      % exactly zero. That light crossed the atmosphere and is incident
+      % energy, so the ceiling admits up to 50 W/m2 there instead of
+      % marking real dusk and dawn samples invalid (POLICY D-28; the
+      % 50 W/m2 allowance is a Section-C-style parameter sized above the
+      % observed twilight range). Elevation comes from the same NOAA solar
+      % geometry that toaIrradiance uses, and the boundary comes from
+      % solarElevationBands, so the darkness pre-pass, the binned
+      % calibration, and this ceiling use the same twilight limit.
+      % Use the maximum over the posting support, matching PROMICE staging
+      % and darkness reconstruction. A posting that begins in deep night
+      % but enters twilight must not be judged from its start instant.
        elevation = kwargs.elevation;
        if isempty(elevation)
           elevation = ...
@@ -137,7 +134,8 @@ function [valid, lower_limit, upper_limit] = physicalValidity( ...
       end
       valid = valid & isfinite(kwargs.swd) & values <= kwargs.swd;
       % min ignores NaN, so a missing swd reference leaves the scalar
-      % ceiling in place; validity above already rejects those samples.
+      % ceiling in place. The validity test above already rejects those
+      % samples.
       upper_limit = min(upper_limit, kwargs.swd);
    end
 end

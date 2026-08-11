@@ -424,7 +424,8 @@ function lines = reportMarkdown(title_text, suite_kind, results, summary, ...
       "## Visual summary"
       ""];
 
-   % Put visual evidence before the compact table, as the primary review surface.
+   % Put the visual evidence before the compact table, so reviewers see it
+   % first.
    if isempty(assets)
       lines(end + 1) = "No plottable suite metrics were present.";
    else
@@ -520,7 +521,8 @@ function lines = regressionExplanation(summary)
       ""];
    vars = string(summary.Properties.VariableNames);
 
-   % Summarize each model/site group so solver repetition does not hide the pattern.
+   % Summarize each model and site group, so that repeated solvers do not hide
+   % the pattern.
    if all(ismember(["smbmodel", "sitename"], vars))
       metric_names = ["runoff_pct_delta", "melt_pct_delta", ...
          "runoff_eval_pct_delta", "melt_eval_pct_delta"];
@@ -604,7 +606,8 @@ function lines = regressionExplanation(summary)
       end
    end
 
-   % Separate current closure quality from comparison evidence that may be absent.
+   % Separate the current closure quality from comparison evidence, which can
+   % be absent.
    current_closure = ["closure_seb_rmse", "closure_seb_max_abs"];
    if all(ismember(current_closure, vars))
       rmse = summary.closure_seb_rmse;

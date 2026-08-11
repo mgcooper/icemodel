@@ -31,9 +31,9 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  gap-filled product from icemodel.forcing.reconstruct, complete for
    %  every ledger-ready station-year. "promice" is the native PROMICE AWS
    %  station-met source (a met_<site>_promice file staged by the
-   %  verification builders), retained for provenance and QC — its record
-   %  is incomplete for most station-years and cannot force the model
-   %  there. In both cases the site is named by SITENAME;
+   %  verification builders). It exists for provenance and QC. Its record
+   %  is incomplete for most station-years, so it cannot force the model
+   %  there. In both cases SITENAME names the site;
    %  "gcnet" is the Vandecrux GC-Net gap-filled surface/SEB source for RetMIP
    %  Dye-2-long and Summit (2 m T/RH, 10 m wind); "imau", "retmip", and
    %  "esm_snowmip" are native verification-staged sources with source-specific
@@ -228,7 +228,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts.ro_ice_init     = 900.0;    % initial ice density               [kg/m3]
    opts.T_ice_init      = -8.0;     % initial ice temperature           [C]
 
-   % Note: use_ro_glc resets the densities used to build the initial phase
+   % use_ro_glc resets the densities used to build the initial phase
    % fractions in icemodel.column.initialize_column_state. Kernels load ro_ice
    % and ro_liq from icemodel.physicalConstant, so use_ro_glc does not reach
    % them: the solver densities are the intrinsic ro_ice and ro_liq whatever
@@ -246,8 +246,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    %%% Surface turbulent-heat-flux scheme.
    %
-   % Default = 'bulk_richardson'. 'monin_obukhov' is opt-in via resetopts;
-   % its runtime guard is enforced in configureRun.
+   % Default = 'bulk_richardson'. 'monin_obukhov' is opt-in via resetopts.
+   % configureRun enforces its runtime guard.
    opts.turbulent_flux_scheme = 'bulk_richardson';
    %
    % Roughness lengths default to parameterLookup values via configureRun if
@@ -257,9 +257,9 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts.z0_snow_low_density    = [];
    opts.z0_snow_high_density   = [];
    %
-   % Observation heights for the turbulent-flux scheme. Known forcing-dependent
-   % defaults are set below after the solver block; Override via resetopts for
-   % forcing-specific runs that are not resolved below.
+   % Observation heights for the turbulent-flux scheme. This function sets the
+   % known forcing-dependent defaults below, after the solver block. Override
+   % them via resetopts for a forcing-specific run that is not resolved below.
    opts.z_tair = [];   % air temperature observation height [m]
    opts.z_wind = [];   % wind speed observation height      [m]
    opts.z_relh = [];   % relative humidity obs height       [m] (= z_tair)
@@ -279,7 +279,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %                 (transition temperature single-sourced in
    %                 icemodel.forcing.reconstruct.setopts).
    % D-0b: the solver's advective-rain forcing stays zero either way until
-   % rain physics is implemented; this option doesn't alter model physics.
+   % rain physics is implemented, so this option does not change model physics.
    %
    opts.precip_phase_source = 'source';
 
@@ -465,8 +465,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %------------------------- End of user-defined model options
    %--------------------------------------------------------------
 
-   % Initialize run-time contracts. If external callers modify opts via
-   % resetopts, contracts are re-enforced by configureRun at model run-time.
+   % Initialize run-time contracts. If an external caller modifies opts via
+   % resetopts, configureRun re-enforces the contracts at model run time.
    opts = icemodel.resetopts(opts, varargin{:});
    opts = icemodel.configureRun(opts);
 end

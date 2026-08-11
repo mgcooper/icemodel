@@ -3,9 +3,9 @@ function row = emptyFetchProductStatusRow()
    %
    %  row = icemodel.verification.setup.emptyFetchProductStatusRow()
    %
-   % Product fetchers use this value only for struct preallocation. Keeping the
-   % prototype literal makes an empty product selection free of cache globbing,
-   % callbacks, and filesystem mutation.
+   % Product fetchers use this value only for struct preallocation. The
+   % prototype is a literal, so an empty product selection does no cache
+   % globbing, calls no callback, and changes no file.
 
    row = struct( ...
       'product', "", ...

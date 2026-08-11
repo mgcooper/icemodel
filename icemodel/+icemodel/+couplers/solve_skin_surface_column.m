@@ -6,9 +6,9 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = ...
       cpl_alpha, cpl_aitken, cpl_jumpmax, ro_sfc, snow_depth, opts)
    %SOLVE_SKIN_SURFACE_COLUMN Coupled skin-subsurface Ts-T solve.
    %
-   % Skinmodel-specific predictor-corrector coupler: iterates between surface
-   % energy balance (Ts) and subsurface enthalpy (T, f_ice, f_liq) until Ts
-   % and the SEB residual converge to within the specified tolerances.
+   % Skinmodel-specific predictor-corrector coupler. It iterates between the
+   % surface energy balance (Ts) and the subsurface enthalpy (T, f_ice, f_liq).
+   % The loop stops when Ts and the SEB residual reach the given tolerances.
    %
    %#codegen
 
@@ -117,9 +117,9 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = ...
       % solve.
    end
 
-   % Dump the outer failure only when neither inner dump ran. Both inner
-   % dumps write the same debug file, so without this the outer snapshot
-   % overwrites the inner-solver state that was being captured.
+   % Dump the outer failure only when neither inner dump ran. Both inner dumps
+   % write the same debug file. Without this guard, the outer snapshot
+   % overwrites the inner-solver state.
    if debug && ok_seb && ok_ieb && ~ok_cpl
       dumpSkinEbSolveFailure("coupler_nonconvergence", Ts, Ts_diag, ...
          Ts_old, T, f_ice, f_liq, k_eff, dt, cpliter, cpl_maxiter, ...

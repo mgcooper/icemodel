@@ -14,13 +14,13 @@ function [met, opts] = loadmet(opts, fileiter) %#codegen
       fileiter = 1:numel(opts.metfname);
    end
 
-   % The derived PROMICE product is runnable only when the configured filled
-   % met files carry the producer-manifest identity and cover every requested
-   % timestep in the requested window with the required forcing channels
-   % (POLICY A4); calendar-year ledger verdicts are bookkeeping, never the
-   % runtime gate. Table I/O stays outside this code-generation entry point;
-   % generated callers must pass an options struct prevalidated by the same
-   % public verifier.
+   % The derived PROMICE product runs only when the configured filled met files
+   % carry the producer-manifest identity, and cover every requested timestep
+   % in the requested window with the required forcing channels (POLICY A4).
+   % Calendar-year ledger verdicts are bookkeeping, never the runtime gate.
+   % Table I/O stays outside this code-generation entry point. A generated
+   % caller must pass an options struct that the same public verifier has
+   % already validated.
    if coder.target('MATLAB')
       opts = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness( ...
          opts, fileiter);
@@ -270,11 +270,11 @@ end
 function met = addCanonicalTotalPrecip(met)
    %ADDCANONICALTOTALPRECIP Derive total precip from split components.
 
-   % Sources that ship rainf/snowf without ppt (or with a placeholder ppt)
-   % still expose one canonical total at runtime, so the runtime phase
-   % option and forcing-readiness logic never require a restage: each nonfinite
-   % ppt sample takes rainf + snowf where both components are finite, and
-   % finite ppt samples are never overwritten.
+   % A source that ships rainf and snowf without ppt, or with a placeholder
+   % ppt, still exposes one canonical total at runtime. The runtime phase
+   % option and the forcing-readiness logic therefore need no restage. Each
+   % nonfinite ppt sample takes rainf + snowf where both components are
+   % finite. A finite ppt sample is never overwritten.
    if ~(isvariable('rainf', met) && isvariable('snowf', met))
       return
    end
@@ -285,9 +285,9 @@ function met = addCanonicalTotalPrecip(met)
    end
    derived = ~isfinite(ppt) & isfinite(met.rainf) & isfinite(met.snowf);
    ppt(derived) = met.rainf(derived) + met.snowf(derived);
-   % A file carrying both split channels always exposes the canonical
-   % total — even when nothing was derivable (all-NaN placeholders) the
-   % column must exist so downstream contracts see one ppt channel.
+   % A file that carries both split channels always exposes the canonical
+   % total. The column must exist even when no sample is derivable (all-NaN
+   % placeholders), so downstream contracts see one ppt channel.
    met.ppt = ppt;
 end
 
@@ -529,13 +529,13 @@ end
 function filepath = resolveUserdataFile(opts, thisyear, mettime)
    %RESOLVEUSERDATAFILE Locate the userdata file covering this run year's met.
    % Prefers a full-period window file <site>_<source>_<YYYYMMDD>_<YYYYMMDD>.mat
-   % whose encoded period brackets the met samples being swapped (the
-   % writeuserdata naming="window" form); falls back to the legacy per-year
-   % <site>_<source>_<YYYY>.mat. The caller retimes whichever file onto METTIME,
-   % so a single full-period file serves every run year. The window lookup is the
-   % shared icemodel.forcing.helpers.findEnclosingWindowFile (same primitive
-   % icemodel.createMetFileNames uses for met files), bracketed by the actual
-   % met time span rather than the whole calendar year.
+   % whose encoded period brackets the met samples being swapped. That is the
+   % writeuserdata naming="window" form. It falls back to the legacy per-year
+   % file <site>_<source>_<YYYY>.mat. The caller retimes whichever file onto
+   % METTIME, so one full-period file serves every run year. The window lookup
+   % uses the shared helper icemodel.forcing.helpers.findEnclosingWindowFile,
+   % which icemodel.createMetFileNames also uses for met files. It brackets by
+   % the actual met time span, not by the whole calendar year.
 
    % Manifest-selected paths take precedence over cadence-blind legacy name
    % discovery. Select the widest explicit artifact that actually brackets this

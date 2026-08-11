@@ -59,14 +59,15 @@ function result = comparecase(case_id, kwargs)
       "icemodel_config_casename", kwargs.icemodel_config_casename, ...
       "dataset_family", kwargs.dataset_family);
 
-   % Load the target and candidate bundles. With no candidate supplied, the
-   % staged smoke reference is used so the suite runs before a snow model exists.
+   % Load the target and candidate bundles. With no candidate supplied, this
+   % function uses the staged smoke reference, so the suite runs before a snow
+   % model exists.
    % The eval target is a forcing-agnostic, data-only observations.mat bundle
    % referenced via evaluation_file/evaluation_path (ESM-SnowMIP, SUMup, and
    % freshly staged PROMICE cases); Snow/Colbeck cases load their evaluation.mat
-   % the same way. Older PROMICE fixtures lack that file; they fall back to
-   % reconstituting the PROMICE-obs target on demand from the staged per-year
-   % userdata files the manifest declares.
+   % the same way. Older PROMICE fixtures lack that file, so they rebuild the
+   % PROMICE-obs target on demand from the staged per-year userdata files the
+   % manifest declares.
    if isfield(manifest, 'evaluation_path') ...
          && strlength(string(manifest.evaluation_path)) > 0 ...
          && isfile(manifest.evaluation_path)
@@ -88,8 +89,8 @@ function result = comparecase(case_id, kwargs)
    candidate = icemodel.verification.helpers.resolveCandidateBundle(manifest, ...
       "candidate", kwargs.candidate, "candidate_file", kwargs.candidate_file);
 
-   % Dispatch by artifact format rather than dataset family so future
-   % verification families can reuse the same comparison entry point.
+   % Dispatch by artifact format rather than dataset family, so a new
+   % verification family can reuse the same comparison entry point.
    switch targets.format
       case "timeseries"
          [metrics, aligned] = compareTimeseriesBundle( ...
@@ -112,11 +113,11 @@ function result = comparecase(case_id, kwargs)
    end
 
    % Acceptance-gate mode is keyed by case_type, not by family. comparecase
-   % itself only emits diagnostic metrics (per-variable status + bias/RMSE);
-   % the hard PASS/FAIL tolerance gate lives in colbeck.compareSolutions for
+   % itself only emits diagnostic metrics (per-variable status + bias/RMSE).
+   % colbeck.compareSolutions applies the hard PASS/FAIL tolerance gate for
    % synthetic_process verification cases. firn_observational and esm_site are
    % SOFT (diagnostic only) - they report metrics and never hard-fail here, so
-   % a missing or noisy firn observation lane cannot break the suite.
+   % a missing or noisy firn observation cannot fail the suite.
    gate_mode = acceptanceGateMode(manifest);
 
    % Artifact writing is optional so the same function can serve interactive
@@ -133,9 +134,9 @@ function result = comparecase(case_id, kwargs)
       save(fullfile(artifact_dir, "result.mat"), 'metrics', 'aligned', 'manifest');
    end
 
-   % Plotting has two independent policies. make_plot controls whether figures
-   % are created, save_plot controls PNG export, and plot_visible controls
-   % whether figures remain open for interactive review.
+   % Plotting has three independent controls. make_plot controls whether the
+   % function creates figures, save_plot controls PNG export, and plot_visible
+   % controls whether figures remain open for interactive review.
    if kwargs.make_plot
       if kwargs.save_plot && ~isblanktext(artifact_dir)
          figure_path = fullfile(artifact_dir, "comparison.png");
@@ -568,7 +569,7 @@ function threshold = meltThreshold(varname)
 end
 
 function t = firstBelowThresholdAfterPeak(values, time, threshold)
-   %FIRSTBELOWTHRESHOLDAFTERPEAK Return the first post-peak time below threshold.
+   %FIRSTBELOWTHRESHOLDAFTERPEAK First post-peak time below the threshold.
    % This is the canonical melt-out diagnostic.
 
    t = NaT;

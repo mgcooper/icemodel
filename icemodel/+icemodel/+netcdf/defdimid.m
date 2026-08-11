@@ -15,15 +15,15 @@ function dimid = defdimid(ncid, dimdata, datasize, opts)
    % ice1: time x gridcell
    % ice2: time x depth x gridcell.
    %
-   % Note that a "coordinate variable" is a "1-d variable with the same name as
+   % A "coordinate variable" is a "1-d variable with the same name as
    % its dimension, e.g., time(time), and it is defined as a numeric data type
    % with values that are ordered monotonically".
    %
    % See also:
 
-   % NOTE: With the current setup, GetSizeFromData should be identical to
-   % GetSizeFromDims, because getdimsize sets the max(1, ...) check on depth.
-   % The case where they would differ is if the datasize changes within years.
+   % With this setup, GetSizeFromData gives the same result as GetSizeFromDims,
+   % because getdimsize applies the max(1, ...) check on depth. The two differ
+   % only if the datasize changes within a year.
 
    arguments
       ncid  (1, 1) double {mustBeNumeric}
@@ -77,11 +77,10 @@ function dimid = defdimid(ncid, dimdata, datasize, opts)
    % file. All other dimensions should, whenever possible, be placed to the left
    % of the spatiotemporal dimensions.
    %
-   % Also note:
+   % Also:
    %
    % "we allow but do not require the units attribute of dimensionless vertical
    % coordinates to take the values "level", "layer", or "sigma_level.""
    %
-   % But I was unable to find a similar "units" (or "standard_name") for grid
-   % cell index
+   % I found no similar "units" (or "standard_name") for a grid cell index.
 end

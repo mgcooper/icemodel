@@ -11,8 +11,8 @@ function assertFormalBaselineCandidate(kind, candidate, cases, selector)
       selector (1, 1) string
    end
 
-   % Candidate membership must be an exact one-to-one image of the selected
-   % formal case matrix before any predecessor is archived.
+   % The candidate rows must match the selected formal case matrix one to one
+   % before this code archives a predecessor.
    if isempty(candidate) || ~ismember('case_id', ...
          candidate.Properties.VariableNames)
       error('icemodel:test:baselineCandidateCasesInvalid', ...
@@ -33,8 +33,8 @@ function assertFormalBaselineCandidate(kind, candidate, cases, selector)
    switch kind
       case "regression"
          % Closed metadata allowlist. baseline_tag is a persisted build
-         % identity, not a numerical regression metric; every column not
-         % listed here is validated as a metric.
+         % identity, not a numerical regression metric. Every column not
+         % listed here is a metric, and this function validates it as one.
          metadata = ["case_id", "tier", "baseline_type", "baseline_tag", ...
             "smbmodel", "sitename", "forcings", "simyear", "solver", ...
             "last_updated_utc"];

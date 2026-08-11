@@ -9,8 +9,8 @@ function thermal_conductivity_water(Tc, rho, reference)
    % Description:
    %  Plots liquid-water conductivity and its constant-density temperature
    %  derivative over the Celsius vector Tc using
-   %  icemodel.kernels.thermal_conductivity_water. Multiple density curves
-   %  can be compared on the same axes.
+   %  icemodel.kernels.thermal_conductivity_water. You can compare several
+   %  density curves on the same axes.
    %
    % Inputs:
    %  Tc        - Temperature [°C] (default: -20:0.5:20)

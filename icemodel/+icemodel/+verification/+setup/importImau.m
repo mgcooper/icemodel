@@ -12,22 +12,22 @@ function manifest = importImau(source_dir, kwargs)
    %    forcing_sources selects runtime sources requested by the current call.
    %    Ordinary calls preserve omitted existing legs; overwrite_family=true
    %    replaces the whole family state.
-   %    build_observations=false is a guarded non-dry fast path: requested cases
-   %    must already exist in the target manifest, whose observation entry is
-   %    reused while selected forcing is attached.
+   %    build_observations=false is a guarded non-dry fast path. The requested
+   %    cases must already exist in the target manifest. This function reuses
+   %    their observation entry and attaches the selected forcing.
    %
    %  Default roots
    %    source_dir="" reads <repo>/data/verification/imau. With no output_root,
    %    observations go to <repo>/data/eval/imau/<case_id>/observations.mat and
    %    native met/userdata go to <repo>/data/input/{met,userdata}/imau/.
-   %    Explicit source_dir, output_root, evaluation_data_root, and
-   %    input_data_root overrides are honored as-is.
+   %    This function uses explicit source_dir, output_root,
+   %    evaluation_data_root, and input_data_root overrides without change.
    %
    %  Met and userdata
    %    Model met defaults to dt_out="15m"; pass dt_out="" for native cadence.
    %    Data/userdata defaults to hourly at the shared writer boundary.
-   %    Native met schema completion is fixed at the importer boundary: absent
-   %    required channels are retained as NaN placeholders.
+   %    The importer fixes native met schema completion: an absent required
+   %    channel stays as a NaN placeholder.
    %    Call buildImauHourlyMet directly for strict source-schema validation.
    %
    %  Window selection
@@ -61,8 +61,8 @@ function manifest = importImau(source_dir, kwargs)
    %    dt_out : model-met output timestep (default "15m") for native and
    %        gridded forcing; pass "" to retain native model-met cadence.
    %        IMAU userdata/Data remains at its native hourly cadence.
-   %        Native met schema completion is fixed at the importer boundary:
-   %        absent required channels are retained as NaN placeholders.
+   %        The importer fixes native met schema completion: an absent
+   %        required channel stays as a NaN placeholder.
    %        Call buildImauHourlyMet directly for strict source-schema validation.
    %    overwrite : logical (default false). Refresh requested case artifacts;
    %        other cases are never touched.
@@ -191,9 +191,10 @@ function manifest = importImau(source_dir, kwargs)
          forcing_sources=reuse_sources, coverage=coverage, ...
          startdate=kwargs.startdate, enddate=kwargs.enddate);
    else
-      % Validate caches only when building observations or native runtime files.
-      % Dry runs remain metadata-only; optional skips stay quiet while required
-      % IMAU products print their retrieval guidance before failing.
+      % Validate caches only when building observations or native runtime
+      % files. A dry run stays metadata-only. An optional skip prints nothing,
+      % and a required IMAU product prints its retrieval guidance before it
+      % fails.
       cache_status = struct();
       cache_products = "hourly";
       validate_daily_qa = ~kwargs.dry_run && kwargs.build_observations;
@@ -318,7 +319,8 @@ function state = stageCase(site, source_dir, cache_status, family_root, ...
    end
    if ~kwargs.build_observations && isfield(prior_case, 'colocation') ...
          && isfield(prior_case.colocation, 'daily_qa')
-      % Native-only refreshes preserve prior daily QA without reopening that cache.
+      % A native-only refresh keeps the prior daily QA and does not reopen
+      % that cache.
       daily_qa = prior_case.colocation.daily_qa;
    end
 

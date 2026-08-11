@@ -7,8 +7,8 @@ function pathname = artifactFilePath(kind, kwargs)
    %  pathname = icemodel.test.helpers.artifactFilePath("regression", ...
    %     tier="smoke", smbmodel="icemodel", solver=2)
    %
-   % If RUN_NAME is empty, the most recent artifact run containing a
-   % matching file is resolved by scanning test/artifacts/.
+   % If RUN_NAME is empty, this function scans test/artifacts/ and uses the
+   % most recent artifact run that contains a matching file.
 
    arguments
       kind (1, :) string {mustBeMember( ...

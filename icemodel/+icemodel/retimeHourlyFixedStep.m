@@ -12,10 +12,11 @@ function [hourly, bin_start, bin_end] = retimeHourlyFixedStep(TT)
    % bounds for each retained output row; zero bounds denote an empty native
    % timetable bin.
    %
-   % The fixed path is written for code generation: every construct Coder
-   % rejects sits behind coder.target('MATLAB') and folds away. Nothing in
-   % this repository compiles it, so the directive below records that intent
-   % and lets the analyzer check it; it is not evidence of a completed build.
+   % The fixed path is written for code generation. Every construct that Coder
+   % rejects is inside a coder.target('MATLAB') branch, which the code
+   % generator removes. Nothing in this repository compiles this function. The
+   % directive below records that intent and lets the analyzer check it. It is
+   % not evidence of a completed build.
    %
    %#codegen
 
@@ -32,10 +33,10 @@ function [hourly, bin_start, bin_end] = retimeHourlyFixedStep(TT)
    % timetable retiming can enter the compiled call graph.
    if isFixedStepHourlyCompatible(TT.Properties.RowTimes)
       % Seed the output from the first sample in every block so timetable
-      % schema and metadata are preserved per variable. Storage class is
-      % preserved for floating-point variables only: the block mean widens an
-      % integer or logical variable to double, and the native fallback path
-      % below rejects those outright rather than widening them. Callers with
+      % schema and metadata are preserved per variable. This path preserves
+      % the storage class for floating-point variables only. The block mean
+      % widens an integer or logical variable to double, and the native
+      % fallback path below rejects those instead of widening them. Callers with
       % logical channels must cast before retiming, as icemodel.postprocess
       % does for Tsfc_converged and Tice_converged.
       n_samples = height(TT);
@@ -92,7 +93,7 @@ function [hourly, bin_start, bin_end] = retimeHourlyFixedStep(TT)
 end
 
 function tf = isFixedStepHourlyCompatible(time)
-   %ISFIXEDSTEPHOURLYCOMPATIBLE Check the timetable can use the fixed retime path.
+   %ISFIXEDSTEPHOURLYCOMPATIBLE Check the timetable for the fixed retime path.
 
    % Four samples per hour, an hourly first label, and exact quarter-hour
    % spacing ensure reshape blocks equal MATLAB's native hourly bins.

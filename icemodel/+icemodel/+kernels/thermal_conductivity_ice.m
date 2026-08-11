@@ -1,5 +1,5 @@
 function k = thermal_conductivity_ice(T, reference)
-   %THERMAL_CONDUCTIVITY_ICE Compute thermal conductivity of ice from temperature.
+   %THERMAL_CONDUCTIVITY_ICE Thermal conductivity of ice from temperature.
    %
    %  K = icemodel.kernels.thermal_conductivity_ice(T)
    %  K = icemodel.kernels.thermal_conductivity_ice(T, reference)
@@ -105,7 +105,7 @@ function k = thermal_conductivity_ice(T, reference)
       case "engineering_toolbox"
          % Power-law fit through standard engineering handbook tabulated
          % ice-Ih values, anchored at k(273.15) = 2.24 W m^-1 K^-1.
-         % Useful only if consistency with handbook tables is desired.
+         % Use this option only to match handbook tables.
          %
          % Approximate source:
          % Engineering Toolbox tabulated ice thermal conductivity values.

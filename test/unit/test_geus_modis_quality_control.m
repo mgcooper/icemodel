@@ -33,9 +33,9 @@ function test_normalizer_masks_only_nonphysical_values(testCase)
 end
 
 function test_reader_masks_undocumented_999_sentinel(testCase)
-   % A source file with no fill/range attributes must still expose its finite 999
-   % sentinel as NaN before point or polygon collapse. The misleading year in
-   % the parent path must not replace the product year encoded in the basename.
+   % A source file with no fill/range attributes must still expose its finite
+   % 999 sentinel as NaN before point or polygon collapse. The misleading year
+   % in the parent path must not replace the product year in the basename.
    modis_dir = fullfile(testCase.TestData.tmp, ...
       "scratch_2825_parent", "reader-source");
    [filename, location] = writeTinyGeusModis( ...
@@ -53,8 +53,9 @@ function test_reader_masks_undocumented_999_sentinel(testCase)
 end
 
 function test_reader_renormalizes_partial_polygon_coverage(testCase)
-   % A sentinel in one selected cell must not contaminate the valid-cell mean;
-   % collapsing validity weights separately yields the mean of physical samples.
+   % A sentinel in one selected cell must not contaminate the valid-cell mean.
+   % Collapsing the validity weights separately gives the mean of the physical
+   % samples.
    modis_dir = fullfile(testCase.TestData.tmp, "polygon-source");
    [filename, ~] = writeTinyGeusModis(modis_dir, 2012, 0);
    values = reshape([0.2, 0.4, 0.6, 999], 2, 2, 1);
@@ -117,8 +118,9 @@ function test_channel_preserves_missing_year_and_rejects_duplicates(testCase)
 end
 
 function test_coverage_contract_normalizes_and_rejects_false_coverage(testCase)
-   % Shape/duplicates cannot change canonical bytes, coverage outside the target
-   % axis fails, and a present file with no physical target values is not covered.
+   % Shape and duplicates cannot change the canonical bytes. Coverage outside
+   % the target axis fails. A present file with no physical target values does
+   % not count as covered.
    metadata = icemodel.forcing.helpers.geusModisCoverageMetadata( ...
       [2013; 2012; 2013], [2013; 2012; 2012]);
    testCase.verifyEqual(string(metadata.modis_status), "source_coverage");

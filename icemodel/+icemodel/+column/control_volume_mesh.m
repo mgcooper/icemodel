@@ -2,18 +2,18 @@ function [dz, delz, z_node, z_edge, f, z_node_bc] = control_volume_mesh(Z, dz, g
    %CONTROL_VOLUME_MESH Compute cell edges and nodes for the column mesh.
    %
    % [dz, delz, z_node, z_edge, f, z_node_bc] = control_volume_mesh(Z, dz)
-   % Returns CV
-   % thickness (dz), node-to-node distance (delz), node positions (z_node),
-   % and edge positions (z_edge) for a domain with upper boundary coordinate
-   % z=0, lower boundary coordinate z=Z, and constant CV thickness dz. An
-   % interpolation factor f for each CV interface (edge) is also returned using
-   % the harmonic mean. Control volume nodes are placed midway between faces,
-   % following Patankar's "Practice B".
+   % Returns CV thickness (dz), node-to-node distance (delz), node positions
+   % (z_node), and edge positions (z_edge). The domain has upper boundary
+   % coordinate z=0, lower boundary coordinate z=Z, and constant CV thickness
+   % dz. The function also returns an interpolation factor f for each CV
+   % interface (edge), computed with the harmonic mean. The function places
+   % control volume nodes midway between faces, following Patankar's
+   % "Practice B".
    %
    % [dz, delz, z_node, z_edge, f, z_node_bc] = control_volume_mesh(Z, dz, g)
-   % Uses growth
-   % factor 'g' to construct a mesh with exponentially increasing thickness. If
-   % g is not provided, a uniform thickness mesh is returned.
+   % Uses growth factor 'g' to build a mesh with exponentially increasing
+   % thickness. If you do not supply g, the function returns a uniform
+   % thickness mesh.
    %
    % Inputs:
    %   Z  : Domain thickness [m]
@@ -32,8 +32,8 @@ function [dz, delz, z_node, z_edge, f, z_node_bc] = control_volume_mesh(Z, dz, g
    % and a Neumann boundary condition at the lower boundary. The upper boundary
    % is at z = 0 and the lower boundary is at z = Z. The function computes a
    % constant CV thickness (dz), but adjusts for half CVs at the boundaries.
-   % The harmonic mean is used for computing the interpolation factor f for
-   % each CV edge.
+   % The function computes the interpolation factor f for each CV edge with the
+   % harmonic mean.
    %
    % Example usage:
    %   [dz, delz, z_node, z_edge, f, z_node_bc] = CVTHERMAL(10, 1);
@@ -91,10 +91,9 @@ function [dz, delz, z_node, z_edge, f, z_node_bc] = control_volume_mesh(Z, dz, g
    % z_spect = z_edges(1:end - 2) + diff(z_edges(1:end - 1)) / 2;
 
    % Legacy CVSPECTRAL reference
-   % This was the earlier fixed-dz spectral mesh builder before the spectral
-   % model was consolidated onto control_volume_mesh. Keep the construction
-   % here as a note
-   % because it documents the old staggered spectral layout explicitly.
+   % This is the fixed-dz spectral mesh builder that the spectral model used
+   % before it moved to control_volume_mesh. Keep this construction here
+   % because it documents the staggered spectral layout in full.
    %
    % N = Z / dz;                      % number of nodes [#]
    % dz_cv = dz * ones(N, 1);
@@ -124,10 +123,9 @@ function z_edge = EXPMESH(Z, dz, g)
    %
    % See also: control_volume_mesh
 
-   % The "insert a bottom layer with dz thickness" idea was to simplify
-   % remeshing to enable an exponential thermal grid, but the easier approach
-   % is to use an exponential spectral grid which does not require that, so
-   % I commented it out but kept for reference.
+   % The commented "insert a bottom layer with dz thickness" step simplifies
+   % remeshing for an exponential thermal grid. An exponential spectral grid is
+   % easier and does not need that step. The code stays here for reference.
 
    % Preallocate arrays (with an arbitrary large size, will trim later)
    z_edge = zeros(10000, 1);
@@ -185,16 +183,16 @@ end
 %  ----o---- T6 (N+1)      lower boundary dT/dz = 0, dz_pbc = 0, delz = 0
 %  /////////
 %
-% Note that dz for the c.v.'s is constant but dz for the heat flux terms
-% includes a 1/2 c.v. at the top and bottom (dz_1 and dz_N+1)
-% with the upper and lower boundaries included the actual arrays will have
-% an additional level for the upper boundary
+% dz for the c.v.'s is constant. dz for the heat flux terms includes a
+% 1/2 c.v. at the top and bottom (dz_1 and dz_N+1). With the upper and lower
+% boundaries included, the actual arrays have one more level for the upper
+% boundary.
 
 %% More notes
-% This is the c.v. geometry, labeled as in Patankar, Fig. 4.3. Note that
-% unlike Patankar, i is defined at the surface, not at 1/2 c.v. width., and
-% I use N for number of internal grid points / control volumes (i.e. the
-% upper boundary point B is not included in N)
+% This is the c.v. geometry, labeled as in Patankar, Fig. 4.3. Unlike
+% Patankar, i is defined at the surface, not at 1/2 c.v. width. N is the
+% number of internal grid points / control volumes. N does not include the
+% upper boundary point B.
 % ---------------------------------------------
 % /|:       :       :       :       :       :|\
 % /o:---o---:---o---:---o---:---o---:---o---:o\
@@ -216,19 +214,19 @@ end
 %|0|.15-|.15|   |.15|   |.15|   |.15|   |-|     delz_pos /
 %|0|.15-|--.3---|--.3---|--.3---|--.3---|-.15|  delz
 
-% with this arrangement, lets look at the boundary flux:
-% we need the boundary conductivity, which we get from the interface
-% conductivity equation 4.9:
+% With this arrangement, look at the boundary flux.
+% The boundary conductivity comes from the interface conductivity
+% equation 4.9:
 % ki = 1/[(1-f(i) / kB) + (f(w) / kI)]
 % ki = 1/[(1-1 / kB) + ( 0.5/ kI)]
 % ki = 1/[0 + ( 0.5/ kI)] = kI, so ki = kI which is good because kB is undefined
 % the flux at the top control volume is then:
 % qI = kw(TW-TI) - ki(TI-TB) + ScI
-% this says the flux through c.v. I is the flux into I at interface w plus
-% the source term defined at I minus the flux out of I to the surface
-% also note that kw = 2*kI*kW/(kI+kW) which is also what we want - the
-% interface conductivity is the harmonic mean of the two adjacent
-% conductivity values, which are defined at each c.v. center
+% The flux through c.v. I is the flux into I at interface w, plus the source
+% term defined at I, minus the flux out of I to the surface.
+% Also, kw = 2*kI*kW/(kI+kW), which is the required form: the interface
+% conductivity is the harmonic mean of the two adjacent conductivity values,
+% which are defined at each c.v. center
 
 % P = grid point
 % E = east side grid point, in the positive x-direction from P

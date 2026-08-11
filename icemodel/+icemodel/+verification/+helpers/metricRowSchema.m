@@ -9,7 +9,7 @@ function [names, defaults] = metricRowSchema()
    %
    % Role
    %  Operational helper that defines the comparecase metric table schema in
-   %  one place so future metrics propagate consistently.
+   %  one place, so a new metric propagates consistently.
 
    % Keep the schema order aligned with comparecase output and summary CSVs.
    names = [ ...

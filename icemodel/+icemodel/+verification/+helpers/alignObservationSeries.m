@@ -16,8 +16,8 @@ function [observed, modeled, aligned] = alignObservationSeries( ...
       candidate (1, 1) struct
    end
 
-   % Dispatch once on the declared support so every verification consumer uses
-   % the same interval, depth, and timestamp semantics.
+   % Dispatch once on the declared support, so every verification consumer
+   % handles intervals, depths, and timestamps in the same way.
    if observation.axis_kind == "time" && candidate.axis_kind == "time"
       [observed, modeled, aligned] = alignByTime(observation, candidate);
    elseif observation.axis_kind == "depth" ...

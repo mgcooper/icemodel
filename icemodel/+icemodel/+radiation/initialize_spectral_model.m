@@ -1,7 +1,7 @@
 function [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, ...
       k_bulk_lookup, r_eff, qext, g, coalbedo, kabs, kice, wavel, radii] = ...
       initialize_spectral_model(opts)
-   %initialize_spectral_model Initialize spectral geometry and coefficients.
+   %INITIALIZE_SPECTRAL_MODEL Initialize spectral geometry and coefficients.
    %
    % [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, ...
    %    k_bulk_lookup, r_eff] ...
@@ -17,14 +17,15 @@ function [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, ...
    % terms used by the exact bulk-extinction coefficient transform.
    %
    % Spectral input tables (Mie scattering matrix, solar spectrum, and optional
-   % absorption profiles) are loaded via icemodel.radiation.load_spectral_tables.
+   % absorption profiles) come from
+   % icemodel.radiation.load_spectral_tables.
    %
-   % The additional optical-property outputs are returned so a future grain-size
+   % This function also returns the optical properties, so that a grain-size
    % evolution model can refresh k_ext through
-   % `icemodel.radiation.update_extinction_coefficients` without reloading the
-   % Mie tables every timestep. r_eff is the configured optical grain radius
-   % from the Mie lookup table, which `icemodel.column.initialize_column_state`
-   % expands onto the thermal mesh.
+   % `icemodel.radiation.update_extinction_coefficients` without a reload of
+   % the Mie tables at every timestep. r_eff is the configured optical grain
+   % radius from the Mie lookup table, which
+   % `icemodel.column.initialize_column_state` expands onto the thermal mesh.
    %
    %#codegen
 
@@ -51,11 +52,10 @@ function [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, ...
       qext, g, coalbedo, kabs, kice, wavel, radii, opts.i_grainradius, ...
       z_edges, dz, solar_dwavel, opts.lookup_k_bulk);
 
-   % Return the initial optical grain radius [mm] from the lookup table.
-   % Note: this is the optically equivalent radius from the Mie tables. It's
-   % currently used to initialize the thermal grain radius tracked by
-   % icemodel.column.vapor_mass_transfer, but these concepts are not
-   % identical; coupling them is future
-   % work (see icemodel.radiation.update_extinction_coefficients).
+   % Return the initial optical grain radius [mm] from the lookup table. This
+   % is the optically equivalent radius from the Mie tables. It initializes
+   % the thermal grain radius that icemodel.column.vapor_mass_transfer tracks.
+   % The two radii are not the same quantity, and coupling them is future work
+   % (see icemodel.radiation.update_extinction_coefficients).
    r_eff = radii(opts.i_grainradius);
 end

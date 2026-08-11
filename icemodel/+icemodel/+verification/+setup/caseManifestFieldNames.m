@@ -7,9 +7,9 @@ function names = caseManifestFieldNames()
    %  names   String array in the exact field order written for each case.
    %
    % Role
-   %  Setup helper used while constructing case entries. The operational
-   %  manifest reader can inspect JSON fields directly, but importers need this
-   %  single source of truth so ESM-SnowMIP and Laugh-Tests entries do not drift.
+   %  Setup helper for building case entries. The operational manifest reader
+   %  can inspect the JSON fields directly. Every importer reads the field
+   %  order from here, so ESM-SnowMIP and Laugh-Tests entries stay consistent.
 
    names = [ ...
       "case_id"

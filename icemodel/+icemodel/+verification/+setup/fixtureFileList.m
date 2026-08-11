@@ -7,8 +7,8 @@ function [files, selection] = fixtureFileList(kwargs)
    %     manifest="/tmp/icemodel-v1.1-data-manifest.json")
    %  [files, selection] = icemodel.verification.setup.fixtureFileList(...)
    %
-   % The tracked release-data manifest is the single source of truth shared by
-   % packFixtures and fetchFixtures. Returned paths are relative POSIX paths
+   % packFixtures and fetchFixtures both read the tracked release-data
+   % manifest. Returned paths are relative POSIX paths
    % below root. The optional second output contains the selected manifest rows.
    %
    % Name-value

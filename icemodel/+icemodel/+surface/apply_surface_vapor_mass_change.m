@@ -144,14 +144,14 @@ function [f_ice, d_sbl_err] = sublimation(d_pevp, f_ice, f_liq, f_ice_min, ...
    % liqflag, so Qe is already computed wrt to them. That way evap/subl are
    % computed using the same formula: e = Qe / ro_air_Lv * dt / dz.
    %
-   % The conversion here conserves heat when the surface latent heat flux, Qe,
-   % cannot be satisfied by evaporation alone (all available water evaporates),
-   % and the remainder is allocated to sublimation of ice by sending the excess
-   % d_pevp from the evaporation branch to this function.
+   % This conversion conserves heat when evaporation alone cannot satisfy the
+   % surface latent heat flux Qe, that is, when all available water evaporates.
+   % The evaporation branch then sends the remaining d_pevp to this function,
+   % which applies it to sublimation of ice.
 
-   % Unlike the excess condensation case which is sent to runoff, "excess"
-   % deposition cannot be satisfied by the control volume budget and is assigned
-   % to d_sbl_err. Initialize this value to 0.
+   % The control volume sends excess condensation to runoff. It cannot do the
+   % same with excess deposition, so this function reports that amount in
+   % d_sbl_err. Initialize the value to 0.
    d_sbl_err = 0;
 
    % Early return if there's no energy for sublimation.

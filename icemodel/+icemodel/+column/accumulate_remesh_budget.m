@@ -5,10 +5,10 @@ function ledger = accumulate_remesh_budget( ...
    %  ledger = icemodel.column.accumulate_remesh_budget( ...
    %     ledger, remesh, solid_change, liquid_change)
    %
-   % Call this once per accepted substep, immediately after
+   % Call this once per accepted substep, right after
    % icemodel.column.merge_thin_layers. Remeshing is a numerical grid operation,
-   % not a physical flux, so its storage exchange stays in dedicated channels
-   % that the scientific comparator excludes from physical solid loss.
+   % not a physical flux. Its storage exchange stays in dedicated channels. The
+   % scientific comparator excludes those channels from physical solid loss.
    %
    % Inputs
    %   ledger        - Forcing-step ledger carrying the phase and vapor channels.
@@ -33,9 +33,9 @@ function ledger = accumulate_remesh_budget( ...
    ledger.mass_budget_remesh_enthalpy_j_m2 = ...
       ledger.mass_budget_remesh_enthalpy_j_m2 + remesh.enthalpy_j_m2;
 
-   % Domain exchange decomposes that net into the cloned bottom reservoir the
-   % fixed-depth grid imports and the merge export it discards, closing
-   % remesh = cloned_bottom - merge_export for every event.
+   % Domain exchange splits that net into two parts: the cloned bottom reservoir
+   % the fixed-depth grid imports, and the merge export the grid discards. Every
+   % event satisfies remesh = cloned_bottom - merge_export.
    ledger.mass_budget_cloned_bottom_solid_mwe = ...
       ledger.mass_budget_cloned_bottom_solid_mwe + remesh.cloned_bottom_solid_mwe;
    ledger.mass_budget_cloned_bottom_liquid_mwe = ...
@@ -55,9 +55,9 @@ function ledger = accumulate_remesh_budget( ...
       + remesh.merge_export_enthalpy_j_m2;
 
    % Grid translation: only top removals lower the surface of the fixed grid.
-   % The height is quantized grid geometry; the export is the mass that removal
-   % took out of the column. It over-counts what the
-   % removed cell held, so it is not a surface mass flux.
+   % The height is quantized grid geometry. The export is the mass that the
+   % removal took out of the column. The export over-counts what the removed
+   % cell held, so it is not a surface mass flux.
    ledger.mass_budget_top_deletion_count = ...
       ledger.mass_budget_top_deletion_count + remesh.top_deletion_count;
    ledger.mass_budget_top_deletion_height_m = ...
@@ -98,9 +98,9 @@ function ledger = accumulate_remesh_budget( ...
       ledger.mass_budget_merge_export_enthalpy_gross_j_m2 ...
       + remesh.merge_export_enthalpy_gross_j_m2;
 
-   % Gross endpoint-storage closes the substep: it retains the total
-   % storage change each accepted substep produced before later forcing-step or
-   % hourly aggregation can cancel it.
+   % Gross endpoint-storage keeps the total storage change of each accepted
+   % substep. It records that change before forcing-step or hourly aggregation
+   % can cancel it.
    ledger.mass_budget_solid_storage_gross_mwe = ...
       ledger.mass_budget_solid_storage_gross_mwe ...
       + abs(solid_change + remesh.solid_mwe);

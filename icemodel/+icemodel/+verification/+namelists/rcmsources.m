@@ -3,7 +3,7 @@ function list = rcmsources()
    %
    %  list = icemodel.verification.namelists.rcmsources()
    %
-   % This list is shared by importers, RCM staging helpers, and manifest
-   % source-list derivation so the model set and order cannot drift.
+   % Importers, RCM staging helpers, and manifest source-list derivation all
+   % read this list, so they use the same model set in the same order.
    list = ["mar", "merra", "racmo"];
 end

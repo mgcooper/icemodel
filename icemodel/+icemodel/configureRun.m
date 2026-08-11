@@ -182,9 +182,8 @@ function [vars1, vars2] = defaultOutputVariables(opts)
    % which the data are stored in the cell arrays passed to
    % icemodel.updateoutput from the model main functions.
    %
-   % 2) If new variables are added, icemodel.postprocess must be reviewed to
-   % ensure correct
-   % processing is applied, including rounding precision.
+   % 2) When you add a variable, review icemodel.postprocess to confirm that it
+   % applies the correct processing, including rounding precision.
 
    profile = string(opts.output_profile);
    if any(lower(profile) == ["sector", "grid"])
@@ -306,19 +305,20 @@ end
 
 function paths = resolveMetPaths(pathinput, forcings, names)
    %RESOLVEMETPATHS Resolve met file names to full paths, family subfolder first.
-   % Prefer the per-source subfolder input/met/<forcings>/<name> (the staging
-   % layout that keeps met/ from sprawling); fall back to flat input/met/<name>
-   % so existing flat files still resolve. The forcings label IS the subfolder
-   % key, so no extra option is needed. The subfolder-first ordering is the
-   % shared icemodel.forcing.helpers.sourceSearchDirs primitive.
+   % Prefer the per-source subfolder input/met/<forcings>/<name>. This staging
+   % layout keeps the met/ folder small. Fall back to the flat path
+   % input/met/<name>, so an existing flat file still resolves. The forcings
+   % label IS the subfolder key, so no extra option is needed. The shared
+   % helper icemodel.forcing.helpers.sourceSearchDirs defines the
+   % subfolder-first order.
 
    met_base = fullfile(pathinput, 'met');
    search_dirs = icemodel.forcing.helpers.sourceSearchDirs(met_base, forcings);
    names = cellstr(names);
    paths = cell(1, numel(names));
    for n = 1:numel(names)
-      % First directory holding the file wins; fall back to the flat path
-      % (the last candidate) so a missing file surfaces a clean load error.
+      % Use the first directory that holds the file. Fall back to the flat
+      % path (the last candidate), so a missing file gives a clean load error.
       paths{n} = fullfile(search_dirs{end}, names{n});
       for d = 1:numel(search_dirs)
          candidate = fullfile(search_dirs{d}, names{n});

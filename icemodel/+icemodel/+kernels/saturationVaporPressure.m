@@ -9,9 +9,10 @@ function es = saturationVaporPressure(T, liqflag)
    %  ice (false).
    %
    %  This file is the canonical reference implementation for the Romps/Ambaum
-   %  saturation vapor pressure formula. Paper-specific notation (cvl, cvi) is
-   %  retained for traceability. Production code uses the Rankine-Kirchhoff
-   %  coefficients derived in icemodel.vapor.initialize_vapor_model from these same expressions.
+   %  saturation vapor pressure formula. It keeps the paper notation (cvl,
+   %  cvi) for traceability. Production code uses the Rankine-Kirchhoff
+   %  coefficients that icemodel.vapor.initialize_vapor_model derives from
+   %  these same expressions.
    %
    %  References:
    %     Ambaum (2020), "Accurate, simple equation for saturated vapour
@@ -21,11 +22,13 @@ function es = saturationVaporPressure(T, liqflag)
    %        thermodynamics." QJRMS, 147(741), 3493-3497.
    %        DOI: 10.1002/qj.4154
    %
-   % See also: icemodel.vapor.initialize_vapor_model, icemodel.kernels.latentEnthalpyWater
+   % See also: icemodel.vapor.initialize_vapor_model,
+   %  icemodel.kernels.latentEnthalpyWater
 
-   % Regarding optimal values, Romps optimized cvl, cvi, and Rv simultaneously,
-   % finding one set of values that minimize errors in sum over liquid and ice
-   % whereas Ambaum optimized values separately for liquid and ice.
+   % The two papers optimize the values differently. Romps optimized cvl, cvi,
+   % and Rv together, and found one set of values that minimizes the summed
+   % error over liquid and ice. Ambaum optimized the values separately for
+   % liquid and for ice.
 
    % -----------------------------------------------------------------------
    % Constants following Romps (2021) — retain for reference
@@ -49,8 +52,8 @@ function es = saturationVaporPressure(T, liqflag)
    cpv_l = 2040;   % Ambaum optimal vapor cp over liquid, yields cpl - cpv_l = 2180
    cpv_i = 1885;   % Ambaum optimal vapor cp over ice, yields cpi - cpv_i = 212
 
-   % Note: strictly, cpl and cpi are cvl and cvi but they are taken as equal
-   % so cp is used instead of cv as cp appears in the published works.
+   % Strictly, cpl and cpi are cvl and cvi. This code takes them as equal and
+   % uses cp instead of cv, because cp appears in the published works.
    %
    % In these expressions, cvl = cpl, but cpv != cvv. The Le expressions are
    % equivalent under a substitution of cvv = cpv - Rv.

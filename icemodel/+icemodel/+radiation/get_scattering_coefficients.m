@@ -1,7 +1,7 @@
 function [qext, g, coalbedo, wavel, dwavel] = get_scattering_coefficients( ...
       mie_table, opts)
    %get_scattering_coefficients Extract spectral scattering coefficients from
-   %a pre-loaded Mie scattering matrix and the wavelength grid.
+   % a pre-loaded Mie scattering matrix and the wavelength grid.
    %
    % [qext, g, coalbedo, wavel, dwavel] = ...
    %    icemodel.radiation.get_scattering_coefficients(mie_table, opts)

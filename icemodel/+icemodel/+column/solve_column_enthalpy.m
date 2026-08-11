@@ -3,9 +3,8 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
       delz, fn, dt, solver, tol, maxiter, ~, ~, ~, debug)
    %SOLVE_COLUMN_ENTHALPY Solve the column enthalpy balance.
    %
-   % The alpha, use_aitken, and jumpmax inputs are kept in the function
-   % signature so the older thermal-solver option surface remains stable while
-   % node-wise Aitken acceleration stays disabled here.
+   % The signature keeps the alpha, use_aitken, and jumpmax inputs to match the
+   % thermal-solver option list. Node-wise Aitken acceleration is off here.
    %
    %#codegen
 

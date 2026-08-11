@@ -185,7 +185,7 @@ function test_reader_requires_nonblank_sampling_provenance(testCase)
 end
 
 function test_reader_rejects_missing_request_dates(testCase)
-   % NaT cannot silently become an absent-year or nearest-date selection.
+   % NaT must not become an absent-year or nearest-date selection.
    testCase.verifyError(@() ...
       icemodel.forcing.helpers.readMarDensitySnapshots( ...
       NaT(1, 1), [1 1], source_dir=testCase.TestData.root), ...
@@ -364,7 +364,7 @@ function test_reader_requires_native_time_and_accepts_time_only(testCase)
 end
 
 function test_reader_rejects_time_component_mismatch_and_partial_set(testCase)
-   % Mixed or stale components cannot silently relabel the native TIME axis.
+   % Mixed or stale components must not relabel the native TIME axis.
    mismatch_root = fullfile(testCase.TestData.root, "time_mismatch");
    mkdir(mismatch_root)
    full_source = fullfile(testCase.TestData.root, ...
@@ -1093,7 +1093,7 @@ function writeMarFixture(root, yyyy, include_profile, include_dynamic, ...
    write_shsn = true;
    switch fault
       case "shsn_missing_sector"
-         % Missing/extra sector shapes must not return the first scalar silently.
+         % Missing or extra sector shapes must not return the first scalar.
          shsn_dimensions = {'X', 2, 'Y', 2, time_dimension, 2};
          shsn_data = squeeze(shsn3(:, :, 1, :));
       case "shsn_extra_axis"

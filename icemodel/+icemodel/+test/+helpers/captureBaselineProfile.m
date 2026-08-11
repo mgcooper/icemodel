@@ -25,8 +25,8 @@ function [profile_summary, profile_meta, profile_artifacts] = ...
    end
    mkdir(profdir);
 
-   % Profile the accepted workflow in a second pass so the saved baseline
-   % values are not affected by profiler overhead or altered execution order.
+   % Profile the accepted workflow in a second pass, so profiler overhead and
+   % a changed execution order do not affect the saved baseline values.
    profile clear
    profile('-historysize', kwargs.history_size);
    profile on

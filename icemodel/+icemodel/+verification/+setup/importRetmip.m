@@ -9,15 +9,16 @@ function manifest = importRetmip(source_dir, kwargs)
    %    RetMIP staging hook. It records RetMIP protocol cases as data-only
    %    observations.mat evaluation bundles and stages confirmed native
    %    meteorological sources separately under the standard icemodel input/met
-   %    and input/userdata layout. Optional MAR/MERRA/RACMO legs are delegated
-   %    to the shared dataset-family RCM staging helper after protocol/native
-   %    products are safely persisted.
+   %    and input/userdata layout. It passes optional MAR/MERRA/RACMO legs to
+   %    the shared dataset-family RCM staging helper, and only after it has
+   %    written the protocol and native products.
    %    forcing_sources selects runtime sources requested by the current call.
-   %    Ordinary calls preserve omitted existing legs; overwrite_family=true
+   %    Ordinary calls preserve omitted existing legs. overwrite_family=true
    %    replaces the whole family state.
-   %    build_observations=false is a guarded non-dry fast path: requested cases
-   %    must already exist in the target manifest, whose observation entry is
-   %    reused while selected forcing is attached.
+   %    build_observations=false is a guarded fast path for a non-dry call.
+   %    The requested cases must already exist in the target manifest. The
+   %    importer reuses their observation entry and attaches the selected
+   %    forcing.
    %
    %  Default roots
    %    source_dir="" reads <repo>/data/verification/retmip. With no output_root,
@@ -47,9 +48,9 @@ function manifest = importRetmip(source_dir, kwargs)
    %        protocol observations are always the case definition when
    %        build_observations is true; forcing_sources selects only runtime
    %        met/userdata artifacts. It is a patch selector, not the complete
-   %        desired source state: an existing case's omitted legs remain
-   %        unchanged during ordinary merge updates and are removed only by
-   %        explicit family replacement.
+   %        source state you want. An ordinary merge update leaves the omitted
+   %        legs of an existing case unchanged. Only an explicit family
+   %        replacement removes them.
    %    startdate, enddate : datetime / string. Optional explicit protocol and
    %        forcing window; pass both or neither. With both omitted, each case
    %        uses its catalog-authored RetMIP protocol period. Every selected leg

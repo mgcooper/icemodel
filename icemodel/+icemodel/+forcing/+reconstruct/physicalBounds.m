@@ -7,9 +7,9 @@ function bounds = physicalBounds(channel)
    %  Holds the approved post-fill physical bounds (POLICY A15). The
    %  harness counts violations as hard method failures and the engine
    %  enforces the same limits. Bounds are inclusive [lower, upper] in the
-   %  canonical met units. Channels with a data-dependent upper limit (swd
-   %  vs top-of-atmosphere, swu vs swd) return Inf here; their relational
-   %  checks live with the metrics, which have both channels in hand.
+   %  canonical met units. A channel with a data-dependent upper limit (swd
+   %  against top-of-atmosphere, swu against swd) returns Inf here. The
+   %  metrics hold both channels, so they run the relational check.
    %
    % Returns
    %  bounds : 1x2 double [lower, upper], inclusive.
@@ -41,13 +41,14 @@ function bounds = physicalBounds(channel)
       case "albedo"
          bounds = [0.05, 0.98];       % fraction
       case "lwd"
-         % The floor sits below real physics while still rejecting
-         % garbage (POLICY A15/D-25): extreme-cold clear skies emit
+         % The floor is below every real value and still rejects invalid
+         % data (POLICY A15/D-25). Extreme-cold clear skies emit
          % 69-90 W/m2 in MAR over the interior, and a blackbody at the
-         % tair floor (193 K) emits ~79 W/m2. The ceiling sits above real
-         % physics for the same reason (POLICY D-26): warm-fjord stations
-         % observe genuine 406-451 W/m2 under mild overcast, and
-         % observations are never clamped or censored.
+         % tair floor (193 K) emits about 79 W/m2. The ceiling is above
+         % every real value for the same reason (POLICY D-26). Warm-fjord
+         % stations record true values of 406-451 W/m2 under mild
+         % overcast, and the pipeline never clamps or censors an
+         % observation.
          bounds = [40, 470];          % W/m2
       case "ppt"
          bounds = [0, Inf];           % accumulation rate is nonnegative

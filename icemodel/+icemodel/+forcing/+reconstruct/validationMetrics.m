@@ -8,10 +8,10 @@ function metrics = validationMetrics(truth, filled, gaps, series, channel, kwarg
    %  Held-out metric computation for the validation protocol (gap-fill
    %  policy). `truth` holds the withheld observed values
    %  and `filled` the method's reconstruction on the same sample axis (NaN
-   %  where the method declined); both are restricted to the synthetic-gap
-   %  samples by construction. Metrics are reported overall and per gap
-   %  stratum (bucket x season), and in-sample statistics never enter here —
-   %  callers pass held-out draws only.
+   %  where the method declined). By construction, both cover only the
+   %  synthetic-gap samples. This function reports metrics overall and per
+   %  gap stratum (bucket x season). It never uses in-sample statistics,
+   %  because callers pass held-out draws only.
    %
    % Name-value
    %  sigma : optional 1-sigma uncertainty per sample (same axis as filled)
@@ -64,17 +64,19 @@ function metrics = validationMetrics(truth, filled, gaps, series, channel, kwarg
          'provenance and filled must share one sample axis');
    end
    if ~issorted(gaps.start_time)
-      % The sequential sample-to-gap cursor below assumes time order, which
-      % syntheticMissingness guarantees; refuse anything else loudly.
+      % The sequential sample-to-gap cursor below assumes time order.
+      % syntheticMissingness produces gaps in time order, so any other
+      % input is an error.
       error('icemodel:reconstruct:validationMetrics:unsortedGaps', ...
          'gaps must be sorted by start_time');
    end
 
    times = series.Properties.RowTimes;
    x = series.(channel);
-    % The local step scale contextualizes boundary jumps: POLICY B6 keys
-   % it to the station AND season, through the shared helper so the engine
-   % tiers reject exactly what these metrics would score as violations.
+    % The local step scale sets the size of an acceptable boundary jump.
+   % POLICY B6 keys that scale to the station and the season. This code
+   % calls the shared helper, so the engine tiers reject the same jumps
+   % that these metrics score as violations.
    season_scale = icemodel.forcing.reconstruct.stepScale(times, x);
 
    % Map each truth/filled sample to its gap row so strata aggregate cleanly.
@@ -166,9 +168,10 @@ function row = scoreSubset(truth, filled, sigma, provenance, physical_valid, ...
    predicted = f(paired);
    typical_magnitude = mean(abs(observed), 'omitnan');
 
-   % RMSE and bias alone reward regression toward the mean. Correlation uses
-   % all paired samples, while variability removes each held-out gap's mean
-   % first so between-gap seasonal offsets cannot hide weather compression.
+   % RMSE and bias alone score an over-smoothed series too well. Correlation
+   % uses all paired samples. The variability measure first removes the mean
+   % of each held-out gap, so a between-gap seasonal offset cannot mask a
+   % compressed weather signal.
    correlation = NaN;
    variability_ratio = NaN;
    within_gap_observed_spread = NaN;
@@ -216,8 +219,8 @@ function row = scoreSubset(truth, filled, sigma, provenance, physical_valid, ...
       end
    end
 
-   % Provenance is graded only for values a candidate actually supplied;
-   % declined samples do not need a method code.
+   % Grade provenance only for the values a candidate supplied. A declined
+   % sample does not need a method code.
    provenance_accounting = NaN;
    if ~isempty(provenance) && any(have)
       p = provenance(sample_in);

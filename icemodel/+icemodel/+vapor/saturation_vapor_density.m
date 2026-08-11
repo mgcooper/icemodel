@@ -5,15 +5,14 @@ function [ro_vap, dro_vapdT, d2ro_vapdT2] = saturation_vapor_density(T, f_liq)
    %  [ro_vap, dro_vapdT, d2ro_vapdT2] = icemodel.vapor.saturation_vapor_density(T, f_liq)
    %
    %  Computes the equilibrium (saturation) water vapor density and its
-   %  temperature derivative within the air voids of porous ice. The air
-   %  voids are assumed saturated with respect to either ice or liquid water
-   %  depending on the local liquid fraction.
+   %  temperature derivative within the air voids of porous ice. This
+   %  function assumes the air voids are saturated over ice or over liquid
+   %  water, based on the local liquid fraction.
    %
-   %  Phase awareness: saturation vapor pressure is computed over ice by
-   %  default, switching to over liquid where
-   %  f_liq > f_liq_phase_switch_threshold. This is consistent with the
-   %  assumption that wet cells have pore air saturated with respect to
-   %  liquid water.
+   %  Phase awareness: this function computes the saturation vapor pressure
+   %  over ice by default. It switches to over liquid where
+   %  f_liq > f_liq_phase_switch_threshold. That matches the assumption that
+   %  the pore air of a wet cell is saturated over liquid water.
    %
    %  ro_vap is vapor mass per vapor volume, analogous to an intrinsic density.
    %

@@ -75,8 +75,8 @@ function [manifest, state] = runDatasetFamilyImport(state, alive, kwargs)
    end
 
    % Carry additive manifest legs into the in-memory state before a requested
-   % source refresh. This is preservation only; stageRcmForcing remains the one
-   % owner of cache discovery, derivation, and writes.
+   % source refresh. This step only preserves legs. stageRcmForcing performs
+   % all cache discovery, derivation, and writes.
    state = carryPersistedColocation(state, alive, manifest);
    state = icemodel.verification.setup.stageDatasetRcmForcing(state, alive, ...
       dataset_family=kwargs.dataset_family, ...

@@ -6,12 +6,12 @@ function [raw, header, metadata] = readPangaeaTab(filename, kwargs)
    %     filename, site_id_pattern='\((S[0-9]+)\)')
    %
    % Role
-   %  Shared, source-agnostic ingest for PANGAEA .tab exports. Every export
-   %  carries the same skeleton: a "/* ... */" metadata block (citation with the
+   %  Shared, source-agnostic ingest for PANGAEA .tab exports. Every export has
+   %  the same structure: a "/* ... */" metadata block (citation with the
    %  per-dataset DOI, an optional bundle/series DOI, and an Event(s) station
-   %  line), a tab-delimited header starting with "Date/Time", and numeric data
-   %  rows. This helper owns that skeleton once so per-source readers
-   %  (readImauHourlyTable, readKtransectTable, ...) own only their column
+   %  line), a tab-delimited header that starts with "Date/Time", and numeric
+   %  data rows. This helper reads that structure, so per-source readers
+   %  (readImauHourlyTable, readKtransectTable, ...) handle only their column
    %  mapping and unit conversions.
    %
    % Name-value
@@ -62,8 +62,8 @@ function [raw, header, metadata] = readPangaeaTab(filename, kwargs)
    header = split(lines(header_idx), sprintf('\t')).';
    raw = readRawTable(filename, header_idx + 1, numel(header));
 
-   % Parse citation, DOIs, and the Event(s) station line from the metadata
-   % block; the per-dataset DOI is the first DOI after "Citation:".
+   % Parse the citation, the DOIs, and the Event(s) station line from the
+   % metadata block. The per-dataset DOI is the first DOI after "Citation:".
    text = strjoin(lines(1:find(startsWith(lines, "*/"), 1, 'first')), newline);
    event = eventMetadata(text, kwargs.site_id_pattern);
    metadata = struct( ...

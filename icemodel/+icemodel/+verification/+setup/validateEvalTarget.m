@@ -7,13 +7,14 @@ function validateEvalTarget(eval_target)
    %  eval_target   The eval_target value from a case-manifest entry. A string
    %                array naming which model capabilities the case exercises. An
    %                empty value (string(0,1) or "") is permitted (cases that
-   %                exercise no curated capability, e.g. analytical benchmarks);
-   %                every non-empty element must be a member of the canonical
-   %                vocabulary published by icemodel.verification.namelists.evaltarget.
+   %                exercise no curated capability, e.g. analytical benchmarks).
+   %                Every non-empty element must be a member of the canonical
+   %                vocabulary that
+   %                icemodel.verification.namelists.evaltarget publishes.
    %
    % Role
    %  Setup-side schema gate shared by makeCaseManifestEntry and
-   %  makeFirnCaseManifestEntry so a stamped eval_target cannot drift from the
+   %  makeFirnCaseManifestEntry, so a stamped eval_target always matches the
    %  canonical namelist.
    %
    % See also: icemodel.verification.namelists.evaltarget,

@@ -23,7 +23,7 @@ end
 
 function test_clean_series_not_flagged(testCase)
    % A clean diurnal year produces no flags and the documented empty
-   % findings schema, so per-station results vertcat cleanly.
+   % findings schema, so per-station results concatenate vertically.
    met = makeCleanMet();
 
    [returned, findings] = icemodel.forcing.reconstruct.flatRunScreen( ...
@@ -188,8 +188,8 @@ end
 
 function test_threshold_overrides_respected(testCase)
    % Tightening either the flatness threshold or the run-length floor
-   % below/above the stamped signature disables the flag, proving the
-   % name-value knobs actually plumb into the conditions.
+   % below/above the stamped signature disables the flag. This shows that
+   % the name-value options reach the conditions.
    [met, ~] = makeBuriedMet();
 
    [returned, ~] = icemodel.forcing.reconstruct.flatRunScreen( ...
@@ -220,7 +220,7 @@ function test_empty_and_scalar_met(testCase)
 end
 
 function test_missing_tair_errors(testCase)
-   % The screen is meaningless without air temperature and must refuse.
+   % The screen needs air temperature. Without it, it must raise an error.
    met = removevars(makeCleanMet(), 'tair');
    testCase.verifyError( ...
       @() icemodel.forcing.reconstruct.flatRunScreen(met, 67, -50), ...

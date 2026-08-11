@@ -16,13 +16,15 @@ function manifest = importPromiceSites(source_dir, kwargs)
    %    forcing_sources selects runtime sources requested by the current call.
    %    Ordinary calls preserve omitted existing legs; overwrite_family=true
    %    replaces the whole family state.
-   %    build_observations=false is a guarded non-dry fast path: requested cases
-   %    must already exist in the target manifest, whose observation entry is
-   %    reused while selected forcing is attached.
+   %    build_observations=false is a guarded fast path that still writes.
+   %    Every requested case must already exist in the target manifest. The
+   %    importer reuses that case's observation entry and attaches the
+   %    selected forcing.
    %
    %  Default roots
-   %    source_dir="" reads <repo>/data/verification/promice/hour. With no output_root,
-   %    observations go to <repo>/data/eval/promice/<case_id>/observations.mat and
+   %    source_dir="" reads <repo>/data/verification/promice/hour. With no
+   %    output_root, observations go to
+   %    <repo>/data/eval/promice/<case_id>/observations.mat, and
    %    native met/userdata go to <repo>/data/input/{met,userdata}/promice/.
    %    Explicit source_dir, output_root, evaluation_data_root, and
    %    input_data_root overrides are honored as-is.
@@ -42,12 +44,14 @@ function manifest = importPromiceSites(source_dir, kwargs)
    %  and the station observations.
    %
    %  EVAL IS FORCING-AGNOSTIC. The per-case eval target is a data-only
-   %  observations.mat (same contract as ESM-SnowMIP/SUMup); the manifest records
-   %  the eval contract (evaluation_file, comparison_variables) but NOT the
-   %  forcing provider, so ANY forcing file may be used at the site at runtime
-   %  without rewriting the eval metadata. No bundled evaluation.mat/reference.mat
-   %  (forcing+obs together) is written; forcing lives in separate,
-   %  runtime-discoverable met/userdata files in per-source subfolders.
+   %  observations.mat, under the same contract as ESM-SnowMIP and SUMup. The
+   %  manifest records the eval contract (evaluation_file,
+   %  comparison_variables) but NOT the forcing provider. ANY forcing file may
+   %  therefore be used at the site at runtime, with no rewrite of the eval
+   %  metadata. The importer writes no bundled evaluation.mat or
+   %  reference.mat that holds forcing and observations together. Forcing
+   %  lives in separate met/userdata files in per-source subfolders, which the
+   %  runtime discovers.
    %
    %    Eval (data/eval/promice/<site>/):
    %      * observations.mat           (PROMICE obs target; buildPromiceData)

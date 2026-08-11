@@ -1,5 +1,5 @@
 function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
-   %BUILDESMSNOWMIPFORCING Convert ESM-SnowMIP NetCDF files to icemodel-native forcing.
+   %BUILDESMSNOWMIPFORCING Convert ESM-SnowMIP NetCDF to native forcing.
    %
    %  [forcing, metadata] = buildEsmSnowmipForcing(sitename)
    %  [forcing, metadata] = buildEsmSnowmipForcing(sitename, ...
@@ -26,14 +26,14 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    %
    %  Notes on variable conversions
    %    Qair converts to rh via
-   %    icemodel.vapor.relative_humidity_from_specific_humidity. rainf / snowf
-   %    are stored both as their own forcing channels (so a downstream model can
-   %    consume rain and snow precipitation separately when available) and
-   %    summed into ppt for the legacy single-channel consumers. Mass flux [kg
-   %    m-2 s-1] is divided by the canonical liquid-water density to obtain
-   %    volumetric flux [m s-1]. Albedo is filled with snow / bare-ground
-   %    constants where observations are missing; this is a placeholder until
-   %    the diagnostic / prognostic albedo kernel lands.
+   %    icemodel.vapor.relative_humidity_from_specific_humidity. The builder
+   %    stores rainf and snowf as their own forcing channels, so a downstream
+   %    model can read rain and snow separately. It also sums them into ppt for
+   %    the legacy single-channel consumers. It divides mass flux
+   %    [kg m-2 s-1] by the canonical liquid-water density to obtain volumetric
+   %    flux [m s-1]. Where albedo observations are missing, it fills snow and
+   %    bare-ground constants. That fill is a placeholder for the diagnostic
+   %    and prognostic albedo kernel.
    %
    %  Inputs
    %    sitename : string
@@ -66,9 +66,9 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    %        volumetric flux, and notes on the albedo policy.
    %
    %  Role
-   %    Reusable per-site forcing builder. Called by importEsmSnowmip
-   %    during staging and by any future on-the-fly icemodel run that
-   %    needs to consume the upstream NetCDF directly.
+   %    Reusable per-site forcing builder. importEsmSnowmip calls it during
+   %    staging, and an icemodel run can call it to read the upstream NetCDF
+   %    directly.
    %
    %  References
    %    Menard, C. B. et al. (2019). Meteorological and evaluation
@@ -126,11 +126,11 @@ function [forcing, metadata] = buildEsmSnowmipForcing(sitename, kwargs)
    snowf = icemodel.verification.setup.readNetcdfVariable(metfile, "Snowf");    % [kg m-2 s-1]
 
    % --- Read observation channels needed for forcing -------------------
-   % ESM-SnowMIP sites are heterogeneous: boreal forest sites
-   % (oas, obs, ojp) report snd_gap_auto / snd_gap1_auto in the
-   % canopy gap rather than snd_auto; some sites lack albs entirely.
-   % readBestSnowDepth and readNetcdfVariable(optional=true) hide that
-   % variability so the rest of the builder can stay site-agnostic.
+   % ESM-SnowMIP sites differ from each other. The boreal forest sites
+   % (oas, obs, ojp) report snd_gap_auto or snd_gap1_auto in the canopy
+   % gap instead of snd_auto, and some sites have no albs variable.
+   % readBestSnowDepth and readNetcdfVariable(optional=true) hide those
+   % differences, so the rest of the builder stays site-agnostic.
    obs_time  = icemodel.verification.setup.readNetcdfTime(obsfile, 'time');
    [snd_auto, snow_depth_source] = ...
       icemodel.verification.setup.readBestSnowDepth(obsfile);
@@ -225,12 +225,11 @@ end
 function albedo = buildAlbedo(raw_albedo, snow_depth)
    %BUILDALBEDO Continuous albedo with snow / bare-ground fallback.
    %
-   % Filter raw observed albedo to the [0, 1] range, then linearly
-   % interpolate gaps. Persistent gaps fall back to snow / bare-ground
-   % constants so the staged forcing is continuous (icemodel does not
-   % currently model albedo evolution from state). The diagnostic /
-   % prognostic albedo kernel (icemodel-0gt.2) will replace this
-   % placeholder once it lands.
+   % Filter raw observed albedo to the [0, 1] range, then interpolate gaps
+   % linearly. A gap that remains takes a snow or bare-ground constant, so
+   % the staged forcing is continuous. icemodel does not model albedo
+   % evolution from state. The diagnostic and prognostic albedo kernel
+   % (icemodel-0gt.2) will replace this placeholder.
    albedo = raw_albedo;
    albedo(albedo < 0 | albedo > 1) = NaN;
    albedo = fillmissing(albedo, 'linear', 'EndValues', 'nearest');

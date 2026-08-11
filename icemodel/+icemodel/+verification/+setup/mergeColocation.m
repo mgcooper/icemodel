@@ -1,8 +1,8 @@
 function colocation = mergeColocation(colocation, add)
    %MERGECOLOCATION Copy every field from ADD onto a colocation struct.
    %
-   % This tiny helper centralizes the manifest-leg merge used by dataset-family
-   % importers after each staged source.
+   % The dataset-family importers call this helper after each staged source,
+   % so that one function performs the manifest-leg merge.
 
    fields = fieldnames(add);
    for k = 1:numel(fields)

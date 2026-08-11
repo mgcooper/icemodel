@@ -17,22 +17,21 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %    <repo>/data/input/met/esm_snowmip/.
    %
    %  Stages the requested ESM-SnowMIP site cases under the resolved
-   %  data/eval/esm_snowmip/<sitename>/ tree. All 10 reference sites are
-   %  supported; the per-site forcing and observation artifacts are produced by
-   %  the reusable builders buildEsmSnowmipForcing / buildEsmSnowmipObservations,
-   %  the same conversion path an on-the-fly icemodel run would use.
-   %  There is no forcing_sources/build_observations split: each site's source
-   %  forcing and observations share one requested window and are staged as one
-   %  atomic ESM-SnowMIP case conversion, with no optional RCM attachment path
-   %  to refresh independently.
+   %  data/eval/esm_snowmip/<sitename>/ tree. It supports all 10 reference
+   %  sites. The reusable builders buildEsmSnowmipForcing and
+   %  buildEsmSnowmipObservations produce the per-site forcing and observation
+   %  artifacts. An icemodel run that reads the source directly uses the same
+   %  conversion path. This family has no forcing_sources or
+   %  build_observations split. Each site's source forcing and observations
+   %  share one requested window and stage as one atomic case conversion, and
+   %  there is no optional RCM attachment to refresh on its own.
    %
    %  Window resolution
    %    - With no startdate / enddate, each site stages the full source record
    %      available in the ESM-SnowMIP forcing and observation files.
-   %    - With explicit startdate and enddate, that single window is
-   %      applied to every site listed in case_ids. Per-site staging
-   %      is the natural unit of the importer; multi-window staging
-   %      should be done by repeated calls.
+   %    - With explicit startdate and enddate, that single window applies to
+   %      every site listed in case_ids. The importer stages one window per
+   %      site. Call it again to stage another window.
    %
    %  Inputs
    %    source_dir : string
@@ -74,11 +73,10 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %  Returns
    %    manifest : struct  Family manifest also written to manifest.json.
    %
-   %  Source guarantees
-   %    Layout / file-presence guarantees come from
-   %    icemodel.verification.setup.fetchEsmSnowmip; downstream from that
-   %    point this importer can write the resolved output files directly
-   %    without repeating per-file existence checks.
+   %  Source checks
+   %    icemodel.verification.setup.fetchEsmSnowmip checks the source layout
+   %    and file presence. After that check, this importer writes the resolved
+   %    output files directly and does not repeat per-file existence checks.
    %
    %  See also: icemodel.verification.setup.fetchEsmSnowmip,
    %    icemodel.verification.setup.buildEsmSnowmipForcing,
@@ -373,8 +371,8 @@ function writeMetFiles(forcing_tt, sitename, input_root, dt_out, overwrite, ...
    %
    % Delegates met-file naming, validation, and saving to the shared
    % icemodel.forcing.helpers.writemet (window form, 15-minute by default), so
-   % configureRun + loadmet resolve the file without verification-only branches.
-   % Existing files are additive no-ops unless overwrite=true.
+   % configureRun and loadmet resolve the file without verification-only
+   % branches. An existing file stays unchanged unless overwrite=true.
 
    icemodel.forcing.helpers.writemet(forcing_tt, sitename, dataset_family, ...
       outdir=fullfile(input_root, 'met'), naming="window", dt_out=dt_out, ...

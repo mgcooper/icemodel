@@ -22,18 +22,18 @@ function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask, remesh] = ...
    %                     mass it removed from the column, because combining two
    %                     cells into one retains their mean.
    %   merge_mask      - Logical flag marking merge-eligible layers.
-   %   remesh          - Optional event, signed storage-exchange, and absolute
-   %                     event-gross ledger. Solid/liquid terms are metres
-   %                     water equivalent and enthalpy terms are J m-2.
-   %                     top_deletion_count counts removals of the surface cell,
-   %                     the only ones that translate the fixed grid downward;
-   %                     interior_merge_count counts every other removal.
-   %                     top_export_* is the mass a surface removal exported.
-   %                     A merge keeps the mean of the pair, so this
-   %                     over-counts what the removed cell held and is not a
-   %                     surface mass flux;
-   %                     the quantized top_deletion_height_m is grid geometry
-   %                     and is never mass. Domain exchange closes as
+   %   remesh          - Optional ledger of events, signed storage exchange,
+   %                     and absolute event gross. Solid and liquid terms are
+   %                     metres water equivalent. Enthalpy terms are J m-2.
+   %                     top_deletion_count counts removals of the surface
+   %                     cell. Only these removals translate the fixed grid
+   %                     downward. interior_merge_count counts every other
+   %                     removal. top_export_* is the mass that a surface
+   %                     removal exported. A merge keeps the mean of the pair,
+   %                     so top_export_* over-counts what the removed cell
+   %                     held, and it is not a surface mass flux. The
+   %                     quantized top_deletion_height_m is grid geometry, not
+   %                     mass. Domain exchange closes as
    %                     remesh = cloned_bottom - merge_export.
    %
    % See also: icemodel.column.merge_layer_indices,
@@ -48,9 +48,9 @@ function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask, remesh] = ...
          'Ls', 'Lv', 'ro_ice', 'ro_liq');
    end
 
-   % The eighth output opts into the diagnostic ledger. Existing seven-output
-   % solver callers keep the state transition without allocating structs or
-   % integrating column storage on every substep.
+   % The eighth output turns on the diagnostic ledger. A caller that asks for
+   % seven outputs gets the state transition, and this function does not
+   % allocate structs or integrate column storage on every substep.
    use_remesh_ledger = nargout > 7;
 
    if use_remesh_ledger
@@ -68,8 +68,8 @@ function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask, remesh] = ...
       return
    end
 
-   % merge_mask records which layer(s) were combined this substep. do_merge is
-   % updated in the loop to stay on track with the updated combined layers.
+   % merge_mask records which layers this substep combines. The loop updates
+   % do_merge so that it tracks the combined layers.
    do_merge = merge_mask;
 
    % ji tracks index drift relative to the original column while layers are
@@ -82,8 +82,9 @@ function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask, remesh] = ...
          continue
       end
 
-      % Snapshot each actual event independently so opposite-signed exchanges
-      % cannot cancel before their absolute gross is retained.
+      % Take a separate snapshot for each event. This keeps exchanges with
+      % opposite signs from cancelling before the ledger records their
+      % absolute gross.
       if use_remesh_ledger
          [solid_before, liquid_before, enthalpy_before] = ...
             icemodel.column.integrate_column_budget(T, f_ice, f_liq, dz_therm);
@@ -184,8 +185,8 @@ function remesh = accumulateMergeEvent(remesh, is_top_removal, ...
    remesh.merge_export_enthalpy_j_m2 = ...
       remesh.merge_export_enthalpy_j_m2 + export_enthalpy;
 
-   % Absolute event activity keeps opposite-signed merges within one forcing
-   % step from cancelling before temporal aggregation.
+   % The absolute totals keep merges with opposite signs in one forcing step
+   % from cancelling before the model aggregates them in time.
    remesh.solid_gross_mwe = ...
       remesh.solid_gross_mwe + abs(event_solid);
    remesh.liquid_gross_mwe = ...

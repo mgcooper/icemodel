@@ -6,14 +6,14 @@ function draws = syntheticMissingness(series, channel, runs, kwargs)
    %
    % Role
    %  Blocked synthetic-missingness sampler for the held-out validation
-   %  protocol (gap-fill policy). Gap DURATIONS are
-   %  resampled from the real census run-length distribution of the target
-   %  channel (optionally per stratum) so the synthetic test matches the
-   %  outage structure the engine will face; whole gaps are inserted only
-   %  into fully observed spans of the allowed years, never pointwise, so
-   %  autocorrelation is honest. Inserted gaps do not overlap each other and
-   %  keep an observed context margin on both sides, which the boundary-jump
-   %  metric needs.
+   %  protocol (gap-fill policy). The sampler resamples gap DURATIONS from
+   %  the real census run-length distribution of the target channel, and
+   %  from one stratum when a stratum is requested. The synthetic test then
+   %  matches the outage structure the engine meets. The sampler inserts
+   %  whole gaps into fully observed spans of the allowed years, never single
+   %  samples, so the test keeps the real autocorrelation. Inserted gaps do
+   %  not overlap each other and keep an observed context margin on both
+   %  sides, which the boundary-jump metric needs.
    %
    % Name-value
    %  years : double vector. Calendar years eligible for insertion — the
@@ -21,9 +21,9 @@ function draws = syntheticMissingness(series, channel, runs, kwargs)
    %     for final grading. Required.
    %  seed : nonnegative integer. Required; the draw is deterministic given
    %     (runs, years, seed).
-   %  n_gaps : number of synthetic gaps to attempt (default 25). Fewer are
-   %     returned when the observed spans cannot host more without overlap;
-   %     the shortfall is reported rather than silently absorbed.
+   %  n_gaps : number of synthetic gaps to attempt (default 25). The
+   %     function returns fewer when the observed spans cannot hold more
+   %     without overlap, and it reports the shortfall.
    %  bucket : optional census bucket index filter for the duration pool
    %     (stratified draws pass one bucket at a time).
    %  season : optional season filter ("DJF"/"MAM"/"JJA"/"SON") for the
@@ -66,8 +66,8 @@ function draws = syntheticMissingness(series, channel, runs, kwargs)
    dt_hours = hours(median(diff(times)));
 
    % The duration pool is the real run-length distribution of this channel,
-   % optionally narrowed to one stratum. An empty pool is an error: drawing
-   % durations from nothing would silently test the wrong regime.
+   % narrowed to one stratum when requested. An empty pool is an error,
+   % because durations drawn from nothing would test the wrong regime.
    pool = runs(runs.channel == channel, :);
    if ~isempty(kwargs.bucket)
       pool = pool(ismember(pool.bucket, kwargs.bucket), :);
@@ -110,9 +110,9 @@ function draws = syntheticMissingness(series, channel, runs, kwargs)
    for g = 1:kwargs.n_gaps
       run_len = max(1, round(duration_hours(g) / dt_hours));
       % A viable start needs the whole gap plus both context margins to be
-      % eligible, currently unmasked, and contiguous. movsum's shrinking
-      % endpoint windows can never reach the full-window sum, so series-edge
-      % starts are excluded without any explicit (and crashable) index math.
+      % eligible, unmasked, and contiguous. At the series edges movsum uses a
+      % shorter window, so its sum never reaches the full window. That excludes
+      % edge starts without extra index arithmetic.
       window = run_len + 2 * context;
       viable = movsum(eligible & ~mask, [0, window - 1]) == window;
       candidates = find(viable);
@@ -139,10 +139,10 @@ function draws = syntheticMissingness(series, channel, runs, kwargs)
          'VariableNames', {'start_time', 'end_time', 'duration_hours', ...
          'bucket', 'season'});
    else
-      % Return gaps in TIME order: consumers extract masked samples with
+      % Return gaps in TIME order. Callers extract masked samples with
       % series.(channel)(mask), which is time-ordered, and validationMetrics
-      % maps samples to gaps by walking the table sequentially — insertion
-      % order would silently misalign that mapping.
+      % maps samples to gaps by reading the table row by row. Insertion order
+      % would misalign that mapping.
       gaps = sortrows(gaps, 'start_time');
    end
    draws = struct('mask', mask, 'gaps', gaps, ...

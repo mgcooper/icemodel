@@ -908,8 +908,8 @@ end
 function test_buildPromiceData_stages_step_flags_unaltered(testCase)
    % The de-stepping DETECTION is staged (step_detected/correctable + signed
    % magnitude) but the staged ablation series itself is UNALTERED: it must
-   % still equal the raw -(z - z(start)) lowering, proving correction is not
-   % baked into the staged data.
+   % still equal the raw -(z - z(start)) lowering, which shows the correction
+   % is not applied to the staged data.
 
    [Data, metadata] = icemodel.forcing.buildPromiceData("MIT", ...
       source_dir=testCase.TestData.source_dir, frequency="hourly");
@@ -928,11 +928,11 @@ function test_buildPromiceData_stages_step_flags_unaltered(testCase)
    raw_ablation = -(z - z(find(isfinite(z), 1)));
    testCase.verifyEqual(Data.ablation, raw_ablation, 'AbsTol', 1e-9);
 
-   % The raw series still carries the ~11.9 m of bogus installation jump, so it
-   % overshoots the de-stepped magnitude (the correction is NOT in the staged
-   % data).
+   % The raw series still carries the ~11.9 m of spurious installation jump, so
+   % it exceeds the de-stepped magnitude. The correction is NOT in the staged
+   % data.
    ab = raw_ablation(isfinite(raw_ablation));
-   testCase.verifyGreaterThan(max(ab), 40);   % raw includes the bogus jump
+   testCase.verifyGreaterThan(max(ab), 40);   % raw includes the spurious jump
 end
 
 function test_buildPromiceData_units_from_shared_map(testCase)
@@ -1146,8 +1146,8 @@ function test_readPromiceAws_does_not_extend_shallow_sensor_jump(testCase)
 end
 
 function test_readPromiceAws_marks_neighbor_insufficient_jump_unreviewed(testCase)
-   % The target remains conservatively masked when native neighbors are absent,
-   % but code 2 prevents the sparse event from masquerading as reviewed QC.
+   % The target stays masked when native neighbors are absent, and code 2
+   % records the sparse event as unreviewed rather than reviewed QC.
    root = string(tempname);
    mkdir(fullfile(root, "hour"))
    cleanup = onCleanup(@() rmdir(root, 's'));

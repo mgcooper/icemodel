@@ -213,7 +213,8 @@ function test_resampleMetTimestep_rejects_removed_context_option(testCase)
 end
 
 function test_resampleMetTimestep_preserves_single_sample(testCase)
-   % One row has no inferable support and must not trigger interpolation/extrapolation.
+   % One row has no inferable support, so the helper must not interpolate or
+   % extrapolate.
    source = makeSyntheticMet( ...
       datetime(2016, 1, 1, 0, 0, 0, TimeZone="UTC"), 1);
 
@@ -961,8 +962,8 @@ end
 
 function test_metchecks_fills_wdir_circularly(testCase)
    % A gap between 350 and 10 degrees must fill near north (360/0), not
-   % at the linear midpoint 180. This is the intentional fix relative to
-   % the legacy runoff metchecks.
+   % at the linear midpoint 180. This differs from the legacy runoff
+   % metchecks.
 
    Time = (datetime(2016, 1, 1):hours(1):datetime(2016, 1, 1, 2, 0, 0))';
    wdir = [350; NaN; 10];
@@ -1229,7 +1230,7 @@ end
 
 function test_alignMarDailyMetadata_fails_closed_on_ambiguous_inputs(testCase)
    % Wrong source lengths, schemas, codes, types, axes, and cadences must report
-   % deterministic errors instead of silently positional-clipping provenance.
+   % deterministic errors instead of clipping provenance by position.
    days = (datetime(2012, 1, 1, 'TimeZone', 'UTC'):caldays(1): ...
       datetime(2012, 1, 2, 'TimeZone', 'UTC'))';
    retained = (days(1):hours(1):days(2) + hours(23))';
@@ -1542,9 +1543,9 @@ function test_intervalMaximumSolarElevation_matches_support_samples(testCase)
 end
 
 function test_promiceShortwave_prefers_corrected_and_clamps_raw_fallback(testCase)
-   % Corrected finite values win; raw values fill correction gaps; only a
-   % remaining negative public fallback is zeroed; residual nonfinite source
-   % values normalize to NaN and genuine missing stays NaN.
+   % Corrected finite values take precedence. Raw values fill correction gaps.
+   % Only a remaining negative public fallback becomes zero. Residual
+   % nonfinite source values normalize to NaN, and genuine missing stays NaN.
    Time = (datetime(2020, 1, 1, 'TimeZone', 'UTC'):hours(1): ...
       datetime(2020, 1, 1, 3, 0, 0, 'TimeZone', 'UTC'))';
    swd = [-5; 0; 20; Inf];
@@ -1627,7 +1628,7 @@ function test_promiceShortwave_fills_only_deep_civil_night_missing(testCase)
 end
 
 function test_promiceShortwave_darkness_fill_requires_location(testCase)
-   % Opt-in solar classification cannot silently guess an AWS location.
+   % Opt-in solar classification must not guess an AWS location.
    Time = datetime(2020, 1, 1, 'TimeZone', 'UTC');
    aws = timetable(Time, 0, 'VariableNames', {'swd'});
 
@@ -1785,7 +1786,7 @@ end
 
 function test_gridLocation_nearest_rejects_empty_mask(testCase)
    % A supplied mask with no eligible point cells must fail explicitly rather
-   % than silently falling back to an off-mask cell.
+   % than fall back to an off-mask cell.
 
    [X, Y] = ndgrid(0:2, 0:2);
    testCase.verifyError(@() icemodel.forcing.helpers.gridLocation( ...
@@ -1794,7 +1795,7 @@ function test_gridLocation_nearest_rejects_empty_mask(testCase)
 end
 
 function test_gridLocation_nearest_rejects_nonlocal_valid_cell(testCase)
-   % A mask must not silently snap an off-domain point to a distant valid cell.
+   % A mask must not snap an off-domain point to a distant valid cell.
 
    [X, Y] = ndgrid(0:4, 0:4);
    validmask = false(size(X));
@@ -3308,7 +3309,7 @@ end
 
 function test_modisAlbedoChannel_errors_on_duplicate_files(testCase)
    % Duplicate files for the same MODIS year are a bad source layout, not a
-   % coverage gap, so the helper must refuse to choose one silently.
+   % coverage gap, so the helper must refuse to choose one of them.
 
    modis_dir = string(tempname);
    mkdir(modis_dir);
@@ -3327,8 +3328,8 @@ function test_modisAlbedoChannel_accepts_column_years(testCase)
    % still iterate one year at a time instead of building one impossible
    % multi-year filename pattern.
 
-   % Resolve the scoped root installed by the test bootstrap so provisioned
-   % optional forcing data cannot be skipped behind the former data/test path.
+   % Resolve the scoped root installed by the test bootstrap, so provisioned
+   % optional forcing data cannot be skipped behind the data/test path.
    config = icemodel.config('getenv', true);
    modis_dir = string(fullfile(config.ICEMODEL_DATA_PATH, 'forcing', ...
       'geus', 'albedo', 'gris'));

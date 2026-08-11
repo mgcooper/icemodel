@@ -1,5 +1,5 @@
 function [Tw, ok] = wet_bulb_temperature(Ta, rh, Pa, liqflag)
-   %wet_bulb_temperature Compute wet-bulb temperature from air temperature and humidity.
+   %wet_bulb_temperature Wet-bulb temperature from air temperature and RH.
    %
    %  [Tw, flag] = icemodel.vapor.wet_bulb_temperature(Ta, rh, Pa)
    %  [Tw, flag] = icemodel.vapor.wet_bulb_temperature(Ta, rh, Pa, liqflag)
@@ -24,7 +24,8 @@ function [Tw, ok] = wet_bulb_temperature(Ta, rh, Pa, liqflag)
    %
    %  Outputs:
    %     Tw   - Wet-bulb temperature [K]
-   %     flag - true if Newton converged, false if heuristic was used
+   %     flag - true if Newton converged, false if the function used the
+   %            heuristic
    %
    %  Reference:
    %     Stull (2011), "Wet-Bulb Temperature from Relative Humidity and Air

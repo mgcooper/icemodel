@@ -1,16 +1,17 @@
 function [Data, metadata, diagnostics] = applyMerraTimeSupport(Data, metadata)
-   %APPLYMERRATIMESUPPORT Enforce MERRA interval-start/support semantics.
+   %APPLYMERRATIMESUPPORT Apply the MERRA interval-start and support rules.
    %
    %  [Data, metadata, diagnostics] = ...
    %     icemodel.forcing.helpers.applyMerraTimeSupport(Data, metadata)
    %
-   % MERRA tavg1 channels are already hourly means after the builder's native
-   % center-to-start relabel. The glacier collection is tavg3, so its RUNOFF,
-   % SNICEALB, SNOWDP_GL, and SNOMAS_GL derivatives must be held over each
-   % three-hour interval rather than linearly interpolated. Exact source rows at
-   % 00/03/.../21 UTC plus durable raw-grid proof recover legacy staged artifacts
-   % without reopening NetCDF in this helper. The helper also stamps the
-   % reader/application provenance required by QA.
+   % MERRA tavg1 channels are hourly means after the builder relabels the
+   % native center stamps as interval starts. The glacier collection is tavg3,
+   % so this function holds its RUNOFF, SNICEALB, SNOWDP_GL, and SNOMAS_GL
+   % derivatives constant over each three-hour interval instead of
+   % interpolating them linearly. The exact source rows at 00/03/.../21 UTC
+   % and the durable raw-grid proof let the helper repair old staged
+   % artifacts. The helper does not reopen the NetCDF file. It also stamps the
+   % reader and application provenance that QA requires.
    %
    % Inputs
    %  Data     - hourly MERRA Data timetable on clock-hour interval starts
@@ -26,9 +27,9 @@ function [Data, metadata, diagnostics] = applyMerraTimeSupport(Data, metadata)
       metadata (1, 1) struct = struct()
    end
 
-   % Cached hourly artifacts must be regular application products. A native
-   % center-stamped or clipped non-hourly input cannot be repaired reliably from
-   % its derived table alone.
+   % Cached hourly artifacts must be regular application products. This
+   % function cannot reliably repair a native center-stamped or clipped
+   % non-hourly input from its derived table alone.
    if height(Data) > 1 && any(diff(Data.Time) ~= hours(1))
       error('icemodel:forcing:applyMerraTimeSupport:irregularTime', ...
          'MERRA application Data must have a uniform hourly axis')
@@ -39,10 +40,10 @@ function [Data, metadata, diagnostics] = applyMerraTimeSupport(Data, metadata)
          'MERRA application Data must use clock-hour interval starts')
    end
 
-   % A current clipped artifact may begin at 01:00/02:00 inside a tavg3 support
+   % A clipped artifact can begin at 01:00 or 02:00 inside a tavg3 support
    % block whose source row is outside the saved window. Its durable time and
-   % native-grid contracts are sufficient proof; preserve every value instead of
-   % trying to reconstruct it.
+   % native-grid contracts are enough proof. Keep every value instead of
+   % reconstructing it.
    diagnostics = struct('replaced_count', 0, 'metadata_changed', false);
    if icemodel.forcing.helpers.hasCanonicalMerraTimeSupport(metadata) ...
          && icemodel.forcing.helpers.hasProvenMerraTavg3SourceGrid( ...
@@ -52,9 +53,9 @@ function [Data, metadata, diagnostics] = applyMerraTimeSupport(Data, metadata)
       return
    end
 
-   % Recover the exact tavg3 source rows and hold each over its declared support.
-   % Missing channels are valid for reduced fixtures; their provenance remains
-   % useful for the tavg1 channels that are present.
+   % Recover the exact tavg3 source rows and hold each one over its declared
+   % support. A reduced fixture can omit channels. The provenance stamps are
+   % still useful for the tavg1 channels that are present.
    channels = intersect(["runoff", "albedo", "snowd", "swe"], ...
       string(Data.Properties.VariableNames), 'stable');
    if ~isempty(channels) && ~isempty(Data.Time) ...

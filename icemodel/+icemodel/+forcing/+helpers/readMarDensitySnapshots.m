@@ -8,16 +8,18 @@ function [profiles, status, dynamic_qa] = readMarDensitySnapshots( ...
    %
    % Reads only the requested UTC calendar dates from MAR yearly RUH2 files.
    % The public output is the source-provided RO1 fixed-depth density product
-   % on exact OUTLAY levels and bounds. It is grouped by profile_id and source
-   % datetime, uses positive-down metre depths and kg m-3 density, and carries
-   % explicit model-output, grid-sampling, version, and file provenance.
+   % on exact OUTLAY levels and bounds. The output groups rows by profile_id
+   % and source datetime. Depths are metres, positive down, and density is
+   % kg m-3. Each row carries its model-output, grid-sampling, version, and
+   % file provenance.
    %
    % This dedicated reader never passes profile arrays through readMar3p11's
    % generic level-by-time flattening path. It never substitutes a nearby date
    % or extrapolates beyond source coverage. Reduced sources, non-ice cells,
    % and unavailable dates return explicit status rows without a profile.
-   % Native TIME metadata is checked against exact YYYY/MM/DD/HH/MIN channels;
-   % the lossy float32 packed DATE channel is deliberately ignored.
+   % The reader checks the native TIME metadata against the exact
+   % YYYY/MM/DD/HH/MIN channels. It does not read the packed float32 DATE
+   % channel, because that channel loses precision.
    %
    % DZSN1/ROSN1 are read only for internal QA through marDynamicProfileQa.
    % They are not exposed as a public profile and never modify RO1.
@@ -81,8 +83,8 @@ function [profiles, status, dynamic_qa] = readMarDensitySnapshots( ...
       return
    end
 
-   % Accumulate compact per-date tables so repeated depths remain separated by
-   % profile_id/date rather than being collapsed across the requested archive.
+   % Accumulate one compact table per date. This keeps repeated depths separated
+   % by profile_id and date, instead of collapsed across the whole archive.
    profile_parts = cell(numel(requested_days), 1);
    qa_parts = cell(numel(requested_days), 1);
    profile_count = 0;
@@ -151,8 +153,8 @@ function [profiles, status, dynamic_qa] = readMarDensitySnapshots( ...
       end
 
       for k = reshape(request_rows, 1, [])
-         % Match the UTC calendar date exactly; absence never selects a nearest
-         % snapshot and duplicate native dates are rejected as ambiguous.
+         % Match the UTC calendar date exactly. A missing date never selects a
+         % nearest snapshot. Duplicate native dates are ambiguous and rejected.
          match = find(schema.source_days == requested_days(k));
          if isempty(match)
             status.status(k) = "out_of_window";
@@ -217,8 +219,8 @@ function [profiles, status, dynamic_qa] = readMarDensitySnapshots( ...
       end
    end
 
-   % Concatenate only selected compact snapshots and stamp one stable public
-   % profile contract after table concatenation preserves row metadata.
+   % Concatenate the selected compact snapshots first, because concatenation
+   % preserves the row metadata. Then stamp the stable public profile fields.
    if profile_count > 0
       profiles = vertcat(profile_parts{1:profile_count});
    end
@@ -340,8 +342,8 @@ function schema = inspectSource(filename)
    requireNativeUnits(ro1_info, ["kg/m3", "kg m-3"], ...
       'icemodel:forcing:readMarDensitySnapshots:invalidRo1Units')
 
-   % Only after every public axis/unit guard passes, decode source time and read
-   % the compact fixed-depth coordinate/bounds used to stamp selected rows.
+   % Decode the source time only after every axis and unit check passes. Then
+   % read the compact fixed-depth coordinate and bounds that stamp each row.
    [schema.source_datetimes, schema.time_dim, ...
       schema.source_time_variables] = sourceDatetimes(filename, schema);
    schema.source_days = dateshift(schema.source_datetimes, 'start', 'day');
@@ -351,8 +353,8 @@ function schema = inspectSource(filename)
       double(ncread(filename, bounds_name)), numel(schema.outlay));
    validateOutlay(schema.outlay, schema.outlay_bounds)
 
-   % Optional dynamic variables are resolved without affecting public RO1
-   % availability; their exact shapes are checked only when diagnostics run.
+   % Resolve the optional dynamic variables. They do not affect public RO1
+   % availability, and their shapes are checked only when diagnostics run.
    schema.dzsn1_name = variableName(info, "DZSN1");
    schema.rosn1_name = variableName(info, "ROSN1");
    schema.shsn3_name = variableName(info, "SHSN3");
@@ -372,8 +374,8 @@ function diagnostic = readDynamicDiagnostic(filename, schema, grid_index, ...
       return
    end
 
-   % Dynamic QA accepts only the documented native axes and units. This blocks
-   % unknown dimensions from silently defaulting to index one in the point read.
+   % Dynamic QA accepts only the documented native axes and units. This stops
+   % an unknown dimension from defaulting to index one in the point read.
    try
       dz_info = ncinfo(filename, schema.dzsn1_name);
       rho_info = ncinfo(filename, schema.rosn1_name);
@@ -666,8 +668,8 @@ function [dates, time_dim, provenance] = sourceDatetimes(filename, schema)
    dates = decodeTimeValues(ncread(filename, schema.time_name), units);
    provenance = schema.time_name + " (" + units + ")";
 
-   % Full RUH2 files carry both representations. Require exact agreement so a
-   % stale component vector cannot silently relabel the native coordinate.
+   % Full RUH2 files carry both representations. Require exact agreement so an
+   % out-of-date component vector cannot relabel the native coordinate.
    if has_components
       component_dates = decodeTimeComponents(filename, ...
          schema.time_component_names, time_dim);
@@ -680,8 +682,8 @@ function [dates, time_dim, provenance] = sourceDatetimes(filename, schema)
          + strjoin(schema.time_component_names, "/");
    end
 
-   % Native timestamps must be finite. Duplicate calendar dates remain visible
-   % to the per-request ambiguity status rather than being silently deduplicated.
+   % Native timestamps must be finite. This function keeps duplicate calendar
+   % dates so the per-request status can report them as ambiguous.
    if any(isnat(dates))
       error('icemodel:forcing:readMarDensitySnapshots:invalidTimeValues', ...
          'Native MAR timestamps contain NaT values.')
@@ -704,7 +706,7 @@ function dates = decodeTimeValues(values, units)
          'TIME contains nonfinite values.')
    end
 
-   % Apply the declared elapsed unit exactly; DATE is intentionally untouched.
+   % Apply the declared elapsed unit exactly. This function does not read DATE.
    switch string(match{1})
       case "seconds"
          dates = origin + seconds(values);

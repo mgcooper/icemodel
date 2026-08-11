@@ -15,8 +15,9 @@ function [estimate, clamped] = applyProxyCalibration( ...
    %
    % Name-value
    %  target_elevation : target-station solar elevation (degrees) per
-   %     sample. Required to honor a binned swd record's bands; omitted,
-   %     the per-season scalar applies for callers without station geometry.
+   %     sample. Required to use the bands of a binned swd record. If you
+   %     omit it, the per-season scalar applies. Callers without station
+   %     geometry omit it.
    %
    % See also: icemodel.forcing.reconstruct.fitProxyCalibration,
    %  icemodel.forcing.reconstruct.solarElevationBands
@@ -56,10 +57,10 @@ function [estimate, clamped] = applyProxyCalibration( ...
          continue
       end
 
-      % A persisted or hand-edited record could still carry a nonfinite
-      % correction. Applying it would turn finite proxy input into Inf or NaN,
-      % which downstream validity checks would then refuse as if the PROXY were
-      % unusable. Skipping the season leaves those samples missing instead, so
+      % A saved or hand-edited record can carry a nonfinite correction. That
+      % correction turns finite proxy input into Inf or NaN, and the later
+      % validity checks then reject the samples as if the PROXY were
+      % unusable. Skip the season instead, so those samples stay missing and
       % the denial names the real cause.
       if ~use_bins && ~isfinite(calibration.corrections.(char(name)))
          continue
@@ -82,14 +83,14 @@ function [estimate, clamped] = applyProxyCalibration( ...
    end
 
    % D-27 (user ruling 2026-07-27): a correction that pushes rh past its
-   % physical bounds is calibration arithmetic, not physics. Near-saturation
-   % sources plus a positive ratio can exceed 100%, which without a clamp
-   % refuses the candidate (SWC lost 4.5% of rh). Clamping here covers every
-   % consumer, method tier and last resort alike.
-   % D-51 (2026-08-05) extends the same rule to wspd: a sub-unity wind ratio
+   % physical bounds is calibration arithmetic, not physics. A
+   % near-saturation source and a positive ratio can exceed 100%. Without a
+   % clamp the check rejects the candidate (SWC lost 4.5% of rh). The clamp
+   % here covers every consumer, both the method tiers and the last resort.
+   % D-51 (2026-08-05) extends the same rule to wspd: a wind ratio below one
    % can move a valid 0.1 m/s proxy posting below the runtime floor (TAS_L
-   % 2010 lost four samples that way). The second output keeps every clamped
-   % sample auditable.
+   % 2010 lost four samples that way). The second output reports every
+   % clamped sample.
    clamped = false(size(estimate));
    bounded_calibration = isfield(calibration, 'channel') ...
       && ismember(string(calibration.channel), ["rh", "wspd"]);

@@ -7,10 +7,10 @@ function [d_pevp, pevp, Qe, T_sfc_phys] = ...
    %  [d_pevp, pevp, Qe, Ts_phys] = ...
    %     icemodel.surface.potential_surface_vapor_tendency(...)
    %
-   % This helper is the physical-flux contract used by icemodel mass
-   % balance updates. Ts may be an internal solver temperature that exceeds
-   % Tf; the turbulent latent-heat flux and derived vapor tendency must use
-   % the physical diagnosed surface temperature Ts_phys = min(Ts, Tf).
+   % The icemodel mass-balance updates use this helper for the physical
+   % fluxes. Ts can be an internal solver temperature above Tf. The turbulent
+   % latent-heat flux and the derived vapor tendency must therefore use the
+   % physical diagnosed surface temperature Ts_phys = min(Ts, Tf).
    %
    % Delegates to icemodel.kernels.potential_surface_vapor_tendency
    %

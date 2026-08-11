@@ -4,21 +4,24 @@ function leg = resolveLegWindows(sources, coverage, window_start, window_end)
    %  leg = icemodel.verification.setup.resolveLegWindows(sources, coverage, ...
    %     window_start, window_end)
    %
-   %  Resolves, for each requested gridded source, the calendar window/years to
-   %  stage by intersecting the requested met window with the source's on-disk
-   %  coverage (probed cheaply by rcmSourceCoverage). This is the FAIL-EARLY
-   %  gate: a source with no overlap is marked staged=false WITH A REASON before
-   %  any NetCDF is opened, so an empty model/window is skipped without entering
-   %  an expensive source build.
+   %  For each requested gridded source, this function resolves the calendar
+   %  window and years to stage. It intersects the requested met window with
+   %  the source's on-disk coverage, which rcmSourceCoverage probes cheaply.
+   %  This is the FAIL-EARLY gate: a source with no overlap gets staged=false
+   %  WITH A REASON before any NetCDF is opened, so an empty model window
+   %  skips the expensive source build.
    %
-   %  Per-source policy (all three intersect the requested window via capLeg):
+   %  Per-source policy (capLeg intersects all three with the requested
+   %  window):
    %    * MAR / MERRA : met sources. Window = requested window intersected with
-   %      on-disk years. When the requested window is unbounded (NaT - the
-   %      all-available default), the source's FULL on-disk coverage is used.
-   %    * RACMO       : eval/reference Data only (no met), but still intersected
-   %      with the window: a station whose record lies entirely outside
-   %      RACMO's coverage gets a SKIPPED RACMO leg rather than a zero-overlap
-   %      file; an unbounded window falls back to RACMO's full coverage.
+   %      on-disk years. When the requested window is unbounded (NaT, the
+   %      all-available default), this function uses the source's FULL on-disk
+   %      coverage.
+   %    * RACMO       : eval/reference Data only (no met), but this function
+   %      still intersects it with the window. A station whose record lies
+   %      entirely outside RACMO's coverage gets a SKIPPED RACMO leg, not a
+   %      zero-overlap file. An unbounded window falls back to RACMO's full
+   %      coverage.
    %
    %  Inputs
    %    sources      : string vector subset of ["mar","merra","racmo"] (other
@@ -46,11 +49,12 @@ function leg = resolveLegWindows(sources, coverage, window_start, window_end)
       leg.merra = capLeg(coverage.merra, window_start, window_end, "MERRA-2");
    end
    if ismember("racmo", sources)
-      % RACMO is intersected with the requested window like MAR/MERRA:
-      % staging RACMO's full 2012-2018 span for a station whose observations are
-      % entirely outside it (e.g. a 2022+ record) produces a zero-overlap,
-      % unusable Data file. capLeg SKIPS on no overlap and CLIPS on partial. An
-      % unbounded (NaT) window still falls back to RACMO's full coverage.
+      % capLeg intersects RACMO with the requested window, as it does for MAR
+      % and MERRA. Staging RACMO's full 2012-2018 span for a station whose
+      % observations lie entirely outside it, for example a 2022+ record,
+      % produces a zero-overlap, unusable Data file. capLeg SKIPS on no
+      % overlap and CLIPS on partial overlap. An unbounded (NaT) window still
+      % falls back to RACMO's full coverage.
       leg.racmo = capLeg(coverage.racmo, window_start, window_end, "RACMO");
    end
 end

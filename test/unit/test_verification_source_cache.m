@@ -236,7 +236,8 @@ function test_atomic_importer_rejects_invalid_met_cadence_before_writes(testCase
 end
 
 function test_buildLaughTestsArtifacts_rejects_unknown_case(testCase)
-   % The extracted builder owns case-specific dispatch and a stable error id.
+   % The builder performs the case-specific dispatch and raises a stable
+   % error id.
    verifyError(testCase, @() ...
       icemodel.verification.setup.buildLaughTestsArtifacts( ...
       string(testCase.TestData.tmp), "unknown"), ...

@@ -9,12 +9,12 @@ function manifest = writeFamilyManifestMerge(manifest_file, manifest, kwargs)
    %     manifest_file, manifest, requested_ids=["kanl","kanm"])
    %
    %  Incremental staging primitive shared by the firn importers
-   %  (importPromiceSites, importSumup). Staging one site must NOT churn or drop
-   %  the other sites' committed case entries. This helper ADDS or UPDATES only
-   %  the requested cases and PRESERVES every other existing case entry byte for
-   %  byte, then writes the merged manifest.
+   %  (importPromiceSites, importSumup). Staging one site must NOT change or
+   %  drop the other sites' committed case entries. This helper ADDS or UPDATES
+   %  only the requested cases and PRESERVES every other existing case entry
+   %  byte for byte, then writes the merged manifest.
    %
-   %  Merge semantics (the DEFAULT)
+   %  Merge rules (the DEFAULT)
    %    * Existing manifest is read from manifest_file when present (raw decode,
    %      so untouched cases re-encode identically - no field reordering).
    %    * Each NEW case in manifest.cases PATCHES the existing case with the
@@ -81,10 +81,9 @@ function manifest = writeFamilyManifestMerge(manifest_file, manifest, kwargs)
       requested = unique([new_ids, skipIds(new_skipped)], 'stable');
    end
 
-   % Full-rewrite escape hatch: ignore any prior manifest entirely. Warn only
-   % when replacement actually removes prior cases, sources, skipped records,
-   % or family fields; repeated kill-safe persistence while building a family
-   % is not destructive.
+   % Full rewrite: ignore any prior manifest. Warn only when the replacement
+   % removes prior cases, sources, skipped records, or family fields. Repeated
+   % saves while a family is under construction remove nothing.
    if kwargs.overwrite_family || ~isfile(manifest_file)
       if kwargs.overwrite_family && isfile(manifest_file)
          existing = jsondecode(fileread(manifest_file));
@@ -277,10 +276,10 @@ function patched = mergeCasePatch(existing, incoming)
       end
       replace_prior_artifacts = false;
       if isfield(new_leg, 'replace_prior_artifacts')
-         % This transient signal is set only after a requested refresh proves
-         % prior files missing or concretely incompatible. Consume it here so
-         % additive coverage merging cannot resurrect invalid references and
-         % the implementation detail never enters the durable manifest.
+         % A requested refresh sets this temporary flag only after it finds the
+         % prior files missing or incompatible. Read and remove it here, so the
+         % additive coverage merge cannot restore an invalid reference and the
+         % flag never enters the durable manifest.
          replace_prior_artifacts = ...
             scalarTrue(new_leg.replace_prior_artifacts);
          new_leg = rmfield(new_leg, 'replace_prior_artifacts');
@@ -368,9 +367,9 @@ function [patched, relation] = mergeWindowField(existing, patched, fieldname)
       return
    end
 
-   % One scalar window cannot represent separated support. Preserve the durable
-   % interval instead of inventing continuous coverage across an unproven gap;
-   % callers can rebuild an enclosing artifact or use overwrite_family explicitly.
+   % One scalar window cannot represent two separated intervals. Preserve the
+   % durable interval rather than claim continuous coverage across the gap. A
+   % caller can rebuild an enclosing artifact or pass overwrite_family.
    if old_end < new_start || new_end < old_start
       patched.(fieldname) = old_window;
       relation = "existing";

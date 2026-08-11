@@ -3,8 +3,8 @@ function L = monin_obukhov_length(u_star, theta_air, q_air, theta_star, q_star)
    %
    % L = u_*^2 theta_v / (kappa g theta_v*)
    %
-   % The virtual-potential-temperature corrections are written here in the
-   % humidity form used by the bulk-MO scheme:
+   % This function uses the humidity form of the virtual-potential-temperature
+   % corrections from the bulk-MO scheme:
    %   theta_v  = theta * (1 + c_q q)
    %   theta_v* = theta* * (1 + c_q q*)
    %

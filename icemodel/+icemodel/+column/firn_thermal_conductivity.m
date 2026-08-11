@@ -16,13 +16,14 @@ function k_ice = firn_thermal_conductivity(T_ice, f_ice)
    %     theta  = 1 / (1 + exp(-a*(ro-ro_mid))) logistic snow/firn transition [1]
    %     kfirn  = ki_ref + c_firn*(ro-ro_ref)   firn conductivity [W m-1 K-1]
    %     ksnow  = ka_ref + c1*ro + c2*ro^2      snow conductivity [W m-1 K-1]
-   %     kiceT  = c_kT * exp(-c_kT_exp * T_ice) temperature-dependent ice k [W m-1 K-1]
+   %     kiceT  = c_kT * exp(-c_kT_exp * T_ice) temperature-dependent ice k
+   %                                            [W m-1 K-1]
    %
    %  All parameters are loaded from icemodel.parameterLookup (cal_* namespace).
    %  The (kiceT / ki_ref) factor rescales the density-dependent blended
-   %  conductivity to the actual ice thermal conductivity at the local
-   %  temperature, since kfirn and ksnow were regressed at a reference
-   %  temperature -3°C where kiceT = ki_ref = 2.107 W m-1 K-1.
+   %  conductivity to the ice thermal conductivity at the local temperature.
+   %  This rescaling is needed because kfirn and ksnow were regressed at the
+   %  reference temperature -3°C, where kiceT = ki_ref = 2.107 W m-1 K-1.
    %
    %  Inputs:
    %     T_ice  - Ice temperature [K]

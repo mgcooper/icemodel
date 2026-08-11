@@ -7,9 +7,9 @@ function pathname = baselineFilePath(kind, kwargs)
    %  pathname = icemodel.test.helpers.baselineFilePath("perf", baseline_type="release")
    %  pathname = icemodel.test.helpers.baselineFilePath("regression", smbmodel="icemodel")
    %
-   % If BASELINE_TAG is provided without BASELINE_TYPE, the type is inferred
-   % as "release". If BASELINE_TYPE is "release" without a tag, the most
-   % recent release baseline is resolved by scanning the baselines directory.
+   % A BASELINE_TAG without a BASELINE_TYPE sets the type to "release". A
+   % BASELINE_TYPE of "release" without a tag makes this function scan the
+   % baselines directory for the most recent release baseline.
 
    arguments
       kind (1, :) string {mustBeMember( ...

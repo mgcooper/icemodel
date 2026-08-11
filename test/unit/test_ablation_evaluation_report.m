@@ -5,7 +5,7 @@ function tests = test_ablation_evaluation_report
 end
 
 function test_saved_results_render_complete_scientific_report(testCase)
-   % A compact saved result must produce every scientific evidence surface.
+   % A compact saved result must produce every piece of scientific evidence.
 
    folder = temporaryFolder(testCase);
    results = syntheticResults();
@@ -403,7 +403,7 @@ function test_saved_results_render_complete_scientific_report(testCase)
    verifyEqual(testCase, ...
       density_sensitivity.effective_density_kg_m3, [600; 870; 900])
    % The conversion is a pure density scaling, so the sensitivity must be
-   % proportional to the density rather than a set of restated magic numbers.
+   % proportional to the density, not a set of restated literal values.
    scaled = density_sensitivity.observation_sensitivity_mwe ...
       ./ density_sensitivity.effective_density_kg_m3;
    verifyEqual(testCase, scaled, repmat(scaled(1), size(scaled)), ...
@@ -599,7 +599,7 @@ function test_step_failure_is_explicit_in_closure_report(testCase)
 end
 
 function test_no_completed_rows_render_honest_empty_state(testCase)
-   % Large readiness-only artifacts remain honest and fixed-size.
+   % Large readiness-only artifacts stay accurate and fixed-size.
 
    folder = temporaryFolder(testCase);
    results = largeUnavailableResults(syntheticResults());
@@ -819,8 +819,7 @@ function folder = temporaryFolder(testCase)
 end
 
 function results = syntheticResults()
-   %SYNTHETICRESULTS Return a small saved results struct that needs no data
-   % files.
+   %SYNTHETICRESULTS Return a small saved results struct needing no data files.
 
    t0 = datetime(2019, 6, 1, 0, 0, 0, 'TimeZone', 'UTC');
    t1 = t0 + hours(4);
@@ -1303,7 +1302,7 @@ function test_reworded_documentation_does_not_invalidate_a_saved_policy(testCase
    verifyTrue(testCase, isfile(fullfile(output_folder, ...
       'promice-ablation-evaluation-report.qmd')))
 
-   % A changed VALUE must still be rejected, or the guarantee is gone.
+   % A changed VALUE must still be rejected, or the rule has no effect.
    results = valid;
    results.policy.effective_density_reference_kg_m3 = ...
       results.policy.effective_density_reference_kg_m3 + 1;

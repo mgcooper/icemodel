@@ -42,16 +42,16 @@ function varargout = config(varargin)
    %  CFG = ICEMODEL.CONFIG("ICEMODEL_INPUT_PATH", PATH_NAME) Sets the
    %  environment variable ICEMODEL_INPUT_PATH to PATH_NAME. PATH_NAME is a
    %  scalar text object (string or row vector of characters) which specifies
-   %  the full path where the icemodel input files exist. Note that the
+   %  the full path where the icemodel input files exist. The
    %  ICEMODEL_INPUT_PATH sub-directory structure must conform to a specific
-   %  format described below in the "Model directory structure" section.
+   %  format, described below in the "Model directory structure" section.
    %
    %  CFG = ICEMODEL.CONFIG("ICEMODEL_OUTPUT_PATH", PATH_NAME) Sets the
    %  environment variable ICEMODEL_OUTPUT_PATH to PATH_NAME. PATH_NAME is a
    %  scalar text object (string or row vector of characters) which specifies
-   %  the full path where the icemodel output files are saved. Note that the
+   %  the full path where the icemodel output files are saved. The
    %  ICEMODEL_OUTPUT_PATH sub-directory structure is created automatically when
-   %  running an icemodel simulation, described below in the "Model directory
+   %  an icemodel simulation runs, described below in the "Model directory
    %  structure" section.
    %
    %  CFG = ICEMODEL.CONFIG("ICEMODEL_EVAL_PATH", PATH_NAME) Sets the
@@ -83,8 +83,8 @@ function varargout = config(varargin)
    %     ICEMODEL_OUTPUT_PATH/<sitename>/<smbmodel>/<userdata>/<testname>/restart
    %  with blank path components omitted in the usual way.
    %
-   % Note that all input arguments are specified as name-value pairs, also known
-   % as keyword arguments (kwargs). Specify inputs using comma-separated
+   % All input arguments are name-value pairs, also known as keyword arguments
+   % (kwargs). Specify inputs using comma-separated
    % name-value pairs: icemodel.config("ICEMODEL_INPUT_PATH", PATH_NAME), or
    % Name=Value syntax: icemodel.config(ICEMODEL_INPUT_PATH=PATH_NAME).
    %
@@ -120,7 +120,7 @@ function varargout = config(varargin)
    %  icemodel/data/input/           input data (ICEMODEL_INPUT_PATH)
    %  icemodel/data/input/met/       input meteorological forcing data
    %  icemodel/data/input/spectral/  input data for the spectral model
-   %  icemodel/data/input/userdata/  input user data (default ICEMODEL_USERDATA_PATH)
+   %  icemodel/data/input/userdata/  user data (default ICEMODEL_USERDATA_PATH)
    %  icemodel/data/eval/            evaluation/reference data (ICEMODEL_EVAL_PATH)
    %  icemodel/data/output/          model output data (ICEMODEL_OUTPUT_PATH)
    %  icemodel/data/output/.../restart/ year-boundary restart states

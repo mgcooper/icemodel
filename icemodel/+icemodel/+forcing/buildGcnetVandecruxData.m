@@ -13,13 +13,15 @@ function [Data, metadata] = buildGcnetVandecruxData(station, kwargs)
    % Source precipitation policy: the files carry snowfall estimates but no
    % rain channel. The builder converts source snowfall amounts [m_weq per
    % source timestep] to the canonical snowfall rate `snowf` [m s-1], adds
-   % `rainf` as all-NaN, and leaves total precipitation to data2met. This keeps
-   % missing precipitation missing; no absent channel is zero-filled.
+   % `rainf` as all-NaN, and leaves total precipitation to data2met. Missing
+   % precipitation stays missing. The builder never zero-fills an absent
+   % channel.
    %
-   % Longwave policy: LRin is source-filled regional-climate-model longwave, not
-   % an observed GC-Net longwave sensor. Metadata records both the settled
-   % RetMIP/Vandecrux HIRHAM5 context and the local surface-package RACMO2.3p2
-   % attribute text so downstream comparisons do not treat lwd as observed.
+   % Longwave policy: LRin is source-filled regional-climate-model longwave,
+   % not an observed GC-Net longwave sensor. The metadata records the
+   % RetMIP/Vandecrux HIRHAM5 context and the RACMO2.3p2 attribute text from
+   % the local surface package. Downstream comparisons then do not treat lwd
+   % as observed.
    %
    % Outputs
    %  Data     - timetable with canonical channel names, userdata location
@@ -98,13 +100,13 @@ function [Data, metadata] = buildGcnetVandecruxData(station, kwargs)
    Data = mapIfPresent(Data, filename, source_names, "SMB", "smb", ...
       keep, 1 / dt_hours);
 
-   % The source has no rain channel. Keep the split explicit so data2met derives
-   % ppt as NaN, not as snowfall-only precipitation or fabricated zero rain.
+   % The source has no rain channel. Keep the split explicit so data2met
+   % derives ppt as NaN, not as snowfall-only precipitation or as zero rain.
    Data.rainf = nan(height(Data), 1);
 
-   % Derived radiative/turbulent diagnostics stay alongside the mapped source
-   % fluxes for userdata and evaluation, while downstream processing can still
-   % recompute the minimal met set from swd/lwd/albedo/tsfc.
+   % The derived radiative and turbulent diagnostics stay next to the mapped
+   % source fluxes for userdata and evaluation. Downstream processing can
+   % still recompute the minimal met set from swd, lwd, albedo, and tsfc.
    albedo_qc_counts = struct( ...
       'low_light', 0, ...
       'low_solar_elevation', 0, ...

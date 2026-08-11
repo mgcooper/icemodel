@@ -1164,8 +1164,8 @@ function labels = figureLegendLabels(figures)
 end
 
 function test_plot_forcing_filters_to_date_window(testCase)
-   % The first-class forcing plot supports hourly inspection of a short window
-   % inside a multi-day or multi-year met file.
+   % The forcing plot supports hourly inspection of a short window inside a
+   % multi-day or multi-year met file.
 
    fig = figure('Visible', 'off');
    testCase.addTeardown(@() close(fig));
@@ -1708,7 +1708,7 @@ function test_compare_timeseries_source_aware_model_albedo(testCase)
    state_missing.albedo(25:44) = NaN;
 
    % Fewer than six positive-SWD model samples still define a deterministic
-   % daily energy ratio; zero-SWD polar night remains honestly undefined.
+   % daily energy ratio. A zero-SWD polar night stays undefined.
    ratio = radiometer;
    ratio.swd(25:48) = 0;
    ratio.swd(31:34) = [10; 10; 500; 500];

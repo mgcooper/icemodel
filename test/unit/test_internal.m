@@ -14,7 +14,7 @@ function teardown(testCase) %#ok<INUSD>
 end
 
 function test_ispathinside_containment_contract(testCase)
-   %TEST_ISPATHINSIDE_CONTAINMENT_CONTRACT Canonical containment predicate.
+   %TEST_ISPATHINSIDE_CONTAINMENT_CONTRACT Canonical containment check.
    % The shared helper must accept root-equality and true descendants,
    % reject siblings whose names merely share a prefix and dot-dot
    % escapes, resolve symlinked roots, and stay well defined for

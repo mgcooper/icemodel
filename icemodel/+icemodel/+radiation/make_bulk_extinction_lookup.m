@@ -1,6 +1,6 @@
 function lookup = make_bulk_extinction_lookup(dz_spect, tau_N, ...
       tau_S, solar_dwavel, varargin)
-   %MAKE_BULK_EXTINCTION_LOOKUP Precompute bulk-extinction coefficients on a density grid.
+   %MAKE_BULK_EXTINCTION_LOOKUP Precompute bulk-extinction coefficients.
    %
    %  lookup = icemodel.radiation.make_bulk_extinction_lookup(dz_spect, ...
    %     tau_N, tau_S, solar_dwavel)

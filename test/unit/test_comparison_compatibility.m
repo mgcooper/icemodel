@@ -117,7 +117,7 @@ function test_loadmanifest_carries_explicit_input_root_to_colocated_loader(testC
 end
 
 function test_colocated_loader_rejects_unscoped_manifest(testCase)
-   % Ad hoc manifests must not silently read from the process-global data root.
+   % An ad hoc manifest must not fall back to the process-global data root.
    manifest = struct('colocation', struct());
 
    testCase.verifyError(@() ...

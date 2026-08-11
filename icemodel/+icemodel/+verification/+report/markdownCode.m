@@ -1,16 +1,15 @@
 function text = markdownCode(value)
    %MARKDOWNCODE Wrap saved metadata in a code span that renders literally.
    %
-   % A code span renders its contents literally, so the angle brackets are
-   % already inert. They are entity-encoded anyway so that no rendered report
-   % ever contains a raw <script> sequence. The fence also grows past any
-   % backticks in the value so the span cannot be closed early.
+   % A code span renders its contents literally, so the angle brackets cannot
+   % execute. This function entity-encodes them anyway, so no rendered report
+   % contains a raw <script> sequence. The fence also grows past any backticks
+   % in the value, so the span cannot close early.
    %
-   % sanitizeText encodes the ampersand too, so a value containing one shows
-   % as &amp; rather than &. That costs display fidelity and buys no safety
-   % inside a code span; it is accepted so one sanitizer serves every report
-   % writer. A path or tag with a literal ampersand is the
-   % case where that shows.
+   % sanitizeText encodes the ampersand too, so a value that contains one shows
+   % as &amp; rather than &. That costs display accuracy and adds no safety
+   % inside a code span. It is accepted so that one sanitizer serves every
+   % report writer. A path or tag with a literal ampersand shows this effect.
 
    text = icemodel.verification.report.sanitizeText(value);
    runs = regexp(char(text), '`+', 'match');

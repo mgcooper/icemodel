@@ -5,10 +5,12 @@ function [evaluation_data_root, input_root] = resolveStagingRoots(kwargs)
    %     icemodel.verification.setup.resolveStagingRoots( ...
    %     data_root=..., evaluation_data_root=..., input_data_root=...)
    %
-   % DATA_ROOT owns both <data_root>/eval and <data_root>/input. OUTPUT_ROOT is
-   % retained as a legacy alias and cannot be combined with DATA_ROOT. Otherwise
-   % explicit leaf roots are honored with two-way sibling inference before a
-   % nonmutating config-case or repo-local verification default is resolved.
+   % DATA_ROOT selects both <data_root>/eval and <data_root>/input. OUTPUT_ROOT
+   % is a legacy alias, and a caller cannot combine it with DATA_ROOT.
+   % Otherwise the function uses the explicit leaf roots. Given one leaf, it
+   % infers the sibling from the same parent. Given neither, it resolves a
+   % config-case or repo-local verification default without changing the
+   % configuration.
 
    arguments
       kwargs.output_root (1, 1) string = ""

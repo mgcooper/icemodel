@@ -3,9 +3,9 @@ function donor = readGcnetDonor(filename)
    %
    %  donor = icemodel.forcing.helpers.readGcnetDonor(filename)
    %
-   % Each canonical channel keeps its own origin mask. Samples without a
-   % per-sample origin flag are ineligible because their native provenance
-   % cannot be proven.
+   % Each canonical channel keeps its own origin mask. A sample without a
+   % per-sample origin flag is not eligible, because nothing in the file shows
+   % that the value is native.
 
    arguments
       filename (1, 1) string
@@ -20,8 +20,8 @@ function donor = readGcnetDonor(filename)
    try
       t = ncread(filename, 'time');
       % The raw fractional-day coordinate drifts and lands off the hour
-      % for most rows; the shared row-index convention gives the exact
-      % hourly axis every consumer (builder and donor alike) agrees on.
+      % for most rows. The shared row-index convention gives the exact
+      % hourly axis that both the builder and the donor use.
       times = icemodel.forcing.helpers.gcnetHourlyAxis( ...
          icemodel.forcing.helpers.gcnetTime(t, ...
          ncreadatt(filename, 'time', 'units')));
@@ -40,10 +40,10 @@ function donor = readGcnetDonor(filename)
          % simultaneous observed sample in another channel.
          observed.(map(m, 2)) = origin(:) == 0;
       end
-      % A self-describing artifact's declared location wins; the REAL
-      % Vandecrux surface NetCDFs carry no location attributes at all, so
-      % the station catalog (fed by the dataset's own Dataverse metadata)
-      % is the authoritative fallback for donor geometry.
+      % A location declared in the file takes precedence. The real
+      % Vandecrux surface NetCDFs carry no location attributes, so the
+      % station catalog is the fallback for the donor geometry. That
+      % catalog comes from the Dataverse metadata of the dataset.
       [~, base] = fileparts(filename);
       station = string(extractBefore(base + "_", "_surface_"));
       try
@@ -66,8 +66,8 @@ function donor = readGcnetDonor(filename)
          'location', location, ...
          'observed_mask', observed);
    catch
-      % Files without required channels or coordinates cannot pass the
-      % donor contract; skip them rather than infer missing metadata.
+      % A file without the required channels or coordinates cannot meet
+      % the donor contract. Skip it and do not infer the missing metadata.
       donor = [];
    end
 end

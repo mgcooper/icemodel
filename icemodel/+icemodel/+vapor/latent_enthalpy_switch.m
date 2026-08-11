@@ -7,20 +7,19 @@ function Lv_or_Ls = latent_enthalpy_switch(f_liq, N)
    % Returns an array the same shape as f_liq (or a column vector of length N
    % when N is given) containing the specific latent heat of sublimation (Ls)
    % for dry/cold cells and the latent heat of vaporization (Lv) for wet cells.
-   % The phase switch threshold is the same f_liq_phase_switch_threshold used
-   % elsewhere in the SEB and column solver stacks so that the latent-heat
-   % choice is consistent across the model.
+   % The phase-switch threshold is f_liq_phase_switch_threshold, the same
+   % threshold the SEB and column solver stacks use, so the latent-heat choice
+   % is consistent across the model.
    %
-   % The calling functions assign the result to a variable named `Lv` because
-   % from the caller's perspective the value is the active latent heat for vapor
-   % exchange, which may be Ls or Lv depending on the local f_liq state.
+   % The calling functions assign the result to a variable named `Lv`, because
+   % to the caller the value is the active latent heat for vapor exchange.
+   % That value is Ls or Lv, depending on the local f_liq state.
    %
-   % Shape: when N is omitted the output has the same size as f_liq and
-   % therefore works correctly for both column-vector inputs (the primary
-   % production path) and 2-D inputs such as [JJ × numsteps] arrays used by
-   % icemodel.postprocess and diagnostic routines.  When N is supplied the
-   % output is a column vector of length N (retained for callers that pre-compute
-   % JJ before calling).
+   % Shape: when you omit N, the output has the same size as f_liq. It then
+   % works for column-vector inputs (the primary production path) and for 2-D
+   % inputs such as the [JJ × numsteps] arrays that icemodel.postprocess and
+   % the diagnostic routines use. When you supply N, the output is a column
+   % vector of length N, for callers that compute JJ before the call.
    %
    % Inputs
    %   f_liq - Liquid fraction array of any shape [-].

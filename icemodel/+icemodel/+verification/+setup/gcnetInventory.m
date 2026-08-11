@@ -36,9 +36,9 @@ function [inventory, status] = gcnetInventory(source_dir, kwargs)
    n_records = 0;
    provenance = provenanceByProduct(status, kwargs.products);
 
-   % Build one record per station/product/file class. The fetch status owns the
-   % registry-backed classification, so inventory must consume its resolved
-   % station/suffix/file bindings without matching paths a second time.
+   % Build one record for each station, product, and file class. The fetch
+   % status holds the registry-backed classification, so this inventory reads
+   % its resolved bindings and does not match the paths a second time.
    for product = reshape(kwargs.products, 1, [])
       resolved = resolvedProductEntries(status, product);
       for entry = reshape(resolved, 1, [])

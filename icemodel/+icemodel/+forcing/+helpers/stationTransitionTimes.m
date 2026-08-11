@@ -6,17 +6,19 @@ function [times, record] = stationTransitionTimes(composing_stations, kwargs)
    %     window_start=..., window_end=..., source_dir=...)
    %
    % A PROMICE "site" can merge several AWS ("stations") over time. The
-   % per-station install dates live in AWS_stations_metadata.csv (downloaded from
-   % the GEUS thredds server); the L3 NetCDF and AWS_sites_metadata.csv carry only
-   % the composing-station NAMES and a single SITE-level install date, so the
-   % per-station handover TIMES are recovered here from the stations CSV.
+   % per-station install dates live in AWS_stations_metadata.csv, downloaded
+   % from the GEUS thredds server. The L3 NetCDF and AWS_sites_metadata.csv
+   % carry only the composing-station NAMES and one SITE-level install date.
+   % This function therefore recovers the per-station handover TIMES from the
+   % stations CSV.
    %
    % A composing station's install date is a within-record HANDOVER only when it
-   % falls strictly AFTER the site record start (the FOUNDING station's install
-   % coincides with the record start - it begins the record, it is not a handover
-   % within it) and at/before the record end. Stations whose name is absent from
-   % the CSV (legacy GC-Net names like GITS / DYE-2 / SwissCamp that predate the
-   % modern v3 ids) contribute no date and are reported in the record.
+   % falls strictly AFTER the site record start and at or before the record end.
+   % The FOUNDING station's install coincides with the record start: it begins
+   % the record, so it is not a handover within it. A station whose name is
+   % absent from the CSV contributes no date and still appears in the record.
+   % Those are legacy GC-Net names such as GITS / DYE-2 / SwissCamp, which
+   % predate the modern v3 ids.
    %
    % Inputs
    %  composing_stations  - string array of the site's composing AWS names

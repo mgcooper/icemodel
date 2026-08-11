@@ -33,11 +33,10 @@ function [source_dir, status] = fetchEsmSnowmip(kwargs)
    %      retrieval instructions (DOI, URL, expected pattern) and
    %      either error (kwargs.strict=true, default) or return the
    %      partial cache directory (kwargs.strict=false).
-   %    - Does NOT attempt automatic download. The PANGAEA dataset
-   %      access surface is not stable for unattended fetch and may
-   %      require user registration / acceptance of terms; making the
-   %      retrieval step explicit is preferable to a silent failure
-   %      mode in CI.
+   %    - Does NOT attempt automatic download. PANGAEA dataset access is
+   %      not stable for unattended fetch and can require user
+   %      registration or acceptance of terms. An explicit retrieval step
+   %      is better than a CI failure that reports no cause.
    %
    %  Role
    %    Validator. With create_cache_dir=true, the fetch helper creates the
@@ -182,8 +181,8 @@ function [missing, broken] = missingOrBrokenFiles(cache_dir, stations)
          missing(n_missing) = pattern;
          continue
       end
-      % Use the first match (the upstream bundle has a single file per
-      % site; ambiguous matches are surfaced by the importer).
+      % Use the first match. The upstream bundle has one file per site,
+      % and the importer reports ambiguous matches.
       try
          ncinfo(fullfile(matches(1).folder, matches(1).name));
       catch

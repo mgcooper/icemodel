@@ -3,8 +3,9 @@ function files = listSourceFiles(root)
    %
    %  files = icemodel.forcing.helpers.listSourceFiles(root)
    %
-   % The scan accepts flat manual caches and unpacked DOI/package subfolders, then
-   % removes duplicate paths produced by MATLAB recursive globs.
+   % The scan accepts flat manual caches and unpacked DOI or package
+   % subfolders. It then removes the duplicate paths that MATLAB recursive
+   % globs produce.
 
    arguments
       root (1, 1) string

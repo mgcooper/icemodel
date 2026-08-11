@@ -19,7 +19,9 @@ function test_vappress_derivative_matches_finite_difference(testCase)
 end
 
 function test_tdewpoint_inverts_vappress(testCase)
-   % icemodel.vapor.dew_point_temperature should invert icemodel.vapor.saturation_vapor_pressure: es(Tdew) should equal ea = es(T)*rh/100.
+   % icemodel.vapor.dew_point_temperature should invert
+   % icemodel.vapor.saturation_vapor_pressure: es(Tdew) should equal
+   % ea = es(T)*rh/100.
 
    Tf = icemodel.physicalConstant('Tf');
    T = Tf - 5.0;

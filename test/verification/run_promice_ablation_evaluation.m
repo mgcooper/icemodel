@@ -29,10 +29,10 @@ function results = run_promice_ablation_evaluation(kwargs)
       kwargs.model_provider = []
    end
 
-   % Readiness-only runs are legitimate, but writing artifacts for one yields a
-   % populated run directory and a renderable report describing zero
-   % site-years, which reads like a completed evaluation. Reject the
-   % combination before anything is created on disk.
+   % Readiness-only runs are valid. Writing artifacts for one would create a
+   % populated run directory and a renderable report that describes zero
+   % site-years, which looks like a completed evaluation. Reject the
+   % combination before this code creates anything on disk.
    if kwargs.write_artifacts && isempty(kwargs.case_ids)
       error('icemodel:verification:promiceAblationEvaluation:emptySelection', ...
          ['write_artifacts=true requires a non-empty case selection; ' ...
@@ -309,7 +309,8 @@ function [result, nested, perturbations] = evaluateRow( ...
    run_end = provenance.run_end_inclusive;
 
    % Rehash every producer link and scientific input immediately before the
-   % run; readiness is not a permanent identity grant for mutable staging.
+   % run. A readiness check does not keep the identity of mutable staged
+   % files valid over time.
    execution_artifacts = revalidateExecutionArtifacts( ...
       row, evaluation_data_root, input_data_root);
    manifest.report_inputs_file = execution_artifacts.report_inputs_file;
@@ -564,8 +565,7 @@ function [model, metadata] = appendBoundaryCheckpoint( ...
 end
 
 function seasonal = seasonalDiagnostics(observations, model, provenance, policy)
-   %SEASONALDIAGNOSTICS Build the snow-aware June-to-October series the
-   % report plots.
+   %SEASONALDIAGNOSTICS Build the snow-aware June-to-October report series.
    data = observations.data;
    inside = model.Time >= provenance.display_start ...
       & model.Time <= provenance.display_end;

@@ -4,8 +4,8 @@ function filename = metfilename(site, forcings, t1, t2, dt)
    %  filename = icemodel.forcing.helpers.metfilename(site, forcings, ...
    %     t1, t2, dt)
    %
-   % Two naming forms are supported, matching what
-   % icemodel.createMetFileNames parses on the read side:
+   % This function builds two naming forms. icemodel.createMetFileNames parses
+   % the same two forms on the read side:
    %
    %  Window form (t1 and t2 are datetimes):
    %     met_<site>_<forcings>_<YYYYMMDD>_<YYYYMMDD>_<dt>.mat
@@ -15,7 +15,7 @@ function filename = metfilename(site, forcings, t1, t2, dt)
    %
    % DT is the forcing timestep in seconds (900, 1800, or 3600) or the literal
    % filename suffix ("15m", "30m", or "1hr"). The 30-minute form supports the
-   % proven native Samimi Dye-2 cadence; repository writers still default to 15m.
+   % native Samimi Dye-2 cadence. Repository writers default to 15m.
    %
    % See also: icemodel.createMetFileNames,
    %  icemodel.forcing.helpers.writemet
@@ -35,7 +35,7 @@ function filename = metfilename(site, forcings, t1, t2, dt)
             "icemodel:forcing:metTimestepSuffix:unsupportedTimestep"
          rethrow(err)
       end
-      % Preserve the established public writer-side error identifier.
+      % Use the public writer-side error identifier that callers match on.
       error('icemodel:forcing:metfilename:unsupportedTimestep', ...
          'unsupported dt for met file naming')
    end

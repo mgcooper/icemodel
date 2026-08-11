@@ -5,10 +5,11 @@ function dump_turbulent_heat_flux_debug_state(reason, Ts_old, Ts, tair, ...
    %DUMP_TURBULENT_HEAT_FLUX_DEBUG_STATE Save THF/SEB failure diagnostics.
    %
    % This helper writes a compact, replayable scalar debug record for the
-   % turbulent-flux and surface-energy-balance stack. It is intended for
-   % targeted failure analysis when opts.debug is enabled. The saved state is
-   % scalar-heavy, test-friendly, and reuses the same THF diagnostic structs
-   % returned interactively by icemodel.surface.diagnose_turbulent_heat_fluxes(...).
+   % turbulent-flux and surface-energy-balance stack. Use it for targeted
+   % failure analysis when opts.debug is enabled. The saved state is
+   % scalar-heavy and test-friendly. It reuses the same THF diagnostic structs
+   % that icemodel.surface.diagnose_turbulent_heat_fluxes returns
+   % interactively.
 
    debug_file = getenv('ICEMODEL_DEBUG_THF_FILE');
    if isempty(debug_file)

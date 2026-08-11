@@ -17,7 +17,7 @@ function entry = makeCaseManifestEntry(values)
    names = icemodel.verification.setup.caseManifestFieldNames();
 
    % Fail early if an importer adds or removes a field without updating the
-   % shared schema. This prevents silent per-family manifest drift.
+   % shared schema. That check keeps every family manifest on one schema.
    if numel(values) ~= numel(names)
       error('case manifest entry expects %d values', numel(names))
    end
@@ -26,8 +26,8 @@ function entry = makeCaseManifestEntry(values)
    entry = cell2struct(values(:), names, 1);
 
    % Validate the surface_zone and eval_target descriptors against the canonical
-   % vocabularies. Empty values are permitted where the regime/capability is not
-   % meaningful (e.g. analytical Laugh-Tests benchmarks).
+   % vocabularies. An empty value is allowed where the regime or capability has
+   % no meaning, for example an analytical Laugh-Tests benchmark.
    icemodel.verification.setup.validateSurfaceZone(entry.surface_zone);
    icemodel.verification.setup.validateEvalTarget(entry.eval_target);
    icemodel.verification.setup.validatePermafrostZone(entry.permafrost_zone);

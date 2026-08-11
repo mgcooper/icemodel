@@ -6,8 +6,8 @@ function support = classifyObservationSupport( ...
    %    values, field_names, target_field, policy)
    %
    % Applies the PROMICE flag rules that decide whether an observation row is
-   % supported. Callers pass the observation matrix and the policy; the
-   % returned masks are row-shaped logicals they combine as they need.
+   % supported. Callers pass the observation matrix and the policy. The
+   % returned masks are row-shaped logicals, and each caller combines them.
    %
    % The snow half of the same admission rule is in
    % icemodel.verification.helpers.classifySnowDepth.
@@ -16,10 +16,12 @@ function support = classifyObservationSupport( ...
    %  values       - numeric row-by-field observation matrix. Callers holding
    %                 a table extract the columns they need in policy order.
    %  field_names  - string array naming each column of VALUES.
-   %  target_field - name of the target observation column. Passed rather than
-   %                 read from POLICY because promiceAblationReadiness calls it
-   %                 target_field and promiceAblationPolicy, which derives from
-   %                 it, exposes the same field as observation_field.
+   %  target_field - name of the target observation column. The caller passes
+   %                 it instead of this function reading it from POLICY. The
+   %                 two policies name the field differently:
+   %                 promiceAblationReadiness calls it target_field, and
+   %                 promiceAblationPolicy, which derives from it, calls the
+   %                 same field observation_field.
    %  policy       - readiness or ablation policy struct from
    %                 icemodel.verification.namelists.promiceAblationReadiness
    %                 or promiceAblationPolicy. Both carry the same flag lists.
@@ -36,9 +38,9 @@ function support = classifyObservationSupport( ...
    %    station_transition  the station-transition flag is finite and nonzero
    %    unresolved_step     the unresolved-step flag is finite and nonzero
    %
-   % Callers compose these masks. The comparator's notion of direct support
-   % adds exposed ice, the readiness writer's adds a finite target, and the
-   % report builder's adds both.
+   % Callers compose these masks into their own definition of direct support.
+   % The comparator adds exposed ice. The readiness writer adds a finite
+   % target. The report builder adds both.
    %
    % Callers holding a table get the column set from
    % icemodel.verification.helpers.observationSupportFields.

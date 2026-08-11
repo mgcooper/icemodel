@@ -10,9 +10,10 @@ function bundle = loadColocatedData(manifest, source, kwargs)
    %                   Data filenames under data/input/userdata.
    %  source           Source id to load. Product ids such as "mar3.11" and
    %                   "racmo2.3p3" resolve to their colocation legs. "promice"
-   %                   loads the eval target Data, used only for legacy fixtures
-   %                   staged before the bundled observations.mat eval contract;
-   %                   freshly staged cases bundle observations.mat instead.
+   %                   loads the eval target Data. Only legacy fixtures use it,
+   %                   because they were staged before the bundled
+   %                   observations.mat eval contract. Freshly staged cases
+   %                   bundle observations.mat instead.
    %  input_data_root  Optional base input-data root. When blank, the manifest
    %                   must carry or imply its paired input root.
    %
@@ -23,13 +24,14 @@ function bundle = loadColocatedData(manifest, source, kwargs)
    %             .metadata provenance struct
    %
    % Role
-   %  Operational helper for the firn lane. The forcing/reference side is never
-   %  bundled: colocation is recorded as metadata (available sources + per-leg
-   %  windows) pointing at individual per-source userdata files. This helper
-   %  reconstitutes a comparison bundle on demand from those files, so
-   %  comparecase/plotcase keep their timeseries contract for the RACMO
-   %  reference (and the PROMICE-obs target on legacy fixtures) without a
-   %  committed data bundle.
+   %  Operational helper for the firn lane. The staging code never bundles the
+   %  forcing and reference side. It records colocation as metadata, that is,
+   %  the available sources and the per-leg windows, and that metadata points
+   %  at individual per-source userdata files. This helper rebuilds a
+   %  comparison bundle from those files on demand. comparecase and plotcase
+   %  therefore keep their timeseries contract for the RACMO reference, and
+   %  for the PROMICE-obs target on legacy fixtures, with no committed data
+   %  bundle.
    %
    % See also: icemodel.verification.comparecase,
    %  icemodel.verification.helpers.resolveCandidateBundle,
@@ -41,10 +43,10 @@ function bundle = loadColocatedData(manifest, source, kwargs)
       kwargs.input_data_root (1, 1) string = ""
    end
 
-   % Resolve userdata beside the manifest's own eval tree when no input root is
-   % explicit. This keeps committed demo manifests and top-level research
-   % manifests self-consistent even though the global default root is now
-   % top-level data/.
+   % Resolve userdata beside the eval tree of the manifest when the caller
+   % gives no explicit input root. Committed demo manifests and top-level
+   % research manifests then stay self-consistent, even though the global
+   % default root is the top-level data/ folder.
    ud_dir = fullfile(resolveInputRoot(manifest, kwargs.input_data_root), ...
       'userdata');
    [source_field, source_label] = resolveColocationSource(manifest, source);

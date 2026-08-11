@@ -1,11 +1,12 @@
 function rh = relative_humidity_from_specific_humidity(qair, psfc, tair)
-   %RELATIVEHUMIDITYFROMSPECIFICHUMIDITY Convert specific humidity to RH [%].
+   %RELATIVE_HUMIDITY_FROM_SPECIFIC_HUMIDITY Specific humidity to RH [%].
    %
-   %  rh = icemodel.vapor.relative_humidity_from_specific_humidity(qair, psfc, tair)
+   %  rh = icemodel.vapor.relative_humidity_from_specific_humidity( ...
+   %     qair, psfc, tair)
    %
-   % This helper converts specific humidity into vapor pressure using the
-   % moist-air mixing-ratio identity, then maps that onto relative humidity with
-   % the repo's canonical saturation-vapor routines.
+   % This helper converts specific humidity into vapor pressure with the
+   % moist-air mixing-ratio identity. It then maps that vapor pressure onto
+   % relative humidity with the repo's canonical saturation-vapor routines.
 
    % Convert specific humidity q into vapor pressure ea.
    ea = icemodel.vapor.vapor_pressure_from_specific_humidity(qair, psfc);

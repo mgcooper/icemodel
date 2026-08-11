@@ -19,7 +19,7 @@ function out = standardnames(whichdata)
 
       case 'ice1'
 
-         % Note: I would need to redefine the data to conform to these:
+         % These standard names would require a redefinition of the data:
          %
          % surface_temperature [K]
          % land_ice_surface_melt_flux [kg m2 s-1]
@@ -42,9 +42,9 @@ function out = standardnames(whichdata)
          %
          % !! but no "land_ice_refreezing_flux"
          %
-         % Note: this would define the ice surface temperature but not the snow
-         % surface temperature if a snowpack were present (it is intended to
-         % define the temperature that forces an ice sheet model):
+         % This name defines the ice surface temperature. It does not define
+         % the snow surface temperature when a snowpack is present. Its
+         % purpose is the temperature that forces an ice sheet model:
          % temperature_at_top_of_ice_sheet_model [K]
 
          % Only surface_temperature is a recognized standard_name. The others

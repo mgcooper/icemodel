@@ -61,8 +61,7 @@ function result = releaseMetadata(mode, kwargs)
    end
    validateReleaseVersion(release_version)
 
-   % Dispatch only metadata-local behavior. Publication authority remains
-   % outside this command.
+   % Dispatch only the metadata work. This command does not publish a release.
    switch mode
       case "prepare"
          result = prepareRelease(cff_file, release_version, ...
@@ -232,8 +231,8 @@ function seen = githubReleaseSeen(fetcher, url, version, timeout_seconds)
          string(response.tag_name), version)
    end
 
-   % Drafts and prereleases are valid API responses but are not stable public
-   % release success.
+   % A draft or a prerelease is a valid API response, but it is not a
+   % published stable release.
    seen = true;
    for field = ["draft", "prerelease"]
       if ~isfield(response, field)
@@ -614,7 +613,7 @@ function validateReleaseDate(date_released)
 end
 
 function validateZenodoDoi(doi, field_name)
-   %VALIDATEZENODODOI Require the DOI shape minted by this Zenodo concept.
+   %VALIDATEZENODODOI Require the DOI form this Zenodo concept issues.
 
    if isempty(regexp(doi, '^10\.5281/zenodo\.\d+$', 'once'))
       error('icemodel:internal:releaseMetadata:doiInvalid', ...

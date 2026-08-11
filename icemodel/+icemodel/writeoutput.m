@@ -8,7 +8,7 @@ function writeoutput(ice1, ice2, opts, thisyear, time, swd, lwd, albedo)
    %   ice1_<casename>.mat  — 1-D (per-timestep scalar) outputs
    %   ice2_<casename>.mat  — 2-D (column profile × timestep) outputs
    %
-   % A backup is made of any existing file when opts.backupflag is true.
+   % This function backs up any existing file when opts.backupflag is true.
    %
    %#codegen
 

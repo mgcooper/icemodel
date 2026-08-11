@@ -2085,7 +2085,7 @@ function test_raw_fallback_shortwave_gated_by_validity(testCase)
    swu_vals = result.filled.swu(swu_support);
    testCase.verifyTrue(all(isnan(swu_vals) ...
       | swu_vals <= result.filled.swd(swu_support) + 1e-9));
-   % The gate is surgical: in-bounds raw fallback keeps its code.
+   % The gate is narrow: in-bounds raw fallback keeps its code.
    testCase.verifyTrue(any(result.provenance.swd == codes.raw_shortwave));
    testCase.verifyTrue(any(result.provenance.swu == codes.raw_shortwave));
 end
@@ -2159,7 +2159,8 @@ function test_staged_usr_fixture_ships_swu_product(testCase)
       donor_sites=string.empty(1, 0), use_ktransect=false, ...
       use_gcnet=false, write=false, opts=opts);
 
-   % Only the canonical name survives the read; usr dies at the boundary.
+   % Only the canonical name survives the read. The loader drops usr at the
+   % boundary.
    names = string(result.filled.Properties.VariableNames);
    testCase.verifyTrue(ismember("swu", names));
    testCase.verifyFalse(ismember("usr", names));
@@ -2233,11 +2234,10 @@ function test_readiness_counts_absent_core_channel_as_missing(testCase)
 end
 
 function test_readiness_splits_scalar_and_relational_violations(testCase)
-   % Verdicts grade completeness plus SCALAR bounds only: the negative
-   % precipitation sample flips the verdict, while the relational
-   % exceedances (swd above the TOA ceiling, swu above swd) surface in
-   % the diagnostic columns and never reach a verdict or its reason
-   % (POLICY A15/D-28).
+   % Verdicts grade completeness plus SCALAR bounds only. The negative
+   % precipitation sample flips the verdict. The relational exceedances (swd
+   % above the TOA ceiling, swu above swd) appear in the diagnostic columns,
+   % and never reach a verdict or its reason (POLICY A15/D-28).
    root = testCase.TestData.root;
    writeFixtureStation(root, "tsta", 0, 0, false);
    filename = fullfile(root, 'met', 'promice', ...
@@ -2721,10 +2721,10 @@ function test_last_resort_uses_swd_elevation_bins(testCase)
 end
 
 function test_last_resort_admits_zero_overlap_identity_low_confidence(testCase)
-   % A source with no target overlap carries no calibration evidence, but
-   % refusing it left megasample in-bounds gaps unfilled; POLICY A11/D-25
-   % admits the identity values as last resort with a low-confidence
-   % audit stamp instead.
+   % A source with no target overlap carries no calibration evidence, but a
+   % refusal leaves megasample in-bounds gaps unfilled. POLICY A11/D-25
+   % therefore admits the identity values as last resort, with a
+   % low-confidence audit stamp.
    times = (datetime(2020, 1, 1, 'TimeZone', 'UTC') + hours(0:9)).';
    tair = 260 + zeros(numel(times), 1);
    filled = timetable(times, tair, 'VariableNames', {'tair'});
@@ -3607,7 +3607,7 @@ function test_negative_native_rain_refuses_instead_of_proxy_replacement(testCase
 end
 
 function test_fill_station_errors_without_native_met(testCase)
-   % A missing staged native met fails loudly.
+   % A missing staged native met raises an error.
    testCase.verifyError(@() ...
       icemodel.forcing.reconstruct.fillPromiceStation("nope", ...
       met_dir=fullfile(testCase.TestData.root, 'met', 'promice'), ...
@@ -3712,8 +3712,8 @@ function test_report_builds_ledgered_figures_and_qmd(testCase)
    ghost.site(:) = "ghost";
    writetable(ghost, fullfile(root, 'qa', 'ledger', ...
       'ghost-readiness.csv'));
-   % Unrelated figures from a previous subset render are outside this
-   % requested cohort and must not poison ledger reconciliation.
+   % Unrelated figures from an earlier subset render are outside this
+   % requested cohort and must not corrupt ledger reconciliation.
    fid = fopen(fullfile(root, 'figures', 'ghost_tair_stale.png'), 'w');
    fclose(fid);
    fid = fopen(fullfile(root, 'figures', 'tsta_tair_stale.png'), 'w');
@@ -4264,7 +4264,7 @@ function test_acceptance_window_derives_from_staged_proxies(testCase)
 end
 
 function test_report_errors_without_products(testCase)
-   % No filled products means no report, loudly.
+   % No filled products means no report. The builder raises an error.
    root = testCase.TestData.root;
    testCase.verifyError(@() ...
       icemodel.verification.report.buildGapFillReport(render=false, ...

@@ -8,8 +8,9 @@ function metadata = geusModisCoverageMetadata(requested_years, coverage_years)
    % REQUESTED_YEARS are the calendar years on the target artifact axis.
    % COVERAGE_YEARS are the requested years backed by one unambiguous GEUS
    % Greenland Reflectivity 5 km C6 source file and physical target values.
-   % The returned flat struct is the single product/status/year contract shared
-   % by fresh RCM builders, metadata repair, saved payloads, and artifact QA.
+   % The returned flat struct holds the product, status, and year contract.
+   % Fresh RCM builders, metadata repair, saved payloads, and artifact QA all
+   % use it.
 
    arguments
       requested_years double {mustBeFinite, mustBeInteger}

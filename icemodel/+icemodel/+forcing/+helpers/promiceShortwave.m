@@ -7,25 +7,26 @@ function [swd, swu, metadata, masks] = promiceShortwave(aws, kwargs)
    %     promiceShortwave(aws, fill_darkness=true, ...
    %     latitude=..., longitude=...)
    %
-   % `readPromiceAws` intentionally exposes both the source-faithful raw
-   % pyranometer channels (`swd`/`swu`, from `dsr`/`usr`) and pypromice's
-   % tilt/bias-corrected products (`swd_cor`/`swu_cor`). The PROMICE variable
-   % dictionary allows raw shortwave down to -10 W m-2, so small negative raw
-   % values are valid source records but not physical public forcing/evaluation
-   % fluxes. Builders therefore prefer the corrected product sample-by-sample,
-   % fall back to the raw measurement where the corrected product is missing,
-   % and clamp any remaining finite negative selected value to zero.
+   % `readPromiceAws` returns both the source-faithful raw pyranometer channels
+   % (`swd`/`swu`, from `dsr`/`usr`) and pypromice's tilt/bias-corrected
+   % products (`swd_cor`/`swu_cor`). The PROMICE variable dictionary allows raw
+   % shortwave down to -10 W m-2. Small negative raw values are therefore valid
+   % source records, but they are not physical public forcing or evaluation
+   % fluxes. Builders prefer the corrected product sample by sample, fall back
+   % to the raw measurement where the corrected product is missing, and clamp
+   % any remaining finite negative selected value to zero.
    %
-   % Missing samples remain missing by default. With fill_darkness=true, missing
-   % samples are set to physical zero only when the complete hourly interval
-   % is below the shared civil-twilight solar-elevation boundary. Twilight and
-   % daylight gaps remain missing, and an absent or whole-source-file
-   % all-missing channel remains a placeholder. Whole-file support can be
-   % supplied when `aws` is a surgical slice so selection is independent of
-   % the requested window.
-   % The source file remains the authoritative raw-value record, while returned
-   % metadata preserves exact source, fallback, negative-input, darkness-fill,
-   % and remaining-missing counts for staged artifacts.
+   % Missing samples stay missing by default. With fill_darkness=true, this
+   % function sets a missing sample to physical zero only when the complete
+   % hourly interval is below the shared civil-twilight solar-elevation
+   % boundary. Twilight and daylight gaps stay missing. An absent channel, or a
+   % channel that is all-missing across the whole source file, stays a
+   % placeholder. The caller can supply whole-file support when `aws` is a
+   % subset of the file, so the selection does not depend on the requested
+   % window.
+   % The source file holds the authoritative raw values. The returned metadata
+   % keeps the exact source, fallback, negative-input, darkness-fill, and
+   % remaining-missing counts for staged artifacts.
    %
    % See also: icemodel.forcing.readPromiceAws,
    %  icemodel.forcing.buildPromiceMet, icemodel.forcing.buildPromiceData
@@ -97,8 +98,8 @@ function [data, metadata, masks] = selectChannel( ...
    has_raw = ismember(raw_name, names);
    has_corrected = ismember(corrected_name, names);
 
-   % Absent source channels are represented only inside this selection helper;
-   % observational builders decide whether an absent public channel is omitted.
+   % This helper represents an absent source channel internally. The
+   % observational builders decide whether to omit an absent public channel.
    raw = nan(height(aws), 1);
    corrected = nan(height(aws), 1);
    if has_raw
@@ -117,9 +118,9 @@ function [data, metadata, masks] = selectChannel( ...
    negative = isfinite(data) & data < 0;
    data(negative) = 0;
 
-   % A source-backed channel may safely replace missing deep-night radiation
-   % with physical zero. Whole-file support makes this decision independent of
-   % window selection, while absent/all-missing source files remain placeholders.
+   % A source-backed channel can replace missing deep-night radiation with
+   % physical zero. Whole-file support makes this decision independent of the
+   % window selection. Absent or all-missing source files stay placeholders.
    window_observations_present = ...
       any(isfinite(raw) | isfinite(corrected), 'all');
    source_file_observations_present = window_observations_present;
@@ -138,9 +139,9 @@ function [data, metadata, masks] = selectChannel( ...
       'negative_clamped', negative, ...
       'darkness_fill', darkness_fill);
 
-   % Preserve quantitative provenance for both the raw product and the exact
-   % public selection. This is sufficient to recover rejected samples from the
-   % named source file without staging a physically invalid public channel.
+   % Keep quantitative provenance for the raw product and for the exact public
+   % selection. That is enough to recover rejected samples from the named
+   % source file, without staging a physically invalid public channel.
    raw_finite = isfinite(raw);
    raw_minimum = NaN;
    if any(raw_finite, 'all')
@@ -173,8 +174,8 @@ function [data, metadata, masks] = selectChannel( ...
    metadata.([prefix '_corrected_source']) = ...
       "PROMICE L3 " + corrected_source + " [W m-2]";
 
-   % A channel-specific policy string also makes a whole-file all-missing or
-   % absent required met channel an intentional placeholder to artifact QA.
+   % The channel-specific policy string also tells artifact QA that an absent
+   % or all-missing required met channel is a deliberate placeholder.
    if ~(has_raw || has_corrected) || ~source_file_observations_present
       metadata.([prefix '_policy']) = raw_name + ...
          " = NaN placeholder (PROMICE L3 " + raw_source + " and " + ...
@@ -204,8 +205,9 @@ function deep_dark = wholeHourDeepCivilNight( ...
       Time, latitude, longitude, threshold_degrees)
    %WHOLEHOURDEEPCIVILNIGHT Identify bins wholly below civil twilight.
 
-   % PROMICE times label hourly interval starts. Canonicalize zoned inputs by
-   % instant, while interpreting the reader's unzoned UTC timestamps as UTC.
+   % PROMICE times label the start of each hourly interval. Setting the time
+   % zone converts a zoned input by instant, and reads the reader's unzoned
+   % timestamps as UTC.
    Time.TimeZone = 'UTC';
    maximum_elevation = ...
       icemodel.forcing.helpers.intervalMaximumSolarElevation( ...

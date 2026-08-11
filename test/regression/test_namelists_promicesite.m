@@ -1,9 +1,9 @@
 function tests = test_namelists_promicesite
    %TEST_NAMELISTS_PROMICESITE Auto-discovered PROMICE station namelist (vq5).
    %
-   % icemodel.verification.namelists.promicesite is the single source of truth
-   % for the full PROMICE station list, discovered from the on-disk hourly L3
-   % product. Verifies it discovers stations from the committed verification
+   % icemodel.verification.namelists.promicesite defines the full PROMICE
+   % station list, which it discovers from the on-disk hourly L3 product. This
+   % suite verifies that it discovers stations from the committed verification
    % cache and errors cleanly when the product is absent.
    tests = functiontests(localfunctions);
 end

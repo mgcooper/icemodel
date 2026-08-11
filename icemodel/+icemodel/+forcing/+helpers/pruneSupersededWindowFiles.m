@@ -4,11 +4,12 @@ function removed = pruneSupersededWindowFiles(new_file, prefix, suffix, kwargs)
    %  removed = icemodel.forcing.helpers.pruneSupersededWindowFiles( ...
    %     new_file, prefix, suffix)
    %
-   % Call only after NEW_FILE was written successfully. Files in the same
-   % directory and naming/cadence class are removed when their encoded date
-   % window is strictly contained by the new window. Overlapping, enclosing,
-   % unrelated, and equal-window files remain untouched. A warning lists every
-   % removal before deletion so wider refresh side effects are explicit.
+   % Call this only after NEW_FILE was written successfully. The function
+   % removes a file in the same directory and naming/cadence class when the new
+   % window strictly contains that file's encoded date window. It keeps
+   % overlapping, enclosing, unrelated, and equal-window files. It warns with
+   % the list of files before it deletes them, so a wider refresh shows its
+   % side effects.
 
    arguments
       new_file (1, 1) string

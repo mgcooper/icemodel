@@ -8,8 +8,8 @@ function [locations, batch] = normalizeLocations(location)
    % numeric point list with N greater than one becomes a 1-by-N cell array and
    % sets BATCH true so gridded builders can preserve their public return shape.
 
-   % Only a multirow numeric point list activates the batch contract; every
-   % other supported location object remains one opaque location value.
+   % Only a multirow numeric point list turns on the batch mode. Every other
+   % supported location input stays one location value.
    if isnumeric(location) && size(location, 2) == 2 && size(location, 1) > 1
       locations = num2cell(location, 2)';
       batch = true;

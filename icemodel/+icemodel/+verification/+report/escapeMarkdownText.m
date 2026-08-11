@@ -6,12 +6,12 @@ function text = escapeMarkdownText(value)
    % runs. Then every remaining ASCII punctuation character is backslash
    % escaped so the value cannot introduce emphasis, a link, or a table cell.
    %
-   % Ampersand and semicolon are left unescaped, or the entities sanitizeText
-   % just produced would be broken back apart and shown as \&amp\; instead of
-   % rendering as the original character.
+   % This function leaves the ampersand and the semicolon unescaped.
+   % Otherwise it would break apart the entities that sanitizeText produced,
+   % and the output would show \&amp\; instead of the original character.
    %
-   % Backslash is escaped first, or the escapes added afterwards would
-   % themselves be escaped.
+   % This function escapes the backslash first. Otherwise it would escape the
+   % escapes that it adds afterwards.
 
    text = icemodel.verification.report.sanitizeText(value);
    punctuation = setdiff([92, 33:47, 58:64, 91, 93:96, 123:126], ...

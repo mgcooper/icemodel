@@ -5,10 +5,10 @@ function met = completeMetVariables(met, kwargs)
    %  met = ... completeMetVariables(met, include_split_precip=true)
    %
    % Role
-   %  Source builders use this at the met-building boundary when a source is a
-   %  useful native forcing record but lacks one or more required channels. The
-   %  NaNs mean "missing by source design and available for runtime substitution",
-   %  not zero flux.
+   %  Source builders call this at the met-building boundary. A source can be a
+   %  useful native forcing record and still lack one or more required channels.
+   %  A NaN means the source does not supply that channel and the runtime can
+   %  substitute a value. A NaN does not mean zero flux.
 
    arguments
       met timetable
@@ -20,8 +20,8 @@ function met = completeMetVariables(met, kwargs)
       required = [required, "rainf", "snowf"];
    end
 
-   % Add absent channels after existing columns; data2met reorders required
-   % variables afterwards, while direct source builders may keep source order.
+   % Add the absent channels after the existing columns. data2met then reorders
+   % the required variables. Direct source builders can keep the source order.
    varnames = string(met.Properties.VariableNames);
    missing = setdiff(required, varnames, 'stable');
    for varname = missing

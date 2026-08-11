@@ -20,7 +20,7 @@ function [k, dkdT] = thermal_conductivity_air(T, reference)
    %                           formulation. This is the most rigorous
    %                           temperature-only option in the intended
    %                           snow/firn application regime.
-   %  "sutherland"           - Sutherland-type engineering fit retained for
+   %  "sutherland"           - Sutherland-type engineering fit for
    %                           comparison and simple diagnostic use.
    %
    % Notes:

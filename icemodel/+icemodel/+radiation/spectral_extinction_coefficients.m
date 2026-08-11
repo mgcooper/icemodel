@@ -1,15 +1,15 @@
 function k_ext = spectral_extinction_coefficients( ...
       qext, g, coalbedo, radii, iradius)
-   %spectral_extinction_coefficients Compute spectral extinction coefficients
-   %for one grain radius.
+   %SPECTRAL_EXTINCTION_COEFFICIENTS Compute spectral extinction coefficients
+   % for one grain radius.
    %
    %  k_ext = icemodel.radiation.spectral_extinction_coefficients( ...
    %     qext, g, coalbedo, radii, iradius)
    %
-   % The optical-property tables are loaded once and indexed here by IRADIUS.
-   % Integer IRADIUS values select one tabulated grain size directly. A
-   % fractional IRADIUS linearly interpolates between the two neighboring table
-   % rows, which is the scaffold needed if a future grain-size model maps its
+   % The caller loads the optical-property tables once, and this function
+   % indexes them by IRADIUS. An integer IRADIUS selects one tabulated grain
+   % size. A fractional IRADIUS interpolates linearly between the two
+   % neighboring table rows. That supports a grain-size model that maps an
    % evolving optical grain size onto the Mie table.
    %
    %#codegen

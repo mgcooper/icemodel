@@ -3,10 +3,10 @@ function link = fixtureCallerSymlink(pathname)
    %
    %  link = icemodel.verification.setup.fixtureCallerSymlink(pathname)
    %
-   % The lexical path is inspected before canonicalization so a caller-created
-   % ancestor cannot redirect fixture reads or writes. Root-level macOS aliases
-   % into /private are operating-system paths, not caller-controlled escapes,
-   % and remain valid.
+   % The function inspects the lexical path before canonicalization, so a
+   % caller-created ancestor cannot redirect fixture reads or writes.
+   % Root-level macOS aliases into /private are operating-system paths, not
+   % caller-controlled escapes, so they stay valid.
 
    arguments
       pathname (1, 1) string

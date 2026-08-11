@@ -10,8 +10,8 @@ function assertArtifactSha256(pathname, expected_sha256)
    end
 
    % A readiness identity is usable only while both the artifact and its
-   % complete hash remain available at the execution boundary, so a missing
-   % file or a truncated hash is a hard failure rather than a skipped check.
+   % complete hash are available at the execution boundary. A missing file or
+   % a truncated hash is therefore an error, not a skipped check.
    if ~isfile(pathname)
       error('icemodel:verification:artifactIdentity:missing', ...
          'Pinned artifact is unavailable: %s', pathname)

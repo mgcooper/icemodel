@@ -43,8 +43,8 @@ end
 function tf = manifestPayloadsEquivalent(existing_payload, manifest_for_json)
    %MANIFESTPAYLOADSEQUIVALENT Compare JSON objects independent of field order.
    tf = false;
-   % jsondecode maps both scalar null and [] to numeric [], so the semantic
-   % comparison below cannot see this schema type drift. Force one canonical
+   % jsondecode maps both scalar null and [] to numeric [], so the comparison
+   % below cannot detect this change of schema type. Force one canonical
    % rewrite when an existing flat site_location object contains [].
    if hasNullableSiteLocationArray(existing_payload)
       return
@@ -79,10 +79,10 @@ function tf = manifestPayloadsEquivalent(existing_payload, manifest_for_json)
    if isfield(incoming, 'skipped')
       incoming.skipped = num2cell(incoming.skipped);
    end
-   % A cache-reuse diagnostic is emitted at runtime and must not turn an
-   % otherwise exact additive replay into a manifest mutation. Preserve real
-   % provenance notes; remove only the two exact full-coverage messages owned
-   % by stageRcmForcing before the semantic comparison.
+   % The runtime writes a cache-reuse diagnostic. That diagnostic must not
+   % turn an exact additive replay into a manifest change. Keep the real
+   % provenance notes. Before the comparison, remove only the two exact
+   % full-coverage messages that stageRcmForcing writes.
    existing = stripTransientReuseNotes(existing);
    incoming = stripTransientReuseNotes(incoming);
    existing = canonicalizeObjectFields(existing);

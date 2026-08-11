@@ -23,13 +23,13 @@ function [per_case, aggregate, diagnostics] = ablationPerformanceMetrics( ...
    % band, so the caller compares the whole set and the report ranks at the
    % policy reference density.
    %
-   % Metrics per case and diagnostic. Only the endpoint error is a statement
-   % about the cumulative curves. Every distributional metric is computed on
-   % per-step INCREMENTS, because two cumulative series that both rise all
-   % season are trivially correlated: their residuals are strongly
-   % autocorrelated and a Nash-Sutcliffe efficiency computed on them is
-   % inflated toward 1 regardless of whether the model gets the ablation rate
-   % right. Differencing tests the rate, which is the physical claim.
+   % Metrics per case and diagnostic. Only the endpoint error describes the
+   % cumulative curves. Every distributional metric uses per-step INCREMENTS.
+   % Two cumulative series that both rise all season correlate almost by
+   % construction: their residuals are strongly autocorrelated, and a
+   % Nash-Sutcliffe efficiency computed on them rises toward 1 whether or not
+   % the model gets the ablation rate right. Differencing tests the rate,
+   % which is the physical claim.
    %   endpoint_error_mwe   - cumulative model minus observation at the last row
    %   cumulative_rmse_mwe  - RMSE of the cumulative curves, retained only so
    %                          the curve-level view stays reportable
@@ -54,11 +54,11 @@ function [per_case, aggregate, diagnostics] = ablationPerformanceMetrics( ...
    end
 
    % Converting observed lowering to water equivalent needs a density, and the
-   % choice matters more for increments than for endpoints: an hour of lowering
-   % may be intact ice or porous weathering crust, and the density scales the
-   % observed increments while leaving the modeled ones untouched. Score every
-   % density in the policy band so that sensitivity is visible instead of
-   % buried in a single intact-ice assumption.
+   % choice matters more for increments than for endpoints. An hour of lowering
+   % can be intact ice or porous weathering crust, and the density scales the
+   % observed increments while the modeled ones stay the same. Score every
+   % density in the policy band, so the sensitivity is visible instead of
+   % hidden inside one intact-ice assumption.
    densities = kwargs.densities;
    if isempty(densities)
       policy = icemodel.verification.namelists.promiceAblationPolicy();
@@ -130,7 +130,7 @@ function [per_case, aggregate, diagnostics] = ablationPerformanceMetrics( ...
             model = model(finite);
 
             % Increment pairs must be exactly one output step apart so a gap in
-            % the observation record cannot masquerade as a large hourly rate.
+            % the observation record cannot appear as a large hourly rate.
             adjacent = diff(time) == kwargs.output_step;
             d_observation = diff(observation);
             d_model = diff(model);
@@ -262,8 +262,9 @@ function aggregate = aggregateMetrics(per_case, diagnostics, densities)
          mean_mae_mwe(k) = mean(per_case.mae_mwe(scored), 'omitnan');
          mean_rmse_mwe(k) = mean(per_case.rmse_mwe(scored), 'omitnan');
 
-         % Pool the squared increment error by increment count so long site-years
-         % are not weighted the same as short ones in the headline number.
+         % Pool the squared increment error by increment count, so a long
+         % site-year does not carry the same weight as a short one in the
+         % headline number.
          weights = per_case.n_increments(scored);
          usable = weights > 0 & isfinite(per_case.rmse_mwe(scored));
          case_rmse = per_case.rmse_mwe(scored);
@@ -273,10 +274,11 @@ function aggregate = aggregateMetrics(per_case, diagnostics, densities)
          end
          median_nse(k) = median(per_case.nse(scored), 'omitnan');
 
-         % A tolerance count communicates practical agreement more directly than a
-         % mean error that opposite-signed cases can cancel. The policy signal
-         % floor bounds the denominator: without it, a site-year whose observed
-         % lowering nets to nearly zero makes any model look outside tolerance.
+         % A tolerance count shows practical agreement more directly than a
+         % mean error, which opposite-signed cases can cancel. The policy
+         % signal floor bounds the denominator: without it, a site-year whose
+         % observed lowering nets to nearly zero makes any model look outside
+         % tolerance.
          observed = max(abs(per_case.observation_endpoint_mwe(scored)), ...
             policy.scientific.signal_floor_mwe);
          n_within_tolerance(k) = nnz(abs(endpoint) <= tolerance * observed);

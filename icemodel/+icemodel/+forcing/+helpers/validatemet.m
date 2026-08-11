@@ -3,10 +3,10 @@ function validatemet(met)
    %
    %  icemodel.forcing.helpers.validatemet(met)
    %
-   % Errors unless MET is a timetable with a regular time axis containing every
-   % required met variable (see icemodel.forcing.helpers.metvariables). All-NaN
-   % required variables are allowed as explicit placeholders for runtime
-   % substitution, but absent variables remain invalid.
+   % Errors unless MET is a timetable with a regular time axis that holds every
+   % required met variable (see icemodel.forcing.helpers.metvariables). A
+   % required variable that is all NaN is a placeholder for runtime
+   % substitution and is valid. A variable that is absent is not valid.
    %
    % See also: icemodel.forcing.helpers.metvariables,
    %  icemodel.forcing.helpers.writemet, icemodel.loadmet
@@ -39,8 +39,8 @@ function validatemet(met)
    % Precipitation-rate unit. When the met timetable records VariableUnits,
    % the ppt channel must carry the canonical water-equivalent rate (m s-1;
    % see icemodel.forcing.helpers.metvariables) so every source agrees. A met
-   % file with no VariableUnits is accepted (legacy artifacts predate the
-   % metadata), but a ppt unit that is set and wrong is rejected.
+   % file with no VariableUnits is valid, because older artifacts do not store
+   % that metadata. A ppt unit that is set and wrong is an error.
    units = string(met.Properties.VariableUnits);
    if ~isempty(units)
       [~, ~, pptunit] = icemodel.forcing.helpers.metvariables();

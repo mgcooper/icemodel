@@ -5,17 +5,17 @@ function [estimate, n_support] = climatologyFill(times, x, query_times, kwargs)
    %     icemodel.forcing.reconstruct.climatologyFill(times, x, query_times)
    %
    % Role
-   %  Station day-of-year median climatology (provenance code 8): the
-   %  policy's admission baseline for gaps longer than the short-gap cap,
-   %  and an admissible last-resort method where its own gates pass (e.g.
-   %  long albedo runs). A smoothing window in day-of-year pools nearby
-   %  days so single-year records still yield stable medians; the target's
-   %  time-of-day bins are preserved for diurnal channels.
+   %  Station day-of-year median climatology (provenance code 8). It is the
+   %  policy's admission baseline for gaps longer than the short-gap cap. It
+   %  is also an admissible last-resort method where its own gates pass, for
+   %  example long albedo runs. A smoothing window in day-of-year pools
+   %  nearby days, so a single-year record still gives stable medians. For a
+   %  diurnal channel, the estimate keeps the target's time-of-day bins.
    %  Leap years use a 365-day no-leap calendar (February 29 pools with
-   %  February 28) so March-December observations retain the same calendar
-   %  bins in every year. Implemented as one precomputed calendar-day x
-   %  hour lookup table so a
-   %  full-record query axis costs O(n), not O(n^2).
+   %  February 28), so March-December observations keep the same calendar
+   %  bins in every year. The function builds one calendar-day by hour
+   %  lookup table in advance, so a full-record query axis costs O(n), not
+   %  O(n^2).
    %
    % Name-value
    %  window_days : half-width of the day-of-year pooling window
@@ -44,8 +44,8 @@ function [estimate, n_support] = climatologyFill(times, x, query_times, kwargs)
    end
 
    % Bin the observed pool once by normalized calendar day and exact posting
-   % time. Deriving bins from the data preserves hourly, half-hourly, and
-   % quarter-hourly family semantics without a cadence-specific constant.
+   % time. Bins derived from the data serve hourly, half-hourly, and
+   % quarter-hourly families without a cadence-specific constant.
    finite = isfinite(x);
    pool_doy = normalizedDayOfYear(times(finite));
    pool_clock = timeofday(times(finite));

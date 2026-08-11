@@ -7,21 +7,22 @@ function [x, provenance, audit, quality] = smoothShortwaveSeams( ...
    %     times, x, provenance, latitude, longitude)
    %
    % Role
-   %  Post-final SWD quality repair under POLICY D-32. Method boundaries
-   %  are compared with the station's observed hourly-step distribution
-   %  in the same season and solar-elevation band. A boundary above the
-   %  configured percentile and the adjacent same-direction local slope is
-   %  repaired by masking only the reconstructed posting beside it and
-   %  linearly reconnecting the remaining anchors. Native observations are
-   %  immutable. The local-slope and observed-anchor bridge floors exempt
-   %  smooth solar ramps and changes no interpolation can make smaller. The
-   %  repair never exceeds the short-gap cap or crosses deep darkness or a
-   %  season.
+   %  Post-final SWD quality repair under POLICY D-32. This function
+   %  compares method boundaries with the observed hourly-step distribution
+   %  of the station in the same season and solar-elevation band. A
+   %  boundary above the configured percentile and above the adjacent
+   %  same-direction local slope gets a repair. The repair masks only the
+   %  reconstructed posting beside the boundary and reconnects the
+   %  remaining anchors with a straight line. Native observations stay
+   %  unchanged. The local-slope floor and the observed-anchor bridge floor
+   %  exempt smooth solar ramps and changes that no interpolation can make
+   %  smaller. The repair never exceeds the short-gap cap, and never
+   %  crosses deep darkness or a season.
    %
-   %  One-posting repairs are repeated only up to max_passes. KANL
-   %  evidence showed one posting reduced 75 outliers to 3, while a
-   %  two-posting window changed more data with no further benefit; the
-   %  second one-posting pass reduced the count to the expected tail rate.
+   %  One-posting repairs run only up to max_passes. KANL evidence showed
+   %  that one posting reduced 75 outliers to 3. A two-posting window
+   %  changed more data with no further benefit. The second one-posting
+   %  pass reduced the count to the expected tail rate.
    %
    % Name-value
    %  percentile, min_reference_steps, max_passes, cap_hours : defaults
@@ -89,8 +90,8 @@ function [x, provenance, audit, quality] = smoothShortwaveSeams( ...
    n_passes = 0;
 
    % Each pass repairs only the reconstructed posting immediately beside
-   % a flagged transition. Recomputing the screen exposes a rare cascaded
-   % boundary without widening every repair preemptively.
+   % a flagged transition. A recomputed screen finds a rare cascaded
+   % boundary, and no repair becomes wider than one posting.
    for pass = 1:kwargs.max_passes
       [outliers, ~] = boundaryOutliers(times, x, provenance, ...
          elevation, regime, kwargs.percentile, ...
@@ -117,9 +118,9 @@ function [x, provenance, audit, quality] = smoothShortwaveSeams( ...
          break
       end
 
-      % Reconnect each resulting mask run independently. A failed run is
-      % left unchanged so QA reports it rather than silently broadening
-      % the repair.
+      % Reconnect each resulting mask run on its own. A run that fails
+      % stays unchanged, so QA reports it and the repair does not become
+      % wider.
       proposal = x;
       proposal(mask) = NaN;
       repaired_this_pass = false(size(x));
@@ -309,8 +310,9 @@ function [outliers, ratio, n_boundaries, n_reference_steps, ...
    end
 
    % A bounded-interpolation label inside one otherwise continuous source
-   % is a provenance transition, not a flux seam, when the reconstructed
-   % postings equal the exact line between same-provenance finite anchors.
+   % marks a provenance transition, not a flux seam. This holds when the
+   % reconstructed postings equal the exact line between finite anchors of
+   % the same provenance.
    interpolation_floor = zeros(size(jumps));
    interpolated = provenance == codes.bounded_interp;
    edges = diff([false; interpolated; false]);

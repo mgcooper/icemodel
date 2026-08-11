@@ -13,12 +13,12 @@ function [rainf, snowf] = resolvePrecipPhase(ppt, tair, rainf_source, ...
    %  phase_source - runtime phase-source option (opts.precip_phase_source
    %     from icemodel.setopts):
    %     'source'    the product's split exactly as shipped (e.g. MAR's
-   %                 energy-balance split); absent or missing components
-   %                 stay missing rather than being fabricated.
-   %     'threshold' repartition PPT by air temperature via
-   %                 icemodel.forcing.reconstruct.partitionPrecipitation;
-   %                 the transition temperature defaults from
-   %                 icemodel.forcing.reconstruct.setopts (single source).
+   %                 energy-balance split). An absent or missing component
+   %                 stays missing. This function never invents a value.
+   %     'threshold' repartition PPT by air temperature with
+   %                 icemodel.forcing.reconstruct.partitionPrecipitation. The
+   %                 transition temperature defaults from
+   %                 icemodel.forcing.reconstruct.setopts.
    %
    % Both modes enforce the POLICY A10 validity contract: every finite value
    % is nonnegative, a finite phase cannot exceed a finite total, and every
@@ -35,7 +35,7 @@ function [rainf, snowf] = resolvePrecipPhase(ppt, tair, rainf_source, ...
       phase_source {mustBeTextScalar}
    end
 
-   % One shared sample axis keeps the selection honest across inputs.
+   % Every input must use the same sample axis.
    if numel(tair) ~= numel(ppt) || numel(rainf_source) ~= numel(ppt) ...
          || numel(snowf_source) ~= numel(ppt)
       error('icemodel:resolvePrecipPhase:sizeMismatch', ...
@@ -49,9 +49,9 @@ function [rainf, snowf] = resolvePrecipPhase(ppt, tair, rainf_source, ...
          rainf = rainf_source;
          snowf = snowf_source;
       case 'threshold'
-         % A10/D-18: runtime threshold partition of the canonical total;
-         % the kwargs default inside partitionPrecipitation supplies the
-         % single-source transition temperature.
+         % A10/D-18: runtime threshold partition of the canonical total. The
+         % kwargs default inside partitionPrecipitation supplies the
+         % transition temperature.
          [rainf, snowf] = ...
             icemodel.forcing.reconstruct.partitionPrecipitation(ppt, tair);
       otherwise
@@ -61,7 +61,7 @@ function [rainf, snowf] = resolvePrecipPhase(ppt, tair, rainf_source, ...
    end
 
    % POLICY A10 validity uses the same shared helper as reconstruction and
-   % artifact verification. Honest missingness remains untouched.
+   % artifact verification. The check leaves missing values as they are.
    violates = ~icemodel.forcing.helpers.precipitationValidity( ...
       ppt, rainf, snowf);
    if any(violates)

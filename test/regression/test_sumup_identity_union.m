@@ -113,7 +113,7 @@ function test_default_restage_preserves_union_and_every_case_contributes(testCas
       exclusive = unique(group_min(group_min == group_max & group_min > 0));
       contributes(exclusive) = true;
 
-      % The production helper independently agrees that the union contains the
+      % The production helper returns the same count, so the union holds the
       % exact expected scientific identities for this source variable.
       [~, ~, unique_rows] = ...
          icemodel.verification.setup.deduplicateSumupRecords( ...

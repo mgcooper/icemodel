@@ -219,14 +219,14 @@ end
 %%
 function [ice1, ice2] = roundData(ice1, ice2)
 
-   % Round legacy ice1 channels to five digits. Preserve diagnostic mass-budget
-   % ledgers at solver precision so signed closure identities remain testable.
-   % Round one variable at a time. Brace EXTRACTION concatenates the selected
-   % columns into one array first, and the single-precision columns
-   % (Tsfc_converged, Tice_converged) promote the whole block to single, so
-   % every double channel would round at single precision. Brace ASSIGNMENT
-   % restores each variable's original class, which makes that invisible in
-   % the stored types.
+   % Round legacy ice1 channels to five digits. Keep the diagnostic mass-budget
+   % ledgers at solver precision so the signed closure identities stay testable.
+   % Round one variable at a time. Brace EXTRACTION first concatenates the
+   % selected columns into one array. The single-precision columns
+   % (Tsfc_converged, Tice_converged) then promote the whole block to single,
+   % so every double channel would round at single precision. Brace ASSIGNMENT
+   % restores each variable's original class, so the stored types do not show
+   % that loss.
    vars1 = ice1.Properties.VariableNames;
    is_budget = ismember(vars1, icemodel.namelists.budgetoutputs());
 
@@ -289,9 +289,9 @@ end
 function [ice1, ice2] = computeState(ice1, ice2, opts, swd, lwd, albedo, Tf)
 
    % Compute bulk density, heat capacity, thermal conductivity, and a full
-   % surface and subsurface energy balance. Don't do this for large simulations
-   % if time or disk space is limited, instead compute them after the
-   % simulation.
+   % surface and subsurface energy balance. Do not do this for a large
+   % simulation when time or disk space is limited. Compute them after the
+   % simulation instead.
 
    % Compute bulk density (kg/m3), heat capacity (J/kg/K), thermal K (W/m/K)
    T_ice = ice2.Tice;

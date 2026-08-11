@@ -58,8 +58,8 @@ function test_over_prediction_has_positive_signed_error(testCase)
 end
 
 function test_unscorable_cases_are_retained_with_a_reason(testCase)
-   % An incomplete case must appear with an explicit reason rather than being
-   % dropped, so a reader cannot mistake attrition for agreement.
+   % An incomplete case must appear with an explicit reason. The metrics must
+   % not drop it, because a dropped case looks the same as an agreeing case.
 
    results = syntheticResults();
    [per_case, aggregate] = ...
@@ -111,9 +111,9 @@ end
 function density = scoringDensity()
    %SCORINGDENSITY Dense endpoint of the policy band, used by the fixtures.
    %
-   % Read from the policy rather than written as a literal, so a band change
-   % fails the tests instead of leaving every fixture filter matching zero
-   % rows.
+   % This function reads the value from the policy instead of stating a
+   % literal. A change to the band then fails the tests, and it does not
+   % leave every fixture filter matching zero rows.
 
    policy = icemodel.verification.namelists.promiceAblationPolicy();
    density = policy.effective_density_kg_m3(end);

@@ -72,7 +72,7 @@ function report = repairRcmArtifactMetadata(input_root, kwargs)
    end
 
    % A callback is optional, but when supplied its mutation boundary must be
-   % explicit so an ad-hoc repair cannot silently broaden its own scope.
+   % explicit, so an ad-hoc repair cannot broaden its own scope.
    if ~isempty(kwargs.repair_function) ...
          && ~isa(kwargs.repair_function, 'function_handle')
       error('icemodel:verification:repairRcmArtifactMetadata:badRepairFunction', ...
@@ -334,8 +334,9 @@ function record = repairOne(filename, locations, kwargs)
    record.hash_before = ...
       icemodel.verification.setup.fileSha256(filename);
 
-   % Exact manifest references win; alias fallback is allowed only when every
-   % current family using the alias agrees on the requested coordinates.
+   % An exact manifest reference takes priority. The alias fallback applies
+   % only when every current family that uses the alias agrees on the
+   % requested coordinates.
     [found, location, sample_method, ambiguous] = artifactLocation( ...
        filename, record.alias, record.source_id, locations);
    if ambiguous

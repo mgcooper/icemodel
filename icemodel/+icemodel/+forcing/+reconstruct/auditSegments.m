@@ -4,8 +4,9 @@ function rows = auditSegments(times, mask, channel, method, detail, kwargs)
    %  rows = icemodel.forcing.reconstruct.auditSegments( ...
    %     times, mask, channel, method, detail)
    %
-   % Returns a cell column whose rows match reconstructSeries.audit. A
-   % disjoint selection is split so no audit row claims an unfilled span.
+   % Returns a cell column whose rows match reconstructSeries.audit. The
+   % function splits a disjoint selection, so no audit row claims an unfilled
+   % span.
    % context_id joins a production segment to the exact fitted parameters
    % and held-out evidence in the persisted station plan.
 
@@ -34,8 +35,8 @@ function rows = auditSegments(times, mask, channel, method, detail, kwargs)
          'at least two timestamps are required to audit duration');
    end
 
-   % Contiguous runs are the policy audit unit; duration uses the regular
-   % posting support represented by each selected sample.
+   % Contiguous runs are the policy audit unit. Duration uses the regular
+   % posting support of each selected sample.
    dt_hours = hours(median(diff(times)));
    edges = diff([false; mask; false]);
    starts = find(edges == 1);

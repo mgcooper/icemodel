@@ -33,7 +33,7 @@ function report = summarize_postprocess_perf(kwargs)
    % Run the model.
    [ice1_raw, ~, opts] = icemodel.test.helpers.runSmbModel(opts);
 
-   % Post porocess.
+   % Postprocess the model output.
    met = icemodel.loadmet(opts);
    ice1_tt = rawIce1ToTimetable(ice1_raw, met.Time);
    ice1_tt = repeatQuarterHourTimetable(ice1_tt, 35040);

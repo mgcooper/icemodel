@@ -80,7 +80,7 @@ function report = summarize_spectral_density_floor(kwargs)
       end
       n_steps_with_floor = n_steps_with_floor + 1;
 
-      % Compute k_bulk w and w/o the density floor
+      % Compute k_bulk with and without the density floor
       k_bulk_floor = icemodel.radiation.bulk_extinction_coefficients(dz_spect, max(raw, 300), tau_N, tau_S, ...
          solar_dwavel);
       k_bulk_raw = computeBulkExactNoFloor(dz_spect, raw, tau_N, tau_S, ...

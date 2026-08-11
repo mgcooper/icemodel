@@ -398,7 +398,8 @@ function test_reuse_path_restores_requested_prior_zero_overlap_leg(testCase)
 end
 
 function test_import_rejects_half_comparison_window(testCase)
-   % Invalid windows win before a non-dry import can create its staging roots.
+   % The importer rejects an invalid window before a non-dry import creates
+   % its staging roots.
    root = fullfile(tempname, 'sumup-half-window');
    testCase.verifyError(@() ...
       icemodel.verification.setup.importSumup( ...
@@ -453,9 +454,9 @@ function test_reuse_and_normal_paths_share_final_provenance(testCase)
 end
 
 function test_unbounded_sumup_advertises_overlapping_short_rcm_legs(testCase)
-   % Unbounded SUMup imports report actual all-available observations. A shorter
-   % convenience RCM build is still comparable over its overlap and should stay
-   % advertised with a clipped window.
+   % Unbounded SUMup imports report every available observation. A shorter
+   % convenience RCM build is still comparable over its overlap, so the
+   % manifest must still report it with a clipped window.
    assumeCachePresent(testCase);
    forcing_root = forcingFixtureRoot();
    mar_dir = fullfile(forcing_root, 'mar');

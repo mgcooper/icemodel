@@ -1,6 +1,7 @@
 function err = subsurface_linearization_error(T, T_old, f_ice, f_liq, ...
       f_liq_old, drovdT, dHdT, Sc, dz, dt, a2, Fc, Fp, a1)
-   %SUBSURFACE_LINEARIZATION_ERROR Diagnose the top-node enthalpy linearization error.
+   %SUBSURFACE_LINEARIZATION_ERROR Diagnose the top-node enthalpy
+   % linearization error.
    %
    %  err = icemodel.column.subsurface_linearization_error(...)
    %

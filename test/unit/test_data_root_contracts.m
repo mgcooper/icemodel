@@ -79,7 +79,8 @@ function test_bootstrap_cleanup_runs_after_error(testCase)
 end
 
 function test_formal_classes_use_runner_root_or_verification_default(testCase)
-   % Nested setup must preserve an explicit root and resolve blank to verification.
+   % Nested setup must preserve an explicit root, and must resolve a blank
+   % root to verification.
 
    config_names = configNames();
    selector_names = ["ICEMODEL_TEST_DATA_ROOT"; ...
@@ -151,7 +152,8 @@ function test_formal_classes_use_runner_root_or_verification_default(testCase)
 end
 
 function test_resolver_precedence_and_legacy_alias(testCase)
-   % Whole-root selection precedes leaves and the legacy alias remains supported.
+   % Whole-root selection precedes the leaves, and the legacy alias still
+   % works.
 
    data_root = fullfile(testCase.TestData.tmp, 'selected');
    [eval_root, input_root] = ...
@@ -263,7 +265,8 @@ function test_family_manifest_helper_data_root_precedence_and_isolation(testCase
       icemodel.verification.helpers.familyManifestFiles( ...
       icemodel_config_casename="demo"))
 
-   % An empty whole-root scope stays empty even when all repo roots are populated.
+   % An empty whole-root scope stays empty even when every repo root holds
+   % manifests.
    empty_root = fullfile(testCase.TestData.tmp, 'manifest-empty');
    mkdir(fullfile(empty_root, 'eval'))
    testCase.verifyEmpty( ...

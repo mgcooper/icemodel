@@ -6,10 +6,10 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
    %   dz, delz, z_nodes, f_liq_res] = ...
    %     icemodel.column.initialize_column_state(opts, tair, r_eff)
    %
-   %  Returns the minimal set of column-state variables needed by the model
-   %  kernel. Physical constants (TL, TH, Lf, …), and thermodynamic parameters
-   %  (f_ell_min, f_ell_max, ro_iwe, …) are fetched from
-   %  icemodel.physicalConstant / icemodel.parameterLookup where needed.
+   %  Returns the smallest set of column-state variables that the model kernel
+   %  needs. This function reads physical constants (TL, TH, Lf, …) from
+   %  icemodel.physicalConstant. It reads thermodynamic parameters
+   %  (f_ell_min, f_ell_max, ro_iwe, …) from icemodel.parameterLookup.
    %
    %  opts.use_ro_glc changes only the densities used to construct initial
    %  phase fractions. Solvers use persistent physical constants. See setopts.
@@ -83,7 +83,8 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
    Sc = zeros(JJ, 1);
    Sp = zeros(JJ, 1);
 
-   % RESIDUAL LIQUID-WATER FRACTION (initialized to snow, overridden per substep)
+   % RESIDUAL LIQUID-WATER FRACTION (set to the snow value; each substep
+   % overrides it)
    f_liq_res = opts.f_res_pore_snow;
 
    % INITIALIZE THE OUTPUT STRUCTURES

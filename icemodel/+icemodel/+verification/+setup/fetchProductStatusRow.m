@@ -1,9 +1,9 @@
 function row = fetchProductStatusRow(cache_dir, product, doi, patterns, kwargs)
    %FETCHPRODUCTSTATUSROW Build the standard fetch product status record.
    %
-   % Fetchers use this for product rows whose presence is determined by one or
-   % more local file patterns. Dataset-specific fetchers may add fields after
-   % construction when they need richer provenance.
+   % Fetchers use this function for product rows. One or more local file
+   % patterns decide whether a product is present. A dataset-specific fetcher
+   % can add fields to the row when it needs more provenance.
 
    arguments
       cache_dir (1, 1) string

@@ -169,7 +169,7 @@ function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
    testCase.verifyEqual(dt_sum, 750, 'AbsTol', 1e-12);
    testCase.verifyEqual(dt_next, 150, 'AbsTol', 1e-12);
 
-   % Surface running state is now derived by update_surface_state.
+   % update_surface_state derives the surface running state.
    [liqflag, ~, hv_atm_val, H_e, ~] = ...
       icemodel.surface.update_surface_state( ...
       f_ice(1), f_liq(1), ro_atm_val, De_e_val, 0, substep_opts);
@@ -263,8 +263,8 @@ function test_checksubstep_debug_dump_records_force_advance_context(testCase)
 end
 
 function test_force_advance_guard_resets_after_recovery(testCase)
-   % A successful accepted substep should clear any prior force-advance
-   % streak so transient recoveries do not poison later timesteps.
+   % A successful accepted substep should clear any earlier force-advance
+   % streak, so a transient recovery does not affect later timesteps.
 
    streak_dt = icemodel.timestepping.update_force_advance_guard(300, true, 300, ...
       900, 2, 10, 'icemodel');
@@ -276,7 +276,7 @@ end
 
 function test_force_advance_guard_errors_after_full_timestep(testCase)
    % Persistent force advance beyond one full forcing step should fail fast
-   % instead of allowing a long broken run to limp onward.
+   % instead of letting a long broken run continue.
 
    testCase.verifyError(@() icemodel.timestepping.update_force_advance_guard(900, ...
       true, 1, 900, 2, 10, 'icemodel'), 'icemodel:ForceAdvanceStreakExceeded');
@@ -292,10 +292,10 @@ function cleanupDebugFile(debug_file)
 end
 
 function test_bottom_layer_merge_removes_it_and_conserves_mass(testCase)
-   % A deepest layer below f_ice_min must actually be removed. The clone that
-   % preserves column length must be taken AFTER the deletion; taking it
-   % first would copy the removed layer back into the column, leaving the
-   % layer above it with only half the pair's mass.
+   % A deepest layer below f_ice_min must actually be removed. Take the clone
+   % that preserves column length AFTER the deletion. Taking it first would
+   % copy the removed layer back into the column, and the layer above it would
+   % then hold only half the pair's mass.
 
    [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
    dz = 0.04;

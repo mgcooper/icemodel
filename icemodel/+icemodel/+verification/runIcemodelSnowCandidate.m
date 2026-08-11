@@ -63,8 +63,8 @@ function candidate = runIcemodelSnowCandidate(case_manifest, kwargs)
    % Activate the synthetic-snow hook. These fields are deliberately not
    % part of setopts: they are a narrow verification-only request consumed
    % by icemodel.verification.syntheticSnowModelRun and ignored by normal
-   % model configuration. They retire together with the hook itself once
-   % production snow physics lands.
+   % model configuration. They are removed with the hook once production snow
+   % physics exists.
    opts.verification_synthetic_snow = true;
    opts.verification_case_manifest = case_manifest;
    opts.verification_snow_depth_offset_m = kwargs.snow_depth_offset_m;

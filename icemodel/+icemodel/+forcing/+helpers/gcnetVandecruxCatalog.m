@@ -4,15 +4,15 @@ function catalog = gcnetVandecruxCatalog()
    %  catalog = icemodel.forcing.helpers.gcnetVandecruxCatalog()
    %
    % Role
-   %  Single source of the Vandecrux station identity table: canonical
-   %  name, every alias spelling (including the GEUS PROMICE continuation
-   %  codes, so self-donor exclusion holds through every spelling —
-   %  POLICY A8), and coordinates from the dataset's own Dataverse
-   %  metadata (the station table repeated identically in the three
-   %  sidecar XMLs under data/verification/gcnet/; the surface NetCDFs
-   %  themselves carry no location attributes). Alias normalization and
-   %  metadata lookup both derive from this table and must never restate
-   %  it.
+   %  This function holds the Vandecrux station identity table. Each entry
+   %  gives the canonical name, every alias spelling, and the station
+   %  coordinates. The aliases include the GEUS PROMICE continuation codes,
+   %  so self-donor exclusion holds for every spelling (POLICY A8). The
+   %  coordinates come from the dataset's own Dataverse metadata. The three
+   %  sidecar XMLs under data/verification/gcnet/ repeat the same station
+   %  table, and the surface NetCDFs carry no location attributes. Alias
+   %  normalization and metadata lookup read this table and must not
+   %  restate it.
    %
    % Returns
    %  catalog : 1x9 struct with fields station, aliases, site_location.

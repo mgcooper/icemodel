@@ -5,20 +5,20 @@ function [Data, metadata] = buildKtransectData(station, kwargs)
    %  [Data, metadata] = ... buildKtransectData("AWS9", source_dir=...)
    %
    % Reads every cached Smeets et al. (2022) PANGAEA.947483 annual tab file for
-   % one K-transect station (AWS5/AWS6/AWS9/AWS10), merges the annual children
-   % without duplicate timestamps or cadence conversion, and maps the channels
-   % onto icemodel's canonical forcing/userdata names at the native 30-minute
-   % cadence. Every annual child's DOI is preserved in metadata.children so
+   % one K-transect station (AWS5/AWS6/AWS9/AWS10). Merges the annual children
+   % without duplicate timestamps and without cadence conversion. Maps the
+   % channels onto icemodel's canonical forcing and userdata names at the native
+   % 30-minute cadence. metadata.children keeps every annual child's DOI, so
    % staging manifests can pin the exact upstream datasets.
    %
-   % Albedo policy: the source publishes no albedo channel, so albedo is the
+   % Albedo policy: the source publishes no albedo channel. Albedo is the
    % shared screened radiometer ratio (swd >= 10 W m-2, solar elevation > 20
-   % degrees) with conservative recovered daily-collapse episodes removed; the
-   % input radiation channels are never modified.
+   % degrees), with conservative recovered daily-collapse episodes removed.
+   % This function never modifies the input radiation channels.
    %
-   % Height policy: height_rel stays source-faithful with the aws_type
-   % generation flag because its meaning differs by AWS type (surface
-   % melt/snow height for type 0; sensor-plus-snow height for type 1), and
+   % Height policy: height_rel stays source-faithful and keeps the aws_type
+   % generation flag, because its meaning differs by AWS type. Type 0 reports
+   % surface melt or snow height. Type 1 reports sensor-plus-snow height, and
    % type-1 AWS5/AWS6 files add the ice_melt draw-wire channel.
    %
    % Source precipitation policy: the K-transect files have no precipitation
@@ -70,8 +70,9 @@ function [Data, metadata] = buildKtransectData(station, kwargs)
    location = siteLocation(children);
 
    % Attach the published per-visit sensor-height records when the series
-   % workbook is cached; donor evaluation and height-aware methods need the
-   % wind/temperature sensor heights alongside the acoustic height_rel record.
+   % workbook is cached. Donor evaluation and height-aware methods need the
+   % wind and temperature sensor heights next to the acoustic height_rel
+   % record.
    sensor_heights = stationHeights(source_dir, station);
 
    Time = raw.time;
@@ -236,8 +237,9 @@ end
 
 function location = siteLocation(children)
    %SITELOCATION Summarize per-year event coordinates for a moving station.
-   % Ablation-zone stations ride the ice flow, so the annual event coordinates
-   % drift; the median is the staged point and the ranges stay in metadata.
+   % Ablation-zone stations move with the ice flow, so the annual event
+   % coordinates change. The staged point is the median. The ranges stay in
+   % metadata.
    lat = [children.lat_wgs84];
    lon = [children.lon_wgs84];
    elev = [children.elev_m];

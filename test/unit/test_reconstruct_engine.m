@@ -297,7 +297,7 @@ function test_shortgaps_csi_fill_preserves_diurnal_shape(testCase)
    truth = 0.7 * toa;
    x = truth;
    % Mask five contiguous high-sun hours; solar noon at 48.8 W is ~15:15
-   % UTC, so this window sits inside guaranteed midsummer daylight.
+   % UTC, so this window sits inside continuous midsummer daylight.
    gap = find(times >= datetime(2020, 6, 21, 13, 0, 0, ...
       'TimeZone', 'UTC') & times <= datetime(2020, 6, 21, 17, 0, 0, ...
       'TimeZone', 'UTC'));
@@ -1120,8 +1120,8 @@ end
 function test_proxy_zero_denominator_never_counts_as_overlap(testCase)
    % A multiplicative correction divides by the model value, so a zero
    % denominator cannot produce a finite ratio and must not be counted as
-   % usable overlap. Counting it would let a fit advertise support it lacks
-   % and hand a nonfinite correction to every downstream consumer.
+   % usable overlap. Counting it would let a fit report support it does not
+   % have, and would pass a nonfinite correction to every downstream consumer.
    series = icemodel.test.fixtures.makeReconstructSeries();
    times = series.Properties.RowTimes;
    model = 5 * ones(numel(times), 1);

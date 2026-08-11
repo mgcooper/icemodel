@@ -24,8 +24,8 @@ function [data, metadata] = readRetmipProtocolTable(filename, kwargs)
    [time_name, time_values] = readTimeColumn(data);
    data.(time_name) = time_values;
 
-   % Cadence validation is intentionally simple and strict: the protocol series
-   % is expected at a uniform 3-hour posting.
+   % Cadence validation is simple and strict: the protocol series must have a
+   % uniform 3-hour posting.
    dt_hours = hours(diff(time_values));
    if ~isempty(dt_hours) && any(abs(dt_hours - kwargs.expected_hours) > 1e-9)
       error('icemodel:verification:readRetmipProtocolTable:badCadence', ...

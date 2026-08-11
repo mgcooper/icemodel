@@ -135,10 +135,10 @@ function policy = promiceAblationPolicy
             "with a measured 870 kg m^-3 reference inside it; " + ...
             "600 kg m^-3 is not an intact glacier-ice density."));
 
-   % These fields explain the policy; they do not govern any result. The report
-   % validator compares saved against current policy so a report never
-   % describes a run that used different VALUES, and rewording an explanation
-   % must not invalidate a multi-hour cohort.
+   % These fields explain the policy. They do not govern any result. The
+   % report validator compares the saved policy against the current policy, so
+   % a report never describes a run that used different VALUES. A reworded
+   % explanation must not invalidate a multi-hour cohort.
    policy.documentation_fields = ["effective_density_role", ...
       "observation_rate_outlier_role", "rationale"];
 end
@@ -148,8 +148,8 @@ function fields = insertAfterTarget(support_fields, snow_variable)
    %
    % observationSupportFields returns the target first and then the flag
    % groups. Saved readiness and evaluation artifacts store the observation
-   % columns as target, snow, flags, so the snow variable is spliced back into
-   % second place rather than appended.
+   % columns as target, snow, flags. This function therefore puts the snow
+   % variable in second place instead of appending it.
 
    fields = [support_fields(1), string(snow_variable), support_fields(2:end)];
 end

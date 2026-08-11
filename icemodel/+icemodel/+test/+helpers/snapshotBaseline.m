@@ -34,8 +34,8 @@ function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, ou
       error('rolling %s baseline is missing: %s', kind, char(source_file))
    end
 
-   % Select and validate the saved baseline before inspecting target state.
-   % This keeps an obsolete rolling source as the first actionable diagnosis.
+   % Select and validate the saved baseline before checking the target state.
+   % An out-of-date rolling source is then the first error the caller sees.
    S = load(char(source_file));
    switch kind
       case "perf"

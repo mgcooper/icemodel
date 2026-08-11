@@ -6,12 +6,11 @@ function gate = admissionGate(channel, metrics, baseline_rmse, kwargs)
    %
    % Role
    %  Method-admission decision for one channel and one metric row (gap-fill
-   %  policy): a method is admitted where, on held-out
-   %  draws, |bias| stays within the instrument-class cap, RMSE improves on
-   %  the best available baseline by at least the required margin, and no
-   %  physical-bound violation occurred. The engine consumes the emitted
-   %  admit/deny row per stratum; a denied stratum stays missing rather
-   %  than receiving a weaker fill.
+   %  policy). The gate admits a method when, on held-out draws, |bias| stays
+   %  within the instrument-class cap, RMSE improves on the best available
+   %  baseline by at least the required margin, and no physical-bound
+   %  violation occurred. The engine reads the admit/deny row per stratum. A
+   %  denied stratum stays missing, and takes no weaker fill.
    %
    % Inputs
    %  channel : canonical channel name (bias caps are per channel).
@@ -64,8 +63,8 @@ function gate = admissionGate(channel, metrics, baseline_rmse, kwargs)
    end
 
    bias_cap = biasCap(channel);
-   % Degenerate metric rows (NaN bias/rmse/coverage) must be denied, not
-   % silently admitted through NaN comparisons.
+   % Deny a degenerate metric row (NaN bias, rmse, or coverage). A NaN
+   % comparison is false, so such a row would otherwise pass every test.
    if ~isfinite(metrics.bias) || ~isfinite(metrics.coverage) || ...
          (~isfinite(metrics.rmse) && isfinite(baseline_rmse))
       gate = struct('admit', false, ...

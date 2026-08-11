@@ -5,27 +5,27 @@ function [window, proxy_files] = acceptanceWindow(site, kwargs)
    %     "kanm", location=location)
    %
    % Role
-   %  THE forcing-ready acceptance-window policy: reconstruction verdicts
-   %  must not be penalized by truly missing proxy TIME coverage (a
-   %  staging limitation), only by fundamental limitations, so the window
-   %  within which readiness is judged is the continuous union of the
-   %  per-source staged proxy files actually loaded for the site — left edge
-   %  the earliest selected sample, right edge the latest. Filename date
-   %  tokens must contain those endpoints, but never widen a partial
-   %  boundary day beyond the timetable's exact support. Every candidate
-   %  file is validated and a disjoint staged union is rejected. Per
-   %  source the widest file anchors the selection and validated siblings
-   %  extending beyond it are also pinned, so reconstruction loads (and
-   %  the window honestly reflects) every staged span. The window derives
-   %  from validated met
-   %  artifacts and their window-stamped FILENAMES at call time,
-   %  so restaging redefines the policy with no refill and no stale
-   %  stored columns: extending MERRA-2 widens it automatically, and a
-   %  future source (e.g. HIRHAM) joins by a deliberate code change at
-   %  the marked setopts extension point (supportedProxySources, POLICY
-   %  A12) plus staging its met. The stored readiness
-   %  ledger stays ABSOLUTE (is the file forcing-ready, period);
-   %  consumers apply this window as a read-time view.
+   %  The forcing-ready acceptance-window policy. A reconstruction verdict must
+   %  not be penalized by missing proxy TIME coverage, which is a staging
+   %  limitation, only by fundamental limitations. The window within which
+   %  readiness is judged is therefore the continuous union of the per-source
+   %  staged proxy files loaded for the site: the left edge is the earliest
+   %  selected sample, and the right edge is the latest. The filename date
+   %  tokens must contain those endpoints, but they never widen a partial
+   %  boundary day beyond the timetable's exact support. This function
+   %  validates every candidate file and rejects a disjoint staged union. For
+   %  each source the widest file anchors the selection, and validated siblings
+   %  that extend beyond it are also pinned, so reconstruction loads every
+   %  staged span and the window reports it.
+   %
+   %  The window derives from validated met artifacts and their window-stamped
+   %  FILENAMES at call time. Restaging therefore redefines the policy with no
+   %  refill and no stale stored columns: extending MERRA-2 widens the window
+   %  automatically. A new source (for example HIRHAM) joins by a deliberate
+   %  code change at the marked setopts extension point (supportedProxySources,
+   %  POLICY A12) and by staging its met. The stored readiness ledger stays
+   %  ABSOLUTE: it records whether the file is forcing-ready. Consumers apply
+   %  this window as a read-time view.
    %
    % Name-value
    %  met_dir : selected native source directory or flat met root. Proxy
@@ -60,8 +60,8 @@ function [window, proxy_files] = acceptanceWindow(site, kwargs)
       icemodel.forcing.reconstruct.selectedDataRoot(met_dir);
 
    % Union span across every staged window file of every catalog source.
-   % Validate each artifact before its filename tokens can widen the policy
-   % window; a stale or mislabeled narrow file is just as unsafe as the widest.
+   % Validate each artifact before its filename tokens widen the policy window.
+   % A stale or mislabeled narrow file is as unsafe as the widest one.
     catalog = kwargs.opts.proxy_catalog;
     window = NaT(1, 2, 'TimeZone', 'UTC');
    % Per-source selections collect in cells because one source can pin
@@ -136,11 +136,11 @@ function [window, proxy_files] = acceptanceWindow(site, kwargs)
       % inventory, whether or not the selection below picks it.
       staged_sample_coverage{k} = hit_sample_windows(valid_hit, :);
         if any(valid_hit)
-           % The widest file anchors the source; validated siblings that
-           % extend coverage beyond it join the selection so a staged
-           % year is never dropped just because a wider-duration file
-           % exists (POLICY A6: staging more proxy met widens the
-           % product). Interior overlap still belongs to the anchor.
+           % The widest file anchors the source. Validated siblings that
+           % extend coverage beyond it join the selection, so a staged
+           % year is never dropped just because a file with a wider
+           % duration exists (POLICY A6: staging more proxy met widens
+           % the product). Interior overlap still belongs to the anchor.
            spans = hit_sample_windows(:, 2) - hit_sample_windows(:, 1);
            spans(~valid_hit) = -Inf;
            [~, widest] = max(spans);
@@ -170,8 +170,8 @@ function [window, proxy_files] = acceptanceWindow(site, kwargs)
        return
     end
 
-     % Reject sub-day holes in either the staged inventory or the exact files
-     % reconstruction selects; filename dates alone cannot prove continuity.
+     % Reject sub-day holes in the staged inventory and in the exact files that
+     % reconstruction selects. Filename dates alone cannot prove continuity.
      continuousWindow(sample_coverage, site, minutes(15));
      window = continuousWindow(selected_sample_coverage, site, minutes(15));
 end

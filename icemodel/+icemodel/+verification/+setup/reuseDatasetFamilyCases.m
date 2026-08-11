@@ -7,12 +7,13 @@ function [state, alive, skipped] = reuseDatasetFamilyCases( ...
    %     manifest_file, requested_ids, prototype, ...
    %     forcing_sources=["mar","merra"], coverage=coverage)
    %
-   % This is the guarded build_observations=false path shared by dataset-family
-   % importers. It requires every requested case to exist, preserves the decoded
-   % case entry and colocation graph, and creates only the state needed to attach
-   % explicitly requested RCM forcing. An explicit observation window must fit
-   % inside the staged case period. forcing_startdate/forcing_enddate may select
-   % an independent forcing window (SUMup years); otherwise the observation
+   % This is the guarded build_observations=false path that the dataset-family
+   % importers share. Every requested case must already exist. The function
+   % keeps the decoded case entry and colocation graph. It creates only the
+   % state that attaches the requested RCM forcing. An explicit observation
+   % window must fit inside the staged case period.
+   % forcing_startdate/forcing_enddate may select an independent forcing
+   % window (SUMup years); otherwise the observation
    % request or staged case period supplies the forcing probe. A forcing probe
    % never relabels the staged observation period held in state.
 

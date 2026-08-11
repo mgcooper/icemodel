@@ -121,7 +121,7 @@ function test_prepare_case_root_gates_fixed_artifact_identity(testCase)
    requested = struct('period', period, 'site_location', location, ...
       'artifact_metadata', metadata);
 
-   % Equal identity is an exact no-op and therefore preserves saved bytes.
+   % Equal identity changes nothing, so the saved bytes stay the same.
    testCase.verifyFalse(icemodel.verification.setup.prepareCaseRoot( ...
       case_root, false, "observations.mat", requested));
    testCase.verifyEqual(fileBytes(observation_file), original);
@@ -1243,8 +1243,8 @@ function test_fetch_gcnet_accepts_normalized_station_filenames(testCase)
 end
 
 function test_fetch_gcnet_rejects_partial_and_ambiguous_matches(testCase)
-   % A containing basename is not the required file, and two exact normalized
-   % basenames are ambiguous rather than an invitation to select the first one.
+   % A basename that only contains the token is not the required file. Two
+   % exact normalized basenames are ambiguous, so do not select the first one.
    cache = fullfile(testCase.TestData.cache, 'gcnet-partial-ambiguous');
    mkdir(cache)
    touch(fullfile(cache, 'backup_DYE_2_surface.nc'));
@@ -4846,7 +4846,7 @@ function writeTinyGcnetNetcdf(filename, variables, units, has_level)
 end
 
 function bytes = fileBytes(filename)
-   %FILEBYTES Read one staged binary artifact for no-churn assertions.
+   %FILEBYTES Read one staged binary artifact for byte-stability assertions.
    fid = fopen(filename, 'r');
    cleanup = onCleanup(@() fclose(fid));
    bytes = fread(fid, Inf, '*uint8');

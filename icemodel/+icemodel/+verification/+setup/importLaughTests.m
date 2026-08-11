@@ -13,9 +13,9 @@ function manifest = importLaughTests(laugh_tests_source_dir, kwargs)
    %    laugh_tests_source_dir="" reads the configured Laugh-Tests checkout. With
    %    no output_root, cases go to <repo>/data/eval/laugh_tests/<case_id>/.
    %
-   %  Laugh cases intentionally expose no forcing_sources/build_observations
-   %  split: each case is an atomic evaluation/reference bundle and has no staged
-   %  runtime forcing source that can be attached independently.
+   %  Laugh cases have no forcing_sources/build_observations split. Each case is
+   %  an atomic evaluation/reference bundle, and it has no staged runtime
+   %  forcing source that a caller can attach on its own.
    %
    %  Inputs
    %    laugh_tests_source_dir : string  Root of a local Laugh-Tests checkout.
@@ -146,7 +146,7 @@ function s = stageCase(case_id, source_dir, family_root, source_status, ...
    reference_output_file = fullfile(case_root, "reference.mat");
 
    % The manifest definition validates the requested case without reading raw
-   % files; the build helper owns every source-specific read/normalization step.
+   % files. The build helper does every source-specific read and normalization.
    case_values = dryRunCaseValues(case_id);
    if ~kwargs.dry_run
       % Real staging delegates the complete raw build after cache validation.
@@ -160,8 +160,8 @@ function s = stageCase(case_id, source_dir, family_root, source_status, ...
       % skip-missing imports do not delete existing cases or leave empty roots.
       write_artifacts = icemodel.verification.setup.prepareCaseRoot( ...
          case_root, kwargs.overwrite, ["evaluation.mat", "reference.mat"]);
-      % Keep each already-current half of the atomic source pair byte-stable;
-      % a missing sibling may still be added by an ordinary repeated import.
+      % Keep each already-current half of the atomic source pair byte-stable.
+      % An ordinary repeated import can still add a missing sibling.
       if write_artifacts(1)
          save(evaluation_output_file, 'targets');
       end

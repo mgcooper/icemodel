@@ -9,7 +9,7 @@ function report = writePromiceAblationReadiness(kwargs)
    % The CSV contains one row for every canonical PROMICE case and calendar
    % year intersecting its manifest period. Verdicts inspect the actual staged
    % observations and promice_filled artifacts. The manifest and final producer
-   % ledger provide inventory and provenance, never substitute for payloads.
+   % ledger provide inventory and provenance. They never replace the payloads.
 
    arguments
       kwargs.evaluation_data_root (1, 1) string
@@ -420,9 +420,9 @@ function [row, reason] = observationStatus( ...
 
    if row.target_available
       index = find(names == target, 1);
-      % Older observation timetables may omit these optional table metadata
-      % arrays. Leave the public fields empty so this case receives the normal
-      % semantic exclusion below instead of aborting the complete cohort audit.
+      % An older observation timetable can omit these optional table metadata
+      % arrays. Leave the public fields empty, so this case takes the normal
+      % exclusion below instead of aborting the complete cohort audit.
       units = string(data.Properties.VariableUnits);
       if numel(units) >= index
          row.target_units = units(index);
@@ -705,7 +705,7 @@ function audit = reconstructionWriteAudit()
          n_guard_calls = n_guard_calls + numel(regexp(code, ...
             'assertNotEvaluationDestination\s*\(', 'match'));
       end
-      % Select the offending calls for this file in one pass and stash them
+      % Select the offending calls for this file in one pass and store them
       % in a preallocated slot, so the match list is joined once at the end.
       is_match = ~cellfun(@isempty, regexpi(calls, ...
          'observations\.mat|data[\\/]eval|evaluation_data_root', 'once'));

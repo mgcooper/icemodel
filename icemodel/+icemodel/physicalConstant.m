@@ -1,5 +1,5 @@
 function varargout = physicalConstant(varargin)
-   %PHYSICALCONSTANT return the value of a physical constant.
+   %PHYSICALCONSTANT Return the value of a physical constant.
    %
    % C = physicalConstant(NAME) returns the physical constant C specified by
    % NAME.
@@ -84,10 +84,11 @@ function varargout = physicalConstant(varargin)
    constants.Lv_o_Rv = constants.Lv / constants.Rv;  % [K]
 
    % Constant-L Clausius-Clapeyron saturation vapor density prefactors
-   % [kg m-3 K], as used by Jordan (1991) / SNTHERM89. These would be used if
-   % SNTHERMs vapor model were adopted. The give rho_s = c/T * exp(-L/(Rv*T))
-   % when combined with the ideal gas law. Retained for reference only;
-   % production uses the Ambaum (2020) formulation via icemodel.vapor.initialize_vapor_model.
+   % [kg m-3 K], as used by Jordan (1991) / SNTHERM89. They apply only to the
+   % SNTHERM vapor model. With the ideal gas law they give
+   % rho_s = c/T * exp(-L/(Rv*T)). They are here for reference only. Production
+   % uses the Ambaum (2020) formulation through
+   % icemodel.vapor.initialize_vapor_model.
    % ci = 611.15 * exp(constants.Ls / (constants.Rv * constants.Tf)) / constants.Rv;
    % cl = 611.21 * exp(constants.Lv / (constants.Rv * constants.Tf)) / constants.Rv;
 

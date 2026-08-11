@@ -1,17 +1,18 @@
 function opts = verifyPromiceFilledReadiness(opts, fileiter)
    %VERIFYPROMICEFILLEDREADINESS Gate derived PROMICE forcing by coverage.
    %
-   %  opts = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts) verifies the
-   %  producer-manifest identity of the configured promice_filled artifacts
-   %  and proves complete required-channel coverage plus exact current
-   %  policy/version/registry/channel provenance for every configured file.
-   %  Coverage spans each requested timestep between opts.startdate and
-   %  opts.enddate (or the opts.simyears span when no dates are set) directly
-   %  against the filled met files' samples (POLICY A4; water years and
-   %  arbitrary windows are first-class). The canonical product and runtime
-   %  timestep are both fixed at 15 minutes. Calendar-year ledger verdicts
-   %  are producer bookkeeping and never the runtime gate. The returned
-   %  options are marked for code-generation-safe loading.
+   %  opts = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts)
+   %  verifies the producer-manifest identity of the configured
+   %  promice_filled artifacts. For every configured file it also proves
+   %  complete required-channel coverage, and exact current provenance for
+   %  policy, version, registry, and channels. Coverage covers each requested
+   %  timestep between opts.startdate and opts.enddate, or the opts.simyears
+   %  span when no dates are set. It is checked against the samples in the
+   %  filled met files (POLICY A4; water years and arbitrary windows are
+   %  first-class). The canonical product and runtime timestep are both fixed
+   %  at 15 minutes. Calendar-year ledger verdicts are producer bookkeeping,
+   %  and are never the runtime gate. The returned options are marked for
+   %  code-generation-safe loading.
    %
    % See also: icemodel.loadmet, icemodel.setopts
 
@@ -68,9 +69,9 @@ function opts = verifyPromiceFilledReadiness(opts, fileiter)
    % are never consulted here.
    verifyRequestedWindowCoverage(opts, site, met_files);
 
-   % These flags are the code-generation trust seam. Mint them only after the
-   % manifest, requested-window coverage, and exact artifact provenance have
-   % all passed on the MATLAB side.
+   % These flags are the code-generation trust seam. Set them only after the
+   % manifest, the requested-window coverage, and the exact artifact
+   % provenance all pass on the MATLAB side.
    opts.promice_filled_readiness_verified = true;
    opts.promice_filled_manifest_verified = true;
    opts.promice_filled_provenance_verified = true;
@@ -271,9 +272,9 @@ function verifyRequestedWindowCoverage(opts, site, met_files)
    end
    if all(covered(:))
       % Generated loading cannot inspect timetable UserData. After the
-      % coverage gate passes, validate exact current policy/version,
-      % registry, site/product identity, and channel provenance before
-      % minting flags.
+      % coverage gate passes, validate the exact current policy and version,
+      % the registry, the site and product identity, and the channel
+      % provenance, before setting the flags.
       for k = 1:n_files
          icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
             met_files(k), met_by_file{k}, site)
@@ -315,8 +316,8 @@ function rejectOverlappingIntervalStarts(times, met_files)
       return
    end
 
-   % The verifier must fail before its generated-code trust flags can describe
-   % a runtime payload whose loadmet concatenation would contain duplicate rows.
+   % The verifier must fail here. If it did not, its generated-code trust flags
+   % would describe a payload whose loadmet concatenation holds duplicate rows.
    error('icemodel:loadmet:promiceFilledIntervalOverlap', ...
       ['selected promice_filled artifacts contain %d overlapping UTC ' ...
       'interval-start row(s) (%s .. %s) across %d files'], ...

@@ -15,8 +15,8 @@ function [family_root, manifest_file, met_outdir, userdata_outdir] = ...
       dataset_family (1, 1) string
    end
 
-   % Keep the four shared path relationships in one place so family adapters
-   % cannot drift between eval, manifest, met, and userdata roots.
+   % Keep the four shared path relationships in one place, so every family
+   % adapter uses the same eval, manifest, met, and userdata roots.
    family_root = fullfile(evaluation_data_root, dataset_family);
    manifest_file = fullfile(family_root, "manifest.json");
    met_outdir = fullfile(input_root, "met");

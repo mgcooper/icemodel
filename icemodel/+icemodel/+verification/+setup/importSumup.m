@@ -40,8 +40,8 @@ function manifest = importSumup(source_dir, kwargs)
    %
    %  Source: SUMup_2025 is read from the LOCAL verification cache
    %  (data/verification/sumup, NSIDC G02288); the files are committed there, so
-   %  no download is required. fetchSumup verifies cache presence (and prints a
-   %  retrieval banner only if it is genuinely absent). Provide points explicitly
+   %  no download is required. fetchSumup verifies cache presence, and prints a
+   %  retrieval banner only when the cache is absent. Provide points explicitly
    %  (SUMup is a point collection, not a curated site list); the default is the
    %  PROMICE anchor transect so the staged SUMup cases co-locate with the
    %  existing firn/promice bundles.
@@ -266,8 +266,8 @@ function manifest = importSumup(source_dir, kwargs)
       end
 
       % Validate caches only when building observations.
-      % Dry runs remain metadata-only; optional skips stay quiet while required
-      % SUMup products print their retrieval guidance before failing.
+      % Dry runs stay metadata-only. An optional skip prints nothing, while a
+      % required SUMup product prints its retrieval guidance before it fails.
       if kwargs.dry_run
          source_dir = icemodel.verification.setup.sumupCacheDir(source_dir);
          source_status = [];
@@ -527,8 +527,8 @@ function entry = caseEntry(s)
    if s.reuse_entry
       % A forcing-only refresh keeps the staged observation contract verbatim
       % and updates only requested colocation legs plus derived source lists.
-      % Apply the same overlap annotation as a normal observation build so a
-      % fast refresh cannot advertise a different comparison contract.
+      % Apply the same overlap annotation as a normal observation build, so a
+      % fast refresh cannot report a different comparison contract.
       entry = s.entry;
       colocation = s.colocation;
       for source = reshape(string(fieldnames(s.leg)), 1, [])
@@ -659,7 +659,7 @@ function [points, requested_ids] = deduplicateCatalogPoints( ...
    %
    % Multiple staged source families can describe the same logical anchor with
    % slightly different coordinates. The default catalog path should stage one
-   % SUMup case per resolved id; explicit points/case_ids still surface
+   % SUMup case per resolved id. Explicit points/case_ids still report
    % duplicates through the manifest merge validator. The "stable" unique keeps
    % the first occurrence of each id.
    [~, first_rows] = unique(requested_ids, "stable");

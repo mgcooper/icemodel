@@ -12,9 +12,10 @@ function manifest = importResearchSites(source_dir, kwargs)
    %    forcing_sources selects RCM sources requested by the current call.
    %    Ordinary calls preserve omitted existing legs; overwrite_family=true
    %    replaces the whole family state.
-   %    build_observations=false is a guarded non-dry fast path: requested cases
-   %    must already exist in the target manifest, whose SUMup-derived observation
-   %    entry is reused while selected RCM forcing is attached.
+   %    build_observations=false is a guarded fast path for a real run. Every
+   %    requested case must already exist in the target manifest. The importer
+   %    reuses its SUMup-derived observation entry and attaches the selected
+   %    RCM forcing.
    %    Delegated RCM model met defaults to dt_out="15m"; pass dt_out="" for
    %    native model-met cadence. RCM Data/userdata defaults to hourly.
    %
@@ -24,10 +25,10 @@ function manifest = importResearchSites(source_dir, kwargs)
    %    <repo>/data/eval/research_site/<case_id>/observations.mat and RCM
    %    met/userdata go to <repo>/data/input/{met,userdata}/<source>/.
    %
-   %  Minimal first implementation: Humphrey is represented as a generic
-   %  research_site anchor, with observations sourced from nearby SUMup records
-   %  via buildSumupObservations. It records no native station met. Optional RCM
-   %  forcing/Data legs are delegated to stageRcmForcing after observations stage.
+   %  Humphrey is a generic research_site anchor. buildSumupObservations takes
+   %  its observations from nearby SUMup records. The case records no native
+   %  station met. After the observations stage, stageRcmForcing builds the
+   %  optional RCM forcing and Data legs.
    %
    %  Name-value
    %    case_ids : string vector. Research-site cases to stage (default
@@ -35,10 +36,10 @@ function manifest = importResearchSites(source_dir, kwargs)
    %    forcing_sources : string vector subset of ["mar","merra","racmo"]
    %        (default all three). SUMup observations are always the case definition
    %        when build_observations is true; forcing_sources selects only runtime
-   %        met/userdata artifacts. It is a patch selector, not the complete
-   %        desired source state: an existing case's omitted legs remain
-   %        unchanged during ordinary merge updates and are removed only by
-   %        explicit family replacement.
+   %        met/userdata artifacts. It selects a patch, not the complete
+   %        source state. An ordinary merge update leaves the omitted legs of
+   %        an existing case unchanged. Only an explicit family replacement
+   %        removes those legs.
    %    startdate, enddate : datetime / string. Optional explicit observation and
    %        forcing window; pass both or neither. With both omitted, a fresh
    %        observation import uses the source-authored case period and a forcing-
@@ -69,10 +70,10 @@ function manifest = importResearchSites(source_dir, kwargs)
    %        reading source caches, writing artifacts, or merging the manifest.
    %    build_forcing : logical (default false). Stage runtime artifacts for
    %        forcing_sources. When false, only observations are staged.
-   %    build_observations : logical (default true). When false, requested cases
-   %        must already exist in the target manifest. Their observation entries
-   %        are reused while forcing_sources are attached without rebuilding the
-   %        observation artifact.
+   %    build_observations : logical (default true). When false, every
+   %        requested case must already exist in the target manifest. The
+   %        importer reuses their observation entries and attaches
+   %        forcing_sources. It does not rebuild the observation artifact.
    %
    %  Incremental staging (MERGE by default)
    %    Staging one case adds or updates only that case in the family manifest
@@ -186,8 +187,8 @@ function manifest = importResearchSites(source_dir, kwargs)
          startdate=kwargs.startdate, enddate=kwargs.enddate);
    else
       % Validate caches only when building observations.
-      % Dry runs remain metadata-only; optional skips stay quiet while required
-      % SUMup products print their retrieval guidance before failing.
+      % A dry run stays metadata-only. An optional skip prints nothing. A
+      % required SUMup product prints its retrieval guidance, then fails.
       if ~kwargs.dry_run
          source_dir = icemodel.verification.setup.fetchSumup( ...
             cache_dir=source_dir, strict=~kwargs.skip_missing, ...

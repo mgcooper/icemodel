@@ -6,17 +6,17 @@ function [T, metadata] = applyMarDailyQualityControl( ...
    %  [T, metadata] = ... applyMarDailyQualityControl(_, _, metadata, ...
    %     sector=1)
    %
-   % REPLACEMENTS is a scalar struct whose optional runoff and smb fields are
-   % hourly rates derived from native MAR daily accumulations (daily / 24,
-   % held over the UTC day). A complete hourly day is preserved when its sum
+   % REPLACEMENTS is a scalar struct. Its optional runoff and smb fields hold
+   % hourly rates derived from native MAR daily accumulations (daily / 24, held
+   % over the UTC day). This function keeps a complete hourly day when its sum
    % agrees with the native daily reference. Missing, partial, or inconsistent
-   % days use the daily rate; days lacking a finite daily reference retain the
-   % hourly source and are marked unverified.
+   % days use the daily rate. A day without a finite daily reference keeps the
+   % hourly source and gets the unverified mark.
    %
-   % Metadata stores one compact status code and native daily reference per
-   % UTC day and channel. This lets source-light artifact QA distinguish
-   % preserved (1), replaced (2), and unverified (3) support and recheck every
-   % constrained daily total without reopening the MAR archive.
+   % Metadata stores one status code and one native daily reference per UTC day
+   % and channel. Source-light artifact QA can then tell preserved (1),
+   % replaced (2), and unverified (3) days apart. It can also recheck every
+   % constrained daily total without opening the MAR archive again.
    %
    % See also: icemodel.forcing.buildMarData,
    %  icemodel.forcing.helpers.dailyToHourly
@@ -41,9 +41,9 @@ function [T, metadata] = applyMarDailyQualityControl( ...
    [groups, days, complete] = utcDayGroups(T.Time);
    ndays = numel(days);
 
-   % Start both channel ledgers as unverified. Applied replacement fields
-   % overwrite these defaults; a reduced source therefore has an explicit
-   % per-day ledger without changing its native hourly values.
+   % Start both channel ledgers as unverified. The applied replacement fields
+   % overwrite these defaults. A reduced source therefore gets an explicit
+   % per-day ledger, and its native hourly values do not change.
    ledgers = struct();
    for channel = ["runoff", "smb"]
       ledgers.(channel) = emptyLedger(ndays);
@@ -57,8 +57,8 @@ function [T, metadata] = applyMarDailyQualityControl( ...
       if ismember(channel, string(T.Properties.VariableNames))
          source = T.(channel);
       else
-         % A source-backed daily channel may complete an older reduced
-         % artifact. Missing hourly input is treated as an incomplete day.
+         % A source-backed daily channel can complete an existing reduced
+         % artifact. Missing hourly input counts as an incomplete day.
          source = nan(height(T), 1);
       end
       [T.(channel), ledgers.(channel)] = constrainChannel( ...
@@ -66,16 +66,17 @@ function [T, metadata] = applyMarDailyQualityControl( ...
          kwargs.abs_tolerance_mwe_day, kwargs.rel_tolerance);
    end
 
-   % Reapplying an unchanged current record is byte-idempotent. In particular,
-   % a previously replaced constant day must not be relabelled as preserved on
-   % the second pass merely because it now matches the daily reference.
+   % A second pass over an unchanged current record must produce the same bytes.
+   % A constant day that the first pass replaced must not become preserved on
+   % the second pass just because it now matches the daily reference.
    current = metadataCurrent(metadata, channels, ndays, kwargs);
    if current && isequaln(T, original)
       return
    end
 
-   % Cumulative changed-sample counts retain repair history, while day-ledger
-   % counts describe the current application and are reproducible from status.
+   % The cumulative changed-sample counts keep the repair history. The
+   % day-ledger counts describe the current application, and the status codes
+   % reproduce them.
    runoff_count = priorCount(metadata, ...
       'mar_qc_replaced_runoff_count', current) ...
       + nnz(unequalWithMissing(column(original, "runoff"), ...
@@ -103,8 +104,8 @@ function [T, metadata] = applyMarDailyQualityControl( ...
       sector_name = 'tundra';
    end
 
-   % Stamp the complete daily-constrained provenance contract. The day axis is
-   % derivable from T.Time, so only aligned status/reference vectors are saved.
+   % Stamp the complete daily-constrained provenance contract. T.Time gives the
+   % day axis, so this code saves only the aligned status and reference vectors.
    metadata.mar_qc_method = 'daily_constrained_hourly';
    metadata.mar_qc_status = status;
    metadata.mar_qc_fallback = fallback;
@@ -158,7 +159,7 @@ function [values, ledger] = constrainChannel( ...
       end
       if ~valid_reference
          % A missing or internally inconsistent native daily source cannot
-         % constrain this day. Preserve the hourly source and expose status 3.
+         % constrain this day. Keep the hourly source and report status 3.
          continue
       end
 

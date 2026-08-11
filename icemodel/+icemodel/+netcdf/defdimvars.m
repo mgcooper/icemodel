@@ -22,14 +22,14 @@ function defdimvars(ncid, dimidStruct, varnames, standardnames, longnames, ...
    for v = 1:numel(varnames)
       thisvar = varnames{v};
 
-      % This check is only made on depth b/c it's the only dimension that
-      % differs between ice1/ice2. If dimid had 1:1 mapping with vars, like the
-      % other attrs, then this check could apply to all vars.
+      % This check applies only to depth, because depth is the one dimension
+      % that differs between ice1 and ice2. A 1:1 map from dimid to vars, like
+      % the other attributes, would let the check apply to every var.
       if strcmp(thisvar, 'depth') && ~isfield(dimidStruct, 'depth')
          continue
       end
 
-      % Explicitly assign the fundamental dimensions. The "if isfield(...)"
+      % Explicitly assign the fundamental dimensions.
       switch thisvar
 
          case "gridcell"

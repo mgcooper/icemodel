@@ -1,12 +1,12 @@
 function archiveManagedBaseline(pathname, kind)
-   %ARCHIVEMANAGEDBASELINE Archive an existing rolling baseline before overwrite.
+   %ARCHIVEMANAGEDBASELINE Archive a rolling baseline before overwrite.
    %
    %  icemodel.test.helpers.archiveManagedBaseline(pathname, "perf")
    %
-   % The rolling baseline files are mutable acceptance targets. Before
-   % replacing one, archive the prior managed MAT file and any saved profiler
-   % artifacts under test/baselines/archive/ so older accepted states remain
-   % available for later inspection.
+   % The rolling baseline files are mutable acceptance targets. Before you
+   % replace one, archive the managed MAT file and any saved profiler
+   % artifacts under test/baselines/archive/. Accepted earlier states then
+   % stay available for later inspection.
 
    arguments
       pathname {mustBeTextScalar}

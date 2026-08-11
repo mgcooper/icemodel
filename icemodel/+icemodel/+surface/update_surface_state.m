@@ -7,10 +7,10 @@ function [liqflag, ro_sfc, hv_atm, H_e, f_res_por] = ...
    %     icemodel.surface.update_surface_state( ...
    %     f_ice_1, f_liq_1, ro_atm, De_e, snow_depth, opts)
    %
-   %  Computes the surface state quantities that depend on both the
-   %  current column state and the current forcing step. Called at the
-   %  top of the substep loop so that every substep/coupler call sees
-   %  state consistent with the current metstep and column.
+   %  This function computes the surface state quantities that depend on
+   %  both the current column state and the current forcing step. The
+   %  substep loop calls it at the top, so every substep and coupler call
+   %  sees state consistent with the current metstep and column.
    %
    %  This function is the substep-entry complement to
    %  initialize_surface_state, which precomputes the forcing-derived

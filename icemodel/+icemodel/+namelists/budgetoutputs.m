@@ -25,13 +25,12 @@ function fields = budgetoutputs(kind)
    % mass. Neither export channel is a surface mass flux: a merge keeps the
    % mean of the pair, so the export over-counts what the removed cell held.
    %
-   % Their SUM is nonnegative by construction, because the merged cell keeps
-   % exactly half the pair's total water. The per-phase split is not
-   % guaranteed individually: merge_layers re-derives f_liq_C from the merged
-   % temperature, so the liquid share is a solve result rather than a mean.
-   % It is positive across the realistic states checked, so no separate
-   % absolute-gross channel exists. The liquid channel summed on its own
-   % carries no guaranteed sign.
+   % Their SUM is always nonnegative, because the merged cell keeps exactly
+   % half the pair's total water. The per-phase split has no such property.
+   % merge_layers re-derives f_liq_C from the merged temperature, so the
+   % liquid share is a solve result, not a mean. It is positive across the
+   % realistic states checked, so there is no separate absolute-gross channel.
+   % The liquid channel summed on its own has no fixed sign.
 
    if nargin == 0
       kind = 'all';

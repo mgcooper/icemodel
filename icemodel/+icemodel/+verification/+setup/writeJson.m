@@ -3,10 +3,10 @@ function writeJson(pathname, value)
    %
    %  icemodel.verification.setup.writeJson(pathname, value)
    %
-   % Writes the readiness ledgers, preview evidence, and QA JSON. All are
-   % write UTF-8 with a trailing newline. writeManifest is an exception: it
-   % compares bytes before rewriting, so it keeps its own no-newline write and
-   % stays a no-op when nothing changed.
+   % This function writes the readiness ledgers, the preview evidence, and the
+   % QA JSON. Each file is UTF-8 with a trailing newline. writeManifest is an
+   % exception: it compares bytes before it rewrites, so it keeps its own write
+   % with no trailing newline and changes nothing when the bytes match.
 
    fid = fopen(pathname, 'w', 'n', 'UTF-8');
    if fid < 0

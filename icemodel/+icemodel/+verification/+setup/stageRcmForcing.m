@@ -10,7 +10,7 @@ function out = stageRcmForcing(points, kwargs)
    %     obs_manifest=<path-or-struct>, manifest_file=..., ...
    %     met_outdir=..., userdata_outdir=..., mar_dir=..., racmo_dir=...)
    %
-   %  Single owner of RCM forcing/Data generation for the firn-evaluation
+   %  This function generates all RCM forcing and Data for the firn-evaluation
    %  staging. Observation import (importPromiceSites / importSumup) DELEGATES
    %  here instead of containing the RCM logic, and this builder is ALSO callable
    %  independently after observations are imported, so RCM products can be
@@ -31,8 +31,8 @@ function out = stageRcmForcing(points, kwargs)
    %    Each source is staged only for the files it still needs. Existing window
    %    files are reused only when they cover the full requested leg. A partial
    %    overlap triggers a wider rebuild when raw coverage is available; if that
-   %    rebuild fails, the clipped cached fallback is retained with a warning and
-   %    manifest note rather than being accepted silently. Points that
+   %    rebuild fails, the code keeps the clipped cached fallback and records a
+   %    warning and a manifest note. Points that
    %    still need source reads are grouped by identical year set, so one long
    %    station record does not force every shorter station to read the long union
    %    span. Sources are processed in order and each source's files are written
@@ -257,9 +257,9 @@ function colocation = stageOneSource(src, points, legspec, colocation, kwargs)
             k = gidx(j);
             if endsWith(string(build_err.identifier), ...
                   ":pointOutsideValidDomain")
-               % Native-mask rejection proves that the prior spatial payload is
+               % Native-mask rejection shows that the prior spatial payload is
                % invalid. Make the skipped result destructive so additive
-               % manifest merging cannot resurrect an old off-mask artifact.
+               % manifest merging cannot restore an old off-mask artifact.
                leg = skippedLeg(kind, build_err.message);
                leg.replace_prior_artifacts = true;
                colocation{k}.(srcc) = leg;
@@ -315,7 +315,7 @@ function colocation = stageOneSource(src, points, legspec, colocation, kwargs)
                   ":pointOutsideValidDomain")
                % A non-local ice cell is a proven colocation conflict, not a
                % transient source failure. Replace any cached off-mask leg with
-               % an explicit unavailable result instead of resurrecting it.
+               % an explicit unavailable result instead of reusing it.
                leg = skippedLeg(kind, write_err.message);
                leg.replace_prior_artifacts = true;
                colocation{k}.(srcc) = leg;

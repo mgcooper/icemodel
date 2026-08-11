@@ -5,9 +5,10 @@ function filenames = writemet(met, site, forcings, kwargs)
    %  filenames = ... writemet(_, outdir=..., naming="yearly", ...
    %     dt_out="15m", overwrite=true, validate=false)
    %
-   % Saves MET (a timetable satisfying the icemodel met contract) under
-   % the standard naming convention so icemodel.createMetFileNames and
-   % icemodel.loadmet resolve it without special cases:
+   % This function saves MET, a timetable that meets the icemodel met
+   % contract. It uses the standard naming convention, so
+   % icemodel.createMetFileNames and icemodel.loadmet resolve the file
+   % without special cases:
    %
    %  naming="window" (default): one file spanning the full time axis,
    %     met_<site>_<forcings>_<YYYYMMDD>_<YYYYMMDD>_<dt>.mat
@@ -17,16 +18,18 @@ function filenames = writemet(met, site, forcings, kwargs)
    %
    % OUTDIR defaults to fullfile(icemodel.getpath('input'), 'met'), the
    % met directory of the active icemodel workspace (demo/data when the
-   % demo or test config is active). The directory is created when it
-   % does not exist. The saved .mat file holds one variable named met. Model met
-   % defaults to 15-minute output across repository writers. Pass dt_out="" to
-   % preserve an explicit native cadence. Existing targets are additive no-ops
-   % unless overwrite=true; explicit replacement emits a warning. A successful
-   % wider window write removes only strictly contained files for the same
-   % site/source/cadence class and warns with the exact paths removed.
-   % Yearly naming validates/resamples the full source before calendar slicing,
-   % then applies compact exact per-year support/count summaries. A guarded
-   % 15-minute input must carry those summaries and constant cadence blocks.
+   % demo or test config is active). This function creates the directory
+   % when it does not exist. The saved .mat file holds one variable named
+   % met. Every repository writer defaults model met to 15-minute output.
+   % Pass dt_out="" to keep an explicit native cadence. An existing target
+   % stays unchanged unless overwrite=true, and an explicit replacement
+   % gives a warning. After a wider window write, this function removes
+   % only the files that window strictly contains for the same site,
+   % source, and cadence class, and warns with the exact paths it removed.
+   % Yearly naming validates and resamples the full source before it slices
+   % by calendar year, then applies exact per-year support and count
+   % summaries. A guarded 15-minute input must carry those summaries and
+   % constant cadence blocks.
    %
    % Inputs
    %  met      - timetable of forcing variables (see
@@ -53,14 +56,15 @@ function filenames = writemet(met, site, forcings, kwargs)
       kwargs.validate (1, 1) logical = true
    end
 
-   % Validate and derive the complete output before any directory mutation. This
-   % keeps rejected input side-effect free for both window and yearly naming.
+   % Validate and derive the complete output before this function changes any
+   % directory. Rejected input then leaves no files behind, for both window
+   % naming and yearly naming.
    met = prepareMet(met, kwargs.dt_out, kwargs.validate);
    dt = seconds(met.Time(2) - met.Time(1));
    guarded = false;
    if kwargs.naming == "yearly"
-      % Guarded yearly provenance is another validation boundary and must fail
-      % before the writer creates its per-source directory.
+      % The guarded yearly provenance is a second validation step. It must
+      % fail before the writer creates its per-source directory.
       metadata = met.Properties.UserData;
       guarded = isstruct(metadata) ...
          && isfield(metadata, 'met_resample_policy');
@@ -73,8 +77,8 @@ function filenames = writemet(met, site, forcings, kwargs)
    if outdir == ""
       outdir = string(fullfile(icemodel.getpath('input'), 'met'));
    end
-   % Stage into the per-source subfolder met/<forcings>/ so the flat met/ folder
-   % does not sprawl as verification staging grows; the runtime resolves this
+   % Write into the per-source subfolder met/<forcings>/ to keep the flat met/
+   % folder small as verification staging grows. The runtime resolves this
    % subfolder first (icemodel.configureRun / createMetFileNames).
    outdir = fullfile(outdir, char(forcings));
    if ~isfolder(outdir)
@@ -83,8 +87,8 @@ function filenames = writemet(met, site, forcings, kwargs)
 
    switch kwargs.naming
       case "window"
-         % Centralize model-met cadence at the final shared writer. Userdata
-         % uses its separate hourly writer boundary, and outages remain missing.
+         % Set the model-met cadence in this final shared writer. The userdata
+         % path has its own hourly writer, and outages stay missing.
          identity_matches = @(filename) ...
             icemodel.forcing.helpers.artifactIdentityMatches( ...
             filename, met, "met");
@@ -97,10 +101,10 @@ function filenames = writemet(met, site, forcings, kwargs)
             met.Time(1), met.Time(end), dt);
          filenames = fullfile(outdir, name);
 
-         % Runtime gives an exact window name precedence over broader files, so
-         % validate and return that same artifact before considering enclosure.
-         % A conflicting exact file requires explicit overwrite even when a
-         % compatible broad artifact also exists.
+         % The runtime prefers an exact window name over broader files, so
+         % validate and return that same file before you look for an
+         % enclosing file. A conflicting exact file needs overwrite=true even
+         % when a compatible broad file also exists.
          if isfile(filenames) && ~kwargs.overwrite
             if ~cadence_matches(filenames)
                cadenceConflict(filenames, "window")
@@ -111,8 +115,8 @@ function filenames = writemet(met, site, forcings, kwargs)
             return
          end
 
-         % With no exact file, a broader current window already satisfies a
-         % narrower ordinary request without creating a duplicate artifact.
+         % With no exact file, a broader current window answers a narrower
+         % ordinary request and creates no duplicate file.
          if ~kwargs.overwrite
             prefix = "met_" + site + "_" + forcings;
             suffix = metSuffix(dt);
@@ -120,7 +124,7 @@ function filenames = writemet(met, site, forcings, kwargs)
                icemodel.forcing.helpers.findEnclosingWindowFile( ...
                outdir, prefix, suffix, met.Time(1), met.Time(end), ...
                accept_candidate=candidate_matches);
-            % Return the same path normal runtime resolution would select.
+            % Return the same path that normal runtime resolution selects.
             if enclosing ~= ""
                filenames = fullfile(outdir, enclosing);
                return
@@ -128,16 +132,17 @@ function filenames = writemet(met, site, forcings, kwargs)
          end
          wrote = savemet(filenames, met, kwargs.overwrite);
          if wrote
-            % A successful wider refresh supersedes only contained shorter
-            % windows for this exact site/source/cadence naming class.
+            % A wider write replaces only the shorter windows it contains for
+            % this exact site, source, and cadence naming class.
              icemodel.forcing.helpers.pruneSupersededWindowFiles( ...
                 filenames, "met_" + site + "_" + forcings, metSuffix(dt), ...
                 accept_candidate=candidate_matches);
          end
 
       case "yearly"
-         % The full source was validated above before slicing, so a gap or
-         % irregular step crossing Jan 1 remains visible in the yearly files.
+         % This function validates the full source above, before it slices. A
+         % gap or irregular step that crosses Jan 1 stays visible in the
+         % yearly files.
          identity_matches = @(filename) ...
             icemodel.forcing.helpers.artifactIdentityMatches( ...
             filename, met, "met");
@@ -176,7 +181,7 @@ function cadenceConflict(filename, span)
 end
 
 function identityConflict(filename, span)
-   %IDENTITYCONFLICT Surface an exact-name collision with other provenance.
+   %IDENTITYCONFLICT Report an exact-name collision with other provenance.
    error('icemodel:forcing:writemet:identityConflict', ...
       ['Existing model-met artifact %s has conflicting source, product, ' ...
       'schema, sampling-method, or point metadata. Pass overwrite=true ' ...
@@ -243,9 +248,9 @@ function validateGuardedYearlyMet(met)
       end
    end
 
-   % Gap intervals are the compact distinction between omitted all-NaN blocks
-   % and real all-NaN source rows. Validate them and every source-side aggregate
-   % before any per-year summary is copied into an artifact.
+   % Gap intervals separate omitted all-NaN blocks from real all-NaN source
+   % rows. Validate them and every source-side aggregate before this function
+   % copies a per-year summary into a file.
    validateGuardedSourceSummaries(met, metadata, cadence_s, first_rows)
 end
 
@@ -418,13 +423,14 @@ function wrote = savemet(filename, met, overwrite)
    if exists && ~overwrite
       return
    end
-   % Explicit replacement is intentionally visible to setup callers.
+   % An explicit replacement gives a warning that setup callers can see.
    if exists
       warning('icemodel:forcing:writemet:overwrite', ...
          'Replacing existing model-met artifact %s.', filename);
    end
-   % Persist one exact provenance record in both supported read locations. The
-   % adapter may derive cadence/location facts absent from incoming UserData.
+   % Save one exact provenance record in both supported read locations. The
+   % adapter can derive cadence and location facts that the incoming UserData
+   % does not have.
    S.artifact_metadata = icemodel.forcing.helpers.artifactMetadata(met);
    met.Properties.UserData = S.artifact_metadata;
    S.met = met;

@@ -81,7 +81,7 @@ function tf = staged(colocation, source)
 end
 
 function tf = evaluationStaged(colocation, source)
-   %EVALUATIONSTAGED Resolve evaluation availability without conflating runtime.
+   %EVALUATIONSTAGED Resolve evaluation availability, not runtime staging.
    source = char(source);
    tf = false;
    if ~isfield(colocation, source) || ~isstruct(colocation.(source))

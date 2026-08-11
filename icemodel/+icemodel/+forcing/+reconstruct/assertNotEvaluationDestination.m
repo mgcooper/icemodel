@@ -4,9 +4,9 @@ function assertNotEvaluationDestination(destinations, evaluation_roots)
    %  icemodel.forcing.reconstruct.assertNotEvaluationDestination( ...
    %     destinations, evaluation_roots)
    %
-   % Reconstruction may read evaluation observations, but its persistence
-   % boundaries must never create, replace, or remove files in an evaluation
-   % tree. Canonical containment closes relative-path and symlink aliases.
+   % Reconstruction may read evaluation observations. It must never create,
+   % replace, or remove a file in an evaluation tree. The check compares
+   % canonical paths, so a relative path or a symlink cannot get past it.
 
    destinations = reshape(string(destinations), [], 1);
    evaluation_roots = unique(reshape(string(evaluation_roots), [], 1));

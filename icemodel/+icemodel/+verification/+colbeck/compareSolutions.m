@@ -56,8 +56,8 @@ function result = compareSolutions(kwargs)
       'snow_liquid_water_storage_m', kwargs.tolerance_storage_m, ...
       'bottom_outflow_mps',          kwargs.tolerance_outflow_mps);
 
-   % Resolve one paired tree and preflight missing public assets without network
-   % access so clean checkouts receive the exact provisioning command.
+   % Resolve one paired tree. Check for missing public assets without network
+   % access, so a clean checkout receives the exact provisioning command.
    [evaluation_data_root, input_data_root] = ...
       icemodel.verification.setup.resolveStagingRoots( ...
       data_root=kwargs.data_root, ...
@@ -214,7 +214,7 @@ end
 %% Per-pair statistics: synchronize then compute bias / rmse / correlation.
 function row = computeOnePair(target_tt, candidate_tt, varname)
 
-   % Bail out if the variable is missing from either timetable.
+   % Return early if the variable is missing from either timetable.
    if ~ismember(varname, string(target_tt.Properties.VariableNames)) || ...
          ~ismember(varname, string(candidate_tt.Properties.VariableNames))
       row = struct('status', "not_applicable", 'n', 0, ...

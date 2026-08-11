@@ -7,18 +7,16 @@ function dirs = sourceSearchDirs(base, source)
    % resolving a staged met/userdata file:
    %
    %   1. BASE/<SOURCE>  - the per-source subfolder the staging writers
-   %      (icemodel.forcing.helpers.writemet / writeuserdata) create so the
-   %      flat BASE folder does not sprawl as verification staging grows.
-   %   2. BASE           - the flat layout, kept as a backward-compatibility
-   %      fallback so committed flat fixtures (and pre-subfolder workspaces)
-   %      still resolve.
+   %      (icemodel.forcing.helpers.writemet / writeuserdata) create, so the
+   %      flat BASE folder does not fill with files as staging grows.
+   %   2. BASE           - the flat layout, kept as a fallback so committed
+   %      flat fixtures and workspaces without subfolders still resolve.
    %
-   % Subfolder-FIRST is the single rule for the layout: a staged subfolder file
-   % always wins over a same-named flat file. This is the one place the ordering
-   % is defined, shared by the three runtime resolvers
-   % (icemodel.configureRun.resolveMetPaths,
+   % The rule is subfolder first: a staged subfolder file takes priority over a
+   % flat file with the same name. This function defines that order for the
+   % three runtime resolvers (icemodel.configureRun.resolveMetPaths,
    % icemodel.createMetFileNames.findEnclosingMetFile, and
-   % icemodel.loadmet.resolveUserdataFile) so they cannot drift.
+   % icemodel.loadmet.resolveUserdataFile).
    %
    % Inputs
    %  base   - the flat input directory (e.g. input/met or input/userdata)

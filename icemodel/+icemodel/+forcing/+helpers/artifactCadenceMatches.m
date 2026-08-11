@@ -1,12 +1,13 @@
 function tf = artifactCadenceMatches(filename, variable_name, expected_seconds)
-   %ARTIFACTCADENCEMATCHES Prove a saved timetable has the requested cadence.
+   %ARTIFACTCADENCEMATCHES Check a saved timetable for the requested cadence.
    %
    %  tf = icemodel.forcing.helpers.artifactCadenceMatches( ...
    %     filename, variable_name, expected_seconds)
    %
-   % Current writers save artifact_cadence_seconds beside the payload, keeping
-   % checks source-light. Legacy artifacts without that field remain reusable only
-   % when the saved timetable has at least two rows and a uniform matching axis.
+   % Writers save artifact_cadence_seconds beside the payload, and this
+   % function reads that field when the file has it. An older file without the
+   % field is reusable only when the saved timetable has at least two rows and
+   % a uniform time axis that matches expected_seconds.
 
    arguments
       filename (1, 1) string
@@ -26,7 +27,7 @@ function tf = artifactCadenceMatches(filename, variable_name, expected_seconds)
    end
    names = string({inventory.name});
 
-   % Trust the writer-derived top-level cadence when current metadata provides it.
+   % Use the top-level cadence the writer stored when the metadata has it.
    if ismember("artifact_metadata", names)
       saved = load(filename, 'artifact_metadata');
       if isstruct(saved.artifact_metadata) ...
@@ -38,7 +39,8 @@ function tf = artifactCadenceMatches(filename, variable_name, expected_seconds)
       end
    end
 
-   % Legacy files require the actual table axis; a label alone is not proof.
+   % A file without that metadata needs the actual table axis. The variable
+   % name alone does not show the cadence.
    if ~ismember(variable_name, names)
       return
    end

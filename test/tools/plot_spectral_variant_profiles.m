@@ -165,7 +165,7 @@ function profiles = buildProfiles(s)
 end
 
 function exportTwoPanelPlot(z, exact, lookup, outfile, ttl, xlbl, ylbl, kwargs)
-   %EXPORTTWOPANELPLOT Plot functions and lookup profiles with a difference panel.
+   %EXPORTTWOPANELPLOT Plot functions and lookup profiles plus a difference.
 
    arguments
       z

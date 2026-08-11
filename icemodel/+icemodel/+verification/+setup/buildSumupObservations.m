@@ -257,12 +257,12 @@ function [record, note, counts] = readSumupVariable(source_dir, variable, ...
    %READSUMUPVARIABLE Read the nearest SUMup records for one variable group.
    %
    % Locates the SUMup 2025 Greenland file for the requested variable group
-   % (density / temperature / SMB), reads the gridded /DATA group into a flat
-   % table, selects the records within radius_km of the point, optionally
-   % windows them by timestamp, resolves the name_key into the human-readable
-   % core/site name, and returns the selection plus a provenance note. Returns
-   % [] with an explanatory note when the variable file is absent or no record
-   % falls within range.
+   % (density / temperature / SMB), and reads the gridded /DATA group into a
+   % flat table. It then selects the records within radius_km of the point,
+   % and can window them by timestamp. It resolves the name_key into the
+   % readable core or site name, and returns the selection plus a provenance
+   % note. It returns [] with an explanatory note when the variable file is
+   % absent, or when no record falls within range.
    %
    % SUMup 2025 NetCDF layout: each release file holds two groups, /DATA and
    % /METADATA. /DATA exposes 1-D variables along measurement_id (latitude,

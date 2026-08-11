@@ -4,10 +4,10 @@ function manifest = runDatasetFamilyDryRun(state, alive, kwargs)
    %  manifest = icemodel.verification.setup.runDatasetFamilyDryRun( ...
    %     state, alive, dataset_family=..., entry_callback=@makeEntry)
    %
-   % Dry-run importers should return the same manifest shape as real imports
-   % without writing to the staged eval/input tree. This helper routes them through
-   % runDatasetFamilyImport using a temporary manifest file that is removed before
-   % returning to the caller.
+   % Dry-run importers must return the same manifest shape as real imports,
+   % and must not write to the staged eval/input tree. This helper calls
+   % runDatasetFamilyImport with a temporary manifest file, and deletes that
+   % file before it returns to the caller.
 
    arguments
       state (1, :) struct

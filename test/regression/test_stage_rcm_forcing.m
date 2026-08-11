@@ -26,7 +26,7 @@ function setupOnce(testCase)
    testCase.TestData.promice_dir = string(fullfile(icemodel.internal.fullpath(), ...
       'data', 'verification', 'promice'));
    testCase.TestData.site = "KAN_L";
-   % A single January window keeps the staged fixture-backed green-path builds quick.
+   % A single January window keeps the fixture-backed success-path builds quick.
    testCase.TestData.startdate = "2012-01-01";
    testCase.TestData.enddate = "2012-01-31";
    cfg = icemodel.config('getenv', true);
@@ -105,8 +105,8 @@ function test_default_import_is_observation_only(testCase)
 end
 
 function test_promice_blank_dt_preserves_native_model_met(testCase)
-   % The public PROMICE importer forwards the explicit native-cadence escape
-   % hatch while leaving hourly userdata untouched.
+   % The public PROMICE importer forwards the explicit native-cadence option,
+   % and leaves hourly userdata unchanged.
    assumePromicePresent(testCase);
    root = testCase.TestData.root;
 
@@ -209,8 +209,9 @@ function test_manifest_convenience_skips_absent_sources(testCase)
    % stageRcmForcing manifest-convenience mode: after an observations-only
    % import, it resolves the legs from the staged manifest and, when the RCM
    % sources are absent (bogus dirs), degrades EVERY source to a skip-with-reason
-   % WITHOUT throwing - validating the manifest-mode plumbing (read cases ->
-   % resolve points/windows -> stage -> merge -> persist) off the fail-early gate.
+   % WITHOUT throwing - validating the manifest-mode steps (read cases ->
+   % resolve points/windows -> stage -> merge -> persist) apart from the
+   % fail-early gate.
    % An unrelated pre-existing skipped record is preserved exactly once.
    assumePromicePresent(testCase);
    root = testCase.TestData.root;
@@ -799,7 +800,7 @@ function test_mar_merra_write_met_and_userdata(testCase)
    testCase.verifyEqual(seconds(median(diff(native_met.met.Time))), 900);
    testCase.verifyEqual(seconds(median(diff(native_data.Data.Time))), 3600);
 
-   % MAR + MERRA: a met file AND a Data (userdata) file (the fix).
+   % MAR + MERRA: a met file AND a Data (userdata) file.
    for src = ["mar", "merra"]
       product = icemodel.verification.namelists.rcmProductIds(src);
       leg = c.colocation.(char(src));
@@ -961,7 +962,7 @@ function test_manifest_checkpoint_survives_later_source_write_failure(testCase)
    root = testCase.TestData.root;
 
    % Seed an observation-only manifest and an unrelated skip record that the
-   % first source checkpoint must retain byte-logically through ordinary merge.
+   % first source checkpoint must retain unchanged through an ordinary merge.
    icemodel.verification.setup.importPromiceSites( ...
       case_ids=testCase.TestData.site, promice_dir=testCase.TestData.promice_dir, ...
       startdate=testCase.TestData.startdate, ...

@@ -4,9 +4,10 @@ function skill = commonSupportSkill(truth, candidate, baseline)
    %  skill = icemodel.forcing.reconstruct.commonSupportSkill( ...
    %     truth, candidate, baseline)
    %
-   % Candidate coverage is graded separately. This helper prevents a
-   % partially supported method from claiming skill by selecting samples
-   % that are easier than the samples used to score its baseline.
+   % Another check grades candidate coverage. This helper scores the
+   % candidate and the baseline on the same samples. A method with partial
+   % support therefore cannot gain skill from easier samples than its
+   % baseline.
 
    arguments
       truth (:, 1) double
@@ -30,7 +31,7 @@ function skill = commonSupportSkill(truth, candidate, baseline)
    candidate_rmse = sqrt(mean((candidate(common) - truth(common)).^2));
    baseline_rmse = sqrt(mean((baseline(common) - truth(common)).^2));
    if baseline_rmse == 0
-      % Exact ties have zero improvement; a nonzero candidate is infinitely
+      % An exact tie has zero improvement. A nonzero candidate is infinitely
       % worse than an exact baseline.
       if candidate_rmse == 0
          rmse_ratio = 1;

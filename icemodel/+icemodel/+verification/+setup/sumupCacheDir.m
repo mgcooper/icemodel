@@ -3,8 +3,8 @@ function cache_dir = sumupCacheDir(source_dir)
    %
    %  cache_dir = icemodel.verification.setup.sumupCacheDir("")
    %
-   % Blank source roots are pinned to the repo top-level data/verification tree so
-   % source reads are independent of ICEMODEL_DATA_PATH.
+   % A blank source root resolves to the repo top-level data/verification
+   % tree. Source reads then do not depend on ICEMODEL_DATA_PATH.
    arguments
       source_dir (1, 1) string = ""
    end

@@ -23,11 +23,12 @@ function [summary, aligned, diagnostics, policy] = compareAblation( ...
    % but are censored from alignment.
    % ENDPOINT_DEFICIT_KG_M2 supplies caller-provided sensitivity scenarios for
    % D(t1)-D(t0). This comparator cannot validate their observation provenance,
-   % so they remain visible but never govern classification. Geometric
-   % observations are also converted over the fixed 600--900 kg m^-3
-   % porous-weathering-crust-to-intact sensitivity range; 600 kg m^-3 is the
-   % porous endpoint, not necessarily the numeric lower bound when signed
-   % lowering is negative and not an intact-ice density.
+   % so they remain visible but never govern classification. This function
+   % also converts geometric observations over the fixed sensitivity range
+   % 600--900 kg m^-3, from a porous weathering crust to intact ice. The
+   % 600 kg m^-3 value is the porous endpoint. It is not an intact-ice
+   % density, and it is not always the numeric lower bound, because signed
+   % lowering can be negative.
 
    arguments
       observations
@@ -207,8 +208,8 @@ function [summary, aligned, diagnostics, policy] = compareAblation( ...
    obs_intact_mwe = obs_lowering * ro_ice / ro_liq;
    density = policy.effective_density_kg_m3(:);
    obs_density_mwe = obs_lowering .* density.' / ro_liq;
-   % Pointwise extrema keep lower/upper field names numerically truthful when
-   % signed lowering is negative and the density-endpoint order reverses.
+   % Pointwise extrema keep the lower and upper field names correct when
+   % signed lowering is negative and the two density endpoints swap order.
    obs_density_lower_mwe = min(obs_density_mwe, [], 2);
    obs_density_upper_mwe = max(obs_density_mwe, [], 2);
 
@@ -594,7 +595,7 @@ function [scenarios, reasons] = scenarioDiagnostics(a_model, a_obs, ...
 
    % Only credible material accounting can govern classification. Endpoint
    % sensitivities remain diagnostic until a validated runner-derived evidence
-   % path exists; caller-supplied values cannot grant themselves provenance.
+   % path exists. A caller-supplied value carries no provenance of its own.
    changed = scenarios.changes_sign | scenarios.changes_classification;
    governs = scenarios.role == "accounting" & scenarios.material;
    reasons = scenarios.scenario(changed & governs & scenarios.credible);

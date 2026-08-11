@@ -10,16 +10,16 @@ function info = stageModisAlbedo(sites, kwargs)
    % window-stamped userdata artifact per site through the canonical
    % icemodel.forcing.helpers.writeuserdata path (per-source subfolder
    % userdata/modis/, timetable named Data, native daily cadence, top-level
-   % artifact_cadence_seconds). This is the staging half of the gap-fill
-   % reconstruction MODIS tier (reconstruct/POLICY.md B12, D-15); runtime
-   % attachment onto a met axis is the job of the single conversion helper
-   % icemodel.forcing.modisToMetCadence, never of the model runtime.
+   % artifact_cadence_seconds). This function is the staging half of the
+   % gap-fill reconstruction MODIS tier (reconstruct/POLICY.md B12, D-15).
+   % The conversion helper icemodel.forcing.modisToMetCadence attaches the
+   % series onto a met axis. The model runtime never does that attachment.
    %
    % Extraction method: single NEAREST 5 km cell per station (readGeusModis
-   % method "nearest"). The 5 km cell already integrates a footprint far
-   % larger than the AWS-local surface, and a neighbourhood mean would blend
-   % across the sharp ice-margin albedo gradients (ocean/tundra/bare-ice
-   % mixing) that many PROMICE lowland stations sit on, biasing the series.
+   % method "nearest"). The 5 km cell already covers a footprint much larger
+   % than the AWS-local surface. A neighbourhood mean would blend across the
+   % sharp ice-margin albedo gradients (ocean, tundra, and bare-ice mixing)
+   % where many PROMICE lowland stations sit, and would bias the series.
    % Nearest-cell also matches the default point sampling of the gridded
    % builders' MODIS channel, so staged and built MODIS resolve identically.
    % The method, selected cell indices, cell centre, and query-to-cell
@@ -28,7 +28,7 @@ function info = stageModisAlbedo(sites, kwargs)
    % Source loop: each yearly NetCDF is opened ONCE and every station is
    % extracted from that single covering read (readGeusModis point rows),
    % and each file is byte-pinned (size + SHA-256) into every artifact's
-   % metadata so a changed source is detectable (POLICY A1 spirit).
+   % metadata, so a changed source is detectable (follows POLICY A1).
    %
    % Physical validity: finite extracted values outside the reconstruction
    % albedo bounds (icemodel.forcing.reconstruct.physicalBounds("albedo"))
@@ -37,19 +37,20 @@ function info = stageModisAlbedo(sites, kwargs)
    %
    % Station identity: each site's location is copied from its staged met
    % artifact met_<site>_<met_source>_*.mat so the MODIS artifact is
-   % colocated with the met product it will reconstruct. The source-light
-   % top-level artifact_metadata record (lat/lon/elev, the gap-filled
-   % PROMICE convention) is preferred; met files carrying the full location
-   % CustomProperties contract (X, Y, Lat, Lon, Elev, Slope) resolve from
-   % the met timetable instead.
+   % colocated with the met product it will reconstruct. This function first
+   % reads the top-level artifact_metadata record (lat/lon/elev, the
+   % gap-filled PROMICE convention). For a met file that carries the full
+   % location CustomProperties contract (X, Y, Lat, Lon, Elev, Slope), it
+   % reads the location from the met timetable instead.
    %
    % Inputs
    %  sites - string row of met-site tokens (e.g. ["kanm" "kanl"])
    %
    % Name-value
    %  modis_dir  - directory of yearly GEUS reflectivity NetCDFs. Default ""
-   %               resolves the ICEMODEL_MODIS_DIR environment variable;
-   %               unresolved is an error (no silent partial staging).
+   %               resolves the ICEMODEL_MODIS_DIR environment variable. An
+   %               unresolved path is an error, so staging never runs on a
+   %               partial source set.
    %  met_dir    - directory of staged met artifacts supplying station
    %               identity. Default: <input>/met/<met_source>.
    %  met_source - met filename source token (default "promice")
@@ -86,7 +87,7 @@ function info = stageModisAlbedo(sites, kwargs)
    icemodel.forcing.reconstruct.mustBeStationToken(sites)
 
    % Resolve the source and met directories up front so every failure is a
-   % clear precondition error rather than a mid-loop surprise.
+   % clear precondition error, not a failure part way through the loop.
    modis_dir = resolveModisDir(kwargs.modis_dir);
    met_dir = kwargs.met_dir;
    if met_dir == ""
@@ -103,9 +104,9 @@ function info = stageModisAlbedo(sites, kwargs)
    locations = metLocations(sites, met_dir, kwargs.met_source);
    points = [[locations.lat_wgs84]', [locations.lon_wgs84]'];
 
-   % One strictly regular daily axis spanning the staged years: dates with no
-   % source coverage stay NaN, which keeps the artifact cadence uniform (so
-   % artifact_cadence_seconds stamps) and the window stamp honest.
+   % One strictly regular daily axis spanning the staged years. A date with no
+   % source coverage stays NaN. This keeps the artifact cadence uniform, so
+   % artifact_cadence_seconds stamps, and the window stamp covers every date.
    t0 = datetime(min(file_years), 1, 1, 'TimeZone', 'UTC');
    t1 = datetime(max(file_years), 12, 31, 'TimeZone', 'UTC');
    Time = (t0:days(1):t1)';
@@ -150,8 +151,9 @@ function info = stageModisAlbedo(sites, kwargs)
          'sha256', char(icemodel.verification.setup.fileSha256(files(n))));
    end
 
-   % Mask finite values outside the reconstruction albedo bounds (SSOT; do
-   % not restate the limits here) so staged artifacts are gate-clean.
+   % Mask finite values outside the reconstruction albedo bounds so staged
+   % artifacts pass the admission gates. The limits live only in
+   % physicalBounds. Do not restate them here.
    bounds = icemodel.forcing.reconstruct.physicalBounds("albedo");
    outside = isfinite(albedo) & (albedo < bounds(1) | albedo > bounds(2));
    albedo(outside) = NaN;
@@ -220,9 +222,9 @@ end
 function modis_dir = resolveModisDir(modis_dir)
    %RESOLVEMODISDIR Require an explicit or environment-configured source dir.
 
-   % The caller's explicit path wins; otherwise the documented environment
-   % override. There is no hard-coded volume fallback here: the source
-   % location is site/machine configuration, not code.
+   % Use the caller's explicit path first, then the documented environment
+   % variable. There is no hard-coded volume fallback here, because the
+   % source location is site or machine configuration, not code.
    if modis_dir == ""
       modis_dir = string(getenv("ICEMODEL_MODIS_DIR"));
    end
@@ -261,7 +263,8 @@ function [files, file_years] = sourceInventory(modis_dir, years)
    end
 
    % An explicit year request is a contract: every requested year must have
-   % a source file, so a mount hiccup cannot silently stage a subset.
+   % a source file. A failed mount then raises an error instead of staging
+   % a subset.
    if ~isempty(years)
       missing = setdiff(years, file_years);
       if ~isempty(missing)
@@ -314,10 +317,10 @@ end
 function location = metArtifactLocation(met_file)
    %METARTIFACTLOCATION Resolve the location identity saved in a met artifact.
 
-   % Prefer the source-light top-level artifact_metadata record (the
-   % gap-filled PROMICE builders save lat/lon/elev there) so the multi-year
-   % met timetable never has to load just for a point identity; fall back to
-   % the full location CustomProperties contract of the met timetable.
+   % Read the top-level artifact_metadata record first, because the
+   % gap-filled PROMICE builders save lat/lon/elev there. This avoids loading
+   % the multi-year met timetable for a point identity. If that record is
+   % absent, read the location CustomProperties of the met timetable.
    names = string(who('-file', met_file));
    if ismember("artifact_metadata", names)
       loaded = load(met_file, 'artifact_metadata');

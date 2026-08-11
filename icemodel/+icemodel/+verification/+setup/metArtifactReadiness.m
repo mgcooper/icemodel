@@ -11,9 +11,9 @@ function [tf, reason, complete_windows, cadence_seconds] = ...
    % request timetable passed to the writer.
    %
    % COMPLETE_WINDOWS is a JSON-portable struct column with UTC ISO-8601
-   % start_time/end_time strings and numeric sample_count. The caller's existing
-   % scalar met_files field is the artifact link; no absolute path is duplicated
-   % in each window record.
+   % start_time/end_time strings and numeric sample_count. The existing scalar
+   % met_files field of the caller is the artifact link, so a window record
+   % carries no absolute path.
    % CADENCE_SECONDS is the exact regular cadence derived from the saved payload,
    % or NaN when the payload has fewer than two rows or no single cadence.
    %
@@ -54,8 +54,8 @@ function [tf, reason, complete_windows, cadence_seconds] = ...
    end
 
    % A file selected by writemet must still satisfy the structural model-met
-   % contract. Fail clearly on a malformed legacy/colliding file rather than
-   % publishing advisory readiness for bytes runtime cannot load safely.
+   % contract. Raise an error for a malformed legacy or colliding file. Do not
+   % report advisory readiness for bytes that the runtime cannot load.
    try
       icemodel.forcing.helpers.validatemet(saved.met)
       [tf, reason, windows] = ...

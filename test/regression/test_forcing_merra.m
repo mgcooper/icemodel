@@ -4,12 +4,13 @@ function tests = test_forcing_merra
    % Reads the staged MERRA-2 daily fixture collection under test/data/forcing;
    % skips cleanly when absent.
    %
-   % Note on swd: the builder uses the raw SWGDN downwelling channel rather
-   % than the legacy SWGNT/(1-SNICEALB) derivation (which mixed the cell net
-   % flux with the snow/ice tile albedo and inflated swd). The new-vs-legacy
+   % swd: the builder uses the raw SWGDN downwelling channel, not the legacy
+   % SWGNT/(1-SNICEALB) derivation. That derivation mixed the cell net flux
+   % with the snow/ice tile albedo and inflated swd. The new-vs-legacy
    % ak4_merra statistical comparison is a user-facing script, not part of this
-   % formal suite: see test/interactive/ablation_comparison/compare_forcing_vs_legacy.m. Documented
-   % in the owning ExecPlan (2026-06-12).
+   % formal suite. See
+   % test/interactive/ablation_comparison/compare_forcing_vs_legacy.m.
+   % The owning ExecPlan (2026-06-12) documents this.
    tests = functiontests(localfunctions);
 end
 
@@ -89,17 +90,18 @@ end
 
 function test_buildMerraData_conservative_polygon_geographic(testCase)
    % Conservative polygon remap runs in MERRA's native geographic grid
-   % (UseGeoCoords): a catchment build is full-length for the fixture, finite, and
-   % physically near the equal-weight result (different weighting, same
-   % field). MERRA's grid is coarse, so a small catchment overlaps few
-   % cells; the result must still be valid.
+   % (UseGeoCoords). A catchment build is full-length for the fixture, finite,
+   % and physically near the equal-weight result: different weighting, same
+   % field. MERRA's grid is coarse, so a small catchment overlaps few cells.
+   % The result must still be valid.
    ak4 = '/Users/mattcooper/MATLAB/projects/runoff/data/ak4/ak4.mat';
    testCase.assumeTrue(isfile(ak4), 'ak4 catchment polygon not available');
    P = load(ak4).ak4.max.poly;
 
    % MERRA's grid is coarse, so a small catchment overlaps few cells and the
-   % exactremap infill triangulation degenerates (benign collinearity warning,
-   % result still valid); silence it for clean test output.
+   % exactremap infill triangulation degenerates. That raises a harmless
+   % collinearity warning, and the result stays valid. Turn the warning off
+   % for clean test output.
    src = testCase.TestData.source_dir;
    wstate = warning('off', 'all');
    cleanup = onCleanup(@() warning(wstate));
@@ -218,9 +220,9 @@ function test_buildMerraData_holds_tavg_support_and_does_not_extrapolate(testCas
 end
 
 function test_buildMerraData_calendar_from_files(testCase)
-   % The calendar derives from the files present: requesting a year
-   % outside the archive errors informatively instead of silently
-   % assuming the legacy hardcoded 2008-2020 span.
+   % The calendar derives from the files present. A request for a year
+   % outside the archive errors informatively instead of assuming the
+   % hardcoded 2008-2020 span.
 
    testCase.verifyError(@() icemodel.forcing.buildMerraData( ...
       [67.1556, -49.9226], 1999, ...
@@ -229,8 +231,9 @@ function test_buildMerraData_calendar_from_files(testCase)
 end
 
 function test_buildMerraData_rejects_malformed_middle_native_time(testCase)
-   % Every daily coordinate is decoded: a shifted middle file cannot inherit a
-   % synthetic filename-derived grid proof merely because the endpoints are valid.
+   % The builder decodes every daily coordinate. A shifted middle file cannot
+   % inherit a synthetic filename-derived grid proof just because the endpoints
+   % are valid.
    shadow = string(tempname);
    mkdir(shadow)
    cleanup = onCleanup(@() rmdir(shadow, 's'));
@@ -260,7 +263,8 @@ function test_buildMerraData_mass_flux_units(testCase)
    testCase.verifyTrue(all(Data.runoff(supported) >= 0));
    testCase.verifyLessThan(sum(Data.runoff(supported)), 10);
 
-   % Precipitation is now m s-1, so the source-window depth is sum(ppt) * 3600 [m].
+   % Precipitation is m s-1, so the source-window depth is
+   % sum(ppt) * 3600 [m].
    annual_depth = sum(Data.ppt(supported)) * 3600;
    testCase.verifyGreaterThanOrEqual(annual_depth, 0);
    testCase.verifyLessThan(annual_depth, 5);
@@ -352,8 +356,8 @@ function test_buildMerraMet_satisfies_contract(testCase)
    testCase.verifyEqual(string(met.Properties.UserData.met_resample_policy), ...
       "interval_start_zero_order_hold");
    expected = met.Properties.UserData.met_resample_expected_missing_counts;
-   % Default staging preserves native SNICEALB gaps instead of silently
-   % applying a PROMICE-specific or generic albedo fill.
+   % Default staging preserves native SNICEALB gaps and does not apply a
+   % PROMICE-specific or generic albedo fill.
    testCase.verifyGreaterThan(expected.albedo, 0);
    testCase.verifyEqual(nnz(isnan(met.albedo)), expected.albedo);
    [forcing_ready, forcing_ready_reason] = ...
@@ -439,8 +443,9 @@ function test_applyMerraTimeSupport_proven_missing_source_stays_nan(testCase)
 end
 
 function test_applyMerraTimeSupport_clipped_legacy_fails_closed(testCase)
-   % A legacy window starting inside a 3-hour block lacks its leading source row;
-   % the helper must error rather than replace valid samples with NaN or guess.
+   % A legacy window starting inside a 3-hour block lacks its leading source
+   % row. The helper must error, not replace valid samples with NaN and not
+   % guess.
    hourly_time = (datetime(2012, 1, 1, 1, 0, 0, TimeZone="UTC"):hours(1): ...
       datetime(2012, 1, 1, 5, 0, 0, TimeZone="UTC"))';
    Data = timetable((1:5)', RowTimes=hourly_time, ...
@@ -569,8 +574,8 @@ end
 
 function test_hasConstantMerraTavg3Support_scales_over_many_blocks(testCase)
    % A full 15-minute year exercises 2,928 independent support blocks. The
-   % adjacent comparison remains linear; the former full-vector scan per block
-   % made this production-sized shape quadratic.
+   % adjacent comparison stays linear. A full-vector scan per block would make
+   % this production-sized shape quadratic.
    many_times = (datetime(2012, 1, 1, TimeZone="UTC"):minutes(15): ...
       datetime(2012, 12, 31, 23, 45, 0, TimeZone="UTC"))';
    block = floor((0:numel(many_times) - 1)' / 12);
@@ -585,7 +590,7 @@ function test_hasConstantMerraTavg3Support_scales_over_many_blocks(testCase)
 end
 
 function test_hasProvenMerraTavg3SourceGrid_checks_exact_inventory(testCase)
-   % The source-grid predicate accepts explicit gaps but rejects stale counts,
+   % The source-grid check accepts explicit gaps but rejects stale counts,
    % non-UTC lists, out-of-grid timestamps, and nonmonotonic application axes.
    hourly_time = (datetime(2012, 1, 1, TimeZone="UTC"):hours(1): ...
       datetime(2012, 1, 1, 5, 0, 0, TimeZone="UTC"))';
@@ -636,7 +641,7 @@ function test_hasProvenMerraTavg3SourceGrid_checks_exact_inventory(testCase)
 end
 
 function test_hasCanonicalMerraTimeSupport_rejects_malformed(testCase)
-   % Builders, repair tooling, and QA share one exact policy predicate.
+   % Builders, repair tooling, and QA share one exact policy check.
    metadata = canonicalMerraTimeMetadata();
    testCase.verifyTrue( ...
       icemodel.forcing.helpers.hasCanonicalMerraTimeSupport(metadata));

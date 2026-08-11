@@ -1,9 +1,9 @@
 function rates = observationRateOutliers(summary, policy)
    %OBSERVATIONRATEOUTLIERS Flag site-years whose observed ablation rate is far
-   %below the same station's own family of scored site-years.
+   % below the same station's own family of scored site-years.
    %
-   % An observation record can be systematically compressed without tripping
-   % any readiness gate, because the gates only reject FLAGGED transitions and
+   % An observation record can be systematically compressed and still pass
+   % every readiness gate, because the gates only reject FLAGGED transitions and
    % unresolved steps. An unflagged sensor or datum problem passes admission
    % and appears in the comparison as a model error. Comparing each station
    % against its own distribution catches that without penalising genuinely
@@ -49,7 +49,7 @@ function rates = observationRateOutliers(summary, policy)
    usable_median = station_median_rate > 0;
    rate_ratio(usable_median) = observed_rate(usable_median) ...
       ./ station_median_rate(usable_median);
-   % A family needs enough members for its median to mean anything.
+   % A family needs enough members for its median to be meaningful.
    has_family = station_scored_year_count ...
       >= policy.observation_rate_outlier_min_years;
    flagged = has_family & isfinite(rate_ratio) ...

@@ -12,7 +12,7 @@ function validateSurfaceZone(surface_zone)
    %
    % Role
    %  Setup-side schema gate shared by makeCaseManifestEntry and
-   %  makeFirnCaseManifestEntry so a stamped surface_zone cannot drift from the
+   %  makeFirnCaseManifestEntry, so a stamped surface_zone always matches the
    %  canonical namelist.
    %
    % See also: icemodel.verification.namelists.surfacezone

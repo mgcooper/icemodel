@@ -5,9 +5,9 @@ function policy = promiceAblationReadiness()
    %     icemodel.verification.namelists.promiceAblationReadiness()
    %
    % The policy identifies one longest summertime ice-ablation window from
-   % staged surface data. Trace snow up to 0.05 m does not split continuity,
-   % but comparison rows require at most 0.01 m so modeled values are censored
-   % wherever the observed height record may not represent exposed ice.
+   % staged surface data. Trace snow up to 0.05 m does not split the window.
+   % A comparison row needs at most 0.01 m of snow. This censors the modeled
+   % values wherever the observed height record may not show exposed ice.
 
    % Target and flag roles read by readiness, comparison, and reporting.
    target_field = "ablation";

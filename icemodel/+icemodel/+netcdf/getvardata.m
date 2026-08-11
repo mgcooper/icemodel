@@ -5,8 +5,8 @@ function data = getvardata(filepath, varnames, dimdata, xtype, ...
    % Allocate arrays in column-major format for efficiency.
    % Permute them to match the defined dimensions when writing to netcdf.
    %
-   % For now, only allow chunking over cells. Note this is not netcdf chunking,
-   % this preallocates and reads the ice2 arrays into memory in chunks.
+   % For now, only allow chunking over cells. This is not netcdf chunking. The
+   % function preallocates and reads the ice2 arrays into memory in chunks.
    %
    % See also:
 
@@ -30,7 +30,7 @@ function data = getvardata(filepath, varnames, dimdata, xtype, ...
       sdata = 'ice2';
    end
 
-   % Short circuit if this is an ice2 file. If an entire year of ice2
+   % Return early if this is an ice2 file. If an entire year of ice2
    % data can fit in memory, this function will allocate it.
    if strcmp(sdata, 'ice2') && isnan(countcell)
       data = [];

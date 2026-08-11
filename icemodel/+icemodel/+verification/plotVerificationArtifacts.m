@@ -577,8 +577,8 @@ function [row, plotted] = plotTimeseriesGroup(c, records, group, target, ...
    for k = 1:numel(group.variables)
       varname = group.variables(k);
       ax = nexttile(tl);
-      % A nonvisual tag keeps semantic panel selection stable after removing
-      % titles that merely repeated the y-axis variable name.
+      % A nonvisual tag keeps panel selection stable by variable name. The
+      % panel carries no title that repeats the y-axis variable name.
       ax.Tag = char(varname);
       panel_axes(k) = ax;
        [payloads, names, observations, albedo_sources] = ...
@@ -599,8 +599,8 @@ function [row, plotted] = plotTimeseriesGroup(c, records, group, target, ...
           albedo_source=albedo_sources, show_legend=false);
        explanatory_title = variableDisplayTitle(varname);
        if explanatory_title ~= ""
-          % Retain only titles that explain semantics not present in the axis
-          % label; reduction/support details remain in the figure/report text.
+          % Keep only a title that explains what the axis label does not.
+          % Reduction and support details stay in the figure and report text.
           title(ax, explanatory_title, 'FontWeight', 'bold', ...
              'Interpreter', 'none')
        end
@@ -646,7 +646,7 @@ function unit = groupDisplayUnit(group_name, varname)
 end
 
 function label = variableDisplayTitle(varname)
-   %VARIABLEDISPLAYTITLE Explain variables whose compact names hide semantics.
+   %VARIABLEDISPLAYTITLE Explain variables whose compact names hide the meaning.
 
    switch varname
       case "snowf_subl"
@@ -906,9 +906,10 @@ function items = fallbackStagedFiles(c, input_root, manifest_field, input_subdir
       return
    end
 
-   % The atomic manifest has no met_files field. Reuse the actual model option
-   % resolver so nested/flat precedence, cadence, period, and enclosing-window
-   % selection cannot drift from runtime behavior or admit wildcard decoys.
+   % The atomic manifest has no met_files field. Reuse the model option
+   % resolver, so that nested and flat precedence, cadence, period, and
+   % enclosing-window selection match runtime behavior and reject a wildcard
+   % match.
    paths = icemodel.verification.helpers.esmRuntimeMetFiles(c, input_root);
    paths = paths(isfile(paths));
    paths = unique(paths, 'stable');
@@ -1413,8 +1414,11 @@ function [payloads, names, observations, albedo_sources] = ...
 end
 
 function selected = preferObservationRecords(selected)
-   %PREFEROBSERVATIONRECORDS Drop same-source userdata when a target has
-   % VARNAME.
+   %PREFEROBSERVATIONRECORDS Keep only the observations record of a source.
+   %
+   % recordsForVariable passes the records that carry one variable. When a
+   % source has an observations record, this function drops the other
+   % records of that source, such as its userdata copy.
 
    if isempty(selected)
       return

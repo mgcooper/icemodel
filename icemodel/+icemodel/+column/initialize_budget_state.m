@@ -6,12 +6,12 @@ function [ledger, solid_p, liquid_p, phase_solid, phase_liquid, ...
    %  [ledger, solid_p, liquid_p, phase_solid, phase_liquid, vapor_solid, ...
    %     vapor_liquid] = icemodel.column.initialize_budget_state()
    %
-   % The optional outputs are the zeroed handoffs the accumulators pass between
-   % each other within a substep: accumulate_phase_budget produces solid_p and
-   % liquid_p for accumulate_vapor_budget, and both produce the signed
-   % increments accumulate_remesh_budget needs to close gross storage. They are
-   % not ledger fields and are overwritten on the first substep; returning them
-   % here gives the solver its codegen predeclarations.
+   % The optional outputs are the zeroed handoffs that the accumulators pass to
+   % each other within a substep. accumulate_phase_budget produces solid_p and
+   % liquid_p for accumulate_vapor_budget. Both produce the signed increments
+   % that accumulate_remesh_budget needs to close gross storage. These outputs
+   % are not ledger fields, and the first substep overwrites them. They are
+   % returned here to give the solver its codegen predeclarations.
    %
    % Storage, phase, vapor, and remesh changes are positive into the column.
    % Overflow and merge export are positive out; unapplied vapor retains

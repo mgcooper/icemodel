@@ -4,11 +4,11 @@ function station = gcnetVandecruxStation(station)
    %  station = icemodel.forcing.helpers.gcnetVandecruxStation("dye2")
    %
    % Fetch validation, inventory discovery, builders, and the donor
-   % self-exclusion (POLICY A8: the target is never its own donor,
-   % through every alias spelling) all match the same Vandecrux station
-   % names. Canonicalization derives from the single-source catalog's
-   % alias table so no spelling can escape it; unknown names pass
-   % through unchanged.
+   % self-exclusion all match the same Vandecrux station names. The
+   % self-exclusion applies POLICY A8: the target is never its own donor,
+   % through every alias spelling. This function reads the alias table from
+   % the catalog, so it canonicalizes every listed spelling. An unknown name
+   % passes through unchanged.
 
    arguments
       station (1, :) string

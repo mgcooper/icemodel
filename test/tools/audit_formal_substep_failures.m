@@ -1,5 +1,6 @@
 function report = audit_formal_substep_failures(kwargs)
-   %AUDIT_FORMAL_SUBSTEP_FAILURES Probe formal cases for dt-min/maxsubstep fallback.
+   %AUDIT_FORMAL_SUBSTEP_FAILURES Probe formal cases for the dt-min and
+   % maxsubstep fallback.
    %
    %  report = audit_formal_substep_failures()
    %  report = audit_formal_substep_failures(tier="full", smbmodel="icemodel")

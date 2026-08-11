@@ -3,11 +3,12 @@ function [albedo, qc_counts] = sourceAlbedo(swd, swu, kwargs)
    %
    % Ratios below 10 W m-2 downwelling are dominated by low-sun sensor noise.
    % Nonpositive reflected shortwave is also not a usable albedo observation.
-   % When timestamp and location are supplied together, radiometer ratios below
-   % 20 degrees solar elevation are rejected as low-angle measurements. Callers
-   % may override that angle or impose a source-specific physical minimum.
-   % Leave rejected samples missing so forcing builders can apply their explicit
-   % gap-fill policy afterward; the input radiation is never modified.
+   % If you supply timestamp and location together, the function rejects
+   % radiometer ratios below 20 degrees solar elevation as low-angle
+   % measurements. Callers can override that angle or set a source-specific
+   % physical minimum. The function leaves rejected samples missing, so forcing
+   % builders can then apply their own gap-fill policy. The function does not
+   % change the input radiation.
    arguments
       swd
       swu
@@ -18,8 +19,8 @@ function [albedo, qc_counts] = sourceAlbedo(swd, swu, kwargs)
       kwargs.minimum_solar_elevation (1, 1) double {mustBeFinite} = 20
    end
 
-   % Solar screening is optional, but partial geometry would silently produce a
-   % different QC policy. Require the complete timestamp/location tuple.
+   % Solar screening is optional. Partial geometry would apply a different QC
+   % policy, so require the complete timestamp, latitude, and longitude set.
    has_solar_geometry = [~isempty(kwargs.Time), ...
       isfinite(kwargs.latitude), isfinite(kwargs.longitude)];
    if any(has_solar_geometry) && ~all(has_solar_geometry)
