@@ -1,18 +1,21 @@
-function [tf, reason, complete_windows] = metArtifactReadiness(met_file)
+function [tf, reason, complete_windows, cadence_seconds] = ...
+      metArtifactReadiness(met_file)
    %METARTIFACTREADINESS Diagnose the exact saved scalar-window met artifact.
    %
-   %  [tf, reason, complete_windows] = ...
+   %  [tf, reason, complete_windows, cadence_seconds] = ...
    %     icemodel.verification.setup.metArtifactReadiness(met_file)
    %
    % Importers call this helper with the path returned by writemet, which may be
    % a newly written file, an exact no-overwrite reuse, or a broader enclosing
-   % reuse. Readiness must describe those referenced bytes rather than the
-   % request timetable that happened to precede the writer call.
+   % reuse. Readiness describes the bytes in that referenced file, not the
+   % request timetable passed to the writer.
    %
    % COMPLETE_WINDOWS is a JSON-portable struct column with UTC ISO-8601
-   % start_time/end_time strings and numeric sample_count. The caller's existing
-   % scalar met_files field is the artifact link; no absolute path is duplicated
-   % in each window record.
+   % start_time/end_time strings and numeric sample_count. The existing scalar
+   % met_files field of the caller is the artifact link, so a window record
+   % carries no absolute path.
+   % CADENCE_SECONDS is the exact regular cadence derived from the saved payload,
+   % or NaN when the payload has fewer than two rows or no single cadence.
    %
    % See also: icemodel.forcing.helpers.writemet,
    %  icemodel.verification.setup.metForcingReady
@@ -21,8 +24,8 @@ function [tf, reason, complete_windows] = metArtifactReadiness(met_file)
       met_file string
    end
 
-   % The current importer contract is intentionally one naming="window" file.
-   % Reject vectors explicitly instead of inventing unused cross-file semantics.
+   % The importer contract is one naming="window" file, so a vector of paths
+   % has no defined meaning here.
    if ~isscalar(met_file)
       error('icemodel:verification:metArtifactReadiness:scalarWindowRequired', ...
          'met_file must name one scalar-window artifact')
@@ -51,12 +54,18 @@ function [tf, reason, complete_windows] = metArtifactReadiness(met_file)
    end
 
    % A file selected by writemet must still satisfy the structural model-met
-   % contract. Fail clearly on a malformed legacy/colliding file rather than
-   % publishing advisory readiness for bytes runtime cannot load safely.
+   % contract. Raise an error for a malformed legacy or colliding file. Do not
+   % report advisory readiness for bytes that the runtime cannot load.
    try
       icemodel.forcing.helpers.validatemet(saved.met)
       [tf, reason, windows] = ...
          icemodel.verification.setup.metForcingReady(saved.met);
+
+      % Report cadence from the saved time coordinate itself, so downstream
+      % policy gates read the payload rather than a filename or a stale
+      % metadata marker.
+      cadence_seconds = ...
+         icemodel.forcing.helpers.uniformCadenceSeconds(saved.met);
    catch err
       error('icemodel:verification:metArtifactReadiness:badPayload', ...
          'referenced saved met artifact %s is invalid: %s', ...
@@ -78,8 +87,8 @@ function text = isoUtc(value)
    %ISOUTC Format one finite manifest diagnostic timestamp explicitly in UTC.
 
    value = icemodel.verification.setup.ensureUtc(value);
-   % ensureUtc attaches UTC to naive values but intentionally preserves an
-   % existing zone. Convert that zoned instant before appending the literal Z.
+   % ensureUtc attaches UTC to naive values and preserves an existing zone.
+   % Convert that zoned instant to UTC before appending the literal Z.
    value.TimeZone = 'UTC';
    text = string(value, "yyyy-MM-dd'T'HH:mm:ss'Z'");
 end

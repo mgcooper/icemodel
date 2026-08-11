@@ -18,8 +18,9 @@ function [Fc, Fp, diag] = surface_flux_linearization(T_sfc, tair, Qsi, ...
    % conductive term remains in the `icemodel.column.solve_column_enthalpy`
    % Robin interior solve.
    %
-   % cv_atm, hv_atm, ro_atm, nu_air are precomputed per forcing timestep and
-   % passed in; they are constant across inner solver iterations.
+   % The caller precomputes cv_atm, hv_atm, ro_atm, and nu_air once per
+   % forcing timestep and passes them in. They stay constant across the inner
+   % solver iterations.
    %
    %#codegen
 

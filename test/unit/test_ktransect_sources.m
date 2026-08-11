@@ -1,5 +1,5 @@
 function tests = test_ktransect_sources
-   %TEST_KTRANSECT_SOURCES Verify K-transect parser, builder, and staging contracts.
+   %TEST_KTRANSECT_SOURCES Verify K-transect parser, builder, and staging.
    tests = functiontests(localfunctions);
 end
 
@@ -77,8 +77,8 @@ function test_parser_handles_all_column_variants(testCase)
 end
 
 function test_parser_extracts_maintenance_visits(testCase)
-   % The once-yearly battery-voltage value of 100 marks the maintenance visit
-   % and must surface as metadata rather than ride along as a channel.
+   % The once-yearly battery-voltage value of 100 marks the maintenance visit.
+   % It must appear as metadata, not as a channel.
    filename = fixtureFile(testCase, "AWS9", 2010);
    writeKtransectFixture(filename, "AWS9", 2010, "type0", visit_row=2);
 
@@ -211,7 +211,8 @@ function test_builder_regularizes_interior_gaps_as_missing(testCase)
 end
 
 function test_builder_rejects_overlapping_annual_children(testCase)
-   % Overlapping annual children would double-count samples; refuse loudly.
+   % Overlapping annual children would double-count samples, so the builder
+   % raises an error.
    % The second file deliberately repeats the first file's timestamps.
    writeKtransectFixture(fixtureFile(testCase, "AWS9", 2010), ...
       "AWS9", 2010, "type0");
@@ -405,24 +406,24 @@ function test_import_stages_case_with_provenance(testCase)
    testCase.verifyEqual(string(entry.case_id), "aws9");
    leg = entry.colocation.ktransect;
    testCase.verifyEqual(string(leg.kind), "annual_aws_met_and_eval");
-    testCase.verifyEqual(string(leg.license), "CC-BY-4.0");
-    testCase.verifyEqual([leg.children.year].', [2010; 2011]);
-    testCase.verifyFalse(isfield(leg, 'source_dir'));
-    testCase.verifyFalse(isfield(leg, 'source_file'));
-    evaluation_file = fullfile(output_root, 'eval', 'ktransect', ...
-       leg.evaluation_file);
-    evaluation_info = dir(evaluation_file);
-    testCase.verifyEqual(double(leg.evaluation_size_bytes), ...
-       evaluation_info.bytes);
-    testCase.verifyEqual(string(leg.evaluation_sha256), ...
-       icemodel.verification.setup.fileSha256(evaluation_file));
-    testCase.verifyFalse(contains(string(jsonencode(manifest)), ...
-       string(testCase.TestData.tmp)));
-    staged = load(fullfile(output_root, 'eval', 'ktransect', ...
-       'aws9', 'observations.mat'), 'targets');
-    testCase.verifyFalse(contains(string(jsonencode( ...
-       staged.targets.metadata)), string(testCase.TestData.tmp)));
-    testCase.verifyFalse(logical(leg.forcing_ready));
+   testCase.verifyEqual(string(leg.license), "CC-BY-4.0");
+   testCase.verifyEqual([leg.children.year].', [2010; 2011]);
+   testCase.verifyFalse(isfield(leg, 'source_dir'));
+   testCase.verifyFalse(isfield(leg, 'source_file'));
+   evaluation_file = fullfile(output_root, 'eval', 'ktransect', ...
+      leg.evaluation_file);
+   evaluation_info = dir(evaluation_file);
+   testCase.verifyEqual(double(leg.evaluation_size_bytes), ...
+      evaluation_info.bytes);
+   testCase.verifyEqual(string(leg.evaluation_sha256), ...
+      icemodel.verification.setup.fileSha256(evaluation_file));
+   testCase.verifyFalse(contains(string(jsonencode(manifest)), ...
+      string(testCase.TestData.tmp)));
+   staged = load(fullfile(output_root, 'eval', 'ktransect', ...
+      'aws9', 'observations.mat'), 'targets');
+   testCase.verifyFalse(contains(string(jsonencode( ...
+      staged.targets.metadata)), string(testCase.TestData.tmp)));
+   testCase.verifyFalse(logical(leg.forcing_ready));
    testCase.verifyTrue(contains(string(leg.forcing_ready_reason), ...
       "build_forcing=false"));
    testCase.verifyEqual(string(entry.evaluation_file), ...
@@ -448,8 +449,8 @@ end
 
 function test_import_flags_native_identity_conflict(testCase)
    % When a prior case's native product identity no longer matches the fresh
-   % source, the refreshed leg must demand an explicit native rebuild instead
-   % of silently reusing stale forcing references.
+   % source, the refreshed leg must demand an explicit native rebuild. It must
+   % not reuse stale forcing references without notice.
    writeKtransectFixture(fixtureFile(testCase, "AWS9", 2010), ...
       "AWS9", 2010, "type0");
    writeHeightsFixture(testCase);

@@ -4,11 +4,11 @@ function edges = bucketEdges()
    %  edges = icemodel.forcing.reconstruct.bucketEdges()
    %
    % Role
-   %  Single source of the policy's gap-duration strata ([0 6 24 72 168
-   %  Inf]) shared by the census, the synthetic-missingness sampler, the
-   %  orchestrator, and the method planner. gapDurationBucket applies the
-   %  policy's right-closed convention, so exact boundaries stay in the
-   %  shorter-duration stratum.
+   %  Defines the policy's gap-duration strata ([0 6 24 72 168 Inf]). The
+   %  census, the synthetic-missingness sampler, the orchestrator, and the
+   %  method planner all read these edges. gapDurationBucket applies the
+   %  policy's right-closed convention, so an exact boundary value stays in
+   %  the shorter-duration stratum.
    %
    % See also: icemodel.forcing.reconstruct.gapCensus,
    %  icemodel.forcing.reconstruct.syntheticMissingness

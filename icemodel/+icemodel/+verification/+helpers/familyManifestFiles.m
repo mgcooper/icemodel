@@ -35,8 +35,7 @@ function files = familyManifestFiles(kwargs)
       evaluation_data_root=kwargs.evaluation_data_root, ...
       icemodel_config_casename=kwargs.icemodel_config_casename);
 
-   % Find one manifest per family under the selected root. The wildcard is
-   % intentionally
+   % Find one manifest per family under the selected root. The wildcard goes
    % one level deep because case folders live below the family folder.
    entries = dir(fullfile(root, "*", "manifest.json"));
    if isempty(entries)

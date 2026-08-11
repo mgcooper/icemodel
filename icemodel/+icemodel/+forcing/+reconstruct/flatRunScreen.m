@@ -8,10 +8,10 @@ function [flagged, findings] = flatRunScreen(met, latitude, longitude, kwargs)
    %
    % Role
    %  Pre-reconstruction QA screen for the buried / rime-encased station
-   %  signature (bead icemodel-g1n.45): a station whose sensors are under
+   %  signature (bead icemodel-g1n.45). A station whose sensors are under
    %  snow or encased in rime keeps reporting, and upstream PROMICE QC can
    %  certify those samples as valid observations. The verified reference
-   %  case is FRE 2018-03-25 to 2018-04-15 — 22 consecutive days with
+   %  case is FRE 2018-03-25 to 2018-04-15: 22 consecutive days with
    %  tair daily range < 0.15 K, rh pinned at 85 %, swd < 1 W/m2 under
    %  April daylight, and lwd equal to sigma*tair^4 (the radiometer sees
    %  the rime shell at instrument temperature, a blackbody). The screen
@@ -23,8 +23,8 @@ function [flagged, findings] = flatRunScreen(met, latitude, longitude, kwargs)
    %         tolerance (radiometer viewing its own encasement).
    %  Under POLICY A1 the native record is immutable: this screen never
    %  modifies data. Callers must exclude flagged samples from training
-   %  pools (climatology, donor fits, step scales) and report the runs;
-   %  the natives themselves ship unmodified with the flag as audit.
+   %  pools (climatology, donor fits, step scales) and must report the
+   %  runs. The natives ship unmodified, and the flag is the audit record.
    %
    % Inputs
    %  met : timetable with a tair channel [K]; swd [W/m2], lwd [W/m2],
@@ -33,25 +33,26 @@ function [flagged, findings] = flatRunScreen(met, latitude, longitude, kwargs)
    %  latitude, longitude : station point (WGS84 degrees, east positive)
    %     for the top-of-atmosphere daylight reference.
    %
-   % Name-value (defaults are the single source of these thresholds,
-   % following the physicalBounds pattern; retuning is a policy change)
+   % Name-value (these defaults define the thresholds, in the same way as
+   % physicalBounds; retuning one is a policy change)
    %  min_run_days : consecutive qualifying days required before a run is
-   %     flagged. Default 3 — long enough that persistent synoptic
-   %     overcast (1-2 days of small tair range) does not trip the
-   %     screen; the FRE reference run lasted 22 days.
+   %     flagged. Default 3. Persistent synoptic overcast gives 1-2 days
+   %     of small tair range, which does not trip the screen. The FRE
+   %     reference run lasted 22 days.
    %  max_tair_range_k : daily (max - min) tair below which a day counts
-   %     as flat. Default 0.5 K — a free-standing sensor sees several K
-   %     of diurnal plus synoptic range; FRE ran below 0.15 K.
+   %     as flat. Default 0.5 K. A free-standing sensor sees several K
+   %     of diurnal plus synoptic range. FRE ran below 0.15 K.
    %  max_swd_wm2 : daily-max swd below which the pyranometer counts as
    %     dark. Default 5 W/m2 (matches the physicalValidity night-noise
-   %     floor); FRE topped out at 0.9 W/m2 under April daylight.
+   %     floor). FRE topped out at 0.9 W/m2 under April daylight.
    %  min_toa_wm2 : daily-max top-of-atmosphere irradiance required
-   %     before darkness is evidence — polar night must not corroborate.
-   %     Default 100 W/m2.
+   %     before darkness counts as evidence. Polar night must not
+   %     corroborate. Default 100 W/m2.
    %  lwd_blackbody_tol_wm2 : daily mean |lwd - sigma*tair^4| below which
-   %     lwd counts as blackbody-locked. Default 15 W/m2 — clear skies
-   %     sit 20-90 W/m2 below blackbody, overcast approaches it but the
-   %     conjunction with a flat tair separates the cases; FRE ran ~5.
+   %     lwd counts as blackbody-locked. Default 15 W/m2. Clear skies sit
+   %     20-90 W/m2 below blackbody. Overcast comes close to blackbody,
+   %     but a flat tair at the same time separates the two cases. FRE
+   %     ran near 5 W/m2.
    %  max_rh_range_pct : run-level rh (max - min) below which rh is
    %     reported as pinned. Evidence annotation only, never a flag
    %     condition. Default 1 percent; FRE pinned exactly at 85.
@@ -93,8 +94,8 @@ function [flagged, findings] = flatRunScreen(met, latitude, longitude, kwargs)
       kwargs.require_corroboration (1, 1) logical = true
    end
 
-   % The screen is meaningless without air temperature: the flat-tair
-   % condition is the core signature every corroboration hangs off.
+   % The screen needs air temperature: the flat-tair condition is the core
+   % signature, and each corroboration adds evidence to it.
    varnames = string(met.Properties.VariableNames);
    if ~any(varnames == "tair")
       error('icemodel:reconstruct:flatRunScreen:missingTair', ...
@@ -115,8 +116,8 @@ function [flagged, findings] = flatRunScreen(met, latitude, longitude, kwargs)
       return
    end
 
-   % Group samples into calendar days on the record's own clock; daily
-   % aggregation is what turns the diurnal cycle into the range statistic
+   % Group samples into calendar days on the record's own clock. Daily
+   % aggregation turns the diurnal cycle into the range statistic that
    % the buried signature suppresses.
    day_start = dateshift(times, 'start', 'day');
    [day_list, ~, gid] = unique(day_start);
@@ -141,7 +142,7 @@ function [flagged, findings] = flatRunScreen(met, latitude, longitude, kwargs)
    cond_tair = evaluable & tair_range < kwargs.max_tair_range_k;
 
    % Corroboration (b): swd pinned at zero while the top of the
-   % atmosphere is bright — a working pyranometer cannot be dark under
+   % atmosphere is bright. A working pyranometer cannot be dark under
    % daylight, but polar night must not count as evidence.
    toa = icemodel.forcing.reconstruct.toaIrradiance( ...
       times, latitude, longitude);
@@ -159,8 +160,8 @@ function [flagged, findings] = flatRunScreen(met, latitude, longitude, kwargs)
    end
 
    % Corroboration (c): lwd locked to the blackbody emission at air
-   % temperature — a radiometer under rime radiatively views its own
-   % encasement at instrument temperature instead of the sky.
+   % temperature. A radiometer under rime views its own encasement at
+   % instrument temperature instead of the sky.
    sigma = icemodel.physicalConstant('SB');
    lwd_dev = nan(n_days_total, 1);
    cond_lwd = false(n_days_total, 1);
@@ -174,8 +175,8 @@ function [flagged, findings] = flatRunScreen(met, latitude, longitude, kwargs)
          & lwd_dev < kwargs.lwd_blackbody_tol_wm2;
    end
 
-   % A qualifying day is flat tair plus at least one radiation
-   % corroboration; the diagnostic escape hatch screens on tair alone.
+   % A qualifying day has flat tair plus at least one radiation
+   % corroboration. The diagnostic option screens on tair alone.
    if kwargs.require_corroboration
       buried_day = cond_tair & (cond_swd | cond_lwd);
    else

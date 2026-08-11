@@ -9,15 +9,16 @@ function manifest = importRetmip(source_dir, kwargs)
    %    RetMIP staging hook. It records RetMIP protocol cases as data-only
    %    observations.mat evaluation bundles and stages confirmed native
    %    meteorological sources separately under the standard icemodel input/met
-   %    and input/userdata layout. Optional MAR/MERRA/RACMO legs are delegated
-   %    to the shared dataset-family RCM staging helper after protocol/native
-   %    products are safely persisted.
+   %    and input/userdata layout. It passes optional MAR/MERRA/RACMO legs to
+   %    the shared dataset-family RCM staging helper, and only after it has
+   %    written the protocol and native products.
    %    forcing_sources selects runtime sources requested by the current call.
-   %    Ordinary calls preserve omitted existing legs; overwrite_family=true
-   %    deliberately replaces the whole family state.
-   %    build_observations=false is a guarded non-dry fast path: requested cases
-   %    must already exist in the target manifest, whose observation entry is
-   %    reused while selected forcing is attached.
+   %    Ordinary calls preserve omitted existing legs. overwrite_family=true
+   %    replaces the whole family state.
+   %    build_observations=false is a guarded fast path for a non-dry call.
+   %    The requested cases must already exist in the target manifest. The
+   %    importer reuses their observation entry and attaches the selected
+   %    forcing.
    %
    %  Default roots
    %    source_dir="" reads <repo>/data/verification/retmip. With no output_root,
@@ -47,9 +48,9 @@ function manifest = importRetmip(source_dir, kwargs)
    %        protocol observations are always the case definition when
    %        build_observations is true; forcing_sources selects only runtime
    %        met/userdata artifacts. It is a patch selector, not the complete
-   %        desired source state: an existing case's omitted legs remain
-   %        unchanged during ordinary merge updates and are removed only by
-   %        explicit family replacement.
+   %        source state you want. An ordinary merge update leaves the omitted
+   %        legs of an existing case unchanged. Only an explicit family
+   %        replacement removes them.
    %    startdate, enddate : datetime / string. Optional explicit protocol and
    %        forcing window; pass both or neither. With both omitted, each case
    %        uses its catalog-authored RetMIP protocol period. Every selected leg
@@ -90,7 +91,7 @@ function manifest = importRetmip(source_dir, kwargs)
    %    Staging one case adds or updates only that case in the family manifest
    %    and preserves every other committed case and file. Re-staging the same
    %    case updates exactly its entry. Set overwrite_family=true only to
-   %    deliberately rebuild the family root.
+   %    rebuild the family root.
    %
    %  Returns
    %    manifest : struct  Final or dry-run family manifest.
@@ -134,7 +135,7 @@ function manifest = importRetmip(source_dir, kwargs)
 
    % Validate the optional clamp before any cache or staging side effect.
    [window_start, window_end, window_enabled] = ...
-      icemodel.internal.pairedWindow( ...
+      icemodel.pairedWindow( ...
       kwargs.startdate, kwargs.enddate);
 
    % Resolve the forcing sources.
@@ -1050,11 +1051,16 @@ end
 
 function variables = comparisonVariables(files)
    %COMPARISONVARIABLES Return staged comparison/eval axes.
-   variables = ["tsfc", "melt", "snowf_subl"];
-   for filename = reshape(string(files.profiles), 1, [])
-      variables(end + 1) = string(profileName(filename)); %#ok<AGROW>
+
+   % Name every staged profile axis first, because the profile count is known
+   % from the file list, then form the catalog in one concatenation.
+   profiles = reshape(string(files.profiles), 1, []);
+   profile_variables = strings(1, numel(profiles));
+   for k = 1:numel(profiles)
+      profile_variables(k) = string(profileName(profiles(k)));
    end
-   variables = unique(variables, 'stable');
+   variables = unique(["tsfc", "melt", "snowf_subl", profile_variables], ...
+      'stable');
 end
 
 function variables = modelOutputVariables(output_files)

@@ -3,9 +3,9 @@ function out = compareTimeseries(data, varname, kwargs)
    %
    %  out = icemodel.plot.compareTimeseries({tt1, tt2}, "tair", names=...)
    %
-   % DATA is a timetable or a cell array of timetables. VARNAME is plotted from
-   % each timetable that contains a finite numeric column. The helper owns the
-   % common visual-QA overlay path so verification plots do not duplicate
+   % DATA is a timetable or a cell array of timetables. This function plots
+   % VARNAME from each timetable that has a finite numeric column. It holds the
+   % shared visual-QA overlay code, so verification plots do not repeat
    % retiming, temperature conversion, unit labels, and line-only rendering.
    % SHORTWAVE_WEIGHTED_MEAN uses ALBEDO_SOURCE to preserve the source's
    % physical meaning. RADIOMETER ratios use the ratio of daily reflected and
@@ -27,7 +27,7 @@ function out = compareTimeseries(data, varname, kwargs)
       kwargs.aggregation (1, :) string ...
          {mustBeMember(kwargs.aggregation, ...
          ["mean", "mean_omitmissing", "shortwave_weighted_mean", ...
-          "daily_total"])} = "mean"
+         "daily_total"])} = "mean"
       kwargs.albedo_source (1, :) string ...
          {mustBeMember(kwargs.albedo_source, ...
          ["radiometer", "model_state", "model_ratio"])} = "radiometer"
@@ -61,8 +61,8 @@ function out = compareTimeseries(data, varname, kwargs)
    plotted = false(numel(tables), 1);
    y_unit = "";
 
-   % Hold state is preserved so callers can compose this helper inside larger
-   % figure layouts without surprising existing axes content.
+   % Restore the hold state, so a caller can use this helper inside a larger
+   % figure layout without changing the existing axes content.
    washeld = ishold(kwargs.axes);
    hold(kwargs.axes, 'on')
 
@@ -154,8 +154,8 @@ function [tt, unit] = extractSeries(T, varname, kwargs)
       unit = "degC";
    end
 
-   % Resolve physical daily semantics centrally so every caller of the shared
-   % renderer inherits ratio and circular-variable behavior automatically.
+   % Resolve the daily reduction rules in one place, so every caller of the
+   % shared renderer gets the ratio and circular-variable behavior.
    aggregation = dailyAggregation(varname, kwargs.frequency, ...
       kwargs.aggregation, kwargs.albedo_source);
    tt = timetable(values, 'RowTimes', T.Time, 'VariableNames', {'value'});
@@ -201,11 +201,12 @@ function [tt, unit] = extractSeries(T, varname, kwargs)
             tt = retime(tt, char(kwargs.frequency), 'mean');
          end
    end
-   % Presentation scaling happens after temporal aggregation so rates are
-   % integrated exactly once and interval observations retain their support.
+   % Apply the display scaling after the time aggregation. This integrates a
+   % rate exactly once and keeps the support of an interval observation.
    [tt, unit] = convertDisplayUnit(tt, unit, kwargs.display_unit);
-   % Aggregation can prove that every requested interval is incomplete. Do not
-   % create an all-NaN graphics object whose legend promises a nonexistent line.
+   % Aggregation can show that every requested interval is incomplete. Do not
+   % create an all-NaN graphics object, because its legend would show a line
+   % that the axes do not contain.
    if isempty(tt) || ~any(isfinite(tt.value))
       tt = timetable.empty;
    end
@@ -213,18 +214,18 @@ end
 
 function aggregation = dailyAggregation(varname, frequency, requested, ...
       albedo_source)
-   %DAILYAGGREGATION Resolve variable-aware physical reduction semantics.
+   %DAILYAGGREGATION Resolve the daily reduction rule for one variable.
 
    aggregation = requested;
    if frequency ~= "daily"
       return
    end
 
-   % Source radiometers are ratios, native model albedo is a surface state, and
-   % a ratio derived from model fluxes remains a ratio but does not inherit the
-   % sparse-observation support gate. Keeping these cases distinct prevents
-   % valid modeled polar-night state from being censored or a flux ratio from
-   % being averaged as though it were a prognostic state.
+   % A source radiometer value is a ratio. A native model albedo is a surface
+   % state. A ratio computed from model fluxes is still a ratio, but it does
+   % not use the sparse-observation support gate. These three cases stay
+   % separate. Otherwise the code would mask valid modeled polar-night state,
+   % or average a flux ratio as though it were a prognostic state.
    if varname == "albedo" ...
          && any(requested == ...
          ["mean", "mean_omitmissing", "shortwave_weighted_mean"])
@@ -300,8 +301,8 @@ function [tt, unit] = dailyTotal(tt, unit, support)
    end
 
    % A sparse amount already represents its native observation support. A
-   % sparse rate has no defensible represented duration, so keep its timestamp
-   % but mask the requested total instead of inventing an integration interval.
+   % sparse rate has no known duration, so keep its timestamp and mask the
+   % requested total rather than assume an integration interval.
    is_rate = any(unit == ["m s-1", "mWE/h"]);
    if ~support.dense
       if is_rate
@@ -361,8 +362,8 @@ function support = inferDailySupport(time)
       return
    end
 
-   % Absolute steps retain cadence evidence for a reversed dense axis, which
-   % must fail closed rather than being misclassified as a sparse observation.
+   % Absolute steps keep the cadence evidence for a reversed dense axis. A
+   % reversed axis must fail here, not pass as a sparse observation.
    steps_s = seconds(diff(time));
    nonzero_steps = abs(steps_s(isfinite(steps_s) & steps_s ~= 0));
    if isempty(nonzero_steps)
@@ -414,20 +415,21 @@ function tt = aggregateDenseDays(tt, support, method)
    day = (first_day:caldays(1):last_day)';
    value = nan(numel(day), 1);
 
-   % Any reversed step invalidates the declared dense axis. The vectorized path
-   % below keeps duplicate, missing, off-grid, and nonfinite failures local to
-   % their UTC day without rebuilding a full-length time mask for every day.
+   % Any reversed step invalidates the declared dense axis. The vectorized code
+   % below keeps a duplicate, missing, off-grid, or nonfinite failure inside its
+   % own UTC day. It does not rebuild a full-length time mask for every day.
    if support.has_reversed
       tt = timetable(value, 'RowTimes', day, 'VariableNames', {'value'});
       return
    end
 
    % Assign each row to one UTC day and one expected native-grid slot. Every
-   % reducer requires each slot exactly once; strict reducers also require every
-   % value, while omit-missing reducers require finite measurement support.
-   % A daily radiometer albedo based on less than one quarter of the native
-   % grid is too sensitive to the few low-sun samples at polar dawn/dusk, so
-   % the shortwave-weighted reducer requires at least six represented hours.
+   % reducer requires each slot exactly once. A strict reducer also requires
+   % every value, and an omit-missing reducer requires finite measurement
+   % support. A daily radiometer albedo built from less than one quarter of the
+   % native grid is too sensitive to the few low-sun samples at polar dawn and
+   % dusk, so the shortwave-weighted reducer requires at least six represented
+   % hours.
    day_start = dateshift(time, 'start', 'day');
    day_index = round(days(day_start - first_day)) + 1;
    offset_s = seconds(time - day_start);
@@ -455,8 +457,8 @@ function tt = aggregateDenseDays(tt, support, method)
    row_count = accumarray(day_index, ones(size(day_index)), [n_days, 1]);
    finite_count = zeros(n_days, 1);
    if any(finite)
-      % Empty numeric accumarray indices are not portable inputs, so every
-      % optional accumulator is guarded explicitly rather than relying on it.
+      % accumarray does not accept an empty numeric index array in every
+      % release, so each optional accumulator has an explicit guard.
       finite_count = accumarray(day_index(finite), ones(nnz(finite), 1), ...
          [n_days, 1]);
    end

@@ -722,7 +722,7 @@ function test_named_profiles_and_interval_totals_render_readably(testCase)
    profile_labels = string(get(profile_lines, 'DisplayName'));
    testCase.verifyEqual(sort(profile_labels), sort( ...
       ["PROMICE observations - core A"; ...
-       "PROMICE observations - core B"]));
+      "PROMICE observations - core B"]));
    testCase.verifyEqual(size(unique(vertcat(profile_lines.Color), 'rows'), 1), 2);
    profile_legend = findall(profile_fig, 'Type', 'Legend');
    testCase.verifyNumElements(profile_legend, 1);
@@ -800,13 +800,13 @@ function test_group_names_preserve_reductions_while_tiles_omit_redundancy(testCa
       + "(daily totals; complete days only)")), 1);
    testCase.verifyEqual(nnz(contains(names, ...
       "radiation fluxes (native support)")), 1);
-    testCase.verifyEqual(nnz(contains(names, ...
-       "surface albedo (daily source-aware means; " ...
-       + "source-specific support rules)")), 1);
-     testCase.verifyEqual(nnz(contains(names, ...
-        "surface height change, snow depth, and stores " ...
-        + "(daily means; complete forcing " ...
-        + "days, available observation samples)")), 1);
+   testCase.verifyEqual(nnz(contains(names, ...
+      "surface albedo (daily source-aware means; " ...
+      + "source-specific support rules)")), 1);
+   testCase.verifyEqual(nnz(contains(names, ...
+      "surface height change, snow depth, and stores " ...
+      + "(daily means; complete forcing " ...
+      + "days, available observation samples)")), 1);
 
    % The exported figure title keeps case/group context but leaves reduction
    % details to the report caption instead of consuming tile space.
@@ -925,17 +925,19 @@ function test_shared_figures_use_one_column_and_deduplicated_sources(testCase)
    testCase.verifyNumElements(downwelling_ax, 1);
    drawnow limitrate nocallbacks
    axes_pixels = getpixelposition(downwelling_ax, true);
-   downwelling_legend = gobjects(0, 1);
-   for lgd = reshape(met_legends, 1, [])
-      legend_pixels = getpixelposition(lgd, true);
+   % Mark the legends centred over the tile, then select them in one step, so
+   % the handle list is never grown one legend at a time.
+   all_legends = reshape(met_legends, [], 1);
+   over_downwelling = false(numel(all_legends), 1);
+   for k = 1:numel(all_legends)
+      legend_pixels = getpixelposition(all_legends(k), true);
       legend_center = legend_pixels(1:2) + legend_pixels(3:4) / 2;
-      if legend_center(1) >= axes_pixels(1) ...
-            && legend_center(1) <= axes_pixels(1) + axes_pixels(3) ...
-            && legend_center(2) >= axes_pixels(2) ...
-            && legend_center(2) <= axes_pixels(2) + axes_pixels(4)
-         downwelling_legend(end + 1, 1) = lgd; %#ok<AGROW>
-      end
+      over_downwelling(k) = legend_center(1) >= axes_pixels(1) ...
+         && legend_center(1) <= axes_pixels(1) + axes_pixels(3) ...
+         && legend_center(2) >= axes_pixels(2) ...
+         && legend_center(2) <= axes_pixels(2) + axes_pixels(4);
    end
+   downwelling_legend = all_legends(over_downwelling);
    testCase.verifyNumElements(downwelling_legend, 1);
    legend_pixels = getpixelposition(downwelling_legend, true);
    legend_bottom = (legend_pixels(2) - axes_pixels(2)) / axes_pixels(4);
@@ -970,11 +972,11 @@ function test_shared_figures_use_one_column_and_deduplicated_sources(testCase)
       ["downwelling radiation", "surface albedo", "precipitation"]);
    paired = ismember(met_tags, ...
       ["air temperature and humidity", "wind speed and surface pressure"]);
-     testCase.verifyEqual(nnz(single), 3);
-     testCase.verifyEqual(nnz(paired), 2);
-     testCase.verifyTrue(all(met_titles == ""));
-     testCase.verifyTrue(all(arrayfun(@(ax) isscalar(ax.YAxis), ...
-        met_axes(single))));
+   testCase.verifyEqual(nnz(single), 3);
+   testCase.verifyEqual(nnz(paired), 2);
+   testCase.verifyTrue(all(met_titles == ""));
+   testCase.verifyTrue(all(arrayfun(@(ax) isscalar(ax.YAxis), ...
+      met_axes(single))));
    testCase.verifyTrue(all(arrayfun(@(ax) numel(ax.YAxis) == 2, ...
       met_axes(paired))));
 
@@ -987,10 +989,10 @@ function test_shared_figures_use_one_column_and_deduplicated_sources(testCase)
    testCase.verifyNumElements(albedo_fig, 1);
    height_labels = figureLegendLabels(height_fig);
    albedo_labels = figureLegendLabels(albedo_fig);
-    % Separate axes may each repeat the same source label, but native PROMICE
-    % evaluation channels must never fall back to the ambiguous bare source.
-    testCase.verifyGreaterThanOrEqual( ...
-       nnz(height_labels == "PROMICE observations"), 1);
+   % Separate axes may each repeat the same source label, but native PROMICE
+   % evaluation channels must never fall back to the ambiguous bare source.
+   testCase.verifyGreaterThanOrEqual( ...
+      nnz(height_labels == "PROMICE observations"), 1);
    testCase.verifyFalse(any(height_labels == "PROMICE"));
    testCase.verifyEqual(nnz(albedo_labels == "MODIS (GEUS)"), 1);
 
@@ -1162,8 +1164,8 @@ function labels = figureLegendLabels(figures)
 end
 
 function test_plot_forcing_filters_to_date_window(testCase)
-   % The first-class forcing plot supports hourly inspection of a short window
-   % inside a multi-day or multi-year met file.
+   % The forcing plot supports hourly inspection of a short window inside a
+   % multi-day or multi-year met file.
 
    fig = figure('Visible', 'off');
    testCase.addTeardown(@() close(fig));
@@ -1706,7 +1708,7 @@ function test_compare_timeseries_source_aware_model_albedo(testCase)
    state_missing.albedo(25:44) = NaN;
 
    % Fewer than six positive-SWD model samples still define a deterministic
-   % daily energy ratio; zero-SWD polar night remains honestly undefined.
+   % daily energy ratio. A zero-SWD polar night stays undefined.
    ratio = radiometer;
    ratio.swd(25:48) = 0;
    ratio.swd(31:34) = [10; 10; 500; 500];
@@ -2129,9 +2131,9 @@ function writeTinyFirnTree(root)
       {'firn'}
       'none'
       struct('lat_wgs84', 67, 'lon_wgs84', -50, ...
-         'x_epsg3413', 0, 'y_epsg3413', 0, 'elev_m', 1000)
+      'x_epsg3413', 0, 'y_epsg3413', 0, 'elev_m', 1000)
       struct('start', '2012-01-01 00:00:00', ...
-         'end', '2012-01-02 23:00:00')
+      'end', '2012-01-02 23:00:00')
       'kanm/observations.mat'
       {'promice', 'mar3.11', 'racmo2.3p3'}
       {'promice_obs', 'mar3.11', 'racmo2.3p3'}
@@ -2278,7 +2280,7 @@ function writeEmptyResearchTree(root)
       {'firn'}
       'none'
       struct('lat_wgs84', NaN, 'lon_wgs84', NaN, ...
-         'x_epsg3413', NaN, 'y_epsg3413', NaN, 'elev_m', NaN)
+      'x_epsg3413', NaN, 'y_epsg3413', NaN, 'elev_m', NaN)
       struct('start', '', 'end', '')
       'empty/missing_observations.mat'
       {}

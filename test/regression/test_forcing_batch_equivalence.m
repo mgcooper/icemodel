@@ -5,11 +5,11 @@ function tests = test_forcing_batch_equivalence
    % (buildMarData/buildMerraData/buildRacmoData and the buildMar/MerraMet
    % wrappers) accept a LIST of points (Nx2 [lat lon]) and open each source
    % file ONCE for the whole list, rather than re-opening it per point. This
-   % suite is the hard equivalence gate: building 2-3 points the NEW way (one
-   % multi-point call) must be byte-identical (isequaln on the variables,
-   % times, and CustomProperties) to the OLD way (a loop of single-point
-   % calls). Payload metadata is part of that equality contract. Lanes self-skip
-   % when their staged fast fixtures are not on disk.
+   % suite is the hard equivalence gate. Building 2-3 points with one
+   % multi-point call must be byte-identical (isequaln on the variables,
+   % times, and CustomProperties) to a loop of single-point calls. Payload
+   % metadata is part of that equality contract. A test skips itself when its
+   % staged fast fixtures are not on disk.
    %
    % Reads the small fixture subset under test/data/forcing. This belongs in
    % regression because it exercises real RCM I/O and batch-vs-loop behavior,
@@ -138,8 +138,10 @@ function verifyMetBatchOutputs(testCase, met, metadata, Data, expectedData, labe
 end
 
 function verifyTimetablesIdentical(testCase, a, b, label)
-   %VERIFYTIMETABLESIDENTICAL isequaln on variables, times, units, and
-   % the userdata metadata/CustomProperties.
+   %VERIFYTIMETABLESIDENTICAL Compare two timetables for exact equality.
+   %
+   % Uses isequaln on the variables, the times, the units, the UserData
+   % metadata, and the CustomProperties.
    testCase.verifyEqual(string(a.Properties.VariableNames), ...
       string(b.Properties.VariableNames), ...
       sprintf('%s: variable names differ', label));

@@ -4,11 +4,12 @@ function paths = esmRuntimeMetFiles(case_manifest, input_root)
    %  paths = icemodel.verification.helpers.esmRuntimeMetFiles( ...
    %     case_manifest, input_root)
    %
-   % ESM-SnowMIP cases intentionally omit forcing_sources, colocation, and
-   % met_files because forcing and observations are staged atomically. Reuse the
-   % verification runner's normal option-resolution chain so audit and plotting
-   % select the same nested-or-flat artifact as an actual model run. Missing
-   % files remain in PATHS; callers decide whether to report or skip them.
+   % ESM-SnowMIP cases omit forcing_sources, colocation, and met_files, because
+   % the staging step writes forcing and observations together. Reuse the
+   % verification runner's normal option-resolution chain, so audit and
+   % plotting select the same nested-or-flat artifact as an actual model run.
+   % Missing files stay in PATHS. Callers decide whether to report or skip
+   % them.
 
    % Carry the caller-selected input root into the same helper used by
    % runIcemodelSnowCandidate. configureRun then delegates filename and path

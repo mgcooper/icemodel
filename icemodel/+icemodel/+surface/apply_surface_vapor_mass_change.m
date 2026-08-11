@@ -6,15 +6,16 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
    % f_liq     = fraction of liquid water by volume in each control volume
    % d_rof     = condensation which exceeds control volume available porosity
    % d_pevp    = potential vapor-driven change in top-layer liquid fraction
-   % d_sbl_err = vapor-driven ice change which exceeds control-volume limits
+   % d_sbl_err = vapor-driven ice change which exceeds control-volume limits;
+   %             positive is rejected deposition, negative is unsatisfied subl
    % f_ice_min = minimum retained surface ice fraction before remeshing
    % f_res_por = residual liquid-water fraction per pore volume [-]
    %
    %#codegen
 
-   % Clarify the CV budget for a future refactor that accounts for f_bub. For
-   % glacier ice or any medium w/closed pores, "availableCapacity" is a misnomer
-   % if f_por is defined as 1-f_ice since it does not account for f_bub.
+   % Reference definitions for the control-volume budget. For glacier ice or
+   % any medium w/closed pores, "availableCapacity" is a misnomer if f_por is
+   % defined as 1-f_ice since it does not account for f_bub.
    %
    % Canonical definitions for snow:
    %
@@ -48,9 +49,9 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
    % Initialize potential deposition that cannot be satisfied by the cv budget.
    d_sbl_err = 0;
 
-   % If a liquid film is present, partition vapor exchange through the liquid
-   % reservoir first. Otherwise route it directly to the ice phase so dry/cold
-   % deposition forms ice rather than spurious liquid water.
+   % If a liquid film is present, partition liquid vapor exchange first.
+   % Otherwise route the exchange straight to the ice phase, so dry or cold
+   % deposition forms ice instead of liquid water that is not there.
    if wetflag
 
       if d_pevp < 0 % evaporation
@@ -59,7 +60,7 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
             % only residual water exists, send d_pevp to sublimation
 
             if debug == true
-               fprintf('metstep = %d, f_liq(1) < f_res\n', metstep)
+               fprintf('f_liq(1) < f_res, d_pevp sent to sublimation\n')
             end
 
          elseif abs(d_pevp) <= (f_liq_top - f_res) % availWater >= evap
@@ -101,8 +102,10 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
 
             f_liq = f_liq + d_aevp;
 
-            % Update d_pevp. This is "extra" condensation that converts to
-            % runoff. In practice this never occurs hence debug is disabled.
+            % Condensation beyond what the top cell's pore space can hold. The
+            % excess cannot be stored, so it leaves as runoff (d_rof sends it
+            % to diagnose_column_runoff). The excess is real water, so
+            % dropping it would break the budget.
             d_pevp = d_pevp - d_aevp_max;
             d_rof = d_rof + d_pevp;
 
@@ -119,7 +122,7 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_mass_change( ...
    end
 
    if debug == true && d_sbl_err > 0
-      fprintf('unsatisfied sublimation: %.6f\n', d_sbl_err)
+      fprintf('rejected deposition: %.6f\n', d_sbl_err)
    end
 end
 
@@ -137,18 +140,18 @@ function [f_ice, d_sbl_err] = sublimation(d_pevp, f_ice, f_liq, f_ice_min, ...
    %
    % d_psbl = d_pevp * (Lv * ro_liq) / (Ls * ro_ice)
    %
-   % Note: in icemodel, ro_air_Lv is set to ro_air * Lv or ro_air * Ls depending
-   % on liqflag, so Qe is already computed wrt to them. That way evap/subl are
+   % In icemodel, ro_air_Lv is set to ro_air * Lv or ro_air * Ls depending on
+   % liqflag, so Qe is already computed wrt to them. That way evap/subl are
    % computed using the same formula: e = Qe / ro_air_Lv * dt / dz.
    %
-   % The conversion here conserves heat when the surface latent heat flux, Qe,
-   % cannot be satisfied by evaporation alone (all available water evaporates),
-   % and the remainder is allocated to sublimation of ice by sending the excess
-   % d_pevp from the evaporation branch to this function.
+   % This conversion conserves heat when evaporation alone cannot satisfy the
+   % surface latent heat flux Qe, that is, when all available water evaporates.
+   % The evaporation branch then sends the remaining d_pevp to this function,
+   % which applies it to sublimation of ice.
 
-   % Unlike the excess condensation case which is sent to runoff, "excess"
-   % deposition cannot be satisfied by the control volume budget and is assigned
-   % to d_sbl_err. Initialize this value to 0.
+   % The control volume sends excess condensation to runoff. It cannot do the
+   % same with excess deposition, so this function reports that amount in
+   % d_sbl_err. Initialize the value to 0.
    d_sbl_err = 0;
 
    % Early return if there's no energy for sublimation.
@@ -183,8 +186,8 @@ function [f_ice, d_sbl_err] = sublimation(d_pevp, f_ice, f_liq, f_ice_min, ...
       return
    end
 
-   % Note: layer combination is based on f_ice, so requiring f_ice_top < 0
-   % should suffice (rather than <f_ice_min). If f_ice(1) + d_psbl < 0, it will
+   % Layer combination is based on f_ice, so requiring f_ice_top < 0 should
+   % suffice (rather than <f_ice_min). If f_ice(1) + d_psbl < 0, it will
    % error, otherwise the layers will combine if f_ice(1) + d_psbl < f_min.
 
    % Budget sublimation

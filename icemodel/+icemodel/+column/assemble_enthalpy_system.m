@@ -6,14 +6,14 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    %  This function constructs the lower, middle, and upper diagonals of the
    %  A matrix in a form compatible with icemodel.numerics.trisolve.
    %
-   %  The suppressed linearization factor Sp is retained in the input signature
-   %  for generality.
+   %  The input signature keeps the suppressed linearization factor Sp for
+   %  generality.
    %
    %  Note: ro_sno * cp_sno = (cv_ice * f_ice + cv_liq * f_liq)
    %  See updatestate (or icemodel.timestepping.updatesubstep) for how ro_sno
    %  and cp_sno are computed.
    %
-   %  Subtle point: Pmelt here is identical to SNTHRM:
+   %  Pmelt here is identical to SNTHRM:
    %     P = g_liq - g_liq_o
    %       = ro_liq * (f_liq - f_liq_o)
    %       = g_wat * (f_ell - f_ell_o)
@@ -28,15 +28,15 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    %    = 1 / (f_liq - f_liq_o) / dT * (f_liq - f_liq_o) + To
    %  T = dT + To
    %
-   % The same result is found using Jordan's definition of Pmelt and gv/gk.
+   % Jordan's definition of Pmelt and gv/gk gives the same result.
    %
    % See also: icemodel.column.solve_column_enthalpy, icemodel.numerics.trisolve
    %
    %#codegen
 
-   % Commented statements are kept for reference. In some cases they are needed
-   % but are set when initialized e.g. the gv/gk/dLdT BCs, in other cases they
-   % are not used but would be for a frozen soil model.
+   % The commented statements are for reference. The code needs some of them,
+   % such as the gv/gk/dLdT boundary conditions, but sets them at
+   % initialization. It does not use the others, but a frozen soil model would.
 
    persistent Lf ro_liq TL TH
    if isempty(Lf)
@@ -105,8 +105,8 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    % gkP = gk;
    % gvP = gv;
 
-   % Compute the aN and aS conductances [W m-2 K-1]. Note that delz(1) &
-   % delz(end) are 1/2 CVs.
+   % Compute the aN and aS conductances [W m-2 K-1]. Note: delz(1) and delz(end)
+   % are half control volumes.
    aN = g_b_ns(N:S)     ./ delz(N:S);
    aS = g_b_ns(N+1:S+1) ./ delz(N+1:S+1);
 

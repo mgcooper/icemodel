@@ -5,11 +5,11 @@ function fig = newFigure(kwargs)
    %  fig = icemodel.plot.newFigure(width=1100, height=360, name="met")
    %
    % Role
-   %  Single source of the export-figure frame every report and
-   %  verification figure uses: white background (headless sessions
-   %  otherwise export on the default dark canvas), hidden by default,
-   %  and a stable pixel size so exported rasters are reproducible.
-   %  Callers own closing the figure (pair with onCleanup).
+   %  Builds the export-figure frame that every report and verification
+   %  figure uses: a white background, hidden by default, and a stable
+   %  pixel size so exported rasters are reproducible. Without the white
+   %  background, a headless session exports on the default dark canvas.
+   %  The caller must close the figure; pair it with onCleanup.
    %
    % See also: icemodel.plot.compareTimeseries, exportgraphics
 

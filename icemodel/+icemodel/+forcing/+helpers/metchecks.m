@@ -4,17 +4,16 @@ function [met, checks] = metchecks(met, kwargs)
    %  [met, checks] = icemodel.forcing.helpers.metchecks(met)
    %  [met, checks] = ... metchecks(met, fillgaps=false, clamp=false)
    %
-   % METCHECKS is the standard QA/QC pass every forcing builder applies
-   % before a met or Data timetable is written:
+   % METCHECKS is the standard QA/QC pass that every forcing builder applies
+   % before it writes a met or Data timetable:
    %
    %  1. Counts NaN and complex-valued samples per variable. The counts
    %     are returned in CHECKS so builders can record data provenance.
    %  2. Gap-fills each variable by linear interpolation with
-   %     nearest-value end fill. Wind direction (wdir) is circular, so it
-   %     is filled through its unit-vector components rather than
-   %     linearly. (The legacy runoff metchecks linear-filled wdir, which
-   %     corrupts fills that cross the 360/0 wrap; the component fill is
-   %     an intentional fix, recorded in the +forcing README.)
+   %     nearest-value end fill. Wind direction (wdir) is circular, so this
+   %     function fills it through its unit-vector components, not
+   %     linearly. A linear fill corrupts a gap that crosses the 360/0
+   %     wrap. The +forcing README describes the component fill.
    %  3. Clamps recognized variables to the legacy physical ranges:
    %
    %        albedo   [0.05, 0.98]   [-]
@@ -23,7 +22,7 @@ function [met, checks] = metchecks(met, kwargs)
    %        wdir     wrapped to (0, 360]
    %        tsfc     <= 273.16 when in kelvin, <= 0 when in celsius
    %
-   %     Unrecognized variables are gap-filled but never clamped.
+   %     This function gap-fills an unrecognized variable but never clamps it.
    %
    % Inputs
    %  met - timetable holding any subset of the met-contract variables
@@ -87,7 +86,11 @@ function [met, checks] = metchecks(met, kwargs)
          met.rh = clampPresent(met.rh, 5, 99.99);
       end
       if ismember("wspd", varnames)
-         met.wspd = clampPresent(met.wspd, 0.1, Inf);
+         % Apply the wind floor so a reconstructed met file is accepted at
+         % runtime.
+         wspd_bounds = ...
+            icemodel.forcing.reconstruct.physicalBounds("wspd");
+         met.wspd = clampPresent(met.wspd, wspd_bounds(1), Inf);
       end
       if ismember("wdir", varnames)
          met.wdir = wrapWindDirection(met.wdir);
@@ -97,7 +100,8 @@ function [met, checks] = metchecks(met, kwargs)
          % kelvin vs celsius from the series magnitude (legacy
          % convention; glacier surfaces are never near 100 C).
          if min(met.tsfc, [], 'omitnan') > 100
-            met.tsfc = clampPresent(met.tsfc, -Inf, 273.16);
+            met.tsfc = clampPresent(met.tsfc, -Inf, ...
+               icemodel.physicalConstant('Tf'));
          else
             met.tsfc = clampPresent(met.tsfc, -Inf, 0);
          end

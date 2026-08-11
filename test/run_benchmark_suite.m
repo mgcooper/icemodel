@@ -96,7 +96,7 @@ function [num_warmups, max_samples, relative_margin_of_error, ...
    [num_warmups, max_samples, relative_margin_of_error, ...
       confidence_level] = profileDefaults(options.sampling_profile);
 
-   % Explicit numeric overrides win over the named profile defaults.
+   % An explicit numeric override replaces the named profile default.
    if ~isnan(options.num_warmups)
       num_warmups = options.num_warmups;
    end

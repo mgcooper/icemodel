@@ -1,5 +1,5 @@
 function Qli = empirical_incoming_longwave_radiation(Tair, ea_atm, emiss)
-   %EMPIRICAL_INCOMING_LONGWAVE_RADIATION Estimate downwelling longwave radiation.
+   %EMPIRICAL_INCOMING_LONGWAVE_RADIATION Estimate downwelling longwave.
    %
    %  Qli = icemodel.surface.empirical_incoming_longwave_radiation(Tair, ea_atm)
    %
@@ -10,9 +10,9 @@ function Qli = empirical_incoming_longwave_radiation(Tair, ea_atm, emiss)
    % Output:
    %  Qli - incoming longwave radiation [W m^-2]
    %
-   % This is a legacy fallback used when forcing data do not provide downwelling
-   % longwave radiation directly so initialize_surface_forcings can derive `lwd`
-   % from raw station data. The canonical SEB longwave bookkeeping stays in
+   % This is a legacy fallback for forcing data that has no downwelling
+   % longwave radiation. initialize_surface_forcings uses it to derive `lwd`
+   % from raw station data. The canonical SEB longwave accounting stays in
    % `icemodel.surface.net_longwave_radiation` and
    % `icemodel.surface.outgoing_longwave_radiation`.
    %

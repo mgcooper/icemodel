@@ -1,6 +1,6 @@
 function [d_pevp, pevp] = potential_surface_vapor_tendency(Qe, dt, dz)
    %POTENTIAL_SURFACE_VAPOR_TENDENCY Potential vapor tendency as top-layer
-   %liquid fraction change and flux
+   % liquid fraction change and flux
    %
    % Definition:
    % d_pevp = (Qe / (Lv * ro_liq)) * (dt / dz)
@@ -19,12 +19,12 @@ function [d_pevp, pevp] = potential_surface_vapor_tendency(Qe, dt, dz)
    % pevp > 0 and d_pevp > 0 : condensation potential
    % pevp < 0 and d_pevp < 0 : evaporation/sublimation potential
    %
-   % Note: To budget sublimation, outputs require conversion to ice frac change:
+   % To budget sublimation, convert the outputs to an ice-fraction change:
    % d_psbl = d_pevp * (Lv * ro_liq) / (Ls * ro_ice)
    %
    % See also: icemodel.surface.apply_surface_vapor_mass_change
    %
-   % The combined surface-flux + PEVAP contract lives in
+   % The combined surface-flux and PEVAP contract is defined in
    % icemodel.surface.potential_surface_vapor_tendency(...), which applies
    % the physical Ts = min(Ts, Tf) rule before evaluating Qe.
    %

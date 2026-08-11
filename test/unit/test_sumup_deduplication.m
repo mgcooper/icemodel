@@ -61,8 +61,8 @@ function test_smb_identity_fields(testCase)
 end
 
 function test_empty_input_and_invalid_contracts(testCase)
-   % A schema-valid empty selection reports zero counts; unknown variables and
-   % missing identity columns fail before silently weakening equality.
+   % A schema-valid empty selection reports zero counts. Unknown variables and
+   % missing identity columns fail before they can weaken the equality test.
    [record, ~] = identityFixture("density");
    empty_record = record([], :);
 

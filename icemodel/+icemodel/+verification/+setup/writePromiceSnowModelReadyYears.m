@@ -40,29 +40,37 @@ function report = writePromiceSnowModelReadyYears(kwargs)
    manifest = icemodel.verification.helpers.readFamilyManifest(manifest_file);
 
    % Process one case at a time so multi-decade met artifacts are released
-   % before the next station is loaded.
-   rows = repmat(rowTemplate(), 0, 1);
-   sites_without_rcm = strings(0, 1);
-   for icase = 1:numel(manifest.cases)
+   % before the next station is loaded. One slot per case holds that case's
+   % annual rows, and the station ledger is sized at the case count, so neither
+   % list grows inside the loop.
+   n_cases = numel(manifest.cases);
+   case_rows = cell(n_cases, 1);
+   sites_without_rcm = strings(n_cases, 1);
+   n_without_rcm = 0;
+   for icase = 1:n_cases
       c = manifest.cases(icase);
       [promice_met, promice_exists] = loadMet(c, "promice", ...
          kwargs.input_data_root);
       [mar_met, mar_exists] = loadMet(c, "mar", kwargs.input_data_root);
       observations = loadObservations(c, manifest.family_root);
       if ~mar_exists
-         sites_without_rcm(end + 1, 1) = string(c.site_id); %#ok<AGROW>
+         n_without_rcm = n_without_rcm + 1;
+         sites_without_rcm(n_without_rcm) = string(c.site_id);
       end
 
       % Audit only complete years inside the declared MAR leg: precipitation is
       % mandatory, so years outside that source window are not candidates.
-      years = candidateYears(c, mar_exists);
-      for y = reshape(years, 1, [])
-         row = annualRow(c, y, promice_met, mar_met, observations, ...
-            promice_exists, mar_exists);
-         rows(end + 1, 1) = row; %#ok<AGROW>
+      years = reshape(candidateYears(c, mar_exists), 1, []);
+      year_rows = repmat(rowTemplate(), numel(years), 1);
+      for k = 1:numel(years)
+         year_rows(k) = annualRow(c, years(k), promice_met, mar_met, ...
+            observations, promice_exists, mar_exists);
       end
+      case_rows{icase} = year_rows;
       clear promice_met mar_met observations
    end
+   rows = vertcat(repmat(rowTemplate(), 0, 1), case_rows{:});
+   sites_without_rcm = sites_without_rcm(1:n_without_rcm);
 
    % Stable station/year ordering makes CSV bytes and grouped Markdown
    % deterministic even if a future manifest writer reorders case records.
@@ -88,7 +96,7 @@ function report = writePromiceSnowModelReadyYears(kwargs)
       sites_without_rcm));
    check = buildCheck(coverage, ready, sites_without_rcm, coverage_file, ...
       ready_file, summary_file);
-   writeText(check_file, string(jsonencode(check, PrettyPrint=true)));
+   icemodel.verification.setup.writeJson(check_file, check);
 
    report = struct('coverage', coverage, 'ready', ready, 'check', check, ...
       'files', struct('coverage_csv', string(coverage_file), ...
@@ -361,12 +369,18 @@ function reason = hybridReason(promice_exists, promice_grid, missing, ...
       parts(end + 1) = "PROMICE time grid incomplete";
    end
    channels = requiredPromiceChannels();
+   % One slot per required channel, filled only for channels with missing
+   % samples, then appended once so the reason list never grows in place.
+   channel_parts = strings(numel(channels), 1);
+   n_channel_parts = 0;
    for k = 1:numel(channels)
       if missing(k) > 0
-         parts(end + 1) = sprintf('%s missing=%d', ...
-            channels(k), missing(k)); %#ok<AGROW>
+         n_channel_parts = n_channel_parts + 1;
+         channel_parts(n_channel_parts) = sprintf('%s missing=%d', ...
+            channels(k), missing(k));
       end
    end
+   parts = [parts; channel_parts(1:n_channel_parts)];
    if ~mar_exists
       parts(end + 1) = "MAR precipitation leg absent";
    elseif ~mar_grid
@@ -433,13 +447,18 @@ function lines = summaryMarkdown(coverage, ready, sites_without_rcm)
       "| Site | Practical years | Strict 100% snow-depth years |"; ...
       "|---|---|---|"];
 
-   % Render one stable station row with compact contiguous ranges.
-   for site = reshape(ready_sites, 1, [])
+   % Render one stable station row with compact contiguous ranges. The row
+   % count equals the ready-site count, so the table is sized before the loop.
+   sites = reshape(ready_sites, 1, []);
+   site_rows = strings(numel(sites), 1);
+   for k = 1:numel(sites)
+      site = sites(k);
       practical_years = ready.year(ready.site_id == site);
       strict_years = strict.year(strict.site_id == site);
-      lines(end + 1) = sprintf('| %s | %s | %s |', site, ...
-         compactYears(practical_years), compactYears(strict_years)); %#ok<AGROW>
+      site_rows(k) = sprintf('| %s | %s | %s |', site, ...
+         compactYears(practical_years), compactYears(strict_years));
    end
+   lines = [lines; site_rows];
    lines(end + 1:end + 3) = [""; ...
       "Detailed exclusions and channel counts: " + ...
       "`promice_snow_model_site_year_coverage.csv`."; ""];
@@ -452,20 +471,25 @@ function text = compactYears(years)
       text = "none";
       return
    end
-   parts = strings(0, 1);
+   % A year list holds at most one contiguous range per year, so size the
+   % parts list at the year count and trim to the runs actually closed.
+   parts = strings(numel(years), 1);
+   n_parts = 0;
    first = years(1);
    last = first;
    for k = 2:numel(years)
       if years(k) == last + 1
          last = years(k);
       else
-         parts(end + 1) = yearRange(first, last); %#ok<AGROW>
+         n_parts = n_parts + 1;
+         parts(n_parts) = yearRange(first, last);
          first = years(k);
          last = first;
       end
    end
-   parts(end + 1) = yearRange(first, last);
-   text = strjoin(parts, ', ');
+   n_parts = n_parts + 1;
+   parts(n_parts) = yearRange(first, last);
+   text = strjoin(parts(1:n_parts), ', ');
 end
 
 function text = yearRange(first, last)

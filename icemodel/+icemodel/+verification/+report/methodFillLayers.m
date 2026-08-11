@@ -5,15 +5,14 @@ function layers = methodFillLayers(values, provenance, own_method_mask)
    %     values, provenance, own_method_mask)
    %
    % Role
-   %  The color logic behind the POLICY D-31 method detail panels: the
-   %  filled product's per-sample provenance channel identifies which
-   %  samples are reconstructions, and the plan audit's segment spans for
-   %  the panel's method (OWN_METHOD_MASK) attribute each reconstructed
-   %  sample to the panel's own method or to some other method. The
-   %  caller plots the three returned layers so a panel accents only its
-   %  own method and renders every foreign fill in the muted context
-   %  color — a bounded_interp panel can never display a MAR fill in the
-   %  same accent.
+   %  The color logic behind the POLICY D-31 method detail panels. The
+   %  per-sample provenance channel of the filled product identifies which
+   %  samples are reconstructions. The segment spans of the plan audit for
+   %  the panel method (OWN_METHOD_MASK) assign each reconstructed sample
+   %  to the panel method or to another method. The caller plots the three
+   %  returned layers, so a panel accents only its own method and draws
+   %  every other fill in the muted context color. A bounded_interp panel
+   %  therefore cannot show a MAR fill in the same accent.
    %
    % Inputs
    %  values : channel sample values from the filled product.
@@ -63,8 +62,8 @@ function layers = methodFillLayers(values, provenance, own_method_mask)
    other_fill = values;
    other_fill(~(is_fill & ~own_method_mask)) = NaN;
 
-   % Colors ride along from the single style registry so the plotting
-   % call sites and the layer split can never disagree about the accent.
+   % Read the colors from the shared style registry, so the plotting call
+   % sites and this layer split always use the same accent.
    style = icemodel.verification.report.gapfillFigureStyle();
    layers = struct('observed', observed, 'own_fill', own_fill, ...
       'other_fill', other_fill, 'observed_color', style.observed, ...

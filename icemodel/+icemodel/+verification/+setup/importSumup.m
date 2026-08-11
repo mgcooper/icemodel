@@ -36,12 +36,12 @@ function manifest = importSumup(source_dir, kwargs)
    %  RCM forcing can be built later, independently, on the staged manifest.
    %  forcing_sources selects RCM sources requested by the current call.
    %  Ordinary calls preserve omitted existing legs; overwrite_family=true
-   %  deliberately replaces the whole family state.
+   %  replaces the whole family state.
    %
    %  Source: SUMup_2025 is read from the LOCAL verification cache
    %  (data/verification/sumup, NSIDC G02288); the files are committed there, so
-   %  no download is required. fetchSumup verifies cache presence (and prints a
-   %  retrieval banner only if it is genuinely absent). Provide points explicitly
+   %  no download is required. fetchSumup verifies cache presence, and prints a
+   %  retrieval banner only when the cache is absent. Provide points explicitly
    %  (SUMup is a point collection, not a curated site list); the default is the
    %  PROMICE anchor transect so the staged SUMup cases co-locate with the
    %  existing firn/promice bundles.
@@ -108,7 +108,7 @@ function manifest = importSumup(source_dir, kwargs)
    %    Staging one case adds or updates only that case in the family manifest
    %    and preserves every other committed case and file. Re-staging the same
    %    case updates exactly its entry. Set overwrite_family=true only to
-   %    deliberately rebuild the family root.
+   %    rebuild the family root.
    %
    %  Colocation architecture: SUMup observations are staged first as the
    %    bundled data-only observations.mat eval target. Co-located RCM forcing
@@ -160,7 +160,7 @@ function manifest = importSumup(source_dir, kwargs)
 
    % Validate the optional clamp before any cache or staging side effect.
    [window_start, window_end, window_enabled] = ...
-      icemodel.internal.pairedWindow( ...
+      icemodel.pairedWindow( ...
       kwargs.startdate, kwargs.enddate);
 
    % Resolve the forcing sources.
@@ -266,8 +266,8 @@ function manifest = importSumup(source_dir, kwargs)
       end
 
       % Validate caches only when building observations.
-      % Dry runs remain metadata-only; optional skips stay quiet while required
-      % SUMup products print their retrieval guidance before failing.
+      % Dry runs stay metadata-only. An optional skip prints nothing, while a
+      % required SUMup product prints its retrieval guidance before it fails.
       if kwargs.dry_run
          source_dir = icemodel.verification.setup.sumupCacheDir(source_dir);
          source_status = [];
@@ -398,8 +398,8 @@ function s = stageCase(point, n, source_dir, family_root, proj, ...
 
    obs_file = "observations.mat";
    if ~kwargs.dry_run
-      % Stop a quiet, importer-level cache miss before the standalone builder's
-      % strict fetch can print its user-facing retrieval banner.
+      % Fail on an importer-level cache miss before the standalone builder's
+      % strict fetch prints its user-facing retrieval banner.
       assertSourceAvailable(source_status);
       % Observations are the primary target and are never blocked by forcing.
       [observations, obs_meta] = ...
@@ -445,7 +445,7 @@ function s = stageCase(point, n, source_dir, family_root, proj, ...
       kwargs.colocation_threshold_km);
 
    [surface_zone, eval_target, permafrost_zone] = ...
-       caseZoneAndTarget(is_coloc, anchor);
+      caseZoneAndTarget(is_coloc, anchor);
    s = struct('case_id', string(case_id), 'storage_alias', ...
       icemodel.verification.setup.rcmStorageAlias(dataset_family, case_id), ...
       'site_id', string(site_id), ...
@@ -505,7 +505,9 @@ end
 function [t1, t2] = forcingWindow(window_start, window_end, years)
    %FORCINGWINDOW Resolve the co-located RCM forcing window for the SUMup legs.
    % The explicit comparison window wins; else the kwargs.years span; else
-   % unbounded (NaT -> each source's full on-disk coverage in resolveLegWindows).
+   % unbounded (NaT -> each source's full on-disk coverage in
+   % resolveLegWindows).
+
    if ~isnat(window_start) && ~isnat(window_end)
       t1 = window_start;
       t2 = window_end;
@@ -525,8 +527,8 @@ function entry = caseEntry(s)
    if s.reuse_entry
       % A forcing-only refresh keeps the staged observation contract verbatim
       % and updates only requested colocation legs plus derived source lists.
-      % Apply the same overlap annotation as a normal observation build so a
-      % fast refresh cannot advertise a different comparison contract.
+      % Apply the same overlap annotation as a normal observation build, so a
+      % fast refresh cannot report a different comparison contract.
       entry = s.entry;
       colocation = s.colocation;
       for source = reshape(string(fieldnames(s.leg)), 1, [])
@@ -637,12 +639,16 @@ function rows = uniqueLocationRows(lat, lon)
       keys(k) = sprintf("%.3f:%.3f", lat(k), lon(k));
    end
 
-   seen = strings(1, 0);
+   % At most one anchor per input row survives, so the seen-key buffer is sized
+   % to the key list once and only its filled prefix is searched.
+   seen = strings(1, numel(keys));
+   n_seen = 0;
    rows = false(1, numel(keys));
    for k = 1:numel(keys)
-      if ~ismember(keys(k), seen)
+      if ~ismember(keys(k), seen(1:n_seen))
          rows(k) = true;
-         seen(end + 1) = keys(k); %#ok<AGROW>
+         n_seen = n_seen + 1;
+         seen(n_seen) = keys(k);
       end
    end
 end
@@ -653,9 +659,9 @@ function [points, requested_ids] = deduplicateCatalogPoints( ...
    %
    % Multiple staged source families can describe the same logical anchor with
    % slightly different coordinates. The default catalog path should stage one
-   % SUMup case per resolved id; explicit points/case_ids still surface
-   % duplicates through the manifest merge validator. MATLAB's stable indices
-   % replace the former hand-maintained seen list without changing first-id wins.
+   % SUMup case per resolved id. Explicit points/case_ids still report
+   % duplicates through the manifest merge validator. The "stable" unique keeps
+   % the first occurrence of each id.
    [~, first_rows] = unique(requested_ids, "stable");
    keep = false(1, numel(requested_ids));
    keep(first_rows) = true;
@@ -894,8 +900,8 @@ end
 function leg = skipNonoverlappingLeg(leg, period)
    %SKIPNONOVERLAPPINGLEG Reject a zero-overlap RCM leg before staging.
    %
-   % resolveLegWindows intentionally returns the source's all-available window
-   % for an unbounded SUMup import. Each SUMup point has its own observation
+   % resolveLegWindows returns the source's all-available window for an
+   % unbounded SUMup import. Each SUMup point has its own observation
    % period, however, so reject only zero-overlap points before an RCM builder
    % can write orphan files. Partially overlapping points retain the shared
    % maximum source window for efficient batching; the later colocation clamp

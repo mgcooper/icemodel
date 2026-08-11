@@ -1,6 +1,8 @@
 function tests = test_verification_data_rebuild
-   %TEST_VERIFICATION_DATA_REBUILD End-to-end validation that the staged
-   %  verification artifacts can be rebuilt from local native source data.
+   %TEST_VERIFICATION_DATA_REBUILD Rebuild the staged verification artifacts.
+   %
+   %  Checks end to end that the staged verification artifacts can be rebuilt
+   %  from local native source data.
    %
    %  Both ESM-SnowMIP and Laugh-Tests source caches are optional. Each
    %  test case probes the corresponding fetch helper in non-strict mode
@@ -170,7 +172,7 @@ function test_rebuild_esm_snowmip_smoke_sites(testCase)
             'AbsTol', 1e-12);
       end
 
-      % Metadata-only: the redundant smoke reference.mat is no longer written.
+      % Metadata-only: reference.mat is not written for the smoke sites.
       verifyTrue(testCase, ...
          exist(fullfile(case_dir, 'reference.mat'), 'file') == 0, ...
          sprintf('%s reference.mat should not be written (metadata-only)', ...
@@ -210,7 +212,7 @@ end
 function test_esm_builders_enforce_paired_utc_window(testCase)
    % Both direct builders reject malformed pairs before source discovery.
    missing_source = fullfile(testCase.TestData.tmp, 'missing-esm-window-source');
-   error_id = 'icemodel:internal:pairedWindow:invalidWindow';
+   error_id = 'icemodel:pairedWindow:invalidWindow';
    missing_builders = { ...
       @(a, b) icemodel.verification.setup.buildEsmSnowmipForcing( ...
       "cdp", source_dir=missing_source, startdate=a, enddate=b)
@@ -279,8 +281,7 @@ function test_esm_default_import_uses_full_source_bounds(testCase)
    testCase.assumeTrue(has_source, ...
       sprintf('ESM-SnowMIP source cache not present at %s', src));
 
-   % Derive the expected CDP bounds directly from the unwindowed builders so a
-   % regression back to the one-year smoke window cannot satisfy this check.
+   % Derive the expected CDP bounds directly from the unwindowed builders.
    [forcing_tt, ~] = ...
       icemodel.verification.setup.buildEsmSnowmipForcing( ...
       "cdp", source_dir=src);
@@ -306,10 +307,10 @@ function test_esm_default_import_uses_full_source_bounds(testCase)
    verifyEqual(testCase, string(manifest.cases.period.end), ...
       string(icemodel.verification.setup.formatManifestTime(source_end)));
 
-   % Keep this test meaningful by proving the full source bounds extend beyond
-   % the short metadata-only preview used by dry_run.
+   % The full source bounds extend beyond the short metadata-only preview
+   % used by dry_run.
    [smoke_start, smoke_end] = ...
-      icemodel.verification.helpers.default_smoke_window("cdp");
+      icemodel.verification.helpers.esmSnowmipWaterYear("cdp");
    verifyLessThan(testCase, source_start, smoke_start);
    verifyGreaterThan(testCase, source_end, smoke_end);
 
@@ -333,7 +334,7 @@ function test_esm_dry_run_does_not_write_staging_tree(testCase)
    verifyEqual(testCase, string(manifest.cases.case_id), "cdp");
    verifyEqual(testCase, string(manifest.cases.native_timestep), "15m");
    [smoke_start, smoke_end] = ...
-      icemodel.verification.helpers.default_smoke_window("cdp");
+      icemodel.verification.helpers.esmSnowmipWaterYear("cdp");
    verifyEqual(testCase, string(manifest.cases.period.start), ...
       string(icemodel.verification.setup.formatManifestTime(smoke_start)));
    verifyEqual(testCase, string(manifest.cases.period.end), ...
@@ -432,7 +433,7 @@ function test_esm_output_root_stages_eval_and_input(testCase)
 end
 
 function test_esm_default_missing_cache_errors(testCase)
-   % Default imports should fail at cache validation instead of silently rewriting
+   % Default imports should fail at cache validation instead of rewriting
    % requested cases into skipped manifest entries.
    src = fullfile(testCase.TestData.tmp, 'strict-empty-esm-cache');
    mkdir(src);
@@ -489,8 +490,8 @@ function [Time, tsl] = writeEsmSoilTemperatureFixture(pathname)
    Time = datetime(2001, 1, 1, 0:4, 0, 0, 'TimeZone', 'UTC')';
    sdepth = single([0.1; 0.5; 1.0]);
    tsl = [101 102 103 104 105; ...
-          201 202 203 204 205; ...
-          301 302 303 304 305];
+      201 202 203 204 205; ...
+      301 302 303 304 305];
 
    % Encode dimensions in the same order as the bundled ESM-SnowMIP files.
    nccreate(pathname, 'time', 'Dimensions', {'time', numel(Time)});
@@ -506,9 +507,9 @@ end
 
 function tf = laughTestsCheckoutComplete(src)
    required = ["test_cases/input_data/colbeck1976/colbeck1976_forcing.nc";
-               "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp1_G1-1_timestep.nc";
-               "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp2_G1-1_timestep.nc";
-               "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp3_G1-1_timestep.nc"];
+      "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp1_G1-1_timestep.nc";
+      "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp2_G1-1_timestep.nc";
+      "validation_data/m2_mac_Sept23/colbeck1976/colbeck1976-exp3_G1-1_timestep.nc"];
    tf = exist(char(src), 'dir') == 7;
    for i = 1:numel(required)
       tf = tf && exist(char(fullfile(src, required(i))), 'file') == 2;
@@ -517,9 +518,9 @@ end
 
 function tf = esmSnowmipCacheComplete(src)
    required = ["met_insitu_cdp_1994_2014.nc";
-               "obs_insitu_cdp_1994_2014.nc";
-               "met_insitu_wfj_1996_2016.nc";
-               "obs_insitu_wfj_1996_2016.nc"];
+      "obs_insitu_cdp_1994_2014.nc";
+      "met_insitu_wfj_1996_2016.nc";
+      "obs_insitu_wfj_1996_2016.nc"];
    tf = exist(char(src), 'dir') == 7;
    for i = 1:numel(required)
       tf = tf && exist(char(fullfile(src, required(i))), 'file') == 2;

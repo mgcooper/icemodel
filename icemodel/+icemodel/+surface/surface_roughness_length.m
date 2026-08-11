@@ -4,9 +4,8 @@ function z0m = surface_roughness_length(snow_depth, ro_sfc, z0_ice, ...
    %
    %  z0m = icemodel.surface.surface_roughness_length(snow_depth, ro_sfc, ...)
    %
-   % Bare ice is selected by snow depth alone. The surface density only
-   % splits the snow/firn branch into lower-density versus higher-density
-   % roughness values.
+   % Snow depth alone selects bare ice. The surface density only splits the
+   % snow/firn branch into lower-density and higher-density roughness values.
    %
    %#codegen
 

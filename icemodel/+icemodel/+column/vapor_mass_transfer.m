@@ -27,10 +27,10 @@ function [radius, U_vap_faces, dm_vap] = vapor_mass_transfer(T, Ts, f_ice, f_liq
    %   Wet, low (f_liq < 0.09):   dd/dt = g2 / d * (f_liq + 0.05) (Eq. 34a)
    %   Wet, high (f_liq >= 0.09): dd/dt = g2 / d * 0.14        (Eq. 34b)
    %
-   % Note: the Jordan grain growth model is strictly monotonic — grains grow
-   % but never shrink. Physically, shrinkage requires additional mechanisms
-   % (e.g., fresh snow deposition resetting grain size, wind slab formation,
-   % or sublimation-driven surface rounding) that are not included here.
+   % The Jordan grain growth model is monotonic. Grains grow and never shrink.
+   % Shrinkage needs other mechanisms that this function does not include:
+   % fresh snow deposition that resets the grain size, wind slab formation, or
+   % surface rounding driven by sublimation.
    %
    % Inputs:
    %   T      - Node temperatures [K] (JJ x 1)
@@ -50,10 +50,10 @@ function [radius, U_vap_faces, dm_vap] = vapor_mass_transfer(T, Ts, f_ice, f_liq
    %   dm_vap - Volumetric mass source rate [kg m-3 s-1] (JJ x 1)
    %              Positive = deposition (mass gain), negative = sublimation.
    %
-   % Note: radius is used for consistency with the spectral model (optically
-   % equivalent grain radius). Long-term, the thermal grain radius tracked
-   % here and the spectral radius are not identical quantities; coupling them
-   % is future work. See icemodel.radiation.initialize_spectral_model,
+   % This function uses radius to match the spectral model, which uses the
+   % optically equivalent grain radius. The thermal grain radius tracked here
+   % and the spectral radius are not the same quantity. Coupling them is
+   % future work. See icemodel.radiation.initialize_spectral_model,
    % icemodel.radiation.update_extinction_coefficients.
    %
    % References:

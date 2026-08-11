@@ -297,7 +297,7 @@ function test_shortgaps_csi_fill_preserves_diurnal_shape(testCase)
    truth = 0.7 * toa;
    x = truth;
    % Mask five contiguous high-sun hours; solar noon at 48.8 W is ~15:15
-   % UTC, so this window sits inside guaranteed midsummer daylight.
+   % UTC, so this window sits inside continuous midsummer daylight.
    gap = find(times >= datetime(2020, 6, 21, 13, 0, 0, ...
       'TimeZone', 'UTC') & times <= datetime(2020, 6, 21, 17, 0, 0, ...
       'TimeZone', 'UTC'));
@@ -524,7 +524,7 @@ end
 
 function test_shortgaps_albedo_override_closes_day_scale_sliver(testCase)
    % D-41: albedo seam remnants use the observed-only-supported
-   % 30-hour linear bridge and cannot silently widen beyond it.
+   % 30-hour linear bridge; a wider cap is rejected.
    times = (datetime(2020, 7, 1, 0, 0, 0, 'TimeZone', 'UTC'): ...
       hours(1):datetime(2020, 7, 2, 3, 0, 0, ...
       'TimeZone', 'UTC')).';
@@ -816,8 +816,8 @@ function test_elevation_psfc_barometric(testCase)
    % Pressure follows the barometric factor, with the scale height taken
    % from the fallback temperature by default and a supplied coincident
    % temperature when the caller has one.
-   % Constants come from the canonical physical-constant source so the
-   % expectation can never drift from the implementation.
+   % Constants come from the canonical physical-constant source shared with
+   % the implementation.
    [Rd, g] = icemodel.physicalConstant('Rd', 'gravity');
    x = [80000; 82000];
    returned = icemodel.forcing.reconstruct.elevationAdjust("psfc", x, 1000);
@@ -1013,8 +1013,8 @@ function test_swd_donor_transfer_uses_station_specific_csi(testCase)
 end
 
 function test_donor_apply_one_sample_respects_lag(testCase)
-   % A singleton application axis supports a zero-lag transfer but cannot
-   % silently treat a fitted nonzero lag as zero.
+   % A singleton application axis supports a zero-lag transfer but returns
+   % NaN rather than treating a fitted nonzero lag as zero.
    time = datetime(2020, 1, 1, 'TimeZone', 'UTC');
    model = struct('kind', "linear", 'slope', 2, 'intercept', 1);
    models = struct('DJF', model, 'MAM', model, 'JJA', model, 'SON', model);
@@ -1117,6 +1117,79 @@ function test_proxy_recovers_additive_bias(testCase)
    testCase.verifyEqual(returned, obs, 'AbsTol', 1e-12);
 end
 
+function test_proxy_zero_denominator_never_counts_as_overlap(testCase)
+   % A multiplicative correction divides by the model value, so a zero
+   % denominator cannot produce a finite ratio and must not be counted as
+   % usable overlap. Counting it would let a fit report support it does not
+   % have, and would pass a nonfinite correction to every downstream consumer.
+   series = icemodel.test.fixtures.makeReconstructSeries();
+   times = series.Properties.RowTimes;
+   model = 5 * ones(numel(times), 1);
+   obs = 2 * model;
+
+   % Mixed denominators: half the record is unusable, the rest is a clean 2x.
+   model(1:2:end) = 0;
+   calibration = icemodel.forcing.reconstruct.fitProxyCalibration( ...
+      times, obs, model, "wspd", fit_years=year(times(1)));
+
+   testCase.verifyEqual(calibration.n_overlap, nnz(model > 0));
+   testCase.verifyTrue(isfinite(calibration.corrections.JJA));
+   testCase.verifyEqual(calibration.corrections.JJA, 2, 'AbsTol', 1e-12);
+
+   % An all-zero denominator leaves no usable overlap at all, so the record
+   % must be the recorded identity rather than a nonfinite correction.
+   calibration_none = icemodel.forcing.reconstruct.fitProxyCalibration( ...
+      times, obs, zeros(numel(times), 1), "wspd", ...
+      fit_years=year(times(1)));
+   testCase.verifyEqual(calibration_none.n_overlap, 0);
+   testCase.verifyTrue(calibration_none.identity);
+   testCase.verifyEqual(calibration_none.corrections.JJA, 1, 'AbsTol', 0);
+end
+
+function test_proxy_zero_observed_wind_stays_finite(testCase)
+   % A zero observed value is a legitimate numerator, so it must still yield a
+   % finite ratio rather than being confused with a zero denominator.
+   series = icemodel.test.fixtures.makeReconstructSeries();
+   times = series.Properties.RowTimes;
+   model = 4 * ones(numel(times), 1);
+   obs = zeros(numel(times), 1);
+
+   calibration = icemodel.forcing.reconstruct.fitProxyCalibration( ...
+      times, obs, model, "wspd", fit_years=year(times(1)));
+
+   testCase.verifyEqual(calibration.n_overlap, numel(times));
+   testCase.verifyEqual(calibration.corrections.JJA, 0, 'AbsTol', 1e-12);
+
+   % The calibrated estimate is finite and the shared bounds clamp it onto the
+   % runtime wind floor rather than emitting a zero the solver cannot use.
+   [returned, clamped] = icemodel.forcing.reconstruct.applyProxyCalibration( ...
+      calibration, times, model);
+   testCase.verifyTrue(all(isfinite(returned)));
+   testCase.verifyTrue(all(clamped));
+   bounds = icemodel.forcing.reconstruct.physicalBounds("wspd");
+   testCase.verifyEqual(returned, bounds(1) * ones(size(returned)), ...
+      'AbsTol', 1e-12);
+end
+
+function test_proxy_nonfinite_stored_correction_cannot_reach_output(testCase)
+   % A malformed persisted record must not turn finite proxy input into Inf.
+   % Leaving those samples missing makes the denial name the real cause.
+   series = icemodel.test.fixtures.makeReconstructSeries();
+   times = series.Properties.RowTimes;
+   model = 5 * ones(numel(times), 1);
+
+   calibration = icemodel.forcing.reconstruct.fitProxyCalibration( ...
+      times, 2 * model, model, "wspd", fit_years=year(times(1)));
+   for name = ["DJF", "MAM", "JJA", "SON"]
+      calibration.corrections.(char(name)) = Inf;
+   end
+
+   returned = icemodel.forcing.reconstruct.applyProxyCalibration( ...
+      calibration, times, model);
+   testCase.verifyTrue(all(isnan(returned)));
+   testCase.verifyFalse(any(isinf(returned)));
+end
+
 function test_proxy_multiplicative_swd_ratio(testCase)
    % Shortwave calibrates by ratio only where target TOA is meaningful,
    % regardless of a bright proxy during target-station darkness.
@@ -1153,8 +1226,9 @@ function test_proxy_multiplicative_swd_ratio(testCase)
 end
 
 function test_proxy_multiplicative_wind_preserves_support(testCase)
-   % Wind speed scales by a positive overlap ratio instead of subtracting
-   % an additive bias that can turn physically valid low winds negative.
+   % Wind speed scales by a positive overlap ratio, but any calibrated calm
+   % sample below the forcing floor clamps once at the shared calibration
+   % boundary and reports that adjustment.
    series = icemodel.test.fixtures.makeReconstructSeries();
    times = series.Properties.RowTimes;
    model = linspace(0.1, 10, height(series)).';
@@ -1162,12 +1236,16 @@ function test_proxy_multiplicative_wind_preserves_support(testCase)
 
    calibration = icemodel.forcing.reconstruct.fitProxyCalibration( ...
       times, obs, model, "wspd", fit_years=2020);
-   returned = icemodel.forcing.reconstruct.applyProxyCalibration( ...
+   [returned, clamped] = ...
+      icemodel.forcing.reconstruct.applyProxyCalibration( ...
       calibration, times, model);
 
    testCase.verifyEqual(calibration.mode, "multiplicative");
-   testCase.verifyEqual(returned, obs, 'AbsTol', 1e-12);
-   testCase.verifyGreaterThanOrEqual(min(returned), 0);
+   wind_bounds = icemodel.forcing.reconstruct.physicalBounds("wspd");
+   expected = min(max(obs, wind_bounds(1)), wind_bounds(2));
+   testCase.verifyEqual(returned, expected, 'AbsTol', 1e-12);
+   testCase.verifyEqual(clamped, obs < wind_bounds(1));
+   testCase.verifyGreaterThanOrEqual(min(returned), wind_bounds(1));
 end
 
 function test_proxy_seasonal_fallback_to_annual(testCase)
@@ -1372,7 +1450,7 @@ end
 
 function test_provenance_registry_values(testCase)
    % The registry is the append-only published mapping; any renumbering
-   % would silently re-label staged products, so pin every value.
+   % would re-label staged products, so every value is pinned here.
    returned = icemodel.forcing.reconstruct.provenanceCodes();
    expected = struct( ...
       'observed', uint8(0), ...
@@ -1386,12 +1464,12 @@ function test_provenance_registry_values(testCase)
       'climatology', uint8(8), ...
       'constant', uint8(9), ...
       'empirical_estimator', uint8(10), ...
-       'darkness', uint8(11), ...
-       'derived_shortwave', uint8(12), ...
+      'darkness', uint8(11), ...
+      'derived_shortwave', uint8(12), ...
       'raw_shortwave', uint8(13), ...
       'clamped_shortwave', uint8(14), ...
       'twilight_climatology', uint8(15), ...
-       'missing', uint8(255));
+      'missing', uint8(255));
    testCase.verifyEqual(returned, expected);
 end
 
@@ -1417,7 +1495,7 @@ end
 %% reconstructSeries
 
 function test_reconstruct_composes_tiers_with_provenance(testCase)
-   % Three deliberate summer gaps compose through the tiers: a 3 h gap
+   % Three summer gaps compose through the tiers: a 3 h gap
    % fills by tier-1 interpolation, a 12 h gap by the first admitted
    % method (donor), and a 48 h gap by climatology after the donor
    % declines; stratum-restricted decoys never fire outside their
@@ -1885,8 +1963,8 @@ function test_reconstruct_darkness_zero_fills_swd_nights(testCase)
    % below civil twilight are KNOWN zeros. A multi-day March swd outage
    % with no admitted methods gets its deep-dark samples zero-filled with
    % the darkness provenance code, while twilight-band and daylight
-   % samples stay honestly missing — decomposed into per-day fragments
-   % for the bucketed methods (none here).
+   % samples stay missing, decomposed into per-day fragments for the
+   % bucketed methods (none here).
    series = icemodel.test.fixtures.makeReconstructSeries();
    times = series.Properties.RowTimes;
    codes = icemodel.forcing.reconstruct.provenanceCodes();
@@ -1926,24 +2004,24 @@ function test_reconstruct_darkness_zero_fills_swd_nights(testCase)
    testCase.verifyEqual(returned(dark), zeros(numel(dark), 1));
    testCase.verifyEqual(result.provenance.swd(dark), ...
       repmat(codes.darkness, numel(dark), 1));
-   % Twilight and daylight samples stay missing — twilight is left to
-   % the fill tiers (none admitted here), never hard-zeroed.
+   % Twilight and daylight samples stay missing; twilight is left to
+   % the fill tiers (none admitted here) rather than hard-zeroed.
    testCase.verifyTrue(all(~isfinite(returned(light))));
    testCase.verifyEqual(result.provenance.swd(light), ...
       repmat(codes.missing, numel(light), 1));
-    % The audit carries one row per contiguous night, never a false span
-    % across intervening daylight.
-    row = result.audit(strcmp(result.audit.method, 'darkness_zero'), :);
-    testCase.verifyGreaterThan(height(row), 1);
-    testCase.verifyEqual(sum(row.duration_hours), ...
-       numel(dark) * hours(median(diff(times))));
+   % The audit carries one row per contiguous night, never a false span
+   % across intervening daylight.
+   row = result.audit(strcmp(result.audit.method, 'darkness_zero'), :);
+   testCase.verifyGreaterThan(height(row), 1);
+   testCase.verifyEqual(sum(row.duration_hours), ...
+      numel(dark) * hours(median(diff(times))));
 end
 
 function test_reconstruct_darkness_leaves_twilight_to_methods(testCase)
    % D-28 twilight handling: samples between civil twilight and sunrise
-   % are NOT known zeros — stations measure real diffuse light there —
-   % so an admitted method (not the darkness pre-pass) fills them, while
-   % deep darkness still zero-fills first.
+   % are not known zeros, because stations measure real diffuse light
+   % there, so an admitted method (not the darkness pre-pass) fills them,
+   % while deep darkness still zero-fills first.
    series = icemodel.test.fixtures.makeReconstructSeries();
    times = series.Properties.RowTimes;
    codes = icemodel.forcing.reconstruct.provenanceCodes();
@@ -1981,8 +2059,9 @@ function test_reconstruct_darkness_leaves_twilight_to_methods(testCase)
    testCase.verifyEqual(returned(dark), zeros(numel(dark), 1));
    testCase.verifyEqual(result.provenance.swd(dark), ...
       repmat(codes.darkness, numel(dark), 1));
-   % Twilight samples carry the METHOD's finite fill and provenance —
-   % values may be seam-blended, so provenance is the honest witness.
+   % Twilight samples carry the method's finite fill and provenance;
+   % values may be seam-blended, so provenance records which method
+   % produced each value.
    testCase.verifyTrue(all(isfinite(returned(twilight))));
    testCase.verifyEqual(result.provenance.swd(twilight), ...
       repmat(codes.mar, numel(twilight), 1));
@@ -2018,7 +2097,7 @@ function test_reconstruct_wholly_missing_shortwave_keeps_known_darkness(testCase
 end
 
 function test_reconstruct_rejects_unknown_channel(testCase)
-   % Channels missing from the series fail loudly instead of silently
+   % Channels missing from the series raise an error instead of
    % composing nothing.
    series = icemodel.test.fixtures.makeReconstructSeries();
    codes = icemodel.forcing.reconstruct.provenanceCodes();
@@ -2091,138 +2170,138 @@ function test_donor_fit_handles_constant_donor(testCase)
    transfer = icemodel.forcing.reconstruct.fitDonorTransfer(times, x, ...
       d, "tair", fit_years=2020, knots=6, min_overlap_hours=4000);
 
-    testCase.verifyEqual(string(transfer.models.DJF.kind), "linear");
+   testCase.verifyEqual(string(transfer.models.DJF.kind), "linear");
 end
 
 function test_physical_validity_enforces_relational_bounds(testCase)
-    % Shared validity rejects shortwave above TOA and upward flux above swd.
-    times = datetime(2020, 3, 21, [3; 15], 0, 0, 'TimeZone', 'UTC');
-    toa = icemodel.forcing.reconstruct.toaIrradiance(times, 67.0, -48.8);
-    values = [0; 1.04 * toa(2)];
-    testCase.verifyTrue(all( ...
-       icemodel.forcing.reconstruct.physicalValidity( ...
-       "swd", values, times, latitude=67.0, longitude=-48.8)));
-    values(2) = 1.06 * toa(2);
-    valid = icemodel.forcing.reconstruct.physicalValidity( ...
-       "swd", values, times, latitude=67.0, longitude=-48.8);
-    testCase.verifyFalse(valid(2));
-    testCase.verifyEqual( ...
-       icemodel.forcing.reconstruct.physicalValidity( ...
-       "swu", [50; 110], times, swd=[100; 100]), [true; false]);
-    testCase.verifyEqual( ...
-       icemodel.forcing.reconstruct.physicalValidity( ...
-       "tair", [193; 301], times), [true; false]);
+   % Shared validity rejects shortwave above TOA and upward flux above swd.
+   times = datetime(2020, 3, 21, [3; 15], 0, 0, 'TimeZone', 'UTC');
+   toa = icemodel.forcing.reconstruct.toaIrradiance(times, 67.0, -48.8);
+   values = [0; 1.04 * toa(2)];
+   testCase.verifyTrue(all( ...
+      icemodel.forcing.reconstruct.physicalValidity( ...
+      "swd", values, times, latitude=67.0, longitude=-48.8)));
+   values(2) = 1.06 * toa(2);
+   valid = icemodel.forcing.reconstruct.physicalValidity( ...
+      "swd", values, times, latitude=67.0, longitude=-48.8);
+   testCase.verifyFalse(valid(2));
+   testCase.verifyEqual( ...
+      icemodel.forcing.reconstruct.physicalValidity( ...
+      "swu", [50; 110], times, swd=[100; 100]), [true; false]);
+   testCase.verifyEqual( ...
+      icemodel.forcing.reconstruct.physicalValidity( ...
+      "tair", [193; 301], times), [true; false]);
 end
 
 function test_physical_validity_rejects_missing_context(testCase)
-    % Relational checks fail loudly without geometry or a paired swd axis.
-    times = datetime(2020, 1, 1, 'TimeZone', 'UTC') + hours(0:1).';
-    testCase.verifyError(@() ...
-       icemodel.forcing.reconstruct.physicalValidity( ...
-       "swd", [0; 0], times), ...
-       'icemodel:reconstruct:physicalValidity:missingSolarGeometry');
-    testCase.verifyError(@() ...
-       icemodel.forcing.reconstruct.physicalValidity( ...
-       "swu", [0; 0], times), ...
-       'icemodel:reconstruct:physicalValidity:missingShortwaveReference');
-    testCase.verifyError(@() ...
-       icemodel.forcing.reconstruct.physicalValidity( ...
-       "tair", 260, times), ...
-       'icemodel:reconstruct:physicalValidity:sizeMismatch');
+   % Relational checks fail loudly without geometry or a paired swd axis.
+   times = datetime(2020, 1, 1, 'TimeZone', 'UTC') + hours(0:1).';
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.physicalValidity( ...
+      "swd", [0; 0], times), ...
+      'icemodel:reconstruct:physicalValidity:missingSolarGeometry');
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.physicalValidity( ...
+      "swu", [0; 0], times), ...
+      'icemodel:reconstruct:physicalValidity:missingShortwaveReference');
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.physicalValidity( ...
+      "tair", 260, times), ...
+      'icemodel:reconstruct:physicalValidity:sizeMismatch');
 end
 
 function test_physical_validity_accepts_precomputed_geometry(testCase)
-    % Hot-loop callers pass axis-sliced precomputed solar geometry; the
-    % verdict and both per-sample limits must match the internally
-    % computed path exactly, and wrong-length vectors must be refused
-    % rather than silently recomputed.
-    times = datetime(2020, 3, 21, 'TimeZone', 'UTC') + hours(0:23).';
-    values = 120 * ones(numel(times), 1);
-    toa = icemodel.forcing.reconstruct.toaIrradiance(times, 67.0, -48.8);
-    elevation = icemodel.forcing.helpers.solarElevation( ...
-       times, 67.0, -48.8);
-    [expected, expected_lower, expected_upper] = ...
-       icemodel.forcing.reconstruct.physicalValidity( ...
-       "swd", values, times, latitude=67.0, longitude=-48.8);
-    [returned, returned_lower, returned_upper] = ...
-       icemodel.forcing.reconstruct.physicalValidity( ...
-       "swd", values, times, latitude=67.0, longitude=-48.8, ...
-       toa=toa, elevation=elevation);
-    testCase.verifyEqual(returned, expected);
-    testCase.verifyEqual(returned_lower, expected_lower);
-    testCase.verifyEqual(returned_upper, expected_upper);
-    % Supplying only one of the two vectors computes the other internally.
-    returned = icemodel.forcing.reconstruct.physicalValidity( ...
-       "swd", values, times, latitude=67.0, longitude=-48.8, toa=toa);
-    testCase.verifyEqual(returned, expected);
-    returned = icemodel.forcing.reconstruct.physicalValidity( ...
-       "swd", values, times, latitude=67.0, longitude=-48.8, ...
-       elevation=elevation);
-    testCase.verifyEqual(returned, expected);
-    % Length mismatches expose caller slicing bugs loudly on both fields.
-    testCase.verifyError(@() ...
-       icemodel.forcing.reconstruct.physicalValidity( ...
-       "swd", values, times, latitude=67.0, longitude=-48.8, ...
-       toa=toa(1:3)), ...
-       'icemodel:reconstruct:physicalValidity:precomputedGeometrySize');
-    testCase.verifyError(@() ...
-       icemodel.forcing.reconstruct.physicalValidity( ...
-       "swd", values, times, latitude=67.0, longitude=-48.8, ...
-       elevation=elevation(1:3)), ...
-       'icemodel:reconstruct:physicalValidity:precomputedGeometrySize');
+   % Hot-loop callers pass axis-sliced precomputed solar geometry; the
+   % verdict and both per-sample limits must match the internally
+   % computed path exactly, and wrong-length vectors must raise an
+   % error rather than being recomputed.
+   times = datetime(2020, 3, 21, 'TimeZone', 'UTC') + hours(0:23).';
+   values = 120 * ones(numel(times), 1);
+   toa = icemodel.forcing.reconstruct.toaIrradiance(times, 67.0, -48.8);
+   elevation = icemodel.forcing.helpers.solarElevation( ...
+      times, 67.0, -48.8);
+   [expected, expected_lower, expected_upper] = ...
+      icemodel.forcing.reconstruct.physicalValidity( ...
+      "swd", values, times, latitude=67.0, longitude=-48.8);
+   [returned, returned_lower, returned_upper] = ...
+      icemodel.forcing.reconstruct.physicalValidity( ...
+      "swd", values, times, latitude=67.0, longitude=-48.8, ...
+      toa=toa, elevation=elevation);
+   testCase.verifyEqual(returned, expected);
+   testCase.verifyEqual(returned_lower, expected_lower);
+   testCase.verifyEqual(returned_upper, expected_upper);
+   % Supplying only one of the two vectors computes the other internally.
+   returned = icemodel.forcing.reconstruct.physicalValidity( ...
+      "swd", values, times, latitude=67.0, longitude=-48.8, toa=toa);
+   testCase.verifyEqual(returned, expected);
+   returned = icemodel.forcing.reconstruct.physicalValidity( ...
+      "swd", values, times, latitude=67.0, longitude=-48.8, ...
+      elevation=elevation);
+   testCase.verifyEqual(returned, expected);
+   % Length mismatches expose caller slicing bugs loudly on both fields.
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.physicalValidity( ...
+      "swd", values, times, latitude=67.0, longitude=-48.8, ...
+      toa=toa(1:3)), ...
+      'icemodel:reconstruct:physicalValidity:precomputedGeometrySize');
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.physicalValidity( ...
+      "swd", values, times, latitude=67.0, longitude=-48.8, ...
+      elevation=elevation(1:3)), ...
+      'icemodel:reconstruct:physicalValidity:precomputedGeometrySize');
 end
 
 function test_physical_validity_uses_complete_posting_twilight(testCase)
-    % A posting that starts below civil twilight but reaches twilight within
-    % its support receives the same diffuse-light allowance as staging.
-    times = datetime(2020, 3, 20, 0, 0, 0, 'TimeZone', 'UTC') ...
-       + minutes(0:15:24 * 60 - 15).';
-    point_elevation = icemodel.forcing.helpers.solarElevation( ...
-       times, 67.0, -48.8);
-    maximum_elevation = ...
-       icemodel.forcing.helpers.intervalMaximumSolarElevation( ...
-       times, 67.0, -48.8, hours(1));
-    bands = icemodel.forcing.reconstruct.solarElevationBands();
-    target = find(point_elevation < bands.civil_twilight_deg ...
-       & maximum_elevation >= bands.civil_twilight_deg ...
-       & maximum_elevation < 0, 1);
-    testCase.assertNotEmpty(target);
+   % A posting that starts below civil twilight but reaches twilight within
+   % its support receives the same diffuse-light allowance as staging.
+   times = datetime(2020, 3, 20, 0, 0, 0, 'TimeZone', 'UTC') ...
+      + minutes(0:15:24 * 60 - 15).';
+   point_elevation = icemodel.forcing.helpers.solarElevation( ...
+      times, 67.0, -48.8);
+   maximum_elevation = ...
+      icemodel.forcing.helpers.intervalMaximumSolarElevation( ...
+      times, 67.0, -48.8, hours(1));
+   bands = icemodel.forcing.reconstruct.solarElevationBands();
+   target = find(point_elevation < bands.civil_twilight_deg ...
+      & maximum_elevation >= bands.civil_twilight_deg ...
+      & maximum_elevation < 0, 1);
+   testCase.assertNotEmpty(target);
 
-    value = 20;
-    point_valid = icemodel.forcing.reconstruct.physicalValidity( ...
-       "swd", value, times(target), latitude=67.0, longitude=-48.8);
-    interval_valid = icemodel.forcing.reconstruct.physicalValidity( ...
-       "swd", value, times(target), latitude=67.0, longitude=-48.8, ...
-       interval=hours(1));
-    precomputed_valid = icemodel.forcing.reconstruct.physicalValidity( ...
-       "swd", value, times(target), latitude=67.0, longitude=-48.8, ...
-       elevation=maximum_elevation(target));
-    testCase.verifyFalse(point_valid);
-    testCase.verifyTrue(interval_valid);
-    testCase.verifyTrue(precomputed_valid);
-    testCase.verifyError(@() ...
-       icemodel.forcing.reconstruct.physicalValidity( ...
-       "swd", value, times(target), latitude=67.0, longitude=-48.8, ...
-       interval=-hours(1)), ...
-       'icemodel:reconstruct:physicalValidity:negativeInterval');
+   value = 20;
+   point_valid = icemodel.forcing.reconstruct.physicalValidity( ...
+      "swd", value, times(target), latitude=67.0, longitude=-48.8);
+   interval_valid = icemodel.forcing.reconstruct.physicalValidity( ...
+      "swd", value, times(target), latitude=67.0, longitude=-48.8, ...
+      interval=hours(1));
+   precomputed_valid = icemodel.forcing.reconstruct.physicalValidity( ...
+      "swd", value, times(target), latitude=67.0, longitude=-48.8, ...
+      elevation=maximum_elevation(target));
+   testCase.verifyFalse(point_valid);
+   testCase.verifyTrue(interval_valid);
+   testCase.verifyTrue(precomputed_valid);
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.physicalValidity( ...
+      "swd", value, times(target), latitude=67.0, longitude=-48.8, ...
+      interval=-hours(1)), ...
+      'icemodel:reconstruct:physicalValidity:negativeInterval');
 end
 
 function test_reconstruct_rejects_upward_shortwave_above_downwelling(testCase)
-    % The production engine applies the same swu<=swd relation as metrics.
-    series = icemodel.test.fixtures.makeReconstructSeries();
-    n = height(series);
-    series.swd = 100 * ones(n, 1);
-    series.swu = 40 * ones(n, 1);
-    gap = 100:110;
-    series.swu(gap) = NaN;
-    codes = icemodel.forcing.reconstruct.provenanceCodes();
-    methods = struct('name', "too_bright", 'code', codes.climatology, ...
-       'estimate', 120 * ones(n, 1), 'seasons', "all", 'buckets', 2:5);
-    cm = struct('channel', "swu", 'methods', methods);
-    result = icemodel.forcing.reconstruct.reconstructSeries(series, cm, ...
-       interp_channels=string.empty(1, 0));
-    testCase.verifyTrue(all(isnan(result.series.swu(gap))));
-    testCase.verifyTrue(all(result.provenance.swu(gap) == codes.missing));
+   % The production engine applies the same swu<=swd relation as metrics.
+   series = icemodel.test.fixtures.makeReconstructSeries();
+   n = height(series);
+   series.swd = 100 * ones(n, 1);
+   series.swu = 40 * ones(n, 1);
+   gap = 100:110;
+   series.swu(gap) = NaN;
+   codes = icemodel.forcing.reconstruct.provenanceCodes();
+   methods = struct('name', "too_bright", 'code', codes.climatology, ...
+      'estimate', 120 * ones(n, 1), 'seasons', "all", 'buckets', 2:5);
+   cm = struct('channel', "swu", 'methods', methods);
+   result = icemodel.forcing.reconstruct.reconstructSeries(series, cm, ...
+      interp_channels=string.empty(1, 0));
+   testCase.verifyTrue(all(isnan(result.series.swu(gap))));
+   testCase.verifyTrue(all(result.provenance.swu(gap) == codes.missing));
 end
 
 function test_reconstruct_processes_swd_before_swu(testCase)
@@ -2256,73 +2335,73 @@ function test_reconstruct_processes_swd_before_swu(testCase)
 end
 
 function test_partition_precipitation_preserves_total(testCase)
-    % Warm/cold totals enter exactly one phase; invalid inputs stay missing.
-    Tf = icemodel.physicalConstant('Tf');
-    [rain, snow] = icemodel.forcing.reconstruct.partitionPrecipitation( ...
-       [1; 2; 0; -1; 3], [Tf; Tf - 1; Tf + 1; Tf; NaN]);
-    testCase.verifyEqual(rain(1:3), [1; 0; 0]);
-    testCase.verifyEqual(snow(1:3), [0; 2; 0]);
-    testCase.verifyTrue(all(isnan(rain(4:5))));
-    testCase.verifyTrue(all(isnan(snow(4:5))));
-    testCase.verifyError(@() ...
-       icemodel.forcing.reconstruct.partitionPrecipitation([1; 2], Tf), ...
-       'icemodel:reconstruct:partitionPrecipitation:sizeMismatch');
+   % Warm/cold totals enter exactly one phase; invalid inputs stay missing.
+   Tf = icemodel.physicalConstant('Tf');
+   [rain, snow] = icemodel.forcing.reconstruct.partitionPrecipitation( ...
+      [1; 2; 0; -1; 3], [Tf; Tf - 1; Tf + 1; Tf; NaN]);
+   testCase.verifyEqual(rain(1:3), [1; 0; 0]);
+   testCase.verifyEqual(snow(1:3), [0; 2; 0]);
+   testCase.verifyTrue(all(isnan(rain(4:5))));
+   testCase.verifyTrue(all(isnan(snow(4:5))));
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.partitionPrecipitation([1; 2], Tf), ...
+      'icemodel:reconstruct:partitionPrecipitation:sizeMismatch');
 end
 
 function test_audit_segments_split_disjoint_masks(testCase)
-    % Disjoint masks never produce a row spanning an unfilled interval.
-    times = datetime(2020, 1, 1, 'TimeZone', 'UTC') + hours(0:7).';
-    rows = icemodel.forcing.reconstruct.auditSegments(times, ...
-       logical([1; 1; 0; 0; 1; 1; 1; 0]), "tair", "method", "detail");
-    testCase.verifyEqual(numel(rows), 2);
-    testCase.verifyEqual(rows{1}{2}, times(1));
-    testCase.verifyEqual(rows{1}{3}, times(2));
-    testCase.verifyEqual(rows{2}{2}, times(5));
-    testCase.verifyEqual(rows{2}{3}, times(7));
-    testCase.verifyEqual(rows{1}{7}, 'method');
-    testCase.verifyEmpty(icemodel.forcing.reconstruct.auditSegments( ...
-       times, false(8, 1), "tair", "method", "detail"));
-    testCase.verifyError(@() ...
-       icemodel.forcing.reconstruct.auditSegments( ...
-       times, false(7, 1), "tair", "method", "detail"), ...
-       'icemodel:reconstruct:auditSegments:sizeMismatch');
-    testCase.verifyError(@() ...
-       icemodel.forcing.reconstruct.auditSegments( ...
-       times(1), true, "tair", "method", "detail"), ...
-       'icemodel:reconstruct:auditSegments:missingCadence');
+   % Disjoint masks never produce a row spanning an unfilled interval.
+   times = datetime(2020, 1, 1, 'TimeZone', 'UTC') + hours(0:7).';
+   rows = icemodel.forcing.reconstruct.auditSegments(times, ...
+      logical([1; 1; 0; 0; 1; 1; 1; 0]), "tair", "method", "detail");
+   testCase.verifyEqual(numel(rows), 2);
+   testCase.verifyEqual(rows{1}{2}, times(1));
+   testCase.verifyEqual(rows{1}{3}, times(2));
+   testCase.verifyEqual(rows{2}{2}, times(5));
+   testCase.verifyEqual(rows{2}{3}, times(7));
+   testCase.verifyEqual(rows{1}{7}, 'method');
+   testCase.verifyEmpty(icemodel.forcing.reconstruct.auditSegments( ...
+      times, false(8, 1), "tair", "method", "detail"));
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.auditSegments( ...
+      times, false(7, 1), "tair", "method", "detail"), ...
+      'icemodel:reconstruct:auditSegments:sizeMismatch');
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.auditSegments( ...
+      times(1), true, "tair", "method", "detail"), ...
+      'icemodel:reconstruct:auditSegments:missingCadence');
 end
 
 function test_empty_audit_timezone_accepts_final_tier(testCase)
-    % A UTC empty composition audit can accept later proxy-segment rows.
-    series = icemodel.test.fixtures.makeReconstructSeries();
-    times = series.Properties.RowTimes;
-    codes = icemodel.forcing.reconstruct.provenanceCodes();
-    methods = struct('name', {}, 'code', {}, 'estimate', {}, ...
-       'seasons', {}, 'buckets', {});
-    composed = icemodel.forcing.reconstruct.reconstructSeries( ...
-       series, struct('channel', "tair", 'methods', methods));
-    testCase.verifyEqual(composed.audit.start_time.TimeZone, 'UTC');
+   % A UTC empty composition audit can accept later proxy-segment rows.
+   series = icemodel.test.fixtures.makeReconstructSeries();
+   times = series.Properties.RowTimes;
+   codes = icemodel.forcing.reconstruct.provenanceCodes();
+   methods = struct('name', {}, 'code', {}, 'estimate', {}, ...
+      'seasons', {}, 'buckets', {});
+   composed = icemodel.forcing.reconstruct.reconstructSeries( ...
+      series, struct('channel', "tair", 'methods', methods));
+   testCase.verifyEqual(composed.audit.start_time.TimeZone, 'UTC');
 
-    composed.series.tair(10) = NaN;
-    composed.provenance.tair(10) = codes.missing;
-     proxy = struct('series', timetable(times, 261 * ones(numel(times), 1), ...
-        'VariableNames', {'tair'}), 'name', "mar", 'code_name', "mar");
-     opts = icemodel.forcing.reconstruct.setopts(required_channels="tair");
-     calibration = icemodel.forcing.reconstruct.fitProxyCalibration( ...
-        times, composed.series.tair, proxy.series.tair, "tair", ...
-        fit_years=unique(year(times)).');
-     calibration.source = "mar";
-     channel_plan = struct('channel', "tair", ...
-        'proxy_calibrations', struct('source', "mar", ...
-        'parameters', calibration));
-     plan = struct('channels', channel_plan);
-     [returned, provenance, audit] = ...
-        icemodel.forcing.reconstruct.lastResortProxies( ...
-        composed.series, composed.provenance, composed.audit, ...
-        proxy, codes, opts, plan=plan);
-    testCase.verifyTrue(isfinite(returned.tair(10)));
-    testCase.verifyEqual(provenance.tair(10), codes.mar);
-    testCase.verifyEqual(height(audit), 1);
+   composed.series.tair(10) = NaN;
+   composed.provenance.tair(10) = codes.missing;
+   proxy = struct('series', timetable(times, 261 * ones(numel(times), 1), ...
+      'VariableNames', {'tair'}), 'name', "mar", 'code_name', "mar");
+   opts = icemodel.forcing.reconstruct.setopts(required_channels="tair");
+   calibration = icemodel.forcing.reconstruct.fitProxyCalibration( ...
+      times, composed.series.tair, proxy.series.tair, "tair", ...
+      fit_years=unique(year(times)).');
+   calibration.source = "mar";
+   channel_plan = struct('channel', "tair", ...
+      'proxy_calibrations', struct('source', "mar", ...
+      'parameters', calibration));
+   plan = struct('channels', channel_plan);
+   [returned, provenance, audit] = ...
+      icemodel.forcing.reconstruct.lastResortProxies( ...
+      composed.series, composed.provenance, composed.audit, ...
+      proxy, codes, opts, plan=plan);
+   testCase.verifyTrue(isfinite(returned.tair(10)));
+   testCase.verifyEqual(provenance.tair(10), codes.mar);
+   testCase.verifyEqual(height(audit), 1);
 end
 
 function test_reconstruct_per_channel_cap_override(testCase)

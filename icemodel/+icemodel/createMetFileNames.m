@@ -25,9 +25,9 @@ function metfname = createMetFileNames(opts)
    forcings = opts.forcings;
    simyears = opts.simyears;
 
-   % Deal with the case where met-station forcing data (as opposed to gridded
-   % climate model forcing data) is requested for a nearby catchment by
-   % replacing the catchment name in the metfile with the met station name.
+   % A run can request met-station forcing data, rather than gridded climate
+   % model forcing data, for a nearby catchment. In that case, put the met
+   % station name in the metfile name instead of the catchment name.
    % For example, if sitename=="behar" and forcingdata=="kanm", this sets the
    % metfile name to met_kanm_kanm_YYYY rather than met_behar_kanm_YYYY, to
    % negate the need to create a second (identical) met_behar_kanm_YYYY file.

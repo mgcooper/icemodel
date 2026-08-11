@@ -14,21 +14,24 @@ function [met, opts] = loadmet(opts, fileiter) %#codegen
       fileiter = 1:numel(opts.metfname);
    end
 
-   % The derived PROMICE product is runnable only when the configured filled
-   % met files carry the producer-manifest identity and cover every requested
-   % timestep in the requested window with the required forcing channels
-   % (POLICY A4); calendar-year ledger verdicts are bookkeeping, never the
-   % runtime gate. Table I/O stays outside this code-generation entry point;
-   % generated callers must pass an options struct prevalidated by the same
-   % public verifier.
+   % The derived PROMICE product runs only when the configured filled met files
+   % carry the producer-manifest identity, and cover every requested timestep
+   % in the requested window with the required forcing channels (POLICY A4).
+   % Calendar-year ledger verdicts are bookkeeping, never the runtime gate.
+   % Table I/O stays outside this code-generation entry point. A generated
+   % caller must pass an options struct that the same public verifier has
+   % already validated.
    if coder.target('MATLAB')
-      opts = icemodel.verifyPromiceFilledReadiness(opts, fileiter);
+      opts = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness( ...
+         opts, fileiter);
    elseif strcmpi(string(opts.forcings), "promice_filled") ...
-         && ~icemodel.promiceFilledVerificationMatches(opts, fileiter)
+         && ~icemodel.forcing.reconstruct.promiceFilledVerificationMatches( ...
+         opts, fileiter)
       error('icemodel:loadmet:promiceFilledNotReady', ...
-         ['generated promice_filled loading requires a prevalidated ' ...
-         'readiness verdict for the exact station, requested window, ' ...
-         'calendar, model, timestep, years, and met files']);
+         ['generated promice_filled loading requires prevalidated ' ...
+         'readiness, manifest, and canonical artifact provenance for the ' ...
+         'exact station, requested window, calendar, model, timestep, ' ...
+         'years, and met files']);
    end
 
    % Load and post-process each requested file before concatenation so yearly
@@ -102,9 +105,9 @@ function opts = applyPromiceObservationHeights(met, opts)
 
    if ~ismember("boom_height", ...
          string(met.Properties.VariableNames))
-      % Historical alias fixtures predate the boom channel; their scalar
-      % setopts geometry is already the nominal constant, so record the
-      % nominal source without a degradation warning and keep it.
+      % Alias fixtures carry no boom channel, and their scalar setopts
+      % geometry is already the nominal constant, so record the nominal
+      % source without a degradation warning and keep it.
       if is_legacy_alias
          opts.boom_height_source = 'nominal';
          opts.boom_height_fraction_fallback = 1;
@@ -222,7 +225,8 @@ function met = loadOneMetFile(opts, fileiter)
             'label %s: %s'], forcing, filename);
       end
       if forcing == "promice_filled"
-         validatePromiceFilledArtifact(filename, met, opts.sitename)
+         icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
+            filename, met, opts.sitename)
       end
    end
 
@@ -232,94 +236,13 @@ function met = loadOneMetFile(opts, fileiter)
    end
 end
 
-function validatePromiceFilledArtifact(filename, met, site)
-   %VALIDATEPROMICEFILLEDARTIFACT Prove runtime product and station identity.
-   [~, name, extension] = fileparts(string(filename));
-   site = lower(string(site));
-   filename_ok = startsWith(lower(string(name)), ...
-      "met_" + site + "_promice_filled_") ...
-      && endsWith(lower(string(name)), "_15m") ...
-      && lower(string(extension)) == ".mat";
-
-   % The filled producer stamps both identities inside the artifact; neither
-   % a readiness ledger nor a caller-supplied path can substitute for them.
-    metadata = met.Properties.UserData;
-    identity_fields = ["gapfill_product", "gapfill_engine_version", ...
-       "gapfill_policy_sha256", "gapfill_donors", "gapfill_channels"];
-    planned_channels = strings(0, 0);
-    if isstruct(metadata) && isfield(metadata, 'gapfill_channels')
-       planned_channels = string(metadata.gapfill_channels);
-    end
-    product_ok = isstruct(metadata) ...
-       && all(isfield(metadata, identity_fields)) ...
-      && isscalar(string(metadata.gapfill_product)) ...
-      && string(metadata.gapfill_product) == "promice_filled" ...
-      && isscalar(string(metadata.gapfill_engine_version)) ...
-      && strlength(string(metadata.gapfill_engine_version)) > 0 ...
-       && isscalar(string(metadata.gapfill_policy_sha256)) ...
-       && ~isempty(regexp(char(string(metadata.gapfill_policy_sha256)), ...
-       '^[0-9a-f]{64}$', 'once')) ...
-       && isrow(planned_channels) ...
-       && all(strlength(planned_channels) > 0) ...
-       && numel(unique(planned_channels)) == numel(planned_channels);
-   site_ok = isstruct(metadata) && isfield(metadata, 'site') ...
-      && isscalar(string(metadata.site)) ...
-      && lower(string(metadata.site)) == site;
-    if ~(filename_ok && product_ok && site_ok)
-       error('icemodel:loadmet:promiceFilledIdentityMismatch', ...
-          'file is not the canonical promice_filled product for %s: %s', ...
-          site, filename);
-    end
-    if ~hasValidPromiceFilledProvenance(met, metadata)
-       error('icemodel:loadmet:promiceFilledProvenanceMismatch', ...
-          'file lacks complete canonical reconstruction provenance: %s', ...
-          filename);
-    end
-end
-
-function valid = hasValidPromiceFilledProvenance(met, metadata)
-    %HASVALIDPROMICEFILLEDPROVENANCE Verify registry and per-channel codes.
-    codes = icemodel.forcing.reconstruct.provenanceCodes();
-    variables = string(met.Properties.VariableNames);
-    channels = unique([string(metadata.gapfill_channels), ...
-       icemodel.forcing.reconstruct.icemodelRequiredChannels(), ...
-       icemodel.forcing.helpers.precipitationVariables()], 'stable');
-    if ismember("boom_height", variables)
-       channels(end + 1) = "boom_height";
-    end
-
-   % The embedded registry must be the canonical append-only registry.
-   valid = isstruct(metadata) && isfield(metadata, 'gapfill_registry') ...
-      && isequal(metadata.gapfill_registry, codes);
-   if ~valid
-      return
-   end
-
-   % Every product channel needs a uint8 code on every sample, with missing
-   % reserved exactly for nonfinite values.
-   allowed = struct2array(codes);
-   for channel = channels
-      provenance_name = channel + "_provenance";
-      if ~all(ismember([channel, provenance_name], variables))
-         valid = false;
-         return
-      end
-      values = met.(channel);
-      provenance = met.(provenance_name);
-      missing = ~isfinite(values);
-      if ~isa(provenance, 'uint8') ...
-            || any(~ismember(provenance, allowed)) ...
-            || any(provenance(missing) ~= codes.missing) ...
-            || any(provenance(~missing) == codes.missing)
-         valid = false;
-         return
-      end
-   end
-end
-
 %%
 function met = prepareMetData(met, opts)
    %PREPAREMETDATA remove leap inds, trim to simyears, check for bad data
+
+   % Normalize staged wall times before any calendar classification. This
+   % keeps year/leap filtering in the same UTC frame as readiness coverage.
+   met.Time.TimeZone = 'UTC';
 
    % remove leap inds if the met data is on a leap-year calendar
    if strcmp('noleap', opts.calendar_type)
@@ -329,8 +252,6 @@ function met = prepareMetData(met, opts)
 
    % subset the met file to the requested simyears
    met = met(ismember(year(met.Time), opts.simyears), :);
-
-   met.Time.TimeZone = 'UTC';
 
    % Optional explicit datetime-window override. When opts.startdate
    % and/or opts.enddate are set, narrow the met data to the
@@ -349,11 +270,11 @@ end
 function met = addCanonicalTotalPrecip(met)
    %ADDCANONICALTOTALPRECIP Derive total precip from split components.
 
-   % Sources that ship rainf/snowf without ppt (or with a placeholder ppt)
-   % still expose one canonical total at runtime, so the runtime phase
-   % option and forcing-readiness logic never require a restage: each nonfinite
-   % ppt sample takes rainf + snowf where both components are finite, and
-   % finite ppt samples are never overwritten.
+   % A source that ships rainf and snowf without ppt, or with a placeholder
+   % ppt, still exposes one canonical total at runtime. The runtime phase
+   % option and the forcing-readiness logic therefore need no restage. Each
+   % nonfinite ppt sample takes rainf + snowf where both components are
+   % finite. A finite ppt sample is never overwritten.
    if ~(isvariable('rainf', met) && isvariable('snowf', met))
       return
    end
@@ -364,9 +285,9 @@ function met = addCanonicalTotalPrecip(met)
    end
    derived = ~isfinite(ppt) & isfinite(met.rainf) & isfinite(met.snowf);
    ppt(derived) = met.rainf(derived) + met.snowf(derived);
-   % A file carrying both split channels always exposes the canonical
-   % total — even when nothing was derivable (all-NaN placeholders) the
-   % column must exist so downstream contracts see one ppt channel.
+   % A file that carries both split channels always exposes the canonical
+   % total. The column must exist even when no sample is derivable (all-NaN
+   % placeholders), so downstream contracts see one ppt channel.
    met.ppt = ppt;
 end
 
@@ -454,8 +375,8 @@ end
 %%
 function Data = loadExternalSwapData(opts, thisyear, mettime)
    %LOADEXTERNALSWAPDATA Load a met-preferred external swap source.
-   % The public option is still named USERDATA for backward compatibility, but
-   % the selected value is a source label. Prefer met/<source>/ files because
+   % The public option is named USERDATA, but the selected value is a source
+   % label. Prefer met/<source>/ files because
    % forcing-channel swaps are meteorological data; fall back to legacy
    % userdata/<source>/ Data files only when no matching met file is staged.
 
@@ -608,13 +529,13 @@ end
 function filepath = resolveUserdataFile(opts, thisyear, mettime)
    %RESOLVEUSERDATAFILE Locate the userdata file covering this run year's met.
    % Prefers a full-period window file <site>_<source>_<YYYYMMDD>_<YYYYMMDD>.mat
-   % whose encoded period brackets the met samples being swapped (the
-   % writeuserdata naming="window" form); falls back to the legacy per-year
-   % <site>_<source>_<YYYY>.mat. The caller retimes whichever file onto METTIME,
-   % so a single full-period file serves every run year. The window lookup is the
-   % shared icemodel.forcing.helpers.findEnclosingWindowFile (same primitive
-   % icemodel.createMetFileNames uses for met files), bracketed by the actual
-   % met time span rather than the whole calendar year.
+   % whose encoded period brackets the met samples being swapped. That is the
+   % writeuserdata naming="window" form. It falls back to the legacy per-year
+   % file <site>_<source>_<YYYY>.mat. The caller retimes whichever file onto
+   % METTIME, so one full-period file serves every run year. The window lookup
+   % uses the shared helper icemodel.forcing.helpers.findEnclosingWindowFile,
+   % which icemodel.createMetFileNames also uses for met files. It brackets by
+   % the actual met time span, not by the whole calendar year.
 
    % Manifest-selected paths take precedence over cadence-blind legacy name
    % discovery. Select the widest explicit artifact that actually brackets this
@@ -684,8 +605,8 @@ function filepath = selectExplicitUserdataFile(files, mettime)
    durations = nan(numel(candidates), 1);
    n_enclosing = 0;
    for n = 1:numel(candidates)
-      % Explicit manifest paths are authoritative; corrupt referenced files
-      % should surface their load error instead of silently selecting a sibling.
+      % Explicit manifest paths are authoritative, so a corrupt referenced
+      % file raises its load error rather than yielding to a sibling.
       saved = load(candidates(n), 'Data');
       if ~isfield(saved, 'Data') || ~istimetable(saved.Data) ...
             || isempty(saved.Data)
@@ -708,7 +629,7 @@ function filepath = selectExplicitUserdataFile(files, mettime)
          strjoin(candidates, ', '))
    end
 
-   % Match legacy enclosing-window selection: widest support, then lexical path.
+   % Enclosing-window selection order: widest support, then lexical path.
    enclosing = enclosing(1:n_enclosing);
    durations = durations(1:n_enclosing);
    rank = table(-durations, enclosing, ...

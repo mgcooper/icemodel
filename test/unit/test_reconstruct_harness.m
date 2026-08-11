@@ -96,7 +96,7 @@ function test_census_bounds_to_observed_record(testCase)
 end
 
 function test_census_rejects_unknown_channel(testCase)
-   % Unknown channels fail loudly instead of censusing nothing.
+   % An unknown channel raises an error instead of censusing nothing.
    testCase.verifyError(@() icemodel.forcing.reconstruct.gapCensus( ...
       icemodel.test.fixtures.makeReconstructSeries(), channels="nope"), ...
       'icemodel:reconstruct:gapCensus:unknownChannel');
@@ -141,6 +141,23 @@ function test_split_manifest_persists_and_wins(testCase)
    testCase.verifyError(@() icemodel.forcing.reconstruct.validationSplit( ...
       2009:2023, station="kanl", seed=1, manifest_file=manifest_file), ...
       'icemodel:reconstruct:validationSplit:stationMismatch');
+end
+
+function test_split_manifest_cannot_write_into_evaluation_root(testCase)
+   % The public persistence seam must fail before creating an eval artifact.
+   eval_root = fullfile(testCase.TestData.tmp, 'eval');
+   manifest_file = fullfile(eval_root, 'splits', 'kanm.json');
+   old_eval = getenv('ICEMODEL_EVAL_PATH');
+   cleanup = onCleanup(@() setenv('ICEMODEL_EVAL_PATH', old_eval));
+   setenv('ICEMODEL_EVAL_PATH', eval_root);
+
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.validationSplit(2009:2023, ...
+      station="kanm", seed=1, manifest_file=manifest_file), ...
+      ['icemodel:reconstruct:' ...
+      'assertNotEvaluationDestination:protectedPath']);
+   testCase.verifyFalse(isfile(manifest_file));
+   clear cleanup
 end
 
 function test_split_manifest_rejects_overlap_and_stale_years(testCase)
@@ -216,7 +233,7 @@ function test_draws_stay_in_requested_season(testCase)
    testCase.verifyTrue(all(draws.gaps.season == "JJA"));
    testCase.verifyTrue(all( ...
       icemodel.forcing.reconstruct.seasonOf( ...
-       series.Properties.RowTimes(draws.mask)) == "JJA"));
+      series.Properties.RowTimes(draws.mask)) == "JJA"));
 end
 
 function test_persistence_masks_every_heldout_draw(testCase)
@@ -274,7 +291,7 @@ function test_options_reject_cap_above_policy_ceiling(testCase)
    testCase.verifyEqual(opts.cap_hours_by_channel.albedo, 30);
    testCase.verifyError(@() ...
       icemodel.forcing.reconstruct.setopts(cap_hours=8), ...
-        'icemodel:reconstruct:setopts:capHours');
+      'icemodel:reconstruct:setopts:capHours');
    testCase.verifyError(@() ...
       icemodel.forcing.reconstruct.setopts( ...
       cap_hours_by_channel=struct('swd', 10)), ...
@@ -327,7 +344,7 @@ end
 
 function test_metrics_score_known_errors(testCase)
    % A constructed reconstruction yields exact bias/RMSE/coverage and flags
-   % the deliberate bound violation and boundary jump.
+   % the injected bound violation and boundary jump.
    series = icemodel.test.fixtures.makeReconstructSeries();
    draws = icemodel.forcing.reconstruct.syntheticMissingness(series, ...
       "tair", seededRuns(), years=2020, seed=7, n_gaps=3);
@@ -347,7 +364,7 @@ function test_metrics_score_known_errors(testCase)
    testCase.verifyEqual(metrics.overall.bound_violations, 1);
    % The 500 K first sample is a boundary jump at its gap's leading edge.
    testCase.verifyGreaterThan(metrics.overall.boundary_jump_rate, 0);
-    testCase.verifyEqual(sum(metrics.by_stratum.n), metrics.overall.n);
+   testCase.verifyEqual(sum(metrics.by_stratum.n), metrics.overall.n);
 end
 
 function test_metrics_and_gate_require_filled_sample_provenance(testCase)
@@ -414,19 +431,19 @@ function test_metrics_context_must_exclude_withheld_truth(testCase)
 end
 
 function test_metrics_count_relational_shortwave_violation(testCase)
-    % Held-out scoring counts swu above its paired swd as a hard violation.
-    series = icemodel.test.fixtures.makeReconstructSeries();
-    n = height(series);
-    series.swd = 100 * ones(n, 1);
-    series.swu = 40 * ones(n, 1);
-    times = series.Properties.RowTimes;
-    gaps = table(times(5), times(6), 0.5, 2, ...
-       icemodel.forcing.reconstruct.seasonOf(times(5)), ...
-       'VariableNames', {'start_time', 'end_time', 'duration_hours', ...
-       'bucket', 'season'});
-    metrics = icemodel.forcing.reconstruct.validationMetrics( ...
-       [40; 40], [50; 120], gaps, series, "swu");
-    testCase.verifyEqual(metrics.overall.bound_violations, 1);
+   % Held-out scoring counts swu above its paired swd as a hard violation.
+   series = icemodel.test.fixtures.makeReconstructSeries();
+   n = height(series);
+   series.swd = 100 * ones(n, 1);
+   series.swu = 40 * ones(n, 1);
+   times = series.Properties.RowTimes;
+   gaps = table(times(5), times(6), 0.5, 2, ...
+      icemodel.forcing.reconstruct.seasonOf(times(5)), ...
+      'VariableNames', {'start_time', 'end_time', 'duration_hours', ...
+      'bucket', 'season'});
+   metrics = icemodel.forcing.reconstruct.validationMetrics( ...
+      [40; 40], [50; 120], gaps, series, "swu");
+   testCase.verifyEqual(metrics.overall.bound_violations, 1);
 end
 
 function test_metrics_score_uncertainty_calibration(testCase)
@@ -498,18 +515,18 @@ function test_metrics_handle_constant_spread(testCase)
       'VariableNames', {'start_time', 'end_time', 'duration_hours', ...
       'bucket', 'season'});
 
-    constant_truth = icemodel.forcing.reconstruct.validationMetrics( ...
-       [1; 1], [1; 1], gaps, series, "tair");
-    testCase.verifyTrue(isnan(constant_truth.overall.correlation));
-    testCase.verifyTrue(isnan( ...
-       constant_truth.overall.variability_ratio));
-    testCase.verifyEqual( ...
-       constant_truth.overall.within_gap_observed_spread, 0);
+   constant_truth = icemodel.forcing.reconstruct.validationMetrics( ...
+      [1; 1], [1; 1], gaps, series, "tair");
+   testCase.verifyTrue(isnan(constant_truth.overall.correlation));
+   testCase.verifyTrue(isnan( ...
+      constant_truth.overall.variability_ratio));
+   testCase.verifyEqual( ...
+      constant_truth.overall.within_gap_observed_spread, 0);
 
    compressed = icemodel.forcing.reconstruct.validationMetrics( ...
       [1; 2], [1; 1], gaps, series, "tair");
    testCase.verifyTrue(isnan(compressed.overall.correlation));
-    testCase.verifyEqual(compressed.overall.variability_ratio, 0);
+   testCase.verifyEqual(compressed.overall.variability_ratio, 0);
 end
 
 function test_gate_rejects_unmeasurable_within_gap_variability(testCase)
@@ -548,11 +565,11 @@ end
 function test_gate_admits_and_denies_per_policy(testCase)
    % The gate admits a clean row and records one reason per failed criterion.
    clean = table(100, 1.0, 0.1, 1.0, 1.0, 1.0, 1.0, 0, 0.0, ...
-       NaN, NaN, 1.0, ...
-       'VariableNames', {'n', 'coverage', 'bias', 'rmse', 'correlation', ...
-       'variability_ratio', 'within_gap_observed_spread', ...
-       'bound_violations', 'boundary_jump_rate', ...
-       'sigma1_coverage', 'sigma2_coverage', 'provenance_accounting'});
+      NaN, NaN, 1.0, ...
+      'VariableNames', {'n', 'coverage', 'bias', 'rmse', 'correlation', ...
+      'variability_ratio', 'within_gap_observed_spread', ...
+      'bound_violations', 'boundary_jump_rate', ...
+      'sigma1_coverage', 'sigma2_coverage', 'provenance_accounting'});
 
    admitted = icemodel.forcing.reconstruct.admissionGate("tair", clean, 2.0);
    testCase.verifyTrue(admitted.admit);
@@ -579,22 +596,22 @@ function test_gate_admits_and_denies_per_policy(testCase)
    % A NaN baseline disables only the improvement criterion and records it.
    no_baseline = icemodel.forcing.reconstruct.admissionGate( ...
       "tair", clean, NaN);
-    testCase.verifyTrue(no_baseline.admit);
-    testCase.verifyFalse(no_baseline.baseline_available);
+   testCase.verifyTrue(no_baseline.admit);
+   testCase.verifyFalse(no_baseline.baseline_available);
 
-    % Missing or nonfinite provenance accounting is a failed invariant, not
-    % permission to skip the provenance gate.
-    missing_provenance = removevars(clean, 'provenance_accounting');
-    missing_gate = icemodel.forcing.reconstruct.admissionGate( ...
-       "tair", missing_provenance, 2.0);
-    testCase.verifyFalse(missing_gate.admit);
-    testCase.verifyTrue(any(contains(missing_gate.reasons, ...
-       "provenance accounting unavailable")));
-    nonfinite_provenance = clean;
-    nonfinite_provenance.provenance_accounting = NaN;
-    nonfinite_gate = icemodel.forcing.reconstruct.admissionGate( ...
-       "tair", nonfinite_provenance, 2.0);
-    testCase.verifyFalse(nonfinite_gate.admit);
+   % Missing or nonfinite provenance accounting is a failed invariant, not
+   % permission to skip the provenance gate.
+   missing_provenance = removevars(clean, 'provenance_accounting');
+   missing_gate = icemodel.forcing.reconstruct.admissionGate( ...
+      "tair", missing_provenance, 2.0);
+   testCase.verifyFalse(missing_gate.admit);
+   testCase.verifyTrue(any(contains(missing_gate.reasons, ...
+      "provenance accounting unavailable")));
+   nonfinite_provenance = clean;
+   nonfinite_provenance.provenance_accounting = NaN;
+   nonfinite_gate = icemodel.forcing.reconstruct.admissionGate( ...
+      "tair", nonfinite_provenance, 2.0);
+   testCase.verifyFalse(nonfinite_gate.admit);
 end
 
 function test_common_support_skill_uses_identical_samples(testCase)
@@ -641,16 +658,16 @@ end
 
 function test_census_daylight_cut_ignores_night_shortwave(testCase)
    % With the site point supplied, nighttime-missing swd is not outage;
-   % only the deliberate daytime gap counts.
+   % only the injected daytime gap counts.
    series = icemodel.test.fixtures.makeReconstructSeries();
    elevation = icemodel.forcing.helpers.solarElevation( ...
       series.Properties.RowTimes, 67.0, -48.8);
    swd = max(0, 600 * sind(max(elevation(:), 0)));
    swd(elevation(:) <= 0) = NaN;                 % night screening pattern
    series.swd = swd;
-   % Mask six CONTIGUOUS daylight hours — midsummer midday at 67 N is
-   % guaranteed daylight, so the gap cannot straddle a night (which would
-   % correctly census as two runs).
+   % Mask six CONTIGUOUS daylight hours. Midsummer midday at 67 N is always
+   % daylight, so the gap cannot cross a night, which would correctly census
+   % as two runs.
    times = series.Properties.RowTimes;
    gap_idx = find(times >= datetime(2020, 6, 21, 9, 0, 0, ...
       'TimeZone', 'UTC') & times <= datetime(2020, 6, 21, 14, 0, 0, ...
@@ -706,7 +723,7 @@ end
 
 function test_metrics_reject_malformed_inputs(testCase)
    % Size mismatches, unsorted gap tables, and gap/sample disagreements all
-   % fail loudly rather than mis-scoring.
+   % raise an error rather than mis-scoring.
    series = icemodel.test.fixtures.makeReconstructSeries();
    draws = icemodel.forcing.reconstruct.syntheticMissingness(series, ...
       "tair", seededRuns(), years=2020, seed=13, n_gaps=3);
@@ -733,13 +750,13 @@ end
 
 function test_gate_relative_wspd_cap_and_unknown_channel(testCase)
    % The wspd cap widens to 10% of the typical magnitude when supplied, and
-   % unknown channels fail loudly.
+   % an unknown channel raises an error.
    row = table(100, 1.0, 1.4, 1.0, 1.0, 1.0, 1.0, 0, 0.0, ...
-       NaN, NaN, 1.0, ...
-       'VariableNames', {'n', 'coverage', 'bias', 'rmse', 'correlation', ...
-       'variability_ratio', 'within_gap_observed_spread', ...
-       'bound_violations', 'boundary_jump_rate', ...
-       'sigma1_coverage', 'sigma2_coverage', 'provenance_accounting'});
+      NaN, NaN, 1.0, ...
+      'VariableNames', {'n', 'coverage', 'bias', 'rmse', 'correlation', ...
+      'variability_ratio', 'within_gap_observed_spread', ...
+      'bound_violations', 'boundary_jump_rate', ...
+      'sigma1_coverage', 'sigma2_coverage', 'provenance_accounting'});
 
    fixed = icemodel.forcing.reconstruct.admissionGate("wspd", row, 2.0);
    testCase.verifyFalse(fixed.admit);            % 1.4 > 1 m/s fixed cap
@@ -752,9 +769,14 @@ function test_gate_relative_wspd_cap_and_unknown_channel(testCase)
 end
 
 function test_physical_bounds_registry(testCase)
-   % Known channels return [lower upper]; unknown channels fail loudly.
+   % Known channels return [lower upper]; an unknown channel raises an error.
    returned = icemodel.forcing.reconstruct.physicalBounds("tair");
    testCase.verifyEqual(returned, [193, 300]);
+   testCase.verifyEqual( ...
+      icemodel.forcing.reconstruct.physicalBounds("wspd"), [0.1, 60]);
+   policy_file = fullfile(fileparts(which( ...
+      'icemodel.forcing.reconstruct.physicalBounds')), 'POLICY.md');
+   testCase.verifySubstring(fileread(policy_file), 'wspd [0.1, 60]');
    testCase.verifyError(@() ...
       icemodel.forcing.reconstruct.physicalBounds("nope"), ...
       'icemodel:reconstruct:physicalBounds:unknownChannel');
@@ -769,6 +791,9 @@ function test_scalar_validity_uses_physical_bounds(testCase)
    swd = icemodel.forcing.reconstruct.scalarValidity( ...
       "swd", [0; 500; Inf; -1]);
    testCase.verifyEqual(swd, [true; true; false; false]);
+   wspd = icemodel.forcing.reconstruct.scalarValidity( ...
+      "wspd", [0; 0.099; 0.1; 5; 60; 60.1]);
+   testCase.verifyEqual(wspd, [false; false; true; true; true; false]);
 end
 
 function test_solar_elevation_bands_contract(testCase)
@@ -851,12 +876,12 @@ function test_plan_prefers_calibrated_proxy_over_climatology_for_swd(testCase)
       & buckets == 1, 1);
    testCase.assertNotEmpty(proxy_index);
    testCase.assertNotEmpty(clim_index);
-   % Climatology genuinely out-skills the proxy on the periodic truth,
-   % so pure skill ranking would list it first...
+   % Climatology out-skills the proxy on the periodic truth, so pure skill
+   % ranking would list climatology first.
    testCase.verifyGreaterThan( ...
       methods(clim_index).selection.fractional_improvement, ...
       methods(proxy_index).selection.fractional_improvement);
-   % ...but the D-29 swap lists the calibrated proxy first in the walk
+   % The D-29 swap instead lists the calibrated proxy first in the walk
    % order the engine consumes.
    testCase.verifyLessThan(proxy_index, clim_index);
    % The persisted calibration registry carries the version-2 binned

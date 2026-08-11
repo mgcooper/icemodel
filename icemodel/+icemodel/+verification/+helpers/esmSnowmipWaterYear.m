@@ -1,8 +1,8 @@
-function [window_start, window_end] = default_smoke_window(sitename)
-   %DEFAULT_SMOKE_WINDOW Per-site default verification window (one snow water year).
+function [window_start, window_end] = esmSnowmipWaterYear(sitename)
+   %ESMSNOWMIPWATERYEAR Return one snow water year for an ESM-SnowMIP site.
    %
-   %  [start, end] = icemodel.verification.helpers.default_smoke_window()
-   %  [start, end] = icemodel.verification.helpers.default_smoke_window("cdp")
+   %  [start, end] = icemodel.verification.helpers.esmSnowmipWaterYear()
+   %  [start, end] = icemodel.verification.helpers.esmSnowmipWaterYear("cdp")
    %
    %  Returns the canonical "one snow water year" window for the given
    %  ESM-SnowMIP site, used by importEsmSnowmip dry-run previews and as the
@@ -27,8 +27,7 @@ function [window_start, window_end] = default_smoke_window(sitename)
    %                                              following year.
    %
    % See also: icemodel.verification.setup.esmSnowmipSiteCatalog,
-   %  icemodel.verification.setup.importEsmSnowmip,
-   %  run_snow_verification_suite
+   %  icemodel.verification.setup.importEsmSnowmip, run_snow_verification_suite
 
    arguments
       sitename (1, 1) string ...
@@ -36,9 +35,9 @@ function [window_start, window_end] = default_smoke_window(sitename)
    end
 
    info = icemodel.verification.setup.esmSnowmipSiteCatalog(sitename);
-   smoke_year = info.insitu_window(1) + 1;
-   window_start = datetime(smoke_year, ...
+   water_year = info.insitu_window(1) + 1;
+   window_start = datetime(water_year, ...
       10, 1, 0, 0, 0, 'TimeZone', 'UTC');
-   window_end = datetime(smoke_year + 1, ...
+   window_end = datetime(water_year + 1, ...
       9, 30, 23, 0, 0, 'TimeZone', 'UTC');
 end

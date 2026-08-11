@@ -9,9 +9,9 @@ function f_wat = water_fraction(f_ice, f_liq)
    %
    %   f_wat = f_liq + f_ice * ro_ice / ro_liq
    %
-   % This helper is the canonical conversion used by the column phase-change
-   % functions. Keep the density lookup local so callers do not need to thread
-   % intrinsic phase densities through unrelated contracts.
+   % The column phase-change functions use this helper for the conversion.
+   % The density lookup stays local, so callers do not need to pass the ice
+   % and liquid densities through their own interfaces.
    %
    %#codegen
 

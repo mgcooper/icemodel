@@ -8,14 +8,14 @@ function census = gapCensus(series, kwargs)
    % Role
    %  Family-generic gap census for the reconstruction harness (DesignSpec
    %  2026-07-23-promice-gap-filling-and-ktransect, bead icemodel-g1n.6).
-   %  The input is any regular timetable under the engine's role contract —
-   %  a PROMICE target, a K-transect donor, a GC-Net record — never a
+   %  The input is any regular timetable under the engine's role contract: a
+   %  PROMICE target, a K-transect donor, or a GC-Net record. It is never a
    %  family-specific type. The census bounds statistics to the observed
-   %  record (first..last finite core-channel sample), optionally restricts
-   %  shortwave to daylight so diurnal screening does not masquerade as
-   %  outage, and returns both the per-run table the synthetic-missingness
-   %  sampler resamples and the per-channel summary the policy and report
-   %  consume.
+   %  record, which runs from the first to the last finite core-channel
+   %  sample. It can also restrict shortwave to daylight, so that the nightly
+   %  screening pattern does not count as an outage. It returns the per-run
+   %  table that the synthetic-missingness sampler resamples, and the
+   %  per-channel summary that the policy and the report read.
    %
    % Name-value
    %  channels : string vector. Channels to census; default every numeric
@@ -141,14 +141,14 @@ function census = gapCensus(series, kwargs)
       starts = find(d == 1);
       stops = find(d == -1) - 1;
       run_hours = (stops - starts + 1) * dt_hours;
-       buckets = icemodel.forcing.reconstruct.gapDurationBucket( ...
-          run_hours, kwargs.edges_hours);
-       % Count the assigned right-closed bucket IDs themselves; histcounts
-       % uses the opposite boundary convention at exact policy edges.
-       valid_buckets = isfinite(buckets);
-       counts = accumarray(buckets(valid_buckets), ...
-          ones(nnz(valid_buckets), 1), ...
-          [numel(kwargs.edges_hours) - 1, 1]).';
+      buckets = icemodel.forcing.reconstruct.gapDurationBucket( ...
+         run_hours, kwargs.edges_hours);
+      % Count the assigned right-closed bucket IDs themselves; histcounts
+      % uses the opposite boundary convention at exact policy edges.
+      valid_buckets = isfinite(buckets);
+      counts = accumarray(buckets(valid_buckets), ...
+         ones(nnz(valid_buckets), 1), ...
+         [numel(kwargs.edges_hours) - 1, 1]).';
 
       % Samples the configured interior cap can fix versus samples needing
       % a donor or proxy tier (sized by the POLICY B3 tier-1 cap).

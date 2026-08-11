@@ -30,15 +30,101 @@ Choose the layer that matches the task:
 | List or load staged cases | `listcases`, `loadmanifest` | No |
 | Audit staged artifacts | `auditArtifacts` | No, unless `report_dir` is set |
 | Compare or plot a case | `comparecase`, `plotcase` | Only when an output path is set |
+| Audit PROMICE ablation readiness | `setup.writePromiceAblationReadiness` | Yes, to the selected report directory |
+| Compare PROMICE cumulative ablation | `compareAblation` | No |
+| Render saved PROMICE ablation results | `report.buildAblationEvaluationReport` | Only generated report outputs |
 | Import or refresh a family | `icemodel.verification.setup.import*` | Yes |
 | Build the gap-fill report | `icemodel.verification.report.buildGapFillReport` | Only generated preview outputs |
 
-Setup functions are deliberately separate from normal verification because they
+Setup functions are separate from normal verification because they
 create or replace MAT artifacts and manifests. Start with
 [Normal workflow](#normal-workflow) for inspection, [Setup workflow](#setup-workflow)
 for staging, or
 [Produce a fresh PROMICE gap-fill report](#produce-a-fresh-promice-gap-fill-report)
 for the reconstruction/report sequence.
+
+## PROMICE ablation evaluation
+
+PROMICE ablation evaluation begins with a machine-readable readiness ledger,
+not a model run. The ledger independently records forcing, snow-input,
+evaluation-target, and candidate status for every canonical case-year and pins
+the exact `promice_filled` artifact used by admitted rows:
+
+```matlab
+readiness = ...
+   icemodel.verification.setup.writePromiceAblationReadiness( ...
+   evaluation_data_root=eval_root, input_data_root=input_root, ...
+   output_dir=report_dir);
+```
+
+`icemodel.verification.compareAblation` compares an admitted observation
+interval with diagnostic model output on exact common support. The formal
+budget quantity is cumulative net physical solid loss from the modeled phase
+and solid-vapor terms in metres water equivalent; it excludes remeshing and
+domain exchange. The seasonal diagnostic contract also retains legacy
+cumulative melt, the six-hour melt/refreeze runoff proxy, refreezing, and
+top-layer deletion. Observed surface lowering is reported as geometry and as a
+shaded 600--900 kg m^-3 sensitivity range with a solid 870 kg m^-3 reference
+line inside it; 600 kg m^-3 is not an intact glacier-ice density. The band and
+its reference come from `promiceAblationPolicy`, which records the supporting
+measurements. Numeric band edges are ordered pointwise because their density
+identity reverses for negative signed lowering. The sign of the
+model-observation difference reverses across the band, so the report states
+that these data do not determine whether the model over- or under-predicts.
+Top-layer deletion height is a secondary quantized geometry diagnostic;
+`dlayer` is not surface displacement.
+
+Cumulative merge export is retained in the mass ledger for closure checking but
+is neither scored nor plotted. A merge gives the joined cell the mean of the
+pair it replaces, so removing a nearly empty top cell still exports about half
+the pair's mass. Across the current cohort the series runs about 1.5 times melt,
+which measures the regridding rule rather than mass leaving the surface. Signed
+mass/energy ledgers and their
+non-cancelling gross channels remain separate so numerical closure cannot
+hide opposing remesh or domain exchanges.
+
+The orchestration entry point is
+`test/verification/run_promice_ablation_evaluation.m`. An empty `case_ids`
+selection writes readiness only; model execution requires explicit case ids or
+`"all"`. Every executed case uses `icemodel.test.helpers.runModelCase`, the
+same setup, solver, and postprocessing path used by formal regression. The
+runner preserves all admitted and excluded ledger rows and writes fixed
+30/60/90-day plus longest-window diagnostics when exact endpoints exist. It
+also predeclares start `+1/+3/+7` day and end `-1/-3/-7` day endpoint
+perturbations, retaining unavailable rows and reasons instead of shortening a
+requested window. Requesting `write_artifacts=true` without a case selection is
+an error: a readiness-only run would otherwise leave a populated run directory
+and a renderable report describing zero site-years.
+
+`icemodel.verification.ablationPerformanceMetrics` scores every diagnostic
+against the measured lowering, once per density in the policy band so the
+sensitivity is visible rather than hidden by one choice. Scores use per-step
+increments, and the report ranks diagnostics at the policy reference density.
+`icemodel.verification.observationRateOutliers` flags any site-year whose
+observed ablation rate falls far below the same station's own median. The
+readiness gates reject only flagged transitions and unresolved steps, so an
+unflagged compressed record passes admission and appears in the comparison as a
+model error. The flag is a visible caveat in `observation-rate-outliers.csv` and
+the report, and never an exclusion: dropping those observations would raise
+apparent model skill.
+
+Each production case initializes at the readiness row's requested calendar-year
+start and retains a compact June 1--October 1 seasonal payload. The selected
+comparison is the single longest interval in that season: snow up to 0.05 m may
+preserve continuity, but paired observation and model rows require finite snow
+depth at or below 0.01 m. Trace-snow and unknown-snow rows remain visible as
+censored gaps. The readiness hashes retain provenance for the full source
+artifacts. This is zero-spinup preconditioning and does not add production snow
+physics, so the scientific report must retain that limitation when interpreting
+thermal, liquid-storage, or refreezing behavior.
+
+`icemodel.verification.report.buildAblationEvaluationReport` is a pure consumer
+of the runner's saved `results.mat`. It does not reopen canonical observations,
+forcing, or model inputs. It exports compact scientific tables and figures,
+an inspectable QMD source, and an optional self-contained HTML report. The
+cross-site graphic contains only completed selected site-years; readiness,
+selection, exclusions, and model-run accounting remain concise appendix prose
+with linked CSV evidence rather than a cohort-count graphic.
 
 ## Normal Workflow
 
@@ -48,7 +134,7 @@ Use the top-level functions for ordinary verification runs:
 - `icemodel.verification.loadmanifest` resolves one case manifest and its artifact paths.
 - `icemodel.verification.auditArtifacts` runs read-only QA/QC over exact
   manifest-referenced files plus the canonical runtime-resolved ESM-SnowMIP met
-  artifact required by that family's intentional atomic manifest schema.
+  artifact required by that family's atomic manifest schema.
 - `icemodel.verification.matchObservations` returns reusable matched SUMup
   interval-SMB and dated density/temperature profile rows.
 - `icemodel.verification.comparecase` compares staged targets with a candidate or smoke reference.
@@ -118,9 +204,9 @@ results = run_snow_verification_suite(write_artifacts=true, save_plots=true);
 Comparison figures include the time-series overlay plus target-versus-candidate
 scatter figures with a 1:1 reference line and fitted linear trend. Scatter
 figures are separate from the time-series figure and are only produced for
-time-series site cases, not the current Colbeck experiment bundle. The scatter
-are generated with `icemodel.plot.scatterplot`. The timeseries plots are generated
-with `icemodel.plot.timeseries`.
+time-series site cases, not the current Colbeck experiment bundle.
+`icemodel.plot.scatterplot` generates the scatter figures, and
+`icemodel.plot.timeseries` generates the time-series plots.
 
 ## Time-window policy
 
@@ -130,11 +216,11 @@ The same vocabulary applies at both staging and runtime:
 - **Staging** (`importEsmSnowmip`): with no explicit window, each requested
   site stages its full forcing/observation source record. Pass `startdate` /
   `enddate` kwargs together to stage a shorter shared window. A metadata-only
-  `dry_run` uses the site's one-year `default_smoke_window` without reading the
+  `dry_run` uses the site's one-year `esmSnowmipWaterYear` without reading the
   source cache or writing artifacts.
 - **Runtime** (`run_snow_verification_suite`): with no explicit
   window and a single ESM-SnowMIP case, the runner narrows to that
-  site's `default_smoke_window`. Pass `startdate` / `enddate` to
+  site's `esmSnowmipWaterYear`. Pass `startdate` / `enddate` to
   override; the staged window remains the upper bound.
 - **Default suite call**: `run_snow_verification_suite()` (no args)
   runs Col de Porte (cdp) over its smoke window. CDP is the most
@@ -143,8 +229,8 @@ The same vocabulary applies at both staging and runtime:
   runs fast.
 
 When the staged window is wider than the runtime window, comparecase
-subsets the staged target on the fly via `opts.startdate` /
-`opts.enddate` — no re-staging required.
+subsets the staged target at read time via `opts.startdate` /
+`opts.enddate`. No re-staging is required.
 
 ## ESM-SnowMIP sites
 
@@ -185,7 +271,7 @@ Setup and refresh tooling lives under `icemodel.verification.setup`:
 - `importEsmSnowmip` stages all 10 ESM-SnowMIP site cases via the builders.
   With no explicit window, each site uses its full source record; pass paired
   `startdate` / `enddate` values to stage a shorter window. Metadata-only dry
-  runs keep the short per-site `default_smoke_window` preview. Default staged
+  runs keep the short per-site `esmSnowmipWaterYear` preview. Default staged
   met and the manifest runtime cadence are 15 minutes; explicit `dt_out=""`
   keeps both the met artifact and its manifest cadence hourly.
 - `importLaughTests` stages selected Laugh-Tests synthetic process cases.
@@ -226,11 +312,11 @@ geospatial release. Builders likewise keep source-faithful selectors:
 and `point` for SUMup observations. Those names do not represent the common
 manifest case selector and must not be replaced with compatibility aliases.
 
-The setup functions are intentionally separate because they create MAT
+The setup functions are separate because they create MAT
 artifacts and manifests. Ordinary `overwrite=false` calls are additive: they
 reuse current requested artifacts, add missing artifacts/sites/sources, and
-preserve unrelated cases and source legs. Use `overwrite=true` only when
-deliberately replacing requested staged setup data.
+preserve unrelated cases and source legs. Use `overwrite=true` only to
+replace requested staged setup data.
 An enclosing staged window satisfies a narrower repeat. A wider same-case
 request makes a fixed-name observation bundle stale, rebuilds it with a visible
 replacement warning, and writes widened window-named met/userdata artifacts.
@@ -243,9 +329,9 @@ non-dry observation staging; dry runs do not gain artifact or raw-source reads.
 
 ### v1.1 release-data tooling
 
-`test/assets/icemodel-v1.1-data-manifest.json` is the single source of truth for
-the required `formal-core` and `verification-showcase` capabilities and the
-optional `forcing-integration` capability. `fixtureFileList` selects manifest
+`test/assets/icemodel-v1.1-data-manifest.json` defines the required
+`formal-core` and `verification-showcase` capabilities and the optional
+`forcing-integration` capability. `fixtureFileList` selects manifest
 rows; `packFixtures` writes one archive per selected capability; and
 `fetchFixtures` verifies or transactionally installs selected archives.
 
@@ -392,7 +478,7 @@ rcm = { ...
 
 Every lasting artifact-contract correction must be implemented in the canonical
 builder or importer, but accepted artifacts do not always require a full raw
-restage. The durable partial-repair tools have deliberately separate scopes:
+restage. The durable partial-repair tools have separate scopes:
 
 - refreshManifestSourceLists(manifest_file) rewrites only derived
   forcing_sources and eval_sources from authoritative colocation state. It does
@@ -403,7 +489,7 @@ restage. The durable partial-repair tools have deliberately separate scopes:
   source_id filters the product inventory. The function defaults to a dry run,
   synchronizes canonical metadata, validates preservation boundaries, replaces
   files atomically, and reports pass-two identity. Its optional repair_function
-  callback is the extension seam for a
+  callback is the extension point for a
   future bounded field/property migration after the same change is canonical in
   the production builder. The caller must declare every variable and UserData
   field or CustomProperty the callback may change; the coordinator rejects
@@ -633,7 +719,7 @@ not a snow-depth alias; `snow_depth` remains nonnegative physical snow height.
 The plotted `tice10m` is the canonical staged 10 m ice/firn temperature channel,
 not a value synthesized by the renderer. Profile legends use family-facing
 observation labels and split a small, explicit `name` identity set into separate
-colors; profile collections without such an identity remain one honest series.
+colors; profile collections without such an identity remain one series.
 `plotFirnArtifacts` forwards the same option as a compatibility wrapper, but new
 workflow examples should use the family-neutral `plotVerificationArtifacts`.
 
@@ -842,8 +928,8 @@ and untouched cases re-encode identically (raw decode, no field reordering);
 hand-added family fields like `schema: "metadata_only"` survive. Re-staging the
 same site updates exactly its entry (idempotent), and a stale `skipped[]` entry
 for a now-staged site clears while other sites' skips are preserved. So adding
-DY2/EGP into the family root that already holds the KAN fixtures never churns or
-drops them.
+DY2/EGP into the family root that already holds the KAN fixtures never rewrites
+or drops them.
 
 A shorter same-identity refresh preserves the enclosing case/leg
 window and its prior artifact references; an enclosing/equal rebuild replaces
@@ -863,7 +949,7 @@ replace rather than union while
 a valid 15-minute-met/hourly-Data leg remains compatible. Durable filename cadence
 is used only when every ref in that class is unambiguous; unknown legacy names
 remain compatible. Source lists are derived again from the final colocation graph.
-Pass `overwrite_family=true` only to deliberately
+Pass `overwrite_family=true` only to
 rebuild the entire family root from the requested sites alone.
 
 ```matlab
@@ -1019,8 +1105,7 @@ non-KAN PROMICE stations and the ESM-SnowMIP sites carry **authoritative**
   no bare ice), `percolation` where a **SUMup_2025** GrIS density profile lies
   within 15 km (firn observed), else `accumulation` (facies unresolved).
 - `permafrost_zone`: **Obu et al. (2019)** permafrost-zone map, point-in-polygon
-  on lon/lat (off-ice sites; ice-sheet/glacier -> `none`). Replaces the v1 Brown
-  et al. (1997) source.
+  on lon/lat (off-ice sites; ice-sheet/glacier -> `none`).
 
 > The Obu zone polygons are read through `activelayer.readobuzones`, which lives
 > in the external [`activelayer`](https://github.com/mgcooper/activelayer) dev
@@ -1146,11 +1231,11 @@ report = icemodel.verification.auditArtifacts( ...
 ```
 
 The default call is non-mutating and returns stable `artifacts`, `channels`,
-`findings`, and `summary` structs. ESM-SnowMIP intentionally omits
+`findings`, and `summary` structs. ESM-SnowMIP omits
 `forcing_sources`, `colocation`, and `met_files`; audit and plotting therefore
 reuse the standard runtime resolver to select its exact nested-or-flat met
 artifact without changing the manifest contract. Findings distinguish `error`,
-`blocker`, `warning`, and `placeholder`; intentional all-NaN placeholders are
+`blocker`, `warning`, and `placeholder`; documented all-NaN placeholders are
 recorded but not counted as observations. Seasonal 15-minute model met must also
 carry the writer's source-gap provenance; the audit reports an error when a
 derived channel contains fewer missing values than its native support requires.
@@ -1276,7 +1361,7 @@ window, resolve their family catalog and staging roots, reuse or stage requested
 cases, record provenance once, return through `runDatasetFamilyDryRun`, or
 persist through `runDatasetFamilyImport`. `stageDatasetFamilyCases` owns the
 common skip/error loop and `stageDatasetRcmForcing` owns delegated RCM work.
-Research-site dry runs intentionally return before root/source resolution so a
+Research-site dry runs return before root/source resolution so a
 metadata-only preview works on a clean machine; fixed Laugh-Test cases have no
 caller-selected window. Those are source-contract differences, not alternate
 manifest pipelines.
@@ -1293,8 +1378,8 @@ separate because their variables, grids, and validation evidence differ.
 always request `fillwithmissing=true` so a staged native met artifact has the
 canonical channel schema with unavailable channels represented explicitly as
 NaN. Direct builder callers can pass `fillwithmissing=false` to require the
-source itself to satisfy the complete met contract. It is deliberately not an
-importer option because changing it would make the persisted schema depend on
+source itself to satisfy the complete met contract. It is not an
+importer option, because changing it would make the persisted schema depend on
 which family wrapper was called.
 
 ## Source Catalogs and Staged Schemas
@@ -1310,7 +1395,7 @@ names make that distinction explicit:
   windows, and source associations describe protocol cases rather than only
   physical sites.
 
-The catalogs deliberately retain source-specific fields instead of padding a
+The catalogs retain source-specific fields instead of padding a
 union struct with fields that do not apply. Importers normalize staged snow
 cases through `makeCaseManifestEntry` and staged firn observational cases
 through `makeFirnCaseManifestEntry`; those factories and their field-name
@@ -1322,16 +1407,31 @@ source rows and must not define a new on-disk contract.
 - `helpers` contains normal workflow helpers for path discovery (`evaluationDataRoot`,
   `inputDataRoot`, `esmRuntimeMetFiles`), manifest reads, artifact loading, candidate
   resolution, metric schema definition, the per-run markdown report writer
-  (`writeRunReport`), the per-site default window (`default_smoke_window`), and
-  per-site default window (`default_smoke_window`). The standard-contract
+  (`writeRunReport`), and the per-site default window
+  (`esmSnowmipWaterYear`). The standard-contract
   opts builder used by `runIcemodelSnowCandidate` is
   `icemodel.test.helpers.setModelOptsForCase`, which accepts both formal-case
   rows and verification manifests via input dispatch.
+- `helpers` also owns the small pieces more than one consumer needs:
+  `residualMetrics` (bias, MAE, RMSE, max error, and NSE
+  with one set of guards), `sampleQuantile`, `evaluationSeason` (the season
+  bounds readiness admits against and the runner evaluates against),
+  `ablationLedgerIncrements` (the per-interval solid-balance, surface-loss,
+  and solid-vapor-loss terms the comparator scores and the runner plots), and
+  `classifySnowDepth`.
+- `report` owns the pieces both report builders share: `markdownTable`,
+  `formatValue`, `markdownCode`, `escapeMarkdownText`, `sanitizeText`,
+  `safeLabel`, `formatReportAxes`, `configureCategoryAxis`, and
+  `exportAndClose`. Figures come from `icemodel.plot.newFigure` and spans from
+  `icemodel.plot.markTimeSpan`, so every report shares one export frame and
+  one span style.
+- `setup.writeJson` writes every readiness ledger, preview evidence, and QA
+  JSON, so they agree on UTF-8 and a trailing newline.
 - `setup` contains the consistently named family source catalogs listed above,
   their shared strict site-id selector (`selectSiteCatalogEntries`), and the
   canonical staged-case factories. RetMIP keeps alias-aware case selection in
   `retmipCaseCatalog`; PROMICE retains its documented first-pass fallback and
-  ESM-SnowMIP retains its scalar site lookup because those semantics differ.
+  ESM-SnowMIP retains its scalar site lookup because those behaviors differ.
 - `namelists` contains canonical selector lists for dataset families, case ids,
   case types, surface zones (`surfacezone`, the per-case physical-regime
   vocabulary stamped onto case manifests), the ESM-SnowMIP site-name namelist
@@ -1358,14 +1458,15 @@ The per-case folder layout is split by `case_type`:
   `firn_observational`) are FORCING-AGNOSTIC: the case folder stores one
   data-only `observations.mat` bundle (the eval target). The manifest is
   forcing-agnostic - it records which forcing/eval sources are available (by id,
-  informational only), but the forcing is NOT bundled and NOT stipulated, so any
-  forcing usable at runtime without rewriting `observations.mat`. No bundled
-  `reference.mat` smoke copy is written — the default candidate, with no model
-  output supplied, falls through to the soft diagnostic lane. Forcing always
+  informational only), but the forcing is NOT bundled and NOT stipulated. You
+  can therefore use any forcing that runs at runtime without rewriting
+  `observations.mat`. No bundled `reference.mat` smoke copy is written. With no
+  model output supplied, the default candidate falls through to the soft
+  diagnostic path. Forcing always
   lives separately under per-source subfolders `data/input/met/<source>/` and
   `data/input/userdata/<source>/` (standard icemodel naming via
-  `writemet`/`writeuserdata`), never in the eval folder. (PROMICE demo fixtures
-  staged before this contract carry no
+  `writemet`/`writeuserdata`), never in the eval folder. (Older PROMICE demo
+  fixtures carry no
   `observations.mat`; the workflow functions fall back to reconstituting the
   PROMICE-obs target from the per-year userdata files those manifests declare.)
 

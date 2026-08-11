@@ -1,8 +1,8 @@
 classdef TryCatchTest < matlab.perftest.TestCase
    %TRYCATCHTEST Microbenchmark for `catch ME` vs bare `catch`.
    %
-   % This is not a core-model hotspot benchmark. Preserve it as a language
-   % overhead experiment in case try/catch becomes relevant in future code.
+   % This is not a core-model hotspot benchmark. Keep it as a
+   % language-overhead experiment for try/catch.
 
    properties (TestParameter)
       handling_mode = {1, 2}
@@ -41,7 +41,7 @@ classdef TryCatchTest < matlab.perftest.TestCase
 end
 
 function c = trycatchWithHandling(a, b)
-%TRYCATCHWITHHANDLING Execute the `catch ME` branch under test.
+   %TRYCATCHWITHHANDLING Execute the `catch ME` branch under test.
 
    try
       c = a - b;
@@ -51,7 +51,7 @@ function c = trycatchWithHandling(a, b)
 end
 
 function c = trycatchWithoutHandling(a, b)
-%TRYCATCHWITHOUTHANDLING Execute the bare `catch` branch under test.
+   %TRYCATCHWITHOUTHANDLING Execute the bare `catch` branch under test.
 
    try
       c = a - b;

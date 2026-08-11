@@ -4,7 +4,8 @@ function products = gcnetProductNames()
    %  products = icemodel.verification.setup.gcnetProductNames()
    %
    % Fetch validation, inventory discovery, and gcnetProductSpec share this
-   % ordered registry so accepted selectors cannot drift from DOI/file metadata.
+   % ordered registry, so the accepted selectors match the DOI and file
+   % metadata.
 
    products = ["surface", "firn_temperature", "simulated_firn"];
 end

@@ -118,8 +118,8 @@ function [colocation, identity_conflict] = preservePriorNativeLeg( ...
       end
    end
 
-   % Point semantics remain local: every known prior case/artifact point must
-   % agree with the fresh producer, while missing or nonfinite legacy points are
+   % The point check is local: every known prior case/artifact point must agree
+   % with the fresh producer, while a missing or nonfinite older point is
    % compatible. Accept direct or nested artifact metadata location records.
    fresh_point = [metadata.site_location.lat_wgs84, ...
       metadata.site_location.lon_wgs84];
@@ -157,7 +157,7 @@ function [colocation, identity_conflict] = preservePriorNativeLeg( ...
    end
 
    % Retain only forcing-owned runtime references, status, and artifact
-   % provenance. Fresh source/window/evaluation fields intentionally win.
+   % provenance. The fresh source, window, and evaluation fields take priority.
    native_fields = ["met_files", "met_file_identities", "data_files", ...
       "forcing_ready", ...
       "forcing_ready_reason", "forcing_complete_windows", ...

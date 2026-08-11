@@ -8,19 +8,19 @@ function sites = researchSiteCatalog(site_ids)
    %  Catchall site catalog for high-value research targets that do not belong
    %  cleanly to a network family such as PROMICE, IMAU, or RetMIP. These sites
    %  are source-family anchors for colocation metadata, not a special SUMup
-   %  subcategory. Staged cases are normalized separately through
-   %  icemodel.verification.setup.makeFirnCaseManifestEntry.
+   %  subcategory. icemodel.verification.setup.makeFirnCaseManifestEntry
+   %  normalizes staged cases separately.
 
    arguments
       site_ids (1, :) string = strings(1, 0)
    end
 
-   % Start with Humphrey because it is the current standalone Meyer-Hewitt target
-   % and should be represented by the generic research_site family.
+   % Start with Humphrey because it is the standalone Meyer-Hewitt target and
+   % belongs to the generic research_site family.
    sites = one("humphrey", "Humphrey percolation thermistor network");
 
    % Reject unknown ids before staging and retain canonical catalog order. Keep
-   % the established error id so callers can catch it across the API rename.
+   % this error id stable so callers can catch it by name.
    sites = icemodel.verification.setup.selectSiteCatalogEntries(sites, ...
       site_ids, "icemodel:verification:researchSiteMetadata:unknownSite", ...
       "research_site");

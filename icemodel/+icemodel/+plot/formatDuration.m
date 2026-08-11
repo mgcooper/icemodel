@@ -5,9 +5,9 @@ function label = formatDuration(duration_hours)
    %  label = icemodel.plot.formatDuration(32300)  % "3.7 y"
    %
    % Role
-   %  Single source of the duration labels report figures and tables
-   %  use: hours below two days, days below two years, years above —
-   %  never scientific notation.
+   %  Report figures and tables use these duration labels: hours below two
+   %  days, days below two years, and years above that. The label never uses
+   %  scientific notation.
    %
    % See also: icemodel.plot.compareTimeseries
 

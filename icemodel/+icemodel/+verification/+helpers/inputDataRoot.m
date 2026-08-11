@@ -37,8 +37,8 @@ function root = inputDataRoot(kwargs)
    end
 
    % Use a repo-root default for staging workflows so importer output does not
-   % depend on the user's active ICEMODEL_DATA_PATH. A nonblank casename keeps
-   % the older committed-fixture path available for tests and demo reads.
+   % depend on the user's active ICEMODEL_DATA_PATH. A nonblank casename
+   % selects the committed-fixture path for tests and demo reads.
    if isblanktext(kwargs.icemodel_config_casename)
       root = string(fullfile(icemodel.internal.fullpath('data'), 'input'));
    else

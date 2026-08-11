@@ -83,9 +83,9 @@ function w = meltSeasonWindows()
    w = struct( ...
       "name", {"2015_jun_oct", "2015_jul_oct", "2016_jun_oct", "2016_jul_oct"}, ...
       "t1",   {datetime(2015,6,1), datetime(2015,7,1), ...
-               datetime(2016,6,1), datetime(2016,7,1)}, ...
+      datetime(2016,6,1), datetime(2016,7,1)}, ...
       "t2",   {datetime(2015,10,1), datetime(2015,10,1), ...
-               datetime(2016,10,1), datetime(2016,10,1)});
+      datetime(2016,10,1), datetime(2016,10,1)});
 end
 
 %% ----------------------------------------------------------------- per site
@@ -300,8 +300,13 @@ function p = relpct(stats)
 end
 
 function root = repoRoot()
-   %REPOROOT Repo root from this file: test/interactive/<file>.m -> up two.
-   root = fileparts(fileparts(fileparts(mfilename("fullpath"))));
+   %REPOROOT Return the repository root.
+   %
+   % Three fileparts calls from this file give <repo>/test, not <repo>,
+   % because the file sits in test/interactive/ablation_comparison. Use the
+   % canonical helper instead of counting directory levels.
+
+   root = string(icemodel.internal.fullpath());
 end
 
 function reportResults(results)

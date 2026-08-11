@@ -4,18 +4,18 @@ function flags = surfaceFlags(z, sensors, t, kwargs)
    %  flags = icemodel.forcing.helpers.surfaceFlags(z, sensors, t)
    %  flags = ... surfaceFlags(z, sensors, t, transition_times=...)
    %
-   % Derives the per-sample flag channels staged alongside a PROMICE/GC-Net
-   % surface-height series. We MODIFY no GEUS data here: these are faithful
-   % per-sample masks read/derived from the L3 channels, never edits to the
-   % series. buildPromiceData attaches them; consumers act on them.
+   % Derives the per-sample flag channels that accompany a PROMICE/GC-Net
+   % surface-height series. This function MODIFIES no GEUS data. The flags are
+   % per-sample masks read or derived from the L3 channels, not edits to the
+   % series. buildPromiceData attaches them, and consumers act on them.
    %
    % GAP FLAG (gap-bridged surface height). The L3 surface height (z_ice_surf or
    % z_surf_combined) is bridged across data gaps by a manual slope when ALL
-   % surface-ranging sensors fail (readme, "Surface height estimation"): the
-   % trend is preserved but a per-timestep RATE through the gap is not a direct
-   % observation. The OLD heuristic flagged only samples where z itself is NaN,
-   % which misses these slope-bridged segments (z is finite there, manufactured
-   % by interpolation). This flag instead marks a sample gap-bridged when ALL of
+   % surface-ranging sensors fail (readme, "Surface height estimation"). The
+   % trend is preserved, but a per-timestep RATE through the gap is not a direct
+   % observation. A flag based only on NaN values of z misses these
+   % slope-bridged segments, because z is finite there and comes from
+   % interpolation. This flag instead marks a sample gap-bridged when ALL of
    % the underlying contributing sensors (transducer/boom/stake ranges) are NaN
    % yet z is finite -> the surface value at that sample is interpolated, not
    % measured. Leading/trailing samples before the first / after the last finite
@@ -23,12 +23,12 @@ function flags = surfaceFlags(z, sensors, t, kwargs)
    % is available the flag falls back to ~isfinite(z).
    %
    % STATION-TRANSITION FLAG (handover window). A PROMICE "site" can merge
-   % several AWS ("stations") over time; at a handover the surface or subsurface
+   % several AWS ("stations") over time. At a handover the surface or subsurface
    % series can carry an expected discrete offset (readme Table 1 / Station vs
-   % site). When known handover times are supplied (transition_times) this flag
-   % marks samples within tol_days of any handover. This is distinct from the gap
-   % flag: a transition is a step, not a NaN, so the gap flag never sees it (e.g.
-   % a site with a known merge but no surface NaN at the handover).
+   % site). When the caller supplies known handover times (transition_times),
+   % this flag marks samples within tol_days of any handover. It differs from
+   % the gap flag: a transition is a step, not a NaN, so the gap flag never sees
+   % it (e.g. a site with a known merge but no surface NaN at the handover).
    %
    % Inputs
    %  z       - double column, the surface-height series (may hold NaN)

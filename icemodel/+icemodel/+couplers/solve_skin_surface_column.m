@@ -6,9 +6,9 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = ...
       cpl_alpha, cpl_aitken, cpl_jumpmax, ro_sfc, snow_depth, opts)
    %SOLVE_SKIN_SURFACE_COLUMN Coupled skin-subsurface Ts-T solve.
    %
-   % Skinmodel-specific predictor-corrector coupler: iterates between surface
-   % energy balance (Ts) and subsurface enthalpy (T, f_ice, f_liq) until Ts
-   % and the SEB residual converge to within the specified tolerances.
+   % Skinmodel-specific predictor-corrector coupler. It iterates between the
+   % surface energy balance (Ts) and the subsurface enthalpy (T, f_ice, f_liq).
+   % The loop stops when Ts and the SEB residual reach the given tolerances.
    %
    %#codegen
 
@@ -32,11 +32,10 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = ...
       chi, xT, k_eff, dz, ro_sfc, snow_depth, opts);
    Ts = icemodel.surface.physical_surface_temperature(Ts);
 
-   % Initialize past Picard iterates for Aitken-acceleration
-   Ts_1 = nan;
-   Ts_2 = nan;
+   % Initial solver histories for acceleration.
+   hist = icemodel.couplers.initialize_coupler_history();
 
-   % Initial values for convergence checks
+   % Initial values for convergence checks.
    ok_cpl = false;
    Ts_old = Ts;
    Ts_diag = Ts;
@@ -45,7 +44,7 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = ...
    % Run outer Ts-T convergence loop (iterative block/Picard coupling).
    for cpliter = 1:cpl_maxiter
 
-      % Inner subsurface solve from checkpoint state w/o physical advancement
+      % Inner subsurface solve from checkpoint state w/o physical advancement.
       [T, f_ice, f_liq, k_eff, ok_ieb, n_iters] = ...
          icemodel.column.solve_column_temperature(Ts, xT, xf_ice, ...
          xf_liq, dz, delz, fn, dt, tol, maxiter, alpha, debug);
@@ -63,7 +62,7 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = ...
       % Update surface density for the surface turbulent heat flux scheme.
       ro_sfc = icemodel.surface.surface_bulk_density(f_ice(1), f_liq(1));
 
-      % Inner surface solve (in-loop corrector using updated trial state)
+      % Inner surface solve (in-loop corrector using updated trial state).
       Ts_old = Ts;
       [Ts, ok_seb] = ...
          icemodel.surface.solve_surface_energy_balance(Ts, tair, ...
@@ -73,6 +72,7 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = ...
       Ts = icemodel.surface.physical_surface_temperature(Ts);
       Ts_diag = Ts;
 
+      % Debug dump and break on surface solve failure.
       if not(ok_seb)
          if debug
             dumpSkinEbSolveFailure("sebsolve_failed", Ts, Ts_diag, ...
@@ -96,30 +96,31 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = ...
          seb_res = 0.0;
       end
 
-      % Check convergence (bypass coupler if cpl_maxiter == 1)
+      % Check convergence (bypass coupler if cpl_maxiter == 1).
       if (cpl_maxiter == 1) || ...
             abs(Ts - Ts_old) < cpl_Ts_tol && seb_res < cpl_seb_tol
          ok_cpl = true;
          break
       end
 
-      % Aitken acceleration w/ relaxation-fallback (on failure or ~cpl_aitken).
-      Ts_0 = Ts;
-      Ts = icemodel.surface.physical_surface_temperature( ...
-         icemodel.numerics.aitkenscalar(Ts_2, Ts_1, Ts_0, ...
-         (1.0 - cpl_alpha) * Ts_old + cpl_alpha * Ts, ... % relaxation
-         cpl_jumpmax, cpl_aitken));
-      Ts_2 = Ts_1;
-      Ts_1 = Ts_0;
+      % Apply hybrid Aitken-secant step acceleration.
+      [Ts_accel, hist] = icemodel.couplers.accelerate_coupler_iterate( ...
+         hist, Ts_old, Ts, cpl_alpha, cpl_jumpmax, cpl_aitken);
 
-      if abs(Ts - Ts_old) < cpl_Ts_tol && seb_res < cpl_seb_tol
-         ok_cpl = true;
-         break
-      end
+      % Apply the physical surface temperature.
+      Ts = icemodel.surface.physical_surface_temperature(Ts_accel);
+
+      % The accelerated iterate is not accepted here: its residual has not been
+      % evaluated, and T_ice and k_eff belong to the sweep that produced the
+      % pre-acceleration iterate. It is tested on the next sweep against its
+      % own column solve.
+      % solve.
    end
 
-   % Debug dump on coupler failure.
-   if ~(ok_seb && ok_ieb && ok_cpl) && debug
+   % Dump the outer failure only when neither inner dump ran. Both inner dumps
+   % write the same debug file. Without this guard, the outer snapshot
+   % overwrites the inner-solver state.
+   if debug && ok_seb && ok_ieb && ~ok_cpl
       dumpSkinEbSolveFailure("coupler_nonconvergence", Ts, Ts_diag, ...
          Ts_old, T, f_ice, f_liq, k_eff, dt, cpliter, cpl_maxiter, ...
          cpl_Ts_tol, cpl_seb_tol, seb_res, n_iters, ok_seb, ok_ieb, ...

@@ -4,19 +4,25 @@ function met = resampleMetTimestep(met, dt_out)
    %  met = icemodel.forcing.helpers.resampleMetTimestep(met, "15m")
    %  met = icemodel.forcing.helpers.resampleMetTimestep(met, "")
    %
-   % The 15-minute path treats every source row as the interval mean valid over
-   % [t,t+source_dt), matching the model's forward integration contract. It
-   % therefore holds each numeric value constant over its declared support;
-   % interpolation would change the interval integral. Explicit non-finite
-   % values and omitted timestamps remain unavailable, and the final source
-   % interval is represented through its exclusive end. Timetable variable
-   % attributes and UserData are preserved; UserData gains source-derived
-   % support and missing-count provenance for artifact QA. Larger timestamp
-   % steps must omit whole native intervals. A compact two-row source may prove
-   % a common cadence up to one hour; a longer lone step is rejected because it
-   % cannot distinguish native cadence from a gap. dt_out="" is an exact no-op.
-   % Compact per-calendar-year summaries preserve exact source/gap/support facts
-   % when writemet later divides the fully derived output into yearly artifacts.
+   % The 15-minute path treats every source row as the interval mean over
+   % [t,t+source_dt). This matches the forward integration contract of the
+   % model. The function therefore holds each numeric value constant over its
+   % declared support. Interpolation would change the interval integral.
+   %
+   % Explicit non-finite values and omitted timestamps stay unavailable. The
+   % final source interval appears through its exclusive end. The function
+   % keeps the timetable variable attributes and UserData. It adds
+   % source-derived support and missing-count provenance to UserData for
+   % artifact QA.
+   %
+   % Larger timestamp steps must omit whole native intervals. A compact
+   % two-row source can show a common cadence up to one hour. The function
+   % rejects a longer lone step, because that step cannot separate the native
+   % cadence from a gap. dt_out="" changes nothing.
+   %
+   % Compact per-calendar-year summaries keep the exact source, gap, and
+   % support facts for the point where writemet divides the derived output
+   % into yearly artifacts.
 
    arguments
       met timetable
@@ -53,8 +59,9 @@ function met = resampleMetTimestep(met, dt_out)
       return
    end
 
-   % One row has no inferable source duration. Preserve that exact sample rather
-   % than inventing support; multi-row writers enforce their own requirements.
+   % One row gives no source duration. Keep that exact sample and do not
+   % assign it a support interval. Multi-row writers enforce their own
+   % requirements.
    if height(met) < 2
       met = recordResampleProvenance(met, met, ...
          "single_sample_unchanged", NaN, 0, missingCounts(met), NaT);
@@ -120,13 +127,14 @@ function [met, cadence_s, gap_count, expected_missing] = ...
    rows_per_interval = round(cadence_s / 900);
    source_rows = round(seconds(source.Time - new_time(1)) / 900) + 1;
 
-   % The hold targets are channel-invariant: source row k owns the
-   % rows_per_interval output rows starting at source_rows(k), clipped to
-   % the output axis. Cadence validation guarantees whole-multiple steps,
-   % so target blocks never overlap and one vectorized scatter per channel
-   % assigns exactly what the former per-row loop assigned (that loop
-   % dominated the production driver profile at ~10^7 iterations per
-   % site, largely datetime numel dispatch inside the clip test).
+   % The hold targets are the same for every channel: source row k owns the
+   % rows_per_interval output rows that start at source_rows(k), clipped to
+   % the output axis. Cadence validation admits only whole-multiple steps,
+   % so the target blocks never overlap. A per-row loop over the same
+   % targets runs about 10^7 iterations per site and dominates the
+   % production driver profile, mostly through datetime numel dispatch
+   % inside the clip test. One vectorized scatter per channel assigns the
+   % same values at much lower cost.
    n_out = numel(new_time);
    target_rows = reshape(source_rows.' + (0:rows_per_interval - 1).', [], 1);
    filled_from = repelem((1:height(source)).', rows_per_interval);
@@ -223,10 +231,10 @@ function summaries = yearlyResampleSummaries(met, source, cadence_s, gaps)
       return
    end
 
-   % One full-axis year() evaluation serves both the year inventory and
-   % every per-year slice below; recomputing it inside the loop cost one
-   % O(axis) datetime pass per calendar year per resample and dominated
-   % the production driver profile alongside the hold loop.
+   % One full-axis year() call serves both the year inventory and every
+   % per-year slice below. A year() call inside the loop costs one O(axis)
+   % datetime pass per calendar year per resample, and dominates the
+   % production driver profile together with the hold loop.
    met_years = year(met.Time);
    years_present = unique(met_years);
    summaries = repmat(template, numel(years_present), 1);
@@ -238,8 +246,9 @@ function summaries = yearlyResampleSummaries(met, source, cadence_s, gaps)
       support_start = output.Time(1);
       support_end = output.Time(end) + minutes(15);
 
-      % A source row belongs to every yearly slice touched by its forward
-      % interval; a cross-midnight interval can therefore contribute to two.
+      % A source row belongs to every yearly slice that its forward interval
+      % covers. An interval that crosses the year boundary at midnight
+      % therefore contributes to two slices.
       source_mask = source.Time < support_end ...
          & source_support_end > support_start;
       gap_overlaps = false(numel(gaps), 1);

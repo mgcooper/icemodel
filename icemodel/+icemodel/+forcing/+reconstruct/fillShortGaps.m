@@ -7,15 +7,15 @@ function [x, filled, audit] = fillShortGaps(times, x, channel, kwargs)
    %     times, x, "swd", latitude=67.0, longitude=-48.8)
    %
    % Role
-   %  The approved short-gap tier (POLICY B3): linear
-   %  interpolation bridges interior gaps up to the wall-clock cap for
-   %  state variables and albedo, while shortwave is never raw-linearly interpolated
-   %  across daylight — its short gaps interpolate in clear-sky-index
-   %  space (swd / top-of-atmosphere irradiance) and reconvert, which
-   %  preserves the diurnal cycle a raw line would flatten. Every candidate
-   %  fill passes physical bounds (A15), and excess boundary mismatch
-   %  is tapered under POLICY B6 rather than refused. Native finite
-   %  samples are never modified.
+   %  The approved short-gap tier (POLICY B3). For state variables and
+   %  albedo, linear interpolation bridges interior gaps up to the
+   %  wall-clock cap. Shortwave is never raw-linearly interpolated across
+   %  daylight. Its short gaps interpolate in clear-sky-index space
+   %  (swd / top-of-atmosphere irradiance) and then convert back, which
+   %  preserves the diurnal cycle that a raw line would flatten. Every
+   %  candidate fill passes physical bounds (A15). POLICY B6 tapers an
+   %  excess boundary mismatch instead of refusing the fill. The tier never
+   %  modifies native finite samples.
    %
    % Name-value
    %  cap_hours : maximum interior gap bridged by this tier. Caps are
@@ -24,21 +24,21 @@ function [x, filled, audit] = fillShortGaps(times, x, channel, kwargs)
    %     six hours ordinarily, nine for SWD and RH, and 30 for albedo.
    %  latitude, longitude : site point, required for the swd CSI variant.
    %  jump_factor : boundary-jump multiplier (POLICY B6).
-    %  blend_hours : seam-blend taper window (POLICY B6).
+   %  blend_hours : seam-blend taper window (POLICY B6).
    %  toa_dark_wm2 : irradiance threshold below which a sample counts as
-    %     dark in the swd CSI mask.
+   %     dark in the swd CSI mask.
    %  allow_swd_flux_fallback : false by default. The post-final D-32
-   %     pass sets true so residual SWD gaps for which CSI is undefined
-   %     use a capped flux-linear bridge. A run of at least two postings
-   %     may instead use one finite daylight CSI anchor and one physically
-   %     known darkness zero; the target itself never enters deep darkness.
+   %     pass sets true, so residual SWD gaps with no defined CSI use a
+   %     capped flux-linear bridge. A run of at least two postings may
+   %     instead use one finite daylight CSI anchor and one physically
+   %     known darkness zero. The target itself never enters deep darkness.
    %     If that CSI candidate is blocked, the same scalar-valid flux bridge
-   %     closes the residual without clipping it to the diagnostic solar
-   %     relation. Only SWD within its D-49 nine-hour cap and
-   %     D-48 RH within its evidence-backed nine-hour cap may cross a
+   %     closes the residual and does not clip it to the diagnostic solar
+   %     relation. Only SWD within its D-49 nine-hour cap, and D-48 RH
+   %     within its evidence-backed nine-hour cap, may cross a
    %     calendar-season boundary.
-    %  step_scale : optional native-only scale frozen by the orchestrator
-    %     before any reconstruction values are inserted.
+   %  step_scale : optional native-only scale frozen by the orchestrator
+   %     before any reconstruction values are inserted.
    %  Defaults come from the central
    %  icemodel.forcing.reconstruct.setopts contract.
    %
@@ -67,10 +67,10 @@ function [x, filled, audit] = fillShortGaps(times, x, channel, kwargs)
          icemodel.forcing.reconstruct.setopts().jump_factor
       kwargs.blend_hours (1, 1) double {mustBeNonnegative} = ...
          icemodel.forcing.reconstruct.setopts().blend_hours
-       kwargs.toa_dark_wm2 (1, 1) double {mustBePositive} = ...
-          icemodel.forcing.reconstruct.setopts().toa_dark_wm2
-       kwargs.allow_swd_flux_fallback (1, 1) logical = false
-       kwargs.step_scale (1, 1) struct = struct()
+      kwargs.toa_dark_wm2 (1, 1) double {mustBePositive} = ...
+         icemodel.forcing.reconstruct.setopts().toa_dark_wm2
+      kwargs.allow_swd_flux_fallback (1, 1) logical = false
+      kwargs.step_scale (1, 1) struct = struct()
    end
 
    % SWU has no independent tier-1 path: it follows albedo*swd downstream.
@@ -96,7 +96,7 @@ function [x, filled, audit] = fillShortGaps(times, x, channel, kwargs)
       scale = icemodel.forcing.reconstruct.stepScale(times, x);
    end
 
-   % Shortwave interpolates in clear-sky-index space; the policy forbids
+   % Shortwave interpolates in clear-sky-index space. The policy forbids
    % raw-linear daylight interpolation for radiation-cycle channels.
    use_csi = channel == "swd";
    if use_csi
@@ -164,9 +164,9 @@ function [x, filled, audit] = fillShortGaps(times, x, channel, kwargs)
          [season_ok, season] = seasonBridgeAllowed( ...
             times, before, target, after, channel, duration);
          if ~season_ok
-            % Held-out interpolation evidence is season-contained, so both
-            % observed anchors and the missing samples normally share a
-            % season; D-48/D-49 own the narrow calendar-edge exceptions.
+            % Held-out interpolation evidence stays inside one season, so
+            % both observed anchors and the missing samples normally share a
+            % season. D-48/D-49 define the narrow calendar-edge exceptions.
             continue
          end
          if use_csi && any(x([before; after]) > ...
@@ -249,27 +249,26 @@ function [x, filled, audit] = fillShortGaps(times, x, channel, kwargs)
          end
 
          % Fill only the natively missing samples; never touch finite data.
-       x(target) = candidate_fill;
-       filled(target) = true;
-       method = "bounded_interp";
+         x(target) = candidate_fill;
+         filled(target) = true;
+         method = "bounded_interp";
          detail = sprintf('linear, cap %.3g h', kwargs.cap_hours);
          if use_csi
             detail = sprintf('csi-linear, cap %.3g h', kwargs.cap_hours);
          end
          detail = [detail seam_note]; %#ok<AGROW>
-       segment = false(numel(times), 1);
-       segment(target) = true;
-       rows = icemodel.forcing.reconstruct.auditSegments( ...
-          times, segment, channel, method, detail);
-       audit = [audit; rows]; %#ok<AGROW>
+         segment = false(numel(times), 1);
+         segment(target) = true;
+         rows = icemodel.forcing.reconstruct.auditSegments( ...
+            times, segment, channel, method, detail);
+         audit = [audit; rows]; %#ok<AGROW>
       end
-    end
+   end
 
-   % CSI intentionally has no denominator near darkness. On the D-32
-   % post-final pass only, retry the still-missing short SWD slivers in
-   % flux space. Real KANL holdouts show this local bridge halves
-   % shoulder-hour RMSE versus persistence while CSI has no coverage;
-   % ordinary tier 1 remains CSI-only.
+   % CSI has no denominator near darkness. On the D-32 post-final pass only,
+   % retry the still-missing short SWD slivers in flux space. Real KANL
+   % holdouts show this local bridge halves shoulder-hour RMSE against
+   % persistence where CSI has no coverage. Ordinary tier 1 stays CSI-only.
    if use_csi && kwargs.allow_swd_flux_fallback && any(~isfinite(x))
       [x, flux_filled, flux_audit] = fillShortwaveFluxResiduals( ...
          times, x, kwargs.cap_hours, kwargs.latitude, kwargs.longitude, ...
@@ -286,8 +285,8 @@ function [x, filled, audit] = fillShortwaveFluxResiduals( ...
    % least two still-sunlit postings beside one known darkness zero uses
    % the opposite finite anchor's clear-sky index over the target TOA
    % curve. The target never enters deep darkness. The flux-linear bridge
-   % retains its evidence-backed diagnostic exception to the pointwise
-   % solar relation; the one-sided CSI path must pass the shared SWD
+   % keeps its evidence-backed diagnostic exception to the pointwise
+   % solar relation. The one-sided CSI path must pass the shared SWD
    % physical-validity ceiling.
    dt_hours = hours(median(diff(times)));
    maximum_elevation = ...
@@ -367,8 +366,8 @@ function [x, filled, audit] = fillShortwaveFluxResiduals( ...
       end
       % D-32 makes the solar relation diagnostic for this final residual
       % bridge. If CSI is unavailable or fails its relational ceiling, use
-      % the finite local anchors directly and retain only the hard scalar
-      % bound; clipping would manufacture the very seam this pass closes.
+      % the finite local anchors directly and keep only the hard scalar
+      % bound. Clipping would create the seam that this pass closes.
       can_flux_bridge = numel(target) >= 2 ...
          && any(isfinite(csi([before; after]))) ...
          && anchors_plausible;
@@ -403,9 +402,9 @@ function [ok, season] = seasonBridgeAllowed( ...
    crosses_boundary = any(bridge_seasons ~= bridge_seasons(1));
    caps = icemodel.forcing.reconstruct.interpolationCapHours();
    % A calendar-season label is not a physical discontinuity. D-49 applies
-   % SWD's existing ceiling to the whole local bridge, including samples
-   % that straddle the boundary; D-48 does the same within RH's
-   % cap. Other state channels retain the season guard.
+   % SWD's ceiling to the whole local bridge, including samples that cross
+   % the boundary. D-48 does the same within RH's cap. Other state channels
+   % keep the season guard.
    boundary_exception = (channel == "swd" ...
       && duration_hours <= caps.swd_season_boundary) ...
       || (channel == "rh" && duration_hours <= caps.rh);

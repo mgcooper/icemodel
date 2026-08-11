@@ -3,8 +3,8 @@ function mustBeGcnetProductSelection(arg)
    %
    %  icemodel.verification.validators.mustBeGcnetProductSelection(arg)
    %
-   % The canonical selector order lives in gcnetProductNames. Keeping registry
-   % lookup inside this validator also makes it safe in MATLAB arguments blocks.
+   % The canonical selector order lives in gcnetProductNames. This validator
+   % reads that registry itself, so it is safe inside MATLAB arguments blocks.
 
    values = reshape(string(arg), 1, []);
    if isempty(values)

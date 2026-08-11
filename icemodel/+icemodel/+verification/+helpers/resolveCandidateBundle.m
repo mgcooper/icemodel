@@ -32,8 +32,8 @@ function candidate = resolveCandidateBundle(manifest, kwargs)
       return
    end
 
-   % Candidate files are for actual model/synthetic outputs. With no supplied
-   % candidate file, the staged reference is loaded below for smoke comparisons.
+   % Candidate files hold model or synthetic outputs. With no candidate file,
+   % the code below loads the staged reference for smoke comparisons.
    if ~isblanktext(kwargs.candidate_file)
       data = load(kwargs.candidate_file, "candidate");
       if ~isfield(data, "candidate")
@@ -46,9 +46,9 @@ function candidate = resolveCandidateBundle(manifest, kwargs)
 
    % With no supplied model output, compare against a staged smoke reference.
    % Firn cases bundle no reference.mat, so pick a declared staged model source
-   % and reconstitute its per-year userdata files. RACMO remains preferred when
-   % present to preserve the old smoke-reference behavior, but MAR/MERRA-only
-   % cases still resolve a usable default candidate.
+   % and rebuild its per-year userdata files. RACMO takes precedence when it is
+   % present, which keeps the smoke reference the same. A MAR-only or
+   % MERRA-only case still resolves a usable default candidate.
    if isfield(manifest, 'reference_path') ...
          && strlength(string(manifest.reference_path)) > 0 ...
          && isfile(manifest.reference_path)

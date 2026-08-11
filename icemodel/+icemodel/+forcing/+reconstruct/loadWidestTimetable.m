@@ -4,10 +4,11 @@ function [series, filename] = loadWidestTimetable(hits)
    %  [series, filename] = ...
    %     icemodel.forcing.reconstruct.loadWidestTimetable(dir(...))
    %
-   % MAT-file size is not a coverage proxy: metadata and unrelated payloads
-   % can make a narrow window larger. The greatest saved time span wins;
-   % row count breaks ties. Files without a nonempty timetable are ignored.
-   % filename is the selected artifact path, or "" when none is usable.
+   % MAT-file size is not a measure of coverage: metadata and unrelated
+   % payloads can make a narrow window larger. The function selects the
+   % greatest saved time span and breaks ties on row count. The function skips
+   % files without a nonempty timetable.
+   % filename is the selected artifact path, or "" when no file is usable.
 
    arguments
       hits (1, :) struct

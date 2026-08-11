@@ -7,10 +7,10 @@ function report = summarize_spectral_perf(kwargs)
    % This diagnostic reports:
    %  1. kernel timings for the inlined, exact, and lookup paths
    %  2. direct whole-model timings for exact vs lookup
-   %  3. agreement metrics against the historical inlined path using the same
-   %     scalar summary semantics as the formal regression suite
+   %  3. agreement metrics against the inlined path using the same scalar
+   %     summary definitions as the formal regression suite
    %
-   % The kernel section preserves all three variants (inlined, exact, lookup)
+   % The kernel section includes all three variants (inlined, exact, lookup)
    % because those functions are called directly. The direct-model section
    % compares only exact vs lookup via opts.lookup_k_bulk.
 
@@ -39,7 +39,8 @@ function report = summarize_spectral_perf(kwargs)
    % Install the formal test config once so the synthetic fixtures and perf
    % runner share the same environment as the accepted test suite.
    [~, ~, ~, ~, suite_cleanup] = ...
-      icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>
+      icemodel.test.helpers.bootstrapTestEnvironment( ...
+      icemodel_config_casename="verification");
 
    % Measure the narrow kernel path first because it isolates the spectral
    % transforms from the rest of the model runtime.
@@ -69,9 +70,8 @@ function report = summarize_spectral_perf(kwargs)
       save(char(kwargs.output_file), 'report');
    end
 
-   % Print compact tables so interactive use mirrors the saved report without
-   % flooding the command window with fields that are only useful in the MAT
-   % artifact.
+   % Print compact tables so interactive use matches the saved report. Do not
+   % print the fields that are only useful in the MAT artifact.
    disp('Spectral kernel timing summary:')
    disp(report.kernels.timing(:, {'variant', 'seconds_per_call', ...
       'ref_variant', 'speedup_vs_ref'}))
@@ -84,6 +84,9 @@ function report = summarize_spectral_perf(kwargs)
       disp('Spectral direct-model output agreement:')
       disp(report.direct_model.accuracy)
    end
+
+   % Restore the caller config now that this entrypoint is done.
+   delete(suite_cleanup)
 end
 
 function report = summarizeSpectralKernelPerf(simyear)
@@ -255,8 +258,8 @@ function T = compareVariantOutputs(outputs, variants)
    %COMPAREVARIANTOUTPUTS Summarize full-model output differences by variant.
 
    % Summarize the direct outputs with the same scalar metric helper used by
-   % the formal regression suite so the study stays aligned with accepted
-   % report semantics.
+   % the formal regression suite, so the study matches the accepted report
+   % definitions.
    summaries = cellfun(@(out) icemodel.test.helpers.summarizeIce1Metrics( ...
       out.ice1), outputs, 'UniformOutput', false);
    ref = summaries{1};

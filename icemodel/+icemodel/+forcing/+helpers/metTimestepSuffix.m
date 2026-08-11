@@ -4,8 +4,8 @@ function suffix = metTimestepSuffix(dt)
    %  suffix = icemodel.forcing.helpers.metTimestepSuffix(dt)
    %
    % Accepts the proven model-met cadences in seconds (900, 1800, 3600) or
-   % their canonical tags ("15m", "30m", "1hr"). Centralizing this closed
-   % registry keeps writer naming and runtime discovery in lockstep.
+   % their canonical tags ("15m", "30m", "1hr"). This closed registry keeps the
+   % writer file names and the runtime discovery in agreement.
 
    % Preserve canonical text inputs while rejecting aliases that would create a
    % file name the runtime does not recognize.

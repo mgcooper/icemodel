@@ -53,8 +53,8 @@ function T = classify_site_facies(varargin)
    %     geometry and asshapefile/asgeostruct=true to return the raw geostruct
    %     for the point-in-polygon query. activelayer + its matfunclib helper
    %     dependencies are placed on the path by
-   %     icemodel.test.helpers.bootstrapTestEnvironment (the readers earlier
-   %     "failed" only because matfunclib was off the path). EXTENT->zone mapping
+   %     icemodel.test.helpers.bootstrapTestEnvironment (the readers fail when
+   %     matfunclib is off the path). EXTENT->zone mapping
    %     (Cont/Discon/Spora/Isol) matches readobuzones' parsing exactly.
    %
    %  3. SUMup_2025 GrIS density profiles (FIRN facies within accumulation):
@@ -62,7 +62,7 @@ function T = classify_site_facies(varargin)
    %     /DATA/latitude,/DATA/longitude carry ~2M firn/snow density measurement
    %     points. Within the accumulation area (not bare ice), a SUMup density
    %     profile co-located within ~15 km is direct EVIDENCE of firn presence ->
-   %     percolation/firn facies. Otherwise we leave the honest coarse value
+   %     percolation/firn facies. Otherwise we keep the coarse value
    %     "accumulation" (the surface data cannot resolve percolation vs dry snow).
    %
    %  surface_zone LOGIC
@@ -73,10 +73,11 @@ function T = classify_site_facies(varargin)
    %    ice sheet -> by MODIS f_bare:
    %        f_bare >= 0.50                      -> ablation     (frequently bare).
    %        f_bare <  0.50 & SUMup within 15 km -> percolation  (firn observed).
-   %        f_bare <  0.50 otherwise            -> accumulation (honest coarse).
-   %    (A former elev >= 2500 m & f_bare==0 -> dry_snow branch was removed: the
-   %     hard elevation cutoff did not generalize. dry_snow is now never emitted;
-   %     accumulation-area facies is percolation via SUMup density else accumulation.)
+   %        f_bare <  0.50 otherwise            -> accumulation (coarse).
+   %    (This function never emits dry_snow, because a hard elevation cutoff
+   %     (elev >= 2500 m with f_bare == 0) does not generalize. In the
+   %     accumulation area the facies is percolation when SUMup density is
+   %     nearby, and accumulation otherwise.)
    %      MODIS no-data at the cell -> fall back to elevation band, flagged.
    %
    %  permafrost_zone is ORTHOGONAL to surface_zone: ice-sheet/glacier sites get
@@ -121,10 +122,10 @@ function T = classify_site_facies(varargin)
    n = numel(sites);
    T = table('Size', [n 13], ...
       'VariableTypes', ["string","double","double","double","string", ...
-         "double","double","logical","double","string","string","string","string"], ...
+      "double","double","logical","double","string","string","string","string"], ...
       'VariableNames', ["site","lat","lon","elev","location_type", ...
-         "modis_fbare","modis_nyr","sumup_firn","sumup_km", ...
-         "obu_extent","surface_zone","eval_target","permafrost_zone"]);
+      "modis_fbare","modis_nyr","sumup_firn","sumup_km", ...
+      "obu_extent","surface_zone","eval_target","permafrost_zone"]);
    note = strings(n, 1);
 
    for k = 1:n
@@ -201,8 +202,11 @@ end
 %% ------------------------------------------------------------------ site list
 function sites = readSiteList(csv)
    Tp = readtable(csv, "TextType", "string");
-   sites = struct("site", {}, "lat", {}, "lon", {}, "elev", {}, ...
-      "location_type", {}, "kind", {});
+   % Both catalogs contribute exactly one entry per input row, so each block is
+   % sized once and filled by index instead of grown one station at a time.
+   prototype = struct("site", "", "lat", NaN, "lon", NaN, "elev", NaN, ...
+      "location_type", "", "kind", "");
+   sites = repmat(prototype, 1, height(Tp));
    for n = 1:height(Tp)
       site = string(Tp.site_id(n));
       lat = todouble(Tp.latitude_installation(n));
@@ -228,13 +232,13 @@ function sites = readSiteList(csv)
          end
       end
 
-      sites(end+1) = struct( ...
+      sites(n) = struct( ...
          "site", site, ...
          "lat", lat, ...
          "lon", lon, ...
          "elev", elev, ...
          "location_type", lower(strtrim(string(Tp.location_type(n)))), ...
-         "kind", "promice"); %#ok<AGROW>
+         "kind", "promice");
    end
    % ESM-SnowMIP sites: permafrost descriptor only (off-ice land surfaces).
    smip = icemodel.verification.setup.esmSnowmipSiteCatalog();
@@ -243,13 +247,15 @@ function sites = readSiteList(csv)
       "ojp",[53.916 -104.692], "rme",[43.064 -116.755], "sap",[43.08 141.34], ...
       "snb",[37.907 -107.726], "sod",[67.362 26.633], "swa",[37.907 -107.711], ...
       "wfj",[46.83 9.81]);
+   smip_sites = repmat(prototype, 1, numel(smip));
    for n = 1:numel(smip)
       sc = char(smip(n).sitename);
       ll = coords.(sc);
-      sites(end+1) = struct("site", upper(string(sc)), "lat", ll(1), ...
+      smip_sites(n) = struct("site", upper(string(sc)), "lat", ll(1), ...
          "lon", ll(2), "elev", NaN, "location_type", "snowmip_land", ...
-         "kind", "snowmip"); %#ok<AGROW>
+         "kind", "snowmip");
    end
+   sites = [sites, smip_sites];
 end
 
 function [lat, lon, elev] = ncCoords(site)
@@ -367,8 +373,8 @@ function b = openObu(S03)
       "Obu zones shapefile not found: %s", fullfile(pn, "wgs", fn));
    assert(~isempty(which("activelayer.readobuzones")), ...
       ["activelayer.readobuzones not on path; run " ...
-       "icemodel.test.helpers.bootstrapTestEnvironment to add " ...
-       "projects/activelayer/toolbox + projects/matfunclib."]);
+      "icemodel.test.helpers.bootstrapTestEnvironment to add " ...
+      "projects/activelayer/toolbox + projects/matfunclib."]);
    b.S = activelayer.readobuzones(pathname=char(pn), filename=char(fn), ...
       variant="wgs", asshapefile=true, asgeostruct=true);
    b.ext = strings(numel(b.S), 1);
@@ -410,7 +416,7 @@ function s = openSumup(repo)
 end
 
 function km = sampleSumup(s, lat, lon)
-   % great-circle-ish nearest distance (small-angle, fine at GrIS scale)
+   % Nearest distance with a small-angle approximation, accurate at GrIS scale.
    dk = 111 .* hypot(s.lat - lat, (s.lon - lon) .* cosd(lat));
    km = min(dk);
 end

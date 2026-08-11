@@ -73,23 +73,48 @@ function test_diagnostic_output_profile_extends_surface_contract(testCase)
    workspace = testCase.TestData.workspace;
    opts_standard = icemodel.test.helpers.buildSyntheticOpts( ...
       workspace, 'icemodel', 2016, output_profile='standard');
+   opts_minimal = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'icemodel', 2016, output_profile='minimal');
    opts_diag = icemodel.test.helpers.buildSyntheticOpts( ...
       workspace, 'icemodel', 2016, output_profile='diagnostic');
+   opts_skin_diag = icemodel.test.helpers.buildSyntheticOpts( ...
+      workspace, 'skinmodel', 2016, output_profile='diagnostic');
 
-   diagnostic_suffix = { ...
+   diagnostic_suffix = [{ ...
       'n_subfail', 'ea_atm', 'br_coefs_gamma', 'br_coefs_b1_num', ...
       'br_coefs_b2_num', 'hv_atm', 'ro_sfc', ...
       'thf_es_sfc', 'thf_stability_factor', 'thf_z0m', 'thf_z0h', ...
       'thf_z0q', 'thf_u_star', 'thf_L', 'thf_Re', 'thf_numiter', ...
-      'thf_scalar_exchange_Qh', 'thf_scalar_exchange_Qe'};
+      'thf_scalar_exchange_Qh', 'thf_scalar_exchange_Qe'}, ...
+      icemodel.namelists.budgetoutputs()];
 
+   % Freeze the standard and minimal field lists. Every icemodel profile
+   % carries df_rof because the runoff water budget consumes it, and a physical
+   % diagnostic must not change with the chosen output profile.
+   testCase.verifyEqual(opts_standard.vars1, ...
+      {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
+      'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter', ...
+      'df_rof'});
+   testCase.verifyEqual(opts_standard.vars2, ...
+      {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp', 'df_lyr', ...
+      'Sc', 'r_eff'});
+   testCase.verifyEqual(opts_minimal.vars1, {'Tsfc', 'df_rof'});
+   testCase.verifyEqual(opts_minimal.vars2, ...
+      {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp'});
+
+   % IceModel diagnostic output appends the budget channels only.
    testCase.verifyEqual(opts_standard.output_profile, 'standard');
+   testCase.verifyEqual(opts_minimal.output_profile, 'minimal');
    testCase.verifyEqual(opts_diag.output_profile, 'diagnostic');
    testCase.verifyEqual(opts_diag.vars1(1:numel(opts_standard.vars1)), ...
       opts_standard.vars1);
    testCase.verifyEqual(opts_diag.vars1(numel(opts_standard.vars1)+1:end), ...
       diagnostic_suffix);
    testCase.verifyEqual(opts_diag.vars2, opts_standard.vars2);
+
+   % SkinModel has no column-remesh ledger and must not declare these fields.
+   testCase.verifyFalse(any(ismember(opts_skin_diag.vars1, ...
+      icemodel.namelists.budgetoutputs())));
 end
 
 function test_turbulent_flux_option_defaults_follow_runtime_contract(testCase)
@@ -139,9 +164,9 @@ function test_configureRun_preserves_forcing_snow_depth_override(testCase)
 end
 
 function test_configureRun_guards_monin_obukhov_solver_contract(testCase)
-   % The bulk-MO scheme requires seb_solver=2 and should be accepted by the
-   % current Dirichlet and Robin solver paths. configureRun now coerces the
-   % surface solver to seb_solver=2 with a warning instead of erroring.
+   % The bulk-MO scheme requires seb_solver=2 and is accepted by the current
+   % Dirichlet and Robin solver paths. configureRun coerces the surface
+   % solver to seb_solver=2 and issues a warning.
 
    workspace = testCase.TestData.workspace;
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
@@ -233,7 +258,7 @@ function test_getpath_builds_restart_path_without_blank_parts(testCase)
 end
 
 function test_setpath_remains_a_compatibility_alias(testCase)
-   % SETPATH should continue to match GETPATH while older callers migrate.
+   % SETPATH must return the same paths as GETPATH.
 
    returned = icemodel.setpath('restart', 'kanm', 'skinmodel', '', [], ...
       'case01');
@@ -299,8 +324,8 @@ end
 
 function test_incompatible_simyears_and_window_errors(testCase)
    % A window that touches calendar years not covered by SIMYEARS is a
-   % caller error; the canonicalization step refuses to silently widen
-   % SIMYEARS or trim the window.
+   % caller error; the canonicalization step refuses to widen SIMYEARS or
+   % trim the window.
 
    testCase.verifyError(@() icemodel.setopts( ...
       'icemodel', 'kanm', [2015 2016], 'kanm', ...

@@ -1,4 +1,5 @@
-function [ice1, met, opts, metrics, runtime_seconds] = runThfValidationCase(c, kwargs)
+function [ice1, met, opts, metrics, runtime_seconds] = runThfValidationCase( ...
+      c, kwargs)
    %RUNTHFVALIDATIONCASE Run one real-case THF validation scenario.
    %
    %  [ice1, met, opts, metrics, runtime_seconds] = ...

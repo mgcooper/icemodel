@@ -4,8 +4,8 @@ function window = manifestWindow(window_start, window_end)
    %  window = icemodel.verification.setup.manifestWindow( ...
    %     window_start, window_end)
    %
-   % Keeping this two-field record in one helper prevents importers and RCM
-   % staging from drifting in their handling of UTC, midnight, and open bounds.
+   % This helper builds the two-field record, so importers and RCM staging
+   % handle UTC, midnight, and open bounds the same way.
 
    window = struct( ...
       'start', icemodel.verification.setup.formatManifestTime(window_start), ...

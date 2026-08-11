@@ -1,14 +1,15 @@
 function force_advance_streak_dt = update_force_advance_guard( ...
       force_advance_streak_dt, forced_advance, dt, dt_limit, timestep, ...
       numsteps, model_name)
-   % Track persistent maxsubstep force-advance streaks across full steps.
+   %UPDATE_FORCE_ADVANCE_GUARD Track persistent maxsubstep force-advance
+   % streaks across full steps.
    %
    %  streak_dt = icemodel.timestepping.update_force_advance_guard( ...
    %     streak_dt, forced_advance, dt, dt_limit, timestep, numsteps, ...
    %     model_name)
    %
-   % Consecutive forced advances are allowed to span up to one full forcing
-   % step. Beyond that, treat the run as broken and fail fast.
+   % Consecutive forced advances can span up to one full forcing step. Above
+   % that, this function raises an error and stops the run.
    %
    %#codegen
 

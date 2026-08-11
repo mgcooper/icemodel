@@ -39,7 +39,7 @@ function manifest = refreshPromiceMetIdentities(kwargs)
          'Staged met root does not exist: %s', met_root)
    end
 
-   % Decode and validate the one structural field this targeted repair owns.
+   % Decode and validate the one structural field this targeted repair needs.
    manifest = jsondecode(fileread(manifest_file));
    if ~isstruct(manifest) || ~isfield(manifest, 'cases') ...
          || ~isstruct(manifest.cases) || isempty(manifest.cases)
@@ -78,7 +78,7 @@ function manifest = refreshPromiceMetIdentities(kwargs)
          'sha256', ""), numel(declared), 1);
       for n = 1:numel(declared)
          filename = string(fullfile(met_root, declared(n)));
-         if ~icemodel.internal.isPathInside(filename, met_root)
+         if ~icemodel.isPathInside(filename, met_root)
             error(['icemodel:verification:refreshPromiceMetIdentities:' ...
                'artifactOutsideRoot'], ...
                'PROMICE staged met path escapes %s: %s', met_root, declared(n))

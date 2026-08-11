@@ -10,7 +10,7 @@ function unit = variableUnit(T, varname)
       return
    end
 
-   % Unknown variables can still be plotted; they simply receive no unit suffix.
+   % An unknown variable can still be plotted. It gets no unit suffix.
    try
       info = icemodel.netcdf.defaults.variable(varname);
       unit = string(info.unit);

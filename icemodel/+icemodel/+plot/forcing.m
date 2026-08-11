@@ -4,10 +4,10 @@ function out = forcing(inputs, kwargs)
    %  out = icemodel.plot.forcing("met_kanm_mar_2012_1hr.mat")
    %  out = icemodel.plot.forcing({met1, met2}, names=["mar","merra"])
    %
-   % Inputs can be paths to MAT files containing `met`, timetables, or cell/
-   % string arrays of either. Energy fluxes are retimed to daily means by
-   % default and plotted on the left axis; near-surface air temperature is
-   % plotted in degC on the right axis for context.
+   % Inputs can be paths to MAT files that contain `met`, timetables, or cell
+   % and string arrays of either. By default the function retimes energy fluxes
+   % to daily means and plots them on the left axis. It plots near-surface air
+   % temperature in degC on the right axis for context.
 
    arguments
       inputs

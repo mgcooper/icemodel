@@ -4,9 +4,9 @@ function results = run_test_bootstrap(kwargs)
    % Use this function when you want one command to:
    %  1. optionally clean old formal artifacts and managed baselines
    %  2. rebuild the rolling regression baseline(s)
-   %  3. snapshot release regression baseline(s)
+   %  3. retain or create the registered release regression baseline(s)
    %  4. rebuild the rolling perf baseline(s)
-   %  5. snapshot release perf baseline(s)
+   %  5. retain or create the registered release perf baseline(s)
    %  6. run smoke/full regression compares against rolling and release
    %  7. run smoke/full perf compares against rolling and release
    %
@@ -38,14 +38,14 @@ function results = run_test_bootstrap(kwargs)
    %
    % Cleanup behavior:
    %  - clean_artifacts=true empties test/artifacts/ completely
-   %  - clean_baselines=true deletes all baseline .mat files in
-   %    test/baselines/
+   %  - clean_baselines=true deletes rolling baseline .mat files in
+   %    test/baselines/; immutable release files remain untouched
    %  - backup_before_clean=true first creates zip backups in test/backups/
    %
    % Notes:
    %  - This bootstrap does not rebuild test/references/runoff_reference.mat.
-   %  - smbmodel="all" is virtual: it rebuilds per-model files for each formal
-   %    model and runs the union of those cases.
+   %  - smbmodel="all" is an aggregate selector. It rebuilds the per-model
+   %    files for each formal model and runs the union of those cases.
    %  - SMOKE_SITES and FULL_SITES are advanced overrides for the site lists
    %    used by each formal tier.
    %  - The optional solver filter accepts any subset of [1 2 3].
@@ -116,7 +116,7 @@ function results = run_test_bootstrap(kwargs)
       if backup_before_clean && hasContents(baselinesdir)
          backupToFolder(baselinesdir, backupzipdir);
       end
-      removeMatFiles(baselinesdir);
+      removeRollingMatFiles(baselinesdir);
    end
 
    % Generate new baselines and artifacts covering the canonical workflow.
@@ -155,10 +155,10 @@ function out = runStep(c, baseline_tag, smbmodel, solver, simyear, ...
                   full_sites=full_sites);
 
             case "snapshot"
-               % Freeze the current rolling baseline into a versioned release.
-               out = snapshot_regression_baseline( ...
-                  baseline_tag=baseline_tag, smbmodel=smbmodel, ...
-                  overwrite=true);
+               % Preserve frozen releases whose registered forcing differs
+               % from the newly accepted rolling product.
+               out = resolveBootstrapRelease( ...
+                  "regression", baseline_tag, smbmodel, simyear);
 
             case "run"
                % Compare current outputs against the requested baseline.
@@ -183,10 +183,10 @@ function out = runStep(c, baseline_tag, smbmodel, solver, simyear, ...
                   smoke_sites=smoke_sites, full_sites=full_sites);
 
             case "snapshot"
-               % Freeze the current rolling baseline into a versioned release.
-               out = snapshot_perf_baseline( ...
-                  baseline_tag=baseline_tag, smbmodel=smbmodel, ...
-                  overwrite=true);
+               % Preserve frozen releases whose registered forcing differs
+               % from the newly accepted rolling product.
+               out = resolveBootstrapRelease( ...
+                  "perf", baseline_tag, smbmodel, simyear);
 
             case "run"
                % Compare current runtimes against the requested baseline.
@@ -231,6 +231,32 @@ function baseline = resolveBaseline(baseline_mode, baseline_tag)
    end
 end
 
+function baseline = resolveBootstrapRelease( ...
+      kind, baseline_tag, smbmodel, simyear)
+   %RESOLVEBOOTSTRAPRELEASE Preserve or create one registered release baseline.
+
+   policy = icemodel.test.helpers.formalBaselinePolicy(baseline_tag);
+   if policy.snapshot_from_rolling
+      switch kind
+         case "regression"
+            baseline = snapshot_regression_baseline( ...
+               baseline_tag=baseline_tag, smbmodel=smbmodel);
+         case "perf"
+            baseline = snapshot_perf_baseline( ...
+               baseline_tag=baseline_tag, smbmodel=smbmodel, ...
+               simyear=simyear);
+      end
+      return
+   end
+
+   baseline = icemodel.test.helpers.loadBaseline(kind, ...
+      smbmodel=smbmodel, baseline_tag=baseline_tag, simyear=simyear);
+   if isempty(baseline)
+      error('icemodel:test:preservedReleaseMissing', ...
+         'Registered immutable %s release %s is missing.', kind, baseline_tag)
+   end
+end
+
 function tf = hasContents(folder)
    %HASCONTENTS Return true when a folder exists and is non-empty.
    listing = dir(folder);
@@ -251,9 +277,9 @@ function removeFolder(folder)
    end
 end
 
-function removeMatFiles(folder)
-   %REMOVEMATFILES Remove top-level MAT files from a folder.
-   files = dir(fullfile(folder, '*.mat'));
+function removeRollingMatFiles(folder)
+   %REMOVEROLLINGMATFILES Remove mutable top-level rolling MAT files.
+   files = dir(fullfile(folder, '*_rolling_*.mat'));
    for i = 1:numel(files)
       delete(fullfile(files(i).folder, files(i).name));
    end

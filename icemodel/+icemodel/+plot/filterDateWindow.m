@@ -3,8 +3,9 @@ function T = filterDateWindow(T, startdate, enddate)
    %
    %  T = icemodel.plot.filterDateWindow(T, startdate, enddate)
    %
-   % Supports timetables, tables with a time/date column, and interval tables with
-   % start_date/end_date columns. Empty tables return unchanged.
+   % This function supports timetables, tables with a time or date column, and
+   % interval tables with start_date and end_date columns. An empty table
+   % returns unchanged.
 
    if isequal(startdate, "") && isequal(enddate, "")
       return

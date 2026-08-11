@@ -4,20 +4,20 @@ function [T, metadata] = applyMarSnowDepthQualityControl(T, metadata, kwargs)
    %  [T, metadata] = ... applyMarSnowDepthQualityControl(T)
    %  [T, metadata] = ... applyMarSnowDepthQualityControl(_, metadata)
    %
-   % MAR SHSN2 is snow-pack height above ice and is the definition compatible
-   % with seasonal snow evaluation. Some selected pixels contain large source
+   % MAR SHSN2 is snow-pack height above ice. This definition is the one that
+   % suits seasonal snow evaluation. Some selected pixels contain large source
    % resets at annual-file boundaries. This helper screens the daily 00:00
-   % samples using an archive-calibrated, scale-relative boundary rule. It
-   % masks an interior year only when severe jumps bracket it and its annual
-   % median is farther from both neighbours than those neighbours are from
-   % each other. One-sided or otherwise ambiguous edges remain finite but are
-   % explicitly unverified. SHSN3 is total snow/firn thickness and is never
-   % substituted.
+   % samples with an archive-calibrated, scale-relative boundary rule. It masks
+   % an interior year only when severe jumps bracket that year, and when its
+   % annual median is farther from both neighbours than those neighbours are
+   % from each other. A one-sided or ambiguous edge keeps finite values, and
+   % the helper marks it unverified. SHSN3 is total snow and firn thickness,
+   % and this helper never substitutes it.
    %
    % The default rule is conservative: a boundary jump must exceed both 0.5 m
    % and ten times the adjacent years' pooled 99th-percentile daily increment.
-   % The calibration remains explicit so a future source version can be
-   % re-audited without changing the provenance vocabulary.
+   % The calibration stays explicit, so an audit can repeat it against a new
+   % source version with the same provenance vocabulary.
    %
    % See also: icemodel.forcing.buildMarData,
    %  icemodel.verification.auditArtifacts
@@ -55,9 +55,13 @@ function [T, metadata] = applyMarSnowDepthQualityControl(T, metadata, kwargs)
    % calendar years with a continuous daily boundary and finite local support.
    daily = hour(T.Time) == 0 & minute(T.Time) == 0 & second(T.Time) == 0;
    years = unique(year(T.Time(daily)))';
-   boundary_years = zeros(0, 1);
-   jumps = zeros(0, 1);
-   references = zeros(0, 1);
+   % Size the boundary ledgers at the number of adjacent-year pairs, because
+   % each pair contributes at most one entry, then trim to the detected count.
+   n_pairs = max(numel(years) - 1, 0);
+   boundary_years = zeros(n_pairs, 1);
+   jumps = zeros(n_pairs, 1);
+   references = zeros(n_pairs, 1);
+   n_boundary = 0;
    medians = nan(size(years));
    for k = 1:numel(years)
       values = T.snowd(daily & year(T.Time) == years(k));
@@ -86,15 +90,22 @@ function [T, metadata] = applyMarSnowDepthQualityControl(T, metadata, kwargs)
       jump = abs(current(1) - previous(end));
       if jump > kwargs.minimum_jump_m ...
             && jump > kwargs.jump_ratio * reference
-         boundary_years(end + 1, 1) = current_year; %#ok<AGROW>
-         jumps(end + 1, 1) = jump; %#ok<AGROW>
-         references(end + 1, 1) = reference; %#ok<AGROW>
+         n_boundary = n_boundary + 1;
+         boundary_years(n_boundary) = current_year;
+         jumps(n_boundary) = jump;
+         references(n_boundary) = reference;
       end
    end
+   boundary_years = boundary_years(1:n_boundary);
+   jumps = jumps(1:n_boundary);
+   references = references(1:n_boundary);
 
    % Only a two-sided three-year comparison can identify an isolated source
-   % year without assigning blame across a single ambiguous boundary.
-   masked_years = zeros(0, 1);
+   % year. A single boundary does not show which of its two years is wrong.
+   % Size the mask ledger at the number of interior years, because each one
+   % contributes at most one entry, then trim to the detected count.
+   masked_years = zeros(max(numel(years) - 2, 0), 1);
+   n_masked = 0;
    for k = 2:numel(years) - 1
       has_entry = ismember(years(k), boundary_years);
       has_exit = ismember(years(k + 1), boundary_years);
@@ -105,13 +116,14 @@ function [T, metadata] = applyMarSnowDepthQualityControl(T, metadata, kwargs)
       current_distance = min(abs(medians(k) - medians(k - 1)), ...
          abs(medians(k) - medians(k + 1)));
       if current_distance > neighbour_distance
-         masked_years(end + 1, 1) = years(k); %#ok<AGROW>
+         n_masked = n_masked + 1;
+         masked_years(n_masked) = years(k);
       end
    end
-   masked_years = unique(masked_years);
+   masked_years = unique(masked_years(1:n_masked));
 
-   % Edges adjacent to an isolated masked year are resolved. The year entered
-   % by every remaining edge is retained but explicitly unverified, including
+   % An edge next to an isolated masked year is resolved. Every remaining edge
+   % keeps the year it enters, and marks that year unverified. This includes
    % endpoint cases such as CP1 2019.
    resolved = false(size(boundary_years));
    for k = 1:numel(masked_years)

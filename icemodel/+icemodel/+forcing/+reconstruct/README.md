@@ -49,7 +49,7 @@ Use `met_dir`, `modis_dir`, `out_dir`, and `qa_dir` together when operating on
 an alternate data tree. The selected native met directory determines the
 enclosing data root; reconstruction never falls back to another tree.
 
-## Contract at a glance
+## Contract summary
 
 This family-generic engine produces `promice_filled`, the canonical runnable
 PROMICE forcing. Native PROMICE is incomplete for most station-years and is
@@ -59,8 +59,8 @@ retained unmodified as the provenance source.
   `2026-07-23-promice-gap-filling-and-ktransect`.
 - Every filled sample carries a `uint8` provenance code and every contiguous
   segment has an audit row.
-- `setopts` is the single source for scalar knobs, channel lists, and proxy
-  source mappings. Dedicated functions own per-channel bounds, admission caps,
+- `setopts` defines the scalar options, channel lists, and proxy source
+  mappings. Dedicated functions define per-channel bounds, admission caps,
   precipitation names, and bucket edges.
 - Every required non-precipitation output is planned. Precipitation is excluded
   from the statistical method set at option validation and at the direct
@@ -84,8 +84,8 @@ Methods admit only through this validation harness:
   daylight-only shortwave option, `bucketEdges` strata assigned by the
   right-closed `gapDurationBucket` convention).
 - `validationSplit` — persisted whole-year selection/evaluation split
-  (a schema-valid manifest wins only while it remains a disjoint, complete
-  partition of the current record years).
+  (the engine uses a schema-valid manifest only while it remains a disjoint,
+  complete partition of the current record years).
 - `syntheticMissingness` — blocked synthetic gaps drawn from the real
   run-length distribution, inserted only into observed spans; time-sorted.
 - `validationMetrics` — bias/RMSE/correlation/within-gap observed spread and
@@ -122,11 +122,14 @@ Methods admit only through this validation harness:
   geometry.
 - `fitProxyCalibration` / `applyProxyCalibration` — tier 4 overlap bias
   calibration (additive for state channels; multiplicative for shortwave and
-  wind speed, preserving their shape and wind's nonnegative support).
+  wind speed, preserving their shape). Calibrated RH and wind candidates
+  clamp once into their shared scalar bounds with an audit flag, preventing a
+  fitted calm-wind ratio from crossing the 0.1 m/s runtime floor.
   Shortwave overlap is screened by target-station TOA rather than proxy
   magnitude; fitted proxy
   corrections persist in the station plan for calibrated last-resort use,
-  whether or not the candidate wins an admitted stratum, but zero-overlap
+  whether or not the candidate is selected for an admitted stratum, but
+  zero-overlap
   corrections are ineligible for both competition and last resort.
   `lwdEstimator` is
   the calibrated empirical lwd candidate.
@@ -198,7 +201,10 @@ Methods admit only through this validation harness:
   neighbor never supplies support; an exactly continuous provenance change
   is not a seam.
 - `blendFallbackSeams` — applies that same taper to proxy, precipitation,
-  and constant fallback segments using the frozen native step scale.
+  and constant fallback segments using the frozen native step scale. If
+  that optional taper would push an already-valid last-resort wind segment
+  outside the runtime wind bounds, the untapered source segment is retained
+  with an audit note; other channels retain the general refusal rule.
 - `stationMethodPlan` — the per-station selection experiment: the
   policy geometry gate (`setopts`), deterministic selection draws created
   only from years with jointly finite core-channel support before fitting
@@ -252,7 +258,9 @@ Methods admit only through this validation harness:
   - **Cadence.** Guarded PROMICE 15-minute staging is collapsed to hourly
     source postings for planning and reconstruction. Observed values and their
     provenance remain exact held copies over the original four-sample support;
-    filled values use the policy-approved mean-preserving disaggregation. The
+    filled values use the policy-approved mean-preserving disaggregation. Wind
+    disaggregation enforces the same 0.1 m/s lower bound as `metchecks`, so a
+    valid hourly posting cannot synthesize singular calm quarter-hours. The
     canonical runtime artifact is published only at 15 minutes, and runtime
     discovery rejects every other `opts.dt`. When several staged windows
     exist, saved timetable coverage—not MAT-file size—selects the widest.

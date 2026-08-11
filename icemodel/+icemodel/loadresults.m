@@ -4,17 +4,16 @@ function [ice1, ice2, met] = loadresults(opts, varargin)
    %  [ice1, ice2, met] = icemodel.loadresults(opts)
    %  [ice1, ice2, met] = icemodel.loadresults(opts, simyears)
    %
-   % If SIMYEARS is omitted, all post-spinup output years are loaded. When
-   % more than one year is requested, the yearly postprocessed output files
-   % are concatenated in time so the returned data match the no-save
-   % multi-year run.point path.
+   % Without SIMYEARS, this function loads every post-spinup output year. For
+   % more than one year, it concatenates the yearly postprocessed output files
+   % in time, so the returned data match the no-save multi-year run.point path.
 
    % If the simulation year is not specified, load all saved output years.
    if nargin < 2
       if isfield(opts, 'output_years') && ~isempty(opts.output_years)
          simyears = opts.output_years;
       else
-         % Older saved OPTS may not carry OUTPUT_YEARS yet.
+         % A saved OPTS struct can lack the OUTPUT_YEARS field.
          simyears = icemodel.outputYears(opts);
       end
    else

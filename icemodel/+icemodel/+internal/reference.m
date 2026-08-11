@@ -1,5 +1,5 @@
 function str = reference(new)
-   %REFERENCE set or get the icemodel reference
+   %REFERENCE Set or get the icemodel reference.
    %
    %  REF = ICEMODEL.INTERNAL.REFERENCE() Returns a char for the primary
    %  reference for icemodel.

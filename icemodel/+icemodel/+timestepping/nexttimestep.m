@@ -1,7 +1,8 @@
 function [metstep, substep, dt_new] = nexttimestep(metstep, substep, dt_max, ...
       maxsubstep, ok, n_subfail, n_iters)
-   %nexttimestep Advance the forcing index and adapt the next full-step substep
-   %size.
+   %NEXTTIMESTEP Advance the forcing index and adapt the next substep size.
+   %
+   % The new substep size applies to the next full forcing step.
    %
    % Syntax:
    % [metstep, substep, dt_new] = icemodel.timestepping.nexttimestep(...
@@ -73,8 +74,8 @@ function [metstep, substep, dt_new] = nexttimestep(metstep, substep, dt_max, ...
       dt_new = dt_max / substep;
    end
 
-   % Enforce dt_min = dt_max / maxsubstep (if updatesubstep shortens dt_new to
-   % <dt_min to ensure the final substep exactly completes a full step).
+   % Enforce dt_min = dt_max / maxsubstep. updatesubstep can shorten dt_new
+   % below dt_min so the final substep exactly completes a full step.
    dt_new = max(dt_new, dt_max / maxsubstep);
    metstep = metstep + 1;
 end

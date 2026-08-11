@@ -5,34 +5,33 @@ function opts = setopts(kwargs)
    %  opts = icemodel.forcing.reconstruct.setopts(blend_hours=3)
    %
    % Role
-   %  Single source of every scalar knob and channel list the
-   %  reconstruction pipeline consumes. Engine functions default their
-   %  own name-value arguments from this function and the production
-   %  driver passes one opts struct down, so each parameter is defined
-   %  exactly once. Per-channel physical bounds, admission bias caps,
-   %  and gap-duration bucket edges stay with their dedicated
-   %  single-source functions (physicalBounds, admissionGate,
-   %  bucketEdges); this function owns the scalar knobs, the channel
-   %  namelists, and the proxy-source catalog derived from the repo's
-   %  canonical alias map.
+   %  Defines every scalar parameter and channel list that the
+   %  reconstruction pipeline uses. Engine functions default their own
+   %  name-value arguments from this function, and the production driver
+   %  passes one opts struct down. The per-channel physical bounds, the
+   %  admission bias caps, and the gap-duration bucket edges belong to
+   %  physicalBounds, admissionGate, and bucketEdges. This function
+   %  supplies the scalar parameters, the channel namelists, and the
+   %  proxy-source catalog that comes from the repo alias map.
    %
    % Name-value (all optional; defaults are the approved policy values)
    %  required_channels : channels the ready_icemodel verdict must
    %     complete (POLICY A5): the seven-channel icemodel set. Snowfall
    %     input (ppt OR snowf) is graded separately by the ready_snowmodel
    %     verdict, and swu is derived (B10), never required.
-   %  core_channels : native state channels the low-coverage confidence
-   %     advisory grades; they never replace the readiness verdict.
+   %  core_channels : native state channels that the low-coverage
+   %     confidence advisory grades. They never replace the readiness
+   %     verdict.
    %  plan_channels : channels the selection experiment plans methods for
    %     (precipitation is adopted per POLICY A10, never planned; swu
    %     follows albedo*swd downstream). Every required non-precipitation
    %     channel must appear here so the product carries its provenance.
    %  interp_channels : channels eligible for tier-1 bounded
-   %     interpolation; unsupported channels are rejected at construction.
+   %     interpolation. This function rejects an unsupported channel.
    %  proxy_sources : short RCM family labels, in adoption-preference
    %     order. Only MAR and MERRA are complete-meteorology fallbacks;
-   %     storage directories and provenance identities are derived, never
-   %     restated (see proxyCatalog).
+   %     proxyCatalog resolves each label to its storage directory and
+   %     provenance identity.
    %  cap_hours : tier-1 interior interpolation cap (wall-clock hours),
    %     at most the adopted six-hour policy ceiling.
    %  cap_hours_by_channel : per-channel tier-1 cap overrides (POLICY
@@ -47,6 +46,11 @@ function opts = setopts(kwargs)
    %  seam_qa_min_reference_steps : minimum observed steps required in a
    %     season x solar-elevation band before the screen falls back to the
    %     season-wide reference.
+   %  seam_retain_unblended_channels : channels that keep their whole
+   %     unblended source segment when the seam blend crosses their
+   %     physical bounds, instead of taking the general post-blend
+   %     refusal. The list holds wind because a calm clamp would replace
+   %     real variability.
    %  seam_qa_max_passes : maximum one-posting synthetic-side repair
    %     iterations. Two passes resolve cascaded KANL boundaries without
    %     the extra distortion caused by a two-posting window.
@@ -81,15 +85,16 @@ function opts = setopts(kwargs)
    %     barometric pressure elevation adjustment.
    %  min_season_samples : overlap samples a season needs for its own
    %     proxy calibration before falling back to the annual fit.
-    %  rain_snow_transition_temperature_k : air-temperature threshold the
-    %     RUNTIME 'threshold' phase option uses to partition the product's
-    %     total precipitation (POLICY A10/D-18; reconstruction itself
-    %     never partitions).
-    %  native_winter_albedo, native_winter_months : the native PROMICE
-   %     builder's winter-albedo stamp (from icemodel.parameterLookup);
-   %     samples carrying exactly this constant in these months are
-   %     legacy fills, not observations, and re-enter the engine as
-   %     missing so methods fill them with honest provenance.
+   %  rain_snow_transition_temperature_k : air-temperature threshold the
+   %     RUNTIME 'threshold' phase option uses to partition the product's
+   %     total precipitation (POLICY A10/D-18; reconstruction itself
+   %     never partitions).
+   %  native_winter_albedo, native_winter_months : the winter-albedo
+   %     stamp of the native PROMICE builder (from
+   %     icemodel.parameterLookup). A sample that holds exactly this
+   %     constant in one of these months is a legacy fill, not an
+   %     observation. It enters the engine as missing, so a method fills
+   %     it and records the correct provenance.
    %  plan_n_gaps : synthetic validation gaps the planner draws per
    %     stratum (duration bucket x season) and split.
    %  knot_candidates : monotone piecewise knot counts the donor-transfer
@@ -135,8 +140,7 @@ function opts = setopts(kwargs)
       % Per-channel tier-1 cap overrides (POLICY B3/D-21): a struct whose
       % fields name interp channels and whose values replace cap_hours for
       % that channel only. Defaults empty = every channel uses cap_hours.
-      % The default SWD override is supported by the D-39 held-out
-      % evidence. Any future extension still needs its own evidence.
+      % The SWD override rests on the D-39 held-out evidence.
       kwargs.cap_hours_by_channel (1, 1) struct = struct()
       kwargs.jump_factor (1, 1) double {mustBePositive} = 3
       kwargs.blend_hours (1, 1) double {mustBeNonnegative} = 6
@@ -146,6 +150,7 @@ function opts = setopts(kwargs)
          {mustBeInteger, mustBePositive} = 100
       kwargs.seam_qa_max_passes (1, 1) double ...
          {mustBeInteger, mustBeNonnegative} = 2
+      kwargs.seam_retain_unblended_channels (1, :) string = "wspd"
       kwargs.toa_dark_wm2 (1, 1) double {mustBePositive} = 10
       kwargs.max_donor_distance_km (1, 1) double {mustBePositive} = 60
       kwargs.max_donor_elev_diff_m (1, 1) double {mustBePositive} = 600
@@ -165,11 +170,11 @@ function opts = setopts(kwargs)
       kwargs.min_native_core_coverage (1, 1) double = 0.30
       kwargs.lapse_rate (1, 1) double = -0.0060
       kwargs.elevation_threshold_m (1, 1) double {mustBePositive} = 100
-       kwargs.tair_for_pressure (1, 1) double {mustBePositive} = 255
-       kwargs.min_season_samples (1, 1) double {mustBePositive} = 300
-       kwargs.rain_snow_transition_temperature_k (1, 1) double ...
-          {mustBePositive} = icemodel.physicalConstant('Tf')
-       kwargs.native_winter_albedo (1, 1) double = ...
+      kwargs.tair_for_pressure (1, 1) double {mustBePositive} = 255
+      kwargs.min_season_samples (1, 1) double {mustBePositive} = 300
+      kwargs.rain_snow_transition_temperature_k (1, 1) double ...
+         {mustBePositive} = icemodel.physicalConstant('Tf')
+      kwargs.native_winter_albedo (1, 1) double = ...
          icemodel.parameterLookup('promice_winter_albedo')
       kwargs.native_winter_months (1, :) double = ...
          icemodel.parameterLookup('promice_winter_albedo_months')
@@ -235,9 +240,9 @@ function opts = setopts(kwargs)
          'channels have no tier-1 interpolation policy: %s', ...
          strjoin(unsupported_interpolation, ', '));
    end
-   % Materialize evidenced defaults only after the caller's interpolation
-   % schema is valid. A deliberately narrower schema must not inherit an
-   % irrelevant override, and an explicit caller value wins.
+   % Apply the evidenced defaults only after the caller's interpolation
+   % schema is valid. A narrower schema takes no override for a channel it
+   % excludes, and an explicit caller value takes precedence.
    defaults = defaultInterpolationOverrides();
    for f = string(fieldnames(defaults)).'
       if ismember(f, kwargs.interp_channels) ...
@@ -263,9 +268,8 @@ function opts = setopts(kwargs)
    end
    opts = kwargs;
    opts.proxy_sources = proxy_sources;
-   % The catalog is derived, never restated: storage tokens come from the
-   % repo's canonical alias map and provenance identities from the
-   % published code registry.
+   % Storage tokens come from the repo's canonical alias map and
+   % provenance identities from the published code registry.
    opts.proxy_catalog = proxyCatalog(opts.proxy_sources);
 end
 

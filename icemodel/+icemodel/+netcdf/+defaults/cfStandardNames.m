@@ -7,10 +7,10 @@ function names = cfStandardNames(kwargs)
    %
    % Returns a string array of every recognized CF standard name (the
    % <entry> ids plus the deprecated-but-recognized <alias> ids) from the
-   % official CF Standard Name Table. This is the authoritative set the
-   % canonical variable map (icemodel.netcdf.defaults.variables) validates
-   % its standard_name fields against, so CF names are pulled from the table
-   % PROGRAMMATICALLY rather than hand-maintained.
+   % official CF Standard Name Table. The canonical variable map
+   % (icemodel.netcdf.defaults.variables) validates its standard_name fields
+   % against this set. The CF names come from the table PROGRAMMATICALLY, not
+   % from a hand-maintained list.
    %
    % The table XML is fetched once from cfconventions.org and CACHED in a
    % gitignored cache directory (.cache/cf-standard-names/). The fetch is
@@ -64,8 +64,8 @@ function xmlfile = resolveTable(refresh)
       return
    end
 
-   % Fetch and cache. webread is used (not curl/wget, which the sandbox
-   % blocks). On failure, fall back to the committed fixture.
+   % Fetch and cache. This code uses webread, because the sandbox blocks curl
+   % and wget. On failure, fall back to the committed fixture.
    try
       opts = weboptions('Timeout', 30, 'ContentType', 'text');
       xmltext = webread(url, opts);

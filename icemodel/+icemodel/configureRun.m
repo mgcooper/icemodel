@@ -72,6 +72,11 @@ function opts = configureRun(opts)
 
    if ~isfield(opts, 'output_profile') || isempty(opts.output_profile)
       opts.output_profile = 'standard';
+   else
+      % Normalize once here. Consumers compare with strcmp, so without this
+      % an unnormalized 'Diagnostic' would build the diagnostic variable list
+      % and then write the thf_* columns as NaN.
+      opts.output_profile = lower(char(string(opts.output_profile)));
    end
 
    if ~isfield(opts, 'metfname') || isempty(opts.metfname)
@@ -177,9 +182,8 @@ function [vars1, vars2] = defaultOutputVariables(opts)
    % which the data are stored in the cell arrays passed to
    % icemodel.updateoutput from the model main functions.
    %
-   % 2) If new variables are added, icemodel.postprocess must be reviewed to
-   % ensure correct
-   % processing is applied, including rounding precision.
+   % 2) When you add a variable, review icemodel.postprocess to confirm that it
+   % applies the correct processing, including rounding precision.
 
    profile = string(opts.output_profile);
    if any(lower(profile) == ["sector", "grid"])
@@ -192,35 +196,41 @@ function [vars1, vars2] = defaultOutputVariables(opts)
             vars1 = {'Tsfc', 'Qm', 'Qe'};
             vars2 = {'Tice'};
          else
-            vars1 = {'Tsfc'};
+            % df_rof is a physical water flux the runoff budget consumes, so
+            % every icemodel profile carries it. Runoff must not depend on the
+            % chosen output profile.
+            vars1 = {'Tsfc', 'df_rof'};
             vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp'};
          end
 
       case 'standard'
-         vars1 = ...
-            {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
-            'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter'};
+         vars1 = icemodel.namelists.surfaceoutputs();
 
          if strcmp(opts.smbmodel, 'skinmodel')
             vars2 = {'Tice', 'f_ice', 'f_liq'};
          else
+            vars1 = [vars1, {'df_rof'}];
             vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp', 'df_lyr', ...
                'Sc', 'r_eff'};
          end
 
       case 'diagnostic'
-         vars1 = ...
-            {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
-            'dt_sum', 'Tsfc_converged', 'Tice_converged', 'Tice_numiter', ...
-            'n_subfail', 'ea_atm', 'br_coefs_gamma', 'br_coefs_b1_num', ...
-            'br_coefs_b2_num', 'hv_atm', 'ro_sfc', ...
-            'thf_es_sfc', 'thf_stability_factor', 'thf_z0m', 'thf_z0h', ...
-            'thf_z0q', 'thf_u_star', 'thf_L', 'thf_Re', 'thf_numiter', ...
-            'thf_scalar_exchange_Qh', 'thf_scalar_exchange_Qe'};
+         % The diagnostic profile adds to the standard one, so it starts from
+         % the same fields. df_rof keeps its standard position so the
+         % extension stays a pure suffix.
+         vars1 = icemodel.namelists.surfaceoutputs();
+         diagnostic_suffix = ...
+            icemodel.namelists.surfaceoutputs('diagnostic_suffix');
 
          if strcmp(opts.smbmodel, 'skinmodel')
+            vars1 = [vars1, diagnostic_suffix];
             vars2 = {'Tice', 'f_ice', 'f_liq'};
          else
+            % Mass-budget channels are opt-in diagnostic scalars. Appending
+            % them preserves every existing output position and keeps the
+            % standard/minimal contracts unchanged.
+            vars1 = [vars1, {'df_rof'}, diagnostic_suffix, ...
+               icemodel.namelists.budgetoutputs()];
             vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp', 'df_lyr', ...
                'Sc', 'r_eff'};
          end
@@ -295,19 +305,20 @@ end
 
 function paths = resolveMetPaths(pathinput, forcings, names)
    %RESOLVEMETPATHS Resolve met file names to full paths, family subfolder first.
-   % Prefer the per-source subfolder input/met/<forcings>/<name> (the staging
-   % layout that keeps met/ from sprawling); fall back to flat input/met/<name>
-   % so existing flat files still resolve. The forcings label IS the subfolder
-   % key, so no extra option is needed. The subfolder-first ordering is the
-   % shared icemodel.forcing.helpers.sourceSearchDirs primitive.
+   % Prefer the per-source subfolder input/met/<forcings>/<name>. This staging
+   % layout keeps the met/ folder small. Fall back to the flat path
+   % input/met/<name>, so an existing flat file still resolves. The forcings
+   % label IS the subfolder key, so no extra option is needed. The shared
+   % helper icemodel.forcing.helpers.sourceSearchDirs defines the
+   % subfolder-first order.
 
    met_base = fullfile(pathinput, 'met');
    search_dirs = icemodel.forcing.helpers.sourceSearchDirs(met_base, forcings);
    names = cellstr(names);
    paths = cell(1, numel(names));
    for n = 1:numel(names)
-      % First directory holding the file wins; fall back to the flat path
-      % (the last candidate) so a missing file surfaces a clean load error.
+      % Use the first directory that holds the file. Fall back to the flat
+      % path (the last candidate), so a missing file gives a clean load error.
       paths{n} = fullfile(search_dirs{end}, names{n});
       for d = 1:numel(search_dirs)
          candidate = fullfile(search_dirs{d}, names{n});

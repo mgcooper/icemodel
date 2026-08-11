@@ -1,5 +1,5 @@
 function De = vapor_diffusivity(T, Pa)
-   %vapor_diffusivity effective water vapor diffusion coefficient in porous ice.
+   %VAPOR_DIFFUSIVITY Effective water-vapor diffusion coefficient in porous ice.
    %
    %  De = icemodel.vapor.vapor_diffusivity(T, Pa)
    %
@@ -29,8 +29,9 @@ function De = vapor_diffusivity(T, Pa)
       [nd, De0] = icemodel.parameterLookup('nd', 'De0');
    end
 
-   % Pressure-correction term is effectively disabled at all call sites pending
-   % further review of the vapor diffusivity formulation.
+   % Every call site omits Pa, so this default of 100000 Pa makes the
+   % pressure-correction term equal to one. The vapor diffusivity formulation
+   % needs further review before any call site passes a real pressure.
    if nargin < 2
       Pa = 100000;
    end

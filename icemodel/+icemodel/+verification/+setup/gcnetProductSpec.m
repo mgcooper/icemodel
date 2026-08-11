@@ -3,9 +3,10 @@ function spec = gcnetProductSpec(product)
    %
    %  spec = icemodel.verification.setup.gcnetProductSpec("surface")
    %
-   %  This is the shared metadata authority for GC-Net/Vandecrux fetch validation
-   %  and inventory discovery. gcnetProductNames owns accepted selector order;
-   %  keep DOI metadata and station suffixes here so discovery cannot drift.
+   %  This is the shared metadata authority for GC-Net/Vandecrux fetch
+   %  validation and inventory discovery. gcnetProductNames defines the
+   %  accepted selector order. Keep the DOI metadata and the station suffixes
+   %  here, so discovery reads them from one place.
 
    arguments
       product (1, 1) string ...

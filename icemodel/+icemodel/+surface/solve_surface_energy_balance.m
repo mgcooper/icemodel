@@ -8,7 +8,8 @@ function [T_sfc, ok] = solve_surface_energy_balance(T_sfc, tair, Qsi, ...
    %
    % Solver options:
    %  0 = derivative-free, slower but more robust, used as a fall back.
-   %  1 = newton-rhapson, fast, requires analytic derivative, used as a default.
+   %  1 = newton-raphson, fast, needs an analytic derivative. This is the
+   %      default.
    %  2 = complex-step, fast and does not require an analytical derivative.
    % -1 = no outer iterations, use this if phase change is not represented
    %      explicitly in the model.

@@ -104,7 +104,7 @@ function test_capability_order_is_canonical_for_pack_and_fetch(testCase)
 end
 
 function test_manifest_rejects_noncanonical_file_order(testCase)
-   % Selection must not silently rewrite authoritative manifest file ordering.
+   % Selection must not rewrite the authoritative manifest file ordering.
    manifest = sourceManifest(testCase.TestData.root);
    manifest.files = flip(manifest.files);
    invalid = fullfile(testCase.TestData.staging, ...
@@ -143,7 +143,8 @@ function test_relative_posix_normalizes_windows_paths(testCase)
 end
 
 function test_manifest_rejects_unsafe_and_inconsistent_rows(testCase)
-   % Manifest-controlled paths, names, tags, and capability policy are trusted input.
+   % Manifest-controlled paths, names, tags, and capability policy are
+   % trusted input.
    manifest = sourceManifest(testCase.TestData.root);
    manifest.files(1).path = "../escape.mat";
    writeManifest(testCase.TestData.manifest, manifest);
@@ -220,7 +221,8 @@ function test_required_archives_are_byte_deterministic(testCase)
 end
 
 function test_pack_rejects_source_drift_and_clobber(testCase)
-   % A changed source cannot be silently blessed into a release artifact.
+   % A changed source must not enter a release artifact. Packing must fail
+   % with a sourceMismatch error.
    mkfile(fullfile(testCase.TestData.root, "a", "formal1.mat"), "changed");
    testCase.verifyError(@() packRequired(testCase), ...
       'icemodel:verification:packFixtures:sourceMismatch');
@@ -873,9 +875,9 @@ function manifest = sourceManifest(root)
    archives = [ ...
       archiveRow("formal-core", "icemodel-v1.1-formal-core.tar.gz", true); ...
       archiveRow("verification-showcase", ...
-         "icemodel-v1.1-verification-showcase.tar.gz", true); ...
+      "icemodel-v1.1-verification-showcase.tar.gz", true); ...
       archiveRow("forcing-integration", ...
-         "icemodel-v1.1-forcing-integration.tar.gz", false)];
+      "icemodel-v1.1-forcing-integration.tar.gz", false)];
    definitions = { ...
       "formal-core", "a/formal1.mat", true; ...
       "formal-core", "b/formal2.mat", true; ...

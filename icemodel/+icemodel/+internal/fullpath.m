@@ -1,5 +1,5 @@
 function pathname = fullpath(varargin)
-   %PATHNAME Build full path to toolbox folder or file.
+   %FULLPATH Build full path to toolbox folder or file.
    %
    %  PATHNAME = FULLPATH() Returns the full path to the top level folder.
    %  PATHNAME = FULLPATH(FOLDERNAME)

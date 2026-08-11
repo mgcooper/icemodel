@@ -3,9 +3,9 @@ function root = fixtureCanonicalRoot(root)
    %
    %  root = icemodel.verification.setup.fixtureCanonicalRoot(root)
    %
-   % Canonicalization delegates platform aliases, separators, and traversal to
-   % the filesystem. Pack/fetch separately reject symbolic links inside this
-   % trusted root where ordinary file predicates would otherwise follow them.
+   % This function lets the filesystem resolve platform aliases, separators,
+   % and traversal. Pack and fetch separately reject symbolic links inside this
+   % trusted root, because the ordinary file tests would follow them.
 
    arguments
       root (1, 1) string

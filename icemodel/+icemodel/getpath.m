@@ -1,4 +1,5 @@
-function pathlist = getpath(pathtype, sitename, smbmodel, userdata, simyears, varargin)
+function pathlist = getpath( ...
+      pathtype, sitename, smbmodel, userdata, simyears, varargin)
    %GETPATH Return canonical icemodel data and run paths.
    %
    %  pathlist = icemodel.getpath('data')
@@ -15,10 +16,10 @@ function pathlist = getpath(pathtype, sitename, smbmodel, userdata, simyears, va
    %  pathlist = icemodel.getpath('output', sitename, smbmodel, userdata, ...
    %     simyears, testname, startdate, enddate)
    %
-   % This is the canonical path getter used by configureRun and by downstream
-   % workflows that need stable path derivation without re-creating the
-   % corresponding OPTS struct. DEMO returns the repo-local demo root and TEST
-   % returns the repo-local test root; runtime data paths remain config-backed
+   % This is the canonical path getter. configureRun and downstream workflows
+   % call it when they need stable path derivation without re-creating the
+   % corresponding OPTS struct. DEMO returns the repo-local demo root, and TEST
+   % returns the repo-local test root. Runtime data paths stay config-backed
    % through icemodel.config(...).
 
    narginchk(1, Inf)

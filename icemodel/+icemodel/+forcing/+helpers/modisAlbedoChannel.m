@@ -7,18 +7,18 @@ function [modis, metadata] = modisAlbedoChannel(modis_dir, years, location, meth
    %     location, method, remap, Time)
    %
    % Reads the GEUS MODIS daily albedo for each requested year and interpolates
-   % it onto the hourly TIME axis, returning one column aligned to TIME. This is
-   % the single shared implementation behind the optional MODIS channel of every
-   % gridded-source builder (buildMarData / buildMerraData / buildRacmoData), so
-   % all three resolve MODIS identically.
+   % it onto the hourly TIME axis. It returns one column aligned to TIME. Every
+   % gridded-source builder (buildMarData / buildMerraData / buildRacmoData)
+   % calls this function for its optional MODIS channel, so all three resolve
+   % MODIS the same way.
    %
-   % LOCATION is the ORIGINAL build request (a [lat lon] point or an EPSG:3413
-   % polyshape); readGeusModis maps it onto the GEUS 5 km grid with the same
+   % LOCATION is the ORIGINAL build request: a [lat lon] point or an EPSG:3413
+   % polyshape. readGeusModis maps it onto the GEUS 5 km grid with the same
    % point (nearest/natural) or polygon (conservative/equal) selection as the
-   % builder's other gridded channels, so a catchment build gets the
-   % area-weighted ROI mean rather than the single nearest cell. Missing years
-   % stay NaN because MODIS is an optional diagnostic channel; duplicate matches
-   % remain an error because they make the source layout ambiguous.
+   % builder's other gridded channels. A catchment build therefore gets the
+   % area-weighted ROI mean, not the single nearest cell. A missing year stays
+   % NaN, because MODIS is an optional diagnostic channel. A duplicate match is
+   % an error, because it makes the source layout ambiguous.
    %
    % Inputs
    %  modis_dir - directory with GEUS Greenland_Reflectivity_<YYYY>_5km_C6.nc
@@ -37,13 +37,16 @@ function [modis, metadata] = modisAlbedoChannel(modis_dir, years, location, meth
    % See also: icemodel.forcing.readGeusModis,
    %  icemodel.forcing.helpers.dailyToHourly, icemodel.forcing.buildMarData
 
-   % NaN-initialized so any sample without source coverage stays missing. The
-   % target axis, rather than vector orientation or duplicate caller years,
-   % defines the requested artifact years recorded in metadata.
+   % Initialize with NaN, so any sample without source coverage stays missing.
+   % The target axis defines the requested artifact years in metadata, not the
+   % caller's vector orientation or duplicate years.
    modis = nan(numel(Time), 1);
    requested_years = unique(year(Time))';
-   coverage_years = zeros(1, 0);
    source_years = unique(reshape(years, 1, []), 'stable');
+   % Each source year contributes at most one covered year, so the coverage
+   % buffer is sized to the source list once and trimmed after the loop.
+   coverage_years = zeros(1, numel(source_years));
+   n_coverage = 0;
    for yyyy = source_years
       inyear = year(Time) == yyyy;
       if ~any(inyear)
@@ -76,8 +79,12 @@ function [modis, metadata] = modisAlbedoChannel(modis_dir, years, location, meth
             'on the target axis'], yyyy)
       end
       modis(inyear) = values;
-      coverage_years(end + 1) = yyyy; %#ok<AGROW>
+      n_coverage = n_coverage + 1;
+      coverage_years(n_coverage) = yyyy;
    end
+   % Drop the unused tail so no-coverage builds keep the 1-by-0 shape the
+   % provenance helper expects.
+   coverage_years = coverage_years(1:n_coverage);
 
    % Reuse the exact source matches above: provenance adds no directory scan or
    % NetCDF read beyond the physical channel construction.

@@ -16,7 +16,7 @@ function results = run_regression_suite(kwargs)
    % Use this for normal regression comparisons against an existing rolling or
    % release baseline.
    %
-   % This function does not update baselines; it only runs the formal cases,
+   % This function does not update baselines. It runs the formal cases,
    % compares core scalar outputs to the requested baseline, and writes one
    % artifact and one Quarto HTML report under test/artifacts/<run_name>/.
    %
@@ -65,15 +65,6 @@ function results = run_regression_suite(kwargs)
          = ""
    end
 
-   % Canonical formal runs require the published formal-core capability. This
-   % check never downloads; its missing-data error gives the exact opt-in fetch
-   % command. Explicit comparison candidates bypass manifest identity checks
-   % because PROMICE candidates intentionally differ from release fixtures.
-   if isblanktext(kwargs.data_root)
-      icemodel.verification.setup.fetchFixtures( ...
-         "v1.1", capabilities="formal-core", download=false);
-   end
-
    % Deal out arguments.
    [tier, smbmodel, solver, simyear, smoke_sites, full_sites, baseline, ...
       run_name, build_report] = deal(kwargs.tier, kwargs.smbmodel, ...
@@ -84,12 +75,35 @@ function results = run_regression_suite(kwargs)
    % Resolve full path to the test/ dir.
    testdir = icemodel.getpath('test');
 
+   % The baseline registration defines the default data tree and the forcing.
+   % An explicit DATA_ROOT still takes precedence inside the bootstrap helper.
+   baseline_policy = ...
+      icemodel.test.helpers.formalBaselinePolicy(baseline);
+
    % Bootstrap the source/test trees once for CLI and interactive runs.
    % Keep the cleanup handle in scope so the caller's config is restored
    % when this entrypoint returns.
-   [~, ~, ~, ~, suite_cleanup] = ...
+   [~, input_path, ~, ~, suite_cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment( ...
+      icemodel_config_casename=baseline_policy.config_case, ...
       data_root=kwargs.data_root); %#ok<ASGLU>
+
+   % Propagate the configured verification root through the TestCase selector.
+   % A caller-supplied root keeps precedence over the resolved default.
+   data_root = kwargs.data_root;
+   if isblanktext(data_root)
+      data_root = string(fileparts(input_path));
+   end
+
+   % Verify registered frozen-release capabilities without downloading before
+   % dispatch. A missing fixture, or a fixture whose hash changed, then fails
+   % with one repair command.
+   if ~isempty(baseline_policy.required_fixture_capabilities)
+      icemodel.verification.setup.fetchFixtures( ...
+         baseline_policy.baseline_tag, ...
+         capabilities=baseline_policy.required_fixture_capabilities, ...
+         root=data_root, download=false);
+   end
 
    % Expand the requested formal model selector once at the entrypoint.
    models = icemodel.test.helpers.resolveRequestedSmbmodels(smbmodel);
@@ -107,7 +121,7 @@ function results = run_regression_suite(kwargs)
    % Run the canonical single-model workflow for each requested model.
    per_model = arrayfun(@(mdl) runSingleModelRegression( ...
       runner, suite, tier, mdl, solver, simyear, ...
-      smoke_sites, full_sites, baseline, run_name, kwargs.data_root), ...
+      smoke_sites, full_sites, baseline, run_name, data_root), ...
       models, 'UniformOutput', false);
 
    % Combine per-model results into a common struct and display.
@@ -131,6 +145,13 @@ function results = runSingleModelRegression(runner, suite, tier, smbmodel, ...
       run_name, data_root)
    %RUNSINGLEMODELREGRESSION Configure one formal model regression run.
 
+   % Reject an unaccepted forcing transition before unittest dispatch so the
+   % top-level runner keeps the shared baseline error id.
+   formal_baseline = icemodel.test.helpers.loadBaseline("regression", ...
+      smbmodel=smbmodel, baseline_tag=baseline);
+   icemodel.test.helpers.assertFormalBaselineForcing( ...
+      formal_baseline, baseline);
+
    % Provide the requested regression selection to the unittest class.
    selector_cleanup = configureRegressionSelectorEnv( ...
       tier, smbmodel, solver, simyear, smoke_sites, full_sites, ...
@@ -141,19 +162,28 @@ function results = runSingleModelRegression(runner, suite, tier, smbmodel, ...
 
    % Load the artifact saved by IcemodelRegressionTest to build the
    % results struct that mirrors the perf suite contract.
-   artifact_file = getenv('ICEMODEL_REGRESSION_ARTIFACT_FILE');
+   artifact_file = string(getenv('ICEMODEL_REGRESSION_ARTIFACT_FILE'));
+   if artifact_file == "" || ~isfile(artifact_file)
+      error('icemodel:test:regressionArtifactMissing', ...
+         ['The regression test did not write its comparison artifact. ' ...
+         'Inspect the unittest diagnostics above for the setup or test failure.'])
+   end
    S = load(artifact_file, 'report', 'case_opts', 'meta');
+
    results = struct();
    results.report = S.report;
    results.case_opts = S.case_opts;
    results.meta = S.meta;
-   results.artifact_file = string(artifact_file);
+   results.artifact_file = artifact_file;
    results.test_result = test_result;
    results.passed = all([test_result.Passed]);
    if results.passed
       results.failed_cases = strings(0, 1);
+   elseif any(~S.report.passed)
+      results.failed_cases = S.report.case_id(~S.report.passed);
    else
-      results.failed_cases = S.report.case_id(~[test_result.Passed]);
+      % A setup or teardown failure cannot be localized to one saved row.
+      results.failed_cases = S.report.case_id;
    end
 end
 

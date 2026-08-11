@@ -3,10 +3,10 @@ function metadata = artifactMetadata(value)
    %
    %  metadata = icemodel.forcing.helpers.artifactMetadata(value)
    %
-   % VALUE may be a metadata struct or a table/timetable. Table UserData is
-   % preserved, and legacy Lat/Lon CustomProperties fill missing
-   % lat_wgs84/lon_wgs84 identity fields. Writers save this record beside the
-   % payload so reuse checks need not load a large timetable.
+   % VALUE may be a metadata struct, a table, or a timetable. The function keeps
+   % table UserData. It fills missing lat_wgs84/lon_wgs84 identity fields from
+   % Lat/Lon CustomProperties. Writers save this record beside the payload, so
+   % reuse checks do not load a large timetable.
 
    metadata = struct();
    if isstruct(value)
@@ -21,20 +21,20 @@ function metadata = artifactMetadata(value)
    end
 
    % Derive the actual saved cadence rather than trusting a filename or caller
-   % marker. This top-level copy lets later reuse/prune checks remain source-light.
-   if istimetable(value) && height(value) >= 2
-      steps = seconds(diff(value.Time));
-      cadence = median(steps, 'omitnan');
-      if isfinite(cadence) && cadence > 0 ...
-            && all(isfinite(steps)) && all(abs(steps - cadence) < 1e-6)
+   % marker. This top-level copy keeps later reuse and prune checks
+   % source-light.
+   if istimetable(value)
+      cadence = icemodel.forcing.helpers.uniformCadenceSeconds(value);
+      if isfinite(cadence)
          metadata.artifact_cadence_seconds = cadence;
       elseif isfield(metadata, 'artifact_cadence_seconds')
          metadata = rmfield(metadata, 'artifact_cadence_seconds');
       end
    end
 
-   % Custom location properties predate direct point fields in UserData. Fill
-   % only absent facts so explicit source metadata remains authoritative.
+   % Some tables carry the location in CustomProperties instead of direct point
+   % fields in UserData. Fill only absent fields, so explicit source metadata
+   % stays authoritative.
    custom = value.Properties.CustomProperties;
    names = string(fieldnames(custom));
    if ismember("Lat", names) && ~isfield(metadata, 'lat_wgs84')

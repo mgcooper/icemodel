@@ -8,12 +8,11 @@ function [k, dkdT] = thermal_conductivity_water(T, rho, reference)
    % Description:
    %  Returns liquid-water thermal conductivity k [W m-1 K-1] and its
    %  constant-density temperature derivative dkdT [W m-1 K-2] for numeric
-   %  arrays T [K]. The default implementation is a simple near-melting
-   %  linearization of the IAPWS (2011) formulation, intended for practical
-   %  snow/ice production use. The full IAPWS temperature-density
-   %  formulation is also available, with the critical enhancement term
-   %  omitted because this repo's application is focused on near-melting
-   %  liquid water rather than near-critical water.
+   %  arrays T [K]. The default option is a near-melting linearization of
+   %  the IAPWS (2011) formulation, for practical snow and ice production
+   %  use. The full IAPWS temperature-density formulation is also
+   %  available. It omits the critical enhancement term because this
+   %  repository models near-melting liquid water, not near-critical water.
    %
    % Inputs:
    %  T         - Temperature [K]
@@ -28,15 +27,15 @@ function [k, dkdT] = thermal_conductivity_water(T, rho, reference)
    %                              k(T) = 0.5556444681 ...
    %                                   + 0.0024605629 * (T - 273.15)
    %
-   %                           The rho input is ignored for this option.
+   %                           This option ignores the rho input.
    %  "iapws_2011" - IAPWS (2011) liquid-water conductivity using the
    %                 dilute-gas and finite-density terms only.
    %
    % Notes:
    %  The full IAPWS release defines conductivity as the sum of a
    %  temperature-density base correlation plus a critical enhancement term.
-   %  For the intended snow/firn meltwater regime, the critical enhancement
-   %  is negligible and is therefore omitted intentionally here.
+   %  The critical enhancement is negligible in the snow and firn meltwater
+   %  regime, so this function omits it.
    %
    %  The official IAPWS validity range for stable liquid water begins at the
    %  triple point. The release also states that the equation behaves in a

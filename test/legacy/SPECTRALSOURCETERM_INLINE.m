@@ -7,9 +7,9 @@ function [Sc, chi] = SPECTRALSOURCETERM_INLINE(Qsi, albedo, I0, dz_spect, ...
    %     tau_N, tau_S, solar_dwavel, dz_therm, ro_sno, z_nodes_therm, ...
    %     z_nodes_spect)
    %
-   % This preserves the pre-refactor inlined source-term implementation so the
+   % This file keeps the earlier inlined source-term implementation, so the
    % spectral study can compare code organization and lookup changes against a
-   % historical reference while reusing the shared precomputed geometry.
+   % historical reference. It reuses the shared precomputed geometry.
    %
    %#codegen
 

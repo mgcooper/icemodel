@@ -123,10 +123,10 @@ function plotOneVariable(ax, target_tt, candidate_tt, varname)
 end
 
 function noDataPanel(ax, varname, missing_target, missing_candidate)
-   %NODATAPANEL Render a visible "no data" tile and warn loudly.
+   %NODATAPANEL Render a visible "no data" tile and raise a warning.
    %
-   % Replaces the prior silent axis-off behavior so missing variables
-   % surface in both the figure and the command window.
+   % The tile and the warning both report a missing variable, so it appears
+   % in the figure and in the command window.
 
    if missing_target && missing_candidate
       reason = 'target and candidate';

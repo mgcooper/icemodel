@@ -39,7 +39,7 @@ function test_bootstrap_data_root_precedence_and_cleanup(testCase)
    mkdir(fullfile(data_root, 'input'))
    mkdir(fullfile(data_root, 'eval'))
 
-   % An invalid case is deliberately ignored because DATA_ROOT has precedence.
+   % An invalid case is ignored because DATA_ROOT has precedence.
    [~, input_path, output_path, eval_path, cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment( ...
       data_root=data_root, icemodel_config_casename="ignored");
@@ -69,7 +69,8 @@ function test_bootstrap_cleanup_runs_after_error(testCase)
    mkdir(fullfile(data_root, 'input'))
    mkdir(fullfile(data_root, 'eval'))
 
-   % The local helper keeps cleanup in its stack frame, then fails deliberately.
+   % The local helper keeps cleanup in its stack frame, then fails so cleanup
+   % is exercised during error unwinding.
    testCase.verifyError(@() failAfterBootstrap(data_root), ...
       'test:dataRoots:forcedFailure')
    testCase.verifyEqual(currentRawConfig(names), caller_values)
@@ -77,8 +78,9 @@ function test_bootstrap_cleanup_runs_after_error(testCase)
    clear restore
 end
 
-function test_formal_classes_inherit_runner_data_root(testCase)
-   % Nested class setup must preserve the candidate root selected by its runner.
+function test_formal_classes_use_runner_root_or_verification_default(testCase)
+   % Nested setup must preserve an explicit root, and must resolve a blank
+   % root to verification.
 
    config_names = configNames();
    selector_names = ["ICEMODEL_TEST_DATA_ROOT"; ...
@@ -98,7 +100,8 @@ function test_formal_classes_inherit_runner_data_root(testCase)
    testCase.verifyClass(outer_cleanup, 'onCleanup')
    setenv('ICEMODEL_TEST_DATA_ROOT', data_root)
 
-   % Regression setup previously replaced this outer root with test/data.
+   % Regression setup must preserve this outer root rather than switching to
+   % test/data.
    regression_case = IcemodelRegressionTest();
    regression_case.configureCases();
    testCase.verifyEqual(string(getenv('ICEMODEL_DATA_PATH')), data_root)
@@ -125,14 +128,32 @@ function test_formal_classes_inherit_runner_data_root(testCase)
       '_15m.mat')))
    perf_case.restoreConfig();
 
+   % Direct class setup has no outer root selector and therefore resolves the
+   % production verification tree that owns the official PROMICE forcing.
+   setenv('ICEMODEL_TEST_DATA_ROOT', '')
+   verification_root = fullfile(testCase.TestData.rootdir, 'data');
+   default_regression_case = IcemodelRegressionTest();
+   default_regression_case.configureCases();
+   testCase.verifyEqual(string(getenv('ICEMODEL_DATA_PATH')), ...
+      verification_root)
+   default_regression_case.restoreConfig();
+
+   default_perf_case = IcemodelPerfTest();
+   default_perf_case.configureCases();
+   testCase.verifyEqual(string(default_perf_case.opts.pathinput), ...
+      string(fullfile(verification_root, 'input')))
+   default_perf_case.restoreConfig();
+
    % Each nested cleanup restores the still-active outer runner selection.
    testCase.verifyEqual(string(getenv('ICEMODEL_DATA_PATH')), data_root)
-   clear outer_cleanup regression_case perf_case
+   clear outer_cleanup regression_case perf_case default_regression_case ...
+      default_perf_case
    clear restore
 end
 
 function test_resolver_precedence_and_legacy_alias(testCase)
-   % Whole-root selection precedes leaves and the legacy alias remains supported.
+   % Whole-root selection precedes the leaves, and the legacy alias still
+   % works.
 
    data_root = fullfile(testCase.TestData.tmp, 'selected');
    [eval_root, input_root] = ...
@@ -238,13 +259,14 @@ function test_family_manifest_helper_data_root_precedence_and_isolation(testCase
    leaf_files = icemodel.verification.helpers.familyManifestFiles( ...
       evaluation_data_root=fullfile(ignored_root, 'eval'));
    testCase.verifyEqual(leaf_files, string(ignored_file))
-   % The minimal demo root intentionally has no evaluation manifests, and the
-   % helper must not fall back to populated test or verification roots.
+   % The minimal demo root has no evaluation manifests, and the helper must
+   % not fall back to populated test or verification roots.
    testCase.verifyEmpty( ...
       icemodel.verification.helpers.familyManifestFiles( ...
       icemodel_config_casename="demo"))
 
-   % An empty whole-root scope stays empty even when all repo roots are populated.
+   % An empty whole-root scope stays empty even when every repo root holds
+   % manifests.
    empty_root = fullfile(testCase.TestData.tmp, 'manifest-empty');
    mkdir(fullfile(empty_root, 'eval'))
    testCase.verifyEmpty( ...
@@ -271,11 +293,11 @@ function test_public_readers_forward_data_root(testCase)
    calls = { ...
       @() icemodel.verification.loadmanifest("colbeck1976", data_root=data_root)
       @() icemodel.verification.comparecase("colbeck1976", ...
-         data_root=data_root, make_plot=false)
+      data_root=data_root, make_plot=false)
       @() icemodel.verification.plotcase("colbeck1976", ...
-         data_root=data_root, visible="off")
+      data_root=data_root, visible="off")
       @() icemodel.verification.plotscatter("cdp", ...
-         data_root=data_root, visible="off")};
+      data_root=data_root, visible="off")};
    for n = 1:numel(calls)
       message = errorMessage(calls{n});
       testCase.verifySubstring(message, expected_eval)
@@ -331,7 +353,7 @@ function test_colbeck_rejects_mismatched_showcase_bytes(testCase)
       source_paths(k) = fixturePath(source_root, files(k));
    end
 
-   % The public archive is intentionally ignored; a clean checkout skips this
+   % The public archive is not required; a clean checkout skips this
    % integration fixture while the synthetic provisioning tests remain active.
    testCase.assumeTrue(all(isfile(source_paths)), ...
       "Public showcase is not provisioned. Run: " ...

@@ -32,8 +32,8 @@ function result = packFixtures(version, kwargs)
       kwargs.silent (1, 1) logical = false
    end
 
-   % Parse selection through the shared manifest gate so list, pack, and fetch
-   % cannot disagree about capability membership or install paths.
+   % Parse selection through the shared manifest gate, which defines capability
+   % membership and install paths for list, pack, and fetch.
    [~, selection] = icemodel.verification.setup.fixtureFileList( ...
       capabilities=kwargs.capabilities, root=kwargs.root, ...
       manifest=kwargs.manifest);
@@ -53,7 +53,7 @@ function result = packFixtures(version, kwargs)
    end
 
    % Verify source bytes against the authoritative file rows before producing
-   % any artifact; packaging must never silently bless source drift.
+   % any artifact, so a source that does not match the manifest fails here.
    [missing, mismatched] = verifyFiles(kwargs.root, selection.files);
    if ~isempty(missing) || ~isempty(mismatched)
       error('icemodel:verification:packFixtures:sourceMismatch', ...
@@ -88,8 +88,8 @@ function result = packFixtures(version, kwargs)
          'Pass overwrite=true to replace them.'], kwargs.staging_dir)
    end
 
-   % Build every artifact outside the final staging tree. A later archive or
-   % manifest failure therefore cannot leave partial outputs that poison retry.
+   % Build every artifact outside the final staging tree, so a later archive or
+   % manifest failure leaves no partial outputs in the staging directory.
    work_dir = makeWorkDir(kwargs.staging_dir);
    cleaner = onCleanup(@() removeTree(work_dir));
    work_archive_files = fullfile(work_dir, ...
@@ -97,8 +97,8 @@ function result = packFixtures(version, kwargs)
    work_manifest_file = fullfile(work_dir, ...
       "icemodel-" + version + "-data-manifest.json");
 
-   % Package each capability independently so the optional forcing archive
-   % never burdens users who need only formal and showcase data.
+   % Package each capability on its own, so a user who needs only formal and
+   % showcase data does not have to download the optional forcing archive.
    archives = repmat(archiveTemplate(), numel(selection.archives), 1);
    source_bytes = zeros(numel(selection.archives), 1);
    archive_bytes = zeros(numel(selection.archives), 1);
@@ -129,15 +129,15 @@ function result = packFixtures(version, kwargs)
       'version', version, ...
       'archives', archives, ...
       'files', selection.files);
-   writeJson(work_manifest_file, manifest);
+   writeManifestJson(work_manifest_file, manifest);
 
    % Promote the complete artifact set as one rollback-protected transaction.
    promoteArtifacts([work_archive_files; work_manifest_file], outputs, ...
       kwargs.staging_dir, work_dir);
    clear cleaner
 
-   % Preserve the historical scalar fields for one-capability callers while
-   % exposing vectors for the normal multi-capability v1.1 pack.
+   % Keep the scalar fields for one-capability callers while exposing vectors
+   % for the normal multi-capability v1.1 pack.
    result = struct( ...
       'version', version, ...
       'capabilities', selection.capabilities, ...
@@ -221,13 +221,13 @@ function promoteArtifacts(sources, destinations, staging_dir, work_dir)
          backup = fullfile(backup_root, "output-" + string(k));
 
          % Preserve every replaceable pre-call output until the full commit.
-          if isfolder(destination)
-             error( ...
-                'icemodel:verification:packFixtures:destinationTypeConflict', ...
-                'Release artifact output is an existing directory: %s', ...
-                destination)
-          elseif isfile(destination)
-             moveChecked(destination, backup);
+         if isfolder(destination)
+            error( ...
+               'icemodel:verification:packFixtures:destinationTypeConflict', ...
+               'Release artifact output is an existing directory: %s', ...
+               destination)
+         elseif isfile(destination)
+            moveChecked(destination, backup);
             backup_count = backup_count + 1;
             backups(backup_count) = struct( ...
                'destination', destination, 'backup', backup);
@@ -397,12 +397,14 @@ function createArchive(archive_file, paths, root)
       members = [ancestorDirectories(paths); paths];
       quoted_members = strings(numel(members), 1);
       for k = 1:numel(members)
-         quoted_members(k) = shellQuote(members(k));
+         quoted_members(k) = ...
+            icemodel.shellQuote(members(k));
       end
       command = "COPYFILE_DISABLE=1 /usr/bin/tar --format ustar " ...
          + "--uid 0 --gid 0 --uname root --gname root " ...
          + "--no-recursion --options gzip:!timestamp -czf " ...
-         + shellQuote(archive_file) + " -C " + shellQuote(root) + " -- " ...
+         + icemodel.shellQuote(archive_file) ...
+         + " -C " + icemodel.shellQuote(root) + " -- " ...
          + strjoin(quoted_members, " ");
       [status, message] = system(char(command));
       if status ~= 0
@@ -431,12 +433,6 @@ function directories = ancestorDirectories(files)
    directories = unique(directories);
 end
 
-function quoted = shellQuote(pathname)
-   %SHELLQUOTE Quote one path for the fixed native macOS tar command.
-   quote = char(39);
-   escaped = strrep(char(pathname), quote, [quote '"' quote '"' quote]);
-   quoted = string([quote escaped quote]);
-end
 
 function pathname = underRoot(root, relpath)
    %UNDERROOT Convert a validated relative POSIX path to a local path.
@@ -444,18 +440,17 @@ function pathname = underRoot(root, relpath)
    pathname = string(fullfile(root, parts{:}));
 end
 
-function writeJson(pathname, data)
-   %WRITEJSON Write deterministic pretty JSON with array shape preserved.
+function writeManifestJson(pathname, data)
+   %WRITEMANIFESTJSON Write the release-data manifest.
+   %
+   % Only the array reshaping is specific to this manifest: cell-wrapping
+   % keeps single-element archive and file lists encoded as JSON arrays rather
+   % than collapsing to scalars. The write itself is the shared writer.
+
    payload = data;
    payload.archives = num2cell(payload.archives);
    payload.files = num2cell(payload.files);
-   fid = fopen(pathname, 'w');
-   if fid < 0
-      error('icemodel:verification:packFixtures:cannotWrite', ...
-         'Cannot write release-data manifest: %s', pathname)
-   end
-   cleaner = onCleanup(@() fclose(fid));
-   fwrite(fid, jsonencode(payload, PrettyPrint=true), 'char');
+   icemodel.verification.setup.writeJson(pathname, payload);
 end
 
 function reportSaving(result)

@@ -15,12 +15,11 @@ function surface_zones = surfacezone()
    %  stamp surface_zone onto case manifests) and validators. surface_zone is
    %  the glaciological zone ONLY: where on a Greenland (or off-ice) transect
    %  the case sits. It deliberately does NOT carry capability descriptors such
-   %  as "bare_ice" or "seasonal_snow" - those are eval_target values. The single
-   %  source of truth for a PROMICE anchor's zone is
-   %  icemodel.verification.setup.promiceSiteCatalog(site).surface_zone, which uses
-   %  this vocabulary. An empty surface_zone ("") is permitted for analytical
-   %  cases where the regime is not meaningful (e.g. the Laugh-Tests Colbeck
-   %  benchmark).
+   %  as "bare_ice" or "seasonal_snow" - those are eval_target values.
+   %  icemodel.verification.setup.promiceSiteCatalog(site).surface_zone defines
+   %  a PROMICE anchor's zone and uses this vocabulary. An empty surface_zone
+   %  ("") is allowed for an analytical case where the regime has no meaning,
+   %  for example the Laugh-Tests Colbeck benchmark.
    %
    % See also: icemodel.verification.namelists.evaltarget,
    %  icemodel.verification.setup.promiceSiteCatalog

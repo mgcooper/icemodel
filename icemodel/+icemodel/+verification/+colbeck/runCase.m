@@ -5,18 +5,18 @@ function candidate = runCase(case_manifest, kwargs)
    %  candidate = icemodel.verification.colbeck.runCase(case_manifest, ...
    %     kind="numerical", experiment_names=["exp1", "exp2", "exp3"])
    %
-   %  Single candidate-provider entry point for the Colbeck verification case.
-   %  Dispatches internally on `kind`: the "numerical" branch runs a thin
-   %  time-loop calling icemodel.column.infiltration once per step (all physics
-   %  lives in the kernel); the "analytical" branch wraps
-   %  icemodel.verification.colbeck.analyticalSolution. Both branches return the
-   %  same experiment_bundle schema so the comparison driver treats them
-   %  uniformly.
+   %  Candidate-provider entry point for the Colbeck verification case.
+   %  This function dispatches on `kind`. The "numerical" branch runs a thin
+   %  time loop that calls icemodel.column.infiltration once per step; the
+   %  kernel holds all the physics. The "analytical" branch wraps
+   %  icemodel.verification.colbeck.analyticalSolution. Both branches return
+   %  the same experiment_bundle schema, so the comparison driver handles
+   %  them the same way.
    %
    %  Inputs
-   %    case_manifest      Resolved Colbeck case manifest (currently
-   %                       informational; the canonical case definition is
-   %                       loaded directly from caseDefinition).
+   %    case_manifest      Resolved Colbeck case manifest (informational
+   %                       only; this function loads the canonical case
+   %                       definition from caseDefinition).
    %  Name-value
    %    kind               "numerical" (default) | "analytical"
    %    experiment_names   String row vector. Default
@@ -117,9 +117,9 @@ function [tt, meta] = run_numerical(experiment_name, def)
    inflow_total  = 0;
    outflow_total = 0;
 
-   % Time loop: one infiltration call per output step. The kernel handles its
-   % own CFL substepping internally, so this loop body is deliberately thin —
-   % all physics lives in icemodel.column.infiltration.
+   % Time loop: one infiltration call per output step. The kernel does its
+   % own CFL substepping, so this loop body is thin.
+   % icemodel.column.infiltration holds all the physics.
    for step = 1:n_steps
 
       % Top boundary follows the Colbeck rain window. q_top is constant during

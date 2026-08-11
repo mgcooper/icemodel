@@ -61,8 +61,7 @@ function result = releaseMetadata(mode, kwargs)
    end
    validateReleaseVersion(release_version)
 
-   % Dispatch only metadata-local behavior. Publication authority remains
-   % outside this command.
+   % Dispatch only the metadata work. This command does not publish a release.
    switch mode
       case "prepare"
          result = prepareRelease(cff_file, release_version, ...
@@ -123,7 +122,7 @@ function result = observeRelease(version, repository, concept_doi, ...
    version_doi = "";
 
    % A valid but incomplete public state is resumable. Malformed or failed
-   % public reads return an error result instead of masquerading as pending.
+   % public reads return an error result rather than a pending one.
    while true
       elapsed = max(0, clock() - started);
       if elapsed >= timeout_seconds
@@ -232,8 +231,8 @@ function seen = githubReleaseSeen(fetcher, url, version, timeout_seconds)
          string(response.tag_name), version)
    end
 
-   % Drafts and prereleases are valid API responses but are not stable public
-   % release success.
+   % A draft or a prerelease is a valid API response, but it is not a
+   % published stable release.
    seen = true;
    for field = ["draft", "prerelease"]
       if ~isfield(response, field)
@@ -513,7 +512,10 @@ end
 function output = runGit(project_dir, arguments)
    %RUNGIT Run one read-only Git query in the candidate project.
 
-   command = "git -C " + shellQuote(project_dir) + " " + arguments;
+   % --no-pager: a configured pager writes terminal escape codes into the
+   % captured output, and a non-empty result here reads as a dirty worktree.
+   command = "git --no-pager -C " + icemodel.shellQuote(project_dir) ...
+      + " " + arguments;
    [status, text] = system(command);
    if status ~= 0
       error('icemodel:internal:releaseMetadata:gitFailed', ...
@@ -525,7 +527,8 @@ end
 function validateCff(filename)
    %VALIDATECFF Run the repository's CFF schema validator.
 
-   command = "uvx cffconvert --validate --infile " + shellQuote(filename);
+   command = "uvx cffconvert --validate --infile " ...
+      + icemodel.shellQuote(filename);
    [status, text] = system(command);
    if status ~= 0
       error('icemodel:internal:releaseMetadata:cffInvalid', ...
@@ -610,27 +613,10 @@ function validateReleaseDate(date_released)
 end
 
 function validateZenodoDoi(doi, field_name)
-   %VALIDATEZENODODOI Require the DOI shape minted by this Zenodo concept.
+   %VALIDATEZENODODOI Require the DOI form this Zenodo concept issues.
 
    if isempty(regexp(doi, '^10\.5281/zenodo\.\d+$', 'once'))
       error('icemodel:internal:releaseMetadata:doiInvalid', ...
          '%s is not a Zenodo DOI: %s', field_name, doi)
    end
-end
-
-function quoted = shellQuote(value)
-   %SHELLQUOTE Protect one path from the host command shell.
-
-   value = char(string(value));
-   if ispc
-      if contains(value, '%')
-         error('icemodel:internal:releaseMetadata:unsafeWindowsPath', ...
-            'Release command paths cannot contain %% on Windows')
-      end
-      quoted = string([char(34), value, char(34)]);
-      return
-   end
-   embedded_quote = char([39, 34, 39, 34, 39]);
-   value = strrep(value, char(39), embedded_quote);
-   quoted = string([char(39), value, char(39)]);
 end

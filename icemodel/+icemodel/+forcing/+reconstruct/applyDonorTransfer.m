@@ -5,12 +5,12 @@ function estimate = applyDonorTransfer(transfer, times, x_donor, kwargs)
    %     transfer, times, x_donor)
    %
    % Role
-   %  Application half of the donor-transfer tier: shifts the donor by the
-   %  fitted lag, evaluates the per-season model, and enforces the
-   %  policy's extrapolation limit — donor samples beyond the fitted
-   %  donor range plus the allowed fraction of its span produce NaN
-   %  rather than an extrapolated value (POLICY B4), so the next tier or
-   %  missingness handles them honestly.
+   %  Application half of the donor-transfer tier. This function shifts the
+   %  donor by the fitted lag, evaluates the per-season model, and applies
+   %  the policy extrapolation limit. A donor sample beyond the fitted
+   %  donor range plus the allowed fraction of its span gives NaN instead
+   %  of an extrapolated value (POLICY B4). The next tier then handles the
+   %  sample, or it stays missing.
    %
    % Name-value
    %  max_extrapolation_fraction : how far beyond the fitted donor range
@@ -64,8 +64,8 @@ function estimate = applyDonorTransfer(transfer, times, x_donor, kwargs)
    end
 
    % The extrapolation window widens the fitted range by the allowed
-   % fraction of its span on each side; beyond it the transfer refuses
-   % rather than extrapolates.
+   % fraction of its span on each side. Outside that window the transfer
+   % gives NaN instead of an extrapolated value.
    span = diff(transfer.donor_range);
    lo = transfer.donor_range(1) ...
       - kwargs.max_extrapolation_fraction * span;

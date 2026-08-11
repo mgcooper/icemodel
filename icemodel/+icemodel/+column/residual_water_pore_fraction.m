@@ -12,14 +12,14 @@ function f_res_por = residual_water_pore_fraction(f_ice, f_liq)
    %   f_liq_min = f_wat * f_ell_min                 (minimum vol. liquid, meltzone_bounds)
    %   f_res_por = f_liq_min / (1 - f_ice)           (convert to per-pore-volume)
    %
-   % The result is in the same reference frame as the model's opts.f_res_pore_ice /
-   % opts.f_res_pore_snow / opts.f_res_pore_firn parameters (pore-volume), so it
-   % can be used directly in max(f_res_por, ...).
-   % Multiply by (1 - f_ice) to obtain the volumetric liquid fraction; see
+   % The result uses the same pore-volume reference frame as the model
+   % parameters opts.f_res_pore_ice, opts.f_res_pore_snow and
+   % opts.f_res_pore_firn, so you can use it directly in max(f_res_por, ...).
+   % Multiply by (1 - f_ice) to get the volumetric liquid fraction; see
    % icemodel.column.residual_water_fraction for that form.
    %
-   % The residual floor ensures that evaporation does not reduce f_liq below
-   % the minimum physically consistent value for a melting node (T > TL).
+   % The residual floor keeps evaporation from reducing f_liq below the
+   % minimum physically consistent value for a melting node (T > TL).
    %
    % Inputs
    %   f_ice  - Volumetric ice fraction [-], scalar or column vector.

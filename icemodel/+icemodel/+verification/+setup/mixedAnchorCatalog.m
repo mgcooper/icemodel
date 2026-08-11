@@ -8,8 +8,9 @@ function anchors = mixedAnchorCatalog(kwargs)
    %     evaluation_data_root=eval_root)
    %
    % Returns a flat struct array with family, site/source ids, WGS84/EPSG:3413
-   % coordinates, period, and available met/userdata/eval source labels. Missing
-   % family manifests are ignored so callers can use it during partial staging.
+   % coordinates, period, and available met/userdata/eval source labels. The
+   % function skips missing family manifests, so callers can use it during
+   % partial staging.
    %
    % Role
    %  Setup catalog helper for mixed-anchor provenance. It reads staged manifests
@@ -29,8 +30,8 @@ function anchors = mixedAnchorCatalog(kwargs)
    rows = cell(1, numel(families));
    n_rows = 0;
 
-   % Each family can be staged independently; skip absent manifests rather than
-   % turning a partial eval tree into a hard failure for colocation metadata.
+   % Each family can be staged on its own. Skip absent manifests, so a partial
+   % eval tree does not become a hard failure for colocation metadata.
    for manifest_file = reshape(manifest_files, 1, [])
       [~, family] = fileparts(fileparts(manifest_file));
       add = familyAnchors(manifest_file, family);

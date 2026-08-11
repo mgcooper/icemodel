@@ -7,14 +7,15 @@ function manifests = previewFirnStaging(families, kwargs)
    %     "all", mar_dir=mar_dir, merra_dir=merra_dir, racmo_dir=racmo_dir)
    %
    % Role
-   %  User-facing setup helper for preflight QA. It stages representative,
-   %  one-year-or-shorter previews with build_forcing=true into a separate
-   %  output root so users can visualize observations, native met/userdata, and
-   %  RCM legs before running the full final staging workflow into data/eval and
-   %  data/input. It calls the production importers; there is no separate scratch
-   %  conversion path. It is an optional preflight/troubleshooting workflow, not
-   %  a repair, promotion, or substitute for a canonical full stage. Once a full
-   %  tree has passed QA, use it again only to isolate a source/importer change.
+   %  User-facing setup helper for preflight QA. It stages representative
+   %  previews of one year or less with build_forcing=true into a separate
+   %  output root. Users can then view observations, native met/userdata, and
+   %  RCM legs before they run the full staging workflow into data/eval and
+   %  data/input. It calls the production importers. There is no separate
+   %  scratch conversion path. It is an optional preflight and troubleshooting
+   %  workflow. It does not repair, promote, or replace a canonical full stage.
+   %  After a full tree passes QA, use this helper again only to isolate a
+   %  source or importer change.
    %
    % Defaults
    %  output_root defaults to <repo>/data/preview/firn_staging. The default
@@ -24,8 +25,8 @@ function manifests = previewFirnStaging(families, kwargs)
    %  requested from every importer. Pass source/cache kwargs to override them.
    %  Model met defaults to dt_out="15m"; pass dt_out="" to retain each
    %  model-met source's native cadence. Userdata defaults to hourly.
-   %  overwrite=true also clears prior PNGs for the selected cases before plotting;
-   %  all writes remain beneath output_root.
+   %  overwrite=true also clears earlier PNGs for the selected cases before
+   %  plotting. All writes stay beneath output_root.
    %
    % See also: icemodel.verification.plotVerificationArtifacts,
    %  icemodel.verification.setup.importPromiceSites,

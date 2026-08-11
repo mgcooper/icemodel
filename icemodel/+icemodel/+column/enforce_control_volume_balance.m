@@ -1,9 +1,10 @@
-function [h_ice, h_liq, h_air, x_ice, x_liq] = enforce_control_volume_balance(h_ice, h_liq, h_res, h_tot)
+function [h_ice, h_liq, h_air, x_ice, x_liq] = enforce_control_volume_balance( ...
+      h_ice, h_liq, h_res, h_tot)
    %ENFORCE_CONTROL_VOLUME_BALANCE Enforce the total-volume constraint.
    %#codegen
-   % Note: this is not used in the model, it was designed for the
-   % thickness-based formulation. It might work as-is for the
-   % volumetric fraction-based forms, but needs to be tested.
+   % The model does not use this function. It is written for the
+   % thickness-based formulation. It can also work for the volumetric
+   % fraction-based forms, but no test covers that case.
 
    % Check if ice+liq exceeds available pore space
    x_ice = max(0.0, h_ice + h_res - h_tot);
@@ -41,8 +42,7 @@ function [h_ice, h_liq, h_air, x_ice, x_liq] = enforce_control_volume_balance(h_
       h_air = h_tot - h_ice - h_liq;      % reduce the air
    end
 
-   % Note: It is sufficient to do h_air = h_tot - h_ice - h_liq at the end,
-   % rather than h_air = 0.0 in the if/else statements above, the former
-   % usually evaluates to rounding error (~1e-18), so keep the h_air = 0
-   % statements in the if/else block above.
+   % A single h_air = h_tot - h_ice - h_liq at the end also works instead of
+   % h_air = 0.0 in the if/else statements above. That form usually gives
+   % rounding error (~1e-18), so keep the h_air = 0.0 statements above.
 end

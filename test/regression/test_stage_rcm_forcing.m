@@ -26,7 +26,7 @@ function setupOnce(testCase)
    testCase.TestData.promice_dir = string(fullfile(icemodel.internal.fullpath(), ...
       'data', 'verification', 'promice'));
    testCase.TestData.site = "KAN_L";
-   % A single January window keeps the staged fixture-backed green-path builds quick.
+   % A single January window keeps the fixture-backed success-path builds quick.
    testCase.TestData.startdate = "2012-01-01";
    testCase.TestData.enddate = "2012-01-31";
    cfg = icemodel.config('getenv', true);
@@ -105,8 +105,8 @@ function test_default_import_is_observation_only(testCase)
 end
 
 function test_promice_blank_dt_preserves_native_model_met(testCase)
-   % The public PROMICE importer forwards the explicit native-cadence escape
-   % hatch while leaving hourly userdata untouched.
+   % The public PROMICE importer forwards the explicit native-cadence option,
+   % and leaves hourly userdata unchanged.
    assumePromicePresent(testCase);
    root = testCase.TestData.root;
 
@@ -209,8 +209,9 @@ function test_manifest_convenience_skips_absent_sources(testCase)
    % stageRcmForcing manifest-convenience mode: after an observations-only
    % import, it resolves the legs from the staged manifest and, when the RCM
    % sources are absent (bogus dirs), degrades EVERY source to a skip-with-reason
-   % WITHOUT throwing - validating the manifest-mode plumbing (read cases ->
-   % resolve points/windows -> stage -> merge -> persist) off the fail-early gate.
+   % WITHOUT throwing - validating the manifest-mode steps (read cases ->
+   % resolve points/windows -> stage -> merge -> persist) apart from the
+   % fail-early gate.
    % An unrelated pre-existing skipped record is preserved exactly once.
    assumePromicePresent(testCase);
    root = testCase.TestData.root;
@@ -799,7 +800,7 @@ function test_mar_merra_write_met_and_userdata(testCase)
    testCase.verifyEqual(seconds(median(diff(native_met.met.Time))), 900);
    testCase.verifyEqual(seconds(median(diff(native_data.Data.Time))), 3600);
 
-   % MAR + MERRA: a met file AND a Data (userdata) file (the fix).
+   % MAR + MERRA: a met file AND a Data (userdata) file.
    for src = ["mar", "merra"]
       product = icemodel.verification.namelists.rcmProductIds(src);
       leg = c.colocation.(char(src));
@@ -814,7 +815,7 @@ function test_mar_merra_write_met_and_userdata(testCase)
       testCase.verifyNotEmpty( ...
          dir(fullfile(root, 'input', 'met', char(product), '*.mat')));
       testCase.verifyNotEmpty( ...
-       dir(fullfile(root, 'input', 'userdata', char(product), '*.mat')));
+         dir(fullfile(root, 'input', 'userdata', char(product), '*.mat')));
       met_match = dir(fullfile(root, 'input', 'met', char(product), '*.mat'));
       loaded = load(fullfile(met_match(1).folder, met_match(1).name), ...
          'met', 'artifact_metadata');
@@ -961,7 +962,7 @@ function test_manifest_checkpoint_survives_later_source_write_failure(testCase)
    root = testCase.TestData.root;
 
    % Seed an observation-only manifest and an unrelated skip record that the
-   % first source checkpoint must retain byte-logically through ordinary merge.
+   % first source checkpoint must retain unchanged through an ordinary merge.
    icemodel.verification.setup.importPromiceSites( ...
       case_ids=testCase.TestData.site, promice_dir=testCase.TestData.promice_dir, ...
       startdate=testCase.TestData.startdate, ...
@@ -1103,18 +1104,25 @@ end
 
 function filenames = stagedCaseArtifacts(root, c)
    %STAGEDCASEARTIFACTS Resolve every artifact referenced by one PROMICE case.
-   filenames = string(fullfile(root, 'eval', 'promice', c.evaluation_file));
-   for src = ["promice", "mar", "merra", "racmo"]
-      leg = c.colocation.(char(src));
+
+   sources = ["promice", "mar", "merra", "racmo"];
+   % Two slots per source, one for its met files and one for its user data,
+   % so the file list is concatenated once instead of per source leg.
+   source_files = repmat({strings(0, 1)}, 2 * numel(sources), 1);
+   for k = 1:numel(sources)
+      leg = c.colocation.(char(sources(k)));
       if isfield(leg, 'met_files')
-         filenames = [filenames; fullfile(root, 'input', 'met', ...
-            string(leg.met_files(:)))]; %#ok<AGROW>
+         source_files{2 * k - 1} = fullfile(root, 'input', 'met', ...
+            string(leg.met_files(:)));
       end
       if isfield(leg, 'data_files')
-         filenames = [filenames; fullfile(root, 'input', 'userdata', ...
-            string(leg.data_files(:)))]; %#ok<AGROW>
+         source_files{2 * k} = fullfile(root, 'input', 'userdata', ...
+            string(leg.data_files(:)));
       end
    end
+   filenames = vertcat( ...
+      string(fullfile(root, 'eval', 'promice', c.evaluation_file)), ...
+      source_files{:});
 end
 
 function bytes = fileBytes(filename)
@@ -1125,7 +1133,9 @@ function bytes = fileBytes(filename)
 end
 
 function p = firstWithData(candidates, hasData)
-   %FIRSTWITHDATA First candidate dir that exists and satisfies hasData, else "".
+   %FIRSTWITHDATA First candidate dir that exists and satisfies hasData, else
+   % "".
+
    p = "";
    for c = candidates
       if isfolder(c) && hasData(c)

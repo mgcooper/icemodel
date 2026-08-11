@@ -120,7 +120,7 @@ end
 
 function test_modisToMetCadence_rejects_bad_inputs(testCase)
    % Unsorted axes, misaligned sizes, non-positive gaps, and out-of-bounds
-   % daily values all fail loudly instead of producing silent output.
+   % daily values all raise an error instead of returning unmarked output.
    time_daily = dailyAxis(3);
    time_met = dailyAxis(2);
    testCase.verifyError(@() icemodel.forcing.modisToMetCadence( ...
@@ -362,8 +362,8 @@ function test_stageModisAlbedo_missing_met_errors(testCase)
 end
 
 function test_stageModisAlbedo_missing_year_errors(testCase)
-   % Explicitly requested years without a source file fail loudly so a mount
-   % hiccup cannot silently stage a partial window.
+   % A requested year with no source file raises an error, so a lost mount
+   % cannot stage a partial window without notice.
    testCase.verifyError(@() icemodel.forcing.stageModisAlbedo("kanm", ...
       modis_dir=fixtureModisDir(), ...
       met_dir=fullfile(testCase.TestData.tmp, "met"), ...

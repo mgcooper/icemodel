@@ -61,16 +61,16 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    % Observation heights (important for the turbulent-flux scheme): MAR's
    % hourly diagnostics are at the standard meteorological heights -
    % temperature/humidity (TTH/QQH -> tair/rh) at 2 m, wind (UUH/VVH ->
-   % wspd) at 10 m. They are intentionally on different levels. The model
-   % must be told these heights: icemodel.setopts sets opts.z_tair = 2 and
-   % opts.z_wind = 10 for forcings = "mar" (z_relh = z_tair). If you build
-   % MAR forcing for a custom run, keep opts.z_wind = 10 / opts.z_tair = 2.
+   % wspd) at 10 m. The two channels sit on different levels. The model needs
+   % these heights: icemodel.setopts sets opts.z_tair = 2 and opts.z_wind = 10
+   % for forcings = "mar" (z_relh = z_tair). If you build MAR forcing for a
+   % custom run, keep opts.z_wind = 10 and opts.z_tair = 2.
    %
-   % Legacy: reimplements runoff/functions/saveMarData.m (the original
-   % retained, unchanged, as the legacy reference workflow). Derivable
-   % radiation terms (swu, lwu, swn, lwn, netr) that the legacy
-   % computeDerivedValues stored are NOT carried here - icemodel.processmet
-   % recomputes them on load from swd/albedo/tsfc/lwd.
+   % Legacy: this function reimplements runoff/functions/saveMarData.m. That
+   % file stays unchanged as the legacy reference workflow. This function does
+   % NOT carry the derivable radiation terms (swu, lwu, swn, lwn, netr) that
+   % the legacy computeDerivedValues stored. icemodel.processmet recomputes
+   % them on load from swd, albedo, tsfc, and lwd.
    %
    % See also: icemodel.forcing.readMar3p11, icemodel.forcing.data2met,
    %  icemodel.forcing.buildMarMet, icemodel.forcing.helpers.writeuserdata
@@ -397,19 +397,19 @@ function [Data, metadata] = finalizeMarData(Data, files, slab, site, ...
    end
 
    % Native daily delayed RU and daily SMB constrain the hourly diagnostics.
-   % Retain them outside metchecks so missing source days cannot be synthesized
-   % by generic gap filling; the selective helper below preserves raw hourly
-   % structure only where its complete UTC-day aggregate is source-consistent.
+   % Keep them outside metchecks so generic gap filling cannot synthesize a
+   % missing source day. The selective helper below keeps the raw hourly
+   % structure only where its complete UTC-day sum matches the source.
    names = string(Data.Properties.VariableNames);
    if all(ismember(["runoff_daily", "smb_daily"], names))
       replacements = struct('runoff', Data.runoff_daily, ...
          'smb', Data.smb_daily);
       Data = removevars(Data, {'runoff_daily', 'smb_daily'});
    else
-      % Some intentionally reduced test/legacy sources contain only hourly
-      % RUH/SMBH. Preserve those source values but mark native-daily QC as not
-      % applicable; production MAR archives carry RU/SMB and take the branch
-      % above. This is a source-schema compatibility hook, not a silent mask.
+      % Some reduced test and legacy sources contain only hourly RUH/SMBH.
+      % Keep those source values and mark native-daily QC as not applicable.
+      % Production MAR archives carry RU/SMB and take the branch above. This
+      % branch handles a source schema. It does not mask a data problem.
       replacements = struct();
    end
    if ismember("melt_daily_reference", names)
@@ -483,9 +483,9 @@ function [Data, metadata] = finalizeMarData(Data, files, slab, site, ...
       'n_cells', prod(count), ...
       'lat', site.lat, 'lon', site.lon, ...
       'elev', site.elev, ...
-       'humidity_kernel', ...
-       "icemodel.vapor.relative_humidity_from_specific_humidity", ...
-       'checks', checks);
+      'humidity_kernel', ...
+      "icemodel.vapor.relative_humidity_from_specific_humidity", ...
+      'checks', checks);
    % The channel helper already resolved exact source years while reading the
    % physical data, so copying its canonical fields adds no source access.
    modis_fields = fieldnames(modis_metadata);

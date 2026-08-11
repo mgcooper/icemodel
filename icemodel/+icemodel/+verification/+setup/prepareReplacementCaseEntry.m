@@ -5,10 +5,10 @@ function entry = prepareReplacementCaseEntry(entry, dataset_family)
    %     entry, dataset_family)
    %
    % A build_observations=false whole-family replacement needs the requested
-   % observation contract, but its prior native/RCM runtime state is not part of
-   % the replacement. This helper removes every RCM leg and clears the combined
-   % native/evaluation fields used by PROMICE, IMAU, and RetMIP before requested
-   % forcing is attached.
+   % observation contract. The prior native and RCM runtime state is not part
+   % of that replacement. This helper removes every RCM leg and clears the
+   % combined native and evaluation fields that PROMICE, IMAU, and RetMIP use,
+   % before the importer attaches the requested forcing.
    %
    % See also: icemodel.verification.setup.reuseDatasetFamilyCases,
    %  icemodel.verification.setup.colocationSourceLists
@@ -22,8 +22,9 @@ function entry = prepareReplacementCaseEntry(entry, dataset_family)
       return
    end
 
-   % Whole-family replacement discards every prior RCM leg; selected sources are
-   % rediscovered or rebuilt after the observation-only checkpoint.
+   % Whole-family replacement discards every prior RCM leg. The importer
+   % rediscovers or rebuilds the selected sources after the observation-only
+   % checkpoint.
    colocation = entry.colocation;
    for source = icemodel.verification.namelists.rcmsources()
       name = char(source);

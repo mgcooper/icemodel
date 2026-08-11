@@ -67,11 +67,10 @@ function [candidate, note] = blendFallbackSeams(times, native, current, ...
          notes(n_notes) = string(local_note);
       end
    end
-   % Era-scale adoptions (a multi-year outage union at stations whose
-   % native record never carried a channel) produce dozens of seams; a
-   % verbatim concatenation makes every audit row unreadable, so beyond a
-   % handful the note collapses to a count. The per-sample product and
-   % provenance remain the detailed record.
+   % A multi-year outage at a station whose native record never carried a
+   % channel produces dozens of seams. Listing each seam makes the audit
+   % row unreadable, so more than four seams report a count instead. The
+   % per-sample product and provenance keep the detailed record.
    if n_notes > 4
       note = char(", seam blend: " + n_notes + " seams tapered");
    else

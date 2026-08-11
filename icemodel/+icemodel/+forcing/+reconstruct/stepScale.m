@@ -4,12 +4,12 @@ function scale = stepScale(times, x)
    %  scale = icemodel.forcing.reconstruct.stepScale(times, x)
    %
    % Role
-   %  Single source of the boundary-jump scale (POLICY B6):
-   %  the median absolute consecutive change of the observed channel at
-   %  this station and season, with an all-season fallback where a season
-   %  has too few observed steps for a stable median. Shared by the
-   %  validation metrics (scoring jumps) and the engine tiers (rejecting
-   %  fills that would create them) so the two can never disagree.
+   %  Defines the boundary-jump scale (POLICY B6): the median absolute
+   %  consecutive change of the observed channel at this station and season.
+   %  Where a season has too few observed steps for a stable median, the
+   %  function returns the all-season value instead. The validation metrics
+   %  (which score jumps) and the engine tiers (which reject fills that
+   %  create jumps) both call this function, so both apply the same scale.
    %
    % Returns
    %  scale : struct with fields DJF, MAM, JJA, SON (finite nonnegative
@@ -27,8 +27,8 @@ function scale = stepScale(times, x)
 
    % Steps between ADJACENT finite samples only: a difference spanning a
    % gap is not an hourly change and would inflate the scale. Zero observed
-   % steps remain in the policy median; a flat/quantized channel must tighten
-   % rather than inflate its seam threshold.
+   % steps remain in the policy median. A flat or quantized channel must
+   % tighten its seam threshold, not inflate it.
    adjacent = isfinite(x(1:end - 1)) & isfinite(x(2:end));
    step_from = find(adjacent);
    steps = abs(x(step_from + 1) - x(step_from));

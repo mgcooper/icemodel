@@ -8,15 +8,16 @@ function f = plotcase(case_id, kwargs)
    %
    % Inputs
    %  case_id                    Staged verification case id.
-%  data_root                  Whole data tree containing eval/ and input/.
-%  evaluation_data_root       Base evaluation-data root. When blank, the
-%                             repo-local data/eval tree is used.
-%  input_data_root            Optional paired input-data root for staged
-%                             met/userdata artifacts.
-%  icemodel_config_casename   Config casename used to resolve the default
-%                             evaluation-data root without mutating config.
-%  dataset_family             Optional family filter for shared case ids.
-%  source                     "targets", "reference", or "compare".
+   %  data_root                  Whole data tree containing eval/ and input/.
+   %  evaluation_data_root       Base evaluation-data root. When blank, this
+   %                             function uses the repo-local data/eval tree.
+   %  input_data_root            Optional paired input-data root for staged
+   %                             met/userdata artifacts.
+   %  icemodel_config_casename   Config casename that resolves the default
+   %                             evaluation-data root. It does not change the
+   %                             config.
+   %  dataset_family             Optional family filter for shared case ids.
+   %  source                     "targets", "reference", or "compare".
    %  variables                  Optional variable subset. Defaults to the
    %                             manifest comparison variables.
    %  candidate                  Optional in-memory candidate bundle used when
@@ -59,12 +60,11 @@ function f = plotcase(case_id, kwargs)
       "icemodel_config_casename", kwargs.icemodel_config_casename, ...
       "dataset_family", kwargs.dataset_family);
    % The eval target is a forcing-agnostic, data-only observations.mat bundle
-   % referenced via evaluation_path (ESM-SnowMIP, SUMup, freshly staged PROMICE,
-   % and the Snow/Colbeck evaluation.mat). Only PROMICE fixtures staged before
-   % the observations.mat contract lack that file; they fall back to
-   % reconstituting the PROMICE-obs target on demand from the staged per-year
-   % userdata files. The default reference is resolved from the staged model
-   % sources the manifest actually declares.
+   % that evaluation_path names (ESM-SnowMIP, SUMup, freshly staged PROMICE,
+   % and the Snow/Colbeck evaluation.mat). Only the older PROMICE fixtures
+   % lack that file. For those, this function rebuilds the PROMICE-obs target
+   % from the staged per-year userdata files. The default reference comes from
+   % the staged model sources that the manifest declares.
    if isfield(manifest, 'evaluation_path') ...
          && strlength(string(manifest.evaluation_path)) > 0 ...
          && isfile(manifest.evaluation_path)
@@ -190,8 +190,8 @@ function plotExperimentBundle(f, primary, secondary, variable_names, ...
       labels, manifest)
    %PLOTEXPERIMENTBUNDLE Plot one experiment grid such as Colbeck exp1-exp3.
 
-   % Experiment bundles use rows for experiments and columns for variables so
-   % process-case differences are visible at a glance.
+   % Experiment bundles use rows for experiments and columns for variables, so
+   % the reader can see the differences between process cases.
    [exp_names, exp_values] = deal(fieldnames(primary), struct2cell(primary));
 
    setFigureSize(f, 1180, max(760, 230 * numel(exp_names)));
@@ -202,8 +202,8 @@ function plotExperimentBundle(f, primary, secondary, variable_names, ...
    title(tl, sprintf('%s (%s)', manifest.case_id, manifest.dataset_family), ...
       'Interpreter', 'none', 'FontSize', 14, 'FontWeight', 'normal')
 
-   % Validate secondary experiment names before plotting to avoid silently
-   % comparing the wrong experiment rows.
+   % Validate the secondary experiment names before plotting. This keeps the
+   % panels from comparing the wrong experiment rows.
    if ~isempty(secondary)
       [secondary_names, secondary_values] = deal( ...
          fieldnames(secondary.experiments), struct2cell(secondary.experiments));
@@ -331,19 +331,27 @@ function [data, names] = profilePlotGroups(value, varname, label)
    end
 
    groups = icemodel.verification.helpers.profileGroups(value);
+   % One slot per group. A group without a profile for this variable stays
+   % unused, so both lists are trimmed to the plotted count after the loop.
+   data = cell(1, numel(groups));
+   names = strings(1, numel(groups));
+   n_plotted = 0;
    for n = 1:numel(groups)
       profile = profileTableForVariable(groups(n).data, varname);
       if isempty(profile)
          continue
       end
-      data{end+1} = profile; %#ok<AGROW>
+      n_plotted = n_plotted + 1;
+      data{n_plotted} = profile;
       if isnat(groups(n).datetime) || isscalar(groups)
-         names(end+1) = label; %#ok<AGROW>
+         names(n_plotted) = label;
       else
-         names(end+1) = label + " " ...
-            + string(groups(n).datetime, 'yyyy-MM-dd'); %#ok<AGROW>
+         names(n_plotted) = label + " " ...
+            + string(groups(n).datetime, 'yyyy-MM-dd');
       end
    end
+   data = data(1:n_plotted);
+   names = names(1:n_plotted);
 end
 
 function used = plotIntervalWithSharedHelper(ax, primary, secondary, varname, ...

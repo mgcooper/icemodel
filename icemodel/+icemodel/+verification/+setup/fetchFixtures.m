@@ -53,8 +53,9 @@ function result = fetchFixtures(version, kwargs)
          version, selection.version)
    end
 
-   % Reject destination links before even the verified fast path can inspect
-   % matching bytes through a path that escapes the selected data root.
+   % Reject destination links first. Otherwise even the verified fast path
+   % could read matching bytes through a path that escapes the selected data
+   % root.
    assertNoDestinationSymlinks(kwargs.root, {selection});
 
    % A complete installed capability is an idempotent success. This branch
@@ -166,7 +167,7 @@ function selected = capabilitySelection(selection, capability)
 end
 
 function [missing, mismatched] = verifyInstalled(root, selection)
-   %VERIFYINSTALLED Verify selected declared files without rejecting unrelated data.
+   %VERIFYINSTALLED Verify declared files without rejecting unrelated data.
    if isempty(selection.files)
       missing = "capability:" + selection.capabilities;
       mismatched = strings(0, 1);
@@ -226,7 +227,7 @@ end
 
 function result = resultStruct(ok, mode, root, selection, missing, ...
       mismatched, command)
-   %RESULTSTRUCT Return one stable status shape for verification and provisioning.
+   %RESULTSTRUCT Return one status shape for verification and provisioning.
    result = struct( ...
       'ok', ok, ...
       'mode', mode, ...

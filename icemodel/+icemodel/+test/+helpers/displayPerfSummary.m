@@ -10,9 +10,9 @@ function displayPerfSummary(case_summary, benchmark)
    % be either a baseline file (e.g., perf_baseline_2016_rolling_icemodel.mat)
    % or an artifact file (e.g., perf_results_smoke_icemodel_s2_vs_rolling.mat).
    %
-   % If run_perf_suite is called with include_benchmarks=false, then the
-   % benchmark struct will have an empty benchmark.summary table and results
-   % are not reported.
+   % If run_perf_suite runs with include_benchmarks=false, the benchmark
+   % struct holds an empty benchmark.summary table, and this function reports
+   % no benchmark results.
 
    if nargin == 1 && (ischar(case_summary) || isStringScalar(case_summary))
       [case_summary, benchmark] = loadFromFile(case_summary);

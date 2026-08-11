@@ -61,7 +61,7 @@ function varargout = parameterLookup(varargin)
       'f_liq_phase_switch_threshold', 0.02, ...
       ...
       ... ----------------------------------------------------------------
-      ... PROMICE albedo winter-fill policy (single source: the native
+      ... PROMICE albedo winter-fill policy (defined once here: the native
       ... builder stamps these months with the dry-snow constant, and the
       ... reconstruction detects exactly that stamp)
       ... ----------------------------------------------------------------
@@ -69,10 +69,10 @@ function varargout = parameterLookup(varargin)
       'promice_winter_albedo_months', [11 12 1 2], ...
       ...
       ... ----------------------------------------------------------------
-      ... PROMICE boom geometry (single source: the POLICY A3 fallback
-      ... chain in icemodel.loadmet bottoms out on this nominal install
-      ... height, and the legacy kanm/kanl alias heights in
-      ... icemodel.setopts are the same constant)
+      ... PROMICE boom geometry (defined once here: the POLICY A3 fallback
+      ... chain in icemodel.loadmet ends on this nominal install
+      ... height, and the kanm/kanl alias heights in
+      ... icemodel.setopts use the same constant)
       ... ----------------------------------------------------------------
       'promice_nominal_boom_height_m', 2.6, ... Nominal upper-boom height [m]
       ...

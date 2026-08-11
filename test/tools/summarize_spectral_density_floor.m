@@ -29,7 +29,8 @@ function report = summarize_spectral_density_floor(kwargs)
    % Install the canonical suite config once so the formal case uses the same
    % environment as the accepted regression/perf tooling.
    [~, ~, ~, ~, suite_cleanup] = ...
-      icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>
+      icemodel.test.helpers.bootstrapTestEnvironment( ...
+      icemodel_config_casename="verification");
 
    % Build and run one canonical formal smoke case, retaining the full formal
    % two-year contract so the density-floor audit sees the spinup evolution.
@@ -79,7 +80,7 @@ function report = summarize_spectral_density_floor(kwargs)
       end
       n_steps_with_floor = n_steps_with_floor + 1;
 
-      % Compute k_bulk w and w/o the density floor
+      % Compute k_bulk with and without the density floor
       k_bulk_floor = icemodel.radiation.bulk_extinction_coefficients(dz_spect, max(raw, 300), tau_N, tau_S, ...
          solar_dwavel);
       k_bulk_raw = computeBulkExactNoFloor(dz_spect, raw, tau_N, tau_S, ...
@@ -123,6 +124,9 @@ function report = summarize_spectral_density_floor(kwargs)
    disp(' ')
    disp(report(:, ...
       {'pct_nodes_below_floor', 'pct_steps_with_floor', 'worst_bulk_rel'}))
+
+   % Restore the caller config now that this entrypoint is done.
+   delete(suite_cleanup)
 end
 
 function bulkcoefs = computeBulkExactNoFloor(dz_spect, ro_sno, ...

@@ -118,7 +118,8 @@ function cases = familyCases(family, kwargs, evaluation_data_root)
 end
 
 function tf = usesDefaultManifestDiscovery(kwargs)
-   %USESDEFAULTMANIFESTDISCOVERY True when listcases should resolve default roots.
+   %USESDEFAULTMANIFESTDISCOVERY True when listcases resolves the default roots.
+
    tf = kwargs.output_root == "" && kwargs.evaluation_data_root == "" ...
       && kwargs.input_data_root == "" ...
       && kwargs.icemodel_config_casename == "";
@@ -315,10 +316,10 @@ function panels = metForcingPanels(records)
    candidates(3) = struct('title', "wind speed and surface pressure", ...
       'left', "wspd", 'right', "psfc", 'aggregation', "mean", ...
       'left_label', "wspd [m s-1]", 'right_label', "psfc [Pa]");
-    candidates(4) = struct('title', "surface albedo", 'left', "albedo", ...
-       'right', strings(1, 0), ...
-       'aggregation', "shortwave_weighted_mean", ...
-       'left_label', "albedo [-]", 'right_label', "");
+   candidates(4) = struct('title', "surface albedo", 'left', "albedo", ...
+      'right', strings(1, 0), ...
+      'aggregation', "shortwave_weighted_mean", ...
+      'left_label', "albedo [-]", 'right_label', "");
    candidates(5) = struct('title', "precipitation", 'left', "ppt", ...
       'right', strings(1, 0), 'aggregation', "daily_total", ...
       'left_label', "ppt [m day-1]", 'right_label', "");
@@ -434,8 +435,8 @@ function groups = variableGroups(records)
    groups(9) = makeGroup("surface_height_depth", ...
       "surface height change, snow depth, and stores", vars, ...
       ["ablation", "surface_height", "snow_depth", "swe", ...
-       "snow_depth_m", "swe_kg_m2"], "mean", "daily", ...
-       pattern="^snd_.*_m$");
+      "snow_depth_m", "swe_kg_m2"], "mean", "daily", ...
+      pattern="^snd_.*_m$");
    groups(9).title = "surface height change, snow depth, and stores " ...
       + "(daily means; complete forcing days, available observation samples)";
    % Albedo is structurally absent without usable shortwave radiation. Weight
@@ -463,16 +464,21 @@ end
 
 function groups = splitOversizedGroups(groups, max_panels)
    %SPLITOVERSIZEDGROUPS Keep every full-width figure within its panel limit.
-   expanded = repmat(emptyGroup(), 1, 0);
+
+   % One expansion block per input group, each sized to that group's part
+   % count, so the expanded list is concatenated once instead of grown per
+   % part.
+   blocks = repmat({repmat(emptyGroup(), 1, 0)}, 1, numel(groups));
    for k = 1:numel(groups)
       group = groups(k);
       if group.name == "subsurface_temperature_string"
          % The established PROMICE QA view overlays the complete thermistor
          % string on one axes; it is not a stack of per-sensor panels.
-         expanded(end + 1) = group; %#ok<AGROW>
+         blocks{k} = group;
          continue
       end
       n_parts = max(1, ceil(numel(group.variables) / max_panels));
+      parts = repmat(group, 1, n_parts);
       for part_index = 1:n_parts
          first = (part_index - 1) * max_panels + 1;
          last = min(part_index * max_panels, numel(group.variables));
@@ -488,10 +494,11 @@ function groups = splitOversizedGroups(groups, max_panels)
                part.name = group.name + "_" + part_index;
             end
          end
-         expanded(end + 1) = part; %#ok<AGROW>
+         parts(part_index) = part;
       end
+      blocks{k} = parts;
    end
-   groups = expanded;
+   groups = [repmat(emptyGroup(), 1, 0), blocks{:}];
 end
 
 function group = emptyGroup()
@@ -570,38 +577,38 @@ function [row, plotted] = plotTimeseriesGroup(c, records, group, target, ...
    for k = 1:numel(group.variables)
       varname = group.variables(k);
       ax = nexttile(tl);
-      % A nonvisual tag keeps semantic panel selection stable after removing
-      % titles that merely repeated the y-axis variable name.
+      % A nonvisual tag keeps panel selection stable by variable name. The
+      % panel carries no title that repeats the y-axis variable name.
       ax.Tag = char(varname);
       panel_axes(k) = ax;
-       [payloads, names, observations, albedo_sources] = ...
-          recordsForVariable(records, varname);
+      [payloads, names, observations, albedo_sources] = ...
+         recordsForVariable(records, varname);
       if isempty(payloads)
          noDataPanel(ax, varname, "not present");
          continue
       end
       aggregations = repmat(group.aggregation, 1, numel(payloads));
-       if group.name == "surface_height_depth"
-          aggregations(observations) = "mean_omitmissing";
-       end
-       display_unit = groupDisplayUnit(group.name, varname);
-       out = icemodel.plot.compareTimeseries(payloads, varname, axes=ax, ...
-          names=names, frequency=group.frequency, ...
-          aggregation=aggregations, startdate=startdate, ...
-          enddate=enddate, display_unit=display_unit, ...
-          albedo_source=albedo_sources, show_legend=false);
-       explanatory_title = variableDisplayTitle(varname);
-       if explanatory_title ~= ""
-          % Retain only titles that explain semantics not present in the axis
-          % label; reduction/support details remain in the figure/report text.
-          title(ax, explanatory_title, 'FontWeight', 'bold', ...
-             'Interpreter', 'none')
-       end
-       if varname == "smb_interval"
-          % The display alias names the source support, while this shorter axis
-          % label keeps the physical quantity and unit readable in the report.
-          ylabel(ax, "interval SMB [" + out.unit + "]", ...
-             'Interpreter', 'none')
+      if group.name == "surface_height_depth"
+         aggregations(observations) = "mean_omitmissing";
+      end
+      display_unit = groupDisplayUnit(group.name, varname);
+      out = icemodel.plot.compareTimeseries(payloads, varname, axes=ax, ...
+         names=names, frequency=group.frequency, ...
+         aggregation=aggregations, startdate=startdate, ...
+         enddate=enddate, display_unit=display_unit, ...
+         albedo_source=albedo_sources, show_legend=false);
+      explanatory_title = variableDisplayTitle(varname);
+      if explanatory_title ~= ""
+         % Keep only a title that explains what the axis label does not.
+         % Reduction and support details stay in the figure and report text.
+         title(ax, explanatory_title, 'FontWeight', 'bold', ...
+            'Interpreter', 'none')
+      end
+      if varname == "smb_interval"
+         % The display alias names the source support, while this shorter axis
+         % label keeps the physical quantity and unit readable in the report.
+         ylabel(ax, "interval SMB [" + out.unit + "]", ...
+            'Interpreter', 'none')
       end
       if any(out.plotted)
          styleLegend(ax);
@@ -639,7 +646,7 @@ function unit = groupDisplayUnit(group_name, varname)
 end
 
 function label = variableDisplayTitle(varname)
-   %VARIABLEDISPLAYTITLE Explain variables whose compact names hide semantics.
+   %VARIABLEDISPLAYTITLE Explain variables whose compact names hide the meaning.
 
    switch varname
       case "snowf_subl"
@@ -890,16 +897,19 @@ function label = legSourceLabel(source, leg)
 end
 
 function items = fallbackStagedFiles(c, input_root, manifest_field, input_subdir)
-   %FALLBACKSTAGEDFILES Resolve atomic ESM met through the standard runtime path.
+   %FALLBACKSTAGEDFILES Resolve atomic ESM met through the standard runtime
+   % path.
+
    items = {};
    if input_subdir ~= "met" || manifest_field ~= "met_files" ...
          || string(c.dataset_family) ~= "esm_snowmip"
       return
    end
 
-   % The atomic manifest has no met_files field. Reuse the actual model option
-   % resolver so nested/flat precedence, cadence, period, and enclosing-window
-   % selection cannot drift from runtime behavior or admit wildcard decoys.
+   % The atomic manifest has no met_files field. Reuse the model option
+   % resolver, so that nested and flat precedence, cadence, period, and
+   % enclosing-window selection match runtime behavior and reject a wildcard
+   % match.
    paths = icemodel.verification.helpers.esmRuntimeMetFiles(c, input_root);
    paths = paths(isfile(paths));
    paths = unique(paths, 'stable');
@@ -1167,10 +1177,10 @@ function label = sourceDisplayName(source, kind)
       otherwise
          label = string(source);
    end
-    if isObservationRole(source, kind)
-       % Native evaluation userdata remains observational even when it is
-       % loaded from the staged userdata tree rather than a target bundle.
-       label = label + " observations";
+   if isObservationRole(source, kind)
+      % Native evaluation userdata remains observational even when it is
+      % loaded from the staged userdata tree rather than a target bundle.
+      label = label + " observations";
    elseif kind == "met"
       label = label + " forcing";
    end
@@ -1404,7 +1414,12 @@ function [payloads, names, observations, albedo_sources] = ...
 end
 
 function selected = preferObservationRecords(selected)
-   %PREFEROBSERVATIONRECORDS Drop same-source userdata when the target has VARNAME.
+   %PREFEROBSERVATIONRECORDS Keep only the observations record of a source.
+   %
+   % recordsForVariable passes the records that carry one variable. When a
+   % source has an observations record, this function drops the other
+   % records of that source, such as its userdata copy.
+
    if isempty(selected)
       return
    end
@@ -1443,15 +1458,17 @@ function [tables, names] = profilesForVariable(profiles, varname, dataset_family
    %PROFILESFORVARIABLE Return human-labelled profile series carrying VARNAME.
    keep = arrayfun(@(p) ismember(varname, p.value_variables), profiles);
    selected = profiles(keep);
-   tables = cell(1, 0);
-   names = strings(1, 0);
    base_name = sourceDisplayName(dataset_family, "observations");
+   % One series block per selected profile, collected in buffers sized to the
+   % selection and flattened once after the loop.
+   table_blocks = repmat({cell(1, 0)}, 1, numel(selected));
+   name_blocks = repmat({strings(1, 0)}, 1, numel(selected));
    for k = 1:numel(selected)
-      [next_tables, next_names] = splitNamedProfiles( ...
+      [table_blocks{k}, name_blocks{k}] = splitNamedProfiles( ...
          selected(k).payload, base_name);
-      tables = [tables, next_tables]; %#ok<AGROW>
-      names = [names, next_names]; %#ok<AGROW>
    end
+   tables = [cell(1, 0), table_blocks{:}];
+   names = [strings(1, 0), name_blocks{:}];
 end
 
 function [tables, names] = splitNamedProfiles(T, base_name)
@@ -1611,16 +1628,21 @@ function finalizeLegendClearance(fig)
       end
       legend_pixels = getpixelposition(lgd, true);
       legend_center = legend_pixels(1:2) + legend_pixels(3:4) / 2;
-      owner = gobjects(0, 1);
+      % At most every axes on the figure can contain the legend centre, so the
+      % owner buffer is sized to the axes list and trimmed to the hits.
+      owner = gobjects(numel(axes_handles), 1);
+      n_owner = 0;
       for ax = reshape(axes_handles, 1, [])
          axes_pixels = getpixelposition(ax, true);
          if legend_center(1) >= axes_pixels(1) ...
                && legend_center(1) <= axes_pixels(1) + axes_pixels(3) ...
                && legend_center(2) >= axes_pixels(2) ...
                && legend_center(2) <= axes_pixels(2) + axes_pixels(4)
-            owner(end + 1, 1) = ax; %#ok<AGROW>
+            n_owner = n_owner + 1;
+            owner(n_owner) = ax;
          end
       end
+      owner = owner(1:n_owner);
       if isscalar(owner)
          % Freeze MATLAB's resolved best position before changing limits;
          % otherwise BEST can move the legend after clearance is computed.

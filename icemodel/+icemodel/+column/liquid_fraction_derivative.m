@@ -4,9 +4,9 @@ function [dFdT, f_wat] = liquid_fraction_derivative(T, f_ice, f_liq, f_wat)
    %  [DFDT, F_WAT] = liquid_fraction_derivative(T, F_ICE, F_LIQ)
    %  [DFDT, F_WAT] = liquid_fraction_derivative(..., F_WAT)
    %
-   % If F_WAT is provided, the derivative is evaluated against that total water
-   % fraction instead of recomputing it from F_ICE and F_LIQ. This is useful
-   % inside melt-zone corrector iterations where F_WAT is held fixed.
+   % If you supply F_WAT, the function evaluates the derivative against that
+   % total water fraction and does not recompute it from F_ICE and F_LIQ.
+   % Melt-zone corrector iterations use this form because they hold F_WAT fixed.
    %
    % See also: icemodel.column.liquid_fraction_function
    %

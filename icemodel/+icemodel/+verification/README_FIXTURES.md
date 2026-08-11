@@ -40,7 +40,8 @@ result = icemodel.verification.setup.packFixtures("v1.1", ...
    root="/path/to/staged/test/data");
 ```
 
-Packing refuses missing or hash-drifted source files. Output goes to the
+Packing refuses a missing source file, and a file whose hash does not match
+the manifest. Output goes to the
 gitignored `release-staging/` directory by default. On macOS, packing uses the
 native USTAR writer with metadata copying disabled so undeclared AppleDouble
 members cannot enter an archive.
@@ -76,9 +77,9 @@ result = icemodel.verification.setup.fetchFixtures("v1.1", ...
 A scalar local archive requires one selected capability. Multiple selected
 capabilities require one archive per capability in the same order.
 
-Before canonical data are touched, `fetchFixtures` verifies the archive size and
-SHA-256, checks raw tar headers, rejects unsafe paths/types and undeclared or
-missing members, extracts to same-filesystem temporary storage, and verifies
-every file. Promotion backs up declared prior paths and restores them on any
-failure. Unrelated files are preserved, and an already-valid capability returns
+`fetchFixtures` runs every check before it changes canonical data. It verifies
+the archive size and SHA-256, checks the raw tar headers, and rejects unsafe
+paths and types as well as undeclared or missing members. It then extracts to
+temporary storage on the same filesystem and verifies every file. Promotion
+backs up the declared prior paths and restores them on any failure. Unrelated files are preserved, and an already-valid capability returns
 success without rewriting data.

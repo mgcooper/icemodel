@@ -25,9 +25,8 @@ Operator-facing usage notes for the public runners and study tools live in:
    - component benchmarks and selected exploratory microbenchmarks
    - top-level benchmark files are the core kernel benchmarks run by default
    - opt-in microbenchmarks can live in subfolders such as `benchmarks/micro/`
-   - representative core benchmark files now live in:
-     `SebKernelPerfTest.m`, `ColumnKernelPerfTest.m`,
-     and `SpectralKernelPerfTest.m`
+   - the core benchmark files are `SebKernelPerfTest.m`,
+     `ColumnKernelPerfTest.m`, and `SpectralKernelPerfTest.m`
 7. `tools/`
    - explicit build/snapshot utilities
 8. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/+icemodel/+test/+helpers/`
@@ -60,7 +59,12 @@ Default software-level regression coverage:
 2. `icemodel`, `kanl`, `2016`, `solver = 1, 2, 3`
 3. `skinmodel`, `kanm`, `2016`, `solver = 1`
 4. `skinmodel`, `kanl`, `2016`, `solver = 1`
-5. self-forced station runs only (`sitename == forcings`)
+5. rolling/default comparisons use the official gap-filled PROMICE forcing
+   (`forcings = "promice_filled"`), with each case's `sitename` selecting the
+   station-specific artifact
+6. explicit `baseline = "v1.1"` comparisons retain the frozen release's
+   historical station forcing (`kanm` or `kanl`) under the existing case ids;
+   any other release tag must register its forcing identity before use
 
 Formal runtime contract for the default regression/perf matrices:
 
@@ -75,9 +79,15 @@ Programmatic regression helpers:
    - canonical performance-regression case matrix
 2. `icemodel.test.helpers.getRegressionCaseMatrix(...)`
    - canonical numerical-regression case matrix
+   - both matrix helpers accept `baseline`; blank/rolling selects
+     `promice_filled`, while registered frozen releases retain their own
+     forcing identity
 3. `icemodel.test.helpers.setModelOptsForCase(...)`
    - canonical builder for the model `opts` used by one regression case
-4. `icemodel.test.helpers.getFormalTestSuiteCases()`
+4. `icemodel.test.helpers.runModelCase(...)`
+   - shared case setup, model dispatch, and canonical postprocessing path used
+     by regression and verification investigations
+5. `icemodel.test.helpers.getFormalTestSuiteCases()`
    - canonical ordered regression/bootstrap cases used by
      `run_test_bootstrap(...)`
 
@@ -85,21 +95,38 @@ Programmatic regression helpers:
 
 1. `run_test_bootstrap(...)`
    - First-time setup or full refresh / pre-release orchestration entry point.
-   - The only tool that owns cleanup/backups of `test/artifacts` and
+   - The only tool that cleans up and backs up `test/artifacts` and the
      managed perf/regression baseline files.
+   - Cleanup removes mutable rolling MAT files only. Registered immutable
+     releases such as v1.1 are loaded for release checks, not snapshotted from
+     a rolling baseline with a different forcing identity.
 2. `build_regression_baseline(...)` and `build_perf_baseline(...)`
    - Rebuild/accept new rolling or versioned baselines.
    - Writes baseline files; does not produce compare artifacts.
+   - Direct versioned builds cannot replace an existing release file.
 3. `snapshot_regression_baseline(...)` and `snapshot_perf_baseline(...)`
    - Freeze a release regression/perf baseline from the current rolling
      regression/perf baseline.
+   - Existing release files are immutable, including when `overwrite=true` is
+     supplied. The rolling source's saved forcing must match the registered
+     current rolling identity and the registered release identity before a new
+     snapshot is written.
 4. `run_regression_suite(...)` and `run_perf_suite(...)`
    - Compare against existing rolling or release baselines
    - Does not mutate baselines
-    - Writes artifacts under `test/artifacts/<yyyymmdd-HHMMSS>/`.
-    - Renders a self-contained Quarto HTML report with plots and a compact CSV
-      in the same directory; use `build_report=false` only for an artifact-only
-      diagnostic run.
+   - Blank `data_root` selects the baseline registration's canonical tree:
+     rolling uses the verification tree, while frozen v1.1 uses historical
+     `test/data`. An explicit root remains authoritative.
+   - The baseline selector also selects the matching formal forcing identity:
+     rolling uses `promice_filled`; frozen v1.1 uses its historical station
+     aliases. Unknown release identities fail before model dispatch.
+   - A rolling file that predates `promice_filled` stops with
+     `rollingBaselineForcingAcceptanceRequired`; accept the authorized rolling
+     baseline before using it for comparison.
+   - Writes artifacts under `test/artifacts/<yyyymmdd-HHMMSS>/`.
+   - Renders a self-contained Quarto HTML report with plots and a compact CSV
+     in the same directory; use `build_report=false` only for an artifact-only
+     diagnostic run.
    - `run_perf_suite` also runs the core benchmark suite and stores
      benchmark timing comparison alongside the formal perf artifact.
    - Formal performance runs force the MATLAB profiler off. Whole-model
@@ -122,8 +149,7 @@ Programmatic regression helpers:
      current sampling budget even though the benchmark itself remained valid.
    - Benchmark-specific interpretation notes should live with the benchmark
      file itself when the timing result motivated a code choice.
-   - The rename/round history is reconciled into `RenameRoundTest.m` rather
-     than split across separate manual scripts.
+   - The rename/round benchmarks live in `RenameRoundTest.m`.
 7.  `build_runoff_reference_from_runoff(...)`
    - Refresh the static runoff reference data in `test/references/`.
    - This is separate from baseline management and requires the sibling
@@ -134,6 +160,33 @@ Programmatic regression helpers:
    - This validates signatures, Code Analyzer cleanliness, runner selector
      variants, per-file discovery, and build/snapshot tools against
      temporary outputs.
+9.  `run_promice_ablation_evaluation(...)`
+   - Audits all canonical PROMICE case-years and runs only an explicit
+     `case_ids` selection (or `"all"`) against the pinned `promice_filled`
+     artifact.
+   - Initializes each selected year on January 1 and saves the June 1--October
+     1 snow-aware comparison payload: observed 600--900 kg m^-3 broad porous-
+      weathering-crust sensitivity band, legacy melt, the diagnosed runoff
+      proxy, refreezing, net physical solid loss from modeled phase and vapor
+      terms, closure, and quantized top-layer deletion. That solid-loss series
+      excludes remeshing and domain exchange. The 600 kg m^-3 density endpoint
+      is not intact glacier-ice density, and the numeric band edges are
+      ordered pointwise for signed lowering.
+   - Chooses one longest summer interval with a 0.05 m trace-snow continuity
+     threshold and a 0.01 m exposed-ice threshold for paired values. Censored
+     rows stay explicit: the interval is not split, and snow-covered rows are
+     not scored.
+   - An empty `case_ids` selection is readiness-only and writes no run
+     artifacts. To persist the ledger, summaries, and saved result bundle,
+     name the cases (or pass `case_ids="all"`) and set
+     `write_artifacts=true`. Setting `write_artifacts=true` with an empty
+     selection is an error.
+   - Render the saved bundle with
+     `icemodel.verification.report.buildAblationEvaluationReport(...)`; the
+     report layer never reruns the model or rereads canonical science inputs.
+     Its cross-site figure is limited to completed selected site-years, while
+     operational readiness and run accounting remain available as appendix
+     prose and downloadable CSV files.
 
 ## Execution policy
 
@@ -144,8 +197,8 @@ Formal suites run from `icemodel` only and read these local files:
 
 They do not require `runoff` on path at execution time.
 
-The SUMup canonical identity-union regression is deliberately excluded from an
-ordinary regression pass by an assumption because it restages 47 observation
+The SUMup canonical identity-union regression is excluded from an ordinary
+regression pass by an assumption because it restages 47 observation
 cases from three multi-million-row NetCDF files. Before a canonical SUMup
 replacement, opt in explicitly and run only that file:
 

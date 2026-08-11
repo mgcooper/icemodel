@@ -147,29 +147,42 @@ function [found, resolved, missing, ambiguous] = ...
    %STATIONFILESTATUS Resolve every registry rule without arbitrary selection.
    [~, names, extensions] = fileparts(files);
    tokens = normalizeFileToken(names + extensions);
-   found = strings(1, 0);
-   resolved = repmat(resolvedEntry("", "", ""), 1, 0);
-   missing = strings(1, 0);
-   ambiguous = strings(1, 0);
+   % Every registry rule resolves or misses exactly once, so the resolved and
+   % missing buffers are sized to the rule list and trimmed after the loop. A
+   % multi-match rule contributes a variable-length ambiguity block, collected
+   % per rule and concatenated once.
+   n_expected = numel(expected);
+   found = strings(1, n_expected);
+   resolved = repmat(resolvedEntry("", "", ""), 1, n_expected);
+   n_resolved = 0;
+   missing = strings(1, n_expected);
+   n_missing = 0;
+   ambiguous_blocks = repmat({strings(1, 0)}, 1, n_expected);
 
    % A zero-match rule is missing; a multi-match rule is both missing from the
    % usable product and explicitly ambiguous for retrieval diagnostics.
-   for k = 1:numel(expected)
+   for k = 1:n_expected
       matches = expectedFileMatches(tokens, expected(k));
       if nnz(matches) == 1
          filename = files(matches);
-         found(end + 1) = filename; %#ok<AGROW>
-         resolved(end + 1) = resolvedEntry( ...
-            expected(k).station, expected(k).suffix, filename); %#ok<AGROW>
+         n_resolved = n_resolved + 1;
+         found(n_resolved) = filename;
+         resolved(n_resolved) = resolvedEntry( ...
+            expected(k).station, expected(k).suffix, filename);
       else
-         missing(end + 1) = expected(k).display; %#ok<AGROW>
+         n_missing = n_missing + 1;
+         missing(n_missing) = expected(k).display;
          if nnz(matches) > 1
-            ambiguous = [ambiguous, files(matches)]; %#ok<AGROW>
+            ambiguous_blocks{k} = files(matches);
          end
       end
    end
-   found = unique(found, 'stable');
-   ambiguous = unique(ambiguous, 'stable');
+   % Drop the unused tails so an all-missing registry keeps the 1-by-0 shapes
+   % the caller stores on the status row.
+   found = unique(found(1:n_resolved), 'stable');
+   resolved = resolved(1:n_resolved);
+   missing = missing(1:n_missing);
+   ambiguous = unique([strings(1, 0), ambiguous_blocks{:}], 'stable');
 end
 
 function matches = expectedFileMatches(tokens, expected)
@@ -188,7 +201,9 @@ function matches = expectedFileMatches(tokens, expected)
 end
 
 function entries = expectedStationEntries(spec, stations)
-   %EXPECTEDSTATIONENTRIES Build required station filename checks for one product.
+   %EXPECTEDSTATIONENTRIES Build required station filename checks for one
+   % product.
+
    suffixes = reshape(string(spec.station_suffixes), 1, []);
    n_entries = numel(stations) * numel(suffixes);
    entries = repmat(expectedEntry("", "", "", "", ""), 1, n_entries);

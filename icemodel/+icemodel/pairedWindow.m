@@ -2,12 +2,12 @@ function [window_start, window_end, enabled] = pairedWindow(startdate, enddate)
    %PAIREDWINDOW Normalize one optional start/end pair to UTC datetimes.
    %
    %  [window_start, window_end, enabled] = ...
-   %     icemodel.internal.pairedWindow(startdate, enddate)
+   %     icemodel.pairedWindow(startdate, enddate)
    %
    % Blank bounds disable the window and return UTC-zoned NaT values. A
    % supplied window must contain both finite scalar bounds in chronological
-   % order. Keeping this policy in the neutral internal namespace lets forcing
-   % builders and verification importers share one public-input boundary.
+   % order. Forcing builders and verification importers call this at their
+   % public boundary to check an optional window.
 
    % Determine endpoint presence before parsing so half-window errors are
    % independent of whether callers use strings, chars, or datetimes.
@@ -67,5 +67,5 @@ end
 
 function invalidWindow(message)
    %INVALIDWINDOW Raise the single neutral optional-window contract error.
-   error('icemodel:internal:pairedWindow:invalidWindow', '%s', message)
+   error('icemodel:pairedWindow:invalidWindow', '%s', message)
 end

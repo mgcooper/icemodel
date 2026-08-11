@@ -1,4 +1,5 @@
-function [Data, metadata] = applyRacmoPrecipitationQualityControl(Data, prior_metadata)
+function [Data, metadata] = applyRacmoPrecipitationQualityControl( ...
+      Data, prior_metadata)
    %APPLYRACMOPRECIPITATIONQUALITYCONTROL Enforce nonnegative RACMO ppt.
    %
    %  [Data, metadata] = ... applyRacmoPrecipitationQualityControl(Data)
@@ -6,19 +7,19 @@ function [Data, metadata] = applyRacmoPrecipitationQualityControl(Data, prior_me
    %     Data, prior_metadata)
    %
    % RACMO labels `precip` as a precipitation flux, which is physically
-   % nonnegative, but the native model field contains small negative numerical
-   % undershoots. Apply the invariant after spatial sampling/remapping and
-   % temporal interpolation, when the builder has converted the public `ppt`
-   % channel to canonical m s-1. Every finite negative sample becomes exactly
-   % zero; missing values, legitimate positives, the time axis, and unrelated
-   % channels are preserved.
+   % nonnegative. The native model field still contains small negative
+   % numerical undershoots. Apply this rule after spatial sampling/remapping
+   % and temporal interpolation, when the builder has converted the public
+   % `ppt` channel to canonical m s-1. Every finite negative sample becomes
+   % exactly zero. This function keeps missing values, positive values, the
+   % time axis, and the other channels unchanged.
    %
-   % The returned flat metadata fields are suitable for both freshly built
-   % artifacts and the exact-reference repair path. There is deliberately no
-   % magnitude threshold: precipitation cannot be negative, while QA retains
-   % the input minimum and replacement count as provenance. Pass the prior flat
-   % QC contract when repairing an already-canonical artifact so the second pass
-   % preserves the original input minimum/count as well as the data.
+   % The returned flat metadata fields fit both freshly built artifacts and
+   % the exact-reference repair path. This function uses no magnitude
+   % threshold, because precipitation cannot be negative. QA keeps the input
+   % minimum and the replacement count as provenance. Pass the prior flat QC
+   % contract when you repair an already-canonical artifact. The second pass
+   % then keeps the original input minimum and count as well as the data.
    %
    % See also: icemodel.forcing.buildRacmoData
 
@@ -46,8 +47,8 @@ function [Data, metadata] = applyRacmoPrecipitationQualityControl(Data, prior_me
       return
    end
 
-   % Record the source-finalized input distribution before enforcing the
-   % physical invariant, preserving all nonfinite values without fabrication.
+   % Record the input minimum from the finalized source before this function
+   % sets negative samples to zero. Nonfinite values stay unchanged.
    values = Data.ppt;
    finite = isfinite(values);
    if any(finite, 'all')
@@ -57,8 +58,8 @@ function [Data, metadata] = applyRacmoPrecipitationQualityControl(Data, prior_me
    values(negative) = 0;
    Data.ppt = values;
 
-   % Report whether this pass repaired anything. Reapplying the helper is a
-   % data-level no-op; passing the prior contract also preserves metadata.
+   % Report whether this pass repaired anything. A second call leaves the data
+   % unchanged. Passing the prior contract also keeps the metadata unchanged.
    metadata.racmo_ppt_qc_replaced_count = nnz(negative);
    if any(negative, 'all')
       metadata.racmo_ppt_qc_status = "applied";
@@ -90,8 +91,9 @@ function tf = compatiblePriorMetadata(prior, current)
       return
    end
 
-   % Reject non-scalar or non-text contract tokens before converting them to
-   % strings, so malformed prior metadata falls back cleanly instead of erroring.
+   % Reject non-scalar or non-text contract tokens before this code converts
+   % them to strings. Malformed prior metadata then falls back instead of
+   % raising an error.
    text_fields = { ...
       'racmo_ppt_qc_method', 'racmo_ppt_qc_stage', ...
       'racmo_ppt_qc_source_variable', 'racmo_ppt_qc_basis', ...

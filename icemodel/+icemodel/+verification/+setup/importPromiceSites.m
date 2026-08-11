@@ -15,14 +15,16 @@ function manifest = importPromiceSites(source_dir, kwargs)
    %    manifest; not part of normal verification runs.
    %    forcing_sources selects runtime sources requested by the current call.
    %    Ordinary calls preserve omitted existing legs; overwrite_family=true
-   %    deliberately replaces the whole family state.
-   %    build_observations=false is a guarded non-dry fast path: requested cases
-   %    must already exist in the target manifest, whose observation entry is
-   %    reused while selected forcing is attached.
+   %    replaces the whole family state.
+   %    build_observations=false is a guarded fast path that still writes.
+   %    Every requested case must already exist in the target manifest. The
+   %    importer reuses that case's observation entry and attaches the
+   %    selected forcing.
    %
    %  Default roots
-   %    source_dir="" reads <repo>/data/verification/promice/hour. With no output_root,
-   %    observations go to <repo>/data/eval/promice/<case_id>/observations.mat and
+   %    source_dir="" reads <repo>/data/verification/promice/hour. With no
+   %    output_root, observations go to
+   %    <repo>/data/eval/promice/<case_id>/observations.mat, and
    %    native met/userdata go to <repo>/data/input/{met,userdata}/promice/.
    %    Explicit source_dir, output_root, evaluation_data_root, and
    %    input_data_root overrides are honored as-is.
@@ -42,12 +44,14 @@ function manifest = importPromiceSites(source_dir, kwargs)
    %  and the station observations.
    %
    %  EVAL IS FORCING-AGNOSTIC. The per-case eval target is a data-only
-   %  observations.mat (same contract as ESM-SnowMIP/SUMup); the manifest records
-   %  the eval contract (evaluation_file, comparison_variables) but NOT the
-   %  forcing provider, so ANY forcing file may be used at the site at runtime
-   %  without rewriting the eval metadata. No bundled evaluation.mat/reference.mat
-   %  (forcing+obs together) is written; forcing lives in separate,
-   %  runtime-discoverable met/userdata files in per-source subfolders.
+   %  observations.mat, under the same contract as ESM-SnowMIP and SUMup. The
+   %  manifest records the eval contract (evaluation_file,
+   %  comparison_variables) but NOT the forcing provider. ANY forcing file may
+   %  therefore be used at the site at runtime, with no rewrite of the eval
+   %  metadata. The importer writes no bundled evaluation.mat or
+   %  reference.mat that holds forcing and observations together. Forcing
+   %  lives in separate met/userdata files in per-source subfolders, which the
+   %  runtime discovers.
    %
    %    Eval (data/eval/promice/<site>/):
    %      * observations.mat           (PROMICE obs target; buildPromiceData)
@@ -149,7 +153,7 @@ function manifest = importPromiceSites(source_dir, kwargs)
    %    Staging one case adds or updates only that case in the family manifest
    %    and preserves every other committed case and file. Re-staging the same
    %    case updates exactly its entry. Set overwrite_family=true only to
-   %    deliberately rebuild the family root.
+   %    rebuild the family root.
    %
    %  Returns
    %    manifest : struct  Family manifest also written to manifest.json.
@@ -190,7 +194,7 @@ function manifest = importPromiceSites(source_dir, kwargs)
 
    % Validate the optional clamp before any cache or staging side effect.
    [window_start, window_end, window_enabled] = ...
-      icemodel.internal.pairedWindow( ...
+      icemodel.pairedWindow( ...
       kwargs.startdate, kwargs.enddate);
 
    % Resolve the forcing sources.
@@ -404,7 +408,7 @@ end
 function assertPriorWindowCompatible(prior_case, kwargs)
    %ASSERTPRIORWINDOWCOMPATIBLE Guard fast refresh against period drift.
    [window_start, window_end, window_enabled] = ...
-      icemodel.internal.pairedWindow( ...
+      icemodel.pairedWindow( ...
       kwargs.startdate, kwargs.enddate);
    if ~window_enabled
       return
@@ -446,7 +450,7 @@ function s = stageCase(site, family_root, met_outdir, userdata_outdir, ...
    else
       % Normal imports resolve source metadata before output writes so missing
       % files or empty windows remain whole-site skips.
-       [aws_meta, promice_start, promice_end] = resolveCaseMetadata( ...
+      [aws_meta, promice_start, promice_end] = resolveCaseMetadata( ...
          site, window_enabled, window_start, window_end, kwargs);
       lat = aws_meta.lat;
       lon = aws_meta.lon;
@@ -479,7 +483,7 @@ function s = stageCase(site, family_root, met_outdir, userdata_outdir, ...
 
    [colocation, comparison_variables, observation_variables, ...
       evaluation_file_rel] = ...
-       stageNativeSource(site, case_id, case_root, userdata_outdir, ...
+      stageNativeSource(site, case_id, case_root, userdata_outdir, ...
       met_outdir, promice_start, promice_end, prior_case, ...
       build_native_forcing, dataset_family, kwargs);
 
@@ -570,7 +574,7 @@ function [colocation, comparison_variables, observation_variables, ...
    end
 
    preserve_prior_promice = ~kwargs.dry_run && ~build_native_forcing ...
-       && ~kwargs.overwrite_family && hasPriorNativeLeg(prior_case);
+      && ~kwargs.overwrite_family && hasPriorNativeLeg(prior_case);
    if preserve_prior_promice
       % A merge refresh should add/update requested sources without erasing a
       % prior PROMICE leg merely because PROMICE was omitted from this call.
@@ -587,10 +591,10 @@ function [colocation, comparison_variables, observation_variables, ...
          icemodel.verification.setup.relpaths(promice_data_files, userdata_outdir);
       promice_co.window = icemodel.verification.setup.manifestWindow( ...
          promice_start, promice_end);
-       if kwargs.dry_run || ~build_native_forcing
-          promice_co.met_files = strings(1, 0);
-          promice_co.met_file_identities = emptyMetFileIdentities();
-       else
+      if kwargs.dry_run || ~build_native_forcing
+         promice_co.met_files = strings(1, 0);
+         promice_co.met_file_identities = emptyMetFileIdentities();
+      else
          try
             promice_met = icemodel.forcing.buildPromiceMet(site, ...
                source_dir=kwargs.promice_dir, ...
@@ -604,26 +608,26 @@ function [colocation, comparison_variables, observation_variables, ...
             % select an existing exact or broader enclosing artifact.
             [forcing_ready, forcing_ready_reason, forcing_complete_windows] = ...
                icemodel.verification.setup.metArtifactReadiness(promice_met_files);
-             promice_co.met_files = ...
-                icemodel.verification.setup.relpaths(promice_met_files, met_outdir);
-             promice_co.met_file_identities = ...
-                metFileIdentities(promice_met_files, met_outdir);
-             promice_co.forcing_ready = logical(forcing_ready);
+            promice_co.met_files = ...
+               icemodel.verification.setup.relpaths(promice_met_files, met_outdir);
+            promice_co.met_file_identities = ...
+               metFileIdentities(promice_met_files, met_outdir);
+            promice_co.forcing_ready = logical(forcing_ready);
             promice_co.forcing_ready_reason = char(forcing_ready_reason);
             promice_co.forcing_complete_windows = forcing_complete_windows;
          catch met_err
-             if ~isSkippableNativeBuildError(met_err)
+            if ~isSkippableNativeBuildError(met_err)
                rethrow(met_err)
             end
-             promice_co.met_files = strings(1, 0);
-             promice_co.met_file_identities = emptyMetFileIdentities();
-             promice_co.met_skipped_reason = string(met_err.message);
+            promice_co.met_files = strings(1, 0);
+            promice_co.met_file_identities = emptyMetFileIdentities();
+            promice_co.met_skipped_reason = string(met_err.message);
          end
       end
 
-      % A native leg is staged only when at least one real runtime artifact is
-      % selectable. This deliberately keeps a one-sample Data-only leg staged
-      % when PROMICE met construction is inapplicable.
+      % A native leg is staged when at least one runtime artifact is
+      % selectable, so a Data-only leg still counts as staged when PROMICE met
+      % construction is inapplicable.
       promice_co.staged = ~isempty(promice_co.data_files) ...
          || ~isempty(promice_co.met_files);
    end
@@ -800,9 +804,9 @@ end
 function anchor = caseCatalogEntry(site, aws_sites)
    %CASECATALOGENTRY Resolve site_name/surface_zone/eval_target/note for a case.
    %
-   % Curated and first-pass classifications both live in promiceSiteCatalog (the
-   % single source of truth for surface_zone + eval_target). When a station is
-   % not cataloged there (e.g. a brand-new L3 station absent from the AWS CSV),
+   % Curated and first-pass classifications both live in promiceSiteCatalog,
+   % which defines surface_zone and eval_target. When a station is not
+   % cataloged there (e.g. a brand-new L3 station absent from the AWS CSV),
    % fall back to "unknown" so the manifest still validates.
    try
       info = icemodel.verification.setup.promiceSiteCatalog(site);

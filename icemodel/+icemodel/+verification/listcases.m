@@ -7,7 +7,7 @@ function cases = listcases(kwargs)
    % Inputs
    %  data_root                  Whole data tree containing eval/ and input/.
    %  evaluation_data_root       Base evaluation-data root. When blank, the
-   %                             repo-local data/eval tree is used.
+   %                             function uses the repo-local data/eval tree.
    %  icemodel_config_casename   Config casename used to resolve the default
    %                             evaluation-data root without mutating config.
    %  dataset_family             Optional family filter, for example
@@ -72,11 +72,11 @@ function cases = listcases(kwargs)
 
    % Sort by case id so runner and test output are stable across filesystems.
    % Snow (esm_snowmip/laugh_tests) and firn (promice/sumup) families carry
-   % different case-entry schemas - the forcing-agnostic firn schema adds
-   % site_location, period, forcing_sources/eval_sources, and colocation - so
-   % harmonize the field set to a common union before
-   % vertcat, filling family-absent fields with []. This keeps the snow lane
-   % byte-identical while letting the firn families be enumerated alongside.
+   % different case-entry schemas. The forcing-agnostic firn schema adds
+   % site_location, period, forcing_sources/eval_sources, and colocation.
+   % Harmonize the field set to a common union before vertcat, and fill
+   % family-absent fields with []. The snow lane then stays byte-identical,
+   % and the firn families appear in the same enumeration.
    groups = selected_family_cases(1:n_families);
    groups = harmonizeCaseFields(groups);
    cases = vertcat(groups{:});
@@ -156,13 +156,13 @@ function resolved = resolveCase(entry, family, input_data_root)
    resolved.input_data_root = resolvedInputRoot(family.family_root, ...
       input_data_root);
 
-   % Resolve relative artifact paths at read time so manifests stay portable
-   % across scoped data roots while workflow functions receive absolute paths. The firn
-   % families bundle their eval target as observations.mat: promice references it
-   % via evaluation_file, SUMup references it via colocation.sumup.obs_file, so
-   % resolve that to evaluation_path when no evaluation_file is declared. (Legacy
-   % promice fixtures predating the bundle leave both empty and fall back to the
-   % per-year userdata reconstitution downstream.)
+   % Resolve relative artifact paths at read time. Manifests then stay portable
+   % across scoped data roots, and workflow functions receive absolute paths.
+   % The firn families bundle their eval target as observations.mat. promice
+   % references it through evaluation_file, and SUMup references it through
+   % colocation.sumup.obs_file, so resolve that to evaluation_path when no
+   % evaluation_file is declared. Some promice fixtures leave both empty and
+   % fall back to the per-year userdata reconstitution downstream.
    resolved.evaluation_path = resolveCasePath(family.family_root, entry, ...
       'evaluation_file');
    if strlength(resolved.evaluation_path) == 0

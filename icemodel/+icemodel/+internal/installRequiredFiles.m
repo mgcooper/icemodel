@@ -15,11 +15,11 @@ function [requirementsList, urlList] = installRequiredFiles(requiredFiles, kwarg
    %
    % Description
    %
-   %  The use case for this function is to install a list of required files
-   %  from GitHub. The list could be shipped with a toolbox, and third party
-   %  users run an install script which reads the requirements list and installs
-   %  them from GitHub. Alternatively, the toolbox maintainer can use this
-   %  function to package the requirements with the toolbox.
+   %  This function installs a list of required files from GitHub. A toolbox
+   %  can ship the list, and a third-party user runs an install script that
+   %  reads the requirements list and installs the files from GitHub. The
+   %  toolbox maintainer can also use this function to package the
+   %  requirements with the toolbox.
    %
    % Input Arguments
    %

@@ -12,7 +12,8 @@ Current contents:
 - `update_force_advance_guard`
 
 Rules:
-- keep runtime control logic here, even when state payloads include column variables
+- keep runtime control logic here, even when state payloads include column
+  variables
 - do not move generic math into this namespace
 
-Migration status: active runtime control helpers have been migrated here.
+This namespace holds the active runtime control helpers.

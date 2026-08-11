@@ -14,16 +14,15 @@ function [H, dHdT, dFdT, dLdT, dVdT] = bulk_enthalpy(T, f_ice, f_liq, f_wat, ...
    %      + ro_liq * Lf * df_liq/dT ...
    %      + L_v/s * f_air * d(ro_vap)/dT] dT.
    %
-   % The strict primitive of that expression carries reference terms such as
-   % f_liq(Tf) and ro_vap(Tf). The solver, however, only uses this helper
-   % through H - H_old. Under the current Picard solve assumptions, the
-   % omitted reference terms are fixed for a node over the nonlinear update
-   % and therefore cancel in the subtraction.
+   % The exact primitive of that expression also carries reference terms such
+   % as f_liq(Tf) and ro_vap(Tf). This helper omits them. The solver uses the
+   % result only through the difference H - H_old. The Picard solve holds the
+   % omitted reference terms fixed for a node over the nonlinear update, so
+   % they cancel in that difference.
    %
-   % In that sense, this helper should be read as the solver-consistent bulk
-   % enthalpy measure, not as a claim that the returned H is the uniquely
-   % normalized thermodynamic enthalpy of the mixture in every reference
-   % convention.
+   % The returned H is therefore consistent with the solver. It is not the
+   % uniquely normalized thermodynamic enthalpy of the mixture in every
+   % reference convention.
    %
    % The current implementation assumes:
    %  - the liquid-fraction curve is evaluated at fixed f_wat within the solve

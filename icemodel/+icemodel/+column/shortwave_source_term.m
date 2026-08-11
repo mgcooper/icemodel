@@ -1,7 +1,7 @@
 function [Sc, chi] = shortwave_source_term(Qsi, albedo, I0, dz_spect, ...
       tau_N, tau_S, solar_dwavel, dz_therm, z_nodes_therm, z_nodes_spect, ...
       z_edges_spect, ro_sno, k_bulk_lookup)
-   %shortwave_source_term Solve the spectral shortwave source term.
+   %SHORTWAVE_SOURCE_TERM Solve the spectral shortwave source term.
    %
    % [Sc, chi] = icemodel.column.shortwave_source_term(Qsi, albedo, ...
    %    I0, dz_spect, tau_N, tau_S, solar_dwavel, dz_therm, ...
@@ -51,8 +51,8 @@ function [Sc, chi] = shortwave_source_term(Qsi, albedo, I0, dz_spect, ...
    %
    % Sc = (1.0 - chi) * Qsi / I0 * -dQ_therm ./ dz_therm;
    %
-   % The surface portion is allocated in the SEB. Note that Qnet and dQnet are
-   % not adjusted for chi in this routine.
+   % The SEB allocates the surface portion. This routine does not adjust Qnet
+   % and dQnet for chi.
    %
    % #codegen
 

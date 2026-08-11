@@ -5,15 +5,14 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    %  [met, metadata] = ... buildPromiceMet(site, source_dir=..., ...
    %     startdate=..., enddate=..., fillwinter=true, fillwithmissing=true)
    %
-   % Reads the station's PROMICE v3 hourly NetCDF (icemodel.forcing.
-   % readPromiceAws), selects pypromice's corrected shortwave product with a
-   % physical raw fallback, derives zero only for missing whole-hour deep-civil-
-   % night radiation, applies the albedo winter-fill policy, runs the standard
-   % source-faithful QA/QC pass (physical clamps without unbounded gap fill), and
-   % returns a timetable
-   % satisfying the icemodel met contract for any station and any window in the
-   % source record. Save it with
-   % icemodel.forcing.helpers.writemet.
+   % Reads the station's PROMICE v3 hourly NetCDF with
+   % icemodel.forcing.readPromiceAws. Selects pypromice's corrected shortwave
+   % product, with a physical raw fallback. Sets zero only for missing
+   % whole-hour deep-civil-night radiation. Applies the albedo winter-fill
+   % policy. Runs the standard source-faithful QA/QC pass, which clamps to
+   % physical limits and does no unbounded gap fill. Returns a timetable that
+   % meets the icemodel met contract for any station and any window in the
+   % source record. Save it with icemodel.forcing.helpers.writemet.
    %
    % PROMICE rainfall_cor_u is corrected liquid precipitation from a tipping-
    % bucket gauge when that channel exists. The builder converts its hourly
@@ -59,11 +58,10 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
       source_dir=kwargs.source_dir, timescale="hourly", ...
       startdate=kwargs.startdate, enddate=kwargs.enddate);
 
-   % Preserve known within-record station handovers with the met artifact
-   % as provenance for surface-height QC flags and for the future
-   % maintenance-visit registry refinement of the runtime interpolation
-   % rung (icemodel-1ps.16); the A3 chain itself may interpolate across
-   % handovers by design.
+   % Keep the known within-record station handovers in the met artifact. They
+   % are provenance for surface-height QC flags and for the maintenance-visit
+   % registry that refines the runtime interpolation rung (icemodel-1ps.16).
+   % The A3 chain may interpolate across a handover by design.
    site_info = icemodel.verification.setup.promiceSiteCatalog(site, ...
       source_dir=kwargs.source_dir);
    [transition_times, transition_record] = ...
@@ -83,13 +81,14 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
       swu_source_file_observations_present= ...
       source_meta.swu_source_file_observations_present);
 
-   % lwd source. Normally the observed channel. OPT-IN fallback (fill_lwd, off
-   % by default) for stations with no longwave sensor (older GC-Net/firn sites,
-   % where dlr is absent or all-NaN in the window): estimate lwd from air
-   % temperature + vapor pressure via the legacy empirical relation, FLAGGED as
-   % estimated in metadata. The default met-builder contract leaves an absent
-   % lwd as an explicit NaN placeholder; fillwithmissing=false is the opt-in
-   % strict path for callers that want missing required channels to abort.
+   % lwd source. Normally the observed channel. An OPT-IN fallback (fill_lwd,
+   % off by default) covers stations with no longwave sensor, where dlr is
+   % absent or all-NaN in the window (older GC-Net/firn sites). That fallback
+   % estimates lwd from air temperature and vapor pressure with the legacy
+   % empirical relation, and it FLAGS the result as estimated in the metadata.
+   % The default met-builder contract leaves an absent lwd as an explicit NaN
+   % placeholder. Callers that want a missing required channel to abort set
+   % fillwithmissing=false, the opt-in strict path.
    has_lwd = ismember('lwd', aws.Properties.VariableNames) ...
       && any(isfinite(aws.lwd));
    lwd_estimated = false;
@@ -118,10 +117,11 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
          'required forcing channel(s) absent at %s: lwd (no met built)', site);
    end
 
-   % In strict mode, a station that lacks a required forcing channel aborts with
-   % a clean, named error instead of a cryptic "Unrecognized table variable
-   % name" from the assembly below. Normal met-builder mode keeps those absent
-   % channels as explicit placeholders so a runtime source swap can fill them.
+   % In strict mode, a station that lacks a required forcing channel stops with
+   % a named error. Without this check, the assembly below fails with
+   % "Unrecognized table variable name". Normal met-builder mode keeps those
+   % absent channels as explicit placeholders so a runtime source swap can fill
+   % them.
    % lwd is excluded here - it has its own observed/estimated/absent handling
    % above.
    forcing_channels = ["tair", "albedo", "wspd", "rh", "psfc"];
@@ -153,8 +153,8 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    met.lwd = lwd;
 
    % Distinguish an observed albedo series from an intentional all-missing or
-   % absent placeholder. The placeholder stays NaN for a later forcing swap;
-   % no constant observation is invented merely to satisfy the met schema.
+   % absent placeholder. The placeholder stays NaN for a later forcing swap.
+   % The code does not invent a constant observation to fit the met schema.
    has_albedo_source = ismember("albedo", ...
       string(aws.Properties.VariableNames));
    has_albedo_observations = has_albedo_source ...
@@ -185,10 +185,10 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    % cloud fraction, turbulent fluxes, ...). These are not required scalar
    % meteorological channels, so a station missing any of them (e.g. KAN_B has
    % no cfrac) must still yield a native met file. Boom height passes
-   % through as optional geometry: the runtime A3 fallback chain
-   % guarantees usable heights and never blocks a run (POLICY A3).
-   % The canonical optional set is the single source of truth for pass-through;
-   % rainf is handled explicitly below because it requires a unit conversion.
+   % through as optional geometry. The runtime A3 fallback chain supplies
+   % usable heights, so a missing boom height does not block a run
+   % (POLICY A3). The canonical optional set defines what passes through.
+   % rainf is handled below on its own because it needs a unit conversion.
    [~, optional] = icemodel.forcing.helpers.metvariables();
    for v = setdiff(optional, "rainf", 'stable')
       if ismember(v, string(aws.Properties.VariableNames))
@@ -233,9 +233,9 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
 
    metadata = source_meta;
    metadata.checks = checks;
-   % Pin the raw bytes that define builder-derived support masks so later
-   % reconstruction cannot replay a changed file with coincidentally equal
-   % aggregate counts.
+   % Record the source file size and hash, because the builder-derived support
+   % masks depend on the raw bytes. A later reconstruction then cannot replay
+   % a changed file that happens to have equal aggregate counts.
    source_info = dir(string(source_meta.source_file));
    metadata.source_size_bytes = source_info.bytes;
    metadata.source_sha256 = ...
@@ -271,8 +271,8 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    metadata.gap_policy = ...
       "shortwave missing values become zero only for whole-hour deep civil " + ...
       "night; other source gaps preserved; no metchecks gap interpolation";
-   % Record the exact delivered met contract just like every Data-backed met
-   % builder while preserving PROMICE's source-specific leg assembly above.
+   % Record the delivered met contract, as every Data-backed met builder does.
+   % The PROMICE-specific leg assembly above stays as it is.
    metadata.met_variables = string(met.Properties.VariableNames);
    metadata.fillwithmissing = kwargs.fillwithmissing;
    metadata = icemodel.forcing.helpers.columnizeMetadata(metadata);

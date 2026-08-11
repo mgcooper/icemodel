@@ -3,21 +3,21 @@ function Data = attachLocationMetadata(Data, location)
    %
    %  Data = icemodel.forcing.helpers.attachLocationMetadata(Data, location)
    %
-   % LOCATION uses the canonical WGS84/projected location fields accepted by
-   % projectLocation plus elev_m. An optional slope field supplies the native
-   % surface slope in m/m; sources without slope metadata receive NaN.
+   % LOCATION uses the WGS84 or projected location fields that projectLocation
+   % accepts, plus elev_m. An optional slope field gives the native surface
+   % slope in m/m. A source with no slope metadata gets NaN.
 
    % Project only locations that do not already carry finite EPSG:3413 values.
    location = icemodel.forcing.helpers.projectLocation(location);
 
-   % Preserve a source-provided surface slope while keeping the common
-   % no-source-metadata representation used by the other forcing families.
+   % Keep the surface slope that the source gives. Use NaN when the source has
+   % no slope, as the other forcing families do.
    slope = NaN;
    if isfield(location, 'slope')
       slope = location.slope;
    end
 
-   % Attach one canonical CustomProperties schema across every Data builder.
+   % Attach the same CustomProperties schema that every Data builder uses.
    Data = addprop(Data, ...
       {'X', 'Y', 'Lat', 'Lon', 'Elev', 'Slope', 'ScalarUnits'}, ...
       repmat({'table'}, 1, 7));

@@ -6,14 +6,15 @@ function [albedo, support] = modisToMetCadence(albedo_daily, time_daily, ...
    %     albedo_daily, time_daily, time_met)
    %  [albedo, support] = ... modisToMetCadence(_, max_gap=days(5))
    %
-   % Single source of the daily-MODIS -> met-cadence conversion mandated by
-   % the gap-fill reconstruction policy (reconstruct/POLICY.md B12, D-15):
-   % attachment happens at staging/reconstruction time through THIS helper,
-   % never at model runtime (icemodel.loadmet rejects daily swap userdata),
-   % so every consumer resolves the staged daily artifact identically. Met
-   % samples are linear interpolations between finite daily samples; daily
-   % satellite albedo is adequate sub-daily forcing because albedo varies
-   % with snowfall and synoptic events, not the hour of day (B12).
+   % This helper performs the daily-MODIS to met-cadence conversion that the
+   % gap-fill reconstruction policy requires (reconstruct/POLICY.md B12,
+   % D-15). Attachment happens at staging and reconstruction time, never at
+   % model runtime, because icemodel.loadmet rejects daily swap userdata.
+   % Every consumer therefore resolves the staged daily artifact the same
+   % way. Each met sample is a linear interpolation between finite daily
+   % samples. Daily satellite albedo is adequate sub-daily forcing because
+   % albedo changes with snowfall and synoptic events, not with the hour of
+   % day (B12).
    %
    % Gap awareness: the staged daily series carries NaN holes (masked 999
    % sentinels, polar darkness, bounds-masked samples). Interpolation never
@@ -23,10 +24,10 @@ function [albedo, support] = modisToMetCadence(albedo_daily, time_daily, ...
    % SUPPORT false. Met samples that land exactly on a finite daily sample
    % are always supported.
    %
-   % The reconstruction albedo bounds (physicalBounds("albedo")) are
-   % enforced fail-closed on the finite daily input: staged artifacts are
-   % already masked to those bounds, so an out-of-bounds sample here means
-   % the caller bypassed staging and the conversion refuses to run.
+   % This function applies the reconstruction albedo bounds
+   % (physicalBounds("albedo")) to the finite daily input. Staging already
+   % masks an artifact to those bounds. An out-of-bounds sample here means
+   % the caller skipped staging, so the conversion raises an error.
    %
    % Inputs
    %  albedo_daily - daily MODIS albedo [-], NaN where missing
@@ -55,8 +56,8 @@ function [albedo, support] = modisToMetCadence(albedo_daily, time_daily, ...
       kwargs.max_gap (1, 1) duration = days(5)
    end
 
-   % An unordered or duplicated daily axis makes interval bookkeeping (and
-   % interp1) meaningless, so fail loudly instead of silently sorting.
+   % An unordered or duplicated daily axis breaks the interval arithmetic and
+   % interp1, so raise an error instead of sorting the axis here.
    if numel(time_daily) ~= numel(albedo_daily)
       error('icemodel:forcing:modisToMetCadence:sizeMismatch', ...
          'albedo_daily (%d) and time_daily (%d) must align', ...
@@ -81,9 +82,9 @@ function [albedo, support] = modisToMetCadence(albedo_daily, time_daily, ...
 
    albedo = nan(numel(time_met), 1);
 
-   % Interpolate between finite daily samples only: NaN holes are handled by
-   % the explicit gap policy below rather than by interp1 NaN propagation,
-   % which would refuse every hole regardless of width.
+   % Interpolate between finite daily samples only. The gap policy below
+   % handles NaN holes. interp1 NaN propagation would instead reject every
+   % hole, whatever its width.
    finite = isfinite(albedo_daily);
    time_finite = time_daily(finite);
    value_finite = albedo_daily(finite);
@@ -101,10 +102,10 @@ function [albedo, support] = modisToMetCadence(albedo_daily, time_daily, ...
       return
    end
 
-   % Reuse the canonical daily->met interpolation without endpoint
-   % extrapolation so met samples outside the finite support stay NaN, and
-   % enforce the reconstruction albedo bounds (SSOT) fail-closed on the
-   % staged input rather than restating the limits here.
+   % Reuse the canonical daily-to-met interpolation with no endpoint
+   % extrapolation, so met samples outside the finite support stay NaN. Read
+   % the albedo bounds from the reconstruction policy function instead of
+   % repeating the limits here.
    albedo = icemodel.forcing.helpers.dailyToHourly( ...
       value_finite, time_finite, time_met, extrapolate=false, ...
       bounds=icemodel.forcing.reconstruct.physicalBounds("albedo"));

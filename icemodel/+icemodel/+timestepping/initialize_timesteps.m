@@ -23,9 +23,9 @@ function [metstep, substep, numsteps, maxsubstep, dt_new, dt_FULL_STEP, ...
    % dt_min = dt_FULL_STEP / maxsubstep; % keep for reference
    dt_new = dt_FULL_STEP / minsubstep;
 
-   % Compute the number of leading spinup years. The forcing years in
-   % opts.simyears are run in order; the first numspinup years are excluded
-   % from saved/postprocessed output.
+   % Compute the number of leading spinup years. The model runs the forcing
+   % years in opts.simyears in order. The saved and postprocessed output
+   % excludes the first numspinup years.
    numspinup = opts.n_spinup_years;
    assert(numspinup < opts.numyears)
    simyears = opts.simyears(:);

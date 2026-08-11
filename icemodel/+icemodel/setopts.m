@@ -31,9 +31,9 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  gap-filled product from icemodel.forcing.reconstruct, complete for
    %  every ledger-ready station-year. "promice" is the native PROMICE AWS
    %  station-met source (a met_<site>_promice file staged by the
-   %  verification builders), retained for provenance and QC — its record
-   %  is incomplete for most station-years and cannot force the model
-   %  there. In both cases the site is named by SITENAME;
+   %  verification builders). It exists for provenance and QC. Its record
+   %  is incomplete for most station-years, so it cannot force the model
+   %  there. In both cases SITENAME names the site;
    %  "gcnet" is the Vandecrux GC-Net gap-filled surface/SEB source for RetMIP
    %  Dye-2-long and Summit (2 m T/RH, 10 m wind); "imau", "retmip", and
    %  "esm_snowmip" are native verification-staged sources with source-specific
@@ -69,6 +69,24 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %
    %  BACKUPFLAG - (optional) a logical scalar indicating whether to backup the
    %  output files if they already exist.
+   %
+   %  OUTPUT_PROFILE - (optional) which channels a run writes. One of:
+   %
+   %     'minimal'    the smallest set that still supports melt, runoff, and
+   %                  refreezing diagnostics.
+   %     'standard'   the default. Adds the surface energy-balance terms and
+   %                  the convergence counters.
+   %     'diagnostic' adds the turbulent-flux internals, and for icemodel the
+   %                  per-forcing-step mass and energy ledger. The closure
+   %                  identities are evaluated from that ledger, which only
+   %                  this profile builds, so a standard run does not build
+   %                  or write it.
+   %
+   %  The channel lists live in icemodel.namelists.surfaceoutputs and
+   %  icemodel.namelists.budgetoutputs; icemodel.configureRun assembles the
+   %  run's vars1 and vars2 from them. The diagnostic list extends the
+   %  standard one, so a standard channel is always present in a diagnostic
+   %  run and stays at the same position.
    %
    % Optional name/value overrides
    %
@@ -170,9 +188,9 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    % Parse inputs.
    % Keep explicit positional parsing here instead of an arguments block for
-   % pre-R2019b compatibility. Namespace/test helpers may use arguments
-   % blocks, but this core runtime entry point should preserve the older
-   % calling contract until that compatibility target is intentionally dropped.
+   % pre-R2019b compatibility. Namespace/test helpers may use arguments blocks,
+   % but core model functions including this entry point preserve pre-R2019b
+   % compatibility until that target is dropped.
    narginchk(4, inf)
    if nargin < 5; userdata = []; end
    if nargin < 6; uservars = []; end
@@ -193,7 +211,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %---------------------------------------------------------
 
    %%% General model settings
-   opts.n_spinup_years  = 0;        % number of leading simulation years used only for spinup
+   % number of leading simulation years used only for spinup
+   opts.n_spinup_years  = 0;
    opts.use_init        = false;    % reserved for later generic initialization support
    opts.initfile        = '';       % reserved generic initialization source
    opts.use_restart     = false;    % load an exact year-boundary restart state?
@@ -209,6 +228,12 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts.ro_ice_init     = 900.0;    % initial ice density               [kg/m3]
    opts.T_ice_init      = -8.0;     % initial ice temperature           [C]
 
+   % use_ro_glc resets the densities used to build the initial phase
+   % fractions in icemodel.column.initialize_column_state. Kernels load ro_ice
+   % and ro_liq from icemodel.physicalConstant, so use_ro_glc does not reach
+   % them: the solver densities are the intrinsic ro_ice and ro_liq whatever
+   % this option is set to. See icemodel-hd6.
+
    %%% Timestepping / mesh options
    opts.calendar_type   = 'noleap'; %
    opts.dt              = 900;      % timestep: 3600 or (recommended) 900  [s]
@@ -221,8 +246,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
    %%% Surface turbulent-heat-flux scheme.
    %
-   % Default = 'bulk_richardson'. 'monin_obukhov' is opt-in via resetopts;
-   % its runtime guard is enforced in configureRun.
+   % Default = 'bulk_richardson'. 'monin_obukhov' is opt-in via resetopts.
+   % configureRun enforces its runtime guard.
    opts.turbulent_flux_scheme = 'bulk_richardson';
    %
    % Roughness lengths default to parameterLookup values via configureRun if
@@ -232,9 +257,9 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts.z0_snow_low_density    = [];
    opts.z0_snow_high_density   = [];
    %
-   % Observation heights for the turbulent-flux scheme. Known forcing-dependent
-   % defaults are set below after the solver block; Override via resetopts for
-   % forcing-specific runs that are not resolved below.
+   % Observation heights for the turbulent-flux scheme. This function sets the
+   % known forcing-dependent defaults below, after the solver block. Override
+   % them via resetopts for a forcing-specific run that is not resolved below.
    opts.z_tair = [];   % air temperature observation height [m]
    opts.z_wind = [];   % wind speed observation height      [m]
    opts.z_relh = [];   % relative humidity obs height       [m] (= z_tair)
@@ -243,20 +268,19 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % the production snow model is implemented.
    opts.use_forcing_snow_depth_for_thf = false;
 
-   %%% Precipitation phase source (POLICY A10 / D-18).
+   %%% Precipitation phase source (see +reconstruct/POLICY.md A10 / D-18).
    %
    % Selects which rainf/snowf split
-   % icemodel.surface.initialize_surface_forcings exposes to
-   % snowfall-consuming callers:
+   % icemodel.surface.initialize_surface_forcings uses:
    %   'source'    - the met product's own rainf/snowf components exactly as
    %                 shipped (e.g. MAR's energy-balance split). Default.
-   %   'threshold' - repartition the canonical total ppt by air temperature
-   %                 via icemodel.forcing.reconstruct.partitionPrecipitation
+   %   'threshold' - repartition total ppt by air temperature via
+   %                 icemodel.forcing.reconstruct.partitionPrecipitation
    %                 (transition temperature single-sourced in
    %                 icemodel.forcing.reconstruct.setopts).
    % D-0b: the solver's advective-rain forcing stays zero either way until
-   % the rain physics is finished; this option never alters existing model
-   % physics.
+   % rain physics is implemented, so this option does not change model physics.
+   %
    opts.precip_phase_source = 'source';
 
    %%% Radiative transfer scheme.
@@ -316,7 +340,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.cpl_Ts_tol      = 1e-2;  % coupler Ts convergence tolerance [K]
       opts.cpl_seb_tol     = 1.0;   % coupler SEB convergence tolerance [W m-2]
       opts.cpl_alpha       = 1.0;   % coupler Ts relaxation factor (rec: 1.0)
-      opts.cpl_aitken      = true;  % coupler Ts aitken-acceleration flag
+      opts.cpl_aitken      = true;  % coupler Ts acceleration (Aitken+secant)
       opts.cpl_jumpmax     = 5.0;   % coupler Ts acceleration guess tolerance [K]
 
    elseif strcmp(smbmodel, 'skinmodel')
@@ -331,7 +355,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.maxiter         = 100;   % thermal solver max iterations
       opts.tol             = 1e-2;  % thermal solver convergence tolerance [K]
       opts.alpha           = 1.8;   % thermal solver relaxation factor (rec: 1.8)
-      opts.use_aitken      = true;  % thermal solver aitken-acceleration flag (rec: true)
+      % thermal solver aitken-acceleration flag (rec: true)
+      opts.use_aitken      = true;
       opts.jumpmax         = 5.0;   % thermal solver acceleration guess tolerance [K]
 
       % Surface-subsurface coupler options
@@ -339,7 +364,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.cpl_Ts_tol      = 1e-2;  % coupler Ts convergence tolerance [K]
       opts.cpl_seb_tol     = 1.0;   % coupler SEB convergence tolerance [W m-2]
       opts.cpl_alpha       = 1.8;   % coupler Ts relaxation factor (rec: 1.8)
-      opts.cpl_aitken      = true;  % coupler Ts aitken-acceleration flag (rec: true)
+      % coupler Ts acceleration (Aitken+secant) (rec: true)
+      opts.cpl_aitken      = true;
       opts.cpl_jumpmax     = 5.0;   % coupler Ts acceleration guess tolerance [K]
    else
       error('unrecognized surface mass balance model name SMBMODEL')
@@ -358,17 +384,18 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
       case 'kanl'
          % PROMICE/GC-Net single-boom nominal install height (matches the
-         % generic 'promice' path; single-sourced in parameterLookup).
-         % When the met file carries the time-varying boom_height channel,
-         % icemodel.loadmet replaces this scalar through the POLICY A3
-         % measured -> interpolated -> nominal fallback chain.
+         % generic 'promice' path; defined in parameterLookup). When the
+         % met file carries the time-varying boom_height channel,
+         % icemodel.loadmet replaces this scalar through the
+         % +reconstruct/POLICY.md A3 measured -> interpolated -> nominal
+         % fallback hierarchy.
          opts.z_tair = ...
             icemodel.parameterLookup('promice_nominal_boom_height_m');
          opts.z_wind = opts.z_tair;
 
       case 'kanm'
          % PROMICE/GC-Net single-boom nominal install height (matches the
-         % generic 'promice' path; single-sourced in parameterLookup).
+         % generic 'promice' path; defined in parameterLookup).
          % When the met file carries the time-varying boom_height channel,
          % icemodel.loadmet replaces this scalar through the POLICY A3
          % measured -> interpolated -> nominal fallback chain.
@@ -382,19 +409,18 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
       case {'promice', 'promice_filled'}
          % Native PROMICE AWS station met (met_<site>_promice) and the
-         % canonical runnable gap-filled product
-         % (met_<site>_promice_filled). T/RH and wind share the upper boom,
-         % whose height changes as the surface evolves. NaN is an intentional
-         % unresolved sentinel: icemodel.loadmet replaces it with the
-         % per-timestep boom-height series resolved through the POLICY A3
-         % fallback chain (measured -> interpolated -> nominal constant),
-         % recording the outcome in opts.boom_height_source so geometry
-         % never blocks a run (D-0a).
+         % gap-filled product (met_<site>_promice_filled). T/RH and wind share
+         % the upper boom, whose height changes as the surface evolves. NaN is
+         % the unresolved sentinel: icemodel.loadmet replaces it with
+         % the per-timestep boom-height series resolved through the
+         % +reconstruct/POLICY.md A3 fallback hierarchy (measured ->
+         % interpolated -> nominal constant), recording the outcome in
+         % opts.boom_height_source so geometry never blocks a run (D-0a).
          opts.z_tair = NaN;
          opts.z_wind = NaN;
 
       case 'gcnet'
-         % Vandecrux GC-Net surface/SEB files expose Ta_2m and WS_10m, so use
+         % Vandecrux GC-Net surface/SEB files include Ta_2m and WS_10m, so use
          % standard 2 m T/RH and 10 m wind heights rather than the PROMICE
          % single-boom convention.
          opts.z_tair = 2.0;
@@ -407,8 +433,9 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
          opts.z_wind = 10.0;
 
       case 'retmip'
-         % RetMIP-native met files are staged under one runtime source label,
-         % but their measurement heights follow the native source for the case.
+         % RetMIP-native met files are staged under one runtime source
+         % label, but their measurement heights follow the native source
+         % for the case.
          [opts.z_tair, opts.z_wind] = retmipObservationHeights(sitename);
 
       case 'esm_snowmip'
@@ -429,17 +456,17 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % hours to timesteps.
    opts.tlag = 6 * 3600 / opts.dt;
 
-   % Output profile. "minimal" is the lean profile used when wrappers request
-   % reduced grid-style output; "standard" is the full point-run profile; and
-   % "diagnostic" extends the point-run profile with solver/THF debugging
-   % scalars.
+   % Output profile. "minimal" is the lean profile, recommended for large-scale
+   % gridded runs to reduce output storage; "standard" is the full point-run
+   % profile; and "diagnostic" extends the point-run profile with solver/THF
+   % debugging scalars.
    opts.output_profile = 'standard';
 
    %------------------------- End of user-defined model options
    %--------------------------------------------------------------
 
-   % Initialize run-time contracts. If external callers modify opts via
-   % resetopts, contracts are re-enforced by configureRun at model run-time.
+   % Initialize run-time contracts. If an external caller modifies opts via
+   % resetopts, configureRun re-enforces the contracts at model run time.
    opts = icemodel.resetopts(opts, varargin{:});
    opts = icemodel.configureRun(opts);
 end
@@ -507,11 +534,11 @@ function opts = initopts(smbmodel, sitename, simyears, forcings, ...
 
    % Optional explicit time-window bounds. When set (via name/value override or
    % icemodel.resetopts), icemodel.loadmet subsets the loaded met data to
-   % [startdate, enddate] in addition to the year-granularity simyears subset.
-   % The defaults are NaT so the canonical year-only behaviour is preserved when
-   % these are not set. Used by the verification suite to evaluate against
-   % targeted windows (e.g. one snow season) without inventing new calendar /
-   % hydrologic-year policy.
+   % [startdate, enddate] or the years set by simyears. The defaults are NaT so
+   % the year-only behaviour (simyears) is respected when these are not set.
+   % [startdate, enddate] can be used to evaluate against targeted windows
+   % (e.g. one snow season) in the +verification suite, without inventing new
+   % calendar or hydrologic-year policy.
    opts.startdate = NaT('TimeZone', 'UTC');
    opts.enddate   = NaT('TimeZone', 'UTC');
 
@@ -524,31 +551,32 @@ function opts = initopts(smbmodel, sitename, simyears, forcings, ...
    opts.pathrestart = [];
    opts.casename = [];
    opts.metfname = {};
-    opts.userdatafname = {};
-    opts.readiness_file = "";
-     opts.report_inputs_file = "";
-     opts.promice_filled_readiness_verified = false;
-      opts.promice_filled_manifest_verified = false;
-      opts.promice_filled_verified_forcing = '';
-      opts.promice_filled_verified_site = '';
-      opts.promice_filled_verified_simyears = [];
-      opts.promice_filled_verified_metfname = {};
-      opts.promice_filled_verified_startdate = NaT('TimeZone', 'UTC');
-      opts.promice_filled_verified_enddate = NaT('TimeZone', 'UTC');
-      opts.promice_filled_verified_calendar_type = '';
-      opts.promice_filled_verified_smbmodel = '';
-      opts.promice_filled_verified_dt = NaN;
-      % Boom-height resolution contract stamped by icemodel.loadmet for
-      % PROMICE-geometry forcings (POLICY A3): '' until loadmet resolves the
-      % chain, then 'measured' (every requested sample passed validation),
-      % 'interpolated' (invalid samples were bridged from neighboring valid
-      % measurements), or 'nominal' (no valid measurement existed and the
-      % parameterLookup nominal constant applies). The fraction records the
-      % share of requested samples not taken directly from valid
-      % measurements.
-      opts.boom_height_source = '';
-      opts.boom_height_fraction_fallback = NaN;
-    opts.vars1 = {};
+   opts.userdatafname = {};
+   opts.readiness_file = "";
+   opts.report_inputs_file = "";
+   opts.promice_filled_readiness_verified = false;
+   opts.promice_filled_manifest_verified = false;
+   opts.promice_filled_provenance_verified = false;
+   opts.promice_filled_verified_forcing = '';
+   opts.promice_filled_verified_site = '';
+   opts.promice_filled_verified_simyears = [];
+   opts.promice_filled_verified_metfname = {};
+   opts.promice_filled_verified_startdate = NaT('TimeZone', 'UTC');
+   opts.promice_filled_verified_enddate = NaT('TimeZone', 'UTC');
+   opts.promice_filled_verified_calendar_type = '';
+   opts.promice_filled_verified_smbmodel = '';
+   opts.promice_filled_verified_dt = NaN;
+
+   % Boom-height resolution set by icemodel.loadmet for PROMICE-geometry
+   % forcings (POLICY A3): '' until loadmet resolves the chain, then 'measured'
+   % (every requested sample passed validation), 'interpolated' (invalid samples
+   % were bridged from neighboring valid measurements), or 'nominal' (no valid
+   % measurement existed and the parameterLookup nominal constant applies). The
+   % fraction records the share of requested samples not taken directly from
+   % valid measurements.
+   opts.boom_height_source = '';
+   opts.boom_height_fraction_fallback = NaN;
+   opts.vars1 = {};
    opts.vars2 = {};
 end
 
@@ -562,7 +590,7 @@ function [z_tair, z_wind] = retmipObservationHeights(sitename)
          z_wind = 10.0;
       case {"kanu", "kan"}
          % KAN_U follows the PROMICE single-boom nominal install height
-         % (single-sourced in parameterLookup).
+         % (defined in parameterLookup).
          z_tair = icemodel.parameterLookup('promice_nominal_boom_height_m');
          z_wind = z_tair;
       otherwise

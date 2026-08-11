@@ -21,7 +21,7 @@ function [stability, dstability] = stability_factor(T_sfc, tair, wspd, br_coefs)
    % For unstable, the absolute value of the Richardson number is implicit
    % because T_sfc>tair implies T_sfc-tair>0, see Appendix of Liston et al 1999
    %
-   % Legacy implementation, for comparison with notes.
+   % Scalar branch form, for comparison with the notes.
    %
    %  if T_sfc < tair % Stable case
    %
@@ -59,7 +59,12 @@ function [stability, dstability] = stability_factor(T_sfc, tair, wspd, br_coefs)
    % downstream branch formulas operate on the possibly complex T_sfc value.
    T_sfc_real = real(T_sfc);
 
-   state_size = size(T_sfc + 0 * tair + 0 * wspd);
+   % Broadcast T_sfc against both forcings so every expanded evaluation array
+   % shares one shape. Any T_sfc matching that shape works, including the
+   % vectorized call path and a complex-step derivative over an array; the
+   % solver happens to pass a scalar.
+   broadcast_shape = T_sfc + 0 * tair + 0 * wspd;
+   state_size = size(broadcast_shape);
    tair_eval = expand_input(tair, state_size);
    B1_eval = expand_input(B1, state_size);
    B2_eval = expand_input(B2, state_size);
@@ -111,8 +116,24 @@ function [B1, B2] = bulk_stability_terms(tair, wspd, br_coefs)
       B2_num = reshape(br_coefs(:, 3), size(tair));
    end
 
-   B1 = B1_num ./ (tair .* wspd .^ 2);
-   B2 = B2_num ./ (sqrt(tair) .* wspd);
+   % Exact calm air has no forced aerodynamic exchange because De is zero.
+   % Define its otherwise singular stability multiplier as neutral so zero
+   % transport prefactors remain finite in the flux and Robin pathways.
+   wspd_eval = wspd;
+   calm_mask = wspd_eval == 0;
+   wspd_eval(calm_mask) = 1;
+
+   B1 = B1_num ./ (tair .* wspd_eval .^ 2);
+   B2 = B2_num ./ (sqrt(tair) .* wspd_eval);
+   if isscalar(calm_mask)
+      if calm_mask
+         B1(:) = 0;
+         B2(:) = 0;
+      end
+   else
+      B1(calm_mask) = 0;
+      B2(calm_mask) = 0;
+   end
 end
 
 function [S, dSdT] = stableBranch(T_sfc, tair, B1)

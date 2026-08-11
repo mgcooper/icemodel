@@ -23,13 +23,13 @@ function series = remapPolygon(X, Y, block, P, kwargs)
    % Name-value
    %  cellareas : N x M true cell areas [m^2]. When omitted, exactremap
    %      derives areas from the coordinates. RACMO ships gridarea (km^2);
-   %      pass it as gridarea*1e6. Areas matter for area-sums; for the
-   %      area-weighted MEAN returned here they are second-order (the
-   %      weights are a ratio), but passing true areas is exact.
-   %  validmask : N x M logical, true = valid cell. Invalid cells (e.g.
-   %      off-ice) are infilled from valid neighbours (infillmasked=true,
-   %      the default) before averaging; cells that remain invalid follow
-   %      the normalizationdomain / missingvalue policy.
+   %      pass it as gridarea*1e6. Areas matter for area sums. For the
+   %      area-weighted MEAN returned here they are second-order, because
+   %      the weights are a ratio. True areas still give the exact result.
+   %  validmask : N x M logical, true = valid cell. With infillmasked=true
+   %      (the default), exactremap fills invalid cells, such as off-ice
+   %      cells, from valid neighbours before it averages. Cells that stay
+   %      invalid follow the normalizationdomain and missingvalue policy.
    %  infillmasked : extend valid data across masked cells (default true).
    %  normalizationdomain : "polygon" (default; result represents the whole
    %      polygon) or "valid" (renormalise over valid-overlap area only).
@@ -47,8 +47,8 @@ function series = remapPolygon(X, Y, block, P, kwargs)
    %  - data must be shaped like the grid: a 2-D (single time) or 3-D
    %    N-by-M-by-T array, OR fully-flattened coordinate lists
    %    (V(:), X(:), Y(:) all consistent). A V(:) column paired with 2-D
-   %    X, Y is a mixed form that mis-aligns, so the caller's cells-by-time
-   %    block is reshaped to a 3-D meshgrid-oriented array here.
+   %    X, Y is a mixed form that mis-aligns, so this wrapper reshapes the
+   %    caller's cells-by-time block into a 3-D meshgrid-oriented array.
    %
    % Dependency: the exactremap toolbox must be on the MATLAB path. It lives
    % in a sibling dev repo (projects/exactremap,

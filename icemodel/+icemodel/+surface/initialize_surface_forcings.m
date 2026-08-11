@@ -24,13 +24,13 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
    %  rainf  - phase-source-selected liquid precipitation rate [m s^-1]
    %  snowf  - phase-source-selected solid precipitation rate [m s^-1]
    %
-   % The trailing rainf/snowf outputs expose the runtime precipitation
-   % phase selection (opts.precip_phase_source, POLICY A10/D-18): 'source'
-   % returns the met product's own split exactly as shipped; 'threshold'
-   % repartitions the canonical total ppt by air temperature. They are
-   % appended after OPTS so every existing caller is positionally
-   % unaffected, and per POLICY D-0b they feed no existing physics: the
-   % RAIN output stays zero until the advective-rain physics is finished.
+   % The trailing rainf/snowf outputs carry the runtime precipitation phase
+   % selection (opts.precip_phase_source, POLICY A10/D-18). 'source' returns
+   % the met product's own split as shipped. 'threshold' repartitions the
+   % canonical total ppt by air temperature. They come after OPTS, so the
+   % positions of the earlier outputs do not change. Under POLICY D-0b they
+   % feed no existing physics: the RAIN output stays zero until the
+   % advective-rain physics is finished.
    %
    %#codegen
 
@@ -66,17 +66,17 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
    rain = 0 * tair;
 
    % Runtime precipitation phase selection (POLICY A10 / D-18). The option
-   % opts.precip_phase_source picks the rainf/snowf split exposed to
-   % snowfall-consuming callers; the resolution helper enforces the A10
-   % validity contract (nonnegative components summing to the total). The
-   % helper parses options and defaults outside the code-generation
-   % subset, so it stays behind the MATLAB-target boundary exactly like
-   % the readiness verifier in icemodel.loadmet; generated targets expose
-   % the honest unresolved sentinel until a generated consumer exists.
+   % opts.precip_phase_source picks the rainf/snowf split that
+   % snowfall-consuming callers receive. The resolution helper enforces the
+   % A10 validity contract: nonnegative components that sum to the total.
+   % The helper parses options and defaults outside the code-generation
+   % subset, so it stays behind the MATLAB-target boundary, like the
+   % readiness verifier in icemodel.loadmet. Generated targets return the
+   % unresolved NaN sentinel until a generated consumer exists.
    if coder.target('MATLAB')
-      % Cached options structs may predate the option; default to the
-      % product's own split (the icemodel.setopts default) so old structs
-      % keep their historical behavior.
+      % A cached options struct can lack this field. Default to the
+      % product's own split (the icemodel.setopts default), so an old
+      % struct keeps its behavior.
       phase_source = 'source';
       if isfield(opts, 'precip_phase_source')
          phase_source = opts.precip_phase_source;
@@ -91,13 +91,12 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
    end
 
    % TODO: support rainfall and snowfall mass/state evolution. The optional
-   % snow-depth hook
-   % used by the THF roughness selector is standardized separately as
-   % `snow_depth`, but it does not imply a full snow-model mass/energy
-   % treatment and may remain NaN in existing station datasets.
+   % snow-depth input that the THF roughness selector uses is standardized
+   % separately as `snow_depth`. It does not imply a full snow-model mass and
+   % energy treatment, and it can stay NaN in existing station datasets.
    %
    % Legacy forcing-derivation fallbacks for station datasets that omit
-   % `lwd`, `swd`, or `psfc` now live under `icemodel.surface`:
+   % `lwd`, `swd`, or `psfc` live under `icemodel.surface`:
    %   empirical_incoming_longwave_radiation
    %   incoming_shortwave_radiation
    %   terrain_adjusted_shortwave_radiation
@@ -117,9 +116,8 @@ end
 function values = optionalMetColumn(met, name)
    %OPTIONALMETCOLUMN Return a met column or an all-NaN placeholder.
    %
-   % Absent channels stay honestly missing rather than zero-filled so the
-   % phase resolution never fabricates precipitation from a source that
-   % ships none.
+   % An absent channel stays missing instead of zero-filled, so the phase
+   % resolution never creates precipitation from a source that has none.
    if ismember(name, met.Properties.VariableNames)
       values = met.(name);
    else

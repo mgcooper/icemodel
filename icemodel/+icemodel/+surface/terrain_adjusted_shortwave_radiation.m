@@ -1,6 +1,6 @@
 function Qsi = terrain_adjusted_shortwave_radiation(Jday, xlat, ...
       cloudfrac, xhour, slopeaz, sfcslope, transmiss)
-   %terrain_adjusted_shortwave_radiation Estimate terrain-adjusted shortwave.
+   %TERRAIN_ADJUSTED_SHORTWAVE_RADIATION Estimate terrain-adjusted shortwave.
    %
    %  Qsi = icemodel.surface.terrain_adjusted_shortwave_radiation( ...
    %     Jday, xlat, cloudfrac, xhour, slopeaz, sfcslope, transmiss)

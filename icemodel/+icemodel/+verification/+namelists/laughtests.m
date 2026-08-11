@@ -10,8 +10,8 @@ function case_ids = laughtests()
    % Role
    %  Mirrors icemodel.verification.namelists.snowmipsite for the
    %  Laugh-Tests dataset family so case-id resolution stays uniform
-   %  across families. Currently only colbeck1976 is staged; new
-   %  Laugh-Tests cases are added by extending this list.
+   %  across families. Only colbeck1976 is staged. Add a new Laugh-Tests
+   %  case by extending this list.
 
    case_ids = "colbeck1976";
 end

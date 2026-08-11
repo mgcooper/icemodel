@@ -3,9 +3,8 @@ function pathlist = setpath(varargin)
    %
    %  pathlist = icemodel.setpath(...)
    %
-   % Use icemodel.getpath(...) for new code. This wrapper exists so older
-   % callers continue to resolve the same canonical paths while the repo
-   % transitions to the clearer getter name.
+   % Use icemodel.getpath(...) for new code. This wrapper resolves the same
+   % canonical paths for callers that still use the setpath name.
 
    pathlist = icemodel.getpath(varargin{:});
 end

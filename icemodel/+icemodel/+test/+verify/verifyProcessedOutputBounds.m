@@ -1,5 +1,5 @@
 function verifyProcessedOutputBounds(testCase, ice1, ice2)
-   %VERIFYPROCESSEDOUTPUTBOUNDS Verify basic physical bounds of processed output.
+   %VERIFYPROCESSEDOUTPUTBOUNDS Verify physical bounds of the processed output.
    %
    %  icemodel.test.verify.verifyProcessedOutputBounds(testCase, ice1, ice2)
 

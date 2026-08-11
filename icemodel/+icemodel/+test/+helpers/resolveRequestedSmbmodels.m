@@ -4,16 +4,16 @@ function models = resolveRequestedSmbmodels(smbmodel)
    %  models = icemodel.test.helpers.resolveRequestedSmbmodels("all")
    %  models = icemodel.test.helpers.resolveRequestedSmbmodels("icemodel")
    %
-   % Use this helper at formal-suite entrypoints so the canonical workflow is
-   % always "run one concrete model, then loop when the caller requested the
-   % virtual aggregate selector".
+   % Use this helper at a formal-suite entry point. The workflow then runs one
+   % named model, and loops over every model when the caller asks for the
+   % aggregate selector "all".
 
    arguments
       smbmodel (1, :) string ...
          {icemodel.validators.mustBeTestSmbmodelSelector(smbmodel)}
    end
 
-   % Expand the virtual aggregate selector once at the entrypoint boundary.
+   % Expand the aggregate selector once, at the entry point.
    if smbmodel == "all"
       models = icemodel.namelists.smbmodel("test");
    else

@@ -215,7 +215,7 @@ function test_iceebsolvedirichlet_converges_on_synthetic_column(testCase)
       s.liqflag, s.chi, s.T, s.k_eff, s.dz, s.ro_sfc, s.snow_depth, s.opts);
 
    % Solve for column T_ice using the subsurface column solver
-   [T_old, f_ice_old, f_liq_old, k_eff_old, ok_ieb_old] = ...
+   [T_old, ~, ~, k_eff_old, ok_ieb_old] = ...
       icemodel.column.solve_column_enthalpy(Ts_old, s.T, s.f_ice, s.f_liq, ...
       s.Fc, s.Fp, s.Sc, s.Sp, s.dz, s.delz, s.fn, s.opts.dt, 1, s.tol, ...
       s.maxiter, s.alpha, s.use_aitken, s.jumpmax, false);
@@ -397,6 +397,136 @@ function test_iceenbal_routes_exhausted_budget_to_substep_recovery(testCase)
    testCase.verifyEqual(iter, 1);
 end
 
+function test_secantscalar_finds_root_after_acceleration(testCase)
+   % Residual pairs remain valid even when evaluated states are not a
+   % consecutive unaccelerated Picard sequence.
+
+   [x_next, ok] = icemodel.numerics.secantscalar( ...
+      1.25, 0.375, 2.25, -0.125, 2.125, 10, true);
+
+   testCase.verifyTrue(ok);
+   testCase.verifyEqual(x_next, 2.0, 'AbsTol', 10 * eps);
+end
+
+function test_secantscalar_uses_safeguarded_fallbacks(testCase)
+   % Each invalid or unsafe secant state must retain the caller's relaxed
+   % fallback instead of emitting an unusable accelerated temperature.
+
+   cases = [ ...
+      struct('xprev', 0.25, 'rprev', 0.875, 'x', 1.25, 'r', 0.375, ...
+      'fallback', 1.625, 'jumpmax', 10, 'enabled', false); ...
+      struct('xprev', nan, 'rprev', 0.875, 'x', 1.25, 'r', 0.375, ...
+      'fallback', 1.625, 'jumpmax', 10, 'enabled', true); ...
+      struct('xprev', 0.25, 'rprev', nan, 'x', 1.25, 'r', 0.375, ...
+      'fallback', 1.625, 'jumpmax', 10, 'enabled', true); ...
+      struct('xprev', 0.25, 'rprev', 0.875, 'x', nan, 'r', 0.375, ...
+      'fallback', 1.625, 'jumpmax', 10, 'enabled', true); ...
+      struct('xprev', 0.25, 'rprev', 0.875, 'x', 1.25, 'r', nan, ...
+      'fallback', 1.625, 'jumpmax', 10, 'enabled', true); ...
+      struct('xprev', 0.25, 'rprev', 0, 'x', 1.25, 'r', -0.375, ...
+      'fallback', 1.625, 'jumpmax', 10, 'enabled', true); ...
+      struct('xprev', 0.25, 'rprev', 0.375, 'x', 1.25, 'r', 0, ...
+      'fallback', 1.625, 'jumpmax', 10, 'enabled', true); ...
+      struct('xprev', 0.25, 'rprev', 0.375, 'x', 1.25, 'r', 0.375, ...
+      'fallback', 1.625, 'jumpmax', 10, 'enabled', true); ...
+      struct('xprev', 1, 'rprev', 1, 'x', 1 + eps, 'r', -1, ...
+      'fallback', 3, 'jumpmax', 10, 'enabled', true)];
+
+   for n = 1:numel(cases)
+      c = cases(n);
+      [x_next, ok] = icemodel.numerics.secantscalar(c.xprev, c.rprev, ...
+         c.x, c.r, c.fallback, c.jumpmax, c.enabled);
+      testCase.verifyFalse(ok, sprintf('case %d unexpectedly accelerated', n));
+      testCase.verifyEqual(x_next, c.fallback, ...
+         sprintf('case %d did not retain fallback', n));
+   end
+end
+
+function test_secantscalar_keeps_bracket_when_fallback_is_outside(testCase)
+   % Every endpoint orientation, exterior fallback side, and jump regime must
+   % keep a sign-bracketed step inside the bracket and independent of fallback.
+
+   endpoint_cases = [ ...
+      struct('xprev', 0, 'rprev', 1, 'x', 2, 'r', -1); ...
+      struct('xprev', 2, 'rprev', -1, 'x', 0, 'r', 1)];
+   fallbacks = [-100, 100];
+   jumpmax_cases = [realmax, 0.25];
+
+   for n_endpoint = 1:numel(endpoint_cases)
+      c = endpoint_cases(n_endpoint);
+      for fallback = fallbacks
+         for jumpmax = jumpmax_cases
+            [x_next, ok] = icemodel.numerics.secantscalar( ...
+               c.xprev, c.rprev, c.x, c.r, fallback, jumpmax, true);
+
+            expected = c.x + sign(1 - c.x) * min(abs(1 - c.x), jumpmax);
+            testCase.verifyTrue(ok);
+            testCase.verifyEqual(x_next, expected, 'AbsTol', 10 * eps);
+            testCase.verifyGreaterThan(x_next, 0);
+            testCase.verifyLessThan(x_next, 2);
+         end
+      end
+   end
+end
+
+function test_secantscalar_keeps_unsafe_interpolation_inside_bracket(testCase)
+   % Ill-conditioned, overflowing, and endpoint-hugging interpolation should
+   % take the finite interior midpoint rather than leave the root bracket.
+
+   cases = [ ...
+      struct('xprev', 0, 'rprev', realmin, 'x', 2, 'r', -realmin, ...
+      'fallback', 1, 'expected', 1); ...
+      struct('xprev', -realmax, 'rprev', -1, 'x', realmax, 'r', 1, ...
+      'fallback', 0, 'expected', 0); ...
+      struct('xprev', 0, 'rprev', 1, 'x', 2, 'r', -eps, ...
+      'fallback', 1, 'expected', 1)];
+
+   for n = 1:numel(cases)
+      c = cases(n);
+      [x_next, ok] = icemodel.numerics.secantscalar(c.xprev, c.rprev, ...
+         c.x, c.r, c.fallback, realmax, true);
+      testCase.verifyTrue(ok, sprintf('case %d rejected its bracket', n));
+      testCase.verifyEqual(x_next, c.expected, ...
+         sprintf('case %d did not use its bracket midpoint', n));
+   end
+end
+
+function test_robin_debug_dump_handles_inner_failure(testCase)
+   % The Robin debug path must preserve the failed solver flags instead of
+   % masking the original inner-solve failure with an argument-count error.
+
+   s = testCase.TestData.ice;
+   debug_file = [tempname, '.mat'];
+   old_debug_file = getenv('ICEMODEL_DEBUG_ICEEBSOLVE_FILE');
+   cleanup = onCleanup(@() restoreIceEbDebugEnv( ...
+      old_debug_file, debug_file));
+   setenv('ICEMODEL_DEBUG_ICEEBSOLVE_FILE', debug_file)
+   opts = s.opts;
+   opts.debug = true;
+
+   % A one-iteration inner budget deterministically exercises the failure dump.
+   [~, ~, ~, ~, ~, ok_seb, ok_ieb, ok_cpl] = ...
+      icemodel.couplers.solve_surface_column_robin( ...
+      s.Ts, s.T, s.f_ice, s.f_liq, s.Sc, s.Sp, s.dz, s.delz, s.fn, ...
+      s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, ...
+      s.tppt, s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, ...
+      s.H_e, s.hv_atm, s.br_coefs, s.liqflag, s.chi, 3, s.tol, 1, ...
+      s.alpha, s.use_aitken, s.jumpmax, s.cpl_Ts_tol, s.cpl_seb_tol, ...
+      s.cpl_maxiter, s.cpl_alpha, s.cpl_aitken, s.cpl_jumpmax, ...
+      s.ro_sfc, s.snow_depth, opts);
+
+   % The public flags and persisted diagnostic must identify the same failure.
+   testCase.verifyTrue(ok_seb);
+   testCase.verifyFalse(ok_ieb);
+   testCase.verifyFalse(ok_cpl);
+   testCase.assertEqual(exist(debug_file, 'file'), 2);
+   loaded = load(debug_file, 'debug_state');
+   testCase.verifyEqual(loaded.debug_state.reason, "iceenbal_failed");
+   testCase.verifyTrue(loaded.debug_state.ok_seb);
+   testCase.verifyFalse(loaded.debug_state.ok_ieb);
+   testCase.verifyFalse(loaded.debug_state.ok_cpl);
+end
+
 function test_robin_coupler_supports_monin_obukhov_on_synthetic_column(testCase)
    % The Robin coupler should accept the bulk-MO scheme and converge on the
    % synthetic ice state used by the shared solver tests.
@@ -432,4 +562,12 @@ function test_robin_coupler_supports_monin_obukhov_on_synthetic_column(testCase)
    testCase.verifyLessThanOrEqual(max(f_ice_rob + f_liq_rob * ...
       s.ro_liq / s.ro_ice), 1 + 1e-9);
    testCase.verifyLessThan(abs(residual), 1.0);
+end
+
+function restoreIceEbDebugEnv(old_debug_file, debug_file)
+   %RESTOREICEEBDEBUGENV Restore the debug target and remove the test artifact.
+   setenv('ICEMODEL_DEBUG_ICEEBSOLVE_FILE', old_debug_file)
+   if exist(debug_file, 'file') == 2
+      delete(debug_file)
+   end
 end

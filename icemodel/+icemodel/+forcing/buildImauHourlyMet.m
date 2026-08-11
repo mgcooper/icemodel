@@ -24,8 +24,8 @@ function [met, metadata, Data] = buildImauHourlyMet(station, kwargs)
       source_dir=kwargs.source_dir, startdate=kwargs.startdate, ...
       enddate=kwargs.enddate, fillgaps=kwargs.fillgaps);
 
-   % Use the shared collection-aware conversion path; this source returns one
-   % native hourly timetable, so the default blank dt_out is an exact no-op.
+   % Use the shared collection-aware conversion path. This source returns one
+   % native hourly timetable, so the default blank dt_out changes nothing.
    [met, metadata] = icemodel.forcing.helpers.data2metCollection(Data, ...
       fillwithmissing=kwargs.fillwithmissing);
 end

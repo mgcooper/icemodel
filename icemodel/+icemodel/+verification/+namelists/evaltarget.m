@@ -10,12 +10,13 @@ function eval_targets = evaltarget()
    %                 glaciological zone the case sits in (that is surface_zone).
    %
    % Role
-   %  Canonical eval-target vocabulary shared by the setup importers (which stamp
-   %  eval_target onto case manifests) and validators. eval_target is a string
-   %  ARRAY: one case can exercise several capabilities (e.g. a KAN ablation site
-   %  that carries both a seasonal snowpack and a bare-ice melt season exercises
-   %  both "seasonal_snow" and "bare_ice"). It answers "what does this case test?"
-   %  whereas surface_zone answers "where is this case?". Examples:
+   %  Canonical eval-target vocabulary shared by the setup importers, which
+   %  stamp eval_target onto case manifests, and by the validators. eval_target
+   %  is a string ARRAY, because one case can exercise several capabilities.
+   %  A KAN ablation site carries both a seasonal snowpack and a bare-ice melt
+   %  season, so it exercises both "seasonal_snow" and "bare_ice". eval_target
+   %  answers "what does this case test?", and surface_zone answers "where is
+   %  this case?". Examples:
    %    KAN_L surface_zone="ablation",    eval_target=["seasonal_snow","bare_ice"]
    %    KAN_U surface_zone="percolation", eval_target=["seasonal_snow","firn"]
    %  An empty eval_target (string(0,1)) is permitted for cases that do not

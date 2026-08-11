@@ -4,8 +4,8 @@ function balance = evaluate_surface_energy_balance(Qsn, Qln, Qh, Qe, Qc, Qa, Qm)
    %  balance = icemodel.surface.evaluate_surface_energy_balance(
    %     Qsn, Qln, Qh, Qe, Qc, Qa, Qm)
    %
-   % All flux terms must already be evaluated at the current surface state
-   % before calling this function. The balance is:
+   % You must evaluate all flux terms at the current surface state before you
+   % call this function. The balance is:
    %
    %   balance = Qsn + Qln + Qh + Qe + Qc + Qa - Qm
    %
@@ -13,9 +13,9 @@ function balance = evaluate_surface_energy_balance(Qsn, Qln, Qh, Qe, Qc, Qa, Qm)
    %   Qsn = chi * Qsi * (1 - albedo)           [W m^-2]  net shortwave
    %   Qln = emiss * Qli - emiss * SB * T_sfc^4 [W m^-2]  net longwave
    %
-   % Pass Qm = 0 to obtain the energy available for melt when no melt is
-   % assumed (the pre-melt residual). Pass Qm as the diagnosed melt energy to
-   % obtain the closed balance (should be ~0 at steady state).
+   % Pass Qm = 0 to get the energy available for melt with no melt (the
+   % pre-melt residual). Pass Qm as the diagnosed melt energy to get the
+   % closed balance, which is about 0 at steady state.
    %
    % This is the downstream assembler in the diagnostic SEB chain:
    %   surface_energy_balance_terms -> diagnose_melt_freeze_energy -> here

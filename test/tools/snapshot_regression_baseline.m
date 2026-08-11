@@ -1,13 +1,14 @@
 function RegressionBaseline = snapshot_regression_baseline(kwargs)
-   %SNAPSHOT_REGRESSION_BASELINE Save a release snapshot from the rolling regression baseline.
+   %SNAPSHOT_REGRESSION_BASELINE Freeze the rolling regression baseline.
    %
    %  RegressionBaseline = snapshot_regression_baseline(baseline_tag="v1.1")
    %
-   % Use this when the current rolling regression baseline should be frozen
-   % as a named release baseline. This does not rerun the model; it copies
-   % the current rolling baseline into a versioned release file. A custom
-   % OUTPUT_FILE is supported only when SMBMODEL resolves to one concrete
-   % formal model.
+   % Use this to freeze the current rolling regression baseline as a named
+   % release baseline. It does not rerun the model. It copies the current
+   % rolling baseline into a versioned release file. You can pass a custom
+   % OUTPUT_FILE only when SMBMODEL resolves to one concrete formal model.
+   % Existing release files stay immutable even when the OVERWRITE option is
+   % true.
 
    arguments (Input)
 

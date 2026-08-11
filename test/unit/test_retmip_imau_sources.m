@@ -121,7 +121,7 @@ function test_prepare_case_root_gates_fixed_artifact_identity(testCase)
    requested = struct('period', period, 'site_location', location, ...
       'artifact_metadata', metadata);
 
-   % Equal identity is an exact no-op and therefore preserves saved bytes.
+   % Equal identity changes nothing, so the saved bytes stay the same.
    testCase.verifyFalse(icemodel.verification.setup.prepareCaseRoot( ...
       case_root, false, "observations.mat", requested));
    testCase.verifyEqual(fileBytes(observation_file), original);
@@ -305,7 +305,7 @@ function test_import_retmip_half_window_preserves_error_id(testCase)
    % RetMIP window validation should expose a catchable identifier.
    testCase.verifyError(@() icemodel.verification.setup.importRetmip( ...
       dry_run=true, startdate="2012-01-01"), ...
-      'icemodel:internal:pairedWindow:invalidWindow');
+      'icemodel:pairedWindow:invalidWindow');
 end
 
 function test_imau_forcing_only_fast_path_requires_manifest(testCase)
@@ -586,7 +586,7 @@ function test_import_imau_half_window_preserves_error_id(testCase)
    % IMAU window validation should match the other importers.
    testCase.verifyError(@() icemodel.verification.setup.importImau( ...
       dry_run=true, startdate="2014-01-01"), ...
-      'icemodel:internal:pairedWindow:invalidWindow');
+      'icemodel:pairedWindow:invalidWindow');
 end
 
 function test_native_builders_validate_window_before_missing_source_discovery(testCase)
@@ -606,7 +606,7 @@ function test_native_builders_validate_window_before_missing_source_discovery(te
 
    for k = 1:numel(calls)
       testCase.verifyError(calls{k}, ...
-         'icemodel:internal:pairedWindow:invalidWindow');
+         'icemodel:pairedWindow:invalidWindow');
    end
    testCase.verifyFalse(isfolder(missing_root));
 end
@@ -855,6 +855,28 @@ function test_set_model_opts_rejects_mixed_manifest_met_cadence(testCase)
       'icemodel:test:setModelOptsForCase:invalidManifestMetFiles');
 end
 
+function test_set_model_opts_rejects_manifest_artifact_path_escapes(testCase)
+   % Met and userdata records must reject every platform spelling that could
+   % leave their selected input subtree before any referenced bytes are loaded.
+
+   times = datetime(2012, 1, 1, [0; 1], 0, 0, 'TimeZone', 'UTC');
+   [c, ~] = makeManifestMetListCase(testCase, "path-escape", ...
+      {times}, times(1), times(end));
+   fields = ["met_files", "data_files"];
+   attacks = ["../../outside.mat", "..\..\outside.mat", ...
+      "/tmp/outside.mat", "C:\outside.mat"];
+
+   for field = fields
+      for attack = attacks
+         unsafe = c;
+         unsafe.colocation.mar.(char(field)) = {char(attack)};
+         testCase.verifyError( ...
+            @() icemodel.test.helpers.setModelOptsForCase(unsafe), ...
+            'icemodel:test:setModelOptsForCase:invalidManifestArtifactPath');
+      end
+   end
+end
+
 function test_retmip_candidate_adapter_returns_protocol_bundle(testCase)
    % RetMIP manifests compare against retmip_protocol_bundle targets, not the
    % SUMup-style subsurface_profile_bundle used by profile observations.
@@ -1049,9 +1071,9 @@ function test_dated_profiles_pair_exact_dates_without_depth_collapse(testCase)
    testCase.verifyEqual(height(result.aligned.density), 2)
    testCase.verifyEqual(unique(result.aligned.density.datetime), first_date)
 
-    f = icemodel.verification.plotcase("dated", ...
-       evaluation_data_root=eval_root, dataset_family="sumup", ...
-       source="compare", candidate=candidate, visible="off");
+   f = icemodel.verification.plotcase("dated", ...
+      evaluation_data_root=eval_root, dataset_family="sumup", ...
+      source="compare", candidate=candidate, visible="off");
    testCase.verifyTrue(isvalid(f))
    testCase.verifyGreaterThanOrEqual(numel(findobj(f, 'Type', 'line')), 3)
    close(f)
@@ -1221,8 +1243,8 @@ function test_fetch_gcnet_accepts_normalized_station_filenames(testCase)
 end
 
 function test_fetch_gcnet_rejects_partial_and_ambiguous_matches(testCase)
-   % A containing basename is not the required file, and two exact normalized
-   % basenames are ambiguous rather than an invitation to select the first one.
+   % A basename that only contains the token is not the required file. Two
+   % exact normalized basenames are ambiguous, so do not select the first one.
    cache = fullfile(testCase.TestData.cache, 'gcnet-partial-ambiguous');
    mkdir(cache)
    touch(fullfile(cache, 'backup_DYE_2_surface.nc'));
@@ -1421,7 +1443,7 @@ end
 
 function test_gcnet_inventory_ignores_partial_and_ambiguous_files(testCase)
    % Tolerant inventory must not revive a containing basename or choose between
-   % two normalized copies that fetch status has deliberately left unresolved.
+   % two normalized copies that fetch status leaves unresolved as ambiguous.
    cache = fullfile(testCase.TestData.cache, 'gcnet-inventory-ambiguous');
    first = fullfile(cache, 'package-a');
    second = fullfile(cache, 'package-b');
@@ -2879,7 +2901,7 @@ end
 function test_imau_hourly_builder_enforces_paired_utc_window(testCase)
    % The direct builder rejects every malformed pair and preserves zoned instants.
    cache = makeImauSourceCache(testCase.TestData.cache, "S21");
-   error_id = 'icemodel:internal:pairedWindow:invalidWindow';
+   error_id = 'icemodel:pairedWindow:invalidWindow';
    testCase.verifyError(@() icemodel.forcing.buildImauHourlyData( ...
       "S21", source_dir=cache, startdate="2014-04-12"), error_id);
    testCase.verifyError(@() icemodel.forcing.buildImauHourlyData( ...
@@ -3424,9 +3446,9 @@ function test_sumup_colocation_records_mixed_anchor_metadata(testCase)
    % mixed anchors instead of assuming every anchor is PROMICE.
    anchors = [ ...
       struct('site', "FA", 'family', "retmip", 'source_id', "fa", ...
-         'x_epsg3413', 0, 'y_epsg3413', 0)
+      'x_epsg3413', 0, 'y_epsg3413', 0)
       struct('site', "S21", 'family', "imau", 'source_id', "S21", ...
-         'x_epsg3413', 50000, 'y_epsg3413', 0)];
+      'x_epsg3413', 50000, 'y_epsg3413', 0)];
 
    [tf, returned, distance_km] = ...
       icemodel.verification.helpers.sumupColocation(1000, 0, ...
@@ -3571,11 +3593,11 @@ function test_import_research_sites_dry_run_is_source_free(testCase)
    merra_root = fullfile(root, 'merra');
    racmo_root = fullfile(root, 'racmo');
    returned = icemodel.verification.setup.importResearchSites(missing_sumup, ...
-       family="research_site", observation_source="sumup", ...
-       case_ids="humphrey", dry_run=true, build_forcing=true, ...
-       skip_missing=false, evaluation_data_root=eval_root, ...
-       input_data_root=input_root, mar_dir=mar_root, ...
-       merra_dir=merra_root, racmo_dir=racmo_root);
+      family="research_site", observation_source="sumup", ...
+      case_ids="humphrey", dry_run=true, build_forcing=true, ...
+      skip_missing=false, evaluation_data_root=eval_root, ...
+      input_data_root=input_root, mar_dir=mar_root, ...
+      merra_dir=merra_root, racmo_dir=racmo_root);
 
    testCase.verifyEqual(string(returned.dataset_family), "research_site");
    testCase.verifyEqual(string(returned.cases.case_id), "humphrey");
@@ -3616,7 +3638,7 @@ function test_import_research_sites_invalid_window_precedes_root_resolution(test
    testCase.verifyError(@() ...
       icemodel.verification.setup.importResearchSites("", ...
       output_root=output_root, startdate="2012-01-01"), ...
-      'icemodel:internal:pairedWindow:invalidWindow');
+      'icemodel:pairedWindow:invalidWindow');
    testCase.verifyFalse(isfolder(output_root));
 end
 
@@ -4000,8 +4022,8 @@ function test_import_sumup_default_catalog_uses_2025_canonical_map(testCase)
    % retaining both Dye-2 targets.
    eval_root = fullfile(testCase.TestData.cache, 'sumup-canonical-eval');
    sites = ["SER_B", "MIT", "TAS_U", "TAS_L", "THU_L", "THU_L2", ...
-       "THU_U", "ZAC_A", "ZAC_L", "ZAC_U", "HUMPHREY", "DY2", ...
-       "Dye-2_long", "KANT", "S23", "LYN_L", "LYN_T", "NUK_B"];
+      "THU_U", "ZAC_A", "ZAC_L", "ZAC_U", "HUMPHREY", "DY2", ...
+      "Dye-2_long", "KANT", "S23", "LYN_L", "LYN_T", "NUK_B"];
    writeSumupCatalogManifest(eval_root, sites);
 
    returned = icemodel.verification.setup.importSumup("", ...
@@ -4479,7 +4501,7 @@ function entry = tinyManifestEntry(case_id, site_id, lat, lon, x, y, ...
       {'firn'}
       'unknown'
       struct('lat_wgs84', lat, 'lon_wgs84', lon, ...
-         'x_epsg3413', x, 'y_epsg3413', y, 'elev_m', 1000)
+      'x_epsg3413', x, 'y_epsg3413', y, 'elev_m', 1000)
       struct('start', '', 'end', '')
       ''
       forcing_sources
@@ -4595,7 +4617,7 @@ function entry = promiceAnchorEntry(site_id, x3413, y3413)
       {'firn'}
       'unknown'
       struct('lat_wgs84', 69, 'lon_wgs84', -48, ...
-         'x_epsg3413', x3413, 'y_epsg3413', y3413, 'elev_m', 1500)
+      'x_epsg3413', x3413, 'y_epsg3413', y3413, 'elev_m', 1500)
       struct('start', '', 'end', '')
       char(fullfile(lower(site_id), 'observations.mat'))
       {'promice'}
@@ -4619,7 +4641,7 @@ function entry = sumupManifestEntry(case_id)
       {'firn'}
       ''
       struct('lat_wgs84', 69, 'lon_wgs84', -48, ...
-         'x_epsg3413', 0, 'y_epsg3413', 0, 'elev_m', NaN)
+      'x_epsg3413', 0, 'y_epsg3413', 0, 'elev_m', NaN)
       struct('start', '', 'end', '')
       char(fullfile(case_id, 'observations.mat'))
       {}
@@ -4627,8 +4649,8 @@ function entry = sumupManifestEntry(case_id)
       {'density'}
       struct()
       struct('sumup', struct('kind', 'firn_profile_obs', ...
-         'staged', true, 'obs_file', char(fullfile(case_id, ...
-         'observations.mat'))))
+      'staged', true, 'obs_file', char(fullfile(case_id, ...
+      'observations.mat'))))
       'irregular'
       'stale test row'};
    entry = icemodel.verification.setup.makeFirnCaseManifestEntry(values);
@@ -4715,8 +4737,8 @@ function cache = makeGcnetCache(root)
    touch(fullfile(simulated, ...
       "Simulated_firn_density_temperature_liquid_water.xml"));
 
-   % Station files are deliberately split across product folders to exercise
-   % recursive validation rather than flat-cache-only matching.
+   % Station files are split across product folders to exercise recursive
+   % validation rather than flat-cache-only matching.
    for station = ["DYE_2", "Summit"]
       touch(fullfile(surface, station + "_surface.nc"));
       touch(fullfile(firn_temperature, station + "_T_firn_obs.nc"));
@@ -4824,7 +4846,7 @@ function writeTinyGcnetNetcdf(filename, variables, units, has_level)
 end
 
 function bytes = fileBytes(filename)
-   %FILEBYTES Read one staged binary artifact for no-churn assertions.
+   %FILEBYTES Read one staged binary artifact for byte-stability assertions.
    fid = fopen(filename, 'r');
    cleanup = onCleanup(@() fclose(fid));
    bytes = fread(fid, Inf, '*uint8');
@@ -4861,7 +4883,7 @@ function [fields, matching, conflicting] = fixedArtifactIdentityCases()
       "product", "schema", "method"];
    matching = ["imau", "S21", "10.1594/PANGAEA.969585", ...
       "10.1594/PANGAEA.971647", "hourly_aws", ...
-   "verification_timeseries", "nearest"];
+      "verification_timeseries", "nearest"];
    conflicting = ["samimi", "S22", "10.1594/PANGAEA.969629", ...
       "10.1594/PANGAEA.970127", "protocol_bundle", ...
       "retmip_protocol_bundle", "natural"];

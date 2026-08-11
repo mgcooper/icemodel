@@ -32,10 +32,12 @@ function [Ri, coef] = richardson_number(tsfc, tair, wspd_or_coef, z_tair, z_wind
    %     Accepts a precomputed coef (scalar or array) in place of wspd.
    %     Computes Ri = coef * (1 - tsfc/tair) efficiently.
    %
-   % Note: The Louis parameterization assumes z_wind == z_tair (referred to
-   % as z_obs). The 5-argument form supports differing measurement heights.
+   % The Louis parameterization assumes z_wind == z_tair, and calls that
+   % height z_obs. The 5-argument form supports different measurement
+   % heights.
    %
-   % Inputs are converted to Kelvin if passed in Celsius (tair or tsfc < 0).
+   % This function converts inputs to Kelvin when they arrive in Celsius
+   % (tair or tsfc < 0).
 
    [tsfc, tair, wspd, coef, z_wind] = parseinputs( ...
       tsfc, tair, wspd_or_coef, z_tair, z_wind, nargin);

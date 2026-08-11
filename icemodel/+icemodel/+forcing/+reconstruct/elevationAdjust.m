@@ -7,8 +7,8 @@ function x = elevationAdjust(channel, x, dz, kwargs)
    %  The policy's donor elevation adjustments (POLICY B4): temperature by a
    %  lapse rate and pressure barometrically, applied to the DONOR series
    %  before transfer fitting whenever |dz| exceeds the adjustment
-   %  threshold. Other channels pass through unchanged unless held-out
-   %  validation later justifies channel-specific treatment.
+   %  threshold. The other channels pass through unchanged. A channel-specific
+   %  adjustment needs support from held-out validation first.
    %
    % Inputs
    %  channel : canonical channel name.

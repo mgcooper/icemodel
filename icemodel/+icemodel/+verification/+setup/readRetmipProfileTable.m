@@ -54,8 +54,8 @@ function data = readSimpleDelimitedTable(filename)
       raw(n - 1, :) = split(lines(n), delimiter).';
    end
 
-   % Profile files are numeric after the header; keep nonnumeric columns as
-   % strings if a future protocol extension adds labels.
+   % Profile files are numeric after the header. Keep a nonnumeric column as
+   % strings, so a label column still parses.
    data = table();
    for k = 1:numel(names)
       values = raw(:, k);

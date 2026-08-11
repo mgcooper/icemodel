@@ -6,28 +6,28 @@ function result = reconstructSeries(series, channel_methods, kwargs)
    %
    % Role
    %  The engine orchestrator (DesignSpec Resolution 6; POLICY B1 tier
-   %  order). For swd a darkness pre-pass zero-fills missing
-   %  below-civil-twilight samples first (a known value per POLICY B2
-   %  refined by D-28, stamped with its own provenance code) so long
-   %  outages decompose into daylight fragments; twilight-band samples
-   %  carry real diffuse light and are left to the fill tiers. Tier 1 (bounded interior
-   %  interpolation, CSI-space for swd) applies next to the
-   %  interpolation-eligible channels; every
-   %  remaining missing run then walks the caller's ordered, ADMITTED
-   %  method estimates — donor transfers, calibrated proxies, climatology,
-   %  constants — taking the first method admitted for the run's stratum
+   %  order). For swd, a darkness pre-pass first zero-fills the missing
+   %  samples below civil twilight. That zero is a known value per POLICY
+   %  B2, refined by D-28, and carries its own provenance code. The
+   %  pre-pass breaks a long outage into daylight fragments. Twilight-band
+   %  samples carry real diffuse light, so they go to the fill tiers.
+   %  Tier 1 applies next to the interpolation-eligible channels: bounded
+   %  interior interpolation, in CSI space for swd. Every remaining
+   %  missing run then walks the caller's ordered, ADMITTED method
+   %  estimates: donor transfers, calibrated proxies, climatology, and
+   %  constants. The run takes the first method admitted for its stratum
    %  (season x duration bucket) whose estimate passes the physical bounds
-   %  check. Anchored boundary mismatches beyond the jump limit are
-   %  BLENDED per POLICY B6: the excess offset tapers to zero across
-   %  the blend window, landing the seam at half the limit, while seams
-   %  already inside the limit stay untouched so skilled estimates keep
-   %  their exact values. Refusal is reserved for bounds violations and
-   %  missing estimates. Native finite samples are never modified; runs
-   %  no admitted method fills stay missing with a per-method refusal
-   %  reason in the audit. Fitting and admission happen UPSTREAM (harness
-   %  experiments + fit/apply helpers); this function only composes and
-   %  stamps, which is what keeps it family-generic under the role
-   %  contract.
+   %  check. This function BLENDS an anchored boundary mismatch beyond the
+   %  jump limit, per POLICY B6: the excess offset tapers to zero across
+   %  the blend window and leaves the seam at half the limit. A seam
+   %  already inside the limit stays unchanged, so a skilled estimate
+   %  keeps its exact values. This function refuses a run only for bounds
+   %  violations and missing estimates. It does not modify a native finite
+   %  sample. A run that no admitted method fills stays missing, with a
+   %  per-method refusal reason in the audit. Fitting and admission happen
+   %  UPSTREAM, in the harness experiments and the fit/apply helpers. This
+   %  function only composes and stamps, which keeps it generic across
+   %  families under the role contract.
    %
    % Inputs
    %  series : target timetable (native, gaps preserved).
@@ -118,8 +118,8 @@ function result = reconstructSeries(series, channel_methods, kwargs)
    channel_methods = channel_methods( ...
       [find(method_channels ~= "swu"), find(method_channels == "swu")]);
    provenance = timetable(times);
-   % One audit-cell slot per channel, sized inside the loop; assembled once
-   % at the end so nothing grows sample-by-sample.
+   % One audit-cell slot per channel. The loop sizes each slot, and the code
+   % joins them once at the end, so no array grows sample by sample.
    channel_audits = cell(numel(channel_methods), 1);
 
    for c = 1:numel(channel_methods)
@@ -149,18 +149,19 @@ function result = reconstructSeries(series, channel_methods, kwargs)
 
       % Policy swd darkness rule (B2, refined by D-28): a missing sample
       % with the sun below civil twilight is a KNOWN zero, not an
-      % estimate. Zero-filling deep darkness FIRST decomposes a multi-day
-      % outage into per-day daylight fragments the admitted duration
-      % buckets cover — validation strata are daylight-bounded, so
-      % buckets above ~one day can never admit a shortwave method.
+      % estimate. Zero-filling deep darkness FIRST breaks a multi-day
+      % outage into per-day daylight fragments that the admitted duration
+      % buckets cover. The validation strata are daylight-bounded, so a
+      % bucket above about one day can never admit a shortwave method.
       % Samples in the twilight band (civil twilight up to 0 deg) carry
-      % real diffuse light stations measure at 15-38 W m^-2 (D-28), so
-      % they stay missing here and reach the normal fill tiers instead of
-      % being forced to zero.
-      % Hoisted per-channel solar geometry: the run x method walk below
-      % validates every swd candidate against the TOA ceiling and the
-      % whole-posting twilight allowance. One interval-maximum evaluation
-      % on the complete axis is reused by darkness and sliced per run.
+      % real diffuse light that stations measure at 15-38 W m^-2 (D-28),
+      % so they stay missing here and reach the normal fill tiers. This
+      % code does not force them to zero.
+      % Compute the solar geometry once per channel: the run x method walk
+      % below validates every swd candidate against the TOA ceiling and
+      % the whole-posting twilight allowance. Darkness reuses this one
+      % interval-maximum evaluation on the complete axis, and the run loop
+      % slices it.
       axis_elevation = zeros(0, 1);
       axis_toa = zeros(0, 1);
       if channel == "swd" && isfinite(kwargs.latitude) ...
@@ -205,10 +206,10 @@ function result = reconstructSeries(series, channel_methods, kwargs)
          [x, filled1, audit1] = ...
             icemodel.forcing.reconstruct.fillShortGaps(times, x, ...
             channel, cap_hours=channel_cap, ...
-             latitude=kwargs.latitude, longitude=kwargs.longitude, ...
-             jump_factor=kwargs.jump_factor, ...
-             blend_hours=kwargs.blend_hours, ...
-             toa_dark_wm2=kwargs.toa_dark_wm2, step_scale=scale);
+            latitude=kwargs.latitude, longitude=kwargs.longitude, ...
+            jump_factor=kwargs.jump_factor, ...
+            blend_hours=kwargs.blend_hours, ...
+            toa_dark_wm2=kwargs.toa_dark_wm2, step_scale=scale);
          code(filled1) = codes.bounded_interp;
       end
 
@@ -221,9 +222,11 @@ function result = reconstructSeries(series, channel_methods, kwargs)
       stops = find(miss & [~miss(2:end) ...
          | seasons(1:end - 1) ~= seasons(2:end); true]);
       methods = channel_methods(c).methods;
-       % Method attempts can fill disjoint fragments, so audit row groups
-       % are collected and flattened after the run loop.
-       run_audits = cell(0, 1);
+      % A method attempt can fill disjoint fragments, so the code collects
+      % audit row groups and flattens them after the run loop. One slot per
+      % run holds that run's groups, and each slot starts as the typed empty
+      % column so a run without audit rows adds nothing.
+      gap_audits = repmat({cell(0, 1)}, numel(starts), 1);
       blend_len = max(1, round(kwargs.blend_hours / dt_hours));
       for g = 1:numel(starts)
          idx = (starts(g):stops(g)).';
@@ -231,9 +234,9 @@ function result = reconstructSeries(series, channel_methods, kwargs)
          duration = run_len * dt_hours;
          bucket = icemodel.forcing.reconstruct.gapDurationBucket(duration);
          season = seasons(starts(g));
-         % The run's boundary anchors are fixed OUTSIDE the run before any
-         % method fills it; deriving them from a shrunken leftover index
-         % would test seams against another method's fresh fill.
+         % The run's boundary anchors sit OUTSIDE the run and are fixed
+         % before any method fills it. Anchors taken from a shrunken
+         % leftover index would test seams against another method's fill.
          run_before = starts(g) - 1;
          run_after = stops(g) + 1;
          if run_before >= 1 && miss(run_before)
@@ -242,14 +245,14 @@ function result = reconstructSeries(series, channel_methods, kwargs)
          if run_after <= numel(x) && miss(run_after)
             run_after = numel(x) + 1;
          end
-         % Per-run seam limit: floored at the linear bridge's implied
-         % per-step change between the two anchors — when the native
-         % record itself steps across the gap by more than the seasonal
-         % limit allows (a dawn shortwave transition, a frontal jump),
-         % no fill value can satisfy both seams and refusal would be
-         % unphysical. A fill at least as smooth as the straight bridge
-         % is never refused; the tiny slack keeps float-exact midpoints
-         % on the passing side of the strict > test.
+         % Per-run seam limit. The floor is the per-step change that the
+         % linear bridge between the two anchors implies. When the native
+         % record steps across the gap by more than the seasonal limit
+         % allows, for example at a dawn shortwave transition or a frontal
+         % jump, no fill value can meet both seams, and a refusal would be
+         % unphysical. A fill at least as smooth as the straight bridge is
+         % never refused. The small slack keeps float-exact midpoints on
+         % the passing side of the strict > test.
          run_limit = kwargs.jump_factor * scale.(char(season));
          if run_before >= 1 && run_after <= numel(x) ...
                && isfinite(x(run_before)) && isfinite(x(run_after))
@@ -257,11 +260,15 @@ function result = reconstructSeries(series, channel_methods, kwargs)
                / (run_len + 1);
             run_limit = max(run_limit, bridge_step * (1 + 1e-6));
          end
-         % Refusal bookkeeping: every attempt that declines the run (or
-         % part of it) records why, so residual missing runs are
-         % explained in the audit instead of silently omitted.
+         % Refusal bookkeeping: every attempt that declines the run, or
+         % part of it, records why. The audit then explains each residual
+         % missing run instead of omitting it.
          reasons = strings(numel(methods), 1);
          n_reason = 0;
+         % One slot per method attempt, plus the run's residual group, so the
+         % run's audit rows keep method order without growing a column.
+         method_audits = repmat({cell(0, 1)}, numel(methods), 1);
+         residual_audit = cell(0, 1);
          for m = 1:numel(methods)
             method = methods(m);
             [admitted, admission_reason] = stratumAdmitted(method, ...
@@ -279,42 +286,42 @@ function result = reconstructSeries(series, channel_methods, kwargs)
                reasons(n_reason) = method.name + ": no finite estimate";
                continue
             end
-             % The shared validator enforces both scalar and relational
-             % limits; invalid samples cascade to the next admitted method.
-             if channel == "swu"
-                physically_valid = ...
-                   icemodel.forcing.reconstruct.physicalValidity( ...
-                   channel, candidate, times(idx), swd=series.swd(idx));
-             elseif channel == "swd" && ~isempty(axis_toa)
-                % Slices of the hoisted axis geometry keep the validator
-                % bit-identical while skipping its per-call NOAA passes.
-                physically_valid = ...
-                   icemodel.forcing.reconstruct.physicalValidity( ...
-                   channel, candidate, times(idx), ...
-                   latitude=kwargs.latitude, longitude=kwargs.longitude, ...
-                   toa=axis_toa(idx), elevation=axis_elevation(idx));
-             else
-                physically_valid = ...
-                   icemodel.forcing.reconstruct.physicalValidity( ...
-                   channel, candidate, times(idx), ...
-                   latitude=kwargs.latitude, longitude=kwargs.longitude);
-             end
-             usable = have & physically_valid;
+            % The shared validator enforces both scalar and relational
+            % limits; invalid samples cascade to the next admitted method.
+            if channel == "swu"
+               physically_valid = ...
+                  icemodel.forcing.reconstruct.physicalValidity( ...
+                  channel, candidate, times(idx), swd=series.swd(idx));
+            elseif channel == "swd" && ~isempty(axis_toa)
+               % Slices of the axis geometry computed above give the
+               % validator bit-identical input and skip its per-call
+               % NOAA passes.
+               physically_valid = ...
+                  icemodel.forcing.reconstruct.physicalValidity( ...
+                  channel, candidate, times(idx), ...
+                  latitude=kwargs.latitude, longitude=kwargs.longitude, ...
+                  toa=axis_toa(idx), elevation=axis_elevation(idx));
+            else
+               physically_valid = ...
+                  icemodel.forcing.reconstruct.physicalValidity( ...
+                  channel, candidate, times(idx), ...
+                  latitude=kwargs.latitude, longitude=kwargs.longitude);
+            end
+            usable = have & physically_valid;
             if ~any(usable)
                n_reason = n_reason + 1;
                reasons(n_reason) = method.name + ": all out of bounds";
                continue
             end
-            % POLICY B6: anchored seam offsets that exceed the jump
-            % limit blend away across the taper window rather than
-            % refusing the run — admitted-method point RMSE routinely
-            % exceeds the seasonal step scale, so an exact-seam demand
-            % would reject skilled fills wholesale. Seams already inside
-            % the limit are left untouched, so skilled estimates keep
-            % their exact values.
+            % POLICY B6: an anchored seam offset above the jump limit
+            % blends away across the taper window, and the run is not
+            % refused. The point RMSE of an admitted method often exceeds
+            % the seasonal step scale, so an exact-seam demand would
+            % reject skilled fills. A seam already inside the limit stays
+            % unchanged, so a skilled estimate keeps its exact values.
             % A prior method can leave disjoint residual fragments. Blend
-            % each contiguous wall-clock segment independently so ordinal
-            % position never carries a taper across an already filled span.
+            % each contiguous wall-clock segment on its own, so ordinal
+            % position does not carry a taper across a filled span.
             segment_starts = [1; find(diff(idx) > 1) + 1];
             segment_stops = [segment_starts(2:end) - 1; numel(idx)];
             seam_note = "";
@@ -328,26 +335,26 @@ function result = reconstructSeries(series, channel_methods, kwargs)
                seam_note = seam_note + string(part_note);
             end
             seam_note = char(seam_note);
-             % The taper can violate a scalar or relational bound; drop
-             % those samples rather than clip so limits stay hard.
-             if channel == "swu"
-                physically_valid = ...
-                   icemodel.forcing.reconstruct.physicalValidity( ...
-                   channel, candidate, times(idx), swd=series.swd(idx));
-             elseif channel == "swd" && ~isempty(axis_toa)
-                % Same hoisted-geometry slices as the pre-blend check.
-                physically_valid = ...
-                   icemodel.forcing.reconstruct.physicalValidity( ...
-                   channel, candidate, times(idx), ...
-                   latitude=kwargs.latitude, longitude=kwargs.longitude, ...
-                   toa=axis_toa(idx), elevation=axis_elevation(idx));
-             else
-                physically_valid = ...
-                   icemodel.forcing.reconstruct.physicalValidity( ...
-                   channel, candidate, times(idx), ...
-                   latitude=kwargs.latitude, longitude=kwargs.longitude);
-             end
-             usable = usable & physically_valid;
+            % The taper can violate a scalar or relational bound; drop
+            % those samples rather than clip so limits stay hard.
+            if channel == "swu"
+               physically_valid = ...
+                  icemodel.forcing.reconstruct.physicalValidity( ...
+                  channel, candidate, times(idx), swd=series.swd(idx));
+            elseif channel == "swd" && ~isempty(axis_toa)
+               % The same axis-geometry slices as the pre-blend check.
+               physically_valid = ...
+                  icemodel.forcing.reconstruct.physicalValidity( ...
+                  channel, candidate, times(idx), ...
+                  latitude=kwargs.latitude, longitude=kwargs.longitude, ...
+                  toa=axis_toa(idx), elevation=axis_elevation(idx));
+            else
+               physically_valid = ...
+                  icemodel.forcing.reconstruct.physicalValidity( ...
+                  channel, candidate, times(idx), ...
+                  latitude=kwargs.latitude, longitude=kwargs.longitude);
+            end
+            usable = usable & physically_valid;
             if ~any(usable)
                n_reason = n_reason + 1;
                reasons(n_reason) = method.name + ": out of bounds after blend";
@@ -364,20 +371,19 @@ function result = reconstructSeries(series, channel_methods, kwargs)
             end
             x(idx(usable)) = candidate(usable);
             code(idx(usable)) = method.code;
-             filled_idx = idx(usable);
-             filled_mask = false(numel(times), 1);
-             filled_mask(filled_idx) = true;
-             rows = icemodel.forcing.reconstruct.auditSegments( ...
-                times, filled_mask, channel, method.name, sprintf( ...
-                'season %s bucket %d, filled %d/%d run samples%s', ...
-                season, bucket, numel(filled_idx), run_len, seam_note), ...
-                context_id=methodContextId(method));
-             run_audits = [run_audits; rows]; %#ok<AGROW>
+            filled_idx = idx(usable);
+            filled_mask = false(numel(times), 1);
+            filled_mask(filled_idx) = true;
+            method_audits{m} = icemodel.forcing.reconstruct.auditSegments( ...
+               times, filled_mask, channel, method.name, sprintf( ...
+               'season %s bucket %d, filled %d/%d run samples%s', ...
+               season, bucket, numel(filled_idx), run_len, seam_note), ...
+               context_id=methodContextId(method));
             if all(usable)
                break
             end
-            % Leftover samples advance to later methods; the run anchors
-            % captured above keep the seam checks honest.
+            % Leftover samples go to later methods. The run anchors
+            % captured above keep the seam checks correct.
             idx = idx(~usable);
             if isempty(idx)
                break
@@ -385,34 +391,37 @@ function result = reconstructSeries(series, channel_methods, kwargs)
          end
          % Residual-missing runs get one audit row joining every refusal
          % reason, honoring the documented contract.
-          if any(~isfinite(x(starts(g):stops(g))))
-             residual = false(numel(times), 1);
-             residual(starts(g):stops(g)) = ...
-                ~isfinite(x(starts(g):stops(g)));
-             rows = icemodel.forcing.reconstruct.auditSegments( ...
-                times, residual, channel, "unfilled", ...
-                char("residual missing; " + ...
-                strjoin(reasons(1:n_reason), "; ")));
-             run_audits = [run_audits; rows]; %#ok<AGROW>
+         if any(~isfinite(x(starts(g):stops(g))))
+            residual = false(numel(times), 1);
+            residual(starts(g):stops(g)) = ...
+               ~isfinite(x(starts(g):stops(g)));
+            residual_audit = icemodel.forcing.reconstruct.auditSegments( ...
+               times, residual, channel, "unfilled", ...
+               char("residual missing; " + ...
+               strjoin(reasons(1:n_reason), "; ")));
          end
+         % Method rows precede the run's residual row, matching the order the
+         % audit column carried when it was grown in place.
+         gap_audits{g} = vertcat(cell(0, 1), method_audits{:}, residual_audit);
       end
+      run_audits = vertcat(cell(0, 1), gap_audits{:});
 
       series.(channel) = x;
       provenance.(channel) = code;
-       channel_audits{c} = [audit_dark; audit1; run_audits];
+      channel_audits{c} = [audit_dark; audit1; run_audits];
    end
 
    audit_rows = vertcat(channel_audits{:});
-    if isempty(audit_rows)
-       audit = table('Size', [0 7], 'VariableTypes', {'cellstr', ...
-          'datetime', 'datetime', 'double', 'cellstr', 'cellstr', ...
-          'cellstr'}, ...
-          'VariableNames', {'channel', 'start_time', 'end_time', ...
-          'duration_hours', 'method', 'detail', 'context_id'});
-       % Empty datetime columns must retain the target axis timezone so a
-       % later last-resort or constant row can concatenate safely.
-       audit.start_time.TimeZone = times.TimeZone;
-       audit.end_time.TimeZone = times.TimeZone;
+   if isempty(audit_rows)
+      audit = table('Size', [0 7], 'VariableTypes', {'cellstr', ...
+         'datetime', 'datetime', 'double', 'cellstr', 'cellstr', ...
+         'cellstr'}, ...
+         'VariableNames', {'channel', 'start_time', 'end_time', ...
+         'duration_hours', 'method', 'detail', 'context_id'});
+      % Empty datetime columns must retain the target axis timezone so a
+      % later last-resort or constant row can concatenate safely.
+      audit.start_time.TimeZone = times.TimeZone;
+      audit.end_time.TimeZone = times.TimeZone;
    else
       audit = cell2table(vertcat(audit_rows{:}), 'VariableNames', ...
          {'channel', 'start_time', 'end_time', 'duration_hours', ...
@@ -461,9 +470,9 @@ function tf = jumpViolation(x, candidate, idx, usable, run_start, ...
       run_stop, run_before, run_after, limit)
    %JUMPVIOLATION POLICY B6 check at the run's fixed boundary anchors.
    % Anchors sit outside the original run (native or tier-1 values that no
-   % method in this loop modifies). Each seam is tested only when this
-   % method actually fills the run-edge sample; interior seams between two
-   % methods' partial fills carry no observed anchor to test against.
+   % method in this loop modifies). This function tests a seam only when the
+   % method fills the run-edge sample. An interior seam between the partial
+   % fills of two methods has no observed anchor to test against.
    tf = false;
    first_use = find(usable, 1, 'first');
    last_use = find(usable, 1, 'last');

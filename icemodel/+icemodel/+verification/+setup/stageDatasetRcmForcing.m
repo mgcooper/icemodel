@@ -5,14 +5,14 @@ function state = stageDatasetRcmForcing(state, alive, kwargs)
    %
    % Shared orchestration for family importers that already staged their native
    % observations. It builds a per-source legspec through a family-supplied
-   % callback, calls stageRcmForcing for exactly one source at a time, merges the
-   % returned colocation legs into each state record, and invokes an optional
-   % persist callback after every source for kill-safe manifests.
-   % forcing_sources selects only sources requested by this call; duplicate
-   % tokens collapse in stable order and omitted fields remain unchanged.
-   % method is restricted to the builders' supported nearest/natural choices.
+   % callback. It calls stageRcmForcing for one source at a time and merges the
+   % returned colocation legs into each state record. It calls the optional
+   % persist callback after every source, so an interrupted run leaves a valid
+   % manifest. forcing_sources selects only the sources this call requests.
+   % Duplicate tokens collapse in stable order, and omitted fields stay
+   % unchanged. method accepts only the builders' nearest and natural choices.
    % Model met defaults to dt_out="15m"; pass dt_out="" for native cadence.
-   % Data/userdata defaults to hourly at the shared writer boundary.
+   % Data and userdata default to hourly at the shared writer boundary.
    %
    % See also: icemodel.verification.setup.stageRcmForcing,
    %  icemodel.verification.setup.mergeColocation
@@ -115,8 +115,9 @@ function state = stageDatasetRcmForcing(state, alive, kwargs)
       fprintf('[staging] %s: %d staged, %d skipped\n', upper(char(src)), ...
          n_staged, numel(alive_idx) - n_staged);
 
-      % Family-specific optional products may attach to the completed source
-      % leg, but cache discovery and primary RCM writes stay owned above.
+      % A family-specific optional product can attach to the completed source
+      % leg. The code above still performs the cache discovery and the primary
+      % RCM writes.
       if ~isempty(kwargs.after_source_callback)
          state = kwargs.after_source_callback(state, alive_idx, src);
       end

@@ -3,9 +3,9 @@ function err = surface_linearization_error(T_sfc, T_top, Fc, Fp, a1)
    %
    %  err = icemodel.column.surface_linearization_error(T_sfc, T_top, Fc, Fp, a1)
    %
-   % Returns the mismatch, expressed as an equivalent temperature error [K],
-   % between the linearized surface-flux boundary condition and the conductive
-   % temperature jump at the top control-volume interface.
+   % Returns the mismatch between the linearized surface-flux boundary
+   % condition and the conductive temperature jump at the top control-volume
+   % interface. The mismatch is an equivalent temperature error [K].
    %
    %#codegen
 

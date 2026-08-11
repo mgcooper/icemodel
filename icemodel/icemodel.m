@@ -1,5 +1,5 @@
 function [ice1, ice2, opts] = icemodel(opts)
-   % ICEMODEL Simulate the phase change process in glacier ice.
+   %ICEMODEL Simulate the phase change process in glacier ice.
    %
    % This function models the phase change process in melting glacier ice. It
    % uses iterative processes to update the temperature, liquid and ice fraction
@@ -28,8 +28,8 @@ function [ice1, ice2, opts] = icemodel(opts)
    %         near-surface atmosphere. Contains one value per timestep.
    % ice2  - 2-dimensional data storing variables defined on the subsurface ice
    %         column control volume mesh. Contains one column per timestep.
-   % opts  - Finalized runtime configuration after icemodel.configureRun() has
-   %         applied the last non-negotiable pre-execution updates.
+   % opts  - Finalized runtime configuration after icemodel.configureRun()
+   %         applies the required pre-execution updates.
    %
    % See also: skinmodel, icemodel.setopts
    %
@@ -42,16 +42,18 @@ function [ice1, ice2, opts] = icemodel(opts)
    opts = icemodel.configureRun(opts);
    opts = icemodel.prepareRunOutput(opts);
 
-   % Verification can ask icemodel to return snow-model-like outputs before
-   % the production snow physics exists. Keep the bypass explicit and owned by
-   % the verification namespace so the normal solver path remains unchanged.
+   % Verification suite option to ask icemodel to return snow-model-like outputs
+   % before the production snow model exists.
    if isfield(opts, 'verification_synthetic_snow') ...
          && opts.verification_synthetic_snow
       [ice1, ice2, opts] = icemodel.verification.syntheticSnowModelRun(opts);
       return
    end
 
-   TINY = 1e-8;
+   % Option to use detailed diagnostic output structs.
+   use_diagnostic_profile = strcmp(opts.output_profile, 'diagnostic');
+   use_mass_budget = use_diagnostic_profile;
+   use_thf_diag = use_diagnostic_profile;
 
    % UNPACK SOLVER OPTS
    [solver, maxiter, tol, alpha, use_aitken, jumpmax, cpl_maxiter, ...
@@ -60,6 +62,7 @@ function [ice1, ice2, opts] = icemodel(opts)
       'solver', 'maxiter', 'tol', 'alpha', 'use_aitken', 'jumpmax', ...
       'cpl_maxiter', 'cpl_Ts_tol', 'cpl_seb_tol', 'cpl_alpha', 'cpl_aitken', ...
       'cpl_jumpmax', 'f_ice_min');
+   TINY = 1e-8;
 
    % INITIALIZE THE FORCING DATA
    [tair, swd, lwd, albedo, wspd, ...
@@ -95,17 +98,29 @@ function [ice1, ice2, opts] = icemodel(opts)
       = icemodel.timestepping.resetsubstep(T_sfc, T_ice, f_ice, f_liq);
    force_advance_streak_dt = 0.0;
 
+   % Initialize the diagnostic mass/energy budget ledger.
+   [mass_energy_budget, solid_p, liquid_p, phase_solid, phase_liquid, ...
+      vapor_solid, vapor_liquid] = icemodel.column.initialize_budget_state();
+
    %% START TIMESTEPS OVER YEARS
    for thisyear = 1:numyears
 
       for timestep = 1:numsteps
 
          % INITIALIZE NEW TIMESTEP
-         [dt_sum, n_subfail, ok_seb, ok_ieb, d_liq, d_evp, d_lyr] ...
+         [dt_sum, n_subfail, ok_seb, ok_ieb, d_liq, d_evp, d_lyr, d_rof] ...
             = icemodel.timestepping.newtimestep(f_liq, solver);
 
-         % Scalarize time-varying observation geometry and its corresponding
-         % bulk-Richardson coefficients at the forcing-step boundary.
+         % Zero the ledger for this forcing step and set initial values.
+         if use_mass_budget
+            mass_energy_budget = icemodel.column.initialize_budget_state();
+            [mass_energy_budget.mass_budget_solid_start_mwe, ...
+               mass_energy_budget.mass_budget_liquid_start_mwe] = ...
+               icemodel.column.integrate_column_budget(T_ice, f_ice, f_liq, dz);
+         end
+
+         % Scalarize time-varying met observation heights and corresponding
+         % bulk-Richardson coefficients prior to each forcing step.
          step_opts = icemodel.surface.step_observation_heights(opts, metstep);
          br_coefs_step = br_coefs(min(metstep, size(br_coefs, 1)), :);
 
@@ -155,7 +170,8 @@ function [ice1, ice2, opts] = icemodel(opts)
                   cpl_aitken, cpl_jumpmax, ro_sfc, snow_depth, step_opts);
             end
 
-            % Hitting max coupling iterations without ok_cpl is a substep fail.
+            % Reaching the maximum coupling iterations without ok_cpl is a
+            % substep failure.
             ok = ok_seb && ok_ieb && ok_cpl;
 
             % CHECK SUBSTEP FAILURE (shorten dt and restart substep on failure)
@@ -171,6 +187,13 @@ function [ice1, ice2, opts] = icemodel(opts)
                continue
             end
 
+            % Checkpoint melt/freeze phase change before surface vapor exchange.
+            if use_mass_budget
+               [mass_energy_budget, solid_p, liquid_p, phase_solid, phase_liquid] ...
+                  = icemodel.column.accumulate_phase_budget(mass_energy_budget, ...
+                  xT_ice, xf_ice, xf_liq, T_ice, f_ice, f_liq, dz);
+            end
+
             % UPDATE POTENTIAL SURFACE NET VAPOR FLUX
             [d_pevp, ~, ~, ~] ...
                = icemodel.surface.potential_surface_vapor_tendency( ...
@@ -180,15 +203,36 @@ function [ice1, ice2, opts] = icemodel(opts)
                liqflag, f_ice(1), f_liq(1), dt, dz(1), snow_depth, step_opts);
 
             % UPDATE THE SURFACE MASS-BALANCE BUDGETS
-            [T_ice, f_ice, f_liq, d_liq, d_evp] ...
+            [T_ice, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err] ...
                = icemodel.column.budget_surface_mass_balance( ...
-               T_ice, f_ice, f_liq, xf_liq, d_pevp, d_liq, d_evp, ...
+               T_ice, f_ice, f_liq, xf_liq, d_pevp, d_liq, d_evp, d_rof, ...
                f_res_por, f_ice_min);
 
+            % Checkpoint realized vapor exchange and its input, overflow, and
+            % signed unapplied energy (d_sbl_err).
+            if use_mass_budget
+               [mass_energy_budget, vapor_solid, vapor_liquid] ...
+                  = icemodel.column.accumulate_vapor_budget(mass_energy_budget, ...
+                  solid_p, liquid_p, T_ice, f_ice, f_liq, dz, ...
+                  d_pevp, d_rof, d_sbl_err);
+            end
+
             % REMESH THIN LAYERS AFTER THE MASS-BALANCE UPDATE
-            [T_ice, f_ice, f_liq, Sc, Sp, d_lyr, ~] ...
-               = icemodel.column.merge_thin_layers( ...
-               T_ice, f_ice, f_liq, Sc, Sp, dz(1), d_pevp, d_lyr, f_ice_min);
+            if use_mass_budget
+               [T_ice, f_ice, f_liq, Sc, Sp, d_lyr, ~, remesh] ...
+                  = icemodel.column.merge_thin_layers( ...
+                  T_ice, f_ice, f_liq, Sc, Sp, dz(1), d_pevp, d_lyr, ...
+                  f_ice_min);
+
+               % Accumulate numerical remeshing increments.
+               mass_energy_budget = icemodel.column.accumulate_remesh_budget( ...
+                  mass_energy_budget, remesh, phase_solid + vapor_solid, ...
+                  phase_liquid + vapor_liquid);
+            else
+               [T_ice, f_ice, f_liq, Sc, Sp, d_lyr, ~] ...
+                  = icemodel.column.merge_thin_layers( ...
+                  T_ice, f_ice, f_liq, Sc, Sp, dz(1), d_pevp, d_lyr, f_ice_min);
+            end
 
             % CHECKPOINT STATE AND SUBSTEP TIME
             [xT_sfc, xT_ice, xf_ice, xf_liq, dt_sum, dt] = ...
@@ -199,6 +243,14 @@ function [ice1, ice2, opts] = icemodel(opts)
 
          % Error if dt accumulation exceeds full step
          assertF(@() dt_sum < dt_FULL_STEP + 2 * TINY)
+
+         % Close the forcing-step budget endpoints after every accepted substep
+         if use_mass_budget
+            [mass_energy_budget.mass_budget_solid_end_mwe, ...
+               mass_energy_budget.mass_budget_liquid_end_mwe] = ...
+               icemodel.column.integrate_column_budget( ...
+               T_ice, f_ice, f_liq, dz);
+         end
 
          % UPDATE GRAIN SIZE VIA VAPOR MASS TRANSFER
          r_eff = icemodel.column.vapor_mass_transfer(T_ice, T_sfc, ...
@@ -213,7 +265,8 @@ function [ice1, ice2, opts] = icemodel(opts)
             nu_air(metstep), H_h(metstep), H_e, hv_atm, br_coefs_step, ...
             liqflag, chi, T_ice, k_eff, dz, ro_sfc, snow_depth, step_opts);
 
-         if strcmp(opts.output_profile, 'diagnostic')
+         % Build a detailed thf diagnostic ledger if requested.
+         if use_thf_diag
             [~, ~, thf_diag] ...
                = icemodel.surface.diagnose_turbulent_heat_fluxes( ...
                icemodel.surface.physical_surface_temperature(T_sfc), ...
@@ -228,29 +281,31 @@ function [ice1, ice2, opts] = icemodel(opts)
          % SAVE OUTPUT IF SPINUP IS FINISHED
          if thisyear > numspinup
 
-            surface_state = struct( ...
-               'Tsfc', T_sfc, ...
-               'Qm', Qm, ...
-               'Qf', Qf, ...
-               'Qe', Qe, ...
-               'Qh', Qh, ...
-               'Qc', Qc, ...
-               'Qsn', Qsn, ...
-               'Qln', Qln, ...
-               'Qa', Qa, ...
-               'chi', chi, ...
-               'balance', Qbal, ...
-               'dt_sum', dt_sum, ...
-               'Tsfc_converged', ok_seb, ...
-               'Tice_converged', ok_ieb, ...
-               'Tice_numiter', n_iters, ...
-               'n_subfail', n_subfail, ...
-               'ea_atm', ea_atm(metstep), ...
-               'br_coefs_gamma', br_coefs_step(1), ...
-               'br_coefs_b1_num', br_coefs_step(2), ...
-               'br_coefs_b2_num', br_coefs_step(3), ...
-               'hv_atm', hv_atm, ...
-               'ro_sfc', ro_sfc);
+            % Assemble one compile-time struct layout for every profile.
+            surface_state = mass_energy_budget;
+            surface_state.Tsfc = T_sfc;
+            surface_state.Qm = Qm;
+            surface_state.Qf = Qf;
+            surface_state.Qe = Qe;
+            surface_state.Qh = Qh;
+            surface_state.Qc = Qc;
+            surface_state.Qsn = Qsn;
+            surface_state.Qln = Qln;
+            surface_state.Qa = Qa;
+            surface_state.chi = chi;
+            surface_state.balance = Qbal;
+            surface_state.dt_sum = dt_sum;
+            surface_state.Tsfc_converged = ok_seb;
+            surface_state.Tice_converged = ok_ieb;
+            surface_state.Tice_numiter = n_iters;
+            surface_state.n_subfail = n_subfail;
+            surface_state.ea_atm = ea_atm(metstep);
+            surface_state.br_coefs_gamma = br_coefs_step(1);
+            surface_state.br_coefs_b1_num = br_coefs_step(2);
+            surface_state.br_coefs_b2_num = br_coefs_step(3);
+            surface_state.hv_atm = hv_atm;
+            surface_state.ro_sfc = ro_sfc;
+            surface_state.df_rof = d_rof;
 
             subsurface_state = struct( ...
                'Tice', T_ice, ...

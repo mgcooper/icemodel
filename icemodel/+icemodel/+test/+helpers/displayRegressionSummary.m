@@ -34,13 +34,13 @@ function displayRegressionSummary(report)
 
    pairs = {
       'runoff_final', 'baseline_runoff_final', 'runoff_pct_delta', ...
-         'runoff', 'baseline', 'pct_delta'
+      'runoff', 'baseline', 'pct_delta'
       'melt_final', 'baseline_melt_final', 'melt_pct_delta', ...
-         'melt', 'baseline', 'pct_delta'
+      'melt', 'baseline', 'pct_delta'
       'runoff_eval', 'baseline_runoff_eval', 'runoff_eval_pct_delta', ...
-         'runoff_eval', 'baseline_eval', 'pct_delta'
+      'runoff_eval', 'baseline_eval', 'pct_delta'
       'melt_eval', 'baseline_melt_eval', 'melt_eval_pct_delta', ...
-         'melt_eval', 'baseline_eval', 'pct_delta'
+      'melt_eval', 'baseline_eval', 'pct_delta'
       };
 
    for k = 1:size(pairs, 1)

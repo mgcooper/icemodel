@@ -8,7 +8,8 @@ function PerfBaseline = snapshot_perf_baseline(kwargs)
    % named release baseline. This does not rerun the model; it copies the
    % current rolling baseline into a versioned release file. A custom
    % OUTPUT_FILE is supported only when SMBMODEL resolves to one concrete
-   % formal model.
+   % formal model. Existing release files remain immutable even when the
+   % OVERWRITE option is true.
 
    arguments (Input)
 

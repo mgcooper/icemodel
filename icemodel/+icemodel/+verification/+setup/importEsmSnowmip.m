@@ -17,23 +17,21 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %    <repo>/data/input/met/esm_snowmip/.
    %
    %  Stages the requested ESM-SnowMIP site cases under the resolved
-   %  data/eval/esm_snowmip/<sitename>/ tree. All 10 reference sites are
-   %  supported; the per-site forcing and observation artifacts are produced by
-   %  the reusable builders buildEsmSnowmipForcing / buildEsmSnowmipObservations
-   %  so the same conversion path is used for staging and for any future
-   %  on-the-fly icemodel run.
-   %  This importer intentionally has no forcing_sources/build_observations split:
-   %  each site's source forcing and observations share one requested window and
-   %  are staged as one atomic ESM-SnowMIP case conversion. There is no optional
-   %  RCM attachment path to refresh independently.
+   %  data/eval/esm_snowmip/<sitename>/ tree. It supports all 10 reference
+   %  sites. The reusable builders buildEsmSnowmipForcing and
+   %  buildEsmSnowmipObservations produce the per-site forcing and observation
+   %  artifacts. An icemodel run that reads the source directly uses the same
+   %  conversion path. This family has no forcing_sources or
+   %  build_observations split. Each site's source forcing and observations
+   %  share one requested window and stage as one atomic case conversion, and
+   %  there is no optional RCM attachment to refresh on its own.
    %
    %  Window resolution
    %    - With no startdate / enddate, each site stages the full source record
    %      available in the ESM-SnowMIP forcing and observation files.
-   %    - With explicit startdate and enddate, that single window is
-   %      applied to every site listed in case_ids. Per-site staging
-   %      is the natural unit of the importer; multi-window staging
-   %      should be done by repeated calls.
+   %    - With explicit startdate and enddate, that single window applies to
+   %      every site listed in case_ids. The importer stages one window per
+   %      site. Call it again to stage another window.
    %
    %  Inputs
    %    source_dir : string
@@ -75,18 +73,17 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
    %  Returns
    %    manifest : struct  Family manifest also written to manifest.json.
    %
-   %  Source guarantees
-   %    Layout / file-presence guarantees come from
-   %    icemodel.verification.setup.fetchEsmSnowmip; downstream from that
-   %    point this importer can write the resolved output files directly
-   %    without repeating per-file existence checks.
+   %  Source checks
+   %    icemodel.verification.setup.fetchEsmSnowmip checks the source layout
+   %    and file presence. After that check, this importer writes the resolved
+   %    output files directly and does not repeat per-file existence checks.
    %
    %  See also: icemodel.verification.setup.fetchEsmSnowmip,
    %    icemodel.verification.setup.buildEsmSnowmipForcing,
    %    icemodel.verification.setup.buildEsmSnowmipObservations,
    %    icemodel.verification.namelists.snowmipsite,
    %    icemodel.verification.setup.esmSnowmipSiteCatalog,
-   %    icemodel.verification.helpers.default_smoke_window
+   %    icemodel.verification.helpers.esmSnowmipWaterYear
 
    arguments
       source_dir (1, 1) string = ""
@@ -112,7 +109,7 @@ function manifest = importEsmSnowmip(source_dir, kwargs)
 
    % Validate the optional clamp before any cache or staging side effect.
    [window_start, window_end, window_enabled] = ...
-      icemodel.internal.pairedWindow( ...
+      icemodel.pairedWindow( ...
       kwargs.startdate, kwargs.enddate);
 
    % Validate source caches only for real staging. Dry runs remain metadata-only.
@@ -251,13 +248,13 @@ function s = stageCase(sitename, source_dir, family_root, input_root, ...
          'obs_file', char(fullfile(sitename, "observations.mat"))});
    else
       [window_start, window_end] = ...
-         icemodel.verification.helpers.default_smoke_window(sitename);
+         icemodel.verification.helpers.esmSnowmipWaterYear(sitename);
       comparison_variables = dryRunComparisonVariables();
       observation_variables = dryRunObservationVariables(sitename);
    end
 
    % Forcing-agnostic schema: evaluation_file references observations.mat and
-   % reference_file is empty because the old smoke reference was redundant.
+   % reference_file is empty because this family stages no reference series.
    % native_timestep records the staged model-met cadence used by standard
    % runtime filename resolution, not the raw hourly source cadence.
    staged_timestep = kwargs.dt_out;
@@ -298,12 +295,15 @@ end
 function permafrost_zone = casePermafrostZone(sitename)
    %CASEPERMAFROSTZONE Obu et al. (2019) extent per SnowMIP site.
    %
+   % Obu et al. (2019) supersedes the Brown et al. (1997) map used for the v1
+   % permafrost_zone values, so staged v1 values will not always match.
+   %
    % Hard-coded results of a point-in-polygon test of the Obu et al. (2019) ESA
    % GlobPermafrost / UiO PEX permafrost-zone map at each ESM-SnowMIP site
-   % (test/interactive/site_classification/classify_site_facies.m). All ten sites are off-ice land
-   % surfaces. Sites outside any permafrost polygon -> "none". Vocabulary:
-   % icemodel.verification.namelists.permafrostzone. Replaces the v1 Brown et al.
-   % (1997) source.
+   % (test/interactive/site_classification/classify_site_facies.m). All ten
+   % sites are off-ice land surfaces. A site outside every permafrost polygon
+   % gets "none". Vocabulary: icemodel.verification.namelists.permafrostzone.
+
    switch lower(string(sitename))
       case "sod"   % Sodankyla, boreal Lapland
          permafrost_zone = "continuous";
@@ -324,14 +324,13 @@ function vars = obsComparisonVariables(obs_tt)
    % Returns a string column with the canonical ordering:
    %   snow_depth_m, swe_kg_m2, surface_temp_C, soil_temp_<k>_C
    %
-   % A canonical variable is included when its column exists in the
-   % staged obs timetable. The obs builder
-   % (buildEsmSnowmipObservations) decides which canonical columns to
-   % stage based on upstream NetCDF channel availability, so a simple
-   % presence check is sufficient here. Sparseness within the staged
-   % window is preserved on the comparison axis (plotcase renders
-   % sparse markers); never-observed variables are absent and never
-   % appear as comparison rows.
+   % A canonical variable is included when its column exists in the staged obs
+   % timetable. The obs builder (buildEsmSnowmipObservations) decides which
+   % canonical columns to stage from the upstream NetCDF channels, so a presence
+   % check is enough here. Gaps inside the staged window stay on the comparison
+   % axis, and plotcase draws them as sparse markers. A variable that was never
+   % observed is absent and never becomes a comparison row.
+
    present = string(obs_tt.Properties.VariableNames);
    canonical = ["snow_depth_m"; "swe_kg_m2"; "surface_temp_C"];
    soil = reshape(present(startsWith(present, "soil_temp_")), [], 1);
@@ -372,8 +371,8 @@ function writeMetFiles(forcing_tt, sitename, input_root, dt_out, overwrite, ...
    %
    % Delegates met-file naming, validation, and saving to the shared
    % icemodel.forcing.helpers.writemet (window form, 15-minute by default), so
-   % configureRun + loadmet resolve the file without verification-only branches.
-   % Existing files are additive no-ops unless overwrite=true.
+   % configureRun and loadmet resolve the file without verification-only
+   % branches. An existing file stays unchanged unless overwrite=true.
 
    icemodel.forcing.helpers.writemet(forcing_tt, sitename, dataset_family, ...
       outdir=fullfile(input_root, 'met'), naming="window", dt_out=dt_out, ...

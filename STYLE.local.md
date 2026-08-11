@@ -101,3 +101,17 @@ issue and stop at the namespace-only deliverable.
   10. solver options, then `opts` last
 - This surface ordering schema is not enforced repo-wide; other namespaces may differ.
 - When editing kernels, keep the code shape close to surrounding kernels unless there is a strong reason to refactor more broadly.
+
+## Prose examples
+
+Rewrite this:
+
+> Note that a blank char '' returns true which is technically incorrect,
+> isscalar('') = false. This incorrect behavior is preserved for legacy
+> reasons.
+
+as this:
+
+> Note: a blank char '' returns true. This is incorrect, because
+> isscalar('') = false. Keep the behavior for legacy reasons. Use
+> isblanktext for a strict check.

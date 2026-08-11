@@ -24,8 +24,9 @@ The study answers two separate questions:
 
 `opts.lookup_k_bulk` (default `true`) controls whether the production path
 uses the lookup-table approximation or the exact bulk-extinction transform.
-`icemodel.radiation.initialize_spectral_model` builds the lookup table when `opts.lookup_k_bulk` is true and
-passes it as `k_bulk_lookup` to `icemodel.column.shortwave_source_term`, which dispatches on
+`icemodel.radiation.initialize_spectral_model` builds the lookup table when
+`opts.lookup_k_bulk` is true. It passes the table as `k_bulk_lookup` to
+`icemodel.column.shortwave_source_term`, which dispatches on
 `isempty(k_bulk_lookup)`.
 
 1. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/icemodel.radiation.initialize_spectral_model.m`
@@ -34,7 +35,8 @@ passes it as `k_bulk_lookup` to `icemodel.column.shortwave_source_term`, which d
 2. `/Users/mattcooper/MATLAB/projects/icemodel/icemodel/icemodel.column.shortwave_source_term.m`
    - main entrypoint called by `icemodel.m`
    - remaps thermal density to the spectral grid
-   - chooses exact or lookup bulk extinction coefficients via `isempty(k_bulk_lookup)`
+   - chooses exact or lookup bulk extinction coefficients with
+     `isempty(k_bulk_lookup)`
    - solves the two-stream system
    - reconstructs net spectral flux
    - collapses that flux to the thermal-grid source term and `chi`
@@ -163,7 +165,7 @@ Formal smoke perf acceptance under `R2024b`:
 
 - the whole-model perf gate is currently skipped because the accepted rolling
   perf baselines were built under `R2025b`
-- the runner now records that incompatibility explicitly instead of reporting a
+- the runner records that incompatibility explicitly and does not report a
   false failure
 - measured smoke times under `R2024b` were:
   - `functions`: `129.86 s` direct whole-model summary
@@ -172,8 +174,8 @@ Formal smoke perf acceptance under `R2024b`:
 
 Interpretation:
 
-1. `functions` now matches `inlined` to roundoff and is not slower in the
-   current validated setup.
+1. `functions` matches `inlined` to roundoff and is not slower in the
+   validated setup.
 2. `lookup` remains the clear production speed path.
 3. The solver/control fixes did not introduce any formal `dt_min` or
    `maxsubstep` failures in the `icemodel` full matrix.
@@ -190,7 +192,7 @@ reference and accessible via `opts.lookup_k_bulk = false`.
 
 ## Direct-Model Timing Note
 
-The direct whole-model timings above were measured during a long MATLAB session and
+A long MATLAB session produced the direct whole-model timings above, and they
 appear inflated relative to expected steady-state performance. Expected 1-year
 runtimes in a fresh session are approximately:
 
@@ -199,5 +201,5 @@ runtimes in a fresh session are approximately:
 - `skinmodel`: ~10 s
 
 The formal test suite runs 2-year cases (1 spinup + 1 retained output year), so
-formal runtimes are roughly 2x the 1-year values. These timings will be
-regenerated in a fresh MATLAB session and updated here before final acceptance.
+formal runtimes are roughly 2x the 1-year values. Regenerate these timings in a
+fresh MATLAB session and update this section before final acceptance.

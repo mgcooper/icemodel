@@ -98,7 +98,7 @@ end
 function test_promice_builders_enforce_paired_utc_window(testCase)
    % Both public products share one paired-window boundary through the reader.
    source_dir = testCase.TestData.source_dir;
-   error_id = 'icemodel:internal:pairedWindow:invalidWindow';
+   error_id = 'icemodel:pairedWindow:invalidWindow';
    missing_source = fullfile(source_dir, 'missing-window-precedence');
    testCase.verifyError(@() icemodel.forcing.buildPromiceMet("KAN_M", ...
       source_dir=missing_source, startdate="2015-06-01"), error_id);
@@ -691,7 +691,7 @@ function test_buildPromiceData_reads_l3_evaluation_channels(testCase)
 
    % Ablation: cumulative surface lowering, positive-down, monotone-ish, with
    % a physically plausible multi-year magnitude (KAN_L lowers ~57 m over the
-   % window; the homegrown derivation inflated multi-year totals).
+   % window).
    ab = Data.ablation(isfinite(Data.ablation));
    testCase.verifyGreaterThan(numel(ab), 1000);
    testCase.verifyEqual(ab(1), 0, 'AbsTol', 1e-6);   % zeroed at window start
@@ -767,9 +767,9 @@ function test_buildPromiceData_keeps_wholly_masked_tice10m_contract(testCase)
 end
 
 function test_buildPromiceData_gap_flag_from_sensors_not_just_z_nan(testCase)
-   % The improved gap flag is sensor-derived: it must catch slope-bridged
-   % samples (all surface sensors NaN but z finite) that the old z-NaN-only
-   % heuristic missed. MIT has thousands of such samples, so the new
+   % The gap flag is sensor-derived: it catches slope-bridged samples (all
+   % surface sensors NaN but z finite), not just samples where z itself is
+   % NaN. MIT has thousands of such samples, so the sensor-derived
    % gap-flagged count must EXCEED the bare z-NaN count.
 
    [Data, metadata] = icemodel.forcing.buildPromiceData("MIT", ...
@@ -782,8 +782,8 @@ function test_buildPromiceData_gap_flag_from_sensors_not_just_z_nan(testCase)
 
    names = string(Data.Properties.VariableNames);
    testCase.verifyTrue(ismember("surface_height_flag", names));
-   % The sensor-derived gap count must strictly exceed the z-NaN-only count
-   % (slope-bridged segments are now flagged too).
+   % The sensor-derived gap count must strictly exceed the z-NaN-only count:
+   % slope-bridged segments are flagged too.
    testCase.verifyGreaterThan(metadata.gap_flagged_samples, z_nan_only);
 end
 
@@ -908,8 +908,8 @@ end
 function test_buildPromiceData_stages_step_flags_unaltered(testCase)
    % The de-stepping DETECTION is staged (step_detected/correctable + signed
    % magnitude) but the staged ablation series itself is UNALTERED: it must
-   % still equal the raw -(z - z(start)) lowering, proving correction is not
-   % baked into the staged data.
+   % still equal the raw -(z - z(start)) lowering, which shows the correction
+   % is not applied to the staged data.
 
    [Data, metadata] = icemodel.forcing.buildPromiceData("MIT", ...
       source_dir=testCase.TestData.source_dir, frequency="hourly");
@@ -928,11 +928,11 @@ function test_buildPromiceData_stages_step_flags_unaltered(testCase)
    raw_ablation = -(z - z(find(isfinite(z), 1)));
    testCase.verifyEqual(Data.ablation, raw_ablation, 'AbsTol', 1e-9);
 
-   % The raw series still carries the ~11.9 m of bogus installation jump, so it
-   % overshoots the de-stepped magnitude (the correction is NOT in the staged
-   % data).
+   % The raw series still carries the ~11.9 m of spurious installation jump, so
+   % it exceeds the de-stepped magnitude. The correction is NOT in the staged
+   % data.
    ab = raw_ablation(isfinite(raw_ablation));
-   testCase.verifyGreaterThan(max(ab), 40);   % raw includes the bogus jump
+   testCase.verifyGreaterThan(max(ab), 40);   % raw includes the spurious jump
 end
 
 function test_buildPromiceData_units_from_shared_map(testCase)
@@ -1146,8 +1146,8 @@ function test_readPromiceAws_does_not_extend_shallow_sensor_jump(testCase)
 end
 
 function test_readPromiceAws_marks_neighbor_insufficient_jump_unreviewed(testCase)
-   % The target remains conservatively masked when native neighbors are absent,
-   % but code 2 prevents the sparse event from masquerading as reviewed QC.
+   % The target stays masked when native neighbors are absent, and code 2
+   % records the sparse event as unreviewed rather than reviewed QC.
    root = string(tempname);
    mkdir(fullfile(root, "hour"))
    cleanup = onCleanup(@() rmdir(root, 's'));

@@ -12,18 +12,18 @@ function manifest = importKtransect(source_dir, kwargs)
    %    header alongside the series DOI.
    %    forcing_sources selects runtime sources requested by the current call.
    %    Ordinary calls preserve omitted existing legs; overwrite_family=true
-   %    deliberately replaces the whole family state.
-   %    build_observations=false is a guarded non-dry fast path: requested cases
-   %    must already exist in the target manifest, whose observation entry is
-   %    reused while selected forcing is attached.
+   %    replaces the whole family state.
+   %    build_observations=false is a guarded path that writes artifacts.
+   %    Requested cases must already exist in the target manifest. The call
+   %    reuses each case's observation entry and attaches the selected forcing.
    %
    %  Default roots
    %    source_dir="" reads <repo>/data/verification/ktransect. With no
    %    output_root, observations go to
    %    <repo>/data/eval/ktransect/<case_id>/observations.mat and native
    %    met/userdata go to <repo>/data/input/{met,userdata}/ktransect/.
-   %    Explicit source_dir, output_root, evaluation_data_root, and
-   %    input_data_root overrides are honored as-is.
+   %    The importer uses explicit source_dir, output_root,
+   %    evaluation_data_root, and input_data_root values without change.
    %
    %  Met and userdata
    %    Model met defaults to dt_out="15m"; pass dt_out="" for native cadence.
@@ -85,7 +85,7 @@ function manifest = importKtransect(source_dir, kwargs)
    %    Staging one case adds or updates only that case in the family manifest
    %    and preserves every other committed case and file. Re-staging the same
    %    case updates exactly its entry. Set overwrite_family=true only to
-   %    deliberately rebuild the family root.
+   %    rebuild the family root.
    %
    %  Returns
    %    manifest : struct  Final or dry-run family manifest.
@@ -125,7 +125,7 @@ function manifest = importKtransect(source_dir, kwargs)
 
    % Validate the optional clamp before any cache or staging side effect.
    [window_start, window_end, window_enabled] = ...
-      icemodel.internal.pairedWindow( ...
+      icemodel.pairedWindow( ...
       kwargs.startdate, kwargs.enddate);
 
    % Resolve the forcing sources.
@@ -157,8 +157,8 @@ function manifest = importKtransect(source_dir, kwargs)
    prior_cases = struct([]);
    coverage = struct();
    reuse_sources = strings(1, 0);
-   % Dry runs deliberately preserve the caller's (possibly empty) source
-   % token without resolving or touching the cache.
+   % Dry runs keep the caller's (possibly empty) source token without
+   % resolving or touching the cache.
    resolved_source_dir = source_dir;
 
    if ~kwargs.dry_run
@@ -197,8 +197,9 @@ function manifest = importKtransect(source_dir, kwargs)
          startdate=kwargs.startdate, enddate=kwargs.enddate);
    else
       % Validate caches only when building observations or native runtime files.
-      % Dry runs remain metadata-only; optional skips stay quiet while required
-      % K-transect products print their retrieval guidance before failing.
+      % Dry runs read metadata only. An optional product prints nothing when
+      % it is missing. A required K-transect product prints its retrieval
+      % guidance and then fails.
       cache_status = struct();
       if ~kwargs.dry_run
          strict_cache = ~kwargs.skip_missing;
@@ -329,8 +330,8 @@ function state = stageCase(site, source_dir, cache_status, family_root, ...
          'target K-transect manifest.'], case_id);
    end
 
-   % A native-only refresh defaults to the staged observation window instead of
-   % silently widening the runtime artifact to the full source record.
+   % A native-only refresh defaults to the staged observation window rather
+   % than widening the runtime artifact to the full source record.
    build_start = window_start;
    build_end = window_end;
    if ~window_enabled && ~kwargs.build_observations
@@ -422,9 +423,9 @@ function state = stageCase(site, source_dir, cache_status, family_root, ...
    evaluation_identity = struct('bytes', evaluation_info.bytes, ...
       'sha256', icemodel.verification.setup.fileSha256(evaluation_file));
 
-    colocation = nativeColocation(metadata, met_files, data_files, ...
-       met_outdir, userdata_outdir, evaluation_file_rel, ...
-       evaluation_identity, period, ...
+   colocation = nativeColocation(metadata, met_files, data_files, ...
+      met_outdir, userdata_outdir, evaluation_file_rel, ...
+      evaluation_identity, period, ...
       site.source_association, forcing_ready, ...
       forcing_ready_reason, forcing_complete_windows);
    [colocation, identity_conflict] = ...
@@ -512,10 +513,10 @@ function colocation = nativeColocation(metadata, met_files, data_files, ...
    %NATIVECOLOCATION Build staged native-source colocation metadata.
    % children pins every annual child DOI actually merged into this case so the
    % manifest satisfies the series-plus-children DOI pinning requirement.
-    % DOI records are the durable raw-source identity. Local cache paths are
-    % deliberately absent because they do not survive relocation or sharing.
-    ktransect = struct('kind', 'annual_aws_met_and_eval', 'staged', true, ...
-       'doi', char(metadata.doi), ...
+   % DOI records are the durable raw-source identity. Local cache paths are
+   % omitted because they do not survive relocation or sharing.
+   ktransect = struct('kind', 'annual_aws_met_and_eval', 'staged', true, ...
+      'doi', char(metadata.doi), ...
       'bundle_doi', char(metadata.bundle_doi), ...
       'license', char(metadata.license), ...
       'children', childDoiRecords(metadata.children), ...

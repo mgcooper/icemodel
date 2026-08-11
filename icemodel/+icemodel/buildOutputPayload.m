@@ -7,9 +7,9 @@ function [data1, data2] = buildOutputPayload(opts, surface_state, ...
    %  [data1, data2] = icemodel.buildOutputPayload(opts, surface_state, ...
    %     subsurface_state, thf_diag)
    %
-   % This helper is the canonical bridge between the finalized output-profile
-   % contract in OPTS.VARS1 / OPTS.VARS2 and the raw timestep state assembled
-   % inside the core model loops.
+   % This helper connects the finalized output-profile contract in OPTS.VARS1
+   % and OPTS.VARS2 to the raw timestep state assembled inside the core model
+   % loops.
 
    if nargin < 4
       thf_diag = struct([]);

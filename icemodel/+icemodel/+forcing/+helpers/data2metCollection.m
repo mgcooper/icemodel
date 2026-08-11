@@ -8,11 +8,12 @@ function [met, metadata] = data2metCollection(Data, kwargs)
    %
    % Applies the canonical data2met conversion and optional interval-support
    % resampling to each source timetable. A single timetable returns a single
-   % timetable and metadata struct; a cell collection preserves the met-cell
-   % and metadata-struct-array input shape. Final metadata records the met
-   % variables and fill policy and exactly matches met.Properties.UserData.
-   % This keeps Data-backed forcing builders on the same conversion and
-   % finalization path without duplicating single-point and multi-point flow.
+   % timetable and one metadata struct. A cell collection returns a met cell
+   % array and a metadata struct array of the same shape. Final metadata
+   % records the met variables and the fill policy, and matches
+   % met.Properties.UserData exactly. Data-backed forcing builders then share
+   % one conversion and finalization path for single-point and multi-point
+   % sources.
    %
    % See also: icemodel.forcing.data2met,
    %  icemodel.forcing.helpers.resampleMetTimestep
@@ -55,8 +56,8 @@ function [met, metadata] = data2metCollection(Data, kwargs)
       met{k}.Properties.UserData = metadata{k};
    end
 
-   % Restore the public scalar return contract; collection metadata follows the
-   % same shape as its met cell array rather than being silently columnized.
+   % Restore the scalar return shape for a single input. Collection metadata
+   % keeps the shape of its met cell array, not a column shape.
    if ~collection_input
       met = met{1};
       metadata = metadata{1};

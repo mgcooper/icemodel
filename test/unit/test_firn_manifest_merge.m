@@ -1,11 +1,11 @@
 function tests = test_firn_manifest_merge
    %TEST_FIRN_MANIFEST_MERGE Verify incremental family-manifest staging.
    %
-   % Exercises icemodel.verification.setup.writeFamilyManifestMerge directly
-   % (no raw forcing sources needed, so it never data-gates): staging a NEW
-   % site into a family manifest that already holds a committed site must ADD
-   % the new case and PRESERVE the existing case + its sidecar files byte for
-   % byte. This is the KAN no-churn guarantee the firn importers rely on.
+   % Exercises icemodel.verification.setup.writeFamilyManifestMerge directly.
+   % It needs no raw forcing sources, so it never skips for missing data.
+   % Staging a NEW site into a family manifest that already holds a committed
+   % site must ADD the new case and PRESERVE the existing case and its sidecar
+   % files byte for byte. The firn importers depend on this KAN rule.
    tests = functiontests(localfunctions);
 end
 
@@ -24,7 +24,7 @@ end
 
 function test_new_site_preserves_existing_case_bytes(testCase)
    % Stage a first site, snapshot its JSON, then merge a second site and assert
-   % the first case re-encodes IDENTICALLY (no churn) and the new case is added.
+   % the first case re-encodes IDENTICALLY and the new case is added.
 
    mf = testCase.TestData.manifest_file;
 
@@ -814,8 +814,8 @@ function test_overwrite_family_drops_prior_cases(testCase)
       requested_ids="kanl", overwrite_family=true);
    testCase.verifyWarning(@() ...
       icemodel.verification.setup.writeFamilyManifestMerge(mf, ...
-         familyWith({caseEntry("kanm", "KAN_M", "ablation")}), ...
-         requested_ids="kanm", overwrite_family=true), ...
+      familyWith({caseEntry("kanm", "KAN_M", "ablation")}), ...
+      requested_ids="kanm", overwrite_family=true), ...
       'icemodel:verification:writeFamilyManifestMerge:overwriteFamily');
 
    decoded = jsondecode(fileread(mf));
@@ -834,12 +834,12 @@ function test_overwrite_family_warns_when_source_removed(testCase)
 
    testCase.verifyWarning(@() ...
       icemodel.verification.setup.writeFamilyManifestMerge(mf, replacement, ...
-         requested_ids="kanl", overwrite_family=true), ...
+      requested_ids="kanl", overwrite_family=true), ...
       'icemodel:verification:writeFamilyManifestMerge:overwriteFamily');
 end
 
 function test_overwrite_family_source_addition_is_warning_free(testCase)
-   % Kill-safe replacement may add source state without reporting a removal.
+   % A replacement that only adds source state must report no removal.
    mf = testCase.TestData.manifest_file;
    first = familyWith({caseEntry("kanl", "KAN_L", "ablation")});
    first.cases.forcing_sources = {'promice'};
@@ -848,13 +848,13 @@ function test_overwrite_family_source_addition_is_warning_free(testCase)
 
    testCase.verifyWarningFree(@() ...
       icemodel.verification.setup.writeFamilyManifestMerge(mf, ...
-         familyWith({caseEntry("kanl", "KAN_L", "ablation")}), ...
-         requested_ids="kanl", overwrite_family=true));
+      familyWith({caseEntry("kanl", "KAN_L", "ablation")}), ...
+      requested_ids="kanl", overwrite_family=true));
 end
 
 function test_overwrite_family_warns_when_skipped_record_removed(testCase)
    % A skipped record is durable family state, so dropping it during a full
-   % replacement must surface the same destructive-overwrite warning.
+   % replacement must raise the same destructive-overwrite warning.
    mf = testCase.TestData.manifest_file;
    first = familyWith({caseEntry("kanl", "KAN_L", "ablation")});
    first.skipped = struct('site', "zzz", 'reason', "missing source");
@@ -863,8 +863,8 @@ function test_overwrite_family_warns_when_skipped_record_removed(testCase)
 
    testCase.verifyWarning(@() ...
       icemodel.verification.setup.writeFamilyManifestMerge(mf, ...
-         familyWith({caseEntry("kanl", "KAN_L", "ablation")}), ...
-         requested_ids="kanl", overwrite_family=true), ...
+      familyWith({caseEntry("kanl", "KAN_L", "ablation")}), ...
+      requested_ids="kanl", overwrite_family=true), ...
       'icemodel:verification:writeFamilyManifestMerge:overwriteFamily');
 
    decoded = jsondecode(fileread(mf));
@@ -1086,7 +1086,7 @@ function test_semantic_compare_writes_real_case_order_change(testCase)
 end
 
 function test_semantic_compare_replaces_malformed_existing_json(testCase)
-   % Invalid JSON cannot be treated as a semantic no-op by the shared writer.
+   % The shared writer must not treat invalid JSON as an unchanged file.
    mf = testCase.TestData.manifest_file;
    fid = fopen(mf, 'w');
    cleaner = onCleanup(@() fclose(fid));
@@ -1101,7 +1101,8 @@ function test_semantic_compare_replaces_malformed_existing_json(testCase)
 end
 
 function test_case_field_mismatch_preserves_error_identifier(testCase)
-   % Schema drift between preserved and touched case entries must stay catchable.
+   % A field-set mismatch between a preserved case entry and a touched one
+   % must raise a catchable error.
    mf = testCase.TestData.manifest_file;
    first = familyWith({caseEntry("kanl", "KAN_L", "ablation")});
    icemodel.verification.setup.writeFamilyManifestMerge(mf, first, ...

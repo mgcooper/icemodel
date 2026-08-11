@@ -640,7 +640,7 @@ end
 
 function test_rejects_missing_or_inconsistent_mar_diagnostic_inventory(testCase)
    % Missing provenance and a forged source/channel inventory have distinct
-   % repair codes so neither can masquerade as an optional reduced source.
+   % repair codes, so neither can be mistaken for an optional reduced source.
    [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
    loaded = load(paths.mar_data, 'Data', 'artifact_metadata');
    original = loaded.Data.Properties.UserData;
@@ -762,8 +762,8 @@ function test_audits_promice_tice10m_source_mask_and_provenance(testCase)
    testCase.verifyTrue(any(string({report.findings.code}) ...
       == "promice_tice10m_persistent_epoch_masked"));
 
-   % Count provenance is part of the durable contract and cannot silently drift
-   % from the staged flag after an additive refresh or daily aggregation.
+   % Count provenance is part of the durable contract and must still match the
+   % staged flag after an additive refresh or a daily aggregation.
    metadata.tice10m_qc_flagged_sample_count = 99;
    Data.Properties.UserData = metadata;
    artifact_metadata = metadata;
@@ -1008,7 +1008,7 @@ end
 
 function test_unverified_merra_orientation_is_an_explicit_blocker(testCase)
    % Numeric MERRA fluxes without a durable orientation marker are unresolved
-   % source-quality blockers, not silently accepted warnings.
+   % source-quality blockers, not warnings the audit accepts.
    [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
    loaded = load(paths.merra_data, 'Data', 'artifact_metadata');
    loaded.Data.Properties.UserData = rmfield(loaded.Data.Properties.UserData, ...
@@ -1114,7 +1114,7 @@ end
 
 function test_partial_required_met_gap_warns_without_failing(testCase)
    % Partial required-channel gaps remain source-faithful but must be visible as
-   % non-runnable forcing rather than buried only in the channel ledger.
+   % non-runnable forcing rather than recorded only in the channel ledger.
    [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
    loaded = load(paths.promice_met, 'met');
    loaded.met.albedo(4:5) = NaN;
@@ -1211,8 +1211,8 @@ function test_atomic_esm_runtime_met_is_audited_exactly(testCase)
    testCase.verifyFalse(met_records.exists);
    testCase.verifyTrue(any(string({report.findings.code}) == "missing_artifact"));
 
-   % A genuine resolver failure is reported rather than silently suppressing
-   % the entire forcing leg. The atomic manifest itself remains byte-stable.
+   % A genuine resolver failure is reported rather than suppressing the
+   % entire forcing leg. The atomic manifest itself remains byte-stable.
    rmdir(input_root, 's')
    report = icemodel.verification.auditArtifacts( ...
       evaluation_data_root=eval_root, input_data_root=input_root, ...

@@ -11,6 +11,7 @@ function PerfBaseline = build_perf_baseline(kwargs)
    %     smbmodel="icemodel", solver=[1 3])
    %  PerfBaseline = build_perf_baseline(simyear=2017, smoke_sites="kanm", ...
    %     full_sites=["kanm"; "kanl"])
+   %  PerfBaseline = build_perf_baseline(data_root="/path/to/test/data")
    %
    % Use this when you want to accept new runtime measurements as a rolling
    % or versioned perf baseline. This writes baseline files only; it does not
@@ -83,17 +84,43 @@ function PerfBaseline = build_perf_baseline(kwargs)
 
       kwargs.output_file string ...
          = string.empty()
+
+      kwargs.data_root (1, 1) string ...
+         = ""
    end
+
+   % Resolve the baseline-owned default tree before installing scoped config.
+   baseline_selector = kwargs.baseline_tag;
+   if isblanktext(baseline_selector)
+      baseline_selector = kwargs.baseline;
+   end
+   baseline_policy = ...
+      icemodel.test.helpers.formalBaselinePolicy(baseline_selector);
 
    % Keep the cleanup handle in scope so the caller's config is restored
    % when this entrypoint returns.
-   [~, ~, ~, ~, suite_cleanup] = ...
-      icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>
+   [~, input_path, ~, ~, suite_cleanup] = ...
+      icemodel.test.helpers.bootstrapTestEnvironment( ...
+      icemodel_config_casename=baseline_policy.config_case, ...
+      data_root=kwargs.data_root);
+
+   % The perf TestCase bootstraps each measured case, so retain the configured
+   % root through the environment the runner sets for the class. A caller-
+   % supplied root keeps precedence over the resolved verification root.
+   data_root = kwargs.data_root;
+   if isblanktext(data_root)
+      data_root = string(fileparts(input_path));
+   end
+   data_root_name = 'ICEMODEL_TEST_DATA_ROOT';
+   prior_data_root = getenv(data_root_name);
+   data_root_cleanup = onCleanup( ...
+      @() setenv(data_root_name, prior_data_root));
+   setenv(data_root_name, char(data_root));
 
    % Baseline timings must never inherit an interactive profiler.
    profile off
 
-   % Deal out inputs.
+   % Unpack the parsed inputs.
    [baseline, baseline_tag, tier, smbmodel, solver, simyear, smoke_sites, ...
       full_sites, n_runs, tol_perf, include_benchmarks, ...
       benchmark_sampling_profile, ...
@@ -136,6 +163,9 @@ function PerfBaseline = build_perf_baseline(kwargs)
 
    % Collapse to a single table.
    PerfBaseline = vertcat(baselines{:});
+
+   % Restore the caller config now that this entrypoint is done.
+   delete(suite_cleanup)
 end
 
 function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
@@ -208,6 +238,12 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
 
    % Convert the accepted case rows into the saved baseline table.
    PerfBaseline = struct2table(rows);
+   selector = baseline_tag;
+   if baseline_type == "rolling"
+      selector = "rolling";
+   end
+   icemodel.test.helpers.assertFormalBaselineCandidate( ...
+      "perf", PerfBaseline, cases, selector);
 
    % Record the build metadata alongside the accepted baseline values.
    meta = struct();
@@ -245,12 +281,6 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
    meta.host = string(computer);
    meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
 
-   % Rolling baselines are acceptance targets. Archive the prior managed
-   % state before overwriting it so older accepted timings remain available.
-   if baseline_type == "rolling"
-      icemodel.test.helpers.archiveManagedBaseline(output_file, "perf");
-   end
-
    % Attach the managed component benchmark baseline to the same file so the
    % accepted end-to-end timings and their supporting kernel diagnostics stay
    % linked.
@@ -266,6 +296,7 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
          BenchmarkBaseline.last_updated_utc = repmat( ...
             datetime('now', 'TimeZone', 'UTC'), n_rows, 1);
       end
+      icemodel.test.helpers.assertFormalBenchmarkCandidate(BenchmarkBaseline);
       benchmark_meta.baseline_type = baseline_type;
       benchmark_meta.baseline_tag = baseline_tag;
       benchmark_meta.source = "run_benchmark_suite";
@@ -280,6 +311,12 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
       [profile_summary, profile_meta, profile_artifacts] = ...
          icemodel.test.helpers.captureBaselineProfile( ...
          "perf", cases, output_file, history_size=profile_history_size);
+   end
+
+   % Archive only after the end-to-end, benchmark, and optional profile
+   % candidates have all passed their own validation and completed.
+   if baseline_type == "rolling"
+      icemodel.test.helpers.archiveManagedBaseline(output_file, "perf");
    end
 
    % Save the rolling or release perf baseline file.

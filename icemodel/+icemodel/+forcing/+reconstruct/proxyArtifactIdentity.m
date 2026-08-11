@@ -4,9 +4,9 @@ function tf = proxyArtifactIdentity(metadata, site, location, product)
    %  tf = icemodel.forcing.reconstruct.proxyArtifactIdentity( ...
    %     metadata, site, location, product)
    %
-   % The filename is only a catalog hint. Acceptance and reconstruction
-   % require the staged timetable metadata to identify the requested target
-   % point and the exact producer represented by the catalog storage token.
+   % The filename is only a catalog hint. The staged timetable metadata must
+   % identify the requested target point. It must also identify the exact
+   % producer that the catalog storage token names.
 
    arguments
       metadata
@@ -24,8 +24,9 @@ function tf = proxyArtifactIdentity(metadata, site, location, product)
       double(location.lat_wgs84)) ...
       && isequal(double(metadata.lon_wgs84), double(location.lon_wgs84));
 
-   % Older canonical proxy artifacts predate the site token. When present it
-   % must agree; otherwise the exact target coordinates carry the identity.
+   % Some canonical proxy artifacts carry no site token. When the token is
+   % present it must agree. When it is absent, the exact target coordinates
+   % give the identity.
    has_site = true;
    if isfield(metadata, 'site')
       has_site = (ischar(metadata.site) ...

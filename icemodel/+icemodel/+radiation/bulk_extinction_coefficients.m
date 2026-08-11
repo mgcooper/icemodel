@@ -9,9 +9,9 @@ function k_bulk = bulk_extinction_coefficients(dz_spect, ro_sno, tau_N, ...
    %
    % Computes bulk (spectrally integrated) extinction coefficients.
    %
-   % When LOOKUP is provided and non-empty, the fast density-table path is used
-   % (see local subfunction bulk_extinction_coefficients_lookup). When LOOKUP is
-   % absent or empty, the exact spectral transform is computed.
+   % With a non-empty LOOKUP, this function uses the fast density-table path
+   % (see the local subfunction bulk_extinction_coefficients_lookup). Without
+   % LOOKUP, or with an empty LOOKUP, it computes the exact spectral transform.
    %
    % Inputs correspond to one spectral-grid density profile and the fixed
    % spectral integration coefficients tau_N/S returned by

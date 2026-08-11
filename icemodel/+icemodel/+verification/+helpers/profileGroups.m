@@ -6,11 +6,11 @@ function groups = profileGroups(value, kwargs)
    %     value, time_resolution="timestamp")
    %
    % MAR tables use their explicit profile_id. SUMup tables use the source
-   % name_key that its builder already treats as physical profile identity,
-   % falling back to name or coordinates for older tables. Row depth and
-   % measurement/reference/method identifiers are deliberately excluded so one
-   % physical profile remains one group. Tables without a datetime/profile
-   % identity remain one ungrouped profile for backward-compatible plots.
+   % name_key, which its builder treats as the physical profile identity. Older
+   % SUMup tables fall back to name or to coordinates. The grouping excludes
+   % row depth and the measurement, reference, and method identifiers, so one
+   % physical profile stays one group. A table without a datetime or profile
+   % identity stays one ungrouped profile, which keeps older plots working.
 
    arguments
       value
@@ -62,8 +62,9 @@ function groups = profileGroups(value, kwargs)
       end
    end
 
-   % A dated profile is keyed by its UTC calendar date. Time-of-day remains in
-   % the rows and output metadata, but cannot split one daily MAR snapshot.
+   % The function keys a dated profile by its UTC calendar date. Time-of-day
+   % stays in the rows and output metadata, but it cannot split one daily MAR
+   % snapshot.
    if has_datetime
       timestamps = icemodel.verification.setup.ensureUtc( ...
          value.(char(datetime_name)));

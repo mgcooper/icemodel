@@ -10,8 +10,9 @@ function cases = loadPriorDatasetFamilyCases(manifest_file, kwargs)
    %  build_observations True when this call rebuilds observation contracts.
    %
    % Outputs
-   %  cases   Existing cases for additive refreshes and forcing-only replacement
-   %          calls; observation-building whole-family replacement returns empty.
+   %  cases   Existing cases for an additive refresh or a forcing-only
+   %          replacement. A whole-family replacement that also builds
+   %          observations returns empty.
 
    arguments
       manifest_file (1, 1) string
@@ -19,8 +20,9 @@ function cases = loadPriorDatasetFamilyCases(manifest_file, kwargs)
       kwargs.build_observations (1, 1) logical = true
    end
 
-   % Observation-building whole-family replacement owns every source leg. A
-   % forcing-only replacement still needs the requested observation contract.
+   % A whole-family replacement that also builds observations regenerates every
+   % source, so it needs no prior cases. A forcing-only replacement still needs
+   % the existing observation contract.
    cases = struct([]);
    if (kwargs.overwrite_family && kwargs.build_observations) ...
          || ~isfile(manifest_file)

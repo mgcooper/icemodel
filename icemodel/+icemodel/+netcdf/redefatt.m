@@ -19,7 +19,7 @@ function redefatt(filelist, varname, newatts)
       % Update the attribute of the variable
       netcdf.putAtt(fid, vid, 'units', newatts{n});
 
-      % How I originally used this:
+      % Example use:
       % YYYY = num2str(allyears(n));
       % correctTimeUnits = ['seconds since ' YYYY '-01-01 00:00:00'];
       % netcdf.putAtt(fid, vid, 'units', correctTimeUnits);

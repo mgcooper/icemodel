@@ -70,7 +70,7 @@ function info = esmSnowmipSiteCatalog(sitename)
    match = string({catalog.sitename}) == sitename;
    if ~any(match)
       valid = strjoin([catalog.sitename], ', ');
-      % Preserve the established identifier across the catalog rename.
+      % Keep the snowmipinfo error identifier so callers that catch it work.
       error('icemodel:verification:snowmipinfo:unknown', ...
          'unknown ESM-SnowMIP sitename %s. Valid: %s', sitename, valid);
    end

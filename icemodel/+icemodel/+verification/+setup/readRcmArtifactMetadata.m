@@ -4,9 +4,9 @@ function metadata = readRcmArtifactMetadata(filename)
    %  metadata = ...readRcmArtifactMetadata(filename)
    %
    % Returns the scalar artifact_metadata struct saved beside a staged met or
-   % Data payload. Legacy, missing, unreadable, and malformed metadata all
-   % return an empty struct so callers can apply their own unknown-provenance
-   % policy without loading the potentially large timetable.
+   % Data payload. Older, missing, unreadable, and malformed metadata all
+   % return an empty struct. Callers can then apply their own
+   % unknown-provenance policy without loading the large timetable.
 
    arguments
       filename (1, 1) string

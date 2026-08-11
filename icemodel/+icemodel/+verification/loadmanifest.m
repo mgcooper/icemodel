@@ -8,19 +8,19 @@ function manifest = loadmanifest(case_id, kwargs)
    %
    % Inputs
    %  case_id                    Case id to resolve from the staged manifests.
-%  data_root                  Whole data tree containing eval/ and input/.
-%  evaluation_data_root       Base evaluation-data root. When blank, the
-%                             repo-local data/eval tree is used.
-%  input_data_root            Optional paired input-data root. When blank,
-%                             resolved cases infer input/ beside eval/.
-%  icemodel_config_casename   Config casename used to resolve the default
-%                             evaluation-data root without mutating config.
-   %  dataset_family             Optional family filter to disambiguate case
-   %                             ids shared across families. The firn families
-   %                             promice and sumup both publish kanl/kanm/kanu
-   %                             (distinguished only by family folder), so a
+   %  data_root                  Whole data tree containing eval/ and input/.
+   %  evaluation_data_root       Base evaluation-data root. When blank, this
+   %                             function uses the repo-local data/eval tree.
+   %  input_data_root            Optional paired input-data root. When blank,
+   %                             resolved cases infer input/ beside eval/.
+   %  icemodel_config_casename   Config casename used to resolve the default
+   %                             evaluation-data root without mutating config.
+   %  dataset_family             Optional family filter for a case id shared
+   %                             across families. The firn families promice
+   %                             and sumup both publish kanl, kanm, and kanu,
+   %                             and only the family folder separates them. A
    %                             bare loadmanifest("kanl") returns the first
-   %                             match; pass dataset_family to select one.
+   %                             match. Pass dataset_family to select one.
    %
    % Outputs
    %  manifest   One resolved case-entry struct with family provenance and

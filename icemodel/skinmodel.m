@@ -4,8 +4,8 @@ function [ice1, ice2, opts] = skinmodel(opts)
    % [ice1, ice2] = SKINMODEL(opts)
    % [ice1, ice2, opts] = SKINMODEL(opts)
    %
-   % OPTS is returned so callers can inspect the finalized runtime
-   % configuration after icemodel.configureRun() has resolved derived fields.
+   % This function returns OPTS so callers can inspect the finalized runtime
+   % configuration after icemodel.configureRun() resolves the derived fields.
    % See also: icemodel, icemodel.setopts
    %
    %#codegen
@@ -66,8 +66,8 @@ function [ice1, ice2, opts] = skinmodel(opts)
          [dt_sum, n_subfail, ok_seb, ok_ieb] ...
             = icemodel.timestepping.newtimestep(f_liq, solver);
 
-         % Scalarize time-varying observation geometry and its corresponding
-         % bulk-Richardson coefficients at the forcing-step boundary.
+         % Scalarize time-varying met observation heights and the matching
+         % bulk-Richardson coefficients before each forcing step.
          step_opts = icemodel.surface.step_observation_heights(opts, metstep);
          br_coefs_step = br_coefs(min(metstep, size(br_coefs, 1)), :);
 
@@ -95,7 +95,8 @@ function [ice1, ice2, opts] = skinmodel(opts)
                cpl_seb_tol, cpl_alpha, cpl_aitken, cpl_jumpmax, ...
                ro_sfc, snow_depth, step_opts);
 
-            % Hitting max coupling iterations without ok_cpl is a substep fail.
+            % Reaching the maximum coupling iterations without ok_cpl is a
+            % substep failure.
             ok = ok_seb && ok_ieb && ok_cpl;
 
             % CHECK SUBSTEP FAILURE (shorten dt and restart substep on failure)

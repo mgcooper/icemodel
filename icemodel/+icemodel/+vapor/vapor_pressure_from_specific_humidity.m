@@ -1,5 +1,6 @@
 function e = vapor_pressure_from_specific_humidity(q, p)
-   %SPECIFIC_HUMIDITY_FROM_VAPOR_PRESSURE Convert specific humidity to vapor pressure
+   %VAPOR_PRESSURE_FROM_SPECIFIC_HUMIDITY Convert specific humidity to vapor
+   % pressure
    %
    % e = q * p / (epsilon + (1 - epsilon) * q)
    %

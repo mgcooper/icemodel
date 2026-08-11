@@ -1,5 +1,5 @@
 function mesh(Z, dz, growth_factor)
-   % Plot the nodes and edges of an exponential grid.
+   %MESH Plot the nodes and edges of an exponential grid.
    %
    % Parameters:
    %   Z (float): Total depth of the grid.
@@ -19,8 +19,13 @@ function mesh(Z, dz, growth_factor)
    z = 0;         % Start at the top
    n = 1;         % Layer counter
    Z_tot = 0;     % Total thickness covered
-   nodes = [];    % Initialize node array
-   edges = 0;     % Start with the top edge
+
+   % Preallocate to the layer count of a uniform mesh, which bounds every
+   % non-shrinking growth factor. The arrays are trimmed to the realized
+   % layer count after the loop, so EDGES(1) is still the top edge at 0.
+   n_max = max(ceil(Z / dz), 1);
+   nodes = zeros(1, n_max);       % Initialize node array
+   edges = zeros(1, n_max + 1);   % Start with the top edge
 
    % Compute positions of edges and nodes
    while Z_tot < Z
@@ -33,11 +38,15 @@ function mesh(Z, dz, growth_factor)
       end
 
       z = z + current_dz;
-      nodes(n) = z - current_dz / 2; %#ok<*AGROW>
+      nodes(n) = z - current_dz / 2;
       edges(n + 1) = z;
 
       n = n + 1;
    end
+
+   % Trim the preallocated tail to the layers the loop actually produced.
+   nodes = nodes(1:n - 1);
+   edges = edges(1:n);
 
    % Plot nodes as filled circles
    figure; hold on

@@ -119,42 +119,40 @@ function info = makencfile(datafile, datapath, savepath, smbmodel, forcings, ...
 end
 %%
 
-% Note: The call to icemodel.netcdf.getdefaults returns varnames, units, axes,
-% etc, and then trimvars removes variables which are not present in the actual
-% ice1/2 data files. Rather than call getdefaults once in the main function, it
-% is included in this subfunction to account for the case where the data files
-% change year by year, otherwise trimvars could remove variables in one year
-% which are present in a later year.
+% icemodel.netcdf.getdefaults returns varnames, units, axes, and more. trimvars
+% then removes the variables that the ice1/ice2 data files do not contain. This
+% subfunction calls getdefaults, instead of the main function calling it once,
+% because the data files can change from year to year. A single call would let
+% trimvars drop a variable in one year that a later year contains.
 %
-% A similar issue occurs if the depth dimension (or time) changes year by year.
-% The changing depth dimension is nominally handled by the call to getvarinfo,
-% and the "GetSizeFromData" vs "GetSizeFromDims" options.
+% The same issue occurs if the depth dimension or the time dimension changes
+% from year to year. The call to getvarinfo and the "GetSizeFromData" and
+% "GetSizeFromDims" options handle a changing depth dimension.
 %
-% However, neither trimvars nor the "GetSize" options account for the case where
-% the vars or dims change within a year from file to file.
+% Neither trimvars nor the "GetSize" options handle vars or dims that change
+% from file to file within one year.
 %
-% For dims, specifically depth, the important thing is setting the dimsizes in
-% the files to the maximum depth so if some files have 300 layers and other 500,
-% the nc files are defined to have 500 layers and when a file with 300 layers is
-% encountered the data is written to the first 300 layers. Thus Z and dz are
-% used to set the file-wise dims, which means using GetSizeFromDims == true, and
-% GetSizeFromData could be removed altogether. In general they should be
-% interchangeable and the Z,dz inputs could be removed to simplify the
+% For dims, and for depth in particular, set the dimsizes in the files to the
+% maximum depth. If some files have 300 layers and others have 500, define the
+% nc files with 500 layers. A file with 300 layers then writes into the first
+% 300 layers. Z and dz set the file-wise dims, which means GetSizeFromDims ==
+% true. GetSizeFromData could then be removed. The two options should be
+% interchangeable, and removing the Z and dz inputs would simplify the
 % interface.
 %
-% There may be a use case for the two separate "GetSize" paths - Z, dz could
-% be used to set the file-wise dims, where getdimsize returns the size of the
-% depth grid defined by Z, dz. But GetSizeFromData is used in getchunksize so
-% the chunks match the actual data ... but actually that's not right either, the
-% chunksize is file-wise. So there may not be any use case for GetSizeFromData
-% unless we want to eliminated Z, dz and rely entirely on the data.
+% The two separate "GetSize" paths may still have a use case. Z and dz can set
+% the file-wise dims, where getdimsize returns the size of the depth grid that
+% Z and dz define. getchunksize uses GetSizeFromData so the chunks match the
+% data, but the chunksize is file-wise, so that reason does not hold. There may
+% be no use case for GetSizeFromData unless Z and dz are removed and the code
+% relies on the data alone.
 
 % The use case could just be for validating consistent datasize and dimsize
 
 function processOneYear(datapath, datafile, filename, ncprops, opts, smbmodel)
 
-   % Note: smbmodel is only added as an input to patch the skinmodel
-   % ice1.freeze data. Once those files are written, remove smbmodel.
+   % smbmodel is an input only to patch the skinmodel ice1.freeze data.
+   % Remove smbmodel once those files are written.
 
    % Pull out the netcdf api options
    [xtype, shuffle, deflate, deflateLevel] = deal( ...

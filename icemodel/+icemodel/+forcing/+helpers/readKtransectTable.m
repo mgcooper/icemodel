@@ -6,23 +6,23 @@ function [data, metadata] = readKtransectTable(filename)
    % Role
    %  Source-specific parser for the Smeets et al. (2022) PANGAEA.947483
    %  K-transect annual files (AWS5/AWS6/AWS9/AWS10, 30-minute cadence). The
-   %  shared PANGAEA ingest skips the metadata block and reads positional rows;
-   %  this parser maps channels to icemodel-native names by source label
-   %  because the column set varies across files: type-0 AWS10 files omit the
-   %  "T tech" column and type-1 AWS5/AWS6 files add an "Ice melt" draw-wire
+   %  shared PANGAEA ingest skips the metadata block and reads positional rows.
+   %  This parser maps channels to icemodel-native names by source label
+   %  because the column set varies across files. Type-0 AWS10 files omit the
+   %  "T tech" column, and type-1 AWS5/AWS6 files add an "Ice melt" draw-wire
    %  column, so fixed positions cannot identify variables safely.
    %
    % Channel policy
    %  The AWS-generation flag (source "ID", 0=modular 2003-era type, 1=compact
-   %  integrated type) ships as the aws_type channel because the acoustic
-   %  height-ranger semantics differ by generation: type 0 records surface
-   %  melt/snow height, type 1 records sensor-plus-snow height. The record is
-   %  therefore kept source-faithful as height_rel rather than renamed to a
-   %  canonical surface-height channel. Instrument diagnostics ("T body",
-   %  "T tech") are not carried; the raw cache retains them. Battery voltage
-   %  ("Vlog") is not carried either, but its once-yearly station-visit marker
-   %  (value == 100) is preserved as metadata.visits because visits time the
-   %  generation switch and height-pole re-mounts.
+   %  integrated type) ships as the aws_type channel, because the acoustic
+   %  height-ranger reading differs by generation. Type 0 records surface
+   %  melt/snow height, and type 1 records sensor-plus-snow height. The parser
+   %  therefore keeps the record source-faithful as height_rel and does not
+   %  rename it to a canonical surface-height channel. The parser drops the
+   %  instrument diagnostics ("T body", "T tech"); the raw cache retains them.
+   %  The parser also drops battery voltage ("Vlog"), but keeps its
+   %  once-yearly station-visit marker (value == 100) as metadata.visits,
+   %  because visits time the generation switch and height-pole re-mounts.
    %
    % See also: icemodel.forcing.helpers.readPangaeaTab,
    %  icemodel.forcing.buildKtransectData
@@ -33,7 +33,7 @@ function [data, metadata] = readKtransectTable(filename)
 
    % Shared PANGAEA ingest. The K-transect series line reads "[dataset
    % publication series]. PANGAEA, https://doi.org/..." rather than the IMAU
-   % "bundled publication]" phrasing, and the station id rides the event id
+   % "bundled publication]" phrasing. The event id carries the station id
    % (e.g. "K-transect_AWS9").
    [raw, header, source] = icemodel.forcing.helpers.readPangaeaTab( ...
       filename, site_id_pattern='^K-transect_(AWS[0-9]+)', ...
@@ -41,9 +41,9 @@ function [data, metadata] = readKtransectTable(filename)
       'https://doi.org/([0-9.]+/PANGAEA\.[0-9]+)'], ...
       missing_header_error_id='icemodel:forcing:readKtransectTable:missingHeader');
 
-   % Identify columns by their label prefix (text before the units bracket) so
-   % the varying column sets and the non-ASCII degree sign in temperature
-   % labels cannot break the mapping.
+   % Identify columns by their label prefix (the text before the units
+   % bracket). The varying column sets and the non-ASCII degree sign in
+   % temperature labels then cannot break the mapping.
    labels = strtrim(extractBefore(header + " [", " ["));
    required = ["Date/Time", "dd", "ff", "SWD", "SWU", "LWD", "LWU", ...
       "TTT", "RH", "PPPP", "Height rel", "Vlog", "ID"];
@@ -84,9 +84,9 @@ function [data, metadata] = readKtransectTable(filename)
    vlog = col("Vlog");
    visits = time(isfinite(vlog) & vlog == 100);
 
-   % Preserve source metadata for staging manifests and DOI pinning; every
+   % Preserve source metadata for staging manifests and DOI pinning. Every
    % annual child carries its own citation and DOI in the header block.
-   % Parse only the annual child's citation line; the generic metadata
+   % Parse only the annual child's citation line. The generic metadata
    % extractor can otherwise fall through to the following series DOI.
    child_doi = icemodel.forcing.helpers.regexpOnce( ...
       string(source.citation), ...
@@ -111,8 +111,8 @@ end
 
 function time = parseRowTime(text, filename)
    %PARSEROWTIME Parse K-transect timestamps with and without seconds.
-   % Annual files post minute-resolution stamps ("2010-01-01T00:00"); accept a
-   % seconds-bearing variant defensively since PANGAEA event lines carry one.
+   % Annual files post minute-resolution stamps ("2010-01-01T00:00"). Also
+   % accept a variant with seconds, because PANGAEA event lines carry one.
    time = NaT(size(text), 'TimeZone', 'UTC');
    nonempty = strlength(text) > 0;
    with_minutes = nonempty & strlength(text) == 16;

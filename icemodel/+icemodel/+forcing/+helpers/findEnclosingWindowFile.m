@@ -1,5 +1,7 @@
-function name = findEnclosingWindowFile(directory, prefix, suffix, qstart, qend, kwargs)
-   %FINDENCLOSINGWINDOWFILE Name of a staged window file bracketing a query span.
+function name = findEnclosingWindowFile( ...
+      directory, prefix, suffix, qstart, qend, kwargs)
+   %FINDENCLOSINGWINDOWFILE Name of a staged window file bracketing a query
+   %span.
    %
    %  name = icemodel.forcing.helpers.findEnclosingWindowFile(DIRECTORY, ...
    %     PREFIX, SUFFIX, QSTART, QEND)
@@ -7,11 +9,11 @@ function name = findEnclosingWindowFile(directory, prefix, suffix, qstart, qend,
    % Returns the file name PREFIX_<YYYYMMDD>_<YYYYMMDD>SUFFIX in DIRECTORY whose
    % encoded period [file-start 00:00, file-end 23:59:59] CONTAINS the query span
    % [QSTART, QEND], or "" when none matches. When several files enclose the
-   % query, selection is deterministic: widest window first, then latest end,
-   % then lexical file name. This is the single source of the
-   % "does a staged full-period file already cover this window" logic shared by
-   % met-file resolution (icemodel.createMetFileNames) and met-swap userdata
-   % resolution (icemodel.loadmet).
+   % query, the function picks the widest window first, then the latest end,
+   % then the first file name in lexical order. Met-file resolution
+   % (icemodel.createMetFileNames) and met-swap userdata resolution
+   % (icemodel.loadmet) both call this function to ask whether a staged
+   % full-period file already covers a window.
    %
    % Inputs
    %  directory - folder to search

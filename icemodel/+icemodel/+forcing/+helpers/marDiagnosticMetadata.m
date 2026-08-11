@@ -7,17 +7,17 @@ function metadata = marDiagnosticMetadata(T, melt_daily_rate, metadata, kwargs)
    % T may carry the independently defined MAR diagnostics subl (SUH),
    % subl_evap (SU), and refreeze_deposition (RZ), all in mWE/h.
    % MELT_DAILY_RATE is the native daily ME value divided by 24 and held on
-   % T.Time; it is used only to validate hourly MEH-derived melt and is not
-   % promoted to a second public melt channel. An empty vector explicitly
-   % records that the optional daily ME product was unavailable.
+   % T.Time. This function uses it only to validate hourly MEH-derived melt.
+   % It does not become a second public melt channel. An empty vector records
+   % that the optional daily ME product was not available.
    %
-   % SUH is hourly sublimation, whereas SU combines sublimation and
-   % evaporation. RZ is a signed native combined meltwater-refreezing and
-   % deposition term with rare source-real negatives. The metadata therefore
-   % freezes distinct canonical names rather than claiming unsupported
-   % equivalence with pure evaporation or nonnegative refreezing products, and
-   % records both strict-negative statistics and a reporting-only material
-   % subset without changing any RZ value.
+   % SUH is hourly sublimation. SU combines sublimation and evaporation. RZ is
+   % a signed native term that combines meltwater refreezing and deposition,
+   % and a few of its negative values come from the source data. The metadata
+   % therefore keeps a distinct canonical name for each product instead of
+   % treating them as equal to pure evaporation or to a nonnegative refreezing
+   % product. It records strict-negative statistics and a reporting-only
+   % material subset, and it changes no RZ value.
    %
    % See also: icemodel.forcing.buildMarData,
    %  icemodel.forcing.helpers.dailyToHourly
@@ -34,8 +34,8 @@ function metadata = marDiagnosticMetadata(T, melt_daily_rate, metadata, kwargs)
    end
 
    % Infer availability from public channels plus the private daily-ME
-   % reference. A source missing every optional field remains a valid reduced
-   % source and is described as not_available rather than as forcing failure.
+   % reference. A source that has none of the optional fields is still a valid
+   % reduced source, so it gets the status not_available, not a forcing error.
    names = string(T.Properties.VariableNames);
    public_names = ["subl", "subl_evap", "refreeze_deposition"];
    native_names = ["SUH", "SU", "RZ"];
@@ -103,11 +103,11 @@ function metadata = marDiagnosticMetadata(T, melt_daily_rate, metadata, kwargs)
       "positive_loss_negative_deposition";
    metadata.mar_diagnostic_subl_evap_sign = ...
       "positive_loss_negative_deposition";
-    metadata.mar_diagnostic_suh_su_relationship = ...
-       "distinct_native_products_not_interchangeable";
+   metadata.mar_diagnostic_suh_su_relationship = ...
+      "distinct_native_products_not_interchangeable";
    metadata.mar_diagnostic_rz_relationship = ...
       "combined_refreezing_and_deposition_not_pure_refreeze";
-    metadata.mar_diagnostic_abs_limit_mwe_h = kwargs.abs_limit_mwe_h;
+   metadata.mar_diagnostic_abs_limit_mwe_h = kwargs.abs_limit_mwe_h;
    metadata.mar_diagnostic_melt_validation_status = melt_status;
    metadata.mar_diagnostic_melt_abs_tolerance_mwe_day = ...
       kwargs.melt_abs_tolerance_mwe_day;
@@ -121,11 +121,11 @@ function metadata = marDiagnosticMetadata(T, melt_daily_rate, metadata, kwargs)
    metadata.mar_diagnostic_melt_mismatch_day_count = nnz(day_status == 2);
    metadata.mar_diagnostic_melt_unverified_day_count = nnz(day_status == 3);
    metadata.mar_diagnostic_melt_max_abs_error_mwe_day = maximum_residual;
-    metadata.mar_diagnostic_basis = ...
-       "MAR SUH is hourly sublimation; SU and RZ are native daily rates " ...
-       + "divided by 24 and previous-held; daily ME validates but does not " ...
-       + "replace hourly MEH";
-    metadata = icemodel.forcing.helpers.marRefreezeMetadata(T, metadata);
+   metadata.mar_diagnostic_basis = ...
+      "MAR SUH is hourly sublimation; SU and RZ are native daily rates " ...
+      + "divided by 24 and previous-held; daily ME validates but does not " ...
+      + "replace hourly MEH";
+   metadata = icemodel.forcing.helpers.marRefreezeMetadata(T, metadata);
 end
 
 function [status, reference, residual] = meltLedger( ...

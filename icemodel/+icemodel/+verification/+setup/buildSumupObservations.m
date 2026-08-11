@@ -25,12 +25,11 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
    %  Each sub-bundle is present only when the corresponding SUMup variable
    %  file is in the cache and has a record within radius_km of the point.
    %
-   %  The bundle struct is a WRAPPER for three heterogeneous profile tables
-   %  (density rho(z), subsurface temperature T(z,t), smb), not a storage choice;
-   %  the three tables carry different indexing axes (depth, time, period) and
-   %  cannot share one table. The generic name "subsurface_profile_bundle" (not
-   %  "firn_profile_bundle") covers ablation sites too, where the bare-ice/
-   %  seasonal-snow column is not firn.
+   %  The bundle struct groups three heterogeneous profile tables (density
+   %  rho(z), subsurface temperature T(z,t), smb). They carry different
+   %  indexing axes (depth, time, period) and cannot share one table. The
+   %  name "subsurface_profile_bundle" also covers ablation sites, where the
+   %  bare-ice / seasonal-snow column is not firn.
    %
    %  TIME AXIS. SUMup stores a numeric `timestamp` (days since 1900-01-01).
    %  This builder converts it to real UTC datetimes:
@@ -56,9 +55,9 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
    %    metadata     : struct  provenance + which variables were found
    %
    %  Role
-   %    Reusable per-point SUMup observation builder used by importSumup. The
-   %    low-level SUMup file parsing is intentionally isolated here so
-   %    importSumup stays a staging orchestrator.
+   %    Reusable per-point SUMup observation builder used by importSumup. It
+   %    holds the low-level SUMup file parsing; importSumup orchestrates
+   %    staging.
    %
    %  The concrete SUMup parsing targets the real 2025 release Greenland files
    %  (grouped NetCDF: /DATA + /METADATA). When the cache is missing, fetchSumup
@@ -80,12 +79,12 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
 
    % Reject malformed public windows before resolving or probing the SUMup cache.
    [window_start, window_end, has_window] = ...
-      icemodel.internal.pairedWindow( ...
+      icemodel.pairedWindow( ...
       kwargs.startdate, kwargs.enddate);
 
-   % Resolve and verify the cache (fetch is the single source of truth for
-   % "are the SUMup files present?"). strict=true errors with the retrieval
-   % banner when the cache is empty, so this builder never fabricates records.
+   % Resolve and verify the cache through fetchSumup. strict=true errors with
+   % the retrieval banner when the cache is empty, so this builder never
+   % fabricates records.
    source_dir = icemodel.verification.setup.fetchSumup( ...
       cache_dir=icemodel.verification.setup.sumupCacheDir(kwargs.source_dir), ...
       strict=true);
@@ -106,9 +105,9 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
    [temperature, temp_note, temperature_counts] = ...
       readSumupVariable(source_dir, "temperature", ...
       point, kwargs.radius_km, window_start, window_end);
-   % SMB (surface mass balance) - the third obs axis. NOT "accumulation": SUMup
-   % spans accumulation AND ablation zones, so this quantity is signed SMB
-   % (positive net accumulation / negative net ablation), not accumulation per se.
+   % SMB (surface mass balance) is the third obs axis. SUMup spans both
+   % accumulation and ablation zones, so this quantity is signed SMB:
+   % positive for net accumulation, negative for net ablation.
    [smb, smb_note, smb_counts] = readSumupVariable(source_dir, "SMB", ...
       point, kwargs.radius_km, window_start, window_end);
 
@@ -131,8 +130,8 @@ function [observations, metadata] = buildSumupObservations(point, kwargs)
    observations.smb = stampObservedUncertaintyUnits( ...
       observations.smb, "smb");
 
-   % Record the actual observation coverage so unbounded imports can still
-   % write inspectable manifest periods without imposing a hidden fixed window.
+   % Record the observation coverage so unbounded imports still write a
+   % manifest period taken from the data rather than a fixed window.
    [period_start, period_end] = observationPeriod(observations);
 
    metadata = icemodel.verification.setup.metadataStruct({ ...
@@ -258,12 +257,12 @@ function [record, note, counts] = readSumupVariable(source_dir, variable, ...
    %READSUMUPVARIABLE Read the nearest SUMup records for one variable group.
    %
    % Locates the SUMup 2025 Greenland file for the requested variable group
-   % (density / temperature / SMB), reads the gridded /DATA group into a flat
-   % table, selects the records within radius_km of the point, optionally
-   % windows them by timestamp, resolves the name_key into the human-readable
-   % core/site name, and returns the selection plus a provenance note. Returns
-   % [] with an explanatory note when the variable file is absent or no record
-   % falls within range.
+   % (density / temperature / SMB), and reads the gridded /DATA group into a
+   % flat table. It then selects the records within radius_km of the point,
+   % and can window them by timestamp. It resolves the name_key into the
+   % readable core or site name, and returns the selection plus a provenance
+   % note. It returns [] with an explanatory note when the variable file is
+   % absent, or when no record falls within range.
    %
    % SUMup 2025 NetCDF layout: each release file holds two groups, /DATA and
    % /METADATA. /DATA exposes 1-D variables along measurement_id (latitude,
@@ -332,8 +331,8 @@ function tbl = readSumupNetcdf(file, variable)
    % Resolve name_key -> name (core / location label) from /METADATA. The
    % /METADATA/name char matrix is fixed-width: each name is padded to the
    % column width with trailing NUL (char 0) and/or space. Strip both so the
-   % name is the bare label (e.g. "s5", not "s5" + 31 pad chars). deblank
-   % removes trailing whitespace; char(0) is removed explicitly first.
+   % name is the bare label (e.g. "s5", not "s5" + 31 pad chars): erase
+   % removes char(0), then strtrim removes the surrounding whitespace.
    meta_keys = double(ncread(file, '/METADATA/name_key'));
    meta_names = string(ncread(file, '/METADATA/name')');
    meta_names = strtrim(erase(meta_names, char(0)));

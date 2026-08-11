@@ -10,7 +10,7 @@ function out = stageRcmForcing(points, kwargs)
    %     obs_manifest=<path-or-struct>, manifest_file=..., ...
    %     met_outdir=..., userdata_outdir=..., mar_dir=..., racmo_dir=...)
    %
-   %  Single owner of RCM forcing/Data generation for the firn-evaluation
+   %  This function generates all RCM forcing and Data for the firn-evaluation
    %  staging. Observation import (importPromiceSites / importSumup) DELEGATES
    %  here instead of containing the RCM logic, and this builder is ALSO callable
    %  independently after observations are imported, so RCM products can be
@@ -31,8 +31,8 @@ function out = stageRcmForcing(points, kwargs)
    %    Each source is staged only for the files it still needs. Existing window
    %    files are reused only when they cover the full requested leg. A partial
    %    overlap triggers a wider rebuild when raw coverage is available; if that
-   %    rebuild fails, the clipped cached fallback is retained with a warning and
-   %    manifest note rather than being accepted silently. Points that
+   %    rebuild fails, the code keeps the clipped cached fallback and records a
+   %    warning and a manifest note. Points that
    %    still need source reads are grouped by identical year set, so one long
    %    station record does not force every shorter station to read the long union
    %    span. Sources are processed in order and each source's files are written
@@ -130,7 +130,9 @@ end
 
 %% Explicit mode
 function modis_dir = defaultModisDir(modis_dir)
-   %DEFAULTMODISDIR Use the standard GEUS MODIS cache when the caller is silent.
+   %DEFAULTMODISDIR Use the standard GEUS MODIS cache when the caller passes
+   % no directory.
+
    if modis_dir ~= ""
       return
    end
@@ -255,9 +257,9 @@ function colocation = stageOneSource(src, points, legspec, colocation, kwargs)
             k = gidx(j);
             if endsWith(string(build_err.identifier), ...
                   ":pointOutsideValidDomain")
-               % Native-mask rejection proves that the prior spatial payload is
+               % Native-mask rejection shows that the prior spatial payload is
                % invalid. Make the skipped result destructive so additive
-               % manifest merging cannot resurrect an old off-mask artifact.
+               % manifest merging cannot restore an old off-mask artifact.
                leg = skippedLeg(kind, build_err.message);
                leg.replace_prior_artifacts = true;
                colocation{k}.(srcc) = leg;
@@ -273,9 +275,9 @@ function colocation = stageOneSource(src, points, legspec, colocation, kwargs)
       % Per point: clip to its own window and write only the outputs that were
       % not already covered. A write failure degrades only that point's leg.
       for j = 1:numel(gidx)
-          k = gidx(j);
-          L = legspec(k).(srcc);
-          try
+         k = gidx(j);
+         L = legspec(k).(srcc);
+         try
             % MAR builders stamp per-day provenance on the whole source-year
             % axis. Preserve that exact axis before the case window removes rows.
             if src == "mar"
@@ -313,7 +315,7 @@ function colocation = stageOneSource(src, points, legspec, colocation, kwargs)
                   ":pointOutsideValidDomain")
                % A non-local ice cell is a proven colocation conflict, not a
                % transient source failure. Replace any cached off-mask leg with
-               % an explicit unavailable result instead of resurrecting it.
+               % an explicit unavailable result instead of reusing it.
                leg = skippedLeg(kind, write_err.message);
                leg.replace_prior_artifacts = true;
                colocation{k}.(srcc) = leg;
@@ -389,8 +391,9 @@ function co = writeRcmLeg(src, d, alias, kind, L, point, kwargs, existing)
    %WRITERCMLEG Write one point's staged leg + build its colocation record.
    % MAR/MERRA write BOTH the full Data (userdata) AND the met (data2met); RACMO
    % writes Data only. Existing files are reused only when they cover the full
-   % requested leg; partial files remain on disk while a wider artifact is built.
-   % Every staged leg carries staged==true.
+   % requested leg; partial files remain on disk while a wider artifact is
+   % built. Every staged leg carries staged==true.
+
    if nargin < 8
       existing = emptyExistingFiles;
    end
@@ -843,26 +846,37 @@ end
 function records = findExistingWindowRecords( ...
       base, source, prefix, suffix, t1, t2)
    %FINDEXISTINGWINDOWRECORDS Staged files whose encoded windows overlap T1-T2.
-   records = emptyWindowRecord;
-   records = records([]);
-   for d = icemodel.forcing.helpers.sourceSearchDirs(base, source)
-      folder = string(d{1});
+   empty_records = emptyWindowRecord;
+   empty_records = empty_records([]);
+
+   % One record block per search directory, each sized to that directory's
+   % listing and trimmed to the overlapping files, so the record array is
+   % concatenated once instead of reallocated per matched file.
+   search_dirs = icemodel.forcing.helpers.sourceSearchDirs(base, source);
+   blocks = repmat({empty_records}, numel(search_dirs), 1);
+   for d = 1:numel(search_dirs)
+      folder = string(search_dirs{d});
       if ~isfolder(folder)
          continue
       end
       listing = dir(fullfile(folder, char(string(prefix) + "_*_*" ...
          + string(suffix))));
+      block = repmat(emptyWindowRecord, numel(listing), 1);
+      n_block = 0;
       for k = 1:numel(listing)
          [ok, candidate_start, candidate_end] = parseWindowFilename( ...
             listing(k).name, prefix, suffix);
          if ~ok || ~windowsOverlap(candidate_start, candidate_end, t1, t2)
             continue
          end
-         records(end + 1, 1) = struct( ...
+         n_block = n_block + 1;
+         block(n_block) = struct( ...
             'filename', string(fullfile(listing(k).folder, listing(k).name)), ...
-            'start', candidate_start, 'end', candidate_end); %#ok<AGROW>
+            'start', candidate_start, 'end', candidate_end);
       end
+      blocks{d} = block(1:n_block);
    end
+   records = vertcat(empty_records, blocks{:});
 end
 
 function record = emptyWindowRecord()
@@ -1203,7 +1217,9 @@ function kwargs = inferManifestModeOutputDirs(kwargs, manifest_file)
 end
 
 function outdir = userdataOutdir(kwargs)
-   %USERDATAOUTDIR Match writeuserdata's default output root when callers omit it.
+   %USERDATAOUTDIR Match writeuserdata's default output root when callers omit
+   % it.
+
    [~, outdir] = icemodel.verification.setup.rcmArtifactOutputDirs( ...
       kwargs.met_outdir, kwargs.userdata_outdir);
 end
@@ -1243,7 +1259,9 @@ function leg = skippedLeg(kind, reason)
 end
 
 function tt = windowSubset(tt, t1, t2)
-   %WINDOWSUBSET Clamp a timetable to [t1, t2] on a UTC-aware axis (no-op blank).
+   %WINDOWSUBSET Clamp a timetable to [t1, t2] on a UTC-aware axis (no-op
+   % blank).
+
    if isnat(t1) || isnat(t2)
       return
    end

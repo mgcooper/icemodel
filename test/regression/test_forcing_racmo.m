@@ -1,17 +1,17 @@
 function tests = test_forcing_racmo
    %TEST_FORCING_RACMO Verify the RACMO evaluation-Data builder.
    %
-   % Reads the staged RACMO2.3p3 per-variable fixture subset under
-   % test/data/forcing; skips cleanly when absent.
+   % This suite reads the staged RACMO2.3p3 per-variable fixture subset
+   % under test/data/forcing. It skips when that fixture is absent.
    %
-   % Note: the RACMO archive carries SMB components and surface fluxes
-   % only (no air temperature / wind / humidity / pressure), so there is
-   % no buildRacmoMet. The legacy eval artifacts
+   % The RACMO archive carries SMB components and surface fluxes only. It
+   % has no air temperature, wind, humidity, or pressure, so there is no
+   % buildRacmoMet. The legacy eval artifacts
    % (racmo_runoff_subsurface_ak4_*.mat) come from the *subsurface*
-   % product with a non-timetable schema and are not comparable to the
-   % staged surface fixture; gates here are raw-NetCDF self-consistency and
-   % physical plausibility (recorded in the owning
-   % ExecPlan, 2026-06-12).
+   % product with a non-timetable schema, so they are not comparable to the
+   % staged surface fixture. The gates here are raw-NetCDF self-consistency
+   % and physical plausibility (recorded in the owning ExecPlan,
+   % 2026-06-12).
    tests = functiontests(localfunctions);
 end
 
@@ -59,7 +59,7 @@ function test_buildRacmoData_shape_and_channels(testCase)
       string(Data.Properties.VariableNames)));
    testCase.verifyTrue(all(isfinite(Data.runoff)));
 
-   % Derived albedo (1 - swn/swd) restored and clamped by metchecks.
+   % metchecks restores and clamps the derived albedo (1 - swn/swd).
    testCase.verifyTrue(ismember("albedo", ...
       string(Data.Properties.VariableNames)));
    a = Data.albedo(isfinite(Data.albedo));
@@ -128,10 +128,10 @@ function test_buildRacmoData_normalizes_sublimation_sign(testCase)
 end
 
 function test_buildRacmoData_conservative_polygon_rotated(testCase)
-   % Conservative polygon remap runs in RACMO's native rotated-pole frame
-   % exactremap GridMapping + shipped gridarea, weights mode: the polygon
-   % result must match a direct exactremap re-aggregation of the same raw
-   % source window.
+   % Conservative polygon remap runs in RACMO's native rotated-pole frame,
+   % with the exactremap GridMapping, the shipped gridarea, and weights mode.
+   % The polygon result must match a direct exactremap re-aggregation of the
+   % same raw source window.
    testCase.assertNotEmpty(which('exactremap'), ...
       'exactremap toolbox not on path');
    ak4 = '/Users/mattcooper/MATLAB/projects/runoff/data/ak4/ak4.mat';

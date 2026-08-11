@@ -11,10 +11,9 @@ function [T, f_ice, f_liq, f_wat, dFdT] = liquid_fraction_function(T, ...
    %  f_liq = f_wat ./ (1.0 + (fcp * T_dep) .^ 2.0);
    %  f_ice = (1.0 - f_ell) .* f_wat * (ro_liq / ro_ice);
    %
-   % Increases in f_liq are defined as positive, so the change in f_liq is the
-   % new f_liq minus the old f_liq, and the new f_ice is the old f_ice minus
-   % df_liq times the ratio of liquid water density to ice density (volume
-   % expansion).
+   % An increase in f_liq is positive. The change in f_liq is the new f_liq
+   % minus the old f_liq. The new f_ice is the old f_ice minus df_liq times the
+   % ratio of liquid water density to ice density (volume expansion).
    %
    % See also: icemodel.column.liquid_fraction_derivative
    %

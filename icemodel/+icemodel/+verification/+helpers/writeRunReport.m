@@ -17,9 +17,9 @@ function report_path = writeRunReport(run_dir, case_results, cases, kwargs)
    %    run_dir       Run artifact directory.
    %    case_results  Cell array of per-case result structs from
    %                  icemodel.verification.comparecase. Each carries
-   %                  a metric table; the report iterates over them
-   %                  directly so the long-format summary table held
-   %                  by the runner does not need to be passed in.
+   %                  a metric table. The report reads those tables
+   %                  directly, so the caller does not pass in the
+   %                  long-format summary table that the runner holds.
    %    cases         Resolved case manifest array from listcases.
    %
    %  Name-value
@@ -27,9 +27,9 @@ function report_path = writeRunReport(run_dir, case_results, cases, kwargs)
    %    run_icemodel : logical (default false)
    %        Mark the report as a synthetic-candidate run.
    %    plotted : logical (default false)
-   %        True when comparison / scatter figures were produced and
-   %        saved alongside the report. Controls whether per-case
-   %        figure links are included.
+   %        True when the run saved comparison and scatter figures
+   %        next to the report. This flag controls whether the report
+   %        holds per-case figure links.
    %
    %  Returns
    %    report_path : string

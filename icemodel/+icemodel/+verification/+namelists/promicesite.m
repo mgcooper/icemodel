@@ -1,5 +1,5 @@
 function sites = promicesite(source_dir)
-   %PROMICESITE Auto-discovered PROMICE station-id namelist (single source of truth).
+   %PROMICESITE Auto-discovered PROMICE station-id namelist.
    %
    %  sites = icemodel.verification.namelists.promicesite()
    %  sites = icemodel.verification.namelists.promicesite(source_dir)
@@ -9,13 +9,14 @@ function sites = promicesite(source_dir)
    %          hourly L3 product (<STATION>_hour.nc), e.g. "KAN_L".
    %
    % Role
-   %  THE single source of truth for the full PROMICE station list. Unlike the
-   %  static snowmipsite list, the PROMICE set is DISCOVERED from the staged L3
-   %  product, so it tracks whatever stations are present without a hand-
-   %  maintained list (a new station file is picked up automatically). Any
-   %  consumer needing the full set - importPromiceSites' default-sites path,
-   %  analysis scripts, tests - calls this rather than re-globbing or hardcoding.
-   %  For the per-site catalog (zone, eval_target, coords) use
+   %  This function defines the full PROMICE station list. The snowmipsite
+   %  list is static, but this function DISCOVERS the PROMICE set from the
+   %  staged L3 product. It therefore reports whatever stations are present,
+   %  with no hand-maintained list, and it finds a new station file
+   %  automatically. Every consumer that needs the full set calls this
+   %  function instead of globbing or hardcoding the list. Those consumers
+   %  include the default-sites path of importPromiceSites, analysis scripts,
+   %  and tests. For the per-site catalog (zone, eval_target, coords) use
    %  icemodel.verification.setup.promiceSiteCatalog.
    %
    % Input

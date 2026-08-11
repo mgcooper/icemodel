@@ -8,8 +8,8 @@ function metadata = marRefreezeMetadata(T, metadata)
    % negative values are source-real and must not be clipped or relabelled as
    % pure refreezing. This helper stamps a canonical signed-policy token plus
    % cadence-independent strict-negative and material-negative statistics. The
-   % 1e-8 mWE/h material threshold is reporting-only: it never clips, rounds,
-   % accepts, rejects, or otherwise authorizes mutation of RZ.
+   % 1e-8 mWE/h material threshold is for reporting only. It does not clip,
+   % round, accept, or reject RZ, and it does not authorize any change to RZ.
    %
    % See also: icemodel.forcing.helpers.marDiagnosticMetadata
 
@@ -18,8 +18,8 @@ function metadata = marRefreezeMetadata(T, metadata)
       metadata (1, 1) struct = struct()
    end
 
-   % Remove the superseded roundoff-only tolerance so one artifact cannot claim
-   % both the old nonnegative policy and the current signed native contract.
+   % Remove the roundoff-only tolerance field. One artifact must not claim both
+   % the nonnegative policy and the signed native contract.
    legacy = 'mar_diagnostic_refreeze_negative_tolerance_mwe_h';
    if isfield(metadata, legacy)
       metadata = rmfield(metadata, legacy);
@@ -45,10 +45,11 @@ function metadata = marRefreezeMetadata(T, metadata)
          material_minimum = min(real(values(material_negative)));
       end
    end
-   % Use the row-time property instead of assuming the dimension is named Time;
-   % valid timetable artifacts may preserve a source-specific row-dimension name.
-   % Normalize the instants before grouping so the recorded statistic is UTC-day
-   % based even when a valid in-memory timetable carries another display zone.
+   % Use the row-time property instead of assuming the dimension is named Time.
+   % A valid timetable artifact can keep a source-specific row-dimension name.
+   % Normalize the instants before grouping. The recorded statistic is then
+   % UTC-day based even when a valid in-memory timetable carries another
+   % display zone.
    times = T.Properties.RowTimes;
    times.TimeZone = 'UTC';
    negative_days = unique(dateshift(times(negative), 'start', 'day'));

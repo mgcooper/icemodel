@@ -72,7 +72,7 @@ function report = repairRcmArtifactMetadata(input_root, kwargs)
    end
 
    % A callback is optional, but when supplied its mutation boundary must be
-   % explicit so an ad-hoc repair cannot silently broaden its own scope.
+   % explicit, so an ad-hoc repair cannot broaden its own scope.
    if ~isempty(kwargs.repair_function) ...
          && ~isa(kwargs.repair_function, 'function_handle')
       error('icemodel:verification:repairRcmArtifactMetadata:badRepairFunction', ...
@@ -290,17 +290,20 @@ function files = rcmArtifactFiles(input_root, locations, source_ids)
       fullfile(input_root, "userdata", "mar3.11", "*.mat")
       fullfile(input_root, "userdata", "merra2", "*.mat")
       fullfile(input_root, "userdata", "racmo2.3p3", "*.mat")];
-   files = strings(0, 1);
-   for pattern = reshape(patterns, 1, [])
-      hits = dir(pattern);
+   % One match block per glob pattern, collected in a buffer sized to the
+   % pattern list so the file list is stacked once instead of per pattern.
+   pattern_list = reshape(patterns, 1, []);
+   file_blocks = repmat({strings(0, 1)}, 1, numel(pattern_list));
+   for p = 1:numel(pattern_list)
+      hits = dir(pattern_list(p));
       hits = hits(~[hits.isdir]);
       next = strings(numel(hits), 1);
       for k = 1:numel(hits)
          next(k) = string(fullfile(hits(k).folder, hits(k).name));
       end
-      files = [files; next]; %#ok<AGROW>
+      file_blocks{p} = next;
    end
-   files = sort(files);
+   files = sort(vertcat(strings(0, 1), file_blocks{:}));
    if ~isempty(source_ids)
       % A source-scoped bounded repair must not restamp unrelated RCM files.
       keep = false(size(files));
@@ -331,19 +334,20 @@ function record = repairOne(filename, locations, kwargs)
    record.hash_before = ...
       icemodel.verification.setup.fileSha256(filename);
 
-   % Exact manifest references win; alias fallback is allowed only when every
-   % current family using the alias agrees on the requested coordinates.
-    [found, location, sample_method, ambiguous] = artifactLocation( ...
-       filename, record.alias, record.source_id, locations);
+   % An exact manifest reference takes priority. The alias fallback applies
+   % only when every current family that uses the alias agrees on the
+   % requested coordinates.
+   [found, location, sample_method, ambiguous] = artifactLocation( ...
+      filename, record.alias, record.source_id, locations);
    if ambiguous
       record.status = "ambiguous";
       record.reason = "current manifests disagree for this artifact";
       return
    end
-    if ~found
-       record.status = "unmapped";
-       record.reason = "artifact alias/source is not present in current manifests";
-       return
+   if ~found
+      record.status = "unmapped";
+      record.reason = "artifact alias/source is not present in current manifests";
+      return
    end
 
    try
@@ -666,7 +670,8 @@ function tf = preservesUnrelatedTableProperties(before, after, ...
 end
 
 function value = variablePropertyValue(values, index, variable_count)
-   %VARIABLEPROPERTYVALUE Read optional per-variable metadata without over-indexing.
+   %VARIABLEPROPERTYVALUE Read per-variable metadata without over-indexing.
+
    value = [];
    if isempty(values)
       return
@@ -688,7 +693,8 @@ function values = customProperties(T)
 end
 
 function names = protectedCustomProperties()
-   %PROTECTEDCUSTOMPROPERTIES Metadata owned by extraction or canonical stamping.
+   %PROTECTEDCUSTOMPROPERTIES Metadata owned by extraction or by stamping.
+
    names = [ ...
       "X", "Y", "Lat", "Lon", "Elev", "Slope", "ScalarUnits", ...
       "StandardNames"];
@@ -724,12 +730,18 @@ function names = changedVariables(before, after)
    before_names = string(before.Properties.VariableNames);
    after_names = string(after.Properties.VariableNames);
    names = setxor(before_names, after_names, "stable");
-   common = intersect(before_names, after_names, "stable");
-   for name = reshape(common, 1, [])
+   common = reshape(intersect(before_names, after_names, "stable"), 1, []);
+   % At most one name per shared variable changes value, so the buffer is sized
+   % to the shared list and appended to the name row once.
+   changed = strings(1, numel(common));
+   n_changed = 0;
+   for name = common
       if ~isequaln(before.(name), after.(name))
-         names(end + 1) = name; %#ok<AGROW>
+         n_changed = n_changed + 1;
+         changed(n_changed) = name;
       end
    end
+   names = [names, changed(1:n_changed)];
 end
 
 function names = changedMetadataFields(before, after)
@@ -737,16 +749,23 @@ function names = changedMetadataFields(before, after)
    before_names = string(fieldnames(before));
    after_names = string(fieldnames(after));
    names = setxor(before_names, after_names, "stable");
-   common = intersect(before_names, after_names, "stable");
-   for name = reshape(common, 1, [])
+   common = reshape(intersect(before_names, after_names, "stable"), 1, []);
+   % At most one name per shared field changes value, so the buffer is sized to
+   % the shared list and appended to the name column once.
+   changed = strings(numel(common), 1);
+   n_changed = 0;
+   for name = common
       if ~isequaln(before.(name), after.(name))
-         names(end + 1) = name; %#ok<AGROW>
+         n_changed = n_changed + 1;
+         changed(n_changed) = name;
       end
    end
+   names = [names; changed(1:n_changed)];
 end
 
 function saveRepairedArtifact(filename, variable, repaired, metadata)
-   %SAVEREPAIREDARTIFACT Atomically replace one MAT while preserving top-level data.
+   %SAVEREPAIREDARTIFACT Replace one MAT atomically and keep top-level data.
+
    [folder, stem, suffix] = fileparts(filename);
    temp_file = string(fullfile(folder, ...
       "." + string(stem) + ".repair-" + string(char(java.util.UUID.randomUUID)) ...
@@ -799,23 +818,23 @@ function [found, location, sample_method, ambiguous] = artifactLocation( ...
    location = struct();
    sample_method = "nearest";
    file_key = char(absolutePath(filename));
-    if isKey(locations.by_file, file_key)
-       ambiguous = locations.ambiguous_file(file_key);
-       if ambiguous
-          return
-       end
-       entry = locations.by_file(file_key);
-       if entry.source_id == "" || entry.source_id ~= string(source_id)
-          ambiguous = true;
-          return
-       end
-       location = entry.location;
+   if isKey(locations.by_file, file_key)
+      ambiguous = locations.ambiguous_file(file_key);
+      if ambiguous
+         return
+      end
+      entry = locations.by_file(file_key);
+      if entry.source_id == "" || entry.source_id ~= string(source_id)
+         ambiguous = true;
+         return
+      end
+      location = entry.location;
       sample_method = entry.sample_method;
       found = true;
       return
    end
 
-    alias_key = aliasKey(alias);
+   alias_key = aliasKey(alias);
    if ~isKey(locations.by_alias, alias_key)
       return
    end
@@ -823,18 +842,18 @@ function [found, location, sample_method, ambiguous] = artifactLocation( ...
    if ambiguous
       return
    end
-    entry = locations.by_alias(alias_key);
-    location = entry.location;
-    method_key = aliasSourceKey(alias, source_id);
-    if ~isKey(locations.by_alias_source, method_key)
-       return
-    end
-    ambiguous = locations.ambiguous_alias_source(method_key);
-    if ambiguous
-       return
-    end
-    sample_method = locations.by_alias_source(method_key);
-    found = true;
+   entry = locations.by_alias(alias_key);
+   location = entry.location;
+   method_key = aliasSourceKey(alias, source_id);
+   if ~isKey(locations.by_alias_source, method_key)
+      return
+   end
+   ambiguous = locations.ambiguous_alias_source(method_key);
+   if ambiguous
+      return
+   end
+   sample_method = locations.by_alias_source(method_key);
+   found = true;
 end
 
 function metadata = artifactMetadata(T, location, sample_method, metadata)
@@ -927,11 +946,11 @@ function summary = summarizeRecords(records)
    summary = struct( ...
       'total', numel(records), ...
       'unchanged', 0, ...
-       'would_repair', 0, ...
-       'repaired', 0, ...
-       'repair_required', 0, ...
-       'restage_required', 0, ...
-       'unmapped', 0, ...
+      'would_repair', 0, ...
+      'repaired', 0, ...
+      'repair_required', 0, ...
+      'restage_required', 0, ...
+      'unmapped', 0, ...
       'ambiguous', 0, ...
       'error', 0, ...
       'skipped', 0);

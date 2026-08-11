@@ -1,5 +1,6 @@
 function [corrected, record, flags] = destepSurface(t, surf, kwargs)
-   %DESTEPSURFACE Detect (and optionally correct) step-shifts in a surface series.
+   %DESTEPSURFACE Detect and optionally correct step-shifts in a surface
+   % series.
    %
    %  [corrected, record, flags] = icemodel.forcing.destepSurface(t, surf)
    %  [...] = icemodel.forcing.destepSurface(t, surf, mode="unambiguous", ...
@@ -10,8 +11,8 @@ function [corrected, record, flags] = destepSurface(t, surf, kwargs)
    % DETECTS candidate single-timestep step-shifts using multiple independent
    % lines of evidence, CLASSIFIES each as UNAMBIGUOUS or AMBIGUOUS, and (per
    % the requested mode) levels UNAMBIGUOUS steps by subtracting the offset from
-   % the post-step segment. The staged .mat is never altered by this function;
-   % buildPromiceData stages the raw series plus per-sample flags, and a
+   % the post-step segment. This function never changes the staged .mat file.
+   % buildPromiceData stages the raw series and the per-sample flags, and a
    % consumer calls this transform at analysis time.
    %
    % DETECTION (a candidate step is a single finite-to-finite jump d = surf(k+1)
@@ -32,8 +33,9 @@ function [corrected, record, flags] = destepSurface(t, surf, kwargs)
    %   4. season      a melt-signed jump in the accumulation/winter season is
    %                  suspect: ice ablation occurs in the melt season, so a
    %                  melt-signed step in winter violates season consistency. To
-   %                  avoid promoting hourly noise, the season line requires the
-   %                  jump to also clear max_step (a winter MICRO-jump is noise).
+   %                  keep hourly noise out, the season line also requires the
+   %                  jump to exceed a small absolute floor (winter_floor); a
+   %                  winter MICRO-jump is noise.
    %
    % CLASSIFICATION
    %   UNAMBIGUOUS  the rate-magnitude gate fires AND at least one independent
@@ -173,11 +175,11 @@ function [corrected, record, flags] = destepSurface(t, surf, kwargs)
 
    % Evidence 4: a melt-signed jump in the non-melt season (Nov..Apr) is
    % season-inconsistent (ice ablation requires melt energy, absent in winter),
-   % so a winter surface-lowering step is physically implausible. Now that
+   % so a winter surface-lowering step is physically implausible. Because
    % gap-bridged samples are excluded, a winter melt-signed jump beyond the rate
-   % bound is strong evidence; it only needs a small absolute floor (winter_floor)
-   % to keep sub-decimetre sensor noise from promoting itself - it no longer
-   % needs to clear the gross max_step ceiling.
+   % bound is strong evidence. It only needs a small absolute floor
+   % (winter_floor) to keep sub-decimetre sensor noise out. It does not need to
+   % clear the gross max_step ceiling.
    winter_floor = 0.3;
    mon = month(t(k1));
    in_winter = mon >= 11 | mon <= 4;
@@ -238,8 +240,9 @@ function [corrected, record, flags] = destepSurface(t, surf, kwargs)
       corrected(later) = corrected(later) - record(c).magnitude;
    end
 
-   % Censor mode: blank out ambiguous steps' post-step samples up to the next
-   % candidate (the ambiguous discontinuity is removed from scoring, not faked).
+   % Censor mode: blank out the post-step samples of ambiguous steps up to the
+   % next candidate. This removes the ambiguous discontinuity from scoring
+   % instead of replacing it with an invented value.
    if kwargs.mode == "censor_ambiguous"
       for r = 1:numel(record)
          if record(r).classification == "ambiguous"

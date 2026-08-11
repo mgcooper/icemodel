@@ -27,8 +27,8 @@ function Qsi = incoming_shortwave_radiation(J_day_start, step, dt, xlat, ...
    % provided `ihour` and uses a continuous step-based Julian-day offset so
    % the seasonal declination term evolves smoothly for arbitrary `dt`.
    %
-   % This is a forcing fallback helper, not the canonical spectral or SEB
-   % shortwave machinery used once `swd` is already known.
+   % This is a forcing fallback helper. It is not the canonical spectral or
+   % SEB shortwave code that runs once `swd` is known.
    %
    %#codegen
 
@@ -45,9 +45,8 @@ function Qsi = incoming_shortwave_radiation(J_day_start, step, dt, xlat, ...
       end
       Qsi = Qsi_sum / ihrs_day;
    else
-      % Preserve the historical 1-based step interpretation while
-      % generalizing the day-fraction update beyond the old hourly-only
-      % `step / 24` expression.
+      % Keep the 1-based step interpretation. The day fraction uses
+      % `step * dt / 86400`, so it holds for any dt, not only hourly steps.
       J_day = J_day_start - 1 + step * dt / 86400.0;
       Qsi = icemodel.surface.terrain_adjusted_shortwave_radiation( ...
          J_day, xlat, cloud_frac, ihour, slope_az, terrain_slope, ...

@@ -5,15 +5,15 @@ function transfer = fitDonorTransfer(times, x_target, x_donor, channel, kwargs)
    %     times, x_target, x_donor, "tair", fit_years=split.years_selection)
    %
    % Role
-   %  The donor-transfer model (POLICY B4): per-season linear
-   %  regression target~donor on the concurrent overlap, with an optional
-   %  monotone piecewise-linear adjustment whose knot count is the policy's
-   %  validated spline hyperparameter (the clean-room stand-in for the
-   %  paper's six-interval monotone spline — a recorded deviation), and a
-   %  ±lag search applied only when it clearly improves the overlap
-   %  correlation. Elevation adjustment happens BEFORE this fit via
-   %  elevationAdjust. Fitting uses only the caller-supplied fit years so
-   %  selection/evaluation hygiene is enforced by construction.
+   %  The donor-transfer model (POLICY B4). It fits a per-season linear
+   %  regression target~donor on the concurrent overlap. An optional
+   %  monotone piecewise-linear adjustment uses a knot count that the
+   %  policy validates as a spline hyperparameter. That adjustment is the
+   %  clean-room stand-in for the paper's six-interval monotone spline, and
+   %  is a recorded deviation. A ±lag search runs only when it clearly
+   %  improves the overlap correlation. elevationAdjust applies the
+   %  elevation adjustment BEFORE this fit. The fit uses only the fit years
+   %  that the caller gives, which keeps selection and evaluation separate.
    %
    % Name-value
    %  fit_years : calendar years eligible for fitting (required — pass the
@@ -23,8 +23,9 @@ function transfer = fitDonorTransfer(times, x_target, x_donor, channel, kwargs)
    %     Section-C knot_candidates parameter, currently [0 6]).
    %  lag_search : search donor lags within ±max_lag_hours (default true).
    %  max_lag_hours : lag search half-width (default 18, legacy precedent).
-   %  min_lag_gain : correlation improvement required to adopt a nonzero
-   %     lag (default 0.02); below it the lag stays 0 and is recorded so.
+   %  min_lag_gain : correlation improvement needed to adopt a nonzero
+   %     lag (default 0.02). Below it, the lag stays 0 and the record
+   %     shows 0.
    %  min_overlap_hours : minimum concurrent finite overlap (default 8760,
    %     the policy's one-year requirement).
    %  target_location, donor_location : station points required for SWD;
@@ -34,9 +35,9 @@ function transfer = fitDonorTransfer(times, x_target, x_donor, channel, kwargs)
    % Returns
    %  transfer : struct — channel, lag_hours, knots, per-season model
    %     (slope/intercept or breakpoint tables), fitted donor range,
-   %     n_overlap, n_overlap_hours, overlap correlation before/after lag
-   %     (diagnostics
-   %     only — admission always comes from held-out gates).
+   %     n_overlap, n_overlap_hours, and the overlap correlation before and
+   %     after the lag. The correlations are diagnostics only. The held-out
+   %     gates decide admission.
    %
    % See also: icemodel.forcing.reconstruct.applyDonorTransfer,
    %  icemodel.forcing.reconstruct.elevationAdjust
@@ -61,15 +62,15 @@ function transfer = fitDonorTransfer(times, x_target, x_donor, channel, kwargs)
          icemodel.forcing.reconstruct.setopts().toa_dark_wm2
    end
 
-   % A sampling interval cannot be inferred from one timestamp; report the
-   % same policy failure used for every other under-constrained fit.
+   % One timestamp does not give a sampling interval. Report the same policy
+   % failure as every other under-constrained fit.
    if numel(times) < 2
       error('icemodel:reconstruct:fitDonorTransfer:insufficientOverlap', ...
          'at least two timestamps are required to fit %s', channel);
    end
 
-   % SWD lag and regression operate on cloud transmissivity rather than raw
-   % flux, so station solar geometry cannot masquerade as transfer skill.
+   % The SWD lag and regression use cloud transmissivity, not raw flux.
+   % Station solar geometry then cannot look like transfer skill.
    transfer_space = "native";
    if channel == "swd"
       x_target = icemodel.forcing.reconstruct.clearSkyIndex( ...
@@ -116,8 +117,8 @@ function transfer = fitDonorTransfer(times, x_target, x_donor, channel, kwargs)
          n_overlap_hours, kwargs.min_overlap_hours, channel);
    end
 
-   % Per-season models; a season without enough overlap inherits the
-   % all-season fit so application never silently mixes seasons.
+   % Per-season models. A season without enough overlap uses the all-season
+   % fit, so the applied transfer does not mix seasons.
    season = icemodel.forcing.reconstruct.seasonOf(times);
    all_model = fitOne(x_target(overlap), donor(overlap), kwargs.knots);
    models = struct();
@@ -173,9 +174,9 @@ function model = fitOne(y, d, knots)
    %FITONE Fit one linear or monotone piecewise-linear transfer.
    % The linear fit is ordinary least squares. The piecewise variant bins
    % the donor at equally spaced quantile breakpoints, takes the target
-   % median per bin, and enforces monotonicity with a running maximum —
-   % the clean-room stand-in for the paper's monotone spline whose
-   % interval count the policy treats as a validated hyperparameter.
+   % median per bin, and enforces monotonicity with a running maximum.
+   % This is the clean-room stand-in for the paper's monotone spline. The
+   % policy treats its interval count as a validated hyperparameter.
    if knots == 0
       coeffs = [d, ones(size(d))] \ y;
       model = struct('kind', "linear", 'slope', coeffs(1), ...
@@ -185,9 +186,9 @@ function model = fitOne(y, d, knots)
    edges = quantile(d, linspace(0, 1, knots + 1));
    edges = unique(edges);
    if numel(edges) < 2
-      % A near-constant donor collapses every quantile to one value; a
-      % scalar second argument would flip discretize into its N-bins form
-      % and error, so fall back to the linear fit immediately.
+      % A near-constant donor collapses every quantile to one value. MATLAB
+      % reads a scalar second argument as the N-bins form of discretize and
+      % errors, so use the linear fit here.
       coeffs = [d, ones(size(d))] \ y;
       model = struct('kind', "linear", 'slope', coeffs(1), ...
          'intercept', coeffs(2));

@@ -3,15 +3,16 @@ function digest = fileSha256(pathname)
    %
    %  digest = icemodel.verification.setup.fileSha256(pathname)
    %
-   %  Content hash used to make the fixture bundle verifiable: packFixtures
-   %  records each fixture file's SHA-256 in the bundle manifest, and
-   %  fetchFixtures re-hashes the on-disk (committed or extracted) file and
-   %  compares, so a corrupt or stale fixture is detected rather than silently
-   %  trusted.
+   %  Content hash that makes the fixture bundle verifiable. packFixtures
+   %  records the SHA-256 of each fixture file in the bundle manifest.
+   %  fetchFixtures hashes the on-disk file again, committed or extracted, and
+   %  compares the two values. The check therefore detects a corrupt or stale
+   %  fixture instead of trusting it.
    %
-   %  Uses java.security.MessageDigest, which ships with every MATLAB JVM, so no
-   %  toolbox or shell dependency is introduced (Simulink.getFileChecksum would
-   %  pull in Simulink; a shasum shell-out would be platform-fragile in CI).
+   %  Uses java.security.MessageDigest, which ships with every MATLAB JVM, so
+   %  this function needs no toolbox and no shell command.
+   %  Simulink.getFileChecksum would require Simulink. A shasum shell command
+   %  would be fragile across CI platforms.
    %
    %  Input
    %    pathname : string

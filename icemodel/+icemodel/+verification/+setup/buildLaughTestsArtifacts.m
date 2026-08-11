@@ -5,9 +5,10 @@ function [forcing, targets, reference] = ...
    %  [forcing, targets, reference] = ...
    %     icemodel.verification.setup.buildLaughTestsArtifacts(source_dir)
    %
-   % Raw Laugh-Tests reads and source-specific normalization live here so
-   % importLaughTests remains orchestration-only. The returned structs are not
-   % written; the importer owns atomic evaluation/reference persistence.
+   % This function does the raw Laugh-Tests reads and the source-specific
+   % normalization, so importLaughTests only orchestrates. It does not write
+   % the returned structs. The importer writes the evaluation and reference
+   % files atomically.
 
    arguments
       source_dir (1, 1) string

@@ -16,8 +16,8 @@ function temperature(T, dz, z_nodes)
    xlabel('Temperature [K]')
    ylabel('Depth [m]')
 
-   % This was in a random file. It is the plot of subsurface T profile with
-   % open circles for the skin and air temperature.
+   % The commented code below plots the subsurface T profile with open
+   % circles for the skin and air temperature.
    %
    % figure
    % plot(T, cumsum(dz)); hold on

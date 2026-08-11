@@ -89,8 +89,8 @@ function test_namelist_includes_firn_observational(testCase)
 end
 
 function test_listcases_enumerates_firn_family_alongside_snow(testCase)
-   % listcases (unfiltered) must surface the firn promice cases together with
-   % the snow cases. This is the M2a gap M2c closes: familyManifestFiles now
+   % listcases (unfiltered) must return the firn promice cases together with
+   % the snow cases. This is the M2a gap that M2c closes: familyManifestFiles
    % globs the firn root as well as the snow root.
 
    all_cases = icemodel.verification.listcases( ...
@@ -149,7 +149,7 @@ function test_each_firn_case_carries_valid_surface_zone(testCase)
          sprintf('%s surface_zone "%s" not in namelist', id, zone));
       testCase.verifyEqual(zone, expected.(char(id)), ...
          sprintf('%s surface_zone mismatch', id));
-      % The manifest must agree with the single source of truth.
+      % The manifest must agree with promiceSiteCatalog.
       testCase.verifyEqual(zone, ...
          string(icemodel.verification.setup.promiceSiteCatalog( ...
          manifest.site_id).surface_zone));
@@ -234,8 +234,9 @@ function test_manifest_is_metadata_only(testCase)
       testCase.verifyTrue(all(ismember(needed, string(fieldnames(manifest)))), ...
          sprintf('%s manifest missing a canonical firn field', id));
 
-      % Source lists are informational and must match currently staged,
-      % compatible colocation legs; stale/incompatible RCM legs are not exposed.
+      % Source lists are informational and must match the currently staged,
+      % compatible colocation legs. A stale or incompatible RCM leg is not
+      % listed.
       [forcing_sources, eval_sources] = ...
          icemodel.verification.setup.colocationSourceLists( ...
          manifest.colocation);
@@ -394,7 +395,7 @@ end
 
 function test_sumup_cases_inherit_kan_zone_and_target(testCase)
    % The KAN-co-located SUMup cases inherit the anchor classification from
-   % promiceSiteCatalog (the single source of truth): kanl/kanm=ablation +
+   % promiceSiteCatalog, the anchor catalog: kanl/kanm=ablation +
    % [seasonal_snow,bare_ice]; kanu=percolation + [seasonal_snow,firn]. All
    % three carry permafrost_zone=none (KAN ice-sheet anchors).
 
@@ -502,7 +503,7 @@ end
 function test_sumup_obs_files_resolve_on_disk(testCase)
    % Each committed SUMup case must reference an observation profile bundle
    % (colocation.sumup.obs_file) that resolves on disk, and listcases must
-   % surface it as the case evaluation_path.
+   % report it as the case evaluation_path.
 
    for case_entry = reshape(testCase.TestData.sumup_cases, 1, [])
       id = case_entry.case_id;
@@ -562,7 +563,7 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
    testCase.verifyEqual(unique(candidate.data.density.datetime), time(1));
 
    % Subsurface temperature profile T(z,t) preserves every dated column in
-   % degrees C rather than silently retaining only the first model timestamp.
+   % degrees C rather than retaining only the first model timestamp.
    testCase.verifyTrue(isfield(candidate.data, 'subsurface_temperature'));
    testCase.verifyTrue(istable(candidate.data.subsurface_temperature));
    testCase.verifyEqual( ...
@@ -719,7 +720,7 @@ end
 function test_all_committed_promice_fixtures_validate(testCase)
    % DATA-DRIVEN contract: EVERY committed promice firn fixture (KAN transect +
    % the egp accumulation fixture) must validate against the canonical
-   % namelists AND agree with promiceSiteCatalog (the single source of truth) for
+   % namelists AND agree with promiceSiteCatalog, the anchor catalog, for
    % case_type / surface_zone / eval_target / permafrost_zone. This enumerates
    % the fixtures rather than hard-coding KAN-specific values, so new committed
    % firn-accumulation cases are validated automatically.

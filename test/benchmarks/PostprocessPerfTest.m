@@ -31,7 +31,7 @@ classdef PostprocessPerfTest < matlab.perftest.TestCase
 
    methods (Test)
       function testHourlyRetimeLegacy(testCase)
-         % Benchmark the timetable RETIME branch used historically.
+         % Benchmark the legacy timetable RETIME branch.
          batch_size = 4;
          ice1_hourly = legacyHourlyMean(testCase.ice1_tt);
          testCase.assertTrue(~isempty(ice1_hourly));

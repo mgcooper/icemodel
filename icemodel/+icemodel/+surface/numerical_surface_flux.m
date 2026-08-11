@@ -13,10 +13,10 @@ function [Q_sfc, dQ_sfc_dTs] = numerical_surface_flux(T_sfc, tair, Qsi, ...
    %
    %   dQ_sfc_dTs ≈ imag(Q_sfc(T_sfc + 1i*h)) / h,  h = 1e-10
    %
-   % The helper exists primarily for derivative-validation tests; the
-   % production Dirichlet solve still uses the analytical Jacobian in
+   % The helper exists mainly for derivative-validation tests. The production
+   % Dirichlet solve uses the analytical Jacobian in
    % `icemodel.surface.solve_surface_temperature`, and the production Robin
-   % linearization may still use a scheme-specific analytical helper.
+   % linearization may use a scheme-specific analytical helper.
    %
    % See also: icemodel.surface.surface_energy_balance_residual,
    %           icemodel.surface.surface_flux_linearization,

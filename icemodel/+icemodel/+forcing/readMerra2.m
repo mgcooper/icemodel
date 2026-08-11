@@ -8,11 +8,11 @@ function [data, units, Time] = readMerra2(filename, varname, kwargs)
    % Reads one variable from a single MERRA-2 daily collection file
    % (tavg1_2d_{slv,rad,flx}_Nx or tavg3_2d_glc_Nx; optionally a spatial
    % hyperslab) and converts the native units to icemodel-standard ones.
-   % Mirrors icemodel.forcing.readMar3p11 / readRacmo2p3 and the legacy
-   % merra.readMerra2, so the gridded-source readers share a contract: a
-   % cells-by-time block (cells flattened in native [lon lat] order, matching
-   % the X, Y grids and gridLocation's column-major slab), the unit string,
-   % and the UTC time axis.
+   % Mirrors icemodel.forcing.readMar3p11 / readRacmo2p3 and merra.readMerra2.
+   % The gridded-source readers therefore share one contract: a cells-by-time
+   % block (cells flattened in native [lon lat] order, matching the X, Y grids
+   % and gridLocation's column-major slab), the unit string, and the UTC time
+   % axis.
    %
    % MERRA-2 surface collections are dimensioned [lon lat time], with 24
    % hourly bins (tavg1) or 8 three-hourly bins (tavg3/glc) per daily file.
@@ -24,8 +24,8 @@ function [data, units, Time] = readMerra2(filename, varname, kwargs)
    %    hPa        -> Pa
    %    W m-2      -> W/m2    (label only)
    %    m s-1      -> m/s     (label only)
-   % kg m-2 (a STORE, e.g. SNOMAS_GL/swe) is left untouched - only the
-   % per-second flux RATE is scaled to mWE/h.
+   % The reader does not scale kg m-2 (a STORE, e.g. SNOMAS_GL/swe). It scales
+   % only the per-second flux RATE to mWE/h.
    %
    % Inputs
    %  filename - MERRA-2 daily NetCDF (e.g. MERRA2_400.tavg1_2d_slv_Nx....nc4)
@@ -35,12 +35,12 @@ function [data, units, Time] = readMerra2(filename, varname, kwargs)
    %  start, count - optional grid hyperslab: start cell [i j] (1-based) and
    %                 extent [ni nj] over [lon lat]. Default reads the full grid.
    %  slabs        - optional cell array of [start; count] 2x2 hyperslab specs
-   %                 ({[i j; ni nj], ...}). When given, the file is OPENED ONCE
-   %                 and every listed hyperslab is read from the same open file,
-   %                 returning a cell array of blocks (one per slab) instead of a
-   %                 single matrix - the batch path that extracts many points
-   %                 from one daily file without re-opening it per point.
-   %                 start/count are ignored when slabs is given.
+   %                 ({[i j; ni nj], ...}). When given, the reader OPENS the
+   %                 file ONCE and reads every listed hyperslab from that open
+   %                 file. It returns a cell array of blocks (one per slab)
+   %                 instead of a single matrix. This batch path extracts many
+   %                 points from one daily file without re-opening it per
+   %                 point. The reader ignores start/count when slabs is given.
    %
    % Outputs
    %  data  - (ncells x ntime) double in standard units, native grid order;
@@ -124,9 +124,9 @@ function data = convertSlab(data, units, count)
    % variables off-ice) -> NaN, so it never corrupts a downstream mean/sum.
    data(data >= 1e14) = NaN;
 
-   % Standard unit conversions (shared reader family). Note kg m-2 s-1 (a
-   % flux rate) converts to mWE/h, but kg m-2 (a store, e.g. swe) does not.
-   % The unit STRING is relabelled once at the top level by convertUnits.
+   % Standard unit conversions (shared reader family). kg m-2 s-1 (a flux
+   % rate) converts to mWE/h, but kg m-2 (a store, e.g. swe) does not.
+   % convertUnits relabels the unit STRING once at the top level.
    switch units
       case 'kg m-2 s-1'
          data = data * 3600 / 1000;   % -> meters water equivalent per hour

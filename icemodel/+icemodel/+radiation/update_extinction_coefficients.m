@@ -12,13 +12,12 @@ function [tau_N, tau_S, k_bulk_lookup, k_ext] = update_extinction_coefficients( 
    % This helper computes k_ext for the requested optical grain-radius index,
    % or interpolated index, applies the optional impurity scaling, then
    % precomputes tau_N and tau_S for the exact bulk-extinction coefficient
-   % transform. It is the natural entry point if a future grain-growth model
-   % needs to refresh k_ext during the timestep loop without reloading the
-   % optical tables.
+   % transform. A grain-growth model can call this function to refresh k_ext
+   % during the timestep loop without reloading the optical tables.
    %
-   % When USE_LOOKUP is true, the bulk-extinction lookup table is also built and
-   % returned through K_BULK_LOOKUP. Otherwise K_BULK_LOOKUP is an empty struct,
-   % which causes icemodel.column.shortwave_source_term to use the exact
+   % When USE_LOOKUP is true, this function also builds the bulk-extinction
+   % lookup table and returns it in K_BULK_LOOKUP. Otherwise K_BULK_LOOKUP is
+   % an empty struct, and icemodel.column.shortwave_source_term uses the exact
    % transform.
    %
    %#codegen

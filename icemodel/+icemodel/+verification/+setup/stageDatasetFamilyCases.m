@@ -3,8 +3,8 @@ function [state, alive, skipped] = stageDatasetFamilyCases(items, ...
    %STAGEDATASETFAMILYCASES Stage requested cases with shared skip handling.
    %
    % Importers provide the family-specific staging callback and label callback.
-   % This helper owns the common state preallocation, alive mask, skipped-record
-   % compaction, skip_missing behavior, and warning shape.
+   % This helper handles the common state preallocation, alive mask,
+   % skipped-record compaction, skip_missing behavior, and warning shape.
 
    arguments
       items

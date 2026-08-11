@@ -4,9 +4,9 @@ function [signature, files] = benchmarkSuiteSignature()
    %  signature = icemodel.test.helpers.benchmarkSuiteSignature()
    %  [signature, files] = icemodel.test.helpers.benchmarkSuiteSignature()
    %
-   % This signature is used to decide whether a benchmark baseline saved
-   % inside a perf baseline file is still comparable to the currently
-   % checked-out benchmark suite.
+   % Callers use this signature to decide whether a benchmark baseline saved
+   % inside a perf baseline file is comparable to the checked-out benchmark
+   % suite.
 
    % Collect the public runner plus the default top-level benchmark files.
    testdir = icemodel.getpath('test');

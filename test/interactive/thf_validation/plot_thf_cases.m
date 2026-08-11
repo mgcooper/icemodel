@@ -32,7 +32,8 @@ function plot_thf_cases(options)
       options.save_figs (1,:) logical = true
    end
 
-   % Default data file resolved at runtime (mfilename not valid in arguments block).
+   % Resolve the default data file at runtime, because mfilename is not valid
+   % in an arguments block.
    if isempty(options.datafile)
       options.datafile = fullfile(fileparts(mfilename('fullpath')), 'data', ...
          'thf_validation_results.mat');

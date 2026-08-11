@@ -12,17 +12,18 @@ function plot_thf_scalar_comparison(options)
    %   2. Scalar exchange (BR stability factor + Andreas (2002) z0h/z0q)
    %   3. Monin-Obukhov (reference scheme)
    %
-   % Produces one figure per site/year group with a 2 × 2 panel layout:
+   % Produces one figure per site/year group with a 3 × 2 panel layout:
    %
    %   (1,1)  SHF 7-day moving-mean time series (all three schemes)
    %   (1,2)  LHF 7-day moving-mean time series (all three schemes)
    %   (2,1)  SHF scatter: BR vs scalar-exchange
    %   (2,2)  LHF scatter: BR vs scalar-exchange
+   %   (3,1)  SHF scatter: BR vs Monin-Obukhov
+   %   (3,2)  LHF scatter: BR vs Monin-Obukhov
    %
-   % The scatter panels focus on BR vs. scalar-exchange because the main
-   % question is whether correcting for separate scalar roughness lengths
-   % materially alters the fluxes relative to the production scheme. The MO
-   % scheme appears in the time-series panels for context.
+   % Row 2 answers the main question: whether separate scalar roughness
+   % lengths change the fluxes relative to the production scheme. Row 3 and
+   % the time-series panels show the MO scheme for context.
    %
    % Prerequisite: run run_thf_cases() first (diagnostic profile is the default).
    %

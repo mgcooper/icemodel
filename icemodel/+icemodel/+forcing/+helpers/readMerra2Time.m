@@ -3,9 +3,9 @@ function Time = readMerra2Time(filename)
    %
    %  Time = icemodel.forcing.helpers.readMerra2Time(filename)
    %
-   % Reads the small `time` coordinate and its units attribute without opening a
-   % gridded science variable. Native snapshot or interval-center stamps are
-   % returned unchanged; application-layer relabeling belongs in the builders.
+   % This function reads the `time` coordinate and its units attribute. It does
+   % not open a gridded science variable. It returns the native snapshot or
+   % interval-center stamps unchanged. The builders do any relabeling.
 
    arguments
       filename (1, 1) string

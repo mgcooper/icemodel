@@ -4,19 +4,20 @@ function tf = artifactScalarIdentityMatches(existing, incoming)
    %  tf = icemodel.forcing.helpers.artifactScalarIdentityMatches( ...
    %     existing, incoming)
    %
-   % Missing legacy metadata remains compatible. Known family/source/product,
-   % native producer, relationship, DOI, or schema conflicts return false.
-   % Production `method` and repaired/manifest `sample_method` are the one
-   % documented alias group; contradictory values within either record are also
-   % conflicts.
+   % A record that omits a metadata field stays compatible. The function returns
+   % false when both records know a field and the values differ. The checked
+   % fields are family, source, product, native producer, relationship, DOI, and
+   % schema. Production `method` and repaired or manifest `sample_method` are
+   % the one documented alias group. Two different values inside one record are
+   % also a conflict.
 
    arguments
       existing (1, 1) struct
       incoming (1, 1) struct
    end
 
-   % Compare independent fields without aliasing descriptive family/product text
-   % to versioned source/product identifiers.
+   % Compare each field on its own. Descriptive family and product text is not
+   % the same value as a versioned source or product identifier.
    tf = false;
    fields = ["kind", "family", "source_family", "source", "source_id", ...
       "station", "product", "product_id", "relationship", "doi", ...
@@ -29,8 +30,8 @@ function tf = artifactScalarIdentityMatches(existing, incoming)
       end
    end
 
-   % Collapse exactly the sampling-method alias pair used by production and
-   % repaired artifacts; unrelated identity fields remain independent.
+   % Collapse only the sampling-method alias pair that production and repaired
+   % artifacts use. All other identity fields stay independent.
    [old_value, old_known, old_valid] = aliasIdentity( ...
       existing, ["sample_method", "method"]);
    [new_value, new_known, new_valid] = aliasIdentity( ...

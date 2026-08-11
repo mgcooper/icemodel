@@ -6,10 +6,10 @@ function [x, filled, audit] = fillTwilightClimatology( ...
    %     icemodel.forcing.reconstruct.fillTwilightClimatology( ...
    %     times, x, native, latitude, longitude)
    %
-   % A single still-missing civil-twilight posting with exactly one
-   % adjacent all-interval darkness posting uses the existing station
-   % day-of-year/posting climatology. The untouched native series is the
-   % only support pool; finite input samples are never modified.
+   % This function fills a missing civil-twilight posting when exactly one
+   % neighbouring posting is dark for the whole interval. The fill value
+   % comes from the station day-of-year and posting climatology. Only the
+   % native series supplies support, and a finite input sample never changes.
 
    arguments
       times datetime
@@ -68,7 +68,9 @@ function [x, filled, audit] = fillTwilightClimatology( ...
    candidate = candidate(valid);
    n_support = n_support(valid);
    filled = false(size(x));
-   audit = cell(0, 1);
+   % One audit block per filled posting: collect the blocks in a buffer sized
+   % to the target list and concatenate once after the loop.
+   audit_blocks = cell(numel(target), 1);
    for k = 1:numel(target)
       x(target(k)) = candidate(k);
       filled(target(k)) = true;
@@ -79,6 +81,9 @@ function [x, filled, audit] = fillTwilightClimatology( ...
          ['day-of-year/posting median; support %d; ' ...
          'interval maximum %.3g deg'], n_support(k), ...
          maximum_elevation(target(k))));
-      audit = [audit; rows]; %#ok<AGROW>
+      audit_blocks{k} = rows;
    end
+   % Seed with an empty cell column so the result keeps that shape when TARGET
+   % is empty. Callers concatenate this with other channels.
+   audit = vertcat(cell(0, 1), audit_blocks{:});
 end

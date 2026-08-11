@@ -1,5 +1,6 @@
 function [al, bl, cl, ai, bi, ci] = initialize_vapor_model()
-   %initialize_vapor_model Initialize Ambaum (2020) Rankine-Kirchhoff vapor coefficients.
+   %INITIALIZE_VAPOR_MODEL Initialize Ambaum (2020) Rankine-Kirchhoff vapor
+   % coefficients.
    %
    %  [AL, BL, CL, AI, BI, CI] = icemodel.vapor.initialize_vapor_model() computes
    %  the Rankine-Kirchhoff
@@ -9,12 +10,12 @@ function [al, bl, cl, ai, bi, ci] = initialize_vapor_model()
    %
    %  where (al, bl, cl) are over liquid and (ai, bi, ci) are over ice.
    %
-   %  Physical constants are obtained from icemodel.physicalConstant. Optimal
-   %  vapor heat capacities (cpv_l, cpv_i) are from Ambaum (2020). The
-   %  measurement-consensus values of cp_liq and cp_ice from physicalConstant
-   %  are used (4218, 2093), which differ slightly from the Ambaum fitting
-   %  values (4220, 2097) but produce negligible differences in the derived
-   %  coefficients.
+   %  The physical constants come from icemodel.physicalConstant. The optimal
+   %  vapor heat capacities (cpv_l, cpv_i) come from Ambaum (2020). This
+   %  function uses the measurement-consensus values of cp_liq and cp_ice
+   %  from physicalConstant (4218, 2093). They differ a little from the
+   %  Ambaum fitting values (4220, 2097), and the difference in the derived
+   %  coefficients is negligible.
    %
    %  For the algebraic derivation and equivalence with Romps (2021), see:
    %     icemodel.kernels.latentEnthalpyWater
@@ -29,7 +30,8 @@ function [al, bl, cl, ai, bi, ci] = initialize_vapor_model()
    %        DOI: 10.1002/qj.4154
    %
    % See also: icemodel.parameterLookup, icemodel.physicalConstant,
-   %  icemodel.kernels.latentEnthalpyWater, icemodel.kernels.saturationVaporPressure
+   %  icemodel.kernels.latentEnthalpyWater,
+   %  icemodel.kernels.saturationVaporPressure
    %
    %#codegen
 

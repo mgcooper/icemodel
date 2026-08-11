@@ -2,10 +2,8 @@ function [h_resid, h_avail, h_drain, h_ice, h_liq, h_air] = available_liquid_wat
       h_ice, h_liq, h_air, T_old, Tf, theta_resid, h_drain, liqflag, h_total)
    %AVAILABLE_LIQUID_WATER Compute available liquid water in one control volume.
    %
-   % Note: This function is not used in the model. If used, it should be called
-   % with scalar values, nominally in a loop or for the top layer, but it might
-   % work fine with vectors. Noting this because this was once upon a time
-   % called from MELT or REFREEZE, where a single layer was passed in at a time.
+   % Note: The model does not use this function. Call it with scalar values,
+   % in a loop or for the top layer. It can also work with vectors.
    %
    %#codegen
 
@@ -32,17 +30,17 @@ function [h_resid, h_avail, h_drain, h_ice, h_liq, h_air] = available_liquid_wat
    end
 end
 
-% NOTE: it's essential that liqflag be sent back as false if we're not in
-% the first layer, otherwise all water except liqresid is drained in MELT
+% NOTE: liqflag must return false for every layer below the first layer. If it
+% returns true, MELT drains all water except liqresid.
 
 % If porosity is defined as h_tot - h_ice, Colbeck's water saturation is:
 % Sw = liqsat = h_liq_j / porosity,
 % If porosity is defined as 1 - f_ice, then:
 % Sw = liqsat = f_liq / porosity
 
-% Also, note that my theta_resid is NOT the usual theta_resid, it is
-% irreducible liquid water content as defined in the glaciological
-% literature as volume water / volume ice. Thus:
+% theta_resid here is NOT the usual theta_resid. It is the irreducible liquid
+% water content of the glaciological literature: volume water / volume ice.
+% Thus:
 % liqresid = theta_resid * h_ice
 
 % Confirmed correct:

@@ -91,13 +91,13 @@ function test_each_site_stages_expected_comparison_variables(testCase)
    % column for every ESM-SnowMIP site, and surface_temp_C for sites whose
    % upstream obs files contain a usable surface-temperature channel.
    % This is the self-verification that catches regressions in the obs
-   % builder / manifest schema when one site silently loses a variable.
+   % builder / manifest schema when one site loses a variable.
 
    for sitename = expectedEsmCaseIds()'
       manifest = icemodel.verification.loadmanifest(sitename);
       vars = string(manifest.comparison_variables);
 
-      % Every site stages snow depth; this is the most basic sanity check.
+      % Every site stages snow depth, so check that column first.
       testCase.verifyTrue(ismember("snow_depth_m", vars), ...
          sprintf('snow_depth_m missing for %s', sitename));
    end
@@ -114,8 +114,8 @@ end
 function test_each_esm_case_carries_land_zone_seasonal_snow_target(testCase)
    % Every ESM-SnowMIP case is an off-ice seasonal snowpack at a land site:
    % surface_zone="land" (glaciological zone) and eval_target=["seasonal_snow"]
-   % (the capability the case exercises). seasonal_snow is NOT a zone - it moved
-   % to the eval_target descriptor.
+   % (the capability the case exercises). seasonal_snow is NOT a zone; it
+   % belongs to the eval_target descriptor.
 
    zones = icemodel.verification.namelists.surfacezone();
    targets = icemodel.verification.namelists.evaltarget();
@@ -199,9 +199,9 @@ end
 
 function test_loadmanifest_resolves_repo_data_paths(testCase)
    % LOADMANIFEST should resolve full verification data from the top-level root.
-   % Forcing is no longer in the manifest - it is staged under data/input/met/ via
-   % the standard icemodel naming convention, so checks below cover evaluation
-   % paths only.
+   % The manifest does not carry forcing. Forcing is staged under
+   % data/input/met/ through the standard icemodel naming convention, so the
+   % checks below cover evaluation paths only.
 
    manifest = icemodel.verification.loadmanifest("cdp");
    verification_root = string(icemodel.internal.fullpath("data"));
@@ -330,8 +330,8 @@ function test_candidate_adapter_samples_soil_temp_from_ice2(testCase)
 
    time = datetime(2000, 1, 1, 0, 0, 0) + hours(0:2);
    T_column = [273.15 273.05 273.25; ...
-               272.15 272.10 272.20; ...
-               271.15 271.20 271.30];
+      272.15 272.10 272.20; ...
+      271.15 271.20 271.30];
    ice1 = struct("Time", time(:), "Tsfc", T_column(1, :)');
    ice2 = struct("T", T_column);
    opts = struct("smbmodel", "icemodel", "sitename", "wfj", ...

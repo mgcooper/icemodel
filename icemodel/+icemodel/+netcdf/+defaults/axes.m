@@ -12,7 +12,7 @@ function out = axes(whichdata)
       'Z', ...    depth
       'T', ...    time
       };
-   % Regarding lat lon, specify them as 'coordinate' attributes
+   % For lat and lon, specify them as 'coordinate' attributes
    % Also see Example 5.17
 
    % Only the dimensions have the 'axis' attribute, the blanks below are dummy

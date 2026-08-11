@@ -21,7 +21,7 @@ function out = config()
    cfg.ICEMODEL_NC_CONTACT = CONTACT;
    cfg.ICEMODEL_NC_DEFAULT_FORMAT = 'NC_FORMAT_NETCDF4';
 
-   % Use setenv b/c setpref is way too slow
+   % Use setenv because setpref is too slow
    for field = fieldnames(cfg)'
       setenv(field{:}, cfg.(field{:}))
    end

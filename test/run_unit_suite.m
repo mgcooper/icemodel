@@ -65,6 +65,11 @@ function results = run_unit_suite(options)
          end
       end
    end
+
+   % Restore the caller's config once the suite has finished. An early error
+   % also restores it, because MATLAB deletes the cleanup object when the
+   % scope ends.
+   delete(suite_cleanup)
 end
 
 function suite = buildUnitSuite(unitdir, selector)

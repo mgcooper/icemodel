@@ -25,8 +25,8 @@ function [profile_summary, profile_meta, profile_artifacts] = ...
    end
    mkdir(profdir);
 
-   % Profile the accepted workflow in a second pass so the saved baseline
-   % values are not affected by profiler overhead or altered execution order.
+   % Profile the accepted workflow in a second pass, so profiler overhead and
+   % a changed execution order do not affect the saved baseline values.
    profile clear
    profile('-historysize', kwargs.history_size);
    profile on
@@ -84,10 +84,8 @@ function profileRegressionBuild(cases)
       c = cases(icase, :);
       fprintf('Profiling regression case %d/%d: %s\n', ...
          icase, height(cases), c.case_id)
-      opts_run = icemodel.test.helpers.setModelOptsForCase(c);
-      [ice1, ice2] = icemodel.test.helpers.runSmbModel(opts_run);
-      [ice1, ~] = icemodel.postprocess( ...
-         ice1, ice2, opts_run, opts_run.output_years);
+      % Profile the same path the baseline and the suite run.
+      [ice1, ~, opts_run] = icemodel.test.helpers.runModelCase(c);
       ridx = icemodel.test.helpers.findRunoffReferenceRow(runoff_ref, c);
       met = icemodel.test.helpers.loadProcessedMetForOutputYears(opts_run);
       if isempty(ridx)

@@ -33,11 +33,11 @@ function summary = plot_promice_eval(options)
    %       deep), all below ~0 degC after the dictionary [-80, 1] C clamp and
    %       the surfaced-thermistor discard in readPromiceAws.
    %
-   % This is a verification/diagnostics tool for the firn evaluation-data
-   % work: the migrated L3 eval channels (snow depth, ablation, the tice
-   % string) need a per-station eyeball check before they become load-bearing
-   % for model development. It is not a unit test; the automated contract
-   % lives in test/unit/test_forcing_promice.m.
+   % This is a verification and diagnostics tool for the firn evaluation-data
+   % work. The migrated L3 eval channels (snow depth, ablation, the tice
+   % string) need a per-station visual check before model development depends
+   % on them. It is not a unit test. The automated contract lives in
+   % test/unit/test_forcing_promice.m.
    %
    % Alongside the figures, a per-station SANITY SUMMARY TABLE is printed to
    % the console and saved as a markdown file in the (gitignored) figures
@@ -163,8 +163,8 @@ function summary = plot_promice_eval(options)
          surf = nan(height(Data), 1); surflbl = 'surface height [m]';
       end
       hold(ax2, 'on')
-      % Each legend handle carries an explicit DisplayName and the legend auto-
-      % collects only named handles, so no unnamed handle leaks a blank entry.
+      % Each legend handle carries an explicit DisplayName, and the legend
+      % collects only named handles. An unnamed handle adds no blank entry.
       plot(ax2, t, surf, '-', 'Color', [0 0.3 0.7], 'LineWidth', 1.0, ...
          'DisplayName', 'full series (cumulative comparison)')
       % Overplot only genuinely gap-bridged samples (flag==1) in red so the
@@ -217,9 +217,9 @@ function summary = plot_promice_eval(options)
       have = tice_names(ismember(tice_names, ...
          string(Data.Properties.VariableNames)));
       hold(ax3, 'on')
-      % Plot the depth-tagged string as thin grey diagnostic lines, each with its
-      % own DisplayName so the legend stays aligned (no positional mismatch that
-      % leaks a blank "data1" entry).
+      % Plot the depth-tagged string as thin grey diagnostic lines, each with
+      % its own DisplayName so the legend stays aligned. A positional mismatch
+      % would otherwise add a blank "data1" entry.
       for k = 1:numel(have)
          % Kelvin -> degC for readability (channels stored in kelvin).
          plot(ax3, t, Data.(have{k}) - 273.15, '-', 'LineWidth', 0.6, ...
@@ -332,9 +332,11 @@ function row = sanityRow(site, Data, meta, tice_names, frequency)
    has_tice10m = ismember("tice10m", string(Data.Properties.VariableNames)) ...
       && any(isfinite(Data.tice10m));
    tv = [];
+   tv_blocks = cell(numel(have), 1);
    for k = 1:numel(have)
-      tv = [tv; colFinite(Data, have{k}) - 273.15]; %#ok<AGROW>
+      tv_blocks{k} = colFinite(Data, have{k}) - 273.15;
    end
+   tv = vertcat(tv, tv_blocks{:});
    if isempty(tv)
       ti_min = NaN; ti_max = NaN; ti_warm = NaN;
    else
@@ -418,7 +420,7 @@ function flags = buildFlags(row, frequency)
       f(end+1) = "GAP_HEAVY(>25%)";
    end
    % Net ablation sign sanity: an ablation site that NET rises, or an
-   % accumulation site that NET lowers, is worth the user's eye.
+   % accumulation site that NET lowers, needs a check by the user.
    if row.site_type == "ablation" && ~isnan(row.surf_total) ...
          && row.surf_total < -0.5
       f(end+1) = "ABL_NET_RISE";
@@ -497,13 +499,13 @@ function writeMarkdown(summary, mdfile, frequency, source_dir)
    % key. Each renders within a normal window width.
    groups = { ...
       "Record & site", ...
-         {"station", "site_type", "start", "stop", "span_d", "nrows"}; ...
+      {"station", "site_type", "start", "stop", "span_d", "nrows"}; ...
       "Surface & snow", ...
-         {"station", "sd_med", "sd_max", "sd_neg", "surf_total", ...
-         "surf_mono", "surf_source", "gap_pct"}; ...
+      {"station", "sd_med", "sd_max", "sd_neg", "surf_total", ...
+      "surf_mono", "surf_source", "gap_pct"}; ...
       "Subsurface temperature & flags", ...
-         {"station", "n_tice", "has_tice10m", "tice_min", "tice_max", ...
-         "tice_warmpct", "flags"}};
+      {"station", "n_tice", "has_tice10m", "tice_min", "tice_max", ...
+      "tice_warmpct", "flags"}};
    for g = 1:size(groups, 1)
       fprintf(fid, '### %s\n\n', groups{g, 1});
       writeMarkdownTable(fid, summary, groups{g, 2});

@@ -14,7 +14,7 @@ function teardown(testCase) %#ok<INUSD>
 end
 
 function test_ispathinside_containment_contract(testCase)
-   %TEST_ISPATHINSIDE_CONTAINMENT_CONTRACT Canonical containment predicate.
+   %TEST_ISPATHINSIDE_CONTAINMENT_CONTRACT Canonical containment check.
    % The shared helper must accept root-equality and true descendants,
    % reject siblings whose names merely share a prefix and dot-dot
    % escapes, resolve symlinked roots, and stay well defined for
@@ -26,17 +26,17 @@ function test_ispathinside_containment_contract(testCase)
    cleaner = onCleanup(@() cellfun(@(d) rmdir(d, 's'), {root, sibling}));
 
    % Root equality and a direct child are inside.
-   testCase.verifyTrue(icemodel.internal.isPathInside(root, root));
+   testCase.verifyTrue(icemodel.isPathInside(root, root));
    child = fullfile(root, 'a.mat');
-   testCase.verifyTrue(icemodel.internal.isPathInside(child, root));
+   testCase.verifyTrue(icemodel.isPathInside(child, root));
    % A sibling sharing the root's name prefix is outside.
-   testCase.verifyFalse(icemodel.internal.isPathInside( ...
+   testCase.verifyFalse(icemodel.isPathInside( ...
       fullfile(sibling, 'a.mat'), root));
    % A dot-dot escape resolves outside the root.
-   testCase.verifyFalse(icemodel.internal.isPathInside( ...
+   testCase.verifyFalse(icemodel.isPathInside( ...
       fullfile(root, '..', 'ipi_root2', 'a.mat'), root));
    % A nonexistent leaf under the root still resolves inside.
-   testCase.verifyTrue(icemodel.internal.isPathInside( ...
+   testCase.verifyTrue(icemodel.isPathInside( ...
       fullfile(root, 'missing', 'leaf.mat'), root));
    % A symlinked alias of the root resolves to the same canonical root.
    link = fullfile(tempdir, 'ipi_link');
@@ -46,7 +46,7 @@ function test_ispathinside_containment_contract(testCase)
    status = system(sprintf('ln -s "%s" "%s"', root, link));
    if status == 0
       link_cleaner = onCleanup(@() delete(link));
-      testCase.verifyTrue(icemodel.internal.isPathInside( ...
+      testCase.verifyTrue(icemodel.isPathInside( ...
          fullfile(link, 'a.mat'), root));
    end
 end
@@ -61,6 +61,22 @@ end
 
 function test_functionSignatures(testCase)
    % Validate the toolbox-level signatures.
+   %
+   % test/functionSignatures.json documents the runners in test/tools, and
+   % validateFunctionSignaturesJSON resolves each name with which, so those
+   % folders have to be on the path for the check to mean anything.
+   root = icemodel.internal.fullpath();
+   added = {fullfile(root, 'test'), fullfile(root, 'test', 'tools'), ...
+      fullfile(root, 'test', 'verification'), ...
+      fullfile(root, 'test', 'regression')};
+   original_path = path;
+   restore_path = onCleanup(@() path(original_path));
+   for k = 1:numel(added)
+      if isfolder(added{k})
+         addpath(added{k});
+      end
+   end
+
    T = validateFunctionSignaturesJSON(fullfile( ...
       icemodel.internal.fullpath(), 'icemodel', 'functionSignatures.json'));
    T_test = validateFunctionSignaturesJSON(fullfile( ...
@@ -260,7 +276,7 @@ function test_readCffVersion(testCase)
    testCase.verifyEqual(icemodel.internal.readCffVersion(cffpath), '2.5');
 
    % A missing, duplicate, empty, or partially quoted version must fail with a
-   % specific contract error instead of silently choosing a value.
+   % specific contract error rather than resolve to an unintended value.
    writeText(cffpath, 'cff-version: 1.2.0');
    testCase.verifyError( ...
       @() icemodel.internal.readCffVersion(cffpath), ...
@@ -811,7 +827,8 @@ end
 function runTestGit(project_dir, arguments)
    %RUNTESTGIT Run one checked Git command inside a disposable fixture.
 
-   command = "git -C " + quoteTestShellPath(project_dir) + " " + arguments;
+   command = "git --no-pager -C " + quoteTestShellPath(project_dir) ...
+      + " " + arguments;
    [status, output] = system(command);
    assert(status == 0, '%s', output)
 end

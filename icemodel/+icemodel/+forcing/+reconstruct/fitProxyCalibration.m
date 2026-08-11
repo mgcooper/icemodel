@@ -9,10 +9,10 @@ function calibration = fitProxyCalibration(times, x_obs, x_model, channel, kwarg
    %  additive median bias per season for state channels and a
    %  multiplicative ratio for shortwave and wind speed. Multiplication
    %  preserves shortwave shape and wind's nonnegative support. Fits use
-   %  only the caller's fit years. Seasons with fewer than the minimum
-   %  overlap samples inherit the annual correction; with no usable
-   %  overlap at all the calibration is the recorded identity — B5
-   %  requires calibration and evidence, not a mandatory nonzero
+   %  only the caller's fit years. A season with fewer than the minimum
+   %  overlap samples takes the annual correction. With no usable overlap,
+   %  the calibration records the identity correction. POLICY B5 requires
+   %  a calibration and its evidence. It does not require a nonzero
    %  adjustment.
    %
    % Name-value
@@ -21,11 +21,11 @@ function calibration = fitProxyCalibration(times, x_obs, x_model, channel, kwarg
    %     correction (default 300, a Section-C parameter).
    %  target_toa : target-station top-of-atmosphere irradiance; required
    %     for multiplicative shortwave calibration.
-   %  target_elevation : target-station solar elevation (degrees, signed;
-   %     TOA clamps twilight to zero, which would hide the very band the
-   %     bins correct). When supplied for swd it additionally fits the
-   %     D-28 elevation-binned ratios; omitted, the record keeps the
-   %     legacy single-ratio shape.
+   %  target_elevation : target-station solar elevation (degrees, signed).
+   %     A signed value is needed because TOA clamps twilight to zero and
+   %     therefore hides the bands that the bins correct. For swd, this
+   %     input also fits the D-28 elevation-binned ratios. Without it, the
+   %     record keeps the single-ratio shape.
    %
    % Returns
    %  calibration : struct — channel, mode ("additive"|"multiplicative"),
@@ -53,8 +53,8 @@ function calibration = fitProxyCalibration(times, x_obs, x_model, channel, kwarg
       kwargs.target_elevation (:, 1) double = zeros(0, 1)
    end
 
-   % A supplied elevation vector must cover the axis exactly; a silent
-   % length mismatch would disable the binned fit without any signal.
+   % A supplied elevation vector must cover the axis exactly; a length
+   % mismatch would disable the binned fit.
    if ~isempty(kwargs.target_elevation) ...
          && numel(kwargs.target_elevation) ~= numel(times)
       error('icemodel:reconstruct:fitProxyCalibration:targetElevationSize', ...
@@ -68,14 +68,20 @@ function calibration = fitProxyCalibration(times, x_obs, x_model, channel, kwarg
    multiplicative = ismember(channel, ["swd", "swu", "wspd"]);
    in_years = ismember(year(times), kwargs.fit_years);
    overlap = in_years & isfinite(x_obs) & isfinite(x_model);
+   if multiplicative
+      % A multiplicative correction divides by the model value, so a zero or
+      % negative denominator cannot give a finite ratio. The screen applies to
+      % every multiplicative channel, not only shortwave, so that n_overlap
+      % counts only pairs that can give a finite ratio.
+      overlap = overlap & x_model > 0;
+   end
    if ismember(channel, ["swd", "swu"])
       if numel(kwargs.target_toa) ~= numel(times)
          error('icemodel:reconstruct:fitProxyCalibration:targetToaRequired', ...
             ['target_toa must contain one target-station irradiance ' ...
             'value per time for shortwave calibration']);
       end
-      overlap = overlap & kwargs.target_toa >= kwargs.min_light_wm2 ...
-         & x_model > 0;
+      overlap = overlap & kwargs.target_toa >= kwargs.min_light_wm2;
    end
 
    season = icemodel.forcing.reconstruct.seasonOf(times);
@@ -120,9 +126,9 @@ function calibration = fitProxyCalibration(times, x_obs, x_model, channel, kwarg
       binned_corrections = struct();
       binned_counts = struct();
       for name = ["DJF", "MAM", "JJA", "SON"]
-         % Bands without enough overlap inherit the season's single ratio
-         % (which itself already fell back to the annual fit if thin), so
-         % application degrades gracefully instead of extrapolating a
+         % A band without enough overlap takes the season's single ratio,
+         % which itself takes the annual fit when the season is thin. This
+         % keeps the applied correction defined instead of extrapolating a
          % noisy band median.
          ratios = repmat(corrections.(char(name)), 1, n_bins);
          counts = zeros(1, n_bins);
@@ -137,9 +143,9 @@ function calibration = fitProxyCalibration(times, x_obs, x_model, channel, kwarg
          binned_corrections.(char(name)) = ratios;
          binned_counts.(char(name)) = counts;
       end
-      % Version stamp plus explicit edges make the persisted record
-      % self-describing: applyProxyCalibration keys on field presence, so
-      % an old single-ratio record (no version, no bins) still applies.
+      % The version stamp and the explicit edges let the saved record
+      % describe itself. applyProxyCalibration keys on field presence, so a
+      % single-ratio record with no version and no bins still applies.
       calibration.version = 2;
       calibration.bin_edges_deg = edges;
       calibration.binned_corrections = binned_corrections;
@@ -170,5 +176,13 @@ function value = oneCorrection(obs, model, multiplicative)
       value = median(obs ./ model, 'omitnan');
    else
       value = median(obs - model, 'omitnan');
+   end
+
+   % The denominator screen above should make this unreachable, but a stored
+   % or malformed record must never propagate a nonfinite correction into a
+   % candidate. Falling back to the identity keeps the estimate equal to the
+   % proxy rather than turning finite input into Inf or NaN.
+   if ~isfinite(value)
+      value = identityCorrection(multiplicative);
    end
 end

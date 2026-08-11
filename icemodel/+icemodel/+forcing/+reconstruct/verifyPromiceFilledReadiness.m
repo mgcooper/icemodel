@@ -1,16 +1,18 @@
 function opts = verifyPromiceFilledReadiness(opts, fileiter)
    %VERIFYPROMICEFILLEDREADINESS Gate derived PROMICE forcing by coverage.
    %
-   %  opts = icemodel.verifyPromiceFilledReadiness(opts) verifies the
-   %  producer-manifest identity of the configured promice_filled artifacts
-   %  and proves complete required-channel coverage of every requested
-   %  timestep between opts.startdate and opts.enddate (or the opts.simyears
-   %  span when no dates are set) directly against the filled met files'
-   %  samples (POLICY A4; water years and arbitrary windows are
-   %  first-class). The canonical product and runtime timestep are both
-   %  fixed at 15 minutes. Calendar-year ledger verdicts are producer
-   %  bookkeeping and never the runtime gate. The returned options are
-   %  marked for code-generation-safe loading.
+   %  opts = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts)
+   %  verifies the producer-manifest identity of the configured
+   %  promice_filled artifacts. For every configured file it also proves
+   %  complete required-channel coverage, and exact current provenance for
+   %  policy, version, registry, and channels. Coverage covers each requested
+   %  timestep between opts.startdate and opts.enddate, or the opts.simyears
+   %  span when no dates are set. It is checked against the samples in the
+   %  filled met files (POLICY A4; water years and arbitrary windows are
+   %  first-class). The canonical product and runtime timestep are both fixed
+   %  at 15 minutes. Calendar-year ledger verdicts are producer bookkeeping,
+   %  and are never the runtime gate. The returned options are marked for
+   %  code-generation-safe loading.
    %
    % See also: icemodel.loadmet, icemodel.setopts
 
@@ -32,7 +34,7 @@ function opts = verifyPromiceFilledReadiness(opts, fileiter)
    end
 
    % Resolve the producer ledger without placing table I/O in loadmet's
-   % code-generation surface. The ledger no longer gates the run (A4) but
+   % code-generation surface. The ledger does not gate the run (A4) but
    % remains a required, manifest-pinned bookkeeping artifact.
    readiness_file = "";
    if isfield(opts, 'readiness_file')
@@ -67,8 +69,12 @@ function opts = verifyPromiceFilledReadiness(opts, fileiter)
    % are never consulted here.
    verifyRequestedWindowCoverage(opts, site, met_files);
 
+   % These flags are the code-generation trust seam. Set them only after the
+   % manifest, the requested-window coverage, and the exact artifact
+   % provenance all pass on the MATLAB side.
    opts.promice_filled_readiness_verified = true;
    opts.promice_filled_manifest_verified = true;
+   opts.promice_filled_provenance_verified = true;
    opts.promice_filled_verified_forcing = char(string(opts.forcings));
    opts.promice_filled_verified_site = char(site);
    opts.promice_filled_verified_simyears = double(opts.simyears(:)).';
@@ -92,7 +98,10 @@ function opts = narrowRequestToSelectedFiles(opts, met_files)
             'file does not contain a nonempty met timetable: %s', ...
             met_files(k));
       end
-      times_by_file{k} = payload.met.Time;
+      % Match loadmet before narrowing UTC request bounds to selected files.
+      selected_times = payload.met.Time;
+      selected_times.TimeZone = 'UTC';
+      times_by_file{k} = selected_times;
    end
    times = vertcat(times_by_file{:});
    selected_years = intersect(double(opts.simyears(:)).', ...
@@ -133,6 +142,7 @@ function verifyRequestedWindowCoverage(opts, site, met_files)
    % file; per-file cells avoid growing arrays inside the loop.
    met_files = string(met_files(:));
    n_files = numel(met_files);
+   met_by_file = cell(n_files, 1);
    times_by_file = cell(n_files, 1);
    flags_by_file = cell(n_files, 1);
    precip_by_file = cell(n_files, 1);
@@ -199,6 +209,7 @@ function verifyRequestedWindowCoverage(opts, site, met_files)
             ppt, rainf, snowf);
          precip_ok = precip_ok & phase_ok;
       end
+      met_by_file{k} = met;
       times_by_file{k} = met.Time;
       flags_by_file{k} = flags;
       precip_by_file{k} = precip_ok;
@@ -207,17 +218,10 @@ function verifyRequestedWindowCoverage(opts, site, met_files)
    flags = vertcat(flags_by_file{:});
    precip_ok = vertcat(precip_by_file{:});
 
-   % Merge duplicate timestamps across files: a timestep is covered when
-   % any configured file covers it.
-   [times, ~, index] = unique(times);
-   merged = false(numel(times), size(flags, 2));
-   for c = 1:size(flags, 2)
-      merged(:, c) = accumarray(index, double(flags(:, c)), ...
-         [numel(times), 1], @max) > 0;
-   end
-   flags = merged;
-   precip_ok = accumarray(index, double(precip_ok), ...
-      [numel(times), 1], @max) > 0;
+   % Runtime concatenation retains every row, so coverage rejects an
+   % ambiguous cross-file interval start rather than unioning flags across
+   % duplicate rows.
+   rejectOverlappingIntervalStarts(times, met_files);
 
    [window_start, window_end] = requestedWindow(opts);
    if numel(times) < 2
@@ -267,6 +271,14 @@ function verifyRequestedWindowCoverage(opts, site, met_files)
       covered = [covered, covered_precip];
    end
    if all(covered(:))
+      % Generated loading cannot inspect timetable UserData. After the
+      % coverage gate passes, validate the exact current policy and version,
+      % the registry, the site and product identity, and the channel
+      % provenance, before setting the flags.
+      for k = 1:n_files
+         icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
+            met_files(k), met_by_file{k}, site)
+      end
       return
    end
 
@@ -291,6 +303,26 @@ function verifyRequestedWindowCoverage(opts, site, met_files)
       'promice_filled does not cover the requested window %s..%s for %s: %s', ...
       string(window_start), string(window_end), site, ...
       strjoin(problems(1:n_problems), '; '));
+end
+
+function rejectOverlappingIntervalStarts(times, met_files)
+   %REJECTOVERLAPPINGINTERVALSTARTS Refuse duplicate selected forcing rows.
+
+   % Count identical UTC interval starts across the complete selected file set.
+   [distinct_times, ~, groups] = unique(times);
+   counts = accumarray(groups, 1, [numel(distinct_times), 1]);
+   overlapping = distinct_times(counts > 1);
+   if isempty(overlapping)
+      return
+   end
+
+   % The verifier must fail here. If it did not, its generated-code trust flags
+   % would describe a payload whose loadmet concatenation holds duplicate rows.
+   error('icemodel:loadmet:promiceFilledIntervalOverlap', ...
+      ['selected promice_filled artifacts contain %d overlapping UTC ' ...
+      'interval-start row(s) (%s .. %s) across %d files'], ...
+      numel(overlapping), string(min(overlapping)), ...
+      string(max(overlapping)), numel(met_files));
 end
 
 function [window_start, window_end] = requestedWindow(opts)
@@ -323,10 +355,10 @@ end
 function channels = icemodelRequiredChannels()
    %ICEMODELREQUIREDCHANNELS POLICY A5 runtime forcing channel set.
    %
-   % The set itself lives once in the reconstruct namespace SSOT so the
-   % runtime gate and the ledger default can never silently diverge; the
-   % gate keeps this thin accessor because callers must not tune it the
-   % way reconstruct.setopts required_channels can be tuned per product.
+   % The channel set is defined in the reconstruct namespace and shared with
+   % the ledger default. The runtime gate reads it through this accessor
+   % because, unlike reconstruct.setopts required_channels, the gate's set
+   % is not tunable per product.
    channels = icemodel.forcing.reconstruct.icemodelRequiredChannels();
 end
 
@@ -334,9 +366,9 @@ function tf = requiresSnowfallForcing(smbmodel)
    %REQUIRESSNOWFALLFORCING True when the smbmodel consumes precip mass.
    %
    % POLICY A5: ready_icemodel requires the seven forcing channels; a snow
-   % model additionally requires finite total ppt OR snowf. The two
-   % historical models keep the D-0b zero-rain contract and consume no
-   % precipitation mass, so any other smbmodel is treated as
+   % model additionally requires finite total ppt OR snowf. The icemodel
+   % and skinmodel entry points keep the D-0b zero-rain contract and consume
+   % no precipitation mass, so any other smbmodel is treated as
    % snowfall-consuming and gates on the wider set.
    tf = ~ismember(lower(string(smbmodel)), ["icemodel", "skinmodel"]);
 end
@@ -354,11 +386,11 @@ function verifyProducerManifest(filename, site, readiness_file, met_files)
          'PROMICE producer manifest is unreadable: %s', filename);
    end
    valid_manifest = isstruct(manifest) && isscalar(manifest) ...
-       && isfield(manifest, 'site') && isfield(manifest, 'artifacts') ...
-       && isfield(manifest, 'path_base') ...
-       && string(manifest.path_base) == "selected_data_root" ...
-       && strcmpi(string(manifest.site), site) ...
-       && isstruct(manifest.artifacts);
+      && isfield(manifest, 'site') && isfield(manifest, 'artifacts') ...
+      && isfield(manifest, 'path_base') ...
+      && string(manifest.path_base) == "selected_data_root" ...
+      && strcmpi(string(manifest.site), site) ...
+      && isstruct(manifest.artifacts);
    if ~valid_manifest
       error('icemodel:loadmet:promiceFilledIdentityMismatch', ...
          'PROMICE producer manifest has invalid identity: %s', filename);
@@ -382,7 +414,7 @@ function verifyProducerManifest(filename, site, readiness_file, met_files)
    for k = 1:numel(relative_paths)
       relative_file = java.io.File(char(relative_paths(k)));
       candidate = string(fullfile(data_root, relative_paths(k)));
-      if relative_file.isAbsolute() || ~icemodel.internal.isPathInside(candidate, data_root)
+      if relative_file.isAbsolute() || ~icemodel.isPathInside(candidate, data_root)
          error('icemodel:loadmet:promiceFilledIdentityMismatch', ...
             'PROMICE producer manifest path escapes its selected root: %s', ...
             relative_paths(k));
@@ -411,9 +443,9 @@ function verifyProducerManifest(filename, site, readiness_file, met_files)
       end
    end
 
-function pathname = canonicalPath(pathname)
-   %CANONICALPATH Resolve one artifact path for identity comparison.
-   pathname = string(java.io.File(char(pathname)).getCanonicalPath());
-end
+   function pathname = canonicalPath(pathname)
+      %CANONICALPATH Resolve one artifact path for identity comparison.
+      pathname = string(java.io.File(char(pathname)).getCanonicalPath());
+   end
 
 end

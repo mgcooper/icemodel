@@ -14,18 +14,18 @@ function filenames = writeuserdata(Data, site, source, kwargs)
    %
    %    <site>_<source>_<YYYYMMDD>_<YYYYMMDD>[_<cadence>].mat
    %
-   % icemodel.loadmet resolves either form (a window file bracketing the run
-   % year is preferred; otherwise the per-year file).
+   % icemodel.loadmet resolves either form. It prefers a window file that
+   % brackets the run year, otherwise it uses the per-year file.
    %
-   % consumed by icemodel.loadmet when opts.userdata / opts.uservars
-   % request that variables of the met file be swapped with the
-   % corresponding columns of the userdata file. Each .mat file holds
-   % one variable named Data, a timetable carrying location metadata as
-   % table CustomProperties (X, Y, Lat, Lon, Elev, Slope, ScalarUnits).
-   % Existing targets are additive no-ops unless overwrite=true. Userdata
-   % defaults to hourly output at this shared writer boundary; pass dt_out=""
-   % only when an explicitly documented source must retain native cadence.
-   % Explicit replacement and wider-window cleanup emit warnings.
+   % icemodel.loadmet reads these files when opts.userdata or opts.uservars
+   % ask it to swap met-file variables with the matching userdata columns.
+   % Each .mat file holds one variable named Data. That variable is a
+   % timetable that carries location metadata as table CustomProperties
+   % (X, Y, Lat, Lon, Elev, Slope, ScalarUnits). An existing target file
+   % stays unchanged unless overwrite=true. This shared writer boundary
+   % defaults to hourly userdata output. Pass dt_out="" only when a
+   % documented source must keep its native cadence. Explicit replacement
+   % and wider-window cleanup raise warnings.
    %
    % OUTDIR defaults to icemodel.getpath('userdata') (demo/data/input/
    % userdata when the demo or test config is active) and is created
@@ -66,7 +66,7 @@ function filenames = writeuserdata(Data, site, source, kwargs)
       filename, "Data", requested_cadence_s);
 
    % Userdata files can contain source-specific comparison columns, so stamp
-   % known channels while leaving truly source-key columns blank.
+   % the known channels and leave the source-key columns blank.
    Data = icemodel.forcing.helpers.stampMetadata(Data, strict=false);
    identity_matches = @(filename) ...
       icemodel.forcing.helpers.artifactIdentityMatches( ...
@@ -82,8 +82,8 @@ function filenames = writeuserdata(Data, site, source, kwargs)
    if outdir == ""
       outdir = string(icemodel.getpath('userdata'));
    end
-   % Stage into the per-source subfolder userdata/<source>/ so the flat userdata/
-   % folder does not sprawl; the runtime resolves this subfolder first
+   % Stage into the per-source subfolder userdata/<source>/ to keep the flat
+   % userdata/ folder small. The runtime resolves this subfolder first
    % (icemodel.loadmet.resolveUserdataFile).
    outdir = fullfile(outdir, char(source));
    if ~isfolder(outdir)
@@ -100,10 +100,10 @@ function filenames = writeuserdata(Data, site, source, kwargs)
             site, source, t1, t2, cadence_suffix);
          filenames = fullfile(outdir, name);
 
-         % Validate the exact target before broad reuse. Legacy runtime lookup
-         % still prefers the widest covering Data file, but a stale exact file
-         % must not remain silently selectable when its identity or cadence
-         % conflicts with this request.
+         % Validate the exact target before broad reuse. The runtime lookup
+         % prefers the widest covering Data file. An old exact file must not
+         % stay selectable when its identity or cadence conflicts with this
+         % request, so this check rejects it.
          if isfile(filenames) && ~kwargs.overwrite
             assertReusableUserdata(filenames, cadence_matches, ...
                identity_matches, "window");
@@ -113,10 +113,10 @@ function filenames = writeuserdata(Data, site, source, kwargs)
          % ordinary request without resampling or duplicating native Data.
          if ~kwargs.overwrite
             enclosing = ...
-                icemodel.forcing.helpers.findEnclosingWindowFile( ...
-                outdir, site + "_" + source, cadence_suffix + ".mat", ...
-                min(Data.Time), max(Data.Time), ...
-                accept_candidate=candidate_matches);
+               icemodel.forcing.helpers.findEnclosingWindowFile( ...
+               outdir, site + "_" + source, cadence_suffix + ".mat", ...
+               min(Data.Time), max(Data.Time), ...
+               accept_candidate=candidate_matches);
             % Return the same path loadmet would select for met swapping.
             if enclosing ~= ""
                filenames = fullfile(outdir, enclosing);
@@ -127,24 +127,24 @@ function filenames = writeuserdata(Data, site, source, kwargs)
          if wrote
             % A successful wider refresh supersedes only contained shorter
             % windows for this exact site/source naming class.
-             icemodel.forcing.helpers.pruneSupersededWindowFiles( ...
-                filenames, site + "_" + source, cadence_suffix + ".mat", ...
-                accept_candidate=candidate_matches);
+            icemodel.forcing.helpers.pruneSupersededWindowFiles( ...
+               filenames, site + "_" + source, cadence_suffix + ".mat", ...
+               accept_candidate=candidate_matches);
          end
       case "yearly"
          years_present = unique(year(Data.Time));
          filenames = strings(numel(years_present), 1);
          for n = 1:numel(years_present)
-             yyyy = years_present(n);
-             filenames(n) = fullfile(outdir, ...
-                sprintf('%s_%s_%d%s.mat', ...
-                site, source, yyyy, cadence_suffix));
-             if isfile(filenames(n)) && ~kwargs.overwrite
-                assertReusableUserdata(filenames(n), cadence_matches, ...
-                   identity_matches, "year");
-             end
-             savedata(filenames(n), Data(year(Data.Time) == yyyy, :), ...
-                kwargs.overwrite)
+            yyyy = years_present(n);
+            filenames(n) = fullfile(outdir, ...
+               sprintf('%s_%s_%d%s.mat', ...
+               site, source, yyyy, cadence_suffix));
+            if isfile(filenames(n)) && ~kwargs.overwrite
+               assertReusableUserdata(filenames(n), cadence_matches, ...
+                  identity_matches, "year");
+            end
+            savedata(filenames(n), Data(year(Data.Time) == yyyy, :), ...
+               kwargs.overwrite)
          end
    end
 end
@@ -219,9 +219,10 @@ function Data = resampleUserdataTimestep(Data, dt_out)
       return
    end
 
-   % Finer native averages are aggregated into clock-hour bins. Coarser native
-   % products are interpolated to hourly support; no current writer caller uses
-   % that path, but keeping it defined makes the public default unconditional.
+   % This function aggregates finer native averages into clock-hour bins. It
+   % interpolates coarser native products onto hourly support. No writer caller
+   % uses the interpolation path, but defining it keeps the hourly default
+   % valid for every input cadence.
    if cadence_s <= 3600
       Data = aggregateHourly(source);
       policy = "hourly_mean";
@@ -307,7 +308,7 @@ function wrote = savedata(filename, Data, overwrite)
    if exists && ~overwrite
       return
    end
-   % Explicit replacement is intentionally visible to setup callers.
+   % This warning makes an explicit replacement visible to setup callers.
    if exists
       warning('icemodel:forcing:writeuserdata:overwrite', ...
          'Replacing existing userdata artifact %s.', filename);

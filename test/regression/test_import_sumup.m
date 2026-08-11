@@ -300,13 +300,13 @@ function test_forcing_only_default_uses_each_staged_case_period(testCase)
    tmp = tempname;
    mkdir(tmp);
    testCase.addTeardown(@() rmdir(tmp, 's'));
-    eval_root = fullfile(tmp, 'eval');
-    input_root = fullfile(tmp, 'input');
-    writeSumupForcingOnlyPeriodManifest(eval_root);
-    prior = jsondecode(fileread( ...
-       fullfile(eval_root, 'sumup', 'manifest.json')));
-    prior_ids = string({prior.cases.case_id});
-    prior_wegb = prior.cases(prior_ids == "wegb");
+   eval_root = fullfile(tmp, 'eval');
+   input_root = fullfile(tmp, 'input');
+   writeSumupForcingOnlyPeriodManifest(eval_root);
+   prior = jsondecode(fileread( ...
+      fullfile(eval_root, 'sumup', 'manifest.json')));
+   prior_ids = string({prior.cases.case_id});
+   prior_wegb = prior.cases(prior_ids == "wegb");
 
    manifest = icemodel.verification.setup.importSumup( ...
       "", case_ids=["wegb", "kanu"], build_observations=false, ...
@@ -315,10 +315,10 @@ function test_forcing_only_default_uses_each_staged_case_period(testCase)
       overwrite=false);
 
    ids = string({manifest.cases.case_id});
-    wegb = manifest.cases(ids == "wegb");
-    testCase.verifyEqual(jsonencode(wegb), jsonencode(prior_wegb));
-    testCase.verifyEqual(string(wegb.period.start), ...
-       "1929-07-31 00:00:00");
+   wegb = manifest.cases(ids == "wegb");
+   testCase.verifyEqual(jsonencode(wegb), jsonencode(prior_wegb));
+   testCase.verifyEqual(string(wegb.period.start), ...
+      "1929-07-31 00:00:00");
    testCase.verifyEqual(string(wegb.period.end), ...
       "1931-10-04 00:00:00");
    testCase.verifyFalse(isfield(wegb.colocation, 'mar'), ...
@@ -331,14 +331,14 @@ function test_forcing_only_default_uses_each_staged_case_period(testCase)
    testCase.verifyEqual(string(kanu.period.end), ...
       "2012-01-31 23:00:00");
    testCase.verifyTrue(logical(kanu.colocation.mar.staged));
-    testCase.verifyTrue(ismember("mar3.11", string(kanu.forcing_sources)));
-    testCase.verifyNotEmpty(kanu.colocation.mar.met_files);
-    testCase.verifyNotEmpty(kanu.colocation.mar.data_files);
-    testCase.verifyEqual(string(kanu.colocation.mar.window.start), ...
-       "2012-01-01 00:00:00");
-    testCase.verifyEqual(string(kanu.colocation.mar.window.end), ...
-       "2012-12-31 23:00:00");
- end
+   testCase.verifyTrue(ismember("mar3.11", string(kanu.forcing_sources)));
+   testCase.verifyNotEmpty(kanu.colocation.mar.met_files);
+   testCase.verifyNotEmpty(kanu.colocation.mar.data_files);
+   testCase.verifyEqual(string(kanu.colocation.mar.window.start), ...
+      "2012-01-01 00:00:00");
+   testCase.verifyEqual(string(kanu.colocation.mar.window.end), ...
+      "2012-12-31 23:00:00");
+end
 
 function test_reuse_path_preserves_existing_staged_and_diagnostic_legs(testCase)
    % A metadata-only repeat call preserves every existing case leg verbatim,
@@ -347,16 +347,16 @@ function test_reuse_path_preserves_existing_staged_and_diagnostic_legs(testCase)
    mkdir(tmp);
    testCase.addTeardown(@() rmdir(tmp, 's'));
    eval_root = fullfile(tmp, 'eval');
-    input_root = fullfile(tmp, 'input');
-    writeSumupReuseOverlapManifest(eval_root);
-    prior = jsondecode(fileread( ...
-       fullfile(eval_root, 'sumup', 'manifest.json')));
+   input_root = fullfile(tmp, 'input');
+   writeSumupReuseOverlapManifest(eval_root);
+   prior = jsondecode(fileread( ...
+      fullfile(eval_root, 'sumup', 'manifest.json')));
 
    manifest = icemodel.verification.setup.importSumup( ...
       "", case_ids="kanu", build_observations=false, ...
       build_forcing=false, evaluation_data_root=eval_root, ...
       input_data_root=input_root);
-    c = manifest.cases(1);
+   c = manifest.cases(1);
 
    testCase.verifyEqual(jsonencode(c), jsonencode(prior.cases));
    testCase.verifyTrue(logical(c.colocation.merra.staged));
@@ -398,13 +398,14 @@ function test_reuse_path_restores_requested_prior_zero_overlap_leg(testCase)
 end
 
 function test_import_rejects_half_comparison_window(testCase)
-   % Invalid windows win before a non-dry import can create its staging roots.
+   % The importer rejects an invalid window before a non-dry import creates
+   % its staging roots.
    root = fullfile(tempname, 'sumup-half-window');
    testCase.verifyError(@() ...
       icemodel.verification.setup.importSumup( ...
       "", points=testCase.TestData.point, case_ids="kanu", ...
       output_root=root, startdate="2012-01-01"), ...
-      'icemodel:internal:pairedWindow:invalidWindow');
+      'icemodel:pairedWindow:invalidWindow');
    testCase.verifyFalse(isfolder(root));
 
    end_only_root = fullfile(tempname, 'sumup-end-only-window');
@@ -412,7 +413,7 @@ function test_import_rejects_half_comparison_window(testCase)
       icemodel.verification.setup.importSumup( ...
       "", points=testCase.TestData.point, case_ids="kanu", ...
       output_root=end_only_root, enddate="2012-01-02"), ...
-      'icemodel:internal:pairedWindow:invalidWindow');
+      'icemodel:pairedWindow:invalidWindow');
    testCase.verifyFalse(isfolder(end_only_root));
 
    reversed_root = fullfile(tempname, 'sumup-reversed-window');
@@ -421,7 +422,7 @@ function test_import_rejects_half_comparison_window(testCase)
       "", points=testCase.TestData.point, case_ids="kanu", ...
       output_root=reversed_root, startdate="2012-01-02", ...
       enddate="2012-01-01"), ...
-      'icemodel:internal:pairedWindow:invalidWindow');
+      'icemodel:pairedWindow:invalidWindow');
    testCase.verifyFalse(isfolder(reversed_root));
 end
 
@@ -453,9 +454,9 @@ function test_reuse_and_normal_paths_share_final_provenance(testCase)
 end
 
 function test_unbounded_sumup_advertises_overlapping_short_rcm_legs(testCase)
-   % Unbounded SUMup imports report actual all-available observations. A shorter
-   % convenience RCM build is still comparable over its overlap and should stay
-   % advertised with a clipped window.
+   % Unbounded SUMup imports report every available observation. A shorter
+   % convenience RCM build is still comparable over its overlap, so the
+   % manifest must still report it with a clipped window.
    assumeCachePresent(testCase);
    forcing_root = forcingFixtureRoot();
    mar_dir = fullfile(forcing_root, 'mar');
@@ -675,13 +676,13 @@ function writeSumupReuseOverlapManifest(eval_root)
       'sample_method', 'nearest', ...
       'window', struct('start', '2012-01-01 00:00:00', ...
       'end', '2012-06-15 23:00:00'));
-    merra = struct('kind', 'point_met', 'staged', true, ...
+   merra = struct('kind', 'point_met', 'staged', true, ...
       'source', 'merra', 'source_id', 'merra2', ...
       'met_files', {{'merra2/met_kanu_merra2_disjoint_15m.mat'}}, ...
       'data_files', {{'merra2/kanu_merra2_disjoint.mat'}}, ...
       'sample_method', 'nearest', ...
-       'window', struct('start', '2011-01-01 00:00:00', ...
-       'end', '2011-12-31 23:00:00'));
+      'window', struct('start', '2011-01-01 00:00:00', ...
+      'end', '2011-12-31 23:00:00'));
    racmo = struct('kind', 'point_data', 'staged', false, ...
       'source', 'racmo', 'source_id', 'racmo2.3p3', ...
       'reason', 'diagnostic leg retained');

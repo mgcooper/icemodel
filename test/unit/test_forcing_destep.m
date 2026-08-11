@@ -256,7 +256,7 @@ end
 
 function test_stationTransitionTimes_missing_csv_is_empty(testCase)
    % With no AWS_stations_metadata.csv staged, the times are empty and every
-   % record entry reports in_csv=false (the merge fact lives elsewhere).
+   % record entry reports in_csv=false (another component records the merge).
 
    src = string(tempname);
    mkdir(src);

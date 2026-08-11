@@ -190,7 +190,10 @@ a continuous local interpolation into an artificial low seam. The RULE is
 normative; the bound VALUES are
 Section-C parameters (D-11, D-25). Current values: tair [193, 300] K;
 rh [5, 100] % with calibrated candidates clamped into bounds (D-27);
-wspd [0, 60] m s⁻¹; psfc [60000, 108000] Pa; swd
+wspd [0.1, 60] m s⁻¹ with calibrated candidates clamped into bounds
+(D-51; the positive floor is also the runtime forcing contract and
+prevents reconstruction from synthesizing calm rows); psfc
+[60000, 108000] Pa; swd
 [0, max(1.05×TOA, 5)] W m⁻² for candidates (the 5 W m⁻² term is a
 minimum CEILING in darkness admitting thermal-offset noise, not a floor
 on data — D-28); swu [0, swd]; albedo [0.05, 0.98]; lwd [40, 470]
@@ -750,6 +753,27 @@ within 15 W m⁻² of the temperature blackbody.
   bounds, native immutability, bounded-interpolation provenance, exact
   audit, and final seam QA remain mandatory; ten-hour gaps remain outside
   tier 1.
+- D-51 (2026-08-05, Codex evidence-backed forcing-readiness ruling under
+  the user's 2026-07-28 authorization): clamp calibrated wind candidates
+  into the shared [0.1, 60] m s-1 scalar bounds inside
+  `applyProxyCalibration`, with the existing per-sample clamp audit.
+  TAS_L 2010 exposed one four-sample residual at 2010-05-31 23:00 UTC:
+  the MAR source was exactly the valid 0.1 m s-1 floor, but the fitted MAM
+  multiplicative correction 0.6685 produced an inadmissible 0.06685 m s-1
+  estimate and left the posting missing. No zero wind passed the producer;
+  all finite reconstructed samples remained at or above 0.1 m s-1, and
+  the readiness text `wspd 0.0% invalid` was a rounded percentage for
+  four missing samples. A bound-crossing calibrated value is calibration
+  arithmetic, so one shared clamp is preferable to a site-specific gap
+  exception and applies identically to method and last-resort consumers.
+- D-52 (2026-08-05, Codex evidence-backed forcing-readiness ruling under
+  the same authorization): when last-resort seam optimization pushes any
+  posting of an already-valid wind-source segment outside [0.1, 60]
+  m s-1, retain that whole segment unblended. SDL 2003 exposed 28 missing
+  quarter-hours from this path even though aligned MAR wind was finite and
+  bounded. Retaining the prevalidated source preserves its variability and
+  avoids both a synthetic calm clamp and a residual outage. Radiative and
+  other channels keep the B6 post-blend refusal rule.
 
 ---
 

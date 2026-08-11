@@ -49,15 +49,15 @@ function [De_h, S123, W1] = exchange_coefficients(wspd, z0_bulk, z_tair, z_wind)
    %  S1 = c = c_star * a^2 * b * (z / z0_bulk)^0.5   (eq 20)
    %  S1 = gamma in Liston et al. 1999, eq. A15
    %
-   % Note also that eta_star = eta / 2 = 9.4 / 2 = 4.7 is customarily referred
-   % to as "beta" for the stable case, whereas gamma is comparable to the
-   % "gamma" normally used for the unstable case.
+   % Also, eta_star = eta / 2 = 9.4 / 2 = 4.7 is customarily called "beta" for
+   % the stable case. gamma is comparable to the "gamma" normally used for the
+   % unstable case.
    %
    %#codegen
 
-   % Note: vectorized operations are used to support post-run diagnostics
-   % where z_tair, z_wind, z0_bulk are allowed to vary in time. They remain
-   % scalar-valued for the expected model initialization use-case.
+   % The operations are vectorized to support post-run diagnostics, where
+   % z_tair, z_wind, and z0_bulk can vary in time. For the expected model
+   % initialization they stay scalar.
 
    % Parse the optional z_wind input; set it equal to z_tair if not provided
    if nargin < 4

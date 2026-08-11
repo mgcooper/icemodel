@@ -13,10 +13,10 @@ function [row_flags, report] = dailyAlbedoAnomalyFlags(Time, swd, swu)
    % recovery requirement rejects persistent dark-ice seasons while retaining
    % short sensor-collapse episodes on otherwise bright snow and firn.
    %
-   % `row_flags` preserves the input vector shape and identifies every timestamp on an
-   % anomalous day. `report` contains compact counts/dates plus a daily
+   % `row_flags` keeps the input vector shape and marks every timestamp on an
+   % anomalous day. `report` contains compact counts and dates plus a daily
    % diagnostic timetable for audit and provenance use. The helper never edits
-   % source radiation; callers decide which derived channels to mask.
+   % source radiation. The caller decides which derived channels to mask.
 
    arguments
       Time datetime {mustBeVector}
@@ -24,8 +24,8 @@ function [row_flags, report] = dailyAlbedoAnomalyFlags(Time, swd, swu)
       swu double {mustBeVector}
    end
 
-   % Reject mismatched inputs before any grouping can silently truncate a
-   % source channel.
+   % Reject mismatched inputs first. Grouping truncates a source channel
+   % without an error.
    input_size = size(Time);
    n_rows = numel(Time);
    if numel(swd) ~= n_rows || numel(swu) ~= n_rows
@@ -39,9 +39,9 @@ function [row_flags, report] = dailyAlbedoAnomalyFlags(Time, swd, swu)
       return
    end
 
-   % A naive source axis is declared to be UTC; an already zoned axis is
-   % converted to UTC. Reversed axes fail closed because sorting would hide a
-   % broken native-grid contract.
+   % Declare a naive source axis to be UTC, and convert a zoned axis to UTC.
+   % A reversed axis returns no flags, because a sort would hide a broken
+   % native-grid contract.
    Time.TimeZone = 'UTC';
    Time = Time(:);
    swd = swd(:);
@@ -170,8 +170,8 @@ function complete = exactDailyGrid( ...
    on_grid = slot >= 0 & slot < n_slots ...
       & abs(offset_s - expected_offset_s) <= tolerance_s;
 
-   % Count every accepted day/slot pair. A duplicate plus a missing timestamp
-   % cannot masquerade as a complete day merely because its row count matches.
+   % Count every accepted day/slot pair. A day with one duplicate and one
+   % missing timestamp has the expected row count, but it is not complete.
    slot_index = (day_index(on_grid) - 1) .* n_slots + slot(on_grid) + 1;
    slot_count = zeros(n_days * n_slots, 1);
    if ~isempty(slot_index)

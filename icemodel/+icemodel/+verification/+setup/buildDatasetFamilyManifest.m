@@ -5,10 +5,11 @@ function manifest = buildDatasetFamilyManifest(state, alive, kwargs)
    %     state, alive, dataset_family=..., entry_callback=@makeEntry)
    %
    % The callback receives one family-specific state record and returns one
-   % schema-valid case entry, usually from makeFirnCaseManifestEntry. This helper
-   % keeps manifest creation and writeFamilyManifestMerge semantics neutral so
-   % importers do not duplicate manifest assembly. Case-entry callbacks should
-   % derive forcing_sources/eval_sources with colocationSourceLists.
+   % schema-valid case entry, usually from makeFirnCaseManifestEntry. This
+   % helper keeps manifest creation and writeFamilyManifestMerge behavior
+   % neutral, so importers do not duplicate manifest assembly. Case-entry
+   % callbacks must derive forcing_sources/eval_sources with
+   % colocationSourceLists.
    %
    % See also: icemodel.verification.setup.runDatasetFamilyImport,
    %  icemodel.verification.setup.writeFamilyManifestMerge

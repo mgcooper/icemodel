@@ -1,4 +1,4 @@
-function [dt_sum, n_subfail, ok_seb, ok_ieb, d_liq, d_evp, d_lyr] = ...
+function [dt_sum, n_subfail, ok_seb, ok_ieb, d_liq, d_evp, d_lyr, d_rof] = ...
       newtimestep(f_liq, solver)
    %NEWTIMESTEP Initialize per-full-step accumulators and solver status flags.
    %
@@ -11,6 +11,7 @@ function [dt_sum, n_subfail, ok_seb, ok_ieb, d_liq, d_evp, d_lyr] = ...
    d_liq = 0.0 * f_liq;    % reset the change in liq water content
    d_evp = 0.0 * f_liq;    % reset the evaporation change in water content
    d_lyr = 0.0 * f_liq;    % reset the layer change
+   d_rof = 0.0;            % reset the condensation overflow
    dt_sum = 0.0;
    n_subfail = 0;          % keep track of failed substeps
 

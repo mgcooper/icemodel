@@ -4,12 +4,12 @@ function codes = provenanceCodes()
    %  codes = icemodel.forcing.reconstruct.provenanceCodes()
    %
    % Role
-   %  Single named source of the uint8 per-sample provenance codes the
-   %  engine stamps and the report decodes (DesignSpec Resolution 3,
-   %  POLICY A7). Every filled product channel carries one code per
-   %  sample; the segment audit table carries the donor/fit/uncertainty
-   %  detail codes alone cannot. Codes are append-only: renumbering would
-   %  silently re-label previously staged products.
+   %  Defines the uint8 per-sample provenance codes that the engine stamps
+   %  and the report decodes (DesignSpec Resolution 3, POLICY A7). Every
+   %  filled product channel carries one code per sample. The segment audit
+   %  table carries the donor, fit, and uncertainty detail that the codes
+   %  alone cannot carry. Codes are append-only: renumbering would re-label
+   %  products that are already staged.
    %
    % Returns
    %  codes : struct of named uint8 constants —
@@ -27,9 +27,9 @@ function codes = provenanceCodes()
    %
    % See also: icemodel.forcing.reconstruct.admissionGate
 
-   % Keep the registry explicit and append-only; the legacy Origin scheme's
-   % conflations (one code for HIRHAM/MAR/RACMO, one for MODIS/climatology/
-   % constant) are precisely what this table exists to prevent.
+   % Keep the registry explicit and append-only. The Origin scheme grouped
+   % several sources under one code (one code for HIRHAM/MAR/RACMO, one for
+   % MODIS/climatology/constant). This table keeps those sources separate.
    codes = struct( ...
       'observed', uint8(0), ...
       'bounded_interp', uint8(1), ...

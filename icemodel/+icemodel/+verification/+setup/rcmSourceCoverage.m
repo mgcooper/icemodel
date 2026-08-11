@@ -143,10 +143,11 @@ function entry = probeRacmo(source_dir)
    if source_dir == ""
       source_dir = defaultForcingDir("racmo");
       if ~isfolder(source_dir)
-         % Default to the SUBSURFACE product (2012-2018), matching
-         % buildRacmoData's default. The surface "no_subsurf_en" product only
-         % covers 2012-2015, so defaulting to it here silently capped RACMO
-         % staging to 2012-2015 even though subsurface 2012-2018 was available.
+         % Default to the SUBSURFACE product (2012-2018), which matches
+         % buildRacmoData's default. The surface "no_subsurf_en" product
+         % covers only 2012-2015. A default of that product would cap RACMO
+         % staging at 2012-2015, even though subsurface 2012-2018 is
+         % available.
          source_dir = "/Volumes/S03/DATA/greenland/racmo2p3/subsurface";
       end
    end
@@ -169,12 +170,16 @@ function entry = probeRacmo(source_dir)
          'no FGRN11_<y0>_<y1> span in RACMO files under %s', source_dir));
       return
    end
-   years = [];
-   for tok = tokens(have)
-      y0 = str2double(tok{1}{1});
-      y1 = str2double(tok{1}{2});
-      years = [years, y0:y1]; %#ok<AGROW>
+   % Collect each file's span in its own slot, because the spans have
+   % different lengths, then concatenate the union once after the loop.
+   spanned = tokens(have);
+   spans = cell(1, numel(spanned));
+   for k = 1:numel(spanned)
+      y0 = str2double(spanned{k}{1});
+      y1 = str2double(spanned{k}{2});
+      spans{k} = y0:y1;
    end
+   years = [spans{:}];
    entry = yearsCoverage(years);
 end
 

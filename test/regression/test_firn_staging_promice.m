@@ -1,10 +1,11 @@
 function tests = test_firn_staging_promice
    %TEST_FIRN_STAGING_PROMICE Verify the co-located firn staging driver.
    %
-   % Exercises icemodel.verification.setup.importPromiceSites end to end:
-   % the co-located PROMICE/MAR/MERRA/RACMO bundle is staged for a PROMICE
-   % anchor site and the per-site manifest entry resolves. Reads PROMICE from
-   % the verification cache and RCMs from the small test/data/forcing fixtures.
+   % Exercises icemodel.verification.setup.importPromiceSites end to end. It
+   % stages the co-located PROMICE/MAR/MERRA/RACMO bundle for a PROMICE anchor
+   % site and checks that the per-site manifest entry resolves. It reads
+   % PROMICE from the verification cache and the RCMs from the small
+   % test/data/forcing fixtures.
    tests = functiontests(localfunctions);
 end
 
@@ -126,15 +127,15 @@ function test_native_promice_stage_uses_hourly_userdata_and_15m_met(testCase)
    testCase.verifyEqual(seconds(median(diff(met_bundle.met.Time))), 900);
    testCase.verifyEqual(seconds(median(diff(data_bundle.Data.Time))), 3600);
 
-   % A wider same-case request is not an identical no-op: the fixed observation
-   % bundle and window-named native artifacts must widen together visibly.
+   % A wider same-case request does not leave everything unchanged. The fixed
+   % observation bundle and the window-named native artifacts must both widen.
    observation_file = fullfile(testCase.TestData.eval_root, 'promice', ...
       c.evaluation_file);
    initial = load(observation_file, 'targets');
 
-   % Observations and userdata intentionally persist the same native PROMICE
-   % table, so corrected radiation/cloud fraction and the canonical thermistor
-   % source-mask contract cannot diverge by sink.
+   % Observations and userdata store the same native PROMICE table, so the
+   % corrected radiation, the cloud fraction, and the canonical thermistor
+   % source-mask contract are identical in both sinks.
    native_channels = ["swd", "swu", "cfrac", "tice10m", ...
       "tice10m_source", "tice10m_qc_flag"];
    testCase.verifyTrue(all(ismember(native_channels, ...
@@ -142,7 +143,7 @@ function test_native_promice_stage_uses_hourly_userdata_and_15m_met(testCase)
    testCase.verifyEqual(initial.targets.data.Time, data_bundle.Data.Time);
    for name = native_channels
       testCase.verifyEqual(initial.targets.data.(name), ...
-          data_bundle.Data.(name));
+         data_bundle.Data.(name));
    end
    flagged = data_bundle.Data.tice10m_qc_flag > 0;
    testCase.verifyTrue(all(isnan(data_bundle.Data.tice10m(flagged))));
@@ -329,8 +330,8 @@ function test_build_observations_false_requires_existing_case(testCase)
       promice_dir=testCase.TestData.promice, ...
       mar_dir=testCase.TestData.mar, ...
       evaluation_data_root=eval_root, ...
-       input_data_root=input_root, ...
-       icemodel_config_casename="", overwrite=true), ...
+      input_data_root=input_root, ...
+      icemodel_config_casename="", overwrite=true), ...
       'icemodel:verification:reuseDatasetFamilyCases:missingManifest');
 
 end
@@ -557,8 +558,8 @@ end
 
 function test_staging_second_site_does_not_churn_first(testCase)
    % Staging a SECOND site into a family root that already holds a FIRST site
-   % must ADD the second case and leave the first site's case entry + its
-   % staged files byte for byte unchanged (the KAN no-churn guarantee). This is
+   % must ADD the second case and leave the case entry of the first site and
+   % its staged files byte for byte unchanged (the KAN no-churn rule). This is
    % the file-level counterpart to test_firn_manifest_merge.
 
    % Stage KAN_L first (a short window keeps it fast).

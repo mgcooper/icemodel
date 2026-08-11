@@ -28,15 +28,15 @@ function [is_colocated, anchor, distance_km] = sumupColocation(x3413, y3413, kwa
    %                 coordinates are available).
    %
    % Co-location threshold rationale
-   %  7.5 km is chosen as the default. PROMICE AWS sites sit on the GrIS
-   %  ablation-to-percolation transect where surface-mass-balance gradients
-   %  with elevation are steep, so the co-location radius must be small enough
-   %  that a SUMup firn core and the PROMICE anchor share broadly the same
-   %  accumulation regime, yet large enough to capture the sparse SUMup
-   %  coverage near each anchor. 7.5 km is also comfortably inside one MAR
-   %  (~7.5-15 km) / RACMO (~5.5-11 km) grid cell, so the co-located MAR/RACMO
-   %  forcing extracted at the SUMup point is effectively the same model cell
-   %  as the anchor's - the co-location is meaningful at the RCM resolution the
+   %  7.5 km is the default. PROMICE AWS sites sit on the GrIS
+   %  ablation-to-percolation transect, where surface-mass-balance gradients
+   %  with elevation are steep. The co-location radius must therefore be small
+   %  enough that a SUMup firn core and the PROMICE anchor share broadly the
+   %  same accumulation regime, and large enough to capture the sparse SUMup
+   %  coverage near each anchor. 7.5 km also sits well inside one MAR
+   %  (~7.5-15 km) or RACMO (~5.5-11 km) grid cell. The MAR or RACMO forcing
+   %  extracted at the SUMup point is therefore from the same model cell as
+   %  the anchor's, so the co-location holds at the RCM resolution that the
    %  reference is built from. EPSG:3413 is a conformal projection at GrIS
    %  latitudes, so planar distance is an accurate proxy for great-circle
    %  distance over a few km.

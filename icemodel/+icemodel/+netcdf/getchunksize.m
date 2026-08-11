@@ -13,8 +13,8 @@ function chunksize = getchunksize(whichdata, dimdata, datasize, opts)
    numcells = dimsizes.gridcell;
 
    % Use GetSizeFromData to update the depth dimension values directly from the
-   % size of the ice2 data set in getvarinfo. Note that this will not catch the
-   % case where the size changes from file to file within a year.
+   % size of the ice2 data set in getvarinfo. This does not catch the case
+   % where the size changes from file to file within a year.
 
    if opts.GetSizeFromDims
       numlayers = dimsizes.depth;
@@ -37,12 +37,12 @@ function chunksize = getchunksize(whichdata, dimdata, datasize, opts)
    % Define chunkSize based on data access patterns. Larger chunk sizes
    % increase memory usage during read/write.
    %
-   % When writing, the primary concern is reducing the number of writes.
-   % Thus writing the entire array at once is typically ideal, and the
-   % netcdf software will determine the chunk size.
+   % When writing, the main concern is the number of writes. Writing the
+   % entire array at once is usually best, and the netcdf software then
+   % determines the chunk size.
    %
-   % However, if typical access patterns are known, chunking can improve
-   % efficiency by ensuring the data layout in the file matches how it is
-   % accessed later. If data is predominantly accessed in large contiguous
-   % blocks, having the data and chunks aligned to those patterns is ideal.
+   % If the typical access patterns are known, chunking can improve
+   % efficiency, because the data layout in the file then matches the later
+   % access. If readers mostly access the data in large contiguous blocks,
+   % align the data and the chunks to those blocks.
 end

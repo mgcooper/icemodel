@@ -1,5 +1,5 @@
 function dimsize = getdimsize(dimdata, dimnames)
-   %GETDIMSIZE
+   %GETDIMSIZE Return the size of each named dimension.
    %
    %  DIMSIZE = GETDIMSIZE(DIMDATA)
    %  DIMSIZE = GETDIMSIZE(DIMDATA, DIMNAMES)
@@ -17,11 +17,11 @@ function dimsize = getdimsize(dimdata, dimnames)
       dimnames (1, :) string {mustBeText} = string(fieldnames(dimdata))
    end
 
-   % The max(1, ...) prevents dimsize.depth = 0, for the ice1 case where
-   % dimdata.depth is an empty array because Z = 0, dz = 0. If it is useful to
-   % allow dimsize.depth = 0, e.g., for data which truly has 1 depth, remove
-   % the max condition and update defdimid and anywhere dimsize.depth == 1
-   % is used to identify ice1 data.
+   % The max(1, ...) prevents dimsize.depth = 0 in the ice1 case, where
+   % dimdata.depth is an empty array because Z = 0 and dz = 0. To allow
+   % dimsize.depth = 0, for example for data that truly has 1 depth, remove
+   % the max condition. Then update defdimid and every place that uses
+   % dimsize.depth == 1 to identify ice1 data.
 
    for f = dimnames(:)'
       dimsize.(f) = max(1, numel(dimdata.(f)));

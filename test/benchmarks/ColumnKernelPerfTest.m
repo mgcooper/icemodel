@@ -164,7 +164,7 @@ classdef ColumnKernelPerfTest < matlab.perftest.TestCase
 
          % The coupled Robin icemodel solve carries both column and SEB
          % work, so scale the batch enough to keep variance low without
-         % making the suite sluggish.
+         % making the suite too slow.
          batch_size = 128;
 
          [Ts, T, f_ice, f_liq, k_eff, ~, ok_ieb] = ...

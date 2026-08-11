@@ -6,25 +6,25 @@ function sites = imauSiteCatalog(site_ids)
    %
    % Role
    %  The first IMAU verification inventory is the hourly PANGAEA S21/S22/S23
-   %  collection. Coordinates are left unset until parsed from source files so
-   %  this source catalog does not pretend to be a geodetic source of truth.
-   %  Staged cases are normalized separately through
-   %  icemodel.verification.setup.makeFirnCaseManifestEntry.
+   %  collection. Coordinates stay unset until the parser reads them from the
+   %  source files, because this catalog is not a geodetic reference.
+   %  icemodel.verification.setup.makeFirnCaseManifestEntry normalizes staged
+   %  cases separately.
 
    arguments
       site_ids (1, :) string = strings(1, 0)
    end
 
    % Keep the hourly network separate from the daily 19-station SEB product.
-   % PANGAEA identifies S21 as accumulation-zone and S22/S23 as ablation-zone;
-   % the daily product remains QA/provenance input, not a first-pass case list.
+   % PANGAEA identifies S21 as accumulation-zone and S22/S23 as ablation-zone.
+   % The daily product stays QA/provenance input, not a first-pass case list.
    sites = [ ...
       one("S21", "accumulation", "RetMIP FA meteorological source")
       one("S22", "ablation", "")
       one("S23", "ablation", "")];
 
    % Reject unknown ids before staging and retain canonical catalog order. Keep
-   % the established error id so callers can catch it across the API rename.
+   % this error id stable so callers can catch it by name.
    sites = icemodel.verification.setup.selectSiteCatalogEntries(sites, ...
       site_ids, "icemodel:verification:imauSiteMetadata:unknownSite", ...
       "IMAU site");

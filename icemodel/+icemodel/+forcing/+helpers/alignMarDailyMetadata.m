@@ -6,10 +6,10 @@ function metadata = alignMarDailyMetadata(metadata, source_days, retained_times)
    %
    % SOURCE_DAYS is the exact UTC-day axis used to create the saved RU/SMB and
    % ME/MEH ledgers. RETAINED_TIMES is the hourly Data or derived-met axis kept
-   % after a staging window is applied. Complete retained days preserve their
+   % after a staging window is applied. Complete retained days keep their
    % source ledger entries exactly. Partial boundary days become unverified
-   % (status 3) with NaN references/residuals. Numeric payloads are not inputs
-   % and therefore cannot be modified by this metadata-only operation.
+   % (status 3) with NaN references and residuals. Numeric payloads are not
+   % inputs, so this metadata-only operation cannot modify them.
 
    arguments
       metadata (1, 1) struct
@@ -31,9 +31,9 @@ function metadata = alignMarDailyMetadata(metadata, source_days, retained_times)
          'MAR retained times must be strictly increasing')
    end
 
-   % Validate each independently meaningful ledger as an atomic group. Empty
-   % ME/MEH fields are the supported reduced-source representation; a partially
-   % populated or wrong-length group is ambiguous and must fail closed.
+   % Validate each independently meaningful ledger as one group. Empty ME/MEH
+   % fields are the supported reduced-source form. A partly populated group, or
+   % one with the wrong length, is ambiguous, so the function raises an error.
    qc_runoff = ["mar_qc_runoff_day_status", ...
       "mar_qc_runoff_daily_reference_mwe"];
    qc_smb = ["mar_qc_smb_day_status", ...
@@ -45,8 +45,9 @@ function metadata = alignMarDailyMetadata(metadata, source_days, retained_times)
    validateLedgerGroup(metadata, qc_smb, numel(source_days));
    validateLedgerGroup(metadata, melt, numel(source_days));
 
-   % Select retained UTC days from the source ledger, rejecting times that have
-   % no source-day identity rather than guessing a positional correspondence.
+   % Select retained UTC days from the source ledger. The function rejects a
+   % time that has no matching source day. It does not guess a match by
+   % position.
    retained_days = unique(dateshift(retained_times, 'start', 'day'), 'stable');
    [found, source_index] = ismember(retained_days, source_days);
    if ~all(found)
@@ -77,8 +78,8 @@ function metadata = alignMarDailyMetadata(metadata, source_days, retained_times)
       end
    end
 
-   % RU/SMB summaries describe only the retained artifact. Cumulative changed-
-   % sample counts intentionally remain untouched as repair-history provenance.
+   % RU/SMB summaries describe only the retained artifact. The cumulative
+   % changed-sample counts stay unchanged because they record repair history.
    qc_status_fields = [qc_runoff(1), qc_smb(1)];
    if any(isfield(metadata, cellstr(qc_status_fields)))
       metadata.mar_qc_complete_utc_day_count = nnz(complete);
@@ -97,8 +98,8 @@ function metadata = alignMarDailyMetadata(metadata, source_days, retained_times)
       end
    end
 
-   % Recompute the ME/MEH validation summary from the aligned ledger. Empty
-   % reduced-source ledgers remain explicitly unavailable, not forcing failures.
+   % Recompute the ME/MEH validation summary from the aligned ledger. An empty
+   % reduced-source ledger reports "not_available". It is not a forcing failure.
    if isfield(metadata, melt(1))
       status = uint8(metadata.(melt(1)));
       if isempty(status)
@@ -193,8 +194,9 @@ function complete = retainedDayCompleteness(times, days)
          'MAR retained times do not have one unambiguous regular cadence')
    end
 
-   % Compare exact interval-start support within each retained UTC day. This is
-   % cadence-neutral: hourly Data and 15-minute met are never conflated.
+   % Compare the exact interval starts within each retained UTC day. The
+   % comparison uses the measured cadence, so hourly Data and 15-minute met
+   % never mix.
    samples_per_day = round(samples_per_day);
    offsets = seconds((0:samples_per_day - 1)' * cadence);
    groups = findgroups(dateshift(times, 'start', 'day'));

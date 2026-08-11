@@ -34,10 +34,10 @@ function [met, metadata, Data] = buildMarMet(location, years, kwargs)
    %  metadata - finalized met metadata; exactly met.Properties.UserData
    %  Data     - source Data timetable before conversion/resampling
    %
-   % Legacy: reimplements runoff/functions/makeMarMetfile.m (the original
-   % retained, unchanged, as the legacy reference workflow). The legacy
-   % per-point loop, per-variable rounding, and in-function saving are not
-   % reproduced (saving is icemodel.forcing.helpers.writemet's job).
+   % Legacy: this function reimplements runoff/functions/makeMarMetfile.m. The
+   % original stays unchanged as the legacy reference workflow. This function
+   % does not reproduce the legacy per-point loop, per-variable rounding, or
+   % in-function saving; icemodel.forcing.helpers.writemet does the saving.
    %
    % See also: icemodel.forcing.buildMarData, icemodel.forcing.data2met,
    %  icemodel.forcing.helpers.writemet,

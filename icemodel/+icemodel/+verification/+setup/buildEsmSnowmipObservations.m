@@ -11,15 +11,14 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
    %  by comparecase, plotcase, and the runIcemodelSnowCandidate adapter without
    %  a per-site branch.
    %
-   %  Observation contract: this builder stages every snow / surface
-   %  channel that the upstream obs file makes available, so downstream
-   %  model-vs-observation comparison can use any of them. Canonical
-   %  comparison columns (snow_depth_m, swe_kg_m2, surface_temp_C,
-   %  soil_temp_<k>_C) are added when the corresponding upstream
-   %  channel is present in the NetCDF, regardless of whether the
-   %  smoke window happens to contain finite values for that channel
-   %  (so plotcase still draws a sparse-marker axis when observations
-   %  are gappy in the staged window).
+   %  Observation contract: this builder stages every snow and surface
+   %  channel that the upstream obs file provides, so downstream
+   %  model-vs-observation comparison can use any of them. It adds a
+   %  canonical comparison column (snow_depth_m, swe_kg_m2,
+   %  surface_temp_C, soil_temp_<k>_C) when the matching upstream channel
+   %  is in the NetCDF, even when the smoke window holds no finite values
+   %  for that channel. plotcase then still draws a sparse-marker axis
+   %  when observations are gappy in the staged window.
    %
    %  Variable mapping (ESM-SnowMIP -> verification target):
    %     snd_auto / snd_man / snd_gap_auto / snd_gap1_auto
@@ -62,7 +61,7 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
    % Validate and normalize the optional interval before source discovery so
    % malformed public input cannot be obscured by an unrelated file error.
    [window_start, window_end, has_window] = ...
-      icemodel.internal.pairedWindow(kwargs.startdate, kwargs.enddate);
+      icemodel.pairedWindow(kwargs.startdate, kwargs.enddate);
 
    % Treat an explicit blank like omission; never reinterpret it as the CWD.
    source_dir = icemodel.forcing.helpers.verificationSourceDir( ...
@@ -86,9 +85,9 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
    obs_time = icemodel.verification.setup.readNetcdfTime(obsfile, 'time');
    ntime = numel(obs_time);
 
-   % Discover which channels the upstream file provides. Canonical
-   % comparison columns are added only when the matching upstream
-   % channel(s) exist. ESM-SnowMIP sites are heterogeneous:
+   % Discover which channels the upstream file provides. This code adds a
+   % canonical comparison column only when the matching upstream channel
+   % exists. ESM-SnowMIP sites are heterogeneous:
    %   - boreal forest sites (oas, obs, ojp) report snd_gap_auto in the
    %     canopy gap rather than snd_auto;
    %   - sap lacks tsl, so no soil_temp_<k>_C columns are added;
@@ -140,11 +139,10 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
       albs = nan(ntime, 1);
    end
 
-   % MATLAB reads the native tsl dimensions as sdepth x time. Preserve that
-   % source orientation when normalizing singleton dimensions; each row must
-   % remain one physical soil depth, so this operation intentionally does not
-   % transpose the source data. Sites without tsl produce zero soil-temperature
-   % columns rather than a placeholder NaN soil layer.
+   % MATLAB reads the native tsl dimensions as sdepth x time. The reshape
+   % normalizes singleton dimensions while preserving that orientation, so
+   % each row stays one physical soil depth. Sites without tsl produce zero
+   % soil-temperature columns rather than a placeholder NaN soil layer.
    if has_tsl
       tsl = icemodel.verification.setup.readNetcdfVariable(obsfile, "tsl");
       tsl = reshape(tsl, [], ntime);
@@ -158,8 +156,8 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
    end
 
    % Read every available snow-depth variant separately so model-obs
-   % comparison can target any specific channel. Variants absent from
-   % the file are skipped (we do not synthesise NaN columns for those).
+   % comparison can target any specific channel. This code skips a variant
+   % that the file does not have, and creates no NaN column for it.
    snd_variants = struct();
    variant_names = ["snd_auto", "snd_man", "snd_gap_auto", "snd_gap1_auto"];
    for c = variant_names

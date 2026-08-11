@@ -5,22 +5,23 @@ function tt = stampMetadata(tt, kwargs)
    %  tt = icemodel.forcing.helpers.stampMetadata(tt, strict=false)
    %
    % Stamps each variable of the table or timetable TT with its canonical
-   % metadata from the single source icemodel.netcdf.defaults.variable, so
-   % met/Data/observation files are self-describing:
+   % metadata from icemodel.netcdf.defaults.variable, so met, Data, and
+   % observation files describe themselves:
    %
    %    Properties.VariableUnits        <- unit
    %    Properties.VariableDescriptions <- long_name
    %    Properties.CustomProperties.StandardNames <- CF standard_name
    %
-   % Timetables have native slots for units and descriptions but none for CF
-   % standard names, so the standard_name strings are carried in a
-   % table-level CustomProperty StandardNames (a string array aligned to the
-   % variable order). A channel with no CF name carries "" in that slot.
+   % Timetables have native slots for units and descriptions, but none for CF
+   % standard names. This function therefore stores the standard_name strings
+   % in the table-level CustomProperty StandardNames. That property is a string
+   % array in the same order as the variables. A channel with no CF name
+   % carries "" in its slot.
    %
-   % An unmapped channel errors via the canonical map by default: every shipped
-   % forcing column must be labelled. Verification tables can pass strict=false
-   % so non-science string keys keep blank units/descriptions while known
-   % science variables are still labelled.
+   % By default, an unmapped channel raises the error from the canonical map,
+   % because every shipped forcing column must carry a label. A verification
+   % table can pass strict=false. Then a non-science string key keeps blank
+   % units and descriptions, and a known science variable still gets its label.
    %
    % See also: icemodel.netcdf.defaults.variable,
    %  icemodel.forcing.helpers.variableUnits, icemodel.forcing.data2met

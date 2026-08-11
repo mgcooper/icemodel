@@ -1,7 +1,7 @@
 function list = benchmark()
-%BENCHMARK Return the supported formal benchmark file names.
-%
-%  list = icemodel.namelists.benchmark()
+   %BENCHMARK Return the supported formal benchmark file names.
+   %
+   %  list = icemodel.namelists.benchmark()
 
    tmp = dir(fullfile(icemodel.internal.fullpath, 'test', 'benchmarks', ...
       '*.m'));

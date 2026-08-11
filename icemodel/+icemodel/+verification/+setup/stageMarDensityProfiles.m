@@ -7,8 +7,8 @@ function state = stageMarDensityProfiles(state, alive_idx, source, kwargs)
    % The helper runs after one MAR colocation leg has been merged but before the
    % family manifest is persisted. It selects only SUMup density observation
    % dates, writes one additive model-output sidecar per case, and records the
-   % sidecar on the MAR leg. Absence or failed refresh never changes forcing
-   % readiness and never removes an existing valid sidecar.
+   % sidecar on the MAR leg. A missing source or a failed refresh does not
+   % change forcing readiness and does not remove an existing valid sidecar.
 
    arguments
       state (1, :) struct
@@ -54,8 +54,8 @@ function state = stageMarDensityProfiles(state, alive_idx, source, kwargs)
       return
    end
    grid_file = string(fullfile(source_files(1).folder, source_files(1).name));
-   % Only source cell identity is needed here; avoid reading unrelated static
-   % fields required by the forcing builder's full grid contract.
+   % This code needs only the source cell identity, so it does not read the
+   % other static fields that the forcing builder's full grid contract needs.
    grid = struct('LON', double(ncread(grid_file, 'LON')), ...
       'LAT', double(ncread(grid_file, 'LAT')));
    output_dir = fullfile(kwargs.userdata_outdir, "mar3.11");
@@ -145,10 +145,10 @@ function state = stageMarDensityProfiles(state, alive_idx, source, kwargs)
       if isfile(output_file)
          prior = load(output_file, 'reference');
          has_prior_table = isfield(prior, 'reference') ...
-               && isstruct(prior.reference) ...
-               && isfield(prior.reference, 'data') ...
-               && isfield(prior.reference.data, 'density') ...
-               && istable(prior.reference.data.density);
+            && isstruct(prior.reference) ...
+            && isfield(prior.reference, 'data') ...
+            && isfield(prior.reference.data, 'density') ...
+            && istable(prior.reference.data.density);
          if has_prior_table
             prior_profiles = prior.reference.data.density;
             compatible = isequal( ...
@@ -203,8 +203,8 @@ function state = stageMarDensityProfiles(state, alive_idx, source, kwargs)
       save(temporary_file, 'reference', 'artifact_metadata')
       movefile(temporary_file, output_file, 'f')
 
-      % Model output is discoverable without entering forcing data_files or
-      % changing the advisory forcing_ready contract.
+      % Callers can find the model output without it entering forcing
+      % data_files, and the advisory forcing_ready contract stays the same.
       leg.model_output_files = char(relative_file);
       leg.model_output_format = 'subsurface_profile_bundle';
       leg.model_output_variables = {'density'};
@@ -227,7 +227,7 @@ function leg = recordModelOutputFailure(leg, status, note)
       return
    end
 
-   % Without an existing artifact, expose the optional failure diagnostically.
+   % Without an existing artifact, record the optional failure as a diagnostic.
    leg.model_output_status = status;
    leg.model_output_note = note;
 end

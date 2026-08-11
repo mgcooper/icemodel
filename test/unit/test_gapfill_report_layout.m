@@ -105,8 +105,8 @@ function test_ledger_paths_reconcile_with_folders(testCase)
 end
 
 function test_stale_and_foreign_figures_handled(testCase)
-   % Selected-site leftovers vanish in the same transaction (including
-   % legacy flat-layout PNGs); foreign sites' figures survive untouched.
+   % The same transaction removes selected-site leftovers, including
+   % legacy flat-layout PNGs. Figures of other sites stay untouched.
    root = testCase.TestData.root;
    testCase.verifyFalse(isfile(fullfile(root, 'figures', 'detail', ...
       'tsta_tair_stale_gapfill.png')));
@@ -629,7 +629,7 @@ function writeLayoutFixture(root)
    save(native_file, 'met');
 
    % A native-only station with NO filled product: the Results section
-   % must surface it as a windowRecordDisjoint refusal.
+   % must report it as a windowRecordDisjoint refusal.
    refusal_location = struct('site', "kant", 'lat', 60, 'lon', -45, ...
       'elev', 500);
    met = timetable(times(1:96), tair(1:96), 'VariableNames', {'tair'});

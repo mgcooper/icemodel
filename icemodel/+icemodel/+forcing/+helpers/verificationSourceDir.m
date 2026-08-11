@@ -5,16 +5,17 @@ function source_dir = verificationSourceDir(source_dir, parts)
    %  source_dir = icemodel.forcing.helpers.verificationSourceDir( ...
    %     "", ["retmip", "samimi"])
    %
-   % Forcing builders read manually staged verification sources from the top-level
-   % repo data tree. Keeping this policy in one helper prevents builder-specific
-   % defaults from drifting when the staging root convention changes.
+   % Forcing builders read manually staged verification sources from the
+   % top-level repo data tree. This helper holds that policy, so a change to
+   % the staging root convention updates every builder default.
 
    arguments
       source_dir (1, 1) string
       parts (1, :) string
    end
 
-   % Explicit caller roots win. Blank roots resolve under <repo>/data/verification.
+   % An explicit caller root takes priority. A blank root resolves under
+   % <repo>/data/verification.
    if source_dir == ""
       pieces = [{'verification'}, cellstr(parts)];
       source_dir = string(fullfile(icemodel.internal.fullpath('data'), ...

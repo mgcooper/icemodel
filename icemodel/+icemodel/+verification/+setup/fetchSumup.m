@@ -8,10 +8,10 @@ function [source_dir, status] = fetchSumup(kwargs)
    %  Resolves the local source-cache directory holding the SUMup firn
    %  observation files (density, SMB, subsurface temperature) used by
    %  icemodel.verification.setup.importSumup to stage the per-point firn
-   %  verification artifacts. By default the cache lives at
-   %  data/verification/sumup/ (committed in this repo) and is populated by the
-   %  user / developer following the retrieval instructions printed when
-   %  files are missing.
+   %  verification artifacts. The default cache directory is
+   %  data/verification/sumup/, which this repo commits. The user or the
+   %  developer fills that directory by following the retrieval instructions
+   %  that this function prints when files are missing.
    %
    %  SUMup is the firn observation source for density, SMB, and subsurface
    %  temperature. FirnCover compaction strain is not part of this cache.
@@ -38,9 +38,8 @@ function [source_dir, status] = fetchSumup(kwargs)
    %      instructions (DOI, NSIDC URL, Earthdata login) and either error
    %      (kwargs.strict=true, default) or return the partial cache
    %      directory (kwargs.strict=false).
-   %    - Does NOT attempt automatic download. SUMup is access-gated behind
-   %      a NASA Earthdata Login (registration), so the retrieval step is
-   %      made explicit rather than hidden behind an automatic download.
+   %    - Never downloads a file. SUMup needs a NASA Earthdata Login
+   %      (registration), so the user performs the retrieval step.
    %
    %  Role
    %    Validator. With create_cache_dir=true, the fetch helper creates the

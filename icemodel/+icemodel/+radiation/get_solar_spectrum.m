@@ -1,6 +1,7 @@
-function [I0, solar, solar_dwavel] = get_solar_spectrum(solar_spectrum, wavel, dwavel)
-   %get_solar_spectrum Interpolate the reference solar spectrum to the model grid.
-   %
+function [I0, solar, solar_dwavel] = get_solar_spectrum( ...
+      solar_spectrum, wavel, dwavel)
+   %GET_SOLAR_SPECTRUM Interpolate the reference solar spectrum to the model
+   % grid.
    %  [I0, solar, solar_dwavel] = icemodel.radiation.get_solar_spectrum( ...
    %     solar_spectrum, wavel, dwavel)
    %

@@ -20,8 +20,8 @@ function test_cvmesh_uniform_and_exponential_layout(testCase)
 end
 
 function test_interp1_nearest_preserves_expected_spectral_remap(testCase)
-   % The spectral density remap now uses direct nearest-neighbor interp1, so
-   % verify the expected shape and values on a compact controlled example.
+   % The spectral density remap uses direct nearest-neighbor interp1; verify
+   % the expected shape and values on a compact controlled example.
 
    ro_sno = interp1([0.2; 0.6; 1.0], [300; 400; 500], [0.1; 0.5; 0.9], ...
       'nearest', 'extrap');
@@ -44,6 +44,21 @@ function test_layerinds_selects_expected_merge_neighbors(testCase)
    testCase.verifyEqual(j2_zero, 3);
    testCase.verifyEqual(j1_nonzero, 2);
    testCase.verifyEqual(j2_nonzero, 1);
+end
+
+function test_layerinds_merges_the_bottom_layer_upward(testCase)
+   % The bottom layer has no layer below it, so it must merge with the one
+   % above. Without this branch the interior path reads f_ice(j1 + 1) past the
+   % end of the column.
+
+   [j1, j2] = icemodel.column.merge_layer_indices(3, [0.4; 0.3; 0.0]);
+   testCase.verifyEqual([j1 j2], [3 2]);
+
+   % A nonzero bottom layer takes the same path, since the choice is forced by
+   % the boundary rather than by the neighbour thicknesses.
+   [j1_solid, j2_solid] = ...
+      icemodel.column.merge_layer_indices(3, [0.4; 0.3; 0.2]);
+   testCase.verifyEqual([j1_solid j2_solid], [3 2]);
 end
 
 function test_trisolve_matches_backslash(testCase)
@@ -90,10 +105,10 @@ function test_inittimesteps_and_newtimestep_follow_solver_contract(testCase)
    [metstep, substep, numsteps, maxsubstep, dt_new, dt_full, numyears, ...
       numspinup, simyears] = icemodel.timestepping.initialize_timesteps( ...
       opts, Time);
-   
+
    [dt_sum, n_subfail, ok_seb_1, ok_ieb_1] = ...
       icemodel.timestepping.newtimestep(zeros(3, 1), 1);
-   
+
    [~, ~, ok_seb_2, ok_ieb_2] = icemodel.timestepping.newtimestep( ...
       zeros(3, 1), 2);
 
@@ -154,7 +169,7 @@ function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
    testCase.verifyEqual(dt_sum, 750, 'AbsTol', 1e-12);
    testCase.verifyEqual(dt_next, 150, 'AbsTol', 1e-12);
 
-   % Surface running state is now derived by update_surface_state.
+   % update_surface_state derives the surface running state.
    [liqflag, ~, hv_atm_val, H_e, ~] = ...
       icemodel.surface.update_surface_state( ...
       f_ice(1), f_liq(1), ro_atm_val, De_e_val, 0, substep_opts);
@@ -230,7 +245,7 @@ function test_checksubstep_debug_dump_records_force_advance_context(testCase)
    % triggered force advance and the projected cross-timestep streak.
 
    debug_file = [tempname '.mat'];
-   cleanup = onCleanup(@() cleanupDebugFile(debug_file)); %#ok<NASGU>
+   cleanup = onCleanup(@() cleanupDebugFile(debug_file));
    setenv('ICEMODEL_DEBUG_MAXSUBSTEP_FILE', debug_file);
 
    icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
@@ -248,8 +263,8 @@ function test_checksubstep_debug_dump_records_force_advance_context(testCase)
 end
 
 function test_force_advance_guard_resets_after_recovery(testCase)
-   % A successful accepted substep should clear any prior force-advance
-   % streak so transient recoveries do not poison later timesteps.
+   % A successful accepted substep should clear any earlier force-advance
+   % streak, so a transient recovery does not affect later timesteps.
 
    streak_dt = icemodel.timestepping.update_force_advance_guard(300, true, 300, ...
       900, 2, 10, 'icemodel');
@@ -261,7 +276,7 @@ end
 
 function test_force_advance_guard_errors_after_full_timestep(testCase)
    % Persistent force advance beyond one full forcing step should fail fast
-   % instead of allowing a long broken run to limp onward.
+   % instead of letting a long broken run continue.
 
    testCase.verifyError(@() icemodel.timestepping.update_force_advance_guard(900, ...
       true, 1, 900, 2, 10, 'icemodel'), 'icemodel:ForceAdvanceStreakExceeded');
@@ -274,4 +289,31 @@ function cleanupDebugFile(debug_file)
    if exist(debug_file, 'file') == 2
       delete(debug_file);
    end
+end
+
+function test_bottom_layer_merge_removes_it_and_conserves_mass(testCase)
+   % A deepest layer below f_ice_min must actually be removed. Take the clone
+   % that preserves column length AFTER the deletion. Taking it first would
+   % copy the removed layer back into the column, and the layer above it would
+   % then hold only half the pair's mass.
+
+   [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
+   dz = 0.04;
+   f_ice_min = 0.1;
+   T = [Tf - 1; Tf - 2; Tf - 3];
+   f_ice = [0.9; 0.8; 0.02];
+   f_liq = [0.01; 0.01; 0.0];
+   zeros_col = zeros(3, 1);
+
+   water_equivalent = @(fi, fl) sum(ro_ice / ro_liq * fi + fl) * dz;
+   expected = water_equivalent(f_ice, f_liq);
+
+   [~, returned_f_ice, returned_f_liq] = icemodel.column.merge_thin_layers( ...
+      T, f_ice, f_liq, zeros_col, zeros_col, dz, 0.0, zeros_col, f_ice_min);
+
+   testCase.verifyFalse(any(returned_f_ice < f_ice_min))
+   testCase.verifyEqual( ...
+      water_equivalent(returned_f_ice, returned_f_liq), expected, ...
+      AbsTol=1e-12)
+   testCase.verifyNumElements(returned_f_ice, 3)
 end

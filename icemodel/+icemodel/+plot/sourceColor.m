@@ -5,8 +5,8 @@ function colors = sourceColor(names)
    %
    % Names may include plot roles such as "promice met" or
    % "mar3.11 userdata". MAR, RACMO, and MERRA-2 use the established
-   % runoff/RunoffPlot palette. Other known verification sources use durable
-   % colors across roles, while unknown labels receive a deterministic fallback.
+   % runoff/RunoffPlot palette. Other known verification sources keep the same
+   % color across roles. An unknown label gets a deterministic fallback color.
 
    names = reshape(string(names), [], 1);
    colors = zeros(numel(names), 3);
@@ -27,9 +27,9 @@ function colors = sourceColor(names)
             || startsWith(key, "mar ")
          colors(k, :) = [0.866 0.329 0];
       elseif contains(key, "promice_filled") || contains(key, "filled")
-         % The gap-filled product needs its own stable identity beside
-         % native PROMICE purple so before/after overlays read at a
-         % glance.
+         % The gap-filled product needs its own stable color beside the
+         % native PROMICE purple, so a before/after overlay is easy to
+         % read.
          colors(k, :) = [0.9290 0.6940 0.1250];
       elseif contains(key, "promice")
          colors(k, :) = [0.4940 0.1840 0.5560];

@@ -9,12 +9,12 @@ function manifest = writeFamilyManifestMerge(manifest_file, manifest, kwargs)
    %     manifest_file, manifest, requested_ids=["kanl","kanm"])
    %
    %  Incremental staging primitive shared by the firn importers
-   %  (importPromiceSites, importSumup). Staging one site must NOT churn or drop
-   %  the other sites' committed case entries. This helper ADDS or UPDATES only
-   %  the requested cases and PRESERVES every other existing case entry byte for
-   %  byte, then writes the merged manifest.
+   %  (importPromiceSites, importSumup). Staging one site must NOT change or
+   %  drop the other sites' committed case entries. This helper ADDS or UPDATES
+   %  only the requested cases and PRESERVES every other existing case entry
+   %  byte for byte, then writes the merged manifest.
    %
-   %  Merge semantics (the DEFAULT)
+   %  Merge rules (the DEFAULT)
    %    * Existing manifest is read from manifest_file when present (raw decode,
    %      so untouched cases re-encode identically - no field reordering).
    %    * Each NEW case in manifest.cases PATCHES the existing case with the
@@ -29,17 +29,16 @@ function manifest = writeFamilyManifestMerge(manifest_file, manifest, kwargs)
    %      Newly added cases are appended after preserved existing cases.
    %    * Family-level fields the new manifest does not carry (e.g. a hand-added
    %      "schema" descriptor) are PRESERVED from the existing manifest, so a
-   %      re-stage never silently drops them.
+   %      re-stage never drops them.
    %    * skipped[]: skip records for the REQUESTED ids are recomputed from the
    %      new manifest; skip records for OTHER ids are preserved. Re-staging a
    %      site that now succeeds clears its stale skip entry.
    %
-   %  overwrite_family=true forces a full rewrite from manifest.cases alone
-   %  (legacy whole-family behavior), discarding any prior cases and family
-   %  fields. When that rewrite actually removes prior cases, coverage, sources,
-   %  artifact references, skipped records, or extension fields, this helper
-   %  emits an overwriteFamily warning. Use only to deliberately rebuild a
-   %  family root from scratch.
+   %  overwrite_family=true forces a full rewrite from manifest.cases alone,
+   %  discarding any prior cases and family fields. When that rewrite removes
+   %  prior cases, coverage, sources, artifact references, skipped records, or
+   %  extension fields, this helper emits an overwriteFamily warning. Use it
+   %  only to rebuild a family root from scratch.
    %
    %  Inputs
    %    manifest_file : string  destination eval/<family>/manifest.json path.
@@ -82,10 +81,9 @@ function manifest = writeFamilyManifestMerge(manifest_file, manifest, kwargs)
       requested = unique([new_ids, skipIds(new_skipped)], 'stable');
    end
 
-   % Full-rewrite escape hatch: ignore any prior manifest entirely. Warn only
-   % when replacement actually removes prior cases, sources, skipped records,
-   % or family fields; repeated kill-safe persistence while building a family
-   % is not destructive.
+   % Full rewrite: ignore any prior manifest. Warn only when the replacement
+   % removes prior cases, sources, skipped records, or family fields. Repeated
+   % saves while a family is under construction remove nothing.
    if kwargs.overwrite_family || ~isfile(manifest_file)
       if kwargs.overwrite_family && isfile(manifest_file)
          existing = jsondecode(fileread(manifest_file));
@@ -278,10 +276,10 @@ function patched = mergeCasePatch(existing, incoming)
       end
       replace_prior_artifacts = false;
       if isfield(new_leg, 'replace_prior_artifacts')
-         % This transient signal is set only after a requested refresh proves
-         % prior files missing or concretely incompatible. Consume it here so
-         % additive coverage merging cannot resurrect invalid references and
-         % the implementation detail never enters the durable manifest.
+         % A requested refresh sets this temporary flag only after it finds the
+         % prior files missing or incompatible. Read and remove it here, so the
+         % additive coverage merge cannot restore an invalid reference and the
+         % flag never enters the durable manifest.
          replace_prior_artifacts = ...
             scalarTrue(new_leg.replace_prior_artifacts);
          new_leg = rmfield(new_leg, 'replace_prior_artifacts');
@@ -303,9 +301,9 @@ function patched = mergeCasePatch(existing, incoming)
          old_leg, new_leg, coverage_relation);
    end
 
-   % Derive source labels from the final graph so retained/unioned legs cannot
-   % drift from forcing_sources or eval_sources. Keep incoming extension labels
-   % that are not represented by a standard colocation leg.
+   % Derive source labels from the final graph, so forcing_sources and
+   % eval_sources describe the retained and unioned legs. Keep incoming
+   % extension labels that no standard colocation leg represents.
    if isfield(existing, 'forcing_sources') ...
          || isfield(incoming, 'forcing_sources') ...
          || isfield(existing, 'eval_sources') ...
@@ -339,7 +337,7 @@ function [patched, relation] = mergeWindowField(existing, patched, fieldname)
       return
    end
    try
-      [old_start, old_end, old_enabled] = icemodel.internal.pairedWindow( ...
+      [old_start, old_end, old_enabled] = icemodel.pairedWindow( ...
          old_window.start, old_window.end);
    catch
       % Legacy non-datetime sentinels cannot define enclosing coverage.
@@ -355,7 +353,7 @@ function [patched, relation] = mergeWindowField(existing, patched, fieldname)
 
    new_window = patched.(fieldname);
    try
-      [new_start, new_end, new_enabled] = icemodel.internal.pairedWindow( ...
+      [new_start, new_end, new_enabled] = icemodel.pairedWindow( ...
          new_window.start, new_window.end);
    catch
       % Do not let an ordinary malformed patch destroy valid durable coverage.
@@ -369,9 +367,9 @@ function [patched, relation] = mergeWindowField(existing, patched, fieldname)
       return
    end
 
-   % One scalar window cannot represent separated support. Preserve the durable
-   % interval instead of inventing continuous coverage across an unproven gap;
-   % callers can rebuild an enclosing artifact or use overwrite_family explicitly.
+   % One scalar window cannot represent two separated intervals. Preserve the
+   % durable interval rather than claim continuous coverage across the gap. A
+   % caller can rebuild an enclosing artifact or pass overwrite_family.
    if old_end < new_start || new_end < old_start
       patched.(fieldname) = old_window;
       relation = "existing";
@@ -709,8 +707,8 @@ function [cadence, known] = artifactFilenameCadence(reference, kind)
       return
    end
 
-   % Hourly userdata intentionally retain the suffix-free legacy grammar;
-   % native variants carry minute or raw-second suffixes.
+   % Hourly userdata filenames carry no cadence suffix; native variants carry a
+   % minute or raw-second suffix.
    if ~isempty(regexp(name, ...
          "^.+_(?:\d{4}|\d{8}_\d{8})\.mat$", "once"))
       cadence = 3600;
@@ -786,7 +784,7 @@ function tf = windowNarrows(existing_window, incoming_window)
       return
    end
    try
-      [old_start, old_end, old_enabled] = icemodel.internal.pairedWindow( ...
+      [old_start, old_end, old_enabled] = icemodel.pairedWindow( ...
          existing_window.start, existing_window.end);
    catch
       % Legacy non-datetime sentinel periods are not comparable coverage.
@@ -799,7 +797,7 @@ function tf = windowNarrows(existing_window, incoming_window)
          return
       end
       try
-         [~, ~, new_enabled] = icemodel.internal.pairedWindow( ...
+         [~, ~, new_enabled] = icemodel.pairedWindow( ...
             incoming_window.start, incoming_window.end);
          tf = new_enabled;
       catch
@@ -813,7 +811,7 @@ function tf = windowNarrows(existing_window, incoming_window)
       return
    end
    try
-      [new_start, new_end, new_enabled] = icemodel.internal.pairedWindow( ...
+      [new_start, new_end, new_enabled] = icemodel.pairedWindow( ...
          incoming_window.start, incoming_window.end);
       tf = ~new_enabled || new_start > old_start || new_end < old_end;
    catch
@@ -984,8 +982,8 @@ function s = alignFields(s, ref)
    %ALIGNFIELDS Ensure struct s carries exactly the ref field set.
    %
    % A mismatch in the field SET (not just order) between a preserved case and a
-   % touched case would otherwise break concatenation; surface it instead of
-   % silently fabricating fields.
+   % touched case breaks concatenation. Raise an error rather than fabricating
+   % the missing fields.
    have = fieldnames(s);
    if ~isempty(setxor(have, ref))
       error('icemodel:verification:writeFamilyManifestMerge:fieldMismatch', ...

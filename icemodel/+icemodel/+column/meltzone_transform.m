@@ -2,24 +2,25 @@ function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
       dLdT, f_liq_min, f_liq_max, iM, debug)
    %MELTZONE_TRANSFORM Apply the melt-zone temperature-enthalpy transform.
    %
-   % This function uses the change in liquid fraction returned by the numerical
-   % solution of the enthalpy equation to update the temperature of nodes
-   % undergoing phase change, using the temperature-enthalpy relationship.
-   % This ensures the change in enthalpy due to solid-liquid phase change is
-   % accounted for in terms of both the latent heat and the specific heat of the
-   % control volume, i.e., that the temperature, liquid fraction, and enthalpy
-   % are consistent. This is sometimes referred to as a "corrector" step. Note
-   % that for nodes undergoing phase change, the input to this function, T, is
-   % the change in liquid fraction due to solid-liquid phase change multiplied
-   % by the density of liquid water. For nodes which are not undergoing phase
-   % change, T is the temperature.
+   % This function uses the change in liquid fraction from the numerical
+   % solution of the enthalpy equation. It updates the temperature of nodes
+   % that undergo phase change, using the temperature-enthalpy relationship.
+   % The update accounts for the enthalpy change from solid-liquid phase
+   % change through both the latent heat and the specific heat of the control
+   % volume. The temperature, liquid fraction, and enthalpy are therefore
+   % consistent. This step is also called a "corrector" step.
+   %
+   % For nodes that undergo phase change, the input T is the change in liquid
+   % fraction from solid-liquid phase change, multiplied by the density of
+   % liquid water. For nodes that do not undergo phase change, T is the
+   % temperature.
    %
    % This function also implements three numerical checks:
    %  1) if the enthalpy predictor implies an impossible liquid fraction
    %     (negative, above the available water, or above the available ice),
    %  2) if a melt-zone node overshoots either melt-zone phase boundary by
-   %     more than 5%, meaning the local melt-curve linearization is no longer
-   %     trusted, and
+   %     more than 5%, which means the local melt-curve linearization is not
+   %     valid there, and
    %  3) if a node that started outside the melt zone skipped it entirely,
    %     meaning a node below TL ended the step above TH (or vice versa).
    %
@@ -71,7 +72,7 @@ function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
 
    %%% Update liquid / solid fractions
    %
-   % Note that here, T(i_M) = ro_liq * (f_liq_new - f_liq_old), T(~i_M) = T_new
+   % Here, T(i_M) = ro_liq * (f_liq_new - f_liq_old), and T(~i_M) = T_new
 
    % Update the liquid fraction of melt-zone layers (f_liq = f_liq_old + P/ro)
    f_liq(iM) = f_liq(iM) + T(iM) / ro_liq; % line 79 of ftemp.f
@@ -106,11 +107,10 @@ function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
    %%% Update temperature
    % Below here, transform T(i_M) = ro_liq * (f_liq_new - f_liq_old) to T_new
    %
-   % The older version applied the melt-zone analytic inverse to all melt-zone
-   % nodes that survived the tol overshoot check (like Jordan). That is not
-   % correct for nodes that exited the melt zone during the predictor step.
-   % Below treats nodes that remain in the melt zone separately from nodes that
-   % exit it.
+   % The code below treats nodes that remain in the melt zone separately from
+   % nodes that exit it. The melt-zone analytic inverse is not correct for a
+   % node that exited the melt zone during the predictor step, so it is applied
+   % only to the nodes that remain.
 
    % Identify nodes that left the melt zone during the predictor step but not
    % by enough to reject the timestep. These transitions are handled below by
@@ -129,8 +129,8 @@ function [T, f_ice, f_liq, ok] = meltzone_transform(T, T_iter, f_liq, f_wat, ...
       T(i_ok) = Tf - sqrt(f_wat(i_ok) ./ f_liq(i_ok) - 1.0) / fcp; % Eq. 133a
    end
 
-   % Note: above uses the new f_liq directly, which is correct. Don't use this
-   % update (use it below for nodes that have exited):
+   % The update above uses the new f_liq directly, which is correct. Do not use
+   % the linearized update here. It applies only to the exit nodes below:
    % T(i_M) = T_iter(i_M) + T(i_M) ./ (ro_liq * dLdT_iter(i_M));
 
    % For nodes that exit the melt zone with only a small predictor overshoot,

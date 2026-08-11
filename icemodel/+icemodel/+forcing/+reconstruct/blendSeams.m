@@ -2,9 +2,9 @@ function [candidate, note] = blendSeams(x, candidate, idx, usable, ...
       run_start, run_stop, run_before, run_after, blend_len, limit)
    %BLENDSEAMS Taper excess anchored boundary mismatch across one run.
    %
-   % Each anchored edge whose sample this method fills is tested against
-   % the jump limit. Larger mismatches are pulled to half the limit by a
-   % linearly decaying offset; seams already inside the limit are unchanged.
+   % This function tests each anchored edge that it fills against the jump
+   % limit. A linearly decaying offset pulls a larger mismatch to half the
+   % limit. A seam already inside the limit stays unchanged.
 
    n = numel(idx);
    note = "";

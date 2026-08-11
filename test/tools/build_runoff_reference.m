@@ -277,7 +277,8 @@ function [cfg_prev, extra_names, extra_values, old_path] = snapshotEnvironment()
       extra_values{n} = getenv(extra_names(n));
    end
 
-   % Restore the full MATLAB path so transient runoff paths do not leak.
+   % Capture the full MATLAB path so the later restore removes the transient
+   % runoff paths.
    old_path = path();
 end
 

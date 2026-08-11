@@ -9,10 +9,11 @@ classdef IcemodelPerfTest < matlab.perftest.TestCase
    methods (TestMethodSetup)
       function configureCases(testCase)
          % Install the runner-selected data root before timing begins. A direct
-         % class run leaves the selector blank and uses the canonical test case.
+         % class run resolves the canonical verification data instead.
          data_root = string(getenv('ICEMODEL_TEST_DATA_ROOT'));
          [~, ~, ~, ~, testCase.env_cleanup] = ...
             icemodel.test.helpers.bootstrapTestEnvironment( ...
+            icemodel_config_casename="verification", ...
             data_root=data_root);
          testCase.opts = buildCaseOpts();
       end

@@ -190,7 +190,8 @@ function rows = intervalSourceRows(observation_table, aligned)
       return
    end
 
-   % Older aligned tables did not retain their source row explicitly.
+   % An aligned table without a source_row column requires a lookup on the
+   % exact interval bounds.
    rows = zeros(height(aligned), 1);
    for n = 1:height(aligned)
       rows(n) = find(observation_table.start_date == aligned.start_date(n) ...
@@ -530,9 +531,9 @@ function row = populateMetric(row, observed, modeled)
       row.status = "no_overlap";
       return
    end
-   delta = modeled - observed;
-   row.bias = mean(delta);
-   row.rmse = sqrt(mean(delta .^ 2));
+   metrics = icemodel.verification.helpers.residualMetrics(modeled, observed);
+   row.bias = metrics.bias;
+   row.rmse = metrics.rmse;
    if numel(observed) > 1 && std(observed) > 0 && std(modeled) > 0
       C = corrcoef(observed, modeled);
       row.correlation = C(1, 2);

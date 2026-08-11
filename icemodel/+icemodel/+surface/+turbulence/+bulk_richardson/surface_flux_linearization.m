@@ -20,12 +20,12 @@ function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, ...
    %  Fc = F0 + F' - (dF/dT)' * T'
    %  Fp = (dF/dT)'
    %
-   % Note that the outgoing longwave and the saturation vapor pressure are
-   % linearized around T_old but the stability function is not linearized,
-   % thus T_old should be used to compute the stability function.
+   % The outgoing longwave and the saturation vapor pressure are linearized
+   % around T_old. The stability function is not linearized, so use T_old to
+   % compute the stability function.
    %
-   % All terms passed here are 'old', meaning the linearizations are computed
-   % once at the start of the timestep, and on iterations updated as
+   % All terms passed here are 'old'. The linearizations are computed once at
+   % the start of the timestep, and each iteration updates
    % F = Fc + Fp * T_new
    %
    % Fc and Fp represent only the non-conductive surface flux linearization.

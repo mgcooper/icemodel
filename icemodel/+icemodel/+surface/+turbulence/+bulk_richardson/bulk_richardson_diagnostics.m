@@ -38,22 +38,23 @@ function diag = bulk_richardson_diagnostics(T_sfc, es_sfc, tair, wspd, ...
    % where z_obs is the implied observation height from the neutral coefficient:
    %   ln(z_obs/z0m) = kappa / sqrt(Cd),   Cd = De_h / U
    %
-   % In the aerodynamically rough regime (Re > 2.5) Andreas z0h and z0q are
-   % significantly smaller than z0m (0.1-0.5x z0m), so De_h < De and De_e < De
-   % thus the scalar-exchange scheme predicts weaker scalar fluxes than the
+   % In the aerodynamically rough regime (Re > 2.5) the Andreas z0h and z0q are
+   % much smaller than z0m (0.1-0.5x z0m), so De_h < De and De_e < De. The
+   % scalar-exchange scheme therefore predicts weaker scalar fluxes than the
    % production BR scheme. In the aerodynamically smooth regime (Re < 0.135)
-   % z0h and z0q exceed z0m, reversing the sign of the correction. For typical
-   % glacier conditions (z0m ~ 1-3 mm, u* ~ 0.1-0.5 m/s), Re ~ 7-100, placing
-   % most timesteps in the rough regime and explaining the systematic offset
-   % toward smaller |Qe| and |Qh| relative to the production BR scheme.
+   % z0h and z0q exceed z0m, which reverses the sign of the correction. For
+   % typical glacier conditions (z0m ~ 1-3 mm, u* ~ 0.1-0.5 m/s), Re ~ 7-100.
+   % Most timesteps are therefore in the rough regime, which explains the
+   % systematic offset toward smaller |Qe| and |Qh| relative to the production
+   % BR scheme.
    %
-   % STABILITY NOTE: The Louis/Liston stability factor is re-used unchanged from
-   % the production run. This is an approximation: the parameterization was
-   % calibrated assuming z0h = z0m, so applying it with distinct scalar
-   % roughness lengths is internally inconsistent. The error is second-order
-   % relative to the roughness correction itself, but a fully consistent
-   % treatment would require separate stability corrections for momentum and
-   % scalars (as in the full Monin-Obukhov scheme).
+   % STABILITY NOTE: This code reuses the Louis/Liston stability factor from
+   % the production run without change. That is an approximation: the
+   % parameterization was calibrated with z0h = z0m, so applying it with
+   % separate scalar roughness lengths is internally inconsistent. The error is
+   % second-order relative to the roughness correction. A consistent treatment
+   % needs separate stability corrections for momentum and scalars, as in the
+   % full Monin-Obukhov scheme.
    %
    % --------------------------------------------------------------------------
    %
@@ -136,7 +137,7 @@ function diag = bulk_richardson_diagnostics(T_sfc, es_sfc, tair, wspd, ...
          'scalar_exchange_De_e',    0.0, ...
          'scalar_exchange_Qh',      H_h .* stability .* (tair - T_sfc), ...
          'scalar_exchange_Qe',      hv_atm .* (De_h .* epsilon ./ psfc) ...
-            .* stability .* (ea_atm - es_sfc));
+         .* stability .* (ea_atm - es_sfc));
       return
    end
 

@@ -100,6 +100,10 @@ function report = plot_spectral_variant_profiles(kwargs)
       "The lookup path is plotted against it because the inlined legacy ", ...
       "path is visually indistinguishable from the exact functions path."];
    clear cleanup
+
+   % Restore the caller's config last, after the synthetic workspace cleanup
+   % has already run against the configured test environment.
+   delete(suite_cleanup)
 end
 
 function profiles = buildProfiles(s)
@@ -161,7 +165,7 @@ function profiles = buildProfiles(s)
 end
 
 function exportTwoPanelPlot(z, exact, lookup, outfile, ttl, xlbl, ylbl, kwargs)
-   %EXPORTTWOPANELPLOT Plot functions and lookup profiles with a difference panel.
+   %EXPORTTWOPANELPLOT Plot functions and lookup profiles plus a difference.
 
    arguments
       z

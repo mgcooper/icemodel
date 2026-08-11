@@ -5,11 +5,11 @@ function filenames = locateKtransectFiles(source_dir, station)
    %     source_dir, "AWS9")
    %
    % Role
-   %  Shared cache-layout resolver for the PANGAEA.947483 annual files, used by
-   %  the Data builder and the importer preflight so both agree on what
-   %  "present in the cache" means. The extracted archive layout (datasets/)
-   %  is searched first, then flat and recursive fallbacks, mirroring the
-   %  fetch-status glob order.
+   %  Shared cache-layout resolver for the PANGAEA.947483 annual files. The
+   %  Data builder and the importer preflight both call it, so both agree on
+   %  what "present in the cache" means. The search order is the extracted
+   %  archive layout (datasets/) first, then the flat layout, then a recursive
+   %  search. This order matches the fetch-status glob order.
    %
    % See also: icemodel.forcing.buildKtransectData,
    %  icemodel.verification.setup.fetchKtransect

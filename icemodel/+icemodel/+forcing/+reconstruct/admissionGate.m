@@ -6,12 +6,11 @@ function gate = admissionGate(channel, metrics, baseline_rmse, kwargs)
    %
    % Role
    %  Method-admission decision for one channel and one metric row (gap-fill
-   %  policy): a method is admitted where, on held-out
-   %  draws, |bias| stays within the instrument-class cap, RMSE improves on
-   %  the best available baseline by at least the required margin, and no
-   %  physical-bound violation occurred. The engine consumes the emitted
-   %  admit/deny row per stratum; a denied stratum stays missing rather
-   %  than receiving a weaker fill.
+   %  policy). The gate admits a method when, on held-out draws, |bias| stays
+   %  within the instrument-class cap, RMSE improves on the best available
+   %  baseline by at least the required margin, and no physical-bound
+   %  violation occurred. The engine reads the admit/deny row per stratum. A
+   %  denied stratum stays missing, and takes no weaker fill.
    %
    % Inputs
    %  channel : canonical channel name (bias caps are per channel).
@@ -30,17 +29,17 @@ function gate = admissionGate(channel, metrics, baseline_rmse, kwargs)
    %     measurable spread. This prevents a low-RMSE mean/climatology
    %     estimate from winning by suppressing weather variability. Missing
    %     within-gap spread evidence is denied; proven zero spread is exempt.
-    %  min_coverage : minimum reconstructed fraction of the drawn samples
+   %  min_coverage : minimum reconstructed fraction of the drawn samples
    %     (default 0.10). This is a usefulness floor, not a completeness
    %     requirement: the orchestrator composes ordered methods and
    %     cascades uncovered leftovers to the next tier, so a method that
    %     skillfully covers part of a stratum (e.g. a donor whose record
    %     ends before the target's) is admitted for the samples it covers
-    %     — support-held coarse-cadence donors reach only fractional
-    %     coverage on a finer target axis while beating the climatology
-    %     baseline severalfold where they do cover.
-    %  metrics must contain finite provenance_accounting equal to one; an
-    %     absent accounting result is a failed gate, never an opt-out.
+   %     — support-held coarse-cadence donors reach only fractional
+   %     coverage on a finer target axis while beating the climatology
+   %     baseline severalfold where they do cover.
+   %  metrics must contain finite provenance_accounting equal to one; an
+   %     absent accounting result is a failed gate, never an opt-out.
    %
    % Returns
    %  gate : struct — admit (logical), reasons (string column, empty when
@@ -64,8 +63,8 @@ function gate = admissionGate(channel, metrics, baseline_rmse, kwargs)
    end
 
    bias_cap = biasCap(channel);
-   % Degenerate metric rows (NaN bias/rmse/coverage) must be denied, not
-   % silently admitted through NaN comparisons.
+   % Deny a degenerate metric row (NaN bias, rmse, or coverage). A NaN
+   % comparison is false, so such a row would otherwise pass every test.
    if ~isfinite(metrics.bias) || ~isfinite(metrics.coverage) || ...
          (~isfinite(metrics.rmse) && isfinite(baseline_rmse))
       gate = struct('admit', false, ...
@@ -107,13 +106,13 @@ function gate = admissionGate(channel, metrics, baseline_rmse, kwargs)
       reasons = [reasons; sprintf("coverage %.2f below %.2f", ...
          metrics.coverage, kwargs.min_coverage)];
    end
-    if ~ismember('provenance_accounting', metrics.Properties.VariableNames) ...
-          || ~isfinite(metrics.provenance_accounting)
-       reasons = [reasons; "provenance accounting unavailable"];
-    elseif metrics.provenance_accounting ~= 1
-       reasons = [reasons; sprintf( ...
-          "provenance accounting %.2f is not 1.00", ...
-          metrics.provenance_accounting)];
+   if ~ismember('provenance_accounting', metrics.Properties.VariableNames) ...
+         || ~isfinite(metrics.provenance_accounting)
+      reasons = [reasons; "provenance accounting unavailable"];
+   elseif metrics.provenance_accounting ~= 1
+      reasons = [reasons; sprintf( ...
+         "provenance accounting %.2f is not 1.00", ...
+         metrics.provenance_accounting)];
    end
    if ~ismember('within_gap_observed_spread', ...
          metrics.Properties.VariableNames) ...

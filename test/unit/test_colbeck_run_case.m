@@ -55,7 +55,7 @@ function test_numerical_matches_analytical_for_exp1_during_rain(testCase)
    def = icemodel.verification.colbeck.caseDefinition();
    rain_idx = (1:def.time.rain_window_s / def.time.dt_s).';
    diff = num.experiments.exp1.snow_liquid_water_storage_m(rain_idx) ...
-        - ana.experiments.exp1.snow_liquid_water_storage_m(rain_idx);
+      - ana.experiments.exp1.snow_liquid_water_storage_m(rain_idx);
    verifyLessThan(testCase, sqrt(mean(diff.^2)), 1e-3, ...
       'exp1 storage during rain RMSE > 1 mm');
 end

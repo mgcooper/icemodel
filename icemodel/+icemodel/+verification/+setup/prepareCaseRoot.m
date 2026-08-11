@@ -7,9 +7,10 @@ function write_artifacts = prepareCaseRoot( ...
    %
    % Inputs
    %  case_root   Folder where one case's setup artifacts are staged.
-   %  overwrite   When false, existing requested artifacts are additive no-ops.
-   %              When true, every requested artifact may be replaced and any
-   %              existing replacement is reported with a warning.
+   %  overwrite   When false, this function keeps an existing requested
+   %              artifact and adds only the missing ones. When true, it can
+   %              replace every requested artifact and it warns for each
+   %              replacement.
    %  artifacts   Relative filenames requested by the caller. Omit only for
    %              legacy folder-level checks.
    %  requested_case  Optional struct with the requested .period and, when
@@ -66,9 +67,9 @@ function write_artifacts = prepareCaseRoot( ...
       return
    end
 
-   % Legacy callers without explicit filenames get one folder-level decision:
-   % an empty folder needs a write, while an existing non-overwrite folder is a
-   % no-op instead of the former hard error.
+   % A legacy caller without explicit filenames gets one folder-level
+   % decision. An empty folder needs a write. A folder that exists without
+   % overwrite is a no-op and raises no error.
    files = dir(fullfile(case_root, '*'));
    names = string({files.name});
    names = names(~ismember(names, [".", ".."]));
@@ -92,9 +93,9 @@ function tf = fixedArtifactIdentityMatches(filename, requested_case)
    end
 
    % Verification observation bundles save one `targets` struct. Loading that
-   % staged variable may read its small payload but never reopens a raw source;
-   % metadata-free legacy artifacts remain unknown-compatible, while unreadable
-   % or malformed present targets require repair.
+   % staged variable can read its small payload, but it never reopens a raw
+   % source. A legacy artifact without metadata stays compatible. A present
+   % targets struct that is unreadable or malformed needs repair.
    candidate = struct();
    try
       saved = load(filename, 'targets');

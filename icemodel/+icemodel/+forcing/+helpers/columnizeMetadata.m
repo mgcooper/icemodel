@@ -3,10 +3,11 @@ function value = columnizeMetadata(value)
    %
    %  value = icemodel.forcing.helpers.columnizeMetadata(value)
    %
-   % Metadata saved into MAT files is usually inspected interactively. MATLAB
-   % displays Nx1 string/cell/numeric vectors more readably than 1xN rows, so
-   % this helper recursively turns single-row multi-element metadata vectors into
-   % columns while leaving char text and true matrices unchanged.
+   % Users inspect metadata saved into MAT files interactively. MATLAB displays
+   % Nx1 string, cell, and numeric vectors more readably than 1xN rows. This
+   % helper therefore turns each single-row multi-element metadata vector into a
+   % column. It works recursively and leaves char text and true matrices
+   % unchanged.
 
    if istimetable(value)
       return

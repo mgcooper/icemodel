@@ -43,7 +43,12 @@ function report = reportPromiceCoverage(coverage, requested, leg_windows)
       'promice', 'full record', stagedTag(leg_windows, 'promice', y0, y1), 'none');
 
    sources = icemodel.verification.namelists.rcmsources();
-   for m = sources
+   % One report row per catalog source, filled only for sources the coverage
+   % struct carries, then appended once so the line list never grows in place.
+   source_lines = strings(numel(sources), 1);
+   n_source_lines = 0;
+   for k = 1:numel(sources)
+      m = sources(k);
       if ~isfield(coverage, m)
          continue
       end
@@ -56,9 +61,13 @@ function report = reportPromiceCoverage(coverage, requested, leg_windows)
          miss = setdiff(requested_years, cov.years);
          missing = compactYears(miss);
       end
-      lines(end+1) = sprintf('%-8s %-14s %-22s %s', ...
-         m, disk, stagedTag(leg_windows, char(m), y0, y1), missing); %#ok<AGROW>
+      n_source_lines = n_source_lines + 1;
+      source_lines(n_source_lines) = sprintf('%-8s %-14s %-22s %s', ...
+         m, disk, stagedTag(leg_windows, char(m), y0, y1), missing);
    end
+   % The header lines above grew into a row, so reshape before appending the
+   % per-source column. strjoin reads either orientation identically.
+   lines = [reshape(lines, [], 1); source_lines(1:n_source_lines)];
 
    lines(end+1) = string(repmat('-', 1, 78));
    report = strjoin(lines, newline);
@@ -88,7 +97,10 @@ function s = compactYears(years)
       return
    end
    years = sort(reshape(years, 1, []));
-   parts = strings(0, 1);
+   % A year list holds at most one contiguous range per year, so size the
+   % parts list at the year count and trim to the runs actually closed.
+   parts = strings(numel(years), 1);
+   n_parts = 0;
    run_start = years(1);
    prev = years(1);
    for k = 2:numel(years)
@@ -96,12 +108,14 @@ function s = compactYears(years)
          prev = years(k);
          continue
       end
-      parts(end+1) = rangeTag(run_start, prev); %#ok<AGROW>
+      n_parts = n_parts + 1;
+      parts(n_parts) = rangeTag(run_start, prev);
       run_start = years(k);
       prev = years(k);
    end
-   parts(end+1) = rangeTag(run_start, prev);
-   s = strjoin(parts, ', ');
+   n_parts = n_parts + 1;
+   parts(n_parts) = rangeTag(run_start, prev);
+   s = strjoin(parts(1:n_parts), ', ');
 end
 
 function t = rangeTag(a, b)

@@ -1,8 +1,14 @@
 function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, output_file, simyear)
    %SNAPSHOTBASELINE Save a release snapshot from the rolling test baseline.
    %
-   %  baseline = icemodel.test.helpers.snapshotBaseline("perf", "v1.1", "skinmodel", true, string.empty(), 2016)
-   %  baseline = icemodel.test.helpers.snapshotBaseline("regression", "v1.1", "icemodel", true)
+   %  baseline = icemodel.test.helpers.snapshotBaseline( ...
+   %     "perf", "v1.1", "skinmodel", false, string.empty(), 2016)
+   %  baseline = icemodel.test.helpers.snapshotBaseline( ...
+   %     "regression", "v1.1", "icemodel", false)
+   %
+   % Existing release files are immutable. New snapshots also require the
+   % rolling source rows to match the forcing identity registered for the
+   % requested release tag.
 
    arguments
       kind (1, :) string {mustBeMember(kind, ["perf", "regression"])}
@@ -21,10 +27,6 @@ function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, ou
          baseline_tag=baseline_tag, simyear=simyear);
    end
 
-   if isfile(char(output_file)) && ~overwrite
-      error('release %s baseline already exists: %s', kind, char(output_file))
-   end
-
    % Copy from the current rolling baseline bundle, not from a rerun.
    source_file = icemodel.test.helpers.baselineFilePath(kind, ...
       smbmodel=smbmodel, simyear=simyear);
@@ -32,15 +34,14 @@ function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, ou
       error('rolling %s baseline is missing: %s', kind, char(source_file))
    end
 
-   % Rewrite the saved baseline metadata in-memory before saving the new
-   % release file.
+   % Select and validate the saved baseline before checking the target state.
+   % An out-of-date rolling source is then the first error the caller sees.
    S = load(char(source_file));
    switch kind
       case "perf"
          if ~isfield(S, 'PerfBaseline')
             error('rolling perf baseline file is malformed: %s', char(source_file))
          end
-         S.PerfBaseline = rewriteBaselineTag(S.PerfBaseline, baseline_tag);
          baseline = S.PerfBaseline;
 
       case "regression"
@@ -48,9 +49,21 @@ function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, ou
             error('rolling regression baseline file is malformed: %s', ...
                char(source_file))
          end
-         S.RegressionBaseline = rewriteBaselineTag( ...
-            S.RegressionBaseline, baseline_tag);
          baseline = S.RegressionBaseline;
+   end
+
+   icemodel.test.helpers.assertFormalBaselineForcing(baseline, "rolling");
+   icemodel.test.helpers.assertFormalBaselineForcing(baseline, baseline_tag);
+   icemodel.test.helpers.assertNewReleaseBaselineTarget( ...
+      output_file, overwrite);
+
+   % Rewrite the validated in-memory baseline before saving the new release.
+   baseline = rewriteBaselineTag(baseline, baseline_tag);
+   switch kind
+      case "perf"
+         S.PerfBaseline = baseline;
+      case "regression"
+         S.RegressionBaseline = baseline;
    end
 
    % Keep the managed benchmark timing bundle aligned with the snapshot.

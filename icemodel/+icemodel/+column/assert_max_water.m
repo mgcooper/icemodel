@@ -38,10 +38,10 @@ function tf = assert_max_water(f_ice, f_liq)
    %   d_liq_max = f_wat_max - f_liq_old
    %             = ro_ice / ro_liq - f_liq(iM)
    %
-   % Note that f_wat here equals ro_ice/ro_liq only because the melt-zone
-   % calculation preserves total water mass: f_wat does not change as ice
-   % melts, it is simply partitioned differently between f_ice and f_liq.
-   % The assertion checks the result of that partitioning.
+   % Here f_wat equals ro_ice/ro_liq only because the melt-zone calculation
+   % preserves total water mass. As ice melts, f_wat does not change. The
+   % model only partitions it differently between f_ice and f_liq. The
+   % assertion checks the result of that partitioning.
    %
    % Infiltration / snow
    % --------------------

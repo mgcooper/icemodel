@@ -7,7 +7,7 @@ function [T, mdfile] = firn_coverage_analysis(kwargs)
    %
    %  Builds a per-site COVERAGE TABLE for the firn/accumulation candidate set
    %  (PROMICE/GC-Net Accumulation-type sites + KAN_U) profiling each across the
-   %  dimensions a firn-model development effort cares about, then classifies
+   %  dimensions that firn-model development needs, then classifies
    %  each site into one or more firn-physics verification regimes and writes a
    %  markdown report. This is a USER-FACING analysis tool; its outputs (table +
    %  markdown + figures) go to this theme's gitignored
@@ -35,9 +35,10 @@ function [T, mdfile] = firn_coverage_analysis(kwargs)
    %   REGIME         firn-physics verification regime(s) the site can exercise:
    %                    (a) INFILTRATION  low/med-accum WITH melt  (percolation)
    %                    (b) AQUIFER       high-accum WITH melt (perennial water)
-   %                    (c) DRY_FIRN      high-accum LOW melt (densification/thermal)
+   %                    (c) DRY_FIRN      high-accum LOW melt
+   %                                      (densification/thermal)
    %
-   %  REGIME LOGIC (honest, surface-observable)
+   %  REGIME LOGIC (based on surface-observable evidence)
    %  -----------------------------------------
    %   The GC-Net accumulation transect is INTERIOR/high-elevation; it spans the
    %   cold-percolation and dry-firn regimes. The FIRN AQUIFER regime (Forster

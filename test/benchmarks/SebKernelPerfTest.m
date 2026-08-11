@@ -27,6 +27,7 @@ classdef SebKernelPerfTest < matlab.perftest.TestCase
       hv_atm
       ro_sfc
       snow_depth
+      z0_bulk
    end
 
    properties (TestParameter)
@@ -59,11 +60,11 @@ classdef SebKernelPerfTest < matlab.perftest.TestCase
          testCase.nu_air = 1.5e-5;
          testCase.hv_atm = testCase.ro_atm * Lv;
 
-         z0_bulk = 1e-3;
+         testCase.z0_bulk = 1e-3;
          z_tair = 3;
          [De_h, testCase.br_coefs] = ...
             icemodel.surface.turbulence.bulk_richardson.exchange_coefficients( ...
-            testCase.wspd, z0_bulk, z_tair);
+            testCase.wspd, testCase.z0_bulk, z_tair);
          testCase.H_h = testCase.cv_atm * De_h;
          De_e = De_h * epsilon / testCase.Pa;
          testCase.H_e = testCase.hv_atm * De_e;
@@ -86,7 +87,8 @@ classdef SebKernelPerfTest < matlab.perftest.TestCase
          % Benchmark only the solve_surface_energy_balance call for each
          % available root finder.
          opts_sv = struct('seb_solver', seb_solver, 'debug', false, ...
-            'turbulent_flux_scheme', 'bulk_richardson');
+            'turbulent_flux_scheme', 'bulk_richardson', ...
+            'z0_bulk', testCase.z0_bulk);
 
          [Ts, ok] = icemodel.surface.solve_surface_energy_balance( ...
             testCase.Ts0, testCase.Ta, testCase.Qsi, ...
@@ -133,12 +135,12 @@ function batch_size = sebBenchmarkBatchSize(seb_solver)
 
    switch seb_solver
       case 1
-         % The secant/newton variant stays quick enough that it still needs
-         % a large batch to stay above framework precision.
+         % The secant/newton variant is fast, so it needs a large batch to
+         % stay above framework clock precision.
          batch_size = 2048;
       case 2
-         % The constrained solve is similarly quick once the setup state is
-         % fixed, so batch it aggressively as well.
+         % The constrained solve is also fast once the setup state is fixed,
+         % so it uses the same large batch.
          batch_size = 2048;
       otherwise
          % The fallback solver is also fast relative to the framework
