@@ -1050,11 +1050,16 @@ end
 
 function variables = comparisonVariables(files)
    %COMPARISONVARIABLES Return staged comparison/eval axes.
-   variables = ["tsfc", "melt", "snowf_subl"];
-   for filename = reshape(string(files.profiles), 1, [])
-      variables(end + 1) = string(profileName(filename)); %#ok<AGROW>
+
+   % Name every staged profile axis first, because the profile count is known
+   % from the file list, then form the catalog in one concatenation.
+   profiles = reshape(string(files.profiles), 1, []);
+   profile_variables = strings(1, numel(profiles));
+   for k = 1:numel(profiles)
+      profile_variables(k) = string(profileName(profiles(k)));
    end
-   variables = unique(variables, 'stable');
+   variables = unique(["tsfc", "melt", "snowf_subl", profile_variables], ...
+      'stable');
 end
 
 function variables = modelOutputVariables(output_files)

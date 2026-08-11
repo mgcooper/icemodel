@@ -42,8 +42,11 @@ function [modis, metadata] = modisAlbedoChannel(modis_dir, years, location, meth
    % defines the requested artifact years recorded in metadata.
    modis = nan(numel(Time), 1);
    requested_years = unique(year(Time))';
-   coverage_years = zeros(1, 0);
    source_years = unique(reshape(years, 1, []), 'stable');
+   % Each source year contributes at most one covered year, so the coverage
+   % buffer is sized to the source list once and trimmed after the loop.
+   coverage_years = zeros(1, numel(source_years));
+   n_coverage = 0;
    for yyyy = source_years
       inyear = year(Time) == yyyy;
       if ~any(inyear)
@@ -76,8 +79,12 @@ function [modis, metadata] = modisAlbedoChannel(modis_dir, years, location, meth
             'on the target axis'], yyyy)
       end
       modis(inyear) = values;
-      coverage_years(end + 1) = yyyy; %#ok<AGROW>
+      n_coverage = n_coverage + 1;
+      coverage_years(n_coverage) = yyyy;
    end
+   % Drop the unused tail so no-coverage builds keep the 1-by-0 shape the
+   % provenance helper expects.
+   coverage_years = coverage_years(1:n_coverage);
 
    % Reuse the exact source matches above: provenance adds no directory scan or
    % NetCDF read beyond the physical channel construction.

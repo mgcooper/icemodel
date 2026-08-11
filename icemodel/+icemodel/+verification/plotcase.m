@@ -331,19 +331,27 @@ function [data, names] = profilePlotGroups(value, varname, label)
    end
 
    groups = icemodel.verification.helpers.profileGroups(value);
+   % One slot per group. A group without a profile for this variable stays
+   % unused, so both lists are trimmed to the plotted count after the loop.
+   data = cell(1, numel(groups));
+   names = strings(1, numel(groups));
+   n_plotted = 0;
    for n = 1:numel(groups)
       profile = profileTableForVariable(groups(n).data, varname);
       if isempty(profile)
          continue
       end
-      data{end+1} = profile; %#ok<AGROW>
+      n_plotted = n_plotted + 1;
+      data{n_plotted} = profile;
       if isnat(groups(n).datetime) || isscalar(groups)
-         names(end+1) = label; %#ok<AGROW>
+         names(n_plotted) = label;
       else
-         names(end+1) = label + " " ...
-            + string(groups(n).datetime, 'yyyy-MM-dd'); %#ok<AGROW>
+         names(n_plotted) = label + " " ...
+            + string(groups(n).datetime, 'yyyy-MM-dd');
       end
    end
+   data = data(1:n_plotted);
+   names = names(1:n_plotted);
 end
 
 function used = plotIntervalWithSharedHelper(ax, primary, secondary, varname, ...

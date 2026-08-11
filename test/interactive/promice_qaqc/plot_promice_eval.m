@@ -332,9 +332,11 @@ function row = sanityRow(site, Data, meta, tice_names, frequency)
    has_tice10m = ismember("tice10m", string(Data.Properties.VariableNames)) ...
       && any(isfinite(Data.tice10m));
    tv = [];
+   tv_blocks = cell(numel(have), 1);
    for k = 1:numel(have)
-      tv = [tv; colFinite(Data, have{k}) - 273.15]; %#ok<AGROW>
+      tv_blocks{k} = colFinite(Data, have{k}) - 273.15;
    end
+   tv = vertcat(tv, tv_blocks{:});
    if isempty(tv)
       ti_min = NaN; ti_max = NaN; ti_warm = NaN;
    else

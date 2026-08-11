@@ -201,8 +201,11 @@ end
 %% ------------------------------------------------------------------ site list
 function sites = readSiteList(csv)
    Tp = readtable(csv, "TextType", "string");
-   sites = struct("site", {}, "lat", {}, "lon", {}, "elev", {}, ...
-      "location_type", {}, "kind", {});
+   % Both catalogs contribute exactly one entry per input row, so each block is
+   % sized once and filled by index instead of grown one station at a time.
+   prototype = struct("site", "", "lat", NaN, "lon", NaN, "elev", NaN, ...
+      "location_type", "", "kind", "");
+   sites = repmat(prototype, 1, height(Tp));
    for n = 1:height(Tp)
       site = string(Tp.site_id(n));
       lat = todouble(Tp.latitude_installation(n));
@@ -228,13 +231,13 @@ function sites = readSiteList(csv)
          end
       end
 
-      sites(end+1) = struct( ...
+      sites(n) = struct( ...
          "site", site, ...
          "lat", lat, ...
          "lon", lon, ...
          "elev", elev, ...
          "location_type", lower(strtrim(string(Tp.location_type(n)))), ...
-         "kind", "promice"); %#ok<AGROW>
+         "kind", "promice");
    end
    % ESM-SnowMIP sites: permafrost descriptor only (off-ice land surfaces).
    smip = icemodel.verification.setup.esmSnowmipSiteCatalog();
@@ -243,13 +246,15 @@ function sites = readSiteList(csv)
       "ojp",[53.916 -104.692], "rme",[43.064 -116.755], "sap",[43.08 141.34], ...
       "snb",[37.907 -107.726], "sod",[67.362 26.633], "swa",[37.907 -107.711], ...
       "wfj",[46.83 9.81]);
+   smip_sites = repmat(prototype, 1, numel(smip));
    for n = 1:numel(smip)
       sc = char(smip(n).sitename);
       ll = coords.(sc);
-      sites(end+1) = struct("site", upper(string(sc)), "lat", ll(1), ...
+      smip_sites(n) = struct("site", upper(string(sc)), "lat", ll(1), ...
          "lon", ll(2), "elev", NaN, "location_type", "snowmip_land", ...
-         "kind", "snowmip"); %#ok<AGROW>
+         "kind", "snowmip");
    end
+   sites = [sites, smip_sites];
 end
 
 function [lat, lon, elev] = ncCoords(site)

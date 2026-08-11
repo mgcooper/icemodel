@@ -15,14 +15,19 @@ function [tf, reason, complete_windows] = metForcingReady(met)
 
    required = icemodel.forcing.helpers.metvariables();
    names = string(met.Properties.VariableNames);
-   missing = strings(0, 1);
+   % Every required channel reports at most one missing-channel name, so the
+   % name buffer is sized to the requirement list once and trimmed to the
+   % realized count after the loop.
+   missing = strings(numel(required), 1);
+   n_missing = 0;
    row_complete = true(height(met), 1);
 
    % Intersect per-row finite support while retaining channel names for the
    % actionable readiness reason.
    for v = reshape(required, 1, [])
       if ~ismember(v, names)
-         missing(end + 1, 1) = v; %#ok<AGROW>
+         n_missing = n_missing + 1;
+         missing(n_missing) = v;
          row_complete(:) = false;
          continue
       end
@@ -32,9 +37,13 @@ function [tf, reason, complete_windows] = metForcingReady(met)
       channel_complete = all(isfinite(met.(char(v))), 2);
       row_complete = row_complete & channel_complete;
       if ~all(channel_complete)
-         missing(end + 1, 1) = v; %#ok<AGROW>
+         n_missing = n_missing + 1;
+         missing(n_missing) = v;
       end
    end
+   % Drop the unused tail so an empty result keeps the strings(0, 1) shape the
+   % readiness reason below relies on.
+   missing = missing(1:n_missing);
 
    % Split finite runs at omitted, duplicate, reversed, or off-cadence row
    % times. A gap in the coordinate is as non-runnable as an explicit NaN row.

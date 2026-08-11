@@ -13,6 +13,6 @@ function list = completions()
    % selector functions are added.
    files = dir(fullfile(icemodel.internal.fullpath('icemodel'), ...
       '+icemodel', '+verification', '+namelists', '*.m'));
-   names = string(erase({files.name}, '.m'))';
-   list = sort(names); %#ok<TRSRT>
+   names = string(erase({files.name}, '.m'));
+   list = sort(names)';
 end

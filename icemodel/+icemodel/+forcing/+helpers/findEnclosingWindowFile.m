@@ -1,5 +1,7 @@
-function name = findEnclosingWindowFile(directory, prefix, suffix, qstart, qend, kwargs)
-   %FINDENCLOSINGWINDOWFILE Name of a staged window file bracketing a query span.
+function name = findEnclosingWindowFile( ...
+      directory, prefix, suffix, qstart, qend, kwargs)
+   %FINDENCLOSINGWINDOWFILE Name of a staged window file bracketing a query
+   %span.
    %
    %  name = icemodel.forcing.helpers.findEnclosingWindowFile(DIRECTORY, ...
    %     PREFIX, SUFFIX, QSTART, QEND)

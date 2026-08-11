@@ -57,8 +57,8 @@ function test_loadBaseline_regression_normalizes_legacy_schema(testCase)
 
    filepath = [tempname '.mat'];
    cleanup = onCleanup(@() deleteIfExists(filepath));
-   legacy_time = datenum(datetime(2026, 3, 9, 4, 15, 39, ...
-      'TimeZone', 'UTC')); %#ok<DATNM>
+   legacy_time = convertTo(datetime(2026, 3, 9, 4, 15, 39, ...
+      'TimeZone', 'UTC'), 'datenum');
 
    baseline = table( ...
       "smoke_icemodel_kanm_2016_bc2", ...
@@ -1014,7 +1014,9 @@ function verifyRunnerBootstrap(testCase, baseline, data_root)
 end
 
 function verifyFixtureCapabilityError(testCase, operation, data_root)
-   %VERIFYFIXTURECAPABILITYERROR Check the repair path works without network access.
+   %VERIFYFIXTURECAPABILITYERROR Check the repair path works without network
+   % access.
+
    try
       operation();
       testCase.verifyFail('expected incomplete frozen fixture capability');

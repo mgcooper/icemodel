@@ -1,5 +1,6 @@
 function [al, bl, cl, ai, bi, ci] = initialize_vapor_model()
-   %initialize_vapor_model Initialize Ambaum (2020) Rankine-Kirchhoff vapor coefficients.
+   %INITIALIZE_VAPOR_MODEL Initialize Ambaum (2020) Rankine-Kirchhoff vapor
+   % coefficients.
    %
    %  [AL, BL, CL, AI, BI, CI] = icemodel.vapor.initialize_vapor_model() computes
    %  the Rankine-Kirchhoff

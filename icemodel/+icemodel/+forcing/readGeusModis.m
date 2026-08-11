@@ -1,4 +1,5 @@
-function [albedo, Time, selection] = readGeusModis(filename, location, method, kwargs)
+function [albedo, Time, selection] = readGeusModis( ...
+      filename, location, method, kwargs)
    %READGEUSMODIS Read the GEUS MODIS daily albedo at points or a polygon.
    %
    %  [albedo, Time] = icemodel.forcing.readGeusModis(filename, [lat lon])

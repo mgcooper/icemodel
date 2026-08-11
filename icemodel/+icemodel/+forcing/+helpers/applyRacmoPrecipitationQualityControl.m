@@ -1,4 +1,5 @@
-function [Data, metadata] = applyRacmoPrecipitationQualityControl(Data, prior_metadata)
+function [Data, metadata] = applyRacmoPrecipitationQualityControl( ...
+      Data, prior_metadata)
    %APPLYRACMOPRECIPITATIONQUALITYCONTROL Enforce nonnegative RACMO ppt.
    %
    %  [Data, metadata] = ... applyRacmoPrecipitationQualityControl(Data)

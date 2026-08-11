@@ -1071,12 +1071,13 @@ function test_fill_station_writes_canonical_artifacts(testCase)
     % the MAR last-resort tier has filled it.
     testCase.verifyFalse(any(string(result.audit.method) == "unfilled" ...
        & string(result.audit.channel) == "tair"));
-    plan_ids = strings(0, 1);
+   % One context-id block per planned channel, stacked once after the loop.
+   plan_id_blocks = cell(numel(result.plan.channels), 1);
     for c = 1:numel(result.plan.channels)
-       method_ids = string( ...
+      plan_id_blocks{c} = string( ...
           {result.plan.channels(c).methods.audit_context_id}).';
-       plan_ids = [plan_ids; method_ids]; %#ok<AGROW>
     end
+   plan_ids = vertcat(strings(0, 1), plan_id_blocks{:});
     used_plan_context = startsWith(string(result.audit.context_id), ...
        string(result.audit.channel) + ":candidate-");
     testCase.verifyTrue(all(ismember( ...
@@ -1091,13 +1092,15 @@ function test_fill_station_writes_canonical_artifacts(testCase)
        numel(unique(string(result.audit.context_id))));
     testCase.verifyTrue(all(ismember(string(result.audit.context_id), ...
        string(result.plan.audit_contexts.context_id))));
-    % The caller's extreme overlap requirement reaches the planner: no
-    % donor transfer may survive by reverting to defaults.
-    names = strings(0, 1);
+   % The caller's extreme overlap requirement reaches the planner: no donor
+   % transfer may survive by reverting to defaults. One method-name block per
+   % planned channel, stacked once after the loop.
+   name_blocks = cell(numel(result.plan.channels), 1);
     for c = 1:numel(result.plan.channels)
-       names = [names; ...
-          string({result.plan.channels(c).methods.name}).']; %#ok<AGROW>
+      name_blocks{c} = ...
+         string({result.plan.channels(c).methods.name}).';
     end
+   names = vertcat(strings(0, 1), name_blocks{:});
     testCase.verifyFalse(any(startsWith(names, "donor:")));
    % Native samples are byte-identical to the input where observed.
    native = load(fullfile(root, 'met', 'promice', ...
@@ -4289,13 +4292,13 @@ end
 
 function [target, donor] = syntheticPair(dlat, delev)
    %SYNTHETICPAIR In-memory target/donor structs with correlated channels.
-   % Both carry seeded gaps so either can play the target role (a gapless
-   % target correctly admits nothing - there is nothing to validate), and
-   % both share a seeded weather anomaly: without irreducible day-to-day
-   % variability, climatology reproduces a deterministic fixture exactly
-   % and no donor could ever clear the improvement gate.
-   % Three fixture years keep the one-year fitting-overlap requirement off
-   % the threshold edge for every split seed.
+   % Both carry seeded gaps so either can play the target role (a gapless target
+   % correctly admits nothing - there is nothing to validate), and both share a
+   % seeded weather anomaly: without irreducible day-to-day variability,
+   % climatology reproduces a deterministic fixture exactly and no donor could
+   % ever clear the improvement gate. Three fixture years keep the one-year
+   % fitting-overlap requirement off the threshold edge for every split seed.
+
    anomaly = weatherAnomaly();
    target = struct('series', syntheticMet(0, true, anomaly, 2019, 3), ...
       'station', "tsta", ...
@@ -4484,10 +4487,11 @@ end
 
 function recordFamilyMetPathIdentity(site, family, filename)
    %RECORDFAMILYMETPATHIDENTITY Pin one staged path in a family manifest.
-   % Mirrors the production non-promice manifests (e.g. data/eval/imau):
-   % the colocation.<family> leg pins the met_files path without per-file
-   % hashes, exercising the legacy path-identity branch of
-   % verifyNativeMetIdentity (bead icemodel-g1n.49).
+   % Mirrors the production non-promice manifests (e.g. data/eval/imau): the
+   % colocation.<family> leg pins the met_files path without per-file hashes,
+   % exercising the legacy path-identity branch of verifyNativeMetIdentity (bead
+   % icemodel-g1n.49).
+
    [met_dir, stem, ext] = fileparts(filename);
    data_root = ...
       icemodel.forcing.reconstruct.selectedDataRoot(string(met_dir));
@@ -4744,7 +4748,8 @@ function recordNativeMetIdentity(~, site, filename)
 end
 
 function writeJsonFixture(filename, value)
-   %WRITEJSONFIXTURE Write one compact JSON fixture with guaranteed closure.
+   %WRITEJSONFIXTURE Write one compact JSON fixture that always closes.
+
    fid = fopen(filename, 'w');
    cleaner = onCleanup(@() fclose(fid));
    fprintf(fid, '%s', jsonencode(value));

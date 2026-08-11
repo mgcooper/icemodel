@@ -64,12 +64,14 @@ function [window, proxy_files] = acceptanceWindow(site, kwargs)
    % window; a stale or mislabeled narrow file is just as unsafe as the widest.
     catalog = kwargs.opts.proxy_catalog;
     window = NaT(1, 2, 'TimeZone', 'UTC');
-    sample_coverage = NaT(0, 2, 'TimeZone', 'UTC');
-    % Per-source selections collect in cells because one source may pin
-    % several files: the widest plus any span extenders (POLICY A6 —
-    % staged met must widen the product, never silently shrink it).
+   % Per-source selections collect in cells because one source can pin
+   % several files: the widest file plus any span extenders (POLICY A6 -
+   % staged met must widen the product, never shrink it).
     source_files = cell(numel(catalog), 1);
     source_sample_coverage = cell(numel(catalog), 1);
+   % The staged-inventory coverage collects per source in the same way, so
+   % the union concatenates once after the catalog loop.
+   staged_sample_coverage = cell(numel(catalog), 1);
     for k = 1:numel(catalog)
        hits = [];
         for d = icemodel.forcing.helpers.sourceSearchDirs( ...
@@ -129,8 +131,10 @@ function [window, proxy_files] = acceptanceWindow(site, kwargs)
          end
          valid_hit(h) = true;
          hit_sample_windows(h, :) = proxy_times([1, end]);
-         sample_coverage(end + 1, :) = proxy_times([1, end]); %#ok<AGROW>
         end
+      % Every validated file of this source counts toward the staged
+      % inventory, whether or not the selection below picks it.
+      staged_sample_coverage{k} = hit_sample_windows(valid_hit, :);
         if any(valid_hit)
            % The widest file anchors the source; validated siblings that
            % extend coverage beyond it join the selection so a staged
@@ -160,6 +164,8 @@ function [window, proxy_files] = acceptanceWindow(site, kwargs)
         source_files{:}), 'stable');
      selected_sample_coverage = vertcat( ...
         NaT(0, 2, 'TimeZone', 'UTC'), source_sample_coverage{:});
+   sample_coverage = vertcat( ...
+      NaT(0, 2, 'TimeZone', 'UTC'), staged_sample_coverage{:});
     if isempty(sample_coverage)
        return
     end

@@ -176,6 +176,13 @@ function validate_test_suite(kwargs)
 
    disp('VALIDATION_OK');
 
+   % Remove the scratch outputs before restoring the caller's config, because
+   % cleanupTemp resolves its paths through the configured test environment.
+   % An early error still runs both, because MATLAB deletes the cleanup
+   % objects when the scope ends.
+   delete(cleanup)
+   delete(suite_cleanup)
+
    function runCase(name, fh)
       %RUNCASE Execute one validation case and retain any failure report.
 

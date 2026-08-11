@@ -1,4 +1,5 @@
-function pathlist = getpath(pathtype, sitename, smbmodel, userdata, simyears, varargin)
+function pathlist = getpath( ...
+      pathtype, sitename, smbmodel, userdata, simyears, varargin)
    %GETPATH Return canonical icemodel data and run paths.
    %
    %  pathlist = icemodel.getpath('data')

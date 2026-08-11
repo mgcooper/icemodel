@@ -268,12 +268,17 @@ end
 
 function time = yearGrid(years, step)
    %YEARGRID Concatenate exact UTC calendar grids for adjacent fixture years.
-   time = NaT(0, 1, 'TimeZone', 'UTC');
-   for y = reshape(years, 1, [])
-      first = datetime(y, 1, 1, 'TimeZone', 'UTC');
-      last = datetime(y + 1, 1, 1, 'TimeZone', 'UTC') - step;
-      time = [time; (first:step:last)']; %#ok<AGROW>
+
+   % Build each year's grid in its own slot, because the yearly lengths
+   % differ, then concatenate the calendar once after the loop.
+   grid_years = reshape(years, 1, []);
+   year_grids = cell(numel(grid_years), 1);
+   for k = 1:numel(grid_years)
+      first = datetime(grid_years(k), 1, 1, 'TimeZone', 'UTC');
+      last = datetime(grid_years(k) + 1, 1, 1, 'TimeZone', 'UTC') - step;
+      year_grids{k} = (first:step:last)';
    end
+   time = vertcat(NaT(0, 1, 'TimeZone', 'UTC'), year_grids{:});
 end
 
 function saveMet(pathname, value)

@@ -50,8 +50,10 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          baseline_tag = testCase.caseinfo.baseline_tag;
 
          % Accumulate the compare report and resolved opts for one saved
-         % artifact per regression run.
-         report_rows = struct([]);
+         % artifact per regression run. One row slot per formal case, filled in
+         % run order and concatenated once after the loop, so the report array
+         % is never rebuilt per case.
+         case_rows = cell(height(cases), 1);
          case_opts = struct([]);
          r = 0;
 
@@ -123,7 +125,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
             % Build the report row with case identity, current metrics,
             % baseline values, and computed deltas.
-            row = struct(); %#ok<*AGROW>
+            row = struct();
             row.case_id = string(c.case_id);
             row.tier = string(c.tier);
             row.baseline_tag = string(baseline_tag);
@@ -148,15 +150,16 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
                   S.(delta_specs{i, 1}), base.(delta_specs{i, 1}));
             end
             row.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
-            report_rows = vertcat(report_rows, row);
 
             r = r + 1;
 
+            case_rows{r} = row;
             case_opts(r).case_id = string(c.case_id);
             case_opts(r).case = table2struct(c);
             case_opts(r).opts = opts;
          end
 
+         report_rows = vertcat(struct([]), case_rows{1:r});
          report = struct2table(report_rows);
          meta = IcemodelRegressionTest.reportMeta(testCase.caseinfo);
 
@@ -254,10 +257,10 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
    methods (Static, Access = private)
       function s = getenvRequired(name)
-         %GETENVREQUIRED Read one required regression env var or error cleanly.
-         %
-         % The test bootstrap installs config paths, but the runner still
-         % owns the concrete ICEMODEL_TEST_* selectors for one compare run.
+         %GETENVREQUIRED Read one required regression env var, or raise an
+         % error. The test bootstrap installs the config paths. The runner sets
+         % the concrete ICEMODEL_TEST_* selectors for one compare run.
+
          s = getenv(name);
          if isempty(s)
             error('missing required regression env var: %s', name)

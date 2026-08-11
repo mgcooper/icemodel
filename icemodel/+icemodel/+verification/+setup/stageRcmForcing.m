@@ -130,7 +130,9 @@ end
 
 %% Explicit mode
 function modis_dir = defaultModisDir(modis_dir)
-   %DEFAULTMODISDIR Use the standard GEUS MODIS cache when the caller is silent.
+   %DEFAULTMODISDIR Use the standard GEUS MODIS cache when the caller passes
+   % no directory.
+
    if modis_dir ~= ""
       return
    end
@@ -389,8 +391,9 @@ function co = writeRcmLeg(src, d, alias, kind, L, point, kwargs, existing)
    %WRITERCMLEG Write one point's staged leg + build its colocation record.
    % MAR/MERRA write BOTH the full Data (userdata) AND the met (data2met); RACMO
    % writes Data only. Existing files are reused only when they cover the full
-   % requested leg; partial files remain on disk while a wider artifact is built.
-   % Every staged leg carries staged==true.
+   % requested leg; partial files remain on disk while a wider artifact is
+   % built. Every staged leg carries staged==true.
+
    if nargin < 8
       existing = emptyExistingFiles;
    end
@@ -843,26 +846,37 @@ end
 function records = findExistingWindowRecords( ...
       base, source, prefix, suffix, t1, t2)
    %FINDEXISTINGWINDOWRECORDS Staged files whose encoded windows overlap T1-T2.
-   records = emptyWindowRecord;
-   records = records([]);
-   for d = icemodel.forcing.helpers.sourceSearchDirs(base, source)
-      folder = string(d{1});
+   empty_records = emptyWindowRecord;
+   empty_records = empty_records([]);
+
+   % One record block per search directory, each sized to that directory's
+   % listing and trimmed to the overlapping files, so the record array is
+   % concatenated once instead of reallocated per matched file.
+   search_dirs = icemodel.forcing.helpers.sourceSearchDirs(base, source);
+   blocks = repmat({empty_records}, numel(search_dirs), 1);
+   for d = 1:numel(search_dirs)
+      folder = string(search_dirs{d});
       if ~isfolder(folder)
          continue
       end
       listing = dir(fullfile(folder, char(string(prefix) + "_*_*" ...
          + string(suffix))));
+      block = repmat(emptyWindowRecord, numel(listing), 1);
+      n_block = 0;
       for k = 1:numel(listing)
          [ok, candidate_start, candidate_end] = parseWindowFilename( ...
             listing(k).name, prefix, suffix);
          if ~ok || ~windowsOverlap(candidate_start, candidate_end, t1, t2)
             continue
          end
-         records(end + 1, 1) = struct( ...
+         n_block = n_block + 1;
+         block(n_block) = struct( ...
             'filename', string(fullfile(listing(k).folder, listing(k).name)), ...
-            'start', candidate_start, 'end', candidate_end); %#ok<AGROW>
+            'start', candidate_start, 'end', candidate_end);
       end
+      blocks{d} = block(1:n_block);
    end
+   records = vertcat(empty_records, blocks{:});
 end
 
 function record = emptyWindowRecord()
@@ -1203,7 +1217,9 @@ function kwargs = inferManifestModeOutputDirs(kwargs, manifest_file)
 end
 
 function outdir = userdataOutdir(kwargs)
-   %USERDATAOUTDIR Match writeuserdata's default output root when callers omit it.
+   %USERDATAOUTDIR Match writeuserdata's default output root when callers omit
+   % it.
+
    [~, outdir] = icemodel.verification.setup.rcmArtifactOutputDirs( ...
       kwargs.met_outdir, kwargs.userdata_outdir);
 end
@@ -1243,7 +1259,9 @@ function leg = skippedLeg(kind, reason)
 end
 
 function tt = windowSubset(tt, t1, t2)
-   %WINDOWSUBSET Clamp a timetable to [t1, t2] on a UTC-aware axis (no-op blank).
+   %WINDOWSUBSET Clamp a timetable to [t1, t2] on a UTC-aware axis (no-op
+   % blank).
+
    if isnat(t1) || isnat(t2)
       return
    end

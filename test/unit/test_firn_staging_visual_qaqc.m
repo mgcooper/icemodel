@@ -925,17 +925,19 @@ function test_shared_figures_use_one_column_and_deduplicated_sources(testCase)
    testCase.verifyNumElements(downwelling_ax, 1);
    drawnow limitrate nocallbacks
    axes_pixels = getpixelposition(downwelling_ax, true);
-   downwelling_legend = gobjects(0, 1);
-   for lgd = reshape(met_legends, 1, [])
-      legend_pixels = getpixelposition(lgd, true);
+   % Mark the legends centred over the tile, then select them in one step, so
+   % the handle list is never grown one legend at a time.
+   all_legends = reshape(met_legends, [], 1);
+   over_downwelling = false(numel(all_legends), 1);
+   for k = 1:numel(all_legends)
+      legend_pixels = getpixelposition(all_legends(k), true);
       legend_center = legend_pixels(1:2) + legend_pixels(3:4) / 2;
-      if legend_center(1) >= axes_pixels(1) ...
-            && legend_center(1) <= axes_pixels(1) + axes_pixels(3) ...
-            && legend_center(2) >= axes_pixels(2) ...
-            && legend_center(2) <= axes_pixels(2) + axes_pixels(4)
-         downwelling_legend(end + 1, 1) = lgd; %#ok<AGROW>
-      end
+      over_downwelling(k) = legend_center(1) >= axes_pixels(1) ...
+         && legend_center(1) <= axes_pixels(1) + axes_pixels(3) ...
+         && legend_center(2) >= axes_pixels(2) ...
+         && legend_center(2) <= axes_pixels(2) + axes_pixels(4);
    end
+   downwelling_legend = all_legends(over_downwelling);
    testCase.verifyNumElements(downwelling_legend, 1);
    legend_pixels = getpixelposition(downwelling_legend, true);
    legend_bottom = (legend_pixels(2) - axes_pixels(2)) / axes_pixels(4);

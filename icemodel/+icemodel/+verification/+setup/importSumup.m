@@ -505,7 +505,9 @@ end
 function [t1, t2] = forcingWindow(window_start, window_end, years)
    %FORCINGWINDOW Resolve the co-located RCM forcing window for the SUMup legs.
    % The explicit comparison window wins; else the kwargs.years span; else
-   % unbounded (NaT -> each source's full on-disk coverage in resolveLegWindows).
+   % unbounded (NaT -> each source's full on-disk coverage in
+   % resolveLegWindows).
+
    if ~isnat(window_start) && ~isnat(window_end)
       t1 = window_start;
       t2 = window_end;
@@ -637,12 +639,16 @@ function rows = uniqueLocationRows(lat, lon)
       keys(k) = sprintf("%.3f:%.3f", lat(k), lon(k));
    end
 
-   seen = strings(1, 0);
+   % At most one anchor per input row survives, so the seen-key buffer is sized
+   % to the key list once and only its filled prefix is searched.
+   seen = strings(1, numel(keys));
+   n_seen = 0;
    rows = false(1, numel(keys));
    for k = 1:numel(keys)
-      if ~ismember(keys(k), seen)
+      if ~ismember(keys(k), seen(1:n_seen))
          rows(k) = true;
-         seen(end + 1) = keys(k); %#ok<AGROW>
+         n_seen = n_seen + 1;
+         seen(n_seen) = keys(k);
       end
    end
 end

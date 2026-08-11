@@ -865,6 +865,10 @@ function [filled, provenance, audit] = closeResidualShortGaps( ...
    native_names = string(native.Properties.VariableNames);
    channels = intersect(opts.interp_channels, names, 'stable');
    times = filled.Properties.RowTimes;
+   % One audit block per adopting channel, buffered against the channel list
+   % and appended to the ledger once so the table is not rebuilt per channel.
+   audit_blocks = repmat({audit([], :)}, 1, numel(channels));
+   n_blocks = 0;
    for channel = channels
       x = filled.(channel);
       if all(isfinite(x))
@@ -907,13 +911,15 @@ function [filled, provenance, audit] = closeResidualShortGaps( ...
       provenance.(channel) = code;
       % Method identities stay exact; the detail distinguishes this
       % post-final application from the initial composition tiers.
-      rows = [rows; twilight_rows]; %#ok<AGROW>
-      for r = 1:numel(rows)
-         rows{r}{6} = ['post-final residual; ' rows{r}{6}];
+      adopted_rows = [rows; twilight_rows];
+      for r = 1:numel(adopted_rows)
+         adopted_rows{r}{6} = ['post-final residual; ' adopted_rows{r}{6}];
       end
-      audit = [audit; cell2table(vertcat(rows{:}), ...
-         'VariableNames', audit.Properties.VariableNames)]; %#ok<AGROW>
+      n_blocks = n_blocks + 1;
+      audit_blocks{n_blocks} = cell2table(vertcat(adopted_rows{:}), ...
+         'VariableNames', audit.Properties.VariableNames);
    end
+   audit = vertcat(audit, audit_blocks{1:n_blocks});
 end
 
 function audit = reconcileUnfilledAudit(audit, filled, denials)
@@ -930,7 +936,9 @@ function audit = reconcileUnfilledAudit(audit, filled, denials)
    provisional = audit(is_unfilled, :);
    audit = audit(~is_unfilled, :);
    times = filled.Properties.RowTimes;
-   rows = {};
+   % One residual-segment block per provisional row, buffered against the
+   % provisional ledger and stacked once after the loop.
+   row_blocks = repmat({cell(0, 1)}, height(provisional), 1);
    for r = 1:height(provisional)
       channel = string(provisional.channel{r});
       if ~ismember(channel, string(filled.Properties.VariableNames))
@@ -958,8 +966,9 @@ function audit = reconcileUnfilledAudit(audit, filled, denials)
       segment_rows = icemodel.forcing.reconstruct.auditSegments( ...
          times, residual, channel, "unfilled", detail, ...
          context_id=string(provisional.context_id{r}));
-      rows = [rows; segment_rows]; %#ok<AGROW>
+      row_blocks{r} = segment_rows;
    end
+   rows = vertcat(cell(0, 1), row_blocks{:});
    if ~isempty(rows)
       audit = [audit; cell2table(vertcat(rows{:}), ...
          'VariableNames', audit.Properties.VariableNames)];
@@ -2116,6 +2125,9 @@ function [filled, provenance, audit] = adoptPrecip(filled, provenance, ...
     edge = diff([false; ~isfinite(ppt); false]);
     starts = find(edge == 1);
     stops = find(edge == -1) - 1;
+   % One adoption block per outage, buffered against the outage list and
+   % stacked once after the scan.
+   gap_row_blocks = repmat({cell(0, 1)}, numel(starts), 1);
     for g = 1:numel(starts)
        idx = (starts(g):stops(g)).';
        chosen = 0;
@@ -2194,9 +2206,11 @@ function [filled, provenance, audit] = adoptPrecip(filled, provenance, ...
        snow_code(idx(derived_snow)) = source_code;
 
        % Every filled precipitation channel gets contiguous audit rows.
-       for item = {["ppt", "total"], ["rainf", "derived rain"], ...
-             ["snowf", "derived snow"]}
-          pair = item{1};
+      adoption_items = {["ppt", "total"], ["rainf", "derived rain"], ...
+         ["snowf", "derived snow"]};
+      item_blocks = repmat({cell(0, 1)}, 1, numel(adoption_items));
+      for it = 1:numel(adoption_items)
+         pair = adoption_items{it};
           local_mask = chosen_mask;
           if pair(1) == "rainf"
              local_mask = derived_rain;
@@ -2209,9 +2223,11 @@ function [filled, provenance, audit] = adoptPrecip(filled, provenance, ...
               times, mask, pair(1), ...
               "proxy:" + proxies(chosen).name + ":precip_adoption", ...
               pair(2) + string(seam_note));
-          rows = [rows; segment_rows]; %#ok<AGROW>
+         item_blocks{it} = segment_rows;
        end
+      gap_row_blocks{g} = vertcat(cell(0, 1), item_blocks{:});
     end
+   rows = vertcat(rows, gap_row_blocks{:});
 
     filled.ppt = ppt;
     filled.rainf = rain;
@@ -2223,19 +2239,22 @@ function [filled, provenance, audit] = adoptPrecip(filled, provenance, ...
     % shipped missing values and the final report must explain every one.
     % Record the post-adoption state directly because precipitation never
     % enters the statistically planned provisional-unfilled ledger.
-    for item = { ...
-          ["ppt", "no valid staged proxy total precipitation value"], ...
-          ["rainf", "source rain phase unavailable; runtime phase option required"], ...
-          ["snowf", "source snow phase unavailable; runtime phase option required"]}
-       pair = item{1};
+   unfilled_items = { ...
+      ["ppt", "no valid staged proxy total precipitation value"], ...
+      ["rainf", "source rain phase unavailable; runtime phase option required"], ...
+      ["snowf", "source snow phase unavailable; runtime phase option required"]};
+   unfilled_blocks = repmat({cell(0, 1)}, 1, numel(unfilled_items));
+   for it = 1:numel(unfilled_items)
+      pair = unfilled_items{it};
        name = pair(1);
        values = filled.(name);
        missing = ~isfinite(values);
        segment_rows = icemodel.forcing.reconstruct.auditSegments( ...
           times, missing, name, "unfilled", ...
           "final tier: " + pair(2), context_id="precip_adoption");
-       rows = [rows; segment_rows]; %#ok<AGROW>
+      unfilled_blocks{it} = segment_rows;
     end
+   rows = vertcat(rows, unfilled_blocks{:});
     if ~isempty(rows)
        audit = [audit; cell2table(vertcat(rows{:}), ...
           'VariableNames', audit.Properties.VariableNames)];
@@ -2879,11 +2898,13 @@ function records = auditContextRecords(plan, audit)
    record_type = repmat("runtime_policy", numel(context_id), 1);
    channels = strings(numel(context_id), 1);
    n_segments = zeros(numel(context_id), 1);
-   candidate_ids = strings(0, 1);
+   % One context-id block per planned channel, stacked once after the loop.
+   candidate_blocks = cell(numel(plan.channels), 1);
    for c = 1:numel(plan.channels)
-      candidate_ids = [candidate_ids; string( ...
-         {plan.channels(c).methods.audit_context_id}).']; %#ok<AGROW>
+      candidate_blocks{c} = string( ...
+         {plan.channels(c).methods.audit_context_id}).';
    end
+   candidate_ids = vertcat(strings(0, 1), candidate_blocks{:});
    fixed_ids = string({plan.fixed_methods.audit_context_id}).';
    for k = 1:numel(context_id)
       rows = string(audit.context_id) == context_id(k);
@@ -2908,9 +2929,10 @@ function records = auditContextRecords(plan, audit)
 end
 
 function donor_sites = inventoryDonors(data_root, site, opts, donor_families)
-   %INVENTORYDONORS Geometry-plausible donor-family neighbors from the
-   % inventory. The registry records each neighbor's family; only members
-   % of the caller's donor family set are admitted (bead icemodel-g1n.49).
+   %INVENTORYDONORS Geometry-plausible neighbors from the donor inventory.
+   % The registry records each neighbor's family. Only members of the
+   % caller's donor family set are admitted (bead icemodel-g1n.49).
+
    donor_sites = strings(1, 0);
    inventory_file = fullfile(data_root, 'preview', 'qa', 'gapfill', ...
       'site_inventory.json');

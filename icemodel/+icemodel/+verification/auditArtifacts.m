@@ -57,18 +57,26 @@ function report = auditArtifacts(kwargs)
    % entire multi-family audit.
    manifest_files = icemodel.verification.helpers.familyManifestFiles( ...
       evaluation_data_root=eval_root);
-   families = selectedFamilies(kwargs.families, manifest_files);
-   artifacts = repmat(emptyArtifact(), 0, 1);
-   channels = repmat(emptyChannel(), 0, 1);
-   findings = repmat(emptyFinding(), 0, 1);
+   families = reshape(selectedFamilies(kwargs.families, manifest_files), 1, []);
+   % One ledger slot per selected family. Each family fills its own slot and
+   % the three ledgers are concatenated once after the loop, so no ledger is
+   % rebuilt on every family or artifact.
+   family_artifacts = repmat({repmat(emptyArtifact(), 0, 1)}, ...
+      numel(families), 1);
+   family_channels = repmat({repmat(emptyChannel(), 0, 1)}, ...
+      numel(families), 1);
+   family_findings = repmat({repmat(emptyFinding(), 0, 1)}, ...
+      numel(families), 1);
    case_count = 0;
 
-   for family = reshape(families, 1, [])
+   for f = 1:numel(families)
+      family = families(f);
       manifest_path = familyManifestPath(family, manifest_files);
       if manifest_path == ""
-         findings(end + 1) = finding("error", "missing_manifest", family, ...
+         family_findings{f} = appendStructs(family_findings{f}, ...
+            finding("error", "missing_manifest", family, ...
             "", "", "manifest", fullfile(eval_root, family, "manifest.json"), ...
-            "", "selected family has no manifest.json"); %#ok<AGROW>
+            "", "selected family has no manifest.json"));
          continue
       end
 
@@ -80,22 +88,32 @@ function report = auditArtifacts(kwargs)
       manifest_record.path = manifest_path;
       manifest_record.exists = true;
       manifest_record.status = "checked";
-      artifacts(end + 1) = manifest_record; %#ok<AGROW>
+      manifest_read_error = "";
+      manifest_read_failed = false;
       try
          % Record the exact manifest bytes before parsing so a later report can
          % reject a manifest that changed after this audit pass.
          manifest_info = dir(manifest_path);
-         artifacts(end).artifact_size_bytes = manifest_info.bytes;
-         artifacts(end).artifact_sha256 = ...
+         manifest_record.artifact_size_bytes = manifest_info.bytes;
+         manifest_record.artifact_sha256 = ...
             icemodel.verification.setup.fileSha256(manifest_path);
          manifest = icemodel.verification.helpers.readFamilyManifest(manifest_path);
       catch err
-         artifacts(end).status = "read_error";
-         findings(end + 1) = finding("error", "manifest_read_error", family, ...
-            "", "", "manifest", manifest_path, "", string(err.message)); %#ok<AGROW>
+         manifest_record.status = "read_error";
+         manifest_read_error = string(err.message);
+         manifest_read_failed = true;
+      end
+      % The manifest record joins the ledger carrying whatever status and
+      % partial metadata the read attempt produced.
+      family_artifacts{f} = appendStructs(family_artifacts{f}, manifest_record);
+      if manifest_read_failed
+         family_findings{f} = appendStructs(family_findings{f}, ...
+            finding("error", "manifest_read_error", family, ...
+            "", "", "manifest", manifest_path, "", manifest_read_error));
          continue
       end
-      findings = appendStructs(findings, validateManifest(manifest));
+      family_findings{f} = appendStructs(family_findings{f}, ...
+         validateManifest(manifest));
 
       % Reuse the existing resolved-case and comparison discovery paths. The
       % latter owns portable path resolution and exact manifest artifact lists.
@@ -107,9 +125,10 @@ function report = auditArtifacts(kwargs)
             evaluation_data_root=eval_root, input_data_root=input_root, ...
             dataset_family=family);
       catch err
-         findings(end + 1) = finding("error", "manifest_resolution_error", ...
+         family_findings{f} = appendStructs(family_findings{f}, ...
+            finding("error", "manifest_resolution_error", ...
             family, "", "", "manifest", manifest_path, "", ...
-            string(err.message)); %#ok<AGROW>
+            string(err.message)));
          continue
       end
       case_count = case_count + numel(cases);
@@ -117,7 +136,8 @@ function report = auditArtifacts(kwargs)
       % Audit source-list declarations separately from file content so a stale
       % manifest cannot be hidden by a valid artifact left elsewhere on disk.
       for k = 1:numel(cases)
-         findings = appendStructs(findings, validateCaseSources(cases(k)));
+         family_findings{f} = appendStructs(family_findings{f}, ...
+            validateCaseSources(cases(k)));
       end
 
       % Inspect every concrete artifact discovered by comparisonCompatibility.
@@ -130,7 +150,12 @@ function report = auditArtifacts(kwargs)
          [omitted_met, met_resolution_findings] = ...
             omittedMetArtifacts(case_manifest, discovered, input_root);
          discovered = appendStructs(discovered, omitted_met);
-         findings = appendStructs(findings, met_resolution_findings);
+         family_findings{f} = appendStructs(family_findings{f}, ...
+            met_resolution_findings);
+         % At most one artifact record per discovered spec, so the case ledger
+         % is sized before the loop and trimmed to the inspected records.
+         case_artifacts = repmat(emptyArtifact(), numel(discovered), 1);
+         n_case_artifacts = 0;
          for n = 1:numel(discovered)
             spec = discovered(n);
 
@@ -145,12 +170,20 @@ function report = auditArtifacts(kwargs)
             period = artifactPeriod(case_manifest, spec.source, spec.kind);
             [artifact_record, channel_records, artifact_findings] = ...
                inspectArtifact(case_manifest, spec, period);
-            artifacts(end + 1) = artifact_record; %#ok<AGROW>
-            channels = appendStructs(channels, channel_records);
-            findings = appendStructs(findings, artifact_findings);
+            n_case_artifacts = n_case_artifacts + 1;
+            case_artifacts(n_case_artifacts) = artifact_record;
+            family_channels{f} = appendStructs(family_channels{f}, ...
+               channel_records);
+            family_findings{f} = appendStructs(family_findings{f}, ...
+               artifact_findings);
          end
+         family_artifacts{f} = appendStructs(family_artifacts{f}, ...
+            case_artifacts(1:n_case_artifacts));
       end
    end
+   artifacts = vertcat(repmat(emptyArtifact(), 0, 1), family_artifacts{:});
+   channels = vertcat(repmat(emptyChannel(), 0, 1), family_channels{:});
+   findings = vertcat(repmat(emptyFinding(), 0, 1), family_findings{:});
 
    % Stable ordering makes JSON diffs and downstream report ingestion repeatable.
    artifacts = sortRecords(artifacts, ...
@@ -217,12 +250,17 @@ function findings = validateManifest(manifest)
 
    % Family fields are centralized in the setup schema helper.
    required = string(icemodel.verification.setup.familyManifestFieldNames());
-   missing = setdiff(required, string(fieldnames(manifest)), 'stable');
-   for name = reshape(missing, 1, [])
-      findings(end + 1) = finding("error", "missing_manifest_field", ...
+   missing = reshape(setdiff(required, string(fieldnames(manifest)), ...
+      'stable'), 1, []);
+   % Exactly one finding per absent family field, so the ledger is sized
+   % before the loop and appended once.
+   missing_findings = repmat(emptyFinding(), numel(missing), 1);
+   for k = 1:numel(missing)
+      missing_findings(k) = finding("error", "missing_manifest_field", ...
          family, "", "", "manifest", string(fieldOr(manifest, ...
-         'manifest_path', "")), name, "missing required family field"); %#ok<AGROW>
+         'manifest_path', "")), missing(k), "missing required family field");
    end
+   findings = appendStructs(findings, missing_findings);
    if ~isfield(manifest, 'cases') || ~isstruct(manifest.cases)
       findings(end + 1) = finding("error", "invalid_manifest_cases", ...
          family, "", "", "manifest", string(fieldOr(manifest, ...
@@ -241,25 +279,36 @@ function findings = validateManifest(manifest)
       else
          case_required = icemodel.verification.setup.caseManifestFieldNames();
       end
-      case_missing = setdiff(case_required, string(fieldnames(c)), 'stable');
-      for name = reshape(case_missing, 1, [])
-         findings(end + 1) = finding("error", "missing_case_field", ...
+      case_missing = reshape(setdiff(case_required, ...
+         string(fieldnames(c)), 'stable'), 1, []);
+      % Exactly one finding per absent case field, sized before the loop.
+      case_findings = repmat(emptyFinding(), numel(case_missing), 1);
+      for j = 1:numel(case_missing)
+         case_findings(j) = finding("error", "missing_case_field", ...
             family, case_id, "", "manifest", string(manifest.manifest_path), ...
-            name, "missing required case field"); %#ok<AGROW>
+            case_missing(j), "missing required case field");
       end
+      findings = appendStructs(findings, case_findings);
       findings = appendStructs(findings, validateCasePeriod(c, family, ...
          string(manifest.manifest_path)));
    end
 
    % Duplicate ids make loadmanifest's first-match behavior ambiguous.
-   unique_ids = unique(ids(ids ~= ""));
-   for id = reshape(unique_ids, 1, [])
-      if sum(ids == id) > 1
-         findings(end + 1) = finding("error", "duplicate_case_id", ...
-            family, id, "", "manifest", string(manifest.manifest_path), ...
-            "case_id", "case_id appears more than once in this manifest"); %#ok<AGROW>
+   unique_ids = reshape(unique(ids(ids ~= "")), 1, []);
+   % At most one finding per distinct id, so the ledger is sized at the id
+   % count and trimmed to the duplicates actually found.
+   duplicate_findings = repmat(emptyFinding(), numel(unique_ids), 1);
+   n_duplicates = 0;
+   for k = 1:numel(unique_ids)
+      if sum(ids == unique_ids(k)) > 1
+         n_duplicates = n_duplicates + 1;
+         duplicate_findings(n_duplicates) = finding("error", ...
+            "duplicate_case_id", family, unique_ids(k), "", "manifest", ...
+            string(manifest.manifest_path), "case_id", ...
+            "case_id appears more than once in this manifest");
       end
    end
+   findings = appendStructs(findings, duplicate_findings(1:n_duplicates));
 end
 
 function findings = validateCasePeriod(c, family, manifest_path)
@@ -287,7 +336,9 @@ function findings = validateCasePeriod(c, family, manifest_path)
 end
 
 function findings = validateCaseSources(c)
-   %VALIDATECASESOURCES Check source lists against staged colocation declarations.
+   %VALIDATECASESOURCES Check source lists against staged colocation
+   % declarations.
+
    findings = repmat(emptyFinding(), 0, 1);
    family = string(c.dataset_family);
    case_id = string(c.case_id);
@@ -299,19 +350,33 @@ function findings = validateCaseSources(c)
 
    % Every declared forcing/evaluation source must resolve to a concrete leg or
    % the case-level evaluation artifact.
-   forcing_sources = stringArray(fieldOr(c, 'forcing_sources', strings(0, 1)));
-   for source = reshape(forcing_sources, 1, [])
+   forcing_sources = reshape(stringArray(fieldOr(c, 'forcing_sources', ...
+      strings(0, 1))), 1, []);
+   % At most one finding per declared forcing source, so the ledger is sized
+   % at the source count and trimmed to the sources that failed.
+   forcing_findings = repmat(emptyFinding(), numel(forcing_sources), 1);
+   n_forcing = 0;
+   for k = 1:numel(forcing_sources)
+      source = forcing_sources(k);
       [found, leg] = sourceLeg(colocation, source);
       has_met = found && hasFiles(leg, "met_files");
       if ~has_met
-         findings(end + 1) = finding("error", "forcing_source_without_met", ...
+         n_forcing = n_forcing + 1;
+         forcing_findings(n_forcing) = finding("error", ...
+            "forcing_source_without_met", ...
             family, case_id, source, "manifest", manifest_path, ...
-            "forcing_sources", "declared forcing source has no staged met file"); %#ok<AGROW>
+            "forcing_sources", "declared forcing source has no staged met file");
       end
    end
+   findings = appendStructs(findings, forcing_findings(1:n_forcing));
 
-   eval_sources = stringArray(fieldOr(c, 'eval_sources', strings(0, 1)));
-   for source = reshape(eval_sources, 1, [])
+   eval_sources = reshape(stringArray(fieldOr(c, 'eval_sources', ...
+      strings(0, 1))), 1, []);
+   % At most one finding per declared evaluation source, sized the same way.
+   eval_findings = repmat(emptyFinding(), numel(eval_sources), 1);
+   n_eval = 0;
+   for k = 1:numel(eval_sources)
+      source = eval_sources(k);
       base_source = erase(erase(source, "_obs"), "_protocol");
       [found, leg] = sourceLeg(colocation, source);
       if ~found
@@ -323,16 +388,26 @@ function findings = validateCaseSources(c)
          hasFiles(leg, "evaluation_file"), hasFiles(leg, "data_files"), ...
          hasFiles(leg, "model_output_files"), hasFiles(leg, "reference_file")]);
       if ~case_eval && ~leg_eval
-         findings(end + 1) = finding("error", "eval_source_without_artifact", ...
+         n_eval = n_eval + 1;
+         eval_findings(n_eval) = finding("error", ...
+            "eval_source_without_artifact", ...
             family, case_id, source, "manifest", manifest_path, ...
-            "eval_sources", "declared evaluation source has no artifact reference"); %#ok<AGROW>
+            "eval_sources", ...
+            "declared evaluation source has no artifact reference");
       end
    end
+   findings = appendStructs(findings, eval_findings(1:n_eval));
 
-   % A staged leg must carry at least one file reference; an unstaged leg must not
-   % claim files. This catches stale source-list/file drift directly.
-   names = string(fieldnames(colocation));
-   for name = reshape(names, 1, [])
+   % A staged leg must carry at least one file reference, and an unstaged leg
+   % must claim no files. This catches a stale mismatch between the source
+   % list and the files.
+   names = reshape(string(fieldnames(colocation)), 1, []);
+   % At most one finding per colocation leg, so the ledger is sized at the
+   % leg count and trimmed to the legs that failed.
+   leg_findings = repmat(emptyFinding(), numel(names), 1);
+   n_legs = 0;
+   for k = 1:numel(names)
+      name = names(k);
       leg = colocation.(char(name));
       if ~isstruct(leg)
          continue
@@ -347,15 +422,20 @@ function findings = validateCaseSources(c)
       % only leg has no artifact-ownership contract to violate.
       status_only = ~isfield(leg, 'kind') && isfield(leg, 'status');
       if staged && ~has_any && ~status_only
-         findings(end + 1) = finding("error", "staged_leg_without_artifact", ...
+         n_legs = n_legs + 1;
+         leg_findings(n_legs) = finding("error", ...
+            "staged_leg_without_artifact", ...
             family, case_id, name, "manifest", manifest_path, ...
-            "colocation", "staged colocation leg has no file reference"); %#ok<AGROW>
+            "colocation", "staged colocation leg has no file reference");
       elseif ~staged && has_any
-         findings(end + 1) = finding("error", "unstaged_leg_with_artifact", ...
+         n_legs = n_legs + 1;
+         leg_findings(n_legs) = finding("error", ...
+            "unstaged_leg_with_artifact", ...
             family, case_id, name, "manifest", manifest_path, ...
-            "colocation", "unstaged colocation leg still references files"); %#ok<AGROW>
+            "colocation", "unstaged colocation leg still references files");
       end
    end
+   findings = appendStructs(findings, leg_findings(1:n_legs));
 end
 
 %% Artifact discovery and inspection
@@ -584,7 +664,9 @@ function [record, channels, findings] = inspectArtifact(c, spec, period)
       record.status = "invalid_payload";
       return
    end
-   all_times = NaT(0, 1, TimeZone="UTC");
+   % One time slot per inspected node, concatenated once after the loop,
+   % because the nodes carry different sample counts.
+   node_times = repmat({NaT(0, 1, TimeZone="UTC")}, numel(nodes), 1);
    first_cadence = NaN;
    for k = 1:numel(nodes)
       [node_channels, node_findings, times, cadence] = ...
@@ -594,12 +676,13 @@ function [record, channels, findings] = inspectArtifact(c, spec, period)
       findings = appendStructs(findings, node_findings);
       if ~isempty(times)
          utc_times = icemodel.verification.setup.ensureUtc(times(:));
-         all_times = [all_times; utc_times(~isnat(utc_times))]; %#ok<AGROW>
+         node_times{k} = utc_times(~isnat(utc_times));
       end
       if isnan(first_cadence) && ~isnan(cadence)
          first_cadence = cadence;
       end
    end
+   all_times = vertcat(NaT(0, 1, TimeZone="UTC"), node_times{:});
 
    % Optional MAR profile sidecars have a stricter scientific contract than a
    % generic nested table: exact profile/date identity, units, depth ordering,
@@ -734,23 +817,31 @@ function findings = modelOutputProfileChecks(bundle, record)
          record.path, "density", "MAR RO1 nearest-cell provenance is incomplete");
    end
 
-   groups = icemodel.verification.helpers.profileGroups(density);
-   for group = reshape(groups, 1, [])
-      depth = double(group.data.depth);
-      values = double(group.data.density);
-      if any(diff(depth) <= 0) || any(depth < 0 | depth > 20) ...
-            || any(~isfinite(values) | values < 250 | values > 1000)
-         findings(end + 1) = finding("error", "profile_values", ...
-            record.dataset_family, record.case_id, record.source, record.kind, ...
-            record.path, "density", ...
-            "profile depths or densities violate the MAR RO1 contract"); %#ok<AGROW>
-         return
+   groups = reshape(icemodel.verification.helpers.profileGroups(density), 1, []);
+   % One violated group condemns the whole bundle, so stop at the first one
+   % and record the single finding after the loop.
+   violated = false;
+   for k = 1:numel(groups)
+      depth = double(groups(k).data.depth);
+      values = double(groups(k).data.density);
+      violated = any(diff(depth) <= 0) || any(depth < 0 | depth > 20) ...
+         || any(~isfinite(values) | values < 250 | values > 1000);
+      if violated
+         break
       end
+   end
+   if violated
+      findings(end + 1) = finding("error", "profile_values", ...
+         record.dataset_family, record.case_id, record.source, record.kind, ...
+         record.path, "density", ...
+         "profile depths or densities violate the MAR RO1 contract");
    end
 end
 
 function payload = primaryPayload(kind, names)
-   %PRIMARYPAYLOAD Choose the one public payload appropriate for an artifact kind.
+   %PRIMARYPAYLOAD Choose the one public payload appropriate for an artifact
+   % kind.
+
    if kind == "met"
       preferred = "met";
    elseif kind == "userdata"
@@ -796,7 +887,9 @@ function [metadata, findings] = artifactMetadata(loaded, value, record)
 end
 
 function nodes = tableNodes(value, label)
-   %TABLENODES Recursively collect table payloads without descending into arrays.
+   %TABLENODES Recursively collect table payloads without descending into
+   % arrays.
+
    prototype = struct('path', "", 'value', [], 'n_rows', 0);
    nodes = repmat(prototype, 0, 1);
    if istable(value) || istimetable(value)
@@ -827,7 +920,6 @@ end
 function [channels, findings, times, cadence] = inspectTable(T, table_path, ...
       record, metadata, bundle_format)
    %INSPECTTABLE Audit one table's time axis, channel metadata, and values.
-   channels = repmat(emptyChannel(), 0, 1);
    findings = repmat(emptyFinding(), 0, 1);
    times = tableTimes(T);
    cadence = NaN;
@@ -862,12 +954,22 @@ function [channels, findings, times, cadence] = inspectTable(T, table_path, ...
          fillgaps=false, clamp=false);
    end
 
+   % One channel record per numeric variable at most, and one findings slot
+   % per variable, so both ledgers are sized before the loop and merged once
+   % after it.
+   channels = repmat(emptyChannel(), numel(names), 1);
+   n_channels = 0;
+   name_findings = repmat({repmat(emptyFinding(), 0, 1)}, numel(names), 1);
    for k = 1:numel(names)
       name = names(k);
       data = T.(name);
       if ~numeric_mask(k)
          continue
       end
+      % The four channel checks below each contribute at most one finding, so
+      % this per-channel ledger is sized at four and trimmed to what fired.
+      channel_findings = repmat(emptyFinding(), 4, 1);
+      n_channel_findings = 0;
       channel = emptyChannel();
       channel.dataset_family = record.dataset_family;
       channel.case_id = record.case_id;
@@ -909,47 +1011,59 @@ function [channels, findings, times, cadence] = inspectTable(T, table_path, ...
       end
       if ~canonical
          severity = forcingSeverity(record.kind, "warning");
-         findings(end + 1) = finding(severity, "noncanonical_channel", ...
+         n_channel_findings = n_channel_findings + 1;
+         channel_findings(n_channel_findings) = finding(severity, ...
+            "noncanonical_channel", ...
             record.dataset_family, record.case_id, record.source, record.kind, ...
-            record.path, name, "numeric channel is absent from the canonical map"); %#ok<AGROW>
+            record.path, name, "numeric channel is absent from the canonical map");
       elseif units(k) == ""
-         findings(end + 1) = finding("error", "missing_unit", ...
+         n_channel_findings = n_channel_findings + 1;
+         channel_findings(n_channel_findings) = finding("error", ...
+            "missing_unit", ...
             record.dataset_family, record.case_id, record.source, record.kind, ...
             record.path, name, "expected unit '" + expected_unit ...
-            + "', found no unit metadata"); %#ok<AGROW>
+            + "', found no unit metadata");
       elseif ~ismember(units(k), compatible_units)
-         findings(end + 1) = finding("error", "wrong_unit", ...
+         n_channel_findings = n_channel_findings + 1;
+         channel_findings(n_channel_findings) = finding("error", ...
+            "wrong_unit", ...
             record.dataset_family, record.case_id, record.source, record.kind, ...
             record.path, name, "expected unit '" + strjoin(compatible_units, ...
             "' or '") ...
-            + "', found '" + units(k) + "'"); %#ok<AGROW>
+            + "', found '" + units(k) + "'");
       end
 
       % Complex values are never valid observations or forcing samples.
       if channel.complex_count > 0
-         findings(end + 1) = finding("error", "complex_values", ...
+         n_channel_findings = n_channel_findings + 1;
+         channel_findings(n_channel_findings) = finding("error", ...
+            "complex_values", ...
             record.dataset_family, record.case_id, record.source, record.kind, ...
-            record.path, name, "channel contains complex-valued samples"); %#ok<AGROW>
+            record.path, name, "channel contains complex-valued samples");
       end
 
       % Preserve all-missing channels as explicit placeholders when documented;
       % do not count them as observed data.
       if channel.finite_count == 0
          documented = documentedPlaceholder(metadata, name);
+         n_channel_findings = n_channel_findings + 1;
          if documented || ~ismember(record.kind, ["met", "userdata"])
-            findings(end + 1) = finding("placeholder", "intentional_placeholder", ...
+            channel_findings(n_channel_findings) = finding("placeholder", ...
+               "intentional_placeholder", ...
                record.dataset_family, record.case_id, record.source, record.kind, ...
-               record.path, name, "all-missing channel is not counted as observations"); %#ok<AGROW>
+               record.path, name, ...
+               "all-missing channel is not counted as observations");
          else
             if requiredMetChannel(name, record.kind, T)
                severity = "error";
             else
                severity = "warning";
             end
-            findings(end + 1) = finding(severity, "undocumented_all_missing", ...
+            channel_findings(n_channel_findings) = finding(severity, ...
+               "undocumented_all_missing", ...
                record.dataset_family, record.case_id, record.source, record.kind, ...
                record.path, name, ...
-               "all-missing forcing channel lacks placeholder policy"); %#ok<AGROW>
+               "all-missing forcing channel lacks placeholder policy");
          end
       elseif channel.missing_count > 0 ...
             && requiredMetChannel(name, record.kind, T)
@@ -961,20 +1075,25 @@ function [channels, findings, times, cadence] = inspectTable(T, table_path, ...
             '%d of %d required met samples are missing (%.6g%% finite); ' ...
             'artifact is not directly runnable without an explicit repair policy'], ...
             channel.missing_count, channel.sample_count, coverage);
-         findings(end + 1) = finding("warning", "required_met_gap", ...
+         n_channel_findings = n_channel_findings + 1;
+         channel_findings(n_channel_findings) = finding("warning", ...
+            "required_met_gap", ...
             record.dataset_family, record.case_id, record.source, record.kind, ...
-            record.path, name, message); %#ok<AGROW>
+            record.path, name, message);
       end
 
       % Apply conservative, source-independent physical bounds only.
       [bounded, minimum, maximum] = physicalRange(name, units(k));
       if bounded && any(real(data(finite)) < minimum ...
             | real(data(finite)) > maximum)
-         findings(end + 1) = finding("error", "physical_range", ...
+         n_channel_findings = n_channel_findings + 1;
+         channel_findings(n_channel_findings) = finding("error", ...
+            "physical_range", ...
             record.dataset_family, record.case_id, record.source, record.kind, ...
             record.path, name, sprintf('finite values must lie in [%g, %g]', ...
-            minimum, maximum)); %#ok<AGROW>
+            minimum, maximum));
       end
+      channel_findings = channel_findings(1:n_channel_findings);
 
       % MAR quantiles and UTC-day reconstruction diagnostics do not impose a
       % magnitude threshold.
@@ -982,10 +1101,15 @@ function [channels, findings, times, cadence] = inspectTable(T, table_path, ...
             && ismember(name, ["runoff", "smb"])
          [channel, mar_findings] = marChannelDiagnostics(channel, data, ...
             times, metadata, record);
-         findings = appendStructs(findings, mar_findings);
+         channel_findings = appendStructs(channel_findings, mar_findings);
       end
-      channels(end + 1) = channel; %#ok<AGROW>
+      name_findings{k} = channel_findings;
+      n_channels = n_channels + 1;
+      channels(n_channels) = channel;
    end
+   channels = channels(1:n_channels);
+   findings = appendStructs(findings, ...
+      vertcat(repmat(emptyFinding(), 0, 1), name_findings{:}));
 
    % The split precipitation channels must sum to total precipitation wherever
    % all three are actual observations.
@@ -1214,14 +1338,16 @@ function findings = albedoTransientChecks(T, metadata, record)
 
    % Raw swd/swu remain source-faithful; only derived radiation channels must
    % be missing on a confirmed episode.
-   derived = intersect(["albedo", "swn", "netr"], names, 'stable');
-   leaking = strings(0, 1);
-   for name = reshape(derived, 1, [])
-      values = T.(char(name));
-      if any(isfinite(values(flags)))
-         leaking(end + 1, 1) = name; %#ok<AGROW>
-      end
+   derived = reshape(intersect(["albedo", "swn", "netr"], names, 'stable'), ...
+      1, []);
+   % Mark the derived channels that still carry finite samples, then select
+   % them in one step instead of growing the name list per channel.
+   leaks = false(numel(derived), 1);
+   for k = 1:numel(derived)
+      values = T.(char(derived(k)));
+      leaks(k) = any(isfinite(values(flags)));
    end
+   leaking = reshape(derived(leaks), [], 1);
    if ~isempty(leaking)
       findings(end + 1) = finding("error", ...
          "albedo_transient_qc_mask", record.dataset_family, ...
@@ -1280,7 +1406,8 @@ function findings = racmoChecks(T, metadata, record)
 end
 
 function findings = marSnowDepthChecks(T, metadata, record)
-   %MARSNOWDEPTHCHECKS Enforce SHSN2 semantics and the durable year mask.
+   %MARSNOWDEPTHCHECKS Enforce the SHSN2 definition and the durable year mask.
+
    findings = repmat(emptyFinding(), 0, 1);
    if ~ismember("snowd", string(T.Properties.VariableNames))
       return
@@ -1401,9 +1528,14 @@ function findings = metResampleChecks(T, metadata, record)
    % The writer records a source-derived lower bound independently of artifact
    % finiteness. Any channel with fewer missing values has bridged a native NaN
    % or omitted-time interval and is unsafe for verification.
-   names = intersect(string(fieldnames(expected)), ...
-      string(T.Properties.VariableNames), 'stable');
-   for name = reshape(names, 1, [])
+   names = reshape(intersect(string(fieldnames(expected)), ...
+      string(T.Properties.VariableNames), 'stable'), 1, []);
+   % At most one finding per compared channel, so the ledger is sized at the
+   % channel count, trimmed, and appended once after the loop.
+   gap_findings = repmat(emptyFinding(), numel(names), 1);
+   n_gap_findings = 0;
+   for k = 1:numel(names)
+      name = names(k);
       values = T.(char(name));
       expected_count = doubleScalar(expected.(char(name)));
       if ~isnumeric(values) || ~isfinite(expected_count)
@@ -1413,11 +1545,14 @@ function findings = metResampleChecks(T, metadata, record)
       if observed_count < expected_count
          message = sprintf(['derived met has %d missing values but source ' ...
             'support requires at least %d'], observed_count, expected_count);
-         findings(end + 1) = finding("error", "met_gap_interpolation", ...
+         n_gap_findings = n_gap_findings + 1;
+         gap_findings(n_gap_findings) = finding("error", ...
+            "met_gap_interpolation", ...
             record.dataset_family, record.case_id, record.source, ...
-            record.kind, record.path, name, message); %#ok<AGROW>
+            record.kind, record.path, name, message);
       end
    end
+   findings = appendStructs(findings, gap_findings(1:n_gap_findings));
 end
 
 function findings = merraChecks(T, metadata, record)
@@ -1603,14 +1738,22 @@ function findings = marMetadataChecks(T, metadata, record)
    end
    % Replacement counts are cumulative idempotent provenance. Validate both
    % fields even when a reduced-source fallback has no declared replacements.
-   for channel = ["runoff", "smb"]
+   qc_channels = ["runoff", "smb"];
+   % Each channel contributes at most two findings, one for its replacement
+   % count and one for its per-day ledger, so the ledger is sized at twice the
+   % channel count and trimmed to the checks that fired.
+   qc_findings = repmat(emptyFinding(), 2 * numel(qc_channels), 1);
+   n_qc_findings = 0;
+   for k = 1:numel(qc_channels)
+      channel = qc_channels(k);
       field = "mar_qc_replaced_" + channel + "_count";
       value = doubleScalar(metadata.(field));
       if ~isfinite(value) || value < 0 || fix(value) ~= value
-         findings(end + 1) = finding("error", ...
+         n_qc_findings = n_qc_findings + 1;
+         qc_findings(n_qc_findings) = finding("error", ...
             "mar_qc_replacement_count_invalid", record.dataset_family, ...
             record.case_id, record.source, record.kind, record.path, channel, ...
-            "MAR replacement count must be a nonnegative integer"); %#ok<AGROW>
+            "MAR replacement count must be a nonnegative integer");
       end
 
       % The compact per-day ledger is the durable source-light proof. Its
@@ -1635,18 +1778,21 @@ function findings = marMetadataChecks(T, metadata, record)
          && doubleScalar(metadata.("mar_qc_unverified_" + channel ...
          + "_day_count")) == nnz(day_status == 3);
       if ~ledger_valid
-         findings(end + 1) = finding("error", ...
+         n_qc_findings = n_qc_findings + 1;
+         qc_findings(n_qc_findings) = finding("error", ...
             "mar_qc_day_ledger_invalid", record.dataset_family, ...
             record.case_id, record.source, record.kind, record.path, channel, ...
-            "MAR per-day status/reference ledger disagrees with its summary"); %#ok<AGROW>
+            "MAR per-day status/reference ledger disagrees with its summary");
       elseif is_applied && any(day_status == 3)
-         findings(end + 1) = finding("warning", ...
+         n_qc_findings = n_qc_findings + 1;
+         qc_findings(n_qc_findings) = finding("warning", ...
             "mar_qc_unverified_days", record.dataset_family, ...
             record.case_id, record.source, record.kind, record.path, channel, ...
             sprintf('%d MAR UTC days lack a finite native daily reference', ...
-            nnz(day_status == 3))); %#ok<AGROW>
+            nnz(day_status == 3)));
       end
    end
+   findings = appendStructs(findings, qc_findings(1:n_qc_findings));
 end
 
 function findings = marDiagnosticChecks(T, metadata, record)
@@ -1807,21 +1953,34 @@ function findings = marDiagnosticChecks(T, metadata, record)
 
    % A broad symmetric source-informed bound catches unconverted mmWE values
    % without rejecting rare source-native signed RZ or ordinary signed SUH/SU.
-   for channel = reshape(present, 1, [])
+   present_channels = reshape(present, 1, []);
+   % At most one range finding per present diagnostic channel, so the ledger
+   % is sized at the channel count, trimmed, and appended once.
+   range_findings = repmat(emptyFinding(), numel(present_channels), 1);
+   n_range_findings = 0;
+   for k = 1:numel(present_channels)
+      channel = present_channels(k);
       values = real(T.(channel));
       finite = isfinite(values) & imag(T.(channel)) == 0;
       if any(abs(values(finite)) > abs_limit)
-         findings(end + 1) = finding("error", ...
+         n_range_findings = n_range_findings + 1;
+         range_findings(n_range_findings) = finding("error", ...
             "mar_diagnostic_range", record.dataset_family, record.case_id, ...
             record.source, record.kind, record.path, channel, ...
             sprintf('absolute MAR diagnostic values must not exceed %g mWE/h', ...
-            abs_limit)); %#ok<AGROW>
+            abs_limit));
       end
     end
+   findings = appendStructs(findings, range_findings(1:n_range_findings));
 
    % Daily SU/RZ support must remain a constant /24 rate within each UTC day.
    [groups, ~] = marUtcDayGroups(T.Time);
-   for channel = ["subl_evap", "refreeze_deposition"]
+   daily_channels = ["subl_evap", "refreeze_deposition"];
+   % At most one support finding per daily channel, sized the same way.
+   support_findings = repmat(emptyFinding(), numel(daily_channels), 1);
+   n_support_findings = 0;
+   for k = 1:numel(daily_channels)
+      channel = daily_channels(k);
       if ~ismember(channel, present)
          continue
       end
@@ -1835,12 +1994,14 @@ function findings = marDiagnosticChecks(T, metadata, record)
          end
       end
       if invalid
-         findings(end + 1) = finding("error", ...
+         n_support_findings = n_support_findings + 1;
+         support_findings(n_support_findings) = finding("error", ...
             "mar_daily_diagnostic_support", record.dataset_family, ...
             record.case_id, record.source, record.kind, record.path, channel, ...
-            "MAR daily diagnostic is not constant within its UTC-day support"); %#ok<AGROW>
+            "MAR daily diagnostic is not constant within its UTC-day support");
       end
    end
+   findings = appendStructs(findings, support_findings(1:n_support_findings));
 
    % Recompute the daily ME/MEH ledger from the staged artifact. This is the
    % only cross-product identity enforced: SUH/SU and RZ/pure refreeze are not
@@ -2079,7 +2240,8 @@ function findings = modisChecks(T, metadata, record)
 end
 
 function findings = promicePrecipitationChecks(T, metadata, record)
-   %PROMICEPRECIPITATIONCHECKS Keep liquid rain source-faithful and splits explicit.
+   %PROMICEPRECIPITATIONCHECKS Keep rain source-faithful and splits explicit.
+
    findings = repmat(emptyFinding(), 0, 1);
    names = string(T.Properties.VariableNames);
    required_metadata = ["precip_policy", "rainf_source_present", ...
@@ -2097,13 +2259,23 @@ function findings = promicePrecipitationChecks(T, metadata, record)
          record.dataset_family, record.case_id, record.source, record.kind, ...
          record.path, "precip", "PROMICE policy must identify rainf and placeholder snowf/ppt");
    end
-   for name = ["snowf", "ppt"]
+   placeholders = ["snowf", "ppt"];
+   % At most one finding per placeholder channel, so the ledger is sized at
+   % the channel count, trimmed, and appended once after the loop.
+   placeholder_findings = repmat(emptyFinding(), numel(placeholders), 1);
+   n_placeholder_findings = 0;
+   for k = 1:numel(placeholders)
+      name = placeholders(k);
       if ~ismember(name, names) || any(isfinite(T.(name)))
-         findings(end + 1) = finding("error", "promice_invented_precip", ...
+         n_placeholder_findings = n_placeholder_findings + 1;
+         placeholder_findings(n_placeholder_findings) = finding("error", ...
+            "promice_invented_precip", ...
             record.dataset_family, record.case_id, record.source, record.kind, ...
-            record.path, name, "PROMICE snowf/ppt must remain all-NaN placeholders"); %#ok<AGROW>
+            record.path, name, "PROMICE snowf/ppt must remain all-NaN placeholders");
       end
    end
+   findings = appendStructs(findings, ...
+      placeholder_findings(1:n_placeholder_findings));
    source_present = logicalScalar(metadata.rainf_source_present);
    observations_present = logicalScalar(metadata.rainf_observations_present);
    finite_rain = ismember("rainf", names) && any(isfinite(T.rainf));
@@ -2159,7 +2331,12 @@ function findings = promiceShortwaveChecks(T, metadata, record)
       latitude=latitude, longitude=longitude, ...
       swd_source_file_observations_present=swd_file_support, ...
       swu_source_file_observations_present=swu_file_support);
-   for channel = channels
+   % At most one darkness-gap finding per audited channel, so the ledger is
+   % sized at the channel count, trimmed, and appended once after the loop.
+   darkness_findings = repmat(emptyFinding(), numel(channels), 1);
+   n_darkness_findings = 0;
+   for k = 1:numel(channels)
+      channel = channels(k);
       if channel == "swd"
          expected = expected_swd;
       else
@@ -2168,14 +2345,17 @@ function findings = promiceShortwaveChecks(T, metadata, record)
       missing_dark = ~isfinite(T.(channel)) & expected == 0;
       if any(missing_dark)
          bands = icemodel.forcing.reconstruct.solarElevationBands();
-         findings(end + 1) = finding("error", ...
+         n_darkness_findings = n_darkness_findings + 1;
+         darkness_findings(n_darkness_findings) = finding("error", ...
             "promice_shortwave_darkness_gap", record.dataset_family, ...
             record.case_id, record.source, record.kind, record.path, channel, ...
             sprintf(['%d hourly samples are missing although the complete ' ...
             'interval is below the %g degree civil-night threshold'], ...
-            nnz(missing_dark), bands.civil_twilight_deg)); %#ok<AGROW>
+            nnz(missing_dark), bands.civil_twilight_deg));
       end
    end
+   findings = appendStructs(findings, ...
+      darkness_findings(1:n_darkness_findings));
 end
 
 function findings = promiceThermistorChecks(T, metadata, record)
@@ -2468,7 +2648,9 @@ function tf = requiredMetChannel(name, kind, T)
 end
 
 function severity = forcingSeverity(kind, fallback)
-   %FORCINGSEVERITY Escalate forcing schema defects while preserving obs metadata.
+   %FORCINGSEVERITY Escalate forcing schema defects while preserving obs
+   % metadata.
+
    if ismember(kind, ["met", "userdata"])
       severity = "error";
    else
@@ -2566,7 +2748,9 @@ function value = fieldOr(s, field, fallback)
 end
 
 function combined = appendStructs(existing, added)
-   %APPENDSTRUCTS Concatenate homogeneous records independent of row orientation.
+   %APPENDSTRUCTS Concatenate homogeneous records independent of row
+   % orientation.
+
    combined = [existing(:); added(:)];
 end
 
@@ -2758,16 +2942,20 @@ function text = markdownReport(report)
             visible(k).dataset_family, visible(k).source, ...
             visible(k).channel], char(31));
       end
-      unique_keys = unique(keys, 'stable');
-      for key = reshape(unique_keys, 1, [])
-         keep = keys == key;
+      unique_keys = reshape(unique(keys, 'stable'), 1, []);
+      % Exactly one table row per distinct grouping key, so the rows are sized
+      % before the loop and appended to the report in one step.
+      key_rows = strings(numel(unique_keys), 1);
+      for k = 1:numel(unique_keys)
+         keep = keys == unique_keys(k);
          f = visible(find(keep, 1));
          row = [f.severity, f.code, f.dataset_family, f.source, ...
             f.channel, string(nnz(keep)), f.message];
          row = replace(row, "|", "\\|");
          row = replace(row, newline, " ");
-         lines(end + 1) = "| " + strjoin(row, " | ") + " |"; %#ok<AGROW>
+         key_rows(k) = "| " + strjoin(row, " | ") + " |";
       end
+      lines = [lines; key_rows];
    end
    if s.placeholder_count > 0
       note = sprintf(['%d intentional placeholder findings are retained in ' ...

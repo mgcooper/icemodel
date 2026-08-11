@@ -173,6 +173,10 @@ function results = run_perf_suite(kwargs)
    % Restore the data-root environment now that every timing has been taken.
    % An early error still restores it, because the object dies with the scope.
    delete(data_root_cleanup)
+
+   % Restore the caller's config last, after every path-dependent cleanup has
+   % already run against the configured test environment.
+   delete(suite_cleanup)
 end
 
 function results = runSingleModelPerfSuite(input_path, output_path, ...

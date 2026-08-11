@@ -14,17 +14,19 @@ function files = fetchProductFiles(cache_dir, patterns, kwargs)
       kwargs.exclude_names (1, :) string = strings(1, 0)
    end
 
-   hits = strings(1, 0);
-   for pattern = patterns
-      listing = dir(fullfile(cache_dir, pattern));
+   % Each pattern contributes one match block. Collect the blocks in a buffer
+   % sized to the pattern list, then concatenate once so the scan does not
+   % reallocate the hit list per pattern.
+   hit_blocks = repmat({strings(1, 0)}, 1, numel(patterns));
+   for k = 1:numel(patterns)
+      listing = dir(fullfile(cache_dir, patterns(k)));
       listing = listing(~[listing.isdir]);
       if isempty(listing)
          continue
       end
-      paths = string(fullfile({listing.folder}, {listing.name}));
-      hits = [hits, paths]; %#ok<AGROW>
+      hit_blocks{k} = string(fullfile({listing.folder}, {listing.name}));
    end
-   hits = unique(hits, 'stable');
+   hits = unique([strings(1, 0), hit_blocks{:}], 'stable');
    if isempty(hits)
       files = hits;
       return

@@ -357,10 +357,11 @@ end
 function [clean, flag] = qualityControlTice10m(aws, timescale)
    %QUALITYCONTROLTICE10M Mask impossible hourly 10 m temperature jumps.
    %
-   % The canonical target is screened only across contiguous hourly source
-   % samples. Native thermistor temperatures and time-varying depths determine
-   % whether each event has at least two comparable subsurface sensors; sparse
-   % events are still masked but remain explicitly unreviewed (code 2).
+   % This screen runs only across contiguous hourly source samples. The native
+   % thermistor temperatures and their time-varying depths decide whether an
+   % event has at least two comparable subsurface sensors. An event with fewer
+   % sensors is still masked, and its flag is unreviewed (code 2).
+
    source = aws.tice10m_source;
    clean = source;
    flag = zeros(size(source));
@@ -396,13 +397,18 @@ function [clean, flag] = qualityControlTice10m(aws, timescale)
       % both endpoints. Two provide the minimum native-profile context needed
       % to call the target discontinuity reviewed rather than merely suspect.
       comparable = 0;
-      comparable_names = strings(0, 1);
-      sensor_jumps = zeros(0, 1);
-      depth_jumps = zeros(0, 1);
-      depths_before = zeros(0, 1);
-      depths_after = zeros(0, 1);
-      before_support = strings(0, 1);
-      after_support = strings(0, 1);
+      % Each ledger holds at most one entry per thermistor, so size them at
+      % the thermistor count and trim to the filled portion after the loop.
+      n_thermistors = numel(thermistors);
+      comparable_names = strings(n_thermistors, 1);
+      sensor_jumps = zeros(n_thermistors, 1);
+      depth_jumps = zeros(n_thermistors, 1);
+      depths_before = zeros(n_thermistors, 1);
+      depths_after = zeros(n_thermistors, 1);
+      before_support = strings(n_thermistors, 1);
+      after_support = strings(n_thermistors, 1);
+      n_before = 0;
+      n_after = 0;
       for name = reshape(thermistors, 1, [])
          depth_name = "d" + name;
          if ~ismember(depth_name, names)
@@ -416,22 +422,29 @@ function [clean, flag] = qualityControlTice10m(aws, timescale)
          after_valid = isfinite(temperature(first + 1)) ...
             && isfinite(depth(first + 1)) && depth(first + 1) > 0;
          if before_valid
-            before_support(end + 1, 1) = name; %#ok<AGROW>
+            n_before = n_before + 1;
+            before_support(n_before) = name;
          end
          if after_valid
-            after_support(end + 1, 1) = name; %#ok<AGROW>
+            n_after = n_after + 1;
+            after_support(n_after) = name;
          end
          if before_valid && after_valid
             comparable = comparable + 1;
-            comparable_names(end + 1, 1) = name; %#ok<AGROW>
-            sensor_jumps(end + 1, 1) = ...
-               abs(diff(temperature(pair))); %#ok<AGROW>
-            depth_jumps(end + 1, 1) = ...
-               abs(diff(depth(pair))); %#ok<AGROW>
-            depths_before(end + 1, 1) = depth(first); %#ok<AGROW>
-            depths_after(end + 1, 1) = depth(first + 1); %#ok<AGROW>
+            comparable_names(comparable) = name;
+            sensor_jumps(comparable) = abs(diff(temperature(pair)));
+            depth_jumps(comparable) = abs(diff(depth(pair)));
+            depths_before(comparable) = depth(first);
+            depths_after(comparable) = depth(first + 1);
          end
       end
+      before_support = before_support(1:n_before);
+      after_support = after_support(1:n_after);
+      comparable_names = comparable_names(1:comparable);
+      sensor_jumps = sensor_jumps(1:comparable);
+      depth_jumps = depth_jumps(1:comparable);
+      depths_before = depths_before(1:comparable);
+      depths_after = depths_after(1:comparable);
       code = 1;
       if comparable < 2
          code = 2;

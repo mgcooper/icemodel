@@ -1103,18 +1103,25 @@ end
 
 function filenames = stagedCaseArtifacts(root, c)
    %STAGEDCASEARTIFACTS Resolve every artifact referenced by one PROMICE case.
-   filenames = string(fullfile(root, 'eval', 'promice', c.evaluation_file));
-   for src = ["promice", "mar", "merra", "racmo"]
-      leg = c.colocation.(char(src));
+
+   sources = ["promice", "mar", "merra", "racmo"];
+   % Two slots per source, one for its met files and one for its user data,
+   % so the file list is concatenated once instead of per source leg.
+   source_files = repmat({strings(0, 1)}, 2 * numel(sources), 1);
+   for k = 1:numel(sources)
+      leg = c.colocation.(char(sources(k)));
       if isfield(leg, 'met_files')
-         filenames = [filenames; fullfile(root, 'input', 'met', ...
-            string(leg.met_files(:)))]; %#ok<AGROW>
+         source_files{2 * k - 1} = fullfile(root, 'input', 'met', ...
+            string(leg.met_files(:)));
       end
       if isfield(leg, 'data_files')
-         filenames = [filenames; fullfile(root, 'input', 'userdata', ...
-            string(leg.data_files(:)))]; %#ok<AGROW>
+         source_files{2 * k} = fullfile(root, 'input', 'userdata', ...
+            string(leg.data_files(:)));
       end
    end
+   filenames = vertcat( ...
+      string(fullfile(root, 'eval', 'promice', c.evaluation_file)), ...
+      source_files{:});
 end
 
 function bytes = fileBytes(filename)
@@ -1125,7 +1132,9 @@ function bytes = fileBytes(filename)
 end
 
 function p = firstWithData(candidates, hasData)
-   %FIRSTWITHDATA First candidate dir that exists and satisfies hasData, else "".
+   %FIRSTWITHDATA First candidate dir that exists and satisfies hasData, else
+   % "".
+
    p = "";
    for c = candidates
       if isfolder(c) && hasData(c)

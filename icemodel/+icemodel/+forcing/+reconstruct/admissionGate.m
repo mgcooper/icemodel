@@ -30,17 +30,17 @@ function gate = admissionGate(channel, metrics, baseline_rmse, kwargs)
    %     measurable spread. This prevents a low-RMSE mean/climatology
    %     estimate from winning by suppressing weather variability. Missing
    %     within-gap spread evidence is denied; proven zero spread is exempt.
-    %  min_coverage : minimum reconstructed fraction of the drawn samples
+   %  min_coverage : minimum reconstructed fraction of the drawn samples
    %     (default 0.10). This is a usefulness floor, not a completeness
    %     requirement: the orchestrator composes ordered methods and
    %     cascades uncovered leftovers to the next tier, so a method that
    %     skillfully covers part of a stratum (e.g. a donor whose record
    %     ends before the target's) is admitted for the samples it covers
-    %     — support-held coarse-cadence donors reach only fractional
-    %     coverage on a finer target axis while beating the climatology
-    %     baseline severalfold where they do cover.
-    %  metrics must contain finite provenance_accounting equal to one; an
-    %     absent accounting result is a failed gate, never an opt-out.
+   %     — support-held coarse-cadence donors reach only fractional
+   %     coverage on a finer target axis while beating the climatology
+   %     baseline severalfold where they do cover.
+   %  metrics must contain finite provenance_accounting equal to one; an
+   %     absent accounting result is a failed gate, never an opt-out.
    %
    % Returns
    %  gate : struct — admit (logical), reasons (string column, empty when
@@ -107,13 +107,13 @@ function gate = admissionGate(channel, metrics, baseline_rmse, kwargs)
       reasons = [reasons; sprintf("coverage %.2f below %.2f", ...
          metrics.coverage, kwargs.min_coverage)];
    end
-    if ~ismember('provenance_accounting', metrics.Properties.VariableNames) ...
-          || ~isfinite(metrics.provenance_accounting)
-       reasons = [reasons; "provenance accounting unavailable"];
-    elseif metrics.provenance_accounting ~= 1
-       reasons = [reasons; sprintf( ...
-          "provenance accounting %.2f is not 1.00", ...
-          metrics.provenance_accounting)];
+   if ~ismember('provenance_accounting', metrics.Properties.VariableNames) ...
+         || ~isfinite(metrics.provenance_accounting)
+      reasons = [reasons; "provenance accounting unavailable"];
+   elseif metrics.provenance_accounting ~= 1
+      reasons = [reasons; sprintf( ...
+         "provenance accounting %.2f is not 1.00", ...
+         metrics.provenance_accounting)];
    end
    if ~ismember('within_gap_observed_spread', ...
          metrics.Properties.VariableNames) ...

@@ -118,7 +118,8 @@ function cases = familyCases(family, kwargs, evaluation_data_root)
 end
 
 function tf = usesDefaultManifestDiscovery(kwargs)
-   %USESDEFAULTMANIFESTDISCOVERY True when listcases should resolve default roots.
+   %USESDEFAULTMANIFESTDISCOVERY True when listcases resolves the default roots.
+
    tf = kwargs.output_root == "" && kwargs.evaluation_data_root == "" ...
       && kwargs.input_data_root == "" ...
       && kwargs.icemodel_config_casename == "";
@@ -463,16 +464,21 @@ end
 
 function groups = splitOversizedGroups(groups, max_panels)
    %SPLITOVERSIZEDGROUPS Keep every full-width figure within its panel limit.
-   expanded = repmat(emptyGroup(), 1, 0);
+
+   % One expansion block per input group, each sized to that group's part
+   % count, so the expanded list is concatenated once instead of grown per
+   % part.
+   blocks = repmat({repmat(emptyGroup(), 1, 0)}, 1, numel(groups));
    for k = 1:numel(groups)
       group = groups(k);
       if group.name == "subsurface_temperature_string"
          % The established PROMICE QA view overlays the complete thermistor
          % string on one axes; it is not a stack of per-sensor panels.
-         expanded(end + 1) = group; %#ok<AGROW>
+         blocks{k} = group;
          continue
       end
       n_parts = max(1, ceil(numel(group.variables) / max_panels));
+      parts = repmat(group, 1, n_parts);
       for part_index = 1:n_parts
          first = (part_index - 1) * max_panels + 1;
          last = min(part_index * max_panels, numel(group.variables));
@@ -488,10 +494,11 @@ function groups = splitOversizedGroups(groups, max_panels)
                part.name = group.name + "_" + part_index;
             end
          end
-         expanded(end + 1) = part; %#ok<AGROW>
+         parts(part_index) = part;
       end
+      blocks{k} = parts;
    end
-   groups = expanded;
+   groups = [repmat(emptyGroup(), 1, 0), blocks{:}];
 end
 
 function group = emptyGroup()
@@ -890,7 +897,9 @@ function label = legSourceLabel(source, leg)
 end
 
 function items = fallbackStagedFiles(c, input_root, manifest_field, input_subdir)
-   %FALLBACKSTAGEDFILES Resolve atomic ESM met through the standard runtime path.
+   %FALLBACKSTAGEDFILES Resolve atomic ESM met through the standard runtime
+   % path.
+
    items = {};
    if input_subdir ~= "met" || manifest_field ~= "met_files" ...
          || string(c.dataset_family) ~= "esm_snowmip"
@@ -1404,7 +1413,9 @@ function [payloads, names, observations, albedo_sources] = ...
 end
 
 function selected = preferObservationRecords(selected)
-   %PREFEROBSERVATIONRECORDS Drop same-source userdata when the target has VARNAME.
+   %PREFEROBSERVATIONRECORDS Drop same-source userdata when a target has
+   % VARNAME.
+
    if isempty(selected)
       return
    end
@@ -1443,15 +1454,17 @@ function [tables, names] = profilesForVariable(profiles, varname, dataset_family
    %PROFILESFORVARIABLE Return human-labelled profile series carrying VARNAME.
    keep = arrayfun(@(p) ismember(varname, p.value_variables), profiles);
    selected = profiles(keep);
-   tables = cell(1, 0);
-   names = strings(1, 0);
    base_name = sourceDisplayName(dataset_family, "observations");
+   % One series block per selected profile, collected in buffers sized to the
+   % selection and flattened once after the loop.
+   table_blocks = repmat({cell(1, 0)}, 1, numel(selected));
+   name_blocks = repmat({strings(1, 0)}, 1, numel(selected));
    for k = 1:numel(selected)
-      [next_tables, next_names] = splitNamedProfiles( ...
+      [table_blocks{k}, name_blocks{k}] = splitNamedProfiles( ...
          selected(k).payload, base_name);
-      tables = [tables, next_tables]; %#ok<AGROW>
-      names = [names, next_names]; %#ok<AGROW>
    end
+   tables = [cell(1, 0), table_blocks{:}];
+   names = [strings(1, 0), name_blocks{:}];
 end
 
 function [tables, names] = splitNamedProfiles(T, base_name)
@@ -1611,16 +1624,21 @@ function finalizeLegendClearance(fig)
       end
       legend_pixels = getpixelposition(lgd, true);
       legend_center = legend_pixels(1:2) + legend_pixels(3:4) / 2;
-      owner = gobjects(0, 1);
+      % At most every axes on the figure can contain the legend centre, so the
+      % owner buffer is sized to the axes list and trimmed to the hits.
+      owner = gobjects(numel(axes_handles), 1);
+      n_owner = 0;
       for ax = reshape(axes_handles, 1, [])
          axes_pixels = getpixelposition(ax, true);
          if legend_center(1) >= axes_pixels(1) ...
                && legend_center(1) <= axes_pixels(1) + axes_pixels(3) ...
                && legend_center(2) >= axes_pixels(2) ...
                && legend_center(2) <= axes_pixels(2) + axes_pixels(4)
-            owner(end + 1, 1) = ax; %#ok<AGROW>
+            n_owner = n_owner + 1;
+            owner(n_owner) = ax;
          end
       end
+      owner = owner(1:n_owner);
       if isscalar(owner)
          % Freeze MATLAB's resolved best position before changing limits;
          % otherwise BEST can move the legend after clearance is computed.

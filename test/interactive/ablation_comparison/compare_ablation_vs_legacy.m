@@ -300,8 +300,13 @@ function p = relpct(stats)
 end
 
 function root = repoRoot()
-   %REPOROOT Repo root from this file: test/interactive/<file>.m -> up two.
-   root = fileparts(fileparts(fileparts(mfilename("fullpath"))));
+   %REPOROOT Return the repository root.
+   %
+   % Three fileparts calls from this file give <repo>/test, not <repo>,
+   % because the file sits in test/interactive/ablation_comparison. Use the
+   % canonical helper instead of counting directory levels.
+
+   root = string(icemodel.internal.fullpath());
 end
 
 function reportResults(results)

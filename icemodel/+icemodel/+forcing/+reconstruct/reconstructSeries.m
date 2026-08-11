@@ -221,9 +221,11 @@ function result = reconstructSeries(series, channel_methods, kwargs)
       stops = find(miss & [~miss(2:end) ...
          | seasons(1:end - 1) ~= seasons(2:end); true]);
       methods = channel_methods(c).methods;
-       % Method attempts can fill disjoint fragments, so audit row groups
-       % are collected and flattened after the run loop.
-       run_audits = cell(0, 1);
+      % A method attempt can fill disjoint fragments, so the code collects
+      % audit row groups and flattens them after the run loop. One slot per
+      % run holds that run's groups, and each slot starts as the typed empty
+      % column so a run without audit rows adds nothing.
+      gap_audits = repmat({cell(0, 1)}, numel(starts), 1);
       blend_len = max(1, round(kwargs.blend_hours / dt_hours));
       for g = 1:numel(starts)
          idx = (starts(g):stops(g)).';
@@ -262,6 +264,10 @@ function result = reconstructSeries(series, channel_methods, kwargs)
          % explained in the audit instead of silently omitted.
          reasons = strings(numel(methods), 1);
          n_reason = 0;
+         % One slot per method attempt, plus the run's residual group, so the
+         % run's audit rows keep method order without growing a column.
+         method_audits = repmat({cell(0, 1)}, numel(methods), 1);
+         residual_audit = cell(0, 1);
          for m = 1:numel(methods)
             method = methods(m);
             [admitted, admission_reason] = stratumAdmitted(method, ...
@@ -367,12 +373,11 @@ function result = reconstructSeries(series, channel_methods, kwargs)
              filled_idx = idx(usable);
              filled_mask = false(numel(times), 1);
              filled_mask(filled_idx) = true;
-             rows = icemodel.forcing.reconstruct.auditSegments( ...
+            method_audits{m} = icemodel.forcing.reconstruct.auditSegments( ...
                 times, filled_mask, channel, method.name, sprintf( ...
                 'season %s bucket %d, filled %d/%d run samples%s', ...
                 season, bucket, numel(filled_idx), run_len, seam_note), ...
                 context_id=methodContextId(method));
-             run_audits = [run_audits; rows]; %#ok<AGROW>
             if all(usable)
                break
             end
@@ -389,13 +394,16 @@ function result = reconstructSeries(series, channel_methods, kwargs)
              residual = false(numel(times), 1);
              residual(starts(g):stops(g)) = ...
                 ~isfinite(x(starts(g):stops(g)));
-             rows = icemodel.forcing.reconstruct.auditSegments( ...
+            residual_audit = icemodel.forcing.reconstruct.auditSegments( ...
                 times, residual, channel, "unfilled", ...
                 char("residual missing; " + ...
                 strjoin(reasons(1:n_reason), "; ")));
-             run_audits = [run_audits; rows]; %#ok<AGROW>
          end
+         % Method rows precede the run's residual row, matching the order the
+         % audit column carried when it was grown in place.
+         gap_audits{g} = vertcat(cell(0, 1), method_audits{:}, residual_audit);
       end
+      run_audits = vertcat(cell(0, 1), gap_audits{:});
 
       series.(channel) = x;
       provenance.(channel) = code;

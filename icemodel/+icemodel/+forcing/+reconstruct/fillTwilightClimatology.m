@@ -68,7 +68,9 @@ function [x, filled, audit] = fillTwilightClimatology( ...
    candidate = candidate(valid);
    n_support = n_support(valid);
    filled = false(size(x));
-   audit = cell(0, 1);
+   % One audit block per filled posting: collect the blocks in a buffer sized
+   % to the target list and concatenate once after the loop.
+   audit_blocks = cell(numel(target), 1);
    for k = 1:numel(target)
       x(target(k)) = candidate(k);
       filled(target(k)) = true;
@@ -79,6 +81,9 @@ function [x, filled, audit] = fillTwilightClimatology( ...
          ['day-of-year/posting median; support %d; ' ...
          'interval maximum %.3g deg'], n_support(k), ...
          maximum_elevation(target(k))));
-      audit = [audit; rows]; %#ok<AGROW>
+      audit_blocks{k} = rows;
    end
+   % Seed with an empty cell column so the result keeps that shape when TARGET
+   % is empty. Callers concatenate this with other channels.
+   audit = vertcat(cell(0, 1), audit_blocks{:});
 end
