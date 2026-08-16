@@ -118,13 +118,81 @@ artifacts. This is zero-spinup preconditioning and does not add production snow
 physics, so the scientific report must retain that limitation when interpreting
 thermal, liquid-storage, or refreezing behavior.
 
-`icemodel.verification.report.buildAblationEvaluationReport` is a pure consumer
-of the runner's saved `results.mat`. It does not reopen canonical observations,
-forcing, or model inputs. It exports compact scientific tables and figures,
+`icemodel.verification.report.buildAblationEvaluationReport` takes every
+scientific value from the runner's saved `results.mat`. It does not reopen
+observations, forcing, or model inputs. It does read the running
+repository to check the saved cohort against current code: the two namelists
+below, the resolved default model options, and `CITATION.cff`. Resolving the
+default options runs `icemodel.setopts`, which needs a resolvable
+`ICEMODEL_INPUT_PATH`. When that is absent, a cohort carrying a stamp warns
+and continues, and a cohort carrying none reports an absent stamp without
+warning.
+
+It exports compact scientific tables and figures,
 an inspectable QMD source, and an optional self-contained HTML report. The
 cross-site graphic contains only completed selected site-years; readiness,
 selection, exclusions, and model-run accounting remain concise appendix prose
 with linked CSV evidence rather than a cohort-count graphic.
+
+### When a saved cohort must be run again
+
+The report checks a saved cohort when it builds, not when code changes.
+Development can change channels, code, and physics freely. Four separate
+identities decide what the check does:
+
+1. Scientific comparison policy. Season bounds, the density band, thresholds,
+   and tolerances must equal the current
+   `icemodel.verification.namelists.promiceAblationPolicy` values. These
+   change how saved output is scored, so a difference stops the build. The
+   policy's own documentation fields are exempt: rewording a citation must not
+   cost a multi-hour run.
+2. Model channel schema. The saved cohort must carry every channel the report
+   reads, named by
+   `icemodel.verification.namelists.ablationReportChannels`. A current channel
+   list that is a superset of the saved list is compatible. The report names
+   the extra channels as unavailable in its Reproducibility Appendix. Removing
+   a channel the report reads stops the build. Appending a diagnostic channel
+   to `icemodel.namelists.budgetoutputs` does not. The check compares names,
+   so a channel that keeps its name while its units or meaning change passes.
+   Bead `icemodel-5gs` adds the definition stamp that would catch that.
+3. Forcing provenance. The `POLICY.md` sha and engine-version gate on the
+   `promice_filled` artifact is unchanged.
+4. Default model option values.
+   `icemodel.verification.helpers.physicsFingerprint` hashes the resolved
+   default options and records the `CITATION.cff` version. A run that
+   executes cases stamps it; a readiness-only run executes no model and
+   stamps nothing. A run with explicit data roots also stamps nothing when
+   `ICEMODEL_INPUT_PATH` will not resolve, because those cases reach their
+   forcing through the manifest root and the global path says nothing about
+   them. The report reads that as an absent stamp. The report recomputes it and WARNS on a difference. It
+   does not stop the build, because an opt-in path that nothing enables also
+   moves the digest.
+
+   Read the fourth check for what it is. It sees a changed default option
+   value and a release bump. It does not see a source-level physics change
+   that touches no option and no release. "Unchanged since the run" is
+   therefore not proof that the current code reproduces the saved numbers.
+   Deciding whether a physics difference warrants a rerun stays a human
+   decision, and the fingerprint informs that decision rather than making
+   it. Bead
+   `icemodel-j2w` holds the decision on whether to widen the scope to the
+   solver source.
+
+Four conditions force a rerun:
+
+- a forcing or `POLICY.md` change (detected by check 3);
+- redefinition of a report-consumed channel under the same name, which check
+  2 does NOT detect until bead `icemodel-5gs` lands. Removal of such a
+  channel is not on this list: a rerun records the same reduced schema and
+  fails the same gate, so `validateAblationModelSchema` tells the operator to
+  restore the channel or drop the report reader instead;
+- a scientific comparison-policy change (detected by check 1);
+- a default-on physics change that alters existing channel values. Check 4
+  sees option values and the release version only, so it does NOT detect one
+  that lives in source rather than in an option value.
+
+Additive channels, flag-off code, prose fields, and documentation renames
+force none.
 
 ## Normal Workflow
 
@@ -1417,8 +1485,14 @@ source rows and must not define a new on-disk contract.
   with one set of guards), `sampleQuantile`, `evaluationSeason` (the season
   bounds readiness admits against and the runner evaluates against),
   `ablationLedgerIncrements` (the per-interval solid-balance, surface-loss,
-  and solid-vapor-loss terms the comparator scores and the runner plots), and
-  `classifySnowDepth`.
+  and solid-vapor-loss terms the comparator scores and the runner plots),
+  `classifySnowDepth`, `physicsFingerprint` (the digest of the resolved
+  default option values plus the `CITATION.cff` version that the ablation
+  runner stamps and the ablation report compares against),
+  `isPhysicsFingerprint` (the shape test a saved stamp must pass before the
+  report compares it), and `validateAblationModelSchema` (the compatibility
+  test between a saved cohort's channel schema, the current namelists, and
+  the channels the ablation report reads).
 - `report` owns the pieces both report builders share: `markdownTable`,
   `formatValue`, `markdownCode`, `escapeMarkdownText`, `sanitizeText`,
   `safeLabel`, `formatReportAxes`, `configureCategoryAxis`, and
@@ -1427,6 +1501,10 @@ source rows and must not define a new on-disk contract.
   one span style.
 - `setup.writeJson` writes every readiness ledger, preview evidence, and QA
   JSON, so they agree on UTF-8 and a trailing newline.
+- `setup.bytesSha256` is the one SHA-256 implementation. `setup.fileSha256`
+  hashes a file through it, and `setup.textSha256` hashes a UTF-8 encoded
+  string through it. A stored artifact digest and an in-memory digest of the
+  same bytes therefore agree.
 - `setup` contains the consistently named family source catalogs listed above,
   their shared strict site-id selector (`selectSiteCatalogEntries`), and the
   canonical staged-case factories. RetMIP keeps alias-aware case selection in
@@ -1435,7 +1513,10 @@ source rows and must not define a new on-disk contract.
 - `namelists` contains canonical selector lists for dataset families, case ids,
   case types, surface zones (`surfacezone`, the per-case physical-regime
   vocabulary stamped onto case manifests), the ESM-SnowMIP site-name namelist
-  (`snowmipsite`), and the Laugh-Tests case-id namelist (`laughtests`). `caseid` dispatches uniformly
+  (`snowmipsite`), the Laugh-Tests case-id namelist (`laughtests`), and the
+  model diagnostic channels the ablation report reads
+  (`ablationReportChannels`, grouped by the report table that reads them).
+  `caseid` dispatches uniformly
   across families using these per-family namelists. The richer per-site
   ESM-SnowMIP catalog query helper lives at
   `icemodel.verification.setup.esmSnowmipSiteCatalog`.

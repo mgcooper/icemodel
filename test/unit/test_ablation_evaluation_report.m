@@ -774,6 +774,8 @@ function test_invalid_saved_contract_is_rejected(testCase)
    invalid_policies{15}.required_observation_fields(2) = "snow_height";
    invalid_policies{16} = valid.policy;
    invalid_policies{16}.scientific.signal_floor_mwe = 0.03;
+   % The strict equality comparison excludes the channel schema, so the
+   % required-field list is what catches its absence.
    invalid_policies{17} = rmfield(valid.policy, 'required_model_fields');
    for k = 1:numel(invalid_policies)
       results = valid;
@@ -992,6 +994,13 @@ function results = syntheticResults()
    % stores the policy alongside the data.
    results.policy = ...
       icemodel.verification.namelists.promiceAblationPolicy();
+
+   % The fixture carries no physics fingerprint on purpose. Resolving one
+   % runs icemodel.setopts, which asserts that ICEMODEL_INPUT_PATH exists.
+   % Every caller of this fixture would then need a provisioned data tree to
+   % build a report from a self-contained struct. An absent stamp does not
+   % warn, so the report tests stay quiet. The fingerprint tests below stamp
+   % their own copies.
    results.run_name = "synthetic<script>unsafe</script>";
    results.paths = struct('run_dir', "/definitely/not/present", ...
       'readiness_csv', "/definitely/not/present/readiness.csv", ...
@@ -1265,6 +1274,210 @@ function result = siteResultFixture(t0, t1)
       'comparison', comparison, 'aligned', aligned, ...
       'diagnostics', diagnostics, 'nested_windows', table(), ...
       'seasonal', seasonal);
+end
+
+function test_an_added_diagnostic_channel_keeps_a_saved_cohort_usable(testCase)
+   % Appending a diagnostic channel must not invalidate a saved cohort. The
+   % saved run cannot contain a channel that did not exist when it ran. A new
+   % channel cannot change a value the run already computed. One appended
+   % channel must therefore never cost a multi-hour rerun.
+
+   valid = syntheticResults();
+   scratch = temporaryFolder(testCase);
+   output_folder = fullfile(scratch, 'added-channel-report');
+   results_file = fullfile(scratch, 'results.mat');
+
+   % A saved schema one channel short of the current namelist is what a
+   % cohort that ran before the channel was added looks like. The dropped
+   % channel must be one the report does not read.
+   consumed = icemodel.verification.namelists.ablationReportChannels();
+   saved_schema = valid.policy.required_model_fields;
+   droppable = setdiff(string(saved_schema), consumed, 'stable');
+   verifyNotEmpty(testCase, droppable, ...
+      'the policy schema must contain a channel the report does not read')
+   results = valid;
+   results.policy.required_model_fields = ...
+      setdiff(string(saved_schema), droppable(1), 'stable');
+   save(results_file, 'results')
+
+   icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false);
+
+   % render=false writes the document source, so that is what proves the
+   % cohort was accepted. The report must also name the missing channel as
+   % unavailable rather than pass over it in silence.
+   qmd_file = fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd');
+   verifyTrue(testCase, isfile(qmd_file))
+   verifySubstring(testCase, strjoin(readlines(qmd_file), newline), ...
+      char(droppable(1)))
+end
+
+function test_a_removed_report_channel_invalidates_a_saved_cohort(testCase)
+   % Compatibility is one-directional. A saved cohort that lacks a channel
+   % the report reads cannot produce that report. A channel the current code
+   % does not define has been removed or redefined. Its saved values do not
+   % mean what the report says they mean.
+
+   valid = syntheticResults();
+   scratch = temporaryFolder(testCase);
+   output_folder = fullfile(scratch, 'removed-channel-report');
+   results_file = fullfile(scratch, 'results.mat');
+
+   consumed = icemodel.verification.namelists.ablationReportChannels();
+   results = valid;
+   results.policy.required_model_fields = setdiff( ...
+      string(valid.policy.required_model_fields), consumed(1), 'stable');
+   save(results_file, 'results')
+   verifyError(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false), ...
+      'icemodel:verification:report:incompatibleModelSchema')
+end
+
+function test_physics_fingerprint_warns_and_never_blocks_a_report(testCase)
+   % A physics change is a prompt to check, not proof of staleness: an opt-in
+   % path that nothing enables also moves the digest. The gate therefore warns
+   % and still builds, and the owner decides whether to rerun.
+
+   valid = syntheticResults();
+   valid.physics_fingerprint = ...
+      icemodel.verification.helpers.physicsFingerprint();
+   scratch = temporaryFolder(testCase);
+   output_folder = fullfile(scratch, 'fingerprint-report');
+   results_file = fullfile(scratch, 'results.mat');
+
+   % A stamp that does not match the running code warns and still builds.
+   results = valid;
+   results.physics_fingerprint.opts_sha256 = string(repmat('0', 1, 64));
+   save(results_file, 'results')
+   verifyWarning(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false), ...
+      'icemodel:verification:report:physicsFingerprintMismatch')
+   verifyTrue(testCase, isfile(fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd')))
+
+   % A cohort saved before the stamp existed must build without a warning.
+   % Every such cohort is in that state, so warning about all of them would
+   % drown the warning that carries information.
+   results = rmfield(valid, 'physics_fingerprint');
+   save(results_file, 'results')
+   verifyWarningFree(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false))
+   qmd_file = fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd');
+   verifySubstring(testCase, strjoin(readlines(qmd_file), newline), ...
+      'not recorded by this cohort')
+
+   % The saved version string reaches the document, so it must be sanitized
+   % like every other saved value. A cohort carrying markup in that field
+   % must not put raw markup into the report.
+   results = valid;
+   results.physics_fingerprint.opts_sha256 = string(repmat('0', 1, 64));
+   results.physics_fingerprint.icemodel_version = ...
+      "<script>alert(1)</script>";
+   save(results_file, 'results')
+   verifyWarning(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false), ...
+      'icemodel:verification:report:physicsFingerprintMismatch')
+   qmd_text = strjoin(readlines(fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd')), newline);
+   verifyFalse(testCase, contains(qmd_text, "<script"))
+
+   % A malformed stamp is a damaged cohort, not an old one, so it warns and
+   % still builds. One shape is enough here. The report only asks
+   % icemodel.verification.helpers.isPhysicsFingerprint whether the stamp is
+   % well formed. test_report_helpers covers every shape that helper rejects,
+   % and pays for no report build.
+   results = valid;
+   results.physics_fingerprint = rmfield(valid.physics_fingerprint, ...
+      'opts_sha256');
+   save(results_file, 'results')
+   verifyWarning(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false), ...
+      'icemodel:verification:report:malformedPhysicsFingerprint')
+   verifySubstring(testCase, strjoin(readlines(fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd')), newline), ...
+      'stamp is malformed')
+
+   % The matching stamp must stay silent, or the warning carries no signal.
+   results = valid;
+   save(results_file, 'results')
+   verifyWarningFree(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false))
+end
+
+function test_report_builds_when_the_workspace_cannot_resolve_defaults( ...
+      testCase)
+   % Resolving the current defaults runs icemodel.setopts, which calls
+   % configureRun and asserts that ICEMODEL_INPUT_PATH exists. Building a
+   % report from a saved MAT file must survive an absent workspace, because
+   % that is the one situation the guard exists for.
+
+   valid = syntheticResults();
+   scratch = temporaryFolder(testCase);
+   output_folder = fullfile(scratch, 'no-workspace-report');
+   results_file = fullfile(scratch, 'results.mat');
+   results = valid;
+   save(results_file, 'results')
+
+   % Restore the caller's configuration even if the verification below fails.
+   prior_input_path = getenv('ICEMODEL_INPUT_PATH');
+   restore_env = onCleanup(@() ...
+      setenv('ICEMODEL_INPUT_PATH', prior_input_path));
+   setenv('ICEMODEL_INPUT_PATH', fullfile(tempname, 'not-a-directory'))
+
+   % This cohort carries no stamp, so the state is absent, not unavailable.
+   % A run with explicit data roots omits the stamp on purpose, and the
+   % broken workspace says nothing about that cohort. Absent does not warn.
+   verifyWarningFree(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false))
+
+   % A cohort that DOES carry a stamp still warns, because there the report
+   % genuinely cannot tell whether the current defaults moved.
+   stamped_file = fullfile(scratch, 'results_stamped.mat');
+   results = valid;
+   results.physics_fingerprint = struct( ...
+      'opts_sha256', string(repmat('a', 1, 64)), ...
+      'icemodel_version', "0.0.0");
+   save(stamped_file, 'results')
+   verifyWarning(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      stamped_file, output_dir=fullfile(scratch, 'stamped-report'), ...
+      render=false), ...
+      'icemodel:verification:report:unavailablePhysicsFingerprint')
+
+   % The report must still be written, and must say the comparison did not
+   % happen rather than claim the physics is unchanged. An absent stamp says
+   % the cohort never recorded one.
+   qmd_file = fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd');
+   verifyTrue(testCase, isfile(qmd_file))
+   qmd_text = strjoin(readlines(qmd_file), newline);
+   verifySubstring(testCase, qmd_text, 'not recorded by this cohort')
+
+   % Pin the clause, not just the state. The workspace cannot resolve the
+   % current defaults here, so the appendix must say so. Asserting only the
+   % state above would also pass against an implementation that printed the
+   % empty digest as a pair of backticks.
+   verifySubstring(testCase, qmd_text, ...
+      'the current defaults did not resolve in this workspace')
+   verifyFalse(testCase, contains(qmd_text, 'current `` at IceModel'), ...
+      'the appendix must not print empty code spans for the current stamp')
+
+   % The stamped cohort's report says the comparison could not run.
+   stamped_qmd = fullfile(scratch, 'stamped-report', ...
+      'promice-ablation-evaluation-report.qmd');
+   verifyTrue(testCase, isfile(stamped_qmd))
+   verifySubstring(testCase, ...
+      strjoin(readlines(stamped_qmd), newline), 'not compared')
+   clear restore_env
 end
 
 function test_reworded_documentation_does_not_invalidate_a_saved_policy(testCase)

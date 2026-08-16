@@ -90,6 +90,43 @@ function test_comparison_rebases_and_closes_budgets(testCase)
    testCase.verifyEqual(summary.policy_version, policy.version);
 end
 
+function test_a_cohort_saved_before_the_redistribution_channels_compares( ...
+      testCase)
+   % A diagnostic timetable saved before the coupled vapor mode carries
+   % neither redistribution channel, and promiceAblationPolicy builds its
+   % required list from the live budgetoutputs. Rejecting that cohort would
+   % force a rerun for channels that cannot change what it recorded, which is
+   % the outcome the channel-schema check exists to avoid. Both channels are
+   % additive, so zero is what such a run wrote.
+
+   [observations, model] = makeInputs();
+
+   % makeInputs wraps the diagnostic timetable in a struct, so drop the two
+   % columns there, the way a cohort saved before those channels existed
+   % would lack them.
+   legacy = model;
+   legacy.data = removevars(legacy.data, ...
+      {'mass_budget_vapor_redistribution_j_m2', ...
+      'mass_budget_vapor_redistribution_gross_j_m2'});
+   testCase.assertFalse(ismember( ...
+      "mass_budget_vapor_redistribution_j_m2", ...
+      string(legacy.data.Properties.VariableNames)));
+
+   [summary_legacy, aligned_legacy] = ...
+      icemodel.verification.compareAblation(observations, legacy);
+   [summary_full, aligned_full] = ...
+      icemodel.verification.compareAblation(observations, model);
+
+   % The fixture writes zero into both channels, so backfilling them must
+   % reproduce the full-schema comparison exactly.
+   testCase.verifyEqual(summary_legacy.classification, ...
+      summary_full.classification);
+   testCase.verifyEqual(aligned_legacy.model_solid_loss_mwe, ...
+      aligned_full.model_solid_loss_mwe, AbsTol=0);
+   testCase.verifyEqual(aligned_legacy.model_melt_mwe, ...
+      aligned_full.model_melt_mwe, AbsTol=0);
+end
+
 function test_signed_density_band_orders_bounds_and_preserves_endpoints(testCase)
    % Negative cumulative lowering reverses which density endpoint is the
    % numeric lower value without changing the density-specific sensitivity.
@@ -498,6 +535,25 @@ function test_required_model_field_has_stable_error(testCase)
    testCase.verifyError(@() icemodel.verification.compareAblation( ...
       observations, model), ...
       'icemodel:verification:compareAblation:missingModelField');
+end
+
+function test_a_cohort_lacking_an_unread_channel_still_compares(testCase)
+   % A cohort saved before a diagnostic channel was appended lacks that
+   % column. The comparison never reads it, so its absence must not reject
+   % the cohort and force a multi-hour rerun.
+   %
+   % Requiring every channel the namelist names would fail this case.
+   [observations, model] = makeInputs();
+   unread = "mass_budget_vapor_redistribution_j_m2";
+   testCase.assumeTrue(ismember(unread, ...
+      string(model.data.Properties.VariableNames)));
+   testCase.assertFalse(ismember(unread, ...
+      icemodel.verification.namelists.ablationReportChannels('ledger')));
+
+   model.data = removevars(model.data, unread);
+
+   returned = icemodel.verification.compareAblation(observations, model);
+   testCase.verifyClass(returned, 'struct');
 end
 
 function test_missing_internal_model_row_has_stable_error(testCase)

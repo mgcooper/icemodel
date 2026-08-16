@@ -45,6 +45,11 @@ function report_file = buildAblationEvaluationReport(results_file, kwargs)
    end
    results = validateResults(saved.results);
 
+   % The physics gate warns instead of failing. A code change that leaves the
+   % default physics alone does not make saved numbers stale. The owner
+   % decides when a real difference is worth a multi-hour rerun.
+   physics = physicsFingerprintStatus(results);
+
    % All derived report artifacts land beside the results file unless the
    % caller selects another output directory for focused inspection.
    output_dir = kwargs.output_dir;
@@ -54,9 +59,9 @@ function report_file = buildAblationEvaluationReport(results_file, kwargs)
          output_dir = ".";
       end
    end
-   icemodel.helpers.ensureDirExists(output_dir)
+   icemodel.helpers.ensureDirExists(output_dir);
    asset_dir = fullfile(output_dir, 'report-assets');
-   icemodel.helpers.ensureDirExists(asset_dir)
+   icemodel.helpers.ensureDirExists(asset_dir);
 
    % Write report-specific copies of the four public ledgers and derive only
    % flat presentation tables from the saved per-site diagnostics.
@@ -71,7 +76,7 @@ function report_file = buildAblationEvaluationReport(results_file, kwargs)
    manifest_file = fullfile(output_dir, ...
       'report-artifact-sha256.csv');
    lines = reportMarkdown(results, results_file, tables, files, assets, ...
-      report_file, source_sha256, manifest_file);
+      report_file, source_sha256, manifest_file, physics);
    writelines(lines, qmd_file)
 
    % Rendering is optional for focused tests and source review only.
@@ -160,8 +165,14 @@ function policy = validateObservationPolicy(policy)
       "evaluation_season_end_month_day", "effective_density_kg_m3", ...
       "effective_density_reference_kg_m3", ...
       "snow_continuity_threshold_m", "ice_exposure_threshold_m"];
+
+   % The saved channel schema is required but is not compared for equality.
+   % strippedPolicyValues removes it, so this list is what keeps a saved
+   % policy that omits it from reaching the schema check below.
+   schema_fields = "required_model_fields";
    if ~isstruct(policy) || ~isscalar(policy) ...
-         || ~all(isfield(policy, [partition_fields, scientific_fields]))
+         || ~all(isfield(policy, ...
+         [partition_fields, scientific_fields, schema_fields]))
       error('icemodel:verification:report:invalidAblationPolicy', ...
          'Saved policy lacks required observation-flag partitions')
    end
@@ -236,6 +247,12 @@ function policy = validateObservationPolicy(policy)
          'Saved policy does not match the fixed PROMICE ablation policy')
    end
 
+   % The channel list is a schema, not a scientific value, so it gets a
+   % compatibility test instead of equality.
+   policy.unavailable_model_fields = ...
+      icemodel.verification.helpers.validateAblationModelSchema( ...
+      policy.required_model_fields, canonical.required_model_fields);
+
    % Hand the report one validated policy struct with row-shaped fields.
    policy.observation_field = observation_field;
    policy.required_observation_fields = required_schema;
@@ -253,10 +270,18 @@ function policy = validateObservationPolicy(policy)
 end
 
 function values = strippedPolicyValues(policy, canonical)
-   %STRIPPEDPOLICYVALUES Drop explanatory fields before comparing policies.
+   %STRIPPEDPOLICYVALUES Drop non-scientific fields before comparing policies.
    %
    % The namelist names its own documentation fields. A saved policy that
    % lacks one of them is valid, so removal is guarded by isfield.
+   %
+   % required_model_fields also comes out. It is the diagnostic channel
+   % schema, derived live from the output namelists. An equality test on it
+   % would reject every saved cohort as soon as one channel is appended.
+   % icemodel.verification.helpers.validateAblationModelSchema tests it for
+   % compatibility instead.
+   % Season bounds, densities, thresholds, and tolerances stay in the strict
+   % comparison: they change how saved output is scored.
 
    values = policy;
    documentation_fields = canonical.documentation_fields;
@@ -271,6 +296,147 @@ function values = strippedPolicyValues(policy, canonical)
    if isfield(values, 'documentation_fields')
       values = rmfield(values, 'documentation_fields');
    end
+
+   % A saved policy is required to carry the schema, but its content is
+   % compared elsewhere. Removal stays guarded so this function also serves
+   % the canonical-versus-canonical call.
+   if isfield(values, 'required_model_fields')
+      values = rmfield(values, 'required_model_fields');
+   end
+end
+
+function clause = currentClause(physics)
+   %CURRENTCLAUSE Name the current defaults, or say they did not resolve.
+   %
+   % The absent and malformed states reach here without resolving the
+   % current defaults when the workspace cannot, so both fields can be
+   % empty. Printing them anyway leaves empty code spans that read as a
+   % digest the reader cannot see.
+   %
+   % Test the RAW status fields. markdownCode wraps an empty string as a
+   % pair of backticks, which is not empty, so a check on the wrapped value
+   % never fires.
+
+   if strlength(physics.current_opts_sha256) == 0 ...
+         || strlength(physics.current_icemodel_version) == 0
+      clause = "; the current defaults did not resolve in this workspace";
+      return
+   end
+   clause = "; current " ...
+      + icemodel.verification.report.markdownCode( ...
+      physics.current_opts_sha256) ...
+      + " at IceModel " ...
+      + icemodel.verification.report.markdownCode( ...
+      physics.current_icemodel_version);
+end
+
+function status = fillCurrentFingerprint(status)
+   %FILLCURRENTFINGERPRINT Record the current defaults when they resolve.
+   %
+   % The absent and malformed states name the current digest beside the
+   % cohort's own, so fill it when the workspace allows. Resolution runs
+   % icemodel.setopts, which asserts ICEMODEL_INPUT_PATH exists, and a
+   % workspace that cannot resolve it says nothing about the cohort. Leave
+   % the fields empty and do not warn.
+
+   try
+      current = icemodel.verification.helpers.physicsFingerprint();
+      status.current_opts_sha256 = current.opts_sha256;
+      status.current_icemodel_version = current.icemodel_version;
+   catch
+      % Leave the current fields as the empty strings the caller set.
+   end
+end
+
+function status = physicsFingerprintStatus(results)
+   %PHYSICSFINGERPRINTSTATUS Compare saved and current default model physics.
+   %
+   % A cohort run stamps results.physics_fingerprint. This function recomputes
+   % the fingerprint from the running code and reports one of five states:
+   %
+   %   "absent"      the cohort predates the stamp, so nothing is compared;
+   %   "unavailable" the running workspace cannot resolve the current
+   %                 defaults, so nothing is compared;
+   %   "malformed"   the cohort carries a stamp of the wrong shape;
+   %   "match"       the running code resolves the same default options;
+   %   "mismatch"    a default option value or the IceModel version moved.
+   %
+   % "unavailable", "malformed", and "mismatch" warn. "absent" and "match" do
+   % not. An absent stamp is expected of every cohort that ran before the
+   % runner started stamping one. A match is the quiet outcome.
+   %
+   % A mismatch warns. It does not prove the saved numbers are stale. An
+   % opt-in path that nothing enables still moves the digest. A source-level
+   % physics change that touches no option moves neither the digest nor the
+   % version. The judgment stays with the owner.
+   %
+   % This gate must never stop a report. The fingerprint resolves the current
+   % defaults through icemodel.setopts, which calls configureRun and asserts
+   % that ICEMODEL_INPUT_PATH exists. A workspace that is absent or unmounted
+   % must therefore degrade to "unavailable", not fail the build.
+
+   status = struct( ...
+      'state', "absent", ...
+      'saved_opts_sha256', "", ...
+      'saved_icemodel_version', "", ...
+      'current_opts_sha256', "", ...
+      'current_icemodel_version', "");
+
+   % No stamp at all is the normal state for every cohort saved before the
+   % runner started stamping one, so it does not warn. The appendix states it,
+   % which is enough for a reader and keeps the warning channel meaningful.
+   if ~isfield(results, 'physics_fingerprint')
+      % Still show what the current code resolves to, when it can, because
+      % the appendix names it beside the missing stamp. A workspace that
+      % cannot resolve it says nothing about this cohort, so do not warn.
+      status = fillCurrentFingerprint(status);
+      return
+   end
+
+   % A stamp that is present but the wrong shape is not an old cohort, it is a
+   % damaged one, so it warns. The shape test is a helper so that every shape
+   % it rejects can be checked without building a report.
+   saved = results.physics_fingerprint;
+   if ~icemodel.verification.helpers.isPhysicsFingerprint(saved)
+      status.state = "malformed";
+      status = fillCurrentFingerprint(status);
+      warning('icemodel:verification:report:malformedPhysicsFingerprint', ...
+         ['Saved cohort carries a malformed physics fingerprint, so the ' ...
+         'report cannot tell whether the current defaults still match.'])
+      return
+   end
+   status.saved_opts_sha256 = string(saved.opts_sha256);
+   status.saved_icemodel_version = string(saved.icemodel_version);
+
+   % Resolve the current defaults only after the cohort's own stamp is
+   % classified. Resolving first would report an unstamped cohort as
+   % unavailable, and warn, whenever the workspace cannot resolve defaults.
+   % A run with explicit data roots omits the stamp on purpose, and that is
+   % an absent stamp, not an unavailable comparison.
+   try
+      current = icemodel.verification.helpers.physicsFingerprint();
+   catch err
+      status.state = "unavailable";
+      warning('icemodel:verification:report:unavailablePhysicsFingerprint', ...
+         ['The current default physics could not be resolved (%s), so the ' ...
+         'report cannot compare it against this cohort.'], err.message)
+      return
+   end
+   status.current_opts_sha256 = current.opts_sha256;
+   status.current_icemodel_version = current.icemodel_version;
+   if status.saved_opts_sha256 == status.current_opts_sha256 ...
+         && status.saved_icemodel_version == status.current_icemodel_version
+      status.state = "match";
+      return
+   end
+
+   status.state = "mismatch";
+   warning('icemodel:verification:report:physicsFingerprintMismatch', ...
+      ['Default model physics moved since this cohort ran ' ...
+      '(saved %s at version %s, current %s at version %s). Decide ' ...
+      'whether the change alters the saved channels before citing them.'], ...
+      status.saved_opts_sha256, status.saved_icemodel_version, ...
+      status.current_opts_sha256, status.current_icemodel_version)
 end
 
 function tf = validMonthDay(value)
@@ -637,8 +803,8 @@ function components = componentTable(site_results)
       t1 = result.comparison.window_end;
       ledger = result.model(result.model.Time >= t0 ...
          & result.model.Time < t1, :);
-      required = ["mass_budget_phase_solid_mwe", ...
-         "mass_budget_vapor_solid_mwe"];
+      required = icemodel.verification.namelists.ablationReportChannels( ...
+         'components');
       if isempty(ledger) || ~all(ismember(required, ...
             string(ledger.Properties.VariableNames)))
          error('icemodel:verification:report:missingAblationComponents', ...
@@ -693,9 +859,7 @@ function rows = gridTranslationRows(result, variable_names)
    t1 = result.comparison.window_end;
    ledger = result.model(result.model.Time >= t0 ...
       & result.model.Time < t1, :);
-   required = ["mass_budget_top_deletion_count", ...
-      "mass_budget_top_deletion_height_m", ...
-      "mass_budget_interior_merge_count"];
+   required = icemodel.verification.namelists.ablationReportChannels('grid');
    if isempty(ledger) || ~all(ismember(required, ...
          string(ledger.Properties.VariableNames)))
       error('icemodel:verification:report:missingGridTranslationLedger', ...
@@ -2006,7 +2170,7 @@ function markers = categoryMarkers(categories)
 end
 
 function lines = reportMarkdown(results, results_file, tables, files, ...
-      assets, report_file, source_sha256, manifest_file)
+      assets, report_file, source_sha256, manifest_file, physics)
    %REPORTMARKDOWN Build the scientific report from saved values only.
 
    generated = string(datetime('now', TimeZone='UTC', ...
@@ -2453,9 +2617,19 @@ function lines = reportMarkdown(results, results_file, tables, files, ...
       ""
       "## Reproducibility Appendix"
       ""
-      "This report was generated solely from the saved MAT artifact below. " ...
-      + "The builder did not reopen readiness inputs, canonical forcing, " ...
-      + "observations, or model configuration paths."
+      "Every scientific value in this report comes from the saved MAT " ...
+      + "artifact below. The builder did not reopen readiness inputs, " ...
+      + "forcing, or observations."
+      ""
+      "The builder does read the running repository, to check the saved " ...
+      + "cohort against current code. It reads the comparison policy and " ...
+      + "the report channel list from the namelists. A saved policy whose " ...
+      + "values differ stops the build. It also resolves the current " ...
+      + "default model options and reads the version from CITATION.cff, " ...
+      + "then compares both against the fingerprint the run stamped. That " ...
+      + "last comparison only warns. Two lines below, the channel-schema " ...
+      + "and default-physics entries therefore describe the running code, " ...
+      + "not the saved artifact."
       ""
       "- Run name: " ...
       + icemodel.verification.report.markdownCode(string(results.run_name))
@@ -2464,6 +2638,9 @@ function lines = reportMarkdown(results, results_file, tables, files, ...
       + icemodel.verification.report.markdownCode(source_sha256)
       "- Saved policy version: " + policyVersion(results.policy)
       "- Generated: " + icemodel.verification.report.markdownCode(generated)
+      "- Model channel schema: " ...
+      + unavailableChannelText(results.policy.unavailable_model_fields)
+      "- Default model physics: " + physicsFingerprintText(physics)
       ""
       "### Machine-readable evidence"
       ""
@@ -2508,6 +2685,67 @@ function lines = reportMarkdown(results, results_file, tables, files, ...
       + "`initialization_policy`, evaluation boundaries, and the inclusive " ...
       + "run endpoint exactly as saved by the runner."
       ""];
+end
+
+function text = unavailableChannelText(unavailable)
+   %UNAVAILABLECHANNELTEXT State which current channels the cohort lacks.
+   %
+   % The report names the channels the running code defines that this cohort
+   % did not record. They are unavailable here, not a defect: a diagnostic
+   % channel added after the run cannot change a value the run computed.
+
+   if isempty(unavailable)
+      text = "complete; the saved cohort carries every current channel";
+      return
+   end
+   % markdownCode sanitizes one scalar value, so map it over the list.
+   coded = arrayfun(@(name) ...
+      icemodel.verification.report.markdownCode(name), ...
+      unavailable, 'UniformOutput', false);
+   text = "unavailable in this cohort: " + strjoin(string(coded), ", ");
+end
+
+function text = physicsFingerprintText(physics)
+   %PHYSICSFINGERPRINTTEXT State whether the current code matches the cohort.
+   %
+   % The saved digest and the saved version both come out of the results MAT
+   % file, so both go through markdownCode. A saved value is untrusted text,
+   % and no report may write it into the document unsanitized.
+
+   saved_digest = ...
+      icemodel.verification.report.markdownCode(physics.saved_opts_sha256);
+   saved_version = icemodel.verification.report.markdownCode( ...
+      physics.saved_icemodel_version);
+   current_digest = ...
+      icemodel.verification.report.markdownCode(physics.current_opts_sha256);
+   current_version = icemodel.verification.report.markdownCode( ...
+      physics.current_icemodel_version);
+
+   switch physics.state
+      case "match"
+         text = "unchanged since the run (" + current_digest ...
+            + ", IceModel " + current_version + ")";
+      case "mismatch"
+         text = "CHANGED since the run: saved " + saved_digest ...
+            + " at IceModel " + saved_version + ", current " ...
+            + current_digest + " at IceModel " + current_version ...
+            + ". An opt-in path that nothing enables also moves this " ...
+            + "digest, so the difference is a prompt to check, not proof " ...
+            + "that the saved values are stale.";
+      case "unavailable"
+         text = "not compared, because this workspace could not resolve " ...
+            + "the current default options";
+      case "malformed"
+         text = "not compared, because this cohort's stamp is malformed" ...
+            + currentClause(physics);
+      case "absent"
+         text = "not recorded by this cohort" ...
+            + currentClause(physics);
+      otherwise
+         % A state this function does not know must not be described as any
+         % of the states above, and must not stop the build.
+         text = "not compared; the gate reported an unrecognized state";
+   end
 end
 
 function text = performanceVerdictText(summary)

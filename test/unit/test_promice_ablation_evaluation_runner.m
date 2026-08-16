@@ -60,6 +60,11 @@ function test_default_is_readiness_only_and_transient(testCase)
       results.summary.eligible_sample_count(kanm | kanl))))
    testCase.verifyEqual(results.paths.run_dir, "")
    testCase.verifyEqual(results.readiness.files.csv, "")
+
+   % A readiness-only run executes no model, so it stamps no physics
+   % fingerprint. Resolving one runs icemodel.setopts, which asserts that the
+   % workspace exists, and this run reads its data roots from the caller.
+   testCase.verifyFalse(isfield(results, 'physics_fingerprint'))
 end
 
 function test_selected_run_pins_filled_forcing_and_half_open_boundary(testCase)
@@ -71,6 +76,15 @@ function test_selected_run_pins_filled_forcing_and_half_open_boundary(testCase)
       artifact_root=testCase.TestData.artifact_root, ...
       run_name="20260804-010203", ...
       write_artifacts=true, model_provider=@selectedModelProvider);
+
+   % A run that executes a case stamps the default physics it ran under, so a
+   % report built later can compare it against the code of the day.
+   testCase.verifyTrue(isfield(results, 'physics_fingerprint'))
+   testCase.verifyTrue( ...
+      icemodel.verification.helpers.isPhysicsFingerprint( ...
+      results.physics_fingerprint))
+   testCase.verifyEqual(results.physics_fingerprint.opts_sha256, ...
+      icemodel.verification.helpers.physicsFingerprint().opts_sha256)
 
    % All readiness rows remain in the flat summary while only KAN_M executes.
    kanm = results.summary.case_id == "kanm";
@@ -238,6 +252,41 @@ function test_selected_run_pins_filled_forcing_and_half_open_boundary(testCase)
       'promice-ablation-evaluation-report.html')))
    testCase.verifyTrue(isfile(fullfile(report_dir, ...
       'promice-ablation-evaluation-report.qmd')))
+end
+
+function test_a_stale_global_path_does_not_stop_an_explicit_root_run(testCase)
+   % physicsFingerprint resolves its reference through icemodel.setopts,
+   % which asserts ICEMODEL_INPUT_PATH exists. A cohort that supplies
+   % explicit roots reaches its forcing through the manifest root instead, so
+   % an unset or stale global path says nothing about whether its cases can
+   % run. The runner guards the stamp, and the run must still complete.
+
+   restore = onCleanup(@() setenv('ICEMODEL_INPUT_PATH', ...
+      getenv('ICEMODEL_INPUT_PATH')));
+   saved_path = getenv('ICEMODEL_INPUT_PATH');
+   cleaner = onCleanup(@() setenv('ICEMODEL_INPUT_PATH', saved_path));
+   setenv('ICEMODEL_INPUT_PATH', ...
+      fullfile(tempdir, 'icemodel-no-such-workspace'));
+
+   results = run_promice_ablation_evaluation( ...
+      case_ids="kanm", years=2019, ...
+      evaluation_data_root=testCase.TestData.eval_root, ...
+      input_data_root=testCase.TestData.input_root, ...
+      artifact_root=testCase.TestData.artifact_root, ...
+      run_name="20260804-010204", ...
+      write_artifacts=true, model_provider=@selectedModelProvider);
+
+   % The case still executes.
+   kanm = results.summary.case_id == "kanm";
+   testCase.verifyEqual(results.summary.status(kanm), "completed", ...
+      'an explicit-root run must not depend on the global path');
+
+   % The stamp is absent rather than the run failing. The report reads an
+   % absent stamp without warning.
+   testCase.verifyFalse(isfield(results, 'physics_fingerprint') ...
+      && ~isempty(results.physics_fingerprint));
+
+   clear cleaner restore
 end
 
 function test_future_display_interval_sentinel_is_rejected(testCase)

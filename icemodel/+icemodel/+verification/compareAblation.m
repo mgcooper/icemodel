@@ -46,8 +46,20 @@ function [summary, aligned, diagnostics, policy] = compareAblation( ...
    % missing physical term cannot be mistaken for unavailable temporal support.
    requireVariables(obs_tt, policy.required_observation_fields, ...
       'icemodel:verification:compareAblation:missingObservationField');
-   requireVariables(model_tt, policy.required_model_fields, ...
+   % Require only the channels this comparison reads.
+   % required_model_fields is derived live from the output namelists, so
+   % requiring all of it rejects a cohort saved before any later channel was
+   % appended, over channels the comparison never touches. Compatibility, not
+   % equality (see icemodel.verification.helpers.validateAblationModelSchema,
+   % which applies the same rule to the report).
+   requireVariables(model_tt, ...
+      icemodel.verification.namelists.ablationReportChannels('ledger'), ...
       'icemodel:verification:compareAblation:missingModelField');
+
+   % The finiteness and sign checks below run over the channels this cohort
+   % carries. A channel it predates cannot be non-finite in it.
+   checked_fields = intersect(policy.required_model_fields, ...
+      string(model_tt.Properties.VariableNames), 'stable');
    obs_tt = normalizeTimetable(obs_tt, "observation");
    model_tt = normalizeTimetable(model_tt, "model");
 
@@ -68,7 +80,7 @@ function [summary, aligned, diagnostics, policy] = compareAblation( ...
    obs_values = numericValues(obs_tt, obs_idx, ...
       policy.required_observation_fields, "observation");
    model_values = numericValues(model_tt, model_idx, ...
-      policy.required_model_fields, "model");
+      checked_fields, "model");
    observation_fields = policy.required_observation_fields;
    snow_values = obs_values(:, ...
       observation_fields == policy.snow_variable);
@@ -142,13 +154,12 @@ function [summary, aligned, diagnostics, policy] = compareAblation( ...
          'row on [t0,t1)'], policy.model_output_cadence_seconds)
    end
    ledger_values = numericValues(ledger, (1:height(ledger))', ...
-      policy.required_model_fields, "model");
+      checked_fields, "model");
    if any(~isfinite(ledger_values), 'all')
       error('icemodel:verification:compareAblation:nonfiniteModelWindow', ...
          'every required diagnostic must be finite throughout the model window')
    end
-   gross_fields = policy.required_model_fields(contains( ...
-      policy.required_model_fields, "_gross_"));
+   gross_fields = checked_fields(contains(checked_fields, "_gross_"));
    gross_values = numericValues(ledger, (1:height(ledger))', ...
       gross_fields, "model");
    if any(gross_values < 0, 'all')
@@ -320,6 +331,7 @@ function tt = comparisonTimetable(value, role)
    end
 end
 
+
 function requireVariables(tt, required, error_id)
    %REQUIREVARIABLES Error if a required variable is missing.
    missing = setdiff(required, string(tt.Properties.VariableNames), 'stable');
@@ -423,16 +435,25 @@ function identities = closureIdentities(ledger, policy, Ls, Lv, ro_liq)
 
    % Vapor energy keeps solid sublimation/deposition on Ls and liquid vapor or
    % overflow on Lv; signed unapplied energy remains an explicit remainder.
+   %
+   % Coupled interior transport moves vapor between cells of different phase.
+   % That conserves mass but moves the Ls-and-Lv-weighted storage with no
+   % potential input, so subtract it. The channel is zero for a default run.
    potential = ledger.mass_budget_vapor_potential_j_m2;
    overflow = ledger.mass_budget_condensation_overflow_mwe;
    unapplied = ledger.mass_budget_unapplied_vapor_j_m2;
-   accepted = ro_liq .* (Ls .* v_s + Lv .* v_l + Lv .* overflow) + unapplied;
+   redistribution = additiveColumn(ledger, ...
+      'mass_budget_vapor_redistribution_j_m2');
+   accepted = ro_liq .* (Ls .* v_s + Lv .* v_l + Lv .* overflow) ...
+      + unapplied - redistribution;
    energy_scale = ro_liq * Lv;
    vapor_q = ro_liq .* ( ...
       Ls .* ledger.mass_budget_vapor_solid_gross_mwe ...
       + Lv .* ledger.mass_budget_vapor_liquid_gross_mwe ...
       + Lv .* ledger.mass_budget_condensation_overflow_gross_mwe) ...
-      + ledger.mass_budget_unapplied_vapor_gross_j_m2;
+      + ledger.mass_budget_unapplied_vapor_gross_j_m2 ...
+      + additiveColumn(ledger, ...
+      'mass_budget_vapor_redistribution_gross_j_m2');
    rows(5) = identityRow("vapor_energy", "J m-2", ...
       sum(potential), potential, accepted, vapor_q, policy, energy_scale);
 
@@ -658,4 +679,22 @@ function counts = exclusionCounts(in_window, eligible, obs_finite, ...
       'snow_censored', nnz(in_window & snow_censored), ...
       'nonfinite_model', nnz(in_window & ~model_finite), ...
       'total_unique_excluded', nnz(in_window & ~eligible));
+end
+
+function values = additiveColumn(ledger, name)
+   %ADDITIVECOLUMN Read an additive ledger channel, or zeros when absent.
+   %
+   % A cohort saved before the coupled vapor mode carries no redistribution
+   % channel. Those channels are additive, and a run that never entered the
+   % coupled path accumulated nothing into them, so zero is the value that
+   % run would have written, not a guess.
+   %
+   % Only additive channels may use this. Zero is wrong for a channel that
+   % carries a state, a rate, or a storage endpoint.
+
+   if ismember(name, ledger.Properties.VariableNames)
+      values = ledger.(name);
+   else
+      values = zeros(height(ledger), 1);
+   end
 end
