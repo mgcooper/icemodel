@@ -7,6 +7,13 @@ function printFilePath(pathname, action)
       action = "load";
    end
 
+   % Stay quiet inside a test run. The suites load the same baseline and
+   % fixture files that an interactive session loads, and one line per file
+   % buries the pass and fail marks the runner prints.
+   if icemodel.internal.isTestRun()
+      return
+   end
+
    % Truncate the pathname to the test/ directory for compact viewing.
    testdir = icemodel.getpath('test');
    parentdir = fileparts(testdir);

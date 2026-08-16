@@ -56,7 +56,10 @@ function out = scatterplot(x, y, kwargs)
          'MarkerFaceAlpha', kwargs.marker_face_alpha, ...
          'HandleVisibility', 'off');
 
-      if numel(x_finite) < 2
+      % polyfit needs two distinct x values. Equal x describes a vertical
+      % line, which a degree-1 fit cannot represent, and polyfit warns that
+      % the Vandermonde matrix is badly conditioned.
+      if numel(x_finite) < 2 || numel(unique(x_finite)) < 2
          continue
       end
 

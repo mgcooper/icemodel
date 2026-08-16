@@ -201,7 +201,11 @@ function result = unavailableResult(version, root, selection, missing, ...
    %UNAVAILABLERESULT Report exact explicit provisioning without downloading.
    command = fetchCommand(version, selection.capabilities, root, ...
       selection.manifest_file, release_url, repo);
-   if ~silent
+   % Print only when the caller carries on without an error. The strict path
+   % raises below with the same root and the same exact command, so printing
+   % here would state it twice, and the tests that assert the strict error
+   % would carry a block of console output that reads like a failure.
+   if ~silent && ~strict
       fprintf('\n=== icemodel required release data incomplete ===\n');
       fprintf('Data root: %s\n', root);
       fprintf('Missing: %d; mismatched: %d\n', ...

@@ -135,8 +135,13 @@ function noDataPanel(ax, varname, missing_target, missing_candidate)
    else
       reason = 'candidate';
    end
-   warning('icemodel:verification:plotscatter:noData', ...
-      '%s scatter unavailable: %s missing', varname, reason);
+   % The tile still states the reason, so a suite loses nothing by staying
+   % quiet. A missing variable is an ordinary fixture condition in tests, and
+   % one warning per variable per figure buries the runner's own output.
+   if ~icemodel.internal.isTestRun()
+      warning('icemodel:verification:plotscatter:noData', ...
+         '%s scatter unavailable: %s missing', varname, reason);
+   end
 
    title(ax, strrep(varname + " scatter", '_', '\_'), ...
       'FontSize', 12, 'FontWeight', 'bold')

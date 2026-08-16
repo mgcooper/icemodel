@@ -516,8 +516,8 @@ function stageSelectedSnowInventory(data_root, case_id)
    source_family = fullfile(icemodel.internal.fullpath('data'), ...
       'eval', 'esm_snowmip');
    target_family = fullfile(data_root, 'eval', 'esm_snowmip');
-   icemodel.helpers.ensureDirExists(target_family)
-   icemodel.helpers.ensureDirExists(fullfile(data_root, 'input'))
+   icemodel.helpers.ensureDirExists(target_family);
+   icemodel.helpers.ensureDirExists(fullfile(data_root, 'input'));
 
    % Filter the family manifest before copying its one selected case folder.
    manifest = jsondecode(fileread(fullfile(source_family, 'manifest.json')));
