@@ -165,6 +165,19 @@ function [q, dq_df_liq] = liquid_flux(f_liq, f_ice, kwargs)
 
    % Indices where flow can occur. Layers below the residual capillary floor or
    % with no pore space contribute zero flux.
+   %
+   % This f_res is the capillary term alone, not
+   % icemodel.column.residual_water_fraction, which returns the maximum of
+   % that term and Jordan's thermodynamic minimum. The two answer different
+   % questions. Mobility is hydraulic: capillarity is what holds water against
+   % flow. Jordan's minimum is the liquid that coexists at the lower melt-zone
+   % boundary. It bounds what a cell can give up to a phase change, not what
+   % can drain. Using the larger floor here would also disagree with the
+   % relSat above, which the constitutive q(S) is built on. The mask and the
+   % saturation would then describe different water.
+   %
+   % icemodel.column.vapor_exchange_is_wet owns the phase-change form of this
+   % predicate.
    iflux = availCap > 0 & f_liq > f_res;
 
    switch kwargs.k_sat_method

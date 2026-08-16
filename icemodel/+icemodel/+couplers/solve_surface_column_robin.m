@@ -14,6 +14,13 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
 
    debug = opts.debug;
 
+   % The coupled vapor mode moves the vapor term from the node conductivity
+   % to the face conductance. It is opt-in and nothing sets it by default.
+   % Guard the read so a caller-built opts struct without the field still
+   % runs the default path.
+   use_coupled_vapor = isfield(opts, 'use_coupled_vapor') ...
+      && opts.use_coupled_vapor;
+
    % Initial values for SEB linearization coefficients Fc, Fp.
    [Fc, Fp] = icemodel.surface.surface_flux_linearization( ...
       T_sfc, tair, swd, lwd, albedo, wspd, ppt, tppt, psfc, ea_atm, ...
@@ -40,7 +47,8 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
       [T_ice, f_ice, f_liq, k_eff, ok_ieb, n_iters, a1] = ...
          icemodel.column.solve_column_enthalpy(T_sfc, xT_ice, ...
          xf_ice, xf_liq, Fc, Fp, Sc, Sp, dz, delz, fn, dt, ...
-         solver, tol, maxiter, alpha, use_aitken, jumpmax, debug);
+         solver, tol, maxiter, alpha, use_aitken, jumpmax, debug, ...
+         use_coupled_vapor);
 
       % Debug dump and break on subsurface solve failure.
       if ~ok_ieb
@@ -85,7 +93,6 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
       % evaluated, and T_ice and k_eff belong to the sweep that produced the
       % pre-acceleration iterate. It is tested on the next sweep against its
       % own column solve.
-      % solve.
 
       % Use the new T_sfc solution to update Fc, Fp for the next column solve.
       [Fc, Fp] = icemodel.surface.surface_flux_linearization( ...

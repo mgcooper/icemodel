@@ -114,7 +114,6 @@ function [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = ...
       % evaluated, and T_ice and k_eff belong to the sweep that produced the
       % pre-acceleration iterate. It is tested on the next sweep against its
       % own column solve.
-      % solve.
    end
 
    % Dump the outer failure only when neither inner dump ran. Both inner dumps

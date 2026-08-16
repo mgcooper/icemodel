@@ -244,6 +244,20 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    opts.f_ice_min       = 0.1;      % minimum ice fraction (remeshing threshold)
    opts.mesh_type       = 1;        % recommended: 1 (Patankar practice "B")
 
+   %%% Coupled vapor mass transport.
+   %
+   % Default = false. When true, the column conserves the vapor mass whose
+   % latent heat it already transports: the surface exchange enters as a
+   % Neumann flux at the top face, interior transport comes from the shared
+   % face quantities in icemodel.column.vapor_face_quantities, and the mass
+   % is applied to every cell rather than the top cell alone.
+   %
+   % This is opt-in while the physics is verified. Nothing sets it, so no
+   % coupled-vapor code runs on the production path. Bead icemodel-bhk.5
+   % holds the decision to make it the default, together with the baseline
+   % rebuild and the one cohort rerun that decision requires.
+   opts.use_coupled_vapor = false;
+
    %%% Surface turbulent-heat-flux scheme.
    %
    % Default = 'bulk_richardson'. 'monin_obukhov' is opt-in via resetopts.

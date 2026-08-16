@@ -1,9 +1,17 @@
-function k_vap = vapor_thermal_diffusion_coefficient(T, f_liq, varargin)
-   %VAPOR_THERMAL_DIFFUSION_COEFFICIENT Vapor thermal diffusion coefficient.
+function [k_vap, De] = vapor_thermal_conductivity(T, f_liq, varargin)
+   %VAPOR_THERMAL_CONDUCTIVITY Effective thermal conductivity from vapor
+   % diffusion [W m-1 K-1].
    %
-   %  k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq)
+   %  k_vap = icemodel.vapor.vapor_thermal_conductivity(T, f_liq)
    %  k_vap = ...
-   %     icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq, dro_vapdT)
+   %     icemodel.vapor.vapor_thermal_conductivity(T, f_liq, dro_vapdT)
+   %  [k_vap, De] = ...
+   %     icemodel.vapor.vapor_thermal_conductivity(T, f_liq, dro_vapdT)
+   %
+   %  The second output returns the effective vapor diffusivity this function
+   %  already evaluates. The coupled vapor path needs the same De to build its
+   %  face quantities. Asking for it here keeps the (T/Tf)^nd power off the hot
+   %  path a second time.
    %
    %  Computes the effective thermal conductivity contribution from vapor
    %  diffusion through porous ice, following Anderson (1976):
@@ -43,6 +51,6 @@ function k_vap = vapor_thermal_diffusion_coefficient(T, f_liq, varargin)
    % Phase-aware latent heat: Ls for dry/cold cells, Lv for wet cells.
    Lv = icemodel.vapor.latent_enthalpy_switch(f_liq);
 
-   % Vapor thermal diffusion coefficient [W m-1 K-1]
+   % Vapor thermal conductivity [W m-1 K-1]
    k_vap = Lv .* De .* dro_vapdT;
 end

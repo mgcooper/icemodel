@@ -62,6 +62,12 @@ function [ice1, ice2, opts] = icemodel(opts)
       'solver', 'maxiter', 'tol', 'alpha', 'use_aitken', 'jumpmax', ...
       'cpl_maxiter', 'cpl_Ts_tol', 'cpl_seb_tol', 'cpl_alpha', 'cpl_aitken', ...
       'cpl_jumpmax', 'f_ice_min');
+
+   % An opts struct built before this flag existed carries no such field, and
+   % configureRun does not add one. Read it the way both couplers do, so an
+   % older struct still runs the default path instead of erroring here.
+   use_coupled_vapor = isfield(opts, 'use_coupled_vapor') ...
+      && opts.use_coupled_vapor;
    TINY = 1e-8;
 
    % INITIALIZE THE FORCING DATA
@@ -110,6 +116,11 @@ function [ice1, ice2, opts] = icemodel(opts)
          % INITIALIZE NEW TIMESTEP
          [dt_sum, n_subfail, ok_seb, ok_ieb, d_liq, d_evp, d_lyr, d_rof] ...
             = icemodel.timestepping.newtimestep(f_liq, solver);
+
+         % Grain growth runs once per forcing step. It therefore needs the
+         % boundary vapor exchange the accepted substeps applied, as a
+         % liquid-water volume fraction like every other d_* increment.
+         d_vap_sfc = 0.0;
 
          % Zero the ledger for this forcing step and set initial values.
          if use_mass_budget
@@ -170,8 +181,7 @@ function [ice1, ice2, opts] = icemodel(opts)
                   cpl_aitken, cpl_jumpmax, ro_sfc, snow_depth, step_opts);
             end
 
-            % Reaching the maximum coupling iterations without ok_cpl is a
-            % substep failure.
+            % Hitting max coupling iterations without ok_cpl is a substep fail.
             ok = ok_seb && ok_ieb && ok_cpl;
 
             % CHECK SUBSTEP FAILURE (shorten dt and restart substep on failure)
@@ -202,11 +212,39 @@ function [ice1, ice2, opts] = icemodel(opts)
                nu_air(metstep), H_h(metstep), H_e, hv_atm, br_coefs_step, ...
                liqflag, f_ice(1), f_liq(1), dt, dz(1), snow_depth, step_opts);
 
+            % MOVE VAPOR BETWEEN THE CELLS
+            %
+            % Coupled mode lets the interior faces transport vapor mass. That
+            % is a separate step from the surface exchange below. The two
+            % conserve different things: Fick's law fixes the mass here, and
+            % the surface energy balance fixes the energy there.
+            d_sbl_err = 0.0;
+            if use_coupled_vapor
+               [f_ice, f_liq, d_sbl_err, mass_energy_budget] = ...
+                  icemodel.column.couple_vapor_step( ...
+                  T_ice, f_ice, f_liq, d_sbl_err, dz, delz, fn, dt, ...
+                  f_ice_min, f_res_por, mass_energy_budget, use_mass_budget);
+            end
+
+            % Accumulate this substep's surface vapor exchange, phase-
+            % corrected, before the exchange changes the top cell. This sum is
+            % signed, and grain growth uses the magnitude, so substeps whose
+            % Qe reverses sign cancel here and drive no growth. Bead
+            % icemodel-55x carries that. The helper
+            % owns the wet/dry read and the latent-heat choice. It must run
+            % here: the applier routes the demand on this state, and a merge
+            % below can replace the top cell outright.
+            if use_coupled_vapor
+               d_vap_sfc = d_vap_sfc ...
+                  + icemodel.surface.potential_surface_vapor_exchange( ...
+                  d_pevp, f_ice(1), f_liq(1), f_res_por);
+            end
+
             % UPDATE THE SURFACE MASS-BALANCE BUDGETS
             [T_ice, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err] ...
                = icemodel.column.budget_surface_mass_balance( ...
-               T_ice, f_ice, f_liq, xf_liq, d_pevp, d_liq, d_evp, d_rof, ...
-               f_res_por, f_ice_min);
+               T_ice, f_ice, f_liq, xf_liq, d_pevp, d_liq, d_evp, ...
+               d_rof, f_res_por, f_ice_min, d_sbl_err);
 
             % Checkpoint realized vapor exchange and its input, overflow, and
             % signed unapplied energy (d_sbl_err).
@@ -221,8 +259,8 @@ function [ice1, ice2, opts] = icemodel(opts)
             if use_mass_budget
                [T_ice, f_ice, f_liq, Sc, Sp, d_lyr, ~, remesh] ...
                   = icemodel.column.merge_thin_layers( ...
-                  T_ice, f_ice, f_liq, Sc, Sp, dz(1), d_pevp, d_lyr, ...
-                  f_ice_min);
+                  T_ice, f_ice, f_liq, Sc, Sp, dz(1), d_pevp, ...
+                  d_lyr, f_ice_min);
 
                % Accumulate numerical remeshing increments.
                mass_energy_budget = icemodel.column.accumulate_remesh_budget( ...
@@ -231,7 +269,8 @@ function [ice1, ice2, opts] = icemodel(opts)
             else
                [T_ice, f_ice, f_liq, Sc, Sp, d_lyr, ~] ...
                   = icemodel.column.merge_thin_layers( ...
-                  T_ice, f_ice, f_liq, Sc, Sp, dz(1), d_pevp, d_lyr, f_ice_min);
+                  T_ice, f_ice, f_liq, Sc, Sp, dz(1), d_pevp, d_lyr, ...
+                  f_ice_min);
             end
 
             % CHECKPOINT STATE AND SUBSTEP TIME
@@ -253,8 +292,23 @@ function [ice1, ice2, opts] = icemodel(opts)
          end
 
          % UPDATE GRAIN SIZE VIA VAPOR MASS TRANSFER
-         r_eff = icemodel.column.vapor_mass_transfer(T_ice, T_sfc, ...
-            f_ice, f_liq, r_eff, dz, delz, fn, dt_FULL_STEP);
+         %
+         % Coupled mode takes the surface face from the accumulated exchange
+         % d_vap_sfc. The interior faces are re-evaluated here at end-of-step
+         % state, so they are not the fluxes the substeps transported.
+         % DesignSpec decision 8 asks for the accumulated interior fluxes;
+         % bead icemodel-55x carries that. This block costs one exponential
+         % and one power per forcing step.
+         if use_coupled_vapor
+            [ro_vap, De] = ...
+               icemodel.column.accepted_vapor_quantities(T_ice, f_liq);
+            r_eff = icemodel.column.vapor_mass_transfer(T_ice, T_sfc, ...
+               f_ice, f_liq, r_eff, dz, delz, fn, dt_FULL_STEP, ...
+               ro_vap, De, d_vap_sfc);
+         else
+            r_eff = icemodel.column.vapor_mass_transfer(T_ice, T_sfc, ...
+               f_ice, f_liq, r_eff, dz, delz, fn, dt_FULL_STEP);
+         end
 
          % DIAGNOSE SURFACE ENERGY BALANCE
          [Qe, Qh, Qc, Qsn, Qln, Qa, Qm, Qf, Qbal] ...

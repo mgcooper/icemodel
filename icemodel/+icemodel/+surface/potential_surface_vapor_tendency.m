@@ -14,7 +14,7 @@ function [d_pevp, pevp, Qe, T_sfc_phys] = ...
    %
    % Delegates to icemodel.kernels.potential_surface_vapor_tendency
    %
-   % See also: icemodel.surface.apply_surface_vapor_mass_change,
+   % See also: icemodel.surface.apply_surface_vapor_exchange,
    %  icemodel.kernels.potential_surface_vapor_tendency
    %
    %#codegen

@@ -37,7 +37,7 @@ function test_budgetoutputs_are_one_partitioned_contract(testCase)
    % The all-list order is the stable diagnostic-profile append order.
    testCase.verifyEqual(all_fields, [first_fields, last_fields, sum_fields]);
    testCase.verifyEqual(numel(unique(all_fields)), numel(all_fields));
-   testCase.verifyEqual(numel(all_fields), 43);
+   testCase.verifyEqual(numel(all_fields), 45);
    testCase.verifyError( ...
       @() icemodel.namelists.budgetoutputs('median'), ...
       'icemodel:namelists:budgetoutputs:kind');
@@ -144,7 +144,8 @@ function test_use_ro_glc_changes_initialization_not_diagnostic_basis(testCase)
          Ls * ice1.mass_budget_vapor_solid_mwe ...
          + Lv * ice1.mass_budget_vapor_liquid_mwe ...
          + Lv * ice1.mass_budget_condensation_overflow_mwe) ...
-         + ice1.mass_budget_unapplied_vapor_j_m2;
+         + ice1.mass_budget_unapplied_vapor_j_m2 ...
+         - ice1.mass_budget_vapor_redistribution_j_m2;
       % Allow only subtraction roundoff from column-integrated checkpoints.
       testCase.verifyEqual( ...
          ice1.mass_budget_vapor_potential_j_m2, vapor_accounted, ...
@@ -528,6 +529,64 @@ function test_merge_prediction_uses_physical_vapor_basis(testCase)
    testCase.verifyEqual(mask, [true; false; false]);
 end
 
+function test_potential_sublimation_converts_on_latent_heat(testCase)
+   % One helper owns the liquid-to-ice conversion. Compare it against the
+   % conversion written out from the constants, not against itself.
+
+   [Ls, Lv, ro_ice, ro_liq] = ...
+      icemodel.physicalConstant('Ls', 'Lv', 'ro_ice', 'ro_liq');
+
+   % Compare bit for bit, and write the conversion with the same association
+   % the callers use. Multiplying by a cached factor instead of dividing
+   % after the multiply differs in the last bit. That would move every
+   % default-mode result for no physical reason.
+   %
+   % Sublimation and deposition must both pass, because the callers apply the
+   % helper to a signed tendency and the sign carries the direction.
+   for d_pevp = [-0.02, 0, 0.03]
+      returned = icemodel.column.potential_sublimation(d_pevp);
+      expected = d_pevp * (Lv * ro_liq) / (Ls * ro_ice);
+      testCase.verifyEqual(returned, expected, 'AbsTol', 0);
+   end
+
+   % A column of tendencies must convert elementwise, because the coupled
+   % vapor path applies the same conversion to every cell.
+   d_pevp = [-0.02; 0.01];
+   testCase.verifyEqual( ...
+      icemodel.column.potential_sublimation(d_pevp), ...
+      d_pevp * (Lv * ro_liq) / (Ls * ro_ice), 'AbsTol', 0);
+end
+
+function test_merge_prediction_reaches_the_top_layer_only(testCase)
+   % Only the top layer receives d_pevp, so the merge look-ahead must not flag
+   % near-threshold interior layers. Broadcasting the scalar across the column
+   % deletes interior layers because of a mass change they never receive.
+
+   [Ls, Lv, ro_ice, ro_liq] = ...
+      icemodel.physicalConstant('Ls', 'Lv', 'ro_ice', 'ro_liq');
+   d_pevp = -0.02;
+   potential_ice_change = d_pevp * (Lv * ro_liq) / (Ls * ro_ice);
+   f_ice_min = 0.1;
+
+   % Place all three layers the same small distance above the floor, at half
+   % the predicted ice loss. Every layer therefore crosses the floor under the
+   % broadcast rule, and only the top layer crosses under the top-only rule.
+   f_near = f_ice_min - potential_ice_change / 2;
+   [T, f_ice, f_liq, Sc, Sp, d_lyr] = ...
+      mergeFixture([f_near; f_near; f_near]);
+   testCase.verifyGreaterThan(min(f_ice), f_ice_min);
+
+   [~, ~, ~, ~, ~, ~, mask] = icemodel.column.merge_thin_layers( ...
+      T, f_ice, f_liq, Sc, Sp, 0.04, d_pevp, d_lyr, f_ice_min);
+   testCase.verifyEqual(mask, [true; false; false]);
+
+   % A zero tendency must leave every layer unflagged, which shows the mask
+   % above came from the prediction and not from the floor test.
+   [~, ~, ~, ~, ~, ~, mask_no_vapor] = icemodel.column.merge_thin_layers( ...
+      T, f_ice, f_liq, Sc, Sp, 0.04, 0.0, d_lyr, f_ice_min);
+   testCase.verifyEqual(mask_no_vapor, [false; false; false]);
+end
+
 function test_merge_ledger_output_does_not_change_the_solver_outputs(testCase)
    % The ledger is opt-in on the eighth output, so requesting it must leave
    % the seven values existing solver callers read untouched.
@@ -617,6 +676,42 @@ function test_pending_flags_match_legacy_multi_event_result(testCase)
    testCase.verifyEqual(Sc_diag, Sc_legacy);
    testCase.verifyEqual(Sp_diag, Sp_legacy);
    testCase.verifyEqual(d_lyr_diag, d_lyr_legacy);
+end
+
+function test_legacy_parity_holds_with_a_nonzero_vapor_tendency(testCase)
+   % Every other legacy-parity call passes d_pevp = 0, which leaves the
+   % oracle's vapor term unexercised: a production rule change would not move
+   % the comparison. This case drives the term on both sides, so the oracle
+   % fails if the two eligibility rules diverge.
+
+   [Ls, Lv, ro_ice, ro_liq] = ...
+      icemodel.physicalConstant('Ls', 'Lv', 'ro_ice', 'ro_liq');
+   d_pevp = -0.02;
+   potential_ice_change = d_pevp * (Lv * ro_liq) / (Ls * ro_ice);
+   f_ice_min = 0.1;
+
+   % The top layer crosses the floor through the vapor term alone. The
+   % second layer is already below the floor. The transition therefore does a
+   % real multi-event merge, not a comparison of two empty results.
+   f_top = f_ice_min - potential_ice_change / 2;
+   [T, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture([f_top; 0.05; 0.7]);
+   [T_new, f_ice_new, f_liq_new, Sc_new, Sp_new, d_lyr_new, mask] = ...
+      icemodel.column.merge_thin_layers( ...
+      T, f_ice, f_liq, Sc, Sp, 0.04, d_pevp, d_lyr, f_ice_min);
+   [T_legacy, f_ice_legacy, f_liq_legacy, Sc_legacy, Sp_legacy, ...
+      d_lyr_legacy, legacy_mask] = legacyMergeThinLayers( ...
+      T, f_ice, f_liq, Sc, Sp, 0.04, d_pevp, d_lyr, f_ice_min);
+
+   % The vapor term must be what flags the top layer, or the case would not
+   % reach the branch it exists to cover.
+   testCase.verifyEqual(mask, [true; true; false]);
+   testCase.verifyEqual(mask, legacy_mask);
+   testCase.verifyEqual(T_new, T_legacy);
+   testCase.verifyEqual(f_ice_new, f_ice_legacy);
+   testCase.verifyEqual(f_liq_new, f_liq_legacy);
+   testCase.verifyEqual(Sc_new, Sc_legacy);
+   testCase.verifyEqual(Sp_new, Sp_legacy);
+   testCase.verifyEqual(d_lyr_new, d_lyr_legacy);
 end
 
 function test_vapor_identity_partitions_wet_evaporation_and_sublimation(testCase)
@@ -862,7 +957,7 @@ function [d_rof, d_sbl_err] = verifyVaporIdentity( ...
    [~, f_ice_v, f_liq_v, ~, ~, d_rof, d_sbl_err] = ...
       icemodel.column.budget_surface_mass_balance( ...
       Tf - 2, f_ice, f_liq, f_liq, d_pevp, 0, 0, 0, ...
-      f_res_por, f_ice_min);
+      f_res_por, f_ice_min, 0);
    [solid_v, liquid_v] = ...
       icemodel.column.integrate_column_budget(Tf - 2, f_ice_v, f_liq_v, dz);
 
@@ -882,11 +977,16 @@ function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask] = ...
       legacyMergeThinLayers( ...
       T, f_ice, f_liq, Sc, Sp, dz_therm, d_pevp, d_lyr, f_ice_min)
    %LEGACYMERGETHINLAYERS Reproduce the pre-ledger seven-output transition.
+   %
+   % This oracle isolates the ledger from the state transition, so its
+   % eligibility rule must track production. The vapor prediction applies to
+   % the top layer only, because that is the only layer d_pevp reaches.
 
    [Ls, Lv, ro_ice, ro_liq] = ...
       icemodel.physicalConstant('Ls', 'Lv', 'ro_ice', 'ro_liq');
-   merge_mask = f_ice <= f_ice_min | ...
-      (f_ice + d_pevp * (Lv * ro_liq) / (Ls * ro_ice)) <= f_ice_min;
+   merge_mask = f_ice <= f_ice_min;
+   merge_mask(1) = merge_mask(1) || ...
+      (f_ice(1) + d_pevp * (Lv * ro_liq) / (Ls * ro_ice)) <= f_ice_min;
    do_merge = merge_mask;
 
    % Follow the historical index drift, clone, delete, and pending-flag order.
@@ -967,4 +1067,38 @@ function restoreProfiler(prior)
    if strcmp(prior.ProfilerStatus, 'on')
       profile on
    end
+end
+
+function test_unapplied_vapor_matches_the_top_cell_scalar_bit_for_bit(testCase)
+   % d_sbl_err carries one entry per cell so the coupled path can record
+   % unapplied vapor anywhere in the column. With a top-cell tendency only
+   % the first entry is nonzero, and the ledger value must then equal the
+   % scalar product the surface-only path produced, to the last bit.
+   %
+   % Multiplication is not associative in floating point. Summing the
+   % dz-weighted fractions and scaling once afterwards differs from scaling
+   % each cell first, and a randomized check puts that difference at roughly
+   % one third of realistic columns. A loose tolerance here would not see it.
+
+   [Ls, ro_ice] = icemodel.physicalConstant('Ls', 'ro_ice');
+   dz = [0.04; 0.09; 0.16; 0.25; 0.36; 0.49];
+   d_sbl_err = zeros(6, 1);
+   d_sbl_err(1) = -4.2e-5;
+
+   ledger = icemodel.column.initialize_budget_state();
+   Tf = icemodel.physicalConstant('Tf');
+   T = (Tf - 3) * ones(6, 1);
+   f_ice = 0.85 * ones(6, 1);
+   f_liq = 0.01 * ones(6, 1);
+   [solid_p, liquid_p] = ...
+      icemodel.column.integrate_column_budget(T, f_ice, f_liq, dz);
+
+   returned = icemodel.column.accumulate_vapor_budget(ledger, ...
+      solid_p, liquid_p, T, f_ice, f_liq, dz, 0, 0, d_sbl_err);
+
+   expected = ro_ice * Ls * d_sbl_err(1) * dz(1);
+   testCase.verifyEqual(returned.mass_budget_unapplied_vapor_j_m2, ...
+      expected, 'AbsTol', 0);
+   testCase.verifyEqual(returned.mass_budget_unapplied_vapor_gross_j_m2, ...
+      abs(expected), 'AbsTol', 0);
 end

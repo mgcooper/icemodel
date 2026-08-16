@@ -23,7 +23,8 @@ function [ledger, vapor_solid, vapor_liquid] = accumulate_vapor_budget( ...
    %   dz                  - Control-volume thickness [m].
    %   d_pevp              - Potential vapor-driven top-layer liquid change [-].
    %   d_rof               - Condensation overflow in liquid fraction [-].
-   %   d_sbl_err           - Signed unapplied vapor-driven ice change [-].
+   %   d_sbl_err           - Signed unapplied vapor-driven ice change per
+   %                         cell [-].
    %
    % Outputs
    %   ledger              - Ledger with the accumulated vapor budgets.
@@ -54,10 +55,38 @@ function [ledger, vapor_solid, vapor_liquid] = accumulate_vapor_budget( ...
    vapor_liquid = liquid_v - liquid_p;
 
    % The potential input and the rejected exchanges are energies, not storage.
-   % d_pevp and d_sbl_err are top-layer fractions scaled by their latent heats.
+   % d_pevp is a top-layer fraction scaled by its latent heat. d_sbl_err is
+   % one fraction per cell, so integrate it over the column. With a top-cell
+   % tendency only the first entry is nonzero, and the integral is then the
+   % top-cell term alone.
    % The condensation overflow is a liquid depth the column does not store.
+   %
+   % Scale each cell before the sum, not the sum afterwards. Multiplication
+   % is not associative in floating point. Summing the dz-weighted fractions
+   % first and scaling once would move the last bits of a value the
+   % surface-only path already produces.
    vapor_potential = ro_liq * Lv * d_pevp * dz(1);
-   unapplied_vapor = ro_ice * Ls * d_sbl_err * dz(1);
+
+   % A scalar d_sbl_err is the top cell's rejection, which is what the
+   % surface-only path produces and what a caller from before the column
+   % path still passes. Integrating it against every dz would spread one
+   % cell's rejection over the whole column and inflate both channels from
+   % the dz(1) term to a sum(dz) one. Weight the scalar form by dz(1) and
+   % keep the per-cell sum for the vector form.
+   if isscalar(d_sbl_err)
+      unapplied_weighted = ro_ice * Ls * d_sbl_err * dz(1);
+   else
+      unapplied_weighted = ro_ice * Ls * d_sbl_err(:) .* dz(:);
+   end
+   unapplied_vapor = sum(unapplied_weighted);
+
+   % Take the magnitude per cell before summing. Coupled mode fills every
+   % entry of d_sbl_err, and one cell rejecting deposition while another
+   % cannot supply sublimation gives the two opposite signs in one substep.
+   % Taking the magnitude of the net would let those cancel, which is what
+   % the gross channel exists to prevent. The surface-only path leaves one
+   % entry nonzero, so this equals the magnitude of the net there.
+   unapplied_vapor_gross = sum(abs(unapplied_weighted));
 
    % Compute condensation overflow in mwe.
    condensation_overflow = d_rof * dz(1);
@@ -74,7 +103,7 @@ function [ledger, vapor_solid, vapor_liquid] = accumulate_vapor_budget( ...
    ledger.mass_budget_unapplied_vapor_j_m2 = ...
       ledger.mass_budget_unapplied_vapor_j_m2 + unapplied_vapor;
 
-   % d_pevp and d_sbl_err are per-substep, but d_rof is reset once per forcing
+   % d_pevp and d_sbl_err are per-substep. d_rof is reset once per forcing
    % step in newtimestep and accumulated across substeps, so it already holds
    % the step total. ASSIGN it, do not add: adding would count the same
    % overflow once per substep.
@@ -94,5 +123,5 @@ function [ledger, vapor_solid, vapor_liquid] = accumulate_vapor_budget( ...
    ledger.mass_budget_condensation_overflow_gross_mwe = ...
       abs(condensation_overflow);
    ledger.mass_budget_unapplied_vapor_gross_j_m2 = ...
-      ledger.mass_budget_unapplied_vapor_gross_j_m2 + abs(unapplied_vapor);
+      ledger.mass_budget_unapplied_vapor_gross_j_m2 + unapplied_vapor_gross;
 end

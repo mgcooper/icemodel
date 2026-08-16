@@ -18,11 +18,11 @@ function [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, varargin)
    %
    %  The vapor component k_vap supports two calling conventions:
    %     nargin=3: k_vap computed internally via
-   %           icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq)
+   %           icemodel.vapor.vapor_thermal_conductivity(T, f_liq)
    %     nargin=4: k_vap provided externally (including explicit 0)
    %
    % See also: icemodel.column.firn_thermal_conductivity,
-   %  icemodel.vapor.vapor_thermal_diffusion_coefficient,
+   %  icemodel.vapor.vapor_thermal_conductivity,
    %  icemodel.vapor.saturation_vapor_density, icemodel.vapor.vapor_diffusivity
    %
    %#codegen
@@ -35,9 +35,9 @@ function [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, varargin)
    % Compute dry snow/firn/ice thermal conductivity (Calonne 2019 Eq. 5)
    k_ice = icemodel.column.firn_thermal_conductivity(T, f_ice);
 
-   % Compute vapor thermal diffusion coefficient
+   % Compute vapor thermal conductivity
    if nargin < 4
-      k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq);
+      k_vap = icemodel.vapor.vapor_thermal_conductivity(T, f_liq);
    else
       % k_vap provided by an external model.
       k_vap = varargin{1};

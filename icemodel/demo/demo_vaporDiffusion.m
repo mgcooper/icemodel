@@ -1,4 +1,4 @@
-%[text] # Compute the vapor heat diffusion coefficient
+%[text] # Compute the vapor thermal conductivity
 %[text] This demonstrates how to compute the diffusion of heat by water vapor
 %[text] Note: The goal was to eliminate the redundant GETGAMMA, GETKVAPOR, GETKTHERMAL, then I realized GETGAMMA is a concise way to get the effective conductivity combining the preferred kthermal from GETKTHERMAL with kvapor, but it should call those functions. Also, VAPORHEAT should replace GETKVAPOR, unless GETKVAPOR becomes a selection function like GETKTHERMAL, but refactoring VAPORHEAT was slightly more complicated than anticipated b/c I need to 1) determine the optimal input/output parsing including a nargout check that circumvents drovdT if only kvap is requested, and 2) determine if (1) is possible or if drovdT is actually required in particular the meltzone indices which GETKVAPOR does not check afaik.
 %[text] This demo did succeed in documenting the Yen's diffusivity enhancement section which was commented out at the bottom of GETGAMMA or GETKVAPOR. The notes at the end of VAPORHEAT need to be incorporated here.
@@ -313,7 +313,7 @@ d_ro_vap_dT = ro_vap .* (B * C ./ (C + Tdep) .^ 2 - 1 ./ T);
 H_vap = Ls * bd_vap;
 %[text] Now, note that d\_ro\_vap\_sat\_dT can be written:
 d_ro_vap_dT = ro_vap .* B * C ./ (C + Tdep) .^ 2 - ro_vap ./ T;
-%[text] And the vapor heat diffusion coefficient can be computed from vapor pressure like this:
+%[text] And the vapor thermal conductivity can be computed from vapor pressure like this:
 %[text] NOTE: This is Liston's k\_vap:
 desi_dT = esi .* B .* C ./ (C + Tdep) .^ 2;  % [Pa K-1]
 De = 9e-5 .* (T / Tf) .^ 14;                 % [m2 s-1]

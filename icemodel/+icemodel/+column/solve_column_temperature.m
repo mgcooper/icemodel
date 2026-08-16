@@ -27,7 +27,7 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(Ts, ...
 
    % To reinstate vapor-aware conductivity and enthalpy:
    % [~, drovdT] = icemodel.vapor.saturation_vapor_density(T, f_liq);
-   % k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient(T, f_liq, drovdT);
+   % k_vap = icemodel.vapor.vapor_thermal_conductivity(T, f_liq, drovdT);
    % k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, k_vap);
    %
    % The iterations need the same update. See solve_column_enthalpy.

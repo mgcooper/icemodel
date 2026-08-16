@@ -1,16 +1,20 @@
 function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask, remesh] = ...
-      merge_thin_layers(T, f_ice, f_liq, Sc, Sp, dz_therm, d_pevp, d_lyr, f_ice_min)
+      merge_thin_layers(T, f_ice, f_liq, Sc, Sp, dz_therm, d_pevp, ...
+      d_lyr, f_ice_min)
    %MERGE_THIN_LAYERS Merge layers that fall below the retained ice floor.
    %
    % merge_thin_layers combines control volumes whose ice fraction is already
-   % below the allowable minimum or is predicted to fall below it after the
-   % current surface vapor-mass exchange.
+   % below the allowable minimum. It also combines the top layer when one more
+   % substep of the current surface vapor exchange would take that layer below
+   % the same minimum. The caller applies that exchange before this call, so
+   % the second test is a one-substep look-ahead, not a second application.
    %
    % Inputs
    %   T, f_ice, f_liq - Column thermodynamic state.
    %   Sc, Sp          - Column shortwave source-term linearization vectors.
    %   dz_therm        - Thermal control-volume thickness [m].
-   %   d_pevp          - Potential surface vapor-driven liquid-fraction change.
+   %   d_pevp          - Potential surface vapor-driven liquid-fraction
+   %                     change for the top layer [-].
    %   d_lyr           - Accumulated merge-export diagnostic, water-equivalent
    %                     fraction per cell; scale by dz for metres w.e.
    %   f_ice_min       - Minimum allowed surface ice fraction [-].
@@ -38,15 +42,11 @@ function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask, remesh] = ...
    %
    % See also: icemodel.column.merge_layer_indices,
    %  icemodel.column.merge_layers,
-   %  icemodel.column.budget_surface_mass_balance
+   %  icemodel.column.budget_surface_mass_balance,
+   %  icemodel.column.potential_sublimation,
+   %  icemodel.surface.apply_surface_vapor_exchange
    %
    %#codegen
-
-   persistent Ls Lv ro_ice ro_liq
-   if isempty(Ls)
-      [Ls, Lv, ro_ice, ro_liq] = icemodel.physicalConstant( ...
-         'Ls', 'Lv', 'ro_ice', 'ro_liq');
-   end
 
    % The eighth output turns on the diagnostic ledger. A caller that asks for
    % seven outputs gets the state transition, and this function does not
@@ -59,10 +59,29 @@ function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask, remesh] = ...
       remesh = icemodel.column.initialize_remesh_ledger();
    end
 
-   % Flag layers that already violate the allowed minimum ice fraction or would
-   % do so after the current surface vapor-driven mass change is applied.
-   merge_mask = f_ice <= f_ice_min | ...
-      (f_ice + d_pevp * (Lv * ro_liq) / (Ls * ro_ice)) <= f_ice_min;
+   % Flag layers that already violate the allowed minimum ice fraction.
+   merge_mask = f_ice <= f_ice_min;
+
+   % Look one substep ahead: merge a layer the same vapor exchange would take
+   % below f_ice_min next substep. The caller applies d_pevp first, so f_ice
+   % holds the current exchange and its tendency estimates the next one. This
+   % merges a spent layer at the end of this substep rather than the start of
+   % the next.
+   %
+   % Index 1 only, because budget_surface_mass_balance applies d_pevp at
+   % index 1. Broadcasting the scalar down the column would merge interior
+   % cells for a mass change they never receive. This restriction changes
+   % default-mode remeshing by design (bead icemodel-bhk.1, DesignSpec
+   % decision 9), and test_mass_budget_bookkeeping holds a parity oracle for
+   % the broadcast form. Do not broadcast it to make a default-mode diff go
+   % away.
+   %
+   % Two biases. Charging the whole tendency to ice merges a wet layer one
+   % substep early. Coupled interior transport gets no look-ahead, so a layer
+   % its next substep would spend merges one substep late; bead icemodel-eea
+   % measures whether that delay matters.
+   merge_mask(1) = merge_mask(1) || (f_ice(1) ...
+      + icemodel.column.potential_sublimation(d_pevp)) <= f_ice_min;
 
    if ~any(merge_mask)
       return
@@ -83,8 +102,8 @@ function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask, remesh] = ...
       end
 
       % Take a separate snapshot for each event. This keeps exchanges with
-      % opposite signs from cancelling before the ledger records their
-      % absolute gross.
+      % opposite signs from cancelling before the ledger records their absolute
+      % gross.
       if use_remesh_ledger
          [solid_before, liquid_before, enthalpy_before] = ...
             icemodel.column.integrate_column_budget(T, f_ice, f_liq, dz_therm);

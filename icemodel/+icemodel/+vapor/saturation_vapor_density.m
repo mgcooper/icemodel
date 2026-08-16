@@ -32,7 +32,7 @@ function [ro_vap, dro_vapdT, d2ro_vapdT2] = saturation_vapor_density(T, f_liq)
    %     dro_vap/dT = ro_vap / T * (c - b/T - 1)
    %     d2ro_vap/dT2 = ro_vap / T^2 * ((c-2) * (c - 2*b/T - 1) + b^2/T^2)
    %
-   % See also: icemodel.vapor.vapor_thermal_diffusion_coefficient,
+   % See also: icemodel.vapor.vapor_thermal_conductivity,
    %  icemodel.vapor.saturation_vapor_pressure,
    %  icemodel.column.vapor_mass_transfer
    %

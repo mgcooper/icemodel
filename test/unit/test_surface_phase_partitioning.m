@@ -15,7 +15,7 @@ function test_dry_deposition_adds_ice(testCase)
    f_res_por = 0.02;
 
    [f_ice_new, f_liq_new, d_con_new, d_sbl_err] = ...
-      icemodel.surface.apply_surface_vapor_mass_change( ...
+      icemodel.surface.apply_surface_vapor_exchange( ...
       f_ice, f_liq, d_con, d_pevp, f_ice_min, f_res_por);
 
    testCase.verifyGreaterThan(f_ice_new(1), f_ice(1));
@@ -36,7 +36,7 @@ function test_wet_condensation_stays_liquid(testCase)
    f_res_por = 0.02;
 
    [f_ice_new, f_liq_new, d_con_new, d_sbl_err] = ...
-      icemodel.surface.apply_surface_vapor_mass_change( ...
+      icemodel.surface.apply_surface_vapor_exchange( ...
       f_ice, f_liq, d_con, d_pevp, f_ice_min, f_res_por);
 
    testCase.verifyEqual(f_ice_new(1), f_ice(1), 'AbsTol', 0);
@@ -56,7 +56,7 @@ function test_dry_sublimation_removes_ice(testCase)
    f_ice_min = 0.1;
    f_res_por = 0.02;
 
-   [f_ice_new, f_liq_new] = icemodel.surface.apply_surface_vapor_mass_change( ...
+   [f_ice_new, f_liq_new] = icemodel.surface.apply_surface_vapor_exchange( ...
       f_ice, f_liq, d_con, d_pevp, f_ice_min, f_res_por);
 
    testCase.verifyLessThan(f_ice_new(1), f_ice(1));
@@ -73,4 +73,26 @@ function test_vappress_honors_satflag(testCase)
 
    testCase.verifyNotEqual(es_iceflag, es_waterflag);
    testCase.verifyGreaterThan(es_waterflag, es_iceflag);
+end
+
+function test_scalar_tendency_reaches_the_top_cell_alone(testCase)
+   % The surface-only path passes one tendency for the whole column. It must
+   % land in the top cell and leave every interior cell untouched, which is
+   % the same rule the merge look-ahead follows.
+
+   f_ice = [0.90; 0.90; 0.90];
+   f_liq = [0.05; 0.05; 0.05];
+
+   [f_ice_new, f_liq_new, d_rof, d_sbl_err] = ...
+      icemodel.surface.apply_surface_vapor_exchange( ...
+      f_ice, f_liq, 0, 1e-4, 0.1, 0.02);
+
+   testCase.verifyGreaterThan(f_liq_new(1), f_liq(1));
+   testCase.verifyEqual(f_liq_new(2:3), f_liq(2:3), 'AbsTol', 0);
+   testCase.verifyEqual(f_ice_new, f_ice, 'AbsTol', 0);
+   testCase.verifyEqual(d_rof, 0, 'AbsTol', 0);
+
+   % The unapplied channel is one entry per cell, not a scalar.
+   testCase.verifySize(d_sbl_err, [3, 1]);
+   testCase.verifyEqual(d_sbl_err, zeros(3, 1), 'AbsTol', 0);
 end

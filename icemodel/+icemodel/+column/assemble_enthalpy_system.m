@@ -1,6 +1,6 @@
 function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
       T_ice, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, ~, k_eff, delz, ...
-      fn, dz, dt, T_sfc, Fc, Fp, bc)
+      fn, dz, dt, T_sfc, Fc, Fp, bc, varargin)
    %ASSEMBLE_ENTHALPY_SYSTEM Compute the general equation coefficients.
    %
    %  This function constructs the lower, middle, and upper diagonals of the
@@ -8,6 +8,12 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    %
    %  The input signature keeps the suppressed linearization factor Sp for
    %  generality.
+   %
+   %  The optional trailing argument is the vapor face conductance from
+   %  icemodel.column.vapor_face_conductance. Supplying it selects the
+   %  coupled vapor mode, in which K_EFF arrives without its vapor term and
+   %  the vapor energy travels on the same face quantities as the vapor mass.
+   %  Without it the vapor term stays inside K_EFF, which is the default.
    %
    %  Note: ro_sno * cp_sno = (cv_ice * f_ice + cv_liq * f_liq)
    %  See updatestate (or icemodel.timestepping.updatesubstep) for how ro_sno
@@ -59,6 +65,18 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
 
    % Compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
    g_b_ns = 1 ./ ((1 - fn) ./ [k_eff(N); k_eff] + fn ./ [k_eff; k_eff(S)]);
+
+   % Coupled vapor mode replaces the vapor share of this interface
+   % conductivity. Harmonically averaging the total k_eff makes the vapor
+   % contribution inseparable from the rest. It also carries the node-tangent
+   % slope rather than the secant the mass flux uses, so the energy and the
+   % mass are not conjugate. The caller supplies k_eff without its vapor term
+   % and the vapor interface conductivity separately, and the two are added
+   % here. Both are conductivities [W m-1 K-1]; the conductances aN and aS
+   % below are the per-area values formed by dividing by delz.
+   if nargin > 18
+      g_b_ns = g_b_ns + varargin{1};
+   end
 
    % Compute the air fraction
    f_air = 1.0 - f_ice - f_liq;

@@ -1,12 +1,22 @@
 function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
       solve_column_enthalpy(T_sfc, T, f_ice, f_liq, Fc, Fp, Sc, Sp, dz, ...
-      delz, fn, dt, solver, tol, maxiter, ~, ~, ~, debug)
+      delz, fn, dt, solver, tol, maxiter, ~, ~, ~, debug, varargin)
    %SOLVE_COLUMN_ENTHALPY Solve the column enthalpy balance.
    %
    % The signature keeps the alpha, use_aitken, and jumpmax inputs to match the
    % thermal-solver option list. Node-wise Aitken acceleration is off here.
    %
+   % A trailing true selects the coupled vapor mode. The bulk conductivity
+   % then leaves the vapor term out. The vapor energy travels on the face
+   % conductance from icemodel.column.vapor_face_conductance, built from the
+   % same face quantities as the vapor mass flux. Without it the
+   % vapor term stays inside k_eff on the node-tangent slope, which is the
+   % default.
+   %
    %#codegen
+
+   % The coupled vapor mode is opt-in and nothing sets it by default.
+   use_coupled_vapor = nargin > 19 && varargin{1};
 
    % Update the water fraction
    f_wat = icemodel.column.water_fraction(f_ice, f_liq);
@@ -39,9 +49,18 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
       [ro_vap, dro_vapdT] = icemodel.vapor.saturation_vapor_density( ...
          T, f_liq);
 
-      % Update vapor thermal diffusion coefficient [W m-1 K-1]
-      k_vap = icemodel.vapor.vapor_thermal_diffusion_coefficient( ...
+      % Update vapor thermal conductivity [W m-1 K-1]
+      [k_vap, De] = icemodel.vapor.vapor_thermal_conductivity( ...
          T, f_liq, dro_vapdT);
+
+      % Coupled mode moves the vapor term from the node conductivity to the
+      % face conductance. The energy the solve carries is then the mass flux
+      % times the donor cell's latent heat.
+      if use_coupled_vapor
+         k_vap_faces = icemodel.column.vapor_face_conductance( ...
+            T, f_liq, ro_vap, dro_vapdT, De, fn);
+         k_vap = zeros(size(k_vap));
+      end
 
       % Update bulk thermal conductivity
       k_eff = icemodel.column.bulk_thermal_conductivity( ...
@@ -52,9 +71,17 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
          T, f_ice, f_liq, f_wat, ro_vap, dro_vapdT);
 
       % Update the general equation coefficients
-      [aN, aP, aS, b, iM, a1, a2] = icemodel.column.assemble_enthalpy_system( ...
-         T, f_ice, f_liq, dHdT, dFdT, dro_vapdT, H - H_old, Sc, Sp, ...
-         k_eff, delz, fn, dz, dt, T_sfc, Fc, Fp, solver);
+      if use_coupled_vapor
+         [aN, aP, aS, b, iM, a1, a2] = ...
+            icemodel.column.assemble_enthalpy_system( ...
+            T, f_ice, f_liq, dHdT, dFdT, dro_vapdT, H - H_old, Sc, Sp, ...
+            k_eff, delz, fn, dz, dt, T_sfc, Fc, Fp, solver, k_vap_faces);
+      else
+         [aN, aP, aS, b, iM, a1, a2] = ...
+            icemodel.column.assemble_enthalpy_system( ...
+            T, f_ice, f_liq, dHdT, dFdT, dro_vapdT, H - H_old, Sc, Sp, ...
+            k_eff, delz, fn, dz, dt, T_sfc, Fc, Fp, solver);
+      end
 
       % % Check diagonal dominance and condition number
       % icemodel.checkdiags(aP, aN, aS)
