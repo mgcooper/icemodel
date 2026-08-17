@@ -5,12 +5,21 @@ function results = run_unit_suite(options)
    %  results = run_unit_suite(selector="test_met_contracts")
    %  results = run_unit_suite(selector="contracts")
    %  results = run_unit_suite(debug=true)
+   %  results = run_unit_suite(progress_log="/tmp/unit_progress.log")
    %
    % SELECTOR may be:
    %  - empty: run the whole unit suite
    %  - a file name under test/unit/
    %  - a subfolder under test/unit/
    %  - an absolute/relative existing file or folder path
+   %
+   % The suite runs one test file at a time. A progress line prints
+   % before and after each file (to stdout in a desktop session, to
+   % stderr otherwise), and a per-file wall-clock table
+   % prints at the end. Set PROGRESS_LOG to also append each progress line
+   % to that file with a per-line open/write/close, so a run that hangs
+   % still leaves a log whose last "..." line names the file that never
+   % finished.
 
    arguments (Input)
 
@@ -26,6 +35,9 @@ function results = run_unit_suite(options)
       options.verbosity (1, :) string ...
          {icemodel.validators.mustBeTestVerbosityName(options.verbosity)} ...
          = "concise" % "terse" "concise" "detailed"
+
+      options.progress_log (1, 1) string ...
+         = ""
    end
 
    import matlab.unittest.TestRunner
@@ -40,7 +52,18 @@ function results = run_unit_suite(options)
    % Keep the cleanup handle in scope so the caller's config is restored
    % when this entrypoint returns.
    [~, ~, ~, ~, suite_cleanup] = ...
-      icemodel.test.helpers.bootstrapTestEnvironment(); %#ok<ASGLU>
+      icemodel.test.helpers.bootstrapTestEnvironment();
+
+   % Fail fast when the progress log cannot be opened for append: a
+   % silently missing log would defeat its hang-diagnosis purpose.
+   if strlength(options.progress_log) > 0
+      fid = fopen(options.progress_log, 'a');
+      if fid == -1
+         error('icemodel:test:runUnitSuite:progressLogOpenFailed', ...
+            'cannot open progress_log for append: %s', options.progress_log)
+      end
+      fclose(fid);
+   end
 
    % Build the requested suite and configure the text runner once.
    suite = buildUnitSuite(unitdir, options.selector);
@@ -52,8 +75,42 @@ function results = run_unit_suite(options)
       runner.addPlugin(StopOnFailuresPlugin)
    end
 
-   % Run the suite.
-   results = runner.run(suite);
+   % Run the suite one test file at a time. File boundaries are fixture
+   % boundaries, so per-file runs produce the same results as one
+   % whole-suite run, and the loop makes a long run observable: stdout
+   % buffers under matlab -batch when redirected, so without unbuffered
+   % progress lines a slow run looks identical to a hung one (see
+   % icemodel-6qo and icemodel-e9j).
+   groups = fileKeys(suite);
+   names = unique(groups, 'stable');
+   ngroups = numel(names);
+   chunks = cell(ngroups, 1);
+   durations = zeros(ngroups, 1);
+   for g = 1:ngroups
+      members = suite(groups == names(g));
+      progress(sprintf('[%d/%d] %s (%d tests) ...', ...
+         g, ngroups, names(g), numel(members)), options.progress_log);
+      tstart = tic;
+      chunks{g} = runner.run(members);
+      durations(g) = toc(tstart);
+      progress(sprintf('[%d/%d] %s: %d passed, %d failed, %d incomplete in %.1f s', ...
+         g, ngroups, names(g), sum([chunks{g}.Passed]), ...
+         sum([chunks{g}.Failed]), sum([chunks{g}.Incomplete]), ...
+         durations(g)), options.progress_log);
+   end
+
+   % Concatenate per-file results so the return value keeps the shape and
+   % order a single whole-suite run produces. The empty seed keeps the
+   % TestResult type when the suite resolves to zero files.
+   results = [matlab.unittest.TestResult.empty(1, 0), chunks{:}];
+
+   % Print per-file wall-clock, slowest first, so the files that dominate
+   % the suite runtime are identifiable from any run.
+   [sorted_durations, order] = sort(durations, 'descend');
+   fprintf('\nPer-file wall-clock (slowest first):\n');
+   for g = 1:ngroups
+      fprintf('%9.1f s  %s\n', sorted_durations(g), names(order(g)));
+   end
 
    % Print the results to the screen
    if options.verbosity == "detailed"
@@ -121,6 +178,47 @@ function target = resolveSelector(unitdir, selector)
    if exist([target '.m'], 'file') == 2
       target = [target '.m'];
       return
+   end
+end
+
+function keys = fileKeys(suite)
+   %FILEKEYS Map each suite element to its containing test-file name.
+
+   % A test name is '<file>/<test>' with optional parameterization after
+   % the test token. Appending '/' before extractBefore guarantees a hit
+   % even if a name ever arrives without a separator.
+   keys = extractBefore(string({suite.Name}) + "/", "/");
+end
+
+function progress(line, logfile)
+   %PROGRESS Emit one runner progress line to the console and optional log.
+
+   % stderr is unbuffered under matlab -batch, so redirected runs stay
+   % observable in real time. The desktop styles stderr as an error (with
+   % an "Explain Error" button), so interactive sessions print to
+   % stdout instead, which the desktop flushes immediately anyway. The
+   % per-line open/write/close on the log file makes each line durable,
+   % so a hard hang still leaves the name of the file that started but
+   % never finished (the icemodel-e9j recipe).
+   if usejava('desktop')
+      stream = 1;
+   else
+      stream = 2;
+   end
+   fprintf(stream, '%s %s\n', ...
+      char(datetime('now', 'Format', 'HH:mm:ss')), line);
+   if strlength(logfile) > 0
+      fid = fopen(logfile, 'a');
+      if fid == -1
+         % The runner verified this path opens before the suite started,
+         % so a failure here is transient; surface it on the console
+         % stream instead of dropping the line without notice.
+         fprintf(stream, 'progress log append failed: %s\n', logfile);
+      else
+         fprintf(fid, '%s %s\n', ...
+            char(datetime('now', 'Format', 'HH:mm:ss')), line);
+         fclose(fid);
+      end
    end
 end
 

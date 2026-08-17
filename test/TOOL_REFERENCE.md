@@ -42,6 +42,10 @@ Key options:
   - stop on first failure for interactive inspection
 - `stop_on_failure`
   - stop after first failing test
+- `progress_log`
+  - optional file that receives one flushed line per test-file boundary,
+    so a hung run still names the file that never finished; the runner
+    errors up front when the path cannot be opened for append
 - `verbosity`
   - command-window detail level
 
