@@ -3,10 +3,21 @@ function tests = test_reconstruct_production
    tests = functiontests(localfunctions);
 end
 
-function setup(testCase)
-   % Fixture tree: staged-met layout, proxy cache, out/qa/report dirs.
+function setupOnce(testCase)
+   % Bootstrap the environment once for the file. Per-test bootstrap
+   % re-ran the full path scan before every one of the 98 tests and
+   % dominated the file's fixed cost.
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.cleanup = cleanup;
+end
+
+function teardownOnce(testCase)
+   % Release the bootstrap cleanup handle after the last test.
+   testCase.TestData.cleanup = [];
+end
+
+function setup(testCase)
+   % Fixture tree: staged-met layout, proxy cache, out/qa/report dirs.
    root = tempname;
    testCase.TestData.root = root;
    mkdir(fullfile(root, 'met', 'promice'));
@@ -21,7 +32,6 @@ function teardown(testCase)
    if isfolder(testCase.TestData.root)
       rmdir(testCase.TestData.root, 's')
    end
-   clear testCase.TestData.cleanup
 end
 
 function test_driver_rejects_evaluation_output_roots_before_loading(testCase)

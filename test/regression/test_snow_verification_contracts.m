@@ -3,13 +3,26 @@ function tests = test_snow_verification_contracts
    tests = functiontests(localfunctions);
 end
 
-function setup(testCase)
-   % Install the full verification config used by this top-level data suite.
+function setupOnce(testCase)
+   % Install the full verification config used by this top-level data
+   % suite, once for the file. Per-test bootstrap re-ran the full path
+   % scan and config resolution before every one of the 21 tests.
 
    [~, ~, ~, evaluation_root, cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment( ...
       icemodel_config_casename="verification");
    testCase.TestData.cleanup = cleanup;
+   testCase.TestData.evaluation_root = evaluation_root;
+end
+
+function teardownOnce(testCase)
+   % Release the bootstrap cleanup handle after the last test.
+   testCase.TestData.cleanup = [];
+end
+
+function setup(testCase)
+   % Allocate a per-test artifact directory and gate on the archive.
+
    testCase.TestData.tmpdir = tempname(fullfile( ...
       icemodel.getpath('test'), 'artifacts', 'tmp'));
    icemodel.helpers.ensureDirExists(testCase.TestData.tmpdir);
@@ -17,18 +30,17 @@ function setup(testCase)
    % The full ESM-SnowMIP archive is local scientific data, not a release
    % fixture. A clean checkout must skip this archive contract explicitly.
    testCase.assumeTrue(isfile(fullfile( ...
-      evaluation_root, 'esm_snowmip', 'manifest.json')), ...
+      testCase.TestData.evaluation_root, 'esm_snowmip', 'manifest.json')), ...
       ['Full snow-verification archive is not installed under the ' ...
       'verification data root.'])
 end
 
 function teardown(testCase)
-   % Remove temporary artifacts and restore the caller's config.
+   % Remove temporary artifacts.
 
    if exist(testCase.TestData.tmpdir, 'dir') == 7
       rmdir(testCase.TestData.tmpdir, 's')
    end
-   clear testCase.TestData.cleanup
 end
 
 function test_listcases_returns_expected_ids(testCase)

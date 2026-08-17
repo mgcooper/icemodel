@@ -3,10 +3,32 @@ function tests = test_verification_artifact_audit
    tests = functiontests(localfunctions);
 end
 
-function setup(testCase)
-   % Install project dependencies and allocate an isolated staged-data tree.
+function setupOnce(testCase)
+   % Install project dependencies once and build one pristine PROMICE/MAR/
+   % MERRA fixture tree as a reusable template. Per-test setup copies this
+   % template instead of rebuilding the ~3696-row MAR QC series from scratch
+   % for each of the ~28 tests that need it.
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.cleanup = cleanup;
+   template_root = string(tempname);
+   mkdir(template_root)
+   [~, ~, template_paths] = writeAuditTree(template_root);
+   testCase.TestData.template_root = template_root;
+   testCase.TestData.template_paths = template_paths;
+end
+
+function teardownOnce(testCase)
+   % Remove the shared template tree, then release the bootstrap cleanup handle.
+   if isfolder(testCase.TestData.template_root)
+      rmdir(testCase.TestData.template_root, 's')
+   end
+   testCase.TestData.cleanup = [];
+end
+
+function setup(testCase)
+   % Allocate an isolated staged-data tree for this test. Tests that need the
+   % standard PROMICE/MAR/MERRA fixture populate it via copyAuditTree, which
+   % copies the shared template instead of rebuilding it.
    testCase.TestData.tmp = string(tempname);
    mkdir(testCase.TestData.tmp)
 end
@@ -16,13 +38,12 @@ function teardown(testCase)
    if isfolder(testCase.TestData.tmp)
       rmdir(testCase.TestData.tmp, 's')
    end
-   clear testCase.TestData.cleanup
 end
 
 function test_valid_tree_passes_writes_reports_and_remains_read_only(testCase)
    % A valid mixed-source PROMICE tree should pass while preserving explicit
    % precipitation placeholders and every staged input byte/mtime.
-   [eval_root, input_root] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root] = copyAuditTree(testCase);
    before = fileSnapshot([eval_root; input_root]);
    report_dir = fullfile(testCase.TestData.tmp, "reports");
 
@@ -67,7 +88,7 @@ end
 
 function test_audit_rejects_precipitation_partition_mismatch(testCase)
    % Artifact QA must use the same phase mass-balance predicate as readiness.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.promice_met, 'met');
    met = loaded.met;
    met.ppt(1) = 2e-8;
@@ -87,7 +108,7 @@ end
 function test_audits_mar_profile_model_output_contract(testCase)
    % Optional MAR RO1 sidecars pass with complete schema/provenance and fail
    % when the public density-unit contract is altered.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    profile_file = attachMarProfileFixture(input_root, paths.manifest);
 
    report = icemodel.verification.auditArtifacts( ...
@@ -290,7 +311,7 @@ end
 function test_model_profiles_use_observation_not_forcing_window(testCase)
    % Exact-date MAR profiles follow observation dates even when the reusable
    % forcing leg begins later than an otherwise valid profile survey.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    attachMarProfileFixture(input_root, paths.manifest);
    manifest = jsondecode(fileread(paths.manifest));
    manifest.cases.colocation.mar.window.start = '2000-06-01 00:00:00';
@@ -308,7 +329,7 @@ end
 function test_records_missing_runs_and_immutable_artifact_identity(testCase)
    % Missing-run metrics retain the existing missing total while distinguishing
    % separate outages. File identity must describe the exact audited bytes.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.promice_data, 'Data');
    loaded.Data.tair = [NaN; 260; NaN; NaN];
    saveData(paths.promice_data, loaded.Data)
@@ -368,7 +389,7 @@ function test_mar_15m_met_uses_derived_not_native_daily_contract(testCase)
    % A manifest-referenced MAR met artifact keeps the native-ledger provenance
    % copied from Data, but the audit must judge its 15-minute payload only by
    % generic schema/time, metadata-sync, and zero-order-hold contracts.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    met_file = attachMarMetFixture(input_root, paths.manifest, paths.mar_data);
 
    report = icemodel.verification.auditArtifacts( ...
@@ -414,7 +435,7 @@ end
 function test_detects_schema_time_range_unit_period_and_metadata_errors(testCase)
    % One malformed met file should surface independent schema, time, range,
    % period, and metadata-parity failures in a single non-throwing pass.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.promice_met, 'met', 'artifact_metadata');
    loaded.met.Time(2) = loaded.met.Time(1);
    loaded.met.albedo(1) = 1.5;
@@ -444,7 +465,7 @@ end
 
 function test_detects_filled_met_gap_and_missing_resample_provenance(testCase)
    % Source-derived missing-count proof catches a finite derived-met bridge.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.promice_met, 'met', 'artifact_metadata');
    loaded.met.Properties.UserData.met_resample_expected_missing_counts.tair = 4;
    loaded.artifact_metadata = loaded.met.Properties.UserData;
@@ -475,7 +496,7 @@ end
 function test_detects_merra_mar_modis_promice_and_missing_artifact(testCase)
    % Source-specific defects should retain distinct codes so downstream reports
    % can route repairs without parsing prose.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
 
    % MERRA's numeric channels are invalid when durable metadata still declares
    % the native positive-upward orientation.
@@ -534,7 +555,7 @@ end
 function test_audits_mar_optional_diagnostic_contract(testCase)
    % Source-light QA rejects wrong source semantics, broken daily support,
    % stale signed-RZ statistics, unconverted magnitudes, and an ME/MEH mismatch.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.mar_data, 'Data', 'artifact_metadata');
    Data = loaded.Data;
    Data.Properties.UserData.mar_diagnostic_subl_sign = 'wrong';
@@ -557,7 +578,7 @@ end
 function test_accepts_signed_native_mar_refreeze_with_matching_metadata(testCase)
    % Source-exact strict and material RZ negatives are valid when both durable
    % statistic sets and constant native daily support agree with userdata.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.mar_data, 'Data', 'artifact_metadata');
    Data = loaded.Data;
    days = dateshift(Data.Time, 'start', 'day');
@@ -586,7 +607,7 @@ end
 function test_rejects_tampered_signed_mar_refreeze_metadata(testCase)
    % Policy, negative-day count, and minimum are independently durable rather
    % than advisory labels that can drift away from the saved userdata values.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.mar_data, 'Data', 'artifact_metadata');
    Data = loaded.Data;
    days = dateshift(Data.Time, 'start', 'day');
@@ -615,7 +636,7 @@ end
 function test_accepts_reduced_mar_optional_diagnostic_schema(testCase)
    % Removing every optional native product remains a valid, explicit reduced
    % schema and does not turn the MAR model-met leg into a readiness failure.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.mar_data, 'Data', 'artifact_metadata');
    Data = removevars(loaded.Data, ...
       {'subl', 'subl_evap', 'refreeze_deposition'});
@@ -641,7 +662,7 @@ end
 function test_rejects_missing_or_inconsistent_mar_diagnostic_inventory(testCase)
    % Missing provenance and a forged source/channel inventory have distinct
    % repair codes, so neither can be mistaken for an optional reduced source.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.mar_data, 'Data', 'artifact_metadata');
    original = loaded.Data.Properties.UserData;
    Data = loaded.Data;
@@ -670,7 +691,7 @@ end
 function test_audits_promice_tice10m_source_mask_and_provenance(testCase)
    % The reusable audit reports safely masked thermistor failures and rejects
    % either a finite flagged target or incomplete durable QC provenance.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.promice_data, 'Data', 'artifact_metadata');
    Data = loaded.Data;
    source = [260; 260.1; 267; 267.1];
@@ -803,7 +824,7 @@ end
 function test_audits_hourly_promice_shortwave_darkness_only(testCase)
    % Missing deep-night zeros are invalid only in hourly native userdata; the
    % same timestamp in 15-minute met remains governed by resampling provenance.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.promice_data, 'Data', 'artifact_metadata');
    Data = loaded.Data;
    Data.Properties.DimensionNames{1} = 'Time';
@@ -911,7 +932,7 @@ end
 function test_mar_reduced_source_fallback_warns_without_daily_constancy(testCase)
    % Reduced-source fixtures may explicitly retain hourly RUH/SMBH. That durable
    % fallback is visible to QA but must not be misdiagnosed as daily-rate drift.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.mar_data, 'Data', 'artifact_metadata');
    loaded.Data.runoff = linspace(0, 0.02, height(loaded.Data))';
    loaded.Data.smb = linspace(-0.01, 0.01, height(loaded.Data))';
@@ -957,7 +978,7 @@ end
 function test_mar_ledger_semantics_are_audited(testCase)
    % Audit rejects contradictory complete-day status and partial-boundary
    % preservation without mutating the staged artifact.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    original = load(paths.mar_data, 'Data', 'artifact_metadata');
 
    % Contradict one finite daily reference with the unverified status code.
@@ -1009,7 +1030,7 @@ end
 function test_unverified_merra_orientation_is_an_explicit_blocker(testCase)
    % Numeric MERRA fluxes without a durable orientation marker are unresolved
    % source-quality blockers, not warnings the audit accepts.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.merra_data, 'Data', 'artifact_metadata');
    loaded.Data.Properties.UserData = rmfield(loaded.Data.Properties.UserData, ...
       'merra_flux_sign_convention');
@@ -1030,7 +1051,7 @@ end
 
 function test_merra_time_semantics_are_required_and_axis_checked(testCase)
    % QA distinguishes an invalid policy marker from a leaked native-center axis.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.merra_data, 'Data', 'artifact_metadata');
    loaded.Data.Properties.UserData.merra_time_relabel_policy = 'native_center';
    loaded.Data.Time = loaded.Data.Time + minutes(30);
@@ -1050,7 +1071,7 @@ end
 function test_reduced_merra_artifact_still_requires_time_semantics(testCase)
    % Glacier-only MERRA artifacts have no turbulent-flux sign contract, but their
    % tavg3 support still requires the same durable timestamp provenance.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.merra_data, 'Data', 'artifact_metadata');
    reduced = timetable(loaded.Data.Time, ones(height(loaded.Data), 1), ...
       VariableNames="runoff");
@@ -1074,7 +1095,7 @@ end
 function test_merra_tavg3_ramp_fails_despite_canonical_markers(testCase)
    % First-class QA checks values as well as markers so stale provenance cannot
    % hide an hourly ramp through a three-hour glacier-collection support block.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.merra_data, 'Data', 'artifact_metadata');
    loaded.Data.runoff = (1:height(loaded.Data))';
    Data = loaded.Data;
@@ -1092,7 +1113,7 @@ end
 function test_undocumented_required_placeholder_fails(testCase)
    % An all-NaN required channel is valid only when source metadata explicitly
    % describes it as a placeholder rather than an observation.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.promice_met, 'met', 'artifact_metadata');
    loaded.met.Properties.UserData.precip_policy = 'PROMICE precipitation';
    loaded.artifact_metadata = loaded.met.Properties.UserData;
@@ -1115,7 +1136,7 @@ end
 function test_partial_required_met_gap_warns_without_failing(testCase)
    % Partial required-channel gaps remain source-faithful but must be visible as
    % non-runnable forcing rather than recorded only in the channel ledger.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    loaded = load(paths.promice_met, 'met');
    loaded.met.albedo(4:5) = NaN;
    loaded.met.Properties.UserData.met_resample_expected_missing_counts.albedo = 2;
@@ -1140,7 +1161,7 @@ end
 function test_detects_manifest_schema_and_source_list_drift(testCase)
    % Required fields and staged source/file declarations should be checked before
    % valid leftover files can make a stale manifest appear usable.
-   [eval_root, input_root, paths] = writeAuditTree(testCase.TestData.tmp);
+   [eval_root, input_root, paths] = copyAuditTree(testCase);
    manifest = jsondecode(fileread(paths.manifest));
    manifest.cases = rmfield(manifest.cases, 'native_timestep');
    manifest.cases.forcing_sources = {'promice', 'missing_forcing'};
@@ -1228,7 +1249,7 @@ end
 
 function test_repairMetTimeSupport_dry_write_and_idempotence(testCase)
    % Legacy source rows are recoverable without raw data; dry-run is byte-stable.
-   [~, ~, paths] = writeAuditTree(testCase.TestData.tmp);
+   [~, ~, paths] = copyAuditTree(testCase);
    loaded = load(paths.promice_met, 'met');
    source = loaded.met(1:4:end, :);
    source.swd = (0:100:300)';
@@ -1273,7 +1294,7 @@ end
 
 function test_repairMetTimeSupport_rejects_missing_and_unknown(testCase)
    % Exact repair inputs fail closed when a path or provenance policy is unknown.
-   [~, ~, paths] = writeAuditTree(testCase.TestData.tmp);
+   [~, ~, paths] = copyAuditTree(testCase);
    testCase.verifyError(@() ...
       icemodel.verification.setup.repairMetTimeSupport( ...
       fullfile(testCase.TestData.tmp, 'missing.mat')), ...
@@ -1291,7 +1312,7 @@ end
 
 function test_repairMetTimeSupport_rejects_invented_source_row(testCase)
    % A finite row at an omitted native timestamp is not exact repair evidence.
-   [~, ~, paths] = writeAuditTree(testCase.TestData.tmp);
+   [~, ~, paths] = copyAuditTree(testCase);
    loaded = load(paths.promice_met, 'met');
    met = loaded.met(1:9, :);
    met.swd = (0:8)';
@@ -1311,7 +1332,7 @@ end
 
 function test_repairMetTimeSupport_rejects_recorded_source_gap(testCase)
    % Recorded native gaps make the legacy interpolation unrecoverable exactly.
-   [~, ~, paths] = writeAuditTree(testCase.TestData.tmp);
+   [~, ~, paths] = copyAuditTree(testCase);
    loaded = load(paths.promice_met, 'met');
    source = loaded.met(1:4:end, :);
    met = retime(source, ...
@@ -1779,6 +1800,27 @@ function [eval_root, input_root, paths] = writeAuditTree(root)
       "2000-01-02", case_entry, struct('site', {}, 'reason', {}));
    paths.manifest = fullfile(family_root, "manifest.json");
    writeJson(paths.manifest, manifest)
+end
+
+function [eval_root, input_root, paths] = copyAuditTree(testCase)
+   %COPYAUDITTREE Copy the shared pristine template tree into this test's
+   %own tmp dir and rebase every returned path from the template root to the
+   %copy root. This avoids re-running the real PROMICE/MAR/MERRA QC
+   %pipeline per test while keeping each test's tree private and mutable.
+   template_root = testCase.TestData.template_root;
+   copy_root = testCase.TestData.tmp;
+   copyfile(template_root, copy_root)
+   eval_root = fullfile(copy_root, "eval");
+   input_root = fullfile(copy_root, "input");
+   paths = testCase.TestData.template_paths;
+   fields = fieldnames(paths);
+   for k = 1:numel(fields)
+      % Every template path field is built from fullfile(template_root, ...),
+      % so replacing the leading template-root prefix rebases it onto the
+      % copy without needing to know each field's internal subfolder layout.
+      paths.(fields{k}) = strrep(paths.(fields{k}), ...
+         template_root, copy_root);
+   end
 end
 
 function [eval_root, input_root, paths] = writeEsmAuditTree(root)

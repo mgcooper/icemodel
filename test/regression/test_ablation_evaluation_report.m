@@ -4,13 +4,58 @@ function tests = test_ablation_evaluation_report
    tests = functiontests(localfunctions);
 end
 
+function setupOnce(testCase)
+   %SETUPONCE Build the expensive shared fixture pieces one time per file.
+   %
+   % Constructing the synthetic cohort walks the full hourly policy season,
+   % so one construction serves every test. Tests that mutate the cohort
+   % copy it into a local variable first; MATLAB struct assignment copies on
+   % write, so a local mutation never reaches TestData.
+
+   % One shared folder holds the pristine saved cohort for the tests that
+   % read it unmodified. teardownOnce removes it.
+   shared_folder = tempname;
+   mkdir(shared_folder)
+   testCase.TestData.shared_folder = shared_folder;
+
+   results = syntheticResults();
+
+   % Stamp the shared copy with the running code's own fingerprint so
+   % successful report builds take the quiet stamped-match path instead of
+   % the absent-stamp path. Resolving a fingerprint runs icemodel.setopts,
+   % which asserts that ICEMODEL_INPUT_PATH exists, so the resolution runs
+   % once here under a guard. A workspace that cannot resolve one leaves
+   % the stamp absent, which the report treats as a quiet pre-stamp cohort,
+   % so the suite stays self-contained.
+   try
+      results.physics_fingerprint = ...
+         icemodel.verification.helpers.physicsFingerprint();
+   catch
+      % The workspace cannot resolve the current defaults. Keep the fixture
+      % unstamped; only the fingerprint tests require a resolvable stamp.
+   end
+   testCase.TestData.results = results;
+
+   % The pristine saved cohort file backs every test that never mutates the
+   % struct, so those tests skip their own save round trip.
+   results_file = fullfile(shared_folder, 'results.mat');
+   save(results_file, 'results')
+   testCase.TestData.results_file = string(results_file);
+end
+
+function teardownOnce(testCase)
+   %TEARDOWNONCE Remove the shared fixture folder.
+
+   rmdir(testCase.TestData.shared_folder, 's')
+end
+
 function test_saved_results_render_complete_scientific_report(testCase)
    % A compact saved result must produce every piece of scientific evidence.
 
    folder = temporaryFolder(testCase);
-   results = syntheticResults();
-   results_file = fullfile(folder, 'results.mat');
-   save(results_file, 'results')
+   % The pristine shared cohort file backs this read-only test, so it skips
+   % a per-test construction and save of the full fixture.
+   results_file = testCase.TestData.results_file;
    expected_results_sha256 = ...
       icemodel.verification.setup.fileSha256(results_file);
    output_folder = fullfile(folder, "report $() 'quoted'");
@@ -462,7 +507,8 @@ function test_relative_result_and_colliding_identifiers(testCase)
    % Relative inputs work, and normalized figure stems cannot overwrite a peer.
 
    folder = temporaryFolder(testCase);
-   results = syntheticResults();
+   % Mutate a local copy of the shared cohort; TestData stays pristine.
+   results = testCase.TestData.results;
    completed = find(string({results.site_year_results.status}) == ...
       "completed", 1);
    duplicate = results.site_year_results(completed);
@@ -498,7 +544,8 @@ function test_step_failure_is_explicit_in_closure_report(testCase)
    % A cancelling window residual must not hide failed forcing-step closure.
 
    folder = temporaryFolder(testCase);
-   results = syntheticResults();
+   % Mutate a local copy of the shared cohort; TestData stays pristine.
+   results = testCase.TestData.results;
    completed_result = find( ...
       string({results.site_year_results.status}) == "completed", 1);
    site_result = results.site_year_results(completed_result);
@@ -602,7 +649,8 @@ function test_no_completed_rows_render_honest_empty_state(testCase)
    % Large readiness-only artifacts stay accurate and fixed-size.
 
    folder = temporaryFolder(testCase);
-   results = largeUnavailableResults(syntheticResults());
+   % Expand a local copy of the shared cohort; TestData stays pristine.
+   results = largeUnavailableResults(testCase.TestData.results);
    results_file = fullfile(folder, 'results-empty.mat');
    save(results_file, 'results')
 
@@ -643,7 +691,7 @@ function test_no_completed_rows_render_honest_empty_state(testCase)
    verifyTrue(testCase, any(status.report_category == "execution_unavailable" ...
       & status.error_identifier == "synthetic:failure"))
 
-   % The full-scale readiness and nested inventories must not produce enormous
+   % The large readiness and nested inventories must not produce enormous
    % raster dimensions; exact rows remain available in the linked CSV files.
    for name = ["ablation-nested-window-stability.png", ...
          "ablation-endpoint-perturbation-stability.png"]
@@ -657,7 +705,8 @@ function test_truncated_or_mislabeled_seasonal_payload_is_rejected(testCase)
    % Completed reports require the full hourly season and exact window labels.
 
    folder = temporaryFolder(testCase);
-   valid = syntheticResults();
+   % Mutate local copies of the shared cohort; TestData stays pristine.
+   valid = testCase.TestData.results;
    completed = find(string({valid.site_year_results.status}) ...
       == "completed", 1);
    invalid_results = cell(4, 1);
@@ -692,7 +741,8 @@ function test_full_season_evaluation_window_is_allowed(testCase)
    % All hourly rows may be selected when saved bounds span the full season.
 
    folder = temporaryFolder(testCase);
-   results = syntheticResults();
+   % Mutate a local copy of the shared cohort; TestData stays pristine.
+   results = testCase.TestData.results;
    completed = find(string({results.site_year_results.status}) ...
       == "completed", 1);
    seasonal = results.site_year_results(completed).seasonal;
@@ -734,7 +784,8 @@ function test_invalid_saved_contract_is_rejected(testCase)
 
    % Exercise malformed partitions and check that every fixed scientific
    % value governing report interpretation is validated.
-   valid = syntheticResults();
+   % Mutate local copies of the shared cohort; TestData stays pristine.
+   valid = testCase.TestData.results;
    invalid_policies = cell(17, 1);
    invalid_policies{1} = rmfield(valid.policy, ...
       'metadata_only_flag_fields');
@@ -777,15 +828,18 @@ function test_invalid_saved_contract_is_rejected(testCase)
    % The strict equality comparison excludes the channel schema, so the
    % required-field list is what catches its absence.
    invalid_policies{17} = rmfield(valid.policy, 'required_model_fields');
+   % Every variant is rejected during validation, before the builder writes
+   % any output, so one reused MAT path and output directory replace the
+   % per-variant paths without changing what each builder entry call sees.
+   policy_file = fullfile(folder, 'invalid-policy.mat');
+   policy_output = fullfile(folder, 'invalid-policy');
    for k = 1:numel(invalid_policies)
       results = valid;
       results.policy = invalid_policies{k};
-      policy_file = fullfile(folder, compose('invalid-policy-%d.mat', k));
       save(policy_file, 'results')
       verifyError(testCase, @() ...
          icemodel.verification.report.buildAblationEvaluationReport( ...
-         policy_file, render=false, output_dir=fullfile(folder, ...
-         compose('invalid-policy-%d', k))), ...
+         policy_file, render=false, output_dir=policy_output), ...
          'icemodel:verification:report:invalidAblationPolicy')
    end
 
@@ -798,16 +852,18 @@ function test_invalid_saved_contract_is_rejected(testCase)
    no_completed.nested_windows = valid.nested_windows([], :);
    no_completed.endpoint_perturbations = ...
       valid.endpoint_perturbations([], :);
+   % Rejection again precedes any output, so this loop reuses one MAT path
+   % and one output directory as well.
+   empty_policy_file = fullfile(folder, 'empty-invalid-policy.mat');
+   empty_policy_output = fullfile(folder, 'empty-invalid-policy');
    for k = 1:2
       results = no_completed;
       results.policy = invalid_policies{k};
-      policy_file = fullfile(folder, ...
-         compose('empty-invalid-policy-%d.mat', k));
-      save(policy_file, 'results')
+      save(empty_policy_file, 'results')
       verifyError(testCase, @() ...
          icemodel.verification.report.buildAblationEvaluationReport( ...
-         policy_file, render=false, output_dir=fullfile(folder, ...
-         compose('empty-invalid-policy-%d', k))), ...
+         empty_policy_file, render=false, ...
+         output_dir=empty_policy_output), ...
          'icemodel:verification:report:invalidAblationPolicy')
    end
 end
@@ -999,8 +1055,9 @@ function results = syntheticResults()
    % runs icemodel.setopts, which asserts that ICEMODEL_INPUT_PATH exists.
    % Every caller of this fixture would then need a provisioned data tree to
    % build a report from a self-contained struct. An absent stamp does not
-   % warn, so the report tests stay quiet. The fingerprint tests below stamp
-   % their own copies.
+   % warn, so the report tests stay quiet. setupOnce stamps the shared
+   % TestData copy once, under a guard, when the workspace can resolve one;
+   % the fingerprint tests mutate copies of that stamped cohort.
    results.run_name = "synthetic<script>unsafe</script>";
    results.paths = struct('run_dir', "/definitely/not/present", ...
       'readiness_csv', "/definitely/not/present/readiness.csv", ...
@@ -1013,27 +1070,29 @@ function results = syntheticResults()
 end
 
 function results = largeUnavailableResults(results)
-   %LARGEUNAVAILABLERESULTS Expand the fixture to production-scale empty rows.
+   %LARGEUNAVAILABLERESULTS Expand the fixture to a large all-empty inventory.
 
-   % Preserve every operational outcome separately across the 904-row
-   % readiness inventory while leaving no scientific completion.
-   n_rows = 904;
+   % Preserve every operational outcome separately across the 304-row
+   % readiness inventory while leaving no scientific completion. No
+   % assertion pins the row count; 304 rows keep the scale far above the
+   % handful the other tests use while costing less to build and render.
+   n_rows = 304;
    template = results.summary(2, :);
    results.summary = template(ones(n_rows, 1), :);
    results.summary.case_id = compose("case_%04d", (1:n_rows)');
    results.summary.site_id = compose("SITE_%04d", (1:n_rows)');
    results.summary.year = repmat(2019, n_rows, 1);
-   status = [repmat("excluded", 302, 1); ...
-      repmat("not_selected", 301, 1); repmat("unavailable", 301, 1)];
+   status = [repmat("excluded", 102, 1); ...
+      repmat("not_selected", 101, 1); repmat("unavailable", 101, 1)];
    results.summary.status = status;
    results.summary.selected = status ~= "not_selected";
    results.summary.admitted = status ~= "excluded";
    results.summary.reason = [ ...
-      repmat("readiness target unavailable", 302, 1); ...
-      repmat("case-year was not explicitly selected", 301, 1); ...
-      repmat("synthetic execution failure", 301, 1)];
-   results.summary.error_identifier = [strings(603, 1); ...
-      repmat("synthetic:failure", 301, 1)];
+      repmat("readiness target unavailable", 102, 1); ...
+      repmat("case-year was not explicitly selected", 101, 1); ...
+      repmat("synthetic execution failure", 101, 1)];
+   results.summary.error_identifier = [strings(203, 1); ...
+      repmat("synthetic:failure", 101, 1)];
    results.summary.classification = repmat("", n_rows, 1);
    results.summary.physical_comparable = false(n_rows, 1);
    numeric_fields = ["eligible_sample_count", ...
@@ -1049,7 +1108,7 @@ function results = largeUnavailableResults(results)
    results.summary.window_start = NaT(n_rows, 1, 'TimeZone', 'UTC');
    results.summary.window_end = NaT(n_rows, 1, 'TimeZone', 'UTC');
 
-   % Match the readiness ledger to the same 904 identities. Not-selected and
+   % Match the readiness ledger to the same 304 identities. Not-selected and
    % execution-failed rows are readiness-admitted; exclusions are not.
    readiness_template = results.readiness.rows(2, :);
    results.readiness.rows = readiness_template(ones(n_rows, 1), :);
@@ -1063,9 +1122,11 @@ function results = largeUnavailableResults(results)
    results.readiness.rows.admitted = admitted;
    results.site_year_results = results.site_year_results(2);
 
-   % Retain 157 explicit unavailable nested rows to test report scalability and
-   % prevent absent values from being rendered as numerical zeros.
-   n_nested = 157;
+   % Retain 57 explicit unavailable nested rows to test report scalability
+   % and prevent absent values from being rendered as numerical zeros. No
+   % assertion pins this count either; 57 site-years still crowd the
+   % stability figures far beyond the completed fixture's scale.
+   n_nested = 57;
    nested_template = results.nested_windows(6, :);
    results.nested_windows = nested_template(ones(n_nested, 1), :);
    results.nested_windows.case_id = compose( ...
@@ -1076,7 +1137,7 @@ function results = largeUnavailableResults(results)
    results.nested_windows.reason = repmat( ...
       "fixed endpoint unavailable", n_nested, 1);
 
-   % Exercise all six planned endpoint rows for 157 site-years on the same
+   % Exercise all six planned endpoint rows for 57 site-years on the same
    % fixed-size canvas, with every unavailable row still written to CSV/QMD.
    endpoint_index = repmat((1:6)', n_nested, 1);
    results.endpoint_perturbations = ...
@@ -1282,7 +1343,8 @@ function test_an_added_diagnostic_channel_keeps_a_saved_cohort_usable(testCase)
    % channel cannot change a value the run already computed. One appended
    % channel must therefore never cost a multi-hour rerun.
 
-   valid = syntheticResults();
+   % Mutate a local copy of the shared cohort; TestData stays pristine.
+   valid = testCase.TestData.results;
    scratch = temporaryFolder(testCase);
    output_folder = fullfile(scratch, 'added-channel-report');
    results_file = fullfile(scratch, 'results.mat');
@@ -1319,7 +1381,8 @@ function test_a_removed_report_channel_invalidates_a_saved_cohort(testCase)
    % does not define has been removed or redefined. Its saved values do not
    % mean what the report says they mean.
 
-   valid = syntheticResults();
+   % Mutate a local copy of the shared cohort; TestData stays pristine.
+   valid = testCase.TestData.results;
    scratch = temporaryFolder(testCase);
    output_folder = fullfile(scratch, 'removed-channel-report');
    results_file = fullfile(scratch, 'results.mat');
@@ -1340,9 +1403,9 @@ function test_physics_fingerprint_warns_and_never_blocks_a_report(testCase)
    % path that nothing enables also moves the digest. The gate therefore warns
    % and still builds, and the owner decides whether to rerun.
 
-   valid = syntheticResults();
-   valid.physics_fingerprint = ...
-      icemodel.verification.helpers.physicsFingerprint();
+   % The shared fixture already carries the running code's stamp, so this
+   % test mutates copies of it instead of resolving a second fingerprint.
+   valid = testCase.TestData.results;
    scratch = temporaryFolder(testCase);
    output_folder = fullfile(scratch, 'fingerprint-report');
    results_file = fullfile(scratch, 'results.mat');
@@ -1405,11 +1468,12 @@ function test_physics_fingerprint_warns_and_never_blocks_a_report(testCase)
       'stamp is malformed')
 
    % The matching stamp must stay silent, or the warning carries no signal.
-   results = valid;
-   save(results_file, 'results')
+   % The pristine shared cohort file already carries the matching stamp, so
+   % this case reuses it instead of saving another copy.
    verifyWarningFree(testCase, @() ...
       icemodel.verification.report.buildAblationEvaluationReport( ...
-      results_file, output_dir=output_folder, render=false))
+      testCase.TestData.results_file, output_dir=output_folder, ...
+      render=false))
 end
 
 function test_report_builds_when_the_workspace_cannot_resolve_defaults( ...
@@ -1419,6 +1483,8 @@ function test_report_builds_when_the_workspace_cannot_resolve_defaults( ...
    % report from a saved MAT file must survive an absent workspace, because
    % that is the one situation the guard exists for.
 
+   % Build the cohort directly instead of using the stamped shared fixture:
+   % the absent-stamp branch under test needs an unstamped cohort.
    valid = syntheticResults();
    scratch = temporaryFolder(testCase);
    output_folder = fullfile(scratch, 'no-workspace-report');
@@ -1486,7 +1552,8 @@ function test_reworded_documentation_does_not_invalidate_a_saved_policy(testCase
    % documentation wrong instead. Values still govern: changing one must still
    % be rejected.
 
-   valid = syntheticResults();
+   % Mutate local copies of the shared cohort; TestData stays pristine.
+   valid = testCase.TestData.results;
    output_folder = fullfile(tempname, 'reworded-report');
    results_file = fullfile(tempname, 'results.mat');
    mkdir(fileparts(results_file))

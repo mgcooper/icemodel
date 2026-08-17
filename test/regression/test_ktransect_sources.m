@@ -3,10 +3,21 @@ function tests = test_ktransect_sources
    tests = functiontests(localfunctions);
 end
 
-function setup(testCase)
-   % Install the verification path and allocate a parser fixture folder.
+function setupOnce(testCase)
+   % Install the verification path once for the file. Per-test bootstrap
+   % re-ran the full path scan before every one of the 25 tests and
+   % dominated the file's fixed cost.
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.cleanup = cleanup;
+end
+
+function teardownOnce(testCase)
+   % Release the bootstrap cleanup handle after the last test.
+   testCase.TestData.cleanup = [];
+end
+
+function setup(testCase)
+   % Allocate a parser fixture folder for each test.
    testCase.TestData.tmp = tempname;
    mkdir(fullfile(testCase.TestData.tmp, 'datasets'));
 end
@@ -16,7 +27,6 @@ function teardown(testCase)
    if isfolder(testCase.TestData.tmp)
       rmdir(testCase.TestData.tmp, 's')
    end
-   clear testCase.TestData.cleanup
 end
 
 %% Parser contracts
@@ -468,9 +478,14 @@ function test_import_flags_native_identity_conflict(testCase)
    fprintf(fid, '%s', jsonencode(staged));
    clear cleaner
 
-   manifest = icemodel.verification.setup.importKtransect( ...
+   % The overwrite re-stage replaces the existing case root, so the
+   % prepareCaseRoot warning is expected; capture it to keep its text out
+   % of the suite log.
+   manifest = icemodel.test.helpers.captureExpectedWarning(testCase, ...
+      @() icemodel.verification.setup.importKtransect( ...
       testCase.TestData.tmp, case_ids="AWS9", output_root=output_root, ...
-      overwrite=true);
+      overwrite=true), ...
+      'icemodel:verification:prepareCaseRoot:overwrite');
 
    leg = manifest.cases(1).colocation.ktransect;
    testCase.verifyEqual(string(leg.kind), "annual_aws_eval");

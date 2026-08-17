@@ -40,7 +40,7 @@ function test_plot_verification_artifacts_summarizes_staged_tree(testCase)
    % userdata from a manifest rooted at output_root without committed fixtures.
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="promice", save_figs=false);
+      dataset_family="promice", save_figs=false, finalize_legends=false);
 
    testCase.verifyGreaterThanOrEqual(height(returned), 4);
    testCase.verifyTrue(all(returned.dataset_family == "promice"));
@@ -71,7 +71,7 @@ function test_plot_verification_artifacts_pairs_explicit_eval_root(testCase)
    % An explicit eval root should imply the sibling input root unless overridden.
    returned = icemodel.verification.plotVerificationArtifacts( ...
       evaluation_data_root=fullfile(testCase.TestData.root, 'eval'), ...
-      dataset_family="promice", save_figs=false);
+      dataset_family="promice", save_figs=false, finalize_legends=false);
 
    testCase.verifyTrue(any(contains(returned.met_sources, "promice")));
    testCase.verifyTrue(any(contains(returned.userdata_sources, "promice")));
@@ -97,7 +97,7 @@ function test_plot_verification_artifacts_discovers_legacy_esm_met(testCase)
 
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="esm_snowmip", save_figs=false);
+      dataset_family="esm_snowmip", save_figs=false, finalize_legends=false);
 
    testCase.verifyTrue(any(returned.met_sources == "esm_snowmip"));
    testCase.verifyTrue(any(contains(returned.plotted_variables, "tair")));
@@ -112,7 +112,7 @@ function test_plot_verification_artifacts_discovers_flat_legacy_esm_met(testCase
 
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="esm_snowmip", save_figs=false);
+      dataset_family="esm_snowmip", save_figs=false, finalize_legends=false);
 
    testCase.verifyTrue(any(returned.met_sources == "esm_snowmip"));
    testCase.verifyTrue(any(contains(returned.plotted_variables, "tair")));
@@ -123,7 +123,7 @@ function test_plot_verification_artifacts_groups_esm_native_aliases(testCase)
    % domain groups instead of creating an oversized other-variables figure.
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="esm_snowmip", save_figs=false);
+      dataset_family="esm_snowmip", save_figs=false, finalize_legends=false);
 
    surface = listedVariables(returned.plotted_variables( ...
       returned.figure_group == "surface_height_depth"));
@@ -166,7 +166,7 @@ function test_sparse_evaluation_state_uses_available_daily_samples(testCase)
 
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="esm_snowmip", save_figs=false);
+      dataset_family="esm_snowmip", save_figs=false, finalize_legends=false);
 
    surface = listedVariables(returned.plotted_variables( ...
       returned.figure_group == "surface_height_depth"));
@@ -195,7 +195,7 @@ function test_plot_firn_artifacts_all_excludes_snow_families(testCase)
    % The firn-specific wrapper's default "all" selector should not forward the
    % snow-only family set used by the neutral verification plotter.
    returned = icemodel.verification.plotFirnArtifacts( ...
-      output_root=string(testCase.TestData.root), save_figs=false);
+      output_root=string(testCase.TestData.root), save_figs=false, finalize_legends=false);
 
    testCase.verifyTrue(all(ismember(returned.dataset_family, ...
       icemodel.verification.namelists.firndatasetfamily())));
@@ -216,7 +216,7 @@ function test_plot_verification_artifacts_accepts_date_window(testCase)
 
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="promice", save_figs=false, ...
+      dataset_family="promice", save_figs=false, finalize_legends=false, ...
       startdate=datetime(2012, 1, 2, 0, 0, 0, 'TimeZone', 'UTC'), ...
       enddate=datetime(2012, 1, 2, 23, 0, 0, 'TimeZone', 'UTC'));
 
@@ -227,7 +227,8 @@ function test_plot_verification_artifacts_treats_nat_as_unset(testCase)
    % NaT bounds come from runtime option defaults and should mean unbounded plots.
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="promice", save_figs=false, startdate=NaT, enddate=NaT);
+      dataset_family="promice", save_figs=false, finalize_legends=false, ...
+      startdate=NaT, enddate=NaT);
 
    testCase.verifyGreaterThan(height(returned), 0);
    testCase.verifyTrue(any(contains(returned.plotted_variables, "tair")));
@@ -238,7 +239,7 @@ function test_plot_verification_artifacts_handles_empty_case(testCase)
    % variable grouping.
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="research_site", save_figs=false);
+      dataset_family="research_site", save_figs=false, finalize_legends=false);
 
    testCase.verifyEqual(returned.figure_group, "no_plottable_data");
    testCase.verifyEqual(returned.case_id, "empty");
@@ -248,7 +249,7 @@ function test_thermistor_string_plotted_once(testCase)
    % The thermistor-string summary is one group and includes its 10 m primary.
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="promice", save_figs=false);
+      dataset_family="promice", save_figs=false, finalize_legends=false);
    has_tice1 = arrayfun(@hasListedTice1, returned.plotted_variables);
 
    testCase.verifyEqual(sum(has_tice1), 1);
@@ -279,7 +280,7 @@ function test_thermistor_string_uses_one_axes_and_emphasizes_primary(testCase)
    set(groot, 'DefaultFigureCloseRequestFcn', @(~, ~) []);
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="promice", save_figs=false);
+      dataset_family="promice", save_figs=false, finalize_legends=false);
    clear restore_close
 
    figures = findall(groot, 'Type', 'Figure');
@@ -370,7 +371,7 @@ function test_surface_albedo_uses_shared_shortwave_weighted_daily_mean(testCase)
    set(groot, 'DefaultFigureCloseRequestFcn', @(~, ~) []);
    icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="promice", save_figs=false);
+      dataset_family="promice", save_figs=false, finalize_legends=false);
    clear restore_close
 
    figures = findall(groot, 'Type', 'Figure');
@@ -437,7 +438,7 @@ function test_radiation_native_partial_hours_break_gaps(testCase)
    set(groot, 'DefaultFigureCloseRequestFcn', @(~, ~) []);
    icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="promice", save_figs=false);
+      dataset_family="promice", save_figs=false, finalize_legends=false);
    clear restore_close
 
    figures = findall(groot, 'Type', 'Figure');
@@ -495,7 +496,7 @@ function test_snow_depth_aliases_share_one_canonical_panel(testCase)
    set(groot, 'DefaultFigureCloseRequestFcn', @(~, ~) []);
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="promice", save_figs=false);
+      dataset_family="promice", save_figs=false, finalize_legends=false);
    clear restore_close
 
    figures = findall(groot, 'Type', 'Figure');
@@ -547,7 +548,7 @@ function test_plot_verification_artifacts_uses_canonical_shared_groups(testCase)
 
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="promice", save_figs=false);
+      dataset_family="promice", save_figs=false, finalize_legends=false);
 
    % Every shared group remains independently selectable by report tooling.
    expected = ["met_forcing", "radiation_fluxes", "energy_balance", ...
@@ -646,7 +647,7 @@ function test_plot_derives_mar_energy_balance_from_native_components(testCase)
 
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="promice", save_figs=false);
+      dataset_family="promice", save_figs=false, finalize_legends=false);
 
    energy = listedVariables(returned.plotted_variables( ...
       returned.figure_group == "energy_balance"));
@@ -672,7 +673,7 @@ function test_profiles_exclude_support_metadata_and_blank_rows(testCase)
 
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="promice", save_figs=false);
+      dataset_family="promice", save_figs=false, finalize_legends=false);
    profile_row = returned(returned.figure_group == "profiles", :);
    testCase.verifyEqual(height(profile_row), 1);
    testCase.verifyEqual(listedVariables(profile_row.plotted_variables), ...
@@ -686,7 +687,7 @@ function test_profiles_exclude_support_metadata_and_blank_rows(testCase)
    save(observation_file, 'targets')
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="promice", save_figs=false);
+      dataset_family="promice", save_figs=false, finalize_legends=false);
    testCase.verifyFalse(any(returned.figure_group == "profiles"));
    testCase.verifyFalse(any(contains(returned.plotted_variables, ...
       ["error", "measurement_id"])));
@@ -717,6 +718,8 @@ function test_named_profiles_and_interval_totals_render_readably(testCase)
    restore_close = onCleanup(@() set(groot, ...
       'DefaultFigureCloseRequestFcn', old_close));
    set(groot, 'DefaultFigureCloseRequestFcn', @(~, ~) []);
+   % This test asserts rendered legend content, so keep the default
+   % finalize_legends layout pass.
    icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
       dataset_family="promice", save_figs=false);
@@ -790,7 +793,7 @@ function test_group_names_preserve_reductions_while_tiles_omit_redundancy(testCa
    set(groot, 'DefaultFigureCloseRequestFcn', @(~, ~) []);
    returned = icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="promice", save_figs=false);
+      dataset_family="promice", save_figs=false, finalize_legends=false);
    clear restore_close
 
    % The stable summary tokens remain machine-readable while exported figure
@@ -896,6 +899,8 @@ function test_shared_figures_use_one_column_and_deduplicated_sources(testCase)
    restore_close = onCleanup(@() set(groot, ...
       'DefaultFigureCloseRequestFcn', old_close));
    set(groot, 'DefaultFigureCloseRequestFcn', @(~, ~) []);
+   % This test asserts legend geometry and y-limits, so keep the default
+   % finalize_legends layout pass.
    icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
       dataset_family="promice", save_figs=false);
@@ -1039,7 +1044,7 @@ function test_timeseries_tiles_share_union_of_finite_time_support(testCase)
    set(groot, 'DefaultFigureCloseRequestFcn', @(~, ~) []);
    icemodel.verification.plotVerificationArtifacts( ...
       output_root=string(testCase.TestData.root), ...
-      dataset_family="promice", save_figs=false);
+      dataset_family="promice", save_figs=false, finalize_legends=false);
    clear restore_close
 
    % Inspect the normally closed energy figure and clean it up after the test.

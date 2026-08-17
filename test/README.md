@@ -19,8 +19,18 @@ Operator-facing usage notes for the public runners and study tools live in:
    - static external reference data such as `runoff_reference.mat`
 4. `regression/`
    - software-level regression classes, including performance regression
+   - end-to-end tests of import pipelines, staged-data audits, report and
+     figure builders, demo scripts, and tests that run the real model or
+     need locally installed scientific archives
+   - these run only when explicitly targeted (`runtests` on a file or on
+     `test/regression`); no default runner discovers this folder
 5. `unit/`
    - ordinary unit tests intended for default discovery
+   - fast, function-level contract tests only: kernels, helpers,
+     validators, and schema gates that everyday development must rerun
+   - a test belongs in `regression/`, not here, when it stages datasets
+     end to end, renders a report or figures, runs the model, or needs
+     local archive data
 6. `benchmarks/`
    - component benchmarks and selected exploratory microbenchmarks
    - top-level benchmark files are the core kernel benchmarks run by default
@@ -135,6 +145,22 @@ Programmatic regression helpers:
 5. `run_unit_suite(...)`
    - Use for folder-based unit-test discovery under `test/unit/`.
    - Use `debug=true` to stop on first failure for inspection.
+   - The suite runs one test file at a time. A timestamped progress line
+     prints before and after each file (to stdout in a desktop session,
+     to stderr otherwise so a redirected `matlab -batch` run stays
+     observable), and a per-file wall-clock table prints at the end,
+     slowest first.
+   - Use `progress_log="<path>"` to also append each progress line to
+     that file with a per-line open/write/close. A hung run then leaves
+     a log whose last `...` line names the file that never finished.
+   - Expected full-suite wall-clock: roughly 8 minutes for the 63-file
+     `test/unit` tree (measured 2026-08-17: 474.8 s, 1155 tests, under
+     `matlab -nodisplay -nosplash -batch`; the small runner-contract
+     test file landed after that measurement). No single file takes more
+     than about 45 s; check the progress log before assuming a hang.
+     The end-to-end staging, report, and model-run tests that used to
+     dominate the runtime live in `test/regression` and run only when
+     explicitly targeted.
 6. `run_benchmark_suite(...)`
    - Use for the formal benchmark suite under `test/benchmarks/`.
    - This remains the standalone component-benchmark runner.
