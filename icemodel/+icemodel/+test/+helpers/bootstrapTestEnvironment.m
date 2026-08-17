@@ -114,8 +114,23 @@ function addCodeFolders(rootdir)
    %ADDCODEFOLDERS Add only source-bearing folders under the test tree.
 
    % Discover the folders that contain MATLAB source files under the
-   % requested root, then add each folder once in stable order.
-   files = dir(fullfile(rootdir, '**', '*.m'));
+   % requested root, then add each folder once in stable order. Skip the
+   % artifacts subtree: it holds archived run evidence whose .m scripts
+   % must not shadow live code, and its hundreds of timestamped
+   % directories made every bootstrap walk the whole archive. Keep
+   % test/legacy: it hosts reference implementations that unit tests
+   % compare against (for example SPECTRALSOURCETERM_INLINE). Enumerate
+   % top-level entries first so the recursive glob never descends into
+   % the skipped tree.
+   top = dir(rootdir);
+   top = top([top.isdir] & ...
+      ~ismember({top.name}, {'.', '..', 'artifacts'}));
+   groups = cell(numel(top) + 1, 1);
+   groups{1} = dir(fullfile(rootdir, '*.m'));
+   for k = 1:numel(top)
+      groups{k + 1} = dir(fullfile(rootdir, top(k).name, '**', '*.m'));
+   end
+   files = vertcat(groups{:});
    folders = unique(string({files.folder}), 'stable');
    for n = 1:numel(folders)
       addpath(char(folders(n)))

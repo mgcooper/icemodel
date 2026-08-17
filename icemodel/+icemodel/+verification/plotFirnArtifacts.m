@@ -20,6 +20,9 @@ function summary = plotFirnArtifacts(kwargs)
       kwargs.save_figs (1, 1) logical = true
       kwargs.overwrite (1, 1) logical = false
       kwargs.visible (1, 1) logical = false
+      % Forwarded to plotVerificationArtifacts; false skips the
+      % drawnow-heavy legend-clearance pass for unsaved figures.
+      kwargs.finalize_legends (1, 1) logical = true
       kwargs.startdate = ""
       kwargs.enddate = ""
    end
@@ -36,6 +39,7 @@ function summary = plotFirnArtifacts(kwargs)
       save_figs=kwargs.save_figs, ...
       overwrite=kwargs.overwrite, ...
       visible=kwargs.visible, ...
+      finalize_legends=kwargs.finalize_legends, ...
       startdate=kwargs.startdate, ...
       enddate=kwargs.enddate);
 end
