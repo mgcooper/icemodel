@@ -144,7 +144,7 @@ function filenames = writeuserdata(Data, site, source, kwargs)
                   identity_matches, "year");
             end
             savedata(filenames(n), Data(year(Data.Time) == yyyy, :), ...
-               kwargs.overwrite)
+               kwargs.overwrite);
          end
    end
 end
