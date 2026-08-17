@@ -3,24 +3,36 @@ function tests = test_firn_staging_visual_qaqc
    tests = functiontests(localfunctions);
 end
 
-function setup(testCase)
+function setupOnce(testCase)
    % Build a tiny staged tree that matches the real eval/input contract without
-   % touching large source fixtures or external RCM products.
+   % touching large source fixtures or external RCM products. Bootstrap the
+   % environment and write the tree once as a template. Per-test setup copies
+   % it, which is much cheaper than rebuilding the ~11 .mat/JSON files before
+   % each of the 64 tests.
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.cleanup = cleanup;
-   root = tempname;
-   mkdir(root);
-   testCase.addTeardown(@() rmdir(root, 's'));
-   testCase.TestData.root = root;
-   writeTinyFirnTree(root);
-   writeTinyEsmTree(root);
-   writeTinyLaughTree(root);
-   writeEmptyResearchTree(root);
+   template = tempname;
+   mkdir(template);
+   testCase.TestData.template = template;
+   writeTinyFirnTree(template);
+   writeTinyEsmTree(template);
+   writeTinyLaughTree(template);
+   writeEmptyResearchTree(template);
 end
 
-function teardown(testCase)
-   % Release the bootstrap cleanup handle.
+function teardownOnce(testCase)
+   % Remove the shared template, then release the bootstrap cleanup handle.
+   rmdir(testCase.TestData.template, 's');
    testCase.TestData.cleanup = [];
+end
+
+function setup(testCase)
+   % Give each test a private copy of the template so fixture mutations in one
+   % test never reach any later test.
+   root = tempname;
+   copyfile(testCase.TestData.template, root);
+   testCase.addTeardown(@() rmdir(root, 's'));
+   testCase.TestData.root = root;
 end
 
 function test_plot_verification_artifacts_summarizes_staged_tree(testCase)
