@@ -375,9 +375,17 @@ function test_met_artifact_readiness_rejects_missing_and_malformed_payloads(test
    wrong_name = fullfile(folder, 'wrong_name.mat');
    other = 1;
    save(wrong_name, 'other')
-   testCase.verifyError( ...
-      @() icemodel.verification.setup.metArtifactReadiness(string(wrong_name)), ...
-      'icemodel:verification:metArtifactReadiness:badPayload');
+   % load() inside metArtifactReadiness warns "Variable 'met' not found"
+   % before raising badPayload. Route the verifyError call through evalc so
+   % the expected warning text does not clutter suite output, and check
+   % lastwarn for the load warning's id (captureExpectedWarning cannot be
+   % used directly here because the wrapped call is expected to error).
+   lastwarn('');
+   evalc(['testCase.verifyError(@() ' ...
+      'icemodel.verification.setup.metArtifactReadiness(string(wrong_name)), ' ...
+      '''icemodel:verification:metArtifactReadiness:badPayload'');']);
+   [~, id] = lastwarn();
+   testCase.verifyEqual(id, 'MATLAB:load:variableNotFound');
 
    corrupt = fullfile(folder, 'corrupt.mat');
    fid = fopen(corrupt, 'w');

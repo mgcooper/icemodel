@@ -6,15 +6,18 @@ end
 function setupOnce(testCase)
    %SETUPONCE Put the baseline runners on the path.
    %
-   % build_regression_baseline and build_perf_baseline live in test/tools and
-   % IcemodelRegressionTest in test/regression. Neither folder is on the path
-   % by default, so running this file on its own would otherwise report
-   % "Undefined function" instead of the contract error it is checking for.
+   % build_regression_baseline and build_perf_baseline live in test/tools,
+   % IcemodelRegressionTest in test/regression, and run_regression_suite
+   % plus run_perf_suite at the test root. None of these folders is on the
+   % path by default, so running this file on its own would otherwise
+   % report "Undefined function" instead of the contract error it is
+   % checking for.
 
    root = icemodel.internal.fullpath();
    original_path = path;
    testCase.addTeardown(@() path(original_path));
-   folders = {fullfile(root, 'test', 'tools'), ...
+   folders = {fullfile(root, 'test'), ...
+      fullfile(root, 'test', 'tools'), ...
       fullfile(root, 'test', 'regression')};
    for k = 1:numel(folders)
       if isfolder(folders{k})
@@ -1017,8 +1020,15 @@ function verifyFixtureCapabilityError(testCase, operation, data_root)
    %VERIFYFIXTURECAPABILITYERROR Check the repair path works without network
    % access.
 
+   % Mirror captureExpectedWarning's guard; this also anchors the
+   % analyzer's view of the argument the evalc string consumes.
+   assert(isa(operation, 'function_handle'))
    try
-      operation();
+      % The empty data_root makes config resolution warn about
+      % ICEMODEL_INPUT_PATH before the capability check errors. Run the
+      % operation under evalc so that expected warning text stays out of
+      % the suite log; evalc still propagates the error to the catch.
+      evalc('operation();');
       testCase.verifyFail('expected incomplete frozen fixture capability');
    catch err
       testCase.verifyEqual(string(err.identifier), ...

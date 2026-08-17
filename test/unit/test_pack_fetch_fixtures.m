@@ -6,10 +6,21 @@ function tests = test_pack_fetch_fixtures
    tests = functiontests(localfunctions);
 end
 
-function setup(testCase)
-   %SETUP Install repo paths and build one deterministic synthetic data root.
+function setupOnce(testCase)
+   %SETUPONCE Install repo paths once for the file.
+   % Per-test bootstrap re-ran the full path scan before every one of
+   % the 38 tests and dominated the file's fixed cost.
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.cleanup = cleanup;
+end
+
+function teardownOnce(testCase)
+   %TEARDOWNONCE Release the bootstrap cleanup handle after the last test.
+   testCase.TestData.cleanup = [];
+end
+
+function setup(testCase)
+   %SETUP Build one deterministic synthetic data root per test.
    testCase.TestData.root = canonicalTempname();
    testCase.TestData.staging = canonicalTempname();
    mkdir(testCase.TestData.root)
@@ -35,14 +46,13 @@ function setup(testCase)
 end
 
 function teardown(testCase)
-   %TEARDOWN Remove only this test's temporary trees and restore configuration.
+   %TEARDOWN Remove only this test's temporary trees.
    for name = ["root", "staging"]
       pathname = testCase.TestData.(name);
       if isfolder(pathname)
          rmdir(pathname, 's')
       end
    end
-   clear testCase.TestData.cleanup
 end
 
 function test_tracked_manifest_declares_v11_boundary(testCase)

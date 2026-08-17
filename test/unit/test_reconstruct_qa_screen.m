@@ -7,15 +7,17 @@ function tests = test_reconstruct_qa_screen
    tests = functiontests(localfunctions);
 end
 
-function setup(testCase)
-   % Install the verification path for namespace resolution.
+function setupOnce(testCase)
+   % Install the verification path for namespace resolution, once for
+   % the file. Per-test bootstrap re-ran the full path scan before
+   % every one of the 30 tests and dominated the file's fixed cost.
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.cleanup = cleanup;
 end
 
-function teardown(testCase)
+function teardownOnce(testCase)
    % Dropping the stored handle destroys the onCleanup object, which
-   % restores the caller's configuration deterministically per test.
+   % restores the caller's configuration after the last test.
    testCase.TestData.cleanup = [];
 end
 

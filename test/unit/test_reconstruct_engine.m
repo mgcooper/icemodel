@@ -3,15 +3,17 @@ function tests = test_reconstruct_engine
    tests = functiontests(localfunctions);
 end
 
-function setup(testCase)
-   % Install the verification path for namespace resolution.
+function setupOnce(testCase)
+   % Install the verification path for namespace resolution, once for
+   % the file. Per-test bootstrap re-ran the full path scan before
+   % every one of the 86 tests and dominated the file's fixed cost.
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.cleanup = cleanup;
 end
 
-function teardown(testCase)
+function teardownOnce(testCase)
    % Dropping the stored handle destroys the onCleanup object, which
-   % restores the caller's configuration deterministically per test.
+   % restores the caller's configuration after the last test.
    testCase.TestData.cleanup = [];
 end
 
@@ -2167,8 +2169,13 @@ function test_donor_fit_handles_constant_donor(testCase)
    x = 260 + 5 * sin(2 * pi * (1:8784).' / 8784);
    d = 250 * ones(8784, 1);
 
-   transfer = icemodel.forcing.reconstruct.fitDonorTransfer(times, x, ...
-      d, "tair", fit_years=2020, knots=6, min_overlap_hours=4000);
+   % The constant donor makes every seasonal fit rank deficient, so the
+   % MATLAB backslash warning is the expected condition here; capture it
+   % to keep its text out of the suite log (every firing shares the id).
+   transfer = icemodel.test.helpers.captureExpectedWarning(testCase, ...
+      @() icemodel.forcing.reconstruct.fitDonorTransfer(times, x, ...
+      d, "tair", fit_years=2020, knots=6, min_overlap_hours=4000), ...
+      'MATLAB:rankDeficientMatrix');
 
    testCase.verifyEqual(string(transfer.models.DJF.kind), "linear");
 end
