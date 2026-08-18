@@ -1,8 +1,8 @@
-function [d_vap, dm_vap] = couple_vapor_transport( ...
+function [d_vap, dm_vap, U_vap_faces] = couple_vapor_transport( ...
       ro_vap, De, dz, delz, fn, dt)
    %COUPLE_VAPOR_TRANSPORT Redistribute vapor mass between the cells.
    %
-   %  [d_vap, dm_vap] = icemodel.column.couple_vapor_transport( ...
+   %  [d_vap, dm_vap, U_vap_faces] = icemodel.column.couple_vapor_transport( ...
    %     ro_vap, De, dz, delz, fn, dt)
    %
    % Returns the mass each cell gains or loses to its neighbours over one
@@ -55,6 +55,10 @@ function [d_vap, dm_vap] = couple_vapor_transport( ...
    %            (JJ x 1). sum(d_vap .* dz) is zero, because both boundaries
    %            are closed.
    %   dm_vap - Volumetric mass source rate [kg m-3 s-1] (JJ x 1).
+   %   U_vap_faces - Face mass flux [kg m-2 s-1] (JJ+1 x 1), positive
+   %            downward, both boundary faces zero. The caller accumulates
+   %            its magnitudes so grain growth consumes the fluxes the
+   %            column transported.
    %
    % See also: icemodel.column.vapor_face_quantities,
    %  icemodel.column.vapor_mass_transfer,

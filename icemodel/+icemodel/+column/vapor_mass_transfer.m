@@ -4,9 +4,7 @@ function [radius, U_vap_faces, dm_vap] = vapor_mass_transfer(T, Ts, f_ice, f_liq
    %
    % [radius, U_vap, dm_vap] = vapor_mass_transfer(T, Ts, f_ice, f_liq, radius, ...
    %    dz, delz, fn, dt)
-   % [radius, U_vap, dm_vap] = vapor_mass_transfer(..., dt, ro_vap, De)
-   % [radius, U_vap, dm_vap] = ...
-   %    vapor_mass_transfer(..., dt, ro_vap, De, d_vap_sfc)
+   % [radius, U_vap, dm_vap] = vapor_mass_transfer(..., dt, d_vap_faces)
    %
    % Computes the diffusive water vapor mass flux through the porous ice
    % column, the mass source/sink from flux divergence, and updates grain
@@ -23,9 +21,9 @@ function [radius, U_vap_faces, dm_vap] = vapor_mass_transfer(T, Ts, f_ice, f_liq
    % Rankine-Kirchhoff formula).
    %
    % Interface diffusivities use Patankar (1980) harmonic mean (Eq. 4.9).
-   % Boundary conditions: zero flux at the bottom, and at the top either a
-   % Dirichlet ghost node at Ts or a Neumann flux the caller supplies. See
-   % the d_vap_sfc input below.
+   % Boundary conditions: zero flux at the bottom and a Dirichlet ghost
+   % node at Ts on top. The coupled path below computes no fluxes at all:
+   % it consumes the accumulated face exchange the driver supplies.
    %
    % Grain growth follows Jordan (1991) in terms of diameter d = 2*r:
    %   Dry snow (f_liq < 1e-4):   dd/dt = g1 / d * |U_vap|    (Eq. 33)
@@ -47,27 +45,28 @@ function [radius, U_vap_faces, dm_vap] = vapor_mass_transfer(T, Ts, f_ice, f_liq
    %   delz   - Distances between adjacent node centers [m] (JJ+1 x 1)
    %   fn     - Interface interpolation weights (JJ+1 x 1)
    %   dt     - Timestep [s]
-   %   ro_vap - (optional) Saturation vapor density at the nodes [kg m-3]
-   %            (JJ x 1), from the accepted solve. Supplying it skips the
-   %            exponential this function would otherwise evaluate again.
-   %   De     - (optional) Effective vapor diffusivity at the nodes
-   %            [m2 s-1] (JJ x 1), from the accepted solve. Supplying it
-   %            skips the (T/Tf)^nd power.
-   %   d_vap_sfc - (optional) Liquid-water volume fraction the surface
-   %            exchanged over this step [-], positive downward, from
-   %            icemodel.surface.potential_surface_vapor_exchange. Supplying
-   %            it selects the Neumann top boundary described below. This
-   %            function converts it to the face mass flux with
-   %            icemodel.surface.surface_vapor_mass_flux, so the caller
-   %            never handles the kilogram basis.
+   %   d_vap_faces - (optional) Gross face exchange the accepted substeps
+   %            applied over this step [m w.e.] (JJ+1 x 1): the realized
+   %            surface exchange at face 1 and the substep-integrated
+   %            interior transport magnitudes elsewhere, from the driver's
+   %            accumulation through icemodel.column.couple_vapor_step.
+   %            Supplying it selects the coupled grain-growth path below.
    %
-   % Top boundary. Without d_vap_sfc the top face uses a Dirichlet ghost node
-   % at Ts with the ice-phase saturation density. That node carries no control
-   % volume, so it can supply unlimited mass, and it uses no atmospheric
-   % state. With d_vap_sfc the top face carries the turbulent surface exchange
-   % the surface energy balance already computed, and no ghost node is
-   % evaluated. That is the boundary the coupled vapor mode uses: the surface
-   % exchange is computed once, in the SEB, and applied once, here.
+   % Coupled path. With d_vap_faces this function grows grains from the
+   % fluxes the column actually transported, per DesignSpec decision 8: the
+   % accumulated depths convert to step-mean magnitude fluxes, and no
+   % saturation state, ghost node, or face flux is evaluated at all, so the
+   % path adds no exponential and no power. The magnitudes are gross so
+   % substeps whose exchange reversed sign add rather than cancel, and the
+   % surface entry is the realized exchange, so demand the applier rejected
+   % never drives growth. U_vap in this mode returns those step-mean
+   % magnitudes, and dm_vap returns zeros: magnitudes carry no sign, so no
+   % divergence exists on this path.
+   %
+   % Default path. Without d_vap_faces the fluxes are computed here: the top
+   % face uses a Dirichlet ghost node at Ts with the ice-phase saturation
+   % density. That node carries no control volume, so it can supply
+   % unlimited mass, and it uses no atmospheric state.
    %
    % Outputs:
    %   radius - Updated grain effective radius [m] (JJ x 1)
@@ -95,71 +94,62 @@ function [radius, U_vap_faces, dm_vap] = vapor_mass_transfer(T, Ts, f_ice, f_liq
    %
    %#codegen
 
-   persistent nd g1 g2 r_max Uv_max
+   persistent nd g1 g2 r_max Uv_max ro_liq
    if isempty(nd)
       [nd, g1, g2, r_max, Uv_max] = icemodel.parameterLookup( ...
          'nd', 'g1', 'g2', 'r_max', 'Uv_max');
+      ro_liq = icemodel.physicalConstant('ro_liq');
    end
 
    JJ = numel(T);
 
-   % The caller supplies the accepted solve's node quantities, or this
-   % function evaluates them. Reuse is what keeps the exponential and the
-   % power off the substep path a second time.
-   use_neumann_top = nargin > 11;
+   % The driver supplies the accumulated step exchange, or this function
+   % computes its own fluxes. The accumulation is what lets the coupled
+   % path skip every saturation evaluation.
+   use_step_fluxes = nargin > 9;
 
-   % --- Saturation vapor density at each node ---
+   if use_step_fluxes
 
-   % Phase-aware vapor density [kg m-3] and diffusivity [m2 s-1] at each node.
-   if nargin > 9
-      ro_vap = varargin{1};
+      % --- Coupled path: consume the accumulated face exchange ---
+
+      % Convert the gross water-equivalent depths to step-mean magnitude
+      % fluxes [kg m-2 s-1]. These are the fluxes the substeps applied:
+      % realized at the surface, transported in the interior.
+      U_vap_faces = varargin{1} * ro_liq / dt;
+
+      % Magnitudes carry no sign, so no flux divergence exists on this path.
+      dm_vap = zeros(JJ, 1);
    else
+
+      % --- Saturation vapor density at each node ---
+
+      % Phase-aware vapor density [kg m-3] and diffusivity [m2 s-1] at each
+      % node.
       ro_vap = icemodel.vapor.saturation_vapor_density(T, f_liq);
-   end
-   if nargin > 10
-      De = varargin{2};
-   else
       De = icemodel.vapor.vapor_diffusivity(T);
-   end
 
-   % --- Top boundary ---
+      % --- Top boundary ---
 
-   if use_neumann_top
-      % The surface exchange arrives as a face flux, so pad with node 1 and
-      % overwrite face 1 below. This evaluates no ghost node, which is the
-      % point: the saturated ghost can supply unlimited mass and reads no
-      % atmospheric state.
-      ro_vap_s = ro_vap(1);
-      De_s = De(1);
-   else
       % Dirichlet ghost node. Use ice-phase es at surface (sublimating
       % interface).
       f_liq_s = 0;
       ro_vap_s = icemodel.vapor.saturation_vapor_density(Ts, f_liq_s);
       De_s = icemodel.vapor.vapor_diffusivity(Ts);
+
+      % --- Vapor flux at control volume interfaces (Patankar Eq. 4.9) ---
+
+      % Vapor mass flux at the JJ+1 interfaces [kg m-2 s-1].
+      % Positive = downward (from surface into column). The bottom face is
+      % zero flux (Neumann / insulated). Face diffusivity is the fn-weighted
+      % harmonic mean of the node values, Patankar Eq. 4.9.
+      U_vap_faces = icemodel.column.vapor_face_quantities( ...
+         ro_vap, ro_vap_s, De, De_s, delz, fn);
+
+      % --- Mass source from flux divergence ---
+
+      % Net flux into each control volume [kg m-3 s-1]
+      dm_vap = (U_vap_faces(1:JJ) - U_vap_faces(2:JJ+1)) ./ dz;
    end
-
-   % --- Vapor flux at control volume interfaces (Patankar Eq. 4.9) ---
-
-   % Vapor mass flux at the JJ+1 interfaces [kg m-2 s-1].
-   % Positive = downward (from surface into column). The bottom face is zero
-   % flux (Neumann / insulated). Face diffusivity is the fn-weighted harmonic
-   % mean of the node values, Patankar Eq. 4.9.
-   U_vap_faces = icemodel.column.vapor_face_quantities( ...
-      ro_vap, ro_vap_s, De, De_s, delz, fn);
-
-   % The turbulent exchange replaces the diffusive top face. It is applied
-   % once, here, having been computed once, in the surface energy balance.
-   % The caller passes a fraction, so the kilogram basis is formed here.
-   if use_neumann_top
-      U_vap_faces(1) = icemodel.surface.surface_vapor_mass_flux( ...
-         varargin{3}, dz(1), dt);
-   end
-
-   % --- Mass source from flux divergence ---
-
-   % Net flux into each control volume [kg m-3 s-1]
-   dm_vap = (U_vap_faces(1:JJ) - U_vap_faces(2:JJ+1)) ./ dz;
 
    % --- Grain growth (Jordan 1991, SNTHERM89 Eqs. 33-34) ---
 

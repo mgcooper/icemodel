@@ -4,7 +4,8 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
       ppt, tppt, psfc, ea_atm, ro_atm, cv_atm, nu_air, H_h, H_e, ...
       hv_atm, br_coefs, liqflag, chi, solver, tol, maxiter, alpha, ...
       use_aitken, jumpmax, cpl_Ts_tol, cpl_seb_tol, cpl_maxiter, ...
-      cpl_alpha, cpl_aitken, cpl_jumpmax, ro_sfc, snow_depth, opts)
+      cpl_alpha, cpl_aitken, cpl_jumpmax, ro_sfc, snow_depth, ...
+      f_res_por, opts)
    %SOLVE_SURFACE_COLUMN_DIRICHLET Coupled icemodel Dirichlet SEB solve.
    %
    % Run an outer Ts-T Picard loop. The loop makes the accepted Dirichlet
@@ -35,18 +36,27 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
 
    % Pre-coupler Ts predictor using checkpoint state.
    %
-   % The three-argument form evaluates the vapor term inside
+   % Default mode: the three-argument form evaluates the vapor term inside
    % bulk_thermal_conductivity, so saturation_vapor_density runs here on the
    % same state solve_column_enthalpy evaluates it on twice more below: once
    % before its loop for H_old, and once on iteration 0. Bead icemodel-3xg
-   % reduces the three to one.
+   % reduces the three to one, with the C3 retirement of the node vapor
+   % term, because removing this one alone would change default results.
    %
-   % This k_eff also carries the legacy node vapor term. Coupled mode moves
-   % that term to the faces instead, so with solver 0, or any cpl_maxiter of
-   % 1, where this predictor supplies the only sweep's boundary, the accepted
-   % state mixes the two formulations. Bead icemodel-55x carries that.
-   k_eff = icemodel.column.bulk_thermal_conductivity( ...
-      xT_ice, xf_ice, xf_liq);
+   % Coupled mode: the vapor term lives on the faces, and the surface face
+   % carries the turbulent exchange rather than a diffusive vapor term, so
+   % the predictor k_eff must leave the node vapor term out. The explicit
+   % zero matches what solve_column_enthalpy returns in coupled mode. With
+   % solver 0, or any cpl_maxiter of 1, this predictor supplies the only
+   % sweep's boundary, so mixing the two formulations here would put the
+   % legacy vapor term into the accepted surface state.
+   if use_coupled_vapor
+      k_eff = icemodel.column.bulk_thermal_conductivity( ...
+         xT_ice, xf_ice, xf_liq, 0);
+   else
+      k_eff = icemodel.column.bulk_thermal_conductivity( ...
+         xT_ice, xf_ice, xf_liq);
+   end
    [T_sfc, ok_seb] = icemodel.surface.solve_surface_energy_balance( ...
       xT_sfc, tair, swd, lwd, albedo, wspd, ppt, tppt, psfc, ...
       ea_atm, ro_atm, cv_atm, nu_air, H_h, H_e, hv_atm, br_coefs, ...
@@ -69,7 +79,7 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = 
          icemodel.column.solve_column_enthalpy( ...
          T_sfc, xT_ice, xf_ice, xf_liq, Fc, Fp, Sc, Sp, dz, delz, ...
          fn, dt, solver, tol, maxiter, alpha, use_aitken, jumpmax, debug, ...
-         use_coupled_vapor);
+         use_coupled_vapor, f_res_por);
 
       % Debug dump and break on subsurface solve failure.
       if ~ok_ieb

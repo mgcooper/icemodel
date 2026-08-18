@@ -1,4 +1,5 @@
-function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_exchange( ...
+function [f_ice, f_liq, d_rof, d_sbl_err, d_applied] = ...
+      apply_surface_vapor_exchange( ...
       f_ice, f_liq, d_rof, d_pevp, f_ice_min, f_res_por)
    %APPLY_SURFACE_VAPOR_EXCHANGE Apply the surface vapor exchange to the
    % top cell.
@@ -11,6 +12,13 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_exchange( ...
    % d_sbl_err = per-cell vapor-driven change which exceeds control-volume
    %             limits, in ice-fraction units; positive is rejected
    %             deposition, negative is unsatisfied sublimation
+   % d_applied = the exchange the top cell realized, signed like d_pevp, as
+   %             the liquid-water volume fraction of the mass that actually
+   %             crossed the surface after every limit, including
+   %             condensation overflow, which crossed before it ran off.
+   %             Grain growth consumes this: only demand the limits
+   %             rejected never crossed, so only that must not drive
+   %             growth.
    % f_ice_min = minimum retained ice fraction before remeshing
    % f_res_por = residual liquid-water fraction per pore volume [-]
    %
@@ -66,19 +74,28 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = apply_surface_vapor_exchange( ...
    % but only the first entry can be nonzero here.
    d_sbl_err = zeros(numel(f_ice), 1);
 
-   [f_ice(1), f_liq(1), overflow, d_sbl_err(1)] = applyCell( ...
+   [f_ice(1), f_liq(1), overflow, d_sbl_err(1), d_applied] = applyCell( ...
       f_ice(1), f_liq(1), d_pevp, f_ice_min, f_res_por);
 
    % Surface condensate the top cell cannot hold runs off.
    d_rof = d_rof + overflow;
 end
 
-function [f_ice, f_liq, d_rof, d_sbl_err] = applyCell( ...
+function [f_ice, f_liq, d_rof, d_sbl_err, d_applied] = applyCell( ...
       f_ice, f_liq, d_pevp, f_ice_min, f_res_por)
    %APPLYCELL Apply one cell's vapor-mass increment under the three limits.
    %
    % D_ROF is the condensation this cell could not hold. The caller decides
    % where it goes, because that depends on whether the cell is the surface.
+   %
+   % D_APPLIED is the realized exchange as a signed liquid-water volume
+   % fraction, formed from the state the limits actually produced: the
+   % liquid change plus the ice change converted to the same mass basis.
+
+   persistent ro_ice ro_liq
+   if isempty(ro_ice)
+      [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
+   end
 
    % Option to check if f_liq_top ever falls below f_res.
    debug = false;
@@ -173,6 +190,15 @@ function [f_ice, f_liq, d_rof, d_sbl_err] = applyCell( ...
    if debug == true && d_sbl_err > 0
       fprintf('rejected deposition: %.6f\n', d_sbl_err)
    end
+
+   % The realized exchange, from the state the limits produced plus the
+   % overflow. The liquid change is already on the liquid basis; the ice
+   % change carries the same mass at a different density, so the density
+   % ratio converts it. Overflow condensate crossed the surface before it
+   % ran off, so it counts: only the amounts d_sbl_err rejected never
+   % crossed.
+   d_applied = (f_liq - f_liq_top) ...
+      + (f_ice - f_ice_top) * ro_ice / ro_liq + d_rof;
 end
 
 %% Vapor exchange with the ice phase

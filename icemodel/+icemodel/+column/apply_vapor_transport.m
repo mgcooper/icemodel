@@ -1,10 +1,10 @@
 function [f_ice, f_liq, d_sbl_err] = apply_vapor_transport( ...
-      f_ice, f_liq, d_vap, f_ice_min, f_res_por)
+      f_ice, f_liq, d_vap, f_ice_min, wet, f_res)
    %APPLY_VAPOR_TRANSPORT Apply interior vapor transport as mass.
    %
    %  [f_ice, f_liq, d_sbl_err] = ...
    %     icemodel.column.apply_vapor_transport( ...
-   %     f_ice, f_liq, d_vap, f_ice_min, f_res_por)
+   %     f_ice, f_liq, d_vap, f_ice_min, wet, f_res)
    %
    % D_VAP is the mass each cell gained from its neighbours over one
    % substep, as a liquid-water volume fraction, from
@@ -18,9 +18,14 @@ function [f_ice, f_liq, d_sbl_err] = apply_vapor_transport( ...
    % the energy follow. A cell therefore never spends part of its exchange at
    % one latent heat and the rest at another: it takes the mass it received.
    %
-   % Each cell exchanges with the phase it holds, decided by
-   % icemodel.column.vapor_exchange_is_wet, the same function the surface
-   % applier uses.
+   % Each cell exchanges with the phase WET names, with the residual floor
+   % F_RES, both from one caller-supplied
+   % icemodel.column.vapor_exchange_is_wet evaluation, the same predicate
+   % the surface applier uses. The caller decides the evaluation state:
+   % the coupled step evaluates at the state the solve converged on, so
+   % the phase the mass lands in matches the latent heat the solve's face
+   % energy carried, while the amounts below still clamp against the
+   % current fractions, because a cell can only give what it holds now.
    %
    % The same three limits apply, and they clamp and record rather than
    % reject: deposition is capped by the air space, sublimation is floored at
@@ -29,11 +34,12 @@ function [f_ice, f_liq, d_sbl_err] = apply_vapor_transport( ...
    % is recorded in D_SBL_ERR, on the ice-phase energy basis, so no mass
    % leaves without a record.
    %
-   % The closure identity does not balance when a clamp binds. The shortfall
-   % enters the ledger's unapplied term, while
-   % icemodel.column.accumulate_redistribution_budget records only the
-   % storage that survived the clamp, so the identity carries a residual the
-   % size of the shortfall. Bead icemodel-55x carries the fix.
+   % The shortfall stays out of the surface closure identity. The caller
+   % routes D_SBL_ERR to
+   % icemodel.column.accumulate_redistribution_budget, which records it in
+   % the redistribution's own unapplied channel pair, so a bound clamp
+   % leaves the surface identity untouched and the transport's broken mass
+   % closure visible in its own accounting.
    %
    % Inputs
    %   f_ice     - Ice fraction [-] (JJ x 1).
@@ -42,7 +48,9 @@ function [f_ice, f_liq, d_sbl_err] = apply_vapor_transport( ...
    %              [-] (JJ x 1). Positive is gain. A dry cell converts it to
    %              the ice basis before applying it.
    %   f_ice_min - Minimum retained ice fraction [-].
-   %   f_res_por - Residual liquid-water fraction per pore volume [-].
+   %   wet      - Per-cell phase decision [logical] (JJ x 1), from
+   %              icemodel.column.vapor_exchange_is_wet.
+   %   f_res    - The residual floor that decision used [-] (JJ x 1).
    %
    % Outputs
    %   f_ice, f_liq - Updated fractions.
@@ -62,11 +70,6 @@ function [f_ice, f_liq, d_sbl_err] = apply_vapor_transport( ...
 
    n_cells = numel(f_ice);
    d_sbl_err = zeros(n_cells, 1);
-   % One call gives both the decision and the floor it used. The column then
-   % evaluates residual_water_fraction once per cell rather than twice, and
-   % the floor cannot disagree with the decision.
-   [wet, f_res] = icemodel.column.vapor_exchange_is_wet( ...
-      f_ice, f_liq, f_res_por);
 
    for j = 1:n_cells
       if d_vap(j) == 0

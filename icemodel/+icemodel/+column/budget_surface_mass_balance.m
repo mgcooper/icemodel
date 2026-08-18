@@ -1,4 +1,4 @@
-function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err] = ...
+function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err, d_applied] = ...
       budget_surface_mass_balance(T, f_ice, f_liq, xf_liq, d_pevp, d_liq, ...
       d_evp, d_rof, f_res_por, f_ice_min, d_sbl_err)
    %BUDGET_SURFACE_MASS_BALANCE Budget surface mass-balance increments.
@@ -20,11 +20,11 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err] = ...
    %   f_res_por  - Residual liquid-water fraction per pore volume [-].
    %   f_ice_min  - Minimum retained surface ice fraction before remeshing [-].
    %   d_sbl_err  - (optional) Running per-cell unapplied vapor record [-].
-   %                Coupled mode arrives with the interior shortfall already
-   %                in it, and the surface term is added rather than
-   %                replacing it. Omit it and the record starts at zero,
-   %                which is the pre-coupled-mode behavior and keeps the
-   %                ten-argument calling convention working.
+   %                The surface term is added to whatever arrives rather
+   %                than replacing it. Omit it and the record starts at
+   %                zero, which is the production convention: the interior
+   %                transport runs after this function and keeps its
+   %                shortfall in its own redistribution accounting.
    %
    % Outputs
    %   T          - Updated column temperature state [K].
@@ -35,6 +35,11 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err] = ...
    %   d_rof      - Updated condensation overflow in liquid-water fraction [-].
    %   d_sbl_err  - Signed unapplied vapor-driven ice-fraction change per
    %                cell [-], the incoming record plus the surface term.
+   %   d_applied  - The exchange the top cell realized [-], signed like
+   %                d_pevp, as a liquid-water volume fraction, after every
+   %                limit. Grain growth consumes this rather than the
+   %                demand, because rejected demand never crossed the
+   %                surface.
    %
    % Notes
    %   This routine does not merge thin layers. Call
@@ -63,11 +68,11 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err] = ...
 
    % Compute delta f_liq.
    %
-   % In default mode the only process that affects f_liq between d_liq
-   % assignments is phase change (icemodel.column.solve_column_enthalpy).
-   % Coupled mode breaks that: icemodel.column.couple_vapor_step moves f_liq
-   % before this runs, so its transport lands in d_liq and is read as melt or
-   % refreezing. Bead icemodel-55x carries the fix.
+   % The only process that affects f_liq between d_liq assignments is phase
+   % change (icemodel.column.solve_column_enthalpy). That holds in coupled
+   % mode too: icemodel.column.couple_vapor_step runs after this function
+   % and after the vapor budget close, so interior transport never lands in
+   % d_liq and is never read as melt or refreezing.
    d_liq = d_liq + f_liq - xf_liq;
 
    % Reset past values for budgeting evap/condensation.
@@ -80,12 +85,12 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err] = ...
    % icemodel.column.couple_vapor_transport and
    % icemodel.column.apply_vapor_transport, because it conserves
    % mass where this conserves energy.
-   [f_ice, f_liq, d_rof, d_sbl_err_sfc] = ...
+   [f_ice, f_liq, d_rof, d_sbl_err_sfc, d_applied] = ...
       icemodel.surface.apply_surface_vapor_exchange( ...
       f_ice, f_liq, d_rof, d_pevp, f_ice_min, f_res_por);
 
-   % Add rather than assign. The interior applier may already have recorded a
-   % shortfall this substep, and the ledger integrates one per-cell record.
+   % Add rather than assign, so a caller that threads a running record in
+   % keeps its accumulation.
    %
    % Keep the caller's shape. The surface applier reaches the top cell alone,
    % so its record is the first entry and every other entry is zero. A caller

@@ -7,9 +7,11 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
    % thermal-solver option list. Node-wise Aitken acceleration is off here.
    %
    % A trailing true selects the coupled vapor mode. The bulk conductivity
-   % then leaves the vapor term out. The vapor energy travels on the face
-   % conductance from icemodel.column.vapor_face_conductance, built from the
-   % same face quantities as the vapor mass flux. Without it the
+   % then leaves the vapor term out. The vapor energy travels on the two
+   % face terms from icemodel.column.vapor_face_conductance, built from the
+   % same face quantities as the vapor mass flux: a positive matrix part
+   % and a deferred-correction source flux. The second trailing argument is
+   % f_res_por, which the donor-phase predicate needs. Without them the
    % vapor term stays inside k_eff on the node-tangent slope, which is the
    % default.
    %
@@ -17,6 +19,13 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
 
    % The coupled vapor mode is opt-in and nothing sets it by default.
    use_coupled_vapor = nargin > 19 && varargin{1};
+
+   % The residual pore fraction rides only with the coupled mode; the
+   % default path never reads it.
+   f_res_por = 0.0;
+   if nargin > 20
+      f_res_por = varargin{2};
+   end
 
    % Update the water fraction
    f_wat = icemodel.column.water_fraction(f_ice, f_liq);
@@ -54,11 +63,14 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
          T, f_liq, dro_vapdT);
 
       % Coupled mode moves the vapor term from the node conductivity to the
-      % face conductance. The energy the solve carries is then the mass flux
-      % times the donor cell's latent heat.
+      % faces. The energy the solve carries is then the mass flux times the
+      % donor cell's latent heat: the positive matrix part joins the
+      % interface conductivity and the deferred flux joins the source, so
+      % the converged face flux is exact.
       if use_coupled_vapor
-         k_vap_faces = icemodel.column.vapor_face_conductance( ...
-            T, f_liq, ro_vap, dro_vapdT, De, fn);
+         [k_vap_faces, q_vap_deferred] = ...
+            icemodel.column.vapor_face_conductance( ...
+            T, f_ice, f_liq, ro_vap, dro_vapdT, De, delz, fn, f_res_por);
          k_vap = zeros(size(k_vap));
       end
 
@@ -75,7 +87,8 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
          [aN, aP, aS, b, iM, a1, a2] = ...
             icemodel.column.assemble_enthalpy_system( ...
             T, f_ice, f_liq, dHdT, dFdT, dro_vapdT, H - H_old, Sc, Sp, ...
-            k_eff, delz, fn, dz, dt, T_sfc, Fc, Fp, solver, k_vap_faces);
+            k_eff, delz, fn, dz, dt, T_sfc, Fc, Fp, solver, ...
+            k_vap_faces, q_vap_deferred);
       else
          [aN, aP, aS, b, iM, a1, a2] = ...
             icemodel.column.assemble_enthalpy_system( ...

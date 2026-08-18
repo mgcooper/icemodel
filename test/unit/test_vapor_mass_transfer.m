@@ -136,83 +136,79 @@ function test_grain_radius_stops_at_the_parameter_maximum(testCase)
    testCase.verifyGreaterThan(unclamped(1), radius(1));
 end
 
-function test_precomputed_node_quantities_reproduce_the_self_computed(testCase)
-   % The coupled path hands the kernel node quantities the caller already
-   % holds, so the kernel does not evaluate its own. Passing the same values
-   % the kernel would have computed must change nothing at all. This pins
-   % that equivalence, not where the caller got the values.
+function test_step_fluxes_convert_to_step_mean_magnitudes(testCase)
+   % The coupled path consumes the gross face exchange the driver
+   % accumulated over the forcing step, as water-equivalent depths. The
+   % kernel converts them to step-mean magnitude fluxes and grows grains
+   % from exactly those, per DesignSpec decision 8, evaluating no fluxes of
+   % its own. Magnitudes carry no sign, so the divergence output is zero on
+   % this path.
 
-   [T, f_ice, f_liq, radius, dz, delz, fn] = kernelFixture(6);
-   T = T + linspace(0, 3, numel(T))';
-   Ts = T(1) + 4;
-
-   [r_self, U_self, dm_self] = icemodel.column.vapor_mass_transfer( ...
-      T, Ts, f_ice, f_liq, radius, dz, delz, fn, 900);
-
-   ro_vap = icemodel.vapor.saturation_vapor_density(T, f_liq);
-   De = icemodel.vapor.vapor_diffusivity(T);
-   [r_given, U_given, dm_given] = icemodel.column.vapor_mass_transfer( ...
-      T, Ts, f_ice, f_liq, radius, dz, delz, fn, 900, ro_vap, De);
-
-   testCase.verifyEqual(r_given, r_self, 'AbsTol', 0);
-   testCase.verifyEqual(U_given, U_self, 'AbsTol', 0);
-   testCase.verifyEqual(dm_given, dm_self, 'AbsTol', 0);
-end
-
-function test_neumann_top_replaces_the_saturated_ghost_node(testCase)
-   % In coupled mode the top face carries the turbulent exchange the surface
-   % energy balance already computed. The ghost node is not evaluated, so the
-   % surface temperature cannot influence the result.
-
-   [T, f_ice, f_liq, radius, dz, delz, fn] = kernelFixture(6);
-   T = T + linspace(0, 3, numel(T))';
-   ro_vap = icemodel.vapor.saturation_vapor_density(T, f_liq);
-   De = icemodel.vapor.vapor_diffusivity(T);
+   [T, f_ice, ~, radius, dz, delz, fn] = kernelFixture(6);
+   f_liq = zeros(6, 1);
+   ro_liq = icemodel.physicalConstant('ro_liq');
+   [g1, r_max, Uv_max] = icemodel.parameterLookup('g1', 'r_max', 'Uv_max');
    dt = 900;
 
-   % The caller supplies a liquid-water volume fraction; the kernel forms the
-   % kilogram basis itself.
-   d_vap_sfc = -1e-9;
-   U_top = icemodel.surface.surface_vapor_mass_flux(d_vap_sfc, dz(1), dt);
+   d_vap_faces = [5e-7; 4e-7; 3e-7; 2e-7; 1e-7; 5e-8; 0];
+   [returned, U_faces, dm_vap] = icemodel.column.vapor_mass_transfer( ...
+      T, T(1), f_ice, f_liq, radius, dz, delz, fn, dt, d_vap_faces);
 
-   [~, U_faces, dm_vap] = icemodel.column.vapor_mass_transfer( ...
-      T, T(1), f_ice, f_liq, radius, dz, delz, fn, dt, ...
-      ro_vap, De, d_vap_sfc);
+   % The returned faces are the converted step-mean magnitudes, exactly.
+   testCase.verifyEqual(U_faces, d_vap_faces * ro_liq / dt, 'AbsTol', 0);
+   testCase.verifyEqual(dm_vap, zeros(6, 1), 'AbsTol', 0);
 
-   % The converted flux is the top face, exactly.
-   testCase.verifyEqual(U_faces(1), U_top, 'AbsTol', 0);
-
-   % Two very different surface temperatures must give one answer, which is
-   % what proves the ghost node is gone rather than merely overwritten after
-   % contributing somewhere else.
-   [~, U_warm] = icemodel.column.vapor_mass_transfer( ...
-      T, T(1) + 40, f_ice, f_liq, radius, dz, delz, fn, dt, ...
-      ro_vap, De, d_vap_sfc);
-   testCase.verifyEqual(U_warm, U_faces, 'AbsTol', 0);
-
-   % The column still conserves: a closed bottom makes the mass the cells
-   % gain equal the mass that crossed the surface face.
-   testCase.verifyEqual(sum(dm_vap .* dz), U_top, 'RelTol', 1e-12);
+   % Dry growth reproduces Jordan Eq. 33 from those magnitudes.
+   U_nodes = min(0.5 * (U_faces(1:6) + U_faces(2:7)), Uv_max);
+   diam = 2 * radius;
+   expected = min(0.5 * (diam + dt * g1 .* U_nodes ./ diam), r_max);
+   testCase.verifyEqual(returned, expected, 'AbsTol', 0);
 end
 
-function test_neumann_top_leaves_the_interior_faces_diffusive(testCase)
-   % Only face 1 changes. Below it the transport stays diffusive, so the
-   % interior faces must match the flag-off run on the same column.
+function test_the_coupled_path_reads_no_saturation_state(testCase)
+   % The accumulation already holds the fluxes the substeps applied, so the
+   % coupled path evaluates no saturation state at all: neither the column
+   % temperatures nor the surface temperature can influence the result.
+   % That is what makes the grain-growth step free of exponentials.
 
-   [T, f_ice, f_liq, radius, dz, delz, fn] = kernelFixture(6);
-   T = T + linspace(0, 3, numel(T))';
-   ro_vap = icemodel.vapor.saturation_vapor_density(T, f_liq);
-   De = icemodel.vapor.vapor_diffusivity(T);
+   [T, f_ice, ~, radius, dz, delz, fn] = kernelFixture(6);
+   f_liq = zeros(6, 1);
+   d_vap_faces = [4e-7; 3e-7; 2e-7; 1e-7; 5e-8; 0; 0];
 
-   % Pad the flag-off run with node 1, which is what the coupled path does,
-   % so the two runs differ in the top face alone.
-   [~, U_padded] = icemodel.column.vapor_mass_transfer( ...
-      T, T(1), f_ice, f_liq, radius, dz, delz, fn, 900, ro_vap, De, 0);
-   [~, U_coupled] = icemodel.column.vapor_mass_transfer( ...
-      T, T(1), f_ice, f_liq, radius, dz, delz, fn, 900, ro_vap, De, -3e-6);
+   [r_a, U_a] = icemodel.column.vapor_mass_transfer( ...
+      T, T(1), f_ice, f_liq, radius, dz, delz, fn, 900, d_vap_faces);
+   [r_b, U_b] = icemodel.column.vapor_mass_transfer( ...
+      T + 10, T(1) + 40, f_ice, f_liq, radius, dz, delz, fn, 900, ...
+      d_vap_faces);
 
-   testCase.verifyEqual(U_coupled(2:end), U_padded(2:end), 'AbsTol', 0);
-   testCase.verifyNotEqual(U_coupled(1), U_padded(1));
+   testCase.verifyEqual(r_b, r_a, 'AbsTol', 0);
+   testCase.verifyEqual(U_b, U_a, 'AbsTol', 0);
+end
+
+function test_reversing_exchanges_add_rather_than_cancel(testCase)
+   % Jordan grows a grain from the flux magnitude, so a surface exchange
+   % that reverses sign between substeps drives growth in both
+   % directions. A signed accumulation would cancel those substeps to
+   % zero and drive no growth at all. The driver therefore accumulates
+   % gross, and this pins the consequence at the kernel: the gross sum
+   % grows the grain, and the signed net of the same substeps does not.
+
+   [T, f_ice, ~, radius, dz, delz, fn] = kernelFixture(6);
+   f_liq = zeros(6, 1);
+
+   % Two equal substep exchanges of opposite sign at the surface face.
+   exchange = 2e-7;
+   net = zeros(7, 1);
+   gross = zeros(7, 1);
+   gross(1) = 2 * abs(exchange);
+
+   from_net = icemodel.column.vapor_mass_transfer( ...
+      T, T(1), f_ice, f_liq, radius, dz, delz, fn, 900, net);
+   from_gross = icemodel.column.vapor_mass_transfer( ...
+      T, T(1), f_ice, f_liq, radius, dz, delz, fn, 900, gross);
+
+   testCase.verifyEqual(from_net, radius, 'AbsTol', 0);
+   testCase.verifyGreaterThan(from_gross(1), radius(1));
 end
 
 function [T, f_ice, f_liq, radius, dz, delz, fn] = kernelFixture(JJ)

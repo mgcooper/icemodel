@@ -14,21 +14,23 @@ function [tf, f_res] = vapor_exchange_is_wet(f_ice, f_liq, f_res_por)
    % together. Liquid at or below that floor is held, not mobile, so it
    % cannot supply evaporation.
    %
-   % One function owns this decision. Both appliers ask it.
-   % icemodel.surface.apply_surface_vapor_exchange routes the surface
-   % exchange with it. icemodel.column.apply_vapor_transport picks with it the
-   % latent heat for the energy demand it records. That heat converts a
-   % transported mass into the energy a cell could not supply. Two different
-   % criteria would make those disagree. A cell in the disagreement band would
-   % gain or lose about twelve percent of its mass.
+   % One function owns this decision. Both appliers consume it.
+   % icemodel.surface.apply_surface_vapor_exchange asks it directly and
+   % routes the surface exchange with it.
+   % icemodel.column.apply_vapor_transport receives its result from
+   % icemodel.column.couple_vapor_step, which asks it at the state the
+   % solve converged on, and picks with it the latent heat for the energy
+   % demand it records. That heat converts a transported mass into the
+   % energy a cell could not supply. Two different criteria would make
+   % those disagree. A cell in the disagreement band would gain or lose
+   % about twelve percent of its mass.
    %
    % icemodel.column.couple_vapor_transport does not ask it. That function
    % moves mass and makes no phase decision.
    %
-   % icemodel.column.vapor_face_conductance does not ask it either, and that
-   % is a defect. It takes the donor phase from latent_enthalpy_switch, so in
-   % the band below its energy and the applier's mass use different latent
-   % heats. Bead icemodel-55x carries the fix.
+   % icemodel.column.vapor_face_conductance asks it too, for the donor-cell
+   % latent heat on each face, so the energy the solve moves and the mass
+   % the applier moves use one latent heat in the band below.
    %
    % This is a different question from the one
    % icemodel.vapor.latent_enthalpy_switch answers. That function picks the

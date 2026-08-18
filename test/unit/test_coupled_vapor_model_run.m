@@ -70,33 +70,39 @@ function test_an_opts_struct_without_the_flag_still_runs(testCase)
 end
 
 function test_the_redistribution_channels_are_zero_when_off(testCase)
-   % The two redistribution channels must read literally zero on a default
-   % run, not merely match another default run. The vapor closure identity
-   % subtracts them, so a nonzero value with the flag off would move the
-   % identity for every existing diagnostic run.
+   % The redistribution channels must read zero on a default run;
+   % matching another default run is not enough. The per-phase storage
+   % closures consume them, so a nonzero value with the flag off would
+   % move those closures for every existing diagnostic run.
 
    [base_opts, cleanup] = syntheticRunOpts(testCase);
    [ice1, ~] = icemodel.test.helpers.runSmbModel(base_opts);
 
-   testCase.verifyEqual(ice1.mass_budget_vapor_redistribution_j_m2, ...
-      zeros(size(ice1.mass_budget_vapor_redistribution_j_m2)));
-   testCase.verifyEqual( ...
-      ice1.mass_budget_vapor_redistribution_gross_j_m2, ...
-      zeros(size(ice1.mass_budget_vapor_redistribution_gross_j_m2)));
+   channels = { ...
+      'mass_budget_vapor_redistribution_solid_mwe', ...
+      'mass_budget_vapor_redistribution_liquid_mwe', ...
+      'mass_budget_vapor_redistribution_unapplied_j_m2', ...
+      'mass_budget_vapor_redistribution_solid_gross_mwe', ...
+      'mass_budget_vapor_redistribution_liquid_gross_mwe', ...
+      'mass_budget_vapor_redistribution_unapplied_gross_j_m2'};
+   for n = 1:numel(channels)
+      testCase.verifyEqual(ice1.(channels{n}), ...
+         zeros(size(ice1.(channels{n}))), channels{n});
+   end
    clear cleanup
 end
 
 function test_coupled_run_closes_the_vapor_identity(testCase)
    % The vapor closure identity must hold in a coupled run, not only in the
    % default one. The potential input equals the realized storage change plus
-   % the overflow plus whatever the column could not apply.
+   % the overflow plus whatever the column could not apply:
    %
    %   potential = ro_liq * (Ls * solid + Lv * liquid + Lv * overflow)
-   %               + unapplied - redistribution
+   %               + unapplied
    %
-   % The redistribution term is the energy-weighted storage that interior
-   % transport moves between cells of different phase. It conserves mass and
-   % needs no potential, so the identity subtracts it.
+   % No redistribution term appears: the transport runs after the vapor
+   % budget takes its storage baseline, so the surface channels carry
+   % surface exchange alone and the transport keeps its own accounting.
 
    [base_opts, cleanup] = syntheticRunOpts(testCase);
    [Ls, Lv, ro_liq] = icemodel.physicalConstant('Ls', 'Lv', 'ro_liq');
@@ -104,12 +110,13 @@ function test_coupled_run_closes_the_vapor_identity(testCase)
    [ice1, ~] = icemodel.test.helpers.runSmbModel( ...
       icemodel.resetopts(base_opts, 'use_coupled_vapor', true));
 
+   % The transport runs after the vapor budget takes its storage baseline,
+   % so the surface closure identity carries no redistribution term.
    accounted = ro_liq * ( ...
       Ls * ice1.mass_budget_vapor_solid_mwe ...
       + Lv * ice1.mass_budget_vapor_liquid_mwe ...
       + Lv * ice1.mass_budget_condensation_overflow_mwe) ...
-      + ice1.mass_budget_unapplied_vapor_j_m2 ...
-      - ice1.mass_budget_vapor_redistribution_j_m2;
+      + ice1.mass_budget_unapplied_vapor_j_m2;
    potential = ice1.mass_budget_vapor_potential_j_m2;
 
    % The tolerance is subtraction roundoff on column-integrated checkpoints,
@@ -123,6 +130,46 @@ function test_coupled_run_closes_the_vapor_identity(testCase)
    scale = max(abs(potential));
    testCase.verifyGreaterThan(scale, 0);
    testCase.verifyLessThan(max(abs(potential - accounted)) / scale, 1e-8);
+   clear cleanup
+end
+
+function test_coupled_run_closes_the_per_phase_storage(testCase)
+   % The per-phase storage closures must hold in a coupled run through the
+   % production driver: the endpoint deltas equal the phase, surface
+   % vapor, remesh, and redistribution increments together. This exercises
+   % the driver's accepted-substep order end to end. Running the transport
+   % before the vapor budget would count cross-phase transport in both the
+   % vapor and the redistribution channels and break this closure by the
+   % double-counted amount, and the endpoint gross bound would lose the
+   % transport's contribution.
+
+   [base_opts, cleanup] = syntheticRunOpts(testCase);
+   [ice1, ~] = icemodel.test.helpers.runSmbModel( ...
+      icemodel.resetopts(base_opts, 'use_coupled_vapor', true));
+
+   solid_delta = ice1.mass_budget_solid_end_mwe ...
+      - ice1.mass_budget_solid_start_mwe;
+   liquid_delta = ice1.mass_budget_liquid_end_mwe ...
+      - ice1.mass_budget_liquid_start_mwe;
+
+   testCase.verifyEqual(solid_delta, ...
+      ice1.mass_budget_phase_solid_mwe ...
+      + ice1.mass_budget_vapor_solid_mwe ...
+      + ice1.mass_budget_remesh_solid_mwe ...
+      + ice1.mass_budget_vapor_redistribution_solid_mwe, 'AbsTol', 1e-10);
+   testCase.verifyEqual(liquid_delta, ...
+      ice1.mass_budget_phase_liquid_mwe ...
+      + ice1.mass_budget_vapor_liquid_mwe ...
+      + ice1.mass_budget_remesh_liquid_mwe ...
+      + ice1.mass_budget_vapor_redistribution_liquid_mwe, 'AbsTol', 1e-10);
+
+   % The endpoint gross bounds its signed delta with the transport
+   % included in the substep storage-change context.
+   testCase.verifyGreaterThanOrEqual( ...
+      ice1.mass_budget_solid_storage_gross_mwe + 1e-12, abs(solid_delta));
+   testCase.verifyGreaterThanOrEqual( ...
+      ice1.mass_budget_liquid_storage_gross_mwe + 1e-12, ...
+      abs(liquid_delta));
    clear cleanup
 end
 

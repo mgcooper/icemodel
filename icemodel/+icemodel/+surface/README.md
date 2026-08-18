@@ -15,17 +15,19 @@ Public entrypoints:
 - `diagnose_surface_ablation`
 - `diagnose_surface_runoff`
 - `potential_surface_vapor_exchange`
-  - phase-corrects one substep's surface vapor demand. `d_pevp` is an energy
-    demand on a fixed `Lv` basis, and the same energy sublimates less mass
-    than it evaporates, so this rescales it to the liquid-water volume
-    fraction of the mass actually moved. It owns the wet/dry read through
-    `icemodel.column.vapor_exchange_is_wet` and must run before the exchange,
-    because a merge can replace the top cell
+  - phase-corrects one surface vapor demand. `d_pevp` is an energy demand
+    on a fixed `Lv` basis, and the same energy sublimates less mass than
+    it evaporates, so this rescales it to the liquid-water volume fraction
+    of the mass the demand would move. It owns the wet/dry read through
+    `icemodel.column.vapor_exchange_is_wet`. No production path calls it:
+    the driver accumulates the applier's realized exchange instead, and
+    this converter stands ready for the planned upstream-conversion
+    unification of the two appliers
 - `surface_vapor_mass_flux`
-  - converts that accumulated fraction to the Neumann face flux
-    [kg m-2 s-1]. It carries no latent heat: the phase correction already
-    happened. Keeping the two apart is what lets the driver accumulate a
-    fraction and never handle a mass
+  - converts a liquid-water volume fraction to the surface face flux
+    [kg m-2 s-1]. It carries no latent heat: any phase correction happens
+    upstream. Keeping conversion and correction apart is what lets callers
+    hold fractions and never handle a mass
 - `apply_surface_vapor_exchange`
   - applies the surface vapor exchange to the top cell under three limits:
     condensation capped by pore capacity, deposition capped by available air

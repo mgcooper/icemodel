@@ -62,13 +62,13 @@ function [ice1, ice2, opts] = icemodel(opts)
       'solver', 'maxiter', 'tol', 'alpha', 'use_aitken', 'jumpmax', ...
       'cpl_maxiter', 'cpl_Ts_tol', 'cpl_seb_tol', 'cpl_alpha', 'cpl_aitken', ...
       'cpl_jumpmax', 'f_ice_min');
+   TINY = 1e-8;
 
    % An opts struct built before this flag existed carries no such field, and
    % configureRun does not add one. Read it the way both couplers do, so an
    % older struct still runs the default path instead of erroring here.
    use_coupled_vapor = isfield(opts, 'use_coupled_vapor') ...
       && opts.use_coupled_vapor;
-   TINY = 1e-8;
 
    % INITIALIZE THE FORCING DATA
    [tair, swd, lwd, albedo, wspd, ...
@@ -118,9 +118,13 @@ function [ice1, ice2, opts] = icemodel(opts)
             = icemodel.timestepping.newtimestep(f_liq, solver);
 
          % Grain growth runs once per forcing step. It therefore needs the
-         % boundary vapor exchange the accepted substeps applied, as a
-         % liquid-water volume fraction like every other d_* increment.
-         d_vap_sfc = 0.0;
+         % face exchanges the accepted substeps actually applied: the
+         % realized surface exchange at face 1 and the interior transport
+         % magnitudes elsewhere, accumulated as water-equivalent depths.
+         % Gross, not signed: growth scales with the flux magnitude, so
+         % substeps whose exchange reverses sign must add rather than
+         % cancel.
+         d_vap_faces = zeros(size(delz));
 
          % Zero the ledger for this forcing step and set initial values.
          if use_mass_budget
@@ -164,7 +168,8 @@ function [ice1, ice2, opts] = icemodel(opts)
                   nu_air(metstep), H_h(metstep), H_e, hv_atm, br_coefs_step, ...
                   liqflag, chi, solver, tol, maxiter, alpha, use_aitken, ...
                   jumpmax, cpl_Ts_tol, cpl_seb_tol, cpl_maxiter, cpl_alpha, ...
-                  cpl_aitken, cpl_jumpmax, ro_sfc, snow_depth, step_opts);
+                  cpl_aitken, cpl_jumpmax, ro_sfc, snow_depth, ...
+                  f_res_por, step_opts);
 
             elseif solver > 1
 
@@ -178,7 +183,8 @@ function [ice1, ice2, opts] = icemodel(opts)
                   nu_air(metstep), H_h(metstep), H_e, hv_atm, br_coefs_step, ...
                   liqflag, chi, solver, tol, maxiter, alpha, use_aitken, ...
                   jumpmax, cpl_Ts_tol, cpl_seb_tol, cpl_maxiter, cpl_alpha, ...
-                  cpl_aitken, cpl_jumpmax, ro_sfc, snow_depth, step_opts);
+                  cpl_aitken, cpl_jumpmax, ro_sfc, snow_depth, ...
+                  f_res_por, step_opts);
             end
 
             % Hitting max coupling iterations without ok_cpl is a substep fail.
@@ -212,39 +218,22 @@ function [ice1, ice2, opts] = icemodel(opts)
                nu_air(metstep), H_h(metstep), H_e, hv_atm, br_coefs_step, ...
                liqflag, f_ice(1), f_liq(1), dt, dz(1), snow_depth, step_opts);
 
-            % MOVE VAPOR BETWEEN THE CELLS
-            %
-            % Coupled mode lets the interior faces transport vapor mass. That
-            % is a separate step from the surface exchange below. The two
-            % conserve different things: Fick's law fixes the mass here, and
-            % the surface energy balance fixes the energy there.
-            d_sbl_err = 0.0;
-            if use_coupled_vapor
-               [f_ice, f_liq, d_sbl_err, mass_energy_budget] = ...
-                  icemodel.column.couple_vapor_step( ...
-                  T_ice, f_ice, f_liq, d_sbl_err, dz, delz, fn, dt, ...
-                  f_ice_min, f_res_por, mass_energy_budget, use_mass_budget);
-            end
-
-            % Accumulate this substep's surface vapor exchange, phase-
-            % corrected, before the exchange changes the top cell. This sum is
-            % signed, and grain growth uses the magnitude, so substeps whose
-            % Qe reverses sign cancel here and drive no growth. Bead
-            % icemodel-55x carries that. The helper
-            % owns the wet/dry read and the latent-heat choice. It must run
-            % here: the applier routes the demand on this state, and a merge
-            % below can replace the top cell outright.
-            if use_coupled_vapor
-               d_vap_sfc = d_vap_sfc ...
-                  + icemodel.surface.potential_surface_vapor_exchange( ...
-                  d_pevp, f_ice(1), f_liq(1), f_res_por);
-            end
+            % The transport below evaluates its face quantities and its
+            % per-cell phase decisions at this state, the one the solve
+            % converged on, so the mass it moves and the phase it moves
+            % between stay conjugate to the energy the solve transported.
+            % The surface exchange can flip the top cell's wet/dry class,
+            % so deciding after it would move a different mass at face 2,
+            % or spend it on the other phase, than the solve's energy.
+            f_ice_solve = f_ice;
+            f_liq_solve = f_liq;
 
             % UPDATE THE SURFACE MASS-BALANCE BUDGETS
-            [T_ice, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err] ...
+            [T_ice, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err, ...
+               d_vap_applied] ...
                = icemodel.column.budget_surface_mass_balance( ...
                T_ice, f_ice, f_liq, xf_liq, d_pevp, d_liq, d_evp, ...
-               d_rof, f_res_por, f_ice_min, d_sbl_err);
+               d_rof, f_res_por, f_ice_min);
 
             % Checkpoint realized vapor exchange and its input, overflow, and
             % signed unapplied energy (d_sbl_err).
@@ -253,6 +242,33 @@ function [ice1, ice2, opts] = icemodel(opts)
                   = icemodel.column.accumulate_vapor_budget(mass_energy_budget, ...
                   solid_p, liquid_p, T_ice, f_ice, f_liq, dz, ...
                   d_pevp, d_rof, d_sbl_err);
+            end
+
+            % MOVE VAPOR BETWEEN THE CELLS
+            %
+            % Coupled mode lets the interior faces transport vapor mass, as a
+            % separate step from the surface exchange above: Fick's law fixes
+            % the mass here, and the surface energy balance fixes the energy
+            % there. The position after the surface budgets is load-bearing
+            % three ways. The d_liq increment above spans the checkpoint to
+            % the surface budget call, so transport before it would be read
+            % as melt or refreezing. The vapor budget's storage baseline
+            % spans the surface exchange alone, so transport before it would
+            % be scored as surface exchange. And the transport's shortfall is
+            % recorded with the per-phase redistribution increments, so the
+            % surface closure identity never carries an interior term.
+            if use_coupled_vapor
+               [f_ice, f_liq, d_vap_faces, vapor_solid, vapor_liquid, ...
+                  mass_energy_budget] = icemodel.column.couple_vapor_step( ...
+                  T_ice, f_ice, f_liq, f_ice_solve, f_liq_solve, ...
+                  d_vap_faces, vapor_solid, vapor_liquid, dz, delz, fn, ...
+                  dt, f_ice_min, f_res_por, mass_energy_budget, ...
+                  use_mass_budget);
+
+               % Accumulate the realized surface exchange for grain growth,
+               % gross, as a water-equivalent depth. Realized, because mass
+               % the applier rejected never crossed the surface.
+               d_vap_faces(1) = d_vap_faces(1) + abs(d_vap_applied) * dz(1);
             end
 
             % REMESH THIN LAYERS AFTER THE MASS-BALANCE UPDATE
@@ -293,18 +309,16 @@ function [ice1, ice2, opts] = icemodel(opts)
 
          % UPDATE GRAIN SIZE VIA VAPOR MASS TRANSFER
          %
-         % Coupled mode takes the surface face from the accumulated exchange
-         % d_vap_sfc. The interior faces are re-evaluated here at end-of-step
-         % state, so they are not the fluxes the substeps transported.
-         % DesignSpec decision 8 asks for the accumulated interior fluxes;
-         % bead icemodel-55x carries that. This block costs one exponential
-         % and one power per forcing step.
+         % Coupled mode grows grains from the accumulated face exchanges the
+         % substeps actually applied, per DesignSpec decision 8: the realized
+         % surface exchange at face 1 and the substep-integrated interior
+         % transport magnitudes elsewhere. The kernel evaluates no
+         % saturation state on this path, so the step adds no exponential
+         % and no power.
          if use_coupled_vapor
-            [ro_vap, De] = ...
-               icemodel.column.accepted_vapor_quantities(T_ice, f_liq);
             r_eff = icemodel.column.vapor_mass_transfer(T_ice, T_sfc, ...
                f_ice, f_liq, r_eff, dz, delz, fn, dt_FULL_STEP, ...
-               ro_vap, De, d_vap_sfc);
+               d_vap_faces);
          else
             r_eff = icemodel.column.vapor_mass_transfer(T_ice, T_sfc, ...
                f_ice, f_liq, r_eff, dz, delz, fn, dt_FULL_STEP);

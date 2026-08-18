@@ -80,12 +80,13 @@ function [ledger, vapor_solid, vapor_liquid] = accumulate_vapor_budget( ...
    end
    unapplied_vapor = sum(unapplied_weighted);
 
-   % Take the magnitude per cell before summing. Coupled mode fills every
-   % entry of d_sbl_err, and one cell rejecting deposition while another
-   % cannot supply sublimation gives the two opposite signs in one substep.
-   % Taking the magnitude of the net would let those cancel, which is what
-   % the gross channel exists to prevent. The surface-only path leaves one
-   % entry nonzero, so this equals the magnitude of the net there.
+   % Take the magnitude per cell before summing. The surface applier
+   % returns one entry per cell with only the top entry nonzero, so today
+   % this equals the magnitude of the net; the per-cell form stays so the
+   % ledger integrates one shape if a future path fills more entries.
+   % Interior transport never reaches this channel: it runs after this
+   % budget closes and records its shortfall in the redistribution's own
+   % unapplied pair.
    unapplied_vapor_gross = sum(abs(unapplied_weighted));
 
    % Compute condensation overflow in mwe.

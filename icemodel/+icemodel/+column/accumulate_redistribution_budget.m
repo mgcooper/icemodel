@@ -1,32 +1,37 @@
 function ledger = accumulate_redistribution_budget( ...
-      ledger, solid_r, liquid_r, T, f_ice, f_liq, dz)
+      ledger, solid_r, liquid_r, T, f_ice, f_liq, dz, d_sbl_err_cpl)
    %ACCUMULATE_REDISTRIBUTION_BUDGET Record interior vapor transport energy.
    %
    %  ledger = icemodel.column.accumulate_redistribution_budget( ...
-   %     ledger, solid_r, liquid_r, T, f_ice, f_liq, dz)
+   %     ledger, solid_r, liquid_r, T, f_ice, f_liq, dz, d_sbl_err_cpl)
    %
    % Call this once per accepted substep, right after
    % icemodel.column.apply_vapor_transport moves vapor between
    % cells. SOLID_R and LIQUID_R are the storage totals from just before that
-   % step.
+   % step. D_SBL_ERR_CPL is the applier's per-cell shortfall record.
    %
    % Interior transport conserves mass: it moves vapor between cells and
-   % creates none. It does not conserve energy-weighted storage. A cell that
-   % gives up vapor from ice releases it at Ls. A cell that takes it into
-   % liquid stores it at Lv. The column's Ls-and-Lv-weighted storage therefore
-   % moves even though its mass does not. Nothing supplies that energy as a
-   % potential, because the enthalpy solve already carries the vapor latent
-   % heat through its conduction term.
+   % creates none. It does not conserve the per-phase storage totals. A
+   % cell that gives up vapor from a liquid film loses liquid storage, and
+   % a cell that takes it into ice gains solid storage, so the solid and
+   % liquid totals move in opposite directions while their sum holds.
    %
-   % The vapor closure identity compares the surface potential against the
-   % energy-weighted storage change, so it needs this term subtracted:
+   % The transport runs after icemodel.column.accumulate_vapor_budget takes
+   % its storage baseline, so no interior term reaches the surface vapor
+   % channels, and the surface closure identity holds without a
+   % redistribution correction:
    %
    %   vapor_potential = ro_liq * (Ls * vapor_solid + Lv * vapor_liquid
-   %                     + Lv * condensation_overflow)
-   %                     + unapplied_vapor - vapor_redistribution
+   %                     + Lv * condensation_overflow) + unapplied_vapor
    %
-   % The channel stays zero unless the coupled vapor mode is on, so the
-   % identity is unchanged for a default run.
+   % The per-phase storage closures do consume the increments this
+   % records: the solid storage delta closes against phase, surface vapor,
+   % remesh, and redistribution solid terms together, and likewise for
+   % liquid. The shortfall channel records what the per-cell limits
+   % rejected. A clamp that binds breaks the transport's own mass closure,
+   % because the donor side applied while the receiver could not, so that
+   % record keeps it visible. All six channels stay zero unless the
+   % coupled vapor mode is on.
    %
    % Inputs
    %   ledger            - Forcing-step ledger.
@@ -34,34 +39,61 @@ function ledger = accumulate_redistribution_budget( ...
    %                       redistribution step.
    %   T, f_ice, f_liq   - Column state after the redistribution step.
    %   dz                - Control-volume thickness [m].
+   %   d_sbl_err_cpl     - Per-cell unapplied transport [-] (JJ x 1), in
+   %                       ice-fraction units from
+   %                       icemodel.column.apply_vapor_transport.
    %
    % Output
-   %   ledger            - Ledger with the redistribution energy accumulated.
+   %   ledger            - Ledger with the per-phase redistribution
+   %                       increments and the interior shortfall
+   %                       accumulated.
    %
    % See also: icemodel.column.apply_vapor_transport,
    %  icemodel.column.accumulate_vapor_budget
    %
    %#codegen
 
-   persistent Ls Lv ro_liq
+   persistent Ls ro_ice
    if isempty(Ls)
-      [Ls, Lv, ro_liq] = icemodel.physicalConstant('Ls', 'Lv', 'ro_liq');
+      [Ls, ro_ice] = icemodel.physicalConstant('Ls', 'ro_ice');
    end
 
    [solid_after, liquid_after] = ...
       icemodel.column.integrate_column_budget(T, f_ice, f_liq, dz);
 
-   redistribution = ro_liq * (Ls * (solid_after - solid_r) ...
-      + Lv * (liquid_after - liquid_r));
+   redistribution_solid = solid_after - solid_r;
+   redistribution_liquid = liquid_after - liquid_r;
 
    % Add rather than assign: a forcing step can take several accepted
    % substeps and each one redistributes.
-   ledger.mass_budget_vapor_redistribution_j_m2 = ...
-      ledger.mass_budget_vapor_redistribution_j_m2 + redistribution;
+   ledger.mass_budget_vapor_redistribution_solid_mwe = ...
+      ledger.mass_budget_vapor_redistribution_solid_mwe ...
+      + redistribution_solid;
+   ledger.mass_budget_vapor_redistribution_liquid_mwe = ...
+      ledger.mass_budget_vapor_redistribution_liquid_mwe ...
+      + redistribution_liquid;
 
-   % Keep the absolute total so exchanges of opposite sign within one forcing
-   % step cannot cancel to a signed zero.
-   ledger.mass_budget_vapor_redistribution_gross_j_m2 = ...
-      ledger.mass_budget_vapor_redistribution_gross_j_m2 ...
-      + abs(redistribution);
+   % Keep the absolute totals so exchanges of opposite sign within one
+   % forcing step cannot cancel to a signed zero.
+   ledger.mass_budget_vapor_redistribution_solid_gross_mwe = ...
+      ledger.mass_budget_vapor_redistribution_solid_gross_mwe ...
+      + abs(redistribution_solid);
+   ledger.mass_budget_vapor_redistribution_liquid_gross_mwe = ...
+      ledger.mass_budget_vapor_redistribution_liquid_gross_mwe ...
+      + abs(redistribution_liquid);
+
+   % The shortfall the per-cell limits rejected, scaled cell by cell before
+   % the sum on the same energy basis the surface unapplied channel uses.
+   % This lives in its own channel pair so the surface closure identity
+   % never carries an interior term.
+   unapplied_weighted = ro_ice * Ls * d_sbl_err_cpl(:) .* dz(:);
+   ledger.mass_budget_vapor_redistribution_unapplied_j_m2 = ...
+      ledger.mass_budget_vapor_redistribution_unapplied_j_m2 ...
+      + sum(unapplied_weighted);
+
+   % Magnitudes per cell before the sum, so a rejecting cell and a starved
+   % cell of opposite sign in one substep cannot cancel to a signed zero.
+   ledger.mass_budget_vapor_redistribution_unapplied_gross_j_m2 = ...
+      ledger.mass_budget_vapor_redistribution_unapplied_gross_j_m2 ...
+      + sum(abs(unapplied_weighted));
 end

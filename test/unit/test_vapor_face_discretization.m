@@ -3,12 +3,15 @@ function tests = test_vapor_face_discretization
    %
    % The coupled vapor mode moves mass with vapor_face_quantities and energy
    % with vapor_face_conductance. Both build on
-   % icemodel.column.vapor_face_diffusivity. The design requires the two to be
-   % conjugate: the energy the enthalpy solve moves across a face must equal
-   % the mass that crosses it times the latent heat of the phase that supplied
-   % it. Nothing else in the suite tests that identity at the face. A column
-   % closure test can balance while a face is wrong, because the errors of an
-   % adjacent pair cancel in the sum.
+   % icemodel.column.vapor_face_diffusivity. The design requires the two to
+   % be conjugate: the energy the enthalpy solve moves across a face must
+   % equal the mass that crosses it times the latent heat of the phase that
+   % supplied it. The energy side is two pieces, a positive donor-tangent
+   % matrix part and a deferred-correction source flux (Patankar 1980,
+   % section 7.2), and the identity holds for their sum. Nothing else in the
+   % suite tests that identity at the face. A column closure test can
+   % balance while a face is wrong, because the errors of an adjacent pair
+   % cancel in the sum.
    %
    % See also: icemodel.column.vapor_face_quantities,
    %  icemodel.column.vapor_face_conductance,
@@ -19,27 +22,29 @@ end
 function test_face_energy_equals_latent_heat_times_face_mass(testCase)
    % The identity the whole conjugate discretization exists to hold:
    %
-   %   k_vap * (T_north - T_south) / delz == L_face * U_vap
+   %   k_vap * (T_north - T_south) / delz + q_deferred == L_face * U_vap
    %
-   % at every interior face. The conductance is the mass flux rewritten in
-   % temperature, so recovering the flux from it must return the flux.
+   % at every interior face. The matrix part alone cannot reproduce the
+   % flux, because it carries the donor tangent rather than the secant; the
+   % deferred term restores the difference, so the sum must return the flux.
 
-   [T, f_liq, delz, fn] = faceFixture(6);
+   [T, f_ice, f_liq, delz, fn, f_res_por] = faceFixture(6);
    [ro_vap, De, dro_vapdT] = nodeQuantities(T, f_liq);
 
    U_vap_faces = icemodel.column.vapor_face_quantities( ...
       ro_vap, ro_vap(1), De, De(1), delz, fn);
-   k_vap_faces = icemodel.column.vapor_face_conductance( ...
-      T, f_liq, ro_vap, dro_vapdT, De, fn);
+   [k_vap_faces, q_vap_deferred] = icemodel.column.vapor_face_conductance( ...
+      T, f_ice, f_liq, ro_vap, dro_vapdT, De, delz, fn, f_res_por);
 
    % Rebuild the latent heat and the temperature difference the conductance
    % used, so the check reads the same faces the functions did.
-   [L_faces, d_T] = faceLatentHeat(T, f_liq, ro_vap);
+   [L_faces, d_T] = faceLatentHeat(T, f_ice, f_liq, ro_vap, f_res_por);
 
    % Interior faces alone. Both boundary faces are set to zero by design and
    % carry no identity to check.
    interior = 2:numel(T);
-   returned = k_vap_faces(interior) .* d_T(interior) ./ delz(interior);
+   returned = k_vap_faces(interior) .* d_T(interior) ./ delz(interior) ...
+      + q_vap_deferred(interior);
    expected = L_faces(interior) .* U_vap_faces(interior);
 
    scale = max(abs(expected));
@@ -54,7 +59,7 @@ function test_the_identity_holds_across_a_wet_dry_boundary(testCase)
    % between a wet and a dry cell must carry the donor's, and the identity
    % must still close there.
 
-   [T, ~, delz, fn] = faceFixture(4);
+   [T, f_ice, ~, delz, fn, f_res_por] = faceFixture(4);
 
    % Wet above, dry below, so face 3 spans the phase change.
    f_liq = [0.05; 0.05; 0; 0];
@@ -62,57 +67,68 @@ function test_the_identity_holds_across_a_wet_dry_boundary(testCase)
 
    U_vap_faces = icemodel.column.vapor_face_quantities( ...
       ro_vap, ro_vap(1), De, De(1), delz, fn);
-   k_vap_faces = icemodel.column.vapor_face_conductance( ...
-      T, f_liq, ro_vap, dro_vapdT, De, fn);
-   [L_faces, d_T] = faceLatentHeat(T, f_liq, ro_vap);
+   [k_vap_faces, q_vap_deferred] = icemodel.column.vapor_face_conductance( ...
+      T, f_ice, f_liq, ro_vap, dro_vapdT, De, delz, fn, f_res_por);
+   [L_faces, d_T] = faceLatentHeat(T, f_ice, f_liq, ro_vap, f_res_por);
 
    % The spanning face takes one of the two latent heats, not a blend.
    [Ls, Lv] = icemodel.physicalConstant('Ls', 'Lv');
    testCase.verifyTrue(L_faces(3) == Ls || L_faces(3) == Lv);
 
-   returned = k_vap_faces(3) * d_T(3) / delz(3);
+   returned = k_vap_faces(3) * d_T(3) / delz(3) + q_vap_deferred(3);
    expected = L_faces(3) * U_vap_faces(3);
    testCase.verifyEqual(returned, expected, 'RelTol', 1e-12);
 end
 
 function test_both_boundary_faces_carry_no_vapor_energy(testCase)
    % The bottom is closed and the surface exchange enters through the SEB's
-   % Qe. A conductance at either boundary would count the surface exchange
+   % Qe. A vapor term at either boundary would count the surface exchange
    % twice, which is what the Neumann boundary decision exists to prevent.
+   % Both the matrix part and the deferred flux must be zero there.
 
-   [T, f_liq, ~, fn] = faceFixture(5);
+   [T, f_ice, f_liq, delz, fn, f_res_por] = faceFixture(5);
    [ro_vap, De, dro_vapdT] = nodeQuantities(T, f_liq);
 
-   k_vap_faces = icemodel.column.vapor_face_conductance( ...
-      T, f_liq, ro_vap, dro_vapdT, De, fn);
+   [k_vap_faces, q_vap_deferred] = icemodel.column.vapor_face_conductance( ...
+      T, f_ice, f_liq, ro_vap, dro_vapdT, De, delz, fn, f_res_por);
 
    testCase.verifyEqual(k_vap_faces(1), 0);
    testCase.verifyEqual(k_vap_faces(numel(T) + 1), 0);
+   testCase.verifyEqual(q_vap_deferred(1), 0);
+   testCase.verifyEqual(q_vap_deferred(numel(T) + 1), 0);
 end
 
 function test_an_isothermal_column_moves_no_vapor(testCase)
-   % Equal temperatures give equal saturation densities, so every face flux
-   % is zero. This is the reproduction case the acceptance policy names: an
-   % isothermal column must leave the surface path acting alone.
+   % Equal temperatures and one phase give equal saturation densities, so
+   % every face flux is zero. This is the reproduction case the acceptance
+   % policy names: an isothermal column must leave the surface path acting
+   % alone. The deferred term must also vanish, so the energy side moves
+   % nothing either.
 
-   [~, f_liq, delz, fn] = faceFixture(5);
+   [~, f_ice, f_liq, delz, fn, f_res_por] = faceFixture(5);
    Tf = icemodel.physicalConstant('Tf');
    T = (Tf - 5) * ones(5, 1);
-   [ro_vap, De] = nodeQuantities(T, f_liq);
+   [ro_vap, De, dro_vapdT] = nodeQuantities(T, f_liq);
 
    returned = icemodel.column.vapor_face_quantities( ...
       ro_vap, ro_vap(1), De, De(1), delz, fn);
    expected = zeros(6, 1);
-
    testCase.verifyEqual(returned, expected, 'AbsTol', 0);
+
+   [~, q_vap_deferred] = icemodel.column.vapor_face_conductance( ...
+      T, f_ice, f_liq, ro_vap, dro_vapdT, De, delz, fn, f_res_por);
+   testCase.verifyEqual(q_vap_deferred, expected, 'AbsTol', 0);
 end
 
-function test_the_tangent_replaces_an_undefined_secant(testCase)
-   % Where a face spans no temperature difference the secant slope divides by
-   % zero. Its limit is the tangent, so the conductance must fall back to the
-   % donor node's derivative and stay finite.
+function test_the_matrix_part_is_the_positive_donor_tangent(testCase)
+   % The matrix part carries the donor cell's tangent slope. Saturation
+   % vapor density rises with temperature, so the tangent is positive at
+   % every face, in every state; that positivity is what keeps the
+   % assembled system diagonally dominant. A face that spans no temperature
+   % difference still gets a finite, nonzero matrix coefficient from the
+   % tangent.
 
-   [~, f_liq, ~, fn] = faceFixture(4);
+   [~, f_ice, f_liq, delz, fn, f_res_por] = faceFixture(4);
    Tf = icemodel.physicalConstant('Tf');
 
    % Faces 2 and 4 span no temperature difference; face 3 does.
@@ -120,12 +136,10 @@ function test_the_tangent_replaces_an_undefined_secant(testCase)
    [ro_vap, De, dro_vapdT] = nodeQuantities(T, f_liq);
 
    k_vap_faces = icemodel.column.vapor_face_conductance( ...
-      T, f_liq, ro_vap, dro_vapdT, De, fn);
+      T, f_ice, f_liq, ro_vap, dro_vapdT, De, delz, fn, f_res_por);
 
    testCase.verifyTrue(all(isfinite(k_vap_faces)));
-
-   % A tangent-slope face is nonzero: ro_vap has a real derivative there even
-   % though the neighbours share a temperature.
+   testCase.verifyTrue(all(k_vap_faces >= 0));
    testCase.verifyGreaterThan(abs(k_vap_faces(2)), 0);
 end
 
@@ -163,7 +177,7 @@ function test_both_flux_paths_share_one_face_diffusivity(testCase)
    % gained a weighting factor the other did not, the identity above would
    % fail while every individual function still looked correct.
 
-   [T, f_liq, delz, fn] = faceFixture(5);
+   [T, ~, f_liq, delz, fn] = faceFixture(5);
    [ro_vap, De] = nodeQuantities(T, f_liq);
 
    [~, returned] = icemodel.column.vapor_face_quantities( ...
@@ -177,22 +191,15 @@ function test_both_flux_paths_share_one_face_diffusivity(testCase)
    testCase.verifyEqual(returned, expected, 'AbsTol', 0);
 end
 
-function test_an_isothermal_wet_dry_face_breaks_conjugacy(testCase)
-   % Known defect, bead icemodel-55x. Two neighbours at equal temperature but
-   % different phase hold different saturation vapor densities, because the
-   % ice and water curves differ. Mass crosses the face while d_T is zero.
-   % The conductance falls back to the tangent slope. The assembly multiplies
-   % it by the zero temperature difference, so the face carries no energy at
-   % all. The identity energy = L * mass fails there.
-   %
-   % The flux is not expressible as a conductance times a temperature
-   % difference at such a face. It belongs in the source term, which is the
-   % deferred correction bead icemodel-ziq already owns.
-   %
-   % This test pins the defect so it cannot be lost. Invert it when the fix
-   % lands: the energy the face carries must then equal L_face * U_vap.
+function test_the_deferred_term_carries_an_isothermal_wet_dry_face(testCase)
+   % Two neighbours at equal temperature but different phase hold
+   % different saturation vapor densities, because the ice and water
+   % curves differ. Mass crosses the face while d_T is zero, so no
+   % conductance times a temperature difference can carry the energy. The
+   % deferred term must carry all of it: the face energy must equal
+   % L_face * U_vap with the matrix part contributing nothing.
 
-   [~, ~, delz, fn] = faceFixture(4);
+   [~, f_ice, ~, delz, fn, f_res_por] = faceFixture(4);
    Tf = icemodel.physicalConstant('Tf');
 
    % Isothermal, wet over dry, so face 3 spans the phase change at equal T.
@@ -202,44 +209,45 @@ function test_an_isothermal_wet_dry_face_breaks_conjugacy(testCase)
 
    U_vap_faces = icemodel.column.vapor_face_quantities( ...
       ro_vap, ro_vap(1), De, De(1), delz, fn);
-   k_vap_faces = icemodel.column.vapor_face_conductance( ...
-      T, f_liq, ro_vap, dro_vapdT, De, fn);
-   [L_faces, d_T] = faceLatentHeat(T, f_liq, ro_vap);
+   [k_vap_faces, q_vap_deferred] = icemodel.column.vapor_face_conductance( ...
+      T, f_ice, f_liq, ro_vap, dro_vapdT, De, delz, fn, f_res_por);
+   [L_faces, d_T] = faceLatentHeat(T, f_ice, f_liq, ro_vap, f_res_por);
 
-   % Mass crosses the face.
+   % Mass crosses the face at zero temperature difference.
    testCase.assertGreaterThan(abs(U_vap_faces(3)), 0);
    testCase.assertEqual(d_T(3), 0);
 
-   % The energy the assembly carries is zero, and the identity wants L * U.
-   carried = k_vap_faces(3) * d_T(3) / delz(3);
+   % The matrix part moves nothing there; the deferred term moves L * U.
+   matrix_part = k_vap_faces(3) * d_T(3) / delz(3);
    required = L_faces(3) * U_vap_faces(3);
-   testCase.verifyEqual(carried, 0);
-   testCase.verifyGreaterThan(abs(required), 0);
+   testCase.verifyEqual(matrix_part, 0);
+   testCase.verifyGreaterThan(abs(q_vap_deferred(3)), 0);
+   testCase.verifyEqual(matrix_part + q_vap_deferred(3), required, ...
+      'RelTol', 1e-12);
 end
 
-function test_a_wet_dry_face_can_lose_diagonal_dominance(testCase)
-   % Pin the known limitation bead icemodel-ziq treats. The conductance goes
-   % negative where the vapor flux opposes the temperature gradient, and the
-   % enthalpy assembly adds it to an always-positive conduction conductance.
-   % In low-density snow the negative part exceeds that conductance, so the
-   % coupled matrix is not diagonally dominant there.
-   %
-   % This test documents the state rather than requiring it. It fails if the
-   % negative branch stops occurring, which would mean the conjugacy the
-   % design rests on was removed.
-   %
-   % It does not fail when the treatment lands. The remedy keeps this negative
-   % conductance and changes how icemodel.column.assemble_enthalpy_system
-   % consumes it, which this test never calls. Bead icemodel-ziq carries the
-   % duty to replace this test with one on the assembled coefficient.
+function test_the_assembled_coefficients_keep_diagonal_dominance(testCase)
+   % The dominance property lives in the assembled coefficients, so this
+   % asserts on them, not on the face terms alone. In the worst region the
+   % verification sweep found, low-density snow with a wet half over a dry
+   % half, the secant slope is negative and its magnitude reaches 21.85
+   % times the face conduction conductance. The split keeps that sign in
+   % the deferred source: every assembled off-diagonal must stay
+   % nonnegative and every row diagonally dominant, while the converged
+   % face flux still carries the Bergeron-Findeisen direction against the
+   % temperature gradient.
 
    Tf = icemodel.physicalConstant('Tf');
    JJ = 20;
-   [~, ~, ~, ~, fn] = icemodel.column.control_volume_mesh(JJ * 0.04, 0.04);
+   f_res_por = 0.02;
+   [dz, delz, ~, ~, fn] = icemodel.column.control_volume_mesh( ...
+      JJ * 0.04, 0.04);
+   dz = dz(1:JJ);
+   delz = delz(1:JJ + 1);
    fn = fn(1:JJ + 1);
 
-   % The worst region the V4 sweep found: low-density snow, shallow gradient,
-   % a wet upper half over a dry lower half.
+   % The worst region the V4 sweep found: low-density snow, shallow
+   % gradient, a wet upper half over a dry lower half.
    T = (Tf - 10) + linspace(0, 0.5, JJ)';
    f_ice = 0.30 * ones(JJ, 1);
    f_liq = zeros(JJ, 1);
@@ -247,22 +255,133 @@ function test_a_wet_dry_face_can_lose_diagonal_dominance(testCase)
 
    [ro_vap, De] = icemodel.column.accepted_vapor_quantities(T, f_liq);
    [~, dro_vapdT] = icemodel.vapor.saturation_vapor_density(T, f_liq);
-   k_vap = icemodel.column.vapor_face_conductance( ...
-      T, f_liq, ro_vap, dro_vapdT, De, fn);
+   [k_vap_faces, q_vap_deferred] = icemodel.column.vapor_face_conductance( ...
+      T, f_ice, f_liq, ro_vap, dro_vapdT, De, delz, fn, f_res_por);
 
-   % The assembly's face conductance, built the same way it builds it.
-   k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq);
-   k_nodes = [k_eff(1); k_eff; k_eff(JJ)];
-   k_faces = 1.0 ./ ((1.0 - fn) ./ k_nodes(1:JJ + 1) ...
-      + fn ./ k_nodes(2:JJ + 2));
-
-   negative = k_vap < 0;
-   testCase.assertTrue(any(negative), ...
+   % The exact face flux still runs against the temperature gradient at the
+   % wet/dry faces: that is the Bergeron-Findeisen direction the design must
+   % keep. Losing it would mean conjugacy was removed rather than treated.
+   U_vap_faces = icemodel.column.vapor_face_quantities( ...
+      ro_vap, ro_vap(1), De, De(1), delz, fn);
+   [L_faces, d_T] = faceLatentHeat(T, f_ice, f_liq, ro_vap, f_res_por);
+   interior = 2:JJ;
+   q_total = k_vap_faces(interior) .* d_T(interior) ./ delz(interior) ...
+      + q_vap_deferred(interior);
+   testCase.assertTrue(any( ...
+      q_total .* d_T(interior) < 0 & d_T(interior) ~= 0), ...
       'the Bergeron-Findeisen branch does not occur');
 
-   % The worst ratio exceeds one, which is the loss of dominance itself.
-   returned = max(abs(k_vap(negative)) ./ k_faces(negative));
-   testCase.verifyGreaterThan(returned, 1);
+   % The identity holds face by face in the worst region too.
+   expected = L_faces(interior) .* U_vap_faces(interior);
+   testCase.verifyEqual(q_total, expected, 'RelTol', 1e-12);
+
+   % Assemble the coupled system the way solve_column_enthalpy does and
+   % assert on its coefficients. The column sits outside the melt zone, so
+   % the melt-zone transform leaves the conductances unscaled.
+   f_wat = icemodel.column.water_fraction(f_ice, f_liq);
+   [~, dHdT, dFdT] = icemodel.column.bulk_enthalpy( ...
+      T, f_ice, f_liq, f_wat, ro_vap, dro_vapdT);
+   k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, 0);
+
+   [aN, aP, aS] = icemodel.column.assemble_enthalpy_system( ...
+      T, f_ice, f_liq, dHdT, dFdT, dro_vapdT, zeros(JJ, 1), ...
+      zeros(JJ, 1), zeros(JJ, 1), k_eff, delz, fn, dz, 900, ...
+      Tf - 10, 0, 0, 1, k_vap_faces, q_vap_deferred);
+
+   testCase.verifyTrue(all(aN >= 0));
+   testCase.verifyTrue(all(aS >= 0));
+   testCase.verifyTrue(all(aP > 0));
+
+   % Diagonal dominance itself: the diagonal exceeds the off-diagonal sum
+   % by the positive storage coefficient in every row.
+   testCase.verifyTrue(all(aP - aN - aS > 0));
+
+   % The bead's acceptance sweep, compacted to its corners and midpoints:
+   % temperature gradients 0.5 to 25 K, surface depressions 0 to 20 K,
+   % liquid fractions 0 to 0.10, ice fractions 0.30 to 0.85, wet upper
+   % half over dry lower half. The matrix part is a positive tangent at
+   % every face by construction, so no state in the sweep may produce a
+   % negative off-diagonal or lose dominance. A 2 K margin keeps every
+   % state below the melt zone: the enthalpy transform rescales the
+   % coefficients inside it, and the faces the bead measured are the
+   % sub-freezing ones.
+   for grad = [0.5, 5, 25]
+      for depression = [0, 10, 20]
+         for f_liq_wet = [0, 0.05, 0.10]
+            for f_ice_s = [0.30, 0.85]
+               T = (Tf - 2 - depression - grad) + linspace(0, grad, JJ)';
+               f_ice = f_ice_s * ones(JJ, 1);
+               f_liq = zeros(JJ, 1);
+               f_liq(1:JJ / 2) = f_liq_wet;
+
+               [ro_vap, De] = icemodel.column.accepted_vapor_quantities( ...
+                  T, f_liq);
+               [~, dro_vapdT] = icemodel.vapor.saturation_vapor_density( ...
+                  T, f_liq);
+               [k_vap_faces, q_vap_deferred] = ...
+                  icemodel.column.vapor_face_conductance( ...
+                  T, f_ice, f_liq, ro_vap, dro_vapdT, De, delz, fn, ...
+                  f_res_por);
+
+               f_wat = icemodel.column.water_fraction(f_ice, f_liq);
+               [~, dHdT, dFdT] = icemodel.column.bulk_enthalpy( ...
+                  T, f_ice, f_liq, f_wat, ro_vap, dro_vapdT);
+               k_eff = icemodel.column.bulk_thermal_conductivity( ...
+                  T, f_ice, f_liq, 0);
+
+               [aN, aP, aS] = icemodel.column.assemble_enthalpy_system( ...
+                  T, f_ice, f_liq, dHdT, dFdT, dro_vapdT, zeros(JJ, 1), ...
+                  zeros(JJ, 1), zeros(JJ, 1), k_eff, delz, fn, dz, 900, ...
+                  T(1), 0, 0, 1, k_vap_faces, q_vap_deferred);
+
+               testCase.verifyTrue(all(aN >= 0) && all(aS >= 0) ...
+                  && all(aP - aN - aS > 0), sprintf( ...
+                  'dominance lost at grad=%g depression=%g f_liq=%g f_ice=%g', ...
+                  grad, depression, f_liq_wet, f_ice_s));
+            end
+         end
+      end
+   end
+end
+
+function test_the_donor_phase_matches_the_mass_applier_in_the_band(testCase)
+   % In the band where the residual floor and the fixed storage threshold
+   % disagree, the mass applier classifies a cell wet while
+   % icemodel.vapor.latent_enthalpy_switch still says dry. The face latent
+   % heat must follow the applier's predicate,
+   % icemodel.column.vapor_exchange_is_wet, so the energy the solve moves
+   % and the mass the applier moves use one latent heat.
+
+   [Ls, Lv, Tf] = icemodel.physicalConstant('Ls', 'Lv', 'Tf');
+   f_res_por = 0.02;
+
+   % The band cell the bead measured: wet to the applier, dry to the
+   % storage switch.
+   f_ice_band = 0.90;
+   f_liq_band = 0.0135;
+   testCase.assertTrue(icemodel.column.vapor_exchange_is_wet( ...
+      f_ice_band, f_liq_band, f_res_por));
+   testCase.assertEqual(icemodel.vapor.latent_enthalpy_switch(f_liq_band), Ls);
+
+   % Two cells, the band cell warmer and on top so it donates the flux.
+   T = [Tf - 3; Tf - 5];
+   f_ice = f_ice_band * ones(2, 1);
+   f_liq = [f_liq_band; 0];
+   delz = [0.04; 0.04; 0.04];
+   fn = [0.5; 0.5; 0.5];
+   [ro_vap, De, dro_vapdT] = nodeQuantities(T, f_liq);
+
+   % The band cell holds the higher vapor density, so it is the donor.
+   testCase.assertGreaterThan(ro_vap(1), ro_vap(2));
+
+   k_vap_faces = icemodel.column.vapor_face_conductance( ...
+      T, f_ice, f_liq, ro_vap, dro_vapdT, De, delz, fn, f_res_por);
+
+   % Recover the latent heat the face carries from the matrix part: the
+   % donor tangent and face diffusivity are known, so L divides out.
+   De_faces = icemodel.column.vapor_face_diffusivity(De, De(1), fn);
+   returned = k_vap_faces(2) / (De_faces(2) * dro_vapdT(1));
+   testCase.verifyEqual(returned, Lv, 'RelTol', 1e-12);
 end
 
 function test_the_surface_fraction_scales_with_the_supplying_phase(testCase)
@@ -333,12 +452,15 @@ function test_the_surface_flux_is_a_unit_conversion(testCase)
    testCase.verifyEqual(returned, expected, 'RelTol', 1e-14);
 end
 
-function [L_faces, d_T] = faceLatentHeat(T, f_liq, ro_vap)
+function [L_faces, d_T] = faceLatentHeat(T, f_ice, f_liq, ro_vap, f_res_por)
    %FACELATENTHEAT Rebuild the donor-cell latent heat and face temperature drop.
+
+   [Ls, Lv] = icemodel.physicalConstant('Ls', 'Lv');
 
    JJ = numel(T);
    T_nodes = [T(1); T; T(JJ)];
    ro_vap_nodes = [ro_vap(1); ro_vap; ro_vap(JJ)];
+   f_ice_nodes = [f_ice(1); f_ice; f_ice(JJ)];
    f_liq_nodes = [f_liq(1); f_liq; f_liq(JJ)];
 
    d_ro_vap = ro_vap_nodes(2:JJ+2) - ro_vap_nodes(1:JJ+1);
@@ -347,7 +469,12 @@ function [L_faces, d_T] = faceLatentHeat(T, f_liq, ro_vap)
    % flux is positive downward. Return that orientation, not its negative.
    d_T = T_nodes(1:JJ+1) - T_nodes(2:JJ+2);
 
-   L_nodes = icemodel.vapor.latent_enthalpy_switch(f_liq_nodes);
+   % The donor phase follows the mass applier's predicate, so this helper
+   % agrees with the production rule by construction.
+   wet_nodes = icemodel.column.vapor_exchange_is_wet( ...
+      f_ice_nodes, f_liq_nodes, f_res_por);
+   L_nodes = Ls * ones(JJ + 2, 1);
+   L_nodes(wet_nodes) = Lv;
    L_north = L_nodes(1:JJ+1);
    L_south = L_nodes(2:JJ+2);
    donor_is_north = d_ro_vap <= 0;
@@ -360,13 +487,13 @@ function [ro_vap, De, dro_vapdT] = nodeQuantities(T, f_liq)
 
    [ro_vap, De] = icemodel.column.accepted_vapor_quantities(T, f_liq);
 
-   % The tangent slope the conductance falls back on. Take it from the same
+   % The tangent slope the matrix part carries. Take it from the same
    % saturation relation the densities came from, the way
    % icemodel.column.solve_column_enthalpy does.
    [~, dro_vapdT] = icemodel.vapor.saturation_vapor_density(T, f_liq);
 end
 
-function [T, f_liq, delz, fn] = faceFixture(JJ)
+function [T, f_ice, f_liq, delz, fn, f_res_por] = faceFixture(JJ)
    %FACEFIXTURE Return one dry column with a temperature gradient.
 
    Tf = icemodel.physicalConstant('Tf');
@@ -376,5 +503,9 @@ function [T, f_liq, delz, fn] = faceFixture(JJ)
 
    % A gradient, so every interior face carries a real flux to check.
    T = (Tf - 8) + linspace(0, 6, JJ)';
+   f_ice = 0.6 * ones(JJ, 1);
    f_liq = zeros(JJ, 1);
+
+   % The residual pore fraction the donor-phase predicate needs.
+   f_res_por = 0.02;
 end

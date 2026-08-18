@@ -9,11 +9,15 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    %  The input signature keeps the suppressed linearization factor Sp for
    %  generality.
    %
-   %  The optional trailing argument is the vapor face conductance from
-   %  icemodel.column.vapor_face_conductance. Supplying it selects the
+   %  The optional trailing arguments are the two vapor face terms from
+   %  icemodel.column.vapor_face_conductance. Supplying them selects the
    %  coupled vapor mode, in which K_EFF arrives without its vapor term and
-   %  the vapor energy travels on the same face quantities as the vapor mass.
-   %  Without it the vapor term stays inside K_EFF, which is the default.
+   %  the vapor energy travels on the same face quantities as the vapor
+   %  mass: the always-positive matrix part joins the interface
+   %  conductivity, and the deferred-correction flux joins the source
+   %  vector b (Patankar 1980, section 7.2), so the converged face flux is
+   %  exact while the matrix keeps its diagonal dominance. Without them the
+   %  vapor term stays inside K_EFF, which is the default.
    %
    %  Note: ro_sno * cp_sno = (cv_ice * f_ice + cv_liq * f_liq)
    %  See updatestate (or icemodel.timestepping.updatesubstep) for how ro_sno
@@ -68,12 +72,15 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
 
    % Coupled vapor mode replaces the vapor share of this interface
    % conductivity. Harmonically averaging the total k_eff makes the vapor
-   % contribution inseparable from the rest. It also carries the node-tangent
-   % slope rather than the secant the mass flux uses, so the energy and the
-   % mass are not conjugate. The caller supplies k_eff without its vapor term
-   % and the vapor interface conductivity separately, and the two are added
-   % here. Both are conductivities [W m-1 K-1]; the conductances aN and aS
-   % below are the per-area values formed by dividing by delz.
+   % contribution inseparable from the rest, and no single conductance
+   % reproduces the vapor flux in every state, so the energy and the mass
+   % are not conjugate that way. The caller supplies k_eff without its
+   % vapor term plus the two face terms from
+   % icemodel.column.vapor_face_conductance. The matrix part added here is
+   % the donor-tangent conductivity, positive at every face; the deferred
+   % flux joins b below. Both conductivity terms are [W m-1 K-1]; the
+   % conductances aN and aS below are the per-area values formed by
+   % dividing by delz.
    if nargin > 18
       g_b_ns = g_b_ns + varargin{1};
    end
@@ -154,6 +161,16 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    % Compute the aP coefficient and solution vector b
    aP = aN + aS + aP0; % -Sp.*dz;
    b = aP0 .* T_ice + Sc .* dz - dH .* dz / dt; % [W m-2]
+
+   % Coupled vapor mode: add the deferred-correction vapor flux, in minus
+   % out with downward positive, evaluated at the incoming iterate. The
+   % matrix part above cannot carry a negative-secant (Bergeron-Findeisen)
+   % face or an isothermal wet/dry face; this term restores the exact flux
+   % there and everywhere else (Patankar 1980, section 7.2).
+   if nargin > 19
+      q_vap = varargin{2};
+      b = b + q_vap(N:S) - q_vap(N+1:S+1);
+   end
 
    % Modify b to account for boundary conditions
    b(N) = b(N) + bc_N;

@@ -72,21 +72,27 @@ Entry points:
     same face quantities, which is what makes `energy = L * mass` hold
     discretely rather than approximately
 - `icemodel.column.vapor_face_conductance`
-  - the energy side of that same face rule. Returns the interface
-    conductivity [W m-1 K-1] the enthalpy assembly adds to its face
-    conductivity in coupled mode, built from the shared face diffusivity, the
-    secant `ro_vap` slope, and the donor-cell latent heat. The conductances
-    are the per-area `aN` and `aS` the assembly forms after dividing by
-    `delz`. Both boundary faces are zero: the bottom is closed, and the
-    surface exchange enters through the surface energy balance rather than
-    as a diffusive flux
+  - the energy side of that same face rule, in two pieces. The matrix part
+    is the donor-tangent interface conductivity [W m-1 K-1], positive at
+    every face, which the enthalpy assembly adds to its face conductivity
+    in coupled mode; the deferred-correction flux [W m-2] joins the source
+    vector, so the converged face flux is exactly `L_face * U_vap` while
+    the assembled system keeps its diagonal dominance (Patankar 1980,
+    section 7.2). The donor phase comes from `vapor_exchange_is_wet`, the
+    mass applier's predicate. Both boundary faces are zero in both parts:
+    the bottom is closed, and the surface exchange enters through the
+    surface energy balance rather than as a diffusive flux
 - `icemodel.column.couple_vapor_step`
   - the one entry point for the coupled interior vapor path. Called once per
-    accepted substep, before the surface mass balance. It evaluates the
-    accepted-state node quantities, moves vapor across the interior faces,
-    applies the arriving mass, threads `d_sbl_err` in and out, and records
-    the redistribution energy. The driver holds no vapor intermediates
-    because this owns them all
+    accepted substep, after the surface budgets close, so interior
+    transport never lands in `d_liq` or in the surface vapor channels. It
+    evaluates the node quantities at the state the solve converged on,
+    moves vapor across the interior faces, applies the arriving mass,
+    threads the gross face accumulation `d_vap_faces` in and out for
+    grain growth, and records the per-phase redistribution increments and
+    their shortfall. The driver carries only the accumulator and the
+    pre-exchange ice and liquid snapshots (`f_ice_solve`, `f_liq_solve`);
+    every other vapor intermediate lives here
 - `icemodel.column.couple_vapor_transport`
   - moves vapor between the cells by Fick's law, on a mass basis. Both its
     boundaries are closed, so it redistributes and creates nothing. The
@@ -98,10 +104,11 @@ Entry points:
     Both the mass flux and the energy conductance call it, and the discrete
     `energy = L * mass` identity holds only while they share it
 - `icemodel.column.accumulate_redistribution_budget`
-  - records the energy-weighted storage that interior transport moves
-    between cells of different phase. That transport conserves mass, but
-    vapor leaving ice at `Ls` and entering liquid at `Lv` is not the same
-    energy, so the vapor closure identity subtracts this term
+  - records the per-phase storage increments interior transport causes,
+    and the shortfall its per-cell limits rejected. Cross-phase transport
+    conserves mass while moving solid and liquid storage in opposite
+    directions, so the per-phase storage closures consume these
+    increments; the surface vapor closure identity never carries them
 - `icemodel.column.accepted_vapor_quantities`
   - evaluates the saturation vapor density and the effective diffusivity at
     an accepted substep state, once, for the coupled path to reuse
@@ -138,12 +145,12 @@ Entry points:
 - `icemodel.column.liquid_flux`
 - `icemodel.column.vapor_mass_transfer`
   - solves the diffusive vapor flux and grows grains from it. Two calling
-    conventions: with nine arguments it evaluates its own saturation density
-    and diffusivity and uses a Dirichlet ghost node at `Ts` for the top face;
-    with the trailing `ro_vap`, `De`, and `d_vap_sfc` arguments it reuses the
-    accepted solve's node quantities and takes the top face from the
-    turbulent surface exchange instead. The second form adds no exponential
-    and no power to the substep path, and evaluates no ghost node
+    conventions: with nine arguments it evaluates its own saturation
+    density and diffusivity and uses a Dirichlet ghost node at `Ts` for
+    the top face; with the trailing `d_vap_faces` vector it grows grains
+    from the gross face exchange the accepted substeps applied, converted
+    to step-mean magnitude fluxes, and evaluates no saturation state and
+    no ghost node at all
 - `icemodel.column.merge_layer_indices`
 - `icemodel.column.merge_layers`
 - `icemodel.column.enforce_control_volume_balance`

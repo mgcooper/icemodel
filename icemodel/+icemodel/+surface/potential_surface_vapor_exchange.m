@@ -18,17 +18,14 @@ function d_vap_sfc = potential_surface_vapor_exchange( ...
    % passes through. A dry surface exchanges at Ls, so the fraction shrinks by
    % Lv / Ls.
    %
-   % Call this once per accepted substep, BEFORE the exchange is applied. The
-   % applier routes the demand on the pre-exchange state. A merge can also
-   % replace the top cell outright. Reading the phase afterwards would
-   % therefore classify the wrong cell.
+   % Call this with the pre-exchange state: the applier routes the demand
+   % on that state, so a later read would classify the wrong cell.
    %
-   % Accumulating the corrected fraction rather than the raw tendency is what
-   % keeps a multi-substep forcing step right. The correction is linear in
-   % d_pevp. Summing the corrected increments therefore equals one conversion
-   % of the total whenever the phase holds, and differs correctly when it does
-   % not. A step that refines through a melt or freeze transition is when the
-   % substepper takes several substeps and the phase changes within one.
+   % No production path calls this. The driver accumulates the realized
+   % exchange the applier returns, which already carries the phase the
+   % limits actually spent. This converter remains the single owner of the
+   % demand-to-mass correction for the planned unification that converts
+   % the surface demand upstream and routes it through one column applier.
    %
    % One latent heat per substep is still an approximation. A demand larger
    % than the mobile liquid spends the remainder on ice inside the same
