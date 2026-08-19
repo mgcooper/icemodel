@@ -35,6 +35,56 @@ function test_skinmodel_reduced_run_stays_bounded(testCase)
    testCase.verifyEqual(height(ice1_pp), workspace.nsteps / 4);
 end
 
+function test_skinmodel_forced_advance_restores_checkpoint(testCase)
+   % A forced SkinModel advance may consume time only. The final state and
+   % diagnosed conductive flux must therefore come from the last checkpoint.
+
+   workspace = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
+      configure=true, nsteps=1, dt_seconds=900);
+   cleanup = onCleanup(@() ...
+      icemodel.test.fixtures.cleanupSyntheticWorkspace(workspace));
+   state = icemodel.test.fixtures.makeSyntheticColumnState( ...
+      workspace, 'skinmodel', solver=1, testname='skin_forced_advance');
+   f_liq_checkpoint = 0.01 * ones(size(state.f_liq));
+   restart = struct('T', state.T, 'f_ice', state.f_ice, ...
+      'f_liq', f_liq_checkpoint, 'Ts', state.Ts, 'r_eff', state.r_eff);
+   restart_file = fullfile(workspace.rootdir, ...
+      'skin-forced-advance-restart.mat');
+   save(restart_file, 'restart');
+
+   opts = state.opts;
+   opts.output_profile = 'diagnostic';
+   opts.vars1 = {};
+   opts.vars2 = {};
+   opts.maxiter = 2;
+   opts.tol = 0;
+   opts.dt = 1;
+   opts.use_restart = true;
+   opts.restartfile = restart_file;
+
+   [ice1, ice2] = icemodel.test.helpers.runSmbModel(opts);
+
+   % Zero tolerance rejects the nonlinear solve. The one-second full step
+   % reaches the bounded fallback immediately and must not accept trial state.
+   testCase.verifyEqual(ice1.dt_sum, 1, 'AbsTol', 0);
+   testCase.verifyEqual(ice1.n_subfail, 1, 'AbsTol', 0);
+   testCase.verifyEqual(ice1.Tice_converged, 0, 'AbsTol', 0);
+   testCase.verifyEqual(ice1.Tsfc, state.Ts, 'AbsTol', 0);
+   testCase.verifyEqual(ice2.Tice, state.T, 'AbsTol', 0);
+   testCase.verifyEqual(ice2.f_ice, state.f_ice, 'AbsTol', 0);
+   testCase.verifyEqual(ice2.f_liq, f_liq_checkpoint, 'AbsTol', 0);
+
+   % Qc observes both restored temperature and restored conductivity, so it
+   % catches a stale rejected-solve k_eff even when the saved state is correct.
+   k_eff_checkpoint = icemodel.column.bulk_thermal_conductivity( ...
+      state.T, state.f_ice, f_liq_checkpoint, 0);
+   Qc_checkpoint = icemodel.surface.conductive_heat_flux( ...
+      k_eff_checkpoint, state.T, state.dz, state.Ts);
+   testCase.verifyEqual(ice1.Qc, Qc_checkpoint, 'AbsTol', 1e-12);
+
+   clear cleanup
+end
+
 function test_shared_model_case_path_returns_postprocessed_output(testCase)
    % The shared formal-case path should resolve, run, and postprocess one case.
 

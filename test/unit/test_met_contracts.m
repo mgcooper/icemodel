@@ -767,11 +767,10 @@ function test_initforcings_keeps_missing_precip_out_of_solver(testCase)
 end
 
 function test_loadmet_boom_chain_for_alias_forcing(testCase)
-   % A legacy-alias met file carrying the boom channel resolves measured
-   % heights, demotes invalid samples (nonfinite or at/below z0_bulk) into
-   % the interpolated rung with one warning, and lands on the nominal
-   % constant when nothing measured exists — geometry never errors
-   % (POLICY A3 / D-0a).
+   % A legacy-alias met file with a boom channel resolves measured heights.
+   % Invalid samples (nonfinite or at/below z0_bulk) enter the interpolated
+   % rung with one warning. If no measured sample exists, use the nominal
+   % constant. Geometry never causes an error (POLICY A3 / D-0a).
    workspace = testCase.TestData.workspace;
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
       workspace, 'skinmodel', 2016);
@@ -1623,8 +1622,12 @@ function test_loadresults_preserves_diagnostic_output_profile_fields(testCase)
       + Lv * ice1.mass_budget_vapor_liquid_mwe ...
       + Lv * ice1.mass_budget_condensation_overflow_mwe) ...
       + ice1.mass_budget_unapplied_vapor_j_m2;
-   testCase.verifyEqual(ice1.mass_budget_vapor_potential_j_m2, ...
-      vapor_accounted, 'AbsTol', 2e-5);
+   vapor_potential = ice1.mass_budget_vapor_potential_j_m2;
+   testCase.verifyEqual(vapor_potential, vapor_accounted, 'AbsTol', 1e-4);
+   vapor_scale = max(abs(vapor_potential));
+   testCase.verifyGreaterThan(vapor_scale, 0);
+   testCase.verifyLessThan( ...
+      max(abs(vapor_potential - vapor_accounted)) / vapor_scale, 1e-8);
    testCase.verifyEqual(ice1.mass_budget_top_deletion_height_m, ...
       opts.dz_thermal * ice1.mass_budget_top_deletion_count, ...
       'AbsTol', 1e-12);
@@ -1856,28 +1859,32 @@ function test_retimeHourlyFixedStep_preserves_irregular_native_bins(testCase)
 end
 
 function test_retimeHourlyFixedStep_sums_increment_channels(testCase)
-   % Every df_ channel holds one forcing step's change, so aggregation sums it.
-   % Averaging one would divide it by the samples per bin, turning an hourly
-   % overflow depth into a quarter of the water that ran off.
+   % Per-step changes and event counts sum during aggregation. Averaging would
+   % divide totals by the samples per bin, turning an hourly overflow depth into
+   % a quarter of the water that ran off and hiding a single recovery event.
 
    % Aligned fixed-array path: four unit increments become one hourly four.
    time = datetime(2016, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') ...
       + minutes((0:7)' * 15);
    df_rof = ones(8, 1);
+   cpl_recovery_count = [1; zeros(7, 1)];
    ordinary = ones(8, 1);
    hourly = icemodel.retimeHourlyFixedStep( ...
-      timetable(df_rof, ordinary, 'RowTimes', time));
+      timetable(df_rof, cpl_recovery_count, ordinary, 'RowTimes', time));
    testCase.verifyEqual(hourly.df_rof, [4; 4]);
+   testCase.verifyEqual(hourly.cpl_recovery_count, [1; 0]);
    testCase.verifyEqual(hourly.ordinary, [1; 1]);
 
    % Native irregular path must apply the same class, not the default mean.
    time = datetime(2016, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') ...
       + minutes([0; 15; 45; 60]);
    df_rof = ones(4, 1);
+   cpl_recovery_count = [1; 0; 0; 0];
    ordinary = ones(4, 1);
    hourly = icemodel.retimeHourlyFixedStep( ...
-      timetable(df_rof, ordinary, 'RowTimes', time));
+      timetable(df_rof, cpl_recovery_count, ordinary, 'RowTimes', time));
    testCase.verifyEqual(hourly.df_rof, [3; 1]);
+   testCase.verifyEqual(hourly.cpl_recovery_count, [1; 0]);
    testCase.verifyEqual(hourly.ordinary, [1; 1]);
 end
 

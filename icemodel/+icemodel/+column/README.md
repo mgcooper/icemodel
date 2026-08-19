@@ -31,10 +31,10 @@ Entry points:
 - `icemodel.column.bulk_thermal_conductivity`
 - `icemodel.column.firn_thermal_conductivity`
 - `icemodel.column.integrate_column_budget`
-  - integrates column solid mass, liquid mass, and optionally enthalpy from
-    `T`, `f_ice`, `f_liq`, and `dz`, on the solver's physical intrinsic-density
-    and physical-water MWE basis; `use_ro_glc` changes initialization fractions
-    only
+  - integrates column solid mass, liquid mass, and optional enthalpy from
+    `T`, `f_ice`, `f_liq`, and `dz`. It uses the solver's physical intrinsic
+    density and physical-water MWE basis. `use_ro_glc` changes only the
+    initialization fractions
 - `icemodel.namelists.budgetoutputs` (the ledger field list, in `+namelists`)
 - `icemodel.column.initialize_budget_state`
   - returns the zeroed fixed-schema ledger a forcing step starts from
@@ -42,8 +42,9 @@ Entry points:
 - `icemodel.column.accumulate_vapor_budget`
 - `icemodel.column.accumulate_remesh_budget`
 - `icemodel.column.initialize_remesh_ledger`
-  - returns the zeroed per-event remesh ledger. `merge_thin_layers` is its
-    only caller and returns the filled struct as its opt-in eighth output
+  - returns the zeroed ledger for one remesh pass. `merge_thin_layers` is its
+    only caller. That function returns the filled struct as its optional eighth
+    output
   - the three accumulators update ledger state rather than returning standalone
     event terms, which is why they are named `accumulate_*_budget`. They keep
     the diagnostic ledger out of the timestep driver; call them once per
@@ -53,104 +54,78 @@ Entry points:
     `d_rof` is reset once per forcing step and accumulated across substeps, so
     it already arrives as the step total
 - `icemodel.column.budget_surface_mass_balance`
-- `icemodel.column.apply_vapor_transport`
-  - applies interior vapor transport, which Fick's law fixes as a MASS, so
-    each cell receives exactly the mass that arrived. The same three limits
-    apply, and what a cell cannot take is recorded rather than assumed. The
-    two appliers are separate because they conserve different quantities:
-    routing transport through the energy path lets a limited cell apply a
-    different mass than arrived
+- `icemodel.column.apply_vapor_transfer`
+  - the one phase-state mutator for surface exchange and interior transport.
+    It applies signed, phase-resolved liquid-water-equivalent increments under
+    the shared liquid and ice storage limits. Phase selection and energy-to-mass
+    conversion happen upstream. Rejected increments return on their original
+    phase basis
+- `icemodel.column.vapor_shortfall_ice_equivalent`
+  - converts rejected liquid- and ice-phase LWE increments to the common
+    ice-fraction energy basis. The surface and redistribution ledgers use this
+    basis
 - `icemodel.column.vapor_exchange_is_wet`
-  - the one owner of the wet/dry decision for vapor mass exchange. Both
-    appliers ask it, so neither can land a cell in a band where two criteria
-    disagree. `couple_vapor_transport` does not ask it: that function moves
-    mass and makes no phase decision
-- `icemodel.column.vapor_face_quantities`
-  - the one face rule for vapor transport: an fn-weighted harmonic mean of
-    `De` with no porosity factor, and the secant `ro_vap` difference across
-    the face. The mass flux and the vapor energy flux are built from these
-    same face quantities, which is what makes `energy = L * mass` hold
-    discretely rather than approximately
-- `icemodel.column.vapor_face_conductance`
-  - the energy side of that same face rule, in two pieces. The matrix part
-    is the donor-tangent interface conductivity [W m-1 K-1], positive at
-    every face, which the enthalpy assembly adds to its face conductivity
-    in coupled mode; the deferred-correction flux [W m-2] joins the source
-    vector, so the converged face flux is exactly `L_face * U_vap` while
-    the assembled system keeps its diagonal dominance (Patankar 1980,
-    section 7.2). The donor phase comes from `vapor_exchange_is_wet`, the
-    mass applier's predicate. Both boundary faces are zero in both parts:
-    the bottom is closed, and the surface exchange enters through the
-    surface energy balance rather than as a diffusive flux
+  - the one owner of the residual-mobility wet/dry decision for vapor
+    exchange. Surface
+    demand partitioning, accepted-state interior transfer, and face latent heat
+    use this predicate
+- `icemodel.column.vapor_transport_faces`
+  - the one face construction for the enthalpy solve. It applies `fn`-weighted
+    harmonic interpolation to the vapor-free node conductivity and effective
+    vapor diffusivity. It returns `k_eff_faces`, `k_vap_faces`,
+    `q_vap_deferred_faces`, and `U_vap_faces`. Both vapor boundary faces are
+    closed. The matrix and deferred terms preserve
+    `Q_vap = L_face * U_vap_faces`. The solver returns the accepted mass flux
+    to the surface coupler and driver without a second calculation. This
+    vapor-specific constructor does not own liquid infiltration or `U_liq`
 - `icemodel.column.couple_vapor_step`
-  - the one entry point for the coupled interior vapor path. Called once per
-    accepted substep, after the surface budgets close, so interior
-    transport never lands in `d_liq` or in the surface vapor channels. It
-    evaluates the node quantities at the state the solve converged on,
-    moves vapor across the interior faces, applies the arriving mass,
-    threads the gross face accumulation `d_vap_faces` in and out for
-    grain growth, and records the per-phase redistribution increments and
-    their shortfall. The driver carries only the accumulator and the
-    pre-exchange ice and liquid snapshots (`f_ice_solve`, `f_liq_solve`);
-    every other vapor intermediate lives here
-- `icemodel.column.couple_vapor_transport`
-  - moves vapor between the cells by Fick's law, on a mass basis. Both its
-    boundaries are closed, so it redistributes and creates nothing. The
-    surface exchange is deliberately not part of it: the flux divergence is
-    linear in the faces, so closing the top face separates the two exactly
-    and each keeps the invariant it actually has
-- `icemodel.column.vapor_face_diffusivity`
-  - the fn-weighted harmonic mean of the node diffusivities at each face.
-    Both the mass flux and the energy conductance call it, and the discrete
-    `energy = L * mass` identity holds only while they share it
+  - the production entry point for interior vapor transfer. It runs once per
+    accepted substep after the surface budgets close. It converts the accepted
+    `U_vap_faces` to node increments and partitions them with the accepted-state
+    wet mask. It calls `apply_vapor_transfer`, accumulates gross face throughput
+    for grain growth, and records redistribution and shortfall terms. Interior
+    transport never enters `d_liq` or the surface vapor channels
 - `icemodel.column.accumulate_redistribution_budget`
-  - records the per-phase storage increments interior transport causes,
-    and the shortfall its per-cell limits rejected. Cross-phase transport
-    conserves mass while moving solid and liquid storage in opposite
-    directions, so the per-phase storage closures consume these
-    increments; the surface vapor closure identity never carries them
-- `icemodel.column.accepted_vapor_quantities`
-  - evaluates the saturation vapor density and the effective diffusivity at
-    an accepted substep state, once, for the coupled path to reuse
+  - records the per-phase storage increments from interior transport and the
+    shortfall rejected by per-cell limits. Cross-phase transport conserves
+    mass while moving solid and liquid storage in opposite directions. The
+    per-phase storage closures include these increments. The surface vapor
+    closure identity excludes them
 - `icemodel.column.max_liquid_fraction_change`
   - the one owner of the largest `f_liq` increase a control volume accepts,
     `ro_ice/ro_liq * (1 - f_ice) - f_liq`, which is `f_wat_max - f_wat` on the
     `water_fraction` basis. The pore volume `1 - f_ice` is scaled to water
-    equivalent as if it were ice, so the bound falls short of the pore volume
-    by `(1 - ro_ice/ro_liq) * (1 - f_ice)`. That shortfall is the room the
-    liquid needs to expand if it refreezes. Both vapor appliers,
-    `infiltration`, and `assert_max_water` use the same bound
+    equivalent as if it were ice. The bound is less than the pore volume by
+    `(1 - ro_ice/ro_liq) * (1 - f_ice)`. That difference gives liquid room to
+    expand if it refreezes. `apply_vapor_transfer`, `infiltration`, and
+    `assert_max_water` use the same bound
 - `icemodel.column.potential_sublimation`
-  - converts a potential vapor tendency from a liquid-water volume fraction
+  - converts a potential vapor demand from a liquid-water volume fraction
     to the ice volume fraction that carries the same latent-heat demand. The
-    surface applier, the `merge_thin_layers` look-ahead, and
-    `apply_vapor_transport`'s wet branches all call it, so a prediction
-    cannot use a different factor than the application
+    surface wrapper, the `merge_thin_layers` look-ahead, and the interior
+    shortfall ledger all call it, so every ice-fraction diagnostic
+    uses the same conversion
 - `icemodel.column.merge_thin_layers`
-  - three views of the same remeshing export, which nest rather than
-    duplicate. `df_lyr` (ice2, standard and diagnostic profiles) totals the
-    mass that all merges removed, as a water-equivalent fraction the caller
-    scales by `dz`.
+  - provides three nested views of one remeshing export. `df_lyr` (ice2,
+    standard and diagnostic profiles) totals the mass removed by all merges.
+    The caller scales this water-equivalent fraction by `dz`.
     `mass_budget_merge_export_solid/liquid_mwe` (diagnostic profile) is that
     same total split by phase, which the closure identities require.
     `mass_budget_top_export_solid/liquid_mwe` is the surface-removal subset,
     separated because interior merges move mass without lowering the grid.
   - none of the three is a surface-loss comparator. A merge gives the joined
-    cell the MEAN of the pair it replaces, so removing a nearly empty top cell
-    still exports about half the pair's mass. The export therefore over-counts
-    what the removed cell held. The PROMICE ablation evaluation scores melt and
-    the runoff diagnostics instead, and it neither scores nor plots merge
-    export. `icemodel-pla` tracks the conserving remap that would fix this.
+    cell the
+    MEAN of the pair that it replaces. Removing a nearly empty top cell still
+    exports about half the pair's mass. The export therefore exceeds the mass
+    in the removed cell. The PROMICE ablation evaluation scores melt and runoff
+    diagnostics. It does not score or plot merge export. `icemodel-pla` tracks
+    the conserving remap that would correct this behavior
 - `icemodel.column.infiltration`
 - `icemodel.column.liquid_flux`
-- `icemodel.column.vapor_mass_transfer`
-  - solves the diffusive vapor flux and grows grains from it. Two calling
-    conventions: with nine arguments it evaluates its own saturation
-    density and diffusivity and uses a Dirichlet ghost node at `Ts` for
-    the top face; with the trailing `d_vap_faces` vector it grows grains
-    from the gross face exchange the accepted substeps applied, converted
-    to step-mean magnitude fluxes, and evaluates no saturation state and
-    no ghost node at all
+- `icemodel.column.update_grain_radius`
+  - advances thermal grain radius once per forcing step from the gross
+    realized face throughput accumulated across accepted substeps and the
+    liquid fraction. It does not diagnose vapor transport or saturation
 - `icemodel.column.merge_layer_indices`
 - `icemodel.column.merge_layers`
 - `icemodel.column.enforce_control_volume_balance`

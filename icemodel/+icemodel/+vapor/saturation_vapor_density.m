@@ -34,7 +34,7 @@ function [ro_vap, dro_vapdT, d2ro_vapdT2] = saturation_vapor_density(T, f_liq)
    %
    % See also: icemodel.vapor.vapor_thermal_conductivity,
    %  icemodel.vapor.saturation_vapor_pressure,
-   %  icemodel.column.vapor_mass_transfer
+   %  icemodel.column.vapor_transport_faces
    %
    %#codegen
 

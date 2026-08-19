@@ -213,6 +213,14 @@ Programmatic regression helpers:
      Its cross-site figure is limited to completed selected site-years, while
      operational readiness and run accounting remain available as appendix
      prose and downloadable CSV files.
+   - On macOS 26.5.2 (Mac16,12) with MATLAB R2025b, this benchmark measured
+     elapsed time from artifact-folder creation through `results.mat`. One
+     site-year took about two minutes. Nine one-site runs gave a median of 96
+     seconds and a range of 71 to 107 seconds. The two-site run took 169 seconds.
+     Full-cohort runs took 3,050
+     seconds and 4,851 seconds, or 51 to 81 minutes, for 118 admitted rows.
+     Allow 90 minutes for a conservative full-cohort estimate; these are
+     operational estimates, not performance gates.
 
 ## Execution policy
 

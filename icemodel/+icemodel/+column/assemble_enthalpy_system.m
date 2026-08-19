@@ -1,6 +1,6 @@
 function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
-      T_ice, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, ~, k_eff, delz, ...
-      fn, dz, dt, T_sfc, Fc, Fp, bc, varargin)
+      T_ice, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, ~, ...
+      k_eff_faces, delz, dz, dt, T_sfc, Fc, Fp, bc, q_deferred_faces)
    %ASSEMBLE_ENTHALPY_SYSTEM Compute the general equation coefficients.
    %
    %  This function constructs the lower, middle, and upper diagonals of the
@@ -9,15 +9,11 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    %  The input signature keeps the suppressed linearization factor Sp for
    %  generality.
    %
-   %  The optional trailing arguments are the two vapor face terms from
-   %  icemodel.column.vapor_face_conductance. Supplying them selects the
-   %  coupled vapor mode, in which K_EFF arrives without its vapor term and
-   %  the vapor energy travels on the same face quantities as the vapor
-   %  mass: the always-positive matrix part joins the interface
-   %  conductivity, and the deferred-correction flux joins the source
-   %  vector b (Patankar 1980, section 7.2), so the converged face flux is
-   %  exact while the matrix keeps its diagonal dominance. Without them the
-   %  vapor term stays inside K_EFF, which is the default.
+   %  K_EFF_FACES is the combined interface conductivity from the caller.
+   %  Q_DEFERRED_FACES is the conservative vapor-energy correction evaluated
+   %  at the incoming Picard iterate [W m-2], positive downward. Its
+   %  in-minus-out convergence joins the source vector b. Keeping the face
+   %  flux here makes this function the one owner of the north/south indexing.
    %
    %  Note: ro_sno * cp_sno = (cv_ice * f_ice + cv_liq * f_liq)
    %  See updatestate (or icemodel.timestepping.updatesubstep) for how ro_sno
@@ -67,24 +63,6 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    % Phase-aware latent heat: Ls for dry/cold cells, Lv for wet cells.
    Lv = icemodel.vapor.latent_enthalpy_switch(f_liq, S);
 
-   % Compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
-   g_b_ns = 1 ./ ((1 - fn) ./ [k_eff(N); k_eff] + fn ./ [k_eff; k_eff(S)]);
-
-   % Coupled vapor mode replaces the vapor share of this interface
-   % conductivity. Harmonically averaging the total k_eff makes the vapor
-   % contribution inseparable from the rest, and no single conductance
-   % reproduces the vapor flux in every state, so the energy and the mass
-   % are not conjugate that way. The caller supplies k_eff without its
-   % vapor term plus the two face terms from
-   % icemodel.column.vapor_face_conductance. The matrix part added here is
-   % the donor-tangent conductivity, positive at every face; the deferred
-   % flux joins b below. Both conductivity terms are [W m-1 K-1]; the
-   % conductances aN and aS below are the per-area values formed by
-   % dividing by delz.
-   if nargin > 18
-      g_b_ns = g_b_ns + varargin{1};
-   end
-
    % Compute the air fraction
    f_air = 1.0 - f_ice - f_liq;
 
@@ -132,8 +110,8 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
 
    % Compute the aN and aS conductances [W m-2 K-1]. Note: delz(1) and delz(end)
    % are half control volumes.
-   aN = g_b_ns(N:S)     ./ delz(N:S);
-   aS = g_b_ns(N+1:S+1) ./ delz(N+1:S+1);
+   aN = k_eff_faces(N:S)     ./ delz(N:S);
+   aS = k_eff_faces(N+1:S+1) ./ delz(N+1:S+1);
 
    % Keep the upper left and right conductances
    a1 = aN(1); % Note: astar = a1 / (a1 - Fp);
@@ -158,19 +136,13 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    aS(S) = 0.0;                       % Neumann: dT/dz = 0.0
    bc_S = aS(S) * 0.0;                % Neumann: dT/dz = 0.0
 
-   % Compute the aP coefficient and solution vector b
-   aP = aN + aS + aP0; % -Sp.*dz;
-   b = aP0 .* T_ice + Sc .* dz - dH .* dz / dt; % [W m-2]
+   % Compute the cell-integrated deferred-flux convergence [W m-2].
+   dq_deferred = q_deferred_faces(N:S) - q_deferred_faces(N+1:S+1);
 
-   % Coupled vapor mode: add the deferred-correction vapor flux, in minus
-   % out with downward positive, evaluated at the incoming iterate. The
-   % matrix part above cannot carry a negative-secant (Bergeron-Findeisen)
-   % face or an isothermal wet/dry face; this term restores the exact flux
-   % there and everywhere else (Patankar 1980, section 7.2).
-   if nargin > 19
-      q_vap = varargin{2};
-      b = b + q_vap(N:S) - q_vap(N+1:S+1);
-   end
+   % Compute the aP coefficient and solution vector b directly from the
+   % finite-volume energy balance. Every term in b has units W m-2.
+   aP = aN + aS + aP0; % -Sp.*dz;
+   b = aP0 .* T_ice + dq_deferred + Sc .* dz - dH .* dz / dt;
 
    % Modify b to account for boundary conditions
    b(N) = b(N) + bc_N;
@@ -224,11 +196,12 @@ end
 
 % top node:
 % aN(1) = 0.0;                                        (outside and inside)
-% aP(1) = aP0(1) + g_b_ns(1) - Sp_1                   (outside)
-% aP(1) = (aP0(1) + g_b_ns(1) - Sp_1)*gvP + Lf*dz/dt  (inside)
-% aS(1) = -g_b_ns(1)*gvS                              (outside and inside)
+% aP(1) = aP0(1) + k_eff_faces(1) - Sp_1                   (outside)
+% aP(1) = (aP0(1) + k_eff_faces(1) - Sp_1)*gvP + Lf*dz/dt  (inside)
+% aS(1) = -k_eff_faces(1)*gvS                              (outside and inside)
 
-% note: for these, I am using aS(1) as in aS(1) = -g_b_ns(1) i.e. b4 *gvS
+% note: for these, I am using aS(1) as in
+% aS(1) = -k_eff_faces(1), i.e. b4 * gvS
 % b(1) = aP0(1)*T_old(1) + Sc(1)*dz + aS(1)*gkS - aP0(1)*gkP - aS(1)*gkP
 
 % Qnet are the past net heat fluxes which include the conductive flux into the

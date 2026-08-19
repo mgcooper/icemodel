@@ -1,31 +1,20 @@
-function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
+function [T, f_ice, f_liq, k_eff, ok, iter, a1, err, U_vap_faces] = ...
       solve_column_enthalpy(T_sfc, T, f_ice, f_liq, Fc, Fp, Sc, Sp, dz, ...
-      delz, fn, dt, solver, tol, maxiter, ~, ~, ~, debug, varargin)
+      delz, fn, dt, solver, tol, maxiter, ~, ~, ~, debug, f_res_por)
    %SOLVE_COLUMN_ENTHALPY Solve the column enthalpy balance.
    %
    % The signature keeps the alpha, use_aitken, and jumpmax inputs to match the
    % thermal-solver option list. Node-wise Aitken acceleration is off here.
    %
-   % A trailing true selects the coupled vapor mode. The bulk conductivity
-   % then leaves the vapor term out. The vapor energy travels on the two
-   % face terms from icemodel.column.vapor_face_conductance, built from the
-   % same face quantities as the vapor mass flux: a positive matrix part
-   % and a deferred-correction source flux. The second trailing argument is
-   % f_res_por, which the donor-phase predicate needs. Without them the
-   % vapor term stays inside k_eff on the node-tangent slope, which is the
-   % default.
+   % The node conductivity leaves the vapor term out.
+   % vapor_transport_faces builds the combined face conductivity,
+   % deferred energy flux, and conjugate mass flux. F_RES_POR supplies the
+   % donor-phase residual-liquid criterion.
+   %
+   % ERR remains the eighth output for compatibility. U_VAP_FACES is the
+   % accepted Picard iterate's face flux and is appended as the ninth output.
    %
    %#codegen
-
-   % The coupled vapor mode is opt-in and nothing sets it by default.
-   use_coupled_vapor = nargin > 19 && varargin{1};
-
-   % The residual pore fraction rides only with the coupled mode; the
-   % default path never reads it.
-   f_res_por = 0.0;
-   if nargin > 20
-      f_res_por = varargin{2};
-   end
 
    % Update the water fraction
    f_wat = icemodel.column.water_fraction(f_ice, f_liq);
@@ -33,8 +22,11 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
    % Update the melt-zone volumetric liquid fraction bounds at T=TL and T=TH.
    [f_liq_min, f_liq_max] = icemodel.column.meltzone_bounds(f_wat);
 
-   % Compute vapor density [kg m-3]
-   ro_vap = icemodel.vapor.saturation_vapor_density(T, f_liq);
+   % Evaluate checkpoint vapor properties once. The first Picard assembly
+   % reuses these values; later properties are refreshed only after a
+   % successful state update at the bottom of the loop.
+   [ro_vap, dro_vapdT] = icemodel.vapor.saturation_vapor_density(T, f_liq);
+   [~, De] = icemodel.vapor.vapor_thermal_conductivity(T, f_liq, dro_vapdT);
 
    % Compute enthalpy [J m-3]
    H_old = icemodel.column.bulk_enthalpy(T, f_ice, f_liq, f_wat, ro_vap);
@@ -50,51 +42,31 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
    % T_1 = nan(size(T));
    % T_2 = nan(size(T));
 
+   % Initialize optional diagnostics so a rejected first iterate still
+   % returns assigned outputs. Callers discard them when ok is false.
+   err = nan;
+   U_vap_faces = zeros(numel(T) + 1, 1);
+
    % Iterate to solve the nonlinear heat equation
    ok = false;
    for iter = 0:maxiter-1
 
-      % Update vapor density and derivative [kg m-3, kg m-3 K-1]
-      [ro_vap, dro_vapdT] = icemodel.vapor.saturation_vapor_density( ...
-         T, f_liq);
-
-      % Update vapor thermal conductivity [W m-1 K-1]
-      [k_vap, De] = icemodel.vapor.vapor_thermal_conductivity( ...
-         T, f_liq, dro_vapdT);
-
-      % Coupled mode moves the vapor term from the node conductivity to the
-      % faces. The energy the solve carries is then the mass flux times the
-      % donor cell's latent heat: the positive matrix part joins the
-      % interface conductivity and the deferred flux joins the source, so
-      % the converged face flux is exact.
-      if use_coupled_vapor
-         [k_vap_faces, q_vap_deferred] = ...
-            icemodel.column.vapor_face_conductance( ...
-            T, f_ice, f_liq, ro_vap, dro_vapdT, De, delz, fn, f_res_por);
-         k_vap = zeros(size(k_vap));
-      end
-
-      % Update bulk thermal conductivity
-      k_eff = icemodel.column.bulk_thermal_conductivity( ...
-         T, f_ice, f_liq, k_vap);
+      % Build vapor-free node conductivity and one conjugate face transport.
+      k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, 0);
+      [k_eff_faces, ~, q_deferred_faces, U_vap_faces] = ...
+         icemodel.column.vapor_transport_faces(T, f_ice, f_liq, k_eff, ...
+         ro_vap, dro_vapdT, De, delz, fn, f_res_por);
 
       % Update bulk enthalpy and derivative wrt temperature
       [H, dHdT, dFdT] = icemodel.column.bulk_enthalpy( ...
          T, f_ice, f_liq, f_wat, ro_vap, dro_vapdT);
 
-      % Update the general equation coefficients
-      if use_coupled_vapor
-         [aN, aP, aS, b, iM, a1, a2] = ...
-            icemodel.column.assemble_enthalpy_system( ...
-            T, f_ice, f_liq, dHdT, dFdT, dro_vapdT, H - H_old, Sc, Sp, ...
-            k_eff, delz, fn, dz, dt, T_sfc, Fc, Fp, solver, ...
-            k_vap_faces, q_vap_deferred);
-      else
-         [aN, aP, aS, b, iM, a1, a2] = ...
-            icemodel.column.assemble_enthalpy_system( ...
-            T, f_ice, f_liq, dHdT, dFdT, dro_vapdT, H - H_old, Sc, Sp, ...
-            k_eff, delz, fn, dz, dt, T_sfc, Fc, Fp, solver);
-      end
+      % Update the general equation coefficients from ready face terms.
+      [aN, aP, aS, b, iM, a1, a2] = ...
+         icemodel.column.assemble_enthalpy_system( ...
+         T, f_ice, f_liq, dHdT, dFdT, dro_vapdT, H - H_old, Sc, Sp, ...
+         k_eff_faces, delz, dz, dt, T_sfc, Fc, Fp, solver, ...
+         q_deferred_faces);
 
       % % Check diagonal dominance and condition number
       % icemodel.checkdiags(aP, aN, aS)
@@ -127,6 +99,11 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
 
       % Control volume check - max water cannot exceed ro_ice / ro_liq.
       assertF(@() icemodel.column.assert_max_water(f_ice, f_liq));
+
+      % Refresh vapor properties once for the next Picard sweep. If that
+      % sweep satisfies convergence, its face flux is already current.
+      [ro_vap, dro_vapdT] = icemodel.vapor.saturation_vapor_density(T, f_liq);
+      [~, De] = icemodel.vapor.vapor_thermal_conductivity(T, f_liq, dro_vapdT);
 
       % Relaxation and Aitken (not implemented). Proper implementation requires
       % a liquid_fraction_function/meltzone_transform-consistent update of
@@ -161,7 +138,7 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err] = ...
    if nargout > 7
       err = icemodel.column.subsurface_linearization_error( ...
          T, T_ice_old, f_ice, f_liq, f_liq_old, dro_vapdT, ...
-         dHdT, Sc, dz, dt, a2, Fc, Fp, a1);
+         dHdT, Sc, q_deferred_faces, dz, dt, a2, Fc, Fp, a1);
    end
 
    % Surface energy balance linearization error [K]. Currently disabled, retain

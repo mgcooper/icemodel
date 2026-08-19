@@ -1,7 +1,10 @@
-function saveRestartState(opts, simyear, T, f_ice, f_liq, Ts, r_eff)
+function saveRestartState(opts, simyear, T, f_ice, f_liq, Ts, r_eff, ...
+      use_conservative_cpl)
    %SAVERESTARTSTATE Save the year-boundary state needed for a restart.
    %
    %  icemodel.saveRestartState(opts, simyear, T, f_ice, f_liq, Ts, r_eff)
+   %  icemodel.saveRestartState(opts, simyear, T, f_ice, f_liq, Ts, r_eff, ...
+   %     use_conservative_cpl)
    %
    %  The restart contract preserves the prognostic column state — variables
    %  that evolve via the governing equations and cannot be reconstructed
@@ -12,6 +15,9 @@ function saveRestartState(opts, simyear, T, f_ice, f_liq, Ts, r_eff)
    %    f_liq  — volumetric liquid fraction [-]
    %    Ts     — surface temperature [K] (SEB boundary condition / prior)
    %    r_eff  — effective grain radius [m] (vapor mass transfer)
+   %
+   %  USE_CONSERVATIVE_CPL preserves the private solver-3 recovery latch. It
+   %  defaults to false for callers, such as skinmodel, that do not own it.
    %
    %  Surface running state (liqflag, ro_sfc, hv_atm, H_e, f_res_por) is
    %  NOT saved. Those quantities are derived at substep entry by
@@ -26,6 +32,10 @@ function saveRestartState(opts, simyear, T, f_ice, f_liq, Ts, r_eff)
    %     icemodel.column.initialize_column_state,
    %     icemodel.surface.update_surface_state
 
+   if nargin < 8
+      use_conservative_cpl = false;
+   end
+
    restart = struct();
    restart.simyear = simyear;
 
@@ -35,6 +45,7 @@ function saveRestartState(opts, simyear, T, f_ice, f_liq, Ts, r_eff)
    restart.f_liq = f_liq;
    restart.Ts = Ts;
    restart.r_eff = r_eff;
+   restart.use_conservative_cpl = use_conservative_cpl;
 
    % Metadata
    restart.casename = string(opts.casename);

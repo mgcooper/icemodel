@@ -30,7 +30,7 @@ function [Qe, Qh, diag] = turbulent_heat_flux(T_sfc, tair, wspd, psfc, ...
       es_sfc, ea_atm, H_e, stability);
 
    % Sensible heat flux at the surface. Keep as an optional second
-   % output for callers like potential_surface_vapor_tendency that
+   % output for callers like potential_surface_vapor_demand that
    % only require Qe.
    if nargout > 1
       Qh = ...

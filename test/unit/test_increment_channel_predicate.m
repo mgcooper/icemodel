@@ -1,5 +1,5 @@
 function tests = test_increment_channel_predicate
-   %TEST_INCREMENT_CHANNEL_PREDICATE Cover the shared df_ channel predicate.
+   %TEST_INCREMENT_CHANNEL_PREDICATE Cover the shared increment predicate.
    %
    % retimeHourlyFixedStep and postprocess both decide aggregation with this
    % predicate, and they pass different container types, so the return shape
@@ -8,11 +8,12 @@ function tests = test_increment_channel_predicate
 end
 
 function test_increment_channels_are_recognized(testCase)
-   % Any df_ channel is a per-step increment and must sum over a bin.
+   % Any df_ channel and the recovery count are per-step totals that must sum.
    returned = icemodel.isIncrementChannel('df_liq');
    testCase.verifyTrue(returned)
    testCase.verifyTrue(icemodel.isIncrementChannel('df_rof'))
    testCase.verifyTrue(icemodel.isIncrementChannel("df_evp"))
+   testCase.verifyTrue(icemodel.isIncrementChannel('cpl_recovery_count'))
 end
 
 function test_non_increment_channels_are_rejected(testCase)

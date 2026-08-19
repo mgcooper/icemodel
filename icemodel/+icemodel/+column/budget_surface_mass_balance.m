@@ -15,7 +15,8 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err, d_applied] = ...
    %   d_pevp     - Potential surface vapor-driven liquid-fraction change for
    %                the top cell [-], an energy demand the SEB fixed.
    %   d_liq      - Accumulated liquid-water fraction change over the step [-].
-   %   d_evp      - Accumulated vapor-driven fraction change over the step [-].
+   %   d_evp      - Accumulated top-node liquid-storage change from surface
+   %                vapor exchange over the forcing step [-].
    %   d_rof      - Accumulated condensation overflow over the step [-].
    %   f_res_por  - Residual liquid-water fraction per pore volume [-].
    %   f_ice_min  - Minimum retained surface ice fraction before remeshing [-].
@@ -31,14 +32,16 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err, d_applied] = ...
    %   f_ice      - Updated column ice fraction [-].
    %   f_liq      - Updated column liquid-water fraction [-].
    %   d_liq      - Updated cumulative liquid-water fraction change [-].
-   %   d_evp      - Updated cumulative vapor-driven fraction change [-].
+   %   d_evp      - Updated top-node liquid-storage change from surface vapor
+   %                exchange [-]. This is not the liquid share of the gross
+   %                interior face-throughput accumulator `d_vap`.
    %   d_rof      - Updated condensation overflow in liquid-water fraction [-].
    %   d_sbl_err  - Signed unapplied vapor-driven ice-fraction change per
    %                cell [-], the incoming record plus the surface term.
    %   d_applied  - The exchange the top cell realized [-], signed like
    %                d_pevp, as a liquid-water volume fraction, after every
-   %                limit. Grain growth consumes this rather than the
-   %                demand, because rejected demand never crossed the
+   %                limit. Surface-budget diagnostics consume realized
+   %                exchange because rejected demand never crossed the
    %                surface.
    %
    % Notes
@@ -60,8 +63,8 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err, d_applied] = ...
    % d_liq < 0 = freeze.
    % d_evp < 0 = evaporation.
 
-   % A caller from before the coupled path threads no record in. Start it at
-   % zero so the ten-argument convention still works.
+   % A caller using the ten-argument convention threads no record in. Start
+   % it at zero.
    if nargin < 11
       d_sbl_err = 0.0;
    end
@@ -69,22 +72,23 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err, d_applied] = ...
    % Compute delta f_liq.
    %
    % The only process that affects f_liq between d_liq assignments is phase
-   % change (icemodel.column.solve_column_enthalpy). That holds in coupled
-   % mode too: icemodel.column.couple_vapor_step runs after this function
-   % and after the vapor budget close, so interior transport never lands in
-   % d_liq and is never read as melt or refreezing.
+   % change (icemodel.column.solve_column_enthalpy).
+   % icemodel.column.couple_vapor_step runs after this function and after the
+   % vapor budget close, so interior transport never lands in d_liq and is
+   % never read as melt or refreezing.
    d_liq = d_liq + f_liq - xf_liq;
 
    % Reset past values for budgeting evap/condensation.
    xf_liq = f_liq;
 
-   % Apply the surface vapor exchange. It reaches the top cell, and
-   % d_sbl_err returns one entry per cell so the ledger integrates one shape
-   % whichever path filled it. Coupled interior transport does not come
-   % through here: it has its own pair,
-   % icemodel.column.couple_vapor_transport and
-   % icemodel.column.apply_vapor_transport, because it conserves
-   % mass where this conserves energy.
+   % Apply the surface vapor exchange to the top cell. d_sbl_err returns one
+   % entry per cell, so the ledger receives the same shape from every path.
+   %
+   % Interior transport does not enter this function.
+   % icemodel.column.couple_vapor_step converts the accepted solve flux and
+   % calls the same icemodel.column.apply_vapor_transfer state mutator. Its
+   % mass-conserving redistribution budget remains separate from this
+   % energy-conserving surface budget.
    [f_ice, f_liq, d_rof, d_sbl_err_sfc, d_applied] = ...
       icemodel.surface.apply_surface_vapor_exchange( ...
       f_ice, f_liq, d_rof, d_pevp, f_ice_min, f_res_por);
@@ -94,8 +98,8 @@ function [T, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err, d_applied] = ...
    %
    % Keep the caller's shape. The surface applier reaches the top cell alone,
    % so its record is the first entry and every other entry is zero. A caller
-   % that threaded a scalar in, which is the ten-argument convention and the
-   % default path, gets a scalar back holding that top-cell term. Adding the
+   % that threaded a scalar in, which is the ten-argument convention, gets a
+   % scalar back holding that top-cell term. Adding the
    % vector to a scalar would expand it and hand that caller a shape its
    % established form never returned.
    if isscalar(d_sbl_err)

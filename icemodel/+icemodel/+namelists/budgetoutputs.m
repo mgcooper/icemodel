@@ -18,7 +18,7 @@ function fields = budgetoutputs(kind)
    % mass_budget_unapplied_vapor_j_m2 is signed: positive is rejected
    % deposition energy and negative is unsatisfied sublimation demand.
    % mass_budget_vapor_redistribution_solid_mwe and _liquid_mwe are the
-   % per-phase storage changes that coupled interior vapor transport
+   % per-phase storage changes that production interior vapor transport
    % causes. That transport conserves mass, but it moves mass between
    % cells of different phase, so the solid and liquid totals move in
    % opposite directions while their sum holds. The transport runs after
@@ -30,7 +30,9 @@ function fields = budgetoutputs(kind)
    % per-cell limits rejected, on the same energy basis as the surface
    % unapplied channel. A bound clamp breaks the transport's own mass
    % closure, and this channel is the record that keeps that visible.
-   % All six stay zero unless use_coupled_vapor is set.
+   % Cross-phase transfer populates the phase channels, and a bound clamp
+   % populates the shortfall channel. Unconstrained same-phase redistribution
+   % can have nonzero face flux while all six channels remain zero.
    % mass_budget_interior_merge_count counts every non-top removal, including
    % a deepest-cell removal; only top removals contribute grid translation.
    % mass_budget_top_export_solid_mwe and mass_budget_top_export_liquid_mwe are

@@ -1,51 +1,62 @@
 function tests = test_coupled_vapor_transport
-   %TEST_COUPLED_VAPOR_TRANSPORT Verify the opt-in coupled vapor mass path.
+   %TEST_COUPLED_VAPOR_TRANSPORT Verify production vapor mass transport.
    %
-   % The coupled mode has two steps, and they conserve different things.
+   % Production vapor exchange has two steps with different invariants.
    %
-   % icemodel.column.couple_vapor_transport moves vapor between cells by
-   % Fick's law, which fixes the MASS. Both its boundaries are closed, so it
-   % redistributes and creates nothing.
-   % icemodel.column.apply_vapor_transport puts that mass into each
-   % cell's phase, applying exactly the mass the cell received.
+   % The accepted face flux moves vapor between cells by Fick's law, which
+   % fixes the MASS. Because both transport boundary faces are closed,
+   % transport redistributes mass and creates none.
+   % icemodel.column.apply_vapor_transfer removes mass from the donor cell and
+   % deposits the same phase in the receiver cell.
    %
-   % The surface exchange is the other step and stays on its own path,
-   % because the surface energy balance fixes the ENERGY and lets the mass
-   % follow. Mixing the two is what loses mass: a cell told to spend an
-   % energy demand can spend part of it at one latent heat and the rest at
-   % another, and the mass it applies is then not the mass that arrived.
+   % Surface exchange remains separate from interior transport. The surface
+   % energy balance fixes the ENERGY and lets the mass follow. Combining
+   % surface exchange with interior transport loses mass.
+   % A cell can spend part of an energy demand at one latent heat and the rest
+   % at another. The applied mass then differs from the mass that arrived.
    %
-   % See also: icemodel.column.couple_vapor_transport,
-   %  icemodel.column.apply_vapor_transport
+   % See also: icemodel.column.vapor_transport_faces,
+   %  icemodel.column.apply_vapor_transfer
    tests = functiontests(localfunctions);
 end
 
 function test_isothermal_column_redistributes_nothing(testCase)
    % No interior vapor gradient means no interior flux. The surface exchange
    % is not part of this step, so an isothermal column moves nothing at all.
-   % This is what lets the coupled mode reproduce the surface-only result:
-   % the surface path is left to act alone, exactly as it does today.
 
-   [dz, delz, fn, T, f_liq] = coupledFixture(8);
-   [ro_vap, De] = icemodel.column.accepted_vapor_quantities(T, f_liq);
-
-   [d_vap, dm_vap] = icemodel.column.couple_vapor_transport( ...
-      ro_vap, De, dz, delz, fn, 900);
+   [dz, delz, fn, T, f_liq, f_ice, f_res_por] = coupledFixture(8);
+   [d_vap, dm_vap] = acceptedTransport( ...
+      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
 
    testCase.verifyEqual(d_vap, zeros(8, 1), 'AbsTol', 1e-30);
    testCase.verifyEqual(dm_vap, zeros(8, 1), 'AbsTol', 1e-30);
+end
+
+function test_phase_shortfall_conversion_preserves_energy(testCase)
+   % Liquid- and ice-phase LWE shortfalls must use the same ledger basis.
+
+   [Ls, Lv, ro_ice, ro_liq] = ...
+      icemodel.physicalConstant('Ls', 'Lv', 'ro_ice', 'ro_liq');
+   d_vap_liq_unapplied = [-2e-4; 3e-4];
+   d_vap_ice_unapplied = [5e-4; -7e-4];
+
+   returned = icemodel.column.vapor_shortfall_ice_equivalent( ...
+      d_vap_liq_unapplied, d_vap_ice_unapplied);
+   expected_energy = ro_liq * (Lv * d_vap_liq_unapplied ...
+      + Ls * d_vap_ice_unapplied);
+
+   testCase.verifyEqual(ro_ice * Ls * returned, expected_energy, ...
+      'RelTol', 1e-14);
 end
 
 function test_redistribution_conserves_column_mass(testCase)
    % Both boundaries are closed, so the transport moves mass between cells
    % and creates none. The column total must come back to zero.
 
-   [dz, delz, fn, ~, f_liq] = coupledFixture(8);
+   [dz, delz, fn, ~, f_liq, f_ice, f_res_por] = coupledFixture(8);
    T = gradientColumn(8);
-   [ro_vap, De] = icemodel.column.accepted_vapor_quantities(T, f_liq);
-
-   [d_vap, dm_vap] = icemodel.column.couple_vapor_transport( ...
-      ro_vap, De, dz, delz, fn, 900);
+   [d_vap, dm_vap] = acceptedTransport( ...
+      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
 
    % The cells must actually exchange, or the sums below are trivially zero.
    % Compare the net against the size of the exchange: the net is a
@@ -64,10 +75,8 @@ function test_applied_mass_equals_redistributed_mass_when_dry(testCase)
 
    [dz, delz, fn, ~, f_liq, f_ice, f_res_por] = coupledFixture(8);
    T = gradientColumn(8);
-   [ro_vap, De] = icemodel.column.accepted_vapor_quantities(T, f_liq);
-
-   d_vap = icemodel.column.couple_vapor_transport( ...
-      ro_vap, De, dz, delz, fn, 900);
+   d_vap = acceptedTransport( ...
+      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
    [f_ice_new, f_liq_new, d_sbl_err] = ...
       applyTransport(f_ice, f_liq, d_vap, 0.1, f_res_por);
 
@@ -84,10 +93,8 @@ function test_applied_mass_equals_redistributed_mass_when_mixed(testCase)
    [dz, delz, fn, ~, ~, f_ice, f_res_por] = coupledFixture(8);
    T = gradientColumn(8);
    f_liq = [0; 0; 0.05; 0.05; 0; 0; 0.05; 0];
-   [ro_vap, De] = icemodel.column.accepted_vapor_quantities(T, f_liq);
-
-   d_vap = icemodel.column.couple_vapor_transport( ...
-      ro_vap, De, dz, delz, fn, 900);
+   d_vap = acceptedTransport( ...
+      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
    [f_ice_new, f_liq_new, d_sbl_err] = ...
       applyTransport(f_ice, f_liq, d_vap, 0.1, f_res_por);
 
@@ -128,9 +135,8 @@ function test_a_thin_liquid_film_records_what_it_cannot_give(testCase)
    testCase.assertTrue(icemodel.column.vapor_exchange_is_wet( ...
       f_ice(2), f_liq(2), f_res_por));
 
-   [ro_vap, De] = icemodel.column.accepted_vapor_quantities(T, f_liq);
-   d_vap = icemodel.column.couple_vapor_transport( ...
-      ro_vap, De, dz, delz, fn, 900);
+   d_vap = acceptedTransport( ...
+      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
    testCase.assertLessThan(d_vap(2), 0);
 
    [f_ice_new, f_liq_new, d_sbl_err] = ...
@@ -211,17 +217,16 @@ function test_a_bound_interior_clamp_keeps_its_own_accounting(testCase)
 
    % The shortfall the applier records, reproduced from the primitives so
    % the orchestrated ledger has an independent expectation to meet.
-   [ro_vap, De] = icemodel.column.accepted_vapor_quantities(T, f_liq);
-   d_vap = icemodel.column.couple_vapor_transport( ...
-      ro_vap, De, dz, delz, fn, 900);
-   [f_ice_new, f_liq_new, d_sbl_err] = ...
-      applyTransport(f_ice, f_liq, d_vap, 0.1, f_res_por);
+   [~, ~, U_vap_faces] = acceptedTransport( ...
+      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
+   [f_ice_new, f_liq_new, d_sbl_err] = applyDonorTransport( ...
+      f_ice, f_liq, f_ice, f_liq, U_vap_faces, 900, dz, 0.1, f_res_por);
    testCase.assertLessThan(d_sbl_err(2), 0);
 
    ledger = icemodel.column.initialize_budget_state();
    [~, ~, ~, ~, ~, ledger_new] = icemodel.column.couple_vapor_step( ...
-      T, f_ice, f_liq, f_ice, f_liq, zeros(6, 1), 0.0, 0.0, dz, delz, ...
-      fn, 900, 0.1, f_res_por, ledger, true);
+      T, f_ice, f_liq, f_ice, f_liq, U_vap_faces, zeros(6, 1), ...
+      0.0, 0.0, dz, 900, 0.1, f_res_por, ledger, true);
 
    % The redistribution channels are the realized per-phase storage moves,
    % to roundoff.
@@ -263,20 +268,20 @@ function test_the_orchestrator_matches_its_parts(testCase)
 
    % The orchestrated path.
    d_vap_faces_in = zeros(7, 1);
+   [~, ~, U_vap_faces] = acceptedTransport( ...
+      T, f_ice, f_liq, dz, delz, fn, f_res_por, dt);
    [f_ice_a, f_liq_a, d_vap_faces_a, ~, ~, ledger_a] = ...
       icemodel.column.couple_vapor_step( ...
-      T, f_ice, f_liq, f_ice, f_liq, d_vap_faces_in, 0.0, 0.0, dz, ...
-      delz, fn, dt, f_ice_min, f_res_por, ledger, true);
+      T, f_ice, f_liq, f_ice, f_liq, U_vap_faces, d_vap_faces_in, ...
+      0.0, 0.0, dz, dt, f_ice_min, f_res_por, ledger, true);
 
    % The same primitives, called directly in the driver's order.
    ro_liq = icemodel.physicalConstant('ro_liq');
-   [ro_vap, De] = icemodel.column.accepted_vapor_quantities(T, f_liq);
-   [d_vap, ~, U_vap_faces] = icemodel.column.couple_vapor_transport( ...
-      ro_vap, De, dz, delz, fn, dt);
    [solid_r, liquid_r] = icemodel.column.integrate_column_budget( ...
       T, f_ice, f_liq, dz);
-   [f_ice_b, f_liq_b, d_sbl_err_b] = ...
-      applyTransport(f_ice, f_liq, d_vap, f_ice_min, f_res_por);
+   [f_ice_b, f_liq_b, d_sbl_err_b] = applyDonorTransport( ...
+      f_ice, f_liq, f_ice, f_liq, U_vap_faces, dt, dz, f_ice_min, ...
+      f_res_por);
    ledger_b = icemodel.column.accumulate_redistribution_budget( ...
       ledger, solid_r, liquid_r, T, f_ice_b, f_liq_b, dz, d_sbl_err_b);
 
@@ -313,15 +318,17 @@ function test_the_orchestrator_skips_the_ledger_when_it_is_off(testCase)
    f_ice_min = 0.1;
    ledger = icemodel.column.initialize_budget_state();
    d_vap_faces_in = zeros(7, 1);
+   [~, ~, U_vap_faces] = acceptedTransport( ...
+      T, f_ice, f_liq, dz, delz, fn, f_res_por, dt);
 
    [f_ice_on, f_liq_on, faces_on, ~, ~, ledger_on] = ...
       icemodel.column.couple_vapor_step( ...
-      T, f_ice, f_liq, f_ice, f_liq, d_vap_faces_in, 0.0, 0.0, dz, ...
-      delz, fn, dt, f_ice_min, f_res_por, ledger, true);
+      T, f_ice, f_liq, f_ice, f_liq, U_vap_faces, d_vap_faces_in, ...
+      0.0, 0.0, dz, dt, f_ice_min, f_res_por, ledger, true);
    [f_ice_off, f_liq_off, faces_off, ~, ~, ledger_off] = ...
       icemodel.column.couple_vapor_step( ...
-      T, f_ice, f_liq, f_ice, f_liq, d_vap_faces_in, 0.0, 0.0, dz, ...
-      delz, fn, dt, f_ice_min, f_res_por, ledger, false);
+      T, f_ice, f_liq, f_ice, f_liq, U_vap_faces, d_vap_faces_in, ...
+      0.0, 0.0, dz, dt, f_ice_min, f_res_por, ledger, false);
 
    % The physics does not depend on whether the ledger is being built.
    testCase.verifyEqual(f_ice_off, f_ice_on, 'AbsTol', 0);
@@ -351,18 +358,20 @@ function test_the_orchestrator_accumulates_into_the_incoming_record(testCase)
    f_liq = zeros(5, 1);
    f_liq(2) = f_res(2) + 1e-9;
    ledger = icemodel.column.initialize_budget_state();
+   [~, ~, U_vap_faces] = acceptedTransport( ...
+      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
 
    [~, ~, from_zero] = icemodel.column.couple_vapor_step( ...
-      T, f_ice, f_liq, f_ice, f_liq, zeros(6, 1), 0.0, 0.0, dz, delz, ...
-      fn, 900, 0.1, f_res_por, ledger, true);
+      T, f_ice, f_liq, f_ice, f_liq, U_vap_faces, zeros(6, 1), ...
+      0.0, 0.0, dz, 900, 0.1, f_res_por, ledger, true);
    testCase.assertTrue(any(from_zero ~= 0));
    testCase.verifyTrue(all(from_zero >= 0));
 
    % The same call with a record already in it must return the sum.
    prior = [1e-7; 0; 2e-7; 0; 0; 3e-8];
    [~, ~, from_prior] = icemodel.column.couple_vapor_step( ...
-      T, f_ice, f_liq, f_ice, f_liq, prior, 0.0, 0.0, dz, delz, ...
-      fn, 900, 0.1, f_res_por, ledger, true);
+      T, f_ice, f_liq, f_ice, f_liq, U_vap_faces, prior, 0.0, 0.0, ...
+      dz, 900, 0.1, f_res_por, ledger, true);
 
    testCase.verifyEqual(from_prior, prior + from_zero, 'AbsTol', 0);
 end
@@ -390,9 +399,11 @@ function test_transport_stays_out_of_the_surface_vapor_channels(testCase)
       T, f_ice, f_liq, f_liq, 0.0, 0.0, 0.0, 0.0, f_res_por, 0.1);
    ledger = icemodel.column.accumulate_vapor_budget(ledger, ...
       solid_p, liquid_p, T2, f_ice2, f_liq2, dz, 0.0, d_rof, d_sbl_err);
+   [~, ~, U_vap_faces] = acceptedTransport( ...
+      T2, f_ice2, f_liq2, dz, delz, fn, f_res_por, 900);
    [f_ice3, ~, ~, ~, ~, ledger] = icemodel.column.couple_vapor_step( ...
-      T2, f_ice2, f_liq2, f_ice2, f_liq2, zeros(7, 1), 0.0, 0.0, dz, ...
-      delz, fn, 900, 0.1, f_res_por, ledger, true);
+      T2, f_ice2, f_liq2, f_ice2, f_liq2, U_vap_faces, zeros(7, 1), ...
+      0.0, 0.0, dz, 900, 0.1, f_res_por, ledger, true);
 
    % The transport moved mass, and none of it reached the surface channels.
    testCase.assertTrue(any(f_ice3 ~= f_ice2));
@@ -439,9 +450,10 @@ function test_the_realized_surface_exchange_excludes_rejected_demand(testCase)
    % liquid-equivalent basis, not the demand.
    expected = -(f_ice(1) - f_ice_min) * ro_ice / ro_liq;
    testCase.verifyEqual(d_applied, expected, 'RelTol', 1e-12);
-   testCase.verifyLessThan(abs(d_applied), ...
-      abs(icemodel.surface.potential_surface_vapor_exchange( ...
-      d_pevp, f_ice(1), f_liq(1), f_res_por)));
+   [d_vap_liq, d_vap_ice] = ...
+      icemodel.surface.potential_surface_vapor_exchange( ...
+      d_pevp, f_ice(1), f_liq(1), f_res_por);
+   testCase.verifyLessThan(abs(d_applied), abs(d_vap_liq + d_vap_ice));
 end
 
 function test_routing_reads_the_solve_state_not_the_current_state(testCase)
@@ -463,9 +475,12 @@ function test_routing_reads_the_solve_state_not_the_current_state(testCase)
       f_ice, f_liq_solve, f_res_por);
    testCase.assertTrue(wet(2));
 
-   [f_ice_solve_route, ~, err_solve_route] = ...
-      icemodel.column.apply_vapor_transport( ...
-      f_ice, f_liq, d_vap, 0.1, wet, f_res);
+   [f_ice_solve_route, ~, liq_unapplied, ice_unapplied] = ...
+      icemodel.column.apply_vapor_transfer( ...
+      f_ice, f_liq, d_vap .* wet, d_vap .* ~wet, 0.1, f_res);
+   [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
+   err_solve_route = icemodel.column.potential_sublimation(liq_unapplied) ...
+      + ice_unapplied * ro_liq / ro_ice;
 
    % Wet routing with no current liquid: the ice is untouched and the
    % demand is recorded on the wet-branch basis.
@@ -490,17 +505,50 @@ function test_routing_reads_the_solve_state_not_the_current_state(testCase)
    f_liq_cur = zeros(6, 1);
    f_liq_solve = 0.05 * ones(6, 1);
    ledger = icemodel.column.initialize_budget_state();
+   [~, ~, U_vap_wet] = acceptedTransport( ...
+      T, f_ice_col, f_liq_solve, dz, delz, fn, f_res_por_c, 900);
+   [~, ~, U_vap_dry] = acceptedTransport( ...
+      T, f_ice_col, f_liq_cur, dz, delz, fn, f_res_por_c, 900);
 
    [f_ice_wet, f_liq_wet] = icemodel.column.couple_vapor_step( ...
-      T, f_ice_col, f_liq_cur, f_ice_col, f_liq_solve, zeros(7, 1), ...
-      0.0, 0.0, dz, delz, fn, 900, 0.1, f_res_por_c, ledger, true);
+      T, f_ice_col, f_liq_cur, f_ice_col, f_liq_solve, U_vap_wet, ...
+      zeros(7, 1), 0.0, 0.0, dz, 900, 0.1, f_res_por_c, ledger, ...
+      true);
    testCase.verifyEqual(f_ice_wet, f_ice_col, 'AbsTol', 0);
    testCase.verifyGreaterThan(max(abs(f_liq_wet - f_liq_cur)), 0);
 
    [f_ice_dry] = icemodel.column.couple_vapor_step( ...
-      T, f_ice_col, f_liq_cur, f_ice_col, f_liq_cur, zeros(7, 1), ...
-      0.0, 0.0, dz, delz, fn, 900, 0.1, f_res_por_c, ledger, true);
+      T, f_ice_col, f_liq_cur, f_ice_col, f_liq_cur, U_vap_dry, ...
+      zeros(7, 1), 0.0, 0.0, dz, 900, 0.1, f_res_por_c, ledger, ...
+      true);
    testCase.verifyNotEqual(f_ice_dry, f_ice_col);
+end
+
+function test_cross_phase_faces_preserve_the_donor_phase(testCase)
+   % A dry donor sends vapor into a wet receiver. Both the removal and the
+   % deposition must use the dry donor phase because the face-energy
+   % calculation uses `Ls`.
+
+   [~, ~, ~, ~, ~, f_ice, f_res_por] = coupledFixture(2);
+   dz = [0.03; 0.05];
+   T = gradientColumn(2);
+   f_liq = [0; 0.05];
+   U_vap_faces = [0; 1e-5; 0];
+   dt = 100;
+   ledger = icemodel.column.initialize_budget_state();
+
+   [f_ice_new, f_liq_new] = icemodel.column.couple_vapor_step( ...
+      T, f_ice, f_liq, f_ice, f_liq, U_vap_faces, zeros(3, 1), ...
+      0.0, 0.0, dz, dt, 0.1, f_res_por, ledger, false);
+
+   ro_ice = icemodel.physicalConstant('ro_ice');
+   expected_ice_change = 1e-5 * dt / dz(1) / ro_ice;
+   expected_receiver_change = 1e-5 * dt / dz(2) / ro_ice;
+   testCase.verifyEqual(f_ice(1) - f_ice_new(1), expected_ice_change, ...
+      'RelTol', 1e-10);
+   testCase.verifyEqual(f_ice_new(2) - f_ice(2), expected_receiver_change, ...
+      'RelTol', 1e-10);
+   testCase.verifyEqual(f_liq_new, f_liq, 'AbsTol', 0);
 end
 
 function test_the_context_gains_exactly_the_transport_increments(testCase)
@@ -513,13 +561,16 @@ function test_the_context_gains_exactly_the_transport_increments(testCase)
    T = gradientColumn(6);
    f_liq = [0; 0; 0.05; 0.05; 0; 0];
    ledger = icemodel.column.initialize_budget_state();
+   [~, ~, U_vap_faces] = acceptedTransport( ...
+      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
 
    context_in_solid = 1.25e-4;
    context_in_liquid = -3.5e-5;
    [~, ~, ~, vs_out, vl_out, ledger_out] = ...
       icemodel.column.couple_vapor_step( ...
-      T, f_ice, f_liq, f_ice, f_liq, zeros(7, 1), context_in_solid, ...
-      context_in_liquid, dz, delz, fn, 900, 0.1, f_res_por, ledger, true);
+      T, f_ice, f_liq, f_ice, f_liq, U_vap_faces, zeros(7, 1), ...
+      context_in_solid, context_in_liquid, dz, 900, 0.1, f_res_por, ...
+      ledger, true);
 
    testCase.assertNotEqual( ...
       ledger_out.mass_budget_vapor_redistribution_solid_mwe, 0);
@@ -649,9 +700,8 @@ function verifyBandConserves(testCase, f_ice, f_liq, f_res_por, T, dz, ...
    testCase.verifyEqual(icemodel.column.vapor_exchange_is_wet( ...
       f_ice(2), f_liq(2), f_res_por), expect_wet);
 
-   [ro_vap, De] = icemodel.column.accepted_vapor_quantities(T, f_liq);
-   d_vap = icemodel.column.couple_vapor_transport( ...
-      ro_vap, De, dz, delz, fn, 900);
+   d_vap = acceptedTransport( ...
+      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
    [f_ice_new, f_liq_new, d_sbl_err] = ...
       applyTransport(f_ice, f_liq, d_vap, 0.1, f_res_por);
 
@@ -681,9 +731,9 @@ function test_wet_condensation_caps_at_the_pore_capacity(testCase)
    % than the pore space takes must apply the capacity and record the rest,
    % or the column gains water the pores cannot hold.
    %
-   % The applier is called directly here. Driving this branch through
-   % couple_vapor_transport would need a temperature field tuned to deliver a
-   % specific mass, which tests the fixture rather than the branch.
+   % Call the applier directly. Testing this branch through the accepted face
+   % flux needs a temperature field tuned to deliver a specific mass. That
+   % setup tests the fixture rather than the branch.
 
    f_ice = 0.99;
    f_liq = 0.005;
@@ -732,6 +782,43 @@ function test_dry_deposition_caps_at_the_air_space(testCase)
    % A dry cell records the ice fraction of the mass it could not take, which
    % is the leftover air space it had no room for.
    testCase.verifyEqual(d_sbl_err, f_air, 'RelTol', 1e-12);
+end
+
+function test_dry_deposition_reserves_residual_liquid_expansion(testCase)
+   % Residual liquid prevents a dry cell from using all air space for vapor
+   % deposition. Reserve capacity for retained liquid to expand during
+   % refreezing so the next phase projection does not delete deposited mass.
+
+   [ro_ice, ro_liq, Tf] = ...
+      icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
+   f_ice = 0.6;
+   f_liq = 0.05;
+   f_res_por = 0.2;
+   [wet, f_res] = icemodel.column.vapor_exchange_is_wet( ...
+      f_ice, f_liq, f_res_por);
+   testCase.assertFalse(wet);
+
+   capacity_lwe = icemodel.column.max_liquid_fraction_change(f_ice, f_liq);
+   raw_air_lwe = (1.0 - f_ice - f_liq) * ro_ice / ro_liq;
+   testCase.assertGreaterThan(raw_air_lwe, capacity_lwe);
+   demand_lwe = 2 * raw_air_lwe;
+
+   [f_ice_new, f_liq_new, ~, d_ice_unapplied] = ...
+      icemodel.column.apply_vapor_transfer( ...
+      f_ice, f_liq, 0.0, demand_lwe, 0.1, f_res);
+   testCase.verifyEqual(f_liq_new, f_liq, 'AbsTol', 0);
+   testCase.verifyEqual(d_ice_unapplied, demand_lwe - capacity_lwe, ...
+      'RelTol', 1e-14);
+
+   f_wat = icemodel.column.water_fraction(f_ice_new, f_liq_new);
+   testCase.verifyEqual(f_wat, ro_ice / ro_liq, 'AbsTol', 2 * eps);
+   testCase.verifyTrue(icemodel.column.assert_max_water(f_ice_new, f_liq_new));
+   [~, f_ice_projected, f_liq_projected] = ...
+      icemodel.column.liquid_fraction_function( ...
+      Tf - 5, f_ice_new, f_liq_new);
+   testCase.verifyEqual( ...
+      icemodel.column.water_fraction(f_ice_projected, f_liq_projected), ...
+      f_wat, 'AbsTol', 2 * eps);
 end
 
 function test_dry_sublimation_floors_at_the_retained_ice(testCase)
@@ -801,16 +888,39 @@ function [f_ice, f_liq, d_sbl_err] = applyTransport( ...
       f_ice, f_liq, d_vap, f_ice_min, f_res_por)
    %APPLYTRANSPORT Apply transport with the predicate at the applied state.
    %
-   % The production applier takes the phase decision as an input, so its
-   % caller controls the evaluation state. These fixtures apply no surface
-   % exchange between the decision and the application, so the applied
-   % state is the decision state, which is what the coupled step supplies
-   % in production.
+   % These fixtures apply no surface exchange between the phase decision and
+   % the mutation, so the applied state is also the decision state.
 
    [wet, f_res] = icemodel.column.vapor_exchange_is_wet( ...
       f_ice, f_liq, f_res_por);
-   [f_ice, f_liq, d_sbl_err] = icemodel.column.apply_vapor_transport( ...
-      f_ice, f_liq, d_vap, f_ice_min, wet, f_res);
+   [f_ice, f_liq, liq_unapplied, ice_unapplied] = ...
+      icemodel.column.apply_vapor_transfer(f_ice, f_liq, ...
+      d_vap .* wet, d_vap .* ~wet, f_ice_min, f_res);
+
+   [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
+   d_sbl_err = icemodel.column.potential_sublimation(liq_unapplied) ...
+      + ice_unapplied * ro_liq / ro_ice;
+end
+
+function [d_vap_nodes, dm_vap_nodes, U_vap_faces] = acceptedTransport( ...
+      T, f_ice, f_liq, dz, delz, fn, f_res_por, dt)
+   %ACCEPTEDTRANSPORT Compute the accepted face flux used by transport fixtures.
+
+   ro_liq = icemodel.physicalConstant('ro_liq');
+   [ro_vap, dro_vapdT] = ...
+      icemodel.vapor.saturation_vapor_density(T, f_liq);
+   [~, De] = icemodel.vapor.vapor_thermal_conductivity( ...
+      T, f_liq, dro_vapdT);
+   k_eff = icemodel.column.bulk_thermal_conductivity( ...
+      T, f_ice, f_liq, zeros(size(T)));
+   [~, ~, ~, U_vap_faces] = ...
+      icemodel.column.vapor_transport_faces( ...
+      T, f_ice, f_liq, k_eff, ro_vap, dro_vapdT, De, delz, fn, ...
+      f_res_por);
+
+   dm_vap_nodes = ...
+      (U_vap_faces(1:end-1) - U_vap_faces(2:end)) ./ dz;
+   d_vap_nodes = dm_vap_nodes * dt / ro_liq;
 end
 
 function T = gradientColumn(JJ)
@@ -818,6 +928,37 @@ function T = gradientColumn(JJ)
 
    Tf = icemodel.physicalConstant('Tf');
    T = (Tf - 8) + linspace(0, 6, JJ)';
+end
+
+function [f_ice, f_liq, d_sbl_err] = applyDonorTransport( ...
+      f_ice, f_liq, f_ice_solve, f_liq_solve, U_vap_faces, dt, ...
+      dz, f_ice_min, f_res_por)
+   %APPLYDONORTRANSPORT Reproduce face donor routing for an independent check.
+
+   ro_liq = icemodel.physicalConstant('ro_liq');
+   JJ = numel(f_ice);
+   [wet, f_res] = icemodel.column.vapor_exchange_is_wet( ...
+      f_ice_solve, f_liq_solve, f_res_por);
+   d_vap_face = U_vap_faces(2:JJ) * dt / ro_liq;
+   donor_is_north = d_vap_face >= 0;
+   donor_wet = wet(1:JJ-1);
+   wet_south = wet(2:JJ);
+   donor_wet(~donor_is_north) = wet_south(~donor_is_north);
+   d_liq = zeros(JJ, 1);
+   d_ice = zeros(JJ, 1);
+   d_liq(1:JJ-1) = d_liq(1:JJ-1) ...
+      - d_vap_face ./ dz(1:JJ-1) .* donor_wet;
+   d_liq(2:JJ) = d_liq(2:JJ) ...
+      + d_vap_face ./ dz(2:JJ) .* donor_wet;
+   d_ice(1:JJ-1) = d_ice(1:JJ-1) ...
+      - d_vap_face ./ dz(1:JJ-1) .* ~donor_wet;
+   d_ice(2:JJ) = d_ice(2:JJ) ...
+      + d_vap_face ./ dz(2:JJ) .* ~donor_wet;
+   [f_ice, f_liq, d_liq_unapplied, d_ice_unapplied] = ...
+      icemodel.column.apply_vapor_transfer( ...
+      f_ice, f_liq, d_liq, d_ice, f_ice_min, f_res);
+   d_sbl_err = icemodel.column.vapor_shortfall_ice_equivalent( ...
+      d_liq_unapplied, d_ice_unapplied);
 end
 
 function [dz, delz, fn, T, f_liq, f_ice, f_res_por] = coupledFixture(JJ)

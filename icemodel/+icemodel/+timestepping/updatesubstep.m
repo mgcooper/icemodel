@@ -1,16 +1,16 @@
-function [Ts, T, f_ice, f_liq, dt_sum, dt_new] = updatesubstep( ...
-      Ts, T, f_ice, f_liq, dt_FULL_STEP, dt_sum, dt_new, TINY)
+function [Ts, T, f_ice, f_liq, k_eff, dt_sum, dt_new] = updatesubstep( ...
+      Ts, T, f_ice, f_liq, k_eff, dt_FULL_STEP, dt_sum, dt_new, TINY)
    %UPDATESUBSTEP Checkpoint the accepted state and advance time within the
    % full step.
    %
-   %  [Ts, T, f_ice, f_liq, dt_sum, dt_new] = ...
+   %  [Ts, T, f_ice, f_liq, k_eff, dt_sum, dt_new] = ...
    %     icemodel.timestepping.updatesubstep( ...
-   %     Ts, T, f_ice, f_liq, dt_FULL_STEP, dt_sum, dt_new, TINY)
+   %     Ts, T, f_ice, f_liq, k_eff, dt_FULL_STEP, dt_sum, dt_new, TINY)
    %
    % This function performs the timestepping bookkeeping after a
    % successful substep:
-   %   1. Checkpoints the accepted column state (Ts, T, f_ice, f_liq)
-   %      as the initial condition for the next substep.
+   %   1. Checkpoints the accepted column state and conductivity
+   %      (Ts, T, f_ice, f_liq, k_eff) for the next substep.
    %   2. Accumulates the substep duration into dt_sum.
    %   3. Adjusts dt_new to exactly complete the full step without
    %      overshooting.

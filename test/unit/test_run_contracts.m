@@ -40,6 +40,10 @@ function test_resetopts_updates_output_years_and_coupler_defaults(testCase)
    workspace = testCase.TestData.workspace;
    opts = icemodel.test.helpers.buildSyntheticOpts( ...
       workspace, 'icemodel', [2015 2016 2017], solver=3);
+   testCase.verifyEqual(opts.cpl_alpha, 1.0);
+   testCase.verifyTrue(opts.cpl_aitken);
+   testCase.verifyEqual( ...
+      icemodel.parameterLookup('cpl_recovery_alpha'), 0.2);
 
    opts = icemodel.resetopts(opts, 'n_spinup_years', 1, 'solver', 2);
    testCase.verifyEqual(opts.output_years, [2016 2017]);
@@ -47,6 +51,11 @@ function test_resetopts_updates_output_years_and_coupler_defaults(testCase)
 
    opts = icemodel.resetopts(opts, 'solver', 3);
    testCase.verifyEqual(opts.cpl_maxiter, 100);
+
+   opts = icemodel.resetopts(opts, 'cpl_alpha', 0.7, 'cpl_aitken', true);
+   opts = icemodel.configureRun(opts);
+   testCase.verifyEqual(opts.cpl_alpha, 0.7);
+   testCase.verifyTrue(opts.cpl_aitken);
 end
 
 function test_userdatafname_is_explicit_and_dependency_safe(testCase)
@@ -86,6 +95,7 @@ function test_diagnostic_output_profile_extends_surface_contract(testCase)
       'thf_es_sfc', 'thf_stability_factor', 'thf_z0m', 'thf_z0h', ...
       'thf_z0q', 'thf_u_star', 'thf_L', 'thf_Re', 'thf_numiter', ...
       'thf_scalar_exchange_Qh', 'thf_scalar_exchange_Qe'}, ...
+      icemodel.namelists.surfaceoutputs('icemodel_diagnostic_suffix'), ...
       icemodel.namelists.budgetoutputs()];
 
    % Freeze the standard and minimal field lists. Every icemodel profile
@@ -102,7 +112,7 @@ function test_diagnostic_output_profile_extends_surface_contract(testCase)
    testCase.verifyEqual(opts_minimal.vars2, ...
       {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp'});
 
-   % IceModel diagnostic output appends the budget channels only.
+   % IceModel diagnostic output appends its recovery and budget channels.
    testCase.verifyEqual(opts_standard.output_profile, 'standard');
    testCase.verifyEqual(opts_minimal.output_profile, 'minimal');
    testCase.verifyEqual(opts_diag.output_profile, 'diagnostic');

@@ -24,8 +24,8 @@ function d_liq_max = max_liquid_fraction_change(f_ice, f_liq)
    % d_liq_max is an upper bound. The model carries no bubble fraction, so
    % f_ice and f_liq are the only phase state a cell can compute this from.
    %
-   % One function owns this limit, so the surface exchange and the interior
-   % transport cannot cap condensation differently.
+   % One function owns this limit, so liquid condensation and ice deposition
+   % cannot disagree with the column's maximum-water invariant.
    %
    % Inputs
    %   f_ice    - Ice fraction [-], scalar or array.
@@ -36,7 +36,7 @@ function d_liq_max = max_liquid_fraction_change(f_ice, f_liq)
    %               a cell is already over f_wat_max; callers floor or clamp.
    %
    % See also: icemodel.surface.apply_surface_vapor_exchange,
-   %  icemodel.column.apply_vapor_transport,
+   %  icemodel.column.apply_vapor_transfer,
    %  icemodel.column.infiltration,
    %  icemodel.column.assert_max_water
    %

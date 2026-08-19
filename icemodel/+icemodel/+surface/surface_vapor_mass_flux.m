@@ -3,11 +3,9 @@ function U_top = surface_vapor_mass_flux(d_vap_sfc, dz_top, dt)
    %
    %  U_top = icemodel.surface.surface_vapor_mass_flux(d_vap_sfc, dz_top, dt)
    %
-   % D_VAP_SFC is the liquid-water volume fraction of the mass the surface
-   % exchange moved, from
-   % icemodel.surface.potential_surface_vapor_exchange. The phase correction
-   % already happened there, so this is a unit conversion and
-   % carries no latent heat:
+   % D_VAP_SFC is the realized liquid-water-equivalent volume fraction of the
+   % mass moved through the surface. Demand partitioning and state limits
+   % happen upstream, so this is a unit conversion and carries no latent heat:
    %
    %   U_top = d_vap_sfc * ro_liq * dz_top / dt   [kg m-2 s-1]
    %
@@ -27,7 +25,7 @@ function U_top = surface_vapor_mass_flux(d_vap_sfc, dz_top, dt)
    %   U_top     - Vapor mass flux at the surface face [kg m-2 s-1].
    %
    % See also: icemodel.surface.potential_surface_vapor_exchange,
-   %  icemodel.column.vapor_mass_transfer
+   %  icemodel.surface.apply_surface_vapor_exchange
    %
    %#codegen
 

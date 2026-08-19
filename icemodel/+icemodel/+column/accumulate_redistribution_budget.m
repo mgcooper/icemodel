@@ -6,9 +6,10 @@ function ledger = accumulate_redistribution_budget( ...
    %     ledger, solid_r, liquid_r, T, f_ice, f_liq, dz, d_sbl_err_cpl)
    %
    % Call this once per accepted substep, right after
-   % icemodel.column.apply_vapor_transport moves vapor between
-   % cells. SOLID_R and LIQUID_R are the storage totals from just before that
-   % step. D_SBL_ERR_CPL is the applier's per-cell shortfall record.
+   % icemodel.column.apply_vapor_transfer realizes the node-wise transport in
+   % the cells. SOLID_R and LIQUID_R are the storage totals from just before that
+   % step. D_SBL_ERR_CPL is the phase-resolved shortfall converted to an
+   % equivalent ice-fraction energy record.
    %
    % Interior transport conserves mass: it moves vapor between cells and
    % creates none. It does not conserve the per-phase storage totals. A
@@ -24,14 +25,17 @@ function ledger = accumulate_redistribution_budget( ...
    %   vapor_potential = ro_liq * (Ls * vapor_solid + Lv * vapor_liquid
    %                     + Lv * condensation_overflow) + unapplied_vapor
    %
-   % The per-phase storage closures do consume the increments this
-   % records: the solid storage delta closes against phase, surface vapor,
-   % remesh, and redistribution solid terms together, and likewise for
-   % liquid. The shortfall channel records what the per-cell limits
-   % rejected. A clamp that binds breaks the transport's own mass closure,
-   % because the donor side applied while the receiver could not, so that
-   % record keeps it visible. All six channels stay zero unless the
-   % coupled vapor mode is on.
+   % The per-phase storage closures use the increments recorded here. The
+   % solid storage delta closes against the phase, surface-vapor, remesh, and
+   % redistribution-solid terms. The liquid storage delta closes against the
+   % corresponding liquid terms.
+   %
+   % The shortfall channel records increments rejected by per-cell limits. A
+   % binding clamp breaks transport mass closure: the donor applies its
+   % increment while the receiver cannot. The shortfall keeps this mismatch
+   % visible. Cross-phase transfer populates the phase channels. A bound clamp
+   % populates the shortfall channel. Unconstrained same-phase redistribution
+   % can have nonzero face flux while all six channels remain zero.
    %
    % Inputs
    %   ledger            - Forcing-step ledger.
@@ -41,14 +45,14 @@ function ledger = accumulate_redistribution_budget( ...
    %   dz                - Control-volume thickness [m].
    %   d_sbl_err_cpl     - Per-cell unapplied transport [-] (JJ x 1), in
    %                       ice-fraction units from
-   %                       icemodel.column.apply_vapor_transport.
+   %                       icemodel.column.couple_vapor_step.
    %
    % Output
    %   ledger            - Ledger with the per-phase redistribution
    %                       increments and the interior shortfall
    %                       accumulated.
    %
-   % See also: icemodel.column.apply_vapor_transport,
+   % See also: icemodel.column.apply_vapor_transfer,
    %  icemodel.column.accumulate_vapor_budget
    %
    %#codegen

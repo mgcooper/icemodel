@@ -3,7 +3,7 @@
 Purpose: public surface-energy, surface-state, and surface mass-diagnostic
 contracts.
 
-Public entrypoints:
+Public entry points:
 - `diagnose_turbulent_heat_fluxes`
 - `diagnose_surface_energy_balance`
 - `solve_surface_energy_balance`
@@ -14,29 +14,25 @@ Public entrypoints:
 - `physical_surface_temperature`
 - `diagnose_surface_ablation`
 - `diagnose_surface_runoff`
+- `potential_surface_vapor_demand`
+  - diagnoses turbulent latent heat at the physical surface temperature and
+    converts it to the liquid-water-equivalent energy demand `d_pevp`
 - `potential_surface_vapor_exchange`
-  - phase-corrects one surface vapor demand. `d_pevp` is an energy demand
-    on a fixed `Lv` basis, and the same energy sublimates less mass than
-    it evaporates, so this rescales it to the liquid-water volume fraction
-    of the mass the demand would move. It owns the wet/dry read through
-    `icemodel.column.vapor_exchange_is_wet`. No production path calls it:
-    the driver accumulates the applier's realized exchange instead, and
-    this converter stands ready for the planned upstream-conversion
-    unification of the two appliers
+  - partitions one `d_pevp` demand into signed liquid- and ice-phase
+    liquid-water-equivalent increments before storage limits. Wet evaporation
+    exhausts mobile liquid before converting the remaining energy demand to
+    ice at `Lv/Ls`. Wet condensation targets liquid, and dry exchange targets
+    ice. The partition closes the mixed-latent energy identity exactly
 - `surface_vapor_mass_flux`
   - converts a liquid-water volume fraction to the surface face flux
     [kg m-2 s-1]. It carries no latent heat: any phase correction happens
     upstream. Keeping conversion and correction apart is what lets callers
     hold fractions and never handle a mass
 - `apply_surface_vapor_exchange`
-  - applies the surface vapor exchange to the top cell under three limits:
-    condensation capped by pore capacity, deposition capped by available air
-    space, and sublimation floored at `f_ice_min`. The surface energy balance
-    fixes that exchange as an ENERGY, so this may spend part of one demand on
-    liquid and the rest on ice. Condensation the top cell cannot hold leaves
-    as runoff. Its interior counterpart is
-    `icemodel.column.apply_vapor_transport`, which applies a MASS instead,
-    because Fick's law fixes the mass and lets the energy follow
+  - owns surface boundary policy. It partitions the energy demand, invokes
+    `icemodel.column.apply_vapor_transfer` for the shared state limits, routes
+    rejected positive liquid condensation to runoff, and translates realized
+    and unapplied increments to the surface budget terms
 - `empirical_incoming_longwave_radiation`
 - `outgoing_longwave_radiation`
 - `net_longwave_radiation`

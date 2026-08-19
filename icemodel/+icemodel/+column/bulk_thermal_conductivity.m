@@ -21,7 +21,15 @@ function [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, varargin)
    %           icemodel.vapor.vapor_thermal_conductivity(T, f_liq)
    %     nargin=4: k_vap provided externally (including explicit 0)
    %
+   %  The ordinary three-state-input form remains vapor-inclusive. Use it for
+   %  postprocessing, state updates, and output diagnostics that require the
+   %  complete node-wise diagnostic conductivity. solve_column_enthalpy uses
+   %  the four-input form with explicit zero vapor node conductivity, then
+   %  adds conjugate vapor transport at the faces through
+   %  vapor_transport_faces.
+   %
    % See also: icemodel.column.firn_thermal_conductivity,
+   %  icemodel.column.vapor_transport_faces,
    %  icemodel.vapor.vapor_thermal_conductivity,
    %  icemodel.vapor.saturation_vapor_density, icemodel.vapor.vapor_diffusivity
    %

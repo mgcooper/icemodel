@@ -7,6 +7,13 @@ function opts = configureRun(opts)
    % are empty, while preserving caller-supplied values for fields such as
    % PATHINPUT, PATHOUTPUT, CASENAME, METFNAME, VARS1, and VARS2.
    %
+   % Debug routing
+   %   When OPTS.DEBUG is true, OPTS.DEBUG_PATH is the sole top-level debug
+   %   root override. CONFIGURERUN replaces every ICEMODEL_DEBUG_*_FILE
+   %   environment variable with its canonical filename below that root.
+   %   Per-kernel environment overrides are supported only for direct-kernel
+   %   diagnostics that bypass CONFIGURERUN.
+   %
    % Time-window configuration
    %   The run window can be specified by SIMYEARS (year-granularity) or by
    %   STARTDATE / ENDDATE (datetime window) or by both if compatible. This
@@ -227,9 +234,12 @@ function [vars1, vars2] = defaultOutputVariables(opts)
             vars2 = {'Tice', 'f_ice', 'f_liq'};
          else
             % Mass-budget channels are opt-in diagnostic scalars. Appending
-            % them preserves every existing output position and keeps the
-            % standard/minimal contracts unchanged.
+            % them and the model-specific recovery count preserves every
+            % existing output position and keeps the standard/minimal
+            % contracts unchanged.
             vars1 = [vars1, {'df_rof'}, diagnostic_suffix, ...
+               icemodel.namelists.surfaceoutputs( ...
+               'icemodel_diagnostic_suffix'), ...
                icemodel.namelists.budgetoutputs()];
             vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp', 'df_lyr', ...
                'Sc', 'r_eff'};
@@ -248,9 +258,12 @@ function opts = configureDebugPaths(opts)
    % the standard output path structure. A user-supplied opts.debug_path
    % overrides the entire root.
    %
-   % The per-kernel ICEMODEL_DEBUG_*_FILE environment variables are set so
-   % the existing dump functions (dumpIceEnbalFailure, dumpMZTransformFailure,
-   % etc.) activate without manual env-var configuration.
+   % The resolved options contract owns top-level debug routing. Replace the
+   % per-kernel ICEMODEL_DEBUG_*_FILE environment variables with canonical
+   % filenames under debug_root so the existing dump functions
+   % (dumpIceEnbalFailure, dumpMZTransformFailure, etc.) activate without
+   % manual env-var configuration. A direct-kernel diagnostic that bypasses
+   % configureRun may still set its kernel variable explicitly.
 
    if isfield(opts, 'debug_path') && ~isempty(opts.debug_path) ...
          && ~isblanktext(string(opts.debug_path))

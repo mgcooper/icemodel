@@ -1,9 +1,10 @@
 function tf = isIncrementChannel(names)
    %ISINCREMENTCHANNEL True for per-step increment channels.
    %
-   % A channel is an increment channel when its name starts with df_. Such a
-   % channel holds one forcing step's change, so retiming sums it over a bin;
-   % averaging an increment would divide it by the samples per bin.
+   % A channel is an increment channel when its name starts with df_. The
+   % per-forcing-step coupling recovery count is also additive. Retiming sums
+   % these channels over a bin; averaging would divide their totals by the
+   % samples per bin.
    %
    % Accepts a char row, a string, or an array of either, and returns a
    % logical of the same shape so both scalar and vectorized callers can use
@@ -18,5 +19,7 @@ function tf = isIncrementChannel(names)
    %
    %#codegen
 
-   tf = startsWith(names, 'df_');
+   recovery_count_field = icemodel.namelists.surfaceoutputs( ...
+      'icemodel_diagnostic_suffix');
+   tf = startsWith(names, 'df_') | strcmp(names, recovery_count_field{1});
 end

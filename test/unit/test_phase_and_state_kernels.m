@@ -65,7 +65,7 @@ function test_volbal_drains_excess_and_respects_total_volume(testCase)
 end
 
 function test_pevap_preserves_sign_and_scaling(testCase)
-   % potential_surface_vapor_tendency should keep the latent-mass increment
+   % potential_surface_vapor_demand should keep the latent-mass increment
    % proportional to the underlying evaporative power input.
 
    Qe = 50;
@@ -73,7 +73,7 @@ function test_pevap_preserves_sign_and_scaling(testCase)
    dz = 0.04;
 
    [d_pevp, pevp] = ...
-      icemodel.kernels.potential_surface_vapor_tendency(Qe, dt, dz);
+      icemodel.kernels.potential_surface_vapor_demand(Qe, dt, dz);
 
    testCase.verifyGreaterThan(d_pevp, 0);
    testCase.verifyEqual(d_pevp, pevp * dt / dz, 'RelTol', 1e-12);
@@ -85,7 +85,6 @@ function test_mztransform_updates_melt_zone_consistently(testCase)
    % fractions.
 
    [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
-   [TL, TH] = icemodel.parameterLookup('TL', 'TH');
    fcp = icemodel.parameterLookup('fcp');
 
    T_old = Tf - 0.5;
@@ -112,7 +111,7 @@ function test_mztransform_allows_melt_zone_exit_to_frozen_branch(testCase)
    % long as the predictor overshoots the melt-zone boundary only slightly.
 
    [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
-   [TL, TH] = icemodel.parameterLookup('TL', 'TH');
+   [TL, ~] = icemodel.parameterLookup('TL', 'TH');
    fcp = icemodel.parameterLookup('fcp');
 
    T_old = TL + 0.01;
@@ -138,7 +137,7 @@ function test_mztransform_rejects_large_freeze_out_overshoot(testCase)
    % A large overshoot of the lower melt-zone boundary should be rejected so
    % the timestep can be shortened before trusting the transformed predictor.
 
-   [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
+   [~, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
    [TL, ~] = icemodel.parameterLookup('TL', 'TH');
    fcp = icemodel.parameterLookup('fcp');
 
@@ -198,17 +197,156 @@ function test_gecoefs_applies_robin_top_boundary_adjustment(testCase)
    Ts = 269;
    Fc = 10;
    Fp = -5;
+   k_eff_faces = 1.0 ./ ((1.0 - fn) ./ [k_eff(1); k_eff] ...
+      + fn ./ [k_eff; k_eff(end)]);
+   q_deferred_faces = zeros(JJ + 1, 1);
    [~, aP_dir, ~, b_dir, ~, a1] = icemodel.column.assemble_enthalpy_system( ...
-      T, f_ice, f_liq, dHdT, dLdT, drovdT, dH, Sc, zeros(JJ, 1), k_eff, ...
-      delz, fn, dz, dt, Ts, Fc, Fp, 1);
+      T, f_ice, f_liq, dHdT, dLdT, drovdT, dH, Sc, zeros(JJ, 1), ...
+      k_eff_faces, delz, dz, dt, Ts, Fc, Fp, 1, q_deferred_faces);
    [~, aP_rob, ~, b_rob] = icemodel.column.assemble_enthalpy_system( ...
-      T, f_ice, f_liq, dHdT, dLdT, drovdT, dH, Sc, zeros(JJ, 1), k_eff, ...
-      delz, fn, dz, dt, Ts, Fc, Fp, 2);
+      T, f_ice, f_liq, dHdT, dLdT, drovdT, dH, Sc, zeros(JJ, 1), ...
+      k_eff_faces, delz, dz, dt, Ts, Fc, Fp, 2, q_deferred_faces);
 
    testCase.verifyEqual(aP_rob(1) - aP_dir(1), ...
       -a1 - Fp * a1 / (a1 - Fp), ...
       'RelTol', 1e-12);
    testCase.verifyNotEqual(b_rob(1), b_dir(1));
+end
+
+function test_assemble_enthalpy_system_adds_deferred_flux_convergence(testCase)
+   % The deferred face flux must enter each cell as in minus out.
+
+   JJ = 3;
+   T = [268; 267; 266];
+   f_ice = 0.8 * ones(JJ, 1);
+   f_liq = zeros(JJ, 1);
+   dHdT = 1.8e6 * ones(JJ, 1);
+   dFdT = zeros(JJ, 1);
+   drovdT = 1e-6 * ones(JJ, 1);
+   dH = zeros(JJ, 1);
+   Sc = zeros(JJ, 1);
+   Sp = zeros(JJ, 1);
+   k_eff_faces = 2.0 * ones(JJ + 1, 1);
+   delz = [0.02; 0.04; 0.04; 0.02];
+   dz = 0.04 * ones(JJ, 1);
+   q_zero = zeros(JJ + 1, 1);
+   q_deferred_faces = [0; 3; -2; 0];
+
+   [~, ~, ~, b_zero] = icemodel.column.assemble_enthalpy_system( ...
+      T, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, Sp, ...
+      k_eff_faces, delz, dz, 900, 269, 0, 0, 1, q_zero);
+   [~, ~, ~, b_flux] = icemodel.column.assemble_enthalpy_system( ...
+      T, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, Sp, ...
+      k_eff_faces, delz, dz, 900, 269, 0, 0, 1, q_deferred_faces);
+
+   expected = q_deferred_faces(1:JJ) - q_deferred_faces(2:JJ+1);
+   testCase.verifyEqual(b_flux - b_zero, expected, 'AbsTol', 10 * eps);
+end
+
+function test_subsurface_error_matches_zero_flux_and_adds_top_convergence(testCase)
+   % Zero deferred flux must reproduce the matrix-and-source formula.
+   % Nonzero flux adds the assembler's top-face convergence.
+
+   [Lf, ro_liq] = icemodel.physicalConstant('Lf', 'ro_liq');
+   T = [268.2; 267.8; 267.0];
+   T_old = [268.0; 267.7; 267.0];
+   f_ice = 0.8 * ones(3, 1);
+   f_liq = zeros(3, 1);
+   f_liq_old = zeros(3, 1);
+   drovdT = 1e-6 * ones(3, 1);
+   dHdT = 1.8e6 * ones(3, 1);
+   Sc = [2; 0; 0];
+   dz = 0.04 * ones(3, 1);
+   dt = 900;
+   a2 = 25;
+   Fc = 10;
+   Fp = -5;
+   a1 = 40;
+   q_zero = zeros(4, 1);
+
+   returned_zero = icemodel.column.subsurface_linearization_error( ...
+      T, T_old, f_ice, f_liq, f_liq_old, drovdT, dHdT, Sc, q_zero, ...
+      dz, dt, a2, Fc, Fp, a1);
+
+   % Assemble the zero-deferred-flux reference independently.
+   L_top = icemodel.vapor.latent_enthalpy_switch(f_liq(1));
+   denominator = dHdT(1) ...
+      + L_top * drovdT(1) * (1.0 - f_ice(1) - f_liq(1));
+   zero_flux_reference = (dt / dz(1) ...
+      * (a2 * (T(2) - T(1)) ...
+      + Fc + Fp * (Fc + a1 * T(1)) / (a1 - Fp) ...
+      + Sc(1) * dz(1)) ...
+      - ro_liq * Lf * (f_liq(1) - f_liq_old(1))) / denominator ...
+      - (T(1) - T_old(1));
+   testCase.verifyEqual( ...
+      returned_zero, zero_flux_reference, 'RelTol', 1e-14);
+
+   % Build the nonzero case through the production assembler. The state is
+   % below the melt zone, so the assembled unknown is T and the top-row
+   % residual can be evaluated directly from aN, aP, aS, and b.
+   q_deferred_faces = [4; -3; 0; 0];
+   dFdT = zeros(3, 1);
+   dH = denominator * (T - T_old) ...
+      + ro_liq * Lf * (f_liq - f_liq_old);
+   k_eff_faces = [0.9; 0.8; 0.7; 0.6];
+   delz = [0.02; 0.04; 0.04; 0.02];
+   T_sfc = 269;
+   bc = 2;
+   [aN, aP, aS, b, ~, a1_assembled, a2_assembled] = ...
+      icemodel.column.assemble_enthalpy_system( ...
+      T, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, zeros(3, 1), ...
+      k_eff_faces, delz, dz, dt, T_sfc, Fc, Fp, bc, ...
+      q_deferred_faces);
+   returned_flux = icemodel.column.subsurface_linearization_error( ...
+      T, T_old, f_ice, f_liq, f_liq_old, drovdT, dHdT, Sc, ...
+      q_deferred_faces, dz, dt, a2_assembled, Fc, Fp, a1_assembled);
+   top_row_residual = b(1) + aN(1) * T_sfc + aS(1) * T(2) ...
+      - aP(1) * T(1);
+   assembled_reference = top_row_residual * dt / dz(1) / denominator;
+   testCase.verifyEqual(returned_flux, assembled_reference, ...
+      'RelTol', 1e-13);
+end
+
+function test_subsurface_error_supports_one_closed_cell(testCase)
+   % A one-cell column has no interior south flux, but its two boundary-face
+   % deferred terms must still enter as in-minus-out convergence.
+
+   [Lf, ro_liq] = icemodel.physicalConstant('Lf', 'ro_liq');
+   T = 268.2;
+   T_old = 268.0;
+   f_ice = 0.8;
+   f_liq = 0.0;
+   f_liq_old = 0.0;
+   drovdT = 1e-6;
+   dHdT = 1.8e6;
+   Sc = 2;
+   dz = 0.04;
+   dt = 900;
+   a2 = 25;
+   Fc = 10;
+   Fp = -5;
+   a1 = 40;
+
+   L_top = icemodel.vapor.latent_enthalpy_switch(f_liq);
+   denominator = dHdT ...
+      + L_top * drovdT * (1.0 - f_ice - f_liq);
+   reference = (dt / dz ...
+      * (Fc + Fp * (Fc + a1 * T) / (a1 - Fp) + Sc * dz) ...
+      - ro_liq * Lf * (f_liq - f_liq_old)) / denominator ...
+      - (T - T_old);
+
+   returned_zero = icemodel.column.subsurface_linearization_error( ...
+      T, T_old, f_ice, f_liq, f_liq_old, drovdT, dHdT, Sc, zeros(2, 1), ...
+      dz, dt, a2, Fc, Fp, a1);
+   testCase.verifyEqual(returned_zero, reference, 'RelTol', 1e-14);
+
+   q_deferred_faces = [4; -3];
+   returned_flux = icemodel.column.subsurface_linearization_error( ...
+      T, T_old, f_ice, f_liq, f_liq_old, drovdT, dHdT, Sc, ...
+      q_deferred_faces, dz, dt, a2, Fc, Fp, a1);
+   expected_flux = reference + dt / dz ...
+      * (q_deferred_faces(1) - q_deferred_faces(2)) / denominator;
+   testCase.verifyEqual(returned_flux, expected_flux, 'RelTol', 1e-14);
 end
 
 function test_iceablation_and_surface_runoff_budget(testCase)
