@@ -1,4 +1,5 @@
-function [T, f_ice, f_liq, k_eff, ok, iter, a1, err, U_vap_faces] = ...
+function [T, f_ice, f_liq, k_eff, ok, iter, a1, err, U_vap_faces, ...
+      L_vap_faces] = ...
       solve_column_enthalpy(T_sfc, T, f_ice, f_liq, Fc, Fp, Sc, Sp, dz, ...
       delz, fn, dt, solver, tol, maxiter, ~, ~, ~, debug, f_res_por)
    %SOLVE_COLUMN_ENTHALPY Solve the column enthalpy balance.
@@ -7,7 +8,7 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err, U_vap_faces] = ...
    % thermal-solver option list. Node-wise Aitken acceleration is off here.
    %
    % The node conductivity leaves the vapor term out.
-   % vapor_transport_faces builds the combined face conductivity,
+   % vapor_transport_terms builds the combined face conductivity,
    % deferred energy flux, and conjugate mass flux. F_RES_POR supplies the
    % donor-phase residual-liquid criterion.
    %
@@ -47,14 +48,22 @@ function [T, f_ice, f_liq, k_eff, ok, iter, a1, err, U_vap_faces] = ...
    err = nan;
    U_vap_faces = zeros(numel(T) + 1, 1);
 
+   % The dry-phase latent heat is the sentinel fill for a rejected first
+   % iterate; callers discard the value when ok is false.
+   persistent Ls
+   if isempty(Ls)
+      Ls = icemodel.physicalConstant('Ls');
+   end
+   L_vap_faces = Ls * ones(numel(T) + 1, 1);
+
    % Iterate to solve the nonlinear heat equation
    ok = false;
    for iter = 0:maxiter-1
 
       % Build vapor-free node conductivity and one conjugate face transport.
       k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, 0);
-      [k_eff_faces, ~, q_deferred_faces, U_vap_faces] = ...
-         icemodel.column.vapor_transport_faces(T, f_ice, f_liq, k_eff, ...
+      [k_eff_faces, ~, q_deferred_faces, U_vap_faces, L_vap_faces] = ...
+         icemodel.column.vapor_transport_terms(T, f_ice, f_liq, k_eff, ...
          ro_vap, dro_vapdT, De, delz, fn, f_res_por);
 
       % Update bulk enthalpy and derivative wrt temperature

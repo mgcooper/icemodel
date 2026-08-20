@@ -143,7 +143,7 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
    % merge_layers.
    %
    % f_wat_12 is solid plus liquid. The liquid-only export is a separate
-   % quantity. The ledger records it as merge_export_liquid_mwe.
+   % quantity; a top removal records it as top_export_liquid_mwe.
    f_wat_12 = ro_ice / ro_liq * (f_ice(j1) + f_ice(j2)) ...
       + f_liq(j1) + f_liq(j2);
    d_lyr(j1) = d_lyr(j1) + f_wat_12 / 2;

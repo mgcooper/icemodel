@@ -16,7 +16,7 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    %  flux here makes this function the one owner of the north/south indexing.
    %
    %  Note: ro_sno * cp_sno = (cv_ice * f_ice + cv_liq * f_liq)
-   %  See updatestate (or icemodel.timestepping.updatesubstep) for how ro_sno
+   %  See updatestate (or icemodel.timestepping.acceptsubstep) for how ro_sno
    %  and cp_sno are computed.
    %
    %  Pmelt here is identical to SNTHRM:

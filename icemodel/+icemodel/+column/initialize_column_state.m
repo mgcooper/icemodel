@@ -1,10 +1,10 @@
 function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
-      delz, z_nodes, f_liq_res, use_conservative_cpl] ...
+      delz, z_nodes, f_liq_res] ...
       = initialize_column_state(opts, tair, r_eff)
    %INITIALIZE_COLUMN_STATE Initialize the 1-d ice column state.
    %
    %  [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, ...
-   %   dz, delz, z_nodes, f_liq_res, use_conservative_cpl] = ...
+   %   dz, delz, z_nodes, f_liq_res] = ...
    %     icemodel.column.initialize_column_state(opts, tair, r_eff)
    %
    %  Returns the smallest set of column-state variables that the model kernel
@@ -14,8 +14,6 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
    %
    %  opts.use_ro_glc changes only the densities used to construct initial
    %  phase fractions. Solvers use persistent physical constants. See setopts.
-   %  USE_CONSERVATIVE_CPL restores the private solver-3 recovery latch and is
-   %  false for fresh runs and legacy restart files.
    %
    %#codegen
 
@@ -48,7 +46,6 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
    TL = icemodel.parameterLookup('TL');
 
    % INITIALIZE CORE STATE VARIABLES
-   use_conservative_cpl = false;
    if opts.use_restart
       restart = icemodel.loadRestartState(opts);
       validateRestartOpts(opts, restart);
@@ -57,7 +54,6 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
       f_liq = restart.f_liq;
       Ts = restart.Ts;
       r_eff = restart.r_eff;
-      use_conservative_cpl = restart.use_conservative_cpl;
       validateRestartState(T, f_ice, f_liq, Ts, r_eff, JJ);
    else
       % Initialize with a physically scaled exponential profile anchored to the

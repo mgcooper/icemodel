@@ -33,7 +33,7 @@ function Lv_or_Ls = latent_enthalpy_switch(f_liq, N)
    %
    % See also: icemodel.column.bulk_enthalpy,
    %           icemodel.column.assemble_enthalpy_system,
-   %           icemodel.timestepping.updatesubstep
+   %           icemodel.timestepping.acceptsubstep
    %
    %#codegen
 

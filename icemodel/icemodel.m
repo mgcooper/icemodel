@@ -50,10 +50,9 @@ function [ice1, ice2, opts] = icemodel(opts)
       return
    end
 
-   % Option to use detailed diagnostic output structs.
-   use_diagnostic_profile = strcmp(opts.output_profile, 'diagnostic');
-   use_mass_budget = use_diagnostic_profile;
-   use_thf_diag = use_diagnostic_profile;
+   % Option to use detailed diagnostic output structs. The mass budget
+   % accumulates on every profile; only output emission is profile-bound.
+   use_thf_diag = strcmp(opts.output_profile, 'diagnostic');
 
    % UNPACK SOLVER OPTS
    [solver, maxiter, tol, alpha, use_aitken, jumpmax, cpl_maxiter, ...
@@ -62,7 +61,13 @@ function [ice1, ice2, opts] = icemodel(opts)
       'solver', 'maxiter', 'tol', 'alpha', 'use_aitken', 'jumpmax', ...
       'cpl_maxiter', 'cpl_Ts_tol', 'cpl_seb_tol', 'cpl_alpha', 'cpl_aitken', ...
       'cpl_jumpmax', 'f_ice_min');
-   cpl_alpha_recovery = min(cpl_alpha, ...
+   % The conservative outer-relaxation floor for the couplers' recovery
+   % phase. The known Robin outer failure is a bounded period-4 limit
+   % cycle of the accelerated map; damped relaxation at this value
+   % converges it (NUK_U 2013 evidence). Single-sourced in
+   % parameterLookup; the min() honors a caller who set an even more
+   % conservative primary alpha.
+   cpl_alpha_min = min(cpl_alpha, ...
       icemodel.parameterLookup('cpl_recovery_alpha'));
    TINY = 1e-8;
 
@@ -78,8 +83,7 @@ function [ice1, ice2, opts] = icemodel(opts)
 
    % INITIALIZE THE THERMAL MODEL
    [ice1, ice2, T_sfc, T_ice, ...
-      f_ice, f_liq, ~, Sp, r_eff, k_eff, fn, dz, delz, z_nodes, ~, ...
-      use_conservative_cpl] ...
+      f_ice, f_liq, ~, Sp, r_eff, k_eff, fn, dz, delz, z_nodes] ...
       = icemodel.column.initialize_column_state(opts, tair, r_eff);
 
    % INITIALIZE THE SURFACE STATE
@@ -101,10 +105,6 @@ function [ice1, ice2, opts] = icemodel(opts)
       = icemodel.timestepping.resetsubstep(T_sfc, T_ice, f_ice, f_liq, k_eff);
    force_advance_streak_dt = 0.0;
 
-   % Initialize the diagnostic mass/energy budget ledger.
-   [mass_energy_budget, solid_p, liquid_p, phase_solid, phase_liquid, ...
-      vapor_solid, vapor_liquid] = icemodel.column.initialize_budget_state();
-
    %% START TIMESTEPS OVER YEARS
    for thisyear = 1:numyears
 
@@ -114,27 +114,20 @@ function [ice1, ice2, opts] = icemodel(opts)
          [dt_sum, n_subfail, ok_seb, ok_ieb, d_liq, d_evp, d_lyr, d_rof] ...
             = icemodel.timestepping.newtimestep(f_liq, solver);
 
-         % Count successful conservative Robin recoveries on this forcing
-         % step. The run-wide latch prevents repeated primary failures after
-         % the first recovery, so later forcing steps report zero.
+         % Count accepted conservative recoveries on this forcing step,
+         % and reset the accepted-solve diagnostics record. The record is
+         % overwritten only when a substep is accepted, so a step whose
+         % only content was forced advances reports these sentinels, never
+         % a rejected solve's values.
          cpl_recovery_count = 0;
+         diag_acc = icemodel.couplers.initialize_solver_diag();
 
-         % Grain growth runs once per forcing step. It therefore needs the face
-         % exchanges the accepted substeps actually applied: the realized
-         % surface exchange at face 1 and the interior transport magnitudes
-         % elsewhere, accumulated as water-equivalent depths. Gross, not signed:
-         % growth scales with the flux magnitude, so substeps whose exchange
-         % reverses sign must add rather than cancel.
-         d_vap = zeros(size(delz));
-         accepted_dt = 0.0;
-
-         % Zero the ledger for this forcing step and set initial values.
-         if use_mass_budget
-            mass_energy_budget = icemodel.column.initialize_budget_state();
-            [mass_energy_budget.mass_budget_solid_start_mwe, ...
-               mass_energy_budget.mass_budget_liquid_start_mwe] = ...
-               icemodel.column.integrate_column_budget(T_ice, f_ice, f_liq, dz);
-         end
+         % Zero the budget for this forcing step. It records the storage
+         % start endpoints from the entry state, accumulates on accepted
+         % substeps only, and closes in finalize_budget_state after the
+         % substep loop.
+         budget = icemodel.column.initialize_budget_state( ...
+            T_ice, f_ice, f_liq, dz);
 
          % Scalarize time-varying met observation heights and corresponding
          % bulk-Richardson coefficients prior to each forcing step.
@@ -160,8 +153,8 @@ function [ice1, ice2, opts] = icemodel(opts)
             if solver <= 1
 
                % COUPLED DIRICHLET SURFACE-SUBSURFACE ENERGY BALANCE
-               [T_sfc, T_ice, f_ice, f_liq, U_vap, k_eff, ok_seb, ...
-                  ok_ieb, ok_cpl, n_iters] ...
+               [T_sfc, T_ice, f_ice, f_liq, U_vap, L_vap, k_eff, ...
+                  ok_seb, ok_ieb, ok_cpl, cpl_diag] ...
                   = icemodel.couplers.solve_surface_column_dirichlet( ...
                   T_sfc, T_ice, f_ice, f_liq, Sc, Sp, dz, delz, fn, dt, ...
                   tair(metstep), swd(metstep), lwd(metstep), albedo(metstep), ...
@@ -170,24 +163,17 @@ function [ice1, ice2, opts] = icemodel(opts)
                   nu_air(metstep), H_h(metstep), H_e, hv_atm, br_coefs_step, ...
                   liqflag, chi, solver, tol, maxiter, alpha, use_aitken, ...
                   jumpmax, cpl_Ts_tol, cpl_seb_tol, cpl_maxiter, cpl_alpha, ...
-                  cpl_aitken, cpl_jumpmax, ro_sfc, snow_depth, ...
-                  f_res_por, step_opts);
+                  cpl_aitken, cpl_jumpmax, cpl_alpha_min, ro_sfc, ...
+                  snow_depth, f_res_por, step_opts);
 
             elseif solver > 1
 
                % COUPLED ROBIN SURFACE-SUBSURFACE ENERGY BALANCE
-               % Keep caller values on the primary path. After one successful
-               % recovery, use the conservative pair directly for the rest of
-               % this model invocation instead of repeating a failed attempt.
-               if use_conservative_cpl
-                  cpl_alpha_step = cpl_alpha_recovery;
-                  cpl_aitken_step = false;
-               else
-                  cpl_alpha_step = cpl_alpha;
-                  cpl_aitken_step = cpl_aitken;
-               end
-               [T_sfc, T_ice, f_ice, f_liq, U_vap, k_eff, ok_seb, ...
-                  ok_ieb, ok_cpl, n_iters] ...
+               % The coupler owns recovery: a healthy inner solve that
+               % exhausts the outer loop reruns once internally with the
+               % conservative pair (cpl_alpha_min, no acceleration).
+               [T_sfc, T_ice, f_ice, f_liq, U_vap, L_vap, k_eff, ...
+                  ok_seb, ok_ieb, ok_cpl, cpl_diag] ...
                   = icemodel.couplers.solve_surface_column_robin( ...
                   T_sfc, T_ice, f_ice, f_liq, Sc, Sp, dz, delz, fn, dt, ...
                   tair(metstep), swd(metstep), lwd(metstep), albedo(metstep), ...
@@ -196,38 +182,8 @@ function [ice1, ice2, opts] = icemodel(opts)
                   nu_air(metstep), H_h(metstep), H_e, hv_atm, br_coefs_step, ...
                   liqflag, chi, solver, tol, maxiter, alpha, use_aitken, ...
                   jumpmax, cpl_Ts_tol, cpl_seb_tol, cpl_maxiter, ...
-                  cpl_alpha_step, cpl_aitken_step, cpl_jumpmax, ro_sfc, ...
-                  snow_depth, f_res_por, step_opts);
-
-               % A healthy inner solve that exhausts the strong Robin outer
-               % loop has no accepted state. Retry that case only, from the
-               % exact prognostic checkpoint, with conservative relaxation.
-               % CHECKSUBSTEP increments N_SUBFAIL before testing MAXSUBSTEP,
-               % so the last allowed failure must retain its time-only fallback.
-               retry_robin = solver == 3 && ok_seb && ok_ieb && ~ok_cpl ...
-                  && ~use_conservative_cpl ...
-                  && n_subfail < maxsubstep - 1 ...
-                  && (cpl_aitken || cpl_alpha ~= cpl_alpha_recovery);
-               if retry_robin
-                  [T_sfc, T_ice, f_ice, f_liq, U_vap, k_eff, ok_seb, ...
-                     ok_ieb, ok_cpl, n_iters] ...
-                     = icemodel.couplers.solve_surface_column_robin( ...
-                     xT_sfc, xT_ice, xf_ice, xf_liq, Sc, Sp, dz, delz, fn, dt, ...
-                     tair(metstep), swd(metstep), lwd(metstep), albedo(metstep), ...
-                     wspd(metstep), ppt(metstep), tppt(metstep), psfc(metstep), ...
-                     ea_atm(metstep), ro_atm(metstep), cv_atm(metstep), ...
-                     nu_air(metstep), H_h(metstep), H_e, hv_atm, br_coefs_step, ...
-                     liqflag, chi, solver, tol, maxiter, alpha, use_aitken, ...
-                     jumpmax, cpl_Ts_tol, cpl_seb_tol, cpl_maxiter, ...
-                     cpl_alpha_recovery, false, cpl_jumpmax, ro_sfc, snow_depth, ...
-                     f_res_por, step_opts);
-                  use_conservative_cpl = ok_seb && ok_ieb && ok_cpl;
-                  if use_conservative_cpl
-                     % Record only a retry that produced the accepted state.
-                     % Failed retries continue through normal substep handling.
-                     cpl_recovery_count = cpl_recovery_count + 1;
-                  end
-               end
+                  cpl_alpha, cpl_aitken, cpl_jumpmax, cpl_alpha_min, ...
+                  ro_sfc, snow_depth, f_res_por, step_opts);
             end
 
             % Hitting max coupling iterations without ok_cpl is a substep fail.
@@ -239,8 +195,8 @@ function [ice1, ice2, opts] = icemodel(opts)
                = icemodel.timestepping.checksubstep(T_sfc, T_ice, f_ice, ...
                f_liq, k_eff, xT_sfc, xT_ice, xf_ice, xf_liq, xk_eff, ...
                dt_sum, dt, dt_FULL_STEP, timestep, numsteps, substep, ...
-               maxsubstep, n_subfail, opts.debug, eps, ok, ...
-               force_advance_streak_dt, dt_FULL_STEP, 'icemodel');
+               maxsubstep, n_subfail, opts.debug, ok, ...
+               force_advance_streak_dt, 'icemodel');
 
             if ~ok
                continue
@@ -249,20 +205,18 @@ function [ice1, ice2, opts] = icemodel(opts)
             % A forced advance accepts only elapsed time. CHECKSUBSTEP restored
             % the last accepted checkpoint, so do not apply surface exchange,
             % interior transport, remeshing, or their budget increments from
-            % the rejected solve.
+            % the rejected solve. ACCEPTSUBSTEP's state pass-through returns
+            % the unchanged checkpoint.
             if forced_advance
                [xT_sfc, xT_ice, xf_ice, xf_liq, xk_eff, dt_sum, dt] = ...
-                  icemodel.timestepping.updatesubstep(T_sfc, T_ice, f_ice, ...
+                  icemodel.timestepping.acceptsubstep(T_sfc, T_ice, f_ice, ...
                   f_liq, k_eff, dt_FULL_STEP, dt_sum, dt, TINY);
                continue
             end
 
             % Checkpoint melt/freeze phase change before surface vapor exchange.
-            if use_mass_budget
-               [mass_energy_budget, solid_p, liquid_p, phase_solid, phase_liquid] ...
-                  = icemodel.column.accumulate_phase_budget(mass_energy_budget, ...
-                  xT_ice, xf_ice, xf_liq, T_ice, f_ice, f_liq, dz);
-            end
+            budget = icemodel.column.accumulate_phase_budget(budget, ...
+               xT_ice, xf_ice, xf_liq, T_ice, f_ice, f_liq, dz);
 
             % UPDATE POTENTIAL SURFACE NET VAPOR FLUX
             [d_pevp, ~, ~, ~] ...
@@ -272,68 +226,51 @@ function [ice1, ice2, opts] = icemodel(opts)
                nu_air(metstep), H_h(metstep), H_e, hv_atm, br_coefs_step, ...
                liqflag, f_ice(1), f_liq(1), dt, dz(1), snow_depth, step_opts);
 
-            % The transfer below consumes the solver-returned face flux and
-            % computes its node-wise divergence at this state, the one the
-            % solve converged on. The mass it moves and the phase it moves
-            % between therefore stay conjugate to the energy transported.
-            % The surface exchange can flip the top cell's wet/dry class,
-            % so deciding after it would move a different mass at face 2,
-            % or spend it on the other phase, than the solve's energy.
-            f_ice_solve = f_ice;
-            f_liq_solve = f_liq;
-
             % UPDATE THE SURFACE MASS-BALANCE BUDGETS
-            [T_ice, f_ice, f_liq, d_liq, d_evp, d_rof, d_sbl_err, ...
-               d_vap_applied] ...
+            % One call applies the surface vapor exchange and closes this
+            % substep's surface vapor budget while the shortfall record is
+            % in scope.
+            [T_ice, f_ice, f_liq, d_liq, d_evp, d_rof, d_applied, budget] ...
                = icemodel.column.budget_surface_mass_balance( ...
                T_ice, f_ice, f_liq, xf_liq, d_pevp, d_liq, d_evp, ...
-               d_rof, f_res_por, f_ice_min);
-
-            % Checkpoint realized vapor exchange and its input, overflow, and
-            % signed unapplied energy (d_sbl_err).
-            if use_mass_budget
-               [mass_energy_budget, vapor_solid, vapor_liquid] ...
-                  = icemodel.column.accumulate_vapor_budget(mass_energy_budget, ...
-                  solid_p, liquid_p, T_ice, f_ice, f_liq, dz, ...
-                  d_pevp, d_rof, d_sbl_err);
-            end
+               d_rof, f_res_por, f_ice_min, budget, dz);
 
             % MOVE VAPOR BETWEEN THE CELLS
             %
             % Interior faces transport vapor separately from the surface
             % exchange above: Fick's law fixes the mass here, and the surface
             % energy balance fixes the energy there. This order keeps melt,
-            % surface exchange, and redistribution in their own ledgers.
-            [f_ice, f_liq, d_vap, vapor_solid, vapor_liquid, ...
-               mass_energy_budget] = icemodel.column.couple_vapor_step( ...
-               T_ice, f_ice, f_liq, f_ice_solve, f_liq_solve, U_vap, ...
-               d_vap, vapor_solid, vapor_liquid, dz, dt, f_ice_min, ...
-               f_res_por, mass_energy_budget, use_mass_budget);
+            % surface exchange, and redistribution in their own ledgers. The
+            % donor latent heat L_vap from the accepted sweep routes each
+            % face's mass to the phase the solve's energy carried.
+            [f_ice, f_liq, budget] = icemodel.column.couple_vapor_step( ...
+               T_ice, f_ice, f_liq, U_vap, L_vap, dz, dt, f_ice_min, ...
+               f_res_por, budget);
 
-            % Accumulate realized surface exchange for grain growth, gross,
-            % because rejected demand never crossed the surface.
-            d_vap(1) = d_vap(1) + abs(d_vap_applied) * dz(1);
+            % UPDATE GRAIN SIZE FROM THIS SUBSTEP'S VAPOR EXCHANGE
+            %
+            % Grain growth runs on the accepted substep's own face transport
+            % and realized surface exchange, gross, because rejected demand
+            % never crossed the surface. The kernel diagnoses no saturation
+            % state or vapor transport.
+            r_eff = icemodel.column.update_grain_radius( ...
+               r_eff, f_liq, U_vap, d_applied, dz(1), dt);
 
             % REMESH THIN LAYERS AFTER THE MASS-BALANCE UPDATE
-            if use_mass_budget
-               [T_ice, f_ice, f_liq, Sc, Sp, d_lyr, ~, remesh] ...
-                  = icemodel.column.merge_thin_layers(T_ice, f_ice, f_liq, ...
-                  Sc, Sp, dz(1), d_pevp, d_lyr, f_ice_min);
-
-               % Accumulate numerical remeshing increments.
-               mass_energy_budget = icemodel.column.accumulate_remesh_budget( ...
-                  mass_energy_budget, remesh, phase_solid + vapor_solid, ...
-                  phase_liquid + vapor_liquid);
-            else
-               [T_ice, f_ice, f_liq, Sc, Sp, d_lyr, ~] ...
-                  = icemodel.column.merge_thin_layers(T_ice, f_ice, f_liq, ...
-                  Sc, Sp, dz(1), d_pevp, d_lyr, f_ice_min);
-            end
+            % The remesh accumulates its own budget increments internally.
+            [T_ice, f_ice, f_liq, Sc, Sp, d_lyr, budget] ...
+               = icemodel.column.merge_thin_layers(T_ice, f_ice, f_liq, ...
+               Sc, Sp, dz(1), d_pevp, d_lyr, f_ice_min, budget);
 
             % CHECKPOINT STATE AND SUBSTEP TIME
-            accepted_dt = accepted_dt + dt;
+            % The accepted-solve diagnostics are captured only here, so
+            % outputs never carry a rejected solve's values, and accepted
+            % conservative recoveries are counted only here.
+            diag_acc = cpl_diag;
+            cpl_recovery_count = ...
+               cpl_recovery_count + double(cpl_diag.cpl_recovered);
             [xT_sfc, xT_ice, xf_ice, xf_liq, xk_eff, dt_sum, dt] = ...
-               icemodel.timestepping.updatesubstep(T_sfc, T_ice, f_ice, ...
+               icemodel.timestepping.acceptsubstep(T_sfc, T_ice, f_ice, ...
                f_liq, k_eff, dt_FULL_STEP, dt_sum, dt, TINY);
          end
 
@@ -341,20 +278,8 @@ function [ice1, ice2, opts] = icemodel(opts)
          assertF(@() dt_sum < dt_FULL_STEP + 2 * TINY)
 
          % Close the forcing-step budget endpoints after every accepted substep
-         if use_mass_budget
-            [mass_energy_budget.mass_budget_solid_end_mwe, ...
-               mass_energy_budget.mass_budget_liquid_end_mwe] = ...
-               icemodel.column.integrate_column_budget(T_ice, f_ice, f_liq, dz);
-         end
-
-         % UPDATE GRAIN SIZE FROM REALIZED VAPOR EXCHANGE
-         %
-         % Grow grains from the accepted substeps' gross face exchanges. The
-         % kernel diagnoses no saturation state or vapor transport.
-         if accepted_dt > 0.0
-            r_eff = icemodel.column.update_grain_radius( ...
-               r_eff, f_liq, d_vap, accepted_dt);
-         end
+         budget = icemodel.column.finalize_budget_state( ...
+            budget, T_ice, f_ice, f_liq, dz);
 
          % DIAGNOSE SURFACE ENERGY BALANCE
          [Qe, Qh, Qc, Qsn, Qln, Qa, Qm, Qf, Qbal] ...
@@ -382,7 +307,7 @@ function [ice1, ice2, opts] = icemodel(opts)
          if thisyear > numspinup
 
             % Assemble one compile-time struct layout for every profile.
-            surface_state = mass_energy_budget;
+            surface_state = rmfield(budget, 'substep');
             surface_state.Tsfc = T_sfc;
             surface_state.Qm = Qm;
             surface_state.Qf = Qf;
@@ -395,10 +320,13 @@ function [ice1, ice2, opts] = icemodel(opts)
             surface_state.chi = chi;
             surface_state.balance = Qbal;
             surface_state.dt_sum = dt_sum;
-            surface_state.Tsfc_converged = ok_seb;
-            surface_state.Tice_converged = ok_ieb;
-            surface_state.Tice_numiter = n_iters;
+            surface_state.Tsfc_converged = diag_acc.ok_seb;
+            surface_state.Tice_converged = diag_acc.ok_ieb;
+            surface_state.Tice_numiter = diag_acc.n_iters;
             surface_state.n_subfail = n_subfail;
+            surface_state.cpl_iters = diag_acc.cpl_iters;
+            surface_state.cpl_res = diag_acc.cpl_res;
+            surface_state.seb_res = diag_acc.seb_res;
             surface_state.cpl_recovery_count = cpl_recovery_count;
             surface_state.ea_atm = ea_atm(metstep);
             surface_state.br_coefs_gamma = br_coefs_step(1);
@@ -426,14 +354,18 @@ function [ice1, ice2, opts] = icemodel(opts)
          end
 
          % MOVE TO THE NEXT TIMESTEP
+         % nexttimestep consumes the RAW last-solve iteration count, not
+         % the accepted record: a rejected solve's high work is the
+         % correct signal to shrink the next step's dt.
          [metstep, substep, dt] = icemodel.timestepping.nexttimestep( ...
-            metstep, substep, dt_FULL_STEP, maxsubstep, ok, n_subfail, n_iters);
+            metstep, substep, dt_FULL_STEP, maxsubstep, ok, n_subfail, ...
+            cpl_diag.n_iters);
 
       end % timesteps (one year)
 
       if isfield(opts, 'saverestart') && opts.saverestart
          icemodel.saveRestartState(opts, opts.simyears(thisyear), ...
-            T_ice, f_ice, f_liq, T_sfc, r_eff, use_conservative_cpl);
+            T_ice, f_ice, f_liq, T_sfc, r_eff);
       end
 
       % RESTART THE MET DATA STEP INDEX DURING SPIN UP

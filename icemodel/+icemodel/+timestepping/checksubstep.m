@@ -1,37 +1,30 @@
 function [Ts, T, f_ice, f_liq, k_eff, n_subfail, substep, dt, ok, ...
-      varargout] = checksubstep(Ts, T, f_ice, f_liq, k_eff, xTs, xT, ...
-      xf_ice, xf_liq, xk_eff, dt_sum, dt, dt_FULL_STEP, timestep, ...
-      numsteps, substep, maxsubstep, n_subfail, debug, eps, ok, varargin)
+      forced_advance, force_advance_streak_dt] = checksubstep(Ts, T, ...
+      f_ice, f_liq, k_eff, xTs, xT, xf_ice, xf_liq, xk_eff, dt_sum, dt, ...
+      dt_FULL_STEP, timestep, numsteps, substep, maxsubstep, n_subfail, ...
+      debug, ok, force_advance_streak_dt, model_name)
    %CHECKSUBSTEP Accept, retry, or force-advance the current substep.
    %
-   %  [Ts, T, f_ice, f_liq, k_eff, n_subfail, substep, dt, ok] = ...
+   %  [Ts, T, f_ice, f_liq, k_eff, n_subfail, substep, dt, ok, ...
+   %     forced_advance, force_advance_streak_dt] = ...
    %     icemodel.timestepping.checksubstep(...)
    %
-   % Optional trailing inputs:
-   %  force_advance_streak_dt - current cross-timestep forced-advance streak [s]
-   %  force_advance_limit_dt  - allowed forced-advance streak before error [s]
-   %  model_name              - model name used in force-advance error messages
+   % On an accepted substep (OK true), assert the water bounds and reset
+   % the forced-advance streak. On a rejected substep, restore the
+   % x-prefixed checkpoint, shorten dt, and, after MAXSUBSTEP failures,
+   % force-advance at the checkpoint (OK returns true with
+   % FORCED_ADVANCE true so the caller advances time only).
    %
-   % Optional trailing outputs:
-   %  forced_advance          - true when maxsubstep forced acceptance occurred
-   %  force_advance_streak_dt - updated streak after accepted-state handling
+   % FORCE_ADVANCE_STREAK_DT tracks consecutive forced-advance time
+   % across forcing steps. One full step (DT_FULL_STEP) of consecutive
+   % forced time is the limit; above it this function errors, because a
+   % run that solves nothing must stop rather than integrate checkpoints
+   % forward. MODEL_NAME names the driver in that error.
    %
    %#codegen
 
    dt_min = dt_FULL_STEP / maxsubstep;
    forced_advance = false;
-   force_advance_streak_dt = NaN;
-   force_advance_limit_dt = NaN;
-   model_name = 'icemodel';
-   if ~isempty(varargin)
-      force_advance_streak_dt = varargin{1};
-   end
-   if numel(varargin) >= 2
-      force_advance_limit_dt = varargin{2};
-   end
-   if numel(varargin) >= 3
-      model_name = varargin{3};
-   end
 
    if ok
       % Mass conservation / control volume check
@@ -47,7 +40,7 @@ function [Ts, T, f_ice, f_liq, k_eff, n_subfail, substep, dt, ok, ...
          = icemodel.timestepping.resetsubstep(xTs, xT, xf_ice, xf_liq, ...
          xk_eff, dt_FULL_STEP, substep, maxsubstep, n_subfail, dt_sum);
 
-      if debug == true && dt <= dt_min + eps && n_subfail < maxsubstep
+      if debug == true && dt <= dt_min + eps(dt_min) && n_subfail < maxsubstep
          fprintf('timestep = %d (%.2f%%), dt = %.0f (dt_min), ok = %s\n', ...
             timestep, 100*timestep/numsteps, dt, mat2str(ok))
       end
@@ -70,22 +63,26 @@ function [Ts, T, f_ice, f_liq, k_eff, n_subfail, substep, dt, ok, ...
             k_eff_fail, xTs, xT, xf_ice, xf_liq, xk_eff, dt_sum, dt, ...
             dt_FULL_STEP, timestep, numsteps, substep, maxsubstep, ...
             n_subfail, forced_advance, projected_force_advance_dt, ...
-            force_advance_limit_dt);
+            dt_FULL_STEP);
       end
    end
 
-   if ok && ~isnan(force_advance_streak_dt) && ~isnan(force_advance_limit_dt)
-      force_advance_streak_dt = ...
-         icemodel.timestepping.update_force_advance_guard( ...
-         force_advance_streak_dt, forced_advance, dt, force_advance_limit_dt, ...
-         timestep, numsteps, model_name);
-   end
-
-   if nargout >= 10
-      varargout{1} = forced_advance;
-   end
-   if nargout >= 11
-      varargout{2} = force_advance_streak_dt;
+   % Track consecutive forced-advance time across forcing steps. A genuine
+   % acceptance resets the streak; a forced advance extends it and errors
+   % above one full step of consecutive forced time.
+   if ok
+      if forced_advance
+         force_advance_streak_dt = force_advance_streak_dt + dt;
+         if force_advance_streak_dt > dt_FULL_STEP + eps(dt_FULL_STEP)
+            error('icemodel:ForceAdvanceStreakExceeded', ...
+               ['%s repeated checksubstep force-advance exceeded the ', ...
+               'allowed streak at timestep %d/%d (streak_dt = %.0f s, ', ...
+               'limit = %.0f s).'], model_name, timestep, numsteps, ...
+               force_advance_streak_dt, dt_FULL_STEP);
+         end
+      else
+         force_advance_streak_dt = 0.0;
+      end
    end
 end
 

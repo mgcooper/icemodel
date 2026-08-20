@@ -3,8 +3,12 @@ function tests = test_coupled_vapor_model_run
    %
    % The kernel tests isolate face transport and constrained phase transfer.
    % These tests run the model. They verify that the retired flag cannot
-   % select alternate physics. They also verify surface-vapor closure,
-   % per-phase storage closure, and nonzero interior redistribution.
+   % select alternate physics. They also verify surface-vapor closure and
+   % per-phase storage closure. A kernel-level probe checks that
+   % icemodel.column.couple_vapor_step's redistribution channels register a
+   % clamped transfer, because a short production run gives no guarantee a
+   % storage-limit clamp actually fires: absent a clamp the donor-receiver
+   % scheme is exact and the net redistribution channels stay at zero.
    %
    % See also: test_coupled_vapor_transport,
    %  icemodel.column.couple_vapor_step
@@ -86,29 +90,80 @@ function test_production_run_closes_the_per_phase_storage(testCase)
       + ice1.mass_budget_vapor_liquid_mwe ...
       + ice1.mass_budget_remesh_liquid_mwe ...
       + ice1.mass_budget_vapor_redistribution_liquid_mwe, 'AbsTol', 1e-10);
-
-   % Gross storage movement must bound the signed endpoint change.
-   testCase.verifyGreaterThanOrEqual( ...
-      ice1.mass_budget_solid_storage_gross_mwe + 1e-12, abs(solid_delta));
-   testCase.verifyGreaterThanOrEqual( ...
-      ice1.mass_budget_liquid_storage_gross_mwe + 1e-12, ...
-      abs(liquid_delta));
 end
 
-function test_production_run_transports_interior_vapor(testCase)
-   % A production run must exercise nonzero interior redistribution.
+function test_couple_vapor_step_records_nonzero_redistribution_net(testCase)
+   % icemodel.column.couple_vapor_step must show up in the surviving net
+   % redistribution channels once a receiving node's storage-limit clamp
+   % blocks part of a face transfer.
+   %
+   % Absent a clamp, the donor-receiver scheme is exact: a face's donor
+   % loses what its receiver gains, in the same phase, so the column-total
+   % net for that phase stays at zero. Nothing forces a clamp within a
+   % short synthetic production run, so that run is not a reliable witness
+   % for this channel. This kernel-level probe forces a clamp directly, so
+   % the nonzero net is provable rather than assumed.
 
-   base_opts = syntheticRunOpts(testCase);
-   [ice1, ~] = icemodel.test.helpers.runSmbModel(base_opts);
+   [Lv, ro_liq] = icemodel.physicalConstant('Lv', 'ro_liq');
 
-   gross = ice1.mass_budget_vapor_redistribution_solid_gross_mwe ...
-      + ice1.mass_budget_vapor_redistribution_liquid_gross_mwe;
-   testCase.verifyGreaterThan(max(gross), 0);
+   % Two-node column. Node 1 is a generous liquid donor. Node 2 is fully
+   % solid ice with no liquid pore space (f_ice = 1, f_liq = 0), so its
+   % storage-limit clamp accepts none of an incoming liquid transfer.
+   T = [260; 260];
+   f_ice = [0.3; 1.0];
+   f_liq = [0.3; 0.0];
+   dz = [0.05; 0.05];
+   dt = 900;
+   f_ice_min = 0.01;
+   f_res_por = 0.02;
+
+   % One interior face (JJ = 2 gives faces 1 and 3 as boundaries, face 2 as
+   % the only interior face). L_vap(2) = Lv routes the transfer through the
+   % liquid phase at both the donor (node 1) and the receiver (node 2), so
+   % the ice channel is never touched and the solid net must stay exactly
+   % zero.
+   JJ = numel(f_ice);
+   U_vap = zeros(JJ + 1, 1);
+   U_vap(2) = 1e-4;
+   L_vap = Lv * ones(JJ + 1, 1);
+
+   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   [solid_v0, liquid_v0] = ...
+      icemodel.column.integrate_column_budget(T, f_ice, f_liq, dz);
+   budget.substep.solid_v = solid_v0;
+   budget.substep.liquid_v = liquid_v0;
+
+   [returned_f_ice, returned_f_liq, returned_budget] = ...
+      icemodel.column.couple_vapor_step(T, f_ice, f_liq, U_vap, L_vap, ...
+      dz, dt, f_ice_min, f_res_por, budget);
+
+   % Node 2's liquid request is fully clamped, so its state is untouched
+   % and node 1 gives up the full requested amount. The ice channel never
+   % receives a request, so f_ice does not change at all.
+   d_vap_face = U_vap(2) * dt / ro_liq;
+   expected_f_liq = [f_liq(1) - d_vap_face / dz(1); f_liq(2)];
+   testCase.verifyEqual(returned_f_liq, expected_f_liq, 'AbsTol', 1e-15);
+   testCase.verifyEqual(returned_f_ice, f_ice, 'AbsTol', 0);
+
+   % The clamp breaks the exact donor/receiver cancellation, so the liquid
+   % net records the mass node 2 could not accept, and it must be nonzero.
+   % The solid net is untouched and must stay exactly zero.
+   expected_liquid_net = -d_vap_face;
+   testCase.verifyEqual( ...
+      returned_budget.mass_budget_vapor_redistribution_liquid_mwe, ...
+      expected_liquid_net, 'AbsTol', 1e-15);
+   testCase.verifyNotEqual( ...
+      returned_budget.mass_budget_vapor_redistribution_liquid_mwe, 0);
+   testCase.verifyEqual( ...
+      returned_budget.mass_budget_vapor_redistribution_solid_mwe, 0, ...
+      'AbsTol', 0);
 end
 
-function test_robin_outer_failure_recovers_from_checkpoint(testCase)
-   % A healthy-inner Robin outer failure must restart from the prognostic
-   % checkpoint. Its accepted result must equal a direct conservative run.
+function test_robin_outer_failure_recovers_inside_the_coupler(testCase)
+   % A healthy-inner Robin outer failure recovers inside the coupler: the
+   % conservative phase reruns the same outer loop from the same entry
+   % state, so the recovered result equals a direct conservative solve
+   % exactly, and the driver sees an ordinary accepted substep.
 
    workspace = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
       configure=true, nsteps=2, dt_seconds=900);
@@ -118,43 +173,48 @@ function test_robin_outer_failure_recovers_from_checkpoint(testCase)
       workspace, 'icemodel', solver=3, testname='robin_recovery');
 
    % Alpha 2 without acceleration deterministically leaves the synthetic
-   % inner solve healthy while exhausting the strong Robin outer loop.
-   [ok_seb, ok_ieb, ok_cpl] = runRobinProbe(state, 2.0, false);
-
+   % inner solve healthy while the primary outer loop exhausts its
+   % iterations; the internal conservative phase then converges it.
+   [ok_seb, ok_ieb, ok_cpl, diag, recovered] = ...
+      runRobinProbe(state, 2.0, false);
    testCase.verifyTrue(ok_seb);
    testCase.verifyTrue(ok_ieb);
-   testCase.verifyFalse(ok_cpl);
-   % The production retry must discard every failed-attempt output. Its result
-   % is therefore exactly the same as starting with the conservative pair. The
-   % first forcing step records the successful latch and the second proves that
-   % the diagnostic resets while the latched policy remains active.
+   testCase.verifyTrue(ok_cpl);
+   testCase.verifyTrue(diag.cpl_recovered);
+   testCase.verifyEqual(diag.cpl_phase, 2);
+
+   % The recovered state equals a direct conservative solve exactly: the
+   % conservative phase and the direct solve run the same loop from the
+   % same entry state.
+   recovery_alpha = icemodel.parameterLookup('cpl_recovery_alpha');
+   [~, ~, ok_cpl_direct, diag_direct, direct] = ...
+      runRobinProbe(state, recovery_alpha, false);
+   testCase.verifyTrue(ok_cpl_direct);
+   testCase.verifyFalse(diag_direct.cpl_recovered);
+   testCase.verifyEqual(diag_direct.cpl_phase, 1);
+   testCase.verifyEqual(recovered, direct);
+
+   % Through the production driver, recovery is per-substep and fires
+   % only where the primary policy actually fails: step 1 recovers from
+   % the synthetic initial state, and step 2's primary CONVERGES from the
+   % evolved state, so no recovery runs there. The removed run-wide latch
+   % would have forced step 2 conservative; this pins the improvement.
    primary_opts = icemodel.resetopts(state.opts, ...
       'cpl_alpha', 2.0, 'cpl_aitken', false, ...
       'output_profile', 'diagnostic');
-   recovery_alpha = icemodel.parameterLookup('cpl_recovery_alpha');
-   conservative_opts = icemodel.resetopts(state.opts, ...
-      'cpl_alpha', recovery_alpha, 'cpl_aitken', false, ...
-      'output_profile', 'diagnostic');
-   [ice1_recovered, ice2_recovered] = ...
-      icemodel.test.helpers.runSmbModel(primary_opts);
-   [ice1_conservative, ice2_conservative] = ...
-      icemodel.test.helpers.runSmbModel(conservative_opts);
+   [ice1_recovered, ~] = icemodel.test.helpers.runSmbModel(primary_opts);
 
    testCase.verifyEqual(ice1_recovered.cpl_recovery_count(:), [1; 0]);
-   testCase.verifyEqual(ice1_conservative.cpl_recovery_count(:), [0; 0]);
-   ice1_recovered = rmfield(ice1_recovered, 'cpl_recovery_count');
-   ice1_conservative = rmfield(ice1_conservative, 'cpl_recovery_count');
-   testCase.verifyEqual(ice1_recovered, ice1_conservative);
-   testCase.verifyEqual(ice2_recovered, ice2_conservative);
    testCase.verifyEqual(ice1_recovered.n_subfail(:), zeros(2, 1));
    testCase.verifyEqual(ice1_recovered.Tsfc_converged(:), ones(2, 1));
    testCase.verifyEqual(ice1_recovered.Tice_converged(:), ones(2, 1));
-
 end
 
-function test_robin_recovery_preserves_forced_advance_boundary(testCase)
-   % The last allowed failed attempt belongs to CHECKSUBSTEP. A conservative
-   % retry must not replace its checkpoint-only forced advance.
+function test_robin_recovery_rescues_the_last_allowed_attempt(testCase)
+   % With recovery inside the coupler, a healthy-inner outer failure on
+   % the only allowed substep attempt recovers instead of forcing an
+   % advance: strictly fewer forced advances than the driver-level retry,
+   % which had to reserve the last attempt for the time-only fallback.
 
    workspace = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
       configure=true, nsteps=1, dt_seconds=900);
@@ -163,8 +223,9 @@ function test_robin_recovery_preserves_forced_advance_boundary(testCase)
    state = icemodel.test.fixtures.makeSyntheticColumnState( ...
       workspace, 'icemodel', solver=3, testname='robin_recovery_boundary');
 
-   % DT=1 makes MAXSUBSTEP=1. Alpha 2 leaves the inner solve healthy while the
-   % primary Robin outer loop fails, so that failure must force immediately.
+   % DT=1 makes MAXSUBSTEP=1: one attempt exists. Alpha 2 leaves the inner
+   % solve healthy while the primary outer loop fails; the internal
+   % conservative phase rescues that only attempt.
    opts = state.opts;
    opts.dt = 1;
    opts.cpl_alpha = 2.0;
@@ -172,32 +233,19 @@ function test_robin_recovery_preserves_forced_advance_boundary(testCase)
    opts.output_profile = 'diagnostic';
    opts.vars1 = {};
    opts.vars2 = {};
-   [ice1, ice2] = icemodel.test.helpers.runSmbModel(opts);
+   [ice1, ~] = icemodel.test.helpers.runSmbModel(opts);
 
-   testCase.verifyEqual(ice1.cpl_recovery_count, 0);
-   testCase.verifyEqual(ice1.n_subfail, 1);
+   testCase.verifyEqual(ice1.cpl_recovery_count, 1);
+   testCase.verifyEqual(ice1.n_subfail, 0);
    testCase.verifyEqual(ice1.dt_sum, 1);
-   testCase.verifyEqual(ice1.Tsfc, state.Ts, 'AbsTol', 0);
-   testCase.verifyEqual(ice2.Tice, state.T, 'AbsTol', 0);
-   testCase.verifyEqual(ice2.f_ice, state.f_ice, 'AbsTol', 0);
-   testCase.verifyEqual(ice2.f_liq, state.f_liq, 'AbsTol', 0);
-   testCase.verifyEqual(ice2.df_liq, zeros(size(state.f_liq)), 'AbsTol', 0);
-   testCase.verifyEqual(ice2.df_evp, zeros(size(state.f_liq)), 'AbsTol', 0);
-   testCase.verifyEqual(ice2.df_lyr, zeros(size(state.f_liq)), 'AbsTol', 0);
-
-   % No physical ledger producer runs after the checkpoint-only advance.
-   budget_fields = string(fieldnames(ice1));
-   process_fields = budget_fields(startsWith(budget_fields, 'mass_budget_') ...
-      & ~endsWith(budget_fields, {'_start_mwe', '_end_mwe'}));
-   for k = 1:numel(process_fields)
-      testCase.verifyEqual(ice1.(process_fields(k)), 0, 'AbsTol', 0, ...
-         sprintf('%s changed during forced acceptance', process_fields(k)));
-   end
+   testCase.verifyEqual(ice1.Tsfc_converged, 1);
+   testCase.verifyEqual(ice1.Tice_converged, 1);
 end
 
 function test_failed_robin_recovery_falls_through_substep_control(testCase)
-   % A conservative retry can fail too. It must leave the checkpoint and latch
-   % untouched, then use the ordinary reduced-step and forced-advance path.
+   % The conservative phase can fail too. The coupler then returns
+   % ~ok_cpl and the ordinary reduced-step and forced-advance path
+   % proceeds; nothing about recovery persists anywhere.
 
    workspace = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
       configure=true, nsteps=1, dt_seconds=900);
@@ -215,13 +263,18 @@ function test_failed_robin_recovery_falls_through_substep_control(testCase)
    probe.cpl_Ts_tol = 0;
    probe.cpl_seb_tol = 0;
    recovery_alpha = icemodel.parameterLookup('cpl_recovery_alpha');
-   [primary_seb, primary_ieb, primary_cpl] = ...
+   [primary_seb, primary_ieb, primary_cpl, primary_diag] = ...
       runRobinProbe(probe, 2.0, false);
-   [retry_seb, retry_ieb, retry_cpl] = ...
+   [retry_seb, retry_ieb, retry_cpl, retry_diag] = ...
       runRobinProbe(probe, recovery_alpha, false);
 
+   % The primary probe runs both phases and still fails; the conservative
+   % probe suppresses its identical phase 2.
    testCase.verifyTrue(primary_seb && primary_ieb && ~primary_cpl);
+   testCase.verifyFalse(primary_diag.cpl_recovered);
+   testCase.verifyEqual(primary_diag.cpl_phase, 2);
    testCase.verifyTrue(retry_seb && retry_ieb && ~retry_cpl);
+   testCase.verifyEqual(retry_diag.cpl_phase, 1);
 
    opts = state.opts;
    opts.dt = 2;
@@ -235,8 +288,11 @@ function test_failed_robin_recovery_falls_through_substep_control(testCase)
    opts.vars1 = {};
    opts.vars2 = {};
 
-   % Four coupler calls distinguish primary+retry followed by two one-second
-   % primaries from the three primary calls run when the retry is skipped.
+   % Three substep attempts run (dt 2, then 1, then 1: the first forced
+   % advance credits one second and the loop needs one more attempt to
+   % close the step). Each attempt is ONE coupler call running both
+   % internal phases; the driver never calls the coupler twice for one
+   % attempt.
    prior = profile('status');
    restore_profiler = onCleanup(@() restoreProfiler(prior));
    profile off
@@ -252,7 +308,10 @@ function test_failed_robin_recovery_falls_through_substep_control(testCase)
    profile_names = string({profile_data.FunctionTable.FunctionName});
    coupler_rows = endsWith(profile_names, 'solve_surface_column_robin');
    coupler_calls = sum([profile_data.FunctionTable(coupler_rows).NumCalls]);
-   testCase.verifyEqual(coupler_calls, 4);
+   testCase.verifyEqual(coupler_calls, 3);
+   outer_rows = endsWith(profile_names, 'robinOuterLoop');
+   outer_calls = sum([profile_data.FunctionTable(outer_rows).NumCalls]);
+   testCase.verifyEqual(outer_calls, 6);
 
    testCase.verifyEqual(ice1.cpl_recovery_count, 0);
    testCase.verifyEqual(ice1.n_subfail, 2);
@@ -265,9 +324,10 @@ function test_failed_robin_recovery_falls_through_substep_control(testCase)
    testCase.verifyEqual(ice2.df_evp, zeros(size(state.f_liq)), 'AbsTol', 0);
    testCase.verifyEqual(ice2.df_lyr, zeros(size(state.f_liq)), 'AbsTol', 0);
 
+   % Solver policy is not prognostic state: no latch rides the restart.
    restart_file = icemodel.restartfile(returned_opts, 2016);
    saved = load(restart_file, 'restart');
-   testCase.verifyFalse(saved.restart.use_conservative_cpl);
+   testCase.verifyFalse(isfield(saved.restart, 'use_conservative_cpl'));
 
    % A failed retry and final forced advance must not run physical producers.
    budget_fields = string(fieldnames(ice1));
@@ -316,7 +376,18 @@ function test_forced_advance_is_time_only(testCase)
    % CHECKSUBSTEP take its bounded fallback immediately.
    testCase.verifyEqual(ice1.dt_sum, 1, 'AbsTol', 0);
    testCase.verifyEqual(ice1.n_subfail, 1, 'AbsTol', 0);
+
+   % A step whose only content was a forced advance reports the fixed
+   % sentinels from initialize_solver_diag, never the rejected solve's
+   % values: converged flags false, iteration counts and residuals NaN
+   % or zero.
+   testCase.verifyEqual(ice1.Tsfc_converged, 0, 'AbsTol', 0);
    testCase.verifyEqual(ice1.Tice_converged, 0, 'AbsTol', 0);
+   testCase.verifyTrue(isnan(ice1.Tice_numiter));
+   testCase.verifyEqual(ice1.cpl_iters, 0, 'AbsTol', 0);
+   testCase.verifyTrue(isnan(ice1.cpl_res));
+   testCase.verifyTrue(isnan(ice1.seb_res));
+   testCase.verifyEqual(ice1.cpl_recovery_count, 0, 'AbsTol', 0);
    testCase.verifyEqual(ice2.Tice, state.T, 'AbsTol', 0);
    testCase.verifyEqual(ice2.f_ice, state.f_ice, 'AbsTol', 0);
    testCase.verifyEqual(ice2.f_liq, f_liq_checkpoint, 'AbsTol', 0);
@@ -360,10 +431,14 @@ function base_opts = syntheticRunOpts(testCase)
    assert(~isfield(base_opts, 'use_coupled_vapor'));
 end
 
-function [ok_seb, ok_ieb, ok_cpl] = runRobinProbe(s, cpl_alpha, cpl_aitken)
+function [ok_seb, ok_ieb, ok_cpl, diag, result] = runRobinProbe( ...
+      s, cpl_alpha, cpl_aitken)
    %RUNROBINPROBE Exercise one explicit Robin coupling policy on a fixture.
+   %
+   % RESULT carries the accepted state so recovery tests can compare a
+   % recovered solve against a direct conservative solve exactly.
 
-   [~, ~, ~, ~, ~, ~, ok_seb, ok_ieb, ok_cpl] = ...
+   [Ts, T, f_ice, f_liq, U_vap, ~, k_eff, ok_seb, ok_ieb, ok_cpl, diag] = ...
       icemodel.couplers.solve_surface_column_robin( ...
       s.Ts, s.T, s.f_ice, s.f_liq, s.Sc, s.Sp, s.dz, s.delz, s.fn, ...
       s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, ...
@@ -371,8 +446,10 @@ function [ok_seb, ok_ieb, ok_cpl] = runRobinProbe(s, cpl_alpha, cpl_aitken)
       s.H_e, s.hv_atm, s.br_coefs, s.liqflag, s.chi, 3, s.tol, ...
       s.maxiter, s.alpha, s.use_aitken, s.jumpmax, s.cpl_Ts_tol, ...
       s.cpl_seb_tol, s.cpl_maxiter, cpl_alpha, cpl_aitken, ...
-      s.cpl_jumpmax, s.ro_sfc, s.snow_depth, s.opts.f_res_pore_ice, ...
+      s.cpl_jumpmax, s.cpl_alpha_min, s.ro_sfc, s.snow_depth, s.opts.f_res_pore_ice, ...
       s.opts);
+   result = struct('Ts', Ts, 'T', T, 'f_ice', f_ice, 'f_liq', f_liq, ...
+      'U_vap', U_vap, 'k_eff', k_eff);
 end
 
 function restoreProfiler(prior)

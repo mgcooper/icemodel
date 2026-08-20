@@ -384,7 +384,7 @@ end
 function test_budget_surface_mass_balance_and_merge_thin_layers(testCase)
    % budget_surface_mass_balance followed by merge_thin_layers should
    % combine a too-thin surface layer while preserving the expected output
-   % array sizes and merge diagnostic.
+   % array sizes and remesh budget counts.
 
    Tf = icemodel.physicalConstant('Tf');
 
@@ -397,15 +397,20 @@ function test_budget_surface_mass_balance_and_merge_thin_layers(testCase)
    d_liq = zeros(3, 1);
    d_evp = zeros(3, 1);
    d_lyr = zeros(3, 1);
+   dz = 0.04;
 
-   [T_new, f_ice_new, f_liq_new, ~, ~] = ...
+   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   [T_new, f_ice_new, f_liq_new, ~, ~, ~, ~, budget] = ...
       icemodel.column.budget_surface_mass_balance(T, f_ice, f_liq, ...
-      xf_liq, 0.0, d_liq, d_evp, 0.0, 0.02, 0.1);
-   [T_new, f_ice_new, f_liq_new, ~, ~, d_lyr_new, lcflag] = ...
+      xf_liq, 0.0, d_liq, d_evp, 0.0, 0.02, 0.1, budget, dz);
+   [T_new, f_ice_new, f_liq_new, ~, ~, d_lyr_new, budget] = ...
       icemodel.column.merge_thin_layers(T_new, f_ice_new, f_liq_new, Sc, ...
-      Sp, 0.04, 0.0, d_lyr, 0.1);
+      Sp, dz, 0.0, d_lyr, 0.1, budget);
 
-   testCase.verifyTrue(any(lcflag));
+   % f_ice(1) = 0.05 starts below f_ice_min = 0.1, so the top cell is the one
+   % merged; the observable is the budget's top-removal count, because
+   % merge_thin_layers returns no per-cell eligibility mask.
+   testCase.verifyGreaterThan(budget.mass_budget_top_deletion_count, 0);
    testCase.verifyEqual(numel(T_new), 3);
    testCase.verifyEqual(numel(f_ice_new), 3);
    testCase.verifyEqual(numel(f_liq_new), 3);

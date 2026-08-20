@@ -78,10 +78,10 @@ Cumulative merge export is retained in the mass ledger for closure checking but
 is neither scored nor plotted. A merge gives the joined cell the mean of the
 pair it replaces, so removing a nearly empty top cell still exports about half
 the pair's mass. Across the current cohort the series runs about 1.5 times melt,
-which measures the regridding rule rather than mass leaving the surface. Signed
-mass/energy ledgers and their
-non-cancelling gross channels remain separate so numerical closure cannot
-hide opposing remesh or domain exchanges.
+which measures the regridding rule rather than mass leaving the surface. The
+budget carries signed per-channel nets; the closure tolerances normalize with
+per-row component magnitudes so numerical closure cannot hide opposing remesh
+or domain exchanges.
 
 The orchestration entry point is
 `test/verification/run_promice_ablation_evaluation.m`. An empty `case_ids`

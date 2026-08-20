@@ -38,25 +38,12 @@ function test_icemodel_year_boundary_restart(testCase)
    verifyRestartRun(testCase, "icemodel", 2);
 end
 
-function test_icemodel_recovery_latch_survives_restart(testCase)
-   % A recovery before the save boundary must keep the resumed run on the same
-   % conservative policy as an uninterrupted invocation.
+function test_icemodel_recovery_is_restart_invariant(testCase)
+   % Recovery is per-substep coupler behavior, not persisted policy: no
+   % latch rides the restart file, and a resumed run reproduces the
+   % continuous run exactly through recovery events.
 
-   verifyRestartRun(testCase, "icemodel", 3, verify_recovery_latch=true);
-end
-
-function test_legacy_restart_defaults_recovery_latch_false(testCase)
-   % Restart files written before the recovery latch existed must retain their
-   % historical primary-policy behavior.
-
-   restart = struct('T', 1);
-   restart_file = fullfile(testCase.TestData.rootdir, 'legacy-restart.mat');
-   save(restart_file, 'restart');
-   opts = struct('use_restart', true, 'restartfile', restart_file);
-
-   returned = icemodel.loadRestartState(opts);
-
-   testCase.verifyFalse(returned.use_conservative_cpl);
+   verifyRestartRun(testCase, "icemodel", 3, verify_recovery=true);
 end
 
 function verifyRestartRun(testCase, smbmodel, solver, kwargs)
@@ -67,11 +54,11 @@ function verifyRestartRun(testCase, smbmodel, solver, kwargs)
       testCase
       smbmodel (1, 1) string
       solver (1, 1) double
-      kwargs.verify_recovery_latch (1, 1) logical = false
+      kwargs.verify_recovery (1, 1) logical = false
    end
 
    simyears = [2015 2016];
-   if kwargs.verify_recovery_latch
+   if kwargs.verify_recovery
       output_profile = "diagnostic";
       cpl_alpha = 2.0;
       cpl_aitken = false;
@@ -114,12 +101,12 @@ function verifyRestartRun(testCase, smbmodel, solver, kwargs)
       testCase.verifyTrue(isfield(restart.restart, 'r_eff'), ...
          'expected icemodel restart file to preserve r_eff');
    end
-   if kwargs.verify_recovery_latch
-      expected_seed_recovery = zeros(size(ice1_seed.cpl_recovery_count));
-      expected_seed_recovery(1) = 1;
-      testCase.verifyEqual(ice1_seed.cpl_recovery_count, ...
-         expected_seed_recovery);
-      testCase.verifyTrue(restart.restart.use_conservative_cpl);
+   if kwargs.verify_recovery
+      % At least the first forcing step recovers under the failing primary
+      % policy, and solver policy never rides the restart file.
+      testCase.verifyEqual(ice1_seed.cpl_recovery_count(1), 1);
+      testCase.verifyFalse( ...
+         isfield(restart.restart, 'use_conservative_cpl'));
    end
 
    % Resume the run
@@ -131,12 +118,9 @@ function verifyRestartRun(testCase, smbmodel, solver, kwargs)
    [ice1_restart, ice2_restart, opts_restart] = ...
       icemodel.test.helpers.runSmbModel(opts_resume);
 
-   if kwargs.verify_recovery_latch
-      testCase.verifyEqual(ice1_full.cpl_recovery_count, ...
-         zeros(size(ice1_full.cpl_recovery_count)));
-      testCase.verifyEqual(ice1_restart.cpl_recovery_count, ...
-         zeros(size(ice1_restart.cpl_recovery_count)));
-   end
+   % Recovery counts need no dedicated comparison: the nested equality
+   % below compares every ice1 channel, recovery counts included, between
+   % the continuous and resumed runs.
 
    [ice1_full_pp, ice2_full_pp] = icemodel.postprocess( ...
       ice1_full, ice2_full, opts_full, opts_full.output_years);

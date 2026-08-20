@@ -26,10 +26,10 @@ function [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, varargin)
    %  complete node-wise diagnostic conductivity. solve_column_enthalpy uses
    %  the four-input form with explicit zero vapor node conductivity, then
    %  adds conjugate vapor transport at the faces through
-   %  vapor_transport_faces.
+   %  vapor_transport_terms.
    %
    % See also: icemodel.column.firn_thermal_conductivity,
-   %  icemodel.column.vapor_transport_faces,
+   %  icemodel.column.vapor_transport_terms,
    %  icemodel.vapor.vapor_thermal_conductivity,
    %  icemodel.vapor.saturation_vapor_density, icemodel.vapor.vapor_diffusivity
    %

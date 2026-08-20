@@ -10,6 +10,9 @@ function fields = surfaceoutputs(kind)
    %   'diagnostic_suffix' the channels the diagnostic profile appends
    %   'icemodel_diagnostic_suffix' the diagnostic channels that only the
    %                       full column model writes
+   %   'additive_diagnostic' the subset of the solver diagnostics that
+   %                       retiming sums over a bin; isIncrementChannel
+   %                       derives additivity from it
    %
    % configureRun composes vars1 from these lists. It adds the model-specific
    % channels, such as df_rof for icemodel but not skinmodel, and sets where
@@ -22,6 +25,13 @@ function fields = surfaceoutputs(kind)
       kind = 'standard';
    end
 
+   % The additive subset of the solver diagnostics. Retiming sums these
+   % channels over a bin; the residual and iteration diagnostics
+   % (cpl_iters, cpl_res, seb_res, Tice_numiter) are per-step records,
+   % not sums. icemodel.isIncrementChannel derives additivity from this
+   % list.
+   additive_diagnostic = {'cpl_recovery_count'};
+
    switch lower(char(kind))
       case 'standard'
          fields = {'Tsfc', 'Qm', 'Qe', 'Qh', 'Qc', 'chi', 'balance', ...
@@ -33,7 +43,14 @@ function fields = surfaceoutputs(kind)
             'thf_z0q', 'thf_u_star', 'thf_L', 'thf_Re', 'thf_numiter', ...
              'thf_scalar_exchange_Qh', 'thf_scalar_exchange_Qe'};
       case 'icemodel_diagnostic_suffix'
-         fields = {'cpl_recovery_count'};
+         % Solver-health observability from the coupler diag struct,
+         % reported from the ACCEPTED solve (sentinels after a step of
+         % only forced advances). cpl_recovery_count counts accepted
+         % conservative recoveries per forcing step.
+         fields = [{'cpl_iters', 'cpl_res', 'seb_res'}, ...
+            additive_diagnostic];
+      case 'additive_diagnostic'
+         fields = additive_diagnostic;
       otherwise
          error('icemodel:namelists:surfaceoutputs:kind', ...
             'unsupported surface-output kind: %s', kind)

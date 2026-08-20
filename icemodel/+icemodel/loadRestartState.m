@@ -23,10 +23,4 @@ function restart = loadRestartState(opts)
    end
 
    restart = S.restart;
-
-   % Restart files written before solver-3 recovery existed have no latch.
-   % Their historical behavior is the primary coupling policy.
-   if ~isfield(restart, 'use_conservative_cpl')
-      restart.use_conservative_cpl = false;
-   end
 end

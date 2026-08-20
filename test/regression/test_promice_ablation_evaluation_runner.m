@@ -714,8 +714,10 @@ function model = selectedModelProvider(manifest, row, run_start, run_end)
    model.mass_budget_liquid_end_mwe(:) = 1;
    model.mass_budget_phase_solid_mwe = -solid_loss;
    model.mass_budget_phase_liquid_mwe = solid_loss;
+   % remesh_liquid_mwe alone closes the liquid_storage checkpoint; the
+   % schema carries no B/O liquid split (cloned_bottom_liquid,
+   % merge_export_liquid).
    model.mass_budget_remesh_liquid_mwe = -solid_loss;
-   model.mass_budget_merge_export_liquid_mwe = solid_loss;
    deletion = time == evaluation_start;
    model.mass_budget_top_deletion_count(deletion) = 1;
    model.mass_budget_top_deletion_height_m(deletion) = 0.01;

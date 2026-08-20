@@ -13,16 +13,28 @@ Shared:
   then a safeguarded secant step when the last two residuals bracket a root.
 - `initialize_coupler_history` returns the empty iterate history that the
   accelerator expects.
+- `initialize_solver_diag` returns the fixed-schema observability record
+  the two column couplers (`solve_surface_column_dirichlet`,
+  `solve_surface_column_robin`) fill and return as their final output.
+  `solve_skin_surface_column` returns its plain `n_iters` count instead.
 
-Production recovery:
-- `icemodel` uses the configured coupling relaxation and acceleration for the
-  primary attempt. Solver 3 alone retries a healthy-inner Robin outer failure
-  from the exact prognostic checkpoint with acceleration disabled and
-  relaxation no larger than the central conservative cap. A successful retry
-  latches that mode for the rest of the run. Diagnostic output records each
-  successful latch in the per-forcing-step `cpl_recovery_count` channel.
-  Failure dumps remain useful for the latest failure, but a later failure can
-  replace an earlier dump.
+Outputs:
+- Both column couplers return `[T_sfc, T_ice, f_ice, f_liq, U_vap, L_vap,
+  k_eff, ok_seb, ok_ieb, ok_cpl, diag]`. `U_vap` is the accepted face vapor
+  mass flux. `L_vap` is its face donor latent heat;
+  `icemodel.column.couple_vapor_step` uses it to route mass to the phase the
+  solve's energy carried.
+
+Recovery:
+- The Robin coupler owns recovery as default behavior. When the inner solve
+  is healthy but the outer loop exhausts its iterations, the coupler reruns
+  once from the entry state. The rerun disables acceleration and sets
+  relaxation to the conservative cap `cpl_alpha_min`. It self-suppresses
+  when the primary policy is already that conservative pair. `diag.cpl_phase` and
+  `diag.cpl_recovered` record the path; the driver counts accepted
+  recoveries in the per-forcing-step `cpl_recovery_count` channel. Failure
+  dumps are sequence-numbered per session, so successive failures do not
+  overwrite each other.
 
 Rules:
 - own Picard/Aitken and cross-domain convergence logic here

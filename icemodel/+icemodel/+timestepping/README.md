@@ -3,13 +3,20 @@
 Purpose: full-step/substep control, retry/reset flow, and timestep adaptation.
 
 Current contents:
-- `check_substep`
-- `reset_substep`
-- `update_substep`
-- `init_timesteps`
-- `new_timestep`
-- `next_step`
-- `update_force_advance_guard`
+- `initialize_timesteps`
+- `newtimestep`
+- `checksubstep`
+  - accept, retry, or force-advance one substep. Owns the cross-step
+    forced-advance streak guard (one full forcing step of consecutive
+    forced time is the limit)
+- `resetsubstep`
+- `acceptsubstep`
+  - accept one substep: checkpoint the state pass-through and credit the
+    substep time. A forced advance calls it with the restored checkpoint,
+    accepting elapsed time only
+- `nexttimestep`
+- `getforcings` and `getsubstepforcings`
+  - legacy met-struct scalarizers with no production caller
 
 Rules:
 - keep runtime control logic here, even when state payloads include column

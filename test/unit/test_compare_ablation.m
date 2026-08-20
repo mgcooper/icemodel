@@ -72,6 +72,11 @@ function test_comparison_rebases_and_closes_budgets(testCase)
       AbsTol=1e-12, RelTol=1e-12);
    testCase.verifyEqual(diagnostics.excluded.total_unique_excluded, 0);
    testCase.verifyTrue(all(diagnostics.identities.passed));
+   % The identities table carries exactly the five closure rows, in the
+   % fixed order the comparator evaluates them.
+   testCase.verifyEqual(diagnostics.identities.identity, ...
+      ["solid_storage"; "liquid_storage"; "phase_mass"; "vapor_energy"; ...
+      "remesh_solid"]);
    testCase.verifyTrue(any(diagnostics.materiality.material));
    testCase.verifyEqual(diagnostics.top_deletion.count, 2);
    testCase.verifyEqual(diagnostics.top_deletion.height_m, 0.2);
@@ -88,66 +93,6 @@ function test_comparison_rebases_and_closes_budgets(testCase)
       [0; 0.04; 0.04; 0.08; 0.08], AbsTol=1e-12);
    testCase.verifyFalse(any(diagnostics.effective_density.rigorous_bound));
    testCase.verifyEqual(summary.policy_version, policy.version);
-end
-
-function test_a_cohort_saved_before_the_redistribution_channels_compares( ...
-      testCase)
-   % A diagnostic timetable saved before the coupled vapor mode carries
-   % neither redistribution channel, and promiceAblationPolicy builds its
-   % required list from the live budgetoutputs. Rejecting that cohort would
-   % force a rerun for channels that cannot change what it recorded, which is
-   % the outcome the channel-schema check exists to avoid. Both channels are
-   % additive, so zero is what such a run wrote.
-
-   [observations, model] = makeInputs();
-
-   % makeInputs wraps the diagnostic timetable in a struct, so drop the two
-   % columns there, the way a cohort saved before those channels existed
-   % would lack them.
-   legacy = model;
-   legacy.data = removevars(legacy.data, ...
-      {'mass_budget_vapor_redistribution_solid_mwe', ...
-      'mass_budget_vapor_redistribution_liquid_mwe', ...
-      'mass_budget_vapor_redistribution_unapplied_j_m2', ...
-      'mass_budget_vapor_redistribution_solid_gross_mwe', ...
-      'mass_budget_vapor_redistribution_liquid_gross_mwe', ...
-      'mass_budget_vapor_redistribution_unapplied_gross_j_m2'});
-   testCase.assertFalse(ismember( ...
-      "mass_budget_vapor_redistribution_solid_mwe", ...
-      string(legacy.data.Properties.VariableNames)));
-
-   [summary_legacy, aligned_legacy] = ...
-      icemodel.verification.compareAblation(observations, legacy);
-   [summary_full, aligned_full] = ...
-      icemodel.verification.compareAblation(observations, model);
-
-   % The fixture writes zero into both channels, so backfilling them must
-   % reproduce the full-schema comparison exactly.
-   testCase.verifyEqual(summary_legacy.classification, ...
-      summary_full.classification);
-   testCase.verifyEqual(aligned_legacy.model_solid_loss_mwe, ...
-      aligned_full.model_solid_loss_mwe, AbsTol=0);
-   testCase.verifyEqual(aligned_legacy.model_melt_mwe, ...
-      aligned_full.model_melt_mwe, AbsTol=0);
-end
-
-function test_a_retired_coupled_schema_cohort_is_rejected(testCase)
-   % A cohort saved under the retired coupled schema recorded interior
-   % transport inside the surface vapor channels and corrected the vapor
-   % identity through mass_budget_vapor_redistribution_j_m2. Such a cohort
-   % closes neither the old identity nor the present one, so a nonzero
-   % retired channel must produce a rerun error, not a false residual.
-
-   [observations, model] = makeInputs();
-
-   retired = model;
-   retired.data = addvars(retired.data, ...
-      1e-3 * ones(height(retired.data), 1), ...
-      'NewVariableNames', {'mass_budget_vapor_redistribution_j_m2'});
-
-   testCase.verifyError( ...
-      @() icemodel.verification.compareAblation(observations, retired), ...
-      'icemodel:verification:compareAblation:retiredCoupledSchema');
 end
 
 function test_signed_density_band_orders_bounds_and_preserves_endpoints(testCase)
@@ -287,8 +232,6 @@ function test_separate_domain_terms_prevent_cancellation(testCase)
    [observations, model] = makeInputs();
    model.data.mass_budget_cloned_bottom_solid_mwe(2) = 0.1;
    model.data.mass_budget_merge_export_solid_mwe(2) = 0.1;
-   model.data.mass_budget_cloned_bottom_solid_gross_mwe(2) = 0.1;
-   model.data.mass_budget_merge_export_solid_gross_mwe(2) = 0.1;
 
    [summary, ~, diagnostics] = ...
       icemodel.verification.compareAblation(observations, model);
@@ -304,43 +247,16 @@ function test_separate_domain_terms_prevent_cancellation(testCase)
       separate)));
 end
 
-function test_native_gross_survives_hourly_cancellation(testCase)
-   % Native event gross must remain visible when every hourly signed
-   % remesh term has cancelled to zero.
-   [observations, model] = makeInputs();
-   model.data.mass_budget_remesh_solid_gross_mwe(2) = 0.2;
-   model.data.mass_budget_cloned_bottom_solid_gross_mwe(2) = 0.1;
-   model.data.mass_budget_merge_export_solid_gross_mwe(2) = 0.1;
-
-   [summary, ~, diagnostics] = ...
-      icemodel.verification.compareAblation(observations, model);
-
-   testCase.verifyTrue(summary.physical_comparable);
-   material = diagnostics.materiality( ...
-      diagnostics.materiality.channel == "remesh_solid", :);
-   testCase.verifyEqual(material.signed_net_mwe, 0);
-   testCase.verifyEqual(material.gross_mwe, 0.2);
-   testCase.verifyTrue(material.material);
-   identity = diagnostics.identities( ...
-      diagnostics.identities.identity == "remesh_solid", :);
-   testCase.verifyEqual(identity.normalization, 0.2, AbsTol=1e-12);
-end
-
 function test_liquid_storage_remains_diagnostic_only(testCase)
    % Retained meltwater is material state evidence, but without a demonstrated
    % observation operator it cannot arithmetically correct solid loss.
    [observations, model] = makeInputs();
    phase_liquid = model.data.mass_budget_phase_liquid_mwe;
    model.data.mass_budget_remesh_liquid_mwe(:) = 0;
-   model.data.mass_budget_merge_export_liquid_mwe(:) = 0;
-   model.data.mass_budget_remesh_liquid_gross_mwe(:) = 0;
-   model.data.mass_budget_merge_export_liquid_gross_mwe(:) = 0;
    model.data.mass_budget_liquid_start_mwe = ...
       1 + [0; cumsum(phase_liquid(1:end - 1))];
    model.data.mass_budget_liquid_end_mwe = ...
       model.data.mass_budget_liquid_start_mwe + phase_liquid;
-   model.data.mass_budget_liquid_storage_gross_mwe = ...
-      abs(phase_liquid);
 
    [summary, ~, diagnostics] = ...
       icemodel.verification.compareAblation(observations, model);
@@ -359,10 +275,7 @@ function test_condensation_overflow_remains_diagnostic_only(testCase)
    [Lv, ro_liq] = icemodel.physicalConstant('Lv', 'ro_liq');
    overflow = 0.1;
    model.data.mass_budget_condensation_overflow_mwe(2) = overflow;
-   model.data.mass_budget_condensation_overflow_gross_mwe(2) = overflow;
    model.data.mass_budget_vapor_potential_j_m2(2) = ...
-      ro_liq * Lv * overflow;
-   model.data.mass_budget_vapor_potential_gross_j_m2(2) = ...
       ro_liq * Lv * overflow;
 
    [summary, ~, diagnostics] = ...
@@ -391,20 +304,13 @@ function test_physical_dry_vapor_closes_fixed_mwe_identity(testCase)
    % Post one dry-sublimation event and carry its storage change through every
    % later checkpoint so both vapor energy and solid storage remain closed.
    model.data.mass_budget_vapor_solid_mwe(event_row) = vapor_solid_mwe;
-   model.data.mass_budget_vapor_solid_gross_mwe(event_row) = ...
-      abs(vapor_solid_mwe);
    model.data.mass_budget_vapor_potential_j_m2(event_row) = ...
       ro_liq * Lv * d_pevp;
-   model.data.mass_budget_vapor_potential_gross_j_m2(event_row) = ...
-      abs(ro_liq * Lv * d_pevp);
    model.data.mass_budget_solid_end_mwe(event_row:end) = ...
       model.data.mass_budget_solid_end_mwe(event_row:end) + vapor_solid_mwe;
    model.data.mass_budget_solid_start_mwe(event_row + 1:end) = ...
       model.data.mass_budget_solid_start_mwe(event_row + 1:end) ...
       + vapor_solid_mwe;
-   model.data.mass_budget_solid_storage_gross_mwe(event_row) = ...
-      model.data.mass_budget_solid_storage_gross_mwe(event_row) ...
-      + abs(vapor_solid_mwe);
 
    [summary, ~, diagnostics] = ...
       icemodel.verification.compareAblation(observations, model);
@@ -416,10 +322,13 @@ function test_physical_dry_vapor_closes_fixed_mwe_identity(testCase)
 end
 
 function test_exact_window_normalization_ignores_storage_path_length(testCase)
-   % The closure scale is |Delta q| plus physical-flux gross. Storage
-   % path length is a separate materiality diagnostic and must not inflate it.
+   % The closure scale is |Delta q| plus physical-flux gross. An extra
+   % column outside the closure formula must not inflate it: no gross
+   % channel exists anymore, so an unrelated column is the sole remaining
+   % way a fixture could leak an unwanted term into the identity.
    [observations, model, increment] = makeInputs();
-   model.data.mass_budget_solid_storage_gross_mwe(:) = 1e6;
+   model.data.unrelated_diagnostic_mwe = ...
+      1e6 * ones(height(model.data), 1);
 
    [~, ~, diagnostics] = ...
       icemodel.verification.compareAblation(observations, model);
@@ -452,22 +361,17 @@ function test_forcing_step_residuals_cannot_cancel(testCase)
 end
 
 function test_phase_mass_uses_combined_forcing_step_increment(testCase)
-   % Opposing phase residuals across rows must not cancel. Compensating remesh
-   % terms keep the other storage and domain identities closed for isolation.
+   % Opposing phase residuals across rows must not cancel. The phase_mass
+   % identity tests p_s == -p_l at every forcing step, normalized by
+   % |step_delta| + |step_flux|; a compensating remesh term keeps the
+   % liquid storage identity closed so the failure stays isolated to
+   % phase_mass.
    [observations, model] = makeInputs();
    phase_error = [0; 1e-4; -1e-4; 0; 0; 0];
    model.data.mass_budget_phase_liquid_mwe = ...
       model.data.mass_budget_phase_liquid_mwe + phase_error;
    model.data.mass_budget_remesh_liquid_mwe = ...
       model.data.mass_budget_remesh_liquid_mwe - phase_error;
-   model.data.mass_budget_merge_export_liquid_mwe = ...
-      -model.data.mass_budget_remesh_liquid_mwe;
-   model.data.mass_budget_phase_liquid_gross_mwe = ...
-      abs(model.data.mass_budget_phase_liquid_mwe);
-   model.data.mass_budget_remesh_liquid_gross_mwe = ...
-      abs(model.data.mass_budget_remesh_liquid_mwe);
-   model.data.mass_budget_merge_export_liquid_gross_mwe = ...
-      abs(model.data.mass_budget_merge_export_liquid_mwe);
 
    [~, ~, diagnostics] = ...
       icemodel.verification.compareAblation(observations, model);
@@ -560,20 +464,13 @@ function test_required_model_field_has_stable_error(testCase)
       'icemodel:verification:compareAblation:missingModelField');
 end
 
-function test_a_cohort_lacking_an_unread_channel_still_compares(testCase)
-   % A cohort saved before a diagnostic channel was appended lacks that
-   % column. The comparison never reads it, so its absence must not reject
-   % the cohort and force a multi-hour rerun.
-   %
-   % Requiring every channel the namelist names would fail this case.
+function test_an_extra_unknown_channel_still_compares(testCase)
+   % A cohort may carry a column this comparison never reads, such as a
+   % channel a later report adds. The comparison must ignore it rather
+   % than reject the cohort; only a missing required field errors.
    [observations, model] = makeInputs();
-   unread = "mass_budget_vapor_redistribution_unapplied_j_m2";
-   testCase.assumeTrue(ismember(unread, ...
-      string(model.data.Properties.VariableNames)));
-   testCase.assertFalse(ismember(unread, ...
-      icemodel.verification.namelists.ablationReportChannels('ledger')));
-
-   model.data = removevars(model.data, unread);
+   model.data.unread_diagnostic_channel_mwe = ...
+      zeros(height(model.data), 1);
 
    returned = icemodel.verification.compareAblation(observations, model);
    testCase.verifyClass(returned, 'struct');
@@ -718,16 +615,6 @@ function test_nonfinite_ledger_and_endpoint_errors_are_stable(testCase)
       'icemodel:verification:compareAblation:badEndpointDeficit');
 end
 
-function test_negative_gross_has_stable_error(testCase)
-   % Gross is an absolute accepted-event total and cannot be negative.
-   [observations, model] = makeInputs();
-   model.data.mass_budget_phase_solid_gross_mwe(2) = -1;
-
-   testCase.verifyError(@() icemodel.verification.compareAblation( ...
-      observations, model), ...
-      'icemodel:verification:compareAblation:negativeGross');
-end
-
 function [observations, model, increment] = makeInputs()
    %MAKEINPUTS Build a closed synthetic five-hour ablation comparison.
    time = datetime(2026, 7, 1, 'TimeZone', 'UTC') + hours((0:4)');
@@ -748,6 +635,10 @@ function [observations, model, increment] = makeInputs()
    % Initialize every required diagnostic from the canonical registry, then
    % populate one physically closed interval-start melt/export ledger. The final
    % row has a large future-interval increment that must not enter [t0,t4).
+   % The fixture carries exactly the required model fields -- budgetoutputs
+   % ('all') plus cumulativeoutputs -- and closes the five identities
+   % (solid_storage, liquid_storage, phase_mass, vapor_energy, remesh_solid)
+   % that icemodel.verification.compareAblation checks.
    model_time = [time(1) - hours(1); time];
    n_model = numel(model_time);
    model.data = timetable('RowTimes', model_time);
@@ -767,14 +658,10 @@ function [observations, model, increment] = makeInputs()
    model.data.mass_budget_liquid_end_mwe(:) = 1;
    model.data.mass_budget_phase_solid_mwe = phase_solid;
    model.data.mass_budget_phase_liquid_mwe = phase_liquid;
+   % remesh_liquid_mwe alone closes the liquid_storage checkpoint. The
+   % schema carries no B/O liquid split (cloned_bottom_liquid,
+   % merge_export_liquid), so no compensating export term is set.
    model.data.mass_budget_remesh_liquid_mwe = remesh_liquid;
-   model.data.mass_budget_merge_export_liquid_mwe = -remesh_liquid;
-   model.data.mass_budget_solid_storage_gross_mwe = solid_loss;
-   model.data.mass_budget_phase_solid_gross_mwe = abs(phase_solid);
-   model.data.mass_budget_phase_liquid_gross_mwe = abs(phase_liquid);
-   model.data.mass_budget_remesh_liquid_gross_mwe = abs(remesh_liquid);
-   model.data.mass_budget_merge_export_liquid_gross_mwe = ...
-      abs(remesh_liquid);
    model.data.mass_budget_top_deletion_count([2, 4]) = 1;
    model.data.mass_budget_top_deletion_height_m([2, 4]) = 0.1;
    model.data.mass_budget_top_deletion_count(end) = 99;

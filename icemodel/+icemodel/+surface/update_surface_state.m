@@ -43,7 +43,7 @@ function [liqflag, ro_sfc, hv_atm, H_e, f_res_por] = ...
    %
    % See also:
    %   icemodel.surface.initialize_surface_state,
-   %   icemodel.timestepping.updatesubstep
+   %   icemodel.timestepping.acceptsubstep
    %
    %#codegen
 

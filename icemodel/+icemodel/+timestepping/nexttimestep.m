@@ -74,7 +74,7 @@ function [metstep, substep, dt_new] = nexttimestep(metstep, substep, dt_max, ...
       dt_new = dt_max / substep;
    end
 
-   % Enforce dt_min = dt_max / maxsubstep. updatesubstep can shorten dt_new
+   % Enforce dt_min = dt_max / maxsubstep. acceptsubstep can shorten dt_new
    % below dt_min so the final substep exactly completes a full step.
    dt_new = max(dt_new, dt_max / maxsubstep);
    metstep = metstep + 1;

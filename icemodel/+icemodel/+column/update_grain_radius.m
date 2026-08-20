@@ -1,26 +1,32 @@
-function r_eff = update_grain_radius(r_eff, f_liq, d_vap_faces, dt)
-   %UPDATE_GRAIN_RADIUS Grow thermal grains from realized vapor exchange.
+function r_eff = update_grain_radius(r_eff, f_liq, U_vap, d_vap_applied, ...
+      dz1, dt)
+   %UPDATE_GRAIN_RADIUS Grow thermal grains from the substep vapor exchange.
    %
-   % r_eff = update_grain_radius(r_eff, f_liq, d_vap_faces, dt)
+   % r_eff = update_grain_radius(r_eff, f_liq, U_vap, d_vap_applied, dz1, dt)
    %
    % Updates the thermal grain radius following Jordan (1991) SNTHERM89
-   % Eqs. 33-34. Dry growth uses the gross vapor exchange accumulated at
-   % faces during the accepted substeps. Wet growth uses the liquid fraction.
-   % This function does not diagnose vapor transport or saturation state.
+   % Eqs. 33-34, once per accepted substep. Dry growth uses the substep's
+   % own instantaneous face-flux magnitudes, the form Jordan's Eq. 33
+   % integrates, so no cross-substep accumulator is needed. Wet growth
+   % uses the concurrent liquid fraction. This function does not diagnose
+   % vapor transport or saturation state.
    %
    % Grain growth is monotonic. Other processes must represent grain-size
    % reductions, including fresh-snow deposition, wind-slab formation, and
    % sublimation-driven surface rounding.
    %
    % Inputs:
-   %   r_eff       - Thermal grain effective radius [m] (JJ x 1)
-   %   f_liq       - Volumetric liquid water fraction (JJ x 1)
-   %   d_vap_faces - Gross realized vapor exchange over the forcing step
-   %                 [m w.e.] (JJ+1 x 1)
-   %   dt          - Sum of physically accepted substep durations [s]
+   %   r_eff         - Thermal grain effective radius [m] (JJ x 1)
+   %   f_liq         - Volumetric liquid water fraction (JJ x 1)
+   %   U_vap         - Accepted interior vapor mass flux [kg m-2 s-1]
+   %                   (JJ+1 x 1, boundary faces zero)
+   %   d_vap_applied - Realized surface vapor exchange this substep [-],
+   %                   a signed top-cell liquid-water volume fraction
+   %   dz1           - Top control-volume thickness [m]
+   %   dt            - Accepted substep duration [s]
    %
    % Output:
-   %   r_eff       - Updated thermal grain effective radius [m] (JJ x 1)
+   %   r_eff         - Updated thermal grain effective radius [m] (JJ x 1)
    %
    % The thermal radius is distinct from the optically equivalent radius in
    % the spectral model. See icemodel.radiation.initialize_spectral_model and
@@ -41,10 +47,12 @@ function r_eff = update_grain_radius(r_eff, f_liq, d_vap_faces, dt)
       ro_liq = icemodel.physicalConstant('ro_liq');
    end
 
-   % Convert the accumulated gross water-equivalent depths to step-mean
-   % magnitude fluxes. Reversing substep exchanges therefore add, not cancel.
+   % Growth scales with the flux magnitude, so the surface face carries the
+   % realized surface exchange as a magnitude flux: rejected demand never
+   % crossed the surface, and a sign never cancels interior transport.
    JJ = numel(r_eff);
-   U_vap_faces = d_vap_faces * ro_liq / dt;
+   U_vap_faces = U_vap;
+   U_vap_faces(1) = abs(d_vap_applied) * dz1 * ro_liq / dt;
    U_vap_nodes = min( ...
       0.5 * (abs(U_vap_faces(1:JJ)) + abs(U_vap_faces(2:JJ+1))), Uv_max);
 

@@ -22,7 +22,7 @@ function [tf, f_res] = vapor_exchange_is_wet(f_ice, f_liq, f_res_por)
    % phase and face latent heat disagree. In the disagreement band, a cell
    % would gain or lose about twelve percent of its mass.
    %
-   % icemodel.column.vapor_transport_faces also calls this predicate
+   % icemodel.column.vapor_transport_terms also calls this predicate
    % to select the donor-cell latent heat. The solve energy and applied mass
    % then use the same latent heat in the disagreement band below.
    %

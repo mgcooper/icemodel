@@ -1,17 +1,17 @@
-function [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces] = ...
-      vapor_transport_faces(T, f_ice, f_liq, k_eff, ro_vap, ...
-      dro_vapdT, De, delz, fn, f_res_por)
-   %VAPOR_TRANSPORT_FACES Build the coupled vapor face transport terms.
+function [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces, ...
+      L_vap_faces] = vapor_transport_terms(T, f_ice, f_liq, k_eff, ...
+      ro_vap, dro_vapdT, De, delz, fn, f_res_por)
+   %VAPOR_TRANSPORT_TERMS Build the coupled vapor face transport terms.
    %
-   %  [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces] = ...
-   %     icemodel.column.vapor_transport_faces(T, f_ice, f_liq, ...
-   %     k_eff, ro_vap, dro_vapdT, De, delz, fn, f_res_por)
+   %  [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces, ...
+   %     L_vap_faces] = icemodel.column.vapor_transport_terms(T, f_ice, ...
+   %     f_liq, k_eff, ro_vap, dro_vapdT, De, delz, fn, f_res_por)
    %
    % Returns the vapor-coupled face terms for the enthalpy solve: the combined
-   % matrix conductivity, its vapor share, the deferred vapor-energy flux, and
-   % the conjugate vapor-mass flux. The conductive and diffusive node values
-   % use the same fn-weighted harmonic face interpolation (Patankar 1980,
-   % Eq. 4.9).
+   % matrix conductivity, its vapor share, the deferred vapor-energy flux, the
+   % conjugate vapor-mass flux, and the face donor latent heat. The
+   % conductive and diffusive node values use the same fn-weighted harmonic
+   % face interpolation (Patankar 1980, Eq. 4.9).
    %
    % The exact vapor energy flux, positive downward, is
    %
@@ -25,10 +25,14 @@ function [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces] = ...
    % coefficient in the matrix.
    %
    % K_EFF is the vapor-free node conductivity. L_face and its tangent come
-   % from the donor node. The donor phase uses vapor_exchange_is_wet, which
-   % is also the phase predicate used when the transported mass is applied.
-   % Both vapor boundary faces are closed; the surface exchange enters
-   % through the surface energy and mass balances instead.
+   % from the donor node. The donor phase uses vapor_exchange_is_wet at the
+   % solve state, and the returned L_VAP_FACES hands that decision to the
+   % mass application (icemodel.column.couple_vapor_step), so the phase the
+   % mass lands in matches the latent heat the face energy carried. One
+   % derivation serves both sides; recomputing the mask after the surface
+   % exchange could flip the top cell's class. Both vapor boundary faces
+   % are closed; the surface exchange enters through the surface energy
+   % and mass balances instead.
    %
    % Inputs
    %   T         - Node temperature [K] (JJ x 1).
@@ -47,6 +51,8 @@ function [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces] = ...
    %   k_vap_faces          - Vapor matrix conductivity [W m-1 K-1].
    %   q_vap_deferred_faces - Deferred vapor-energy flux [W m-2].
    %   U_vap_faces          - Vapor-mass flux [kg m-2 s-1].
+   %   L_vap_faces          - Face donor latent heat [J kg-1] (JJ+1 x 1),
+   %                          Lv where the donor node is wet, Ls otherwise.
    %
    % See also: icemodel.column.assemble_enthalpy_system,
    %  icemodel.column.vapor_exchange_is_wet
@@ -89,6 +95,7 @@ function [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces] = ...
    donor_is_north = d_ro_vap <= 0;
    L_faces = L_south;
    L_faces(donor_is_north) = L_north(donor_is_north);
+   L_vap_faces = L_faces;
 
    % Use the donor tangent for the positive matrix term.
    tangent_north = dro_vapdT_nodes(1:JJ+1);

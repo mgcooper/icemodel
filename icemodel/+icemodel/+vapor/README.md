@@ -23,5 +23,5 @@ Contents:
 Rules:
 - keep general thermodynamic transforms here
 - keep column transport and microstructure updates, such as
-  `vapor_transport_faces` and `update_grain_radius`, in
+  `vapor_transport_terms` and `update_grain_radius`, in
   `icemodel.column`

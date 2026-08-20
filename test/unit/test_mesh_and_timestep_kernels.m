@@ -142,9 +142,9 @@ function test_nexttimestep_adapts_substep_divisor(testCase)
    testCase.verifyLessThan(dt_fail, 300);
 end
 
-function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
-   % Reset and update helpers should restore failed-substep state, then
-   % advance the accepted state and time bookkeeping consistently.
+function test_resetsubstep_and_acceptsubstep_restore_and_advance(testCase)
+   % The reset helper restores failed-substep state; the accept helper
+   % checkpoints the accepted state and advances time consistently.
 
    Ls = icemodel.physicalConstant('Ls');
    ro_atm_val = 1.2;
@@ -158,7 +158,7 @@ function test_resetsubstep_and_updatesubstep_restore_and_advance(testCase)
       900, 2, 9, 0, 450);
 
    [Ts_up, T_up, f_ice_up, f_liq_up, k_eff_up, dt_sum, dt_next] = ...
-      icemodel.timestepping.updatesubstep(Ts, T, f_ice, ...
+      icemodel.timestepping.acceptsubstep(Ts, T, f_ice, ...
       f_liq, k_eff, 900, 450, 300, 1e-12);
 
    testCase.verifyEqual([Ts_up; T_up], [270; 269; 268], 'AbsTol', 0);
@@ -190,7 +190,7 @@ function test_checksubstep_forces_advance_at_maxsubstep(testCase)
       icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
       [0.01; 0.01], [3; 4], 271, [270; 269], [0.8; 0.8], ...
       [0.02; 0.02], [1; 2], 150, 450, 900, 1, 10, 1, 2, 1, false, ...
-      eps, false);
+      false, 0.0, 'icemodel');
 
    testCase.verifyTrue(ok);
    testCase.verifyEqual(Ts, 271);
@@ -213,7 +213,7 @@ function test_checksubstep_retries_failed_solve_from_checkpoint(testCase)
       icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
       [0.01; 0.01], [3; 4], 271, [270; 269], [0.8; 0.8], ...
       [0.02; 0.02], [1; 2], 0, 900, 900, 1, 10, 1, 4, 0, false, ...
-      eps, false);
+      false, 0.0, 'icemodel');
 
    testCase.verifyFalse(ok);
    testCase.verifyEqual(Ts, 271);
@@ -237,7 +237,7 @@ function test_checksubstep_clamps_overshot_failure_count(testCase)
       icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
       [0.01; 0.01], [3; 4], 271, [270; 269], [0.8; 0.8], ...
       [0.02; 0.02], [1; 2], 150, 450, 900, 1, 10, 10, 10, 10, ...
-      false, eps, false);
+      false, false, 0.0, 'icemodel');
 
    testCase.verifyTrue(ok);
    testCase.verifyEqual(Ts, 271);
@@ -262,7 +262,7 @@ function test_checksubstep_debug_dump_records_force_advance_context(testCase)
    icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
       [0.01; 0.01], [3; 4], 271, [270; 269], [0.8; 0.8], ...
       [0.02; 0.02], [1; 2], 150, 450, 900, 1, 10, 1, 2, 1, true, ...
-      eps, false, 450, 900);
+      false, 450, 'icemodel');
 
    loaded = load(debug_file, 'debug_state');
    debug_state = loaded.debug_state;
@@ -276,24 +276,33 @@ function test_checksubstep_debug_dump_records_force_advance_context(testCase)
    testCase.verifyEqual(debug_state.checkpoint.k_eff, [1; 2], 'AbsTol', 0);
 end
 
-function test_force_advance_guard_resets_after_recovery(testCase)
-   % A successful accepted substep should clear any earlier force-advance
-   % streak, so a transient recovery does not affect later timesteps.
+function test_force_advance_streak_resets_on_acceptance(testCase)
+   % An accepted substep clears any earlier force-advance streak, so a
+   % transient recovery does not affect later timesteps. The streak guard
+   % lives inside checksubstep, its only caller.
 
-   streak_dt = icemodel.timestepping.update_force_advance_guard(300, true, 300, ...
-      900, 2, 10, 'icemodel');
-   streak_dt = icemodel.timestepping.update_force_advance_guard(streak_dt, false, ...
-      300, 900, 2, 10, 'icemodel');
+   [~, ~, ~, ~, ~, ~, ~, ~, ok, forced_advance, streak_dt] = ...
+      icemodel.timestepping.checksubstep(270, [269; 268], [0.9; 0.9], ...
+      [0.01; 0.01], [3; 4], 271, [270; 269], [0.8; 0.8], ...
+      [0.02; 0.02], [1; 2], 150, 450, 900, 1, 10, 1, 2, 1, false, ...
+      true, 300, 'icemodel');
 
+   testCase.verifyTrue(ok);
+   testCase.verifyFalse(forced_advance);
    testCase.verifyEqual(streak_dt, 0, 'AbsTol', 0);
 end
 
-function test_force_advance_guard_errors_after_full_timestep(testCase)
-   % Persistent force advance beyond one full forcing step should fail fast
-   % instead of letting a long broken run continue.
+function test_force_advance_streak_errors_after_full_timestep(testCase)
+   % Consecutive forced-advance time beyond one full forcing step fails
+   % fast instead of letting a long broken run integrate checkpoints
+   % forward. The failing call below forces an advance with the streak
+   % already at the one-step limit.
 
-   testCase.verifyError(@() icemodel.timestepping.update_force_advance_guard(900, ...
-      true, 1, 900, 2, 10, 'icemodel'), 'icemodel:ForceAdvanceStreakExceeded');
+   testCase.verifyError(@() icemodel.timestepping.checksubstep( ...
+      270, [269; 268], [0.9; 0.9], ...
+      [0.01; 0.01], [3; 4], 271, [270; 269], [0.8; 0.8], ...
+      [0.02; 0.02], [1; 2], 150, 450, 900, 1, 10, 1, 2, 1, false, ...
+      false, 900, 'icemodel'), 'icemodel:ForceAdvanceStreakExceeded');
 end
 
 function cleanupDebugFile(debug_file)
@@ -322,8 +331,10 @@ function test_bottom_layer_merge_removes_it_and_conserves_mass(testCase)
    water_equivalent = @(fi, fl) sum(ro_ice / ro_liq * fi + fl) * dz;
    expected = water_equivalent(f_ice, f_liq);
 
+   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
    [~, returned_f_ice, returned_f_liq] = icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, zeros_col, zeros_col, dz, 0.0, zeros_col, f_ice_min);
+      T, f_ice, f_liq, zeros_col, zeros_col, dz, 0.0, zeros_col, ...
+      f_ice_min, budget);
 
    testCase.verifyFalse(any(returned_f_ice < f_ice_min))
    testCase.verifyEqual( ...
