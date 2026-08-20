@@ -664,11 +664,16 @@ function test_baseline_runners_select_registered_data_case_without_running(testC
 
    env_names = ["ICEMODEL_EXPECTED_RUNNER_ROOT"; ...
       "ICEMODEL_EXPECTED_RUNNER_CASENAME"; ...
-      "ICEMODEL_REGRESSION_BASELINE"; "ICEMODEL_TEST_DATA_ROOT"];
+      "ICEMODEL_REGRESSION_BASELINE"; "ICEMODEL_TEST_DATA_ROOT"; ...
+      "ICEMODEL_TEST_SESSION_ACTIVITY"];
    env_values = arrayfun(@(name) string(getenv(name)), env_names);
    original_path = path;
    cleanup = onCleanup(@() restoreRunnerFixture( ...
       original_path, fixture_root, env_names, env_values));
+
+   % This probe aborts the runners at bootstrap and times nothing, so the
+   % contaminated-session refusal does not apply; present a clean session.
+   setenv('ICEMODEL_TEST_SESSION_ACTIVITY', '');
 
    writeRunnerBootstrapStub(fullfile(helper_dir, ...
       "bootstrapTestEnvironment.m"));
@@ -706,6 +711,13 @@ function test_release_runners_verify_registered_fixture_capability(testCase)
    data_root = string(tempname);
    mkdir(data_root)
    cleanup = onCleanup(@() rmdir(data_root, 's'));
+
+   % This probe stops at the capability check and times nothing, so the
+   % contaminated-session refusal does not apply; present a clean session.
+   prior_activity = getenv('ICEMODEL_TEST_SESSION_ACTIVITY');
+   activity_cleanup = onCleanup(@() ...
+      setenv('ICEMODEL_TEST_SESSION_ACTIVITY', prior_activity));
+   setenv('ICEMODEL_TEST_SESSION_ACTIVITY', '');
 
    verifyFixtureCapabilityError(testCase, @() run_regression_suite( ...
       tier="smoke", smbmodel="icemodel", baseline="v1.1", ...

@@ -142,6 +142,42 @@ Programmatic regression helpers:
    - Formal performance runs force the MATLAB profiler off. Whole-model
      runtimes must stay inside the accepted two-sided tolerance band so an
      unexplained speedup cannot hide an inflated or incomplete reference.
+   - Measurement protocol. Formal timings are sensitive to session
+     history (JIT state, persistents, heap layout), so `run_perf_suite`
+     enforces four controls:
+     1. `isolation="process"` (the default) runs every case in a fresh
+        `matlab -batch` subprocess. Use this mode for every formal
+        accept/reject verdict on a refactor. The per-case spec and result
+        MAT files land in the run's artifact folder. The opt-in
+        `isolation="session"` times cases in the current session (with
+        `clear functions` hygiene before each case) and is for quick
+        diagnostics only.
+     2. Every suite runner records itself in the session-activity record
+        (`icemodel.test.helpers.markTestSessionDirty`). An in-session
+        formal perf run REFUSES to start in a session that already ran
+        another suite (`icemodel:test:perf:contaminatedSession`); use
+        process isolation or a fresh session. `matlab -batch` one-shot
+        runs always start clean.
+     3. Case order is randomized (the seed rides the artifact), and each
+        case's samples pass a dispersion validity gate
+        (`max/median <= 1.5`). An invalid sample set re-measures once,
+        then fails as "measurement invalid" — never a phantom verdict.
+     4. An ambient anchor re-measures the first executed case at the end
+        of the run. The dispersion gate cannot see load or scheduling
+        shifts that are steady within each case but different across
+        cases; an anchor drift above 15 percent marks every verdict in
+        the run ambient-invalid (`meta.ambient_stable = false`).
+   - A/A acceptance for the protocol: two consecutive
+     `isolation="process"` runs of the same commit must pass the
+     tolerance band against each other on all rows.
+   - Isolation joins the baseline-compatibility check: timings compare
+     against a baseline only when both used the same isolation protocol
+     (a baseline without the field counts as "session"). Measured on
+     this host, process-isolated cases run a systematic ~25 percent
+     slower than session-shared-state cases, so cross-protocol
+     comparison would produce phantom verdicts. Refactor gating in
+     process mode therefore compares two isolated runs (before vs
+     after) rather than the session-built rolling baseline.
 5. `run_unit_suite(...)`
    - Use for folder-based unit-test discovery under `test/unit/`.
    - Use `debug=true` to stop on first failure for inspection.

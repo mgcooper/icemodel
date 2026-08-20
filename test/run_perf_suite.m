@@ -3,6 +3,7 @@ function results = run_perf_suite(kwargs)
    %
    %  results = run_perf_suite()
    %  results = run_perf_suite(tier="smoke")
+   %  results = run_perf_suite(isolation="process")
    %  results = run_perf_suite(tier="smoke", smbmodel="skinmodel")
    %  results = run_perf_suite(tier="smoke", smbmodel="icemodel", solver=2)
    %  results = run_perf_suite(tier="smoke", smbmodel="icemodel", solver=[2 3])
@@ -28,6 +29,18 @@ function results = run_perf_suite(kwargs)
    %
    % The optional solver filter accepts any subset of [1 2 3].
    % DATA_ROOT overrides the default test case for isolated fixture comparisons.
+   %
+   % ISOLATION selects the measurement protocol. "process" (default) runs
+   % every case in a fresh `matlab -batch` subprocess and is the required
+   % mode for formal accept/reject verdicts on refactors. The opt-in
+   % "session" mode times every case in this MATLAB session for quick
+   % diagnostics; it refuses to start when this session already ran
+   % another suite, because inherited JIT state and persistents
+   % contaminate formal timings. Both modes randomize the
+   % case order (the seed is recorded in the artifact) and gate each
+   % case's samples on a dispersion check: an invalid sample set is
+   % re-measured once, then fails as "measurement invalid" rather than
+   % producing a phantom verdict.
    %
    % SMOKE_SITES and FULL_SITES are advanced overrides for the site lists
    % used by each formal tier. Most callers should leave them at the
@@ -83,17 +96,25 @@ function results = run_perf_suite(kwargs)
 
       kwargs.data_root (1, 1) string ...
          = ""
+
+      % Process isolation is the default because it is the only protocol
+      % that supports a formal accept/reject verdict. Session mode is
+      % opt-in for quick diagnostics.
+      kwargs.isolation (1, 1) string ...
+         {mustBeMember(kwargs.isolation, ["session", "process"])} ...
+         = "process"
    end
 
    % Deal out arguments.
    [tier, smbmodel, solver, simyear, smoke_sites, full_sites, n_runs, ...
       tol_perf, include_benchmarks, benchmark_sampling_profile, ...
-      baseline_selector, run_name, build_report] = deal( ...
+      baseline_selector, run_name, build_report, isolation] = deal( ...
       kwargs.tier, kwargs.smbmodel, kwargs.solver, kwargs.simyear, ...
       reshape(kwargs.smoke_sites, [], 1), reshape(kwargs.full_sites, [], 1), ...
       kwargs.n_runs, kwargs.tol_perf, kwargs.include_benchmarks, ...
       kwargs.benchmark_sampling_profile, ...
-      kwargs.baseline, kwargs.run_name, kwargs.build_report);
+      kwargs.baseline, kwargs.run_name, kwargs.build_report, ...
+      kwargs.isolation);
 
    % Resolve full path to the test/ dir.
    testdir = icemodel.getpath('test');
@@ -113,7 +134,7 @@ function results = run_perf_suite(kwargs)
    [~, input_path, output_path, ~, suite_cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment( ...
       icemodel_config_casename=baseline_policy.config_case, ...
-      data_root=kwargs.data_root); %#ok<ASGLU>
+      data_root=kwargs.data_root);
 
    % Carry the configured root through the unittest class's nested setup. A
    % caller-supplied root keeps precedence over the resolved verification root.
@@ -134,6 +155,15 @@ function results = run_perf_suite(kwargs)
    % Hold the env restore for the rest of this function; cleared at the end.
    data_root_cleanup = configurePerfDataRootEnv(data_root);
 
+   % Refuse a contaminated in-session formal run now, immediately before
+   % measurement and after the bootstrap and capability seams, so the
+   % no-run probes in test_baseline_contracts stop at their intended
+   % earlier checks. Record this run in the session activity for later
+   % runners; the activity at start rides the artifact metadata.
+   icemodel.test.helpers.assertCleanPerfSession(isolation);
+   session_activity = icemodel.test.helpers.testSessionActivity();
+   icemodel.test.helpers.markTestSessionDirty("run_perf_suite");
+
    % Formal wall-clock timings must never inherit an interactive profiler.
    profile off
 
@@ -153,7 +183,8 @@ function results = run_perf_suite(kwargs)
       input_path, output_path, testdir, experiment, suite, tier, ...
       mdl, solver, simyear, smoke_sites, full_sites, baseline_type, ...
       baseline_tag, run_date, run_id, run_name, n_runs, tol_perf, ...
-      include_benchmarks, benchmark_sampling_profile), ...
+      include_benchmarks, benchmark_sampling_profile, isolation, ...
+      baseline_policy.config_case, data_root, session_activity), ...
       models, 'UniformOutput', false);
 
    % Combine results into a common struct.
@@ -183,7 +214,8 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       thisdir, experiment, suite, tier, smbmodel, solver, simyear, ...
       smoke_sites, full_sites, baseline_type, baseline_tag, run_date, ...
       run_id, run_name, n_runs, tol_perf, include_benchmarks, ...
-      benchmark_sampling_profile)
+      benchmark_sampling_profile, isolation, config_case, data_root, ...
+      session_activity)
    %RUNSINGLEMODELPERFSUITE Run the formal perf workflow for one smbmodel.
 
    % Build the deterministic case list and load the matching managed baseline.
@@ -206,28 +238,51 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       smbmodel=smbmodel, baseline_tag=baseline_tag, simyear=benchmark_year);
    icemodel.test.helpers.assertFormalBaselineForcing( ...
       baseline, baseline_tag);
-   [baseline_compatible, compare_reason] = perfBaselineCompatibility( ...
-      baseline_meta);
+   [baseline_compatible, compare_reason] = ...
+      icemodel.test.helpers.perfBaselineCompatibility( ...
+      baseline_meta, isolation);
 
    % Accumulate the measured sample/activity rows for the saved artifact.
    [sample_rows, activity_rows, case_rows, case_opts] = deal(struct([]));
    [r_sample, r_activity, r_case] = deal(0);
-   failed_cases = strings(height(cases), 1);
-   n_failed = 0;
+
+   % Randomize the case order so no case always inherits the same
+   % predecessor's session state. The seed rides the artifact so the
+   % exact order is reproducible.
+   case_order_seed = randi(2^31 - 2);
+   rng_prior = rng(case_order_seed, 'twister');
+   case_order = randperm(height(cases));
+   rng(rng_prior);
+
+   % Resolve the artifact folder now: subprocess spec/result files live
+   % beside the saved comparison so the raw measurements stay auditable.
+   artifact_dir = fileparts(icemodel.test.helpers.artifactFilePath( ...
+      "perf", tier=tier, smbmodel=smbmodel, solver=solver, ...
+      baseline_type=baseline_type, baseline_tag=baseline_tag, ...
+      run_name=run_name));
+   if isolation == "process" && exist(artifact_dir, 'dir') ~= 7
+      mkdir(artifact_dir);
+   end
 
    % Run the per-case performance experiment and compare to baseline.
-   for icase = 1:height(cases)
+   for iorder = 1:height(cases)
+      icase = case_order(iorder);
 
-      % Run the case.
+      % Measure the case under the selected isolation protocol, with one
+      % automatic re-measure when the sample set fails the validity gate.
       c = cases(icase, :);
-      perf_data = icemodel.test.helpers.runPerfCase(experiment, suite, c);
+      [perf_data, valid, measurement_reason, dispersion, ...
+         n_measure_attempts] = ...
+         icemodel.test.helpers.retryInvalidMeasurement(@(attempt) ...
+         icemodel.test.helpers.measurePerfCase(experiment, suite, c, ...
+         isolation, config_case, data_root, n_runs, artifact_dir, ...
+         attempt));
 
       % Extract results for this case.
       samples = perf_data.samples;
       activity = perf_data.activity;
       sample_times = perf_data.sample_times;
       activity_times = perf_data.activity_times;
-      valid = perf_data.valid;
 
       % Compare the measured runtime to the accepted baseline row.
       case_compare_reason = compare_reason;
@@ -301,24 +356,71 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       case_rows(r_case).baseline_compatible = baseline_compatible;
       case_rows(r_case).compare_reason = case_compare_reason;
       case_rows(r_case).valid = valid;
+      case_rows(r_case).isolation = isolation;
+      case_rows(r_case).measurement_reason = measurement_reason;
+      case_rows(r_case).dispersion = dispersion;
+      case_rows(r_case).n_measure_attempts = n_measure_attempts;
       case_rows(r_case).passed_perf = passed_perf;
       case_rows(r_case).last_updated_utc = datetime('now', 'TimeZone', 'UTC');
 
       case_opts(r_case).case_id = string(c.case_id);
       case_opts(r_case).case = table2struct(c);
       case_opts(r_case).opts = icemodel.test.helpers.setModelOptsForCase(c);
+   end
 
-      if ~passed_perf
-         n_failed = n_failed + 1;
-         failed_cases(n_failed, 1) = string(c.case_id);
+   % Ambient anchor: re-measure the first executed case once at the end
+   % of the run and compare against its own first measurement. The
+   % per-case dispersion gate cannot see load or scheduling shifts that
+   % are steady WITHIN each case but different ACROSS cases (measured on
+   % this host as a ~35 percent case-level swing under a constant
+   % background load). A drifted anchor marks every verdict in this run
+   % ambient-invalid rather than letting a phantom pass or fail stand.
+   % The anchor tolerance comes from the one formal timing policy.
+   anchor_tol = icemodel.test.helpers.perfMeasurementPolicy().anchor_tol;
+   anchor_ratio = nan;
+   ambient_stable = true;
+   if height(cases) > 0
+      c_anchor = cases(case_order(1), :);
+      first_median = case_rows([case_rows.case_id] == ...
+         string(c_anchor.case_id)).median_wall_s;
+
+      % The anchor sample set passes the same validity gate and single
+      % re-measure as a formal case: an invalid anchor cannot certify
+      % ambient stability. The attempt offset keeps its subprocess spec
+      % and result files clear of the case's own attempt files.
+      [anchor_data, anchor_valid] = ...
+         icemodel.test.helpers.retryInvalidMeasurement(@(attempt) ...
+         icemodel.test.helpers.measurePerfCase(experiment, suite, ...
+         c_anchor, isolation, config_case, data_root, n_runs, ...
+         artifact_dir, 98 + attempt));
+      [ambient_stable, anchor_ratio] = ...
+         icemodel.test.helpers.ambientAnchorVerdict(first_median, ...
+         anchor_data.sample_times, anchor_valid, anchor_tol);
+   end
+   if ~ambient_stable
+      for k = 1:numel(case_rows)
+         case_rows(k).passed_perf = false;
+         case_rows(k).compare_reason = sprintf( ...
+            ['ambient conditions shifted during the run or the anchor ' ...
+            're-measurement was invalid (anchor ratio %.3f); ' ...
+            'measurements are not comparable'], anchor_ratio);
       end
    end
-   failed_cases = failed_cases(1:n_failed, 1);
 
-   % Build the saved artifact tables for this concrete formal model.
+   % The anchor invalidation above can flip verdicts after the loop
+   % accumulated them, so derive the failed list from the final rows. The
+   % string conversion keeps an all-pass run's empty list a string array,
+   % because the empty struct-field concatenation is numeric.
+   failed_cases = reshape(string( ...
+      [case_rows(~[case_rows.passed_perf]).case_id]), [], 1);
+
+   % Build the saved artifact tables for this concrete formal model. The
+   % rows accumulated in randomized execution order; sort the summary by
+   % case id so displays and diffs stay stable across runs.
    sample_detail = struct2table(sample_rows);
    activity_detail = struct2table(activity_rows);
    case_summary = struct2table(case_rows);
+   case_summary = sortrows(case_summary, 'case_id');
 
    % Record the compare metadata for this model-specific artifact.
    meta = struct();
@@ -346,6 +448,12 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    meta.tol_perf = tol_perf;
    meta.include_benchmarks = include_benchmarks;
    meta.benchmark_sampling_profile = benchmark_sampling_profile;
+   meta.isolation = isolation;
+   meta.case_order_seed = case_order_seed;
+   meta.case_order = case_order;
+   meta.session_activity_at_start = session_activity;
+   meta.anchor_ratio = anchor_ratio;
+   meta.ambient_stable = ambient_stable;
    meta.experiment = "matlab.perftest.TimeExperiment.withFixedSampleSize";
    meta.timing_scope = "IcemodelPerfTest.testCoreRuntime (runSmbModel only)";
    meta.timing_notes = sprintf([ ...
@@ -451,40 +559,6 @@ function artifact_file = saveArtifacts(sample_detail, ...
 
    % Print the loaded filename to the console.
    icemodel.test.helpers.printFilePath(artifact_file, "save");
-end
-
-function [compatible, reason] = perfBaselineCompatibility(baseline_meta)
-   %PERFBASELINECOMPATIBILITY Decide whether wall-time comparison is fair.
-
-   compatible = false;
-   reason = "";
-
-   if ~isstruct(baseline_meta) || isempty(fieldnames(baseline_meta))
-      reason = "perf baseline metadata not found";
-      return
-   end
-
-   if ~isfield(baseline_meta, 'matlab_version') || ...
-         ~isfield(baseline_meta, 'host') || ...
-         isblanktext(baseline_meta.matlab_version) || ...
-         isblanktext(baseline_meta.host)
-      reason = "perf baseline predates environment metadata";
-      return
-   end
-
-   current_version = string(version);
-   current_host = string(computer);
-   baseline_version = string(baseline_meta.matlab_version);
-   baseline_host = string(baseline_meta.host);
-   compatible = current_version == baseline_version && ...
-      current_host == baseline_host;
-
-   if ~compatible
-      reason = sprintf([ ...
-         'baseline built under MATLAB %s on %s; current environment is ', ...
-         'MATLAB %s on %s'], char(baseline_version), char(baseline_host), ...
-         char(current_version), char(current_host));
-   end
 end
 
 function cleanup = configurePerfDataRootEnv(data_root)

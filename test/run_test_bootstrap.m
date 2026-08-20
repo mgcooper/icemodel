@@ -83,6 +83,10 @@ function results = run_test_bootstrap(kwargs)
          = true
    end
 
+   % Record this orchestration in the session activity so a later
+   % in-session formal perf run can refuse the contaminated session.
+   icemodel.test.helpers.markTestSessionDirty("run_test_bootstrap");
+
    % Deal out arguments.
    [baseline_tag, smbmodel, solver, simyear, smoke_sites, full_sites, ...
       clean_artifacts, clean_baselines, backup_before_clean] = deal( ...
@@ -190,10 +194,17 @@ function out = runStep(c, baseline_tag, smbmodel, solver, simyear, ...
 
             case "run"
                % Compare current runtimes against the requested baseline.
+               % This orchestration already dirtied the session (the marker
+               % above plus the regression legs), so an in-session formal
+               % run would be refused. Process isolation, stated
+               % explicitly, measures each case in a fresh subprocess.
+               % Against a session-protocol baseline the compare is
+               % validity-only: cross-protocol timings are not comparable,
+               % so no timing gate applies.
                out = run_perf_suite( ...
                   tier=c.tier, smbmodel=smbmodel, solver=solver, ...
                   simyear=simyear, smoke_sites=smoke_sites, ...
-                  full_sites=full_sites, ...
+                  full_sites=full_sites, isolation="process", ...
                   baseline=resolveBaseline(c.baseline_mode, baseline_tag), ...
                   run_name=run_name);
 

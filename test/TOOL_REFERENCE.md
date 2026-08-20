@@ -154,23 +154,22 @@ Purpose:
 
 - Compare formal model runtime against accepted perf baselines
 
-Default use:
+Default use (formal verdicts; process isolation is the default):
 
 ```matlab
-clear functions
 results = run_perf_suite();
 ```
 
 Common use:
 
 ```matlab
-clear functions
 results = run_perf_suite( ...
     tier="smoke", ...
     smbmodel="icemodel", ...
     solver=2, ...
     baseline="rolling", ...
     n_runs=1, ...
+    isolation="process", ...
     include_benchmarks=false);
 ```
 
@@ -181,6 +180,12 @@ Use when:
 Key options:
 
 - same case-selector options as `run_regression_suite`
+- `isolation`
+  - `"process"` (default) measures every case in a fresh `matlab -batch`
+    subprocess; this is the formal measurement protocol
+  - `"session"` measures in the current session and is diagnostic-only; it
+    refuses to run when the session already ran another suite
+    (`icemodel:test:perf:contaminatedSession`)
 - `n_runs`
   - fixed sample count for the perf harness
 - `tol_perf`
@@ -199,8 +204,15 @@ Important note:
 - formal perf cases currently use the same canonical runtime contract as
   regression: for `simyear=2016`, the runtime contract is `[2015 2016]` with
   `n_spinup_years = 1`
+- every case's sample set passes a dispersion validity gate
+  (max/median <= 1.5) with one automatic re-measure; a second invalid set
+  fails the case as "measurement invalid"
+- an ambient anchor re-measures the first executed case at the end of the
+  run; if the anchor drifts more than 15 percent or its re-measurement is
+  invalid, every verdict in the run is marked ambient-invalid
 - whole-model perf gating is skipped when the accepted perf baseline was built
-  under a different MATLAB version/platform than the current run
+  under a different MATLAB version/platform or a different `isolation`
+  protocol than the current run; timings across protocols are not comparable
 
 ### `run_test_bootstrap`
 

@@ -21,6 +21,13 @@ function PerfBaseline = build_perf_baseline(kwargs)
    % spinup year plus one retained output year when the case matrix carries
    % only SIMYEAR.
    %
+   % ISOLATION selects the measurement protocol and defaults to "process",
+   % matching run_perf_suite: every case measures in a fresh
+   % `matlab -batch` subprocess, and the saved metadata records the
+   % protocol so the compatibility check can pair baseline and run. The
+   % opt-in "session" mode refuses a session that already ran another
+   % suite.
+   %
    % The saved MAT file also carries the managed core benchmark timings.
    % Profiler artifacts are an explicit, single-model diagnostic opt-in.
    %
@@ -87,6 +94,13 @@ function PerfBaseline = build_perf_baseline(kwargs)
 
       kwargs.data_root (1, 1) string ...
          = ""
+
+      % Process isolation is the default because it is the only protocol
+      % that supports a formal accept/reject verdict against this
+      % baseline. Session mode is opt-in for quick diagnostics.
+      kwargs.isolation (1, 1) string ...
+         {mustBeMember(kwargs.isolation, ["session", "process"])} ...
+         = "process"
    end
 
    % Resolve the baseline-owned default tree before installing scoped config.
@@ -119,6 +133,14 @@ function PerfBaseline = build_perf_baseline(kwargs)
 
    % Baseline timings must never inherit an interactive profiler.
    profile off
+
+   % An in-session baseline build in a dirty session records contaminated
+   % timings; process isolation is immune.
+   icemodel.test.helpers.assertCleanPerfSession(kwargs.isolation);
+
+   % Record this build in the session activity so a later in-session
+   % formal run refuses the session this matrix already warmed.
+   icemodel.test.helpers.markTestSessionDirty("build_perf_baseline");
 
    % Unpack the parsed inputs.
    [baseline, baseline_tag, tier, smbmodel, solver, simyear, smoke_sites, ...
@@ -158,7 +180,8 @@ function PerfBaseline = build_perf_baseline(kwargs)
       smoke_sites, full_sites, n_runs, tol_perf, include_benchmarks, ...
       benchmark_sampling_profile, ...
       include_profile_artifacts, ...
-      profile_history_size, output_file), ...
+      profile_history_size, output_file, kwargs.isolation, ...
+      baseline_policy.config_case, data_root), ...
       models, 'UniformOutput', false);
 
    % Collapse to a single table.
@@ -173,7 +196,8 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
       full_sites, n_runs, tol_perf, include_benchmarks, ...
       benchmark_sampling_profile, ...
       include_profile_artifacts, ...
-      profile_history_size, output_file)
+      profile_history_size, output_file, isolation, config_case, ...
+      data_root)
    %BUILDSINGLEMODELPERFBASELINE Build one canonical perf baseline file.
 
    % Resolve the baseline target, configure paths, and load formal cases.
@@ -194,17 +218,40 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
    experiment = matlab.perftest.TimeExperiment.withFixedSampleSize( ...
       n_runs, 'NumWarmups', 1);
 
+   % Subprocess spec/result files land beside the run artifacts so the raw
+   % accepted measurements stay auditable.
+   artifact_dir = fileparts(icemodel.test.helpers.artifactFilePath( ...
+      "perf", tier=tier, smbmodel=smbmodel, solver=solver, ...
+      baseline_type=baseline_type, baseline_tag=baseline_tag, ...
+      run_name="baseline_build"));
+   if isolation == "process" && exist(artifact_dir, 'dir') ~= 7
+      mkdir(artifact_dir);
+   end
+
    % Preallocate row containers for the accepted baseline summary and opts.
    rows = struct([]);
    case_opts = struct([]);
    k = 0;
 
+   % Randomize the case order so no case always inherits the same
+   % predecessor's state. The seed rides the metadata so the exact order
+   % is reproducible. The saved rows are keyed by case_id, so the
+   % comparison never depends on row order.
+   case_order_seed = randi(2^31 - 2);
+   rng_prior = rng(case_order_seed, 'twister');
+   case_order = randperm(height(cases));
+   rng(rng_prior);
+
    % Measure each formal case and save the accepted timing summary.
-   for icase = 1:height(cases)
-      c = cases(icase, :);
+   for iorder = 1:height(cases)
+      c = cases(case_order(iorder), :);
       fprintf('Perf baseline case %d/%d: %s\n', ...
-         icase, height(cases), c.case_id)
-      perf_data = icemodel.test.helpers.runPerfCase(experiment, suite, c);
+         iorder, height(cases), c.case_id)
+      [perf_data, valid_gate] = ...
+         icemodel.test.helpers.retryInvalidMeasurement(@(attempt) ...
+         icemodel.test.helpers.measurePerfCase(experiment, suite, c, ...
+         isolation, config_case, data_root, n_runs, artifact_dir, ...
+         attempt));
       sample_times = perf_data.sample_times;
 
       k = k + 1;
@@ -227,13 +274,36 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
       rows(k).max_wall_s = max(sample_times, [], 'omitnan');
       rows(k).ref_wall_s = nan;
       rows(k).gate_wall_s = nan;
-      rows(k).valid = perf_data.valid;
-      rows(k).passed_perf = perf_data.valid;
+      rows(k).valid = valid_gate;
+      rows(k).passed_perf = valid_gate;
       rows(k).last_updated_utc = datetime('now', 'TimeZone', 'UTC');
 
       case_opts(k).case_id = string(c.case_id);
       case_opts(k).case = table2struct(c);
       case_opts(k).opts = icemodel.test.helpers.setModelOptsForCase(c);
+   end
+
+   % The per-case dispersion gate cannot see load shifts that are steady
+   % WITHIN each case but different ACROSS cases. Re-measure the first
+   % executed case (rows(1), by construction) and refuse to accept a
+   % drifted or uncertifiable baseline; comparisons against it would gate
+   % on biased medians.
+   anchor_tol = icemodel.test.helpers.perfMeasurementPolicy().anchor_tol;
+   c_anchor = cases(case_order(1), :);
+   [anchor_data, anchor_valid] = ...
+      icemodel.test.helpers.retryInvalidMeasurement(@(attempt) ...
+      icemodel.test.helpers.measurePerfCase(experiment, suite, ...
+      c_anchor, isolation, config_case, data_root, n_runs, ...
+      artifact_dir, 98 + attempt));
+   [ambient_stable, anchor_ratio] = ...
+      icemodel.test.helpers.ambientAnchorVerdict( ...
+      rows(1).median_wall_s, anchor_data.sample_times, anchor_valid, ...
+      anchor_tol);
+   if ~ambient_stable
+      error('icemodel:test:perf:ambientDrift', ...
+         ['ambient conditions shifted during the baseline build, or ' ...
+         'the anchor re-measurement was invalid (anchor ratio %.3f); ' ...
+         'a drifted baseline must not be accepted'], anchor_ratio)
    end
 
    % Convert the accepted case rows into the saved baseline table.
@@ -262,6 +332,9 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
    meta.n_runs = n_runs;
    meta.n_warmups = 1;
    meta.tol_perf = tol_perf;
+   meta.isolation = isolation;
+   meta.case_order_seed = case_order_seed;
+   meta.anchor_ratio = anchor_ratio;
    meta.timing_scope = "IcemodelPerfTest.testCoreRuntime (runSmbModel only)";
    meta.timing_notes = sprintf([ ...
       'median_wall_s is the median of %d timed samples (wall-clock seconds). ' ...

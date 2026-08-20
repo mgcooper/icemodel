@@ -44,6 +44,10 @@ function results = run_benchmark_suite(options)
          = true
    end
 
+   % Record this suite in the session activity so a later
+   % in-session formal perf run can refuse the contaminated session.
+   icemodel.test.helpers.markTestSessionDirty("run_benchmark_suite");
+
    import matlab.perftest.TimeExperiment
 
    % Install the canonical formal-suite config and keep the cleanup handle

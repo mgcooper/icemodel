@@ -65,6 +65,10 @@ function results = run_regression_suite(kwargs)
          = ""
    end
 
+   % Record this suite in the session activity so a later
+   % in-session formal perf run can refuse the contaminated session.
+   icemodel.test.helpers.markTestSessionDirty("run_regression_suite");
+
    % Deal out arguments.
    [tier, smbmodel, solver, simyear, smoke_sites, full_sites, baseline, ...
       run_name, build_report] = deal(kwargs.tier, kwargs.smbmodel, ...

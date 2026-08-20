@@ -40,6 +40,10 @@ function results = run_unit_suite(options)
          = ""
    end
 
+   % Record this suite in the session activity so a later
+   % in-session formal perf run can refuse the contaminated session.
+   icemodel.test.helpers.markTestSessionDirty("run_unit_suite");
+
    import matlab.unittest.TestRunner
    import matlab.unittest.TestSuite
    import matlab.unittest.Verbosity
