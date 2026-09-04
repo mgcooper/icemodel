@@ -9,9 +9,8 @@ function f_wat = water_fraction(f_ice, f_liq)
    %
    %   f_wat = f_liq + f_ice * ro_ice / ro_liq
    %
-   % The column phase-change functions use this helper for the conversion.
-   % The density lookup stays local, so callers do not need to pass the ice
-   % and liquid densities through their own interfaces.
+   % See also: icemodel.column.bulk_enthalpy,
+   %  icemodel.column.max_liquid_fraction_change
    %
    %#codegen
 

@@ -31,12 +31,12 @@ function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, ...
    % Fc and Fp represent only the non-conductive surface flux linearization.
    % Conduction enters the Robin boundary-condition system through the top-node
    % finite-difference equation in `icemodel.column.assemble_enthalpy_system`
-   % via the conductive conductance a1 = k_eff(1)/(dz(1)/2). In contrast, the
-   % Dirichlet solve (solve_surface_temperature) includes dQc/dT_sfc directly in
-   % the Newton-Raphson Jacobian.
+   % via the conductance a1 = k_eff(1)/(dz(1)/2). In contrast, the Dirichlet
+   % solve (solve_surface_temperature) includes dQc/dT_sfc directly in the
+   % Newton-Raphson Jacobian.
    %
-   % H_h  — sensible heat transport prefactor [W m-2 K-1] = cv_atm * De
-   % H_e  — latent heat transport prefactor [W m-2 Pa-1] = hv_atm * De_e
+   % H_h  - sensible heat transport prefactor [W m-2 K-1] = cv_atm * De
+   % H_e  - latent heat transport prefactor [W m-2 Pa-1] = hv_atm * De_e
    %
    % See also: icemodel.surface.numerical_surface_flux
    %
@@ -65,7 +65,7 @@ function [Fc, Fp] = surface_flux_linearization(T_sfc, tair, Qsi, Qli, ...
       icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux( ...
       T_sfc, tair, H_h, stability);
 
-   % Canonical non-conductive surface terms at the current linearization
+   % Gather non-conductive surface terms at the current linearization
    % state. The Robin solve handles conduction in the interior column system.
    Qa = icemodel.surface.advective_heat_flux(ppt, tppt, cv_liq);
    Qsn = icemodel.surface.net_shortwave_radiation(Qsi, albedo, chi);

@@ -17,9 +17,8 @@ function PerfBaseline = build_perf_baseline(kwargs)
    % or versioned perf baseline. This writes baseline files only; it does not
    % produce compare artifacts or evaluate pass/fail against an older baseline.
    %
-   % Formal perf cases use the canonical suite runtime contract: one leading
-   % spinup year plus one retained output year when the case matrix carries
-   % only SIMYEAR.
+   % Formal perf cases always run one leading spinup year plus one
+   % retained output year when the case matrix carries only SIMYEAR.
    %
    % ISOLATION selects the measurement protocol and defaults to "process",
    % matching run_perf_suite: every case measures in a fresh
@@ -29,7 +28,7 @@ function PerfBaseline = build_perf_baseline(kwargs)
    % suite.
    %
    % The saved MAT file also carries the managed core benchmark timings.
-   % Profiler artifacts are an explicit, single-model diagnostic opt-in.
+   % Profiler artifacts are an opt-in, single-model diagnostic.
    %
    % A custom OUTPUT_FILE is supported only when SMBMODEL resolves to one
    % concrete formal model. Multi-model requests write the managed per-model
@@ -72,7 +71,7 @@ function PerfBaseline = build_perf_baseline(kwargs)
          = 3
 
       kwargs.tol_perf (1, 1) double {mustBePositive} ...
-         = 0.20
+         = icemodel.test.helpers.perfMeasurementPolicy().tol_perf
 
       kwargs.include_benchmarks (1, 1) logical ...
          = true
@@ -134,6 +133,17 @@ function PerfBaseline = build_perf_baseline(kwargs)
    % Baseline timings must never inherit an interactive profiler.
    profile off
 
+   % The component benchmark suite runs in this session before the model
+   % cases, so under session isolation it would warm the session the
+   % model medians are then measured in. Refuse the combination before
+   % any session-state check: it is invalid no matter the session state.
+   if kwargs.isolation == "session" && kwargs.include_benchmarks
+      error('icemodel:test:perf:benchmarksWarmSession', ...
+         ['include_benchmarks=true warms the session before the model ', ...
+         'cases. Use isolation="process" (the default) or pass ', ...
+         'include_benchmarks=false for an in-session build.'])
+   end
+
    % An in-session baseline build in a dirty session records contaminated
    % timings; process isolation is immune.
    icemodel.test.helpers.assertCleanPerfSession(kwargs.isolation);
@@ -174,11 +184,24 @@ function PerfBaseline = build_perf_baseline(kwargs)
          'it when smbmodel expands to more than one formal model.'])
    end
 
+   % Measure the managed component benchmarks once for the whole build.
+   % They are model-independent, so measuring them inside the per-model
+   % builder would repeat the same suite for every model.
+   BenchmarkBaseline = table();
+   benchmark_meta = struct();
+   if include_benchmarks
+      [BenchmarkBaseline, benchmark_meta] = buildBenchmarkBaseline( ...
+         sampling_profile=benchmark_sampling_profile);
+      icemodel.test.helpers.assertFormalBenchmarkCandidate(BenchmarkBaseline);
+      benchmark_meta.source = "run_benchmark_suite";
+   end
+
    % Build the baselines.
    baselines = arrayfun(@(mdl) buildSingleModelPerfBaseline( ...
       baseline, baseline_tag, tier, mdl, solver, simyear, ...
-      smoke_sites, full_sites, n_runs, tol_perf, include_benchmarks, ...
-      benchmark_sampling_profile, ...
+      smoke_sites, full_sites, n_runs, tol_perf, ...
+      include_benchmarks, benchmark_sampling_profile, ...
+      BenchmarkBaseline, benchmark_meta, ...
       include_profile_artifacts, ...
       profile_history_size, output_file, kwargs.isolation, ...
       baseline_policy.config_case, data_root), ...
@@ -194,11 +217,11 @@ end
 function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
       baseline_tag, tier, smbmodel, solver, simyear, smoke_sites, ...
       full_sites, n_runs, tol_perf, include_benchmarks, ...
-      benchmark_sampling_profile, ...
+      benchmark_sampling_profile, BenchmarkBaseline, benchmark_meta, ...
       include_profile_artifacts, ...
       profile_history_size, output_file, isolation, config_case, ...
       data_root)
-   %BUILDSINGLEMODELPERFBASELINE Build one canonical perf baseline file.
+   %BUILDSINGLEMODELPERFBASELINE Build one perf baseline file.
 
    % Resolve the baseline target, configure paths, and load formal cases.
    [baseline_type, baseline_tag, output_file, input_path, output_path, ...
@@ -234,8 +257,8 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
    k = 0;
 
    % Randomize the case order so no case always inherits the same
-   % predecessor's state. The seed rides the metadata so the exact order
-   % is reproducible. The saved rows are keyed by case_id, so the
+   % predecessor's state. The metadata records the seed so the order is
+   % reproducible. The saved rows are keyed by case_id, so the
    % comparison never depends on row order.
    case_order_seed = randi(2^31 - 2);
    rng_prior = rng(case_order_seed, 'twister');
@@ -354,25 +377,17 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
    meta.host = string(computer);
    meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
 
-   % Attach the managed component benchmark baseline to the same file so the
-   % accepted end-to-end timings and their supporting kernel diagnostics stay
-   % linked.
-   BenchmarkBaseline = table();
-   benchmark_meta = struct();
-   if include_benchmarks
-      [BenchmarkBaseline, benchmark_meta] = buildBenchmarkBaseline( ...
-         sampling_profile=benchmark_sampling_profile);
-      if ~isempty(BenchmarkBaseline)
-         n_rows = height(BenchmarkBaseline);
-         BenchmarkBaseline.baseline_type = repmat(baseline_type, n_rows, 1);
-         BenchmarkBaseline.baseline_tag = repmat(baseline_tag, n_rows, 1);
-         BenchmarkBaseline.last_updated_utc = repmat( ...
-            datetime('now', 'TimeZone', 'UTC'), n_rows, 1);
-      end
-      icemodel.test.helpers.assertFormalBenchmarkCandidate(BenchmarkBaseline);
+   % Attach the managed component benchmark baseline (measured once at
+   % the entrypoint) to the same file so the accepted end-to-end timings
+   % and their supporting kernel diagnostics stay linked.
+   if ~isempty(BenchmarkBaseline)
+      n_rows = height(BenchmarkBaseline);
+      BenchmarkBaseline.baseline_type = repmat(baseline_type, n_rows, 1);
+      BenchmarkBaseline.baseline_tag = repmat(baseline_tag, n_rows, 1);
+      BenchmarkBaseline.last_updated_utc = repmat( ...
+         datetime('now', 'TimeZone', 'UTC'), n_rows, 1);
       benchmark_meta.baseline_type = baseline_type;
       benchmark_meta.baseline_tag = baseline_tag;
-      benchmark_meta.source = "run_benchmark_suite";
    end
 
    % Save profiler diagnostics in a separate rerun so the accepted timing

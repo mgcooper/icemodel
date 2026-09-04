@@ -19,14 +19,15 @@ function [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, varargin)
    %  The vapor component k_vap supports two calling conventions:
    %     nargin=3: k_vap computed internally via
    %           icemodel.vapor.vapor_thermal_conductivity(T, f_liq)
-   %     nargin=4: k_vap provided externally (including explicit 0)
+   %     nargin=4: k_vap provided externally (including explicit k_vap=0)
    %
-   %  The ordinary three-state-input form remains vapor-inclusive. Use it for
-   %  postprocessing, state updates, and output diagnostics that require the
-   %  complete node-wise diagnostic conductivity. solve_column_enthalpy uses
-   %  the four-input form with explicit zero vapor node conductivity, then
-   %  adds conjugate vapor transport at the faces through
-   %  vapor_transport_terms.
+   %  The three-input form returns vapor-inclusive k_eff and separate k_vap. The
+   %  model uses the four-input form with k_vap=0 because k_vap is assigned to
+   %  cell interfaces; solve_column_enthalpy adds conjugate vapor transport at
+   %  the faces through vapor_transport_terms. icemodel.postprocess also uses
+   %  the four-input form with k_vap=0 to keep k_eff vapor-free and consistent
+   %  with the solver. To reconstruct vapor-inclusive nodal conductivity, use
+   %  k_eff + (1 - f_ice - f_liq) .* k_vap.
    %
    % See also: icemodel.column.firn_thermal_conductivity,
    %  icemodel.column.vapor_transport_terms,

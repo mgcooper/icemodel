@@ -4,8 +4,13 @@ function [data_root, met_root] = selectedDataRoot(met_dir)
    %  [data_root, met_root] = ...
    %     icemodel.forcing.reconstruct.selectedDataRoot(met_dir)
    %
-   % Supports canonical <data>/input/met[/<source>], compact
-   % <data>/met[/<source>], and caller-owned custom source directories.
+   % Supports the standard <data>/input/met[/<source>] layout, the compact
+   % <data>/met[/<source>] layout, and caller-owned custom source
+   % directories.
+   %
+   % See also: icemodel.forcing.reconstruct.acceptanceWindow,
+   %  icemodel.forcing.reconstruct.verifyPromiceFilledReadiness,
+   %  icemodel.verification.report.buildGapFillReport
 
    arguments
       met_dir (1, 1) string
@@ -20,7 +25,8 @@ function [data_root, met_root] = selectedDataRoot(met_dir)
       met_root = parent;
    end
 
-   % Strip canonical input/met or compact met while preserving custom roots.
+   % Strip the standard input/met suffix or the compact met suffix while
+   % preserving custom roots.
    [met_parent, met_name] = fileparts(met_root);
    if string(met_name) ~= "met"
       data_root = met_root;

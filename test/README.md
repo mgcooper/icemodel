@@ -124,6 +124,24 @@ Programmatic regression helpers:
 4. `run_regression_suite(...)` and `run_perf_suite(...)`
    - Compare against existing rolling or release baselines
    - Does not mutate baselines
+   - Run `run_aa_acceptance(...)` (in `test/tools`) before you accept any A/B
+     result. It checks whether two timing runs reproduce each other.
+     With no arguments, it runs two process-isolated passes back to back and
+     compares them. With two artifact lists it compares already-saved runs.
+     Every per-case median ratio B/A must lie inside the closed band
+     `[1/(1 + tol_perf), 1 + tol_perf]` from the artifacts' common saved
+     `meta.tol_perf` value. Both runs must be process-isolated
+     (`meta.isolation = "process"`) and report `meta.ambient_stable = true`,
+     and every case must report `valid = true` in both runs.
+     A/A compatibility also requires:
+     - artifact lists with equal lengths and no duplicate paths
+     - no path shared between the two sides
+     - one run name per side, with different names between sides
+     - one nonempty hostname across all artifacts
+     - one MATLAB version and data root across all artifacts
+     - one nonempty source revision across all artifacts
+     - matching tier, simulation year, sample count, warmup count, and tolerance
+     - matching case IDs and forcing products
    - Blank `data_root` selects the baseline registration's canonical tree:
      rolling uses the verification tree, while frozen v1.1 uses historical
      `test/data`. An explicit root remains authoritative.
@@ -161,7 +179,7 @@ Programmatic regression helpers:
      3. Case order is randomized (the seed rides the artifact), and each
         case's samples pass a dispersion validity gate
         (`max/median <= 1.5`). An invalid sample set re-measures once,
-        then fails as "measurement invalid" — never a phantom verdict.
+        then fails as "measurement invalid," not as a phantom verdict.
      4. An ambient anchor re-measures the first executed case at the end
         of the run. The dispersion gate cannot see load or scheduling
         shifts that are steady within each case but different across
@@ -178,7 +196,7 @@ Programmatic regression helpers:
      comparison would produce phantom verdicts. Refactor gating in
      process mode therefore compares two isolated runs (before vs
      after) rather than the session-built rolling baseline.
-5. `run_unit_suite(...)`
+1. `run_unit_suite(...)`
    - Use for folder-based unit-test discovery under `test/unit/`.
    - Use `debug=true` to stop on first failure for inspection.
    - The suite runs one test file at a time. A timestamped progress line
@@ -197,7 +215,7 @@ Programmatic regression helpers:
      The end-to-end staging, report, and model-run tests that used to
      dominate the runtime live in `test/regression` and run only when
      explicitly targeted.
-6. `run_benchmark_suite(...)`
+2. `run_benchmark_suite(...)`
    - Use for the formal benchmark suite under `test/benchmarks/`.
    - This remains the standalone component-benchmark runner.
    - By default it runs only the top-level benchmark files.
@@ -212,17 +230,17 @@ Programmatic regression helpers:
    - Benchmark-specific interpretation notes should live with the benchmark
      file itself when the timing result motivated a code choice.
    - The rename/round benchmarks live in `RenameRoundTest.m`.
-7.  `build_runoff_reference_from_runoff(...)`
+3.  `build_runoff_reference_from_runoff(...)`
    - Refresh the static runoff reference data in `test/references/`.
    - This is separate from baseline management and requires the sibling
      `runoff` project.
-8.  `validate_test_suite(...)`
+4.  `validate_test_suite(...)`
    - Use to exercise the public test-suite surface end to end without
      mutating managed baselines.
    - This validates signatures, Code Analyzer cleanliness, runner selector
      variants, per-file discovery, and build/snapshot tools against
      temporary outputs.
-9.  `run_promice_ablation_evaluation(...)`
+5.  `run_promice_ablation_evaluation(...)`
    - Audits all canonical PROMICE case-years and runs only an explicit
      `case_ids` selection (or `"all"`) against the pinned `promice_filled`
      artifact.

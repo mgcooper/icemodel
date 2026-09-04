@@ -124,8 +124,9 @@ end
 function tf = gridIsNdgrid(X)
    %GRIDISNDGRID True if X increases predominantly down dim 1 (ndgrid layout).
    % For a meshgrid grid X is (near) constant down rows; for ndgrid it is
-   % (near) constant across columns. Robust for the regular polar-stereo
-   % grids (MAR, MERRA) and the gently rotated FGRN11/RACMO curvilinear grid.
+   % (near) constant across columns. This test works for the regular
+   % polar-stereo grids (MAR, MERRA) and the gently rotated FGRN11/RACMO
+   % curvilinear grid.
    if size(X, 1) < 2 && size(X, 2) < 2
       tf = false;   % degenerate single-cell slab: nothing to transpose
       return

@@ -3,10 +3,13 @@ function [ice1, ice2] = concatoutput(ice1, ice2, thisice1, thisice2)
    %
    %  [ice1, ice2] = icemodel.concatoutput(ice1, ice2, thisice1, thisice2)
    %
-   % Concatenate one year's output onto an existing output accumulator. ICE1
-   % may be either the raw struct returned by the core model or a postprocessed
-   % timetable loaded from disk. ICE2 is a struct with time varying fields
-   % stored column-wise and static depth fields stored once.
+   % Concatenate one year's output onto an existing output accumulator. ICE1 may
+   % be either the raw struct returned by the core model or a postprocessed
+   % timetable loaded from disk, with fields representing the surface or
+   % top-node state. ICE2 is a struct with fields stored column-wise
+   % representing the subsurface state.
+   %
+   % See also: icemodel, skinmodel, icemodel.loadresults
 
    if isempty(ice1)
       ice1 = thisice1;

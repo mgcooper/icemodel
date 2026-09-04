@@ -1,11 +1,14 @@
 function info = gcnetVandecruxStationMetadata(station)
-   %GCNETVANDECRUXSTATIONMETADATA Return canonical station aliases and location.
+   %GCNETVANDECRUXSTATIONMETADATA Return station aliases and location.
    %
    %  info = icemodel.forcing.helpers.gcnetVandecruxStationMetadata("dye2")
    %
    % Fetch, inventory, and the builders share this metadata. They therefore use
    % the same aliases and station coordinates for discovery and for the staged
    % artifacts.
+   %
+   % See also: icemodel.forcing.buildGcnetVandecruxData,
+   %  icemodel.forcing.helpers.readGcnetDonor
    arguments
       station (1, :) string
    end

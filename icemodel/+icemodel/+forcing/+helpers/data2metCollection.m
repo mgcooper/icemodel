@@ -6,7 +6,7 @@ function [met, metadata] = data2metCollection(Data, kwargs)
    %  met = ... data2metCollection(Data, dt_out="15m", ...
    %     fillwithmissing=true)
    %
-   % Applies the canonical data2met conversion and optional interval-support
+   % Applies the data2met conversion and optional interval-support
    % resampling to each source timetable. A single timetable returns a single
    % timetable and one metadata struct. A cell collection returns a met cell
    % array and a metadata struct array of the same shape. Final metadata

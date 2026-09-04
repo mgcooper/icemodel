@@ -123,7 +123,7 @@ function results = run_test_bootstrap(kwargs)
       removeRollingMatFiles(baselinesdir);
    end
 
-   % Generate new baselines and artifacts covering the canonical workflow.
+   % Generate new baselines and artifacts covering the full workflow.
    results = struct();
    results.run_name = run_name;
    results.baseline_tag = baseline_tag;
@@ -133,7 +133,7 @@ function results = run_test_bootstrap(kwargs)
    results.smoke_sites = smoke_sites;
    results.full_sites = full_sites;
 
-   % Generate the canonical list of all formal suite cases and run them.
+   % Get the list of all formal suite cases and run them.
    cases = icemodel.test.helpers.getFormalTestSuiteCases();
    for i = 1:height(cases)
       c = cases(i, :);

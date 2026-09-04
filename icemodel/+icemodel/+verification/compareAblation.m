@@ -18,7 +18,7 @@ function [summary, aligned, diagnostics, policy] = compareAblation( ...
    % added to it.
    % Each diagnostic model row is a forcing-step ledger stamped at the interval
    % start, so observations at t0 and t1 consume model rows on [t0,t1).
-   % Paired values additionally require finite snow depth at or below the fixed
+   % Paired values also require finite snow depth at or below the fixed
    % exposed-ice threshold; trace-snow rows remain inside the cumulative span
    % but are censored from alignment.
    % ENDPOINT_DEFICIT_KG_M2 supplies caller-provided sensitivity scenarios for
@@ -29,6 +29,9 @@ function [summary, aligned, diagnostics, policy] = compareAblation( ...
    % 600 kg m^-3 value is the porous endpoint. It is not an intact-ice
    % density, and it is not always the numeric lower bound, because signed
    % lowering can be negative.
+   %
+   % See also: run_promice_ablation_evaluation,
+   %  icemodel.verification.ablationPerformanceMetrics
 
    arguments
       observations
@@ -254,10 +257,10 @@ function [summary, aligned, diagnostics, policy] = compareAblation( ...
    % Retain signed and non-cancelling ratios for each accounting channel. A
    % large positive and negative exchange must not disappear by cancellation.
    diagnostics.materiality = materialityDiagnostics( ...
-      ledger, endpoint_deficit, signal, policy, Ls, ro_liq);
+      ledger, endpoint_deficit, signal, policy, ro_liq);
    [diagnostics.scenarios, non_identifiable_reasons] = ...
       scenarioDiagnostics(a_model, a_obs, endpoint_deficit, ...
-      diagnostics.materiality, ledger, policy, Ls, ro_liq);
+      diagnostics.materiality, ledger, policy, ro_liq);
 
    % Effective-density conversions are always labeled sensitivities and never
    % promoted to rigorous endpoint bounds or identifiability evidence.
@@ -397,10 +400,12 @@ function identities = closureIdentities(ledger, policy, Ls, Lv, ro_liq)
    step_d_l = ledger.mass_budget_liquid_end_mwe ...
       - ledger.mass_budget_liquid_start_mwe;
 
-   % Coupled interior transport moves storage between the phases without
-   % changing their sum. The per-phase closures need its increments.
-   x_s = ledger.mass_budget_vapor_redistribution_solid_mwe;
-   x_l = ledger.mass_budget_vapor_redistribution_liquid_mwe;
+   % Interior vapor transport moves the donor phase between cells. A fully
+   % applied face transfer sums to zero, but a cell storage limit can reject
+   % one side. Include the applied solid and liquid increments in the
+   % per-phase closures.
+   x_s = ledger.mass_budget_vapor_transport_solid_mwe;
+   x_l = ledger.mass_budget_vapor_transport_liquid_mwe;
 
    % Two checkpoint mass identities retain the solid and liquid storage
    % views. Their sum reproduces the total-storage identity, so no separate
@@ -420,20 +425,17 @@ function identities = closureIdentities(ledger, policy, Ls, Lv, ro_liq)
    rows(3) = identityRow("phase_mass", "mwe", sum(p_s), p_s, -p_l, ...
       abs(p_l), policy, 1);
 
-   % Vapor energy keeps solid sublimation/deposition on Ls and liquid vapor or
-   % overflow on Lv; signed unapplied energy remains an explicit remainder.
-   %
-   % Coupled interior transport runs after the vapor budget takes its
-   % storage baseline, so no interior term reaches these channels and the
-   % identity needs no redistribution correction. The redistribution
-   % channels stand alone as the transport's own accounting.
+   % Vapor energy uses Ls for solid phase change and Lv for liquid phase
+   % change and overflow. Removal can exceed the available water, and solid
+   % deposition can exceed the storage capacity. The residual detects both
+   % cases because the budget has no unapplied term.
+   % Interior transport does not change the exchange values, so this
+   % identity has no transport term.
    potential = ledger.mass_budget_vapor_potential_j_m2;
    overflow = ledger.mass_budget_condensation_overflow_mwe;
-   unapplied = ledger.mass_budget_unapplied_vapor_j_m2;
-   accepted = ro_liq .* (Ls .* v_s + Lv .* v_l + Lv .* overflow) ...
-      + unapplied;
+   accepted = ro_liq .* (Ls .* v_s + Lv .* v_l + Lv .* overflow);
    accepted_mag = ro_liq .* (Ls .* abs(v_s) + Lv .* abs(v_l) ...
-      + Lv .* abs(overflow)) + abs(unapplied);
+      + Lv .* abs(overflow));
    energy_scale = ro_liq * Lv;
    rows(4) = identityRow("vapor_energy", "J m-2", ...
       sum(potential), potential, accepted, accepted_mag, policy, ...
@@ -481,7 +483,7 @@ function row = identityRow(name, units, window_delta, step_delta, step_flux, ...
 end
 
 function materiality = materialityDiagnostics(ledger, endpoint_deficit, ...
-      signal, policy, Ls, ro_liq)
+      signal, policy, ro_liq)
    %MATERIALITYDIAGNOSTICS Preserve signed and non-cancelling channel ratios.
    step_d_l = ledger.mass_budget_liquid_end_mwe ...
       - ledger.mass_budget_liquid_start_mwe;
@@ -496,10 +498,7 @@ function materiality = materialityDiagnostics(ledger, endpoint_deficit, ...
       materialityRow("cloned_bottom_solid", ...
       ledger.mass_budget_cloned_bottom_solid_mwe, signal, policy); ...
       materialityRow("condensation_overflow", ...
-      ledger.mass_budget_condensation_overflow_mwe, signal, policy); ...
-      materialityRow("unapplied_vapor_solid_equivalent", ...
-      ledger.mass_budget_unapplied_vapor_j_m2 ./ (ro_liq * Ls), ...
-      signal, policy)];
+      ledger.mass_budget_condensation_overflow_mwe, signal, policy)];
    % The caller's deficit list has a known length, so size the array once
    % rather than growing it per iteration.
    n_deficit = numel(endpoint_deficit);
@@ -529,7 +528,7 @@ function row = materialityRow(channel, values, signal, policy)
 end
 
 function [scenarios, reasons] = scenarioDiagnostics(a_model, a_obs, ...
-      endpoint_deficit, materiality, ledger, policy, Ls, ro_liq)
+      endpoint_deficit, materiality, ledger, policy, ro_liq)
    %SCENARIODIAGNOSTICS Test endpoint sensitivities and accounting alternatives.
    base_difference = a_model - a_obs;
    base_class = classifyDifference(base_difference, a_model, a_obs, policy);
@@ -556,12 +555,10 @@ function [scenarios, reasons] = scenarioDiagnostics(a_model, a_obs, ...
    % explicit materiality diagnostics because no observation operator maps
    % them one-for-one onto current-window solid loss.
    scenario_names = ["remesh_solid", ...
-      "merge_delete_solid", "cloned_bottom_solid", ...
-      "unapplied_vapor_solid_equivalent"];
+      "merge_delete_solid", "cloned_bottom_solid"];
    adjustments = [-sum(ledger.mass_budget_remesh_solid_mwe), ...
       sum(ledger.mass_budget_merge_export_solid_mwe), ...
-      -sum(ledger.mass_budget_cloned_bottom_solid_mwe), ...
-      -sum(ledger.mass_budget_unapplied_vapor_j_m2) / (ro_liq * Ls)];
+      -sum(ledger.mass_budget_cloned_bottom_solid_mwe)];
    n_fixed = numel(rows);
    rows(n_fixed + numel(scenario_names)) = rows(n_fixed);
    for n = 1:numel(scenario_names)

@@ -3,41 +3,33 @@ function budget = initialize_budget_state(T, f_ice, f_liq, dz)
    %
    %  budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz)
    %
-   % One budget struct carries the per-step mass and energy accounting on
-   % every output profile. The driver calls this once per forcing step;
-   % the producers (accumulate_phase_budget, budget_surface_mass_balance,
-   % couple_vapor_step, merge_thin_layers) accumulate into it on accepted
-   % substeps only, so a rejected or forced substep never writes and
-   % failure needs no reset. finalize_budget_state records the end
-   % endpoints. Output emission stays profile-filtered by vars1; the
-   % accumulation itself never branches on the profile.
+   % Initialize BUDGET at the start of one forcing step. The phase, surface
+   % vapor, interior vapor, and remesh functions add each accepted substep to
+   % this structure. solid_start and liquid_start are the initial
+   % column-integrated stores. finalize_budget_state records the final stores.
+   % opts.vars1 selects which budget channels the driver writes to disk.
    %
-   % The storage start endpoints are recorded here from the entry state,
-   % so the per-phase storage closures anchor on the same state the first
-   % substep's checkpoint holds.
+   % Storage, phase, vapor, and remesh changes are positive into the column.
+   % Overflow and merge export are positive out.
    %
-   % budget.substep carries the transient baselines the producers pass to
-   % each other WITHIN one accepted substep: solid_p/liquid_p (storage
-   % after the enthalpy solve, the vapor budget's baseline) and
-   % solid_v/liquid_v (storage after the surface exchange, the transport
-   % budget's baseline). They are scratch, not channels: budgetoutputs
-   % does not name them and the output selector never emits them.
+   % Codegen builds the struct from the field list defined below, so the order
+   % here is what the kernel compiles against. budgetoutputs defines the same
+   % fields for output and retiming code, and a test pins the two lists to each
+   % other.
    %
-   % Storage, phase, vapor, and remesh changes are positive into the
-   % column. Overflow and merge export are positive out; unapplied vapor
-   % retains rejected-input sign.
-   %
-   % Codegen builds the struct from the field list written out below, so
-   % the order here is what the kernel compiles against. budgetoutputs
-   % holds the same names for the output and retiming code, and a test
-   % pins the two lists to each other.
+   % See also: icemodel.column.finalize_budget_state,
+   %  icemodel.column.accumulate_phase_budget,
+   %  icemodel.column.accumulate_vapor_exchange,
+   %  icemodel.column.accumulate_vapor_transport,
+   %  icemodel.column.accumulate_remesh_budget
    %
    %#codegen
 
+   % Integrate solid and liquid phase storage over the column [mwe].
    [solid_start, liquid_start] = ...
       icemodel.column.integrate_column_budget(T, f_ice, f_liq, dz);
 
-   % Declare every field literally so MATLAB Coder never has to construct
+   % Declare every field so MATLAB Coder doesn't have to construct
    % or extend the budget from runtime field names.
    budget = struct( ...
       'mass_budget_solid_start_mwe', solid_start, ...
@@ -54,14 +46,11 @@ function budget = initialize_budget_state(T, f_ice, f_liq, dz)
       'mass_budget_merge_export_solid_mwe', 0.0, ...
       'mass_budget_vapor_potential_j_m2', 0.0, ...
       'mass_budget_condensation_overflow_mwe', 0.0, ...
-      'mass_budget_unapplied_vapor_j_m2', 0.0, ...
-      'mass_budget_vapor_redistribution_solid_mwe', 0.0, ...
-      'mass_budget_vapor_redistribution_liquid_mwe', 0.0, ...
+      'mass_budget_vapor_transport_solid_mwe', 0.0, ...
+      'mass_budget_vapor_transport_liquid_mwe', 0.0, ...
       'mass_budget_top_deletion_count', 0.0, ...
       'mass_budget_top_deletion_height_m', 0.0, ...
       'mass_budget_top_export_solid_mwe', 0.0, ...
       'mass_budget_top_export_liquid_mwe', 0.0, ...
-      'mass_budget_interior_merge_count', 0.0, ...
-      'substep', struct( ...
-      'solid_p', 0.0, 'liquid_p', 0.0, 'solid_v', 0.0, 'liquid_v', 0.0));
+      'mass_budget_interior_merge_count', 0.0);
 end

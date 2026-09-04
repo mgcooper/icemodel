@@ -86,7 +86,7 @@ issue and stop at the namespace-only deliverable.
 - Argument blocks are acceptable in namespace functions and test-suite code.
 - Use reusable validators under `+validators` instead of hard-coded member lists when the choices are part of a stable repo contract.
 - Helper layers such as namespaced loaders, postprocessing, config functions, and setup functions may still use old-style parsing when that better matches surrounding code.
-- Maintain codegen compatibility in kernel functions.
+- Maintain codegen compatibility in kernel functions to the degree the `%#codegen` directives enforce it. Nothing compiles to mex today.
 - Preserve established input/output ordering and naming. For example, use `T`, `f_ice`, `f_liq`, then related state/diagnostics.
 - Surface namespace functions follow a preferred ordering schema:
   1. state variables (`T_sfc`, `T_ice`, `f_ice`, `f_liq`)

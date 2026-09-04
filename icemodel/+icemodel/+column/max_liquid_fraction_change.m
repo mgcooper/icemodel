@@ -19,13 +19,9 @@ function d_liq_max = max_liquid_fraction_change(f_ice, f_liq)
    % liquid needs to expand if it refreezes. It keeps
    % f_ice + f_liq * ro_liq / ro_ice from exceeding 1.
    %
-   % Read 1 - f_ice as open porosity in snow. In bubbly glacier ice it is the
-   % total non-ice volume. Some of that volume is closed to liquid there, so
-   % d_liq_max is an upper bound. The model carries no bubble fraction, so
-   % f_ice and f_liq are the only phase state a cell can compute this from.
-   %
-   % One function owns this limit, so liquid condensation and ice deposition
-   % cannot disagree with the column's maximum-water invariant.
+   % Interpret 1 - f_ice as open porosity in snow. In bubbly glacier ice it is
+   % the total non-ice volume. Some of that volume is closed to liquid, so
+   % d_liq_max is an upper bound (the model ignores the bubble fraction).
    %
    % Inputs
    %   f_ice    - Ice fraction [-], scalar or array.

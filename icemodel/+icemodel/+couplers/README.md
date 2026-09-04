@@ -1,41 +1,44 @@
 # icemodel.couplers
 
-Purpose: surface-column coupling workflows and convergence control.
+Purpose: surface-column couplers and helpers.
 
-Public entrypoints:
+Contents:
+
 - `solve_surface_column_dirichlet`
+  - Couples the surface energy balance to the column with a Dirichlet surface
+    temperature.
 - `solve_surface_column_robin`
+  - Couples the surface energy balance to the column with a Robin surface
+    condition.
 - `solve_skin_surface_column`
+  - Couples the skin surface temperature to the subsurface column.
 
-Shared:
-- `accelerate_coupler_iterate` accelerates one Picard step on T_sfc, and all
-  three solvers call it. It applies Aitken with relaxation as the fallback,
-  then a safeguarded secant step when the last two residuals bracket a root.
-- `initialize_coupler_history` returns the empty iterate history that the
-  accelerator expects.
-- `initialize_solver_diag` returns the fixed-schema observability record
-  the two column couplers (`solve_surface_column_dirichlet`,
-  `solve_surface_column_robin`) fill and return as their final output.
-  `solve_skin_surface_column` returns its plain `n_iters` count instead.
+Functions used by all couplers:
 
-Outputs:
-- Both column couplers return `[T_sfc, T_ice, f_ice, f_liq, U_vap, L_vap,
-  k_eff, ok_seb, ok_ieb, ok_cpl, diag]`. `U_vap` is the accepted face vapor
-  mass flux. `L_vap` is its face donor latent heat;
-  `icemodel.column.couple_vapor_step` uses it to route mass to the phase the
-  solve's energy carried.
+- `accelerate_coupler_iterate`
+  - Accelerates one Picard step on T_sfc. It applies Aitken with relaxation as
+    the fallback, then a safeguarded secant step when the last two residuals
+    bracket a root. All three solvers call it.
+- `initialize_coupler_history`
+  - Returns the empty iterate history used by `accelerate_coupler_iterate`.
+- `initialize_solver_settings`
+  - Returns the settings used by the couplers and timestep controls. These
+    settings include `dt_full_step`, `maxsubstep`, and `debug`.
+- `initialize_solver_diag`
+  - Returns the forcing-step diagnostics record. `diag.substep` is the default
+    record for one solve attempt.
+- `update_solver_diag`
+  - Copies an accepted `diag.substep` into the forcing-step record and counts
+    substeps accepted with recovery settings.
 
-Recovery:
-- The Robin coupler owns recovery as default behavior. When the inner solve
-  is healthy but the outer loop exhausts its iterations, the coupler reruns
-  once from the entry state. The rerun disables acceleration and sets
-  relaxation to the conservative cap `cpl_alpha_min`. It self-suppresses
-  when the primary policy is already that conservative pair. `diag.cpl_phase` and
-  `diag.cpl_recovered` record the path; the driver counts accepted
-  recoveries in the per-forcing-step `cpl_recovery_count` channel. Failure
-  dumps are sequence-numbered per session, so successive failures do not
-  overwrite each other.
+Recovery mode:
 
-Rules:
-- own Picard/Aitken and cross-domain convergence logic here
-- call surface and column contracts; do not absorb their physics policy
+- Each coupler makes one attempt with its input settings.
+  `icemodel.timestepping.checksubstep` handles a failed attempt. An outer-loop
+  failure after successful inner solves gets one retry at the same `dt` when
+  the input settings do not already match recovery mode. The retry disables
+  acceleration and sets `cpl_alpha` to `cpl_recovery_alpha`. A failed recovery
+  attempt shortens `dt`. After `maxsubstep` failures, `checksubstep` forces an
+  advance.
+- `update_solver_diag` adds each accepted recovery substep to
+  `cpl_recovery_count`. Failure dumps use a session sequence number.

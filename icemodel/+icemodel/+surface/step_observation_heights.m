@@ -1,9 +1,14 @@
 function step_opts = step_observation_heights(opts, metstep)
    %STEP_OBSERVATION_HEIGHTS Select scalar observation heights for one step.
    %
-   % PROMICE loadmet calls carry time-varying boom heights in the three
-   % observation-height options. Other forcing families retain scalar heights.
-   % This boundary keeps iterative flux kernels scalar for either contract.
+   %  step_opts = icemodel.surface.step_observation_heights(opts, metstep)
+   %
+   % Select element METSTEP from vector-valued PROMICE observation heights.
+   % Keep scalar observation heights unchanged for forcing data that has one
+   % height for the full run.
+   %
+   % See also: icemodel.loadmet,
+   %  icemodel.surface.diagnose_turbulent_heat_fluxes
    %
    %#codegen
 

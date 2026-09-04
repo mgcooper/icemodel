@@ -14,17 +14,20 @@ function [Qc, dQc_dT_sfc] = conductive_heat_flux(k_eff, T, dz, T_sfc)
    %
    %   dQc/dT_sfc = -k_eff(1) / (dz(1) / 2)            [W m^-2 K^-1]
    %
-   % solve_surface_temperature uses the derivative to include the Qc coupling
-   % term in the Newton-Raphson Jacobian for the Dirichlet surface solve. In
-   % the Robin path, conduction enters through the top-node
-   % finite-difference equation in `icemodel.column.assemble_enthalpy_system`
-   % rather than through this derivative.
+   % solve_surface_temperature includes the derivative in the Newton-Raphson
+   % Jacobian for the Dirichlet solve. For the Robin solve, conduction enters
+   % through the top-node finite-difference equation in
+   % icemodel.column.assemble_enthalpy_system rather than this derivative.
    %
    % See also: icemodel.surface.solve_surface_temperature,
    %           icemodel.surface.diagnose_melt_freeze_energy
    %
    %#codegen
 
+   % Qc equals the enthapy solve's top face term a1 (see
+   % icemodel.column.assemble_enthalpy_system). Both use vapor-free k_eff(1)
+   % because face 1 is closed for vapor. Keep the SEB and column solve
+   % consistent by passing the solver's vapor-free k_eff to this function.
    Qc = k_eff(1) * (T(1) - T_sfc) / (dz(1) / 2);
 
    if nargout > 1

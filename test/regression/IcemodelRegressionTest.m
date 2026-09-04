@@ -134,7 +134,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             row.forcings = string(c.forcings);
             row.simyear = c.simyear;
             row.solver = c.solver;
-            row = testCase.copyMetricFields(row, S);
+            row = icemodel.helpers.copyFields(row, S);
             row.passed = case_passed;
 
             for f = all_baseline_fields'
@@ -170,14 +170,6 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
    end
 
    methods (Access = private)
-      function row = copyMetricFields(~, row, S)
-         % Copy the scalar metric struct into one artifact row.
-         names = string(fieldnames(S));
-         for i = 1:numel(names)
-            name = char(names(i));
-            row.(name) = S.(name);
-         end
-      end
 
       function passed = checkAgainstBaseline( ...
             testCase, actual, baseline, row, varname)

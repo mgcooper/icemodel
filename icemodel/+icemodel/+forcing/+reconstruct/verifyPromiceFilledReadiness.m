@@ -9,7 +9,7 @@ function opts = verifyPromiceFilledReadiness(opts, fileiter)
    %  timestep between opts.startdate and opts.enddate, or the opts.simyears
    %  span when no dates are set. It is checked against the samples in the
    %  filled met files (POLICY A4; water years and arbitrary windows are
-   %  first-class). The canonical product and runtime timestep are both fixed
+   %  first-class). The product and runtime timestep are both fixed
    %  at 15 minutes. Calendar-year ledger verdicts are producer bookkeeping,
    %  and are never the runtime gate. The returned options are marked for
    %  code-generation-safe loading.
@@ -308,7 +308,7 @@ end
 function rejectOverlappingIntervalStarts(times, met_files)
    %REJECTOVERLAPPINGINTERVALSTARTS Refuse duplicate selected forcing rows.
 
-   % Count identical UTC interval starts across the complete selected file set.
+   % Count identical UTC interval starts across the selected file set.
    [distinct_times, ~, groups] = unique(times);
    counts = accumarray(groups, 1, [numel(distinct_times), 1]);
    overlapping = distinct_times(counts > 1);
@@ -366,7 +366,7 @@ function tf = requiresSnowfallForcing(smbmodel)
    %REQUIRESSNOWFALLFORCING True when the smbmodel consumes precip mass.
    %
    % POLICY A5: ready_icemodel requires the seven forcing channels; a snow
-   % model additionally requires finite total ppt OR snowf. The icemodel
+   % model also requires finite total ppt or snowf. The icemodel
    % and skinmodel entry points keep the D-0b zero-rain contract and consume
    % no precipitation mass, so any other smbmodel is treated as
    % snowfall-consuming and gates on the wider set.

@@ -33,6 +33,19 @@ function test_skinmodel_reduced_run_stays_bounded(testCase)
    icemodel.test.verify.verifyProcessedOutputBounds( ...
       testCase, ice1_pp, ice2_pp);
    testCase.verifyEqual(height(ice1_pp), workspace.nsteps / 4);
+
+   % Keep the native samples to verify the stored conductivity diagnostics
+   % directly, before hourly averaging.
+   opts_native = opts;
+   opts_native.dt = 3600;
+   [~, ice2_native] = icemodel.postprocess( ...
+      ice1_raw, ice2_raw, opts_native, opts.output_years);
+   expected_k_eff = round(icemodel.column.bulk_thermal_conductivity( ...
+      ice2_raw.Tice, ice2_raw.f_ice, ice2_raw.f_liq, 0), 5);
+   expected_k_vap = round(icemodel.vapor.vapor_thermal_conductivity( ...
+      ice2_raw.Tice, ice2_raw.f_liq), 5);
+   testCase.verifyEqual(ice2_native.k_eff, expected_k_eff, 'AbsTol', 0);
+   testCase.verifyEqual(ice2_native.k_vap, expected_k_vap, 'AbsTol', 0);
 end
 
 function test_skinmodel_forced_advance_restores_checkpoint(testCase)
@@ -67,7 +80,7 @@ function test_skinmodel_forced_advance_restores_checkpoint(testCase)
    % Zero tolerance rejects the nonlinear solve. The one-second full step
    % reaches the bounded fallback immediately and must not accept trial state.
    testCase.verifyEqual(ice1.dt_sum, 1, 'AbsTol', 0);
-   testCase.verifyEqual(ice1.n_subfail, 1, 'AbsTol', 0);
+   testCase.verifyEqual(ice1.n_failed_substeps, 1, 'AbsTol', 0);
    testCase.verifyEqual(ice1.Tice_converged, 0, 'AbsTol', 0);
    testCase.verifyEqual(ice1.Tsfc, state.Ts, 'AbsTol', 0);
    testCase.verifyEqual(ice2.Tice, state.T, 'AbsTol', 0);

@@ -104,8 +104,8 @@ function [T, metadata] = applyMarDailyQualityControl( ...
       sector_name = 'tundra';
    end
 
-   % Stamp the complete daily-constrained provenance contract. T.Time gives the
-   % day axis, so this code saves only the aligned status and reference vectors.
+   % Stamp the daily-constrained QC provenance below. T.Time gives the day
+   % axis, so this code saves only the aligned status and reference vectors.
    metadata.mar_qc_method = 'daily_constrained_hourly';
    metadata.mar_qc_status = status;
    metadata.mar_qc_fallback = fallback;

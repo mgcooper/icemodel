@@ -4,39 +4,30 @@ function met = data2met(Data, kwargs)
    %  met = icemodel.forcing.data2met(Data)
    %  met = ... data2met(Data, validate=false, fillwithmissing=true)
    %
-   % This function generalizes the legacy marData2Met. It selects the
-   % met-contract variables from a Data timetable of any source, derives
-   % the total precipitation channel when the source carries a rain/snow
-   % split, and orders the required variables first. A variable outside
-   % the met contract passes through after the contract set. This
-   % function drops the bookkeeping column `date`.
+   % Selects the required met variables from a Data timetable. It derives total
+   % precipitation from a rain/snow split, removes `date`, and places required
+   % variables first. Other variables follow the required variables.
    %
    %    ppt = snow + rain (or rainf + snowf), when not already present
    %
-   % Precipitation rate: the gridded-source Data builders write their
-   % precipitation channels in the canonical m s-1 water-equivalent rate (see
+   % Precipitation is a water-equivalent rate in m s-1 (see
    % icemodel.forcing.helpers.metvariables). icemodel.surface.advective_heat_flux
    % takes that unit, and the ESM-SnowMIP met uses it. The derived total
    % ppt = rain + snow therefore has the unit m s-1. The result's
-   % Properties.VariableUnits comes from the shared canonical unit map.
+   % Properties.VariableUnits comes from the shared unit map.
    %
    % Inputs
    %  Data - timetable from a build<Source>Data builder (or a legacy
    %         userdata Data file)
    %
    % Name-value
-   %  validate : assert the met contract on the result (default true)
+   %  validate : run icemodel.forcing.helpers.validatemet on the result
+   %             (default true)
    %  fillwithmissing : add absent required met channels as NaN placeholders
    %                    before validation (default true)
    %
    % Outputs
    %  met - timetable ready for icemodel.forcing.helpers.writemet
-   %
-   % Legacy: reimplements runoff/functions/marData2Met.m (retained,
-   % unchanged, as the legacy reference). Unlike the legacy version it derives
-   % ppt from the rain/snow split, drops the bookkeeping `date` column (the
-   % output is a timetable with a Time axis), and orders required variables
-   % first.
    %
    % See also: icemodel.forcing.buildMarData,
    %  icemodel.forcing.helpers.writemet,
@@ -71,17 +62,15 @@ function met = data2met(Data, kwargs)
       met = icemodel.forcing.helpers.completeMetVariables(met);
    end
 
-   % Required contract variables first, everything else after.
+   % Required met variables first, everything else after.
    required = icemodel.forcing.helpers.metvariables();
    varnames = string(met.Properties.VariableNames);
    ordered = [required(ismember(required, varnames)), ...
       varnames(~ismember(varnames, required))];
    met = met(:, cellstr(ordered));
 
-   % Self-describing metadata from the shared canonical map: unit,
-   % long_name (VariableDescriptions), and CF standard_name (StandardNames
-   % custom property). Precipitation channels carry the canonical m s-1 rate,
-   % including the derived ppt. This step labels every remaining channel.
+   % Label each channel with units, a long name, and a CF standard name.
+   % Precipitation, including derived ppt, uses m s-1.
    met = icemodel.forcing.helpers.stampMetadata(met);
 
    if kwargs.validate

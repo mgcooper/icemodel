@@ -6,7 +6,7 @@ function metadata = marRefreezeMetadata(T, metadata)
    %
    % MAR RZ is a native daily combined refreezing/deposition term. Rare
    % negative values are source-real and must not be clipped or relabelled as
-   % pure refreezing. This helper stamps a canonical signed-policy token plus
+   % pure refreezing. This helper stamps a signed-policy token plus
    % cadence-independent strict-negative and material-negative statistics. The
    % 1e-8 mWE/h material threshold is for reporting only. It does not clip,
    % round, accept, or reject RZ, and it does not authorize any change to RZ.
@@ -19,7 +19,7 @@ function metadata = marRefreezeMetadata(T, metadata)
    end
 
    % Remove the roundoff-only tolerance field. One artifact must not claim both
-   % the nonnegative policy and the signed native contract.
+   % the nonnegative policy and the signed native policy.
    legacy = 'mar_diagnostic_refreeze_negative_tolerance_mwe_h';
    if isfield(metadata, legacy)
       metadata = rmfield(metadata, legacy);

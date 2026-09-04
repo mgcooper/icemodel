@@ -75,7 +75,7 @@ function [albedo, support] = modisToMetCadence(albedo_daily, time_daily, ...
 
    % Follow the loadmet swap convention (swap data adopts mettime.TimeZone):
    % the met axis owns the time zone so mixed zoned/unzoned callers convert
-   % here, at the single attachment boundary, not ad hoc downstream.
+   % here, not ad hoc downstream.
    if ~strcmp(time_daily.TimeZone, time_met.TimeZone)
       time_daily.TimeZone = time_met.TimeZone;
    end
@@ -102,7 +102,7 @@ function [albedo, support] = modisToMetCadence(albedo_daily, time_daily, ...
       return
    end
 
-   % Reuse the canonical daily-to-met interpolation with no endpoint
+   % Reuse the daily-to-met interpolation with no endpoint
    % extrapolation, so met samples outside the finite support stay NaN. Read
    % the albedo bounds from the reconstruction policy function instead of
    % repeating the limits here.

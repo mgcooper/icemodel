@@ -10,8 +10,7 @@ function setupOnce(testCase)
    % IcemodelRegressionTest in test/regression, and run_regression_suite
    % plus run_perf_suite at the test root. None of these folders is on the
    % path by default, so running this file on its own would otherwise
-   % report "Undefined function" instead of the contract error it is
-   % checking for.
+   % report "Undefined function" instead of the expected error.
 
    root = icemodel.internal.fullpath();
    original_path = path;
@@ -26,8 +25,273 @@ function setupOnce(testCase)
    end
 end
 
+function test_aa_acceptance_rejects_non_independent_or_foreign_runs(testCase)
+   % The gate certifies two independent runs from one environment. The
+   % same file, a reused run_id, another host, or a session-isolated
+   % artifact must all be rejected before any ratio is computed. The
+   % no-argument mode runs two full timed suites, so these tests cover
+   % the artifact-comparison branches only.
+
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   case_summary = aaCaseSummary(100.0, true);
+
+   meta = aaArtifactMeta("run-a");
+   file_a = fullfile(fixture.Folder, 'perf_results_a.mat');
+   save(file_a, 'meta', 'case_summary');
+
+   % The same file for A and B reproduces trivially: rejected.
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_a), ...
+      'icemodel:test:aaAcceptance:reusedFile');
+
+   % A copy of the same run under another file name carries the same
+   % run_name: rejected.
+   file_b = fullfile(fixture.Folder, 'perf_results_b.mat');
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:reusedRun');
+
+   % A blank run name cannot identify an independent timed run.
+   meta = aaArtifactMeta("   ");
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:unknownRunName');
+
+   % The two sides must contain the same number of model artifacts.
+   testCase.verifyError(@() run_aa_acceptance( ...
+      [string(file_a), string(file_b)], file_b), ...
+      'icemodel:test:aaAcceptance:artifactCountMismatch');
+
+   % A side cannot repeat one artifact in place of another model artifact.
+   testCase.verifyError(@() run_aa_acceptance( ...
+      [string(file_a), string(file_a)], ...
+      [string(file_b), string(file_b)]), ...
+      'icemodel:test:aaAcceptance:duplicateArtifact');
+
+   % An artifact without measured cases cannot certify the timing protocol.
+   empty_summary = case_summary([], :);
+   meta = aaArtifactMeta("empty-a");
+   empty_a = fullfile(fixture.Folder, 'perf_results_empty_a.mat');
+   case_summary = empty_summary;
+   save(empty_a, 'meta', 'case_summary');
+   meta = aaArtifactMeta("empty-b");
+   empty_b = fullfile(fixture.Folder, 'perf_results_empty_b.mat');
+   save(empty_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(empty_a, empty_b), ...
+      'icemodel:test:aaAcceptance:emptyCaseSummary');
+   case_summary = aaCaseSummary(100.0, true);
+
+   % Another machine is not comparable: rejected.
+   meta = aaArtifactMeta("run-b");
+   meta.hostname = "other-host";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:environmentMismatch');
+
+   % A session-isolated artifact certifies a different protocol: rejected.
+   meta = aaArtifactMeta("run-b");
+   meta.isolation = "session";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:notProcessIsolated');
+
+   % An artifact without a recorded hostname certifies an unverified
+   % machine: rejected.
+   meta = aaArtifactMeta("run-b");
+   meta.hostname = "   ";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:unknownHost');
+
+   % A blank MATLAB version cannot identify one measurement environment.
+   meta = aaArtifactMeta("run-b");
+   meta.matlab_version = "   ";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:unknownMatlabVersion');
+
+   % Two runs of different code certify an A/B change: rejected.
+   meta = aaArtifactMeta("run-b");
+   meta.git_revision = "other-rev";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:revisionMismatch');
+
+   % A blank revision cannot certify that both runs used the same source.
+   meta = aaArtifactMeta("run-b");
+   meta.git_revision = "   ";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:unknownRevision');
+
+   % Two measurement procedures are not comparable: rejected.
+   meta = aaArtifactMeta("run-b");
+   meta.n_runs = 30;
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:procedureMismatch');
+
+   % Two input data trees are not comparable: rejected.
+   meta = aaArtifactMeta("run-b");
+   meta.data_root = "other-data";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:inputMismatch');
+
+   % A blank data root cannot identify the measured input tree.
+   meta = aaArtifactMeta("run-b");
+   meta.data_root = "   ";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:unknownDataRoot');
+
+   % A reused case ID can name a different forcing product: rejected.
+   meta = aaArtifactMeta("run-b");
+   case_summary.forcings = "legacy_forcing";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:caseIdentityMismatch');
+   case_summary.forcings = "promice_filled";
+
+   % A side that mixes two runs could pair artifacts whose differences
+   % cancel in the ratios: rejected.
+   meta = aaArtifactMeta("run-c");
+   file_a2 = fullfile(fixture.Folder, 'perf_results_a2.mat');
+   save(file_a2, 'meta', 'case_summary');
+   meta = aaArtifactMeta("run-b");
+   save(file_b, 'meta', 'case_summary');
+   file_b2 = fullfile(fixture.Folder, 'perf_results_b2.mat');
+   save(file_b2, 'meta', 'case_summary');
+   testCase.verifyError( ...
+      @() run_aa_acceptance([string(file_a), string(file_a2)], ...
+      [string(file_b), string(file_b2)]), ...
+      'icemodel:test:aaAcceptance:mixedSide');
+end
+
+function test_aa_acceptance_no_argument_mode_compares_two_runs(testCase)
+   % The no-argument form runs the formal suite twice and compares the
+   % two runs' artifacts. A stub run_perf_suite shadows the real one and
+   % writes one band-centered artifact per call, so the branch runs
+   % without timing anything.
+
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   stub_dir = fullfile(fixture.Folder, 'stub');
+   icemodel.helpers.ensureDirExists(stub_dir);
+   writeAaSuiteStub(fullfile(stub_dir, 'run_perf_suite.m'));
+   testCase.applyFixture(matlab.unittest.fixtures.PathFixture(stub_dir));
+
+   [~] = evalc('report = run_aa_acceptance();');
+   testCase.verifyTrue(report.passed);
+   testCase.verifyEqual(height(report.cases), 1);
+   testCase.verifyEqual(report.cases.ratio_b_over_a, 1.0, 'AbsTol', 0);
+end
+
+function test_aa_acceptance_pairs_artifacts_by_filename(testCase)
+   % Pair model artifacts by filename when their parent directories differ.
+
+   [status, scratch_root] = system('mktemp -d');
+   testCase.assertEqual(status, 0);
+   scratch_root = string(strtrim(scratch_root));
+   cleanup = onCleanup(@() rmdir(scratch_root, 's'));
+   testCase.addTeardown(@() delete(cleanup));
+
+   dirs = fullfile(scratch_root, ["a_ice", "z_skin", "a_skin", "z_ice"]);
+   arrayfun(@mkdir, dirs);
+
+   meta = aaArtifactMeta("run-a");
+   case_summary = aaCaseSummary(100.0, true);
+   ice_a = fullfile(dirs(1), "perf_icemodel.mat");
+   save(ice_a, 'meta', 'case_summary');
+   case_summary.case_id = "skinmodel_kanm_2016_solver1";
+   skin_a = fullfile(dirs(2), "perf_skinmodel.mat");
+   save(skin_a, 'meta', 'case_summary');
+
+   meta = aaArtifactMeta("run-b");
+   skin_b = fullfile(dirs(3), "perf_skinmodel.mat");
+   save(skin_b, 'meta', 'case_summary');
+   case_summary.case_id = "icemodel_kanm_2016_solver1";
+   ice_b = fullfile(dirs(4), "perf_icemodel.mat");
+   save(ice_b, 'meta', 'case_summary');
+
+   [~] = evalc(['report = run_aa_acceptance(' ...
+      '[skin_a, ice_a], [ice_b, skin_b]);']);
+   testCase.verifyTrue(report.passed);
+   testCase.verifyEqual(height(report.cases), 2);
+end
+
+function test_aa_acceptance_fails_invalid_or_unstable_measurements(testCase)
+   % An invalid measurement or an ambient-unstable run must fail the
+   % verdict even when every ratio is inside the band.
+
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   case_summary = aaCaseSummary(100.0, true);
+
+   meta = aaArtifactMeta("run-a");
+   file_a = fullfile(fixture.Folder, 'perf_results_a.mat');
+   save(file_a, 'meta', 'case_summary');
+
+   % Run B's measurement failed its validity gate: the verdict fails.
+   meta = aaArtifactMeta("run-b");
+   case_summary.valid = false;
+   file_b = fullfile(fixture.Folder, 'perf_results_b.mat');
+   save(file_b, 'meta', 'case_summary');
+   [~] = evalc('report = run_aa_acceptance(file_a, file_b);');
+   testCase.verifyFalse(report.passed);
+   testCase.verifyFalse(all(report.cases.measurement_valid));
+
+   % Run B is ambient-unstable: the verdict fails.
+   meta.ambient_stable = false;
+   case_summary.valid = true;
+   save(file_b, 'meta', 'case_summary');
+   [~] = evalc('report = run_aa_acceptance(file_a, file_b);');
+   testCase.verifyFalse(report.passed);
+   testCase.verifyFalse(report.ambient_stable);
+end
+
+function test_perf_builder_refuses_benchmarks_in_session_mode(testCase)
+   % The component benchmark suite runs before the model cases, so an
+   % in-session build with benchmarks would measure model medians in a
+   % session the benchmarks already warmed. The builder must refuse.
+
+   testCase.verifyError(@() build_perf_baseline( ...
+      isolation="session", include_benchmarks=true), ...
+      'icemodel:test:perf:benchmarksWarmSession');
+end
+
+function test_aa_acceptance_accepts_the_band_edge(testCase)
+   % The A/A band is a closed interval: a ratio exactly at the band edge
+   % certifies the measurement protocol, and one just outside fails it.
+
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   band = 1 + icemodel.test.helpers.perfMeasurementPolicy().tol_perf;
+
+   % Two one-case artifacts whose medians sit exactly at the band edge.
+   meta = aaArtifactMeta("run-a");
+   case_summary = aaCaseSummary(100.0, true);
+   file_a = fullfile(fixture.Folder, 'perf_results_a.mat');
+   save(file_a, 'meta', 'case_summary');
+   meta = aaArtifactMeta("run-b");
+   case_summary.median_wall_s = 100.0 * band;
+   file_b = fullfile(fixture.Folder, 'perf_results_b.mat');
+   save(file_b, 'meta', 'case_summary');
+
+   % Discard the printed verdict so the suite log stays quiet.
+   [~] = evalc('report = run_aa_acceptance(file_a, file_b);');
+   testCase.verifyTrue(report.passed);
+   testCase.verifyEqual(report.cases.ratio_b_over_a, band, 'AbsTol', 0);
+
+   % A ratio just outside the closed interval fails.
+   case_summary.median_wall_s = 100.0 * band * (1 + 1e-6);
+   save(file_b, 'meta', 'case_summary');
+   [~] = evalc('report = run_aa_acceptance(file_a, file_b);');
+   testCase.verifyFalse(report.passed);
+end
+
 function test_resolveBaselineSelector_handles_rolling_and_release(testCase)
-   % Cover the public selector contract for rolling and release baselines.
+   % Test the public selector with rolling and release baselines.
 
    [baseline_type, baseline_tag] = ...
       icemodel.test.helpers.resolveBaselineSelector("rolling");
@@ -86,8 +350,8 @@ function test_loadBaseline_regression_normalizes_legacy_schema(testCase)
 end
 
 function test_frozen_v11_baselines_normalize_without_mutation(testCase)
-   % All four immutable release files must acquire the canonical solver alias
-   % in memory and pass their registered forcing/case identity checks.
+   % The four immutable release files must add solver from solver_mode in
+   % memory. Each file must pass its forcing and case checks.
    for kind = ["regression", "perf"]
       for model = ["icemodel", "skinmodel"]
          baseline = icemodel.test.helpers.loadBaseline(kind, ...
@@ -104,8 +368,8 @@ function test_frozen_v11_baselines_normalize_without_mutation(testCase)
 end
 
 function test_loadBaseline_rejects_solver_and_selector_conflicts(testCase)
-   % Existing persisted identity must never be replaced by requested selector
-   % metadata or a canonical alias derived from another column.
+   % The loader must not replace baseline-file values with selector metadata
+   % or an alias copied from another column.
    filepath = [tempname '.mat'];
    cleanup = onCleanup(@() deleteIfExists(filepath));
    RegressionBaseline = table( ...
@@ -176,8 +440,8 @@ function test_getRegressionCaseMatrix_uses_official_forcing(testCase)
 end
 
 function test_getPerfCaseMatrix_keeps_skinmodel_under_filter(testCase)
-   % The same solver-filter contract should hold for the managed perf
-   % matrix so build/run/bootstrap paths stay consistent.
+   % The performance matrix must keep skinmodel at solver 1 when its solver
+   % input is 2. This keeps build, run, and bootstrap paths consistent.
 
    cases = icemodel.test.helpers.getPerfCaseMatrix( ...
       tier="full", smbmodel="all", solver=2);
@@ -749,8 +1013,7 @@ function test_testsmbmodel_completion_group_matches_formal_models(testCase)
 end
 
 function test_resolveRequestedSmbmodels_expands_virtual_all_selector(testCase)
-   % Formal-suite entrypoints should expand the virtual aggregate selector
-   % once, then iterate through the canonical single-model workflow.
+   % Formal-suite entrypoints expand "all" once, then run one model at a time.
 
    models = icemodel.test.helpers.resolveRequestedSmbmodels("all");
 
@@ -803,8 +1066,8 @@ function test_summarizeIce1Metrics_prefers_full_surface_residual(testCase)
 end
 
 function test_bootstrapTestEnvironment_restores_caller_config(testCase)
-   % The suite bootstrap should install the canonical demo config for the
-   % run, then restore the caller's previous config on cleanup.
+   % The suite bootstrap must install the test demo configuration. Cleanup
+   % must restore the caller's configuration.
 
    previous_output = getenv('ICEMODEL_OUTPUT_PATH');
    restore_output = onCleanup(@() setenv('ICEMODEL_OUTPUT_PATH', previous_output));
@@ -1085,4 +1348,50 @@ function restoreRunnerFixture(original_path, fixture_root, names, values)
    if isfolder(fixture_root)
       rmdir(fixture_root, 's');
    end
+end
+
+function meta = aaArtifactMeta(run_name)
+   %AAARTIFACTMETA Build the metadata run_aa_acceptance requires.
+   meta = struct('ambient_stable', true, 'isolation', "process", ...
+      'run_name', string(run_name), 'hostname', "test-host", ...
+      'matlab_version', string(version), 'git_revision', "test-rev", ...
+      'tier', "smoke", 'simyear', 2016, 'n_runs', 3, 'n_warmups', 1, ...
+      'tol_perf', 0.2, 'data_root', "test-data");
+end
+
+function case_summary = aaCaseSummary(median_wall_s, valid)
+   %AACASESUMMARY Build one complete A/A workload row.
+   case_summary = table("icemodel_kanm_2016_solver1", ...
+      "promice_filled", median_wall_s, valid, ...
+      'VariableNames', {'case_id', 'forcings', 'median_wall_s', 'valid'});
+end
+
+function writeAaSuiteStub(stub_file)
+   %WRITEAASUITESTUB Write a run_perf_suite stub for the A/A branch test.
+   %
+   % Each call writes one valid process-isolated artifact beside the stub
+   % and returns its path, with a fresh run_name per call.
+   stub = [ ...
+      "function results = run_perf_suite(varargin)" ...
+      "   persistent n" ...
+      "   if isempty(n); n = 0; end" ...
+      "   n = n + 1;" ...
+      "   meta = struct('ambient_stable', true, 'isolation', ""process"", ..." ...
+      "      'run_name', ""20260101-00000"" + n, 'hostname', ""test-host"", ..." ...
+      "      'matlab_version', string(version), 'git_revision', ""test-rev"", ..." ...
+      "      'tier', ""smoke"", 'simyear', 2016, 'n_runs', 3, ..." ...
+      "      'n_warmups', 1, 'tol_perf', 0.2, 'data_root', ""test-data"");" ...
+      "   case_summary = table(""icemodel_kanm_2016_solver1"", ..." ...
+      "      ""promice_filled"", 100.0, true, ..." ...
+      "      'VariableNames', {'case_id', 'forcings', ..." ...
+      "      'median_wall_s', 'valid'});" ...
+      "   file = fullfile(fileparts(mfilename('fullpath')), ..." ...
+      "      sprintf('perf_results_stub_%d.mat', n));" ...
+      "   save(file, 'meta', 'case_summary');" ...
+      "   results = struct('artifact_file', file);" ...
+      "end"];
+   fid = fopen(stub_file, 'w');
+   assert(fid >= 0, 'cannot write the run_perf_suite stub')
+   cleanup = onCleanup(@() fclose(fid));
+   fprintf(fid, '%s\n', stub{:});
 end

@@ -13,7 +13,7 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    %
    % The mapping covers more than the minimal met subset. Every L3 channel
    % useful for snow, firn, and ice model forcing or evaluation maps to one
-   % canonical icemodel name. The mapping omits the housekeeping and
+   % icemodel name. The mapping omits the housekeeping and
    % diagnostic channels: battery voltage, fan current, raw per-timestep GPS
    % latitude and longitude, and radiation-sensor temperature.
    %
@@ -64,7 +64,7 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    % lower-boom (_l) channels are ignored.
    %
    % Inputs
-   %  site - station name. Accepts the canonical id ("KAN_L") or the compact
+   %  site - station name. Accepts the official id ("KAN_L") or the compact
    %         lowercase alias ("kanl"); matching ignores case and underscores
    %         against the station files in source_dir. The product carries the
    %         full GEUS AWS network (~150 stations).
@@ -244,7 +244,7 @@ function [aws, metadata] = readPromiceAws(site, kwargs)
    end
 
    % Keep GEUS's derived t_i_10m unchanged apart from degC -> K, and add one
-   % conservative canonical target. The source processor documents that
+   % conservative tice10m target. The source processor documents that
    % noisy-thermistor filtering is off. A 45-site audit of 2.30 million
    % consecutive hourly pairs found a 99.9th-percentile change of 0.350 C,
    % while known KAN_U sensor failures jump 5.23 and 6.90 C in one hour. A
@@ -501,7 +501,7 @@ function [clean, flag] = qualityControlTice10m(aws, timescale)
       end
    end
 
-   % Apply every discontinuity decision to the canonical masked target.
+   % Apply every discontinuity decision to the tice10m target.
    clean(flag > 0) = NaN;
 end
 

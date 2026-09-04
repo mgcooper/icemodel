@@ -1,23 +1,33 @@
-function [dt_sum, n_subfail, ok_seb, ok_ieb, d_liq, d_evp, d_lyr, d_rof] = ...
-      newtimestep(f_liq, solver)
-   %NEWTIMESTEP Initialize per-full-step accumulators and solver status flags.
+function [dt_sum, d_liq, d_evp, d_lyr, d_rof, d_vap_liq, ...
+      d_vap_ice, diag] = newtimestep(f_liq)
+   %NEWTIMESTEP Initialize forcing-step accumulators and diagnostics.
    %
-   % See also icemodel.timestepping.nexttimestep
+   %  [dt_sum, d_liq, d_evp, d_lyr, d_rof, d_vap_liq, d_vap_ice, diag] = ...
+   %     icemodel.timestepping.newtimestep(f_liq)
+   %
+   % F_LIQ supplies the size and numeric class for the per-cell outputs.
+   % DT_SUM is the elapsed substep time [s]. D_LIQ records melt and freeze.
+   % D_EVP records the liquid part of surface vapor exchange. D_LYR records
+   % remeshing. D_ROF records condensation overflow. D_VAP_LIQ and D_VAP_ICE
+   % record all vapor-driven phase changes. DIAG records solver results.
+   % All accumulators start at zero for the new forcing step.
+   %
+   % See also: icemodel.couplers.initialize_solver_diag,
+   %  icemodel.timestepping.acceptsubstep
    %
    %#codegen
 
-   ok_seb = false;         % assume seb failed
-   ok_ieb = false;         % assume ice-eb sub-step failed
-   d_liq = 0.0 * f_liq;    % reset the change in liq water content
-   d_evp = 0.0 * f_liq;    % reset the evaporation change in water content
-   d_lyr = 0.0 * f_liq;    % reset the layer change
-   d_rof = 0.0;            % reset the condensation overflow
-   dt_sum = 0.0;
-   n_subfail = 0;          % keep track of failed substeps
+   % Reset the mass budget delta terms.
+   d_liq = 0.0 * f_liq;
+   d_evp = 0.0 * f_liq;
+   d_lyr = 0.0 * f_liq;
+   d_rof = 0.0;
+   d_vap_liq = 0.0 * f_liq;
+   d_vap_ice = 0.0 * f_liq;
 
-   % For non-Dirichlet bc, set ok_seb true so dt control advances
-   % See icemodel.timestepping.nexttimestep.
-   if solver > 1
-      ok_seb = true;
-   end
+   % Reset the substep time budget.
+   dt_sum = 0.0;
+
+   % Reset the solver diagnostics.
+   diag = icemodel.couplers.initialize_solver_diag();
 end

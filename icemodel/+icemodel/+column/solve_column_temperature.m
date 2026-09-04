@@ -2,6 +2,8 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(Ts, ...
       T, f_ice, f_liq, dz, delz, fn, dt, tol, maxiter, alpha, debug)
    %SOLVE_COLUMN_TEMPERATURE Solve the 1-dimensional column conduction equation.
    %
+   % See also: icemodel.couplers.solve_skin_surface_column
+   %
    %#codegen
 
    persistent cv_ice cv_liq Ls
@@ -99,6 +101,7 @@ function [T, f_ice, f_liq, k_eff, ok, iter] = solve_column_temperature(Ts, ...
       % k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, k_vap);
    end
 
+   % Debug dump on a failed solve
    if ~ok && debug
       dumpSkinSolveFailure(T, f_ice, f_liq, k_eff, dz, delz, dt, Ts, iter, ...
          maxiter);

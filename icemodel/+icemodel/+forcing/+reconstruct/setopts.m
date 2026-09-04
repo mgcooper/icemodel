@@ -118,7 +118,7 @@ function opts = setopts(kwargs)
    %
    % Returns
    %  opts : struct of the fields above plus proxy_catalog, a struct
-   %     array with one row per proxy source — label (short family
+   %     array with one row per proxy source: label (short family
    %     label), storage (versioned artifact directory token), and
    %     code_name (provenance-registry field).
    %
@@ -268,8 +268,8 @@ function opts = setopts(kwargs)
    end
    opts = kwargs;
    opts.proxy_sources = proxy_sources;
-   % Storage tokens come from the repo's canonical alias map and
-   % provenance identities from the published code registry.
+   % Storage tokens come from the repo's alias map and provenance
+   % identities from icemodel.forcing.reconstruct.provenanceCodes.
    opts.proxy_catalog = proxyCatalog(opts.proxy_sources);
 end
 

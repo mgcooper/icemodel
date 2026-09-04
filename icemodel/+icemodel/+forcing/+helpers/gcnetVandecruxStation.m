@@ -7,8 +7,11 @@ function station = gcnetVandecruxStation(station)
    % self-exclusion all match the same Vandecrux station names. The
    % self-exclusion applies POLICY A8: the target is never its own donor,
    % through every alias spelling. This function reads the alias table from
-   % the catalog, so it canonicalizes every listed spelling. An unknown name
-   % passes through unchanged.
+   % the catalog, so every listed alias resolves to the station's official
+   % name. An unknown name passes through unchanged.
+   %
+   % See also: icemodel.forcing.buildGcnetVandecruxData,
+   %  icemodel.forcing.reconstruct.fillPromiceStation
 
    arguments
       station (1, :) string

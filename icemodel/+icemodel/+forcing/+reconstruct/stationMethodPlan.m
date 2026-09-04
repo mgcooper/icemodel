@@ -18,14 +18,14 @@ function plan = stationMethodPlan(target, donors, proxies, kwargs)
    %  from PROMICE donors (the role-reversal acceptance test).
    %
    % Inputs
-   %  target : struct — series (timetable), station (string), location
+   %  target : struct with series (timetable), station (string), and location
    %     (struct lat_wgs84, lon_wgs84, elev_m).
-   %  donors : struct array (possibly empty) — series, station, family,
+   %  donors : struct array (possibly empty) with series, station, family,
    %     location, and optional observed_mask (logical vector or timetable
    %     by channel; filled samples are never donors). Source sensor-height
    %     and AWS-generation metadata in series.Properties.UserData is carried
    %     into fitted transfer provenance.
-   %  proxies : struct array (possibly empty) — series (model met on the
+   %  proxies : struct array (possibly empty) with series (model met on the
    %     target axis), name ("mar"|"merra2"), code_name (provenanceCodes
    %     field name).
    %
@@ -33,7 +33,7 @@ function plan = stationMethodPlan(target, donors, proxies, kwargs)
    %  channels : channels to plan (default the policy's required set).
    %  seed : deterministic seed for split and draws (required).
    %  split_manifest : persisted split path ("" disables persistence).
-   %  n_gaps : synthetic gaps per exact stratum (duration bucket x season).
+   %  n_gaps : synthetic gaps per stratum (duration bucket x season).
    %  knot_candidates : spline hyperparameter set.
    %  max_donors : distinct donors retained per channel after held-out
    %     validation ranking.
@@ -46,7 +46,7 @@ function plan = stationMethodPlan(target, donors, proxies, kwargs)
    %  icemodel.forcing.reconstruct.setopts contract.
    %
    % Returns
-   %  plan : struct — station, split, per-channel struct array (channel,
+   %  plan : struct with station, split, per-channel struct array (channel,
    %     methods: ordered admitted methods with fitted parameters, codes,
    %     per-stratum admissions, selection and evaluation metrics), and
    %     the census the readiness ledger reuses.
@@ -297,9 +297,9 @@ function channel_plan = planChannel(channel, series, times, target, ...
    % Grade every candidate on the same precomputed selection draws; the
    % climatology candidate also supplies the longer-gap policy baseline.
    % The calendar year of every axis sample is grading-pass-invariant, so
-   % one full-axis year() evaluation here replaces the per-candidate
-   % recomputation gradeCandidate used to perform (an O(axis) datetime
-   % pass per candidate that showed up in the production driver profile).
+   % one full-axis year() evaluation here avoids gradeCandidate repeating
+   % an O(axis) datetime pass for every candidate, a cost the production
+   % driver profile identified.
    axis_years = year(times);
    graded = cell(numel(candidates), 1);
    for m = 1:numel(candidates)
@@ -680,7 +680,7 @@ end
 
 function draws = drawSynthetic(series, channel, census, years, strata, ...
       kwargs, location)
-   %DRAWSYNTHETIC Create one deterministic held-out draw per exact stratum.
+   %DRAWSYNTHETIC Create one deterministic held-out draw per stratum.
    draws = cell(height(strata), 1);
    if isempty(years)
       % A one-year station cannot furnish disjoint selection/evaluation
@@ -713,7 +713,7 @@ end
 
 function grade = gradeCandidate(candidate, channel, series, ...
       strata, draws, kwargs, label, location, years, axis_years)
-   %GRADECANDIDATE Held-out metrics of one candidate per exact stratum.
+   %GRADECANDIDATE Held-out metrics of one candidate per stratum.
    % axis_years carries year(series.Properties.RowTimes) precomputed once
    % by the caller: the axis never changes between grading calls, so the
    % hoist is exact while removing a per-candidate O(axis) datetime pass.
@@ -769,7 +769,7 @@ end
 
 function [methods, denials] = admitAndRank(candidates, graded, ...
       baseline_idx, persistence_graded, strata, channel, kwargs)
-   %ADMITANDRANK Admit and rank candidates within each exact stratum.
+   %ADMITANDRANK Admit and rank candidates within each stratum.
    % One record per season x duration bucket prevents performance from
    % another regime from changing the method order for the active gap.
    method_slots = cell(numel(candidates) * height(strata), 1);
@@ -916,7 +916,7 @@ function [methods, denials] = admitAndRank(candidates, graded, ...
    [~, order] = sortrows([-skill(:), [methods.selection_rmse].']);
    methods = methods(order);
    % D-29: for swd, calibrated RCM proxies rank ahead of climatology
-   % whenever a stratum admits both — the day-of-year median structurally
+   % whenever a stratum admits both; the day-of-year median structurally
    % inserts clearer-than-context days into cloudy weeks (cen fills
    % +0.09 median CSI vs observed neighbors), a context error the skill
    % ranking above cannot see. Deterministic post-ranking swap only;
@@ -1055,7 +1055,7 @@ function values = donorChannel(donor, channel, times)
       return
    end
 
-   % Legacy vector masks are accepted on either donor or target cadence.
+   % Vector masks are accepted on either donor or target cadence.
    observed = donor.observed_mask(:);
    if numel(observed) == height(donor.series)
       mask_series = timetable(donor.series.Properties.RowTimes, ...
@@ -1071,7 +1071,7 @@ end
 function aligned = alignToAxis(donor_series, channel, times)
    %ALIGNTOAXIS Sample one donor/proxy channel onto the target time axis.
    % Support-held alignment: every target sample takes the donor posting
-   % whose support interval covers it — the same interval-support
+   % whose support interval covers it. The same interval-support
    % convention the target's own 15-minute axis uses (resampleMetTimestep
    % holds each hourly posting across its four quarter-hour samples). An
    % exact join would leave a coarser donor covering only one target

@@ -1,32 +1,33 @@
-function [d_vap_liq, d_vap_ice, f_res] = potential_surface_vapor_exchange( ...
+function [d_vap_liq, d_vap_ice_lwe, f_res] = potential_surface_vapor_exchange( ...
       d_pevp, f_ice, f_liq, f_res_por)
-   %POTENTIAL_SURFACE_VAPOR_EXCHANGE Partition a surface vapor demand.
+   %POTENTIAL_SURFACE_VAPOR_EXCHANGE Partition surface vapor demand.
    %
-   %  [d_vap_liq, d_vap_ice, f_res] = ...
+   %  [d_vap_liq, d_vap_ice_lwe, f_res] = ...
    %     icemodel.surface.potential_surface_vapor_exchange( ...
    %     d_pevp, f_ice, f_liq, f_res_por)
    %
-   % D_PEVP is an energy demand expressed as a liquid-water-equivalent
-   % fraction. This function partitions it into liquid and ice mass
-   % increments, both still expressed as liquid-water-equivalent fractions.
-   % Before storage limits, the partition closes the latent-energy identity
+   % D_PEVP is an energy demand expressed as a liquid-fraction increment. This
+   % function partitions it into liquid and ice mass increments, both expressed
+   % as liquid-fractions:
    %
-   %   Lv * d_pevp = Lv * d_vap_liq + Ls * d_vap_ice.
+   %   Lv * d_pevp = Lv * d_vap_liq + Ls * d_vap_ice_lwe.
    %
-   % Wet condensation goes to liquid. Wet evaporation first exhausts liquid
-   % above F_RES, then converts the remaining energy demand to ice at Lv/Ls.
-   % A dry surface exchanges only with ice. Call this before mutating the
-   % surface state so its phase decision matches the state being applied.
+   % Evaporation first uses f_liq above F_RES, then converts any remaining
+   % demand to a liquid-water-equivalent sublimation increment.
+   % APPLY_VAPOR_TRANSFER limits
+   % condensation and deposition by control-volume water capacity and limits
+   % sublimation by F_ICE_MIN. Call this before mutating the phase fractions so
+   % the partition uses the input state.
    %
    % Inputs
    %   d_pevp    - Potential surface vapor demand [-], on the Lv basis.
-   %   f_ice     - Ice fraction of the top cell [-], before the exchange.
-   %   f_liq     - Liquid fraction of the top cell [-], before the exchange.
+   %   f_ice     - Ice fraction of the top cell [-], before exchange.
+   %   f_liq     - Liquid fraction of the top cell [-], before exchange.
    %   f_res_por - Residual liquid-water fraction per pore volume [-].
    %
    % Outputs
    %   d_vap_liq - Liquid-phase increment on the liquid-water basis [-].
-   %   d_vap_ice - Ice-phase increment on the liquid-water basis [-].
+   %   d_vap_ice_lwe - Ice-phase increment on the liquid-water basis [-].
    %   f_res     - Residual liquid fraction used for the phase decision [-].
    %
    % See also: icemodel.surface.surface_vapor_mass_flux,
@@ -40,20 +41,22 @@ function [d_vap_liq, d_vap_ice, f_res] = potential_surface_vapor_exchange( ...
       [Ls, Lv] = icemodel.physicalConstant('Ls', 'Lv');
    end
 
+   % Identify wet cells and the residual water floor of each cell.
    [wet, f_res] = icemodel.column.vapor_exchange_is_wet( ...
       f_ice, f_liq, f_res_por);
 
+   % Initial/default values.
    d_vap_liq = 0;
-   d_vap_ice = 0;
+   d_vap_ice_lwe = 0;
 
    if wet && d_pevp < 0
-      % Spend only the available liquid at Lv. Ice receives the remaining
-      % energy demand at Ls, still reported on the liquid-water mass basis.
+      % Limit evaporation to the available liquid using Lv. Send the
+      % remaining demand to ice at Ls, as a liquid fraction.
       d_vap_liq = max(d_pevp, -(f_liq - f_res));
-      d_vap_ice = (d_pevp - d_vap_liq) * Lv / Ls;
+      d_vap_ice_lwe = (d_pevp - d_vap_liq) * Lv / Ls;
    elseif wet
       d_vap_liq = d_pevp;
    else
-      d_vap_ice = d_pevp * Lv / Ls;
+      d_vap_ice_lwe = d_pevp * Lv / Ls;
    end
 end

@@ -1,8 +1,7 @@
-function r_eff = update_grain_radius(r_eff, f_liq, U_vap, d_vap_applied, ...
-      dz1, dt)
+function r_eff = update_grain_radius(r_eff, f_liq, U_vap, d_vap, dz1, dt)
    %UPDATE_GRAIN_RADIUS Grow thermal grains from the substep vapor exchange.
    %
-   % r_eff = update_grain_radius(r_eff, f_liq, U_vap, d_vap_applied, dz1, dt)
+   % r_eff = update_grain_radius(r_eff, f_liq, U_vap, d_vap, dz1, dt)
    %
    % Updates the thermal grain radius following Jordan (1991) SNTHERM89
    % Eqs. 33-34, once per accepted substep. Dry growth uses the substep's
@@ -20,8 +19,8 @@ function r_eff = update_grain_radius(r_eff, f_liq, U_vap, d_vap_applied, ...
    %   f_liq         - Volumetric liquid water fraction (JJ x 1)
    %   U_vap         - Accepted interior vapor mass flux [kg m-2 s-1]
    %                   (JJ+1 x 1, boundary faces zero)
-   %   d_vap_applied - Realized surface vapor exchange this substep [-],
-   %                   a signed top-cell liquid-water volume fraction
+   %   d_vap         - Realized surface vapor exchange this substep [-],
+   %                   as a signed top-cell-equivalent liquid-water fraction
    %   dz1           - Top control-volume thickness [m]
    %   dt            - Accepted substep duration [s]
    %
@@ -51,10 +50,9 @@ function r_eff = update_grain_radius(r_eff, f_liq, U_vap, d_vap_applied, ...
    % realized surface exchange as a magnitude flux: rejected demand never
    % crossed the surface, and a sign never cancels interior transport.
    JJ = numel(r_eff);
-   U_vap_faces = U_vap;
-   U_vap_faces(1) = abs(d_vap_applied) * dz1 * ro_liq / dt;
+   U_vap(1) = abs(d_vap) * dz1 * ro_liq / dt;
    U_vap_nodes = min( ...
-      0.5 * (abs(U_vap_faces(1:JJ)) + abs(U_vap_faces(2:JJ+1))), Uv_max);
+      0.5 * (abs(U_vap(1:JJ)) + abs(U_vap(2:JJ+1))), Uv_max);
 
    % Jordan's equations use grain diameter rather than radius.
    diam = 2 * r_eff;

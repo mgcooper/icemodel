@@ -5,12 +5,17 @@ function assertPromiceFilledArtifact(filename, met, site)
    %     filename, met, site)
    %
    % The check is shared by runtime loading and scientific-readiness audit.
-   % It rejects stale policy/engine identity, a noncanonical registry, and
-   % incomplete per-channel provenance before a promice_filled payload can be
-   % treated as model forcing.
+   % It rejects stale policy/engine identity, a gapfill_registry field
+   % that does not match provenanceCodes, and incomplete per-channel
+   % provenance before a promice_filled payload can be treated as model
+   % forcing.
+   %
+   % See also: icemodel.loadmet,
+   %  icemodel.forcing.reconstruct.verifyPromiceFilledReadiness
 
-   % The canonical filename is part of product identity; a caller-supplied
-   % forcing label cannot turn an unrelated payload into promice_filled.
+   % The expected filename pattern is part of product identity; a
+   % caller-supplied forcing label cannot turn an unrelated payload into
+   % promice_filled.
    [~, name, extension] = fileparts(string(filename));
    site = lower(string(site));
    filename_ok = startsWith(lower(string(name)), ...
@@ -20,7 +25,7 @@ function assertPromiceFilledArtifact(filename, met, site)
 
    % The filled producer stamps both identities inside the artifact; neither a
    % readiness ledger nor a caller-supplied path can substitute for them. The
-   % stamps must name the current engine and exact shipped policy, not merely
+   % stamps must name the current engine and shipped policy, not merely
    % strings that resemble version and digest fields.
    metadata = met.Properties.UserData;
    identity_fields = ["gapfill_product", "gapfill_engine_version", ...
@@ -66,7 +71,7 @@ function assertPromiceFilledArtifact(filename, met, site)
 end
 
 function valid = hasValidPromiceFilledProvenance(met, metadata)
-   %HASVALIDPROMICEFILLEDPROVENANCE Verify registry and per-channel codes.
+   %HASVALIDPROMICEFILLEDPROVENANCE Verify gapfill codes per channel.
    codes = icemodel.forcing.reconstruct.provenanceCodes();
    variables = string(met.Properties.VariableNames);
    channels = unique([string(metadata.gapfill_channels), ...
@@ -76,7 +81,8 @@ function valid = hasValidPromiceFilledProvenance(met, metadata)
       channels(end + 1) = "boom_height";
    end
 
-   % The embedded registry must be the canonical append-only registry.
+   % metadata.gapfill_registry must equal the append-only code list that
+   % provenanceCodes returns.
    valid = isstruct(metadata) && isfield(metadata, 'gapfill_registry') ...
       && isequal(metadata.gapfill_registry, codes);
    if ~valid

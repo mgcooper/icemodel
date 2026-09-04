@@ -1,10 +1,12 @@
 function remesh = initialize_remesh_ledger()
    %INITIALIZE_REMESH_LEDGER Zeroed remesh event ledger.
    %
-   % Defines the remesh event schema. merge_thin_layers is the only caller.
-   % It accumulates one substep's merge pass here, then
-   % accumulate_remesh_budget folds the events into the forcing-step
-   % budget channels before the call returns.
+   % Initialize the remesh ledger struct called by merge_thin_layers. The ledger
+   % accumulates one substep's merge budget, then accumulate_remesh_budget folds
+   % the events into the forcing-step budget at the end of merge_thin_layers.
+   %
+   % See also: icemodel.column.merge_thin_layers,
+   %  icemodel.column.accumulate_remesh_budget
    %
    %#codegen
 

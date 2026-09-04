@@ -13,11 +13,11 @@ function gate = admissionGate(channel, metrics, baseline_rmse, kwargs)
    %  denied stratum stays missing, and takes no weaker fill.
    %
    % Inputs
-   %  channel : canonical channel name (bias caps are per channel).
+   %  channel : channel name (bias caps are per channel).
    %  metrics : one-row metric table from validationMetrics (overall or one
    %     stratum row).
-   %  baseline_rmse : held-out RMSE of the policy baseline on the exact
-   %     finite candidate support (persistence for the ≤6 h bucket,
+   %  baseline_rmse : held-out RMSE of the policy baseline on the finite
+   %     candidate support (persistence for the ≤6 h bucket,
    %     station day-of-year climatology otherwise). NaN disables the test ONLY
    %     when the baseline itself produced no finite prediction, and the
    %     gate records that condition.
@@ -31,18 +31,16 @@ function gate = admissionGate(channel, metrics, baseline_rmse, kwargs)
    %     within-gap spread evidence is denied; proven zero spread is exempt.
    %  min_coverage : minimum reconstructed fraction of the drawn samples
    %     (default 0.10). This is a usefulness floor, not a completeness
-   %     requirement: the orchestrator composes ordered methods and
-   %     cascades uncovered leftovers to the next tier, so a method that
-   %     skillfully covers part of a stratum (e.g. a donor whose record
-   %     ends before the target's) is admitted for the samples it covers
-   %     — support-held coarse-cadence donors reach only fractional
-   %     coverage on a finer target axis while beating the climatology
-   %     baseline severalfold where they do cover.
+   %     requirement. The orchestrator applies ordered methods to uncovered
+   %     samples. It can admit a method that covers only part of a stratum.
+   %     For example, a donor record can end before the target record.
+   %     Support-held coarse-cadence donors can cover only part of a finer
+   %     target axis while beating climatology severalfold where they overlap.
    %  metrics must contain finite provenance_accounting equal to one; an
    %     absent accounting result is a failed gate, never an opt-out.
    %
    % Returns
-   %  gate : struct — admit (logical), reasons (string column, empty when
+   %  gate : struct with admit (logical), reasons (string column, empty when
    %     admitted), bias_cap, rmse_improvement_required, baseline_rmse.
    %
    % See also: icemodel.forcing.reconstruct.validationMetrics
@@ -75,7 +73,7 @@ function gate = admissionGate(channel, metrics, baseline_rmse, kwargs)
       return
    end
    if channel == "wspd" && isfinite(kwargs.typical_magnitude)
-      % Policy: wspd bias cap is 1 m/s OR 10% — the relative alternative
+      % The wspd bias limit is 1 m/s or 10%; the relative alternative
       % applies when the caller supplies the stratum's typical wind speed.
       bias_cap = max(bias_cap, 0.10 * kwargs.typical_magnitude);
    end

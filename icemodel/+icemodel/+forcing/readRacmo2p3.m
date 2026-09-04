@@ -9,7 +9,7 @@ function [data, units, Time] = readRacmo2p3(filename, varname, kwargs)
    % from a per-variable RACMO 2.3p3 FGRN11 NetCDF file. It converts the
    % native units to icemodel-standard units. It follows
    % icemodel.forcing.readMar3p11 and the legacy runoff readRacmo2p3, so the
-   % gridded-source readers share one contract: a cells-by-time block (cells
+   % gridded-source readers share one interface: a cells-by-time block (cells
    % flattened in native grid order, matching the X, Y grids from the same
    % file and gridLocation's column-major slab), the unit string, and the
    % UTC time axis.

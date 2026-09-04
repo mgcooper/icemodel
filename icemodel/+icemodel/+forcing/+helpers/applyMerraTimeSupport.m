@@ -19,8 +19,11 @@ function [Data, metadata, diagnostics] = applyMerraTimeSupport(Data, metadata)
    %
    % Outputs
    %  Data        - support-corrected timetable
-   %  metadata    - existing fields plus canonical MERRA time provenance
+   %  metadata    - existing fields plus MERRA time provenance
    %  diagnostics - replaced element count and metadata-change flag
+   %
+   % See also: icemodel.forcing.buildMerraData,
+   %  icemodel.verification.setup.repairMetTimeSupport
 
    arguments
       Data timetable

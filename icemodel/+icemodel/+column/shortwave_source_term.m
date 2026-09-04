@@ -8,12 +8,12 @@ function [Sc, chi] = shortwave_source_term(Qsi, albedo, I0, dz_spect, ...
    %    z_nodes_therm, z_nodes_spect, z_edges_spect, ro_sno, k_bulk_lookup)
    %
    % The spectral model solves for the net shortwave flux profile on the
-   % spectral control-volume grid, then collapses that absorbed-flux profile
-   % to the thermal grid used by the enthalpy solver.
+   % spectral control-volume grid, then remeshes that absorbed-flux profile
+   % on the thermal grid used by the enthalpy solver.
    %
    % If the K_BULK_LOOKUP argument is an empty struct, it switches the
    % bulk-extinction step from the density lookup approximation to the exact
-   % solution. All other parts of the spectral solve remain shared.
+   % solution. All other parts of the spectral solve remain the same.
    %
    % Notes
    %
@@ -51,10 +51,12 @@ function [Sc, chi] = shortwave_source_term(Qsi, albedo, I0, dz_spect, ...
    %
    % Sc = (1.0 - chi) * Qsi / I0 * -dQ_therm ./ dz_therm;
    %
-   % The SEB allocates the surface portion. This routine does not adjust Qnet
+   % The SEB allocates the surface portion. This function does not adjust Qnet
    % and dQnet for chi.
    %
-   % #codegen
+   % See also: icemodel
+   %
+   %#codegen
 
    % Dark/no-sun early exit.
    if Qsi < 1e-3
@@ -75,7 +77,7 @@ function [Sc, chi] = shortwave_source_term(Qsi, albedo, I0, dz_spect, ...
    % Solve the two-stream system for the net flux at each interface.
    Qnet = icemodel.radiation.solvetwostream(I0, albedo, k_bulk, z_edges_spect);
 
-   % Collapse the spectral-grid net flux to the thermal-grid source term and
+   % Remesh the spectral-grid net flux to the thermal-grid source term and
    % compute the chi partition used by the SEB coupling.
    [Sc, chi] = spectralNetFluxToSourceTerm(Qsi, I0, albedo, Qnet, ...
       dz_spect, dz_therm);
@@ -96,8 +98,8 @@ function [Sc, chi] = spectralNetFluxToSourceTerm(Qsi, I0, albedo, Qnet, ...
    dQnet_spect = Qnet(1:end - 1) - Qnet(2:end);
 
    % Aggregate the absorbed spectral flux onto the thermal control volumes.
-   % This current collapse assumes the thermal/spectral spacing ratio is fixed
-   % and uniform. If the spectral grid becomes nonuniform, revisit this mapping
+   % This remesh assumes the thermal/spectral spacing ratio is fixed and
+   % uniform. If the spectral grid becomes nonuniform, revisit this mapping
    % instead of only changing icemodel.radiation.bulk_extinction_coefficients.
    n_spect_per_therm = dz_therm(1) / dz_spect(1);
    dQnet_therm = transpose(sum(reshape(dQnet_spect, n_spect_per_therm, []), 1));

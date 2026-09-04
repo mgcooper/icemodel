@@ -21,29 +21,27 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
    %  snow_depth - optional forcing snow depth [m]; NaN when unavailable
    %  opts    - runtime options with time-varying PROMICE observation
    %            heights resolved by icemodel.loadmet
-   %  rainf  - phase-source-selected liquid precipitation rate [m s^-1]
-   %  snowf  - phase-source-selected solid precipitation rate [m s^-1]
+   %  rainf  - liquid precipitation rate [m s^-1]
+   %  snowf  - solid precipitation rate [m s^-1]
    %
-   % The trailing rainf/snowf outputs carry the runtime precipitation phase
-   % selection (opts.precip_phase_source, POLICY A10/D-18). 'source' returns
-   % the met product's own split as shipped. 'threshold' repartitions the
-   % canonical total ppt by air temperature. They come after OPTS, so the
-   % positions of the earlier outputs do not change. Under POLICY D-0b they
-   % feed no existing physics: the RAIN output stays zero until the
-   % advective-rain physics is finished.
+   % The rainf/snowf outputs are selected by opts.precip_phase_source. 'source'
+   % returns the met product's values. 'threshold' repartitions total ppt by air
+   % temperature.
+   %
+   % See also: icemodel, skinmodel, icemodel.loadmet
    %
    %#codegen
 
    % The 2nd input is the index into the metfile name list resolved in
-   % icemodel.configureRun / icemodel.setopts. If omitted, load and
-   % concatenate all files listed in opts.metfname.
+   % icemodel.configureRun / icemodel.setopts. If omitted, load and concatenate
+   % all files listed in opts.metfname.
    if nargin < 2
       [met, opts] = icemodel.loadmet(opts);
    else
       [met, opts] = icemodel.loadmet(opts, fileiter);
    end
 
-   % Transfer the met data to vectors
+   % Transfer the met data to vectors.
    rh = met.rh;
    swd = met.swd;
    lwd = met.lwd;
@@ -58,21 +56,15 @@ function [tair, swd, lwd, albedo, wspd, rh, psfc, rain, tppt, time, ...
       snow_depth = nan(height(met), 1);
    end
 
-   % Rainfall forcing is ignored in the core time integration. Keep the
-   % zero-rain behavior explicit until rain/snow/ppt forcing support is
-   % implemented consistently and enabled as a separate physics change
-   % (POLICY D-0b; the rainf/snowf outputs below carry the selected data
-   % split without entering the solver).
+   % Rainfall forcing is currently ignored in the model. Keep rain equal to 0
+   % until rain/snow/ppt forcing is implemented.
    rain = 0 * tair;
 
-   % Runtime precipitation phase selection (POLICY A10 / D-18). The option
-   % opts.precip_phase_source picks the rainf/snowf split that
-   % snowfall-consuming callers receive. The resolution helper enforces the
-   % A10 validity contract: nonnegative components that sum to the total.
-   % The helper parses options and defaults outside the code-generation
-   % subset, so it stays behind the MATLAB-target boundary, like the
-   % readiness verifier in icemodel.loadmet. Generated targets return the
-   % unresolved NaN sentinel until a generated consumer exists.
+   % Partition rainf/snowf. resolvePrecipPhase requires nonnegative components
+   % that sum to the total. It parses options and defaults outside the
+   % code-generation subset, so it runs only when coder.target('MATLAB') is
+   % true, like the readiness verifier in icemodel.loadmet. Generated targets
+   % return the unresolved NaN sentinel until a generated consumer exists.
    if coder.target('MATLAB')
       % A cached options struct can lack this field. Default to the
       % product's own split (the icemodel.setopts default), so an old

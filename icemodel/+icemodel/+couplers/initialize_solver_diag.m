@@ -1,37 +1,39 @@
 function diag = initialize_solver_diag()
-   %INITIALIZE_SOLVER_DIAG Return the sentinel solver-diagnostics struct.
+   %INITIALIZE_SOLVER_DIAG Initialize forcing-step solver diagnostics.
    %
    %  diag = icemodel.couplers.initialize_solver_diag()
    %
-   % One fixed-schema scalar struct carries every solver observability
-   % value from both surface-column couplers to the driver. The `ok`
-   % control flags stay plain coupler returns; this struct exists so the
-   % diagnostics can change without touching coupler signatures.
+   % Accepted-solve fields start at these values:
+   %  - ok_seb, ok_ieb, ok_cpl: logical flags, false
+   %  - n_iters: final inner Picard iteration count, NaN
+   %  - cpl_iters: outer iteration count, 0
+   %  - cpl_res: signed outer residual [K], NaN
+   %  - seb_res: SEB residual magnitude [W m-2], NaN
    %
-   % The driver holds one sentinel copy per forcing step and overwrites
-   % it only at the accepted-substep checkpoint, so a forcing step whose
-   % only content was forced advances reports these sentinel values,
-   % never a rejected solve's values. The convergence flags and the inner
-   % iteration count are output-visible in standard-profile channels;
-   % cpl_iters, cpl_res, and seb_res are emitted only through the
-   % diagnostic-profile suffix. The sentinels are therefore fixed here:
-   % converged flags false, iteration counts and residuals NaN or zero.
+   % Forcing-step scalar counters start at zero:
+   %  - cpl_recovery_count: accepted substeps that used recovery settings
+   %  - n_failed_substeps: failures charged to the timestep controller
+   %  - n_forced_advances: checkpoint-only advances without an accepted solve
    %
-   % Fields
-   %  ok_seb, ok_ieb, ok_cpl - copies of the control flags [logical]
-   %  n_iters      - inner Picard iterations, final sweep
-   %  cpl_iters    - outer iterations used, all phases together
-   %  cpl_phase    - 0 sentinel, 1 primary accepted, 2 conservative
-   %  cpl_recovered - the conservative phase produced the returned state
-   %  cpl_res      - final outer residual T_sfc - Ts_old [K]
-   %  seb_res      - final SEB residual magnitude [W m-2]
-   %  cpl_res_hist - signed outer-residual ring, newest last (16 x 1);
-   %                 rides the debug dumps only, never an output channel
+   % DIAG.SUBSTEP stores the latest raw attempt. It also has cpl_res_hist, a
+   % 16-by-1 signed residual ring for failure dumps. Without an accepted
+   % attempt, the accepted-solve fields keep their initial values. Counters can
+   % still change.
    %
-   % See also: icemodel.couplers.solve_surface_column_robin,
-   %  icemodel.couplers.solve_surface_column_dirichlet
+   % See also: icemodel.couplers.update_solver_diag,
+   %  icemodel.timestepping.newtimestep
    %
    %#codegen
+
+   substep_diag = struct( ...
+      'ok_seb', false, ...
+      'ok_ieb', false, ...
+      'ok_cpl', false, ...
+      'n_iters', nan, ...
+      'cpl_iters', 0.0, ...
+      'cpl_res', nan, ...
+      'seb_res', nan, ...
+      'cpl_res_hist', nan(16, 1));
 
    diag = struct( ...
       'ok_seb', false, ...
@@ -39,9 +41,10 @@ function diag = initialize_solver_diag()
       'ok_cpl', false, ...
       'n_iters', nan, ...
       'cpl_iters', 0.0, ...
-      'cpl_phase', 0.0, ...
-      'cpl_recovered', false, ...
       'cpl_res', nan, ...
       'seb_res', nan, ...
-      'cpl_res_hist', nan(16, 1));
+      'cpl_recovery_count', 0.0, ...
+      'n_failed_substeps', 0.0, ...
+      'n_forced_advances', 0.0, ...
+      'substep', substep_diag);
 end

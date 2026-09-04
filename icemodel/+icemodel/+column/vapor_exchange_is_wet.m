@@ -6,41 +6,32 @@ function [tf, f_res] = vapor_exchange_is_wet(f_ice, f_liq, f_res_por)
    %     icemodel.column.vapor_exchange_is_wet(f_ice, f_liq, f_res_por)
    %
    % Returns true where a mobile liquid film exists, so vapor exchange goes
-   % through the liquid phase at Lv. Elsewhere the exchange goes straight to
-   % ice at Ls.
+   % through the liquid phase at Lv. Elsewhere the exchange goes to ice at Ls.
    %
-   % A cell counts as wet when its liquid fraction exceeds the residual floor
-   % that capillary retention and the Jordan thermodynamic minimum set
-   % together. Liquid at or below that floor is held, not mobile, so it
+   % This function defines cell "wetness" for vapor exchange. A cell is "wet"
+   % when its liquid fraction exceeds the residual floor set by the maximum of
+   % capillary retention and the phase-fraction characteristic-curve
+   % thermodynamic minimum. Liquid at or below that floor is immobile, so it
    % cannot supply evaporation.
    %
-   % One function owns this decision. The surface demand partition and
-   % icemodel.column.couple_vapor_step consume it before they call the shared
-   % icemodel.column.apply_vapor_transfer state mutator. The interior path
-   % evaluates it on the state the solve converged on. Two different criteria
-   % would make the selected
-   % phase and face latent heat disagree. In the disagreement band, a cell
-   % would gain or lose about twelve percent of its mass.
-   %
-   % icemodel.column.vapor_transport_terms also calls this predicate
-   % to select the donor-cell latent heat. The solve energy and applied mass
-   % then use the same latent heat in the disagreement band below.
+   % icemodel.surface.potential_surface_vapor_exchange calls this for the
+   % surface demand partition, then applies the result through
+   % icemodel.column.apply_vapor_transfer. icemodel.column.vapor_transport_terms
+   % calls it during the enthalpy solve to pick each face's donor latent heat
+   % (L_vap); icemodel.column.couple_vapor_step uses L_vap to ensure interior
+   % transport uses the same phase for mass transfer as the donor latent heat.
    %
    % This is a different question from the one
    % icemodel.vapor.latent_enthalpy_switch answers. That function picks the
-   % latent heat for vapor storage and conduction in the enthalpy solve, on a
-   % fixed liquid-fraction threshold. This one picks the phase that supplies
-   % a mass exchange, on the residual floor. They agree over most of the
-   % state space and disagree in a band whose width depends on f_ice.
+   % latent heat for vapor storage and conduction in the enthalpy solve, using a
+   % fixed liquid-fraction threshold (f_liq_phase_switch_threshold). This
+   % function picks the phase that supplies the mass exchange.
    %
-   % icemodel.column.liquid_flux asks a third question and keeps its own
-   % floor. Its hydraulic mask tests only the capillary term because
-   % capillarity holds water against flow. Its relative saturation uses that
-   % same term. This predicate uses the maximum of the capillary term and
-   % Jordan's thermodynamic minimum. That value bounds what a cell can give
-   % up to a phase change. The two floors represent different quantities,
-   % not a duplicated rule. Closing the band between them would move
-   % production results.
+   % icemodel.column.liquid_flux asks a third question and uses f_res_pore as
+   % it's floor because capillarity holds water against flow. Its relative
+   % saturation uses that same term. This function uses the maximum of the
+   % capillary term and the phase fraction curve's thermodynamic minimum. That
+   % value bounds what a cell can give up to phase change.
    %
    % Inputs
    %   f_ice     - Ice fraction [-].
@@ -49,9 +40,8 @@ function [tf, f_res] = vapor_exchange_is_wet(f_ice, f_liq, f_res_por)
    %
    % Outputs
    %   tf        - True where the exchange goes through the liquid phase.
-   %   f_res     - The volumetric residual floor this decision used [-]. A
-   %               caller that needs the floor uses this output, so both use
-   %               the same evaluation.
+   %   f_res     - The volumetric residual floor used to decide 'tf' [-], for
+   %               callers that need both.
    %
    % See also: icemodel.column.residual_water_fraction,
    %  icemodel.surface.potential_surface_vapor_exchange,

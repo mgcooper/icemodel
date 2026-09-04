@@ -14,8 +14,8 @@ function metadata = marDiagnosticMetadata(T, melt_daily_rate, metadata, kwargs)
    % SUH is hourly sublimation. SU combines sublimation and evaporation. RZ is
    % a signed native term that combines meltwater refreezing and deposition,
    % and a few of its negative values come from the source data. The metadata
-   % therefore keeps a distinct canonical name for each product instead of
-   % treating them as equal to pure evaporation or to a nonnegative refreezing
+   % therefore keeps a distinct name for each product instead of treating
+   % them as equal to pure evaporation or to a nonnegative refreezing
    % product. It records strict-negative statistics and a reporting-only
    % material subset, and it changes no RZ value.
    %

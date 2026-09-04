@@ -2,10 +2,13 @@ function [met, opts] = loadmet(opts, fileiter) %#codegen
    %LOADMET Load one or more icemodel met files as a timetable.
    %
    %  met = icemodel.loadmet(opts) loads and concatenates all met files named
-   %  in opts.metfname. This is the canonical path for multi-year runs.
+   %  in opts.metfname. Use this form for multi-year runs.
    %
    %  met = icemodel.loadmet(opts, fileiter) loads only the requested met file
    %  index/indices from opts.metfname.
+   %
+   % See also: icemodel.processmet, icemodel.interpmet,
+   %  icemodel.createMetFileNames
 
    if nargin < 1
       opts = icemodel.setopts('icemodel', 'behar', 2016, 'kanm');
@@ -14,13 +17,9 @@ function [met, opts] = loadmet(opts, fileiter) %#codegen
       fileiter = 1:numel(opts.metfname);
    end
 
-   % The derived PROMICE product runs only when the configured filled met files
-   % carry the producer-manifest identity, and cover every requested timestep
-   % in the requested window with the required forcing channels (POLICY A4).
-   % Calendar-year ledger verdicts are bookkeeping, never the runtime gate.
-   % Table I/O stays outside this code-generation entry point. A generated
-   % caller must pass an options struct that the same public verifier has
-   % already validated.
+   % Verify that filled PROMICE files match their producer manifest and contain
+   % all required forcing samples in the requested window (POLICY A4). Generated
+   % callers must use options verified for the same files and window.
    if coder.target('MATLAB')
       opts = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness( ...
          opts, fileiter);
@@ -51,9 +50,9 @@ function [met, opts] = loadmet(opts, fileiter) %#codegen
    met = addCanonicalSnowDepth(met);
    met = addCanonicalTotalPrecip(met);
 
-   % A fileiter subset is its own loading contract. Return only simulation
-   % years actually carried by the selected files so a valid annual load
-   % does not fail because unselected years remain in the caller's list.
+   % A fileiter subset returns only the simulation years the selected files
+   % actually include. This keeps a valid annual load from failing when the
+   % caller asks for years that aren't included in the met file.
    if numel(fileiter) < numel(opts.metfname)
       selected_years = intersect(opts.simyears(:), ...
          unique(year(met.Time)), 'stable');
@@ -113,8 +112,8 @@ function opts = applyPromiceObservationHeights(met, opts)
          opts.boom_height_fraction_fallback = 1;
          return
       end
-      % Canonical PROMICE products without the channel land on the nominal
-      % rung for every sample; one warning identifies the site and files.
+      % PROMICE products without the channel land on the nominal rung for
+      % every sample; one warning identifies the site and files.
       warnBoomFallback('icemodel:loadmet:promiceBoomHeightNominal', ...
          ['no measured boom_height channel; applying the nominal ' ...
          'constant'], height(met), height(met), opts);
@@ -157,7 +156,7 @@ function opts = applyPromiceObservationHeights(met, opts)
 end
 
 function opts = stampBoomHeights(opts, boom_height, source, f_fallback)
-   %STAMPBOOMHEIGHTS Install resolved geometry and its provenance contract.
+   %STAMPBOOMHEIGHTS Install resolved geometry and its source record.
    %
    % All three observation heights share the upper boom on PROMICE
    % stations; the source label and fallback fraction are the runtime
@@ -271,7 +270,7 @@ function met = addCanonicalTotalPrecip(met)
    %ADDCANONICALTOTALPRECIP Derive total precip from split components.
 
    % A source that ships rainf and snowf without ppt, or with a placeholder
-   % ppt, still exposes one canonical total at runtime. The runtime phase
+   % ppt, still exposes one total at runtime. The runtime phase
    % option and the forcing-readiness logic therefore need no restage. Each
    % nonfinite ppt sample takes rainf + snowf where both components are
    % finite. A finite ppt sample is never overwritten.
@@ -285,9 +284,9 @@ function met = addCanonicalTotalPrecip(met)
    end
    derived = ~isfinite(ppt) & isfinite(met.rainf) & isfinite(met.snowf);
    ppt(derived) = met.rainf(derived) + met.snowf(derived);
-   % A file that carries both split channels always exposes the canonical
-   % total. The column must exist even when no sample is derivable (all-NaN
-   % placeholders), so downstream contracts see one ppt channel.
+   % A file that carries both split channels always exposes the total. The
+   % column must exist even when no sample is derivable (all-NaN
+   % placeholders), so callers downstream see one ppt channel.
    met.ppt = ppt;
 end
 
@@ -418,9 +417,10 @@ end
 function [filepath, kind] = resolveSwapSourceFile(opts, thisyear, mettime)
    %RESOLVESWAPSOURCEFILE Prefer met files, then legacy userdata files.
 
-   % An explicit manifest-selected Data artifact is authoritative. This is how
-   % native 30-minute and default-hourly variants with the same site/source are
-   % kept distinct at runtime; legacy calls without the option remain met-first.
+   % An explicit manifest-selected Data artifact takes priority over other
+   % resolution. This keeps native 30-minute and default-hourly variants
+   % with the same site and source distinct at runtime. Calls without the
+   % option use met first.
    if ~isempty(explicitUserdataFiles(opts))
       filepath = resolveUserdataFile(opts, thisyear, mettime);
       kind = "userdata";
@@ -605,8 +605,8 @@ function filepath = selectExplicitUserdataFile(files, mettime)
    durations = nan(numel(candidates), 1);
    n_enclosing = 0;
    for n = 1:numel(candidates)
-      % Explicit manifest paths are authoritative, so a corrupt referenced
-      % file raises its load error rather than yielding to a sibling.
+      % Explicit manifest paths take priority, so a corrupt referenced file
+      % raises its load error rather than yielding to a sibling.
       saved = load(candidates(n), 'Data');
       if ~isfield(saved, 'Data') || ~istimetable(saved.Data) ...
             || isempty(saved.Data)

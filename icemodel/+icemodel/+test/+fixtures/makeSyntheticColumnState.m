@@ -191,10 +191,10 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    state.cpl_alpha = opts.cpl_alpha;
    state.cpl_aitken = opts.cpl_aitken;
    state.cpl_jumpmax = opts.cpl_jumpmax;
-   % The conservative recovery floor, resolved from its single source the
-   % same way the production drivers resolve it.
-   state.cpl_alpha_min = min(opts.cpl_alpha, ...
-      icemodel.parameterLookup('cpl_recovery_alpha'));
+   % The settings struct the couplers consume, resolved the same way the
+   % production drivers resolve it.
+   [state.settings, state.settings0] = ...
+      icemodel.couplers.initialize_solver_settings(opts);
 
    % Attach the spectral grid only for tests that exercise that path.
    if kwargs.include_spectral

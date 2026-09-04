@@ -330,7 +330,7 @@ function test_updateState_matches_component_kernels(testCase)
    f_liq = [0.01; 0.02; 0.03];
    f_wat = icemodel.column.water_fraction(f_ice, f_liq);
 
-   [H, k_eff, dHdT, dLdT, drovdT, ro_vap] = icemodel.column.updatestate( ...
+   [H, k_eff, dHdT, dFdT, drovdT, ro_vap] = icemodel.column.updatestate( ...
       T, f_ice, f_liq, f_wat);
 
    [ro_vap_ref, drovdT_ref] = icemodel.vapor.saturation_vapor_density( ...
@@ -345,7 +345,7 @@ function test_updateState_matches_component_kernels(testCase)
    H_ref = icemodel.column.bulk_enthalpy( ...
       T, f_ice, f_liq, f_wat, ro_vap_ref);
 
-   dLdT_ref = icemodel.column.liquid_fraction_derivative( ...
+   dFdT_ref = icemodel.column.liquid_fraction_derivative( ...
       T, f_ice, f_liq);
 
    testCase.verifyEqual(ro_vap, ro_vap_ref, 'RelTol', 1e-12);
@@ -353,7 +353,7 @@ function test_updateState_matches_component_kernels(testCase)
    testCase.verifyEqual(k_eff, k_eff_ref, 'RelTol', 1e-12);
    testCase.verifyEqual(H, H_ref, 'RelTol', 1e-12);
    testCase.verifyEqual(dHdT, cv_ice * f_ice + cv_liq * f_liq, 'RelTol', 1e-12);
-   testCase.verifyEqual(dLdT, dLdT_ref, 'RelTol', 1e-12);
+   testCase.verifyEqual(dFdT, dFdT_ref, 'RelTol', 1e-12);
 end
 
 function test_twetbulb_returns_air_temperature_at_saturation(testCase)
@@ -408,8 +408,7 @@ function test_ambaum_buck_agreement(testCase)
 end
 
 function test_parameterLookup_returns_expected_fields(testCase)
-   % parameterLookup should return a struct with all canonical fields when
-   % called with 'all'.
+   % With 'all', parameterLookup must return each field in expected.
 
    params = icemodel.parameterLookup('all');
 
@@ -426,7 +425,7 @@ function test_parameterLookup_returns_expected_fields(testCase)
 end
 
 function test_atmosphericVaporPressure_matches_direct_contract(testCase)
-   % The centralized helper should preserve the current ea contract.
+   % The helper must return saturation vapor pressure multiplied by rh / 100.
 
    Ta = 268.15;
    rh = 72.0;

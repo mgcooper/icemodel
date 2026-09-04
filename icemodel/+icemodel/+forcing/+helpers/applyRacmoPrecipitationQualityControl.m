@@ -10,16 +10,17 @@ function [Data, metadata] = applyRacmoPrecipitationQualityControl( ...
    % nonnegative. The native model field still contains small negative
    % numerical undershoots. Apply this rule after spatial sampling/remapping
    % and temporal interpolation, when the builder has converted the public
-   % `ppt` channel to canonical m s-1. Every finite negative sample becomes
-   % exactly zero. This function keeps missing values, positive values, the
-   % time axis, and the other channels unchanged.
+   % `ppt` channel to m s-1. Every finite negative sample becomes exactly
+   % zero. This function keeps missing values, positive values, the time
+   % axis, and the other channels unchanged.
    %
    % The returned flat metadata fields fit both freshly built artifacts and
    % the exact-reference repair path. This function uses no magnitude
    % threshold, because precipitation cannot be negative. QA keeps the input
    % minimum and the replacement count as provenance. Pass the prior flat QC
-   % contract when you repair an already-canonical artifact. The second pass
-   % then keeps the original input minimum and count as well as the data.
+   % struct when you repair an artifact this function already processed. The
+   % second pass then keeps the original input minimum and count as well as
+   % the data.
    %
    % See also: icemodel.forcing.buildRacmoData
 
@@ -28,7 +29,7 @@ function [Data, metadata] = applyRacmoPrecipitationQualityControl( ...
       prior_metadata struct = struct()
    end
 
-   % Define the stable metadata contract even when a reduced source omits ppt.
+   % Define the same qc metadata fields even when a reduced source omits ppt.
    metadata = struct( ...
       'racmo_ppt_qc_method', "negative_to_zero", ...
       'racmo_ppt_qc_stage', ...
@@ -59,7 +60,7 @@ function [Data, metadata] = applyRacmoPrecipitationQualityControl( ...
    Data.ppt = values;
 
    % Report whether this pass repaired anything. A second call leaves the data
-   % unchanged. Passing the prior contract also keeps the metadata unchanged.
+   % unchanged. Passing the prior qc metadata also keeps it unchanged.
    metadata.racmo_ppt_qc_replaced_count = nnz(negative);
    if any(negative, 'all')
       metadata.racmo_ppt_qc_status = "applied";
@@ -73,8 +74,8 @@ function [Data, metadata] = applyRacmoPrecipitationQualityControl( ...
 
    % A second repair must retain the original input minimum and replacement
    % count, not rewrite provenance as if the source never contained negatives.
-   % Preserve a complete compatible prior contract only when this pass makes no
-   % new replacements and the already-repaired output remains nonnegative.
+   % Keep the prior qc_precip metadata only when this pass makes no new
+   % replacements and the already-repaired output remains nonnegative.
    if ~any(negative, 'all') && compatiblePriorMetadata(prior_metadata, metadata)
       fields = fieldnames(metadata);
       for k = 1:numel(fields)
@@ -91,7 +92,7 @@ function tf = compatiblePriorMetadata(prior, current)
       return
    end
 
-   % Reject non-scalar or non-text contract tokens before this code converts
+   % Reject non-scalar or non-text field values before this code converts
    % them to strings. Malformed prior metadata then falls back instead of
    % raising an error.
    text_fields = { ...
@@ -136,8 +137,9 @@ function tf = compatiblePriorMetadata(prior, current)
       return
    end
 
-   % Preserve provenance only for this exact contract and current output
-   % minimum. A different physical basis or changed payload gets fresh metadata.
+   % Preserve provenance only when the qc method, units, and source fields
+   % match and the output minimum holds. A different physical basis or
+   % changed payload gets fresh metadata.
    tf = string(prior.racmo_ppt_qc_method) ...
       == string(current.racmo_ppt_qc_method) ...
       && string(prior.racmo_ppt_qc_stage) ...

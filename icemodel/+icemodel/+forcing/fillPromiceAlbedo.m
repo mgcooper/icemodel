@@ -26,10 +26,10 @@ function albedo = fillPromiceAlbedo(albedo, Time, kwargs)
    % Outputs
    %  albedo - gap-free albedo series [-]
    %
-   % Legacy: this function reimplements runoff/functions/fillPromiceAlbedo.m.
-   % The original stays unchanged as the legacy reference. This version takes a
-   % vector and Time instead of the legacy matrix and header, fixes the legacy
-   % `nyears` undefined-variable bug, and has no plot option.
+   % runoff/functions/fillPromiceAlbedo.m is the reference implementation.
+   % This function accepts an albedo vector and Time, not a matrix and header.
+   % It has no plot option. The reference uses the undefined variable nyears,
+   % so this function iterates unique(year(Time)).
    %
    % See also: icemodel.forcing.buildPromiceMet,
    %  icemodel.forcing.helpers.metchecks

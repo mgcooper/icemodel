@@ -7,7 +7,7 @@ function [met, metadata, Data] = buildMerraMet(location, years, kwargs)
    %     dt_out="15m")
    %
    % Extracts the MERRA-2 forcing at a point (or polygon average) and
-   % converts it to the icemodel met contract: the Data-channel extraction
+   % converts it to icemodel's met format: the Data-channel extraction
    % of icemodel.forcing.buildMerraData followed by icemodel.forcing.data2met
    % (MERRA already carries a total-precipitation channel, so ppt passes
    % through directly). Save the result with
@@ -31,12 +31,12 @@ function [met, metadata, Data] = buildMerraMet(location, years, kwargs)
    %                    before met validation (default true)
    %
    % Outputs
-   %  met      - met-contract timetable (hourly, or dt_out)
+   %  met      - the validated met timetable (hourly, or dt_out)
    %  metadata - finalized met metadata; exactly met.Properties.UserData
    %  Data     - source Data timetable before conversion/resampling
    %
-   % MERRA provides a structurally valid met-contract timetable, while native
-   % source gaps (including SNICEALB/albedo gaps) remain explicit by default.
+   % MERRA provides a structurally valid met timetable, while native source
+   % gaps (including SNICEALB/albedo gaps) remain explicit by default.
    % Callers that require direct-run forcing must separately establish strict
    % forcing readiness or select a provenance-bearing repair policy. The
    % companion Data builder remains available for auxiliary channels.

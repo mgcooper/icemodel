@@ -289,6 +289,53 @@ Notes:
 - by default the rebuilt baselines use the formal 2-year contract:
   retained year plus one leading spinup year
 
+### `run_aa_acceptance`
+
+Purpose:
+
+- run the A/A test before you accept any A/B result
+- require two process-isolated timing runs to reproduce each other
+
+Default use:
+
+```matlab
+report = run_aa_acceptance();
+```
+
+Compare two hand-made runs:
+
+```matlab
+report = run_aa_acceptance( ...
+   [artifact_a_icemodel, artifact_a_skinmodel], ...
+   [artifact_b_icemodel, artifact_b_skinmodel]);
+```
+
+Use when:
+
+- the measurement system changes (host, MATLAB version, protocol code)
+- a perf verdict looks implausible and the protocol needs recertification
+
+Notes:
+
+- runs nothing in the artifact-comparison form; pairing is by sorted
+  filename so per-model artifacts align
+- pass criteria: every artifact is process-isolated
+  (`meta.isolation = "process"`) and reports `meta.ambient_stable = true`;
+  every joined case reports `valid = true` in both runs; and every per-case
+  median ratio B/A lies inside the closed band
+  `[1/(1 + tol_perf), 1 + tol_perf]` from the common saved `meta.tol_perf`
+  value
+- compatibility checks:
+  - artifact lists have equal lengths and no duplicate paths
+  - the two sides share no paths
+  - each side has one run name, and the two names differ
+  - every artifact has the same nonempty hostname
+  - every artifact has the same MATLAB version and data root
+  - every artifact has the same nonempty source revision
+  - tier, simulation year, sample count, warmup count, and tolerance match
+  - matched cases have the same case ID and forcing product
+- prints the verdict and the per-case table; returns them in `report`
+
 ### `snapshot_regression_baseline`
 
 Purpose:
@@ -324,7 +371,7 @@ Purpose:
 
 It reports:
 
-1. kernel timings (inlined, exact, lookup — calls functions directly)
+1. kernel timings (inlined, exact, and lookup; calls functions directly)
 2. direct whole-model timings (exact vs lookup via `opts.lookup_k_bulk`)
 3. output-agreement metrics
 
@@ -517,8 +564,8 @@ Use when:
 
 Production interface:
 
-- `opts.lookup_k_bulk = true` (default) — lookup-table bulk extinction
-- `opts.lookup_k_bulk = false` — exact bulk-extinction transform
+- `opts.lookup_k_bulk = true` (default): lookup-table bulk extinction
+- `opts.lookup_k_bulk = false`: exact bulk-extinction transform
 
 Kernel benchmarks and study tools call the spectral functions directly and
 retain all three historical variants (inlined, exact, lookup) for comparison.

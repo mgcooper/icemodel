@@ -34,13 +34,13 @@ function test_budgetoutputs_are_one_partitioned_contract(testCase)
    sum_fields = icemodel.namelists.budgetoutputs('sum');
    all_fields = icemodel.namelists.budgetoutputs();
 
-   % The all-list order is the stable diagnostic-profile append order. The
-   % schema holds 22 channels: signed nets and endpoints only, with no
-   % gross channels, no enthalpy channels, and a solid-only remesh
-   % decomposition.
+   % The all-list order is the stable diagnostic-profile append order.
+   % budgetoutputs lists 21 channels: signed nets and endpoints only,
+   % with no gross channels, no enthalpy channels, and a solid-only
+   % remesh decomposition.
    testCase.verifyEqual(all_fields, [first_fields, last_fields, sum_fields]);
    testCase.verifyEqual(numel(unique(all_fields)), numel(all_fields));
-   testCase.verifyEqual(numel(all_fields), 22);
+   testCase.verifyEqual(numel(all_fields), 21);
    testCase.verifyError( ...
       @() icemodel.namelists.budgetoutputs('median'), ...
       'icemodel:namelists:budgetoutputs:kind');
@@ -62,15 +62,13 @@ function test_budget_ledger_is_fixed_codegen_schema(testCase)
    budget_fields = icemodel.namelists.budgetoutputs('all');
    ledger_fields = transpose(fieldnames(ledger));
 
-   % The 22 mass_budget_ channels lead the struct in budgetoutputs order.
-   % budget.substep trails them as a transient scratch field the
-   % producers pass to each other within one accepted substep; budgetoutputs
-   % does not name it and the output selector never emits it.
-   testCase.verifyEqual(ledger_fields(1:numel(budget_fields)), budget_fields);
-   testCase.verifyEqual(ledger_fields{end}, 'substep');
-   testCase.verifyEqual(numel(ledger_fields), numel(budget_fields) + 1);
+   % The struct holds exactly the 21 mass_budget_ channels, in
+   % budgetoutputs order, with no other field. Every producer receives its
+   % increments directly, so the struct carries no scratch baseline.
+   testCase.verifyEqual(ledger_fields, budget_fields);
+   testCase.verifyEqual(numel(ledger_fields), 21);
 
-   channel_values = struct2cell(rmfield(ledger, 'substep'));
+   channel_values = struct2cell(ledger);
    testCase.verifyTrue(all(cellfun( ...
       @(value) isa(value, 'double') && isequal(size(value), [1, 1]), ...
       channel_values)));
@@ -94,7 +92,8 @@ function test_budget_ledger_is_fixed_codegen_schema(testCase)
 end
 
 function test_diagnostic_model_payload_matches_canonical_budget_registry(testCase)
-   % The runtime diagnostic payload must contain exactly the canonical ledger.
+   % The runtime diagnostic payload must contain exactly the
+   % budgetoutputs channel list.
 
    workspace = icemodel.test.fixtures.makeSyntheticWorkspace(2016, ...
       configure=true, nsteps=4, dt_seconds=3600);
@@ -166,8 +165,7 @@ function test_use_ro_glc_changes_initialization_not_diagnostic_basis(testCase)
       vapor_accounted = ro_liq * ( ...
          Ls * ice1.mass_budget_vapor_solid_mwe ...
          + Lv * ice1.mass_budget_vapor_liquid_mwe ...
-         + Lv * ice1.mass_budget_condensation_overflow_mwe) ...
-         + ice1.mass_budget_unapplied_vapor_j_m2;
+         + Lv * ice1.mass_budget_condensation_overflow_mwe);
       % Allow only subtraction roundoff from column-integrated checkpoints.
       testCase.verifyEqual( ...
          ice1.mass_budget_vapor_potential_j_m2, vapor_accounted, ...
@@ -674,47 +672,68 @@ function test_vapor_identity_partitions_wet_evaporation_and_sublimation(testCase
    % Evaporation that exhausts mobile liquid must use Lv for liquid and Ls for
    % the remaining realized solid sublimation.
 
-   [d_rof, unapplied_j_m2] = verifyVaporIdentity( ...
-      testCase, 0.5, 0.05, -0.05, 0.1, 0.02);
+   d_rof = verifyVaporIdentity(testCase, 0.5, 0.05, -0.05, 0.1, 0.02);
    testCase.verifyEqual(d_rof, 0, 'AbsTol', 0);
-   testCase.verifyEqual(unapplied_j_m2, 0, 'AbsTol', 0);
 end
 
 function test_vapor_identity_includes_condensation_overflow(testCase)
    % Wet condensation beyond cell capacity must be exposed without routing it.
 
-   [d_rof, unapplied_j_m2] = verifyVaporIdentity( ...
-      testCase, 0.99, 0.005, 0.01, 0.1, 0.02);
+   d_rof = verifyVaporIdentity(testCase, 0.99, 0.005, 0.01, 0.1, 0.02);
    testCase.verifyGreaterThan(d_rof, 0);
-   testCase.verifyEqual(unapplied_j_m2, 0, 'AbsTol', 0);
 end
 
-function test_vapor_identity_retains_negative_unapplied_dry_exhaustion(testCase)
-   % Sublimation demand beyond remaining dry ice must retain a negative signed
-   % unapplied-energy remainder rather than disappear from the budget.
+function test_vapor_identity_cascades_to_the_next_cell(testCase)
+   % A top cell too thin to supply the full sublimation demand draws the
+   % remainder from the cell below it, cell by cell, until the demand is
+   % satisfied. No remainder is left unaccounted, so the vapor-energy
+   % identity closes exactly across both cells.
 
-   [d_rof, unapplied_j_m2] = verifyVaporIdentity( ...
-      testCase, 0.05, 0.0, -0.1, 0.1, 0.02);
+   [Tf, Ls, Lv, ro_liq] = ...
+      icemodel.physicalConstant('Tf', 'Ls', 'Lv', 'ro_liq');
+   f_ice_min = 0.1;
+   f_res_por = 0.02;
+   dz = 0.04 * ones(2, 1);
+   T = (Tf - 2) * ones(2, 1);
+   f_ice = [f_ice_min + 1e-4; 0.8];
+   f_liq = zeros(2, 1);
+
+   % Demand far larger than what cell 1 can give above the retained floor.
+   d_pevp = -0.05;
+
+   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   [~, f_ice_new, ~, ~, ~, d_rof, ~, ~, ~, budget] = ...
+      icemodel.column.budget_surface_mass_balance( ...
+      T, f_ice, f_liq, f_liq, d_pevp, zeros(2, 1), zeros(2, 1), 0, ...
+      zeros(2, 1), zeros(2, 1), f_res_por, f_ice_min, budget, dz);
+
+   % Cell 1 stops at the floor; cell 2 supplies the rest of the demand.
+   testCase.verifyEqual(f_ice_new(1), f_ice_min, 'AbsTol', 1e-12);
+   testCase.verifyLessThan(f_ice_new(2), f_ice(2));
    testCase.verifyEqual(d_rof, 0, 'AbsTol', 0);
-   testCase.verifyLessThan(unapplied_j_m2, 0);
+
+   % The demanded energy and the energy the cascade actually moved match
+   % exactly: no cell is left holding an unaccounted remainder.
+   potential = budget.mass_budget_vapor_potential_j_m2;
+   accepted = ro_liq * ( ...
+      Ls * budget.mass_budget_vapor_solid_mwe ...
+      + Lv * budget.mass_budget_vapor_liquid_mwe ...
+      + Lv * budget.mass_budget_condensation_overflow_mwe);
+   testCase.verifyEqual(potential, accepted, 'AbsTol', 1e-7);
 end
 
 function test_vapor_identity_accepts_dry_sublimation(testCase)
    % Dry sublimation must close on the physical ro_liq/Lv to ro_ice/Ls basis.
 
-   [d_rof, unapplied_j_m2] = verifyVaporIdentity( ...
-      testCase, 0.5, 0.0, -0.02, 0.1, 0.02);
+   d_rof = verifyVaporIdentity(testCase, 0.5, 0.0, -0.02, 0.1, 0.02);
    testCase.verifyEqual(d_rof, 0, 'AbsTol', 0);
-   testCase.verifyEqual(unapplied_j_m2, 0, 'AbsTol', 0);
 end
 
 function test_vapor_identity_accepts_dry_deposition(testCase)
    % Dry deposition must add solid mass on the same physical latent-heat basis.
 
-   [d_rof, unapplied_j_m2] = verifyVaporIdentity( ...
-      testCase, 0.5, 0.0, 0.02, 0.1, 0.02);
+   d_rof = verifyVaporIdentity(testCase, 0.5, 0.0, 0.02, 0.1, 0.02);
    testCase.verifyEqual(d_rof, 0, 'AbsTol', 0);
-   testCase.verifyEqual(unapplied_j_m2, 0, 'AbsTol', 0);
 end
 
 function test_hourly_retime_uses_budget_aggregation_classes(testCase)
@@ -886,7 +905,7 @@ function verifyRemeshIdentity(testCase, budget)
    %VERIFYREMESHIDENTITY Check R = B - O for the accumulated remesh budget.
    %
    % Only the solid side carries the cloned/exported decomposition:
-   % remesh_solid = cloned_bottom_solid - merge_export_solid. The 22-channel
+   % remesh_solid = cloned_bottom_solid - merge_export_solid. The 21-channel
    % schema has no liquid or enthalpy decomposition and no gross
    % accumulator.
 
@@ -895,45 +914,32 @@ function verifyRemeshIdentity(testCase, budget)
       - budget.mass_budget_merge_export_solid_mwe, 'AbsTol', 1e-15);
 end
 
-function [d_rof, unapplied_j_m2] = verifyVaporIdentity( ...
+function d_rof = verifyVaporIdentity( ...
       testCase, f_ice, f_liq, d_pevp, f_ice_min, f_res_por)
-   %VERIFYVAPORIDENTITY Check the accepted latent-energy terms sum to the applied energy.
+   %VERIFYVAPORIDENTITY Check the demanded energy equals the realized energy.
+   %
+   % A single cell with enough ice and liquid above its floors satisfies
+   % the whole demand, so the vapor-energy identity closes exactly: no
+   % remainder is drawn from a cell below and none is left unaccounted.
 
    [Tf, Ls, Lv, ro_liq] = icemodel.physicalConstant('Tf', 'Ls', 'Lv', 'ro_liq');
    dz = 0.04;
    T = Tf - 2;
-   [solid_p, liquid_p] = ...
-      icemodel.column.integrate_column_budget(T, f_ice, f_liq, dz);
 
-   % Seed budget.substep.solid_p/liquid_p with the pre-exchange storage, the
-   % baseline icemodel.column.accumulate_vapor_budget reads. Running
-   % accumulate_phase_budget with the checkpoint equal to the current state
-   % keeps the phase increment at zero while writing that exact baseline.
    budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
-   budget = icemodel.column.accumulate_phase_budget( ...
-      budget, T, f_ice, f_liq, T, f_ice, f_liq, dz);
-
-   % Apply one accepted vapor increment through the production budget kernel.
-   [~, f_ice_v, f_liq_v, ~, ~, d_rof, ~, budget] = ...
+   [~, ~, ~, ~, ~, d_rof, ~, ~, ~, budget] = ...
       icemodel.column.budget_surface_mass_balance( ...
-      T, f_ice, f_liq, f_liq, d_pevp, 0, 0, 0, ...
+      T, f_ice, f_liq, f_liq, d_pevp, 0, 0, 0, 0, 0, ...
       f_res_por, f_ice_min, budget, dz);
-   [solid_v, liquid_v] = ...
-      icemodel.column.integrate_column_budget(T, f_ice_v, f_liq_v, dz);
 
-   % Potential = realized solid + realized liquid + overflow + unapplied, all
-   % expressed with the physical solver densities used by d_pevp and
-   % sublimation. budget_surface_mass_balance keeps the shortfall record
-   % internal, so read unapplied energy from the budget's unapplied-vapor
-   % channel.
-   potential = ro_liq * Lv * d_pevp * dz;
-   realized_and_overflow = ro_liq * ( ...
-      Ls * (solid_v - solid_p) ...
-      + Lv * (liquid_v - liquid_p) ...
-      + Lv * d_rof * dz);
-   unapplied_j_m2 = budget.mass_budget_unapplied_vapor_j_m2;
-   testCase.verifyEqual(potential, realized_and_overflow + unapplied_j_m2, ...
-      'AbsTol', 1e-7);
+   % Potential = realized solid + realized liquid + overflow, all expressed
+   % with the physical solver densities used by d_pevp and sublimation.
+   potential = budget.mass_budget_vapor_potential_j_m2;
+   accepted = ro_liq * ( ...
+      Ls * budget.mass_budget_vapor_solid_mwe ...
+      + Lv * budget.mass_budget_vapor_liquid_mwe ...
+      + Lv * budget.mass_budget_condensation_overflow_mwe);
+   testCase.verifyEqual(potential, accepted, 'AbsTol', 1e-7);
 end
 
 function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask] = ...
@@ -985,8 +991,8 @@ end
 
 function test_condensation_overflow_is_a_step_total_not_a_substep_sum(testCase)
    % d_rof is reset once per forcing step and then accumulated across
-   % substeps, unlike d_pevp and d_sbl_err which are per-substep. The ledger
-   % must therefore record the running total: adding it on every accepted
+   % substeps, unlike d_pevp which is per-substep. The ledger must
+   % therefore record the running total: adding it on every accepted
    % substep would inflate the overflow channel and the vapor closure
    % identity by the substep count.
 
@@ -998,19 +1004,17 @@ function test_condensation_overflow_is_a_step_total_not_a_substep_sum(testCase)
    f_liq = 0.02;
 
    % One overflow event on the first substep, then three quiet substeps that
-   % still carry the accumulated total forward. budget.substep.solid_p and
-   % liquid_p are arbitrary placeholders here: this test only exercises the
-   % overflow channel, not the vapor_solid/vapor_liquid storage terms.
+   % still carry the accumulated total forward. Every substep here reports
+   % zero exchange, so this test exercises the overflow channel alone, not
+   % the vapor_solid/vapor_liquid storage terms.
    budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
-   budget.substep.solid_p = 0.9;
-   budget.substep.liquid_p = 0.02;
    d_rof = 0.0;
    for n = 1:n_substeps
       if n == 1
          d_rof = d_rof + overflow_fraction;
       end
-      budget = icemodel.column.accumulate_vapor_budget(budget, ...
-         T_ice, f_ice, f_liq, dz, 0.0, d_rof, 0.0);
+      budget = icemodel.column.accumulate_vapor_exchange(budget, ...
+         0.0, 0.0, 0.0, d_rof, dz);
    end
 
    returned = budget.mass_budget_condensation_overflow_mwe;
@@ -1030,41 +1034,4 @@ function restoreProfiler(prior)
    if strcmp(prior.ProfilerStatus, 'on')
       profile on
    end
-end
-
-function test_unapplied_vapor_matches_the_top_cell_scalar_bit_for_bit(testCase)
-   % d_sbl_err carries one entry per cell so the coupled path can record
-   % unapplied vapor anywhere in the column. With a top-cell tendency only
-   % the first entry is nonzero, and the ledger value must then equal the
-   % scalar product the surface-only path produced, to the last bit.
-   %
-   % Multiplication is not associative in floating point. Summing the
-   % dz-weighted fractions and scaling once afterwards differs from scaling
-   % each cell first, and a randomized check puts that difference at roughly
-   % one third of realistic columns. A loose tolerance here would not see it.
-
-   [Ls, ro_ice] = icemodel.physicalConstant('Ls', 'ro_ice');
-   dz = [0.04; 0.09; 0.16; 0.25; 0.36; 0.49];
-   d_sbl_err = zeros(6, 1);
-   d_sbl_err(1) = -4.2e-5;
-
-   Tf = icemodel.physicalConstant('Tf');
-   T = (Tf - 3) * ones(6, 1);
-   f_ice = 0.85 * ones(6, 1);
-   f_liq = 0.01 * ones(6, 1);
-   [solid_p, liquid_p] = ...
-      icemodel.column.integrate_column_budget(T, f_ice, f_liq, dz);
-
-   % Seed the pre-exchange baseline directly: T, f_ice, and f_liq are the
-   % checkpoint state itself, so solid_p/liquid_p are exactly what
-   % accumulate_phase_budget would have written to budget.substep.
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
-   budget.substep.solid_p = solid_p;
-   budget.substep.liquid_p = liquid_p;
-   returned = icemodel.column.accumulate_vapor_budget(budget, ...
-      T, f_ice, f_liq, dz, 0, 0, d_sbl_err);
-
-   expected = ro_ice * Ls * d_sbl_err(1) * dz(1);
-   testCase.verifyEqual(returned.mass_budget_unapplied_vapor_j_m2, ...
-      expected, 'AbsTol', 0);
 end

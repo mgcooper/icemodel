@@ -23,9 +23,9 @@ function results = run_perf_suite(kwargs)
    % By default it also runs the managed core benchmark suite and saves those
    % diagnostic timings alongside the formal perf artifact.
    %
-   % Formal perf cases use the same canonical runtime contract as regression:
-   % one leading spinup year plus one retained output year when the case
-   % matrix carries only SIMYEAR.
+   % Formal perf cases run the same way regression does: one leading
+   % spinup year plus one retained output year when the case matrix
+   % carries only SIMYEAR.
    %
    % The optional solver filter accepts any subset of [1 2 3].
    % DATA_ROOT overrides the default test case for isolated fixture comparisons.
@@ -75,7 +75,7 @@ function results = run_perf_suite(kwargs)
          = 3
 
       kwargs.tol_perf (1, 1) double {mustBePositive} ...
-         = 0.20
+         = icemodel.test.helpers.perfMeasurementPolicy().tol_perf
 
       kwargs.include_benchmarks (1, 1) logical ...
          = true
@@ -177,14 +177,19 @@ function results = run_perf_suite(kwargs)
    experiment = matlab.perftest.TimeExperiment.withFixedSampleSize( ...
       n_runs, 'NumWarmups', 1);
 
-   % Run the canonical single-model workflow for each requested model and
-   % merge the saved compare summaries into one returned struct.
+   % Capture the source identity before the first measurement, so a
+   % worktree edit during the run is detectable at artifact save time.
+   revision_at_start = icemodel.test.helpers.worktreeRevision();
+
+   % Run the single-model workflow for each requested model and merge the
+   % saved compare summaries into one returned struct.
    per_model = arrayfun(@(mdl) runSingleModelPerfSuite( ...
       input_path, output_path, testdir, experiment, suite, tier, ...
       mdl, solver, simyear, smoke_sites, full_sites, baseline_type, ...
       baseline_tag, run_date, run_id, run_name, n_runs, tol_perf, ...
       include_benchmarks, benchmark_sampling_profile, isolation, ...
-      baseline_policy.config_case, data_root, session_activity), ...
+      baseline_policy.config_case, data_root, session_activity, ...
+      revision_at_start), ...
       models, 'UniformOutput', false);
 
    % Combine results into a common struct.
@@ -193,8 +198,9 @@ function results = run_perf_suite(kwargs)
    % Display the results.
    icemodel.test.helpers.displayPerfResults(results)
 
-   % Render the saved comparison into the common report layer unless the
-   % caller explicitly requested an artifact-only run.
+   % Render the saved comparison with
+   % icemodel.verification.report.buildTestSuiteReport unless the caller
+   % requested an artifact-only run.
    results.report_file = "";
    if build_report
       results.report_file = ...
@@ -215,7 +221,7 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       smoke_sites, full_sites, baseline_type, baseline_tag, run_date, ...
       run_id, run_name, n_runs, tol_perf, include_benchmarks, ...
       benchmark_sampling_profile, isolation, config_case, data_root, ...
-      session_activity)
+      session_activity, revision_at_start)
    %RUNSINGLEMODELPERFSUITE Run the formal perf workflow for one smbmodel.
 
    % Build the deterministic case list and load the matching managed baseline.
@@ -227,8 +233,8 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       error('no performance cases matched tier=%s smbmodel=%s', tier, smbmodel)
    end
 
-   % Perf baselines and benchmark baselines are keyed by one canonical
-   % comparison year, so guard that contract before loading any baseline.
+   % Perf baselines and benchmark baselines are keyed by one comparison
+   % year, so check that before loading any baseline.
    benchmark_year = unique(cases.simyear);
    assert(isscalar(benchmark_year), ...
       'formal perf suite expects exactly one benchmark year')
@@ -332,7 +338,7 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
          activity_rows(r_activity).wall_s = activity_times(i);
       end
 
-      % Save the compact per-case summary and the resolved opts contract.
+      % Save the compact per-case summary and the resolved opts struct.
       r_case = r_case + 1;
       case_rows(r_case).case_id = string(c.case_id);
       case_rows(r_case).tier = string(c.tier);
@@ -375,7 +381,7 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    % this host as a ~35 percent case-level swing under a constant
    % background load). A drifted anchor marks every verdict in this run
    % ambient-invalid rather than letting a phantom pass or fail stand.
-   % The anchor tolerance comes from the one formal timing policy.
+   % The anchor tolerance comes from icemodel.test.helpers.perfMeasurementPolicy.
    anchor_tol = icemodel.test.helpers.perfMeasurementPolicy().anchor_tol;
    anchor_ratio = nan;
    ambient_stable = true;
@@ -468,6 +474,30 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       'IcemodelPerfTest.m'));
    meta.matlab_version = string(version);
    meta.host = string(computer);
+
+   % computer() names the platform (for example MACA64), not the machine.
+   % The A/A gate compares machines, so record the hostname too.
+   [hostname_status, hostname] = system('hostname');
+   if hostname_status == 0
+      meta.hostname = string(strtrim(hostname));
+   else
+      meta.hostname = "";
+   end
+
+   % The A/A gate certifies two runs of the same code. The identity was
+   % captured before the first measurement; a worktree edit during the
+   % run makes the label meaningless, so a changed identity records ""
+   % and the A/A gate rejects the artifact.
+   if icemodel.test.helpers.worktreeRevision() == revision_at_start
+      meta.git_revision = revision_at_start;
+   else
+      meta.git_revision = "";
+   end
+
+   % Runs that measured different input trees are not comparable; the
+   % A/A gate compares this resolved root.
+   meta.data_root = string(data_root);
+
    meta.baseline_meta = baseline_meta;
    meta.baseline_compatible = baseline_compatible;
    meta.compare_reason = compare_reason;
@@ -477,6 +507,12 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    benchmark = icemodel.test.helpers.runBenchmarkDiagnostics( ...
       benchmark_year, baseline_tag, smbmodel, ...
       include_benchmarks, benchmark_sampling_profile);
+
+   % A benchmark can outlast the earlier identity check. Invalidate the
+   % revision if the source changed before the artifact save.
+   if icemodel.test.helpers.worktreeRevision() ~= revision_at_start
+      meta.git_revision = "";
+   end
 
    % Save the artifacts file.
    artifact_file = saveArtifacts(sample_detail, activity_detail, ...
@@ -540,7 +576,7 @@ function artifact_file = saveArtifacts(sample_detail, ...
       activity_detail, case_summary, case_opts, benchmark, meta)
    %saveArtifacts Save the perf comparison artifact bundle for one run.
 
-   % Build the canonical artifact path.
+   % Build the artifact path.
    artifact_file = icemodel.test.helpers.artifactFilePath("perf", ...
       tier=meta.tier, smbmodel=meta.smbmodel_filter, ...
       solver=meta.solver_filter, baseline_type=meta.baseline_type, ...

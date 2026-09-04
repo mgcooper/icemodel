@@ -15,6 +15,8 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
    %  opts.use_ro_glc changes only the densities used to construct initial
    %  phase fractions. Solvers use persistent physical constants. See setopts.
    %
+   % See also: icemodel, skinmodel
+   %
    %#codegen
 
    debug = false;
@@ -78,9 +80,9 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
    end
 
    % INITIAL SOLVER CONDUCTIVITY
-   % The production solvers add vapor transport on faces. Initialize the
-   % checkpoint with the same vapor-free node-conductivity contract that
-   % subsequent accepted solves return.
+   % The column solvers add vapor transport on faces. Initialize the
+   % checkpoint with the same vapor-free node conductivity that subsequent
+   % accepted solves return.
    k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, 0);
 
    % SOURCE TERM LINEARIZATION VECTORS

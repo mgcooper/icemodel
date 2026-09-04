@@ -10,6 +10,10 @@ function tf = artifactIdentityMatches(filename, expected, variable_name)
    % treated as unknown and remains reusable; conflicting known source/product,
    % schema, sampling-method, or point metadata returns false. A malformed
    % one-coordinate candidate is rejected when EXPECTED has a concrete point.
+   %
+   % See also: icemodel.forcing.helpers.writemet,
+   %  icemodel.forcing.helpers.writeuserdata,
+   %  icemodel.forcing.helpers.artifactMetadata
 
    arguments
       filename (1, 1) string
@@ -62,8 +66,8 @@ function tf = artifactIdentityMatches(filename, expected, variable_name)
       end
    end
 
-   % Share scalar and documented-alias comparison with manifest merging while
-   % preserving this file-reuse boundary's directional malformed-point rule.
+   % Share scalar and documented-alias comparison with manifest merging, but
+   % keep this function's directional malformed-point rule for file reuse.
    if ~icemodel.forcing.helpers.artifactScalarIdentityMatches( ...
          candidate, expected)
       return

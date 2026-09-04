@@ -1,11 +1,11 @@
 function tt = stampMetadata(tt, kwargs)
-   %STAMPMETADATA Embed canonical CF-ish metadata in a timetable's properties.
+   %STAMPMETADATA Embed CF-ish metadata in a timetable's properties.
    %
    %  tt = icemodel.forcing.helpers.stampMetadata(tt)
    %  tt = icemodel.forcing.helpers.stampMetadata(tt, strict=false)
    %
-   % Stamps each variable of the table or timetable TT with its canonical
-   % metadata from icemodel.netcdf.defaults.variable, so met, Data, and
+   % Stamps each variable of the table or timetable TT with metadata from
+   % icemodel.netcdf.defaults.variable, so met, Data, and
    % observation files describe themselves:
    %
    %    Properties.VariableUnits        <- unit
@@ -18,8 +18,8 @@ function tt = stampMetadata(tt, kwargs)
    % array in the same order as the variables. A channel with no CF name
    % carries "" in its slot.
    %
-   % By default, an unmapped channel raises the error from the canonical map,
-   % because every shipped forcing column must carry a label. A verification
+   % By default, an unmapped channel raises the error from that map, because
+   % every shipped forcing column must carry a label. A verification
    % table can pass strict=false. Then a non-science string key keeps blank
    % units and descriptions, and a known science variable still gets its label.
    %
@@ -55,7 +55,7 @@ function tt = stampMetadata(tt, kwargs)
 end
 
 function info = metadataFor(names, strict)
-   %METADATAFOR Return canonical metadata, optionally blanking unknown columns.
+   %METADATAFOR Return channel metadata, optionally blanking unknown columns.
 
    info = repmat(emptyInfo(), 1, numel(names));
    for k = 1:numel(names)

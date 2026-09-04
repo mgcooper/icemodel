@@ -7,6 +7,10 @@ function metadata = artifactMetadata(value)
    % table UserData. It fills missing lat_wgs84/lon_wgs84 identity fields from
    % Lat/Lon CustomProperties. Writers save this record beside the payload, so
    % reuse checks do not load a large timetable.
+   %
+   % See also: icemodel.forcing.helpers.artifactIdentityMatches,
+   %  icemodel.forcing.helpers.writeuserdata,
+   %  icemodel.forcing.helpers.writemet
 
    metadata = struct();
    if isstruct(value)
@@ -34,7 +38,7 @@ function metadata = artifactMetadata(value)
 
    % Some tables carry the location in CustomProperties instead of direct point
    % fields in UserData. Fill only absent fields, so explicit source metadata
-   % stays authoritative.
+   % takes precedence.
    custom = value.Properties.CustomProperties;
    names = string(fieldnames(custom));
    if ismember("Lat", names) && ~isfield(metadata, 'lat_wgs84')

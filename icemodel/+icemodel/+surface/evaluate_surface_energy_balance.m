@@ -17,7 +17,7 @@ function balance = evaluate_surface_energy_balance(Qsn, Qln, Qh, Qe, Qc, Qa, Qm)
    % pre-melt residual). Pass Qm as the diagnosed melt energy to get the
    % closed balance, which is about 0 at steady state.
    %
-   % This is the downstream assembler in the diagnostic SEB chain:
+   % This is the downstream end of the SEB diagnostic chain:
    %   surface_energy_balance_terms -> diagnose_melt_freeze_energy -> here
    %
    % See also: icemodel.surface.diagnose_surface_energy_balance,

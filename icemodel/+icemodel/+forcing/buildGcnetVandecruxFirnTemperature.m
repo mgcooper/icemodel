@@ -8,8 +8,8 @@ function [observations, metadata] = buildGcnetVandecruxFirnTemperature(station, 
    % Reads the Vandecrux/GC-Net firn-temperature observation product
    % (<station>_T_firn_obs.nc) into a structured observation payload. The
    % metadata keeps the source variables `T_firn` and `Depth`. The returned
-   % payload gives canonical `subsurface_temperature` [K] and `depth` [m]
-   % matrices shaped time x level.
+   % payload gives `subsurface_temperature` [K] and `depth` [m] matrices
+   % shaped time x level.
    %
    % See also: icemodel.verification.setup.gcnetInventory,
    %  icemodel.forcing.buildGcnetVandecruxData
@@ -118,7 +118,7 @@ function data = readLevelTimeVariable(filename, variable, first_time, n_time)
 end
 
 function [temperature, policy] = convertTemperature(raw, units)
-   %CONVERTTEMPERATURE Convert source firn temperatures to canonical Kelvin.
+   %CONVERTTEMPERATURE Convert source firn temperatures to Kelvin.
    units = lower(string(units));
    if ismember(units, ["degc", "c", "degree_celsius", "degrees_celsius"])
       temperature = raw + 273.15;

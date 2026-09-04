@@ -170,7 +170,7 @@ function [window, proxy_files] = acceptanceWindow(site, kwargs)
       return
    end
 
-   % Reject sub-day holes in the staged inventory and in the exact files that
+   % Reject sub-day holes in the staged inventory and in the files that
    % reconstruction selects. Filename dates alone cannot prove continuity.
    continuousWindow(sample_coverage, site, minutes(15));
    window = continuousWindow(selected_sample_coverage, site, minutes(15));

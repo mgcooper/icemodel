@@ -3,9 +3,12 @@ function donor = readGcnetDonor(filename)
    %
    %  donor = icemodel.forcing.helpers.readGcnetDonor(filename)
    %
-   % Each canonical channel keeps its own origin mask. A sample without a
+   % Each mapped channel keeps its own origin mask. A sample without a
    % per-sample origin flag is not eligible, because nothing in the file shows
    % that the value is native.
+   %
+   % See also: icemodel.forcing.reconstruct.fillPromiceStation,
+   %  icemodel.forcing.helpers.gcnetHourlyAxis
 
    arguments
       filename (1, 1) string

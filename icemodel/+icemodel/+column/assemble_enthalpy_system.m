@@ -9,15 +9,15 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    %  The input signature keeps the suppressed linearization factor Sp for
    %  generality.
    %
-   %  K_EFF_FACES is the combined interface conductivity from the caller.
-   %  Q_DEFERRED_FACES is the conservative vapor-energy correction evaluated
-   %  at the incoming Picard iterate [W m-2], positive downward. Its
-   %  in-minus-out convergence joins the source vector b. Keeping the face
-   %  flux here makes this function the one owner of the north/south indexing.
+   %  K_EFF_FACES is the combined interface thermal conductivity.
+   %  Q_DEFERRED_FACES is the deferred vapor-energy correction term evaluated at
+   %  the current Picard iterate [W m-2], positive downward. Its in-minus-out
+   %  convergence is added to the source vector b in this function.
    %
    %  Note: ro_sno * cp_sno = (cv_ice * f_ice + cv_liq * f_liq)
-   %  See updatestate (or icemodel.timestepping.acceptsubstep) for how ro_sno
-   %  and cp_sno are computed.
+   %  See icemodel.column.bulk_density and
+   %  icemodel.column.bulk_specific_heat_capacity for how ro_sno and
+   %  cp_sno are computed.
    %
    %  Pmelt here is identical to SNTHRM:
    %     P = g_liq - g_liq_o
@@ -113,7 +113,11 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    aN = k_eff_faces(N:S)     ./ delz(N:S);
    aS = k_eff_faces(N+1:S+1) ./ delz(N+1:S+1);
 
-   % Keep the upper left and right conductances
+   % Keep the upper left and right conductances. a1 = k_eff_faces(1)/delz(1) =
+   % k_eff(1)/(dz(1)/2) because face 1 carries no vapor term.
+   % icemodel.surface.conductive_heat_flux computes Qc with the same
+   % coefficient, so the SEB and this matrix use the same conductance. A
+   % mismatch would prevent the coupler's seb_res from ever reaching zero.
    a1 = aN(1); % Note: astar = a1 / (a1 - Fp);
    a2 = aS(1);
 

@@ -4,10 +4,10 @@ function [met, metadata, Data] = buildGcnetVandecruxMet(station, kwargs)
    %  [met, metadata] = icemodel.forcing.buildGcnetVandecruxMet(station)
    %  [met, metadata, Data] = ... buildGcnetVandecruxMet(station, source_dir=...)
    %
-   % Builds a canonical Data timetable with
-   % icemodel.forcing.buildGcnetVandecruxData, then converts it through the
-   % shared data2met contract. Missing required channels become explicit NaN
-   % placeholders when fillwithmissing=true, not fabricated zeros.
+   % Builds a Data timetable with icemodel.forcing.buildGcnetVandecruxData,
+   % then converts it through the data2met conversion. Missing required
+   % channels become explicit NaN placeholders when fillwithmissing=true,
+   % not fabricated zeros.
    %
    % See also: icemodel.forcing.buildGcnetVandecruxData,
    %  icemodel.forcing.data2met, icemodel.forcing.helpers.writemet

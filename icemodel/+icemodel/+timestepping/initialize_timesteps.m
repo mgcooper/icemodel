@@ -1,6 +1,15 @@
-function [metstep, substep, numsteps, maxsubstep, dt_new, dt_FULL_STEP, ...
-      numyears, numspinup, simyears] = initialize_timesteps(opts, Time)
-   % Initialize timestep counters and the full-step integration contract.
+function [metstep, substep, numsteps, dt_new, numyears, numspinup] = ...
+      initialize_timesteps(opts, Time)
+   %INITIALIZE_TIMESTEPS Initialize the model timestep counters.
+   %
+   %  [metstep, substep, numsteps, dt_new, numyears, numspinup] = ...
+   %     icemodel.timestepping.initialize_timesteps(opts, Time)
+   %
+   % NUMSTEPS is the number of forcing steps per simulated year. DT_NEW
+   % starts at the full forcing-step length OPTS.DT. NUMSPINUP is the number
+   % of leading simulated years excluded from saved output.
+   %
+   % See also: icemodel, skinmodel, icemodel.timestepping.nexttimestep
    %
    %#codegen
 
@@ -13,21 +22,15 @@ function [metstep, substep, numsteps, maxsubstep, dt_new, dt_FULL_STEP, ...
       return
    end
 
-   % Compute the timestep and the total number of model timesteps
-   dt_FULL_STEP = opts.dt;
+   % Compute the number of forcing steps per simulated year.
    assert(mod(numel(Time), opts.numyears) == 0)
    numsteps = numel(Time) / opts.numyears;
-   maxsubstep = opts.dt; % allow 1 sec dt min
-   minsubstep = 1;
-
-   % dt_min = dt_FULL_STEP / maxsubstep; % keep for reference
-   dt_new = dt_FULL_STEP / minsubstep;
+   dt_new = opts.dt;
 
    % Compute the number of leading spinup years. The model runs the forcing
    % years in opts.simyears in order. The saved and postprocessed output
    % excludes the first numspinup years.
    numspinup = opts.n_spinup_years;
    assert(numspinup < opts.numyears)
-   simyears = opts.simyears(:);
-   numyears = numel(simyears);
+   numyears = numel(opts.simyears);
 end

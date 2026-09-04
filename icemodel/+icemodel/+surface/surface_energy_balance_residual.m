@@ -6,9 +6,12 @@ function residual = surface_energy_balance_residual(T_sfc, tair, Qsi, ...
    %
    %  residual = icemodel.surface.surface_energy_balance_residual(...)
    %
-   % This is the canonical nonlinear surface residual for the SEB solvers.
-   % It wraps the surface term diagnostics and then evaluates the residual
-   % with no melt term.
+   % This function evaluates the nonlinear surface residual for the SEB solvers.
+   % It gets the surface terms and then evaluates the residual without melt.
+   %
+   % See also: icemodel.couplers.solve_skin_surface_column,
+   %  icemodel.couplers.solve_surface_column_robin,
+   %  icemodel.surface.numerical_surface_flux
    %
    %#codegen
 

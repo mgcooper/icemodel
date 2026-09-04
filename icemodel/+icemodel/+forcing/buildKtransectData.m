@@ -7,7 +7,7 @@ function [Data, metadata] = buildKtransectData(station, kwargs)
    % Reads every cached Smeets et al. (2022) PANGAEA.947483 annual tab file for
    % one K-transect station (AWS5/AWS6/AWS9/AWS10). Merges the annual children
    % without duplicate timestamps and without cadence conversion. Maps the
-   % channels onto icemodel's canonical forcing and userdata names at the native
+   % channels onto icemodel's forcing and userdata names at the native
    % 30-minute cadence. metadata.children keeps every annual child's DOI, so
    % staging manifests can pin the exact upstream datasets.
    %
@@ -110,8 +110,8 @@ function [Data, metadata] = buildKtransectData(station, kwargs)
       Data.swd, Data.swu, Time=Data.Time, ...
       latitude=location.lat_wgs84, longitude=location.lon_wgs84);
 
-   % Radiative diagnostics are useful userdata/evaluation columns, while the
-   % minimal met contract still comes from data2met at the met boundary.
+   % Radiative diagnostics are useful userdata/evaluation columns; data2met
+   % still builds the minimal met channel set separately.
    Data.swn = Data.swd - Data.swu;
    Data.lwn = Data.lwd - Data.lwu;
    Data.netr = Data.swn + Data.lwn;
@@ -123,7 +123,7 @@ function [Data, metadata] = buildKtransectData(station, kwargs)
 
    % Preserve measured swd/swu but remove conservative recovered-collapse
    % episodes from the derived albedo and energy-balance channels. Running after
-   % regularization gives the shared detector the canonical UTC timestamp grid.
+   % regularization gives the shared detector a regular UTC timestamp grid.
    [transient_rows, transient_report] = ...
       icemodel.forcing.helpers.dailyAlbedoAnomalyFlags( ...
       Data.Time, Data.swd, Data.swu);
@@ -205,8 +205,8 @@ end
 
 function raw = mergeAnnualParts(parts, station)
    %MERGEANNUALPARTS Concatenate annual children without hidden edits.
-   % Column sets differ across the AWS-generation boundary (ice_melt appears
-   % only in type-1 AWS5/AWS6 files), so align on the union with explicit
+   % Column sets differ between AWS generations (ice_melt appears only in
+   % type-1 AWS5/AWS6 files), so align on the union with explicit
    % missing values before concatenation.
    names = strings(1, 0);
    for k = 1:numel(parts)
@@ -331,7 +331,7 @@ function summary = coordinateSummary(children)
 end
 
 function map = channelMap()
-   %CHANNELMAP Record canonical-name to PANGAEA column mapping.
+   %CHANNELMAP Record icemodel-name to PANGAEA column mapping.
    map = struct( ...
       'tair', "TTT", ...
       'rh', "RH", ...
@@ -348,7 +348,7 @@ function map = channelMap()
 end
 
 function Data = orderDataColumns(Data)
-   %ORDERDATACOLUMNS Put K-transect Data columns in the canonical order.
+   %ORDERDATACOLUMNS Put K-transect Data columns in a fixed order.
    preferred = ["tair", "rh", "wspd", "wdir", "psfc", "swd", "swu", ...
       "lwd", "lwu", "swn", "lwn", "netr", "albedo", "height_rel", ...
       "ice_melt", "aws_type", "rainf", "snowf"];

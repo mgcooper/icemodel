@@ -2,11 +2,14 @@ function tf = promiceFilledVerificationMatches(opts, fileiter) %#codegen
    %PROMICEFILLEDVERIFICATIONMATCHES Match a prevalidated runtime identity.
    %
    % Generated loading cannot read the readiness ledger or producer manifest.
-   % The MATLAB verifier therefore snapshots the exact forcing label, station,
+   % The MATLAB verifier therefore snapshots the forcing label, station,
    % requested window, calendar/model contract, simulation years, 15-minute
    % timestep, and met-file list it checked. A separate provenance flag keeps
    % options minted by a manifest/coverage-only verifier out of the generated
    % path. This predicate refuses reuse after any runtime input changes.
+   %
+   % See also: icemodel.loadmet,
+   %  icemodel.forcing.reconstruct.verifyPromiceFilledReadiness
    if nargin < 2 || isempty(fileiter)
       fileiter = 1:numel(opts.metfname);
    end

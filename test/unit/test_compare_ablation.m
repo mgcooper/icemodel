@@ -604,7 +604,7 @@ function test_nonfinite_ledger_and_endpoint_errors_are_stable(testCase)
    % A hidden nonfinite model increment and a nonfinite endpoint scenario must
    % be rejected rather than dropped from the scientific accounting.
    [observations, model] = makeInputs();
-   model.data.mass_budget_unapplied_vapor_j_m2(3) = NaN;
+   model.data.mass_budget_vapor_transport_solid_mwe(3) = NaN;
    testCase.verifyError(@() icemodel.verification.compareAblation( ...
       observations, model), ...
       'icemodel:verification:compareAblation:nonfiniteModelWindow');
@@ -632,7 +632,7 @@ function [observations, model, increment] = makeInputs()
       'step_correctable_flag'});
    observations.format = 'timeseries';
 
-   % Initialize every required diagnostic from the canonical registry, then
+   % Initialize every required diagnostic from the budgetoutputs list, then
    % populate one physically closed interval-start melt/export ledger. The final
    % row has a large future-interval increment that must not enter [t0,t4).
    % The fixture carries exactly the required model fields -- budgetoutputs

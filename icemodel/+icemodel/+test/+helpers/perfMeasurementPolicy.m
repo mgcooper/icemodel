@@ -1,5 +1,5 @@
 function policy = perfMeasurementPolicy()
-   %PERFMEASUREMENTPOLICY Single source for the formal timing gates.
+   %PERFMEASUREMENTPOLICY Formal timing gate thresholds.
    %
    %  policy = icemodel.test.helpers.perfMeasurementPolicy()
    %
@@ -14,10 +14,16 @@ function policy = perfMeasurementPolicy()
    %                   anchor re-measures the first executed case at the
    %                   end of the run; a larger drift marks every verdict
    %                   in the run ambient-invalid.
+   %  tol_perf       - two-sided fractional noise budget for a case
+   %                   verdict. run_perf_suite and build_perf_baseline
+   %                   default their tol_perf argument from it, and the
+   %                   A/A gate (run_aa_acceptance) accepts B/A ratios
+   %                   inside [1/(1 + tol_perf), 1 + tol_perf].
    %
    % See also: icemodel.test.helpers.perfSampleValidity, run_perf_suite
 
    policy = struct( ...
       'max_dispersion', 1.5, ...
-      'anchor_tol', 0.15);
+      'anchor_tol', 0.15, ...
+      'tol_perf', 0.20);
 end

@@ -7,16 +7,18 @@ function [data1, data2] = buildOutputPayload(opts, surface_state, ...
    %  [data1, data2] = icemodel.buildOutputPayload(opts, surface_state, ...
    %     subsurface_state, thf_diag)
    %
-   % This helper connects the finalized output-profile contract in OPTS.VARS1
-   % and OPTS.VARS2 to the raw timestep state assembled inside the core model
-   % loops.
+   % This helper connects the output-profile variables in OPTS.VARS1 and
+   % OPTS.VARS2 to the timestep state assembled inside the core model loops.
+   %
+   % See also: icemodel, skinmodel
 
    if nargin < 4
       thf_diag = struct([]);
    end
 
    surface_output = surface_state;
-   surface_output = mergeStruct(surface_output, normalizeThfDiag(thf_diag));
+   surface_output = icemodel.helpers.copyFields( ...
+      surface_output, normalizeThfDiag(thf_diag));
 
    data1 = selectOutputFields(surface_output, opts.vars1, 'vars1');
    data2 = selectOutputFields(subsurface_state, opts.vars2, 'vars2');
@@ -83,14 +85,6 @@ function value = getDiagField(diag, field_name, default_value)
    end
 end
 
-function output = mergeStruct(output, extra)
-   %MERGESTRUCT Copy fields from EXTRA onto OUTPUT.
-
-   fields = fieldnames(extra);
-   for n = 1:numel(fields)
-      output.(fields{n}) = extra.(fields{n});
-   end
-end
 
 function data = selectOutputFields(state, names, which_names)
    %SELECTOUTPUTFIELDS Return a cell array matching the requested field order.

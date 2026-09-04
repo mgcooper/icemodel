@@ -8,22 +8,22 @@ end
 function test_dry_growth_uses_realized_substep_flux(testCase)
    % Dry growth reproduces Jordan Eq. 33 from the substep's own instantaneous
    % face flux: interior faces from U_vap, and face 1 rebuilt from the
-   % realized top-cell exchange d_vap_applied.
+   % realized top-cell exchange d_vap.
 
-   [r_eff, f_liq, U_vap, d_vap_applied, dz1, dt] = grainFixture(4);
+   [r_eff, f_liq, U_vap, d_vap, dz1, dt] = grainFixture(4);
    [g1, r_max, Uv_max] = icemodel.parameterLookup('g1', 'r_max', 'Uv_max');
    ro_liq = icemodel.physicalConstant('ro_liq');
    JJ = numel(r_eff);
 
    U_vap_faces = U_vap;
-   U_vap_faces(1) = abs(d_vap_applied) * dz1 * ro_liq / dt;
+   U_vap_faces(1) = abs(d_vap) * dz1 * ro_liq / dt;
    U_vap_nodes = min(0.5 * (abs(U_vap_faces(1:JJ)) ...
       + abs(U_vap_faces(2:JJ + 1))), Uv_max);
    diam = 2 * r_eff;
    expected = min(0.5 * (diam + dt * g1 .* U_vap_nodes ./ diam), r_max);
 
    returned = icemodel.column.update_grain_radius( ...
-      r_eff, f_liq, U_vap, d_vap_applied, dz1, dt);
+      r_eff, f_liq, U_vap, d_vap, dz1, dt);
    testCase.verifyEqual(returned, expected, 'AbsTol', 0);
 
    % No realized exchange and no interior flux leaves dry grains unchanged.
@@ -40,15 +40,15 @@ function test_dry_growth_caps_the_step_mean_flux(testCase)
    ro_liq = icemodel.physicalConstant('ro_liq');
    JJ = numel(r_eff);
 
-   % Drive every interior face, and the surface face through d_vap_applied,
+   % Drive every interior face, and the surface face through d_vap,
    % to twice Uv_max so every node's mean magnitude clamps at the cap.
    U_vap = 2 * Uv_max * ones(JJ + 1, 1);
-   d_vap_applied = 2 * Uv_max * dt / (dz1 * ro_liq);
+   d_vap = 2 * Uv_max * dt / (dz1 * ro_liq);
 
    diam = 2 * r_eff;
    expected = min(0.5 * (diam + dt * g1 * Uv_max ./ diam), r_max);
    returned = icemodel.column.update_grain_radius( ...
-      r_eff, f_liq, U_vap, d_vap_applied, dz1, dt);
+      r_eff, f_liq, U_vap, d_vap, dz1, dt);
 
    testCase.verifyEqual(returned, expected, 'AbsTol', 0);
 end
@@ -113,7 +113,7 @@ function test_opposite_signed_substeps_add_instead_of_cancel(testCase)
       r_eff, f_liq, U_vap, 0.0, dz1, dt);
 
    % Equal-magnitude opposite-signed exchanges cause identical growth,
-   % because the flux enters through abs(d_vap_applied).
+   % because the flux enters through abs(d_vap).
    testCase.verifyEqual(grown_up, grown_down, 'AbsTol', 0);
    testCase.verifyGreaterThan(grown_up(1), grown_zero(1));
 
@@ -136,7 +136,7 @@ function test_interface_has_no_saturation_dependency(testCase)
    testCase.verifyTrue(contains(source, '%#codegen'));
 end
 
-function [r_eff, f_liq, U_vap, d_vap_applied, dz1, dt] = grainFixture(JJ)
+function [r_eff, f_liq, U_vap, d_vap, dz1, dt] = grainFixture(JJ)
    %GRAINFIXTURE Return one dry column and an interior-face vapor flux.
 
    r_eff = 5e-4 * ones(JJ, 1);
@@ -144,11 +144,11 @@ function [r_eff, f_liq, U_vap, d_vap_applied, dz1, dt] = grainFixture(JJ)
 
    % Interior faces (2:JJ) carry a nonzero mass flux [kg m-2 s-1]. The
    % boundary faces (1 and JJ+1) are zero on input: update_grain_radius
-   % overrides face 1 from d_vap_applied, and the interior call always closes
+   % overrides face 1 from d_vap, and the interior call always closes
    % face JJ+1.
    U_vap = zeros(JJ + 1, 1);
    U_vap(2:JJ) = linspace(5e-7, 1e-7, JJ - 1)';
-   d_vap_applied = 3e-4;
+   d_vap = 3e-4;
    dz1 = 0.04;
    dt = 900;
 end

@@ -6,8 +6,8 @@ function qa = marDynamicProfileQa(dzsn1, rosn1, shsn3, ro1, outlay, kwargs)
    %
    % DZSN1 and ROSN1 are the native dynamic-layer thickness and density
    % vectors at one MAR grid cell and daily snapshot. SHSN3 is permanent-ice
-   % sector 1 total snow/firn thickness. RO1 and OUTLAY are the authoritative
-   % public fixed-depth density product used only to quantify reconstruction
+   % sector 1 total snow/firn thickness. RO1 and OUTLAY are the public
+   % fixed-depth density product used only to quantify reconstruction
    % mismatch.
    %
    % MAR stores the dynamic layers numerically bottom-to-surface. This helper
@@ -18,6 +18,8 @@ function qa = marDynamicProfileQa(dzsn1, rosn1, shsn3, ro1, outlay, kwargs)
    %
    % Name-value
    %   thickness_tolerance_m : absolute DZSN1-versus-SHSN3 tolerance (2e-5 m)
+   %
+   % See also: icemodel.forcing.helpers.readMarDensitySnapshots
 
    arguments
       dzsn1 double

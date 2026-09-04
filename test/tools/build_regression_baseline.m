@@ -172,7 +172,7 @@ function RegressionBaseline = buildSingleModelRegressionBaseline( ...
       row.forcings = string(c.forcings);
       row.simyear = c.simyear;
       row.solver = c.solver;
-      row = copyMetricFields(row, S);
+      row = icemodel.helpers.copyFields(row, S);
       row.last_updated_utc = datetime('now', 'TimeZone', 'UTC');
       row_cells{icase} = row;
 
@@ -235,14 +235,4 @@ function RegressionBaseline = buildSingleModelRegressionBaseline( ...
    end
    save(char(output_file), 'RegressionBaseline', 'case_opts', 'meta', ...
       'profile_summary', 'profile_meta', 'profile_artifacts');
-end
-
-function row = copyMetricFields(row, S)
-   %COPYMETRICFIELDS Copy the scalar metric struct into one baseline row.
-
-   names = string(fieldnames(S));
-   for i = 1:numel(names)
-      name = char(names(i));
-      row.(name) = S.(name);
-   end
 end

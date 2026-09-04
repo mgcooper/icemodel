@@ -5,15 +5,14 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
    %  [f_liq, f_ice, T, diag] = icemodel.column.infiltration( ...
    %     f_liq, f_ice, T, dz, dt, q_top)
    %
-   %  Performs the full snow infiltration step. The step has three parts: an
-   %  explicit upwind liquid mass redistribution with CFL substepping,
+   %  Computes liquid infiltration in the snow/firn column. There are three
+   %  parts: an explicit upwind liquid mass redistribution with CFL substepping,
    %  cold-content refreezing in cold layers (latent heat released, T capped at
    %  Tf), and a one-step explicit conduction update over the main timestep dt.
    %  Returns the updated f_liq, f_ice and T, plus a diagnostic struct.
    %
-   %  This is the canonical icemodel infiltration kernel. Both the snow
-   %  verification driver (Colbeck 1976 / Clark 2017) and any future production
-   %  caller should call this kernel.
+   %  The snow verification driver calls this kernel for the Colbeck 1976 and
+   %  Clark 2017 cases.
    %
    %  Parameters:
    %  -----------
@@ -95,8 +94,8 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
    % the Mualem exponent (Clark 2017 Eq. 7). f_res_pore is the Colbeck residual
    % capillary saturation. icemodel overrides it per substep with
    % opts.f_res_pore_snow / _ice / _firn at the liquid_flux call site, but the
-   % CFL bound here uses the canonical value. cfl_safety is the substep safety
-   % factor.
+   % CFL bound here uses the parameterLookup value. cfl_safety is the substep
+   % safety factor.
    persistent m_exp f_res_pore cfl_safety Tf Lf ro_ice ro_liq cp_ice
    if isempty(m_exp)
       [m_exp, f_res_pore, cfl_safety] = icemodel.parameterLookup( ...
@@ -107,7 +106,7 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
 
    % Ice-to-liquid water-equivalent ratio. The f_liq upper-bound clip below
    % uses it: f_liq cannot exceed (ro_ice/ro_liq) * (1 - f_ice). That is the
-   % pore volume scaled to water equivalent. It falls short of the pore volume
+   % pore volume scaled to water equivalent. It is less than the pore volume
    % by (1 - ro_ice/ro_liq) * (1 - f_ice), which leaves the liquid room to
    % expand if it refreezes.
    ro_iwe = ro_ice / ro_liq;
@@ -128,10 +127,10 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
 
    % --- CFL substep count -------------------------------------------------
    % Saturated hydraulic conductivity per layer (column-shaped) from the
-   % dispatched closure scheme. k_sat_max bounds the per-layer values for the
-   % CFL estimate.
-   k_sat = icemodel.column.saturated_hydraulic_conductivity( ...
-      f_ice, f_liq, method=k_sat_method, grainsz=grainsz, permeability=permeability);
+   % selected closure scheme. k_sat_max bounds per-layer values for the CFL
+   % estimate.
+   k_sat = icemodel.column.saturated_hydraulic_conductivity(f_ice, f_liq, ...
+      method=k_sat_method, grainsz=grainsz, permeability=permeability);
    k_sat_max = max(k_sat);
 
    % Relative saturation per layer, clipped to [0, 1]. This drives the
@@ -167,9 +166,8 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
 
    for sub = 1:n_sub
 
-      % Calculate fluxes between layers [m/s]. liquid_flux returns one flux
-      % value per layer, computed at the layer's own state. That flux is the
-      % upwind interface flux out the bottom of each layer.
+      % Calculate fluxes between layers [m/s]. liquid_flux returns the upwind
+      % interface flux out of the bottom of each layer (one flux per layer).
       q = icemodel.column.liquid_flux(f_liq, f_ice, ...
          k_sat_method=k_sat_method, grainsz=grainsz, permeability=permeability);
 
@@ -228,6 +226,7 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
       % triggers for the Colbeck cases. The verification metrics agree with
       % SUMMA at sub-mm RMSE.
       f_liq = max(0, f_liq);
+
       % max_liquid_fraction_change returns the liquid a layer can still take
       % before f_wat reaches f_wat_max. Negative means the layer already
       % holds more than that, so the layer is overfilled.

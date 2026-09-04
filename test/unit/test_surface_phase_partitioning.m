@@ -9,19 +9,20 @@ function test_dry_deposition_adds_ice(testCase)
 
    f_ice = 0.95;
    f_liq = 0.0;
-   d_con = 0.0;
+   d_rof = 0.0;
    d_pevp = 1e-4;
    f_ice_min = 0.1;
    f_res_por = 0.02;
 
-   [f_ice_new, f_liq_new, d_con_new, d_sbl_err] = ...
+   [f_ice_new, f_liq_new, d_rof, d_vap_liq, d_vap_ice] = ...
       icemodel.surface.apply_surface_vapor_exchange( ...
-      f_ice, f_liq, d_con, d_pevp, f_ice_min, f_res_por);
+      f_ice, f_liq, d_rof, d_pevp, 1, f_ice_min, f_res_por);
 
    testCase.verifyGreaterThan(f_ice_new(1), f_ice(1));
    testCase.verifyEqual(f_liq_new(1), f_liq(1), 'AbsTol', 0);
-   testCase.verifyEqual(d_con_new(1), 0, 'AbsTol', 0);
-   testCase.verifyEqual(d_sbl_err, 0, 'AbsTol', 0);
+   testCase.verifyEqual(d_rof, 0, 'AbsTol', 0);
+   testCase.verifyEqual(d_vap_liq, 0, 'AbsTol', 0);
+   testCase.verifyGreaterThan(d_vap_ice, 0);
 end
 
 function test_wet_condensation_stays_liquid(testCase)
@@ -30,19 +31,24 @@ function test_wet_condensation_stays_liquid(testCase)
 
    f_ice = 0.90;
    f_liq = 0.05;
-   d_con = 0.0;
+   d_rof = 0.0;
    d_pevp = 1e-4;
    f_ice_min = 0.1;
    f_res_por = 0.02;
 
-   [f_ice_new, f_liq_new, d_con_new, d_sbl_err] = ...
+   [f_ice_new, f_liq_new, d_rof, d_vap_liq, d_vap_ice, d_vap] = ...
       icemodel.surface.apply_surface_vapor_exchange( ...
-      f_ice, f_liq, d_con, d_pevp, f_ice_min, f_res_por);
+      f_ice, f_liq, d_rof, d_pevp, 1, f_ice_min, f_res_por);
 
    testCase.verifyEqual(f_ice_new(1), f_ice(1), 'AbsTol', 0);
    testCase.verifyGreaterThan(f_liq_new(1), f_liq(1));
-   testCase.verifyEqual(d_con_new(1), 0, 'AbsTol', 0);
-   testCase.verifyEqual(d_sbl_err, 0, 'AbsTol', 0);
+   testCase.verifyEqual(d_rof, 0, 'AbsTol', 0);
+   testCase.verifyGreaterThan(d_vap_liq, 0);
+   testCase.verifyEqual(d_vap_ice, 0, 'AbsTol', 0);
+
+   % Liquid applies at Lv on the liquid-water basis, so the realized
+   % exchange equals the demand up to the partition round trip.
+   testCase.verifyEqual(d_vap, d_pevp, 'RelTol', 1e-12);
 end
 
 function test_dry_sublimation_removes_ice(testCase)
@@ -51,13 +57,13 @@ function test_dry_sublimation_removes_ice(testCase)
 
    f_ice = 0.95;
    f_liq = 0.0;
-   d_con = 0.0;
+   d_rof = 0.0;
    d_pevp = -1e-4;
    f_ice_min = 0.1;
    f_res_por = 0.02;
 
    [f_ice_new, f_liq_new] = icemodel.surface.apply_surface_vapor_exchange( ...
-      f_ice, f_liq, d_con, d_pevp, f_ice_min, f_res_por);
+      f_ice, f_liq, d_rof, d_pevp, 1, f_ice_min, f_res_por);
 
    testCase.verifyLessThan(f_ice_new(1), f_ice(1));
    testCase.verifyEqual(f_liq_new(1), f_liq(1), 'AbsTol', 0);
@@ -66,27 +72,105 @@ end
 function test_thin_surface_sublimates_existing_ice_before_remesh(testCase)
    % A top cell below the remesh floor must still spend its existing ice.
 
-   [Ls, Lv, ro_ice, ro_liq] = ...
-      icemodel.physicalConstant('Ls', 'Lv', 'ro_ice', 'ro_liq');
+   [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
    f_ice = 0.05;
    f_liq = 0;
    d_pevp = -0.10;
 
-   [f_ice_new, f_liq_new, d_rof, d_sbl_err, d_applied] = ...
+   [f_ice_new, f_liq_new, d_rof, d_vap_liq, d_vap_ice, d_vap] = ...
       icemodel.surface.apply_surface_vapor_exchange( ...
-      f_ice, f_liq, 0, d_pevp, 0.1, 0.02);
+      f_ice, f_liq, 0, d_pevp, 1, 0.1, 0.02);
 
-   d_vap_ice = d_pevp * Lv / Ls;
    available_lwe = f_ice * ro_ice / ro_liq;
-   unapplied_lwe = d_vap_ice + available_lwe;
 
    testCase.verifyEqual(f_ice_new, 0, 'AbsTol', 0);
    testCase.verifyEqual(f_liq_new, f_liq, 'AbsTol', 0);
    testCase.verifyEqual(d_rof, 0, 'AbsTol', 0);
-   testCase.verifyEqual( ...
-      ro_ice * Ls * d_sbl_err, ro_liq * Ls * unapplied_lwe, ...
+   testCase.verifyEqual(d_vap_liq, 0, 'AbsTol', 0);
+
+   % This one-cell column reaches its storage floor before it satisfies the
+   % demand. The ice increment reports the ice-fraction change, and the
+   % realized exchange stops at the ice the cell held.
+   testCase.verifyEqual(d_vap_ice, -f_ice, 'RelTol', 1e-14);
+   testCase.verifyEqual(d_vap, -available_lwe, 'RelTol', 1e-14);
+end
+
+function test_cascade_conserves_areal_energy_on_nonuniform_mesh(testCase)
+   % A wet top cell supplies liquid and ice before the remaining sublimation
+   % reaches the thicker dry cell. The thickness ratio must preserve the
+   % total areal latent energy.
+
+   [Ls, Lv, ro_ice, ro_liq] = ...
+      icemodel.physicalConstant('Ls', 'Lv', 'ro_ice', 'ro_liq');
+   f_ice_min = 0.1;
+   f_ice = [0.12; 0.90];
+   f_liq = [0.04; 0];
+   dz = [0.02; 0.10];
+   f_res_por = 0.02;
+
+   % The demand removes mobile liquid and spendable ice from cell 1. Cell 2
+   % can supply the remaining sublimation.
+   d_pevp = -0.10;
+
+   [f_ice_new, f_liq_new, d_rof, d_vap_liq, d_vap_ice, d_vap] = ...
+      icemodel.surface.apply_surface_vapor_exchange( ...
+      f_ice, f_liq, 0, d_pevp, dz, f_ice_min, f_res_por);
+
+   % Cell 1 loses liquid and stops at the retained ice limit. The remaining
+   % sublimation removes ice from cell 2.
+   testCase.verifyEqual(f_ice_new(1), f_ice_min, 'RelTol', 1e-14);
+   testCase.verifyEqual(d_vap_ice(1), f_ice_min - f_ice(1), ...
       'RelTol', 1e-14);
-   testCase.verifyEqual(d_applied, -available_lwe, 'RelTol', 1e-14);
+   testCase.verifyLessThan(f_liq_new(1), f_liq(1));
+   testCase.verifyLessThan(d_vap_liq(1), 0);
+   testCase.verifyLessThan(d_vap_ice(2), 0);
+   testCase.verifyEqual(f_liq_new(2), f_liq(2), 'AbsTol', 0);
+   testCase.verifyEqual(d_vap_liq(2), 0, 'AbsTol', 0);
+   testCase.verifyEqual(d_rof, 0, 'AbsTol', 0);
+
+   % The applied liquid and ice changes satisfy the full surface demand.
+   testCase.verifyEqual(Lv * ro_liq * sum(d_vap_liq .* dz) ...
+      + Ls * ro_ice * sum(d_vap_ice .* dz), ...
+      Lv * ro_liq * d_pevp * dz(1), 'RelTol', 1e-14);
+
+   % D_VAP reports the total applied mass as a fraction of cell 1.
+   testCase.verifyEqual(d_vap, ...
+      (sum(d_vap_liq .* dz) ...
+      + sum(d_vap_ice .* dz) * ro_ice / ro_liq) / dz(1), ...
+      'RelTol', 1e-14);
+end
+
+function test_full_top_cell_rejects_solid_deposition_without_cascade(testCase)
+   % Solid deposition a nearly solid top cell cannot store must stay
+   % unrealized at the surface: deposited ice belongs at the surface, so
+   % the rejected remainder never cascades into the cell below.
+
+   [Ls, Lv, ro_ice, ro_liq] = ...
+      icemodel.physicalConstant('Ls', 'Lv', 'ro_ice', 'ro_liq');
+   f_ice = [0.995; 0.90];
+   f_liq = [0; 0];
+   dz = [0.04; 0.04];
+
+   % A dry deposition demand larger than cell 1's representable storage.
+   d_pevp = 0.02;
+
+   [f_ice_new, f_liq_new, d_rof, d_vap_liq, d_vap_ice, d_vap] = ...
+      icemodel.surface.apply_surface_vapor_exchange( ...
+      f_ice, f_liq, 0, d_pevp, dz, 0.1, 0.02);
+
+   % Cell 1 gains ice; cell 2 and all liquid outputs stay unchanged.
+   testCase.verifyGreaterThan(f_ice_new(1), f_ice(1));
+   testCase.verifyEqual(f_ice_new(2), f_ice(2), 'AbsTol', 0);
+   testCase.verifyEqual(f_liq_new, f_liq, 'AbsTol', 0);
+   testCase.verifyEqual(d_vap_liq, zeros(2, 1), 'AbsTol', 0);
+   testCase.verifyEqual(d_vap_ice(2), 0, 'AbsTol', 0);
+   testCase.verifyEqual(d_rof, 0, 'AbsTol', 0);
+
+   % d_vap reports only the realized part, which is smaller than the full
+   % dry-demand realization at Ls.
+   testCase.verifyEqual(d_vap, ...
+      sum(d_vap_ice .* dz) * ro_ice / ro_liq / dz(1), 'RelTol', 1e-14);
+   testCase.verifyLessThan(d_vap, d_pevp * Lv / Ls);
 end
 
 function test_vappress_honors_satflag(testCase)
@@ -102,31 +186,34 @@ function test_vappress_honors_satflag(testCase)
 end
 
 function test_scalar_demand_reaches_the_top_cell_alone(testCase)
-   % The surface-only path passes one demand for the whole column. It must
+   % The surface function passes one demand for the whole column. It must
    % land in the top cell and leave every interior cell untouched, which is
    % the same rule the merge look-ahead follows.
 
    f_ice = [0.90; 0.90; 0.90];
    f_liq = [0.05; 0.05; 0.05];
 
-   [f_ice_new, f_liq_new, d_rof, d_sbl_err] = ...
+   [f_ice_new, f_liq_new, d_rof, d_vap_liq, d_vap_ice] = ...
       icemodel.surface.apply_surface_vapor_exchange( ...
-      f_ice, f_liq, 0, 1e-4, 0.1, 0.02);
+      f_ice, f_liq, 0, 1e-4, ones(3, 1), 0.1, 0.02);
 
    testCase.verifyGreaterThan(f_liq_new(1), f_liq(1));
    testCase.verifyEqual(f_liq_new(2:3), f_liq(2:3), 'AbsTol', 0);
    testCase.verifyEqual(f_ice_new, f_ice, 'AbsTol', 0);
    testCase.verifyEqual(d_rof, 0, 'AbsTol', 0);
 
-   % The unapplied channel is one entry per cell, not a scalar.
-   testCase.verifySize(d_sbl_err, [3, 1]);
-   testCase.verifyEqual(d_sbl_err, zeros(3, 1), 'AbsTol', 0);
+   % The applied-increment outputs contain one entry per cell. Wet deposition
+   % enters only the top cell's liquid output.
+   testCase.verifySize(d_vap_liq, [3, 1]);
+   testCase.verifyEqual(d_vap_liq(1), f_liq_new(1) - f_liq(1), 'AbsTol', 0);
+   testCase.verifyEqual(d_vap_liq(2:3), zeros(2, 1), 'AbsTol', 0);
+   testCase.verifyEqual(d_vap_ice, zeros(3, 1), 'AbsTol', 0);
 end
 
 function test_wet_evaporation_crosses_from_liquid_to_ice_exactly(testCase)
    % A demand larger than the mobile liquid must spend that liquid at Lv and
-   % only its remaining energy on ice at Ls. The surface wrapper must preserve
-   % the state and accounting from the legacy production branch.
+   % only its remaining energy on ice at Ls. The surface function must preserve
+   % the mixed-latent state and energy accounting.
 
    [Ls, Lv, ro_ice, ro_liq] = ...
       icemodel.physicalConstant('Ls', 'Lv', 'ro_ice', 'ro_liq');
@@ -149,9 +236,10 @@ function test_wet_evaporation_crosses_from_liquid_to_ice_exactly(testCase)
    testCase.verifyEqual(Lv * d_pevp, ...
       Lv * d_vap_liq + Ls * d_vap_ice, 'RelTol', 1e-14);
 
-   [f_ice_actual, f_liq_actual, d_rof_actual, d_sbl_err_actual, ...
-      d_applied_actual] = icemodel.surface.apply_surface_vapor_exchange( ...
-      f_ice, f_liq, d_rof, d_pevp, f_ice_min, f_res_por);
+   [f_ice_actual, f_liq_actual, d_rof_actual, d_vap_liq_actual, ...
+      d_vap_ice_actual, d_vap_actual] = ...
+      icemodel.surface.apply_surface_vapor_exchange( ...
+      f_ice, f_liq, d_rof, d_pevp, 1, f_ice_min, f_res_por);
 
    % Replay the legacy wet-crossing branch without calling either new
    % transfer helper. Liquid reaches its residual floor before the remaining
@@ -163,21 +251,22 @@ function test_wet_evaporation_crosses_from_liquid_to_ice_exactly(testCase)
    f_liq_oracle = f_liq + d_aevp_oracle;
    f_ice_oracle = f_ice + d_psbl_oracle;
    d_rof_oracle = d_rof;
-   d_sbl_err_oracle = 0;
-   d_applied_oracle = (f_liq_oracle - f_liq) ...
+   d_vap_oracle = (f_liq_oracle - f_liq) ...
       + (f_ice_oracle - f_ice) * ro_ice / ro_liq;
 
    testCase.verifyEqual(f_ice_actual, f_ice_oracle, 'RelTol', 1e-14);
    testCase.verifyEqual(f_liq_actual, f_liq_oracle, 'AbsTol', 0);
    testCase.verifyEqual(d_rof_actual, d_rof_oracle, 'AbsTol', 0);
-   testCase.verifyEqual(d_sbl_err_actual, d_sbl_err_oracle, 'AbsTol', 0);
-   testCase.verifyEqual(d_applied_actual, d_applied_oracle, ...
-      'RelTol', 1e-14);
+
+   % The per-phase outputs report each phase on its own fraction basis.
+   testCase.verifyEqual(d_vap_liq_actual, d_aevp_oracle, 'RelTol', 1e-14);
+   testCase.verifyEqual(d_vap_ice_actual, d_psbl_oracle, 'RelTol', 1e-14);
+   testCase.verifyEqual(d_vap_actual, d_vap_oracle, 'RelTol', 1e-14);
 end
 
 function test_shared_transfer_reports_each_phase_on_the_lwe_basis(testCase)
-   % The shared mutator must apply selected phase increments without hiding
-   % either phase's limited remainder.
+   % APPLY_VAPOR_TRANSFER applies both phase increments and returns each
+   % limited remainder.
 
    [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
    f_ice_min = 0.1;

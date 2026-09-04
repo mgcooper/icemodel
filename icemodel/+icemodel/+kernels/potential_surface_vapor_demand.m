@@ -8,8 +8,8 @@ function [d_pevp, pevp] = potential_surface_vapor_demand(Qe, dt, dz)
    % equivalent velocity [m s-1], and D_PEVP is the corresponding top-cell
    % liquid-water-equivalent fraction over DT [s] and DZ [m]. Positive is
    % condensation or deposition; negative is evaporation or sublimation.
-   % The surface exchange subsequently partitions this energy demand between
-   % liquid at Lv and ice at Ls.
+   % The surface exchange partitions this energy demand between liquid at
+   % Lv and ice at Ls.
    %
    % Definition:
    %

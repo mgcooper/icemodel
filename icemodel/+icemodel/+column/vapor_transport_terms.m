@@ -24,15 +24,15 @@ function [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces, ...
    % wet/dry face or an isothermal phase boundary, without putting a negative
    % coefficient in the matrix.
    %
-   % K_EFF is the vapor-free node conductivity. L_face and its tangent come
-   % from the donor node. The donor phase uses vapor_exchange_is_wet at the
-   % solve state, and the returned L_VAP_FACES hands that decision to the
-   % mass application (icemodel.column.couple_vapor_step), so the phase the
-   % mass lands in matches the latent heat the face energy carried. One
-   % derivation serves both sides; recomputing the mask after the surface
-   % exchange could flip the top cell's class. Both vapor boundary faces
-   % are closed; the surface exchange enters through the surface energy
-   % and mass balances instead.
+   % K_EFF is the vapor-free node conductivity. L_face and its tangent come from
+   % the donor node. The donor phase uses vapor_exchange_is_wet with the solve
+   % state, and the returned L_VAP_FACES records that decision for the applied
+   % mass transfer step (icemodel.column.couple_vapor_step), so the phase of the
+   % transferred mass (ice or liq) matches the latent heat used for the face
+   % heat flux (recomputing the phase decision after surface exchange could
+   % switch the top cell's state). For the interior vapor transport computed
+   % here, both boundary faces are closed; the surface exchange is computed
+   % using the surface energy and mass balance instead.
    %
    % Inputs
    %   T         - Node temperature [K] (JJ x 1).
@@ -54,8 +54,9 @@ function [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces, ...
    %   L_vap_faces          - Face donor latent heat [J kg-1] (JJ+1 x 1),
    %                          Lv where the donor node is wet, Ls otherwise.
    %
-   % See also: icemodel.column.assemble_enthalpy_system,
-   %  icemodel.column.vapor_exchange_is_wet
+   % See also: icemodel.column.solve_column_enthalpy,
+   % icemodel.column.assemble_enthalpy_system,
+   % icemodel.column.vapor_exchange_is_wet
    %
    %#codegen
 
@@ -75,12 +76,13 @@ function [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces, ...
    f_liq_nodes = [f_liq(1); f_liq; f_liq(JJ)];
 
    % Interpolate each node property once at the faces. The same
-   % face-construction rule serves vapor mass and energy transport.
+   % face-construction rule is used for both vapor mass and energy transport.
    k_eff_faces = 1.0 ./ ((1.0 - fn) ./ [k_eff(1); k_eff] ...
       + fn ./ [k_eff; k_eff(JJ)]);
    De_faces = 1.0 ./ ((1.0 - fn) ./ [De(1); De] ...
       + fn ./ [De; De(JJ)]);
 
+   % Compute vapor mass flux at the cell faces [kg m-2 s-1].
    d_ro_vap = ro_vap_nodes(2:JJ+2) - ro_vap_nodes(1:JJ+1);
    d_T = T_nodes(2:JJ+2) - T_nodes(1:JJ+1);
    U_vap_faces = -De_faces .* d_ro_vap ./ delz;
@@ -108,8 +110,8 @@ function [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces, ...
    q_vap_deferred_faces = ...
       (k_vap_faces .* d_T - L_faces .* De_faces .* d_ro_vap) ./ delz;
 
-   % Close both vapor boundaries explicitly. The ordinary conductive matrix
-   % remains active at both boundaries through k_cond_faces.
+   % Close both vapor boundaries. The ordinary conductive matrix remains active
+   % at both boundaries through k_cond_faces.
    k_vap_faces(1) = 0;
    k_vap_faces(JJ+1) = 0;
    q_vap_deferred_faces(1) = 0;

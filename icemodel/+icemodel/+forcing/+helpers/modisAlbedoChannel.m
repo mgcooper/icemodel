@@ -31,7 +31,7 @@ function [modis, metadata] = modisAlbedoChannel(modis_dir, years, location, meth
    % Outputs
    %  modis   - daily MODIS albedo interpolated to TIME [-] (NaN where no year
    %            covers a sample)
-   %  metadata - canonical product/status/exact-coverage provenance. A caller
+   %  metadata - product/status/exact-coverage provenance. A caller
    %             writing an artifact omits MODIS when coverage is empty.
    %
    % See also: icemodel.forcing.readGeusModis,

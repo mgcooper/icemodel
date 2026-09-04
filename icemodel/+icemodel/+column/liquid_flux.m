@@ -6,15 +6,14 @@ function [q, dq_df_liq] = liquid_flux(f_liq, f_ice, kwargs)
    %
    %  Returns the volumetric liquid water flux q [m s-1] (per unit snow column
    %  area, integrated over a substep at the call site by multiplying by dt) and
-   %  its derivative dq/d(f_liq) [s-1] for the supplied column state. The
-   %  constitutive law evaluated is the Mualem-style power law on the
-   %  colbeck1972 / darcy paths
+   %  its derivative dq/d(f_liq) [s-1]. The constitutive law evaluated is the
+   %  Mualem-style power law for the colbeck1972 / darcy k_sat relations:
    %
    %     q = k_sat * relSat ^ m_exp
    %
-   %  and the van-Genuchten retention form on the shimizu1970 path. The exponent
-   %  m_exp is loaded from icemodel.parameterLookup ("m_exp", default 3) per
-   %  Clark et al. (2017) Eq. 7 and Clark et al. (2021) Table 4.
+   %  and the van-Genuchten retention form for the shimizu1970 relation. The
+   %  exponent m_exp is loaded from icemodel.parameterLookup ("m_exp", default
+   %  3) per Clark et al. (2017) Eq. 7 and Clark et al. (2021) Table 4.
    %
    %  Parameters:
    %  -----------
@@ -55,8 +54,7 @@ function [q, dq_df_liq] = liquid_flux(f_liq, f_ice, kwargs)
    %
    %  Notes:
    %  ------
-   %  This function dispatches between three saturated-hydraulic- conductivity
-   %  closures:
+   %  This function branches on three saturated-hydraulic-conductivity closures:
    %    1. Colbeck 1972 (density-only, default)
    %    2. Shimizu 1970 (grain-size + water-fraction; van-Genuchten q-S)
    %    3. Darcy form  k_sat = kappa * ro_liq * g / mu  (caller-pinned
@@ -80,7 +78,7 @@ function [q, dq_df_liq] = liquid_flux(f_liq, f_ice, kwargs)
    %  water-equivalent volume fraction, i.e., if the ice melted, the combined
    %  liquid plus melted-ice fraction.
    %
-   %  Note: in general, 2-7 % of the pore space must be filled with water before
+   %  Note: in general, 2-7% of the pore space must be filled with water before
    %  any can infiltrate, so when debugging, check that the residual capillary
    %  floor is not exceeded.
    %
@@ -119,24 +117,23 @@ function [q, dq_df_liq] = liquid_flux(f_liq, f_ice, kwargs)
          'shi_n_b', 'shi_a_wat');
    end
 
-   % Resolve the residual capillary-saturation kwarg. NaN is the
-   % verification-default sentinel: production callers pass an explicit
-   % per-substep value derived from opts.f_res_pore_snow / _ice / _firn.
+   % Resolve the residual capillary-saturation kwarg. NaN is the default, the
+   % driver passes an explicit per-substep value from opts.f_res_pore_snow /
+   % _ice / _firn.
    if isnan(kwargs.f_res_pore)
       f_res_pore = default_f_res_pore;
    else
       f_res_pore = kwargs.f_res_pore;
    end
 
-   % Initialize outputs to the no-flow state. Layer indices that satisfy the
-   % flow criterion below are then filled in place; layers at or below the
-   % residual capillary floor remain at q = 0.
+   % Initialize outputs to no-flow state. Layer indices that satisfy the flow
+   % criterion below are then filled in place; layers at or below the residual
+   % capillary floor remain at q = 0.
    N = numel(f_liq);
    q = zeros(N, 1);
    dq_df_liq = zeros(N, 1);
 
-   % Saturated hydraulic conductivity from the column-level kernel.
-   % This dispatches on k_sat_method to one of:
+   % Saturated hydraulic conductivity. This branches on k_sat_method to one of:
    %   colbeck1972 - density-only fit  k_sat = col_k0 * exp(col_a_phi * f_por)
    %   shimizu1970 - grain-size + f_wat fit (varies in time as f_wat moves)
    %   darcy       - constant k_sat from caller-supplied permeability
@@ -153,7 +150,7 @@ function [q, dq_df_liq] = liquid_flux(f_liq, f_ice, kwargs)
    % Pore fraction, residual liquid fraction, available pore capacity, and
    % relative saturation. These are the same SUMMA-style quantities used
    % elsewhere in icemodel.column. relSat is set to 1 in fully-ice layers
-   % (availCap == 0) so the no-flux mask below picks them up cleanly.
+   % (availCap == 0) so the no-flux mask below picks them up.
    f_por = 1.0 - f_ice;
    f_res = f_res_pore * f_por;
    availCap = max(0.0, f_por - f_res);
@@ -166,18 +163,18 @@ function [q, dq_df_liq] = liquid_flux(f_liq, f_ice, kwargs)
    % Indices where flow can occur. Layers below the residual capillary floor or
    % with no pore space contribute zero flux.
    %
-   % This f_res is the capillary term alone, not
-   % icemodel.column.residual_water_fraction, which returns the maximum of
-   % that term and Jordan's thermodynamic minimum. The two answer different
+   % Use f_res (the capillary term) not icemodel.column.residual_water_fraction,
+   % which returns the maximum of f_res and the phase fraction thermodynamic
+   % minimum f_liq_min (see meltzone_bounds). The two answer different
    % questions. Mobility is hydraulic: capillarity is what holds water against
    % flow. Jordan's minimum is the liquid that coexists at the lower melt-zone
-   % boundary. It bounds what a cell can give up to a phase change, not what
-   % can drain. Using the larger floor here would also disagree with the
-   % relSat above, which the constitutive q(S) is built on. The mask and the
-   % saturation would then describe different water.
+   % boundary. It bounds what a cell can give up to a phase change, not what can
+   % drain. Using the larger floor here would also disagree with the relSat
+   % above, which the constitutive q(S) is built on. The mask and the saturation
+   % would then describe different water.
    %
-   % icemodel.column.vapor_exchange_is_wet owns the phase-change form of this
-   % predicate.
+   % icemodel.column.vapor_exchange_is_wet is the phase-change form of this
+   % check.
    iflux = availCap > 0 & f_liq > f_res;
 
    switch kwargs.k_sat_method

@@ -315,3 +315,160 @@ function test_missing_environment_metadata_is_incompatible(testCase)
    testCase.verifyFalse(returned);
    testCase.verifySubstring(reason, "metadata");
 end
+
+function test_worktree_revision_tracks_git_content(testCase)
+   % The performance identity must change for tracked text, tracked binary,
+   % and untracked bytes, then return to its clean value after each removal.
+
+   [project_dir, cleanup] = createWorktreeRevisionFixture();
+   testCase.addTeardown(@() delete(cleanup));
+   clean_revision = icemodel.test.helpers.worktreeRevision(project_dir);
+   testCase.verifyNotEmpty(clean_revision);
+   testCase.verifyFalse(contains(clean_revision, "-dirty-"));
+
+   writeTestText(fullfile(project_dir, "tracked.txt"), "changed");
+   text_revision = icemodel.test.helpers.worktreeRevision(project_dir);
+   testCase.verifyMatches(text_revision, "-dirty-[0-9a-f]{12}$");
+   runPerfTestGit(project_dir, "checkout -- tracked.txt");
+   testCase.verifyEqual( ...
+      icemodel.test.helpers.worktreeRevision(project_dir), clean_revision);
+
+   writeTestBytes(fullfile(project_dir, "tracked.bin"), uint8([0, 1, 255]));
+   binary_revision = icemodel.test.helpers.worktreeRevision(project_dir);
+   testCase.verifyMatches(binary_revision, "-dirty-[0-9a-f]{12}$");
+   testCase.verifyNotEqual(binary_revision, text_revision);
+   runPerfTestGit(project_dir, "checkout -- tracked.bin");
+
+   writeTestBytes(fullfile(project_dir, "untracked.bin"), uint8([3, 2, 1]));
+   untracked_revision = icemodel.test.helpers.worktreeRevision(project_dir);
+   testCase.verifyMatches(untracked_revision, "-dirty-[0-9a-f]{12}$");
+   testCase.verifyNotEqual(untracked_revision, binary_revision);
+   delete(fullfile(project_dir, "untracked.bin"));
+   testCase.verifyEqual( ...
+      icemodel.test.helpers.worktreeRevision(project_dir), clean_revision);
+end
+
+function test_worktree_revision_rejects_a_non_git_directory(testCase)
+   % A missing Git repository cannot identify code for a performance run.
+
+   [scratch_root, cleanup] = createScratchRoot();
+   project_dir = fullfile(scratch_root, "repo $ICEMODEL_PERF_QUOTE 'safe'");
+   mkdir(project_dir);
+   testCase.addTeardown(@() delete(cleanup));
+   testCase.verifyEqual( ...
+      icemodel.test.helpers.worktreeRevision(project_dir), "");
+end
+
+function test_worktree_revision_rejects_an_untracked_read_failure(testCase)
+   % An unreadable untracked file makes the performance identity invalid.
+
+   [project_dir, cleanup] = createWorktreeRevisionFixture();
+   testCase.addTeardown(@() delete(cleanup));
+   writeTestText(fullfile(project_dir, "untracked.txt"), "unreadable");
+
+   revision = icemodel.test.helpers.worktreeRevision( ...
+      project_dir, @rejectTestFileHash);
+   testCase.verifyEqual(revision, "");
+end
+
+function test_worktree_revision_rejects_dirty_git_command_failures(testCase)
+   % A failed tracked-diff or untracked-list command invalidates the identity.
+
+   file_hasher = @icemodel.verification.setup.fileSha256;
+   revision = icemodel.test.helpers.worktreeRevision( ...
+      "unused", file_hasher, @failTrackedDiffCommand);
+   testCase.verifyEqual(revision, "");
+
+   revision = icemodel.test.helpers.worktreeRevision( ...
+      "unused", file_hasher, @failUntrackedListCommand);
+   testCase.verifyEqual(revision, "");
+end
+
+function [project_dir, cleanup] = createWorktreeRevisionFixture()
+   %CREATEWORKTREEREVISIONFIXTURE Create a disposable Git repository.
+
+   [scratch_root, cleanup] = createScratchRoot();
+   project_dir = fullfile(scratch_root, "repo $ICEMODEL_PERF_QUOTE 'safe'");
+   mkdir(project_dir);
+   writeTestText(fullfile(project_dir, "tracked.txt"), "initial");
+   writeTestBytes(fullfile(project_dir, "tracked.bin"), uint8([0, 1, 2]));
+   runPerfTestGit(project_dir, "init -q");
+   runPerfTestGit(project_dir, "add tracked.txt tracked.bin");
+   runPerfTestGit(project_dir, ...
+      "-c user.name=Test -c user.email=test@example.invalid " ...
+      + "commit -qm initial");
+end
+
+function [scratch_root, cleanup] = createScratchRoot()
+   %CREATESCRATCHROOT Create and own one temporary test directory.
+
+   [status, scratch_root] = system('mktemp -d');
+   assert(status == 0, 'Could not create a temporary test directory')
+   scratch_root = string(strtrim(scratch_root));
+   cleanup = onCleanup(@() rmdir(scratch_root, 's'));
+end
+
+function runPerfTestGit(project_dir, arguments)
+   %RUNPERFTESTGIT Run one checked Git command in the disposable repository.
+
+   command = "git --no-pager -C " + icemodel.shellQuote(project_dir) ...
+      + " " + arguments;
+   [status, output] = system(command);
+   assert(status == 0, '%s', output)
+end
+
+function writeTestText(filename, text)
+   %WRITETESTTEXT Write a text fixture with explicit cleanup ownership.
+
+   fid = fopen(filename, 'w');
+   assert(fid >= 0, 'Could not create test fixture: %s', filename)
+   cleanup = onCleanup(@() fclose(fid));
+   fwrite(fid, char(text), 'char');
+end
+
+function writeTestBytes(filename, bytes)
+   %WRITETESTBYTES Write a binary fixture without text conversion.
+
+   fid = fopen(filename, 'w');
+   assert(fid >= 0, 'Could not create test fixture: %s', filename)
+   cleanup = onCleanup(@() fclose(fid));
+   fwrite(fid, bytes, 'uint8');
+end
+
+function digest = rejectTestFileHash(~)
+   %REJECTTESTFILEHASH Simulate an untracked-file read failure.
+
+   digest = "Simulated untracked-file read failure";
+   error('icemodel:test:worktreeRevision:simulatedReadFailure', ...
+      '%s', digest)
+end
+
+function [status, output] = failTrackedDiffCommand(command)
+   %FAILTRACKEDDIFFCOMMAND Simulate failure after Git reports a dirty tree.
+
+   [status, output] = worktreeRevisionCommandResult(command);
+   if contains(command, " diff --binary HEAD")
+      status = 1;
+   end
+end
+
+function [status, output] = failUntrackedListCommand(command)
+   %FAILUNTRACKEDLISTCOMMAND Simulate failure while listing untracked files.
+
+   [status, output] = worktreeRevisionCommandResult(command);
+   if contains(command, " ls-files --others")
+      status = 1;
+   end
+end
+
+function [status, output] = worktreeRevisionCommandResult(command)
+   %WORKTREEREVISIONCOMMANDRESULT Return successful dirty-tree Git output.
+
+   status = 0;
+   output = "";
+   if contains(command, " describe --always")
+      output = "test-revision";
+   elseif contains(command, " status --porcelain")
+      output = " M tracked.txt";
+   end
+end
