@@ -46,6 +46,7 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, diag] = ...
    step_diag = icemodel.couplers.initialize_solver_diag();
    diag = step_diag.substep;
    ok_cpl = false;
+   res_hist = diag.cpl_res_hist;
 
    % nan marks "no evaluated outer residual": an inner-solve failure
    % breaks out of the loop before the first residual evaluation below.
@@ -67,7 +68,7 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, diag] = ...
          if debug
             dumpSkinEbSolveFailure("skinsolve_failed", T_sfc, Ts_diag, ...
                Ts_old, T_ice, f_ice, f_liq, k_eff, dt, cpliter, ...
-               settings, seb_res, n_iters, ok_seb, ok_ieb, ok_cpl);
+               settings, seb_res, n_iters, ok_seb, ok_ieb, ok_cpl, res_hist);
          end
          break
       end
@@ -90,7 +91,7 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, diag] = ...
          if debug
             dumpSkinEbSolveFailure("sebsolve_failed", T_sfc, Ts_diag, ...
                Ts_old, T_ice, f_ice, f_liq, k_eff, dt, cpliter, ...
-               settings, seb_res, n_iters, ok_seb, ok_ieb, ok_cpl);
+               settings, seb_res, n_iters, ok_seb, ok_ieb, ok_cpl, res_hist);
          end
          break
       end
@@ -112,6 +113,7 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, diag] = ...
       % with an unevaluated trial, so a nonconvergent exit reports the
       % last evaluated iterate.
       cpl_res = T_sfc - Ts_old;
+      res_hist = [res_hist(2:end); cpl_res];
 
       % Check convergence (bypass coupler if cpl_maxiter == 1).
       if (settings.cpl_maxiter == 1) || ...
@@ -137,7 +139,7 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, diag] = ...
    if debug && ok_seb && ok_ieb && ~ok_cpl
       dumpSkinEbSolveFailure("coupler_nonconvergence", T_sfc, Ts_diag, ...
          Ts_old, T_ice, f_ice, f_liq, k_eff, dt, cpliter, settings, ...
-         seb_res, n_iters, ok_seb, ok_ieb, ok_cpl);
+         seb_res, n_iters, ok_seb, ok_ieb, ok_cpl, res_hist);
    end
 
    % Assemble the diag record.
@@ -148,11 +150,12 @@ function [T_sfc, T_ice, f_ice, f_liq, k_eff, diag] = ...
    diag.cpl_iters = cpliter;
    diag.cpl_res = cpl_res;
    diag.seb_res = seb_res;
+   diag.cpl_res_hist = res_hist;
 end
 
 function dumpSkinEbSolveFailure(reason, Ts, Ts_diag, Ts_old, T, f_ice, ...
       f_liq, k_eff, dt, cpliter, settings, seb_res, n_iters, ok_seb, ...
-      ok_ieb, ok_cpl)
+      ok_ieb, ok_cpl, res_hist)
    %DUMPSKINEBSOLVEFAILURE Save coupled skin-model solver diagnostics.
 
    debug_file = getenv('ICEMODEL_DEBUG_SKINEBSOLVE_FILE');
@@ -191,6 +194,7 @@ function dumpSkinEbSolveFailure(reason, Ts, Ts_diag, Ts_old, T, f_ice, ...
    debug_state.ok_seb = ok_seb;
    debug_state.ok_ieb = ok_ieb;
    debug_state.ok_cpl = ok_cpl;
+   debug_state.res_hist = res_hist;
 
    save(debug_file, 'debug_state');
 end

@@ -426,6 +426,9 @@ function test_skinebsolve_converges_on_synthetic_column(testCase)
    testCase.verifyTrue(diag.ok_ieb);
    testCase.verifyTrue(diag.ok_cpl);
    testCase.verifyGreaterThan(diag.n_iters, 0);
+   testCase.verifyEqual(sum(isfinite(diag.cpl_res_hist)), ...
+      min(diag.cpl_iters, numel(diag.cpl_res_hist)));
+   testCase.verifyEqual(diag.cpl_res_hist(end), diag.cpl_res, 'AbsTol', 0);
    testCase.verifyTrue(isreal(Ts));
    testCase.verifyTrue(all(isfinite([Ts; T; k_eff])));
    testCase.verifyLessThanOrEqual(max(f_ice + f_liq * s.ro_liq / s.ro_ice), ...
@@ -767,6 +770,81 @@ function test_robin_coupler_supports_monin_obukhov_on_synthetic_column(testCase)
    testCase.verifyLessThan(abs(residual), 1.0);
 end
 
+function test_skin_debug_dump_keeps_coupling_residual_history(testCase)
+   % A coupling failure dump must contain the evaluated residual history.
+
+   s = testCase.TestData.skin;
+   % Negative tolerances force an outer-coupling failure after two evaluated
+   % residuals while leaving both inner solves unchanged.
+   settings = s.settings;
+   settings.debug = true;
+   settings.cpl_maxiter = 2;
+   settings.cpl_Ts_tol = -1;
+   settings.cpl_seb_tol = -1;
+   opts = s.opts;
+   opts.debug = true;
+   [diag, debug_state] = runSkinDebugFailure(testCase, s, settings, opts);
+
+   testCase.verifyEqual(debug_state.reason, "coupler_nonconvergence");
+   testCase.verifyEqual(debug_state.res_hist, diag.cpl_res_hist);
+end
+
+function test_skin_debug_dump_handles_column_failure(testCase)
+   % A column-solve failure occurs before any coupling residual is evaluated.
+
+   s = testCase.TestData.skin;
+   settings = s.settings;
+   settings.debug = true;
+   settings.maxiter = 1;
+   opts = s.opts;
+   opts.debug = true;
+   [diag, debug_state] = runSkinDebugFailure(testCase, s, settings, opts);
+
+   testCase.verifyEqual(debug_state.reason, "skinsolve_failed");
+   testCase.verifyEqual(debug_state.res_hist, diag.cpl_res_hist);
+   testCase.verifyTrue(all(isnan(debug_state.res_hist)));
+end
+
+function test_skin_debug_dump_handles_surface_failure(testCase)
+   % A surface-solve failure occurs before its residual can be recorded.
+
+   s = testCase.TestData.skin;
+   settings = s.settings;
+   settings.debug = true;
+   opts = s.opts;
+   opts.debug = true;
+   opts.seb_solver = -1;
+   [diag, debug_state] = runSkinDebugFailure(testCase, s, settings, opts);
+
+   testCase.verifyEqual(debug_state.reason, "sebsolve_failed");
+   testCase.verifyEqual(debug_state.res_hist, diag.cpl_res_hist);
+   testCase.verifyTrue(all(isnan(debug_state.res_hist)));
+end
+
+function [diag, debug_state] = runSkinDebugFailure(testCase, s, settings, opts)
+   %RUNSKINDEBUGFAILURE Run one skin-coupler failure with an isolated dump.
+
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   debug_file = fullfile(fixture.Folder, 'skin-debug.mat');
+   old_debug_file = getenv('ICEMODEL_DEBUG_SKINEBSOLVE_FILE');
+   cleanup = onCleanup(@() restoreSkinEbDebugEnv(old_debug_file));
+   setenv('ICEMODEL_DEBUG_SKINEBSOLVE_FILE', debug_file)
+
+   [~, ~, ~, ~, ~, diag] = ...
+      icemodel.couplers.solve_skin_surface_column( ...
+      s.Ts, s.T, s.f_ice, s.f_liq, s.dz, s.delz, s.fn, ...
+      s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, s.tppt, ...
+      s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, s.H_e, ...
+      s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...
+      s.snow_depth, settings, opts);
+
+   dump_listing = dir(fullfile(fixture.Folder, 'skin-debug_*.mat'));
+   testCase.assertNumElements(dump_listing, 1);
+   loaded = load(fullfile(fixture.Folder, dump_listing(1).name), 'debug_state');
+   debug_state = loaded.debug_state;
+end
+
 function restoreIceEbDebugEnv(old_debug_file, debug_file)
    %RESTOREICEEBDEBUGENV Restore the debug target and remove the test artifact.
    setenv('ICEMODEL_DEBUG_ICEEBSOLVE_FILE', old_debug_file)
@@ -780,6 +858,11 @@ function restoreIceEbDebugEnv(old_debug_file, debug_file)
    if exist(debug_file, 'file') == 2
       delete(debug_file)
    end
+end
+
+function restoreSkinEbDebugEnv(old_debug_file)
+   %RESTORESKINEBDEBUGENV Restore the debug target.
+   setenv('ICEMODEL_DEBUG_SKINEBSOLVE_FILE', old_debug_file)
 end
 
 function restoreProfiler(prior)

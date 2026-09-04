@@ -375,6 +375,7 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
       'IcemodelPerfTest.m'));
    meta.matlab_version = string(version);
    meta.host = string(computer);
+   meta.hostname = icemodel.test.helpers.machineHostname();
    meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
 
    % Attach the managed component benchmark baseline (measured once at

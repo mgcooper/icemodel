@@ -170,6 +170,7 @@ results = run_perf_suite( ...
     baseline="rolling", ...
     n_runs=1, ...
     isolation="process", ...
+    artifact_root="/absolute/path/to/perf-results", ...
     include_benchmarks=false);
 ```
 
@@ -194,6 +195,9 @@ Key options:
   - also run managed component benchmarks
 - `benchmark_sampling_profile`
   - sampling budget for those managed benchmarks
+- `artifact_root`
+  - parent directory for the run folder; the default is `test/artifacts`
+  - `results.artifact_file` contains one saved MAT-file path per selected model
 
 Important note:
 
@@ -211,8 +215,15 @@ Important note:
   run; if the anchor drifts more than 15 percent or its re-measurement is
   invalid, every verdict in the run is marked ambient-invalid
 - whole-model perf gating is skipped when the accepted perf baseline was built
-  under a different MATLAB version/platform or a different `isolation`
-  protocol than the current run; timings across protocols are not comparable
+  with a different hostname, MATLAB version, platform, or `isolation`
+  protocol; the hostname identifies the machine that supplied the timings
+- a missing or different hostname keeps the sample-validity result but sets
+  `passed_perf=false` and `results.passed=false`; validity-only output is not
+  performance acceptance
+- run on the recorded host, or qualify the intended host with A/A and then
+  explicitly accept a machine-local rolling baseline
+- immutable release baselines are not repaired in place; use the normal release
+  baseline workflow to create a new release baseline
 
 ### `run_test_bootstrap`
 

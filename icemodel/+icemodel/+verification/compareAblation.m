@@ -10,8 +10,10 @@ function [summary, aligned, diagnostics, policy] = compareAblation( ...
    %
    % OBSERVATIONS is a staged PROMICE timetable or a bundle whose data field is
    % that timetable. MODEL is a postprocessed diagnostic IceModel timetable or
-   % an equivalent data bundle. PROMICE ablation is geometric positive-down
-   % lowering [m]. The modeled primary is positive solid-ice loss
+   % an equivalent data bundle. It must contain every field returned by
+   % icemodel.namelists.budgetoutputs('all') and
+   % icemodel.namelists.cumulativeoutputs(). PROMICE ablation is geometric
+   % positive-down lowering [m]. The modeled primary is positive solid-ice loss
    % -(mass_budget_phase_solid_mwe + mass_budget_vapor_solid_mwe) [m w.e.], the
    % solid_balance term from
    % icemodel.verification.helpers.ablationLedgerIncrements. Remeshing is never
@@ -49,20 +51,13 @@ function [summary, aligned, diagnostics, policy] = compareAblation( ...
    % missing physical term cannot be mistaken for unavailable temporal support.
    requireVariables(obs_tt, policy.required_observation_fields, ...
       'icemodel:verification:compareAblation:missingObservationField');
-   % Require only the channels this comparison reads.
-   % required_model_fields is derived live from the output namelists, so
-   % requiring all of it rejects a cohort saved before any later channel was
-   % appended, over channels the comparison never touches. Compatibility, not
-   % equality (see icemodel.verification.helpers.validateAblationModelSchema,
-   % which applies the same rule to the report).
-   requireVariables(model_tt, ...
-      icemodel.verification.namelists.ablationReportChannels('ledger'), ...
+   % policy.required_model_fields is the complete schema used downstream.
+   % Require every field before comparison or diagnostic calculations begin.
+   requireVariables(model_tt, policy.required_model_fields, ...
       'icemodel:verification:compareAblation:missingModelField');
 
-   % The finiteness and sign checks below run over the channels this cohort
-   % carries. A channel it predates cannot be non-finite in it.
-   checked_fields = intersect(policy.required_model_fields, ...
-      string(model_tt.Properties.VariableNames), 'stable');
+   % The finiteness and sign checks below use every required model field.
+   checked_fields = policy.required_model_fields;
    obs_tt = normalizeTimetable(obs_tt, "observation");
    model_tt = normalizeTimetable(model_tt, "model");
 

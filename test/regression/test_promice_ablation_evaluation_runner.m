@@ -289,6 +289,26 @@ function test_a_stale_global_path_does_not_stop_an_explicit_root_run(testCase)
    clear cleaner restore
 end
 
+function test_reduced_model_is_not_completed(testCase)
+   % A model missing a required channel must remain unavailable.
+   results = run_promice_ablation_evaluation( ...
+      case_ids="kanm", years=2019, ...
+      evaluation_data_root=testCase.TestData.eval_root, ...
+      input_data_root=testCase.TestData.input_root, ...
+      artifact_root=testCase.TestData.artifact_root, ...
+      run_name="20260804-010209", ...
+      write_artifacts=true, model_provider=@reducedModelProvider);
+
+   kanm = results.summary.case_id == "kanm";
+   testCase.verifyEqual(results.summary.status(kanm), "unavailable")
+   testCase.verifyEqual(results.summary.error_identifier(kanm), ...
+      "icemodel:verification:compareAblation:missingModelField")
+
+   artifact = load(results.paths.results_mat, 'results');
+   testCase.verifyEqual( ...
+      string(artifact.results.site_year_results.status), "unavailable")
+end
+
 function test_future_display_interval_sentinel_is_rejected(testCase)
    % A provider row stamped at October 1 represents the forbidden interval.
    results = run_promice_ablation_evaluation( ...
@@ -729,6 +749,12 @@ function model = selectedModelProvider(manifest, row, run_start, run_end)
    model.runoff = 0.8 .* model.melt;
    model.freeze = 0.2 .* model.melt;
    model.dlayer = cumsum(solid_loss) .* ro_liq ./ ro_ice;
+end
+
+function model = reducedModelProvider(manifest, row, run_start, run_end)
+   %REDUCEDMODELPROVIDER Remove one required grid diagnostic.
+   model = selectedModelProvider(manifest, row, run_start, run_end);
+   model = removevars(model, "mass_budget_interior_merge_count");
 end
 
 function model = futureIntervalProvider(manifest, row, run_start, run_end)

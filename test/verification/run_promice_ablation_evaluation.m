@@ -387,11 +387,8 @@ function [result, nested, perturbations] = evaluateRow( ...
    % is the cohort's recorded schema. The report's schema gate compares it
    % against the channels the report reads and against the current namelist.
    keep_model = model.Time >= display_start & model.Time <= display_end;
-   % Save the channels this run produced, not every channel the namelist
-   % names. A reduced-profile run writes fewer, and the report's schema gate
-   % reads the saved list to say what the cohort supports.
-   saved_fields = intersect(policy.required_model_fields, ...
-      string(model.Properties.VariableNames), 'stable');
+   % Save the model schema recorded in the policy.
+   saved_fields = policy.required_model_fields;
    result.model = model(keep_model, cellstr(saved_fields));
    result.model_options = opts;
    result.model_metadata = boundary_metadata;
@@ -553,12 +550,12 @@ function [model, metadata] = appendBoundaryCheckpoint( ...
       model, boundary_time, provenance, source, policy)
    %APPENDBOUNDARYCHECKPOINT Add a state-only row at the display endpoint.
 
-   % This schema gate requires only the channels the comparison reads, and
-   % uses the same ablationReportChannels('ledger') list that
-   % icemodel.verification.compareAblation requires, so the two agree.
-   % Requiring every channel the namelist names would reject a table the
-   % comparator accepts.
-   required = icemodel.verification.namelists.ablationReportChannels('ledger');
+   % Require the ledger channels used by the comparison and the storage
+   % channels needed to add the boundary row.
+   required = unique([ ...
+      icemodel.verification.namelists.ablationReportChannels('ledger'), ...
+      string(icemodel.namelists.budgetoutputs('first')), ...
+      string(icemodel.namelists.budgetoutputs('last'))], 'stable');
    missing = setdiff(required, string(model.Properties.VariableNames), 'stable');
    if ~isempty(missing)
       error('icemodel:verification:promiceAblationEvaluation:modelSchema', ...
@@ -588,11 +585,13 @@ function [model, metadata] = appendBoundaryCheckpoint( ...
          policy.model_output_cadence_seconds)
    end
 
-   % Clone one schema-compatible context row, zero every interval ledger, and
-   % carry only the preceding endpoint storage into the synthetic checkpoint.
+   % Clone one schema-compatible context row, zero every saved interval ledger,
+   % and carry only the preceding endpoint storage into the synthetic checkpoint.
    boundary = model(end, :);
    boundary.Properties.RowTimes = boundary_time;
-   for name = string(icemodel.namelists.budgetoutputs('sum'))
+   sum_fields = intersect(string(icemodel.namelists.budgetoutputs('sum')), ...
+      string(model.Properties.VariableNames), 'stable');
+   for name = sum_fields
       boundary.(name) = 0;
    end
    boundary.mass_budget_solid_start_mwe = ...

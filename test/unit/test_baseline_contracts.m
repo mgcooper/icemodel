@@ -671,10 +671,14 @@ function test_performance_verdict_fails_closed_when_compatible(testCase)
       true, 10, baseline, 1, true, 0.2, "");
    testCase.verifyFalse(passed);
    testCase.verifySubstring(reason, "finite and positive");
+end
+
+function test_incompatible_performance_verdict_is_not_acceptance(testCase)
+   % Valid samples do not pass when baseline timings are not comparable.
    [passed, ~, ~, ~, reason] = ...
       icemodel.test.helpers.formalPerformanceVerdict( ...
       true, 10, table(), [], false, 0.2, "metadata incompatible");
-   testCase.verifyTrue(passed);
+   testCase.verifyFalse(passed);
    testCase.verifyEqual(reason, "metadata incompatible");
 end
 

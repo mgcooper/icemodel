@@ -76,11 +76,10 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %                  refreezing diagnostics.
    %     'standard'   the default. Adds the surface energy-balance terms and
    %                  the convergence counters.
-   %     'diagnostic' adds the turbulent-flux internals, and for icemodel the
-   %                  per-forcing-step mass and energy ledger. The closure
-   %                  identities are evaluated from that ledger, which only
-   %                  this profile builds, so a standard run does not build
-   %                  or write it.
+   %     'diagnostic' adds the turbulent-flux internals. For full-column
+   %                  icemodel, it also writes the per-forcing-step mass and
+   %                  energy ledger. Full-column icemodel accumulates the raw
+   %                  budget terms for every profile.
    %
    %  The channel lists live in icemodel.namelists.surfaceoutputs and
    %  icemodel.namelists.budgetoutputs; icemodel.configureRun assembles the

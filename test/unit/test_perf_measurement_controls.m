@@ -135,6 +135,24 @@ function test_process_branch_measures_through_a_fresh_subprocess(testCase)
       'isolated_%s_attempt1_result.mat', c.case_id)), 'file'), 2);
 end
 
+function test_is_test_run_is_false_at_batch_entry(testCase)
+   % A fresh MATLAB batch process starts outside the test framework.
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   result_file = fullfile(fixture.Folder, 'is_test_run.mat');
+   source_path = fullfile(fileparts(fileparts(fileparts( ...
+      mfilename('fullpath')))), 'icemodel');
+   matlab_bin = fullfile(matlabroot, 'bin', 'matlab');
+   cmd = sprintf(['"%s" -nodisplay -nosplash -batch ' ...
+      '"addpath(''%s''); tf = icemodel.internal.isTestRun(); ' ...
+      'save(''%s'', ''tf'')"'], matlab_bin, source_path, result_file);
+   [status, out] = system(cmd);
+   testCase.assertEqual(status, 0, out);
+   testCase.assertEqual(exist(result_file, 'file'), 2);
+   returned = load(result_file, 'tf');
+   testCase.verifyFalse(returned.tf);
+end
+
 function test_session_branch_measures_in_this_session(testCase)
    % The session branch measures in this MATLAB session after
    % clear-functions hygiene and returns the same result shape as the
@@ -277,8 +295,10 @@ end
 
 function test_matching_protocol_and_environment_are_compatible(testCase)
    % A baseline from this environment and protocol supports a timing gate.
+   hostname = icemodel.test.helpers.machineHostname();
    meta = struct('matlab_version', string(version), ...
-      'host', string(computer), 'isolation', "process");
+      'host', string(computer), 'hostname', hostname, ...
+      'isolation', "process");
    [returned, reason] = ...
       icemodel.test.helpers.perfBaselineCompatibility(meta, "process");
    testCase.verifyTrue(returned);
@@ -287,8 +307,10 @@ end
 
 function test_isolation_mismatch_is_incompatible(testCase)
    % Cross-protocol timings are not comparable, whatever the environment.
+   hostname = icemodel.test.helpers.machineHostname();
    meta = struct('matlab_version', string(version), ...
-      'host', string(computer), 'isolation', "session");
+      'host', string(computer), 'hostname', hostname, ...
+      'isolation', "session");
    [returned, reason] = ...
       icemodel.test.helpers.perfBaselineCompatibility(meta, "process");
    testCase.verifyFalse(returned);
@@ -298,14 +320,57 @@ end
 function test_a_baseline_without_the_isolation_field_is_session(testCase)
    % A baseline saved before the isolation field exists counts as
    % session-protocol: incompatible with process, compatible with session.
+   hostname = icemodel.test.helpers.machineHostname();
    meta = struct('matlab_version', string(version), ...
-      'host', string(computer));
+      'host', string(computer), 'hostname', hostname);
    returned = ...
       icemodel.test.helpers.perfBaselineCompatibility(meta, "process");
    testCase.verifyFalse(returned);
    returned = ...
       icemodel.test.helpers.perfBaselineCompatibility(meta, "session");
    testCase.verifyTrue(returned);
+end
+
+function test_a_baseline_without_hostname_is_incompatible(testCase)
+   % Platform architecture alone does not identify the measured machine.
+   meta = struct('matlab_version', string(version), ...
+      'host', string(computer), 'isolation', "process");
+   [returned, reason] = ...
+      icemodel.test.helpers.perfBaselineCompatibility(meta, "process");
+   testCase.verifyFalse(returned);
+   testCase.verifySubstring(reason, "metadata");
+end
+
+function test_a_baseline_from_another_machine_is_incompatible(testCase)
+   % Timings from two machines are not comparable on the same architecture.
+   meta = struct('matlab_version', string(version), ...
+      'host', string(computer), 'hostname', "different-machine", ...
+      'isolation', "process");
+   [returned, reason] = ...
+      icemodel.test.helpers.perfBaselineCompatibility(meta, "process");
+   testCase.verifyFalse(returned);
+   testCase.verifySubstring(reason, "different-machine");
+end
+
+function test_machine_hostname_trims_command_output(testCase)
+   % The saved identity excludes whitespace from the hostname command.
+   returned = icemodel.test.helpers.machineHostname( ...
+      @() deal(0, sprintf('  test-machine  \n')));
+   testCase.verifyEqual(returned, "test-machine");
+end
+
+function test_machine_hostname_rejects_blank_output(testCase)
+   % A successful command with no machine name cannot identify the host.
+   testCase.verifyError(@() icemodel.test.helpers.machineHostname( ...
+      @() deal(0, "   ")), ...
+      'icemodel:test:perf:machineIdentityUnavailable');
+end
+
+function test_machine_hostname_rejects_command_failure(testCase)
+   % Command failure cannot produce a trusted machine identity.
+   testCase.verifyError(@() icemodel.test.helpers.machineHostname( ...
+      @() deal(1, "test-machine")), ...
+      'icemodel:test:perf:machineIdentityUnavailable');
 end
 
 function test_missing_environment_metadata_is_incompatible(testCase)

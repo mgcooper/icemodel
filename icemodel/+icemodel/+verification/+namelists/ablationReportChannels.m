@@ -1,17 +1,17 @@
 function fields = ablationReportChannels(kind)
-   %ABLATIONREPORTCHANNELS Model channels the ablation report reads.
+   %ABLATIONREPORTCHANNELS Model channels read by the ablation report.
    %
    %  fields = icemodel.verification.namelists.ablationReportChannels()
    %  fields = icemodel.verification.namelists.ablationReportChannels(kind)
    %
-   % KIND is 'all', 'components', 'grid', or 'ledger'. These are the model
-   % diagnostic channels that
-   % icemodel.verification.report.buildAblationEvaluationReport reads out of a
-   % saved cohort's per-site model timetable. They are grouped by the report
-   % table that reads them. The channel-schema gate compares the 'all' list
-   % against the schema a cohort recorded, and against the current namelists.
-   % This list is therefore the one place that decides which channels a cohort
-   % must carry.
+   % KIND is 'all', 'components', 'grid', or 'ledger'. These channels are the
+   % subset of model diagnostics read by
+   % icemodel.verification.report.buildAblationEvaluationReport. They are
+   % grouped by the report table that reads them.
+   %
+   % policy.required_model_fields defines the full cohort run schema from
+   % icemodel.namelists.budgetoutputs('all') and
+   % icemodel.namelists.cumulativeoutputs().
    %
    % It is not the only place the names appear. componentTable and
    % gridTranslationRows also read the same columns by name. Renaming a
@@ -41,9 +41,9 @@ function fields = ablationReportChannels(kind)
       "mass_budget_interior_merge_count"];
 
    % icemodel.verification.helpers.ablationLedgerIncrements reads these to
-   % form the per-interval ablation terms. icemodel.verification.compareAblation
-   % cannot run without them, so they gate a cohort's data. Every other
-   % channel in the diagnostic namelists is detail the comparison never reads.
+   % calculate the ablation terms for each interval. compareAblation requires
+   % every budget and cumulative output in policy.required_model_fields before
+   % it compares the data.
    %
    % Keep these out of 'all'. 'all' is the report's schema gate, and adding a
    % channel to it makes every cohort that lacks it invalid for report

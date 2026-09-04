@@ -455,13 +455,17 @@ function test_required_observation_field_has_stable_error(testCase)
 end
 
 function test_required_model_field_has_stable_error(testCase)
-   % Omitting one closure term must prevent physical comparability claims.
-   [observations, model] = makeInputs();
-   model.data = removevars(model.data, 'mass_budget_vapor_solid_mwe');
+   % Omitting a ledger or cumulative term must use the schema error.
+   for field = ["mass_budget_vapor_solid_mwe", ...
+         "mass_budget_phase_liquid_mwe", ...
+         "mass_budget_top_deletion_count", "runoff"]
+      [observations, model] = makeInputs();
+      model.data = removevars(model.data, field);
 
-   testCase.verifyError(@() icemodel.verification.compareAblation( ...
-      observations, model), ...
-      'icemodel:verification:compareAblation:missingModelField');
+      testCase.verifyError(@() icemodel.verification.compareAblation( ...
+         observations, model), ...
+         'icemodel:verification:compareAblation:missingModelField');
+   end
 end
 
 function test_an_extra_unknown_channel_still_compares(testCase)

@@ -4,6 +4,19 @@ function tests = test_suite_reports
    tests = functiontests(localfunctions);
 end
 
+function setup(testCase)
+   % Save the activity record and start each test with a clean session.
+   testCase.TestData.prior_activity = ...
+      getenv('ICEMODEL_TEST_SESSION_ACTIVITY');
+   setenv('ICEMODEL_TEST_SESSION_ACTIVITY', '');
+end
+
+function teardown(testCase)
+   % Restore the caller's activity record after each test.
+   setenv('ICEMODEL_TEST_SESSION_ACTIVITY', ...
+      testCase.TestData.prior_activity);
+end
+
 function test_regression_report_writes_plots_table_and_qmd(testCase)
    % A numerical report must expose physical and iteration changes visually.
 
@@ -202,6 +215,36 @@ function test_perf_entrypoints_disable_default_profiling(testCase)
    verifySubstring(testCase, builder, ...
       "include_profile_artifacts=true requires one concrete smbmodel")
    verifySubstring(testCase, runner, "profile off")
+end
+
+function test_run_perf_suite_writes_machine_metadata(testCase)
+   % The comparison artifact records the machine that ran the model.
+   artifact_root = fullfile(temporaryFolder(testCase), 'artifacts');
+
+   results = run_perf_suite(tier="smoke", smbmodel="icemodel", ...
+      solver=2, smoke_sites="kanm", n_runs=1, isolation="session", ...
+      include_benchmarks=false, build_report=false, ...
+      artifact_root=artifact_root);
+
+   artifact_file = results.artifact_file;
+   verifyTrue(testCase, startsWith(artifact_file, artifact_root))
+   saved = load(artifact_file, 'meta');
+   verifyEqual(testCase, saved.meta.hostname, ...
+      icemodel.test.helpers.machineHostname())
+   verifyEqual(testCase, results.meta.hostname, saved.meta.hostname)
+end
+
+function test_build_perf_baseline_writes_machine_metadata(testCase)
+   % A temporary baseline records the machine that supplied its timings.
+   output_file = fullfile(temporaryFolder(testCase), 'perf_baseline.mat');
+
+   build_perf_baseline(tier="smoke", smbmodel="icemodel", solver=2, ...
+      smoke_sites="kanm", n_runs=1, isolation="session", ...
+      include_benchmarks=false, output_file=output_file);
+
+   saved = load(output_file, 'meta');
+   verifyEqual(testCase, saved.meta.hostname, ...
+      icemodel.test.helpers.machineHostname())
 end
 
 function test_regression_entrypoint_resolves_one_batch_run_name(testCase)

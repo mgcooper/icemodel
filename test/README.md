@@ -10,7 +10,7 @@ Operator-facing usage notes for the public runners and study tools live in:
 ## Layout
 
 1. `artifacts/`
-   - compare-run outputs grouped by batch run under
+   - compare-run outputs grouped by batch run under the default location
      `test/artifacts/<yyyymmdd-HHMMSS>/`
 2. `baselines/`
    - mutable rolling baselines and frozen release baselines for perf and
@@ -151,7 +151,9 @@ Programmatic regression helpers:
    - A rolling file that predates `promice_filled` stops with
      `rollingBaselineForcingAcceptanceRequired`; accept the authorized rolling
      baseline before using it for comparison.
-   - Writes artifacts under `test/artifacts/<yyyymmdd-HHMMSS>/`.
+   - By default, writes artifacts under `test/artifacts/<yyyymmdd-HHMMSS>/`.
+     For `run_perf_suite`, set `artifact_root` to an absolute directory outside
+     the worktree to write the run folder there.
    - Renders a self-contained Quarto HTML report with plots and a compact CSV
      in the same directory; use `build_report=false` only for an artifact-only
      diagnostic run.
