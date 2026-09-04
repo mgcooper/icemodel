@@ -63,7 +63,7 @@ function varargout = parameterLookup(varargin)
       ... ----------------------------------------------------------------
       ... Coupler recovery parameters
       ... ----------------------------------------------------------------
-      'cpl_recovery_alpha', 0.2, ... Conservative Robin retry relaxation cap [1]
+      'cpl_recovery_alpha', 0.2, ... Solver-wide recovery-mode relaxation cap [1]
       ...
       ... ----------------------------------------------------------------
       ... PROMICE albedo winter-fill policy (defined once here: the native

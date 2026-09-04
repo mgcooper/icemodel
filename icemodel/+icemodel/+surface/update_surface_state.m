@@ -67,7 +67,7 @@ function [liqflag, ro_sfc, hv_atm, H_e, f_res_por] = ...
       hv_atm = ro_atm * Ls;
    end
 
-   % Latent heat transport coefficient [W m-2 K-1]
+   % Latent heat transport coefficient [W m-2 Pa-1]
    H_e = hv_atm * De_e;
 
    % Residual pore-water fraction [-]

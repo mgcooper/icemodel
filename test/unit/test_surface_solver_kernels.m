@@ -735,6 +735,44 @@ function test_robin_debug_dump_handles_inner_failure(testCase)
    testCase.verifyEqual(size(loaded.debug_state.res_hist), [16 1]);
 end
 
+function test_dirichlet_debug_dump_keeps_coupling_residual_history(testCase)
+   % A coupling failure dump must contain each evaluated residual.
+
+   s = testCase.TestData.ice;
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   debug_file = fullfile(fixture.Folder, 'ice-debug.mat');
+   old_debug_file = getenv('ICEMODEL_DEBUG_ICEEBSOLVE_FILE');
+   cleanup = onCleanup(@() restoreIceEbDebugEnv( ...
+      old_debug_file, debug_file));
+   setenv('ICEMODEL_DEBUG_ICEEBSOLVE_FILE', debug_file)
+
+   % Negative tolerances force failure after two evaluated residuals.
+   settings = s.settings;
+   settings.solver = 1;
+   settings.debug = true;
+   settings.cpl_maxiter = 2;
+   settings.cpl_Ts_tol = -1;
+   settings.cpl_seb_tol = -1;
+   opts = s.opts;
+   opts.debug = true;
+   [~, ~, ~, ~, ~, ~, ~, diag] = ...
+      icemodel.couplers.solve_surface_column_dirichlet( ...
+      s.Ts, s.T, s.f_ice, s.f_liq, s.Sc, s.Sp, s.dz, s.delz, s.fn, ...
+      s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, ...
+      s.tppt, s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, ...
+      s.H_e, s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...
+      s.snow_depth, s.opts.f_res_pore_ice, settings, opts);
+
+   dump_listing = dir(fullfile(fixture.Folder, 'ice-debug_dirichlet_*.mat'));
+   testCase.assertNumElements(dump_listing, 1);
+   loaded = load(fullfile(fixture.Folder, dump_listing(1).name), ...
+      'debug_state');
+   testCase.verifyEqual(loaded.debug_state.reason, "coupler_nonconvergence");
+   testCase.verifyEqual(loaded.debug_state.res_hist, diag.cpl_res_hist);
+   testCase.verifyEqual(sum(isfinite(diag.cpl_res_hist)), 2);
+end
+
 function test_robin_coupler_supports_monin_obukhov_on_synthetic_column(testCase)
    % The Robin coupler should accept the bulk-MO scheme and converge on the
    % synthetic ice state used by the shared solver tests.
