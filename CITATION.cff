@@ -18,6 +18,9 @@ identifiers:
   - description: "The concept DOI representing all versions of IceModel"
     type: doi
     value: 10.5281/zenodo.11539329
+  - description: "The version DOI for IceModel v1.2"
+    type: doi
+    value: 10.5281/zenodo.22581761
 repository-code: 'https://github.com/mgcooper/icemodel'
 abstract: >-
   A 1-d radiative-thermodynamic heat transfer model of
