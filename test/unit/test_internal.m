@@ -148,10 +148,12 @@ end
 function test_version(testCase)
    %TEST_VERSION Verify the CFF-backed default and process-local override.
    cleanup = onCleanup(@() icemodel.internal.version('reset'));
+   expected = icemodel.internal.readCffVersion( ...
+      icemodel.internal.fullpath('CITATION.cff'));
 
    % A reset must resolve the persisted version instead of a hard-coded value.
    version = icemodel.internal.version('reset');
-   testCase.verifyEqual(version, '1.1');
+   testCase.verifyEqual(version, expected);
    testCase.verifyTrue(ischar(version));
 
    % A character-row override must remain active until the next reset.
@@ -160,7 +162,7 @@ function test_version(testCase)
    testCase.verifyEqual(icemodel.internal.version(), '9.8.7-test');
 
    % Reset must discard the override and reread the citation source.
-   testCase.verifyEqual(icemodel.internal.version('reset'), '1.1');
+   testCase.verifyEqual(icemodel.internal.version('reset'), expected);
 end
 
 function test_version_failedResetClearsOverride(testCase)
@@ -364,6 +366,59 @@ function test_releaseMetadata_prepare(testCase)
       preflight=@successfulPreflight, validator=@rejectValidation), ...
       'test:releaseMetadata:validationRejected');
    testCase.verifyEqual(fileread(cffpath), before);
+
+   % Preparing the next version removes only the prior generated version DOI.
+   finalized = copyCffFixture(testCase, "1.1");
+   unrelated_doi = "10.1234/example.5678";
+   finalized_text = strrep(fileread(finalized), ...
+      'repository-code:', sprintf([ ...
+      '  - description: "Related dataset"\n' ...
+      '    type: doi\n' ...
+      '    value: %s\n' ...
+      'repository-code:'], unrelated_doi));
+   writeText(finalized, finalized_text);
+   icemodel.internal.releaseMetadata("finalize", version="1.1", ...
+      version_doi="10.5281/zenodo.99999999", cff_file=finalized, ...
+      fetcher=@successfulReleaseFetcher, validator=@validateTestCff);
+   finalized_text = fileread(finalized);
+   version_entry = regexp(finalized_text, ...
+      ['(?ms)^  - description: "The version DOI for IceModel v1\.1"\r?\n' ...
+      '    type: doi\r?\n    value: 10\.5281/zenodo\.99999999\r?\n'], ...
+      'match', 'once');
+   testCase.assertNotEmpty(version_entry);
+   icemodel.internal.releaseMetadata("prepare", version="1.2", ...
+      date_released="2026-09-04", cff_file=finalized, ...
+      preflight=@successfulPreflight, validator=@validateTestCff);
+   prepared_text = fileread(finalized);
+   testCase.verifyFalse(contains(prepared_text, ...
+      "The version DOI for IceModel v1.1"));
+   testCase.verifyFalse(contains(prepared_text, ...
+      "10.5281/zenodo.99999999"));
+   testCase.verifySubstring(prepared_text, ...
+      "10.5281/zenodo.11539329");
+   testCase.verifySubstring(prepared_text, unrelated_doi);
+
+   % Malformed and duplicate generated entries must block every CFF change.
+   malformed = copyCffFixture(testCase);
+   malformed_entry = strrep(version_entry, ...
+      '    type: doi', '    type: url');
+   malformed_text = strrep(finalized_text, version_entry, malformed_entry);
+   writeText(malformed, malformed_text);
+   testCase.verifyError(@() icemodel.internal.releaseMetadata("prepare", ...
+      version="1.2", date_released="2026-09-04", cff_file=malformed, ...
+      preflight=@successfulPreflight, validator=@validateTestCff), ...
+      'icemodel:internal:releaseMetadata:identifiersMalformed');
+   testCase.verifyEqual(fileread(malformed), malformed_text);
+
+   duplicate = copyCffFixture(testCase);
+   duplicate_text = strrep(finalized_text, 'repository-code:', ...
+      [version_entry 'repository-code:']);
+   writeText(duplicate, duplicate_text);
+   testCase.verifyError(@() icemodel.internal.releaseMetadata("prepare", ...
+      version="1.2", date_released="2026-09-04", cff_file=duplicate, ...
+      preflight=@successfulPreflight, validator=@validateTestCff), ...
+      'icemodel:internal:releaseMetadata:identifiersMalformed');
+   testCase.verifyEqual(fileread(duplicate), duplicate_text);
 end
 
 function test_releaseMetadata_defaultPreflight(testCase)
@@ -566,7 +621,7 @@ function test_releaseMetadata_finalize(testCase)
    % sequence item and remains parseable.
    eof_cff = string(tempname) + ".cff";
    eof_cleanup = onCleanup(@() delete(eof_cff));
-   canonical = fileread(icemodel.internal.fullpath("CITATION.cff"));
+   canonical = fileread(copyCffFixture(testCase));
    identifier_block = regexp(canonical, ...
       '(?ms)^identifiers:.*?(?=^repository-code:)', 'match', 'once');
    without_identifiers = regexprep(canonical, ...
@@ -662,8 +717,13 @@ function test_releaseMetadata_rejectsInvalidInput(testCase)
    end
 end
 
-function cffpath = copyCffFixture(testCase)
+function cffpath = copyCffFixture(testCase, version)
    %COPYCFFFIXTURE Copy the repository CFF into one disposable test file.
+
+   arguments
+      testCase
+      version (1, 1) string = "1.1"
+   end
 
    % Let the test framework remove the shell-sensitive path even after a
    % verification failure.
@@ -671,6 +731,11 @@ function cffpath = copyCffFixture(testCase)
    copied = copyfile(icemodel.internal.fullpath("CITATION.cff"), cffpath);
    assert(copied == 1)
    testCase.addTeardown(@delete, cffpath);
+
+   % Every caller wants a known version, so always rewrite the version line.
+   text = regexprep(fileread(cffpath), ...
+      '(?m)^version\s*:\s*[^\r\n]+$', "version: " + version, 'once');
+   writeText(cffpath, text);
 end
 
 function ok = successfulPreflight(~, ~)

@@ -395,20 +395,21 @@ changes select a visible rewrite, and missing legacy facts remain
 unknown-compatible. This check reads only the already-staged MAT target during
 non-dry observation staging; dry runs do not gain artifact or raw-source reads.
 
-### v1.1 release-data tooling
+### Release-data tooling
 
-`test/assets/icemodel-v1.1-data-manifest.json` defines the required
+`test/assets/icemodel-<version>-data-manifest.json` defines the required
 `formal-core` and `verification-showcase` capabilities and the optional
 `forcing-integration` capability. `fixtureFileList` selects manifest
-rows; `packFixtures` writes one archive per selected capability; and
+rows. `packFixtures` writes one archive per selected capability, and
 `fetchFixtures` verifies or transactionally installs selected archives.
 
-Calling `fetchFixtures("v1.1")` explicitly provisions the mandatory capabilities
-and downloads missing release archives. Callers that only verify canonical data
-must pass `download=false`; local manifest/archive overrides preserve offline
-operation. Missing mandatory data in network-free verification reports the exact
-MATLAB provisioning command. See `README_FIXTURES.md` for the trust-boundary
-contract.
+Calling `fetchFixtures()` uses the version in `CITATION.cff`, provisions the
+mandatory capabilities, and downloads missing release archives. Pass an
+explicit version such as `"v1.1"` to reproduce an earlier release. Callers that
+only verify installed data must pass `download=false`. Local manifest and
+archive paths support offline operation. Verification without network access
+reports the exact MATLAB provisioning command when required data are missing.
+See `README_FIXTURES.md` for the archive and installation checks.
 
 ### Source-cache layout
 
