@@ -12,6 +12,7 @@ function results = run_regression_suite(kwargs)
    %     full_sites=["kanm"; "kanl"])
    %  results = run_regression_suite(tier="full", baseline="v1.1")
    %  results = run_regression_suite(data_root="/path/to/test/data")
+   %  results = run_regression_suite(fixture_root="/path/to/provisioned/data")
    %
    % Use this for normal regression comparisons against an existing rolling or
    % release baseline.
@@ -22,6 +23,10 @@ function results = run_regression_suite(kwargs)
    %
    % The optional solver filter accepts any subset of [1 2 3].
    % DATA_ROOT overrides the default test case for isolated fixture comparisons.
+   % FIXTURE_ROOT selects where a release's required fixture capabilities are
+   % verified. A release that runs the model from its own provisioned data
+   % (v1.2 onward) rejects a DATA_ROOT that names a different tree with
+   % icemodel:test:releaseDataRootMismatch.
    %
    % SMOKE_SITES and FULL_SITES are advanced overrides for the site lists
    % used by each formal tier. Most callers should leave them at the
@@ -63,6 +68,11 @@ function results = run_regression_suite(kwargs)
 
       kwargs.data_root (1, 1) string ...
          = ""
+
+      % See the FIXTURE_ROOT paragraph above for the same-root rule that a
+      % release with use_fixture_root_for_model enforces.
+      kwargs.fixture_root (1, 1) string ...
+         = ""
    end
 
    % Record this suite in the session activity so a later
@@ -84,33 +94,38 @@ function results = run_regression_suite(kwargs)
    baseline_policy = ...
       icemodel.test.helpers.formalBaselinePolicy(baseline);
 
+   [data_root, fixture_root] = ...
+      icemodel.test.helpers.resolveReleaseDataRoots( ...
+      baseline_policy, kwargs.data_root, kwargs.fixture_root);
+
    % Bootstrap the source/test trees once for CLI and interactive runs.
    % Keep the cleanup handle in scope so the caller's config is restored
    % when this entrypoint returns.
    [~, input_path, ~, ~, suite_cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment( ...
       icemodel_config_casename=baseline_policy.config_case, ...
-      data_root=kwargs.data_root); %#ok<ASGLU>
+      data_root=data_root);
 
    % Propagate the configured verification root through the TestCase selector.
    % A caller-supplied root keeps precedence over the resolved default.
-   data_root = kwargs.data_root;
    if isblanktext(data_root)
       data_root = string(fileparts(input_path));
    end
 
-   % Verify registered frozen-release capabilities without downloading before
-   % dispatch. A missing fixture, or a fixture whose hash changed, then fails
-   % with one repair command.
+   % Verify release assets separately from the formal model input tree.
    if ~isempty(baseline_policy.required_fixture_capabilities)
       icemodel.verification.setup.fetchFixtures( ...
          baseline_policy.baseline_tag, ...
          capabilities=baseline_policy.required_fixture_capabilities, ...
-         root=data_root, download=false);
+         root=fixture_root, download=false);
    end
 
    % Expand the requested formal model selector once at the entrypoint.
    models = icemodel.test.helpers.resolveRequestedSmbmodels(smbmodel);
+   if baseline_policy.require_source_revision
+      icemodel.test.helpers.assertCommonBaselineRevision( ...
+         "regression", baseline, models, simyear);
+   end
 
    % Resolve one run directory before dispatching models so aggregate artifacts
    % and their report always share the same review surface.
@@ -142,6 +157,11 @@ function results = run_regression_suite(kwargs)
          icemodel.verification.report.buildTestSuiteReport( ...
          "regression", results);
    end
+
+   % Restore the caller's config last, after every path-dependent step has
+   % run against the configured test environment. An early error still
+   % restores it, because the object dies with the scope.
+   delete(suite_cleanup)
 end
 
 function results = runSingleModelRegression(runner, suite, tier, smbmodel, ...

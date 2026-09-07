@@ -55,7 +55,7 @@ function results = run_test_bootstrap(kwargs)
    arguments (Input)
 
       kwargs.baseline_tag (1, :) string ...
-         = "v1.1"
+         = "v" + string(icemodel.internal.version())
 
       kwargs.smbmodel (1, :) string ...
          {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} ...
@@ -161,7 +161,7 @@ function out = runStep(c, baseline_tag, smbmodel, solver, simyear, ...
             case "snapshot"
                % Preserve frozen releases whose registered forcing differs
                % from the newly accepted rolling product.
-               out = resolveBootstrapRelease( ...
+               out = icemodel.test.helpers.resolveBootstrapRelease( ...
                   "regression", baseline_tag, smbmodel, simyear);
 
             case "run"
@@ -189,7 +189,7 @@ function out = runStep(c, baseline_tag, smbmodel, solver, simyear, ...
             case "snapshot"
                % Preserve frozen releases whose registered forcing differs
                % from the newly accepted rolling product.
-               out = resolveBootstrapRelease( ...
+               out = icemodel.test.helpers.resolveBootstrapRelease( ...
                   "perf", baseline_tag, smbmodel, simyear);
 
             case "run"
@@ -239,32 +239,6 @@ function baseline = resolveBaseline(baseline_mode, baseline_tag)
       baseline = "rolling";
    else
       baseline = baseline_tag;
-   end
-end
-
-function baseline = resolveBootstrapRelease( ...
-      kind, baseline_tag, smbmodel, simyear)
-   %RESOLVEBOOTSTRAPRELEASE Preserve or create one registered release baseline.
-
-   policy = icemodel.test.helpers.formalBaselinePolicy(baseline_tag);
-   if policy.snapshot_from_rolling
-      switch kind
-         case "regression"
-            baseline = snapshot_regression_baseline( ...
-               baseline_tag=baseline_tag, smbmodel=smbmodel);
-         case "perf"
-            baseline = snapshot_perf_baseline( ...
-               baseline_tag=baseline_tag, smbmodel=smbmodel, ...
-               simyear=simyear);
-      end
-      return
-   end
-
-   baseline = icemodel.test.helpers.loadBaseline(kind, ...
-      smbmodel=smbmodel, baseline_tag=baseline_tag, simyear=simyear);
-   if isempty(baseline)
-      error('icemodel:test:preservedReleaseMissing', ...
-         'Registered immutable %s release %s is missing.', kind, baseline_tag)
    end
 end
 

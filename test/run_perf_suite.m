@@ -12,6 +12,7 @@ function results = run_perf_suite(kwargs)
    %     full_sites=["kanm"; "kanl"])
    %  results = run_perf_suite(tier="full", baseline="v1.1")
    %  results = run_perf_suite(data_root="/path/to/test/data")
+   %  results = run_perf_suite(fixture_root="/path/to/provisioned/data")
    %  results = run_perf_suite(artifact_root="/path/to/artifacts")
    %
    % Use this for normal performance comparisons against an existing rolling or
@@ -41,8 +42,8 @@ function results = run_perf_suite(kwargs)
    % contaminate formal timings. Both modes randomize the
    % case order (the seed is recorded in the artifact) and gate each
    % case's samples on a dispersion check: an invalid sample set is
-   % re-measured once, then fails as "measurement invalid" rather than
-   % producing a phantom verdict.
+   % re-measured once, then fails as "measurement invalid" instead of
+   % producing an incorrect verdict.
    %
    % SMOKE_SITES and FULL_SITES are advanced overrides for the site lists
    % used by each formal tier. Most callers should leave them at the
@@ -105,6 +106,13 @@ function results = run_perf_suite(kwargs)
       kwargs.data_root (1, 1) string ...
          = ""
 
+      % FIXTURE_ROOT selects where a release's required fixture capabilities
+      % are verified. A release that runs the model from its own provisioned
+      % data (v1.2 onward) rejects a DATA_ROOT that names a different tree
+      % with icemodel:test:releaseDataRootMismatch.
+      kwargs.fixture_root (1, 1) string ...
+         = ""
+
       % Process isolation is the default because it is the only protocol
       % that supports a formal accept/reject verdict. Session mode is
       % opt-in for quick diagnostics.
@@ -134,6 +142,10 @@ function results = run_perf_suite(kwargs)
    baseline_policy = ...
       icemodel.test.helpers.formalBaselinePolicy(baseline_selector);
 
+   [data_root, fixture_root] = ...
+      icemodel.test.helpers.resolveReleaseDataRoots( ...
+      baseline_policy, kwargs.data_root, kwargs.fixture_root);
+
    [run_date, run_id, run_name] = ...
       icemodel.test.helpers.resolveRunStamp(run_name);
 
@@ -143,23 +155,20 @@ function results = run_perf_suite(kwargs)
    [~, input_path, output_path, ~, suite_cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment( ...
       icemodel_config_casename=baseline_policy.config_case, ...
-      data_root=kwargs.data_root);
+      data_root=data_root);
 
    % Carry the configured root through the unittest class's nested setup. A
    % caller-supplied root keeps precedence over the resolved verification root.
-   data_root = kwargs.data_root;
    if isblanktext(data_root)
       data_root = string(fileparts(input_path));
    end
 
-
-   % Verify registered frozen-release capabilities without downloading before
-   % dispatch so missing or hash-drifted fixtures fail with one repair command.
+   % Verify release assets separately from the formal model input tree.
    if ~isempty(baseline_policy.required_fixture_capabilities)
       icemodel.verification.setup.fetchFixtures( ...
          baseline_policy.baseline_tag, ...
          capabilities=baseline_policy.required_fixture_capabilities, ...
-         root=data_root, download=false);
+         root=fixture_root, download=false);
    end
    % Hold the env restore for the rest of this function; cleared at the end.
    data_root_cleanup = configurePerfDataRootEnv(data_root);
@@ -178,6 +187,10 @@ function results = run_perf_suite(kwargs)
 
    % Expand the requested formal model selector once at the entrypoint.
    models = icemodel.test.helpers.resolveRequestedSmbmodels(smbmodel);
+   if baseline_policy.require_source_revision
+      icemodel.test.helpers.assertCommonBaselineRevision( ...
+         "perf", baseline_selector, models, simyear);
+   end
 
    % Build the MATLAB perf experiment once, then reuse it for each
    % single-model perf workflow below.

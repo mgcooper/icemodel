@@ -124,8 +124,10 @@ Programmatic regression helpers:
 4. `run_regression_suite(...)` and `run_perf_suite(...)`
    - Compare against existing rolling or release baselines
    - Does not mutate baselines
-   - Run `run_aa_acceptance(...)` (in `test/tools`) before you accept any A/B
-     result. It checks whether two timing runs reproduce each other.
+   - Use `run_aa_acceptance(...)` (in `test/tools`) when you need to check
+     whether two timing runs reproduce each other. It is a diagnostic, not a
+     release gate, and it does not replace `run_perf_suite` or
+     `build_perf_baseline`.
      With no arguments, it runs two process-isolated passes back to back and
      compares them. With two artifact lists it compares already-saved runs.
      Every per-case median ratio B/A must lie inside the closed band
@@ -187,9 +189,19 @@ Programmatic regression helpers:
         shifts that are steady within each case but different across
         cases; an anchor drift above 15 percent marks every verdict in
         the run ambient-invalid (`meta.ambient_stable = false`).
-   - A/A acceptance for the protocol: two consecutive
-     `isolation="process"` runs of the same commit must pass the
-     tolerance band against each other on all rows.
+   - A/A diagnostic for the protocol: two consecutive
+     `isolation="process"` runs of the same commit pass only when every row is
+     inside the tolerance band. Record a failed A/A result as measurement-system
+     evidence; it does not block a release baseline refresh.
+   - If an accepted model change causes a comparison failure, document the
+     performance change before rebuilding. Every other comparison failure
+     blocks acceptance. Missing cases, invalid case samples, incomplete
+     matrices, or missing provenance are unusable and must not become a
+     baseline. If only the builder's final ambient anchor fails during a
+     release, `accept_ambient_drift=true` accepts the complete measurements and
+     records the failed anchor in the baseline metadata. For a release, rebuild
+     the rolling performance baseline after the comparison even when the
+     comparison passes.
    - Isolation joins the baseline-compatibility check: timings compare
      against a baseline only when both used the same isolation protocol
      (a baseline without the field counts as "session"). Measured on

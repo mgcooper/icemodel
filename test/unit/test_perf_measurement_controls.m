@@ -293,6 +293,272 @@ function test_a_nonfinite_anchor_ratio_invalidates_the_run(testCase)
    testCase.verifyFalse(isfinite(ratio));
 end
 
+function test_stable_anchor_is_accepted_without_override(testCase)
+   % A stable anchor passes the baseline acceptance check.
+   testCase.verifyWarningFree(@() ...
+      icemodel.test.helpers.assertAmbientBaselineAcceptance( ...
+      true, true, 1.0, false));
+end
+
+function test_release_override_accepts_finite_anchor_drift(testCase)
+   % The release override accepts a valid finite anchor outside tolerance.
+   testCase.verifyWarningFree(@() ...
+      icemodel.test.helpers.assertAmbientBaselineAcceptance( ...
+      false, true, 0.65, true));
+end
+
+function test_anchor_drift_requires_explicit_override(testCase)
+   % A drifted anchor remains an error under the default policy.
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.assertAmbientBaselineAcceptance( ...
+      false, true, 0.65, false), 'icemodel:test:perf:ambientDrift');
+end
+
+function test_release_override_rejects_invalid_anchor(testCase)
+   % The release override cannot accept invalid anchor samples.
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.assertAmbientBaselineAcceptance( ...
+      false, false, NaN, true), 'icemodel:test:perf:ambientDrift');
+end
+
+function test_release_override_rejects_nonfinite_anchor_ratio(testCase)
+   % The release override requires a finite anchor ratio.
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.assertAmbientBaselineAcceptance( ...
+      false, true, NaN, true), 'icemodel:test:perf:ambientDrift');
+end
+
+function test_source_revision_guard_captures_and_verifies_revision(testCase)
+   % The provenance guard returns a nonblank revision and accepts a match.
+   revision = icemodel.test.helpers.sourceRevisionGuard( ...
+      string.empty(), @() "test-revision");
+   testCase.verifyEqual(revision, "test-revision");
+   testCase.verifyWarningFree(@() ...
+      icemodel.test.helpers.sourceRevisionGuard( ...
+      "test-revision", @() "test-revision"));
+end
+
+function test_source_revision_guard_rejects_missing_or_changed_revision(testCase)
+   % Missing and changed source identities cannot become baseline provenance.
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.sourceRevisionGuard( ...
+      string.empty(), @() ""), ...
+      'icemodel:test:baseline:sourceRevisionMissing');
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.sourceRevisionGuard( ...
+      "first-revision", @() "second-revision"), ...
+      'icemodel:test:baseline:sourceRevisionChanged');
+end
+
+function test_profile_capture_uses_explicit_staging_directory(testCase)
+   % An explicit profile directory leaves the managed sidecar untouched.
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   [~, fixture_name] = fileparts(fixture.Folder);
+   output_file = fullfile(fixture.Folder, fixture_name + "-baseline.mat");
+   managed_dir = icemodel.test.helpers.baselineProfilerDir(output_file);
+   staging_dir = fullfile(fixture.Folder, "profile-stage");
+   cases = table(string.empty(0, 1), 'VariableNames', {'case_id'});
+   testCase.verifyFalse(isfolder(managed_dir));
+
+   [~, ~, artifacts] = ...
+      icemodel.test.helpers.captureBaselineProfile( ...
+      "perf", cases, output_file, history_size=1000, ...
+      profile_dir=staging_dir);
+
+   testCase.verifyFalse(isfolder(managed_dir));
+   testCase.verifyTrue(isfolder(staging_dir));
+   testCase.verifyEqual(artifacts.dir, string(staging_dir));
+end
+
+function test_profile_publication_creates_parent_and_rewrites_paths(testCase)
+   % Publication moves the complete stage and records its managed paths.
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   scratch_root = string(fixture.Folder);
+   stage_dir = fullfile(scratch_root, "stage");
+   final_dir = fullfile(scratch_root, "managed", "profile");
+   mkdir(stage_dir);
+   writeTestText(fullfile(stage_dir, "file0.html"), "profile");
+   writeTestText(fullfile(stage_dir, "profile_info.mat"), "info");
+   artifacts = struct( ...
+      'dir', stage_dir, ...
+      'index_file', fullfile(stage_dir, "file0.html"), ...
+      'info_file', fullfile(stage_dir, "profile_info.mat"));
+
+   [artifacts, transaction] = ...
+      icemodel.test.helpers.publishBaselineProfile( ...
+      stage_dir, final_dir, artifacts);
+   icemodel.test.helpers.commitBaselineProfilePublication(transaction);
+
+   testCase.verifyFalse(isfolder(stage_dir));
+   testCase.verifyTrue(isfile(fullfile(final_dir, "file0.html")));
+   testCase.verifyEqual(artifacts.dir, final_dir);
+   testCase.verifyEqual(artifacts.index_file, ...
+      fullfile(final_dir, "file0.html"));
+   testCase.verifyEqual(artifacts.info_file, ...
+      fullfile(final_dir, "profile_info.mat"));
+end
+
+function test_profile_publication_replaces_existing_sidecar(testCase)
+   % Publication replaces the complete prior sidecar after saving its backup.
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   scratch_root = string(fixture.Folder);
+   stage_dir = fullfile(scratch_root, "stage");
+   final_dir = fullfile(scratch_root, "managed", "profile");
+   mkdir(stage_dir);
+   mkdir(final_dir);
+   writeTestText(fullfile(stage_dir, "new.txt"), "new");
+   writeTestText(fullfile(final_dir, "old.txt"), "old");
+
+   [~, transaction] = icemodel.test.helpers.publishBaselineProfile( ...
+      stage_dir, final_dir, struct());
+
+   testCase.verifyTrue(isfile(fullfile(final_dir, "new.txt")));
+   testCase.verifyFalse(isfile(fullfile(final_dir, "old.txt")));
+   testCase.verifyTrue(isfolder(transaction.backup_dir));
+   icemodel.test.helpers.commitBaselineProfilePublication(transaction);
+   testCase.verifyFalse(isfolder(transaction.backup_dir));
+end
+
+function test_profile_publication_removes_disabled_sidecar(testCase)
+   % A blank stage retires the prior sidecar after the baseline save succeeds.
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   final_dir = fullfile(string(fixture.Folder), "managed", "profile");
+   mkdir(final_dir);
+   writeTestText(fullfile(final_dir, "old.txt"), "old");
+
+   [~, transaction] = icemodel.test.helpers.publishBaselineProfile( ...
+      "", final_dir, struct());
+
+   testCase.verifyFalse(isfolder(final_dir));
+   testCase.verifyTrue(isfolder(transaction.backup_dir));
+   icemodel.test.helpers.commitBaselineProfilePublication(transaction);
+   testCase.verifyFalse(isfolder(transaction.backup_dir));
+end
+
+function test_profile_publication_rolls_back_after_baseline_save_failure(testCase)
+   % A failed baseline save can restore the prior managed sidecar.
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   scratch_root = string(fixture.Folder);
+   stage_dir = fullfile(scratch_root, "stage");
+   final_dir = fullfile(scratch_root, "managed", "profile");
+   mkdir(stage_dir);
+   mkdir(final_dir);
+   writeTestText(fullfile(stage_dir, "new.txt"), "new");
+   writeTestText(fullfile(final_dir, "old.txt"), "old");
+
+   [~, transaction] = icemodel.test.helpers.publishBaselineProfile( ...
+      stage_dir, final_dir, struct());
+   icemodel.test.helpers.rollbackBaselineProfilePublication(transaction);
+
+   testCase.verifyTrue(isfile(fullfile(final_dir, "old.txt")));
+   testCase.verifyFalse(isfile(fullfile(final_dir, "new.txt")));
+   testCase.verifyFalse(isfolder(transaction.backup_dir));
+end
+
+function test_profile_publication_restores_sidecar_after_failed_move(testCase)
+   % A failed stage move restores the prior managed sidecar.
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   scratch_root = string(fixture.Folder);
+   stage_dir = fullfile(scratch_root, "missing-stage");
+   final_dir = fullfile(scratch_root, "managed", "profile");
+   mkdir(final_dir);
+   writeTestText(fullfile(final_dir, "old.txt"), "old");
+
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.publishBaselineProfile( ...
+      stage_dir, final_dir, struct()), ...
+      'icemodel:test:perf:profilePublishFailed');
+
+   testCase.verifyTrue(isfile(fullfile(final_dir, "old.txt")));
+end
+
+function test_baseline_bundle_set_rolls_back_prior_models(testCase)
+   % A later profile failure restores every earlier baseline and sidecar.
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   root = string(fixture.Folder);
+   output_files = fullfile(root, ...
+      ["bundleset-first.mat"; "bundleset-second.mat"]);
+
+   % baselineProfilerDir keys the managed sidecar by baseline stem under the
+   % repo test tree, not beside the baseline file, so this test must remove
+   % the two stems it creates there.
+   profile_dirs = arrayfun( ...
+      @icemodel.test.helpers.baselineProfilerDir, output_files, ...
+      'UniformOutput', false);
+   cleanup = onCleanup(@() removeProfilerDirs(profile_dirs));
+   for k = 1:2
+      marker = "old-" + string(k);
+      save(output_files(k), 'marker');
+      profile_dir = icemodel.test.helpers.baselineProfilerDir(output_files(k));
+      mkdir(profile_dir);
+      writeTestText(fullfile(profile_dir, "old.txt"), marker);
+   end
+
+   first_stage = fullfile(root, "first-stage");
+   mkdir(first_stage);
+   writeTestText(fullfile(first_stage, "new.txt"), "new");
+   missing_stage = fullfile(root, "missing-stage");
+   bundles = cell(2, 1);
+   for k = 1:2
+      stage_dir = missing_stage;
+      if k == 1
+         stage_dir = first_stage;
+      end
+      bundles{k} = struct( ...
+         'RegressionBaseline', table("new-" + string(k), ...
+         'VariableNames', {'value'}), ...
+         'case_opts', struct(), 'meta', struct(), ...
+         'profile_summary', table(), 'profile_meta', struct(), ...
+         'profile_artifacts', struct('dir', stage_dir), ...
+         'profile_stage_dir', stage_dir, ...
+         'baseline_type', "release", 'output_file', output_files(k));
+   end
+
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.publishBaselineBundleSet( ...
+      "regression", bundles), ...
+      'icemodel:test:perf:profilePublishFailed');
+
+   for k = 1:2
+      saved = load(output_files(k), 'marker');
+      testCase.verifyEqual(saved.marker, "old-" + string(k));
+      profile_dir = icemodel.test.helpers.baselineProfilerDir(output_files(k));
+      testCase.verifyTrue(isfile(fullfile(profile_dir, "old.txt")));
+      testCase.verifyFalse(isfile(fullfile(profile_dir, "new.txt")));
+   end
+   clear cleanup
+end
+
+function test_baseline_bundle_set_accepts_relative_output(testCase)
+   % A bare output filename saves the baseline in the current directory.
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   prior_dir = string(pwd);
+   cleanup = onCleanup(@() cd(prior_dir));
+   cd(fixture.Folder);
+   output_file = "relative-baseline.mat";
+   bundles = {struct( ...
+      'RegressionBaseline', table("new", 'VariableNames', {'value'}), ...
+      'case_opts', struct(), 'meta', struct(), ...
+      'profile_summary', table(), 'profile_meta', struct(), ...
+      'profile_artifacts', struct(), 'profile_stage_dir', "", ...
+      'baseline_type', "release", 'output_file', output_file)};
+
+   icemodel.test.helpers.publishBaselineBundleSet("regression", bundles);
+
+   testCase.verifyTrue(isfile(output_file));
+   saved = load(output_file, 'RegressionBaseline');
+   testCase.verifyEqual(saved.RegressionBaseline.value, "new");
+   clear cleanup
+end
+
 function test_matching_protocol_and_environment_are_compatible(testCase)
    % A baseline from this environment and protocol supports a timing gate.
    hostname = icemodel.test.helpers.machineHostname();
@@ -408,7 +674,26 @@ function test_worktree_revision_tracks_git_content(testCase)
    untracked_revision = icemodel.test.helpers.worktreeRevision(project_dir);
    testCase.verifyMatches(untracked_revision, "-dirty-[0-9a-f]{12}$");
    testCase.verifyNotEqual(untracked_revision, binary_revision);
+   testCase.verifyEqual(icemodel.test.helpers.worktreeRevision( ...
+      project_dir, ignored_paths=[ ...
+      fullfile(project_dir, "untracked.bin")]), clean_revision);
    delete(fullfile(project_dir, "untracked.bin"));
+
+   writeTestText(fullfile(project_dir, "relative.mat"), "relative");
+   testCase.verifyEqual(icemodel.test.helpers.worktreeRevision( ...
+      project_dir, ignored_paths="relative.mat"), clean_revision);
+   delete(fullfile(project_dir, "relative.mat"));
+
+   writeTestText(fullfile(project_dir, "candidate1.mat"), "one");
+   pattern_revision = icemodel.test.helpers.worktreeRevision( ...
+      project_dir, ignored_paths=fullfile(project_dir, "candidate[12].mat"));
+   testCase.verifyNotEqual(pattern_revision, clean_revision);
+   delete(fullfile(project_dir, "candidate1.mat"));
+   writeTestText(fullfile(project_dir, "candidate[12].mat"), "literal");
+   testCase.verifyEqual(icemodel.test.helpers.worktreeRevision( ...
+      project_dir, ignored_paths=fullfile(project_dir, ...
+      "candidate[12].mat")), clean_revision);
+   delete(fullfile(project_dir, "candidate[12].mat"));
    testCase.verifyEqual( ...
       icemodel.test.helpers.worktreeRevision(project_dir), clean_revision);
 end
@@ -480,6 +765,16 @@ function runPerfTestGit(project_dir, arguments)
       + " " + arguments;
    [status, output] = system(command);
    assert(status == 0, '%s', output)
+end
+
+function removeProfilerDirs(profile_dirs)
+   %REMOVEPROFILERDIRS Remove managed profiler sidecars a test created.
+
+   for k = 1:numel(profile_dirs)
+      if isfolder(profile_dirs{k})
+         rmdir(profile_dirs{k}, 's')
+      end
+   end
 end
 
 function writeTestText(filename, text)

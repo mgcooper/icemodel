@@ -140,7 +140,15 @@ Key options:
 - `data_root`
   - explicit test-data tree override and always authoritative
   - blank uses the baseline registration's tree: verification data for
-    rolling, historical `test/data` for frozen v1.1
+    rolling, historical `test/data` for frozen v1.1, and the provisioned
+    `fixtureDataRoot("v1.2")` for v1.2
+- `fixture_root`
+  - tree where the release's required fixture capabilities are verified
+  - blank uses `data_root` when set, else the release's provisioned root
+  - a release that runs the model from its own provisioned data (v1.2
+    onward) rejects a `data_root` naming a different tree with
+    `icemodel:test:releaseDataRootMismatch`; set both to the same tree, or
+    set only one
 
 Important runtime contract:
 
@@ -203,8 +211,11 @@ Important note:
 
 - the measured region in the formal perf class is the model call only
 - it does not include report formatting, baseline loading, or runner overhead
-- `data_root` has the same explicit-override and verification-default contract
-  as `run_regression_suite`
+- `data_root` and `fixture_root` follow the same rules as in
+  `run_regression_suite`. An explicit value always wins. A blank
+  `fixture_root` takes an explicit `data_root` when one is set, and otherwise
+  the release's own provisioned root. A release that runs the model from its
+  own provisioned data requires both roots to name one tree
 - formal perf cases currently use the same canonical runtime contract as
   regression: for `simyear=2016`, the runtime contract is `[2015 2016]` with
   `n_spinup_years = 1`
@@ -297,6 +308,10 @@ Notes:
 - the build selector and case matrix use the same explicit forcing-identity
   contract as the regression builder
 - direct versioned builds never overwrite an existing release file
+- `accept_ambient_drift` accepts a build whose final ambient anchor drifted
+  but stayed finite and valid; the saved metadata then records the failed
+  anchor, its ratio, and use of the override. An invalid anchor
+  re-measurement is always rejected.
 - by default the rebuilt baselines use the formal 2-year contract:
   retained year plus one leading spinup year
 
@@ -304,8 +319,11 @@ Notes:
 
 Purpose:
 
-- run the A/A test before you accept any A/B result
-- require two process-isolated timing runs to reproduce each other
+- check whether two process-isolated timing runs reproduce each other
+- diagnose measurement stability when a timing comparison needs investigation
+
+This diagnostic is optional. It does not replace `run_perf_suite` or
+`build_perf_baseline`, and it does not block a release.
 
 Default use:
 

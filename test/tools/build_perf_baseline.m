@@ -13,8 +13,8 @@ function PerfBaseline = build_perf_baseline(kwargs)
    %     full_sites=["kanm"; "kanl"])
    %  PerfBaseline = build_perf_baseline(data_root="/path/to/test/data")
    %
-   % Use this when you want to accept new runtime measurements as a rolling
-   % or versioned perf baseline. This writes baseline files only; it does not
+   % Use this function to accept runtime measurements as a rolling or versioned
+   % perf baseline. It writes baseline files only and does not
    % produce compare artifacts or evaluate pass/fail against an older baseline.
    %
    % Formal perf cases always run one leading spinup year plus one
@@ -29,6 +29,9 @@ function PerfBaseline = build_perf_baseline(kwargs)
    %
    % The saved MAT file also carries the managed core benchmark timings.
    % Profiler artifacts are an opt-in, single-model diagnostic.
+   % ACCEPT_AMBIENT_DRIFT accepts complete release measurements after a
+   % finite, valid final anchor falls outside its tolerance. The saved
+   % metadata records the failed anchor and use of the override.
    %
    % A custom OUTPUT_FILE is supported only when SMBMODEL resolves to one
    % concrete formal model. Multi-model requests write the managed per-model
@@ -100,6 +103,9 @@ function PerfBaseline = build_perf_baseline(kwargs)
       kwargs.isolation (1, 1) string ...
          {mustBeMember(kwargs.isolation, ["session", "process"])} ...
          = "process"
+
+      kwargs.accept_ambient_drift (1, 1) logical ...
+         = false
    end
 
    % Resolve the baseline-owned default tree before installing scoped config.
@@ -109,18 +115,29 @@ function PerfBaseline = build_perf_baseline(kwargs)
    end
    baseline_policy = ...
       icemodel.test.helpers.formalBaselinePolicy(baseline_selector);
+   [data_root, fixture_root] = ...
+      icemodel.test.helpers.resolveReleaseDataRoots( ...
+      baseline_policy, kwargs.data_root, "");
 
    % Keep the cleanup handle in scope so the caller's config is restored
    % when this entrypoint returns.
    [~, input_path, ~, ~, suite_cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment( ...
       icemodel_config_casename=baseline_policy.config_case, ...
-      data_root=kwargs.data_root);
+      data_root=data_root);
+   % Verify the release fixtures this baseline runs from before the build
+   % starts. download=false makes this a hash check against the manifest, not
+   % a network fetch, so a long measured build cannot begin on wrong data.
+   if ~isempty(baseline_policy.required_fixture_capabilities)
+      icemodel.verification.setup.fetchFixtures( ...
+         baseline_policy.baseline_tag, ...
+         capabilities=baseline_policy.required_fixture_capabilities, ...
+         root=fixture_root, download=false);
+   end
 
    % The perf TestCase bootstraps each measured case, so retain the configured
    % root through the environment the runner sets for the class. A caller-
    % supplied root keeps precedence over the resolved verification root.
-   data_root = kwargs.data_root;
    if isblanktext(data_root)
       data_root = string(fileparts(input_path));
    end
@@ -184,6 +201,16 @@ function PerfBaseline = build_perf_baseline(kwargs)
          'it when smbmodel expands to more than one formal model.'])
    end
 
+   % Ignore every managed sibling that can be rebuilt separately.
+   managed_files = icemodel.test.helpers.managedBaselineSiblings( ...
+      "perf", baseline_selector, output_file, simyear=simyear);
+   revision_reader = @() icemodel.test.helpers.worktreeRevision( ...
+      ignored_paths=managed_files);
+
+   % Measure every saved result from one source tree.
+   build_revision = icemodel.test.helpers.sourceRevisionGuard( ...
+      string.empty(), revision_reader);
+
    % Measure the managed component benchmarks once for the whole build.
    % They are model-independent, so measuring them inside the per-model
    % builder would repeat the same suite for every model.
@@ -194,40 +221,57 @@ function PerfBaseline = build_perf_baseline(kwargs)
          sampling_profile=benchmark_sampling_profile);
       icemodel.test.helpers.assertFormalBenchmarkCandidate(BenchmarkBaseline);
       benchmark_meta.source = "run_benchmark_suite";
+      benchmark_meta.git_revision = build_revision;
    end
 
-   % Build the baselines.
-   baselines = arrayfun(@(mdl) buildSingleModelPerfBaseline( ...
-      baseline, baseline_tag, tier, mdl, solver, simyear, ...
-      smoke_sites, full_sites, n_runs, tol_perf, ...
-      include_benchmarks, benchmark_sampling_profile, ...
-      BenchmarkBaseline, benchmark_meta, ...
-      include_profile_artifacts, ...
-      profile_history_size, output_file, kwargs.isolation, ...
-      baseline_policy.config_case, data_root), ...
-      models, 'UniformOutput', false);
+   % Build every candidate before changing a managed baseline file.
+   bundles = cell(numel(models), 1);
+   profile_cleanups = cell(numel(models), 1);
+   for model_index = 1:numel(models)
+      bundles{model_index} = buildSingleModelPerfBaseline( ...
+         baseline, baseline_tag, tier, models(model_index), solver, simyear, ...
+         smoke_sites, full_sites, n_runs, tol_perf, ...
+         include_benchmarks, benchmark_sampling_profile, ...
+         BenchmarkBaseline, benchmark_meta, include_profile_artifacts, ...
+         profile_history_size, output_file, kwargs.isolation, ...
+         baseline_policy.config_case, data_root, ...
+         kwargs.accept_ambient_drift, build_revision);
+      profile_stage_dir = bundles{model_index}.profile_stage_dir;
+      profile_cleanups{model_index} = onCleanup(@() ...
+         icemodel.test.helpers.removeBaselineProfileStage(profile_stage_dir));
+   end
+
+   % Reject source edits before archiving or saving any measured candidate.
+   icemodel.test.helpers.sourceRevisionGuard( ...
+      build_revision, revision_reader);
+
+   % Publish all model files and profiler sidecars as one transaction.
+   bundles = icemodel.test.helpers.publishBaselineBundleSet("perf", bundles);
 
    % Collapse to a single table.
+   baselines = cellfun(@(bundle) bundle.PerfBaseline, bundles, ...
+      'UniformOutput', false);
    PerfBaseline = vertcat(baselines{:});
+   clear profile_cleanups
 
    % Restore the caller config now that this entrypoint is done.
    delete(suite_cleanup)
 end
 
-function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
+function bundle = buildSingleModelPerfBaseline(baseline, ...
       baseline_tag, tier, smbmodel, solver, simyear, smoke_sites, ...
       full_sites, n_runs, tol_perf, include_benchmarks, ...
       benchmark_sampling_profile, BenchmarkBaseline, benchmark_meta, ...
-      include_profile_artifacts, ...
-      profile_history_size, output_file, isolation, config_case, ...
-      data_root)
+      include_profile_artifacts, profile_history_size, output_file, ...
+      isolation, config_case, data_root, accept_ambient_drift, ...
+      source_revision)
    %BUILDSINGLEMODELPERFBASELINE Build one perf baseline file.
 
    % Resolve the baseline target, configure paths, and load formal cases.
    [baseline_type, baseline_tag, output_file, input_path, output_path, ...
       cases] = icemodel.test.helpers.prepareBaselineBuild( ...
-      "perf", baseline, baseline_tag, tier, smbmodel, output_file, simyear, ...
-      solver, smoke_sites, full_sites);
+      "perf", baseline, baseline_tag, tier, smbmodel, output_file, ...
+      simyear, solver, smoke_sites, full_sites);
    testdir = icemodel.getpath('test');
 
    % Accepted wall-clock measurements must not inherit profiler state from an
@@ -307,10 +351,11 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
    end
 
    % The per-case dispersion gate cannot see load shifts that are steady
-   % WITHIN each case but different ACROSS cases. Re-measure the first
-   % executed case (rows(1), by construction) and refuse to accept a
-   % drifted or uncertifiable baseline; comparisons against it would gate
-   % on biased medians.
+   % within each case but different across cases. Re-measure the first
+   % executed case (rows(1), by construction). A valid drifted result
+   % requires the explicit release override; an uncertifiable result is
+   % always rejected. Comparisons against a drifted baseline would gate on
+   % biased medians.
    anchor_tol = icemodel.test.helpers.perfMeasurementPolicy().anchor_tol;
    c_anchor = cases(case_order(1), :);
    [anchor_data, anchor_valid] = ...
@@ -322,12 +367,9 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
       icemodel.test.helpers.ambientAnchorVerdict( ...
       rows(1).median_wall_s, anchor_data.sample_times, anchor_valid, ...
       anchor_tol);
-   if ~ambient_stable
-      error('icemodel:test:perf:ambientDrift', ...
-         ['ambient conditions shifted during the baseline build, or ' ...
-         'the anchor re-measurement was invalid (anchor ratio %.3f); ' ...
-         'a drifted baseline must not be accepted'], anchor_ratio)
-   end
+   icemodel.test.helpers.assertAmbientBaselineAcceptance( ...
+      ambient_stable, anchor_valid, anchor_ratio, ...
+      accept_ambient_drift);
 
    % Convert the accepted case rows into the saved baseline table.
    PerfBaseline = struct2table(rows);
@@ -358,6 +400,9 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
    meta.isolation = isolation;
    meta.case_order_seed = case_order_seed;
    meta.anchor_ratio = anchor_ratio;
+   meta.ambient_stable = ambient_stable;
+   meta.ambient_drift_accepted = ...
+      ~ambient_stable && accept_ambient_drift;
    meta.timing_scope = "IcemodelPerfTest.testCoreRuntime (runSmbModel only)";
    meta.timing_notes = sprintf([ ...
       'median_wall_s is the median of %d timed samples (wall-clock seconds). ' ...
@@ -376,6 +421,7 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
    meta.matlab_version = string(version);
    meta.host = string(computer);
    meta.hostname = icemodel.test.helpers.machineHostname();
+   meta.git_revision = source_revision;
    meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
 
    % Attach the managed component benchmark baseline (measured once at
@@ -396,26 +442,32 @@ function PerfBaseline = buildSingleModelPerfBaseline(baseline, ...
    profile_summary = table();
    profile_meta = struct();
    profile_artifacts = struct();
+   profile_stage_dir = "";
    if include_profile_artifacts
-      [profile_summary, profile_meta, profile_artifacts] = ...
-         icemodel.test.helpers.captureBaselineProfile( ...
-         "perf", cases, output_file, history_size=profile_history_size);
+      profile_stage_dir = string(tempname);
+      try
+         [profile_summary, profile_meta, profile_artifacts] = ...
+            icemodel.test.helpers.captureBaselineProfile( ...
+            "perf", cases, output_file, history_size=profile_history_size, ...
+            profile_dir=profile_stage_dir);
+      catch err
+         try
+            icemodel.test.helpers.removeBaselineProfileStage(profile_stage_dir);
+         catch cleanup_err
+            err = addCause(err, cleanup_err);
+         end
+         rethrow(err)
+      end
    end
 
-   % Archive only after the end-to-end, benchmark, and optional profile
-   % candidates have all passed their own validation and completed.
-   if baseline_type == "rolling"
-      icemodel.test.helpers.archiveManagedBaseline(output_file, "perf");
-   end
-
-   % Save the rolling or release perf baseline file.
-   outdir = fileparts(char(output_file));
-   if exist(outdir, 'dir') ~= 7
-      mkdir(outdir);
-   end
-   save(char(output_file), 'PerfBaseline', 'case_opts', 'meta', ...
-      'BenchmarkBaseline', 'benchmark_meta', 'profile_summary', ...
-      'profile_meta', 'profile_artifacts');
+   % Return the complete in-memory candidate to the entrypoint for one guarded
+   % write phase after all models finish measuring.
+   bundle = struct('PerfBaseline', PerfBaseline, 'case_opts', case_opts, ...
+      'meta', meta, 'BenchmarkBaseline', BenchmarkBaseline, ...
+      'benchmark_meta', benchmark_meta, 'profile_summary', profile_summary, ...
+      'profile_meta', profile_meta, 'profile_artifacts', profile_artifacts, ...
+      'profile_stage_dir', profile_stage_dir, ...
+      'baseline_type', baseline_type, 'output_file', output_file);
 end
 
 function [BenchmarkBaseline, meta] = buildBenchmarkBaseline(kwargs)
