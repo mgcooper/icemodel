@@ -16,13 +16,13 @@ function transfer = fitDonorTransfer(times, x_target, x_donor, channel, kwargs)
    %  that the caller gives, which keeps selection and evaluation separate.
    %
    % Name-value
-   %  fit_years : calendar years eligible for fitting (required — pass the
+   %  fit_years : calendar years eligible for fitting (required; pass the
    %     split's selection years).
    %  knots : 0 for pure linear, or a knot count for the monotone
    %     piecewise adjustment (default 0; the candidate set is the
    %     Section-C knot_candidates parameter, currently [0 6]).
    %  lag_search : search donor lags within ±max_lag_hours (default true).
-   %  max_lag_hours : lag search half-width (default 18, legacy precedent).
+   %  max_lag_hours : lag search half-width (default 18).
    %  min_lag_gain : correlation improvement needed to adopt a nonzero
    %     lag (default 0.02). Below it, the lag stays 0 and the record
    %     shows 0.
@@ -33,7 +33,7 @@ function transfer = fitDonorTransfer(times, x_target, x_donor, channel, kwargs)
    %  toa_dark_wm2 : meaningful-sun threshold for the SWD CSI fit.
    %
    % Returns
-   %  transfer : struct — channel, lag_hours, knots, per-season model
+   %  transfer : struct with channel, lag_hours, knots, and per-season model
    %     (slope/intercept or breakpoint tables), fitted donor range,
    %     n_overlap, n_overlap_hours, and the overlap correlation before and
    %     after the lag. The correlations are diagnostics only. The held-out

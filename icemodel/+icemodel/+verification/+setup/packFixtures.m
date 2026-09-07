@@ -1,7 +1,7 @@
 function result = packFixtures(version, kwargs)
    %PACKFIXTURES Pack selected release-data capabilities into separate archives.
    %
-   %  result = icemodel.verification.setup.packFixtures("v1.1")
+   %  result = icemodel.verification.setup.packFixtures()
    %  result = icemodel.verification.setup.packFixtures("v1.1", ...
    %     capabilities="forcing-integration", root="/tmp/test-data", ...
    %     manifest="/tmp/source-manifest.json", staging_dir="/tmp/stage")
@@ -12,7 +12,8 @@ function result = packFixtures(version, kwargs)
    % is deterministic apart from the compressed archive bytes themselves.
    %
    % Name-value
-   %  capabilities  Capabilities to pack; required v1.1 capabilities by default.
+   %  capabilities  Capabilities to pack; the required release capabilities
+   %                by default.
    %  root          Data root containing manifest-declared relative paths.
    %  manifest      Source release-data manifest.
    %  staging_dir   Output directory for archives and generated manifest.
@@ -20,13 +21,17 @@ function result = packFixtures(version, kwargs)
    %  silent        Suppress the size summary.
    %
    % See also: icemodel.verification.setup.fixtureFileList,
-   %  icemodel.verification.setup.fetchFixtures
+   %  icemodel.verification.setup.fetchFixtures,
+   %  icemodel.verification.setup.fixtureDataRoot
 
    arguments
-      version (1, 1) string
+      version (1, 1) string = ...
+         "v" + string(icemodel.internal.version())
       kwargs.capabilities string = defaultCapabilities()
-      kwargs.root (1, 1) string = defaultTestDataRoot()
-      kwargs.manifest (1, 1) string = defaultManifestFile()
+      kwargs.root (1, 1) string = ...
+         icemodel.verification.setup.fixtureDataRoot(version)
+      kwargs.manifest (1, 1) string = ...
+         icemodel.verification.setup.releaseManifestFile(version)
       kwargs.staging_dir (1, 1) string = defaultStagingDir()
       kwargs.overwrite (1, 1) logical = false
       kwargs.silent (1, 1) logical = false
@@ -52,7 +57,7 @@ function result = packFixtures(version, kwargs)
       end
    end
 
-   % Verify source bytes against the authoritative file rows before producing
+   % Verify source bytes against the declared file rows before producing
    % any artifact, so a source that does not match the manifest fails here.
    [missing, mismatched] = verifyFiles(kwargs.root, selection.files);
    if ~isempty(missing) || ~isempty(mismatched)
@@ -68,8 +73,8 @@ function result = packFixtures(version, kwargs)
       error('icemodel:verification:packFixtures:symlinkDestination', ...
          'Release staging path traverses a symbolic link: %s', staging_link)
    end
-   manifest_file = fullfile(kwargs.staging_dir, ...
-      "icemodel-" + version + "-data-manifest.json");
+   manifest_file = icemodel.verification.setup.releaseManifestFile( ...
+      version, directory=kwargs.staging_dir);
    archive_files = strings(numel(selection.archives), 1);
    for k = 1:numel(selection.archives)
       archive_files(k) = fullfile(kwargs.staging_dir, ...
@@ -84,8 +89,8 @@ function result = packFixtures(version, kwargs)
    end
    if ~kwargs.overwrite && any(isfile(outputs))
       error('icemodel:verification:packFixtures:exists', ...
-         ['One or more v1.1 data artifacts already exist in %s. ' ...
-         'Pass overwrite=true to replace them.'], kwargs.staging_dir)
+         ['One or more %s data artifacts already exist in %s. ' ...
+         'Pass overwrite=true to replace them.'], version, kwargs.staging_dir)
    end
 
    % Build every artifact outside the final staging tree, so a later archive or
@@ -94,8 +99,8 @@ function result = packFixtures(version, kwargs)
    cleaner = onCleanup(@() removeTree(work_dir));
    work_archive_files = fullfile(work_dir, ...
       reshape(string({selection.archives.name}), [], 1));
-   work_manifest_file = fullfile(work_dir, ...
-      "icemodel-" + version + "-data-manifest.json");
+   work_manifest_file = icemodel.verification.setup.releaseManifestFile( ...
+      version, directory=work_dir);
 
    % Package each capability on its own, so a user who needs only formal and
    % showcase data does not have to download the optional forcing archive.
@@ -136,10 +141,12 @@ function result = packFixtures(version, kwargs)
       kwargs.staging_dir, work_dir);
    clear cleaner
 
-   % Keep the scalar fields for one-capability callers while exposing vectors
-   % for the normal multi-capability v1.1 pack.
+   % Keep scalar fields for one-capability callers and vectors for a
+   % multi-capability pack.
    result = struct( ...
       'version', version, ...
+      'summary_heading', ...
+      "=== icemodel " + version + " release data packed ===", ...
       'capabilities', selection.capabilities, ...
       'archive_file', archive_files, ...
       'archive_files', archive_files, ...
@@ -157,23 +164,12 @@ end
 
 %% Local helpers
 function capabilities = defaultCapabilities()
-   %DEFAULTCAPABILITIES Required v1.1 capability set.
+   %DEFAULTCAPABILITIES Required release capability set.
    capabilities = ["formal-core", "verification-showcase"];
 end
 
-function pathname = defaultTestDataRoot()
-   %DEFAULTTESTDATAROOT Canonical formal and public-verification data root.
-   pathname = string(icemodel.internal.fullpath('test', 'data'));
-end
-
-function pathname = defaultManifestFile()
-   %DEFAULTMANIFESTFILE Tracked authoritative release-data manifest.
-   pathname = string(icemodel.internal.fullpath('test', 'assets', ...
-      'icemodel-v1.1-data-manifest.json'));
-end
-
 function pathname = defaultStagingDir()
-   %DEFAULTSTAGINGDIR Canonical gitignored release artifact directory.
+   %DEFAULTSTAGINGDIR Gitignored release artifact directory.
    pathname = string(icemodel.internal.fullpath('release-staging'));
 end
 
@@ -370,7 +366,8 @@ function assertNoSourceSymlinks(root, relpath)
    end
    cursor = icemodel.verification.setup.fixtureCanonicalRoot(string(root));
 
-   % Inspect every manifest component inside the canonical source root.
+   % Inspect every manifest component inside the canonicalized selected source
+   % root.
    parts = split(relpath, "/");
    for k = 1:numel(parts)
       cursor = fullfile(cursor, parts(k));
@@ -414,13 +411,13 @@ function createArchive(archive_file, paths, root)
       return
    end
 
-   % MATLAB tar is portable and does not synthesize AppleDouble files away
-   % from macOS, so it remains the dependency-free implementation elsewhere.
+   % Use MATLAB tar on other platforms because it is portable, does not
+   % synthesize AppleDouble files, and needs no external dependency.
    tar(char(archive_file), cellstr(paths), char(root));
 end
 
 function directories = ancestorDirectories(files)
-   %ANCESTORDIRECTORIES Derive canonical directory entries for archive headers.
+   %ANCESTORDIRECTORIES Return required directory entries for archive headers.
    directories = strings(sum(count(files, "/")), 1);
    cursor = 0;
    for k = 1:numel(files)
@@ -456,7 +453,7 @@ end
 function reportSaving(result)
    %REPORTSAVING Print one compact release-data packing summary.
    mb = @(bytes) double(bytes) / 1024 / 1024;
-   fprintf('\n=== icemodel v1.1 release data packed ===\n');
+   fprintf('\n%s\n', result.summary_heading);
    fprintf('Version:       %s\n', result.version);
    fprintf('Capabilities:  %s\n', strjoin(result.capabilities, ', '));
    fprintf('Files:         %d\n', result.num_files);

@@ -21,10 +21,11 @@ function tf = assert_max_water(f_ice, f_liq)
    % Top-node condensation
    % ---------------------
    % The top control volume can receive condensation through
-   % icemodel.surface.apply_surface_vapor_mass_change. In that path the
+   % icemodel.surface.apply_surface_vapor_exchange. In that path the
    % condensation capacity for a wet node is
    %
-   %   d_liq_max = ro_ice/ro_liq * (1 - f_ice_top) - f_liq_top
+   %   d_liq_max = icemodel.column.max_liquid_fraction_change( ...
+   %      f_ice_top, f_liq_top)
    %
    % which is exactly the remaining headroom below f_wat_max. Condensation
    % exceeding that cap is tracked in d_rof rather than stored, so the
@@ -58,7 +59,7 @@ function tf = assert_max_water(f_ice, f_liq)
    %     is appropriate. If infiltration is added, revisit this check.
    %
    % See also: icemodel.column.water_fraction,
-   %           icemodel.surface.apply_surface_vapor_mass_change,
+   %           icemodel.surface.apply_surface_vapor_exchange,
    %           icemodel.column.meltzone_transform
    %
    %#codegen

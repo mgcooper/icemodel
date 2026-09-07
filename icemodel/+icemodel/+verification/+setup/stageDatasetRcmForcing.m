@@ -66,8 +66,13 @@ function state = stageDatasetRcmForcing(state, alive, kwargs)
 
    points = vertcat(state(alive_idx).point);
    for src = reshape(forcing_sources, 1, [])
-      fprintf('[staging] %s forcing for %d %s case(s)...\n', ...
-         upper(char(src)), numel(alive_idx), kwargs.dataset_family);
+      % Status prints guide an interactive import but bury the pass and
+      % fail marks a test runner prints, so suppress them under the
+      % framework (see icemodel.internal.isTestRun).
+      if ~icemodel.internal.isTestRun()
+         fprintf('[staging] %s forcing for %d %s case(s)...\n', ...
+            upper(char(src)), numel(alive_idx), kwargs.dataset_family);
+      end
 
       legspec = repmat(legProto(src), 1, numel(alive_idx));
       for j = 1:numel(alive_idx)
@@ -112,8 +117,12 @@ function state = stageDatasetRcmForcing(state, alive, kwargs)
             n_staged = n_staged + 1;
          end
       end
-      fprintf('[staging] %s: %d staged, %d skipped\n', upper(char(src)), ...
-         n_staged, numel(alive_idx) - n_staged);
+      % Suppress the per-source summary under the test framework for the
+      % same reason as the banner above.
+      if ~icemodel.internal.isTestRun()
+         fprintf('[staging] %s: %d staged, %d skipped\n', ...
+            upper(char(src)), n_staged, numel(alive_idx) - n_staged);
+      end
 
       % A family-specific optional product can attach to the completed source
       % leg. The code above still performs the cache discovery and the primary

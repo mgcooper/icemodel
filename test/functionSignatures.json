@@ -147,6 +147,14 @@
             "type": [
                "choices=icemodel.completions('testverbosity')"
             ]
+         },
+         {
+            "name": "progress_log",
+            "kind": "namevalue",
+            "type": [
+               "string",
+               "scalar"
+            ]
          }
       ],
       "outputs": [

@@ -38,15 +38,41 @@ function test_icemodel_year_boundary_restart(testCase)
    verifyRestartRun(testCase, "icemodel", 2);
 end
 
-function verifyRestartRun(testCase, smbmodel, solver)
+function test_icemodel_recovery_is_restart_invariant(testCase)
+   % Recovery is per-substep coupler behavior, not persisted policy: no
+   % latch rides the restart file, and a resumed run reproduces the
+   % continuous run exactly through recovery events.
+
+   verifyRestartRun(testCase, "icemodel", 3, verify_recovery=true);
+end
+
+function verifyRestartRun(testCase, smbmodel, solver, kwargs)
    % Compare a continuous two-year run against a split seed/resume pair and
    % require exact agreement before and after postprocessing.
 
+   arguments
+      testCase
+      smbmodel (1, 1) string
+      solver (1, 1) double
+      kwargs.verify_recovery (1, 1) logical = false
+   end
+
    simyears = [2015 2016];
+   if kwargs.verify_recovery
+      output_profile = "diagnostic";
+      cpl_alpha = 2.0;
+      cpl_aitken = false;
+   else
+      output_profile = "standard";
+      cpl_alpha = 1.0;
+      cpl_aitken = true;
+   end
 
    % Build opts for full run
    opts_full = buildOpts(testCase, smbmodel, simyears, ...
-      run_tag="full", solver=solver, n_spinup_years=1);
+      run_tag="full", solver=solver, n_spinup_years=1, ...
+      output_profile=output_profile, cpl_alpha=cpl_alpha, ...
+      cpl_aitken=cpl_aitken);
 
    % Run the model
    [ice1_full, ice2_full, opts_full] = ...
@@ -54,10 +80,12 @@ function verifyRestartRun(testCase, smbmodel, solver)
 
    % Build opts for seed run
    opts_seed = buildOpts(testCase, smbmodel, 2015, ...
-      run_tag="seed", solver=solver, saverestart=true);
+      run_tag="seed", solver=solver, saverestart=true, ...
+      output_profile=output_profile, cpl_alpha=cpl_alpha, ...
+      cpl_aitken=cpl_aitken);
 
    % Run the model
-   [~, ~, opts_seed] = icemodel.test.helpers.runSmbModel(opts_seed);
+   [ice1_seed, ~, opts_seed] = icemodel.test.helpers.runSmbModel(opts_seed);
 
    % Load the restart file
    restart_file = icemodel.restartfile(opts_seed, 2015);
@@ -73,14 +101,26 @@ function verifyRestartRun(testCase, smbmodel, solver)
       testCase.verifyTrue(isfield(restart.restart, 'r_eff'), ...
          'expected icemodel restart file to preserve r_eff');
    end
+   if kwargs.verify_recovery
+      % At least the first forcing step recovers under the failing primary
+      % policy, and solver policy never rides the restart file.
+      testCase.verifyEqual(ice1_seed.cpl_recovery_count(1), 1);
+      testCase.verifyFalse( ...
+         isfield(restart.restart, 'use_conservative_cpl'));
+   end
 
    % Resume the run
    opts_resume = buildOpts(testCase, smbmodel, 2016, ...
       run_tag="resume", solver=solver, use_restart=true, ...
-      restartfile=restart_file);
+      restartfile=restart_file, output_profile=output_profile, ...
+      cpl_alpha=cpl_alpha, cpl_aitken=cpl_aitken);
 
    [ice1_restart, ice2_restart, opts_restart] = ...
       icemodel.test.helpers.runSmbModel(opts_resume);
+
+   % Recovery counts need no dedicated comparison: the nested equality
+   % below compares every ice1 channel, recovery counts included, between
+   % the continuous and resumed runs.
 
    [ice1_full_pp, ice2_full_pp] = icemodel.postprocess( ...
       ice1_full, ice2_full, opts_full, opts_full.output_years);
@@ -125,6 +165,9 @@ function opts = buildOpts(testCase, smbmodel, simyears, kwargs)
       kwargs.saverestart (1, 1) logical = false
       kwargs.use_restart (1, 1) logical = false
       kwargs.restartfile (1, :) char = ''
+      kwargs.output_profile (1, 1) string = "standard"
+      kwargs.cpl_alpha (1, 1) double = 1.0
+      kwargs.cpl_aitken (1, 1) logical = true
    end
 
    opts = icemodel.setopts(char(smbmodel), 'kanm', simyears, ...
@@ -147,7 +190,9 @@ function opts = buildOpts(testCase, smbmodel, simyears, kwargs)
       'pathuserdata', pathuserdata, ...
       'patheval', testCase.TestData.evaldir, ...
       'pathoutput', pathoutput, ...
-      'output_profile', 'standard', ...
+      'output_profile', char(kwargs.output_profile), ...
+      'cpl_alpha', kwargs.cpl_alpha, ...
+      'cpl_aitken', kwargs.cpl_aitken, ...
       'saverestart', kwargs.saverestart, ...
       'use_restart', kwargs.use_restart, ...
       'restartfile', kwargs.restartfile);

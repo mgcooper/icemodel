@@ -4,8 +4,8 @@ function [met, metadata, Data] = buildSamimiDye2Met(kwargs)
    %  [met, metadata] = icemodel.forcing.buildSamimiDye2Met()
    %  [met, metadata, Data] = ... buildSamimiDye2Met(source_dir=...)
    %
-   % Builds canonical Samimi Dye-2 Data with buildSamimiDye2Data, then converts
-   % it through the shared data2met contract. Missing precipitation channels stay
+   % Builds Samimi Dye-2 Data with buildSamimiDye2Data, then converts it
+   % through the data2met conversion. Missing precipitation channels stay
    % explicit NaN placeholders when fillwithmissing=true.
    %
    % See also: icemodel.forcing.buildSamimiDye2Data,
@@ -24,7 +24,7 @@ function [met, metadata, Data] = buildSamimiDye2Met(kwargs)
       enddate=kwargs.enddate, fillgaps=kwargs.fillgaps);
 
    % Use the shared collection-aware conversion path; this source returns one
-   % native half-hourly timetable, so the default blank dt_out is an exact no-op.
+   % native half-hourly timetable, so the default blank dt_out is a no-op.
    [met, metadata] = icemodel.forcing.helpers.data2metCollection(Data, ...
       fillwithmissing=kwargs.fillwithmissing);
 end

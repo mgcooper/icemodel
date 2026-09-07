@@ -18,8 +18,8 @@ function De = vapor_diffusivity(T, Pa)
    %  Output:
    %     De - Effective vapor diffusivity [m2 s-1]
    %
-   % See also: icemodel.vapor.vapor_thermal_diffusion_coefficient,
-   %  icemodel.column.vapor_mass_transfer
+   % See also: icemodel.vapor.vapor_thermal_conductivity,
+   %  icemodel.column.vapor_transport_terms
    %
    %#codegen
 

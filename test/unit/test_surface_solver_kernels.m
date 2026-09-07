@@ -182,6 +182,98 @@ function test_sebsolve_monin_obukhov_converges_with_numeric_derivative(testCase)
    testCase.verifyLessThan(abs(residual), 1.0);
 end
 
+function test_one_sweep_dirichlet_uses_vapor_free_predictor(testCase)
+   % With one coupler sweep, the pre-coupler predictor supplies the only
+   % boundary used by the accepted state. The predictor must therefore use
+   % the same vapor-free node conductivity as the column solver.
+   %
+   % The oracle independently replays the one-sweep sequence with a
+   % vapor-free predictor. Including the node vapor term changes the trial
+   % surface temperature and fails the exact comparison.
+
+   s = testCase.TestData.ice;
+   opts = s.opts;
+
+   % Force one coupler sweep and reuse seb_solver as the inner solver mode,
+   % matching the oracle replay below so both paths run the same solve.
+   settings = s.settings;
+   settings.solver = s.seb_solver;
+   settings.cpl_maxiter = 1;
+
+   % Count the predictor and inner-solver calls without modifying the kernel.
+   % Restore the caller's profiler state because this test owns only the
+   % temporary profiling interval below.
+   prior = profile('status');
+   restore_profiler = onCleanup(@() restoreProfiler(prior));
+   profile off
+   profile clear
+   profile on
+
+   [Ts, T, f_ice, f_liq, k_eff, U_vap, ~, cpl_diag] = ...
+      icemodel.couplers.solve_surface_column_dirichlet( ...
+      s.Ts, s.T, s.f_ice, s.f_liq, s.Sc, s.Sp, s.dz, s.delz, s.fn, ...
+      s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, s.tppt, ...
+      s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, s.H_e, ...
+      s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...
+      s.snow_depth, s.opts.f_res_pore_ice, settings, opts);
+   profile off
+   profile_data = profile('info');
+   profile clear
+   clear restore_profiler
+
+   % One checkpoint evaluation plus one refresh after each solved Picard
+   % iterate is the expected saturation-density call count.
+   profile_names = string({profile_data.FunctionTable.FunctionName});
+   saturation_rows = endsWith(profile_names, 'saturation_vapor_density');
+   n_saturation_calls = sum( ...
+      [profile_data.FunctionTable(saturation_rows).NumCalls]);
+   testCase.verifyEqual(n_saturation_calls, cpl_diag.n_iters + 1);
+
+   testCase.verifyTrue(cpl_diag.ok_seb && cpl_diag.ok_ieb && cpl_diag.ok_cpl);
+   testCase.verifyTrue(isfinite(Ts) && all(isfinite([T; f_ice; f_liq])));
+
+   % The oracle: the same one-sweep sequence, with the predictor
+   % conductivity built from the vapor-free form directly.
+   k_pred = icemodel.column.bulk_thermal_conductivity( ...
+      s.T, s.f_ice, s.f_liq, 0);
+   Ts_trial = icemodel.surface.solve_surface_energy_balance( ...
+      s.Ts, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, s.tppt, ...
+      s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, s.H_e, ...
+      s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.T, k_pred, s.dz, ...
+      s.ro_sfc, s.snow_depth, opts);
+   [T_x, f_ice_x, f_liq_x, k_x, U_vap_x, ~, ~, ~, ~, err_x] = ...
+      icemodel.column.solve_column_enthalpy( ...
+      Ts_trial, s.T, s.f_ice, s.f_liq, 0.0, 0.0, s.Sc, s.Sp, s.dz, ...
+      s.delz, s.fn, s.opts.dt, s.seb_solver, s.tol, s.maxiter, ...
+      s.alpha, s.use_aitken, s.jumpmax, opts.debug, s.opts.f_res_pore_ice);
+   ro_sfc_x = icemodel.surface.surface_bulk_density( ...
+      f_ice_x(1), f_liq_x(1));
+   Ts_x = icemodel.surface.solve_surface_energy_balance( ...
+      Ts_trial, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, s.tppt, ...
+      s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, s.H_e, ...
+      s.hv_atm, s.br_coefs, s.liqflag, s.chi, T_x, k_x, s.dz, ...
+      ro_sfc_x, s.snow_depth, opts);
+
+   testCase.verifyEqual(Ts, Ts_x, 'AbsTol', 0);
+   testCase.verifyEqual(T, T_x, 'AbsTol', 0);
+   testCase.verifyEqual(f_ice, f_ice_x, 'AbsTol', 0);
+   testCase.verifyEqual(f_liq, f_liq_x, 'AbsTol', 0);
+   testCase.verifyEqual(k_eff, k_x, 'AbsTol', 0);
+   testCase.verifyEqual(U_vap, U_vap_x, 'AbsTol', 0);
+   testCase.verifyTrue(isfinite(err_x));
+
+   % Recompute the face flux independently from the accepted solver state.
+   [ro_vap_x, dro_vapdT_x] = ...
+      icemodel.vapor.saturation_vapor_density(T_x, f_liq_x);
+   [~, De_x] = icemodel.vapor.vapor_thermal_conductivity( ...
+      T_x, f_liq_x, dro_vapdT_x);
+   [~, ~, ~, U_expected] = ...
+      icemodel.column.vapor_transport_terms( ...
+      T_x, f_ice_x, f_liq_x, k_x, ro_vap_x, dro_vapdT_x, De_x, ...
+      s.delz, s.fn, s.opts.f_res_pore_ice);
+   testCase.verifyEqual(U_vap, U_expected, 'AbsTol', 0);
+end
+
 function test_iceebsolvedirichlet_converges_on_synthetic_column(testCase)
    % The coupled Dirichlet solver should converge on the synthetic ice
    % column, keep phase fractions bounded, and reduce the accepted
@@ -189,16 +281,17 @@ function test_iceebsolvedirichlet_converges_on_synthetic_column(testCase)
 
    s = testCase.TestData.ice;
 
-   % Solve the coupled surface-column energy balance
-   [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = ...
+   % Solve the coupled surface-column energy balance. Reuse seb_solver as
+   % the inner solver mode, matching the one-pass comparison built below.
+   settings = s.settings;
+   settings.solver = s.seb_solver;
+   [Ts, T, f_ice, f_liq, k_eff, ~, ~, cpl_diag] = ...
       icemodel.couplers.solve_surface_column_dirichlet( ...
       s.Ts, s.T, s.f_ice, s.f_liq, s.Sc, s.Sp, s.dz, s.delz, s.fn, ...
       s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, s.tppt, ...
       s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, s.H_e, ...
-      s.hv_atm, s.br_coefs, s.liqflag, s.chi, ...
-      s.seb_solver, s.tol, s.maxiter, s.alpha, s.use_aitken, s.jumpmax, ...
-      s.cpl_Ts_tol, s.cpl_seb_tol, s.cpl_maxiter, s.cpl_alpha, ...
-      s.cpl_aitken, s.cpl_jumpmax, s.ro_sfc, s.snow_depth, s.opts);
+      s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...
+      s.snow_depth, s.opts.f_res_pore_ice, settings, s.opts);
 
    % Compute the coupled surface-column energy balance residual
    residual_coupled = icemodel.surface.surface_energy_balance_residual(Ts, ...
@@ -215,10 +308,11 @@ function test_iceebsolvedirichlet_converges_on_synthetic_column(testCase)
       s.liqflag, s.chi, s.T, s.k_eff, s.dz, s.ro_sfc, s.snow_depth, s.opts);
 
    % Solve for column T_ice using the subsurface column solver
-   [T_old, ~, ~, k_eff_old, ok_ieb_old] = ...
+   [T_old, ~, ~, k_eff_old, ~, ~, ok_ieb_old] = ...
       icemodel.column.solve_column_enthalpy(Ts_old, s.T, s.f_ice, s.f_liq, ...
       s.Fc, s.Fp, s.Sc, s.Sp, s.dz, s.delz, s.fn, s.opts.dt, 1, s.tol, ...
-      s.maxiter, s.alpha, s.use_aitken, s.jumpmax, false);
+      s.maxiter, s.alpha, s.use_aitken, s.jumpmax, false, ...
+      s.opts.f_res_pore_ice);
 
    % Compute the one-pass residual
    residual_old = icemodel.surface.surface_energy_balance_residual(Ts_old, ...
@@ -228,10 +322,10 @@ function test_iceebsolvedirichlet_converges_on_synthetic_column(testCase)
       s.ro_sfc, s.snow_depth, s.opts);
 
    % Verify the coupled solutions are valid
-   testCase.verifyTrue(ok_seb);
-   testCase.verifyTrue(ok_ieb);
-   testCase.verifyTrue(ok_cpl);
-   testCase.verifyTrue(isfinite(n_iters));
+   testCase.verifyTrue(cpl_diag.ok_seb);
+   testCase.verifyTrue(cpl_diag.ok_ieb);
+   testCase.verifyTrue(cpl_diag.ok_cpl);
+   testCase.verifyTrue(isfinite(cpl_diag.n_iters));
    testCase.verifyTrue(isreal(Ts));
    testCase.verifyTrue(all(isfinite([Ts; T; f_ice; f_liq; k_eff])));
    testCase.verifyLessThanOrEqual(max(f_ice + f_liq * s.ro_liq / s.ro_ice), ...
@@ -319,21 +413,22 @@ function test_skinebsolve_converges_on_synthetic_column(testCase)
    s = testCase.TestData.skin;
 
    % Solve for T_sfc and T_ice using the coupled reduced-complexity solver
-   [Ts, T, f_ice, f_liq, k_eff, ok_seb, ok_ieb, ok_cpl, n_iters] = ...
+   [Ts, T, f_ice, f_liq, k_eff, diag] = ...
       icemodel.couplers.solve_skin_surface_column( ...
       s.Ts, s.T, s.f_ice, s.f_liq, s.dz, s.delz, s.fn, ...
       s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, s.tppt, ...
       s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, s.H_e, ...
-      s.hv_atm, s.br_coefs, s.liqflag, s.chi, ...
-      s.tol, s.maxiter, s.alpha, s.cpl_maxiter, ...
-      s.cpl_Ts_tol, s.cpl_seb_tol, s.cpl_alpha, s.cpl_aitken, ...
-      s.cpl_jumpmax, s.ro_sfc, s.snow_depth, s.opts);
+      s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...
+      s.snow_depth, s.settings, s.opts);
 
    % Verify the solution is valid
-   testCase.verifyTrue(ok_seb);
-   testCase.verifyTrue(ok_ieb);
-   testCase.verifyTrue(ok_cpl);
-   testCase.verifyGreaterThan(n_iters, 0);
+   testCase.verifyTrue(diag.ok_seb);
+   testCase.verifyTrue(diag.ok_ieb);
+   testCase.verifyTrue(diag.ok_cpl);
+   testCase.verifyGreaterThan(diag.n_iters, 0);
+   testCase.verifyEqual(sum(isfinite(diag.cpl_res_hist)), ...
+      min(diag.cpl_iters, numel(diag.cpl_res_hist)));
+   testCase.verifyEqual(diag.cpl_res_hist(end), diag.cpl_res, 'AbsTol', 0);
    testCase.verifyTrue(isreal(Ts));
    testCase.verifyTrue(all(isfinite([Ts; T; k_eff])));
    testCase.verifyLessThanOrEqual(max(f_ice + f_liq * s.ro_liq / s.ro_ice), ...
@@ -349,22 +444,21 @@ function test_iceenbal_and_iceebsolve_converge_on_synthetic_column(testCase)
    % Solve the ice column model using a direct call to
    % icemodel.column.solve_column_enthalpy (single sweep)
    solver = 1;
-   [T_dir, f_ice_dir, f_liq_dir, k_eff_dir, ok_dir, iter_dir] = ...
+   [T_dir, f_ice_dir, f_liq_dir, k_eff_dir, ~, ~, ok_dir, iter_dir] = ...
       icemodel.column.solve_column_enthalpy(s.Ts, s.T, s.f_ice, s.f_liq, ...
       s.Fc, s.Fp, s.Sc, s.Sp, s.dz, s.delz, s.fn, s.opts.dt, solver, s.tol, ...
-      s.maxiter, s.alpha, s.use_aitken, s.jumpmax, false);
+      s.maxiter, s.alpha, s.use_aitken, s.jumpmax, false, ...
+      s.opts.f_res_pore_ice);
 
-   % Solve the ice column model using the fully coupled solver with robin bc
-   solver = 3;
-   [Ts, T_rob, f_ice_rob, f_liq_rob, k_eff_rob, ~, ok_rob, ~, n_iters_rob] = ...
+   % Solve the ice column model using the fully coupled solver with robin bc.
+   % s.settings.solver is already 3 (the ice fixture's build-time opts).
+   [Ts, T_rob, f_ice_rob, f_liq_rob, k_eff_rob, ~, ~, diag_rob] = ...
       icemodel.couplers.solve_surface_column_robin( ...
       s.Ts, s.T, s.f_ice, s.f_liq, s.Sc, s.Sp, s.dz, s.delz, s.fn, ...
       s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, ...
       s.tppt, s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, ...
-      s.H_e, s.hv_atm, s.br_coefs, s.liqflag, s.chi, solver, s.tol, s.maxiter, ...
-      s.alpha, s.use_aitken, s.jumpmax, s.cpl_Ts_tol, s.cpl_seb_tol, ...
-      s.cpl_maxiter, s.cpl_alpha, s.cpl_aitken, s.cpl_jumpmax, ...
-      s.ro_sfc, s.snow_depth, s.opts);
+      s.H_e, s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...
+      s.snow_depth, s.opts.f_res_pore_ice, s.settings, s.opts);
 
    % Verify the single-sweep direct solve is valid
    testCase.verifyTrue(ok_dir);
@@ -374,8 +468,8 @@ function test_iceenbal_and_iceebsolve_converge_on_synthetic_column(testCase)
       s.ro_liq / s.ro_ice), 1 + 1e-9);
 
    % Verify the fully coupled robin bc solve is valid
-   testCase.verifyTrue(ok_rob);
-   testCase.verifyGreaterThan(n_iters_rob, 0);
+   testCase.verifyTrue(diag_rob.ok_seb && diag_rob.ok_ieb && diag_rob.ok_cpl);
+   testCase.verifyGreaterThan(diag_rob.n_iters, 0);
    testCase.verifyTrue(isfinite(Ts));
    testCase.verifyTrue(isreal(Ts));
    testCase.verifyTrue(all(isfinite([T_rob; k_eff_rob])));
@@ -383,15 +477,118 @@ function test_iceenbal_and_iceebsolve_converge_on_synthetic_column(testCase)
       s.ro_liq / s.ro_ice), 1 + 1e-9);
 end
 
+function test_robin_adapter_returns_inner_accepted_vapor_flux(testCase)
+   % A one-sweep Robin adapter must return the accepted inner solve's vapor
+   % flux through its sixth output when solver is greater than one.
+
+   s = testCase.TestData.ice;
+   solver = 3;
+
+   % Reproduce the coefficients that the adapter sends to its only inner
+   % solve. The direct solve and adapter then start from the same state.
+   [Fc, Fp] = icemodel.surface.surface_flux_linearization( ...
+      s.Ts, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, s.tppt, ...
+      s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, s.H_e, ...
+      s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...
+      s.snow_depth, s.opts);
+   [T_inner, f_ice_inner, f_liq_inner, k_eff_inner, U_vap_inner, ~, ...
+      ok_inner, ~, ~, ~] = icemodel.column.solve_column_enthalpy( ...
+      s.Ts, s.T, s.f_ice, s.f_liq, Fc, Fp, s.Sc, s.Sp, s.dz, s.delz, ...
+      s.fn, s.opts.dt, solver, s.tol, s.maxiter, s.alpha, ...
+      s.use_aitken, s.jumpmax, s.opts.debug, s.opts.f_res_pore_ice);
+
+   settings = s.settings;
+   settings.cpl_maxiter = 1;
+   [~, T_adapter, f_ice_adapter, f_liq_adapter, k_eff_adapter, ...
+      U_vap_adapter, ~, diag_adapter] = ...
+      icemodel.couplers.solve_surface_column_robin( ...
+      s.Ts, s.T, s.f_ice, s.f_liq, s.Sc, s.Sp, s.dz, s.delz, s.fn, ...
+      s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, ...
+      s.tppt, s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, ...
+      s.H_e, s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...
+      s.snow_depth, s.opts.f_res_pore_ice, settings, s.opts);
+
+   testCase.verifyTrue(ok_inner && diag_adapter.ok_seb && ...
+      diag_adapter.ok_ieb && diag_adapter.ok_cpl);
+   testCase.verifyEqual(T_adapter, T_inner, 'AbsTol', 0);
+   testCase.verifyEqual(f_ice_adapter, f_ice_inner, 'AbsTol', 0);
+   testCase.verifyEqual(f_liq_adapter, f_liq_inner, 'AbsTol', 0);
+   testCase.verifyEqual(k_eff_adapter, k_eff_inner, 'AbsTol', 0);
+   testCase.verifyEqual(U_vap_adapter, U_vap_inner, 'AbsTol', 0);
+end
+
+function test_one_cell_column_preserves_solver_and_coupler_outputs(testCase)
+   % The tenth solver output must stay a finite residual and the fifth must
+   % stay the two-face vapor flux when a closed column has only one cell.
+
+   s = testCase.TestData.ice;
+   s.T = s.T(1);
+   s.f_ice = s.f_ice(1);
+   s.f_liq = s.f_liq(1);
+   s.Sc = s.Sc(1);
+   s.Sp = s.Sp(1);
+   s.dz = s.dz(1);
+   s.delz = 0.5 * s.dz * ones(2, 1);
+   s.fn = [0; 1];
+
+   % Exercise the direct output ordering that exposed the one-cell indexing.
+   [T, f_ice, f_liq, k_eff, U_vap, ~, ok, ~, a1, err] = ...
+      icemodel.column.solve_column_enthalpy( ...
+      s.Ts, s.T, s.f_ice, s.f_liq, 0.0, 0.0, s.Sc, s.Sp, s.dz, ...
+      s.delz, s.fn, s.opts.dt, 1, s.tol, s.maxiter, s.alpha, ...
+      s.use_aitken, s.jumpmax, s.opts.debug, s.opts.f_res_pore_ice);
+   testCase.verifyTrue(ok);
+   testCase.verifyTrue(all(isfinite([T; f_ice; f_liq; k_eff; a1; err])));
+   testCase.verifyEqual(U_vap, zeros(2, 1), 'AbsTol', 0);
+
+   % Both column couplers request output five and must therefore retain
+   % the same one-cell behavior through the complete surface-column call.
+   settings_dir = s.settings;
+   settings_dir.solver = 1;
+   settings_dir.cpl_maxiter = 1;
+   [Ts_dir, T_dir, ~, ~, ~, U_dir, ~, diag_dir] = ...
+      icemodel.couplers.solve_surface_column_dirichlet( ...
+      s.Ts, s.T, s.f_ice, s.f_liq, s.Sc, s.Sp, s.dz, s.delz, s.fn, ...
+      s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, ...
+      s.tppt, s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, ...
+      s.H_e, s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...
+      s.snow_depth, s.opts.f_res_pore_ice, settings_dir, s.opts);
+   testCase.verifyTrue(diag_dir.ok_seb && diag_dir.ok_ieb && diag_dir.ok_cpl);
+   testCase.verifyTrue(all(isfinite([Ts_dir; T_dir])));
+   testCase.verifyEqual(U_dir, zeros(2, 1), 'AbsTol', 0);
+
+   settings_rob = s.settings;
+   settings_rob.solver = 3;
+   settings_rob.cpl_maxiter = 1;
+   [Ts_rob, T_rob, ~, ~, ~, U_rob, ~, diag_rob] = ...
+      icemodel.couplers.solve_surface_column_robin( ...
+      s.Ts, s.T, s.f_ice, s.f_liq, s.Sc, s.Sp, s.dz, s.delz, s.fn, ...
+      s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, ...
+      s.tppt, s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, ...
+      s.H_e, s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...
+      s.snow_depth, s.opts.f_res_pore_ice, settings_rob, s.opts);
+   testCase.verifyTrue(diag_rob.ok_seb && diag_rob.ok_ieb && diag_rob.ok_cpl);
+   testCase.verifyTrue(all(isfinite([Ts_rob; T_rob])));
+   testCase.verifyEqual(U_rob, zeros(2, 1), 'AbsTol', 0);
+
+   % Both couplers return the same fields as the raw substep attempt.
+   step_diag = icemodel.couplers.initialize_solver_diag();
+   expected = fieldnames(step_diag.substep);
+   testCase.verifyEqual(fieldnames(diag_dir), expected);
+   testCase.verifyEqual(fieldnames(diag_rob), expected);
+   testCase.verifyEqual(size(diag_dir.cpl_res_hist), [16 1]);
+   testCase.verifyEqual(size(diag_rob.cpl_res_hist), [16 1]);
+end
+
 function test_iceenbal_routes_exhausted_budget_to_substep_recovery(testCase)
    % A solve that uses its entire inner iteration budget must let the caller
    % restore the checkpoint and reduce dt instead of accepting that iterate.
 
    s = testCase.TestData.ice;
-   [~, ~, ~, ~, ok, iter] = icemodel.column.solve_column_enthalpy( ...
+   [~, ~, ~, ~, ~, ~, ok, iter] = icemodel.column.solve_column_enthalpy( ...
       s.Ts, s.T, s.f_ice, s.f_liq, s.Fc, s.Fp, s.Sc, s.Sp, s.dz, ...
       s.delz, s.fn, s.opts.dt, 1, s.tol, 1, s.alpha, ...
-      s.use_aitken, s.jumpmax, false);
+      s.use_aitken, s.jumpmax, false, s.opts.f_res_pore_ice);
 
    testCase.verifyFalse(ok);
    testCase.verifyEqual(iter, 1);
@@ -504,27 +701,76 @@ function test_robin_debug_dump_handles_inner_failure(testCase)
    opts = s.opts;
    opts.debug = true;
 
-   % A one-iteration inner budget deterministically exercises the failure dump.
-   [~, ~, ~, ~, ~, ok_seb, ok_ieb, ok_cpl] = ...
+   % A one-iteration inner budget deterministically exercises the failure
+   % dump. The coupler reads debug from settings.debug, so the debug flag
+   % needs the same override as opts.debug.
+   settings = s.settings;
+   settings.maxiter = 1;
+   settings.debug = true;
+   [~, ~, ~, ~, ~, ~, ~, diag] = ...
       icemodel.couplers.solve_surface_column_robin( ...
       s.Ts, s.T, s.f_ice, s.f_liq, s.Sc, s.Sp, s.dz, s.delz, s.fn, ...
       s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, ...
       s.tppt, s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, ...
-      s.H_e, s.hv_atm, s.br_coefs, s.liqflag, s.chi, 3, s.tol, 1, ...
-      s.alpha, s.use_aitken, s.jumpmax, s.cpl_Ts_tol, s.cpl_seb_tol, ...
-      s.cpl_maxiter, s.cpl_alpha, s.cpl_aitken, s.cpl_jumpmax, ...
-      s.ro_sfc, s.snow_depth, opts);
+      s.H_e, s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...
+      s.snow_depth, s.opts.f_res_pore_ice, settings, opts);
 
-   % The public flags and persisted diagnostic must identify the same failure.
-   testCase.verifyTrue(ok_seb);
-   testCase.verifyFalse(ok_ieb);
-   testCase.verifyFalse(ok_cpl);
-   testCase.assertEqual(exist(debug_file, 'file'), 2);
-   loaded = load(debug_file, 'debug_state');
+   % The returned flags and saved diagnostic must identify the same
+   % failure. Dumps are sequence-numbered by a persistent counter that
+   % survives across calls in one MATLAB session, so this single-event
+   % probe discovers the one numbered file under its own fresh base path
+   % instead of assuming the sequence starts at one.
+   testCase.verifyTrue(diag.ok_seb);
+   testCase.verifyFalse(diag.ok_ieb);
+   testCase.verifyFalse(diag.ok_cpl);
+   [dump_dir, dump_name, dump_ext] = fileparts(debug_file);
+   dump_listing = dir(fullfile(dump_dir, ...
+      sprintf('%s_*%s', dump_name, dump_ext)));
+   testCase.assertNumElements(dump_listing, 1);
+   dump_file = fullfile(dump_dir, dump_listing(1).name);
+   loaded = load(dump_file, 'debug_state');
    testCase.verifyEqual(loaded.debug_state.reason, "iceenbal_failed");
-   testCase.verifyTrue(loaded.debug_state.ok_seb);
    testCase.verifyFalse(loaded.debug_state.ok_ieb);
    testCase.verifyFalse(loaded.debug_state.ok_cpl);
+   testCase.verifyEqual(size(loaded.debug_state.res_hist), [16 1]);
+end
+
+function test_dirichlet_debug_dump_keeps_coupling_residual_history(testCase)
+   % A coupling failure dump must contain each evaluated residual.
+
+   s = testCase.TestData.ice;
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   debug_file = fullfile(fixture.Folder, 'ice-debug.mat');
+   old_debug_file = getenv('ICEMODEL_DEBUG_ICEEBSOLVE_FILE');
+   cleanup = onCleanup(@() restoreIceEbDebugEnv( ...
+      old_debug_file, debug_file));
+   setenv('ICEMODEL_DEBUG_ICEEBSOLVE_FILE', debug_file)
+
+   % Negative tolerances force failure after two evaluated residuals.
+   settings = s.settings;
+   settings.solver = 1;
+   settings.debug = true;
+   settings.cpl_maxiter = 2;
+   settings.cpl_Ts_tol = -1;
+   settings.cpl_seb_tol = -1;
+   opts = s.opts;
+   opts.debug = true;
+   [~, ~, ~, ~, ~, ~, ~, diag] = ...
+      icemodel.couplers.solve_surface_column_dirichlet( ...
+      s.Ts, s.T, s.f_ice, s.f_liq, s.Sc, s.Sp, s.dz, s.delz, s.fn, ...
+      s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, ...
+      s.tppt, s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, ...
+      s.H_e, s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...
+      s.snow_depth, s.opts.f_res_pore_ice, settings, opts);
+
+   dump_listing = dir(fullfile(fixture.Folder, 'ice-debug_dirichlet_*.mat'));
+   testCase.assertNumElements(dump_listing, 1);
+   loaded = load(fullfile(fixture.Folder, dump_listing(1).name), ...
+      'debug_state');
+   testCase.verifyEqual(loaded.debug_state.reason, "coupler_nonconvergence");
+   testCase.verifyEqual(loaded.debug_state.res_hist, diag.cpl_res_hist);
+   testCase.verifyEqual(sum(isfinite(diag.cpl_res_hist)), 2);
 end
 
 function test_robin_coupler_supports_monin_obukhov_on_synthetic_column(testCase)
@@ -537,15 +783,13 @@ function test_robin_coupler_supports_monin_obukhov_on_synthetic_column(testCase)
       z0_ice=0.02, testname='ice_kernel_robin_bulk_mo');
 
    % Solve the ice column model using the fully coupled solver with robin bc
-   [Ts, T_rob, f_ice_rob, f_liq_rob, k_eff_rob, ~, ok_rob, ~, n_iters_rob] = ...
+   [Ts, T_rob, f_ice_rob, f_liq_rob, k_eff_rob, ~, ~, diag_rob] = ...
       icemodel.couplers.solve_surface_column_robin( ...
       s.Ts, s.T, s.f_ice, s.f_liq, s.Sc, s.Sp, s.dz, s.delz, s.fn, ...
       s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, ...
       s.tppt, s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, ...
-      s.H_e, s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.opts.solver, ...
-      s.tol, s.maxiter, s.alpha, s.use_aitken, s.jumpmax, s.cpl_Ts_tol, ...
-      s.cpl_seb_tol, s.cpl_maxiter, s.cpl_alpha, s.cpl_aitken, ...
-      s.cpl_jumpmax, s.ro_sfc, s.snow_depth, s.opts);
+      s.H_e, s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...
+      s.snow_depth, s.opts.f_res_pore_ice, s.settings, s.opts);
 
    % Compute the residual
    residual = icemodel.surface.surface_energy_balance_residual(Ts, s.tair, ...
@@ -555,8 +799,8 @@ function test_robin_coupler_supports_monin_obukhov_on_synthetic_column(testCase)
       s.dz, s.ro_sfc, s.snow_depth, s.opts);
 
    % Verify the solution is valid
-   testCase.verifyTrue(ok_rob);
-   testCase.verifyGreaterThan(n_iters_rob, 0);
+   testCase.verifyTrue(diag_rob.ok_seb && diag_rob.ok_ieb && diag_rob.ok_cpl);
+   testCase.verifyGreaterThan(diag_rob.n_iters, 0);
    testCase.verifyTrue(isreal(Ts));
    testCase.verifyTrue(all(isfinite([Ts; T_rob; k_eff_rob; residual])));
    testCase.verifyLessThanOrEqual(max(f_ice_rob + f_liq_rob * ...
@@ -564,10 +808,110 @@ function test_robin_coupler_supports_monin_obukhov_on_synthetic_column(testCase)
    testCase.verifyLessThan(abs(residual), 1.0);
 end
 
+function test_skin_debug_dump_keeps_coupling_residual_history(testCase)
+   % A coupling failure dump must contain the evaluated residual history.
+
+   s = testCase.TestData.skin;
+   % Negative tolerances force an outer-coupling failure after two evaluated
+   % residuals while leaving both inner solves unchanged.
+   settings = s.settings;
+   settings.debug = true;
+   settings.cpl_maxiter = 2;
+   settings.cpl_Ts_tol = -1;
+   settings.cpl_seb_tol = -1;
+   opts = s.opts;
+   opts.debug = true;
+   [diag, debug_state] = runSkinDebugFailure(testCase, s, settings, opts);
+
+   testCase.verifyEqual(debug_state.reason, "coupler_nonconvergence");
+   testCase.verifyEqual(debug_state.res_hist, diag.cpl_res_hist);
+end
+
+function test_skin_debug_dump_handles_column_failure(testCase)
+   % A column-solve failure occurs before any coupling residual is evaluated.
+
+   s = testCase.TestData.skin;
+   settings = s.settings;
+   settings.debug = true;
+   settings.maxiter = 1;
+   opts = s.opts;
+   opts.debug = true;
+   [diag, debug_state] = runSkinDebugFailure(testCase, s, settings, opts);
+
+   testCase.verifyEqual(debug_state.reason, "skinsolve_failed");
+   testCase.verifyEqual(debug_state.res_hist, diag.cpl_res_hist);
+   testCase.verifyTrue(all(isnan(debug_state.res_hist)));
+end
+
+function test_skin_debug_dump_handles_surface_failure(testCase)
+   % A surface-solve failure occurs before its residual can be recorded.
+
+   s = testCase.TestData.skin;
+   settings = s.settings;
+   settings.debug = true;
+   opts = s.opts;
+   opts.debug = true;
+   opts.seb_solver = -1;
+   [diag, debug_state] = runSkinDebugFailure(testCase, s, settings, opts);
+
+   testCase.verifyEqual(debug_state.reason, "sebsolve_failed");
+   testCase.verifyEqual(debug_state.res_hist, diag.cpl_res_hist);
+   testCase.verifyTrue(all(isnan(debug_state.res_hist)));
+end
+
+function [diag, debug_state] = runSkinDebugFailure(testCase, s, settings, opts)
+   %RUNSKINDEBUGFAILURE Run one skin-coupler failure with an isolated dump.
+
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   debug_file = fullfile(fixture.Folder, 'skin-debug.mat');
+   old_debug_file = getenv('ICEMODEL_DEBUG_SKINEBSOLVE_FILE');
+   cleanup = onCleanup(@() restoreSkinEbDebugEnv(old_debug_file));
+   setenv('ICEMODEL_DEBUG_SKINEBSOLVE_FILE', debug_file)
+
+   [~, ~, ~, ~, ~, diag] = ...
+      icemodel.couplers.solve_skin_surface_column( ...
+      s.Ts, s.T, s.f_ice, s.f_liq, s.dz, s.delz, s.fn, ...
+      s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, s.tppt, ...
+      s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, s.H_e, ...
+      s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...
+      s.snow_depth, settings, opts);
+
+   dump_listing = dir(fullfile(fixture.Folder, 'skin-debug_*.mat'));
+   testCase.assertNumElements(dump_listing, 1);
+   loaded = load(fullfile(fixture.Folder, dump_listing(1).name), 'debug_state');
+   debug_state = loaded.debug_state;
+end
+
 function restoreIceEbDebugEnv(old_debug_file, debug_file)
    %RESTOREICEEBDEBUGENV Restore the debug target and remove the test artifact.
    setenv('ICEMODEL_DEBUG_ICEEBSOLVE_FILE', old_debug_file)
+   % The dump writer appends sequence numbers before the extension, so
+   % remove every numbered file the probe produced.
+   [dump_dir, dump_name, dump_ext] = fileparts(debug_file);
+   numbered = dir(fullfile(dump_dir, [dump_name, '_*', dump_ext]));
+   for k = 1:numel(numbered)
+      delete(fullfile(numbered(k).folder, numbered(k).name))
+   end
    if exist(debug_file, 'file') == 2
       delete(debug_file)
+   end
+end
+
+function restoreSkinEbDebugEnv(old_debug_file)
+   %RESTORESKINEBDEBUGENV Restore the debug target.
+   setenv('ICEMODEL_DEBUG_SKINEBSOLVE_FILE', old_debug_file)
+end
+
+function restoreProfiler(prior)
+   %RESTOREPROFILER Put the profiler back in the caller's on/off state.
+   %
+   % PROFILE('info') requires the temporary data collected by this test, so
+   % only the caller's active state can be restored after that data is cleared.
+
+   profile off
+   profile clear
+   if strcmp(prior.ProfilerStatus, 'on')
+      profile on
    end
 end

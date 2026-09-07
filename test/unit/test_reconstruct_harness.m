@@ -3,10 +3,21 @@ function tests = test_reconstruct_harness
    tests = functiontests(localfunctions);
 end
 
-function setup(testCase)
-   % Install the verification path for namespace resolution.
+function setupOnce(testCase)
+   % Install the verification path for namespace resolution, once for
+   % the file. Per-test bootstrap re-ran the full path scan before
+   % every one of the 44 tests and dominated the file's fixed cost.
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.cleanup = cleanup;
+end
+
+function teardownOnce(testCase)
+   % Release the bootstrap cleanup handle after the last test.
+   testCase.TestData.cleanup = [];
+end
+
+function setup(testCase)
+   % Each test gets its own scratch directory for split manifests.
    testCase.TestData.tmp = tempname;
    mkdir(testCase.TestData.tmp);
 end
@@ -16,7 +27,6 @@ function teardown(testCase)
    if isfolder(testCase.TestData.tmp)
       rmdir(testCase.TestData.tmp, 's')
    end
-   clear testCase.TestData.cleanup
 end
 
 %% gapCensus

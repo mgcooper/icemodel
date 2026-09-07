@@ -1,28 +1,25 @@
 function [rainf, snowf] = resolvePrecipPhase(ppt, tair, rainf_source, ...
       snowf_source, phase_source)
-   %RESOLVEPRECIPPHASE Select the runtime rain/snow split (POLICY A10/D-18).
+   %RESOLVEPRECIPPHASE Select the runtime rainf/snowf split.
    %
    %  [rainf, snowf] = icemodel.resolvePrecipPhase(ppt, tair, ...
    %     rainf_source, snowf_source, phase_source)
    %
    % Inputs
-   %  ppt          - canonical total precipitation rate [m s-1]
+   %  ppt          - total precipitation rate [m s-1]
    %  tair         - air temperature [K]
-   %  rainf_source - the met product's own liquid component [m s-1]
-   %  snowf_source - the met product's own solid component [m s-1]
+   %  rainf_source - the met product's own rainfall [m s-1]
+   %  snowf_source - the met product's own snowfall [m s-1]
    %  phase_source - runtime phase-source option (opts.precip_phase_source
    %     from icemodel.setopts):
-   %     'source'    the product's split exactly as shipped (e.g. MAR's
-   %                 energy-balance split). An absent or missing component
-   %                 stays missing. This function never invents a value.
+   %     'source'    the met product's split as provided.
    %     'threshold' repartition PPT by air temperature with
    %                 icemodel.forcing.reconstruct.partitionPrecipitation. The
    %                 transition temperature defaults from
    %                 icemodel.forcing.reconstruct.setopts.
    %
-   % Both modes enforce the POLICY A10 validity contract: every finite value
-   % is nonnegative, a finite phase cannot exceed a finite total, and every
-   % complete split sums to the total.
+   % Both modes enforce every finite value is nonnegative, a finite phase cannot
+   % exceed a finite total, and every complete split sums to the total.
    %
    % See also: icemodel.surface.initialize_surface_forcings
    %           icemodel.forcing.reconstruct.partitionPrecipitation
@@ -45,13 +42,11 @@ function [rainf, snowf] = resolvePrecipPhase(ppt, tair, rainf_source, ...
 
    switch lower(char(phase_source))
       case 'source'
-         % A10: the product's split is data; expose it bit-identically.
+         % Use the met product's values.
          rainf = rainf_source;
          snowf = snowf_source;
       case 'threshold'
-         % A10/D-18: runtime threshold partition of the canonical total. The
-         % kwargs default inside partitionPrecipitation supplies the
-         % transition temperature.
+         % Repartition total ppt.
          [rainf, snowf] = ...
             icemodel.forcing.reconstruct.partitionPrecipitation(ppt, tair);
       otherwise
@@ -60,8 +55,7 @@ function [rainf, snowf] = resolvePrecipPhase(ppt, tair, rainf_source, ...
             char(phase_source));
    end
 
-   % POLICY A10 validity uses the same shared helper as reconstruction and
-   % artifact verification. The check leaves missing values as they are.
+   % Check for bad data. The check leaves missing values in place.
    violates = ~icemodel.forcing.helpers.precipitationValidity( ...
       ppt, rainf, snowf);
    if any(violates)

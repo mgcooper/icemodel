@@ -9,28 +9,22 @@ function [solid_mwe, liquid_mwe, enthalpy_j_m2] = ...
    %
    % solid_mwe and liquid_mwe are positive storage depths in metres water
    % equivalent. enthalpy_j_m2 is the column integral of the solver's
-   % bulk_enthalpy measure. It uses the documented dry-mixture reference and
-   % omits vapor, so remeshing compares on one fixed material basis.
+   % bulk_enthalpy measure. It excludes vapor because the column energy
+   % budget tracks ice and liquid storage.
    %
-   % All MWE outputs use the solver's physical intrinsic phase densities and
-   % physical liquid-water density as the fixed reference. The use_ro_glc
-   % option changes initialization fractions only; it does not redefine this
-   % basis. See icemodel-hd6.
+   % DZ may be a scalar uniform-cell thickness or a vector.
    %
-   % DZ may be a scalar uniform-cell thickness or a vector matching the state.
+   % See also: icemodel.column.initialize_budget_state,
+   %  icemodel.column.bulk_enthalpy
    %
    %#codegen
 
-   % Cache the constants. In the diagnostic profile, each accumulator calls
-   % this once per accepted substep, plus once per merge event, and
-   % physicalConstant rebuilds its whole table on every call.
    persistent ro_ice ro_liq
    if isempty(ro_ice)
       [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
    end
 
-   % Integrate solid and liquid phase storage in mwe, on the same physical
-   % basis as solver phase change.
+   % Integrate solid and liquid phase storage in metres water equivalent.
    solid_mwe = ro_ice / ro_liq * sum(f_ice .* dz);
    liquid_mwe = sum(f_liq .* dz);
 

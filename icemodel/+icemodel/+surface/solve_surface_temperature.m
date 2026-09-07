@@ -24,13 +24,12 @@ function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, ...
    % where dQc/dT_sfc = -k_eff(1) / (dz(1) / 2) is constant.
    %
    % H_h and H_e are the precomputed sensible and latent heat transport
-   % prefactors from initialize_surface_state / updatesubstep.
+   % coefficients from initialize_surface_state / update_surface_state.
    %
-   % This is the Dirichlet surface solve: Qc and its derivative enter the
-   % Newton-Raphson residual and Jacobian directly. In the Robin path,
-   % conduction instead enters through the top-node finite-difference
-   % equation in `icemodel.column.assemble_enthalpy_system` rather than as
-   % an explicit Jacobian term here.
+   % In this Dirichlet surface solve, Qc and its derivative are included
+   % in the Newton-Raphson residual and Jacobian. In the Robin solve,
+   % conduction enters through the top-node finite-difference equation in
+   % icemodel.column.assemble_enthalpy_system rather than the Jacobian here.
    %
    % T_sfc on input is the outer coupling iterate from
    % solve_surface_energy_balance, used as the initial Newton guess. On
@@ -103,6 +102,7 @@ function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, ...
       % Updated T_sfc iterate.
       T_sfc = old - f / dfdT;
 
+      % Check convergence.
       if abs(T_sfc - old) < tol
          ok = true;
          return

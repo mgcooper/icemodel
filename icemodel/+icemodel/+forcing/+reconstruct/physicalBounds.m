@@ -7,7 +7,7 @@ function bounds = physicalBounds(channel)
    %  Holds the approved post-fill physical bounds (POLICY A15). The
    %  harness counts violations as hard method failures and the engine
    %  enforces the same limits. Bounds are inclusive [lower, upper] in the
-   %  canonical met units. A channel with a data-dependent upper limit (swd
+   %  met units. A channel with a data-dependent upper limit (swd
    %  against top-of-atmosphere, swu against swd) returns Inf here. The
    %  metrics hold both channels, so they run the relational check.
    %
@@ -53,7 +53,7 @@ function bounds = physicalBounds(channel)
       case "ppt"
          bounds = [0, Inf];           % accumulation rate is nonnegative
       case "boom_height"
-         bounds = [0, Inf];           % m; runtime additionally requires z > z0
+         bounds = [0, Inf];           % m; runtime also requires z > z0
       otherwise
          error('icemodel:reconstruct:physicalBounds:unknownChannel', ...
             'no approved physical bounds for channel: %s', channel)

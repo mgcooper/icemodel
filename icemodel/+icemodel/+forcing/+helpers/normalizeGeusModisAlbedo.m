@@ -5,9 +5,11 @@ function albedo = normalizeGeusModisAlbedo(albedo)
    %
    % GEUS Greenland Reflectivity C6 files use finite 999 values for missing
    % albedo without declaring a NetCDF fill or valid-range attribute. This
-   % function converts every nonfinite or out-of-domain sample to NaN at the
-   % shared source boundary. The point, polygon, builder, and bounded-repair
-   % paths then agree on coverage.
+   % function converts every nonfinite or out-of-domain sample to NaN in one
+   % shared step. The point, polygon, builder, and bounded-repair paths then
+   % agree on coverage.
+   %
+   % See also: icemodel.forcing.readGeusModis
 
    albedo = double(albedo);
    invalid = ~isfinite(albedo) | imag(albedo) ~= 0 ...

@@ -1,15 +1,26 @@
 function tests = test_pack_fetch_fixtures
-   %TEST_PACK_FETCH_FIXTURES Validate v1.1 release-data pack/fetch transactions.
+   %TEST_PACK_FETCH_FIXTURES Validate release-data pack/fetch transactions.
    %
    % Uses tiny temporary capability trees and local archives. No test touches
    % canonical data, publishes an asset, or reaches an external network.
    tests = functiontests(localfunctions);
 end
 
-function setup(testCase)
-   %SETUP Install repo paths and build one deterministic synthetic data root.
+function setupOnce(testCase)
+   %SETUPONCE Install repo paths once for the file.
+   % Per-test bootstrap re-ran the full path scan before every one of
+   % the 38 tests and dominated the file's fixed cost.
    [~, ~, ~, ~, cleanup] = icemodel.test.helpers.bootstrapTestEnvironment();
    testCase.TestData.cleanup = cleanup;
+end
+
+function teardownOnce(testCase)
+   %TEARDOWNONCE Release the bootstrap cleanup handle after the last test.
+   testCase.TestData.cleanup = [];
+end
+
+function setup(testCase)
+   %SETUP Build one deterministic synthetic data root per test.
    testCase.TestData.root = canonicalTempname();
    testCase.TestData.staging = canonicalTempname();
    mkdir(testCase.TestData.root)
@@ -35,29 +46,38 @@ function setup(testCase)
 end
 
 function teardown(testCase)
-   %TEARDOWN Remove only this test's temporary trees and restore configuration.
+   %TEARDOWN Remove only this test's temporary trees.
    for name = ["root", "staging"]
       pathname = testCase.TestData.(name);
       if isfolder(pathname)
          rmdir(pathname, 's')
       end
    end
-   clear testCase.TestData.cleanup
 end
 
-function test_tracked_manifest_declares_v11_boundary(testCase)
-   % The tracked manifest names all three release archives and required rows.
+function test_tracked_manifest_declares_current_release(testCase)
+   % The current manifest names all three release archives and required rows.
+   version = "v" + string(icemodel.internal.version());
    [files, selection] = icemodel.verification.setup.fixtureFileList();
-   testCase.verifyEqual(selection.version, "v1.1");
+   testCase.verifyEqual(selection.version, version);
    testCase.verifyEqual(selection.capabilities, ...
       ["formal-core"; "verification-showcase"]);
    testCase.verifyEqual(string({selection.archives.name})', [ ...
-      "icemodel-v1.1-formal-core.tar.gz"; ...
-      "icemodel-v1.1-verification-showcase.tar.gz"]);
+      "icemodel-" + version + "-formal-core.tar.gz"; ...
+      "icemodel-" + version + "-verification-showcase.tar.gz"]);
    testCase.verifyTrue(all([selection.archives.bytes] > 0));
    testCase.verifyTrue(all(strlength( ...
       string({selection.archives.sha256})) == 64));
-   testCase.verifyEqual(numel(files), 11);
+   switch version
+      case "v1.1"
+         expected_required = 11;
+      case "v1.2"
+         expected_required = 13;
+      otherwise
+         testCase.assertFail( ...
+            "Add the required fixture count for " + version + ".");
+   end
+   testCase.verifyEqual(numel(files), expected_required);
 
    % Optional forcing is a complete, separately selectable source-fixture set.
    [optional_files, optional] = ...
@@ -68,7 +88,7 @@ function test_tracked_manifest_declares_v11_boundary(testCase)
    testCase.verifyFalse(any(contains(optional_files, ".DS_Store")));
    testCase.verifyFalse(optional.archives.required);
    testCase.verifyEqual(string(optional.archives.name), ...
-      "icemodel-v1.1-forcing-integration.tar.gz");
+      "icemodel-" + version + "-forcing-integration.tar.gz");
    testCase.verifyGreaterThan(optional.archives.bytes, 0);
    testCase.verifyEqual(strlength(string(optional.archives.sha256)), 64);
    testCase.verifyFalse(any([optional.files.required]));
@@ -132,6 +152,67 @@ function test_filelist_default_and_explicit_selection(testCase)
    testCase.verifyEqual(optional, "forcing/source.nc");
 end
 
+function test_fixture_data_root_uses_release_asset_tree(testCase)
+   % Every registered release uses the staged test/data asset tree.
+
+   expected = string(icemodel.internal.fullpath('test', 'data'));
+
+   testCase.verifyEqual( ...
+      icemodel.verification.setup.fixtureDataRoot("v1.1"), ...
+      expected);
+   testCase.verifyEqual( ...
+      icemodel.verification.setup.fixtureDataRoot("v1.2"), ...
+      expected);
+end
+
+function test_release_manifest_file_names_one_manifest_per_release(testCase)
+   % Producers and consumers must resolve one manifest name for a release, so
+   % this helper owns the template that every call site reads.
+
+   testCase.verifyEqual( ...
+      icemodel.verification.setup.releaseManifestFile("v1.2"), ...
+      string(icemodel.internal.fullpath('test', 'assets', ...
+      'icemodel-v1.2-data-manifest.json')));
+
+   % A blank directory returns the bare filename, which packFixtures places
+   % in its staging and work folders.
+   testCase.verifyEqual( ...
+      icemodel.verification.setup.releaseManifestFile("v1.2", directory=""), ...
+      "icemodel-v1.2-data-manifest.json");
+   testCase.verifyEqual( ...
+      icemodel.verification.setup.releaseManifestFile("v1.2", ...
+      directory="/tmp/stage"), ...
+      string(fullfile("/tmp/stage", "icemodel-v1.2-data-manifest.json")));
+
+   % The default version is the one CITATION.cff names.
+   testCase.verifyEqual( ...
+      icemodel.verification.setup.releaseManifestFile(), ...
+      icemodel.verification.setup.releaseManifestFile( ...
+      "v" + string(icemodel.internal.version())));
+end
+
+function test_v1_2_formal_core_contains_promice_filled_inputs(testCase)
+   % The v1.2 formal archive carries the forcing used by its frozen baselines.
+   manifest = icemodel.verification.setup.releaseManifestFile("v1.2");
+   root = icemodel.verification.setup.fixtureDataRoot("v1.2");
+   files = icemodel.verification.setup.fixtureFileList( ...
+      capabilities="formal-core", root=root, manifest=manifest);
+
+   expected = [ ...
+      "input/met/promice_filled/" + ...
+      "met_kanl_promice_filled_20080901_20191231_15m.mat"; ...
+      "input/met/promice_filled/" + ...
+      "met_kanm_promice_filled_20080902_20191231_15m.mat"; ...
+      "preview/qa/gapfill/ledger/kanl-readiness.csv"; ...
+      "preview/qa/gapfill/ledger/kanm-readiness.csv"; ...
+      "preview/qa/gapfill/plans/kanl-report-inputs.json"; ...
+      "preview/qa/gapfill/plans/kanm-report-inputs.json"];
+   testCase.verifyTrue(all(ismember(expected, files)));
+   testCase.verifyFalse(any(contains(files, "met_kanl_kanl")));
+   testCase.verifyFalse(any(contains(files, "met_kanm_kanm")));
+   testCase.verifyNumElements(files, 10);
+end
+
 function test_relative_posix_normalizes_windows_paths(testCase)
    % A single Windows separator normalizes identically on every test host.
    backslash = string(char(92));
@@ -189,6 +270,26 @@ function test_pack_writes_one_archive_per_capability(testCase)
    testCase.verifyTrue(all([result.manifest.archives.bytes] > 0));
    testCase.verifyTrue(all(strlength( ...
       string({result.manifest.archives.sha256})) == 64));
+end
+
+function test_pack_summary_uses_requested_version(testCase)
+   % The printed packing summary names the requested release version.
+   manifest = sourceManifest(testCase.TestData.root);
+   manifest.version = "v1.2";
+   for k = 1:numel(manifest.archives)
+      manifest.archives(k).name = replace( ...
+         manifest.archives(k).name, "v1.1", "v1.2");
+   end
+   manifest_file = fullfile(testCase.TestData.staging, ...
+      "source-manifest-v1.2.json");
+   writeManifest(manifest_file, manifest);
+   staging_dir = fullfile(testCase.TestData.staging, "v1.2-summary");
+
+   result = icemodel.verification.setup.packFixtures("v1.2", ...
+      capabilities="formal-core", root=testCase.TestData.root, ...
+      manifest=manifest_file, staging_dir=staging_dir, silent=true);
+   testCase.verifyEqual(result.summary_heading, ...
+      "=== icemodel v1.2 release data packed ===");
 end
 
 function test_required_archives_are_byte_deterministic(testCase)

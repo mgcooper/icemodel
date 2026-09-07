@@ -1,26 +1,30 @@
-function [metstep, substep, dt_new] = nexttimestep(metstep, substep, dt_max, ...
-      maxsubstep, ok, n_subfail, n_iters)
+function [metstep, substep, dt_new] = nexttimestep(metstep, substep, ...
+      ok, settings, diag)
    %NEXTTIMESTEP Advance the forcing index and adapt the next substep size.
    %
-   % The new substep size applies to the next full forcing step.
-   %
-   % Syntax:
    % [metstep, substep, dt_new] = icemodel.timestepping.nexttimestep(...
-   %    metstep, substep, dt_max, maxsubstep, ok, n_subfail, n_iters)
+   %    metstep, substep, ok, settings, diag)
+   %
+   % Update the forcing (met) index and timestep divisor, and ensure the new
+   % substep size (dt_new) is valid to carry over to the next full forcing step.
    %
    % Inputs:
-   % metstep    - current forcing step index
-   % substep    - current substep divisor (dt_new = dt_max / substep)
-   % dt_max     - full forcing-step length
-   % maxsubstep - max allowed substep divisor (sets dt_min)
-   % ok         - full-step success flag
-   % n_subfail  - number of failed/retried substeps in this full step
-   % n_iters    - iterations used by the final subsurface solve
+   %  metstep    - current forcing step index
+   %  substep    - current timestep divisor (used to compute dt_new:
+   %               dt_new = settings.dt_full_step / substep)
+   %  ok         - full-step success flag
+   %  settings   - solver settings; this function reads dt_full_step and
+   %               maxsubstep (the max substep divisor, which sets dt_min)
+   %  diag       - the forcing step's solver-diagnostics record; this
+   %               function reads n_failed_substeps and the final solve
+   %               attempt's inner iteration count diag.substep.n_iters
    %
    % Outputs:
-   % metstep    - incremented forcing step index
-   % substep    - updated substep divisor
-   % dt_new     - next-step substep length, bounded by dt_min
+   %  metstep    - incremented forcing step index
+   %  substep    - updated substep divisor
+   %  dt_new     - next-step substep length, bounded by dt_min
+   %
+   % See also: icemodel, skinmodel, icemodel.timestepping.newtimestep
    %
    %#codegen
 
@@ -29,12 +33,10 @@ function [metstep, substep, dt_new] = nexttimestep(metstep, substep, dt_max, ...
       cooldown = 0;
    end
 
-   if nargin < 7
-      n_subfail = 0;
-   end
-   if nargin < 8
-      n_iters = 0;
-   end
+   dt_max = settings.dt_full_step;
+   maxsubstep = settings.maxsubstep;
+   n_subfail = diag.n_failed_substeps;
+   n_iters = diag.substep.n_iters;
 
    % Iteration thresholds for dt control.
    % n_iters >= N_hi: solver work is high, shrink dt (increase substep).
@@ -74,7 +76,7 @@ function [metstep, substep, dt_new] = nexttimestep(metstep, substep, dt_max, ...
       dt_new = dt_max / substep;
    end
 
-   % Enforce dt_min = dt_max / maxsubstep. updatesubstep can shorten dt_new
+   % Enforce dt_min = dt_max / maxsubstep. acceptsubstep can shorten dt_new
    % below dt_min so the final substep exactly completes a full step.
    dt_new = max(dt_new, dt_max / maxsubstep);
    metstep = metstep + 1;

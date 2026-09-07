@@ -1,0 +1,1609 @@
+function tests = test_ablation_evaluation_report
+   %TEST_ABLATION_EVALUATION_REPORT Test saved-artifact scientific reporting.
+
+   tests = functiontests(localfunctions);
+end
+
+function setupOnce(testCase)
+   %SETUPONCE Build the expensive shared fixture pieces one time per file.
+   %
+   % Constructing the synthetic cohort walks the full hourly policy season,
+   % so one construction serves every test. Tests that mutate the cohort
+   % copy it into a local variable first; MATLAB struct assignment copies on
+   % write, so a local mutation never reaches TestData.
+
+   % One shared folder holds the pristine saved cohort for the tests that
+   % read it unmodified. teardownOnce removes it.
+   shared_folder = tempname;
+   mkdir(shared_folder)
+   testCase.TestData.shared_folder = shared_folder;
+
+   results = syntheticResults();
+
+   % Stamp the shared copy with the running code's own fingerprint so
+   % successful report builds take the quiet stamped-match path instead of
+   % the absent-stamp path. Resolving a fingerprint runs icemodel.setopts,
+   % which asserts that ICEMODEL_INPUT_PATH exists, so the resolution runs
+   % once here under a guard. A workspace that cannot resolve one leaves
+   % the stamp absent, which the report treats as a quiet pre-stamp cohort,
+   % so the suite stays self-contained.
+   try
+      results.physics_fingerprint = ...
+         icemodel.verification.helpers.physicsFingerprint();
+   catch
+      % The workspace cannot resolve the current defaults. Keep the fixture
+      % unstamped; only the fingerprint tests require a resolvable stamp.
+   end
+   testCase.TestData.results = results;
+
+   % The pristine saved cohort file backs every test that never mutates the
+   % struct, so those tests skip their own save round trip.
+   results_file = fullfile(shared_folder, 'results.mat');
+   save(results_file, 'results')
+   testCase.TestData.results_file = string(results_file);
+end
+
+function teardownOnce(testCase)
+   %TEARDOWNONCE Remove the shared fixture folder.
+
+   rmdir(testCase.TestData.shared_folder, 's')
+end
+
+function test_saved_results_render_complete_scientific_report(testCase)
+   % A compact saved result must produce every piece of scientific evidence.
+
+   folder = temporaryFolder(testCase);
+   % The pristine shared cohort file backs this read-only test, so it skips
+   % a per-test construction and save of the full fixture.
+   results_file = testCase.TestData.results_file;
+   expected_results_sha256 = ...
+      icemodel.verification.setup.fileSha256(results_file);
+   output_folder = fullfile(folder, "report $() 'quoted'");
+   mkdir(output_folder)
+   source_ledgers = ["summary.csv", "nested-windows.csv", ...
+      "endpoint-perturbations.csv"];
+   for name = source_ledgers
+      writelines("source-ledger-sentinel", fullfile(output_folder, name))
+   end
+
+   report_file = ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, render=false, output_dir=output_folder);
+
+   % The report is a pure consumer: nonexistent saved provenance paths do not
+   % prevent source, table, or figure generation.
+   verifyEqual(testCase, report_file, fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.html'))
+   expected_tables = ["report-readiness.csv", "report-summary.csv", ...
+      "report-nested-windows.csv", "report-endpoint-perturbations.csv", ...
+      "site-year-synthesis.csv", ...
+      "synthesis-status.csv", "observation-support.csv", ...
+      "signed-solid-components.csv", "grid-translation.csv", ...
+      "model-initialization.csv", ...
+      "performance-metrics.csv", "performance-summary.csv", ...
+      "closure-identities.csv", "materiality.csv", ...
+      "accounting-scenarios.csv", ...
+      "effective-density-sensitivity.csv", "support-exclusions.csv", ...
+      "observation-rate-outliers.csv"];
+   for name = expected_tables
+      verifyTrue(testCase, isfile(fullfile(output_folder, name)))
+   end
+
+   % Every table written beside the report must also be linked from it. A
+   % table that exists on disk but is unreachable from the document is
+   % invisible to a reader, so a new artifact could go unreported.
+   report_text = string(fileread(fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd')));
+   for name = expected_tables
+      verifyTrue(testCase, contains(report_text, name), ...
+         "report does not link " + name)
+   end
+   for name = source_ledgers
+      verifyEqual(testCase, strtrim(fileread(fullfile(output_folder, name))), ...
+         'source-ledger-sentinel')
+   end
+   identities = readtable(fullfile(output_folder, ...
+      'closure-identities.csv'), TextType='string');
+   verifyEqual(testCase, string(identities.Properties.VariableNames), ...
+      ["case_id", "site_id", "year", "identity", "units", "residual", ...
+      "normalization", "tolerance", "window_passed", "step_passed", ...
+      "failed_step_count", "passed"])
+   scenarios = readtable(fullfile(output_folder, ...
+      'accounting-scenarios.csv'), TextType='string');
+   endpoint_rows = scenarios.role == "endpoint";
+   verifyEqual(testCase, nnz(endpoint_rows), 1)
+   verifyFalse(testCase, any(scenarios.credible(endpoint_rows)))
+   density_sensitivity = readtable(fullfile(output_folder, ...
+      'effective-density-sensitivity.csv'), TextType='string');
+   verifyFalse(testCase, any(density_sensitivity.rigorous_bound))
+
+   expected_assets = ["ablation-nested-window-stability.png", ...
+      "ablation-endpoint-perturbation-stability.png", ...
+      "kanm-2019-cumulative-comparison.png", ...
+      "ablation-signed-components.png", ...
+      "ablation-closure-materiality.png", ...
+      "ablation-cross-site-synthesis.png", ...
+      "performance-endpoint-scatter.png", ...
+      "performance-summary.png"];
+   for name = expected_assets
+      verifyTrue(testCase, isfile(fullfile(output_folder, ...
+         'report-assets', name)))
+   end
+   verifyFalse(testCase, isfile(fullfile(output_folder, 'report-assets', ...
+      'ablation-cohort-attrition.png')))
+
+   % The finalized nonrecursive manifest byte-pins the source MAT and every
+   % generated artifact; render=false produces no HTML row.
+   manifest_file = fullfile(output_folder, ...
+      'report-artifact-sha256.csv');
+   verifyTrue(testCase, isfile(manifest_file))
+   manifest = readtable(manifest_file, TextType='string');
+   verifyEqual(testCase, string(manifest.Properties.VariableNames), ...
+      ["artifact_role", "artifact_path", "bytes", "sha256"])
+   expected_manifest_paths = [string(results_file); ...
+      "promice-ablation-evaluation-report.qmd"; expected_tables(:); ...
+      "report-assets/" + expected_assets(:)];
+   verifyEqual(testCase, sort(manifest.artifact_path), ...
+      sort(expected_manifest_paths))
+   verifyFalse(testCase, any(manifest.artifact_path ...
+      == "report-artifact-sha256.csv"))
+
+   % Every exported figure must be hashed. Coverage is checked against the
+   % asset directory, so a new figure cannot ship unhashed.
+   exported_assets = dir(fullfile(output_folder, 'report-assets', '*.png'));
+   verifyEqual(testCase, ...
+      sort("report-assets/" + string({exported_assets.name})'), ...
+      sort(manifest.artifact_path(startsWith(manifest.artifact_path, ...
+      "report-assets/"))))
+   verifyFalse(testCase, any(manifest.artifact_path ...
+      == "report-assets/ablation-cohort-attrition.png"))
+   verifyFalse(testCase, any(manifest.artifact_role == "report_html"))
+   source_row = manifest.artifact_role == "source_results_mat";
+   verifyEqual(testCase, nnz(source_row), 1)
+   verifyEqual(testCase, manifest.sha256(source_row), ...
+      expected_results_sha256)
+   for k = 1:height(manifest)
+      pathname = fullfile(output_folder, manifest.artifact_path(k));
+      if manifest.artifact_role(k) == "source_results_mat"
+         pathname = manifest.artifact_path(k);
+      end
+      verifyEqual(testCase, manifest.sha256(k), ...
+         icemodel.verification.setup.fileSha256(pathname))
+   end
+
+   % Required scientific sections and machine-readable links remain inspectable
+   % in plain QMD without invoking Quarto.
+   source = fileread(fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd'));
+   required_sections = ["## Structured Abstract", "## Executive Summary", ...
+      "## Data and Methods", "## Results", ...
+      "### Cumulative ablation by site and year", ...
+      "### Directional outcomes and identifiability drivers", ...
+      "## Discussion", "## Limitations", "## Conclusions", ...
+      "## Operational Accounting Appendix", ...
+      "## Reproducibility Appendix"];
+   for section = required_sections
+      verifySubstring(testCase, source, section)
+   end
+   verifySubstring(testCase, source, ...
+      "![kanm 2019 cumulative comparison]" + ...
+      "(report-assets/kanm-2019-cumulative-comparison.png)")
+   verifySubstring(testCase, source, expected_results_sha256)
+   verifySubstring(testCase, source, ...
+      "[Report artifact SHA-256 manifest](report-artifact-sha256.csv)")
+   verifyFalse(testCase, contains(source, ...
+      "![KAN\\_M 2019 cumulative comparison over"))
+   verifySubstring(testCase, source, "```{mermaid}")
+   verifySubstring(testCase, source, ...
+      "PROMICE sonic ranger or pressure transducer")
+   verifySubstring(testCase, source, "Instrument reference datum")
+   verifySubstring(testCase, source, ...
+      "Unverified endpoint weathering-crust deficit sensitivity")
+   verifySubstring(testCase, source, "Liquid storage, reported separately")
+   verifySubstring(testCase, source, "1 June through 1 October")
+
+   % The rendered document, not the builder source, is what a reader acts on,
+   % so this checks the document text directly: it must state the balance is
+   % signed and able to decrease. Without that wording, a falling curve could
+   % be misread as surface lowering.
+   verifySubstring(testCase, source, "signed net solid balance")
+   verifySubstring(testCase, source, "can decrease")
+
+   % These four checks pin the absence of a plotting construct. An absence
+   % leaves no signature in the rendered document, so the builder source is
+   % the only place these claims can be checked.
+   builder_source = fileread(which( ...
+      'icemodel.verification.report.buildAblationEvaluationReport'));
+
+   % Two panels, one unit family. A secondary metre axis would put quantized
+   % grid translation on the same plot as exported mass.
+   verifySubstring(testCase, builder_source, "tiledlayout(fig, 2, 1")
+   verifyFalse(testCase, contains(builder_source, "yyaxis"))
+
+   % A cummax clamp would hide a decreasing signed balance, which is the
+   % behaviour the "can decrease" wording above documents.
+   verifyFalse(testCase, contains(builder_source, "cummax("))
+
+   % The density band is plotted low endpoint first regardless of the order
+   % the two bounds arrive in.
+   verifySubstring(testCase, builder_source, "min(bound_a, bound_b)")
+   verifySubstring(testCase, builder_source, "max(bound_a, bound_b)")
+   verifySubstring(testCase, source, "600--900 kg m^-3")
+   verifySubstring(testCase, source, ...
+      "600 kg m^-3 density endpoint represents porous weathering-crust")
+   verifySubstring(testCase, source, ...
+      "the two band edges are ordered pointwise for signed lowering")
+   verifyFalse(testCase, contains(source, ...
+      "Observed surface lowering is bounded"))
+   verifyFalse(testCase, contains(source, ...
+      "Numeric lower and upper bounds"))
+   verifySubstring(testCase, source, ...
+      "legacy cumulative melt diagnostic")
+   verifySubstring(testCase, source, ...
+      "Saved cumulative refreezing is plotted explicitly")
+   verifySubstring(testCase, source, ...
+      "water budget for the pore " ...
+      + "reservoir with a trailing refreezing residence limit")
+   verifySubstring(testCase, source, "not a modeled boundary flux")
+   verifySubstring(testCase, source, ...
+      "net physical solid loss from modeled phase and vapor terms")
+   verifySubstring(testCase, source, ...
+      "it excludes remeshing and domain exchange")
+   verifyFalse(testCase, contains(source, ...
+      "whole-column solid-storage loss"))
+   verifySubstring(testCase, source, ...
+      "without clipping or enforcing monotonicity")
+   verifySubstring(testCase, source, ...
+      "not a continuous surface prediction")
+
+   % The report must state the mass-versus-geometry distinction explicitly,
+   % because conflating grid geometry with mass over-counts what the top cell
+   % actually held.
+   verifySubstring(testCase, source, ...
+      "grid geometry rather than mass")
+   verifySubstring(testCase, source, ...
+      "over-counts what the top cell actually held")
+   verifySubstring(testCase, source, ...
+      "Finite snow-covered postings are shaded gray")
+   verifySubstring(testCase, source, ...
+      "does not crop the seasonal record")
+   verifySubstring(testCase, source, ...
+      "Saved nested windows: **4/7 available** across **4** site-year(s)")
+   verifySubstring(testCase, source, "Interpretable final classifications")
+   verifySubstring(testCase, source, "model-high n=1")
+   verifySubstring(testCase, source, ...
+      "Material numerical merge/delete solid exchange changed " ...
+      + "the comparison in 1 case-year")
+   verifySubstring(testCase, source, ...
+      "This accounting sensitivity does not identify a physical cause")
+   verifyFalse(testCase, contains(source, ...
+      "Credible destabilizing model-accounting scenarios"))
+   verifyFalse(testCase, contains(source, ...
+      "accounting:merge-delete-solid n=1"))
+   verifyFalse(testCase, contains(source, "endpoint:endpoint-deficit n=1"))
+   verifyFalse(testCase, contains(source, "central-intact-ice"))
+   verifySubstring(testCase, source, ...
+      "Driver counts are non-exclusive")
+   verifySubstring(testCase, source, ...
+      "not physical causation")
+   verifySubstring(testCase, source, ...
+      "Temporal endpoint perturbations are reported separately " ...
+      + "and do not gate classification")
+   verifySubstring(testCase, source, ...
+      "Caller-supplied endpoint-deficit values remain visible " ...
+      + "sensitivity cases but cannot gate classification")
+   verifySubstring(testCase, source, ...
+      "1 of 1 site-year(s) with saved closure evidence passed " ...
+      + "every saved closure identity")
+   verifySubstring(testCase, source, ...
+      "1 yielded an identifiable directional conclusion")
+   verifyFalse(testCase, contains(source, ...
+      "met the saved closure and identifiability gates"))
+   verifySubstring(testCase, source, ...
+      "The saved inventory contains **2** candidate site-year(s). " ...
+      + "**1** met the saved admission rules, **1** were selected " ...
+      + "for a run, and **1** completed")
+   verifySubstring(testCase, source, ...
+      "Supplemental snow data were available for **1** and unavailable for **1**")
+   verifySubstring(testCase, source, ...
+      "G = max(abs(A_model), abs(A_obs), signal_floor)")
+   verifySubstring(testCase, source, ...
+      "saved `signal_floor` is **0.025 m w.e.**")
+   verifySubstring(testCase, source, ...
+      "[Download all saved scenario sensitivities](accounting-scenarios.csv)")
+   verifySubstring(testCase, source, ...
+      "requested year's January 1")
+   verifySubstring(testCase, source, "zero earlier spin-up")
+   verifySubstring(testCase, source, ...
+      "production-snow-physics winter/spring preconditioning")
+   verifySubstring(testCase, source, ...
+      "no initialization sensitivity was run")
+   verifySubstring(testCase, source, ...
+      "[Readiness ledger](report-readiness.csv)")
+   verifySubstring(testCase, source, ...
+      "[Site-year summary](report-summary.csv)")
+   verifySubstring(testCase, source, ...
+      "[Grid-translation event ledger](grid-translation.csv)")
+   verifySubstring(testCase, source, ...
+      "[Nested windows](report-nested-windows.csv)")
+   verifySubstring(testCase, source, ...
+      "[Endpoint perturbations](report-endpoint-perturbations.csv)")
+   verifySubstring(testCase, source, ...
+      "[Synthesis status and reasons](synthesis-status.csv)")
+   verifySubstring(testCase, source, ...
+      "[Readiness and admission ledger](report-readiness.csv)")
+   verifySubstring(testCase, source, ...
+      "[Model-run summary](report-summary.csv)")
+   verifyFalse(testCase, contains(source, ...
+      "ablation-cohort-attrition.png"))
+   verifySubstring(testCase, source, "/definitely/not/present/results.mat")
+   verifyFalse(testCase, contains(source, "scientifically wrong"))
+   verifyFalse(testCase, contains(source, "<script"))
+
+   % Row-level evidence belongs in CSV downloads. Only the two small aggregate
+   % science tables remain inline, and Markdown escaping must not double the
+   % backslash introduced for punctuation.
+   source_lines = splitlines(string(source));
+   inline_table_rows = nnz(startsWith(strtrim(source_lines), "|"));
+   verifyLessThanOrEqual(testCase, inline_table_rows, 20)
+   verifyFalse(testCase, contains(source, ...
+      "| case id | site id | year | perturbation label"))
+   verifyFalse(testCase, contains(source, ...
+      "| case id | site id | year | initialization start"))
+   double_backslash = string([char(92), char(92)]);
+   verifyFalse(testCase, contains(source, double_backslash))
+
+   % Merge export must NOT be drawn beside melt. Merges average the joined
+   % pair, so the export over-counts what the top cell held and runs above
+   % melt; plotting it as a mass-loss curve could be mistaken for a model
+   % result. The rendered document is the evidence: no site caption may
+   % announce it.
+   verifyFalse(testCase, contains(source, ...
+      "cumulative surface mass loss"))
+
+   % Nonfinite required flags remain explicit unknown-quality exclusions, and
+   % signed components preserve melt, refreezing, and vapor directions.
+   support = readtable(fullfile(output_folder, 'observation-support.csv'), ...
+      TextType='string');
+   verifyEqual(testCase, string(support.Properties.VariableNames), ...
+      ["case_id", "site_id", "year", "Time", "in_comparison_window", ...
+      "observation_ablation_m", "observation_lowering_m", ...
+      "snow_depth_m", "support_class", "support_reason"])
+   verifyEqual(testCase, height(support), 10)
+   verifyEqual(testCase, nnz(support.in_comparison_window), 7)
+   unknown = support.support_class == "unknown_quality";
+   verifyEqual(testCase, nnz(unknown), 1)
+   verifySubstring(testCase, support.support_reason(unknown), ...
+      "station_transition_flag")
+   verifySubstring(testCase, support.support_reason(unknown), ...
+      "step_correctable_flag")
+   flagged = support.support_class == "flagged";
+   verifyEqual(testCase, nnz(flagged), 2)
+   verifyEqual(testCase, support.support_class(2), "flagged")
+   verifySubstring(testCase, support.support_reason(2), ...
+      "datum break: station_transition_flag")
+   verifyTrue(testCase, isnan(support.snow_depth_m(2)))
+   verifyEqual(testCase, support.support_class(3), "flagged")
+   verifySubstring(testCase, support.support_reason(3), ...
+      "ordinary gap: surface_height_flag")
+   verifyGreaterThan(testCase, support.snow_depth_m(3), 0.01)
+   snow_censored = support.support_class == "snow_censored";
+   verifyEqual(testCase, nnz(snow_censored), 2)
+   verifyTrue(testCase, all(isfinite( ...
+      support.snow_depth_m(snow_censored))))
+   verifyEqual(testCase, support.snow_depth_m(snow_censored), ...
+      repmat(0.02, 2, 1), AbsTol=eps)
+   verifyTrue(testCase, all(contains( ...
+      support.support_reason(snow_censored), ...
+      "exceeds ice-exposure threshold 0.01 m")))
+   unknown_snow = support.support_class == "unknown_snow";
+   verifyEqual(testCase, nnz(unknown_snow), 3)
+   nonfinite_snow = unknown_snow & ~isfinite(support.snow_depth_m);
+   negative_snow = unknown_snow & support.snow_depth_m < 0;
+   verifyEqual(testCase, nnz(nonfinite_snow), 2)
+   verifyEqual(testCase, nnz(negative_snow), 1)
+   verifyTrue(testCase, all(contains( ...
+      support.support_reason(nonfinite_snow), ...
+      "nonfinite required snow field: snow_depth")))
+   verifyTrue(testCase, all(contains( ...
+      support.support_reason(negative_snow), ...
+      "negative invalid snow field: snow_depth")))
+   verifyEqual(testCase, nnz(snow_censored ...
+      & ~support.in_comparison_window), 1)
+   verifyEqual(testCase, nnz(unknown_snow ...
+      & ~support.in_comparison_window), 2)
+   verifyEqual(testCase, nnz(support.support_class == "direct"), 2)
+   verifyEqual(testCase, support.support_class(1), "direct")
+   verifyEqual(testCase, support.support_class(4), "unknown_quality")
+   verifyTrue(testCase, isnan(support.snow_depth_m(4)))
+   verifyEqual(testCase, support.support_class(7), "direct")
+   verifyEqual(testCase, support.snow_depth_m(7), 0.01, AbsTol=eps)
+   components = readtable(fullfile(output_folder, ...
+      'signed-solid-components.csv'));
+   verifyLessThan(testCase, components.phase_melt_solid_change_mwe, 0)
+   verifyGreaterThan(testCase, ...
+      components.phase_refreezing_solid_change_mwe, 0)
+   verifyLessThan(testCase, components.solid_vapor_change_mwe, 0)
+   grid_translation = readtable(fullfile(output_folder, ...
+      'grid-translation.csv'), TextType='string');
+   verifyEqual(testCase, string(grid_translation.Properties.VariableNames), ...
+      ["case_id", "site_id", "year", "interval_start", "interval_end", ...
+      "top_deletion_count", "top_deletion_height_m", ...
+      "interior_merge_count", "cumulative_top_deletion_count", ...
+      "cumulative_top_deletion_height_m", ...
+      "cumulative_interior_merge_count"])
+   verifyEqual(testCase, sum(grid_translation.top_deletion_count), 2)
+   verifyEqual(testCase, sum(grid_translation.interior_merge_count), 1)
+   verifyEqual(testCase, ...
+      grid_translation.cumulative_top_deletion_height_m(end), 0.05, ...
+      AbsTol=eps)
+   verifyEqual(testCase, grid_translation.interval_end(1:end-1), ...
+      grid_translation.interval_start(2:end))
+   scenarios = readtable(fullfile(output_folder, ...
+      'accounting-scenarios.csv'), TextType='string');
+   verifyTrue(testCase, any(scenarios.scenario == "merge_delete_solid"))
+   verifyTrue(testCase, any(scenarios.classification == "model_high"))
+   density_sensitivity = readtable(fullfile(output_folder, ...
+      'effective-density-sensitivity.csv'));
+   verifyEqual(testCase, ...
+      density_sensitivity.effective_density_kg_m3, [600; 870; 900])
+   % The conversion is a pure density scaling, so the sensitivity must be
+   % proportional to the density, not a set of restated literal values.
+   scaled = density_sensitivity.observation_sensitivity_mwe ...
+      ./ density_sensitivity.effective_density_kg_m3;
+   verifyEqual(testCase, scaled, repmat(scaled(1), size(scaled)), ...
+      RelTol=1e-12)
+   verifyEqual(testCase, density_sensitivity.observation_sensitivity_mwe(1), ...
+      0.024, AbsTol=1e-12)
+   exclusions = readtable(fullfile(output_folder, ...
+      'support-exclusions.csv'), TextType='string');
+   verifyEqual(testCase, string(exclusions.Properties.VariableNames), ...
+      ["case_id", "site_id", "year", "gap_bridged", ...
+      "station_transition", "unresolved_step", ...
+      "step_correctable_but_unresolved", "nonfinite_observation", ...
+      "unknown_quality_flag", "unknown_snow_depth", "snow_censored", ...
+      "nonfinite_model", "total_unique_excluded"])
+   verifyEqual(testCase, exclusions.snow_censored, 1)
+
+   % Final runner coverage fields are copied to the synthesis without changing
+   % what each one divides by.
+   synthesis = readtable(fullfile(output_folder, ...
+      'site-year-synthesis.csv'), TextType='string');
+   completed = synthesis.status == "completed";
+   verifyEqual(testCase, synthesis.window_valid_sample_count(completed), 2)
+   verifyEqual(testCase, synthesis.window_direct_sample_count(completed), 2)
+   verifyEqual(testCase, synthesis.window_possible_sample_count(completed), 5)
+   verifyEqual(testCase, synthesis.coverage_fraction(completed), 0.4, ...
+      AbsTol=eps)
+   verifyEqual(testCase, synthesis.coverage_denominator(completed), ...
+      "window_valid_sample_count / window_possible_sample_count")
+
+   % Endpoint experiments remain KAN-first but generic, and every planned
+   % unavailable row retains its reason rather than becoming a zero.
+   endpoint = readtable(fullfile(output_folder, ...
+      'report-endpoint-perturbations.csv'), TextType='string');
+   verifyEqual(testCase, height(endpoint), 6)
+   verifyEqual(testCase, endpoint.perturbation_days_signed, ...
+      [1; 3; 7; -1; -3; -7])
+   verifyEqual(testCase, nnz(~endpoint.available), 2)
+   verifyTrue(testCase, all(strlength(endpoint.reason(~endpoint.available)) > 0))
+   initialization = readtable(fullfile(output_folder, ...
+      'model-initialization.csv'), TextType='string');
+   verifyEqual(testCase, height(initialization), 1)
+   verifyEqual(testCase, initialization.initialization_policy, ...
+      "readiness requested_window_start")
+
+   % The public nested table retains every unavailable row, including a
+   % site-year with no plottable nested result.
+   nested_saved = readtable(fullfile(output_folder, ...
+      'report-nested-windows.csv'), ...
+      TextType='string');
+   tas = nested_saved.site_id == "TAS_A";
+   verifyEqual(testCase, nnz(tas), 2)
+   verifyTrue(testCase, all(~nested_saved.available(tas)))
+end
+
+function test_relative_result_and_colliding_identifiers(testCase)
+   % Relative inputs work, and normalized figure stems cannot overwrite a peer.
+
+   folder = temporaryFolder(testCase);
+   % Mutate a local copy of the shared cohort; TestData stays pristine.
+   results = testCase.TestData.results;
+   completed = find(string({results.site_year_results.status}) == ...
+      "completed", 1);
+   duplicate = results.site_year_results(completed);
+   duplicate.case_id = "KANM";
+   duplicate.site_id = "KAN_Q";
+   results.site_year_results(end + 1, 1) = duplicate;
+   summary = results.summary(1, :);
+   summary.case_id = "KANM";
+   summary.site_id = "KAN_Q";
+   results.summary = [results.summary; summary];
+   save(fullfile(folder, 'results.mat'), 'results')
+
+   previous_folder = pwd;
+   cleanup = onCleanup(@() cd(previous_folder));
+   cd(folder)
+   report_file = ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      "results.mat", render=false);
+
+   verifyEqual(testCase, report_file, ...
+      string(fullfile('.', 'promice-ablation-evaluation-report.html')))
+   verifyTrue(testCase, isfile( ...
+      'promice-ablation-evaluation-report.qmd'))
+   asset_folder = fullfile(folder, 'report-assets');
+   verifyTrue(testCase, isfile(fullfile(asset_folder, ...
+      'kanm-2019-cumulative-comparison.png')))
+   verifyTrue(testCase, isfile(fullfile(asset_folder, ...
+      'kanm-2019-2-cumulative-comparison.png')))
+   clear cleanup
+end
+
+function test_step_failure_is_explicit_in_closure_report(testCase)
+   % A cancelling window residual must not hide failed forcing-step closure.
+
+   folder = temporaryFolder(testCase);
+   % Mutate a local copy of the shared cohort; TestData stays pristine.
+   results = testCase.TestData.results;
+   completed_result = find( ...
+      string({results.site_year_results.status}) == "completed", 1);
+   site_result = results.site_year_results(completed_result);
+   identities = site_result.diagnostics.identities;
+   identities.step_passed(2) = false;
+   identities.failed_step_count(2) = 2;
+   identities.passed(2) = false;
+   site_result.diagnostics.identities = identities;
+   site_result.diagnostics.scenarios = site_result.diagnostics.scenarios( ...
+      string(site_result.diagnostics.scenarios.role) ~= "endpoint", :);
+   site_result.diagnostics.physical_comparable = false;
+   site_result.comparison.physical_comparable = false;
+   site_result.comparison.classification = "not_physically_comparable";
+   results.site_year_results(completed_result) = site_result;
+   results.summary.physical_comparable(1) = false;
+   results.summary.classification(1) = "not_physically_comparable";
+
+   % A second completed scientific-unavailability class proves that the report
+   % preserves, rather than conflates, non-identifiability and failed closure.
+   non_identifiable = site_result;
+   non_identifiable.case_id = "kanx";
+   non_identifiable.site_id = "KAN_X";
+   non_identifiable.year = 2019;
+   non_identifiable.comparison.classification = "non_identifiable";
+   non_identifiable.diagnostics.identities.step_passed(:) = true;
+   non_identifiable.diagnostics.identities.failed_step_count(:) = 0;
+   non_identifiable.diagnostics.identities.passed(:) = true;
+   non_identifiable.diagnostics.scenarios = ...
+      non_identifiable.diagnostics.scenarios([], :);
+   results.site_year_results(end + 1, 1) = non_identifiable;
+   non_identifiable_summary = results.summary(1, :);
+   non_identifiable_summary.case_id = "kanx";
+   non_identifiable_summary.site_id = "KAN_X";
+   non_identifiable_summary.year = 2019;
+   non_identifiable_summary.classification = "non_identifiable";
+   results.summary = [results.summary; non_identifiable_summary];
+   results_file = fullfile(folder, 'step-failure-results.mat');
+   save(results_file, 'results')
+
+   % The rendered source states both verdict levels, and the exported identity
+   % row preserves a passing window beside a failing per-step/combined verdict.
+   icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, render=false);
+   source = fileread(fullfile(folder, ...
+      'promice-ablation-evaluation-report.qmd'));
+   verifySubstring(testCase, source, ...
+      "Saved closure acceptance: **3/4** identity rows passed both")
+   verifySubstring(testCase, source, ...
+      "per-step acceptance failed for **1** identity row(s) " ...
+      + "across **2** forcing row(s)")
+   verifySubstring(testCase, source, ...
+      "placed at a categorical sentinel just above the limit")
+   verifySubstring(testCase, source, ...
+      "not a measured step ratio because the worst step ratio is not saved")
+   verifySubstring(testCase, source, ...
+      "2 did not (1 non-identifiable, 1 not physically " ...
+      + "comparable, and 0 with another saved classification)")
+   verifySubstring(testCase, source, ...
+      "1 of 2 site-year(s) with saved closure evidence passed " ...
+      + "every saved closure identity")
+   verifySubstring(testCase, source, ...
+      "0 yielded an identifiable directional conclusion")
+   verifyFalse(testCase, contains(source, ...
+      "met the saved closure and identifiability gates"))
+   verifyFalse(testCase, contains(source, "endpoint-deficit"))
+   % The broad category remains stable, but the row-level and aggregated
+   % machine-readable products must distinguish the two scientific failures.
+   synthesis = readtable(fullfile(folder, 'site-year-synthesis.csv'), ...
+      TextType='string');
+   completed = synthesis.status == "completed";
+   verifyTrue(testCase, all(synthesis.report_category(completed) ...
+      == "scientifically_unavailable"))
+   verifyEqual(testCase, synthesis.outcome_category( ...
+      synthesis.case_id == "kanm"), "not_physically_comparable")
+   verifyEqual(testCase, synthesis.outcome_category( ...
+      synthesis.case_id == "kanx"), "non_identifiable")
+   status = readtable(fullfile(folder, 'synthesis-status.csv'), ...
+      TextType='string');
+   verifyTrue(testCase, all(ismember(["report_category", ...
+      "outcome_category", "classification"], ...
+      string(status.Properties.VariableNames))))
+   verifyTrue(testCase, any(status.outcome_category ...
+      == "not_physically_comparable" ...
+      & status.classification == "not_physically_comparable" ...
+      & status.count == 1))
+   verifyTrue(testCase, any(status.outcome_category == "non_identifiable" ...
+      & status.classification == "non_identifiable" ...
+      & status.count == 1))
+   exported = readtable(fullfile(folder, 'closure-identities.csv'), ...
+      TextType='string');
+   failed = exported.case_id == "kanm" ...
+      & exported.identity == "remesh_solid";
+   verifyTrue(testCase, logical(exported.window_passed(failed)))
+   verifyFalse(testCase, logical(exported.step_passed(failed)))
+   verifyEqual(testCase, exported.failed_step_count(failed), 2)
+   verifyFalse(testCase, logical(exported.passed(failed)))
+
+end
+
+function test_no_completed_rows_render_honest_empty_state(testCase)
+   % Large readiness-only artifacts stay accurate and fixed-size.
+
+   folder = temporaryFolder(testCase);
+   % Expand a local copy of the shared cohort; TestData stays pristine.
+   results = largeUnavailableResults(testCase.TestData.results);
+   results_file = fullfile(folder, 'results-empty.mat');
+   save(results_file, 'results')
+
+   icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, render=false);
+   source = fileread(fullfile(folder, ...
+      'promice-ablation-evaluation-report.qmd'));
+
+   verifySubstring(testCase, source, "No site-year completed")
+   verifySubstring(testCase, source, ...
+      "does not support a model--observation ablation conclusion")
+   verifySubstring(testCase, source, ...
+      "No completed closure or materiality diagnostics were saved")
+   verifySubstring(testCase, source, ...
+      "No completed case-year supports a directional " ...
+      + "model--observation interpretation.")
+   verifySubstring(testCase, source, ...
+      "No completed selected site-year comparisons were saved.")
+   verifySubstring(testCase, source, ...
+      "No credible material model-accounting scenario changes sign or classification.")
+   verifyFalse(testCase, contains(source, "endpoint-deficit"))
+   verifyFalse(testCase, contains(source, "ENDPOINT_001"))
+   verifyFalse(testCase, contains(source, "NESTED_001"))
+   verifyLessThan(testCase, numel(splitlines(string(source))), 300)
+   verifyFalse(testCase, isfile(fullfile(folder, 'report-assets', ...
+      'kanm-2019-cumulative-comparison.png')))
+   verifyFalse(testCase, isfile(fullfile(folder, 'report-assets', ...
+      'ablation-cross-site-synthesis.png')))
+
+   % Status reasons and failures remain distinct instead of collapsing into a
+   % single unavailable bucket.
+   status = readtable(fullfile(folder, 'synthesis-status.csv'), ...
+      TextType='string');
+   verifyTrue(testCase, any(status.report_category == "readiness_excluded" ...
+      & status.reason == "readiness target unavailable"))
+   verifyTrue(testCase, any(status.report_category == "not_selected" ...
+      & status.reason == "case-year was not explicitly selected"))
+   verifyTrue(testCase, any(status.report_category == "execution_unavailable" ...
+      & status.error_identifier == "synthetic:failure"))
+
+   % The large readiness and nested inventories must not produce enormous
+   % raster dimensions; exact rows remain available in the linked CSV files.
+   for name = ["ablation-nested-window-stability.png", ...
+         "ablation-endpoint-perturbation-stability.png"]
+      info = imfinfo(fullfile(folder, 'report-assets', name));
+      verifyLessThan(testCase, info.Width, 2000)
+      verifyLessThan(testCase, info.Height, 2000)
+   end
+end
+
+function test_truncated_or_mislabeled_seasonal_payload_is_rejected(testCase)
+   % Completed reports require the full hourly season and exact window labels.
+
+   folder = temporaryFolder(testCase);
+   % Mutate local copies of the shared cohort; TestData stays pristine.
+   valid = testCase.TestData.results;
+   completed = find(string({valid.site_year_results.status}) ...
+      == "completed", 1);
+   invalid_results = cell(4, 1);
+   invalid_results{1} = valid;
+   invalid_results{1}.site_year_results(completed).seasonal(end, :) = [];
+   invalid_results{2} = valid;
+   invalid_results{2}.site_year_results( ...
+      completed).seasonal.evaluation_window(end) = true;
+   invalid_results{3} = valid;
+   invalid_results{3}.site_year_results( ...
+      completed).seasonal.evaluation_window(:) = false;
+   invalid_results{4} = valid;
+   malformed = double(invalid_results{4}.site_year_results( ...
+      completed).seasonal.evaluation_window);
+   malformed(1) = 2;
+   invalid_results{4}.site_year_results( ...
+      completed).seasonal.evaluation_window = malformed;
+   for k = 1:numel(invalid_results)
+      results = invalid_results{k};
+      results_file = fullfile(folder, ...
+         compose('invalid-seasonal-%d.mat', k));
+      save(results_file, 'results')
+      verifyError(testCase, @() ...
+         icemodel.verification.report.buildAblationEvaluationReport( ...
+         results_file, render=false, output_dir=fullfile(folder, ...
+         compose('invalid-seasonal-%d', k))), ...
+         'icemodel:verification:report:invalidAblationSeasonal')
+   end
+end
+
+function test_full_season_evaluation_window_is_allowed(testCase)
+   % All hourly rows may be selected when saved bounds span the full season.
+
+   folder = temporaryFolder(testCase);
+   % Mutate a local copy of the shared cohort; TestData stays pristine.
+   results = testCase.TestData.results;
+   completed = find(string({results.site_year_results.status}) ...
+      == "completed", 1);
+   seasonal = results.site_year_results(completed).seasonal;
+   results.site_year_results(completed).comparison.window_start = ...
+      seasonal.Time(1);
+   results.site_year_results(completed).comparison.window_end = ...
+      seasonal.Time(end);
+   results.site_year_results( ...
+      completed).seasonal.evaluation_window(:) = true;
+   results_file = fullfile(folder, 'full-season-results.mat');
+   save(results_file, 'results')
+
+   icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, render=false, output_dir=folder);
+   verifyTrue(testCase, isfile(fullfile(folder, ...
+      'promice-ablation-evaluation-report.qmd')))
+end
+
+function test_invalid_saved_contract_is_rejected(testCase)
+   % Missing runner state and inconsistent saved flag partitions are rejected.
+
+   folder = temporaryFolder(testCase);
+   other = 1;
+   results_file = fullfile(folder, 'not-results.mat');
+   save(results_file, 'other')
+
+   verifyError(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, render=false), ...
+      'icemodel:verification:report:invalidAblationResults')
+
+   results = 1;
+   scalar_file = fullfile(folder, 'scalar-results.mat');
+   save(scalar_file, 'results')
+   verifyError(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      scalar_file, render=false), ...
+      'icemodel:verification:report:invalidAblationResults')
+
+   % Exercise malformed partitions and check that every fixed scientific
+   % value governing report interpretation is validated.
+   % Mutate local copies of the shared cohort; TestData stays pristine.
+   valid = testCase.TestData.results;
+   invalid_policies = cell(17, 1);
+   invalid_policies{1} = rmfield(valid.policy, ...
+      'metadata_only_flag_fields');
+   invalid_policies{2} = valid.policy;
+   invalid_policies{2}.metadata_only_flag_fields = [ ...
+      "step_correctable_flag", "surface_height_flag"];
+   invalid_policies{3} = valid.policy;
+   invalid_policies{3}.required_observation_fields = setdiff( ...
+      valid.policy.required_observation_fields, "step_correctable_flag", ...
+      'stable');
+   invalid_policies{4} = valid.policy;
+   invalid_policies{4}.support_flag_fields = setdiff( ...
+      valid.policy.support_flag_fields, "step_correctable_flag", 'stable');
+   invalid_policies{5} = valid.policy;
+   invalid_policies{5}.ordinary_gap_flag_fields = "station_transition_flag";
+   invalid_policies{6} = valid.policy;
+   invalid_policies{6}.required_observation_fields = setdiff( ...
+      valid.policy.required_observation_fields, "snow_depth", 'stable');
+   invalid_policies{7} = rmfield(valid.policy, ...
+      'effective_density_kg_m3');
+   invalid_policies{8} = valid.policy;
+   invalid_policies{8}.version = "altered-policy";
+   invalid_policies{9} = valid.policy;
+   invalid_policies{9}.evaluation_season_start_month_day = [5, 1];
+   invalid_policies{10} = valid.policy;
+   invalid_policies{10}.effective_density_kg_m3 = [900, 870, 600];
+   invalid_policies{11} = valid.policy;
+   invalid_policies{11}.snow_continuity_threshold_m = 0.10;
+   invalid_policies{12} = valid.policy;
+   invalid_policies{12}.ice_exposure_threshold_m = 0.02;
+   invalid_policies{13} = valid.policy;
+   invalid_policies{13}.evaluation_season_end_month_day = [9, 30];
+   invalid_policies{14} = valid.policy;
+   invalid_policies{14}.effective_density_kg_m3 = [600, 600, 900];
+   invalid_policies{15} = valid.policy;
+   invalid_policies{15}.snow_variable = "snow_height";
+   invalid_policies{15}.required_observation_fields(2) = "snow_height";
+   invalid_policies{16} = valid.policy;
+   invalid_policies{16}.scientific.signal_floor_mwe = 0.03;
+   % The strict equality comparison excludes the channel schema, so the
+   % required-field list is what catches its absence.
+   invalid_policies{17} = rmfield(valid.policy, 'required_model_fields');
+   % Every variant is rejected during validation, before the builder writes
+   % any output, so one reused MAT path and output directory replace the
+   % per-variant paths without changing what each builder entry call sees.
+   policy_file = fullfile(folder, 'invalid-policy.mat');
+   policy_output = fullfile(folder, 'invalid-policy');
+   for k = 1:numel(invalid_policies)
+      results = valid;
+      results.policy = invalid_policies{k};
+      save(policy_file, 'results')
+      verifyError(testCase, @() ...
+         icemodel.verification.report.buildAblationEvaluationReport( ...
+         policy_file, render=false, output_dir=policy_output), ...
+         'icemodel:verification:report:invalidAblationPolicy')
+   end
+
+   % Missing and overlapping metadata roles must also fail when no completed
+   % result exists, proving validation is part of the unconditional MAT gate.
+   no_completed = valid;
+   no_completed.site_year_results = valid.site_year_results([]);
+   no_completed.summary = valid.summary(2, :);
+   no_completed.readiness.rows = valid.readiness.rows(2, :);
+   no_completed.nested_windows = valid.nested_windows([], :);
+   no_completed.endpoint_perturbations = ...
+      valid.endpoint_perturbations([], :);
+   % Rejection again precedes any output, so this loop reuses one MAT path
+   % and one output directory as well.
+   empty_policy_file = fullfile(folder, 'empty-invalid-policy.mat');
+   empty_policy_output = fullfile(folder, 'empty-invalid-policy');
+   for k = 1:2
+      results = no_completed;
+      results.policy = invalid_policies{k};
+      save(empty_policy_file, 'results')
+      verifyError(testCase, @() ...
+         icemodel.verification.report.buildAblationEvaluationReport( ...
+         empty_policy_file, render=false, ...
+         output_dir=empty_policy_output), ...
+         'icemodel:verification:report:invalidAblationPolicy')
+   end
+end
+
+function folder = temporaryFolder(testCase)
+   %TEMPORARYFOLDER Create one test-owned report directory.
+
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   folder = string(fixture.Folder);
+end
+
+function results = syntheticResults()
+   %SYNTHETICRESULTS Return a small saved results struct needing no data files.
+
+   t0 = datetime(2019, 6, 1, 0, 0, 0, 'TimeZone', 'UTC');
+   t1 = t0 + hours(4);
+   case_id = ["kanm"; "kanl"];
+   site_id = ["KAN_M"; "KAN_L"];
+   year = [2019; 2019];
+   selected = [true; true];
+   admitted = [true; false];
+   status = ["completed"; "excluded"];
+   reason = [""; "no direct snow-free interval"];
+   error_identifier = [""; ""];
+   forcing_artifact = ["input/met/promice_filled/kanm.mat"; ...
+      "input/met/promice_filled/kanl.mat"];
+   forcing_sha256 = [repmat("a", 1, 64); repmat("b", 1, 64)];
+   observation_artifact = ["userdata/promice/kanm.mat"; ...
+      "userdata/promice/kanl.mat"];
+   observation_sha256 = [repmat("c", 1, 64); repmat("d", 1, 64)];
+   possible_support_count = [5; 5];
+   direct_target_count = [4; 1];
+   window_start = [t0; NaT(1, 1, 'TimeZone', 'UTC')];
+   window_end = [t1; NaT(1, 1, 'TimeZone', 'UTC')];
+   classification = ["model_high"; ""];
+   physical_comparable = [true; false];
+   eligible_sample_count = [3; 0];
+   window_valid_sample_count = [2; NaN];
+   window_direct_sample_count = [2; NaN];
+   window_possible_sample_count = [5; NaN];
+   coverage_fraction = [0.4; NaN];
+   coverage_denominator = [ ...
+      "window_valid_sample_count / window_possible_sample_count"; ""];
+   observation_lowering_m = [0.04; NaN];
+   observation_intact_mwe = [0.03668; NaN];
+   model_solid_loss_mwe = [0.05; NaN];
+   model_minus_observation_mwe = [0.01332; NaN];
+   relative_difference = [0.2664; NaN];
+   results.summary = table(case_id, site_id, year, selected, admitted, ...
+      status, reason, error_identifier, forcing_artifact, forcing_sha256, ...
+      observation_artifact, observation_sha256, possible_support_count, ...
+      direct_target_count, window_start, window_end, classification, ...
+      physical_comparable, eligible_sample_count, ...
+      window_valid_sample_count, window_direct_sample_count, ...
+      window_possible_sample_count, coverage_fraction, ...
+      coverage_denominator, observation_lowering_m, ...
+      observation_intact_mwe, model_solid_loss_mwe, ...
+      model_minus_observation_mwe, relative_difference);
+
+   % Readiness preserves each admission dimension so cohort attrition is not
+   % inferred from the final status alone.
+   ice_model_forcing_ready = [true; true];
+   evaluation_target_ready = [true; true];
+   snow_input_ready = [true; false];
+   snow_free_window_start = [string(t0, 'yyyy-MM-dd HH:mm:ssXXX'); ""];
+   snow_free_window_end = [string(t1, 'yyyy-MM-dd HH:mm:ssXXX'); ""];
+   results.readiness.rows = table(case_id, site_id, year, ...
+      ice_model_forcing_ready, evaluation_target_ready, snow_input_ready, ...
+      admitted, forcing_artifact, forcing_sha256, observation_artifact, ...
+      observation_sha256, possible_support_count, direct_target_count, ...
+      snow_free_window_start, snow_free_window_end);
+   results.readiness.files = struct('csv', "/not/read/readiness.csv", ...
+      'json', "/not/read/readiness.json");
+
+   % The completed fixture includes direct and flagged observations, a saved
+   % interval-start ledger, and all diagnostics consumed by the report.
+   completed = siteResultFixture(t0, t1);
+   excluded = completed;
+   excluded.case_id = "kanl";
+   excluded.site_id = "KAN_L";
+   excluded.status = "excluded";
+   excluded.reason = "no direct snow-free interval";
+   excluded.comparison = struct();
+   excluded.model = timetable();
+   excluded.model_metadata = struct();
+   excluded.aligned = timetable();
+   excluded.observations = struct();
+   excluded.diagnostics = struct();
+   results.site_year_results = [completed; excluded];
+
+   % Nested values exercise available fixed/longest windows and an explicit
+   % unavailable row without requiring a real 90-day model run.
+   nested_case = ["kanm"; "kanm"; "kanm"; "kanl"; "zaca"; ...
+      "tasa"; "tasa"];
+   nested_site = ["KAN_M"; "KAN_M"; "KAN_M"; "KAN_L"; "ZAC_A"; ...
+      "TAS_A"; "TAS_A"];
+   nested_year = repmat(2019, 7, 1);
+   window_label = ["30d"; "60d"; "longest"; "30d"; "longest"; ...
+      "30d"; "60d"];
+   target_days = [30; 60; 90; 30; 45; 30; 60];
+   available = [true; true; true; false; true; false; false];
+   nested_reason = [""; ""; ""; "fixed endpoint unavailable"; ""; ...
+      "all nested windows unavailable"; "all nested windows unavailable"];
+   nested_error = strings(7, 1);
+   nested_start = repmat(t0, 7, 1);
+   nested_end = t0 + days(target_days);
+   nested_class = ["model_low"; "within_materiality"; ...
+      "model_high"; ""; "within_materiality"; ""; ""];
+   nested_physical = [true; true; true; false; true; false; false];
+   nested_observation = [0.20; 0.45; 0.70; NaN; 0.30; NaN; NaN];
+   nested_model = [0.18; 0.46; 0.75; NaN; 0.31; NaN; NaN];
+   nested_difference = nested_model - nested_observation;
+   nested_relative = abs(nested_difference) ./ max([abs(nested_model), ...
+      abs(nested_observation), 0.025 * ones(7, 1)], [], 2);
+   results.nested_windows = table(nested_case, nested_site, nested_year, ...
+      window_label, target_days, available, nested_reason, nested_error, ...
+      nested_start, nested_end, nested_class, nested_physical, ...
+      nested_observation, nested_model, nested_difference, nested_relative, ...
+      'VariableNames', {'case_id', 'site_id', 'year', 'window_label', ...
+      'target_days', 'available', 'reason', 'error_identifier', ...
+      'window_start', 'window_end', 'classification', ...
+      'physical_comparable', 'observation_intact_mwe', ...
+      'model_solid_loss_mwe', 'model_minus_observation_mwe', ...
+      'relative_difference'});
+
+   % Six planned endpoint perturbations use the runner's exact signed-axis
+   % schema. Unavailable rows retain requested endpoints and explicit reasons.
+   endpoint_end = t0 + days(90);
+   endpoint_case = repmat("kanm", 6, 1);
+   endpoint_site = repmat("KAN_M", 6, 1);
+   endpoint_year = repmat(2019, 6, 1);
+   perturbation_label = ["start_plus_1d"; "start_plus_3d"; ...
+      "start_plus_7d"; "end_minus_1d"; "end_minus_3d"; ...
+      "end_minus_7d"];
+   perturbation_axis = [repmat("start", 3, 1); repmat("end", 3, 1)];
+   perturbation_days_signed = [1; 3; 7; -1; -3; -7];
+   requested_window_start = repmat(t0, 6, 1);
+   requested_window_end = repmat(endpoint_end, 6, 1);
+   actual_window_start = [t0 + days([1; 3; 7]); repmat(t0, 3, 1)];
+   actual_window_end = [repmat(endpoint_end, 3, 1); ...
+      endpoint_end + days([-1; -3; -7])];
+   endpoint_available = [true; true; false; true; true; false];
+   actual_window_start(~endpoint_available) = NaT( ...
+      nnz(~endpoint_available), 1, 'TimeZone', 'UTC');
+   actual_window_end(~endpoint_available) = NaT( ...
+      nnz(~endpoint_available), 1, 'TimeZone', 'UTC');
+   endpoint_reason = [""; ""; "insufficient direct endpoint support"; ...
+      ""; ""; "insufficient direct endpoint support"];
+   endpoint_error = strings(6, 1);
+   endpoint_class = ["model_low"; "within_materiality"; ""; ...
+      "model_high"; "within_materiality"; ""];
+   endpoint_physical = endpoint_available;
+   endpoint_observation_lowering = [0.10; 0.20; NaN; 0.30; 0.40; NaN];
+   endpoint_observation_intact = endpoint_observation_lowering ...
+      * icemodel.physicalConstant('ro_ice') ...
+      ./ icemodel.physicalConstant('ro_liq');
+   endpoint_observation_min = endpoint_observation_lowering * 0.600;
+   endpoint_observation_max = endpoint_observation_lowering * 0.900;
+   endpoint_model = [0.095; 0.19; NaN; 0.32; 0.39; NaN];
+   endpoint_difference = endpoint_model - endpoint_observation_intact;
+   endpoint_relative = abs(endpoint_difference) ./ max( ...
+      [abs(endpoint_model), abs(endpoint_observation_intact), ...
+      0.025 * ones(6, 1)], [], 2);
+   results.endpoint_perturbations = table(endpoint_case, endpoint_site, ...
+      endpoint_year, perturbation_label, perturbation_axis, ...
+      perturbation_days_signed, requested_window_start, ...
+      requested_window_end, actual_window_start, actual_window_end, ...
+      endpoint_available, endpoint_reason, endpoint_error, endpoint_class, ...
+      endpoint_physical, endpoint_observation_lowering, ...
+      endpoint_observation_intact, endpoint_observation_min, ...
+      endpoint_observation_max, endpoint_model, endpoint_difference, ...
+      endpoint_relative, 'VariableNames', {'case_id', 'site_id', 'year', ...
+      'perturbation_label', 'perturbation_axis', ...
+      'perturbation_days_signed', 'requested_window_start', ...
+      'requested_window_end', 'actual_window_start', 'actual_window_end', ...
+      'available', 'reason', 'error_identifier', 'classification', ...
+      'physical_comparable', 'observation_lowering_m', ...
+      'observation_intact_mwe', 'observation_sensitivity_min_mwe', ...
+      'observation_sensitivity_max_mwe', 'model_solid_loss_mwe', ...
+      'model_minus_observation_mwe', 'relative_difference'});
+
+   % The report reads policy fields from the saved result, so the fixture
+   % stores the policy alongside the data.
+   results.policy = ...
+      icemodel.verification.namelists.promiceAblationPolicy();
+
+   % The fixture carries no physics fingerprint on purpose. Resolving one
+   % runs icemodel.setopts, which asserts that ICEMODEL_INPUT_PATH exists.
+   % Every caller of this fixture would then need a provisioned data tree to
+   % build a report from a self-contained struct. An absent stamp does not
+   % warn, so the report tests stay quiet. setupOnce stamps the shared
+   % TestData copy once, under a guard, when the workspace can resolve one;
+   % the fingerprint tests mutate copies of that stamped cohort.
+   results.run_name = "synthetic<script>unsafe</script>";
+   results.paths = struct('run_dir', "/definitely/not/present", ...
+      'readiness_csv', "/definitely/not/present/readiness.csv", ...
+      'readiness_json', "/definitely/not/present/readiness.json", ...
+      'summary_csv', "/definitely/not/present/summary.csv", ...
+      'nested_windows_csv', "/definitely/not/present/nested.csv", ...
+      'endpoint_perturbations_csv', ...
+      "/definitely/not/present/endpoint-perturbations.csv", ...
+      'results_mat', "/definitely/not/present/results.mat");
+end
+
+function results = largeUnavailableResults(results)
+   %LARGEUNAVAILABLERESULTS Expand the fixture to a large all-empty inventory.
+
+   % Preserve every operational outcome separately across the 304-row
+   % readiness inventory while leaving no scientific completion. No
+   % assertion pins the row count; 304 rows keep the scale far above the
+   % handful the other tests use while costing less to build and render.
+   n_rows = 304;
+   template = results.summary(2, :);
+   results.summary = template(ones(n_rows, 1), :);
+   results.summary.case_id = compose("case_%04d", (1:n_rows)');
+   results.summary.site_id = compose("SITE_%04d", (1:n_rows)');
+   results.summary.year = repmat(2019, n_rows, 1);
+   status = [repmat("excluded", 102, 1); ...
+      repmat("not_selected", 101, 1); repmat("unavailable", 101, 1)];
+   results.summary.status = status;
+   results.summary.selected = status ~= "not_selected";
+   results.summary.admitted = status ~= "excluded";
+   results.summary.reason = [ ...
+      repmat("readiness target unavailable", 102, 1); ...
+      repmat("case-year was not explicitly selected", 101, 1); ...
+      repmat("synthetic execution failure", 101, 1)];
+   results.summary.error_identifier = [strings(203, 1); ...
+      repmat("synthetic:failure", 101, 1)];
+   results.summary.classification = repmat("", n_rows, 1);
+   results.summary.physical_comparable = false(n_rows, 1);
+   numeric_fields = ["eligible_sample_count", ...
+      "window_valid_sample_count", "window_direct_sample_count", ...
+      "window_possible_sample_count", "coverage_fraction", ...
+      "observation_lowering_m", "observation_intact_mwe", ...
+      "model_solid_loss_mwe", "model_minus_observation_mwe", ...
+      "relative_difference"];
+   for name = numeric_fields
+      results.summary.(name) = NaN(n_rows, 1);
+   end
+   results.summary.coverage_denominator = repmat("", n_rows, 1);
+   results.summary.window_start = NaT(n_rows, 1, 'TimeZone', 'UTC');
+   results.summary.window_end = NaT(n_rows, 1, 'TimeZone', 'UTC');
+
+   % Match the readiness ledger to the same 304 identities. Not-selected and
+   % execution-failed rows are readiness-admitted; exclusions are not.
+   readiness_template = results.readiness.rows(2, :);
+   results.readiness.rows = readiness_template(ones(n_rows, 1), :);
+   results.readiness.rows.case_id = results.summary.case_id;
+   results.readiness.rows.site_id = results.summary.site_id;
+   results.readiness.rows.year = results.summary.year;
+   admitted = status ~= "excluded";
+   results.readiness.rows.ice_model_forcing_ready = true(n_rows, 1);
+   results.readiness.rows.evaluation_target_ready = admitted;
+   results.readiness.rows.snow_input_ready = admitted;
+   results.readiness.rows.admitted = admitted;
+   results.site_year_results = results.site_year_results(2);
+
+   % Retain 57 explicit unavailable nested rows to test report scalability
+   % and prevent absent values from being rendered as numerical zeros. No
+   % assertion pins this count either; 57 site-years still crowd the
+   % stability figures far beyond the completed fixture's scale.
+   n_nested = 57;
+   nested_template = results.nested_windows(6, :);
+   results.nested_windows = nested_template(ones(n_nested, 1), :);
+   results.nested_windows.case_id = compose( ...
+      "nested_%03d", (1:n_nested)');
+   results.nested_windows.site_id = compose( ...
+      "NESTED_%03d", (1:n_nested)');
+   results.nested_windows.available = false(n_nested, 1);
+   results.nested_windows.reason = repmat( ...
+      "fixed endpoint unavailable", n_nested, 1);
+
+   % Exercise all six planned endpoint rows for 57 site-years on the same
+   % fixed-size canvas, with every unavailable row still written to CSV/QMD.
+   endpoint_index = repmat((1:6)', n_nested, 1);
+   results.endpoint_perturbations = ...
+      results.endpoint_perturbations(endpoint_index, :);
+   endpoint_case = repelem(compose("endpoint_%03d", (1:n_nested)'), 6, 1);
+   results.endpoint_perturbations.case_id = endpoint_case;
+   results.endpoint_perturbations.site_id = repelem( ...
+      compose("ENDPOINT_%03d", (1:n_nested)'), 6, 1);
+   n_endpoint = height(results.endpoint_perturbations);
+   results.endpoint_perturbations.available = false(n_endpoint, 1);
+   results.endpoint_perturbations.reason = repmat( ...
+      "planned endpoint unavailable", n_endpoint, 1);
+   results.endpoint_perturbations.error_identifier = strings(n_endpoint, 1);
+   results.endpoint_perturbations.actual_window_start = NaT( ...
+      n_endpoint, 1, 'TimeZone', 'UTC');
+   results.endpoint_perturbations.actual_window_end = NaT( ...
+      n_endpoint, 1, 'TimeZone', 'UTC');
+   results.endpoint_perturbations.classification = strings(n_endpoint, 1);
+   results.endpoint_perturbations.physical_comparable = false(n_endpoint, 1);
+   endpoint_numeric = ["observation_lowering_m", ...
+      "observation_intact_mwe", "observation_sensitivity_min_mwe", ...
+      "observation_sensitivity_max_mwe", "model_solid_loss_mwe", ...
+      "model_minus_observation_mwe", "relative_difference"];
+   for name = endpoint_numeric
+      results.endpoint_perturbations.(name) = NaN(n_endpoint, 1);
+   end
+end
+
+function result = siteResultFixture(t0, t1)
+   %SITERESULTFIXTURE Return one compact completed site-year result.
+
+   observation_time = [t0; t0 + minutes(30); t0 + hours(1); ...
+      t0 + hours(2); t0 + hours(3); t0 + hours(3) + minutes(30); ...
+      t1; t1 + hours(1); t1 + hours(2); t1 + hours(3)];
+   ablation = [1.00; 1.005; 1.01; 1.02; 1.03; 1.035; 1.04; 1.05; ...
+      1.06; 1.07];
+   surface_height_flag = [0; 0; 1; 0; 0; 0; 0; 0; 0; 0];
+   station_transition_flag = zeros(10, 1);
+   step_detected_flag = zeros(10, 1);
+   step_correctable_flag = zeros(10, 1);
+   snow_depth = [0; NaN; 0.02; NaN; 0.02; NaN; 0.01; 0.02; NaN; -0.005];
+   station_transition_flag(2) = -1;
+   station_transition_flag(4) = NaN;
+   step_correctable_flag(1) = 1;
+   step_correctable_flag(4) = Inf;
+   observation_data = timetable(ablation, surface_height_flag, ...
+      station_transition_flag, step_detected_flag, step_correctable_flag, ...
+      snow_depth, ...
+      'RowTimes', observation_time);
+
+   ledger_time = (t0:hours(1):t1 - hours(1))';
+   mass_budget_phase_solid_mwe = [-0.01; -0.012; 0.003; -0.014];
+   mass_budget_vapor_solid_mwe = -[0.001; 0; 0; 0];
+   mass_budget_top_deletion_count = [0; 1; 0; 1];
+   mass_budget_top_deletion_height_m = [0; 0.025; 0; 0.025];
+   % Exported mass differs from the quantized cell height, so the fixture keeps
+   % the two channels numerically distinct.
+   mass_budget_top_export_solid_mwe = [0; 0.011; 0; 0.011];
+   mass_budget_top_export_liquid_mwe = [0; 0.001; 0; 0.001];
+   mass_budget_interior_merge_count = [0; 0; 1; 0];
+   mass_budget_remesh_solid_mwe = [0; 0.020; 0; -0.020];
+   model = timetable(mass_budget_phase_solid_mwe, ...
+      mass_budget_vapor_solid_mwe, mass_budget_top_deletion_count, ...
+      mass_budget_top_deletion_height_m, ...
+      mass_budget_top_export_solid_mwe, ...
+      mass_budget_top_export_liquid_mwe, mass_budget_interior_merge_count, ...
+      mass_budget_remesh_solid_mwe, 'RowTimes', ledger_time);
+
+   aligned_time = [t0; t0 + hours(1); t0 + hours(3); t1];
+   observation_ablation_m = [1.00; 1.01; 1.03; 1.04];
+   observation_lowering_m = observation_ablation_m - 1;
+   observation_intact_mwe = observation_lowering_m ...
+      * icemodel.physicalConstant('ro_ice') ...
+      ./ icemodel.physicalConstant('ro_liq');
+   model_solid_loss_mwe = [0; 0.011; 0.036; 0.050];
+   model_minus_observation_mwe = model_solid_loss_mwe ...
+      - observation_intact_mwe;
+   aligned = timetable(observation_ablation_m, observation_lowering_m, ...
+      observation_intact_mwe, model_solid_loss_mwe, ...
+      model_minus_observation_mwe, 'RowTimes', aligned_time);
+
+   comparison = struct('classification', "model_high", ...
+      'physical_comparable', true, 'window_start', t0, 'window_end', t1, ...
+      'observation_lowering_m', 0.04, ...
+      'observation_intact_mwe', 0.03668, ...
+      'model_solid_loss_mwe', 0.05, ...
+      'model_minus_observation_mwe', 0.01332);
+   identities = table(["solid_storage"; "remesh_solid"], ...
+      ["mwe"; "mwe"], [1e-12; 2e-12], ...
+      [0.051; 0.04], [1e-9; 1e-9], [true; true], [true; true], ...
+      [0; 0], [true; true], ...
+      'VariableNames', {'identity', 'units', 'residual', 'normalization', ...
+      'tolerance', 'window_passed', 'step_passed', 'failed_step_count', ...
+      'passed'});
+   materiality = table(["endpoint_liquid_storage"; "remesh_solid"], ...
+      [0.002; 0], [0.002; 0.04], [0.04; 0], [0.04; 0.8], ...
+      [false; true], 'VariableNames', {'channel', 'signed_net_mwe', ...
+      'gross_mwe', 'signed_ratio', 'gross_ratio', 'material'});
+   scenarios = table(["central_intact_ice"; "merge_delete_solid"; ...
+      "endpoint_deficit_1"], ["central"; "accounting"; "endpoint"], ...
+      [0.05; 0.02; 0.05], [0.03668; 0.03668; 0.06], ...
+      [0.01332; -0.01668; -0.01], [0.2664; -0.834; -0.16667], ...
+      ["model_high"; "model_low"; "model_low"], ...
+      [false; true; true], [false; true; true], ...
+      [true; true; false], [true; true; true], ...
+      'VariableNames', {'scenario', 'role', 'model_mwe', ...
+      'observation_mwe', 'difference_mwe', 'relative_difference', ...
+      'classification', 'changes_sign', 'changes_classification', ...
+      'material', 'credible'});
+   effective_density = table([600; 870; 900], ...
+      [0.024; 0.0348; 0.036], [false; false; false], ...
+      'VariableNames', {'effective_density_kg_m3', ...
+      'observation_sensitivity_mwe', 'rigorous_bound'});
+   excluded = struct('gap_bridged', 1, 'station_transition', 0, ...
+      'unresolved_step', 0, 'step_correctable_but_unresolved', 0, ...
+      'nonfinite_observation', 0, 'unknown_quality_flag', 0, ...
+      'unknown_snow_depth', 0, 'snow_censored', 1, ...
+      'nonfinite_model', 0, ...
+      'total_unique_excluded', 1);
+   diagnostics = struct('identities', identities, ...
+      'physical_comparable', true, 'materiality', materiality, ...
+      'scenarios', scenarios, 'effective_density', effective_density, ...
+      'excluded', excluded, 'top_deletion', struct('count', 2, ...
+      'height_m', 0.05, 'interior_merge_count', 0, ...
+      'role', "secondary quantized grid geometry"));
+
+   model_metadata = struct('initialization_start', ...
+      datetime(2019, 1, 1, 'TimeZone', 'UTC'), ...
+      'initialization_policy', "readiness requested_window_start", ...
+      'evaluation_start', t0, 'evaluation_end', t1, ...
+      'run_end_inclusive', t1 - minutes(15));
+
+   % The seasonal payload is the exact inclusive hourly policy grid. Its first
+   % rows exercise finite snow censoring, unknown snow, and an omitted posting.
+   season_start = datetime(2019, 6, 1, 'TimeZone', 'UTC');
+   season_end = datetime(2019, 10, 1, 'TimeZone', 'UTC');
+   seasonal_time = (season_start:hours(1):season_end)';
+   n_season = numel(seasonal_time);
+   progress = linspace(0, 1, n_season)';
+   observation_lowering_m = 0.040 * progress;
+   observation_lowering_m(2) = -0.002;
+   policy = icemodel.verification.namelists.promiceAblationPolicy();
+   ro_liq = icemodel.physicalConstant('ro_liq');
+   density_values = observation_lowering_m ...
+      .* policy.effective_density_kg_m3 ./ ro_liq;
+   observation_lower_mwe = min(density_values, [], 2);
+   observation_upper_mwe = max(density_values, [], 2);
+   observation_reference_mwe = observation_lowering_m ...
+      * policy.effective_density_reference_kg_m3 ./ ro_liq;
+   model_melt_mwe = 0.052 * progress;
+   model_runoff_mwe = 0.035 * progress;
+   model_freeze_mwe = 0.008 * progress;
+   model_net_solid_loss_mwe = 0.042 * progress ...
+      + 0.002 * sin(8 * pi * progress);
+   model_layer_change_mwe = 0.050 * progress;
+   model_ablation_proxy_mwe = 0.048 * progress;
+   model_surface_mass_loss_mwe = 0.025 * double( ...
+      seasonal_time >= datetime(2019, 8, 1, 'TimeZone', 'UTC')) ...
+      + 0.025 * double(seasonal_time >= datetime( ...
+      2019, 9, 30, 'TimeZone', 'UTC'));
+   snow_depth_m = zeros(n_season, 1);
+   ice_exposed = true(n_season, 1);
+   direct_observation = true(n_season, 1);
+   snow_depth_m(3) = 0.08;
+   snow_depth_m(4) = NaN;
+   snow_depth_m(6) = 0.05;
+   snow_depth_m(7) = -0.005;
+   ice_exposed([3, 4, 6, 7]) = false;
+   direct_observation(6) = false;
+   unsupported = [3, 4, 6, 7];
+   observation_lowering_m(unsupported) = NaN;
+   observation_lower_mwe(unsupported) = NaN;
+   observation_upper_mwe(unsupported) = NaN;
+   observation_reference_mwe(unsupported) = NaN;
+   model_melt_mwe(unsupported) = NaN;
+   model_runoff_mwe(unsupported) = NaN;
+   model_freeze_mwe(unsupported) = NaN;
+   model_net_solid_loss_mwe(unsupported) = NaN;
+   model_layer_change_mwe(unsupported) = NaN;
+   model_surface_mass_loss_mwe(unsupported) = NaN;
+   model_ablation_proxy_mwe(unsupported) = NaN;
+   evaluation_window = seasonal_time >= t0 & seasonal_time <= t1;
+   seasonal = timetable(observation_lowering_m, observation_lower_mwe, ...
+      observation_upper_mwe, observation_reference_mwe, ...
+      model_melt_mwe, model_runoff_mwe, ...
+      model_freeze_mwe, model_net_solid_loss_mwe, model_layer_change_mwe, ...
+      model_surface_mass_loss_mwe, model_ablation_proxy_mwe, ...
+      snow_depth_m, ice_exposed, direct_observation, ...
+      evaluation_window, 'RowTimes', seasonal_time);
+   result = struct('case_id', "kanm", 'site_id', "KAN_M", 'year', 2019, ...
+      'status', "completed", 'reason', "", 'error_identifier', "", ...
+      'readiness_row', table(), 'manifest', struct(), ...
+      'observations', struct('data', observation_data), 'model', model, ...
+      'model_options', struct(), 'model_metadata', model_metadata, ...
+      'comparison', comparison, 'aligned', aligned, ...
+      'diagnostics', diagnostics, 'nested_windows', table(), ...
+      'seasonal', seasonal);
+end
+
+function test_an_added_diagnostic_channel_keeps_a_saved_cohort_usable(testCase)
+   % Appending a diagnostic channel must not invalidate a saved cohort. The
+   % saved run cannot contain a channel that did not exist when it ran. A new
+   % channel cannot change a value the run already computed. One appended
+   % channel must therefore never cost a multi-hour rerun.
+
+   % Mutate a local copy of the shared cohort; TestData stays pristine.
+   valid = testCase.TestData.results;
+   scratch = temporaryFolder(testCase);
+   output_folder = fullfile(scratch, 'added-channel-report');
+   results_file = fullfile(scratch, 'results.mat');
+
+   % A saved schema one channel short of the current namelist is what a
+   % cohort that ran before the channel was added looks like. The dropped
+   % channel must be one the report does not read.
+   consumed = icemodel.verification.namelists.ablationReportChannels();
+   saved_schema = valid.policy.required_model_fields;
+   droppable = setdiff(string(saved_schema), consumed, 'stable');
+   verifyNotEmpty(testCase, droppable, ...
+      'the policy schema must contain a channel the report does not read')
+   results = valid;
+   results.policy.required_model_fields = ...
+      setdiff(string(saved_schema), droppable(1), 'stable');
+   save(results_file, 'results')
+
+   icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false);
+
+   % render=false writes the document source, so that is what proves the
+   % cohort was accepted. The report must also name the missing channel as
+   % unavailable rather than pass over it in silence.
+   qmd_file = fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd');
+   verifyTrue(testCase, isfile(qmd_file))
+   verifySubstring(testCase, strjoin(readlines(qmd_file), newline), ...
+      char(droppable(1)))
+end
+
+function test_a_removed_report_channel_invalidates_a_saved_cohort(testCase)
+   % Compatibility is one-directional. A saved cohort that lacks a channel
+   % the report reads cannot produce that report. A channel the current code
+   % does not define has been removed or redefined. Its saved values do not
+   % mean what the report says they mean.
+
+   % Mutate a local copy of the shared cohort; TestData stays pristine.
+   valid = testCase.TestData.results;
+   scratch = temporaryFolder(testCase);
+   output_folder = fullfile(scratch, 'removed-channel-report');
+   results_file = fullfile(scratch, 'results.mat');
+
+   consumed = icemodel.verification.namelists.ablationReportChannels();
+   results = valid;
+   results.policy.required_model_fields = setdiff( ...
+      string(valid.policy.required_model_fields), consumed(1), 'stable');
+   save(results_file, 'results')
+   verifyError(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false), ...
+      'icemodel:verification:report:incompatibleModelSchema')
+end
+
+function test_physics_fingerprint_warns_and_never_blocks_a_report(testCase)
+   % A physics change is a prompt to check, not proof of staleness: an opt-in
+   % path that nothing enables also moves the digest. The gate therefore warns
+   % and still builds, and the owner decides whether to rerun.
+
+   % The shared fixture already carries the running code's stamp, so this
+   % test mutates copies of it instead of resolving a second fingerprint.
+   valid = testCase.TestData.results;
+   scratch = temporaryFolder(testCase);
+   output_folder = fullfile(scratch, 'fingerprint-report');
+   results_file = fullfile(scratch, 'results.mat');
+
+   % A stamp that does not match the running code warns and still builds.
+   results = valid;
+   results.physics_fingerprint.opts_sha256 = string(repmat('0', 1, 64));
+   save(results_file, 'results')
+   verifyWarning(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false), ...
+      'icemodel:verification:report:physicsFingerprintMismatch')
+   verifyTrue(testCase, isfile(fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd')))
+
+   % A cohort saved before the stamp existed must build without a warning.
+   % Every such cohort is in that state, so warning about all of them would
+   % drown the warning that carries information.
+   results = rmfield(valid, 'physics_fingerprint');
+   save(results_file, 'results')
+   verifyWarningFree(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false))
+   qmd_file = fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd');
+   verifySubstring(testCase, strjoin(readlines(qmd_file), newline), ...
+      'not recorded by this cohort')
+
+   % The saved version string reaches the document, so it must be sanitized
+   % like every other saved value. A cohort carrying markup in that field
+   % must not put raw markup into the report.
+   results = valid;
+   results.physics_fingerprint.opts_sha256 = string(repmat('0', 1, 64));
+   results.physics_fingerprint.icemodel_version = ...
+      "<script>alert(1)</script>";
+   save(results_file, 'results')
+   verifyWarning(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false), ...
+      'icemodel:verification:report:physicsFingerprintMismatch')
+   qmd_text = strjoin(readlines(fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd')), newline);
+   verifyFalse(testCase, contains(qmd_text, "<script"))
+
+   % A malformed stamp is a damaged cohort, not an old one, so it warns and
+   % still builds. One shape is enough here. The report only asks
+   % icemodel.verification.helpers.isPhysicsFingerprint whether the stamp is
+   % well formed. test_report_helpers covers every shape that helper rejects,
+   % and pays for no report build.
+   results = valid;
+   results.physics_fingerprint = rmfield(valid.physics_fingerprint, ...
+      'opts_sha256');
+   save(results_file, 'results')
+   verifyWarning(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false), ...
+      'icemodel:verification:report:malformedPhysicsFingerprint')
+   verifySubstring(testCase, strjoin(readlines(fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd')), newline), ...
+      'stamp is malformed')
+
+   % The matching stamp must stay silent, or the warning carries no signal.
+   % The pristine shared cohort file already carries the matching stamp, so
+   % this case reuses it instead of saving another copy.
+   verifyWarningFree(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      testCase.TestData.results_file, output_dir=output_folder, ...
+      render=false))
+end
+
+function test_report_builds_when_the_workspace_cannot_resolve_defaults( ...
+      testCase)
+   % Resolving the current defaults runs icemodel.setopts, which calls
+   % configureRun and asserts that ICEMODEL_INPUT_PATH exists. Building a
+   % report from a saved MAT file must survive an absent workspace, because
+   % that is the one situation the guard exists for.
+
+   % Build the cohort directly instead of using the stamped shared fixture:
+   % the absent-stamp branch under test needs an unstamped cohort.
+   valid = syntheticResults();
+   scratch = temporaryFolder(testCase);
+   output_folder = fullfile(scratch, 'no-workspace-report');
+   results_file = fullfile(scratch, 'results.mat');
+   results = valid;
+   save(results_file, 'results')
+
+   % Restore the caller's configuration even if the verification below fails.
+   prior_input_path = getenv('ICEMODEL_INPUT_PATH');
+   restore_env = onCleanup(@() ...
+      setenv('ICEMODEL_INPUT_PATH', prior_input_path));
+   setenv('ICEMODEL_INPUT_PATH', fullfile(tempname, 'not-a-directory'))
+
+   % This cohort carries no stamp, so the state is absent, not unavailable.
+   % A run with explicit data roots omits the stamp on purpose, and the
+   % broken workspace says nothing about that cohort. Absent does not warn.
+   verifyWarningFree(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false))
+
+   % A cohort that DOES carry a stamp still warns, because there the report
+   % genuinely cannot tell whether the current defaults moved.
+   stamped_file = fullfile(scratch, 'results_stamped.mat');
+   results = valid;
+   results.physics_fingerprint = struct( ...
+      'opts_sha256', string(repmat('a', 1, 64)), ...
+      'icemodel_version', "0.0.0");
+   save(stamped_file, 'results')
+   verifyWarning(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      stamped_file, output_dir=fullfile(scratch, 'stamped-report'), ...
+      render=false), ...
+      'icemodel:verification:report:unavailablePhysicsFingerprint')
+
+   % The report must still be written, and must say the comparison did not
+   % happen rather than claim the physics is unchanged. An absent stamp says
+   % the cohort never recorded one.
+   qmd_file = fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd');
+   verifyTrue(testCase, isfile(qmd_file))
+   qmd_text = strjoin(readlines(qmd_file), newline);
+   verifySubstring(testCase, qmd_text, 'not recorded by this cohort')
+
+   % Pin the clause, not just the state. The workspace cannot resolve the
+   % current defaults here, so the appendix must say so. Asserting only the
+   % state above would also pass against an implementation that printed the
+   % empty digest as a pair of backticks.
+   verifySubstring(testCase, qmd_text, ...
+      'the current defaults did not resolve in this workspace')
+   verifyFalse(testCase, contains(qmd_text, 'current `` at IceModel'), ...
+      'the appendix must not print empty code spans for the current stamp')
+
+   % The stamped cohort's report says the comparison could not run.
+   stamped_qmd = fullfile(scratch, 'stamped-report', ...
+      'promice-ablation-evaluation-report.qmd');
+   verifyTrue(testCase, isfile(stamped_qmd))
+   verifySubstring(testCase, ...
+      strjoin(readlines(stamped_qmd), newline), 'not compared')
+   clear restore_env
+end
+
+function test_reworded_documentation_does_not_invalidate_a_saved_policy(testCase)
+   % Rewording an explanation must not invalidate a saved cohort, or fixing a
+   % citation would cost a multi-hour re-run and authors would leave
+   % documentation wrong instead. Values still govern: changing one must still
+   % be rejected.
+
+   % Mutate local copies of the shared cohort; TestData stays pristine.
+   valid = testCase.TestData.results;
+   output_folder = fullfile(tempname, 'reworded-report');
+   results_file = fullfile(tempname, 'results.mat');
+   mkdir(fileparts(results_file))
+
+   % Rewrite every documentation field, leaving all values untouched.
+   results = valid;
+   documentation_fields = results.policy.documentation_fields;
+   for k = 1:numel(documentation_fields)
+      field = char(documentation_fields(k));
+      if isstruct(results.policy.(field))
+         names = fieldnames(results.policy.(field));
+         for j = 1:numel(names)
+            results.policy.(field).(names{j}) = "reworded explanation";
+         end
+      else
+         results.policy.(field) = "reworded explanation";
+      end
+   end
+   save(results_file, 'results')
+
+   icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false);
+
+   % render=false writes the document source, so that is what proves the
+   % reworded policy was accepted.
+   verifyTrue(testCase, isfile(fullfile(output_folder, ...
+      'promice-ablation-evaluation-report.qmd')))
+
+   % A changed VALUE must still be rejected, or the rule has no effect.
+   results = valid;
+   results.policy.effective_density_reference_kg_m3 = ...
+      results.policy.effective_density_reference_kg_m3 + 1;
+   save(results_file, 'results')
+   verifyError(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false), ...
+      'icemodel:verification:report:invalidAblationPolicy')
+
+   % A saved policy must not be able to self-certify by nominating its own
+   % changed fields as documentation. The strip list comes from the current
+   % namelist for both operands, so this attempt must still be rejected.
+   results = valid;
+   results.policy.effective_density_reference_kg_m3 = ...
+      results.policy.effective_density_reference_kg_m3 + 1;
+   results.policy.documentation_fields = ...
+      [results.policy.documentation_fields, ...
+      "effective_density_reference_kg_m3"];
+   save(results_file, 'results')
+   verifyError(testCase, @() ...
+      icemodel.verification.report.buildAblationEvaluationReport( ...
+      results_file, output_dir=output_folder, render=false), ...
+      'icemodel:verification:report:invalidAblationPolicy')
+end

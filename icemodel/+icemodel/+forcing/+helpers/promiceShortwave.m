@@ -24,8 +24,8 @@ function [swd, swu, metadata, masks] = promiceShortwave(aws, kwargs)
    % placeholder. The caller can supply whole-file support when `aws` is a
    % subset of the file, so the selection does not depend on the requested
    % window.
-   % The source file holds the authoritative raw values. The returned metadata
-   % keeps the exact source, fallback, negative-input, darkness-fill, and
+   % The source file holds the raw values. The returned metadata keeps the
+   % exact source, fallback, negative-input, darkness-fill, and
    % remaining-missing counts for staged artifacts.
    %
    % See also: icemodel.forcing.readPromiceAws,
@@ -42,7 +42,7 @@ function [swd, swu, metadata, masks] = promiceShortwave(aws, kwargs)
 
    % Deep civil night is the conservative empirical boundary at KAN_L: finite
    % source SWD is identically zero below it, whereas twilight SWD can be
-   % positive. Evaluate the complete source-hour interval in canonical UTC.
+   % positive. Evaluate the complete source-hour interval in UTC.
    bands = icemodel.forcing.reconstruct.solarElevationBands();
    darkness_threshold_degrees = bands.civil_twilight_deg;
    darkness_method = ...
@@ -75,8 +75,8 @@ function [swd, swu, metadata, masks] = promiceShortwave(aws, kwargs)
    % Keep metadata flat because writer and audit contracts store scalar
    % artifact metadata rather than nested per-channel structs.
    metadata = struct();
-   metadata = copyFields(metadata, swd_metadata);
-   metadata = copyFields(metadata, swu_metadata);
+   metadata = icemodel.helpers.copyFields(metadata, swd_metadata);
+   metadata = icemodel.helpers.copyFields(metadata, swu_metadata);
    masks = struct( ...
       'swd_corrected_used', swd_masks.corrected_used, ...
       'swd_raw_fallback', swd_masks.raw_fallback, ...
@@ -213,12 +213,4 @@ function deep_dark = wholeHourDeepCivilNight( ...
       icemodel.forcing.helpers.intervalMaximumSolarElevation( ...
       Time, latitude, longitude, hours(1));
    deep_dark = maximum_elevation <= threshold_degrees;
-end
-
-function target = copyFields(target, source)
-   %COPYFIELDS Copy one scalar metadata struct into another.
-   fields = fieldnames(source);
-   for k = 1:numel(fields)
-      target.(fields{k}) = source.(fields{k});
-   end
 end

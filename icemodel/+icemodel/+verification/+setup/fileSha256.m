@@ -9,7 +9,8 @@ function digest = fileSha256(pathname)
    %  compares the two values. The check therefore detects a corrupt or stale
    %  fixture instead of trusting it.
    %
-   %  Uses java.security.MessageDigest, which ships with every MATLAB JVM, so
+   %  Hashing itself is done by icemodel.verification.setup.bytesSha256, which
+   %  uses java.security.MessageDigest. That ships with every MATLAB JVM, so
    %  this function needs no toolbox and no shell command.
    %  Simulink.getFileChecksum would require Simulink. A shasum shell command
    %  would be fragile across CI platforms.
@@ -23,7 +24,8 @@ function digest = fileSha256(pathname)
    %        64-character lowercase hex SHA-256 digest.
    %
    % See also: icemodel.verification.setup.packFixtures,
-   %  icemodel.verification.setup.fetchFixtures
+   %  icemodel.verification.setup.fetchFixtures,
+   %  icemodel.verification.setup.bytesSha256
 
    arguments
       pathname (1, 1) string
@@ -39,9 +41,5 @@ function digest = fileSha256(pathname)
    cleaner = onCleanup(@() fclose(fid));
    bytes = fread(fid, Inf, '*uint8');
 
-   % Hash via the JVM's SHA-256 and format the signed Java byte array as
-   % unsigned lowercase hex.
-   md = java.security.MessageDigest.getInstance('SHA-256');
-   raw = typecast(md.digest(bytes), 'uint8');
-   digest = string(lower(reshape(dec2hex(raw, 2)', 1, [])));
+   digest = icemodel.verification.setup.bytesSha256(bytes);
 end

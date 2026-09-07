@@ -5,7 +5,7 @@ function [row_flags, report] = dailyAlbedoAnomalyFlags(Time, swd, swu)
    %     icemodel.forcing.helpers.dailyAlbedoAnomalyFlags(Time, swd, swu)
    %
    % The detector compares the daily shortwave-energy ratio
-   % `sum(swu)/sum(swd)` with robust baselines before and after each day.
+   % `sum(swu)/sum(swd)` with median/MAD baselines before and after each day.
    % A conservative seed must have complete temporal support, at least one
    % third of the expected irradiated samples, at least 2 kWh m-2 incident
    % shortwave, and at least 80% valid reflected-shortwave energy coverage.
@@ -17,6 +17,10 @@ function [row_flags, report] = dailyAlbedoAnomalyFlags(Time, swd, swu)
    % anomalous day. `report` contains compact counts and dates plus a daily
    % diagnostic timetable for audit and provenance use. The helper never edits
    % source radiation. The caller decides which derived channels to mask.
+   %
+   % See also: icemodel.forcing.buildImauHourlyData,
+   %  icemodel.forcing.buildKtransectData,
+   %  icemodel.verification.auditArtifacts
 
    arguments
       Time datetime {mustBeVector}
@@ -40,8 +44,8 @@ function [row_flags, report] = dailyAlbedoAnomalyFlags(Time, swd, swu)
    end
 
    % Declare a naive source axis to be UTC, and convert a zoned axis to UTC.
-   % A reversed axis returns no flags, because a sort would hide a broken
-   % native-grid contract.
+   % A reversed axis returns no flags, because sorting would hide a genuinely
+   % broken input time order.
    Time.TimeZone = 'UTC';
    Time = Time(:);
    swd = swd(:);
@@ -192,7 +196,8 @@ function complete = exactDailyGrid( ...
 end
 
 function [pre, post, scale] = rollingBaselines(Time, alpha, eligible)
-   %ROLLINGBASELINES Compute separated robust context before and after each day.
+   %ROLLINGBASELINES Compute separated median/MAD context before and after
+   %each day.
    n_days = numel(Time);
    pre = nan(n_days, 1);
    post = nan(n_days, 1);
@@ -222,7 +227,7 @@ end
 
 function flags = anomalyDays( ...
       alpha, pre, post, scale, support, cap, minimum_drop, sigma)
-   %ANOMALYDAYS Apply one two-sided robust transient threshold.
+   %ANOMALYDAYS Apply one two-sided median/MAD transient threshold.
    threshold = max(minimum_drop, sigma .* scale);
    flags = support & alpha < cap ...
       & pre - alpha >= threshold ...

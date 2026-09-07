@@ -1,5 +1,5 @@
 function [required, optional, pptunit] = metvariables()
-   %METVARIABLES Canonical met-file variable names for the forcing builders.
+   %METVARIABLES Met-file variable names for the forcing builders.
    %
    %  [required, optional] = icemodel.forcing.helpers.metvariables()
    %  [required, optional, pptunit] = icemodel.forcing.helpers.metvariables()
@@ -17,14 +17,14 @@ function [required, optional, pptunit] = metvariables()
    %    psfc   [Pa]      surface air pressure
    %    ppt    [m s-1]   total precipitation as a water-equivalent RATE
    %
-   % Canonical precipitation unit (PPTUNIT, third output): the precipitation
+   % Precipitation unit (PPTUNIT, third output): the precipitation
    % channels (ppt, and the optional rainf/snowf split) are a water-equivalent
    % RATE in metres per second. icemodel.surface.advective_heat_flux consumes
    % that unit directly. The rate does not depend on the timestep, so it is
    % the same for every source and every sampling interval. ESM-SnowMIP
    % produces m s-1 (mass flux / ro_liq). The gridded sources (MAR/MERRA/RACMO)
    % emit their precipitation channels in m s-1 from the Data builders, which
-   % convert the source mWE/h posting. The shared canonical unit map
+   % convert the source mWE/h posting. The shared unit map
    % icemodel.forcing.helpers.variableUnits records m s-1 for them.
    %
    % The optional set covers source-specific diagnostics. The builders pass
@@ -42,6 +42,6 @@ function [required, optional, pptunit] = metvariables()
       "shf", "lhf", "tsfc", "cfrac", "snowd", "boom_height", "wdir", ...
       "modis"];
 
-   % Canonical precipitation-rate unit (water-equivalent metres per second).
+   % Precipitation-rate unit (water-equivalent metres per second).
    pptunit = "m s-1";
 end

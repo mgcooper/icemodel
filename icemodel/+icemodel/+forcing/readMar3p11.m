@@ -7,7 +7,7 @@ function [data, units, Time] = readMar3p11(filename, varname, kwargs)
    %  [blocks, units, Time] = ... readMar3p11(_, slabs=..., sector=[1 2])
    %
    % Reads a MAR v3.11 NetCDF variable (optionally a spatial hyperslab)
-   % and converts the legacy MAR units to icemodel-standard ones:
+   % and converts MAR's native units to icemodel-standard ones:
    %
    %    C      -> K        (air/surface temperature)
    %    g/kg   -> kg/kg    (specific humidity)
@@ -61,7 +61,7 @@ function [data, units, Time] = readMar3p11(filename, varname, kwargs)
    [dims, native_units] = ncVarInfo(filename, varname);
 
    if isempty(kwargs.slabs)
-      % Single-hyperslab path (the original contract, returns one matrix).
+      % Single-hyperslab path (the original calling form, returns one matrix).
       assert(numel(kwargs.sector) <= 1, ...
          'a single MAR slab accepts at most one surface sector')
       [start, count] = slabWindow( ...
@@ -160,7 +160,7 @@ function data = convertSlab(data, units, count)
    data = reshape(data, ncells, []);
 
    % No-data handling precedes unit conversion. MAR uses signed ~1e34/1e36
-   % fill values; both signs are unambiguous. Do not apply the legacy >=999
+   % fill values; both signs are unambiguous. Do not apply a >=999
    % mass-flux cut: raw RUH values above 999 sum to native no-delay RU2, and
    % paired positive/negative SMBH pulses sum to native daily SMB. Treating
    % only the positive pulse as missing corrupts the daily mass balance.

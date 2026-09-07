@@ -7,8 +7,12 @@ function rows = auditSegments(times, mask, channel, method, detail, kwargs)
    % Returns a cell column whose rows match reconstructSeries.audit. The
    % function splits a disjoint selection, so no audit row claims an unfilled
    % span.
-   % context_id joins a production segment to the exact fitted parameters
-   % and held-out evidence in the persisted station plan.
+   % context_id joins a production segment to the fitted parameters and
+   % held-out evidence in the persisted station plan.
+   %
+   % See also: icemodel.verification.report.buildGapFillReport,
+   %  icemodel.forcing.reconstruct.deriveUpwardShortwave,
+   %  icemodel.forcing.reconstruct.smoothShortwaveSeams
 
    arguments
       times datetime

@@ -1,5 +1,6 @@
 function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
-      delz, z_nodes, f_liq_res] = initialize_column_state(opts, tair, r_eff)
+      delz, z_nodes, f_liq_res] ...
+      = initialize_column_state(opts, tair, r_eff)
    %INITIALIZE_COLUMN_STATE Initialize the 1-d ice column state.
    %
    %  [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, ...
@@ -13,6 +14,8 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
    %
    %  opts.use_ro_glc changes only the densities used to construct initial
    %  phase fractions. Solvers use persistent physical constants. See setopts.
+   %
+   % See also: icemodel, skinmodel
    %
    %#codegen
 
@@ -73,11 +76,14 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
       f_liq = g_liq ./ ro_liq;
       f_ice = g_ice ./ ro_ice .* ones(JJ, 1);
       Ts = (min(tair(1), Tf) + T(1)) / 2;
-      r_eff = r_eff / 1000 * ones(JJ, 1); % convert mm->m for vapor_mass_transfer
+      r_eff = r_eff / 1000 * ones(JJ, 1); % convert mm to m for grain growth
    end
 
-   % THERMAL CONDUCTIVITY (initialization only; f_liq ≈ 0 so k_vap ≈ 0)
-   k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq);
+   % INITIAL SOLVER CONDUCTIVITY
+   % The column solvers add vapor transport on faces. Initialize the
+   % checkpoint with the same vapor-free node conductivity that subsequent
+   % accepted solves return.
+   k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, 0);
 
    % SOURCE TERM LINEARIZATION VECTORS
    Sc = zeros(JJ, 1);

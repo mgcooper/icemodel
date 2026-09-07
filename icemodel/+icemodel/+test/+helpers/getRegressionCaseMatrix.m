@@ -64,6 +64,7 @@ end
 function cases = makeCases(tier_name, sites, simyear, baseline)
    %MAKECASES Expand one tier/site selection into the formal regression rows.
    models = icemodel.namelists.smbmodel("test");
+   policy = icemodel.test.helpers.formalBaselinePolicy(baseline);
    rows = struct([]);
    k = 0;
 
@@ -89,6 +90,8 @@ function cases = makeCases(tier_name, sites, simyear, baseline)
             rows(k).uservars = "";
             rows(k).simyear = simyear;
             rows(k).solver = solver_id;
+            rows(k).promice_filled_expected_policy_sha256 = ...
+               policy.promice_filled_policy_sha256;
             rows(k).runoff_site = icemodel.test.helpers.getRunoffSite(sitename);
          end
       end

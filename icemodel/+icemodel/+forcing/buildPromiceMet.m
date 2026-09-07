@@ -11,12 +11,12 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    % whole-hour deep-civil-night radiation. Applies the albedo winter-fill
    % policy. Runs the standard source-faithful QA/QC pass, which clamps to
    % physical limits and does no unbounded gap fill. Returns a timetable that
-   % meets the icemodel met contract for any station and any window in the
+   % meets icemodel's met requirements for any station and any window in the
    % source record. Save it with icemodel.forcing.helpers.writemet.
    %
    % PROMICE rainfall_cor_u is corrected liquid precipitation from a tipping-
    % bucket gauge when that channel exists. The builder converts its hourly
-   % timestep amount to canonical rainf [m s-1]. PROMICE supplies neither
+   % timestep amount to rainf [m s-1]. PROMICE supplies neither
    % reliable solid precipitation nor total precipitation, so snowf and ppt
    % remain explicit NaN placeholders for a later fill/swap step.
    %
@@ -60,8 +60,8 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
 
    % Keep the known within-record station handovers in the met artifact. They
    % are provenance for surface-height QC flags and for the maintenance-visit
-   % registry that refines the runtime interpolation rung (icemodel-1ps.16).
-   % The A3 chain may interpolate across a handover by design.
+   % records that refine runtime interpolation (`icemodel-1ps.16`).
+   % POLICY A3 interpolation can cross a station handover.
    site_info = icemodel.verification.setup.promiceSiteCatalog(site, ...
       source_dir=kwargs.source_dir);
    [transition_times, transition_record] = ...
@@ -86,7 +86,7 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    % absent or all-NaN in the window (older GC-Net/firn sites). That fallback
    % estimates lwd from air temperature and vapor pressure with the legacy
    % empirical relation, and it FLAGS the result as estimated in the metadata.
-   % The default met-builder contract leaves an absent lwd as an explicit NaN
+   % The default met builder leaves an absent lwd as an explicit NaN
    % placeholder. Callers that want a missing required channel to abort set
    % fillwithmissing=false, the opt-in strict path.
    has_lwd = ismember('lwd', aws.Properties.VariableNames) ...
@@ -154,7 +154,8 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
 
    % Distinguish an observed albedo series from an intentional all-missing or
    % absent placeholder. The placeholder stays NaN for a later forcing swap.
-   % The code does not invent a constant observation to fit the met schema.
+   % The code does not invent a constant observation just to pass met
+   % validation.
    has_albedo_source = ismember("albedo", ...
       string(aws.Properties.VariableNames));
    has_albedo_observations = has_albedo_source ...
@@ -185,9 +186,9 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    % cloud fraction, turbulent fluxes, ...). These are not required scalar
    % meteorological channels, so a station missing any of them (e.g. KAN_B has
    % no cfrac) must still yield a native met file. Boom height passes
-   % through as optional geometry. The runtime A3 fallback chain supplies
-   % usable heights, so a missing boom height does not block a run
-   % (POLICY A3). The canonical optional set defines what passes through.
+   % through as optional geometry. The POLICY A3 runtime fallback supplies
+   % usable heights, so a missing boom height does not block a run. The
+   % optional-channel set below defines what passes through.
    % rainf is handled below on its own because it needs a unit conversion.
    [~, optional] = icemodel.forcing.helpers.metvariables();
    for v = setdiff(optional, "rainf", 'stable')
@@ -197,10 +198,10 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    end
 
    % PROMICE rainfall_cor_u is a corrected LIQUID amount in millimetres per
-   % hourly timestep. Convert it at the builder boundary to the canonical
-   % water-equivalent rainf rate [m s-1]. The tipping-bucket gauge is not a
-   % reliable solid-precipitation measurement, so it must not populate snowf or
-   % total ppt. Stations without the source channel retain a NaN placeholder.
+   % hourly timestep. Convert it here to the water-equivalent rainf rate
+   % [m s-1]. The tipping-bucket gauge is not a reliable solid-precipitation
+   % measurement, so it must not populate snowf or total ppt. Stations
+   % without the source channel retain a NaN placeholder.
    has_rainf_source = ismember("rainf", string(aws.Properties.VariableNames));
    has_rainf_observations = has_rainf_source && any(isfinite(aws.rainf));
    if has_rainf_source
@@ -225,7 +226,7 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
          include_split_precip=true);
    end
 
-   % Per-variable units from the shared canonical map. rainf carries observed
+   % Per-variable units come from the shared unit map. rainf carries observed
    % liquid precipitation where available; snowf and total ppt stay all-NaN
    % placeholders unless a runtime source swap fills them.
    met.Properties.VariableUnits = icemodel.forcing.helpers.variableUnits( ...
@@ -242,7 +243,7 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
       icemodel.verification.setup.fileSha256(source_meta.source_file);
 
    % Carry the corrected/raw shortwave selection and exact replacement counts
-   % into the saved artifact contract, including the channel-specific swd
+   % into the saved artifact metadata, including the channel-specific swd
    % placeholder policy used by sparse stations.
    fields = fieldnames(shortwave_meta);
    for k = 1:numel(fields)
@@ -271,8 +272,8 @@ function [met, metadata] = buildPromiceMet(site, kwargs)
    metadata.gap_policy = ...
       "shortwave missing values become zero only for whole-hour deep civil " + ...
       "night; other source gaps preserved; no metchecks gap interpolation";
-   % Record the delivered met contract, as every Data-backed met builder does.
-   % The PROMICE-specific leg assembly above stays as it is.
+   % Record the delivered met channel list, as every Data-backed met builder
+   % does. The PROMICE-specific leg assembly above stays as it is.
    metadata.met_variables = string(met.Properties.VariableNames);
    metadata.fillwithmissing = kwargs.fillwithmissing;
    metadata = icemodel.forcing.helpers.columnizeMetadata(metadata);

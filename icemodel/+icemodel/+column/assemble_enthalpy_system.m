@@ -1,6 +1,6 @@
 function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
-      T_ice, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, ~, k_eff, delz, ...
-      fn, dz, dt, T_sfc, Fc, Fp, bc)
+      T_ice, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, ~, ...
+      k_eff_faces, delz, dz, dt, T_sfc, Fc, Fp, bc, q_deferred_faces)
    %ASSEMBLE_ENTHALPY_SYSTEM Compute the general equation coefficients.
    %
    %  This function constructs the lower, middle, and upper diagonals of the
@@ -9,9 +9,15 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    %  The input signature keeps the suppressed linearization factor Sp for
    %  generality.
    %
+   %  K_EFF_FACES is the combined interface thermal conductivity.
+   %  Q_DEFERRED_FACES is the deferred vapor-energy correction term evaluated at
+   %  the current Picard iterate [W m-2], positive downward. Its in-minus-out
+   %  convergence is added to the source vector b in this function.
+   %
    %  Note: ro_sno * cp_sno = (cv_ice * f_ice + cv_liq * f_liq)
-   %  See updatestate (or icemodel.timestepping.updatesubstep) for how ro_sno
-   %  and cp_sno are computed.
+   %  See icemodel.column.bulk_density and
+   %  icemodel.column.bulk_specific_heat_capacity for how ro_sno and
+   %  cp_sno are computed.
    %
    %  Pmelt here is identical to SNTHRM:
    %     P = g_liq - g_liq_o
@@ -56,9 +62,6 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
 
    % Phase-aware latent heat: Ls for dry/cold cells, Lv for wet cells.
    Lv = icemodel.vapor.latent_enthalpy_switch(f_liq, S);
-
-   % Compute gamma at the control volume interfaces (eq. 4.9, p. 45) (JJ+1)
-   g_b_ns = 1 ./ ((1 - fn) ./ [k_eff(N); k_eff] + fn ./ [k_eff; k_eff(S)]);
 
    % Compute the air fraction
    f_air = 1.0 - f_ice - f_liq;
@@ -107,10 +110,14 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
 
    % Compute the aN and aS conductances [W m-2 K-1]. Note: delz(1) and delz(end)
    % are half control volumes.
-   aN = g_b_ns(N:S)     ./ delz(N:S);
-   aS = g_b_ns(N+1:S+1) ./ delz(N+1:S+1);
+   aN = k_eff_faces(N:S)     ./ delz(N:S);
+   aS = k_eff_faces(N+1:S+1) ./ delz(N+1:S+1);
 
-   % Keep the upper left and right conductances
+   % Keep the upper left and right conductances. a1 = k_eff_faces(1)/delz(1) =
+   % k_eff(1)/(dz(1)/2) because face 1 carries no vapor term.
+   % icemodel.surface.conductive_heat_flux computes Qc with the same
+   % coefficient, so the SEB and this matrix use the same conductance. A
+   % mismatch would prevent the coupler's seb_res from ever reaching zero.
    a1 = aN(1); % Note: astar = a1 / (a1 - Fp);
    a2 = aS(1);
 
@@ -133,9 +140,13 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    aS(S) = 0.0;                       % Neumann: dT/dz = 0.0
    bc_S = aS(S) * 0.0;                % Neumann: dT/dz = 0.0
 
-   % Compute the aP coefficient and solution vector b
+   % Compute the cell-integrated deferred-flux convergence [W m-2].
+   dq_deferred = q_deferred_faces(N:S) - q_deferred_faces(N+1:S+1);
+
+   % Compute the aP coefficient and solution vector b directly from the
+   % finite-volume energy balance. Every term in b has units W m-2.
    aP = aN + aS + aP0; % -Sp.*dz;
-   b = aP0 .* T_ice + Sc .* dz - dH .* dz / dt; % [W m-2]
+   b = aP0 .* T_ice + dq_deferred + Sc .* dz - dH .* dz / dt;
 
    % Modify b to account for boundary conditions
    b(N) = b(N) + bc_N;
@@ -189,11 +200,12 @@ end
 
 % top node:
 % aN(1) = 0.0;                                        (outside and inside)
-% aP(1) = aP0(1) + g_b_ns(1) - Sp_1                   (outside)
-% aP(1) = (aP0(1) + g_b_ns(1) - Sp_1)*gvP + Lf*dz/dt  (inside)
-% aS(1) = -g_b_ns(1)*gvS                              (outside and inside)
+% aP(1) = aP0(1) + k_eff_faces(1) - Sp_1                   (outside)
+% aP(1) = (aP0(1) + k_eff_faces(1) - Sp_1)*gvP + Lf*dz/dt  (inside)
+% aS(1) = -k_eff_faces(1)*gvS                              (outside and inside)
 
-% note: for these, I am using aS(1) as in aS(1) = -g_b_ns(1) i.e. b4 *gvS
+% note: for these, I am using aS(1) as in
+% aS(1) = -k_eff_faces(1), i.e. b4 * gvS
 % b(1) = aP0(1)*T_old(1) + Sc(1)*dz + aS(1)*gkS - aP0(1)*gkP - aS(1)*gkP
 
 % Qnet are the past net heat fluxes which include the conductive flux into the

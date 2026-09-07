@@ -9,7 +9,7 @@ function [data, units, Time] = readMerra2(filename, varname, kwargs)
    % (tavg1_2d_{slv,rad,flx}_Nx or tavg3_2d_glc_Nx; optionally a spatial
    % hyperslab) and converts the native units to icemodel-standard ones.
    % Mirrors icemodel.forcing.readMar3p11 / readRacmo2p3 and merra.readMerra2.
-   % The gridded-source readers therefore share one contract: a cells-by-time
+   % The gridded-source readers therefore share one interface: a cells-by-time
    % block (cells flattened in native [lon lat] order, matching the X, Y grids
    % and gridLocation's column-major slab), the unit string, and the UTC time
    % axis.

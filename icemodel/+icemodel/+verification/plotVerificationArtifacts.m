@@ -11,7 +11,10 @@ function summary = plotVerificationArtifacts(kwargs)
    %  eval tree, loads observations.mat targets plus staged met/userdata legs,
    %  and writes grouped figures per case so model developers can inspect every
    %  numeric channel before using the artifacts. With overwrite=true, prior
-   %  PNGs are cleared only from each selected case's figure directory.
+   %  PNGs are cleared only from each selected case's figure directory. With
+   %  finalize_legends=false, the legend-clearance layout pass is skipped;
+   %  use it only when figures are neither saved nor measured, because the
+   %  pass moves legends and pads y-limits before export.
    %
    % See also: icemodel.verification.plotFirnArtifacts,
    %  icemodel.plot.forcing, icemodel.plot.compareTimeseries
@@ -28,6 +31,9 @@ function summary = plotVerificationArtifacts(kwargs)
       kwargs.save_figs (1, 1) logical = true
       kwargs.overwrite (1, 1) logical = false
       kwargs.visible (1, 1) logical = false
+      % The legend-clearance pass forces one drawnow per figure. Callers
+      % that neither save nor assert figure geometry pass false to skip it.
+      kwargs.finalize_legends (1, 1) logical = true
       kwargs.startdate = ""
       kwargs.enddate = ""
    end
@@ -55,7 +61,8 @@ function summary = plotVerificationArtifacts(kwargs)
       for k = 1:numel(cases)
          case_rows = plotOneCase(cases(k), input_root, ...
             hasExplicitInputRoot(kwargs), figure_root, kwargs.save_figs, ...
-            kwargs.overwrite, kwargs.visible, kwargs.startdate, kwargs.enddate);
+            kwargs.overwrite, kwargs.visible, kwargs.startdate, ...
+            kwargs.enddate, kwargs.finalize_legends);
          n_tables = n_tables + 1;
          case_tables{n_tables} = case_rows;
       end
@@ -133,7 +140,7 @@ function tf = hasExplicitInputRoot(kwargs)
 end
 
 function rows = plotOneCase(c, input_root, explicit_input_root, figure_root, ...
-      save_figs, overwrite, visible, startdate, enddate)
+      save_figs, overwrite, visible, startdate, enddate, finalize_legends)
    %PLOTONECASE Create grouped visual-QA figures for one manifest case.
    input_root = caseInputRoot(c, input_root, explicit_input_root);
    target = loadTarget(c);
@@ -167,7 +174,7 @@ function rows = plotOneCase(c, input_root, explicit_input_root, figure_root, ...
 
    if ~isempty(met.items)
       [row, vars] = plotMetForcing(c, target, met, data, case_dir, ...
-         save_figs, visible, startdate, enddate);
+         save_figs, visible, startdate, enddate, finalize_legends);
       n_rows = n_rows + 1;
       rows{n_rows} = row;
       plotted = unique([plotted, vars], 'stable');
@@ -179,7 +186,8 @@ function rows = plotOneCase(c, input_root, explicit_input_root, figure_root, ...
          continue
       end
       [row, vars] = plotTimeseriesGroup(c, records, group, target, met, ...
-         data, case_dir, save_figs, visible, startdate, enddate);
+         data, case_dir, save_figs, visible, startdate, enddate, ...
+         finalize_legends);
       n_rows = n_rows + 1;
       rows{n_rows} = row;
       plotted = unique([plotted, vars], 'stable');
@@ -187,7 +195,7 @@ function rows = plotOneCase(c, input_root, explicit_input_root, figure_root, ...
 
    if ~isempty(profiles)
       [row, vars] = plotProfiles(c, profiles, target, met, data, case_dir, ...
-         save_figs, visible, startdate, enddate);
+         save_figs, visible, startdate, enddate, finalize_legends);
       n_rows = n_rows + 1;
       rows{n_rows} = row;
       plotted = unique([plotted, vars], 'stable');
@@ -211,7 +219,8 @@ function rows = plotOneCase(c, input_root, explicit_input_root, figure_root, ...
          "other numeric variables", 'variables', remaining, ...
          'aggregation', "mean", 'frequency', "daily");
       [row, vars] = plotTimeseriesGroup(c, records, group, target, met, ...
-         data, case_dir, save_figs, visible, startdate, enddate);
+         data, case_dir, save_figs, visible, startdate, enddate, ...
+         finalize_legends);
       n_rows = n_rows + 1;
       rows{n_rows} = row;
       plotted = unique([plotted, vars], 'stable');
@@ -270,7 +279,7 @@ function input_root = caseInputRoot(c, default_input_root, explicit_input_root)
 end
 
 function [row, plotted] = plotMetForcing(c, target, met, data, case_dir, ...
-      save_figs, visible, startdate, enddate)
+      save_figs, visible, startdate, enddate, finalize_legends)
    %PLOTMETFORCING Plot the canonical model-forcing contract in compact panels.
    records = stagedTimeRecords(met, "met");
    panels = metForcingPanels(records);
@@ -293,7 +302,8 @@ function [row, plotted] = plotMetForcing(c, target, met, data, case_dir, ...
    end
    shareFiniteTimeExtent(panel_axes)
 
-   figfile = exportFigure(fig, case_dir, "met_forcing", save_figs);
+   figfile = exportFigure(fig, case_dir, "met_forcing", save_figs, ...
+      finalize_legends);
    close(fig)
 
    row = summaryRow(c, "met_forcing", figfile, plotted, strings(1, 0), ...
@@ -554,11 +564,13 @@ function title_text = readinessTitle(title_text, aggregation, frequency)
 end
 
 function [row, plotted] = plotTimeseriesGroup(c, records, group, target, ...
-      met, data, case_dir, save_figs, visible, startdate, enddate)
+      met, data, case_dir, save_figs, visible, startdate, enddate, ...
+      finalize_legends)
    %PLOTTIMESERIESGROUP Plot one variable group as one panel per variable.
    if group.name == "subsurface_temperature_string"
       [row, plotted] = plotThermistorStringGroup(c, records, group, target, ...
-         met, data, case_dir, save_figs, visible, startdate, enddate);
+         met, data, case_dir, save_figs, visible, startdate, enddate, ...
+         finalize_legends);
       return
    end
 
@@ -625,7 +637,8 @@ function [row, plotted] = plotTimeseriesGroup(c, records, group, target, ...
          && any(arrayfun(@(r) ismember("modis", r.variables), records))
       plotted = unique([plotted, "modis"], 'stable');
    end
-   figfile = exportFigure(fig, case_dir, group.name, save_figs);
+   figfile = exportFigure(fig, case_dir, group.name, save_figs, ...
+      finalize_legends);
    close(fig)
    row = summaryRow(c, group.name, figfile, plotted, strings(1, 0), ...
       target, met, data);
@@ -665,7 +678,8 @@ function label = variableDisplayTitle(varname)
 end
 
 function [row, plotted] = plotThermistorStringGroup(c, records, group, ...
-      target, met, data, case_dir, save_figs, visible, startdate, enddate)
+      target, met, data, case_dir, save_figs, visible, startdate, ...
+      enddate, finalize_legends)
    %PLOTTHERMISTORSTRINGGROUP Reuse the accepted one-axes PROMICE QA design.
    fig = figure('Name', figureName(c, group.title), ...
       'Visible', visibleState(visible), 'Color', 'w');
@@ -740,7 +754,8 @@ function [row, plotted] = plotThermistorStringGroup(c, records, group, ...
    end
 
    plotted = plotted(1:n_plotted);
-   figfile = exportFigure(fig, case_dir, group.name, save_figs);
+   figfile = exportFigure(fig, case_dir, group.name, save_figs, ...
+      finalize_legends);
    close(fig)
    row = summaryRow(c, group.name, figfile, plotted, strings(1, 0), ...
       target, met, data);
@@ -755,7 +770,7 @@ function labels = thermistorLabels(source_names, channel_name)
 end
 
 function [row, plotted] = plotProfiles(c, profiles, target, met, data, ...
-      case_dir, save_figs, visible, startdate, enddate)
+      case_dir, save_figs, visible, startdate, enddate, finalize_legends)
    %PLOTPROFILES Plot all depth-profile variables in one figure.
    value_vars = unique([profiles.value_variables], 'stable');
    fig = figure('Name', figureName(c, "profiles"), ...
@@ -785,7 +800,8 @@ function [row, plotted] = plotProfiles(c, profiles, target, met, data, ...
    end
 
    plotted = plotted(1:n_plotted);
-   figfile = exportFigure(fig, case_dir, "profiles", save_figs);
+   figfile = exportFigure(fig, case_dir, "profiles", save_figs, ...
+      finalize_legends);
    close(fig)
    row = summaryRow(c, "profiles", figfile, plotted, strings(1, 0), ...
       target, met, data);
@@ -1715,9 +1731,14 @@ function padYLimits(ax, lower_fraction, upper_fraction)
    end
 end
 
-function figfile = exportFigure(fig, case_dir, group_name, save_figs)
+function figfile = exportFigure(fig, case_dir, group_name, save_figs, ...
+      finalize_legends)
    %EXPORTFIGURE Write a figure to disk when requested.
-   finalizeLegendClearance(fig)
+   % The clearance pass forces one drawnow per figure, so callers that
+   % neither save nor measure the figure skip it with finalize_legends=false.
+   if finalize_legends
+      finalizeLegendClearance(fig)
+   end
    figfile = "";
    if ~save_figs
       return

@@ -1,18 +1,15 @@
 # icemodel.plot
 
-Shared plotting helpers for model forcing, verification time series, profiles,
-and comparisons.
+Purpose: Shared plotting helpers.
 
-`sourceColor` keys colors to canonical source labels, so plot order and active
-subsets cannot change source identity. MAR, RACMO, and MERRA-2 use the exact
-`runoff/functions/RunoffPlot.m` palette. PROMICE model met, PROMICE native
-userdata, and observations each use their own stable role color.
+Contents:
 
-`timeseries` preserves explicit NaNs and inserts a NaN midpoint when repeated
-cadence makes an omitted-time gap unambiguous. It does not infer gaps for
-two-point interval observations or irregular sparse series.
-
-`newFigure` creates the shared hidden, white, export-sized report frame.
-`markTimeSpan` adds interval boundaries that stay out of the legend.
-`formatDuration` uses the shared hour, day, and year labels for report figures
-and tables.
+- `sourceColor` keys colors to MAR, RACMO, and MERRA-2 (based on the
+  `runoff/functions/RunoffPlot.m` palette). PROMICE met, userdata, and
+  observations have their own palette.
+- `timeseries` preserves NaNs and inserts a NaN midpoint for an unambiguous gap
+  in a regularly sampled series.
+- `newFigure` creates the shared hidden, white, export-sized frame.
+- `markTimeSpan` adds interval boundaries that stay out of the legend.
+- `formatDuration` formats hour, day, and year labels for report figures
+  and tables.

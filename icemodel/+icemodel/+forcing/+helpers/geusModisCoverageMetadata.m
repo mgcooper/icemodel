@@ -1,5 +1,5 @@
 function metadata = geusModisCoverageMetadata(requested_years, coverage_years)
-   %GEUSMODISCOVERAGEMETADATA Build canonical GEUS MODIS coverage provenance.
+   %GEUSMODISCOVERAGEMETADATA Build GEUS MODIS coverage provenance.
    %
    %  metadata = ...
    %     icemodel.forcing.helpers.geusModisCoverageMetadata( ...
@@ -8,9 +8,12 @@ function metadata = geusModisCoverageMetadata(requested_years, coverage_years)
    % REQUESTED_YEARS are the calendar years on the target artifact axis.
    % COVERAGE_YEARS are the requested years backed by one unambiguous GEUS
    % Greenland Reflectivity 5 km C6 source file and physical target values.
-   % The returned flat struct holds the product, status, and year contract.
+   % The returned flat struct holds the product, status, and coverage years.
    % Fresh RCM builders, metadata repair, saved payloads, and artifact QA all
-   % use it.
+   % read the same struct.
+   %
+   % See also: icemodel.forcing.stageModisAlbedo,
+   %  icemodel.forcing.helpers.modisAlbedoChannel
 
    arguments
       requested_years double {mustBeFinite, mustBeInteger}

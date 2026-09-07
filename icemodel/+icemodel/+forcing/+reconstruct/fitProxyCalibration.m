@@ -24,17 +24,17 @@ function calibration = fitProxyCalibration(times, x_obs, x_model, channel, kwarg
    %  target_elevation : target-station solar elevation (degrees, signed).
    %     A signed value is needed because TOA clamps twilight to zero and
    %     therefore hides the bands that the bins correct. For swd, this
-   %     input also fits the D-28 elevation-binned ratios. Without it, the
+   %     input also fits D-28 elevation-binned ratios. Without it, the
    %     record keeps the single-ratio shape.
    %
    % Returns
-   %  calibration : struct — channel, mode ("additive"|"multiplicative"),
+   %  calibration : struct with channel, mode ("additive"|"multiplicative"),
    %     per-season correction, n_overlap, identity flag. Binned swd
    %     records add: version (2), bin_edges_deg, per-season
    %     binned_corrections and binned_counts (one entry per elevation
-   %     bin), and min_bin_samples — all read by applyProxyCalibration
-   %     through a field-presence guard so legacy single-ratio records
-   %     stay applicable (D-28 backward compatibility).
+   %     bin), and min_bin_samples. applyProxyCalibration reads these fields
+   %     only when they exist, so a record without binned_corrections remains
+   %     applicable under the D-28 single-ratio fallback.
    %
    % See also: icemodel.forcing.reconstruct.applyProxyCalibration,
    %  icemodel.forcing.reconstruct.solarElevationBands
@@ -106,12 +106,12 @@ function calibration = fitProxyCalibration(times, x_obs, x_model, channel, kwarg
       'corrections', corrections, 'n_overlap', nnz(overlap), ...
       'identity', ~any(overlap));
 
-   % D-28 twilight-shape fix, swd only: one seasonal ratio mixes regimes
-   % with opposite biases (RCM proxies run 4-20x LOW near solar midnight
-   % and 1.5-2x HIGH on the morning shoulder), so swd additionally fits a
-   % ratio per solar-elevation band when the caller supplies the signed
-   % elevation. The record keeps the seasonal scalar alongside the bins
-   % so elevation-less consumers (and legacy readers) stay correct.
+   % The D-28 correction uses elevation bins for swd. One seasonal ratio mixes
+   % regimes
+   % with opposite biases. RCM proxies run 4-20x low near solar midnight and
+   % 1.5-2x high on the morning shoulder. Fit one ratio per solar-elevation band
+   % when the caller supplies signed elevation. Keep the seasonal scalar for
+   % consumers that omit elevation or do not read the bins.
    if channel == "swd" && ~isempty(kwargs.target_elevation)
       bands = icemodel.forcing.reconstruct.solarElevationBands();
       edges = bands.calibration_bin_edges_deg;
@@ -171,7 +171,7 @@ function value = identityCorrection(multiplicative)
 end
 
 function value = oneCorrection(obs, model, multiplicative)
-   %ONECORRECTION Robust bias (or ratio) of one overlap subset.
+   %ONECORRECTION Median bias (or ratio) of one overlap subset.
    if multiplicative
       value = median(obs ./ model, 'omitnan');
    else

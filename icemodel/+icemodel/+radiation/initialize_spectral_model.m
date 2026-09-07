@@ -54,7 +54,7 @@ function [I0, dz, z_nodes, z_edges, tau_N, tau_S, solar_dwavel, ...
 
    % Return the initial optical grain radius [mm] from the lookup table. This
    % is the optically equivalent radius from the Mie tables. It initializes
-   % the thermal grain radius that icemodel.column.vapor_mass_transfer tracks.
+   % the thermal grain radius that icemodel.column.update_grain_radius tracks.
    % The two radii are not the same quantity, and coupling them is future work
    % (see icemodel.radiation.update_extinction_coefficients).
    r_eff = radii(opts.i_grainradius);

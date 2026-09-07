@@ -948,7 +948,7 @@ function test_policy_identity_mismatch_is_audited_without_aborting(testCase)
       testCase.verifyFalse(ready.ice_model_forcing_ready);
       testCase.verifyFalse(ready.admitted);
       testCase.verifySubstring(ready.ice_model_forcing_reason, ...
-         "canonical current promice_filled product");
+         "registered promice_filled product");
       testCase.verifyTrue(isfile(report.files.csv));
       testCase.verifyTrue(isfile(report.files.json));
    end

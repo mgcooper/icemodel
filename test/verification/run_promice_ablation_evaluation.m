@@ -65,6 +65,37 @@ function results = run_promice_ablation_evaluation(kwargs)
    % Explicit selection is an execution safety boundary. All ledger rows are
    % retained even when they are excluded or were not selected for execution.
    requested = requestedRows(readiness.rows, kwargs.case_ids, kwargs.years);
+
+   % Resolve the physics stamp before the loop, not at the point it is saved.
+   % Resolving it runs icemodel.setopts, which asserts that the workspace
+   % exists. A workspace that disappears during a multi-hour cohort must not
+   % throw between the last completed site-year and the save that keeps it.
+   %
+   % A run that executes no model stamps nothing. It writes no artifacts and
+   % must not require a workspace it never reads. Gate on a requested row
+   % that is also admitted: selecting only readiness-excluded rows requests
+   % work the loop below skips before it runs any case.
+   %
+   % Guard the call. physicsFingerprint resolves its reference through
+   % icemodel.setopts, which asserts ICEMODEL_INPUT_PATH exists, and its own
+   % docstring says a caller that must not fail on a missing workspace has to
+   % guard it. A cohort that supplies input_data_root and
+   % evaluation_data_root reaches its forcing through the manifest root that
+   % setModelOptsForCase injects. The global path is therefore irrelevant to
+   % whether those cases can run. Without this guard such a run dies here before it
+   % executes anything. An unstamped run is already a supported state: the
+   % report reads a missing stamp as absent and says so without warning.
+   % Unavailable is the other state, for a stamped cohort whose current
+   % defaults will not resolve.
+   physics_fingerprint = struct.empty();
+   if any(requested(:) & logical(readiness.rows.admitted(:)))
+      try
+         physics_fingerprint = ...
+            icemodel.verification.helpers.physicsFingerprint();
+      catch
+         physics_fingerprint = struct.empty();
+      end
+   end
    n_rows = height(readiness.rows);
    site_year_results = repmat(emptySiteYearResult(), n_rows, 1);
    summary_rows = repmat(emptySummaryRecord(), n_rows, 1);
@@ -144,6 +175,20 @@ function results = run_promice_ablation_evaluation(kwargs)
       'endpoint_perturbations', endpoint_perturbations, ...
       'policy', policy, ...
       'paths', paths);
+
+   % Save the digest of the model's default option values and the CITATION.cff
+   % version, resolved before the run started. The report recomputes it and
+   % warns when it moved.
+   %
+   % The digest covers a fixed reference resolution, not this cohort's
+   % per-site options. It also does not move for a source change that touches
+   % no option and no release. A match is not proof of reproducibility.
+   %
+   % Assign the field separately, so a readiness-only run leaves it out. A
+   % present but empty stamp would read as a damaged one at report time.
+   if ~isempty(physics_fingerprint)
+      results.physics_fingerprint = physics_fingerprint;
+   end
    if kwargs.write_artifacts
       writetable(summary, paths.summary_csv)
       writetable(nested_windows, paths.nested_windows_csv)
@@ -338,8 +383,13 @@ function [result, nested, perturbations] = evaluateRow( ...
    result.reason = "";
    result.manifest = manifest;
    result.observations = observations;
+   % The saved policy's channel list selects the saved columns, so that list
+   % is the cohort's recorded schema. The report's schema gate compares it
+   % against the channels the report reads and against the current namelist.
    keep_model = model.Time >= display_start & model.Time <= display_end;
-   result.model = model(keep_model, cellstr(policy.required_model_fields));
+   % Save the model schema recorded in the policy.
+   saved_fields = policy.required_model_fields;
+   result.model = model(keep_model, cellstr(saved_fields));
    result.model_options = opts;
    result.model_metadata = boundary_metadata;
    result.comparison = comparison;
@@ -499,7 +549,13 @@ end
 function [model, metadata] = appendBoundaryCheckpoint( ...
       model, boundary_time, provenance, source, policy)
    %APPENDBOUNDARYCHECKPOINT Add a state-only row at the display endpoint.
-   required = policy.required_model_fields;
+
+   % Require the ledger channels used by the comparison and the storage
+   % channels needed to add the boundary row.
+   required = unique([ ...
+      icemodel.verification.namelists.ablationReportChannels('ledger'), ...
+      string(icemodel.namelists.budgetoutputs('first')), ...
+      string(icemodel.namelists.budgetoutputs('last'))], 'stable');
    missing = setdiff(required, string(model.Properties.VariableNames), 'stable');
    if ~isempty(missing)
       error('icemodel:verification:promiceAblationEvaluation:modelSchema', ...
@@ -529,11 +585,13 @@ function [model, metadata] = appendBoundaryCheckpoint( ...
          policy.model_output_cadence_seconds)
    end
 
-   % Clone one schema-compatible context row, zero every interval ledger, and
-   % carry only the preceding endpoint storage into the synthetic checkpoint.
+   % Clone one schema-compatible context row, zero every saved interval ledger,
+   % and carry only the preceding endpoint storage into the synthetic checkpoint.
    boundary = model(end, :);
    boundary.Properties.RowTimes = boundary_time;
-   for name = string(icemodel.namelists.budgetoutputs('sum'))
+   sum_fields = intersect(string(icemodel.namelists.budgetoutputs('sum')), ...
+      string(model.Properties.VariableNames), 'stable');
+   for name = sum_fields
       boundary.(name) = 0;
    end
    boundary.mass_budget_solid_start_mwe = ...

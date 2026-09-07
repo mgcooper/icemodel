@@ -22,13 +22,13 @@ function report = audit_formal_substep_failures(kwargs)
       kwargs.output_file (1, :) string = ""
    end
 
-   % Bootstrap the canonical test config once for the whole audit.
+   % Bootstrap the test config once for the whole audit.
    [~, ~, ~, ~, suite_cleanup] = ...
       icemodel.test.helpers.bootstrapTestEnvironment( ...
       icemodel_config_casename="verification");
 
-   % Resolve the formal case matrix up front so the audit runs one canonical
-   % single-case workflow at a time.
+   % Resolve the formal case matrix up front so the audit runs one case
+   % at a time.
    cases = icemodel.test.helpers.getRegressionCaseMatrix( ...
       tier=kwargs.tier, smbmodel=kwargs.smbmodel, solver=kwargs.solver, ...
       simyear=kwargs.simyear, smoke_sites=kwargs.smoke_sites, ...

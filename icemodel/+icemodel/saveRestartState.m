@@ -3,15 +3,18 @@ function saveRestartState(opts, simyear, T, f_ice, f_liq, Ts, r_eff)
    %
    %  icemodel.saveRestartState(opts, simyear, T, f_ice, f_liq, Ts, r_eff)
    %
-   %  The restart contract preserves the prognostic column state — variables
-   %  that evolve via the governing equations and cannot be reconstructed
-   %  without re-running the prior simulation:
+   %  The restart file preserves variables that evolve through the governing
+   %  equations. Rebuilding them requires a rerun of the prior simulation:
    %
-   %    T      — ice column temperature [K]
-   %    f_ice  — volumetric ice fraction [-]
-   %    f_liq  — volumetric liquid fraction [-]
-   %    Ts     — surface temperature [K] (SEB boundary condition / prior)
-   %    r_eff  — effective grain radius [m] (vapor mass transfer)
+   %    T      - ice column temperature [K]
+   %    f_ice  - volumetric ice fraction [-]
+   %    f_liq  - volumetric liquid fraction [-]
+   %    Ts     - surface temperature [K] (SEB boundary condition / prior)
+   %    r_eff  - effective grain radius [m] (vapor mass transfer)
+   %
+   %  checksubstep selects retry settings for each substep. acceptsubstep
+   %  restores the primary settings. The restart file does not store solver
+   %  settings.
    %
    %  Surface running state (liqflag, ro_sfc, hv_atm, H_e, f_res_por) is
    %  NOT saved. Those quantities are derived at substep entry by

@@ -7,8 +7,8 @@ function info = stageModisAlbedo(sites, kwargs)
    %
    % Extracts the GEUS MODIS C6 daily albedo (Greenland_Reflectivity_
    % <YYYY>_5km_C6.nc) at each requested station and writes one
-   % window-stamped userdata artifact per site through the canonical
-   % icemodel.forcing.helpers.writeuserdata path (per-source subfolder
+   % window-stamped userdata artifact per site through
+   % icemodel.forcing.helpers.writeuserdata (per-source subfolder
    % userdata/modis/, timetable named Data, native daily cadence, top-level
    % artifact_cadence_seconds). This function is the staging half of the
    % gap-fill reconstruction MODIS tier (reconstruct/POLICY.md B12, D-15).
@@ -40,7 +40,7 @@ function info = stageModisAlbedo(sites, kwargs)
    % colocated with the met product it will reconstruct. This function first
    % reads the top-level artifact_metadata record (lat/lon/elev, the
    % gap-filled PROMICE convention). For a met file that carries the full
-   % location CustomProperties contract (X, Y, Lat, Lon, Elev, Slope), it
+   % location CustomProperties set (X, Y, Lat, Lon, Elev, Slope), it
    % reads the location from the met timetable instead.
    %
    % Inputs
@@ -59,8 +59,8 @@ function info = stageModisAlbedo(sites, kwargs)
    %  years      - calendar years to stage. Default [] stages every year
    %               discovered in modis_dir; explicitly requested years must
    %               all be present or the call errors.
-   %  overwrite  - replace existing artifacts (default false: canonical
-   %               writer reuse/conflict rules apply)
+   %  overwrite  - replace existing artifacts (default false: writer
+   %               reuse/conflict rules apply)
    %
    % Outputs
    %  info - per-site struct row: site, filename, n_days, n_finite,
@@ -100,7 +100,7 @@ function info = stageModisAlbedo(sites, kwargs)
    [files, file_years] = sourceInventory(modis_dir, kwargs.years);
 
    % Station identity comes from the staged met artifacts so the MODIS
-   % artifact carries the exact colocated CustomProperties contract.
+   % artifact carries the same colocated CustomProperties.
    locations = metLocations(sites, met_dir, kwargs.met_source);
    points = [[locations.lat_wgs84]', [locations.lon_wgs84]'];
 
@@ -158,8 +158,9 @@ function info = stageModisAlbedo(sites, kwargs)
    outside = isfinite(albedo) & (albedo < bounds(1) | albedo > bounds(2));
    albedo(outside) = NaN;
 
-   % Write one window-stamped native-daily artifact per site through the
-   % canonical writer, carrying the extraction/pinning provenance.
+   % Write one window-stamped native-daily artifact per site through
+   % icemodel.forcing.helpers.writeuserdata, carrying the extraction/pinning
+   % provenance.
    axis_years = unique(year(Time))';
    info = repmat(struct('site', "", 'filename', "", 'n_days', 0, ...
       'n_finite', 0, 'first_finite', NaT('TimeZone', 'UTC'), ...
@@ -169,13 +170,13 @@ function info = stageModisAlbedo(sites, kwargs)
       values = albedo(:, s);
       Data = timetable(Time, values, 'VariableNames', {'albedo'});
 
-      % Reuse the canonical location attachment so the CustomProperties
-      % schema exactly matches every other Data builder.
+      % Reuse the shared location attachment so the CustomProperties match
+      % every other Data builder.
       Data = icemodel.forcing.helpers.attachLocationMetadata( ...
          Data, locations(s).location);
 
       % Coverage years are the axis years holding at least one finite value
-      % for THIS site, classified by the canonical coverage contract.
+      % for THIS site, classified by the shared coverage rule.
       finite_here = isfinite(values);
       coverage_years = axis_years(arrayfun( ...
          @(y) any(finite_here & year(Time) == y), axis_years));
@@ -199,7 +200,7 @@ function info = stageModisAlbedo(sites, kwargs)
       metadata.attachment_helper = 'icemodel.forcing.modisToMetCadence';
       Data.Properties.UserData = metadata;
 
-      % Canonical writer: window naming, explicit native (daily) cadence.
+      % Use the window filename and keep the native daily timestep.
       filename = icemodel.forcing.helpers.writeuserdata(Data, sites(s), ...
          "modis", outdir=kwargs.outdir, naming="window", dt_out="", ...
          overwrite=kwargs.overwrite);
@@ -262,9 +263,9 @@ function [files, file_years] = sourceInventory(modis_dir, years)
          'multiple source files share a year under %s', modis_dir)
    end
 
-   % An explicit year request is a contract: every requested year must have
-   % a source file. A failed mount then raises an error instead of staging
-   % a subset.
+   % An explicit year request is a strict requirement: every requested year
+   % must have a source file. A failed mount then raises an error instead
+   % of staging a subset.
    if ~isempty(years)
       missing = setdiff(years, file_years);
       if ~isempty(missing)
@@ -284,7 +285,7 @@ function [files, file_years] = sourceInventory(modis_dir, years)
 end
 
 function locations = metLocations(sites, met_dir, met_source)
-   %METLOCATIONS Copy each site's location contract from its met artifact.
+   %METLOCATIONS Copy each site's location from its met artifact.
 
    locations = repmat(struct('met_file', "", 'lat_wgs84', NaN, ...
       'lon_wgs84', NaN, 'location', struct()), 1, numel(sites));
@@ -303,8 +304,8 @@ function locations = metLocations(sites, met_dir, met_source)
       end
       met_file = string(fullfile(match.folder, match.name));
 
-      % The met artifact's saved location is the colocation contract; the
-      % MODIS artifact copies it verbatim so colocation identity checks
+      % The met artifact's saved location defines colocation; the MODIS
+      % artifact copies it verbatim so colocation identity checks
       % (artifactIdentityMatches) compare equal points.
       location = metArtifactLocation(met_file);
       locations(s).met_file = met_file;
@@ -346,9 +347,9 @@ end
 function location = locationFromMetadata(metadata)
    %LOCATIONFROMMETADATA Location from a saved artifact metadata record.
 
-   % Accept both canonical spellings: the builder convention (lat_wgs84/
+   % Accept both spellings: the builder convention (lat_wgs84/
    % lon_wgs84/elev_m) and the PROMICE met convention (lat/lon/elev). The
-   % result follows the attachLocationMetadata/projectLocation schema;
+   % result follows the attachLocationMetadata/projectLocation field layout;
    % without saved x/y, projectLocation later derives EPSG:3413 from lat/lon.
    location = struct.empty;
    if ~isstruct(metadata)
@@ -364,11 +365,11 @@ function location = locationFromMetadata(metadata)
 end
 
 function location = locationFromCustomProperties(custom)
-   %LOCATIONFROMCUSTOMPROPERTIES Location from the CustomProperties contract.
+   %LOCATIONFROMCUSTOMPROPERTIES Location from the CustomProperties fields.
 
-   % Field names follow the canonical attachLocationMetadata/projectLocation
-   % location schema; an incomplete or nonfinite contract yields empty so the
-   % caller can fail with one clear identity error.
+   % Field names follow the attachLocationMetadata/projectLocation field
+   % layout; an incomplete or nonfinite set yields empty so the caller can
+   % fail with one clear identity error.
    location = struct.empty;
    needed = ["X", "Y", "Lat", "Lon", "Elev", "Slope"];
    have = string(fieldnames(custom));

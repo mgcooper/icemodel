@@ -1,4 +1,8 @@
 function names = precipitationVariables()
-   %PRECIPITATIONVARIABLES Canonical total and partitioned precipitation names.
+   %PRECIPITATIONVARIABLES Total and partitioned precipitation names.
+   %
+   % See also: icemodel.forcing.reconstruct.setopts,
+   %  icemodel.forcing.reconstruct.fillPromiceStation,
+   %  icemodel.forcing.reconstruct.assertPromiceFilledArtifact
    names = ["ppt", "rainf", "snowf"];
 end

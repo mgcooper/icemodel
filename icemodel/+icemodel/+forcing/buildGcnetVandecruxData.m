@@ -6,13 +6,13 @@ function [Data, metadata] = buildGcnetVandecruxData(station, kwargs)
    %
    % Reads the Vandecrux et al. GC-Net surface/SEB NetCDF product
    % (<station>_surface.nc) and maps the source channels onto icemodel's
-   % canonical forcing/userdata names. The target RetMIP stations are Dye-2
+   % forcing/userdata names. The target RetMIP stations are Dye-2
    % long ("DYE_2", aliases "dye2", "dye2_long") and Summit ("Summit",
    % aliases "sum", "summit").
    %
    % Source precipitation policy: the files carry snowfall estimates but no
    % rain channel. The builder converts source snowfall amounts [m_weq per
-   % source timestep] to the canonical snowfall rate `snowf` [m s-1], adds
+   % source timestep] to the snowfall rate `snowf` [m s-1], adds
    % `rainf` as all-NaN, and leaves total precipitation to data2met. Missing
    % precipitation stays missing. The builder never zero-fills an absent
    % channel.
@@ -24,7 +24,7 @@ function [Data, metadata] = buildGcnetVandecruxData(station, kwargs)
    % as observed.
    %
    % Outputs
-   %  Data     - timetable with canonical channel names, userdata location
+   %  Data     - timetable with channel names, userdata location
    %             CustomProperties, and source provenance in Properties.UserData.
    %  metadata - provenance, channel mapping, unit/policy notes, and QA checks.
    %
@@ -69,11 +69,11 @@ function [Data, metadata] = buildGcnetVandecruxData(station, kwargs)
          'requested window does not overlap %s', filename)
    end
 
-   % The source posts hourly timestep amounts for mass terms. Convert snowfall
-   % to the met-contract m s-1 rate and mass diagnostics to mWE/h rates. The
-   % files are hourly, but the timestep comes from the time coordinate
-   % rather than a fixed hour, so
-   % fixtures and other source postings convert with their own cadence.
+   % The source posts hourly timestep amounts for mass terms. Convert
+   % snowfall to the m s-1 rate met files use, and mass diagnostics to
+   % mWE/h rates. The files are hourly, but the timestep comes from the
+   % time coordinate rather than a fixed hour, so fixtures and other source
+   % postings convert with their own cadence.
    dt_hours = timeStepHours(Time);
    dt_seconds = dt_hours * 3600;
 
@@ -94,7 +94,7 @@ function [Data, metadata] = buildGcnetVandecruxData(station, kwargs)
    Data = mapIfPresent(Data, filename, source_names, "melt", "melt", ...
       keep, 1 / dt_hours);
    % Vandecrux declares sublimation as negative and deposition as positive.
-   % Flip once at the source boundary to the canonical positive-loss sign.
+   % Flip the sign once here to match this file's positive-loss convention.
    Data = mapIfPresent(Data, filename, source_names, "sublimation", "subl", ...
       keep, -1 / dt_hours);
    Data = mapIfPresent(Data, filename, source_names, "SMB", "smb", ...
@@ -175,8 +175,7 @@ function [Data, metadata] = buildGcnetVandecruxData(station, kwargs)
    [Data, checks] = icemodel.forcing.helpers.metchecks(Data, ...
       fillgaps=kwargs.fillgaps);
 
-   % Emit the mapped channels in a fixed column order and stamp the
-   % canonical metadata.
+   % Emit the mapped channels in a fixed column order and stamp metadata.
    preferred = ["tair", "tsfc", "swd", "swu", "lwd", "lwu", "swn", ...
       "lwn", "netr", "shf", "lhf", "thf", "albedo", "rh", "wspd", ...
       "psfc", "rainf", "snowf", "melt", "subl", "smb", "surface_height"];
@@ -204,7 +203,7 @@ function filename = locateSurfaceFile(source_dir, station)
 end
 
 function Data = mapIfPresent(Data, filename, source_names, src, dst, keep, scale)
-   %MAPIFPRESENT Copy one source variable to a scaled canonical Data channel.
+   %MAPIFPRESENT Copy one source variable to a scaled Data channel.
    if ismember(src, source_names)
       data = double(ncread(filename, src)) .* scale;
       Data.(dst) = data(keep);
@@ -262,7 +261,7 @@ function metadata = sourceMetadata(filename, station, source_names, info, ...
 end
 
 function map = channelMap()
-   %CHANNELMAP Record the canonical-name to Vandecrux-name mapping.
+   %CHANNELMAP Record the icemodel-name to Vandecrux-name mapping.
    map = struct( ...
       'tair', "Ta_2m", ...
       'tsfc', "Tsurf", ...

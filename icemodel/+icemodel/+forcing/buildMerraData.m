@@ -2,12 +2,12 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    %BUILDMERRADATA Build a Data timetable from MERRA-2 daily NetCDF files.
    %
    %  [Data, metadata] = icemodel.forcing.buildMerraData(location, years)
-   %  [Data, metadata] = ... buildMerraData(_, source_dir=..., ...
-   %     modis_dir=..., fillgaps=true)
+   %  [Data, metadata] = icemodel.forcing.buildMerraData(_, ...
+   %     source_dir=..., modis_dir=..., fillgaps=true)
    %
    % Extracts the icemodel forcing/evaluation channels from the MERRA-2
-   % single-level collections at a point or averaged over a polygon. The
-   % archive is organized as one NetCDF per day per collection
+   % single-level collections at a point or averaged over a polygon. The archive
+   % is organized as one NetCDF per day per collection
    % (MERRA2_*.tavg1_2d_<col>_Nx.YYYYMMDD.nc4*), with collections:
    %
    %    slv (hourly): T2M -> tair [K], QV2M -> shum [kg/kg] (dropped
@@ -15,51 +15,49 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    %    rad (hourly): SWGDN -> swd, SWGNT -> swn, LWGAB -> lwd,
    %        LWGNT -> lwn [W m-2]
    %    flx (hourly): HFLUX -> shf, EFLUX -> lhf [W m-2, sign flipped to
-   %        the icemodel positive-toward-surface convention],
-   %        PRECTOTCORR -> ppt, PRECSNO -> snowf [m s-1, the canonical
-   %        water-equivalent precipitation rate], EVAP -> evap [mWE/h]
+   %        the icemodel positive-toward-surface convention], PRECTOTCORR ->
+   %        ppt, PRECSNO -> snowf [m s-1, water-equivalent precipitation rate],
+   %        EVAP -> evap [mWE/h]
    %    glc (3-hourly): RUNOFF -> runoff [mWE/h], SNICEALB -> albedo,
    %        SNOWDP_GL -> snowd [m], SNOMAS_GL -> swe [kg m-2]
    %
-   % Derived: wspd/wdir from U2M/V2M; rh [%] via the canonical icemodel.vapor
-   % kernel. The derivable radiation terms (swu, lwu, netr) are NOT stored -
-   % icemodel.processmet recomputes them on load from swd/albedo/tsfc/lwd.
-   % Mass fluxes convert kg m-2 s-1 -> meters water equivalent per hour.
-   % MERRA-2 posts tavg samples at the bin center (00:30 hourly, 01:30
-   % 3-hourly). This application builder explicitly relabels only those
-   % time-averaged collections to the INTERVAL START and holds each mean over
-   % its declared support. The source reader preserves native coordinates.
+   % Derived: wspd/wdir from U2M/V2M; rh [%] via the icemodel.vapor kernel.
+   % icemodel.processmet derives swu, lwu, and netr from the stored radiation
+   % channels when it loads this Data timetable. Mass
+   % fluxes convert kg m-2 s-1 -> meters water equivalent per hour. MERRA-2
+   % posts tavg samples at the bin center (00:30 hourly, 01:30 3-hourly). This
+   % application builder explicitly relabels only those time-averaged
+   % collections to the INTERVAL START and holds each mean over its declared
+   % support. The source reader preserves native coordinates.
    %
-   % Legacy: reimplements runoff/functions/saveMerraData.m, which stays
-   % unchanged as the legacy reference workflow. The legacy code reconstructs
-   % swd as SWGNT/(1-SNICEALB). This builder reads the native SWGDN
-   % downwelling flux directly.
+   % runoff/functions/saveMerraData.m is the reference workflow. It reconstructs
+   % swd as SWGNT/(1-SNICEALB); this builder reads the native SWGDN downwelling
+   % flux directly.
    %
    % The available period is whatever days exist in the source directory. The
-   % calendar derives from the files themselves, not from a hardcoded
-   % 2008-2020 period.
+   % calendar derives from the files themselves, not from a hardcoded 2008-2020
+   % period.
    %
    % Inputs
    %  location - [lat lon] point, polyshape (EPSG:3413 m), or an Nx2 [lat lon]
    %             list of points. A point list returns a 1xN cell of Data
-   %             timetables, and metadata as a 1xN struct array. The builder
-   %             reads the inventory, the grid, and the ice mask ONCE. It also
-   %             opens each daily file ONCE, and slices every point's
-   %             hyperslab from that one open file. N=1 is the single-point
-   %             path.
-   %  years    - calendar years to extract
+   %             timetables and a 1xN metadata struct array.
+   %  years    - calendar years to extract.
    %
    % Name-value
-   %  source_dir : directory holding the collection subdirectories
-   %      (flx/, glc/, rad/, slv/). Defaults to the gitignored cache
-   %      data/forcing/merra2. Reference layout:
-   %      /Volumes/S03/DATA/merra2/1hrly/ncfiles.
-   %  modis_dir : optional GEUS MODIS albedo directory (see buildMarData)
-   %  fillgaps  : opt in to legacy metchecks gap filling (default false)
+   %  source_dir - directory holding the flx/, glc/, rad/, and slv/
+   %               collection directories. Defaults to ICEMODEL_MERRA_DIR,
+   %               then the reference archive path.
+   %  modis_dir  - directory with GEUS MODIS daily albedo files. The default
+   %               empty value omits the optional MODIS channel.
+   %  fillgaps   - fill gaps with metchecks (default false).
+   %  method     - point sampling method: "nearest" (default) or "natural".
+   %  remap      - polygon averaging method: "conservative" (default) or
+   %               "equal".
    %
    % Outputs
-   %  Data     - hourly timetable with userdata CustomProperties
-   %  metadata - provenance: collections, file counts, cell info
+   %  Data        - hourly timetable with userdata CustomProperties
+   %  metadata    - provenance: collections, file counts, cell info
    %
    % See also: icemodel.forcing.buildMarData,
    %  icemodel.forcing.buildRacmoData, icemodel.forcing.data2met
@@ -114,8 +112,8 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    collections = unique(channels(:, 1), 'stable');
    support_hours = struct('slv', 1, 'rad', 1, 'flx', 1, 'glc', 3);
 
-   % File inventory per collection, keyed by the YYYYMMDD name token.
-   % The calendar derives from the files present (no hardcoded period).
+   % File inventory per collection, keyed by the YYYYMMDD name token. The
+   % calendar derives from the files present (no hardcoded period).
    inventory = struct();
    for c = collections'
       files = dir(fullfile(source_dir, c{1}, '*_Nx.*.nc4*'));
@@ -140,8 +138,8 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
 
    % Read native collection coordinates once per collection, validate their
    % official center stamps, and convert only these declared tavg products to
-   % application-level interval starts. Every channel in a collection shares
-   % the resulting axis.
+   % application-level interval starts. Every channel in a collection shares the
+   % resulting axis.
    interval_starts = struct();
    for c = collections'
       collection = c{1};
@@ -149,10 +147,10 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
          inventory.(collection), support_hours.(collection));
    end
 
-   % Grid and target cells from the first slv file (all collections
-   % share the clipped regular lat/lon grid). MERRA-2 variables read as
-   % [nlon nlat ntime], so the coordinate grids use the same [lon lat]
-   % orientation to keep gridLocation indices aligned with ncread.
+   % Grid and target cells from the first slv file (all collections share the
+   % clipped regular lat/lon grid). MERRA-2 variables read as [nlon nlat ntime],
+   % so the coordinate grids use the same [lon lat] orientation to keep
+   % gridLocation indices aligned with ncread.
    first = inventory.slv.files(1);
    lat = double(ncread(first, 'lat'));
    lon = double(ncread(first, 'lon'));
@@ -160,20 +158,20 @@ function [Data, metadata] = buildMerraData(location, years, kwargs)
    proj = icemodel.forcing.helpers.psnProjection();
    [X, Y] = projfwd(proj, LAT, LON);
 
-   % Ice mask for conservative remap. MERRA-2 glacier-tile (glc) variables
-   % are valid only over land-ice cells (non-glacier cells carry the
-   % _FillValue), so SNOMAS_GL validity gives a static land-ice mask; off-
-   % ice cells are inpainted from on-ice neighbours. (Degrades safely to
-   % all-valid if a build of MERRA ever stores 0 rather than fill there.)
+   % Ice mask for conservative remap. MERRA-2 glacier-tile (glc) variables are
+   % valid only over land-ice cells (non-glacier cells carry the _FillValue), so
+   % SNOMAS_GL validity gives a static land-ice mask; off- ice cells are
+   % inpainted from on-ice neighbours. (Degrades safely to all-valid if a build
+   % of MERRA ever stores 0 rather than fill there.)
    validmask = [];
    if kwargs.remap == "conservative"
       validmask = merraIceMask(inventory.glc.files(1), size(X));
    end
 
    % Accept one location (1x2 point or polyshape, returns a single Data
-   % timetable) OR a list of N points (Nx2 [lat lon], returns a 1xN cell of
-   % Data timetables). N=1 is the single-point path. The file inventory, grid,
-   % and ice mask above are read ONCE for the whole list; each point's grid
+   % timetable) OR a list of N points (Nx2 [lat lon], returns a 1xN cell of Data
+   % timetables). N=1 is the single-point path. The file inventory, grid, and
+   % ice mask above are read ONCE for the whole list; each point's grid
    % hyperslab + collapse rule is resolved here, then every channel's daily
    % files are opened ONCE and each point's hyperslab sliced from that open.
    [locations, batch] = ...
@@ -240,14 +238,14 @@ function blocks = readChannelSeries(coll, ncname, slabs, stamps)
    %READCHANNELSERIES Concatenate one channel's hyperslabs over the daily files.
    %
    % Returns a 1xN cell of raw cells-by-time blocks (one per point; cells
-   % flattened column-major over each point's hyperslab, matching
-   % gridLocation's collapse). The caller applies each point's collapse and
-   % support-aware hold using the validated interval-start axis.
-   % The shared reader icemodel.forcing.readMerra2 does the per-file hyperslab
-   % read, the standard-unit conversion, and the fill-masking, so mass fluxes
-   % arrive already in mWE/h. This loop opens each daily file ONCE, and reads
-   % EVERY point's hyperslab from that open file. A single point is a
-   % one-element slab list.
+   % flattened column-major over each point's hyperslab, matching gridLocation's
+   % collapse). The caller applies each point's collapse and support-aware hold
+   % using the validated interval-start axis. The shared reader
+   % icemodel.forcing.readMerra2 does the per-file hyperslab read, the
+   % standard-unit conversion, and the fill-masking, so mass fluxes arrive
+   % already in mWE/h. This loop opens each daily file ONCE, and reads EVERY
+   % point's hyperslab from that open file. A single point is a one-element slab
+   % list.
    n_files = numel(coll.files);
    npts = numel(slabs);
    info = ncinfo(coll.files(1), ncname);
@@ -272,9 +270,9 @@ end
 function starts = averagedIntervalStarts(coll, support_hours)
    %AVERAGEDINTERVALSTARTS Validate native centers and relabel tavg support.
    % The official tavg1/tavg3 coordinates are centered at support/2 and repeat
-   % at the support cadence. Decode every daily coordinate, so that a
-   % malformed middle file, or a filename that disagrees with the native day,
-   % cannot pass this check.
+   % at the support cadence. Decode every daily coordinate, so that a malformed
+   % middle file, or a filename that disagrees with the native day, cannot pass
+   % this check.
    expected_offsets = hours((support_hours / 2):support_hours: ...
       (24 - support_hours / 2))';
    starts = NaT(numel(coll.files) * numel(expected_offsets), 1, ...
@@ -299,9 +297,9 @@ function output = holdIntervalAverages(starts, values, target, support_hours)
    assert(all(diff(starts) >= hours(support_hours)), ...
       'MERRA source intervals overlap or are out of order')
 
-   % Missing source files create no assignment, so their hourly rows remain
-   % NaN. ismember also handles nonconsecutive requested years without treating
-   % the omitted years as a continuous target axis.
+   % Missing source files create no assignment, so their hourly rows remain NaN.
+   % ismember also handles nonconsecutive requested years without treating the
+   % omitted years as a continuous target axis.
    output = nan(numel(target), size(values, 2));
    for offset = 0:support_hours - 1
       [present, target_rows] = ismember(starts + hours(offset), target);
@@ -330,13 +328,13 @@ end
 function [slab, collapse, site] = resolvePoint(grid, location)
    %RESOLVEPOINT Map one point or polygon onto a MERRA grid hyperslab.
    %
-   % Returns the hyperslab as a [start; count] 2x2 (for the batch reader),
-   % the collapse handle, and the site lat/lon (slab mean). Conservative
-   % polygon remap runs in MERRA's NATIVE geographic grid (regular lon/lat)
-   % with exactremap UseGeoCoords=true, which computes true ellipsoidal
-   % overlap areas - the correct conservative weighting for a lat/lon grid
-   % (reprojecting to EPSG:3413 first would make the grid irregular).
-   % Point/nearest and equal-weight stay in the projected grid.
+   % Returns the hyperslab as a [start; count] 2x2 (for the batch reader), the
+   % collapse handle, and the site lat/lon (slab mean). Conservative polygon
+   % remap runs in MERRA's NATIVE geographic grid (regular lon/lat) with
+   % exactremap UseGeoCoords=true, which computes true ellipsoidal overlap areas
+   % - the correct conservative weighting for a lat/lon grid (reprojecting to
+   % EPSG:3413 first would make the grid irregular). Point/nearest and
+   % equal-weight stay in the projected grid.
    if isa(location, 'polyshape') && grid.remap == "conservative"
       [vlat, vlon] = projinv(grid.proj, location.Vertices(:, 1), ...
          location.Vertices(:, 2));
@@ -364,23 +362,23 @@ function [Data, metadata] = finalizeMerraData(Data, site, slab, years, ...
       location, source_dir, collections, n_files, proj, support_hours, ...
       source_grid, kwargs)
    %FINALIZEMERRADATA Post-process one point's assembled MERRA Data + metadata.
-   % Identical to the legacy single-point tail: derived wind/RH, optional
-   % MODIS channel, precip rate, metchecks, units, userdata CustomProperties,
-   % and the provenance struct. start/count come from the point's slab.
+   % Matches the runoff/functions/saveMerraData.m single-point method: derived
+   % wind/RH, optional MODIS channel, precip rate, metchecks, units, userdata
+   % CustomProperties, and the provenance struct.
    start = slab(1, :);
    count = slab(2, :);
 
-   % Mass fluxes (PRECTOTCORR/PRECSNO/EVAP/RUNOFF) arrive already converted
-   % from kg m-2 s-1 to mWE/h by icemodel.forcing.readMerra2.
+   % Mass fluxes (PRECTOTCORR/PRECSNO/EVAP/RUNOFF) arrive already converted from
+   % kg m-2 s-1 to mWE/h by icemodel.forcing.readMerra2.
 
    % MERRA-2 HFLUX/EFLUX are positive upward from the surface; icemodel uses
-   % positive toward the surface for the staged forcing/evaluation contract.
+   % positive toward the surface for the staged forcing/evaluation channels.
    for ch = ["shf", "lhf"]
       Data.(ch) = -Data.(ch);
    end
 
-   % Accumulate source-sign and time-support proof in the single metadata
-   % record that is finalized and attached after all payload processing.
+   % Accumulate source-sign and time-support proof in the single metadata record
+   % that is finalized and attached after all payload processing.
    artifact_metadata = Data.Properties.UserData;
    if isempty(artifact_metadata) || ~isstruct(artifact_metadata)
       artifact_metadata = struct();
@@ -402,11 +400,11 @@ function [Data, metadata] = finalizeMerraData(Data, site, slab, years, ...
       icemodel.forcing.helpers.applyMerraTimeSupport( ...
       Data, artifact_metadata);
 
-   % Derived channels: wind speed/direction and relative humidity. The
-   % derivable radiation terms (swu = swd - swn, netr = swn + lwn, lwu) are
-   % intentionally NOT stored - icemodel.processmet recomputes them on load
-   % from swd/albedo/tsfc/lwd. Only the native MERRA inputs (incl. the net
-   % fluxes swn/lwn and the SNICEALB albedo) are carried.
+   % Derived channels: wind speed/direction and relative humidity. The derivable
+   % radiation terms (swu = swd - swn, netr = swn + lwn, lwu) are intentionally
+   % NOT stored - icemodel.processmet recomputes them on load from
+   % swd/albedo/tsfc/lwd. Only the native MERRA inputs (incl. the net fluxes
+   % swn/lwn and the SNICEALB albedo) are carried.
    [Data.wspd, Data.wdir] = icemodel.forcing.helpers.windFromComponents( ...
       Data.uwind, Data.vwind);
    Data.rh = icemodel.vapor.relative_humidity_from_specific_humidity( ...
@@ -422,7 +420,7 @@ function [Data, metadata] = finalizeMerraData(Data, site, slab, years, ...
          icemodel.forcing.helpers.modisAlbedoChannel( ...
          kwargs.modis_dir, years, location, kwargs.method, kwargs.remap, ...
          Data.Time);
-      % Keep provenance current at the same source-selection boundary;
+      % Keep provenance current where the MODIS source was already selected;
       % stageRcmForcing derives met from this Data without a second GEUS read.
       modis_fields = fieldnames(modis_metadata);
       for k = 1:numel(modis_fields)
@@ -450,13 +448,13 @@ function [Data, metadata] = finalizeMerraData(Data, site, slab, years, ...
    end
 
    % Per-variable units from the shared canonical map. Precipitation is m s-1
-   % (converted above); the diagnostic mass fluxes are mWE/h rates and swe is
-   % a kg m-2 store.
+   % (converted above); the diagnostic mass fluxes are mWE/h rates and swe is a
+   % kg m-2 store.
    Data.Properties.VariableUnits = icemodel.forcing.helpers.variableUnits( ...
       string(Data.Properties.VariableNames));
 
-   % Attach the shared location schema. These MERRA collections carry no
-   % terrain height or surface slope, so both source fields remain NaN.
+   % Attach the shared location schema. These MERRA collections carry no terrain
+   % height or surface slope, so both source fields remain NaN.
    [site_x, site_y] = projfwd(proj, site.lat, site.lon);
    location_metadata = struct( ...
       'lat_wgs84', site.lat, 'lon_wgs84', site.lon, ...
@@ -492,9 +490,9 @@ end
 function mask = merraIceMask(glcfile, gridsize)
    %MERRAICEMASK Static land-ice mask from MERRA-2 glacier-tile validity.
    %
-   % MERRA-2 tavg3_2d_glc variables (RUNOFF, SNOMAS_GL, ...) are defined
-   % on the glacier tile; non-glacier cells carry the _FillValue. A cell
-   % is land-ice where SNOMAS_GL is finite and below the fill magnitude.
+   % MERRA-2 tavg3_2d_glc variables (RUNOFF, SNOMAS_GL, ...) are defined on the
+   % glacier tile; non-glacier cells carry the _FillValue. A cell is land-ice
+   % where SNOMAS_GL is finite and below the fill magnitude.
    v = double(ncread(glcfile, 'SNOMAS_GL', [1 1 1], [Inf Inf 1]));
    mask = reshape(isfinite(v) & v < 1e14, gridsize);
 end

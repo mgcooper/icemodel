@@ -4,9 +4,9 @@ function [met, metadata, Data] = buildImauHourlyMet(station, kwargs)
    %  [met, metadata] = icemodel.forcing.buildImauHourlyMet("S21")
    %  [met, metadata, Data] = ... buildImauHourlyMet("S21", source_dir=...)
    %
-   % Builds canonical IMAU Data with buildImauHourlyData, then converts it
-   % through the shared data2met contract. Missing precipitation channels stay
-   % explicit NaN placeholders when fillwithmissing=true.
+   % Builds IMAU Data with buildImauHourlyData, then converts it through the
+   % data2met conversion. Missing precipitation channels stay explicit NaN
+   % placeholders when fillwithmissing=true.
    %
    % See also: icemodel.forcing.buildImauHourlyData,
    %  icemodel.forcing.data2met

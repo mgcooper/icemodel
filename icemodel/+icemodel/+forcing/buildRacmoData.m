@@ -2,82 +2,71 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
    %BUILDRACMODATA Build a Data timetable from RACMO2.3 NetCDF files.
    %
    %  [Data, metadata] = icemodel.forcing.buildRacmoData(location, years)
-   %  [Data, metadata] = ... buildRacmoData(_, source_dir=..., dt="3hr")
+   %  [Data, metadata] = icemodel.forcing.buildRacmoData(_, ...
+   %     source_dir=..., dt="3hr")
    %
    % Extracts the RACMO2.3p3 surface energy/mass-balance channels at a
    % point or averaged over a polygon. The RACMO archive is organized
-   % as one multi-year 3-hourly NetCDF per variable
-   % (<var>.RACMO23p3_*_FGRN11_*.3H*.nc on the FGRN11 rotated-pole grid).
-   % The AVAILABLE source files carry radiation (swsd/lwsd -> swd/lwd, with a
-   % derived albedo = 1 - swn/swd), turbulent fluxes (senf/latf -> shf/lhf),
-   % precip and the SMB components - but LACK the near-surface meteorological
-   % STATE variables tair, wspd, rh, and psfc. So RACMO Data files serve
-   % evaluation/reference and met-swap of the radiation/flux channels rather
-   % than standalone met-file creation. (This is a property of the available
-   % 2.3p3 files, not RACMO in general - the full state set must be obtained
-   % from the RACMO developers, or borrowed from MAR/MERRA/PROMICE at the point,
-   % for a RACMO-forced run.)
+   % as one multi-year 3-hourly NetCDF file per variable:
+   %     <var>.RACMO23p3_*_FGRN11_*.3H*.nc
+   % The data are posted on the FGRN11 rotated-pole grid. The source files
+   % include radiation (swsd/lwsd -> swd/lwd, derived albedo = 1 - swn/swd),
+   % turbulent fluxes (senf/latf -> shf/lhf), precip and the SMB components, but
+   % lack near-surface meteorological state variables tair, wspd, rh, and psfc.
+   % Use RACMO Data files for evaluation or to replace radiation and
+   % precipitation in a complete met timetable.
    %
-   % Channels (file prefix -> output, standard units):
+   % Channels (file prefix -> icemodel variable name, standard units):
    %    swsd -> swd, lwsd -> lwd, swsn -> swn, lwsn -> lwn   [W m-2]
    %    senf -> shf, latf -> lhf                             [W m-2]
-   %    precip -> ppt      [m s-1, the canonical water-equivalent precip rate]
+   %    precip -> ppt                                        [m s-1]
    %    snowmelt -> melt, runoff -> runoff, smb -> smb,
    %    refreeze -> refreeze, -subl -> subl, sndiv -> sndiv,
    %    meltin -> meltin                                     [mWE/h]
+   %
    % RACMO stores sublimation as negative mass change and deposition as
-   % positive. Canonical subl is positive surface loss, matching MAR SUH.
-   % Derived:  albedo [-] = 1 - swn/swd (RACMO ships no albedo variable).
+   % positive. This file's subl is positive surface loss, matching MAR SUH.
+   % Derived: albedo [-] = 1 - swn/swd.
    % Optional: modis [-] (GEUS MODIS daily albedo, when modis_dir is given).
+   % icemodel.processmet derives swu, lwu, and netr from the stored radiation
+   % channels when it loads this Data timetable.
    %
-   % Derivable radiation terms (swu, lwu, netr) are NOT stored: icemodel.
-   % processmet recomputes them on load from swd/albedo/tsfc/lwd. Only the
-   % native RACMO inputs (incl. the net fluxes swn/lwn) and the non-derivable
-   % albedo are carried.
-   %
-   % Mass fluxes convert from kg m-2 s-1 to meters water equivalent per
-   % hour (x 3600 / 1000); they are rates, so cumulative sums must
-   % multiply by the timestep in hours (1 for dt="1hr", 3 for "3hr"). The
-   % precipitation channel (ppt) is then carried in the canonical m s-1
-   % water-equivalent rate; the diagnostic mass fluxes keep mWE/h.
-   %
-   % Legacy: reimplements runoff/functions/saveRacmoData.m (the original
-   % retained, unchanged, as the legacy reference workflow).
+   % Mass fluxes are converted from kg m-2 s-1 to meters water equivalent per
+   % hour (x 3600 / 1000) rates [mWE h-1], so cumulative sums must multiply by
+   % the timestep in hours (1 for dt="1hr", 3 for "3hr"). Precipitation is
+   % converted to mWE s-1.
    %
    % Inputs
-   %  location - [lat lon] point, polyshape (EPSG:3413 m), or an Nx2 [lat lon]
-   %             list of points. A point list returns a 1xN cell of Data
-   %             timetables (metadata a 1xN struct array); the per-variable
-   %             files and grid are read ONCE and every variable file opened
-   %             ONCE, slicing each point's hyperslab from that single open
-   %             (decisive for the multi-GB subsurface files). N=1 is the
-   %             single-point path.
-   %  years    - calendar years to keep (subset of the archive span)
+   %  location   - [lat lon] point, polyshape (EPSG:3413 m), or an Nx2 [lat lon]
+   %               list of points. A point list returns a 1xN cell of Data
+   %               timetables (metadata a 1xN struct array); the per-variable
+   %               files and grid are read once and every variable file opened
+   %               once, slicing each point's hyperslab from that single open.
+   %  years      - calendar years to keep.
    %
    % Name-value
-   %  source_dir : directory with the per-variable RACMO files. Resolves
-   %      ICEMODEL_RACMO_DIR, else the reference layout
-   %      /Volumes/S03/DATA/greenland/racmo2p3/subsurface (the full RACMO2.3p3
-   %      FGRN11 run, 2012-2018 - preferred for firn work over the shorter
-   %      2012-2015 .../surface "no_subsurf_en" product). The per-variable
-   %      filename pattern (<var>.RACMO*.nc) matches either product.
-   %  modis_dir : directory with GEUS Greenland_Reflectivity_<YYYY>_5km_C6.nc
-   %      files; when given, adds a daily MODIS albedo channel at the site.
-   %      Reference layout: /Volumes/S03/DATA/greenland/geus/albedo/gris.
-   %  dt : "1hr" (default; linear interpolation to hourly, the legacy
-   %      behavior) or "3hr" (native posting)
-   %  method : point sampling "nearest" (default) | "natural". When the
-   %      FGRN11 topography is available, both methods exclude cells outside
-   %      its rounded IceMask (fraction >= 0.5; Promicemask > 0 fallback) and
-   %      reject a nearest valid cell farther than one native grid diagonal.
-   %  remap : polygon aggregation "conservative" (default) | "equal"
-   %      ("conservative" uses exactremap with FGRN11 gridarea as the true
-   %      cell areas and the ice mask as the valid-cells mask)
+   %  source_dir - directory with the per-variable RACMO files. Defaults to
+   %               ICEMODEL_RACMO_DIR if set, else
+   %               /Volumes/S03/DATA/greenland/racmo2p3/subsurface (RACMO2.3p3
+   %               FGRN11 run, 2012-2018).
+   %  modis_dir  - directory with GEUS Greenland_Reflectivity_<YYYY>_5km_C6.nc
+   %               files. When given, adds daily MODIS albedo data at the site.
+   %               Set to /Volumes/S03/DATA/greenland/geus/albedo/gris.
+   %  dt         - "1hr" (default; linear interpolation to hourly) or "3hr"
+   %               (native posting).
+   %  method     - point sampling "nearest" (default) | "natural". When the
+   %               FGRN11 topography is available, both methods exclude cells
+   %               outside its rounded IceMask (fraction >= 0.5; Promicemask > 0
+   %               fallback) and reject a nearest valid cell farther than one
+   %               native grid diagonal.
+   %  remap      - polygon aggregation "conservative" (default) | "equal"
+   %               ("conservative" uses exactremap with FGRN11 gridarea as the
+   %               true cell areas and the ice mask as the valid-cells mask).
    %
    % Outputs
-   %  Data     - timetable with userdata CustomProperties (X, Y, Lat,
-   %             Lon, Elev, Slope, ScalarUnits)
-   %  metadata - provenance: files read, grid hyperslab, cell count
+   %  Data       - timetable with userdata CustomProperties (X, Y, Lat,
+   %               Lon, Elev, Slope, ScalarUnits)
+   %  metadata   - provenance: files read, grid hyperslab, cell count
    %
    % See also: icemodel.forcing.buildMarData,
    %  icemodel.forcing.helpers.gridLocation,
@@ -142,11 +131,10 @@ function [Data, metadata] = buildRacmoData(location, years, kwargs)
 
    % Accept one location (1x2 point or polyshape, returns a single Data
    % timetable) OR a list of N points (Nx2 [lat lon], returns a 1xN cell of
-   % Data timetables). N=1 is the single-point path. The per-variable files
-   % and the grid above are read ONCE for the whole list; each point's grid
+   % Data timetables). N=1 is the single-point option. The per-variable files
+   % and the grid above are read once for the whole list; each point's grid
    % hyperslab + collapse rule is resolved here, then every variable file is
-   % opened ONCE and each point's hyperslab sliced from that single open
-   % (decisive for the multi-GB subsurface files).
+   % opened once and each point's hyperslab sliced from that single open.
    [locations, batch] = ...
       icemodel.forcing.helpers.normalizeLocations(location);
    npts = numel(locations);
@@ -266,9 +254,9 @@ end
 function [Data, metadata] = finalizeRacmoData(Data, site, slab, inslab, ...
       loctype, years, location, files, found, source_dir, grid, kwargs)
    %FINALIZERACMODATA Post-process one point's assembled RACMO Data + metadata.
-   % Identical to the legacy single-point tail: hourly interpolation, derived
-   % albedo, optional MODIS channel, precip rate, units, metchecks, userdata
-   % CustomProperties, and the provenance struct. start/count come from slab.
+   % Matches the runoff/functions/saveRacmoData.m single-point method: hourly
+   % interpolation, derived albedo, optional MODIS channel, precip rate,
+   % units, metchecks, userdata CustomProperties, and the provenance struct.
    start = slab(1, :);
    count = slab(2, :);
 
@@ -294,9 +282,9 @@ function [Data, metadata] = finalizeRacmoData(Data, site, slab, inslab, ...
    % through the polar night, where swd -> 0), so it is computed only where
    % SWdown exceeds a low-insolation floor and left NaN otherwise;
    % metchecks then linearly fills those gaps and clamps to [0.05, 0.98].
-   % This refines the legacy saveRacmoData method, which formed the ratio
-   % everywhere and relied on clamping alone. A daytime-only ratio is the
-   % right hourly estimate here: where it is NaN, swd ~ 0, so the
+   % This refines the approach in runoff/functions/saveRacmoData.m, which
+   % forms the ratio everywhere and relies on clamping alone. A daytime-only
+   % ratio is the right hourly estimate here: where it is NaN, swd ~ 0, so the
    % processmet reconstruction swn = swd*(1-albedo) is insensitive to the
    % filled albedo. (Albedo is a forcing INPUT to icemodel.processmet, not
    % one of the radiation terms it derives, so it must be carried here.)
@@ -305,11 +293,11 @@ function [Data, metadata] = finalizeRacmoData(Data, site, slab, inslab, ...
    albedo(~(Data.swd >= swdown_floor)) = NaN;   % also catches swd == 0 / NaN
    Data.albedo = albedo;
 
-   % Optional GEUS MODIS daily albedo, resolved at the SAME location and
+   % Optional GEUS MODIS daily albedo, resolved at the same location and
    % aggregation as the RACMO channels: nearest/natural for a point,
-   % conservative (or equal) catchment mean for a polygon. This generalizes
-   % the legacy saveRacmoData MODIS channel (which took the nearest cell even
-   % for catchments) to the area-weighted ROI mean for polygons.
+   % conservative (or equal) catchment mean for a polygon. This generalizes the
+   % MODIS channel in runoff/functions/saveRacmoData.m (which took the nearest
+   % cell even for catchments) to the area-weighted ROI mean for polygons.
    modis_metadata = struct();
    if kwargs.modis_dir ~= ""
       [modis, modis_metadata] = ...
@@ -321,36 +309,35 @@ function [Data, metadata] = finalizeRacmoData(Data, site, slab, inslab, ...
       end
    end
 
-   % Precipitation to the canonical water-equivalent rate m s-1. RACMO posts
+   % Precipitation converts to the water-equivalent rate m s-1. RACMO posts
    % precip as mWE/h, so dividing by 3600 s/h yields m s-1. The diagnostic
    % mass fluxes (melt/runoff/smb/refreeze/subl/sndiv/meltin) keep mWE/h.
    Data.ppt = Data.ppt / 3600;
 
-   % Normalize RACMO's native mass-balance sign at the source boundary.
-   % Native negative loss / positive deposition is the exact opposite of the
-   % public positive-loss / negative-deposition sublimation contract.
+   % Normalize RACMO's native mass-balance sign here. RACMO's native
+   % convention (negative loss, positive deposition) is the reverse of the
+   % positive-loss, negative-deposition convention this file uses.
    if ismember("subl", string(Data.Properties.VariableNames))
       Data.subl = -Data.subl;
    end
 
    % RACMO's physical precipitation flux contains small negative numerical
-   % undershoots at the source grid cells. Enforce the nonnegative invariant at
-   % the source-finalization boundary, after spatial sampling/remapping and
-   % hourly interpolation, and retain the exact input minimum/count in metadata.
+   % undershoots at the source grid cells. Enforce nonnegativity here, after
+   % spatial sampling/remapping and hourly interpolation, and retain the exact
+   % input minimum/count in metadata.
    [Data, ppt_qc] = ...
       icemodel.forcing.helpers.applyRacmoPrecipitationQualityControl(Data);
 
-   % Per-variable units from the shared canonical map.
+   % Per-variable units come from the shared unit map.
    Data.Properties.VariableUnits = icemodel.forcing.helpers.variableUnits( ...
       string(Data.Properties.VariableNames));
 
-   % Source-faithful QA/QC applies physical clamps without inventing values
-   % across native outages. The legacy caller can still request gap filling at
-   % its own boundary if needed.
+   % Apply physical QA/QC clamps without gap filling. Request gap filling
+   % separately if needed.
    [Data, checks] = icemodel.forcing.helpers.metchecks(Data, fillgaps=false);
 
-   % Attach the shared location schema. Elevation comes from the companion
-   % topography channel when present; RACMO supplies no surface slope here.
+   % Attach the location metadata. Elevation comes from the topography channel
+   % when present. Unlike MAR and MERRA, RACMO has no surface slope.
    location_metadata = struct( ...
       'lat_wgs84', site.lat, 'lon_wgs84', site.lon, ...
       'x_epsg3413', site_x, 'y_epsg3413', site_y, ...
@@ -378,14 +365,13 @@ function [Data, metadata] = finalizeRacmoData(Data, site, slab, inslab, ...
       "ppt m s-1; diagnostic fluxes mWE/h (rate; cumulative sums need dt hours)", ...
       'checks', checks);
 
-   % Copy exact GEUS product/status/year provenance resolved by the channel
-   % reader without any second inventory or NetCDF access.
+   % Copy GEUS product/status/year provenance resolved by the channel reader.
    modis_fields = fieldnames(modis_metadata);
    for k = 1:numel(modis_fields)
       metadata.(modis_fields{k}) = modis_metadata.(modis_fields{k});
    end
 
-   % Copy the flat precipitation-QC contract so writeuserdata carries it with
+   % Copy the flat precipitation-QC fields so writeuserdata carries them with
    % artifact metadata and the bounded repair can apply the identical policy.
    fields = fieldnames(ppt_qc);
    for k = 1:numel(fields)
@@ -443,13 +429,11 @@ function [start, count, collapse, inslab, loctype] = ...
    % RACMO FGRN11 is a CF rotated_latitude_longitude grid: regular in the
    % rotated rlon/rlat frame. The catchment polygon (EPSG:3413) is mapped to
    % true geographic coordinates for exactremap (which re-rotates it via the
-   % grid mapping) and to rotated coordinates to bound the read hyperslab.
-   % Weights are area-weighted by the shipped true cell areas (gridarea) with
-   % off-ice cells (IceMask) inpainted. We use exactremap's 'weights' mode and
-   % apply the weights ourselves: the polygon geometry is solved ONCE and reused
-   % across every year's data block (the legacy runoff static-weights pattern).
-   % exactremap-0hv (the earlier rotated-pole 'areaavg' ~0) is fixed, so areaavg
-   % is also correct now; weights mode is retained for the compute-once reuse.
+   % grid mapping) and to rotated coordinates to bound the hyperslab. Weights
+   % are area-weighted by the true cell areas (gridarea) with off-ice cells
+   % (IceMask) inpainted. We use exactremap's 'weights' mode and apply the
+   % weights here: the polygon geometry is solved once and reused across every
+   % year's data block (the legacy runoff static-weights pattern).
    loctype = "polygon";
 
    rlon = double(ncread(filename, 'rlon'));
@@ -487,22 +471,21 @@ function [start, count, collapse, inslab, loctype] = ...
    cols = j0:j1;
 
    % Conservative weights over the slab. exactremap takes the gridvector axes
-   % (rlon, rlat) in MESHGRID convention: its grid, the 2-D CellAreas/mask it
-   % consumes, and the W it returns are all laid out [numel(rlat) x numel(rlon)]
-   % (rlat down rows). The readRacmo2p3 data block, the slab, and slabMean are
-   % NDGRID [numel(rlon) x numel(rlat)] (rlon down rows). For gridvector axes
-   % this is a pure transpose (no flips), so transpose the cell-area/mask slabs
-   % going in and the returned W back to ndgrid coming out; exactremap now
-   % validates this orientation (rasterTransposed / ambiguousGridOrientation),
-   % so a mismatch errors rather than misaligns. Weights mode is kept (over the
-   % now-fixed exactremap-0hv 'areaavg' path) because it solves the polygon
-   % geometry ONCE and reuses it across every year's data block via the collapse
-   % closure below. (A coordinate-list 'weights' call computes the IDENTICAL
-   % weights - verified: same sum, bit-identical sorted set - but returns them in
-   % exactremap's reconstructed-grid order, not the input-list order, so it needs
-   % an index remap-back and is no simpler than this transpose. The clean
-   % migration is 'areaavg' on the multi-page V stack, which returns the
-   % aggregate directly with no per-cell weight to reorder - see icemodel-1ps.18.)
+   % (rlon, rlat) in meshgrid convention: its grid, the 2-D CellAreas/mask, and
+   % the W it returns are all laid out [numel(rlat) x numel(rlon)] (rlat down
+   % rows). The readRacmo2p3 data block, the slab, and slabMean are ndgrid
+   % [numel(rlon) x numel(rlat)] (rlon down rows). For gridvector axes this is a
+   % single transpose, so transpose the cell-area/mask slabs going in and the
+   % returned W back to ndgrid coming out. exactremap validates this orientation
+   % (rasterTransposed / ambiguousGridOrientation), so a mismatch errors.
+   %
+   % Weights mode is used because it solves the polygon geometry once and reuses
+   % it across every year's data block via the collapse below. (A coordinate
+   % list 'weights' call computes the identical weights but returns them in
+   % exactremap's reconstructed-grid order, not the input-list order, so it
+   % needs an index remap-back and is no simpler than this transpose). TODO: use
+   % 'areaavg' on the multi-page V stack, which returns the aggregate directly
+   % with no per-cell weight to reorder.
    W = exactremap([], rlon(rows), rlat(cols), Pgeo, 'weights', ...
       'GridMapping', gm, 'CellAreas', cellareas(rows, cols).', ...
       'ValidCellsMask', validmask(rows, cols).', 'InfillMasked', true);

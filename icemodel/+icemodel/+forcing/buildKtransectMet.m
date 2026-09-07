@@ -4,8 +4,8 @@ function [met, metadata, Data] = buildKtransectMet(station, kwargs)
    %  [met, metadata] = icemodel.forcing.buildKtransectMet("AWS9")
    %  [met, metadata, Data] = ... buildKtransectMet("AWS9", source_dir=...)
    %
-   % Builds canonical K-transect Data with buildKtransectData, then converts it
-   % through the shared data2met contract. Missing precipitation channels stay
+   % Builds K-transect Data with buildKtransectData, then converts it
+   % through the data2met conversion. Missing precipitation channels stay
    % explicit NaN placeholders when fillwithmissing=true.
    %
    % See also: icemodel.forcing.buildKtransectData,
@@ -25,7 +25,7 @@ function [met, metadata, Data] = buildKtransectMet(station, kwargs)
       enddate=kwargs.enddate, fillgaps=kwargs.fillgaps);
 
    % Use the shared collection-aware conversion path; this source returns one
-   % native 30-minute timetable, so the default blank dt_out is an exact no-op.
+   % native 30-minute timetable, so the default blank dt_out is a no-op.
    [met, metadata] = icemodel.forcing.helpers.data2metCollection(Data, ...
       fillwithmissing=kwargs.fillwithmissing);
 end

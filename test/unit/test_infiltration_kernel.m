@@ -66,6 +66,48 @@ function test_cold_content_refreezing(testCase)
    verifyEqual(testCase, residual, 0, 'AbsTol', 1e-9);
 end
 
+function test_overfilled_layer_clamps_to_the_water_equivalent_bound(testCase)
+   % The ioverfill clamp had no test. A layer that starts above the bound must
+   % come back to exactly ro_ice/ro_liq * (1 - f_ice). That is the pore volume
+   % in water equivalent, and the clamp goes no further.
+
+   N = 5;
+   dz = 0.05;
+   dt = 60;
+   Tf = icemodel.physicalConstant('Tf');
+   [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
+
+   f_ice = 0.30 * ones(N, 1);
+   T = Tf * ones(N, 1);
+
+   % Start cell 3 above the bound, so the clamp must pull it back.
+   bound = ro_ice / ro_liq * (1 - f_ice);
+   f_liq = 0.05 * ones(N, 1);
+   f_liq(3) = bound(3) + 0.02;
+   testCase.assertGreaterThan(f_liq(3), bound(3));
+
+   % A short step so drainage cannot move the overfilled layer before the
+   % clamp reaches it. Over a long step the layer drains instead, and the
+   % final value comes from the flux, not the clamp.
+   [f_liq_short, ~, ~, ~] = icemodel.column.infiltration( ...
+      f_liq, f_ice, T, dz, 1e-3, 0);
+
+   % The clamped layer lands on the bound exactly, not below it.
+   testCase.verifyEqual(f_liq_short(3), bound(3), 'AbsTol', 1e-15);
+
+   % Over a realistic step the invariant still holds: no layer sits above
+   % the bound, whether the clamp or the drainage got it there.
+   [f_liq2, ~, ~, ~] = icemodel.column.infiltration( ...
+      f_liq, f_ice, T, dz, dt, 0);
+   testCase.verifyLessThanOrEqual(f_liq2, bound + 1e-15);
+
+   % The bound is the pore volume scaled to water equivalent. It sits below
+   % the pore volume by (1 - ro_ice/ro_liq) * (1 - f_ice).
+   shortfall = (1 - f_ice(3)) - bound(3);
+   testCase.verifyEqual(shortfall, ...
+      (1 - ro_ice / ro_liq) * (1 - f_ice(3)), 'RelTol', 1e-14);
+end
+
 function test_n_sub_increases_with_q_top(testCase)
    % Larger top flux -> larger characteristic speed -> more substeps.
    N = 10;

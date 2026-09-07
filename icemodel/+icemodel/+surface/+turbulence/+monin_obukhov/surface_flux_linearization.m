@@ -11,16 +11,19 @@ function [Fc, Fp, diag] = surface_flux_linearization(T_sfc, tair, Qsi, ...
    % The Robin coupler expects a linear boundary-flux form:
    %   Q_sfc(T_sfc) ≈ Fc + Fp * T_sfc
    %
-   % This helper evaluates the current surface flux state, then computes the
+   % This function evaluates the current surface flux state, then computes the
    % local derivative using a complex-step perturbation. It intentionally
    % linearizes only the atmospheric surface flux (shortwave, longwave,
-   % sensible, latent, and precipitation advection) so the subsurface
-   % conductive term remains in the `icemodel.column.solve_column_enthalpy`
+   % sensible, latent, and precipitation advection) because the subsurface
+   % conductive term is in the icemodel.column.solve_column_enthalpy
    % Robin interior solve.
    %
    % The caller precomputes cv_atm, hv_atm, ro_atm, and nu_air once per
    % forcing timestep and passes them in. They stay constant across the inner
    % solver iterations.
+   %
+   % See also: icemodel.surface.surface_flux_linearization,
+   %  icemodel.couplers.solve_surface_column_robin
    %
    %#codegen
 

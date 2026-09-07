@@ -4,7 +4,7 @@ function [es, des_dT, ro_vap, dro_vapdT, k_vap, T_dew] = buckVaporModel( ...
    %
    %  Self-contained implementation of the Buck (1981) empirical vapor model,
    %  including saturation vapor pressure, vapor density, vapor thermal
-   %  diffusion coefficient, and dew point. This file encodes everything
+   %  conductivity, and dew point. This file encodes everything
    %  needed to run the vapor subsystem using Buck instead of Ambaum/Romps.
    %
    %  ES = buckVaporModel(T, TF, LIQFLAG) computes saturation vapor pressure
@@ -34,7 +34,7 @@ function [es, des_dT, ro_vap, dro_vapdT, k_vap, T_dew] = buckVaporModel( ...
    %  saturation vapor density and its temperature derivative.
    %
    %  [ES, DES_DT, RO_VAP, DRO_VAPDT, K_VAP] = buckVaporModel(...) Also
-   %  computes the vapor thermal diffusion coefficient:
+   %  computes the vapor thermal conductivity:
    %     k_vap = De * Ls * dro_vapdT
    %  where De = De0 * (T/Tf)^nd is the vapor diffusivity.
    %
@@ -106,7 +106,7 @@ function [es, des_dT, ro_vap, dro_vapdT, k_vap, T_dew] = buckVaporModel( ...
       % Equivalently: (des_dT - es ./ T) ./ (Rv * T)
    end
 
-   % Vapor thermal diffusion coefficient [W m-1 K-1]
+   % Vapor thermal conductivity [W m-1 K-1]
    if nargout > 4
       De = De0 * (T / Tf) .^ nd;
       k_vap = L * De .* dro_vapdT;

@@ -6,9 +6,12 @@ function pathname = artifactFilePath(kind, kwargs)
    %     run_name="20260324-080229")
    %  pathname = icemodel.test.helpers.artifactFilePath("regression", ...
    %     tier="smoke", smbmodel="icemodel", solver=2)
+   %  pathname = icemodel.test.helpers.artifactFilePath("perf", ...
+   %     artifact_root="/tmp/icemodel-artifacts")
    %
    % If RUN_NAME is empty, this function scans test/artifacts/ and uses the
-   % most recent artifact run that contains a matching file.
+   % most recent artifact run that contains a matching file. ARTIFACT_ROOT
+   % selects a different root for writing or scanning artifacts.
 
    arguments
       kind (1, :) string {mustBeMember( ...
@@ -33,11 +36,16 @@ function pathname = artifactFilePath(kind, kwargs)
 
       kwargs.run_name string {mustBeTextScalarOrEmpty} ...
          = string.empty()
+
+      kwargs.artifact_root (1, 1) string ...
+         = ""
    end
 
-   [tier, smbmodel, solver, baseline_type, baseline_tag, run_name] = deal( ...
+   [tier, smbmodel, solver, baseline_type, baseline_tag, run_name, ...
+      artifact_root] = deal( ...
       kwargs.tier, kwargs.smbmodel, kwargs.solver, ...
-      kwargs.baseline_type, kwargs.baseline_tag, kwargs.run_name);
+      kwargs.baseline_type, kwargs.baseline_tag, kwargs.run_name, ...
+      kwargs.artifact_root);
 
    % Resolve baseline selector: "rolling" or blank → rolling; else release.
    if ~isblanktext(baseline_tag)
@@ -45,8 +53,11 @@ function pathname = artifactFilePath(kind, kwargs)
          icemodel.test.helpers.resolveBaselineSelector(baseline_tag);
    end
 
-   testdir = icemodel.getpath('test');
-   artifacts_dir = fullfile(testdir, 'artifacts');
+   if isblanktext(artifact_root)
+      artifacts_dir = fullfile(icemodel.getpath('test'), 'artifacts');
+   else
+      artifacts_dir = char(artifact_root);
+   end
 
    % Build the artifact filename stem from the label components.
    filename = buildArtifactFilename( ...

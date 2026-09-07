@@ -3,8 +3,12 @@ function ro_sfc = surface_bulk_density(f_ice_sfc, f_liq_sfc)
    %
    %  ro_sfc = icemodel.surface.surface_bulk_density(f_ice_sfc, f_liq_sfc)
    %
-   % The returned density includes the air-filled pore fraction so
-   % melt-weathered ice remains on the thf ice path until a snow layer exists.
+   % The density is the volume-weighted sum of the modeled ice, liquid-water,
+   % and pore-air fractions multiplied by their intrinsic densities.
+   %
+   % See also: icemodel.couplers.solve_skin_surface_column,
+   %  icemodel.couplers.solve_surface_column_robin,
+   %  icemodel.surface.potential_surface_vapor_demand
    %
    %#codegen
 

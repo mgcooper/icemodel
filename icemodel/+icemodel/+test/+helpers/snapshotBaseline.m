@@ -20,14 +20,14 @@ function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, ou
       simyear double = NaN
    end
 
-   % Default to the canonical release-baseline path for this target.
+   % Use the default release baseline path for this target.
    if isblanktext(output_file)
       output_file = icemodel.test.helpers.baselineFilePath(kind, ...
          smbmodel=smbmodel, baseline_type="release", ...
          baseline_tag=baseline_tag, simyear=simyear);
    end
 
-   % Copy from the current rolling baseline bundle, not from a rerun.
+   % Copy the current rolling baseline bundle without rerunning the model.
    source_file = icemodel.test.helpers.baselineFilePath(kind, ...
       smbmodel=smbmodel, simyear=simyear);
    if ~isfile(char(source_file))
@@ -50,6 +50,12 @@ function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, ou
                char(source_file))
          end
          baseline = S.RegressionBaseline;
+   end
+
+   if ~isfield(S, 'meta') || ~isfield(S.meta, 'git_revision') ...
+         || isblanktext(string(S.meta.git_revision))
+      error('icemodel:test:releaseBaselineProvenanceMissing', ...
+         'The rolling %s baseline has no source revision.', kind)
    end
 
    icemodel.test.helpers.assertFormalBaselineForcing(baseline, "rolling");
@@ -86,9 +92,27 @@ function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, ou
       S.profile_meta.snapshot_utc = datetime('now', 'TimeZone', 'UTC');
    end
 
-   % Save the rewritten bundle and copy the matching profiler sidecar.
-   save(char(output_file), '-struct', 'S');
-   copyProfilerArtifacts(source_file, output_file);
+   % Copy the profiler sidecar and save both snapshot parts as one operation.
+   snapshot_profdir = icemodel.test.helpers.baselineProfilerDir(output_file);
+   try
+      [S, snapshot_profdir] = copyProfilerArtifacts( ...
+         S, source_file, output_file);
+      save(char(output_file), '-struct', 'S');
+   catch err
+      try
+         removeSnapshotProfiler(snapshot_profdir);
+      catch cleanup_err
+         err = addCause(err, cleanup_err);
+      end
+      try
+         if isfile(output_file)
+            delete(output_file)
+         end
+      catch cleanup_err
+         err = addCause(err, cleanup_err);
+      end
+      rethrow(err)
+   end
 end
 
 function baseline = rewriteBaselineTag(baseline, baseline_tag)
@@ -107,11 +131,16 @@ function baseline = rewriteBaselineTag(baseline, baseline_tag)
    end
 end
 
-function copyProfilerArtifacts(source_file, output_file)
-   %COPYPROFILERARTIFACTS Copy the profiler sidecar folder for a snapshot.
+function [S, dst_profdir] = copyProfilerArtifacts( ...
+      S, source_file, output_file)
+   %COPYPROFILERARTIFACTS Copy and relink a snapshot's profiler sidecar.
 
    src_profdir = icemodel.test.helpers.baselineProfilerDir(source_file);
+   dst_profdir = "";
    if ~isfolder(src_profdir)
+      if isfield(S, 'profile_artifacts')
+         S.profile_artifacts = struct();
+      end
       return
    end
 
@@ -120,4 +149,40 @@ function copyProfilerArtifacts(source_file, output_file)
       rmdir(dst_profdir, 's');
    end
    copyfile(src_profdir, dst_profdir);
+
+   % A snapshot is tracked, so record the profiler paths relative to the
+   % repository root in POSIX form. An absolute path would pin the snapshot to
+   % the machine that created it. A destination outside the repository keeps
+   % its absolute path, because no relative form exists.
+   if isfield(S, 'profile_artifacts')
+      repo_root = string(icemodel.internal.fullpath());
+      if icemodel.isPathInside(dst_profdir, repo_root)
+         recorded_dir = ...
+            icemodel.verification.setup.fixtureRelativePosix( ...
+            repo_root, dst_profdir);
+      else
+         recorded_dir = replace(string(dst_profdir), filesep, "/");
+      end
+      fields = ["dir", "index_file", "info_file"];
+      for field = fields
+         if isfield(S.profile_artifacts, field)
+            if field == "dir"
+               S.profile_artifacts.(field) = recorded_dir;
+            else
+               [~, name, extension] = fileparts(char( ...
+                  S.profile_artifacts.(field)));
+               S.profile_artifacts.(field) = recorded_dir + "/" ...
+                  + string(name) + string(extension);
+            end
+         end
+      end
+   end
+end
+
+function removeSnapshotProfiler(pathname)
+   %REMOVESNAPSHOTPROFILER Remove an unresolved snapshot sidecar.
+
+   if ~isblanktext(pathname) && isfolder(pathname)
+      rmdir(pathname, 's');
+   end
 end

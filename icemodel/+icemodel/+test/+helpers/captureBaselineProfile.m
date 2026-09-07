@@ -5,10 +5,9 @@ function [profile_summary, profile_meta, profile_artifacts] = ...
    %  [profile_summary, profile_meta, profile_artifacts] = ...
    %     icemodel.test.helpers.captureBaselineProfile("perf", cases, output_file)
    %
-   % The accepted baseline build should stay deterministic and timing-focused.
-   % This helper therefore reruns the accepted workflow *after* the build and
-   % captures profiler diagnostics as separate artifacts that can be archived
-   % with the managed baseline.
+   % Rerun the accepted cases under the profiler after the baseline build. Save
+   % separate diagnostic artifacts for later archival with the managed baseline.
+   % PROFILE_DIR writes to an explicit staging directory.
 
    arguments
       kind (1, :) string {mustBeMember(kind, ["perf", "regression"])}
@@ -16,17 +15,25 @@ function [profile_summary, profile_meta, profile_artifacts] = ...
       output_file {mustBeTextScalar}
       kwargs.history_size (1, 1) double {mustBeInteger, mustBePositive} = ...
          25000000
+      kwargs.profile_dir string {mustBeTextScalarOrEmpty} = string.empty()
    end
 
-   % Replace any previous managed profile bundle for this baseline target.
-   profdir = icemodel.test.helpers.baselineProfilerDir(output_file);
+   % Resolve the managed or caller-staged profile directory.
+   profdir = kwargs.profile_dir;
+   if isblanktext(profdir)
+      profdir = icemodel.test.helpers.baselineProfilerDir(output_file);
+   end
+
+   % Replace any previous profile bundle for this target. The removal is
+   % recursive, so a caller-staged profile_dir must name a directory this
+   % capture owns.
    if isfolder(profdir)
       rmdir(profdir, 's');
    end
    mkdir(profdir);
 
-   % Profile the accepted workflow in a second pass, so profiler overhead and
-   % a changed execution order do not affect the saved baseline values.
+   % Profile the cases in a second pass so profiler overhead and a changed
+   % execution order cannot affect the saved baseline values.
    profile clear
    profile('-historysize', kwargs.history_size);
    profile on

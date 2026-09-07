@@ -22,9 +22,9 @@ function report_file = buildTestSuiteReport(suite_kind, results, kwargs)
    % Resolve one shared artifact directory so multi-model runs produce one
    % combined report rather than one report per saved MAT file.
    output_dir = resolveOutputDir(results, kwargs.output_dir);
-   icemodel.helpers.ensureDirExists(output_dir)
+   icemodel.helpers.ensureDirExists(output_dir);
    asset_dir = fullfile(output_dir, "report-assets");
-   icemodel.helpers.ensureDirExists(asset_dir)
+   icemodel.helpers.ensureDirExists(asset_dir);
 
    % Normalize suite-specific result fields into one compact report table.
    if suite_kind == "regression"

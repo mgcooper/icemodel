@@ -4,7 +4,7 @@ function [files, selection] = fixtureFileList(kwargs)
    %  files = icemodel.verification.setup.fixtureFileList()
    %  files = icemodel.verification.setup.fixtureFileList( ...
    %     capabilities="forcing-integration", root="/tmp/data", ...
-   %     manifest="/tmp/icemodel-v1.1-data-manifest.json")
+   %     manifest="/tmp/icemodel-v1.2-data-manifest.json")
    %  [files, selection] = icemodel.verification.setup.fixtureFileList(...)
    %
    % packFixtures and fetchFixtures both read the tracked release-data
@@ -12,18 +12,21 @@ function [files, selection] = fixtureFileList(kwargs)
    % below root. The optional second output contains the selected manifest rows.
    %
    % Name-value
-   %  capabilities  Capability names to select. The two required v1.1
+   %  capabilities  Capability names to select. The two required release
    %                capabilities are selected by default.
    %  root          Installation root associated with the returned paths.
    %  manifest      Release-data manifest JSON file.
    %
    % See also: icemodel.verification.setup.packFixtures,
-   %  icemodel.verification.setup.fetchFixtures
+   %  icemodel.verification.setup.fetchFixtures,
+   %  icemodel.verification.setup.fixtureDataRoot
 
    arguments
       kwargs.capabilities string = defaultCapabilities()
-      kwargs.root (1, 1) string = defaultTestDataRoot()
-      kwargs.manifest (1, 1) string = defaultManifestFile()
+      kwargs.root (1, 1) string = ...
+         icemodel.verification.setup.fixtureDataRoot()
+      kwargs.manifest (1, 1) string = ...
+         icemodel.verification.setup.releaseManifestFile()
    end
 
    % Load and validate the shared manifest before filtering so malformed rows
@@ -50,9 +53,8 @@ function [files, selection] = fixtureFileList(kwargs)
          'Unknown release-data capability: %s', strjoin(unknown, ', '))
    end
 
-   % Canonical capability and path order makes filtered manifests and archive
-   % mapping independent of caller request order. The manifest declaration
-   % order is authoritative rather than lexical sorting.
+   % Use the manifest declaration order for capabilities, paths, and archives.
+   % The caller's request order does not change the result.
    selected_mask = ismember(known, requested);
    capabilities = known(selected_mask);
    selected_archives = archives(selected_mask);
@@ -77,19 +79,8 @@ end
 
 %% Local helpers
 function capabilities = defaultCapabilities()
-   %DEFAULTCAPABILITIES Required v1.1 capabilities installed together.
+   %DEFAULTCAPABILITIES Required release capabilities installed together.
    capabilities = ["formal-core", "verification-showcase"];
-end
-
-function pathname = defaultTestDataRoot()
-   %DEFAULTTESTDATAROOT Canonical release-provisioned formal-data root.
-   pathname = string(icemodel.internal.fullpath('test', 'data'));
-end
-
-function pathname = defaultManifestFile()
-   %DEFAULTMANIFESTFILE Tracked authoritative release-data manifest.
-   pathname = string(icemodel.internal.fullpath('test', 'assets', ...
-      'icemodel-v1.1-data-manifest.json'));
 end
 
 function manifest = readManifest(pathname)

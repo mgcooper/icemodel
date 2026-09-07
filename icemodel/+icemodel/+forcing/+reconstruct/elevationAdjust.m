@@ -11,13 +11,13 @@ function x = elevationAdjust(channel, x, dz, kwargs)
    %  adjustment needs support from held-out validation first.
    %
    % Inputs
-   %  channel : canonical channel name.
+   %  channel : channel name.
    %  x : donor series values.
    %  dz : target elevation minus donor elevation, meters.
    %
    % Name-value
    %  lapse_rate : temperature lapse in K/m (default -0.0060; the policy's
-   %     recorded fallback — a fitted overlap lapse may override it).
+   %     recorded fallback; a fitted overlap lapse may override it).
    %  threshold_m : |dz| below which no adjustment applies (default 100,
    %     a Section-C parameter).
    %  tair_for_pressure : coincident air temperature (K) for the

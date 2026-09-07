@@ -5,8 +5,12 @@ function assertNotEvaluationDestination(destinations, evaluation_roots)
    %     destinations, evaluation_roots)
    %
    % Reconstruction may read evaluation observations. It must never create,
-   % replace, or remove a file in an evaluation tree. The check compares
-   % canonical paths, so a relative path or a symlink cannot get past it.
+   % replace, or remove a file in an evaluation tree. The check resolves
+   % each path before comparing, so a relative path or a symlink cannot get
+   % past it.
+   %
+   % See also: icemodel.forcing.reconstruct.validationSplit,
+   %  icemodel.forcing.reconstruct.fillPromiceStation
 
    destinations = reshape(string(destinations), [], 1);
    evaluation_roots = unique(reshape(string(evaluation_roots), [], 1));

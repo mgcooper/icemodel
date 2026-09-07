@@ -4,9 +4,9 @@ function [hourly, bin_start, bin_end] = retimeHourlyFixedStep(TT)
    %  TT = icemodel.retimeHourlyFixedStep(TT)
    %  [TT, bin_start, bin_end] = icemodel.retimeHourlyFixedStep(TT)
    %
-   % This helper is intended for the postprocess path where model output is
+   % This helper is used by icemodel.postprocess where model output is
    % known to be 15-minute data (opts.dt == 900). Aligned complete hours use a
-   % fixed-array path that remains available to generated code. Interpreted
+   % fixed-array path for compatibility with code generation. Interpreted
    % MATLAB falls back to native timetable retiming for partial, unaligned, or
    % irregular bins. BIN_START and BIN_END identify the inclusive raw-sample
    % bounds for each retained output row; zero bounds denote an empty native
@@ -15,8 +15,9 @@ function [hourly, bin_start, bin_end] = retimeHourlyFixedStep(TT)
    % The fixed path is written for code generation. Every construct that Coder
    % rejects is inside a coder.target('MATLAB') branch, which the code
    % generator removes. Nothing in this repository compiles this function. The
-   % directive below records that intent and lets the analyzer check it. It is
-   % not evidence of a completed build.
+   % directive below records that intent and lets the analyzer check it.
+   %
+   % See also: icemodel.postprocess, icemodel.isIncrementChannel
    %
    %#codegen
 
@@ -28,17 +29,17 @@ function [hourly, bin_start, bin_end] = retimeHourlyFixedStep(TT)
       return
    end
 
-   % Use the fixed four-sample path whenever the full 15-minute spacing
-   % holds. Generated code rejects all other grids before unsupported native
-   % timetable retiming can enter the compiled call graph.
+   % Use the fixed four-sample branch whenever the full 15-minute spacing is
+   % known to hold. Generated code rejects all other grids to prevent
+   % unsupported native timetable retiming from entering the compiled graph.
    if isFixedStepHourlyCompatible(TT.Properties.RowTimes)
       % Seed the output from the first sample in every block so timetable
-      % schema and metadata are preserved per variable. This path preserves
-      % the storage class for floating-point variables only. The block mean
-      % widens an integer or logical variable to double, and the native
-      % fallback path below rejects those instead of widening them. Callers with
-      % logical channels must cast before retiming, as icemodel.postprocess
-      % does for Tsfc_converged and Tice_converged.
+      % properties are preserved per variable. This branch preserves the storage
+      % class for floating-point variables only. The block mean widens an
+      % integer or logical variable to double, and the fallback branch below
+      % rejects those instead of widening them. Callers with logical channels
+      % must cast before retiming, as icemodel.postprocess does for
+      % Tsfc_converged and Tice_converged.
       n_samples = height(TT);
       n_hours = n_samples / 4;
       use_codegen_leap = ~coder.target('MATLAB') && n_hours == 8784;
@@ -57,8 +58,8 @@ function [hourly, bin_start, bin_end] = retimeHourlyFixedStep(TT)
          n_output_hours = n_hours;
       end
 
-      % Apply the canonical aggregation class one variable at a time. This
-      % avoids concatenating mixed single and double variables into one array.
+      % Apply the aggregation class one variable at a time. This avoids
+      % concatenating mixed single and double variables into one array.
       vars = TT.Properties.VariableNames;
       for n = 1:numel(vars)
          name = vars{n};
@@ -81,8 +82,8 @@ function [hourly, bin_start, bin_end] = retimeHourlyFixedStep(TT)
          '15-minute bins'])
    end
 
-   % Interpreted MATLAB drops the synthetic Feb 29 rows here. The fixed
-   % generated path already excludes that interval above.
+   % Interpreted MATLAB drops the synthetic Feb 29 rows here. The code
+   % generation path above already excludes that interval.
    if coder.target('MATLAB')
       keep = ~(month(hourly.Properties.RowTimes) == 2 ...
          & day(hourly.Properties.RowTimes) == 29);
@@ -93,10 +94,10 @@ function [hourly, bin_start, bin_end] = retimeHourlyFixedStep(TT)
 end
 
 function tf = isFixedStepHourlyCompatible(time)
-   %ISFIXEDSTEPHOURLYCOMPATIBLE Check the timetable for the fixed retime path.
+   %ISFIXEDSTEPHOURLYCOMPATIBLE Check the timetable for the fixed retime.
 
-   % Four samples per hour, an hourly first label, and exact quarter-hour
-   % spacing ensure reshape blocks equal MATLAB's native hourly bins.
+   % Compatibility check: four samples per hour, an hourly first label, and
+   % exact quarter-hour spacing.
    tf = numel(time) >= 4 ...
       && mod(numel(time), 4) == 0 ...
       && minute(time(1)) == 0 ...
@@ -115,6 +116,7 @@ function returned = aggregateFixedValues(values, n_hours, method)
    % of each hour the leading reduction dimension.
    n_columns = size(values, 2);
    blocks = reshape(values, 4, n_hours, n_columns);
+
    % RETIME excludes missing numeric samples from reductions. Zero replacement
    % gives SUM its native all-missing result and leaves MEAN as zero divided by
    % zero when no finite samples exist.

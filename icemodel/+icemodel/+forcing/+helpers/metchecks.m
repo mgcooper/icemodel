@@ -34,11 +34,10 @@ function [met, checks] = metchecks(met, kwargs)
    %           checks.numnan     table of NaN counts per variable
    %           checks.numcomplex table of complex-sample counts per variable
    %
-   % Legacy: reimplements runoff/functions/metchecks.m (retained, unchanged,
-   % as the legacy reference). Differences: timetable-only input (the legacy
-   % version also accepted structs/matrices); circular wdir gap-fill (the
-   % legacy version linear-filled it); no plot option (inspect the returned
-   % checks instead).
+   % runoff/functions/metchecks.m is the numerical-regression reference. It
+   % accepts structs, matrices, and timetables. It linearly fills wdir across
+   % the wrap. This function accepts timetables only and fills wdir through
+   % unit-vector components. It has no plot option; inspect checks instead.
    %
    % See also: icemodel.forcing.helpers.metvariables,
    %  icemodel.forcing.helpers.validatemet, fillmissing

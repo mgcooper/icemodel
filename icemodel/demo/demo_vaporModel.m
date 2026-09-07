@@ -1,5 +1,5 @@
 %[text] # Vapor Model: Saturation Vapor Pressure, Density, and Diffusion
-%[text] This script documents the three vapor formulations used in icemodel and their derivative chains. It reconciles the Liston/Buck, Jordan/SNTHERM, and Ambaum/Romps approaches to computing the vapor heat diffusion coefficient $k\_v$.
+%[text] This script documents the three vapor formulations used in icemodel and their derivative chains. It reconciles the Liston/Buck, Jordan/SNTHERM, and Ambaum/Romps approaches to computing the vapor thermal conductivity $k\_v$.
 %%
 %[text] ## **Formulations covered**
 %[text] 1\. **Buck (1981)** — empirical fit: $e\_s = a \\exp\\left\[\\frac{b(T-T\_f)}{c+T-T\_f}\\right\]$
@@ -17,8 +17,8 @@
 %[text] $\\frac{d\\rho\_v}{dT} = \\frac{1}{R\_v T}\\left(\\frac{de\_s}{dT} - \\frac{e\_s}{T}\\right)$
 %[text] Or equivalently in terms of $\\rho\_v$:
 %[text] $\\frac{d\\rho\_v}{dT} = \\frac{1}{R\_v T}\\frac{de\_s}{dT} - \\frac{\\rho\_v}{T}$
-%[text] ### Vapor heat diffusion coefficient
-%[text] The effective vapor thermal diffusion coefficient (Jordan, above Eq. 63):
+%[text] ### Vapor thermal conductivity
+%[text] The effective vapor thermal conductivity (Jordan, above Eq. 63):
 %[text] $k\_v = D\_e L\_s \\frac{d\\rho\_v}{dT}$
 %[text] Expressed in terms of vapor pressure:
 %[text] $k\_v = \\frac{D\_e L\_s}{R\_v T}\\left(\\frac{de\_s}{dT} - \\frac{e\_s}{T}\\right)$
@@ -143,7 +143,7 @@ plot(T, k_vap_jordan, 'b-') %[output:14016836]
 plot(T, k_vap_liston, 'r--') %[output:14016836]
 ylabel('k_v [W m^{-1} K^{-1}]'); xlabel('T [K]') %[output:14016836]
 legend('Jordan (correct)', 'Liston (missing -e_s/T)', 'Location', 'northwest') %[output:14016836]
-title('Vapor heat diffusion coefficient') %[output:14016836]
+title('Vapor thermal conductivity') %[output:14016836]
 
 nexttile %[output:14016836]
 plot(T, (k_vap_liston - k_vap_jordan) ./ k_vap_jordan * 100) %[output:14016836]

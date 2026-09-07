@@ -76,11 +76,10 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %                  refreezing diagnostics.
    %     'standard'   the default. Adds the surface energy-balance terms and
    %                  the convergence counters.
-   %     'diagnostic' adds the turbulent-flux internals, and for icemodel the
-   %                  per-forcing-step mass and energy ledger. The closure
-   %                  identities are evaluated from that ledger, which only
-   %                  this profile builds, so a standard run does not build
-   %                  or write it.
+   %     'diagnostic' adds the turbulent-flux internals. For full-column
+   %                  icemodel, it also writes the per-forcing-step mass and
+   %                  energy ledger. Full-column icemodel accumulates the raw
+   %                  budget terms for every profile.
    %
    %  The channel lists live in icemodel.namelists.surfaceoutputs and
    %  icemodel.namelists.budgetoutputs; icemodel.configureRun assembles the
@@ -111,7 +110,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  default empty list keeps legacy site/source/year filename discovery.
    %  READINESS_FILE optionally names the exact station readiness CSV pinned
    %  by the promice_filled producer manifest; the default is the canonical
-   %  gapfill ledger. The ledger is bookkeeping — the runtime gate is
+   %  gapfill ledger. The ledger is bookkeeping; the runtime gate is
    %  requested-window coverage of the filled met files (POLICY A4).
    %  REPORT_INPUTS_FILE optionally names the producer manifest that hashes
    %  that ledger and every configured promice_filled met artifact.
@@ -211,17 +210,16 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %---------------------------------------------------------
 
    %%% General model settings
-   % number of leading simulation years used only for spinup
-   opts.n_spinup_years  = 0;
+   opts.n_spinup_years  = 0;        % number of leading simulation years used only for spinup
    opts.use_init        = false;    % reserved for later generic initialization support
    opts.initfile        = '';       % reserved generic initialization source
    opts.use_restart     = false;    % load an exact year-boundary restart state?
    opts.restartfile     = '';       % restart state file used when use_restart=true
    opts.saverestart     = false;    % save a restart state at each year boundary
 
-   %%% Debug mode — enable via resetopts(opts, 'debug', true)
+   %%% Debug mode. Enable with resetopts(opts, 'debug', true).
    opts.debug           = false;    % enable solver diagnostic dumps
-   opts.debug_path      = '';       % override for debug output folder
+   opts.debug_path      = '';       % root override; configureRun names dump files
 
    %%% Model parameters and related options
    opts.use_ro_glc      = false;    % use same density for liquid/solid ice?
@@ -232,7 +230,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % fractions in icemodel.column.initialize_column_state. Kernels load ro_ice
    % and ro_liq from icemodel.physicalConstant, so use_ro_glc does not reach
    % them: the solver densities are the intrinsic ro_ice and ro_liq whatever
-   % this option is set to. See icemodel-hd6.
+   % this option is set to.
 
    %%% Timestepping / mesh options
    opts.calendar_type   = 'noleap'; %
@@ -247,7 +245,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %%% Surface turbulent-heat-flux scheme.
    %
    % Default = 'bulk_richardson'. 'monin_obukhov' is opt-in via resetopts.
-   % configureRun enforces its runtime guard.
+   % configureRun enforces the numerical (complex-step) T_sfc solver for
+   % 'monin_obukhov' (opts.seb_solver = 2).
    opts.turbulent_flux_scheme = 'bulk_richardson';
    %
    % Roughness lengths default to parameterLookup values via configureRun if
@@ -259,7 +258,8 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %
    % Observation heights for the turbulent-flux scheme. This function sets the
    % known forcing-dependent defaults below, after the solver block. Override
-   % them via resetopts for a forcing-specific run that is not resolved below.
+   % them via resetopts for a forcing-specific run that is not included in the
+   % switch-case block below the solver options.
    opts.z_tair = [];   % air temperature observation height [m]
    opts.z_wind = [];   % wind speed observation height      [m]
    opts.z_relh = [];   % relative humidity obs height       [m] (= z_tair)
@@ -273,12 +273,12 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % Selects which rainf/snowf split
    % icemodel.surface.initialize_surface_forcings uses:
    %   'source'    - the met product's own rainf/snowf components exactly as
-   %                 shipped (e.g. MAR's energy-balance split). Default.
+   %                 provided (e.g. MAR's energy-balance split). Default.
    %   'threshold' - repartition total ppt by air temperature via
    %                 icemodel.forcing.reconstruct.partitionPrecipitation
    %                 (transition temperature single-sourced in
    %                 icemodel.forcing.reconstruct.setopts).
-   % D-0b: the solver's advective-rain forcing stays zero either way until
+   % Note: the solver's advective-rain forcing stays zero either way until
    % rain physics is implemented, so this option does not change model physics.
    %
    opts.precip_phase_source = 'source';
@@ -305,7 +305,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    % Saturated hydraulic conductivity (k_sat) method. Options:
    %   'colbeck1972' (default; density-only closure)
    %   'shimizu1970' (grain-size + f_wat, state-dependent)
-   %   'darcy'       (caller-pinned permeability)
+   %   'darcy'       (caller-supplied permeability)
    opts.k_sat_method = 'colbeck1972';
    %
    % Capillary residual liquid water per pore volume fractions [-].
@@ -355,8 +355,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.maxiter         = 100;   % thermal solver max iterations
       opts.tol             = 1e-2;  % thermal solver convergence tolerance [K]
       opts.alpha           = 1.8;   % thermal solver relaxation factor (rec: 1.8)
-      % thermal solver aitken-acceleration flag (rec: true)
-      opts.use_aitken      = true;
+      opts.use_aitken      = true;  % thermal solver aitken-acceleration flag (rec: true)
       opts.jumpmax         = 5.0;   % thermal solver acceleration guess tolerance [K]
 
       % Surface-subsurface coupler options
@@ -364,8 +363,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
       opts.cpl_Ts_tol      = 1e-2;  % coupler Ts convergence tolerance [K]
       opts.cpl_seb_tol     = 1.0;   % coupler SEB convergence tolerance [W m-2]
       opts.cpl_alpha       = 1.8;   % coupler Ts relaxation factor (rec: 1.8)
-      % coupler Ts acceleration (Aitken+secant) (rec: true)
-      opts.cpl_aitken      = true;
+      opts.cpl_aitken      = true;  % coupler Ts acceleration (Aitken+secant) (rec: true)
       opts.cpl_jumpmax     = 5.0;   % coupler Ts acceleration guess tolerance [K]
    else
       error('unrecognized surface mass balance model name SMBMODEL')
@@ -384,21 +382,17 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
 
       case 'kanl'
          % PROMICE/GC-Net single-boom nominal install height (matches the
-         % generic 'promice' path; defined in parameterLookup). When the
-         % met file carries the time-varying boom_height channel,
-         % icemodel.loadmet replaces this scalar through the
-         % +reconstruct/POLICY.md A3 measured -> interpolated -> nominal
-         % fallback hierarchy.
+         % generic 'promice' case; defined in parameterLookup). When the met
+         % file has the time-varying boom_height, icemodel.loadmet replaces this
+         % scalar according to the measured -> interpolated -> nominal fallback
+         % in +reconstruct/POLICY.md.
          opts.z_tair = ...
             icemodel.parameterLookup('promice_nominal_boom_height_m');
          opts.z_wind = opts.z_tair;
 
       case 'kanm'
-         % PROMICE/GC-Net single-boom nominal install height (matches the
-         % generic 'promice' path; defined in parameterLookup).
-         % When the met file carries the time-varying boom_height channel,
-         % icemodel.loadmet replaces this scalar through the POLICY A3
-         % measured -> interpolated -> nominal fallback chain.
+         % Use the nominal PROMICE height for both sensors. icemodel.loadmet
+         % replaces it when the forcing contains measured boom heights.
          opts.z_tair = ...
             icemodel.parameterLookup('promice_nominal_boom_height_m');
          opts.z_wind = opts.z_tair;
@@ -408,21 +402,19 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
          opts.z_wind = 2.0;
 
       case {'promice', 'promice_filled'}
-         % Native PROMICE AWS station met (met_<site>_promice) and the
-         % gap-filled product (met_<site>_promice_filled). T/RH and wind share
-         % the upper boom, whose height changes as the surface evolves. NaN is
-         % the unresolved sentinel: icemodel.loadmet replaces it with
-         % the per-timestep boom-height series resolved through the
-         % +reconstruct/POLICY.md A3 fallback hierarchy (measured ->
-         % interpolated -> nominal constant), recording the outcome in
-         % opts.boom_height_source so geometry never blocks a run (D-0a).
+         % For native PROMICE met (met_<site>_promice) and gap-filled files
+         % (met_<site>_promice_filled), T/RH and wind are on the upper boom,
+         % whose height changes as the surface evolves. icemodel.loadmet
+         % fills NaN heights through the measured -> interpolated ->
+         % nominal-constant hierarchy and records the outcome in
+         % opts.boom_height_source.
          opts.z_tair = NaN;
          opts.z_wind = NaN;
 
       case 'gcnet'
          % Vandecrux GC-Net surface/SEB files include Ta_2m and WS_10m, so use
          % standard 2 m T/RH and 10 m wind heights rather than the PROMICE
-         % single-boom convention.
+         % convention.
          opts.z_tair = 2.0;
          opts.z_wind = 10.0;
 
@@ -433,9 +425,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
          opts.z_wind = 10.0;
 
       case 'retmip'
-         % RetMIP-native met files are staged under one runtime source
-         % label, but their measurement heights follow the native source
-         % for the case.
+         % RetMIP measurement heights depend on the case.
          [opts.z_tair, opts.z_wind] = retmipObservationHeights(sitename);
 
       case 'esm_snowmip'
@@ -449,17 +439,18 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
          opts.z_wind = 2.0;
    end
 
-   % Assume z_relh = z_tair. This option is used in the monin-obukhov thf scheme.
+   % Assume z_relh = z_tair. This option is used in the monin-obukhov thf
+   % scheme.
    opts.z_relh = opts.z_tair;
 
    % Lag time used by icemodel.column.diagnose_column_runoff, converted from
    % hours to timesteps.
    opts.tlag = 6 * 3600 / opts.dt;
 
-   % Output profile. "minimal" is the lean profile, recommended for large-scale
-   % gridded runs to reduce output storage; "standard" is the full point-run
-   % profile; and "diagnostic" extends the point-run profile with solver/THF
-   % debugging scalars.
+   % Output profile. "minimal" is recommended for large-scale gridded runs to
+   % reduce output storage; "standard" is the full point-run profile; and
+   % "diagnostic" extends the point-run profile with solver/THF debugging
+   % scalars.
    opts.output_profile = 'standard';
 
    %------------------------- End of user-defined model options
@@ -537,8 +528,7 @@ function opts = initopts(smbmodel, sitename, simyears, forcings, ...
    % [startdate, enddate] or the years set by simyears. The defaults are NaT so
    % the year-only behaviour (simyears) is respected when these are not set.
    % [startdate, enddate] can be used to evaluate against targeted windows
-   % (e.g. one snow season) in the +verification suite, without inventing new
-   % calendar or hydrologic-year policy.
+   % (e.g. one snow season) in the +verification suite.
    opts.startdate = NaT('TimeZone', 'UTC');
    opts.enddate   = NaT('TimeZone', 'UTC');
 
@@ -554,6 +544,7 @@ function opts = initopts(smbmodel, sitename, simyears, forcings, ...
    opts.userdatafname = {};
    opts.readiness_file = "";
    opts.report_inputs_file = "";
+   opts.promice_filled_expected_policy_sha256 = "";
    opts.promice_filled_readiness_verified = false;
    opts.promice_filled_manifest_verified = false;
    opts.promice_filled_provenance_verified = false;
@@ -567,15 +558,17 @@ function opts = initopts(smbmodel, sitename, simyears, forcings, ...
    opts.promice_filled_verified_smbmodel = '';
    opts.promice_filled_verified_dt = NaN;
 
-   % Boom-height resolution set by icemodel.loadmet for PROMICE-geometry
-   % forcings (POLICY A3): '' until loadmet resolves the chain, then 'measured'
-   % (every requested sample passed validation), 'interpolated' (invalid samples
-   % were bridged from neighboring valid measurements), or 'nominal' (no valid
-   % measurement existed and the parameterLookup nominal constant applies). The
-   % fraction records the share of requested samples not taken directly from
-   % valid measurements.
+   % Initialize PROMICE boom-height source to ''. icemodel.loadmet updates the
+   % value to one of: 'measured' (reported value that passed validation),
+   % 'interpolated' (invalid samples filled using valid neighboring
+   % measurements), or 'nominal' (no valid measured/interpolated value so the
+   % parameterLookup nominal constant was used). The fraction records the share
+   % of requested samples not taken directly from valid measurements.
    opts.boom_height_source = '';
    opts.boom_height_fraction_fallback = NaN;
+
+   % Initialize the requested output variables to empty cells. configureRun sets
+   % them based on opts.output_profile.
    opts.vars1 = {};
    opts.vars2 = {};
 end

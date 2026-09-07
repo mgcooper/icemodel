@@ -14,15 +14,10 @@ function [H, dHdT, dFdT, dLdT, dVdT] = bulk_enthalpy(T, f_ice, f_liq, f_wat, ...
    %      + ro_liq * Lf * df_liq/dT ...
    %      + L_v/s * f_air * d(ro_vap)/dT] dT.
    %
-   % The exact primitive of that expression also carries reference terms such
-   % as f_liq(Tf) and ro_vap(Tf). This helper omits them. The solver uses the
-   % result only through the difference H - H_old. The Picard solve holds the
-   % omitted reference terms fixed for a node over the nonlinear update, so
-   % they cancel in that difference.
-   %
-   % The returned H is therefore consistent with the solver. It is not the
-   % uniquely normalized thermodynamic enthalpy of the mixture in every
-   % reference convention.
+   % The exact result of that expression also includes reference terms such as
+   % f_liq(Tf) and ro_vap(Tf). This helper omits them; the solver uses the
+   % result only for the difference H - H_old where those reference values
+   % are fixed over the nonlinear update and cancel in that difference.
    %
    % The current implementation assumes:
    %  - the liquid-fraction curve is evaluated at fixed f_wat within the solve
@@ -36,8 +31,9 @@ function [H, dHdT, dFdT, dLdT, dVdT] = bulk_enthalpy(T, f_ice, f_liq, f_wat, ...
    %  dLdT - liquid-enthalpy derivative [J m-3 K-1]
    %  dVdT - optional vapor-enthalpy derivative term [J m-3 K-1]
    %
-   % The return signature is dHdT, dFdT because downstream call sites use these
-   % two terms rather than dLdT and dVdT directly.
+   % See also: icemodel.column.water_fraction,
+   %  icemodel.column.liquid_fraction_derivative,
+   %  icemodel.vapor.latent_enthalpy_switch
    %
    %#codegen
 

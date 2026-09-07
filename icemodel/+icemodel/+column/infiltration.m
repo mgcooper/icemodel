@@ -5,19 +5,14 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
    %  [f_liq, f_ice, T, diag] = icemodel.column.infiltration( ...
    %     f_liq, f_ice, T, dz, dt, q_top)
    %
-   %  Performs the full snow infiltration step. The step has three parts: an
-   %  explicit upwind liquid mass redistribution with CFL substepping,
+   %  Computes liquid infiltration in the snow/firn column. There are three
+   %  parts: an explicit upwind liquid mass redistribution with CFL substepping,
    %  cold-content refreezing in cold layers (latent heat released, T capped at
-   %  Tf), and a one-step explicit conduction sweep over the main timestep dt.
+   %  Tf), and a one-step explicit conduction update over the main timestep dt.
    %  Returns the updated f_liq, f_ice and T, plus a diagnostic struct.
    %
-   %  The kernel is the canonical icemodel infiltration entry point. Both the
-   %  snow verification driver (Colbeck 1976 / Clark 2017) and any future
-   %  production caller share this code path. Empirical coefficients come from
-   %  icemodel.parameterLookup, physical constants from
-   %  icemodel.physicalConstant, the saturated hydraulic conductivity from
-   %  icemodel.column.saturated_hydraulic_conductivity, and the thermal
-   %  conductivity from icemodel.column.firn_thermal_conductivity.
+   %  The snow verification driver calls this kernel for the Colbeck 1976 and
+   %  Clark 2017 cases.
    %
    %  Parameters:
    %  -----------
@@ -95,11 +90,11 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
       kwargs.permeability (1, 1) double = NaN
    end
 
-   % Load thermodynamic constants and constitutive-law parameters once. m_exp is
-   % the Mualem exponent (Clark 2017 Eq. 7). f_res_pore is the canonical Colbeck
-   % residual capillary saturation. Production callers override it per substep
-   % with opts.f_res_pore_snow / _ice / _firn at the liquid_flux call site, but
-   % the CFL bound here uses the canonical value. cfl_safety is the substep
+   % Load thermodynamic constants and constitutive-law parameters. m_exp is
+   % the Mualem exponent (Clark 2017 Eq. 7). f_res_pore is the Colbeck residual
+   % capillary saturation. icemodel overrides it per substep with
+   % opts.f_res_pore_snow / _ice / _firn at the liquid_flux call site, but the
+   % CFL bound here uses the parameterLookup value. cfl_safety is the substep
    % safety factor.
    persistent m_exp f_res_pore cfl_safety Tf Lf ro_ice ro_liq cp_ice
    if isempty(m_exp)
@@ -109,9 +104,11 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
          'Tf', 'Lf', 'ro_ice', 'ro_liq', 'cp_ice');
    end
 
-   % Ice-to-liquid water-equivalent ratio. The f_liq upper-bound clip below uses
-   % it: f_liq cannot exceed (ro_ice/ro_liq) * (1 - f_ice), which is the
-   % available pore volume in liquid-water equivalent.
+   % Ice-to-liquid water-equivalent ratio. The f_liq upper-bound clip below
+   % uses it: f_liq cannot exceed (ro_ice/ro_liq) * (1 - f_ice). That is the
+   % pore volume scaled to water equivalent. It is less than the pore volume
+   % by (1 - ro_ice/ro_liq) * (1 - f_ice), which leaves the liquid room to
+   % expand if it refreezes.
    ro_iwe = ro_ice / ro_liq;
 
    % Unpack optional keyword-args
@@ -130,10 +127,10 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
 
    % --- CFL substep count -------------------------------------------------
    % Saturated hydraulic conductivity per layer (column-shaped) from the
-   % dispatched closure scheme. k_sat_max bounds the per-layer values for the
-   % CFL estimate.
-   k_sat = icemodel.column.saturated_hydraulic_conductivity( ...
-      f_ice, f_liq, method=k_sat_method, grainsz=grainsz, permeability=permeability);
+   % selected closure scheme. k_sat_max bounds per-layer values for the CFL
+   % estimate.
+   k_sat = icemodel.column.saturated_hydraulic_conductivity(f_ice, f_liq, ...
+      method=k_sat_method, grainsz=grainsz, permeability=permeability);
    k_sat_max = max(k_sat);
 
    % Relative saturation per layer, clipped to [0, 1]. This drives the
@@ -169,9 +166,8 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
 
    for sub = 1:n_sub
 
-      % Calculate fluxes between layers [m/s]. liquid_flux returns one flux
-      % value per layer, computed at the layer's own state. That flux is the
-      % upwind interface flux out the bottom of each layer.
+      % Calculate fluxes between layers [m/s]. liquid_flux returns the upwind
+      % interface flux out of the bottom of each layer (one flux per layer).
       q = icemodel.column.liquid_flux(f_liq, f_ice, ...
          k_sat_method=k_sat_method, grainsz=grainsz, permeability=permeability);
 
@@ -208,28 +204,35 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
       % Clip f_liq to physical bounds.
       %
       %   Lower bound: f_liq >= 0 (no negative liquid water).
-      %   Upper bound: f_liq <= (ro_ice/ro_liq) * (1 - f_ice) (cannot
-      %                exceed the available pore volume in liquid-water
-      %                equivalent units).
+      %   Upper bound: f_liq <= (ro_ice/ro_liq) * (1 - f_ice). This is the
+      %                pore volume in water equivalent, not the pore volume.
+      %                It falls short of the pore volume by
+      %                (1 - ro_ice/ro_liq) * (1 - f_ice), which is the room
+      %                the liquid needs to expand if it refreezes.
+      %                Equivalently it is f_wat <= f_wat_max, where
+      %                f_wat = f_liq + f_ice * ro_ice / ro_liq.
       %
       % The clip runs in one pass: apply d_liq first, then clip f_liq to the
-      % physical envelope. Water above the upper bound is dropped, so the
+      % physical bounds. Water above the upper bound is dropped, so the
       % scheme does not conserve mass at that bound. liquid_flux upstream
       % returns q = 0 wherever f_liq <= f_res, so a layer at the capillary
       % residual has no outgoing flux. Drainage past f_res therefore cannot
       % occur, and the lower bound is rarely active.
       %
       % A per-layer pre-clamp (drainage clamped to f_liq - f_res, plus a
-      % downward rebalance against the receiver layer's max_infill capacity) is
+      % downward rebalance against the receiving layer's remaining capacity) is
       % not needed here. With CFL substepping (cfl_safety < 1) the wave moves
       % less than one cell per substep, so the receiver-capacity check never
       % triggers for the Colbeck cases. The verification metrics agree with
       % SUMMA at sub-mm RMSE.
       f_liq = max(0, f_liq);
-      f_air_capacity = ro_iwe * f_por - f_liq;
-      neg = f_air_capacity < 0;
-      if any(neg)
-         f_liq(neg) = ro_iwe * f_por(neg);
+
+      % max_liquid_fraction_change returns the liquid a layer can still take
+      % before f_wat reaches f_wat_max. Negative means the layer already
+      % holds more than that, so the layer is overfilled.
+      ioverfill = icemodel.column.max_liquid_fraction_change(f_ice, f_liq) < 0;
+      if any(ioverfill)
+         f_liq(ioverfill) = ro_iwe * f_por(ioverfill);
       end
 
       % Cumulative mass-balance accumulators for diagnostics. The diag struct

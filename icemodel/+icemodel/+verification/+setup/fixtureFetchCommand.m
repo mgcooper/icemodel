@@ -10,8 +10,10 @@ function command = fixtureFetchCommand(version, capabilities, kwargs)
    arguments
       version (1, 1) string
       capabilities string
-      kwargs.root (1, 1) string = defaultTestDataRoot()
-      kwargs.manifest (1, 1) string = defaultManifestFile()
+      kwargs.root (1, 1) string = ...
+         icemodel.verification.setup.fixtureDataRoot(version)
+      kwargs.manifest (1, 1) string = ...
+         icemodel.verification.setup.releaseManifestFile(version)
       kwargs.release_url (1, 1) string = ""
       kwargs.repo (1, 1) string = "mgcooper/icemodel"
    end
@@ -23,10 +25,11 @@ function command = fixtureFetchCommand(version, capabilities, kwargs)
 
    % Preserve only nondefault overrides; spelling out defaults adds no repair
    % information and would make the normal public command machine-specific.
-   if kwargs.root ~= defaultTestDataRoot()
+   if kwargs.root ~= icemodel.verification.setup.fixtureDataRoot(version)
       options(end + 1) = "root=" + matlabStringLiteral(kwargs.root);
    end
-   if kwargs.manifest ~= defaultManifestFile()
+   if kwargs.manifest ~= ...
+         icemodel.verification.setup.releaseManifestFile(version)
       options(end + 1) = "manifest=" ...
          + matlabStringLiteral(kwargs.manifest);
    end
@@ -47,15 +50,4 @@ function literal = matlabStringLiteral(value)
    %MATLABSTRINGLITERAL Quote strings and double embedded quote characters.
    quote = string(char(34));
    literal = quote + replace(string(value), quote, quote + quote) + quote;
-end
-
-function pathname = defaultTestDataRoot()
-   %DEFAULTTESTDATAROOT Canonical release-provisioned test data root.
-   pathname = string(icemodel.internal.fullpath('test', 'data'));
-end
-
-function pathname = defaultManifestFile()
-   %DEFAULTMANIFESTFILE Tracked authoritative release-data manifest.
-   pathname = string(icemodel.internal.fullpath('test', 'assets', ...
-      'icemodel-v1.1-data-manifest.json'));
 end

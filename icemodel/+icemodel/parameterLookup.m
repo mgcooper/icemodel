@@ -61,6 +61,11 @@ function varargout = parameterLookup(varargin)
       'f_liq_phase_switch_threshold', 0.02, ...
       ...
       ... ----------------------------------------------------------------
+      ... Coupler recovery parameters
+      ... ----------------------------------------------------------------
+      'cpl_recovery_alpha', 0.2, ... Solver-wide recovery-mode relaxation cap [1]
+      ...
+      ... ----------------------------------------------------------------
       ... PROMICE albedo winter-fill policy (defined once here: the native
       ... builder stamps these months with the dry-snow constant, and the
       ... reconstruction detects exactly that stamp)

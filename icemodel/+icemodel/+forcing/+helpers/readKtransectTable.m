@@ -18,7 +18,7 @@ function [data, metadata] = readKtransectTable(filename)
    %  height-ranger reading differs by generation. Type 0 records surface
    %  melt/snow height, and type 1 records sensor-plus-snow height. The parser
    %  therefore keeps the record source-faithful as height_rel and does not
-   %  rename it to a canonical surface-height channel. The parser drops the
+   %  rename it to one common surface-height channel. The parser drops the
    %  instrument diagnostics ("T body", "T tech"); the raw cache retains them.
    %  The parser also drops battery voltage ("Vlog"), but keeps its
    %  once-yearly station-visit marker (value == 100) as metadata.visits,

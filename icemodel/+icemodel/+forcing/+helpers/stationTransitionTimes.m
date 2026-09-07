@@ -118,7 +118,7 @@ function di = parseInstall(s)
 end
 
 function entry = emptyRecord()
-   %EMPTYRECORD One station-transition record entry (canonical field order).
+   %EMPTYRECORD One station-transition record entry (fixed field order).
    entry = struct('station', "", 'install_date', NaT('TimeZone', 'UTC'), ...
       'in_csv', false, 'is_handover', false);
 end

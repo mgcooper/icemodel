@@ -5,7 +5,7 @@ function catalog = gcnetVandecruxCatalog()
    %
    % Role
    %  This function holds the Vandecrux station identity table. Each entry
-   %  gives the canonical name, every alias spelling, and the station
+   %  gives the official station name, every alias spelling, and the station
    %  coordinates. The aliases include the GEUS PROMICE continuation codes,
    %  so self-donor exclusion holds for every spelling (POLICY A8). The
    %  coordinates come from the dataset's own Dataverse metadata. The three

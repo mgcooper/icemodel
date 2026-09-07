@@ -23,6 +23,10 @@ function met = resampleMetTimestep(met, dt_out)
    % Compact per-calendar-year summaries keep the exact source, gap, and
    % support facts for the point where writemet divides the derived output
    % into yearly artifacts.
+   %
+   % See also: icemodel.forcing.reconstruct.fillPromiceStation,
+   %  icemodel.forcing.helpers.writemet,
+   %  icemodel.forcing.helpers.data2metCollection
 
    arguments
       met timetable
@@ -37,8 +41,8 @@ function met = resampleMetTimestep(met, dt_out)
          'unsupported model-met timestep: %s', dt_out)
    end
 
-   % A prior guarded builder resample remains authoritative when writemet sees
-   % its already-15-minute output. Do not replace native-source provenance with
+   % A prior guarded builder resample stays unchanged when writemet sees its
+   % already-15-minute output. Do not replace native-source provenance with
    % counts from the derived timetable.
    metadata = met.Properties.UserData;
    already_guarded = isstruct(metadata) ...

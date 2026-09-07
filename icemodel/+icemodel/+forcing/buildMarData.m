@@ -2,55 +2,49 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    %BUILDMARDATA Build a Data timetable from MAR v3.11 yearly NetCDF files.
    %
    %  [Data, metadata] = icemodel.forcing.buildMarData(location, years)
-   %  [Data, metadata] = ... buildMarData(_, source_dir=..., ...
+   %  [Data, metadata] = icemodel.forcing.buildMarData(_, source_dir=..., ...
    %     modis_dir=..., fillgaps=true)
    %
-   % Extracts the icemodel forcing/evaluation channels from MAR v3.11
-   % for any years available in the source directory, at a point or
-   % averaged over a polygon:
+   % Extracts the icemodel forcing/evaluation channels from MAR v3.11 for any
+   % years available in the source directory, at a point or averaged over a
+   % polygon:
    %
-   %  - location = [lat lon] (1x2, degrees): the nearest MAR cell is
-   %    extracted directly (the legacy point workflow that produced the
-   %    ak4/behar met and userdata artifacts).
-   %  - location = Nx2 [lat lon] (N>1): a LIST of points. Returns a 1xN cell
-   %    of Data timetables (metadata is a 1xN struct array). The grid is read
-   %    ONCE and every yearly file is opened ONCE, slicing each point's
-   %    hyperslab from that single open. N=1 is the single-point path.
+   %  - location = [lat lon] (1x2, degrees): samples one MAR grid point.
+   %  - location = Nx2 [lat lon] (N>1): samples a list of points and returns a
+   %    1xN cell of Data timetables with a 1xN metadata struct array.
    %  - location = polyshape (vertices in EPSG:3413 meters): the MAR cells
-   %    are averaged over the polygon. remap="conservative" (default) uses
-   %    exact overlap-area weighting via the exactremap toolbox; remap="equal"
-   %    is a plain mean of in-polygon cell centers. The remap runs in the
-   %    NATIVE MAR projection (a regular 15 km grid); the polygon is mapped
-   %    from EPSG:3413 into native coordinates via the shipped LON/LAT.
+   %    are averaged over the polygon. remap="conservative" (default) uses exact
+   %    overlap-area weighting via the exactremap toolbox; remap="equal" is a
+   %    plain mean of in-polygon cell centers. The remap runs in the MAR native
+   %    projection (a regular 15 km grid); the polygon is mapped from EPSG:3413
+   %    into native coordinates via the shipped LON/LAT.
    %
-   % Channels (canonical units; daily MAR channels interpolated hourly):
-   %  hourly: tair [K], shum [kg/kg] (dropped after rh derivation), swd,
-   %  lwd, shf, lhf [W m-2], albedo [-], snowf, rainf [m s-1, the canonical
-   %  water-equivalent precipitation rates], melt [mWE/h], runoff and smb
-   %  [mWE/h, hourly RUH/SMBH where their UTC-day sums match native daily
-   %  RU/SMB, otherwise native daily RU/SMB divided by 24], subl [mWE/h,
-   %  native hourly SUH when available];
-   %  daily: snowd [m], cfrac [-], tsfc [K], psfc [Pa]; derived: wspd
-   %  [m s-1], wdir [deg] (from UUH/VVH), rh [%] (icemodel.vapor kernel);
-   %  optional diagnostics: subl_evap [mWE/h, native daily SU/24],
-   %  refreeze_deposition [mWE/h, native daily RZ/24], and daily ME used only
-   %  to validate hourly MEH; modis [-] (GEUS MODIS daily albedo).
+   % Channels (standard units; daily MAR channels interpolated hourly):
+   %  hourly: tair [K], shum [kg/kg] (dropped after rh derivation), swd, lwd,
+   %  shf, lhf [W m-2], albedo [-], snowf, rainf [m s-1, water-equivalent
+   %  precipitation rates], melt [mWE/h], runoff and smb [mWE/h, hourly RUH/SMBH
+   %  where their UTC-day sums match native daily RU/SMB, otherwise native daily
+   %  RU/SMB divided by 24], subl [mWE/h, native hourly SUH when available];
+   %  daily: snowd [m], cfrac [-], tsfc [K], psfc [Pa]; derived: wspd [m s-1],
+   %  wdir [deg] (from UUH/VVH), rh [%] (icemodel.vapor kernel); optional
+   %  diagnostics: subl_evap [mWE/h, native daily SU/24], refreeze_deposition
+   %  [mWE/h, native daily RZ/24], and daily ME used only to validate hourly
+   %  MEH; modis [-] (GEUS MODIS daily albedo).
    %
    % Inputs
-   %  location - [lat lon] point or polyshape (see above)
-   %  years    - calendar years to extract (one MAR file per year)
+   %  location   - [lat lon] point, Nx2 [lat lon] point list, or polyshape
+   %               in EPSG:3413 metres.
+   %  years      - calendar years to extract (one MAR file per year).
    %
    % Name-value
-   %  source_dir : directory holding MAR yearly files (*-<YYYY>.nc).
-   %      Defaults to the gitignored cache data/forcing/mar. Reference
-   %      layout: /Volumes/S03/DATA/greenland/mar3p11/RUH2.
-   %  modis_dir  : directory with GEUS Greenland_Reflectivity_<YYYY>_
-   %      5km_C6.nc files; when given, a daily MODIS albedo channel is
-   %      added at the requested location (point: nearest/natural; polygon:
-   %      conservative/equal catchment mean, same as the gridded channels).
-   %      Reference layout: /Volumes/S03/DATA/greenland/geus/albedo/gris.
-   %  fillgaps   : gap-fill through metchecks (default true, the legacy
-   %      RCM-Data behavior; MAR output is gap-free in practice)
+   %  source_dir - directory holding MAR yearly files (*-<YYYY>.nc). Defaults
+   %               to ICEMODEL_MAR_DIR, then the reference archive path.
+   %  modis_dir  - directory with GEUS MODIS daily albedo files. The default
+   %               empty value omits the optional MODIS channel.
+   %  fillgaps   - fill gaps with metchecks (default true).
+   %  method     - point sampling method: "nearest" (default) or "natural".
+   %  remap      - polygon averaging method: "conservative" (default) or
+   %               "equal".
    %
    % Outputs
    %  Data     - hourly timetable with userdata CustomProperties (X, Y,
@@ -58,19 +52,16 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    %  metadata - provenance: files read, cell/polygon info, MAR native-daily
    %             diagnostic policy, and build checks
    %
-   % Observation heights (important for the turbulent-flux scheme): MAR's
-   % hourly diagnostics are at the standard meteorological heights -
-   % temperature/humidity (TTH/QQH -> tair/rh) at 2 m, wind (UUH/VVH ->
-   % wspd) at 10 m. The two channels sit on different levels. The model needs
-   % these heights: icemodel.setopts sets opts.z_tair = 2 and opts.z_wind = 10
-   % for forcings = "mar" (z_relh = z_tair). If you build MAR forcing for a
-   % custom run, keep opts.z_wind = 10 and opts.z_tair = 2.
+   % Observation heights (important for the turbulent-flux scheme): MAR's hourly
+   % diagnostics are at the standard meteorological heights -
+   % temperature/humidity (TTH/QQH -> tair/rh) at 2 m, wind (UUH/VVH -> wspd) at
+   % 10 m. The two channels sit on different levels. The model needs these
+   % heights: icemodel.setopts sets opts.z_tair = 2 and opts.z_wind = 10 for
+   % forcings = "mar" (z_relh = z_tair). If you build MAR forcing for a custom
+   % run, keep opts.z_wind = 10 and opts.z_tair = 2.
    %
-   % Legacy: this function reimplements runoff/functions/saveMarData.m. That
-   % file stays unchanged as the legacy reference workflow. This function does
-   % NOT carry the derivable radiation terms (swu, lwu, swn, lwn, netr) that
-   % the legacy computeDerivedValues stored. icemodel.processmet recomputes
-   % them on load from swd, albedo, tsfc, and lwd.
+   % icemodel.processmet derives swu, lwu, swn, lwn, and netr from swd,
+   % albedo, tsfc, and lwd when it loads this Data timetable.
    %
    % See also: icemodel.forcing.readMar3p11, icemodel.forcing.data2met,
    %  icemodel.forcing.buildMarMet, icemodel.forcing.helpers.writeuserdata
@@ -114,11 +105,11 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
       };
 
    % Accept one location (1x2 point or polyshape, returns a single Data
-   % timetable) OR a list of N points (Nx2 [lat lon], returns a 1xN cell
-   % array of Data timetables). N=1 is just the single-point path, so there
-   % is ONE code path: resolve every point's grid hyperslab up front (grid
-   % metadata + interpolants read ONCE), then loop years opening each yearly
-   % file ONCE and reading every point's hyperslab from that single open.
+   % timetable) OR a list of N points (Nx2 [lat lon], returns a 1xN cell array
+   % of Data timetables). N=1 is just the single-point path, so there is ONE
+   % code path: resolve every point's grid hyperslab up front (grid metadata +
+   % interpolants read ONCE), then loop years opening each yearly file ONCE and
+   % reading every point's hyperslab from that single open.
    [locations, batch] = ...
       icemodel.forcing.helpers.normalizeLocations(location);
    npts = numel(locations);
@@ -166,8 +157,8 @@ function [Data, metadata] = buildMarData(location, years, kwargs)
    end
 
    % Per-point grid hyperslab + collapse rule + site metadata, resolved once
-   % against a single grid read (marGridInfo / scatteredInterpolant built
-   % ONCE for the whole point list rather than per point per year).
+   % against a single grid read (marGridInfo / scatteredInterpolant built ONCE
+   % for the whole point list rather than per point per year).
    grid = resolveGrid(files(1), kwargs.method, kwargs.remap);
    [slabs, collapses, sites] = deal(cell(1, npts), cell(1, npts), cell(1, npts));
    for p = 1:npts
@@ -221,8 +212,8 @@ function grid = resolveGrid(filename, method, remap)
    %
    % Spatial selection/remap is done in the NATIVE MAR projection, where the
    % grid is exactly regular (the EPSG:3413 reprojection is curvilinear and
-   % would be rejected as irregular by the conservative remap). The query
-   % (point or polygon, given as [lat lon] / EPSG:3413) is mapped into native
+   % would be rejected as irregular by the conservative remap). The query (point
+   % or polygon, given as [lat lon] / EPSG:3413) is mapped into native
    % coordinates with the paired LON/LAT and Xnat/Ynat values carried by each
    % MAR grid cell. The grid and native-coordinate maps are built once and
    % reused for every point in a batch.
@@ -240,12 +231,12 @@ function [slab, collapse, site] = resolvePoint(grid, location)
    %RESOLVEPOINT Map one point or polygon onto a MAR grid hyperslab.
    %
    % Returns the bounding hyperslab as a [start; count] 2x2 (for the batch
-   % reader), the collapse function handle that reduces a hyperslab block to
-   % the target series (nearest cell, natural-neighbour point, equal-weight
-   % polygon mean, or conservative area-weighted polygon remap), and the site
-   % summary (nearest cell / in-polygon mean metadata). For the conservative
-   % polygon remap the MAR ice mask (SRF == 4) is passed as the valid-cells
-   % mask so off-ice cells are inpainted from on-ice neighbours.
+   % reader), the collapse function handle that reduces a hyperslab block to the
+   % target series (nearest cell, natural-neighbour point, equal-weight polygon
+   % mean, or conservative area-weighted polygon remap), and the site summary
+   % (nearest cell / in-polygon mean metadata). For the conservative polygon
+   % remap the MAR ice mask (SRF == 4) is passed as the valid-cells mask so
+   % off-ice cells are inpainted from on-ice neighbours.
    if isnumeric(location)
       assert(isequal(size(location), [1 2]), ...
          'point location must be [lat lon]')
@@ -326,9 +317,9 @@ end
 
 function part = assemblePart(blocks, hourly_vars, daily_vars, collapse, p)
    %ASSEMBLEPART Collapse one point's blocks into one MAR year timetable.
-   % COLLAPSE (from gridLocation) reduces each variable's hyperslab block
-   % (cells x time) to the target series (nearest cell, natural-neighbour
-   % point, or polygon mean). p indexes the point in each block's cell list.
+   % COLLAPSE (from gridLocation) reduces each variable's hyperslab block (cells
+   % x time) to the target series (nearest cell, natural-neighbour point, or
+   % polygon mean). p indexes the point in each block's cell list.
    part = timetable(blocks.Time);
    for n = 1:size(hourly_vars, 1)
       part.(hourly_vars{n, 1}) = collapse(blocks.hourly{n}{p});
@@ -361,14 +352,14 @@ end
 function [Data, metadata] = finalizeMarData(Data, files, slab, site, ...
       years, location, kwargs)
    %FINALIZEMARDATA Post-process one point's assembled MAR Data + metadata.
-   % Identical to the legacy single-point tail: optional MODIS channel,
-   % derived wind/RH, precip rate, metchecks, units, userdata CustomProperties,
-   % and the provenance struct. start/count come from the point's slab.
+   % Matches the runoff/functions/saveMarData.m single-point method: optional
+   % MODIS channel, derived wind/RH, precip rate, metchecks, units, userdata
+   % CustomProperties, and the provenance struct.
    start = slab(1, :);
    count = slab(2, :);
 
-   % Optional GEUS MODIS albedo at the requested location: nearest/natural for
-   % a point, conservative (or equal) catchment mean for a polygon (the same
+   % Optional GEUS MODIS albedo at the requested location: nearest/natural for a
+   % point, conservative (or equal) catchment mean for a polygon (the same
    % selection as the gridded channels). Added on the assembled axis via the
    % shared helper so MAR/MERRA/RACMO resolve MODIS identically.
    modis_metadata = struct();
@@ -379,19 +370,19 @@ function [Data, metadata] = finalizeMarData(Data, files, slab, site, ...
          Data.Time);
    end
 
-   % Derived channels: wind from components, RH from the canonical vapor
-   % kernel; the component and humidity inputs then drop out.
+   % Derived channels: wind from components, RH from the vapor kernel; the
+   % component and humidity inputs then drop out.
    [Data.wspd, Data.wdir] = icemodel.forcing.helpers.windFromComponents( ...
       Data.uwind, Data.vwind);
    Data.rh = icemodel.vapor.relative_humidity_from_specific_humidity( ...
       Data.shum, Data.psfc, Data.tair);
    Data = removevars(Data, {'shum', 'uwind', 'vwind'});
 
-   % Precipitation to the canonical water-equivalent rate m s-1. MAR posts
+   % Precipitation converts to the water-equivalent rate m s-1. MAR posts
    % snowfall/rainfall as mWE/h (an hourly water-equivalent depth rate), so
-   % dividing by 3600 s/h yields m s-1. Channels use the canonical snowf/rainf
-   % names (icemodel.forcing.helpers.metvariables optional split; data2met
-   % derives ppt = rainf + snowf). Melt keeps its native mWE/h rate.
+   % dividing by 3600 s/h yields m s-1. Channels use the snowf/rainf names
+   % (icemodel.forcing.helpers.metvariables optional split; data2met derives ppt
+   % = rainf + snowf). Melt keeps its native mWE/h rate.
    for ch = ["snowf", "rainf"]
       Data.(ch) = Data.(ch) / 3600;
    end
@@ -406,10 +397,10 @@ function [Data, metadata] = finalizeMarData(Data, files, slab, site, ...
          'smb', Data.smb_daily);
       Data = removevars(Data, {'runoff_daily', 'smb_daily'});
    else
-      % Some reduced test and legacy sources contain only hourly RUH/SMBH.
-      % Keep those source values and mark native-daily QC as not applicable.
+      % Some reduced test and legacy sources contain only hourly RUH/SMBH. Keep
+      % those source values and mark native-daily QC as not applicable.
       % Production MAR archives carry RU/SMB and take the branch above. This
-      % branch handles a source schema. It does not mask a data problem.
+      % branch handles a source that lacks RU/SMB; it is not a data problem.
       replacements = struct();
    end
    if ismember("melt_daily_reference", names)
@@ -458,13 +449,13 @@ function [Data, metadata] = finalizeMarData(Data, files, slab, site, ...
    qc_metadata = icemodel.forcing.helpers.marDiagnosticMetadata( ...
       Data, melt_daily_rate, qc_metadata, sector=site.sector);
 
-   % Per-variable units from the shared canonical map. Precipitation is m s-1
+   % Per-variable units come from the shared unit map. Precipitation is m s-1
    % (converted above); the diagnostic mass fluxes are mWE/h rates (cumulative
    % sums need the timestep in hours).
    Data.Properties.VariableUnits = icemodel.forcing.helpers.variableUnits( ...
       string(Data.Properties.VariableNames));
 
-   % Attach the shared location schema while retaining MAR's native terrain
+   % Attach the shared location metadata while retaining MAR's native terrain
    % elevation, projected coordinates, and real surface slope.
    location_metadata = struct( ...
       'lat_wgs84', site.lat, 'lon_wgs84', site.lon, ...
@@ -486,8 +477,8 @@ function [Data, metadata] = finalizeMarData(Data, files, slab, site, ...
       'humidity_kernel', ...
       "icemodel.vapor.relative_humidity_from_specific_humidity", ...
       'checks', checks);
-   % The channel helper already resolved exact source years while reading the
-   % physical data, so copying its canonical fields adds no source access.
+   % The channel helper already resolved the source years while reading the
+   % physical data, so copying its fields adds no source access.
    modis_fields = fieldnames(modis_metadata);
    for k = 1:numel(modis_fields)
       metadata.(modis_fields{k}) = modis_metadata.(modis_fields{k});

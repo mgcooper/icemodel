@@ -1,12 +1,12 @@
 function units = variableUnits(names)
-   %VARIABLEUNITS Canonical unit string for each forcing-builder channel.
+   %VARIABLEUNITS Unit string for each forcing-builder channel.
    %
    %  units = icemodel.forcing.helpers.variableUnits(names)
    %
-   % Thin wrapper over the single canonical variable-metadata source
+   % Thin wrapper over the single variable-metadata source
    % icemodel.netcdf.defaults.variable: returns the unit field for each
-   % channel in NAMES. There is NO duplicated unit list here anymore; units,
-   % CF standard_names, and long_names all come from one map
+   % channel in NAMES. There is no duplicated unit list; units, CF
+   % standard_names, and long_names all come from one map
    % (icemodel.netcdf.defaults.variables) so every forcing source (MAR,
    % MERRA-2, RACMO, PROMICE) and the netcdf writers agree.
    %
@@ -15,8 +15,8 @@ function units = variableUnits(names)
    % Properties.VariableUnits. The indexed ice-temperature string (ticeN, K)
    % and thermistor-depth string (dticeN, m) channels resolve by pattern.
    %
-   % An emitted channel missing from the canonical map is an error: the
-   % builders must never ship an unlabeled column. Add the channel to
+   % An emitted channel missing from that map is an error: the builders must
+   % never ship an unlabeled column. Add the channel to
    % icemodel.netcdf.defaults.variables when a builder gains a new output.
    %
    % See also: icemodel.netcdf.defaults.variable,

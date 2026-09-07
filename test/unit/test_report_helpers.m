@@ -1,9 +1,17 @@
 function tests = test_report_helpers
-   %TEST_REPORT_HELPERS Cover the shared report markdown and metric helpers.
+   %TEST_REPORT_HELPERS Cover the shared report helpers.
    %
-   % Both report builders render saved metadata through these, so a value
-   % containing markup, HTML, or backticks must not be able to change the
-   % document structure.
+   % Three groups. Both report builders render saved metadata through the
+   % markdown helpers. A value containing markup, HTML, or backticks must not
+   % be able to change the document structure. The metric helpers score what
+   % the reports show. The provenance helpers decide whether a saved cohort
+   % still supports a report. They are the content digests, the
+   % report-consumed channel list, the schema compatibility test, and the
+   % physics fingerprint.
+   %
+   % test_physics_fingerprint_is_stable_and_covers_physics resolves the model
+   % defaults through icemodel.setopts, so that one case needs a provisioned
+   % workspace. The rest read only namelists and in-memory values.
    tests = functiontests(localfunctions);
 end
 
@@ -185,4 +193,219 @@ function test_ablation_ledger_increments_signs(testCase)
    testCase.verifyEqual(returned.solid_balance, 0.4, AbsTol=1e-12)
    testCase.verifyEqual(returned.surface_loss, 0.25, AbsTol=1e-12)
    testCase.verifyEqual(returned.solid_vapor_loss, 0.1, AbsTol=1e-12)
+end
+
+function test_sha256_digests_match_the_published_vectors(testCase)
+   % One hashing implementation serves the file, byte, and text digests, so a
+   % published vector is the check that keeps all three honest.
+
+   empty_digest = ...
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+   abc_digest = ...
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+
+   testCase.verifyEqual( ...
+      icemodel.verification.setup.bytesSha256(uint8([])), empty_digest)
+   testCase.verifyEqual( ...
+      icemodel.verification.setup.textSha256(""), empty_digest)
+   testCase.verifyEqual( ...
+      icemodel.verification.setup.textSha256("abc"), abc_digest)
+
+   % A row and a column of the same bytes are the same content.
+   bytes = uint8('abc');
+   testCase.verifyEqual( ...
+      icemodel.verification.setup.bytesSha256(bytes), abc_digest)
+   testCase.verifyEqual( ...
+      icemodel.verification.setup.bytesSha256(bytes'), abc_digest)
+
+   % A file of those bytes must hash to the same value, which is what makes
+   % the in-memory digest comparable to a stored artifact digest.
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   scratch = fullfile(fixture.Folder, 'abc.txt');
+   fid = fopen(scratch, 'w');
+   testCase.assertGreaterThan(fid, 0)
+   fwrite(fid, bytes);
+   fclose(fid);
+   testCase.verifyEqual( ...
+      icemodel.verification.setup.fileSha256(scratch), abc_digest)
+end
+
+function test_ablation_report_channels_partition_by_report_table(testCase)
+   % The gate compares the whole list, and each report table checks only the
+   % channels it reads, so the groups must together be the whole list.
+
+   components = ...
+      icemodel.verification.namelists.ablationReportChannels('components');
+   grid = icemodel.verification.namelists.ablationReportChannels('grid');
+   all_fields = icemodel.verification.namelists.ablationReportChannels();
+
+   testCase.verifyEqual(all_fields, [components, grid])
+   testCase.verifyEqual(all_fields, ...
+      icemodel.verification.namelists.ablationReportChannels('all'))
+   testCase.verifyEqual(numel(unique(all_fields)), numel(all_fields))
+   testCase.verifyError( ...
+      @() icemodel.verification.namelists.ablationReportChannels('other'), ...
+      'icemodel:verification:namelists:ablationReportChannels:kind')
+
+   % Every channel the report reads must be one the runner records, or the
+   % schema gate would reject every cohort the runner can produce.
+   policy = icemodel.verification.namelists.promiceAblationPolicy();
+   testCase.verifyTrue( ...
+      all(ismember(all_fields, string(policy.required_model_fields))))
+end
+
+function test_model_schema_compatibility_is_one_directional(testCase)
+   % The saved cohort must carry every channel the report reads. Extra
+   % current channels are additive and only reported as unavailable.
+
+   consumed = icemodel.verification.namelists.ablationReportChannels();
+   policy = icemodel.verification.namelists.promiceAblationPolicy();
+   current = string(policy.required_model_fields);
+
+   % A saved schema one non-consumed channel short is a cohort that ran
+   % before that channel existed. It stays usable, and the missing channel is
+   % named as unavailable.
+   droppable = setdiff(current, consumed, 'stable');
+   testCase.assertNotEmpty(droppable)
+   saved = setdiff(current, droppable(1), 'stable');
+   returned = ...
+      icemodel.verification.helpers.validateAblationModelSchema( ...
+      saved, current);
+   testCase.verifyEqual(returned, droppable(1))
+
+   % An identical pair leaves nothing unavailable.
+   testCase.verifyEmpty( ...
+      icemodel.verification.helpers.validateAblationModelSchema( ...
+      current, current))
+
+   % A saved cohort missing a channel the report reads cannot be reported on.
+   testCase.verifyError(@() ...
+      icemodel.verification.helpers.validateAblationModelSchema( ...
+      setdiff(current, consumed(1), 'stable'), current), ...
+      'icemodel:verification:report:incompatibleModelSchema')
+
+   % A channel the current namelists do not define is a removal or a
+   % redefinition, so the saved values do not mean what the report says.
+   testCase.verifyError(@() ...
+      icemodel.verification.helpers.validateAblationModelSchema( ...
+      current, setdiff(current, consumed(1), 'stable')), ...
+      'icemodel:verification:report:incompatibleModelSchema')
+
+   % When BOTH lists lack the channel, the advice must not be to rerun: a
+   % rerun records the same reduced schema and the owner loops. Both branches
+   % raise one identifier, so the message text is what distinguishes them.
+   reduced = setdiff(current, consumed(1), 'stable');
+   try
+      icemodel.verification.helpers.validateAblationModelSchema( ...
+         reduced, reduced);
+      testCase.verifyFail('a schema missing a consumed channel must raise')
+   catch err
+      testCase.verifyEqual(err.identifier, ...
+         'icemodel:verification:report:incompatibleModelSchema')
+      testCase.verifySubstring(err.message, 'Restore the channel')
+      testCase.verifyFalse(contains(err.message, 'Rerun the cohort'))
+   end
+
+   % The strict policy comparison excludes this field. A saved schema of the
+   % wrong type must therefore raise invalidAblationPolicy, not a bare
+   % conversion error.
+   malformed = {struct('a', 1), 42, {"ok", 7}, [current, ""]};
+   for k = 1:numel(malformed)
+      testCase.verifyError(@() ...
+         icemodel.verification.helpers.validateAblationModelSchema( ...
+         malformed{k}, current), ...
+         'icemodel:verification:report:invalidAblationPolicy')
+   end
+end
+
+function test_physics_stamp_shape_test_rejects_every_damaged_shape(testCase)
+   % The report asks this helper whether a saved stamp is usable, and never
+   % raises. Every rejected shape is checked here rather than through a report
+   % build, so the coverage costs no rendering.
+
+   good = struct('opts_sha256', string(repmat('a', 1, 64)), ...
+      'icemodel_version', "1.2.3", 'excluded_fields', "pathinput");
+   testCase.verifyTrue( ...
+      icemodel.verification.helpers.isPhysicsFingerprint(good))
+
+   % A char digest is text too, so it must pass.
+   char_digest = good;
+   char_digest.opts_sha256 = repmat('a', 1, 64);
+   testCase.verifyTrue( ...
+      icemodel.verification.helpers.isPhysicsFingerprint(char_digest))
+
+   % Not a struct, not scalar, a missing field, then each bad value shape on
+   % each field. Reading a field of the first three would raise, so this also
+   % pins the short-circuit order.
+   wrong_container = {42, "text", {good}, [good, good], struct([]), ...
+      rmfield(good, 'opts_sha256'), rmfield(good, 'icemodel_version')};
+   bad_values = {[], "", '', ["a", "b"], 42, {"a"}, string(missing)};
+   n_fixed = numel(wrong_container);
+   damaged = cell(1, n_fixed + 2 * numel(bad_values));
+   damaged(1:n_fixed) = wrong_container;
+   for k = 1:numel(bad_values)
+      bad_digest = good;
+      bad_digest.opts_sha256 = bad_values{k};
+      bad_version = good;
+      bad_version.icemodel_version = bad_values{k};
+      damaged{n_fixed + 2 * k - 1} = bad_digest;
+      damaged{n_fixed + 2 * k} = bad_version;
+   end
+   for k = 1:numel(damaged)
+      testCase.verifyFalse( ...
+         icemodel.verification.helpers.isPhysicsFingerprint(damaged{k}), ...
+         sprintf('shape %d must be rejected', k))
+   end
+end
+
+function test_physics_fingerprint_is_stable_and_covers_physics(testCase)
+   % The digest must repeat for unchanged code, or every report would warn.
+   returned = icemodel.verification.helpers.physicsFingerprint();
+   testCase.verifyEqual( ...
+      icemodel.verification.helpers.physicsFingerprint(), returned)
+   testCase.verifyEqual(strlength(returned.opts_sha256), 64)
+   testCase.verifyEqual(returned.icemodel_version, ...
+      string(icemodel.internal.version()))
+
+   % The exclusions must drop the machine-dependent workspace paths, or the
+   % same code would fingerprint differently on two computers.
+   testCase.verifyTrue(all(ismember( ...
+      ["pathinput", "pathoutput"], returned.excluded_fields)))
+
+   % A physics option must reach the digest, and a workspace path must not.
+   % Without both checks the gate could warn on every machine, or never warn
+   % on a real physics change.
+   defaults = icemodel.setopts("icemodel", "kanm", 2016, "kanm");
+   moved = defaults;
+   moved.f_ice_min = defaults.f_ice_min + 0.01;
+   relocated = defaults;
+   relocated.pathoutput = '/somewhere/else';
+
+   baseline = icemodel.verification.helpers.physicsFingerprint(defaults);
+   testCase.verifyNotEqual( ...
+      icemodel.verification.helpers.physicsFingerprint(moved).opts_sha256, ...
+      baseline.opts_sha256)
+   testCase.verifyEqual( ...
+      icemodel.verification.helpers.physicsFingerprint( ...
+      relocated).opts_sha256, baseline.opts_sha256)
+
+   % An appended output channel must leave the digest alone. configureRun
+   % expands output_profile into vars1 and vars2, and warning about a channel
+   % that changes no computed value is the false alarm this gate removes.
+   channels = defaults;
+   channels.vars1 = [defaults.vars1, {'a_new_diagnostic_channel'}];
+   channels.vars2 = [defaults.vars2, {'another_new_channel'}];
+   testCase.verifyEqual( ...
+      icemodel.verification.helpers.physicsFingerprint( ...
+      channels).opts_sha256, baseline.opts_sha256)
+
+   % The instrument heights come from the reference station, so the digest
+   % must not depend on which station resolved the defaults.
+   restationed = defaults;
+   restationed.z_tair = defaults.z_tair + 1;
+   restationed.z_wind = NaN;
+   testCase.verifyEqual( ...
+      icemodel.verification.helpers.physicsFingerprint( ...
+      restationed).opts_sha256, baseline.opts_sha256)
 end

@@ -7,9 +7,9 @@ function [met, metadata, Data] = buildMarMet(location, years, kwargs)
    %     dt_out="15m")
    %
    % Extracts the MAR forcing at a point (or polygon average) and
-   % converts it to the icemodel met contract: the Data-channel
-   % extraction of icemodel.forcing.buildMarData followed by
-   % icemodel.forcing.data2met (ppt = snow + rain). Save the result with
+   % converts it to icemodel's met format: the Data-channel extraction of
+   % icemodel.forcing.buildMarData followed by icemodel.forcing.data2met
+   % (ppt = snow + rain). Save the result with
    % icemodel.forcing.helpers.writemet.
    %
    % Inputs
@@ -34,10 +34,9 @@ function [met, metadata, Data] = buildMarMet(location, years, kwargs)
    %  metadata - finalized met metadata; exactly met.Properties.UserData
    %  Data     - source Data timetable before conversion/resampling
    %
-   % Legacy: this function reimplements runoff/functions/makeMarMetfile.m. The
-   % original stays unchanged as the legacy reference workflow. This function
-   % does not reproduce the legacy per-point loop, per-variable rounding, or
-   % in-function saving; icemodel.forcing.helpers.writemet does the saving.
+   % runoff/functions/makeMarMetfile.m is the reference workflow. This
+   % function has no per-point loop or per-variable rounding.
+   % icemodel.forcing.helpers.writemet saves the output.
    %
    % See also: icemodel.forcing.buildMarData, icemodel.forcing.data2met,
    %  icemodel.forcing.helpers.writemet,

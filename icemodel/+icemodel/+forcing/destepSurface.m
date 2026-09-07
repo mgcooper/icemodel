@@ -114,7 +114,7 @@ function [corrected, record, flags] = destepSurface(t, surf, kwargs)
    step_magnitude = zeros(n, 1);
    step_reason = strings(n, 1);
    record = emptyEntry();
-   record = record([]);   % 1x0 record with the canonical field order
+   record = record([]);   % 1x0 record with the fixed field order
 
    % A candidate is a jump between ADJACENT DIRECT-OBSERVATION samples. A sample
    % is usable only when it is finite AND not gap-bridged (gap_flag == 0): the
@@ -257,7 +257,7 @@ end
 
 %% Local functions
 function entry = emptyEntry()
-   %EMPTYENTRY One step-record entry template (canonical field order).
+   %EMPTYENTRY One step-record entry template (fixed field order).
    %
    % Scalar so repmat can preallocate the record at the known candidate count;
    % record([]) yields the 1x0 form for the no-candidate case.
@@ -266,7 +266,7 @@ function entry = emptyEntry()
 end
 
 function flags = packFlags(detected, correctable, magnitude, reason)
-   %PACKFLAGS Assemble the per-sample flag struct in canonical field order.
+   %PACKFLAGS Assemble the per-sample flag struct in a fixed field order.
    flags = struct( ...
       'step_detected', double(detected), ...
       'step_correctable', double(correctable), ...

@@ -10,9 +10,9 @@ function [Qh, dQh_dT_sfc] = sensible_heat_flux(T_sfc, tair, H_h, stability, ...
    % [W m-2] = [W m-2 K-1] * [-] * [K]
    %
    % where H_h = cv_atm * De = ro_atm * cp_air * De is the sensible heat
-   % transport prefactor precomputed at model initialization.
+   % transport coefficient precomputed at model initialization.
    %
-   % When you request the derivative, provide the temperature derivative of
+   % When the derivative is requested, provide the temperature derivative of
    % the stability factor as the fifth input. The returned derivative is then
    % the full dQh/dT_sfc that the newton solve uses, not the fixed-stability
    % partial that the linearization uses.

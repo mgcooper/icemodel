@@ -42,6 +42,10 @@ Key options:
   - stop on first failure for interactive inspection
 - `stop_on_failure`
   - stop after first failing test
+- `progress_log`
+  - optional file that receives one flushed line per test-file boundary,
+    so a hung run still names the file that never finished; the runner
+    errors up front when the path cannot be opened for append
 - `verbosity`
   - command-window detail level
 
@@ -136,7 +140,15 @@ Key options:
 - `data_root`
   - explicit test-data tree override and always authoritative
   - blank uses the baseline registration's tree: verification data for
-    rolling, historical `test/data` for frozen v1.1
+    rolling, historical `test/data` for frozen v1.1, and the provisioned
+    `fixtureDataRoot("v1.2")` for v1.2
+- `fixture_root`
+  - tree where the release's required fixture capabilities are verified
+  - blank uses `data_root` when set, else the release's provisioned root
+  - a release that runs the model from its own provisioned data (v1.2
+    onward) rejects a `data_root` naming a different tree with
+    `icemodel:test:releaseDataRootMismatch`; set both to the same tree, or
+    set only one
 
 Important runtime contract:
 
@@ -150,23 +162,23 @@ Purpose:
 
 - Compare formal model runtime against accepted perf baselines
 
-Default use:
+Default use (formal verdicts; process isolation is the default):
 
 ```matlab
-clear functions
 results = run_perf_suite();
 ```
 
 Common use:
 
 ```matlab
-clear functions
 results = run_perf_suite( ...
     tier="smoke", ...
     smbmodel="icemodel", ...
     solver=2, ...
     baseline="rolling", ...
     n_runs=1, ...
+    isolation="process", ...
+    artifact_root="/absolute/path/to/perf-results", ...
     include_benchmarks=false);
 ```
 
@@ -177,6 +189,12 @@ Use when:
 Key options:
 
 - same case-selector options as `run_regression_suite`
+- `isolation`
+  - `"process"` (default) measures every case in a fresh `matlab -batch`
+    subprocess; this is the formal measurement protocol
+  - `"session"` measures in the current session and is diagnostic-only; it
+    refuses to run when the session already ran another suite
+    (`icemodel:test:perf:contaminatedSession`)
 - `n_runs`
   - fixed sample count for the perf harness
 - `tol_perf`
@@ -185,18 +203,38 @@ Key options:
   - also run managed component benchmarks
 - `benchmark_sampling_profile`
   - sampling budget for those managed benchmarks
+- `artifact_root`
+  - parent directory for the run folder; the default is `test/artifacts`
+  - `results.artifact_file` contains one saved MAT-file path per selected model
 
 Important note:
 
 - the measured region in the formal perf class is the model call only
 - it does not include report formatting, baseline loading, or runner overhead
-- `data_root` has the same explicit-override and verification-default contract
-  as `run_regression_suite`
+- `data_root` and `fixture_root` follow the same rules as in
+  `run_regression_suite`. An explicit value always wins. A blank
+  `fixture_root` takes an explicit `data_root` when one is set, and otherwise
+  the release's own provisioned root. A release that runs the model from its
+  own provisioned data requires both roots to name one tree
 - formal perf cases currently use the same canonical runtime contract as
   regression: for `simyear=2016`, the runtime contract is `[2015 2016]` with
   `n_spinup_years = 1`
+- every case's sample set passes a dispersion validity gate
+  (max/median <= 1.5) with one automatic re-measure; a second invalid set
+  fails the case as "measurement invalid"
+- an ambient anchor re-measures the first executed case at the end of the
+  run; if the anchor drifts more than 15 percent or its re-measurement is
+  invalid, every verdict in the run is marked ambient-invalid
 - whole-model perf gating is skipped when the accepted perf baseline was built
-  under a different MATLAB version/platform than the current run
+  with a different hostname, MATLAB version, platform, or `isolation`
+  protocol; the hostname identifies the machine that supplied the timings
+- a missing or different hostname keeps the sample-validity result but sets
+  `passed_perf=false` and `results.passed=false`; validity-only output is not
+  performance acceptance
+- run on the recorded host, or qualify the intended host with A/A and then
+  explicitly accept a machine-local rolling baseline
+- immutable release baselines are not repaired in place; use the normal release
+  baseline workflow to create a new release baseline
 
 ### `run_test_bootstrap`
 
@@ -270,8 +308,62 @@ Notes:
 - the build selector and case matrix use the same explicit forcing-identity
   contract as the regression builder
 - direct versioned builds never overwrite an existing release file
+- `accept_ambient_drift` accepts a build whose final ambient anchor drifted
+  but stayed finite and valid; the saved metadata then records the failed
+  anchor, its ratio, and use of the override. An invalid anchor
+  re-measurement is always rejected.
 - by default the rebuilt baselines use the formal 2-year contract:
   retained year plus one leading spinup year
+
+### `run_aa_acceptance`
+
+Purpose:
+
+- check whether two process-isolated timing runs reproduce each other
+- diagnose measurement stability when a timing comparison needs investigation
+
+This diagnostic is optional. It does not replace `run_perf_suite` or
+`build_perf_baseline`, and it does not block a release.
+
+Default use:
+
+```matlab
+report = run_aa_acceptance();
+```
+
+Compare two hand-made runs:
+
+```matlab
+report = run_aa_acceptance( ...
+   [artifact_a_icemodel, artifact_a_skinmodel], ...
+   [artifact_b_icemodel, artifact_b_skinmodel]);
+```
+
+Use when:
+
+- the measurement system changes (host, MATLAB version, protocol code)
+- a perf verdict looks implausible and the protocol needs recertification
+
+Notes:
+
+- runs nothing in the artifact-comparison form; pairing is by sorted
+  filename so per-model artifacts align
+- pass criteria: every artifact is process-isolated
+  (`meta.isolation = "process"`) and reports `meta.ambient_stable = true`;
+  every joined case reports `valid = true` in both runs; and every per-case
+  median ratio B/A lies inside the closed band
+  `[1/(1 + tol_perf), 1 + tol_perf]` from the common saved `meta.tol_perf`
+  value
+- compatibility checks:
+  - artifact lists have equal lengths and no duplicate paths
+  - the two sides share no paths
+  - each side has one run name, and the two names differ
+  - every artifact has the same nonempty hostname
+  - every artifact has the same MATLAB version and data root
+  - every artifact has the same nonempty source revision
+  - tier, simulation year, sample count, warmup count, and tolerance match
+  - matched cases have the same case ID and forcing product
+- prints the verdict and the per-case table; returns them in `report`
 
 ### `snapshot_regression_baseline`
 
@@ -308,7 +400,7 @@ Purpose:
 
 It reports:
 
-1. kernel timings (inlined, exact, lookup — calls functions directly)
+1. kernel timings (inlined, exact, and lookup; calls functions directly)
 2. direct whole-model timings (exact vs lookup via `opts.lookup_k_bulk`)
 3. output-agreement metrics
 
@@ -501,8 +593,8 @@ Use when:
 
 Production interface:
 
-- `opts.lookup_k_bulk = true` (default) — lookup-table bulk extinction
-- `opts.lookup_k_bulk = false` — exact bulk-extinction transform
+- `opts.lookup_k_bulk = true` (default): lookup-table bulk extinction
+- `opts.lookup_k_bulk = false`: exact bulk-extinction transform
 
 Kernel benchmarks and study tools call the spectral functions directly and
 retain all three historical variants (inlined, exact, lookup) for comparison.

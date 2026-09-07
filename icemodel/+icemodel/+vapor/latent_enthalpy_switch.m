@@ -8,8 +8,8 @@ function Lv_or_Ls = latent_enthalpy_switch(f_liq, N)
    % when N is given) containing the specific latent heat of sublimation (Ls)
    % for dry/cold cells and the latent heat of vaporization (Lv) for wet cells.
    % The phase-switch threshold is f_liq_phase_switch_threshold, the same
-   % threshold the SEB and column solver stacks use, so the latent-heat choice
-   % is consistent across the model.
+   % threshold the SEB and column solvers use, so the latent-heat choice is
+   % consistent across the model.
    %
    % The calling functions assign the result to a variable named `Lv`, because
    % to the caller the value is the active latent heat for vapor exchange.
@@ -19,7 +19,7 @@ function Lv_or_Ls = latent_enthalpy_switch(f_liq, N)
    % works for column-vector inputs (the primary production path) and for 2-D
    % inputs such as the [JJ × numsteps] arrays that icemodel.postprocess and
    % the diagnostic routines use. When you supply N, the output is a column
-   % vector of length N, for callers that compute JJ before the call.
+   % vector of length N, for callers that compute it before the call.
    %
    % Inputs
    %   f_liq - Liquid fraction array of any shape [-].
@@ -33,7 +33,7 @@ function Lv_or_Ls = latent_enthalpy_switch(f_liq, N)
    %
    % See also: icemodel.column.bulk_enthalpy,
    %           icemodel.column.assemble_enthalpy_system,
-   %           icemodel.timestepping.updatesubstep
+   %           icemodel.timestepping.acceptsubstep
    %
    %#codegen
 
@@ -44,9 +44,8 @@ function Lv_or_Ls = latent_enthalpy_switch(f_liq, N)
          'f_liq_phase_switch_threshold');
    end
 
-   % Default to latent heat of sublimation (dry/cold ice).
-   % Match the shape of f_liq unless the caller explicitly requests a column
-   % vector of length N.
+   % Default to latent heat of sublimation (dry/cold ice). Match the shape of
+   % f_liq unless the caller explicitly requests a column vector of length N.
    if nargin < 2
       Lv_or_Ls = Ls * ones(size(f_liq));
    else

@@ -7,6 +7,13 @@ function opts = configureRun(opts)
    % are empty, while preserving caller-supplied values for fields such as
    % PATHINPUT, PATHOUTPUT, CASENAME, METFNAME, VARS1, and VARS2.
    %
+   % Debug routing
+   %   When OPTS.DEBUG is true, OPTS.DEBUG_PATH is the sole top-level debug
+   %   root override. CONFIGURERUN replaces every ICEMODEL_DEBUG_*_FILE
+   %   environment variable with its fixed filename below that root.
+   %   Per-kernel environment overrides are supported only for direct-kernel
+   %   diagnostics that bypass CONFIGURERUN.
+   %
    % Time-window configuration
    %   The run window can be specified by SIMYEARS (year-granularity) or by
    %   STARTDATE / ENDDATE (datetime window) or by both if compatible. This
@@ -15,6 +22,8 @@ function opts = configureRun(opts)
    %   time window specifier. STARTDATE / ENDDATE are authoritative for
    %   the actual loaded met subset; SIMYEARS drives per-year met-file
    %   naming.
+   %
+   % See also: icemodel, skinmodel, icemodel.setopts
 
    opts = configureTimeWindow(opts);
 
@@ -47,9 +56,9 @@ function opts = configureRun(opts)
    % opts.pathoutput/2016.
    %
    % For grid runs, opts.casename and opts.metfname are set outside this
-   % function in the wrapper that loops over grid-cell IDs. Core icemodel only
-   % provides the canonical base output folder; any legacy extra subfoldering
-   % for gridded workflows belongs in the wrapper, not here.
+   % function in the wrapper that loops over grid-cell IDs. Core icemodel
+   % provides only the base output folder; extra subfoldering for gridded
+   % workflows belongs in the wrapper, not here.
    window_args = runWindowArgs(opts);
 
    if ~isfield(opts, 'pathoutput') || isempty(opts.pathoutput)
@@ -226,13 +235,19 @@ function [vars1, vars2] = defaultOutputVariables(opts)
             vars1 = [vars1, diagnostic_suffix];
             vars2 = {'Tice', 'f_ice', 'f_liq'};
          else
-            % Mass-budget channels are opt-in diagnostic scalars. Appending
-            % them preserves every existing output position and keeps the
-            % standard/minimal contracts unchanged.
+            % Mass-budget channels are opt-in diagnostic scalars. The shared
+            % suffix contains cpl_recovery_count. The icemodel-only suffix
+            % contains cpl_iters, cpl_res, and seb_res. Appending both suffixes
+            % keeps every standard and minimal channel at its position.
             vars1 = [vars1, {'df_rof'}, diagnostic_suffix, ...
+               icemodel.namelists.surfaceoutputs( ...
+               'icemodel_diagnostic_suffix'), ...
                icemodel.namelists.budgetoutputs()];
+            % df_vap_liq and df_vap_ice locate vapor-driven change in the
+            % column (exchange plus transport), the way df_liq locates
+            % refreezing.
             vars2 = {'Tice', 'f_ice', 'f_liq', 'df_liq', 'df_evp', 'df_lyr', ...
-               'Sc', 'r_eff'};
+               'df_vap_liq', 'df_vap_ice', 'Sc', 'r_eff'};
          end
 
       otherwise
@@ -248,9 +263,12 @@ function opts = configureDebugPaths(opts)
    % the standard output path structure. A user-supplied opts.debug_path
    % overrides the entire root.
    %
-   % The per-kernel ICEMODEL_DEBUG_*_FILE environment variables are set so
-   % the existing dump functions (dumpIceEnbalFailure, dumpMZTransformFailure,
-   % etc.) activate without manual env-var configuration.
+   % The resolved options control top-level debug routing. Replace the
+   % per-kernel ICEMODEL_DEBUG_*_FILE environment variables with fixed
+   % filenames under debug_root so the existing dump functions
+   % (dumpIceEnbalFailure, dumpMZTransformFailure, etc.) activate without
+   % manual env-var configuration. A direct-kernel diagnostic that bypasses
+   % configureRun may still set its kernel variable explicitly.
 
    if isfield(opts, 'debug_path') && ~isempty(opts.debug_path) ...
          && ~isblanktext(string(opts.debug_path))

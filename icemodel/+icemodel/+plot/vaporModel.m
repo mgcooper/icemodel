@@ -30,7 +30,7 @@ function vaporModel(T)
    % ---------------------------------------------------------------------
    [es_amb, des_dT_amb, d2es_dT2_amb] = icemodel.vapor.saturation_vapor_pressure(T, false);
    [ro_vap_amb, dro_vapdT_amb] = icemodel.vapor.saturation_vapor_density(T, zeros(size(T)));
-   k_vap_amb = icemodel.vapor.vapor_thermal_diffusion_coefficient( ...
+   k_vap_amb = icemodel.vapor.vapor_thermal_conductivity( ...
       T, zeros(size(T)), dro_vapdT_amb);
 
    % ---------------------------------------------------------------------
@@ -110,7 +110,7 @@ function vaporModel(T)
    ylabel('k_{vap} [W m^{-1} K^{-1}]')
    xlabel('T [K]')
    legend('Buck', 'Ambaum', 'Location', 'northwest')
-   title('Vapor thermal diffusion coeff.')
+   title('Vapor thermal conductivity')
 
    % =====================================================================
    % Figure 2: Relative differences (Buck vs Ambaum)

@@ -135,7 +135,7 @@ function [storage, q_bot, params] = ripe_solution( ...
    % refreezing).
    f_por = 1 - f_ice_0;
    f_res = f_res_pore * f_por;
-   avail = max(eps, f_por - f_res);
+   availCap = max(eps, f_por - f_res);
 
    % Saturated hydraulic conductivity from the darcy form using the
    % case-specific permeability. Returns column-shaped vector; pick the
@@ -150,16 +150,16 @@ function [storage, q_bot, params] = ripe_solution( ...
    % corresponding characteristic wave speed. Same quantity as S_steady /
    % c_steady in icemodel.column.infiltration.
    S_steady = (q_top / k_sat) ^ (1 / m_exp);
-   f_liq_steady = f_res + S_steady * avail;
+   f_liq_steady = f_res + S_steady * availCap;
 
    % Rankine-Hugoniot shock speed; q at f_liq_0 is zero by design (residual).
-   q_at_0 = q_at_f_liq(f_liq_0, k_sat, f_res, avail, m_exp);
+   q_at_0 = q_at_f_liq(f_liq_0, k_sat, f_res, availCap, m_exp);
    c_shock = (q_top - q_at_0) / max(f_liq_steady - f_liq_0, eps);
 
    % Time when the shock reaches z = total_depth, and when the leading edge of
    % the post-rain rarefaction reaches the bottom.
    t_arrival = total_depth / c_shock;
-   c_steady = m_exp * k_sat * S_steady ^ (m_exp - 1) / avail;
+   c_steady = m_exp * k_sat * S_steady ^ (m_exp - 1) / availCap;
    t_drain_start = rain_window + total_depth / c_steady;
 
    n = numel(time_seconds);
@@ -168,7 +168,7 @@ function [storage, q_bot, params] = ripe_solution( ...
    for k = 1:n
       [storage(k), q_bot(k)] = sample_ripe(time_seconds(k), q_top, ...
          rain_window, t_arrival, t_drain_start, f_liq_0, f_liq_steady, ...
-         total_depth, c_steady, k_sat, avail, m_exp);
+         total_depth, c_steady, k_sat, availCap, m_exp);
    end
 
    params = struct( ...
@@ -187,7 +187,7 @@ end
 
 function [storage, q_bot] = sample_ripe(t, q_top, rain_window, ...
       t_arrival, t_drain_start, f_liq_0, f_liq_steady, total_depth, ...
-      c_steady, k_sat, avail, m_exp)
+      c_steady, k_sat, availCap, m_exp)
 
    if t <= 0
       storage = f_liq_0 * total_depth;
@@ -219,14 +219,15 @@ function [storage, q_bot] = sample_ripe(t, q_top, rain_window, ...
    if c_at_bot >= c_steady
       S_star = (q_top / k_sat) ^ (1 / m_exp);
    else
-      S_star = max(0, c_at_bot * avail / (m_exp * k_sat)) ^ (1 / (m_exp - 1));
+      S_star = max(0, c_at_bot * availCap / (m_exp * k_sat)) ...
+         ^ (1 / (m_exp - 1));
    end
    q_bot = k_sat * S_star ^ m_exp;
 
    % Storage from analytical mass-balance integral; closed form for m=2,
    % numerical quadrature otherwise.
    if abs(m_exp - 2) < eps
-      pref = (avail ^ 2) / (4 * k_sat);
+      pref = (availCap ^ 2) / (4 * k_sat);
       D2 = total_depth ^ 2;
       tau1 = t_drain_start - rain_window;
       tau = t - rain_window;
@@ -237,7 +238,8 @@ function [storage, q_bot] = sample_ripe(t, q_top, rain_window, ...
       qs = zeros(size(s));
       for i = 1:n
          c_at_bot_s = total_depth / (s(i) - rain_window);
-         S_s = max(0, c_at_bot_s * avail / (m_exp * k_sat)) ^ (1 / (m_exp - 1));
+         S_s = max(0, c_at_bot_s * availCap / (m_exp * k_sat)) ...
+            ^ (1 / (m_exp - 1));
          qs(i) = k_sat * S_s ^ m_exp;
       end
       drained = trapz(s, qs);
@@ -266,7 +268,7 @@ function [storage, q_bot, params] = cold_solution( ...
    f_ice_w = f_ice_0 + f_frz * (ro_liq / ro_ice);
    f_por_w = 1 - f_ice_w;
    f_res_w = f_res_pore * f_por_w;
-   avail_w = max(eps, f_por_w - f_res_w);
+   availCap_w = max(eps, f_por_w - f_res_w);
 
    % Saturated hydraulic conductivity in the wetted region (darcy form with
    % case-specific permeability).
@@ -274,7 +276,7 @@ function [storage, q_bot, params] = cold_solution( ...
       f_ice_w, 0, method="darcy", permeability=permeability);
    k_sat_w = k_sat_w_vec(1);
    S_w = min(1, (q_top / k_sat_w) ^ (1 / m_exp));
-   f_liq_w = f_res_w + S_w * avail_w;
+   f_liq_w = f_res_w + S_w * availCap_w;
 
    % Wetting-front advance speed (Clark 2017 Eq. 13):
    %   dz_w/dt = q_top / (f_frz + f_liq_w - f_liq_0)
@@ -286,7 +288,7 @@ function [storage, q_bot, params] = cold_solution( ...
    inflow_total_at_rain_end = q_top * rain_window;
 
    % Recession parameters once the wetted region is mature.
-   c_steady = m_exp * k_sat_w * S_w ^ (m_exp - 1) / avail_w;
+   c_steady = m_exp * k_sat_w * S_w ^ (m_exp - 1) / availCap_w;
    t_drain_start = min(rain_window, t_arrival) + total_depth / c_steady;
 
    n = numel(time_seconds);
@@ -295,7 +297,7 @@ function [storage, q_bot, params] = cold_solution( ...
    for k = 1:n
       [storage(k), q_bot(k)] = sample_cold(time_seconds(k), q_top, ...
          rain_window, t_arrival, t_drain_start, f_liq_0, f_liq_w, ...
-         total_depth, c_w, c_steady, k_sat_w, f_res_w, avail_w, m_exp, ...
+         total_depth, c_w, c_steady, k_sat_w, f_res_w, availCap_w, m_exp, ...
          f_frz, inflow_total_at_rain_end);
    end
 
@@ -316,7 +318,7 @@ end
 
 function [storage, q_bot] = sample_cold(t, q_top, rain_window, ...
       t_arrival, t_drain_start, f_liq_0, f_liq_w, total_depth, ...
-      c_w, c_steady, k_sat_w, f_res, avail, m_exp, f_frz, ...
+      c_w, c_steady, k_sat_w, f_res, availCap, m_exp, f_frz, ...
       inflow_total_at_rain_end)
 
    if t <= 0
@@ -417,37 +419,39 @@ function [storage, q_bot] = sample_cold(t, q_top, rain_window, ...
    if c_at_bot >= c_steady
       S_star = (q_top / k_sat_w) ^ (1 / m_exp);
    else
-      S_star = max(0, c_at_bot * avail / (m_exp * k_sat_w)) ^ (1 / (m_exp - 1));
+      S_star = max(0, c_at_bot * availCap / (m_exp * k_sat_w)) ...
+         ^ (1 / (m_exp - 1));
    end
    q_bot = k_sat_w * S_star ^ m_exp;
 
    % Storage via mass-balance integral (numerical quadrature).
    drained = drained_quad(t_off_recession, t, t_drain_start_eff, ...
-      total_depth, k_sat_w, avail, m_exp);
+      total_depth, k_sat_w, availCap, m_exp);
    storage_at_drain_start = storage_at_full ...
       - q_top * (t_drain_start_eff - max(rain_window, t_full));
    storage = max(0, storage_at_drain_start - drained);
 end
 
 function drained = drained_quad(t_off, t_now, t_drain_start, ...
-      total_depth, k_sat, avail, m_exp)
+      total_depth, k_sat, availCap, m_exp)
    n = 256;
    s = linspace(t_drain_start, t_now, n);
    qs = zeros(size(s));
    for i = 1:n
       c_at_bot = total_depth / (s(i) - t_off);
-      S_star = max(0, c_at_bot * avail / (m_exp * k_sat)) ^ (1 / (m_exp - 1));
+      S_star = max(0, c_at_bot * availCap / (m_exp * k_sat)) ...
+         ^ (1 / (m_exp - 1));
       qs(i) = k_sat * S_star ^ m_exp;
    end
    drained = trapz(s, qs);
 end
 
-function q = q_at_f_liq(f_liq, k_sat, f_res, avail, m_exp)
-   if avail <= 0 || f_liq <= f_res
+function q = q_at_f_liq(f_liq, k_sat, f_res, availCap, m_exp)
+   if availCap <= 0 || f_liq <= f_res
       q = 0;
       return
    end
-   S = (f_liq - f_res) / avail;
+   S = (f_liq - f_res) / availCap;
    q = k_sat * S ^ m_exp;
 end
 
@@ -535,11 +539,14 @@ function [storage, q_bot] = cold_partial_duration_pde( ...
          %   Lower: f_liq >= 0 (no negative liquid).
          %   Upper: f_liq <= ro_iwe * (1 - f_ice) (cannot exceed pore
          %          volume in liquid-water-equivalent units).
+         % Same clamp as icemodel.column.infiltration, under the same
+         % names. The bound is computed here rather than through
+         % icemodel.column.max_liquid_fraction_change so the reference
+         % solution stays an independent computation.
          f_liq = max(0, f_liq);
-         f_air = ro_iwe * (1 - f_ice) - f_liq;
-         neg = f_air < 0;
-         if any(neg)
-            f_liq(neg) = ro_iwe * (1 - f_ice(neg));
+         ioverfill = ro_iwe * (1 - f_ice) - f_liq < 0;
+         if any(ioverfill)
+            f_liq(ioverfill) = ro_iwe * (1 - f_ice(ioverfill));
          end
 
          bot_flux_accum = bot_flux_accum + q_bot_sub * dt_ref;

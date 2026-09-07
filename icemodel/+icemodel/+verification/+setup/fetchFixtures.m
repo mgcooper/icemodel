@@ -1,19 +1,19 @@
 function result = fetchFixtures(version, kwargs)
-   %FETCHFIXTURES Transactionally provision or verify v1.1 release data.
+   %FETCHFIXTURES Transactionally provision or verify release data.
    %
-   %  result = icemodel.verification.setup.fetchFixtures("v1.1")
+   %  result = icemodel.verification.setup.fetchFixtures()
    %  result = icemodel.verification.setup.fetchFixtures("v1.1", ...
    %     capabilities="formal-core", archive="/tmp/formal-core.tar.gz")
    %  result = icemodel.verification.setup.fetchFixtures("v1.1", ...
    %     download=false)
    %
-   % Calling this provisioning API is the explicit request to download missing
-   % selected archives; the default selection is the mandatory v1.1 set. Pass
-   % download=false for network-free verification. Local archive and manifest
-   % overrides keep offline and pre-publication workflows fully supported.
+   % This function downloads missing selected archives. The default selection
+   % is the required release set. Pass download=false to verify without network
+   % access. Pass local archive and manifest paths for offline or prepublication
+   % use.
    %
    % Name-value
-   %  capabilities  Capability names; required v1.1 set by default.
+   %  capabilities  Capability names; required release set by default.
    %  root          Destination data root.
    %  manifest      Tracked, staged, or local release-data manifest.
    %  archive       Local archives in canonical capability order as returned by
@@ -27,13 +27,17 @@ function result = fetchFixtures(version, kwargs)
    %  silent        Suppress the actionable provisioning banner.
    %
    % See also: icemodel.verification.setup.fixtureFileList,
-   %  icemodel.verification.setup.packFixtures
+   %  icemodel.verification.setup.packFixtures,
+   %  icemodel.verification.setup.fixtureDataRoot
 
    arguments
-      version (1, 1) string = "v1.1"
+      version (1, 1) string = ...
+         "v" + string(icemodel.internal.version())
       kwargs.capabilities string = defaultCapabilities()
-      kwargs.root (1, 1) string = defaultTestDataRoot()
-      kwargs.manifest (1, 1) string = defaultManifestFile()
+      kwargs.root (1, 1) string = ...
+         icemodel.verification.setup.fixtureDataRoot(version)
+      kwargs.manifest (1, 1) string = ...
+         icemodel.verification.setup.releaseManifestFile(version)
       kwargs.archive string = strings(1, 0)
       kwargs.download (1, 1) logical = true
       kwargs.release_url (1, 1) string = ""
@@ -58,8 +62,8 @@ function result = fetchFixtures(version, kwargs)
    % root.
    assertNoDestinationSymlinks(kwargs.root, {selection});
 
-   % A complete installed capability is an idempotent success. This branch
-   % returns before archive resolution, download, extraction, or writes.
+   % Return before archive resolution, download, extraction, or writes when all
+   % selected capability files match the manifest.
    [missing, mismatched] = verifyInstalled(kwargs.root, selection);
    if isempty(missing) && isempty(mismatched)
       result = resultStruct(true, "verified", kwargs.root, selection, ...
@@ -67,8 +71,8 @@ function result = fetchFixtures(version, kwargs)
       return
    end
 
-   % Network-free verification calls report one exact provisioning command
-   % rather than mutating or reaching the network.
+   % For verification without network access, report the exact provisioning
+   % command and leave installed files unchanged.
    local_archives = reshape(string(kwargs.archive), [], 1);
    local_archives = local_archives(strlength(local_archives) > 0);
    if ~kwargs.extract || (isempty(local_archives) && ~kwargs.download)
@@ -137,23 +141,12 @@ end
 
 %% Selection and status helpers
 function capabilities = defaultCapabilities()
-   %DEFAULTCAPABILITIES Required v1.1 capabilities installed together.
+   %DEFAULTCAPABILITIES Required release capabilities installed together.
    capabilities = ["formal-core", "verification-showcase"];
 end
 
-function pathname = defaultTestDataRoot()
-   %DEFAULTTESTDATAROOT Canonical release-provisioned test data root.
-   pathname = string(icemodel.internal.fullpath('test', 'data'));
-end
-
-function pathname = defaultManifestFile()
-   %DEFAULTMANIFESTFILE Tracked authoritative release-data manifest.
-   pathname = string(icemodel.internal.fullpath('test', 'assets', ...
-      'icemodel-v1.1-data-manifest.json'));
-end
-
 function selected = capabilitySelection(selection, capability)
-   %CAPABILITYSELECTION Filter a parsed selection to one transaction boundary.
+   %CAPABILITYSELECTION Filter a parsed selection to one capability.
    selected = selection;
    selected.capabilities = capability;
    selected.archives = selection.archives( ...
@@ -198,10 +191,12 @@ end
 
 function result = unavailableResult(version, root, selection, missing, ...
       mismatched, release_url, repo, strict, silent)
-   %UNAVAILABLERESULT Report exact explicit provisioning without downloading.
+   %UNAVAILABLERESULT Return the exact provisioning command without downloading.
    command = fetchCommand(version, selection.capabilities, root, ...
       selection.manifest_file, release_url, repo);
-   if ~silent
+   % Print only for non-strict callers. Strict mode raises the same root and
+   % command below. Printing here would duplicate them in error-test output.
+   if ~silent && ~strict
       fprintf('\n=== icemodel required release data incomplete ===\n');
       fprintf('Data root: %s\n', root);
       fprintf('Missing: %d; mismatched: %d\n', ...
@@ -374,7 +369,7 @@ function [files, directories] = tarMembers(tar_file)
          'Cannot rewind tar stream: %s', tar_file)
    end
 
-   % Read the same validated stream into its exact-size inventories.
+   % Read the validated stream into the preallocated inventories.
    files = strings(file_count, 1);
    directories = strings(directory_count, 1);
    file_index = 0;

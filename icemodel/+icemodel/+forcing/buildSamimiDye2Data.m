@@ -5,7 +5,7 @@ function [Data, metadata] = buildSamimiDye2Data(kwargs)
    %  [Data, metadata] = ... buildSamimiDye2Data(source_dir=...)
    %
    % Reads the Samimi/Marshall Dye-2 summer 2016 AWS workbook and maps the
-   % native columns onto icemodel's canonical forcing/userdata names. The source
+   % native columns onto icemodel's forcing/userdata names. The source
    % record is half-hourly and stays native here. Shared artifact writers set
    % the public 15-minute met and hourly userdata output cadences.
    %
@@ -41,7 +41,7 @@ function [Data, metadata] = buildSamimiDye2Data(kwargs)
          'requested window does not overlap %s', filename)
    end
 
-   % Map source units to canonical icemodel units at native half-hourly cadence.
+   % Map source units to icemodel units at native half-hourly cadence.
    % The workbook stores air temperature in degC, pressure in hPa, and its
    % derived continuous snow-depth channel `dsnow` in centimetres. The source
    % `surface` column is also centimetres, not surface temperature.
@@ -146,7 +146,7 @@ function metadata = sourceMetadata(filename, source_names, checks, ...
 end
 
 function map = channelMap()
-   %CHANNELMAP Record canonical-name to workbook-name mapping.
+   %CHANNELMAP Record icemodel-name to workbook-name mapping.
    map = struct( ...
       'tair', "airT", ...
       'rh', "RH", ...

@@ -10,14 +10,12 @@ function [Qe, dQe_dT_sfc] = latent_heat_flux(es_sfc, ea_atm, H_e, stability, ...
    %  [W m-2] = [W m-2 Pa-1] * [-] * [Pa]
    %
    % where H_e = hv_atm * De_e = ro_atm * L * De * epsilon / psfc is the
-   % latent heat transport prefactor precomputed at each substep. This uses
-   % the local moist-air density ro_atm rather than the dry-air reference
-   % density, giving a physically consistent moist-air correction.
+   % latent heat transport coefficient precomputed at each substep.
    %
    % Pass the temperature derivatives of the surface saturation vapor pressure
-   % and of the stability factor when you request the derivative output. The
-   % function then returns the full dQe/dT_sfc that the newton solve needs,
-   % not the fixed-stability partial derivative that the linearization uses.
+   % and stability factor when you request the derivative output. The function
+   % then returns the full dQe/dT_sfc that the newton solve needs, not the
+   % fixed-stability partial derivative that the linearization uses.
    %
    % See also: icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux
    %

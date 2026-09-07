@@ -1720,6 +1720,14 @@ function findings = combinedFlatRunFindings(sites, inputs)
    %COMBINEDFLATRUNFINDINGS Join producer-pinned native-QC evidence.
    cells = cell(numel(sites), 1);
    for s = 1:numel(sites)
+      % A plan file may have no native-QC findings, but load() warns when a
+      % requested variable is absent. Check with who('-file') first so the
+      % warning never fires; keep the isfield guard for the empty-record case.
+      stored = who('-file', inputs{s}.plan);
+      if ~ismember('flat_run_findings_record', stored)
+         cells{s} = table();
+         continue
+      end
       saved = load(inputs{s}.plan, 'flat_run_findings_record');
       if ~isfield(saved, 'flat_run_findings_record') ...
             || isempty(saved.flat_run_findings_record)

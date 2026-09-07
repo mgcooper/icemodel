@@ -1,11 +1,14 @@
-function [Ts, T, f_ice, f_liq, n_subfail, substep, dt_new] = resetsubstep( ...
-      Ts, T, f_ice, f_liq, dt_max, substep, maxsubstep, n_subfail, dt_sum)
+function [Ts, T, f_ice, f_liq, k_eff, n_subfail, substep, dt_new] = ...
+      resetsubstep(Ts, T, f_ice, f_liq, k_eff, dt_max, substep, ...
+      maxsubstep, n_subfail, dt_sum)
    %RESETSUBSTEP Restore the accepted state and shorten the retry timestep.
    %
-   % Call this after a failed substep.
+   % Call this after a failed substep. K_EFF travels with the temperature and
+   % phase checkpoint so diagnostics never retain conductivity from a rejected
+   % solve.
    %
    %#codegen
-   if nargout > 4
+   if nargout > 5
       n_subfail = min(n_subfail + 1, maxsubstep);
       substep = min(substep + 1, maxsubstep);
 

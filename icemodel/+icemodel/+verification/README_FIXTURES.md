@@ -1,8 +1,8 @@
-# v1.1 release-data provisioning
+# Release-data provisioning
 
-The v1.1 data boundary separates tracked demo data, provisioned formal/public
-verification data, optional source-integration data, and the full interactive
-scientific archive.
+Release data live in four separate trees: tracked demo data, provisioned
+formal and public verification data, optional source-integration data, and the
+full scientific archive.
 
 | Capability | Install root | Required |
 |---|---|---|
@@ -10,23 +10,24 @@ scientific archive.
 | `verification-showcase` | `test/data` | yes |
 | `forcing-integration` | `test/data/forcing` | no |
 
-The complete interactive verification archive remains under top-level `data/`
+The full interactive verification archive remains under top-level `data/`
 and is not a release capability. `demo/data` remains tracked with only the two
 15-minute demo forcing files and four spectral tables.
 
 ## Manifest
 
-`test/assets/icemodel-v1.1-data-manifest.json` is the authoritative source. It
-declares each archive and file's capability, required status, relative install
-path, byte size, and SHA-256. The three release archive names are:
+The tracked `test/assets/icemodel-<version>-data-manifest.json` governs release
+data. It declares each archive and file's capability, required status, relative
+install path, byte size, and SHA-256. The three v1.2 archive names are:
 
-- `icemodel-v1.1-formal-core.tar.gz`
-- `icemodel-v1.1-verification-showcase.tar.gz`
-- `icemodel-v1.1-forcing-integration.tar.gz`
+- `icemodel-v1.2-formal-core.tar.gz`
+- `icemodel-v1.2-verification-showcase.tar.gz`
+- `icemodel-v1.2-forcing-integration.tar.gz`
 
 The manifest contains final local archive metadata and 141 optional
 forcing-integration file rows. Publishing those artifacts remains a separate,
-explicit approval gate.
+explicit approval gate. Published releases retain their versioned manifests
+and archives.
 
 ## Producer
 
@@ -34,38 +35,39 @@ explicit approval gate.
 release manifest beside them:
 
 ```matlab
-result = icemodel.verification.setup.packFixtures("v1.1", ...
+result = icemodel.verification.setup.packFixtures( ...
    capabilities=["formal-core", "verification-showcase", ...
       "forcing-integration"], ...
    root="/path/to/staged/test/data");
 ```
 
-Packing refuses a missing source file, and a file whose hash does not match
-the manifest. Output goes to the
-gitignored `release-staging/` directory by default. On macOS, packing uses the
-native USTAR writer with metadata copying disabled so undeclared AppleDouble
-members cannot enter an archive.
+Packing rejects a missing source file or a file whose hash does not match the
+manifest. By default, it writes output to the gitignored `release-staging/`
+directory. On macOS, packing uses the native USTAR writer with metadata copying
+disabled so undeclared AppleDouble members cannot enter an archive.
 
 ## Consumer
 
-Calling the provisioning API without overrides installs the two mandatory v1.1
-capabilities and downloads missing release archives:
+Calling the provisioning API without a version installs the two mandatory
+capabilities for the version in `CITATION.cff` and downloads missing release
+archives:
 
 ```matlab
-result = icemodel.verification.setup.fetchFixtures("v1.1");
+result = icemodel.verification.setup.fetchFixtures();
 ```
 
 Pass `download=false` for network-free verification. Missing mandatory data then
 reports this explicit provisioning command:
 
 ```matlab
-result = icemodel.verification.setup.fetchFixtures("v1.1", download=false);
+result = icemodel.verification.setup.fetchFixtures(download=false);
 
-icemodel.verification.setup.fetchFixtures("v1.1", ...
+icemodel.verification.setup.fetchFixtures( ...
    capabilities=["formal-core", "verification-showcase"], download=true)
 ```
 
-Local archives and manifests support offline or pre-publication provisioning:
+Pass an explicit version to reproduce an earlier release or to use local
+archives and manifests before publication:
 
 ```matlab
 result = icemodel.verification.setup.fetchFixtures("v1.1", ...
@@ -77,9 +79,11 @@ result = icemodel.verification.setup.fetchFixtures("v1.1", ...
 A scalar local archive requires one selected capability. Multiple selected
 capabilities require one archive per capability in the same order.
 
-`fetchFixtures` runs every check before it changes canonical data. It verifies
-the archive size and SHA-256, checks the raw tar headers, and rejects unsafe
-paths and types as well as undeclared or missing members. It then extracts to
-temporary storage on the same filesystem and verifies every file. Promotion
-backs up the declared prior paths and restores them on any failure. Unrelated files are preserved, and an already-valid capability returns
-success without rewriting data.
+`fetchFixtures` finishes every check before it changes installed data. For
+each selected archive that needs installation it checks the size, the SHA-256,
+and the raw tar headers. It rejects unsafe paths and types, undeclared
+members, and missing members. Extraction goes to temporary storage on the same
+filesystem, where every file is verified before promotion. Promotion backs up
+the declared existing paths and restores them after any failure, and it leaves
+unrelated files alone. A capability that is already valid returns success
+without rewriting data.

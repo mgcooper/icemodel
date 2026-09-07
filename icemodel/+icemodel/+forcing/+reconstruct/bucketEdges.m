@@ -1,5 +1,5 @@
 function edges = bucketEdges()
-   %BUCKETEDGES Return the canonical gap-duration bucket edges in hours.
+   %BUCKETEDGES Return the gap-duration bucket edges in hours.
    %
    %  edges = icemodel.forcing.reconstruct.bucketEdges()
    %

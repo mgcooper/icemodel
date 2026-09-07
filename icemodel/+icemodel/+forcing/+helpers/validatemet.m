@@ -37,8 +37,8 @@ function validatemet(met)
    end
 
    % Precipitation-rate unit. When the met timetable records VariableUnits,
-   % the ppt channel must carry the canonical water-equivalent rate (m s-1;
-   % see icemodel.forcing.helpers.metvariables) so every source agrees. A met
+   % the ppt channel must carry the water-equivalent rate (m s-1; see
+   % icemodel.forcing.helpers.metvariables) so every source agrees. A met
    % file with no VariableUnits is valid, because older artifacts do not store
    % that metadata. A ppt unit that is set and wrong is an error.
    units = string(met.Properties.VariableUnits);

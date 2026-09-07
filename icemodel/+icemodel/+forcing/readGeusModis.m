@@ -194,7 +194,5 @@ function digest = coordinateGridSha256(lat, lon)
    % with different shapes cannot identify as the same spatial grid.
    bytes = [typecast(uint64(size(lat)), 'uint8')'; ...
       typecast(lat(:), 'uint8'); typecast(lon(:), 'uint8')];
-   md = java.security.MessageDigest.getInstance('SHA-256');
-   raw = typecast(md.digest(bytes), 'uint8');
-   digest = string(lower(reshape(dec2hex(raw, 2)', 1, [])));
+   digest = icemodel.verification.setup.bytesSha256(bytes);
 end

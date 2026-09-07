@@ -5,7 +5,7 @@ function [Data, metadata] = buildImauHourlyData(station, kwargs)
    %  [Data, metadata] = ... buildImauHourlyData("S21", source_dir=...)
    %
    % Reads the Van Tiggelen et al. PANGAEA hourly S21/S22/S23 tab files and
-   % maps the corrected meteorological channels onto icemodel's canonical
+   % maps the corrected meteorological channels onto icemodel's
    % forcing/userdata names. The first-pass IMAU staging family keeps these
    % hourly sites separate from the daily 19-station SEB QA product.
    %
@@ -77,12 +77,12 @@ function [Data, metadata] = buildImauHourlyData(station, kwargs)
    source_floor = isfinite(source_albedo) & source_albedo <= 0.2;
    Data.albedo(~isfinite(ratio_validity) | source_floor) = NaN;
 
-   % Radiative diagnostics are useful userdata/evaluation columns, while the
-   % minimal met contract still comes from data2met at the met boundary. Keep
-   % raw swd/swu intact, but do not publish derived balances for bright samples
-   % where both the invalid source floor and the raw flux ratio show a collapsed
-   % reflected-shortwave channel. A raw balance that remains plausible on its
-   % own is kept.
+   % Radiative diagnostics are useful userdata/evaluation columns; data2met
+   % still builds the minimal met channel set separately. Keep raw swd/swu
+   % intact, but do not publish derived balances for bright samples where
+   % both the invalid source floor and the raw flux ratio show a collapsed
+   % reflected-shortwave channel. A raw balance that remains plausible on
+   % its own is kept.
    Data.swn = Data.swd - Data.swu;
    raw_shortwave_ratio = Data.swu ./ Data.swd;
    invalid_shortwave_balance = source_floor & Data.swd >= 10 ...
@@ -103,7 +103,7 @@ function [Data, metadata] = buildImauHourlyData(station, kwargs)
 
    % Preserve measured swd/swu but remove conservative recovered-collapse
    % episodes from the derived albedo and energy-balance channels. Running after
-   % regularization gives the shared detector the canonical UTC timestamp grid.
+   % regularization gives the shared detector a regular UTC timestamp grid.
    [transient_rows, transient_report] = ...
       icemodel.forcing.helpers.dailyAlbedoAnomalyFlags( ...
       Data.Time, Data.swd, Data.swu);
@@ -154,7 +154,7 @@ function station = canonicalStation(station)
 end
 
 function Data = orderDataColumns(Data)
-   %ORDERDATACOLUMNS Put IMAU Data columns in the canonical channel order.
+   %ORDERDATACOLUMNS Put IMAU Data columns in a fixed channel order.
    preferred = ["tair", "rh", "wspd", "wdir", "psfc", "swd", "swu", ...
       "lwd", "lwu", "swn", "lwn", "netr", "albedo", "tsfc", ...
       "boom_height", "surface_height", "rainf", "snowf"];
@@ -207,7 +207,7 @@ function location = siteLocation(parsed)
 end
 
 function map = channelMap()
-   %CHANNELMAP Record canonical-name to PANGAEA hourly column mapping.
+   %CHANNELMAP Record icemodel-name to PANGAEA hourly column mapping.
    map = struct( ...
       'tair', "TTT corrected at 2m height", ...
       'rh', "RH corrected at 2m height", ...

@@ -55,7 +55,7 @@ function results = run_test_bootstrap(kwargs)
    arguments (Input)
 
       kwargs.baseline_tag (1, :) string ...
-         = "v1.1"
+         = "v" + string(icemodel.internal.version())
 
       kwargs.smbmodel (1, :) string ...
          {icemodel.validators.mustBeTestSmbmodelSelector(kwargs.smbmodel)} ...
@@ -82,6 +82,10 @@ function results = run_test_bootstrap(kwargs)
       kwargs.backup_before_clean (1, 1) logical ...
          = true
    end
+
+   % Record this orchestration in the session activity so a later
+   % in-session formal perf run can refuse the contaminated session.
+   icemodel.test.helpers.markTestSessionDirty("run_test_bootstrap");
 
    % Deal out arguments.
    [baseline_tag, smbmodel, solver, simyear, smoke_sites, full_sites, ...
@@ -119,7 +123,7 @@ function results = run_test_bootstrap(kwargs)
       removeRollingMatFiles(baselinesdir);
    end
 
-   % Generate new baselines and artifacts covering the canonical workflow.
+   % Generate new baselines and artifacts covering the full workflow.
    results = struct();
    results.run_name = run_name;
    results.baseline_tag = baseline_tag;
@@ -129,7 +133,7 @@ function results = run_test_bootstrap(kwargs)
    results.smoke_sites = smoke_sites;
    results.full_sites = full_sites;
 
-   % Generate the canonical list of all formal suite cases and run them.
+   % Get the list of all formal suite cases and run them.
    cases = icemodel.test.helpers.getFormalTestSuiteCases();
    for i = 1:height(cases)
       c = cases(i, :);
@@ -157,7 +161,7 @@ function out = runStep(c, baseline_tag, smbmodel, solver, simyear, ...
             case "snapshot"
                % Preserve frozen releases whose registered forcing differs
                % from the newly accepted rolling product.
-               out = resolveBootstrapRelease( ...
+               out = icemodel.test.helpers.resolveBootstrapRelease( ...
                   "regression", baseline_tag, smbmodel, simyear);
 
             case "run"
@@ -185,15 +189,22 @@ function out = runStep(c, baseline_tag, smbmodel, solver, simyear, ...
             case "snapshot"
                % Preserve frozen releases whose registered forcing differs
                % from the newly accepted rolling product.
-               out = resolveBootstrapRelease( ...
+               out = icemodel.test.helpers.resolveBootstrapRelease( ...
                   "perf", baseline_tag, smbmodel, simyear);
 
             case "run"
                % Compare current runtimes against the requested baseline.
+               % This orchestration already dirtied the session (the marker
+               % above plus the regression legs), so an in-session formal
+               % run would be refused. Process isolation, stated
+               % explicitly, measures each case in a fresh subprocess.
+               % Against a session-protocol baseline the compare is
+               % validity-only: cross-protocol timings are not comparable,
+               % so no timing gate applies.
                out = run_perf_suite( ...
                   tier=c.tier, smbmodel=smbmodel, solver=solver, ...
                   simyear=simyear, smoke_sites=smoke_sites, ...
-                  full_sites=full_sites, ...
+                  full_sites=full_sites, isolation="process", ...
                   baseline=resolveBaseline(c.baseline_mode, baseline_tag), ...
                   run_name=run_name);
 
@@ -228,32 +239,6 @@ function baseline = resolveBaseline(baseline_mode, baseline_tag)
       baseline = "rolling";
    else
       baseline = baseline_tag;
-   end
-end
-
-function baseline = resolveBootstrapRelease( ...
-      kind, baseline_tag, smbmodel, simyear)
-   %RESOLVEBOOTSTRAPRELEASE Preserve or create one registered release baseline.
-
-   policy = icemodel.test.helpers.formalBaselinePolicy(baseline_tag);
-   if policy.snapshot_from_rolling
-      switch kind
-         case "regression"
-            baseline = snapshot_regression_baseline( ...
-               baseline_tag=baseline_tag, smbmodel=smbmodel);
-         case "perf"
-            baseline = snapshot_perf_baseline( ...
-               baseline_tag=baseline_tag, smbmodel=smbmodel, ...
-               simyear=simyear);
-      end
-      return
-   end
-
-   baseline = icemodel.test.helpers.loadBaseline(kind, ...
-      smbmodel=smbmodel, baseline_tag=baseline_tag, simyear=simyear);
-   if isempty(baseline)
-      error('icemodel:test:preservedReleaseMissing', ...
-         'Registered immutable %s release %s is missing.', kind, baseline_tag)
    end
 end
 

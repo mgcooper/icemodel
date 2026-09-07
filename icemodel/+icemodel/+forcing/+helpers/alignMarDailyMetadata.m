@@ -10,6 +10,8 @@ function metadata = alignMarDailyMetadata(metadata, source_days, retained_times)
    % source ledger entries exactly. Partial boundary days become unverified
    % (status 3) with NaN references and residuals. Numeric payloads are not
    % inputs, so this metadata-only operation cannot modify them.
+   %
+   % See also: icemodel.verification.setup.stageRcmForcing
 
    arguments
       metadata (1, 1) struct
@@ -18,7 +20,8 @@ function metadata = alignMarDailyMetadata(metadata, source_days, retained_times)
    end
 
    % Normalize both axes to UTC before comparing calendar days. A timezone-less
-   % source is interpreted as UTC, matching every MAR reader/writer contract.
+   % source is interpreted as UTC, matching how every MAR reader and writer
+   % treats an unlabeled timestamp.
    source_days = utcColumn(source_days);
    retained_times = utcColumn(retained_times);
    if any(source_days ~= dateshift(source_days, 'start', 'day')) ...

@@ -1,14 +1,18 @@
 function suffix = metTimestepSuffix(dt)
-   %METTIMESTEPSUFFIX Return the canonical file tag for a model-met cadence.
+   %METTIMESTEPSUFFIX Return the file tag for a model-met cadence.
    %
    %  suffix = icemodel.forcing.helpers.metTimestepSuffix(dt)
    %
    % Accepts the proven model-met cadences in seconds (900, 1800, 3600) or
-   % their canonical tags ("15m", "30m", "1hr"). This closed registry keeps the
-   % writer file names and the runtime discovery in agreement.
+   % their tags ("15m", "30m", "1hr"). This closed set keeps the writer
+   % file names and the runtime discovery in agreement.
+   %
+   % See also: icemodel.createMetFileNames,
+   %  icemodel.forcing.helpers.metfilename,
+   %  icemodel.forcing.helpers.writemet
 
-   % Preserve canonical text inputs while rejecting aliases that would create a
-   % file name the runtime does not recognize.
+   % Preserve the three supported tag strings while rejecting aliases that
+   % would create a file name the runtime does not recognize.
    if ischar(dt) || isstring(dt)
       suffix = string(dt);
       if ~isscalar(suffix) || ~ismember(suffix, ["15m", "30m", "1hr"])

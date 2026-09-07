@@ -6,15 +6,17 @@ end
 function setupOnce(testCase)
    %SETUPONCE Put the baseline runners on the path.
    %
-   % build_regression_baseline and build_perf_baseline live in test/tools and
-   % IcemodelRegressionTest in test/regression. Neither folder is on the path
-   % by default, so running this file on its own would otherwise report
-   % "Undefined function" instead of the contract error it is checking for.
+   % build_regression_baseline and build_perf_baseline live in test/tools,
+   % IcemodelRegressionTest in test/regression, and run_regression_suite
+   % plus run_perf_suite at the test root. None of these folders is on the
+   % path by default, so running this file on its own would otherwise
+   % report "Undefined function" instead of the expected error.
 
    root = icemodel.internal.fullpath();
    original_path = path;
    testCase.addTeardown(@() path(original_path));
-   folders = {fullfile(root, 'test', 'tools'), ...
+   folders = {fullfile(root, 'test'), ...
+      fullfile(root, 'test', 'tools'), ...
       fullfile(root, 'test', 'regression')};
    for k = 1:numel(folders)
       if isfolder(folders{k})
@@ -23,8 +25,273 @@ function setupOnce(testCase)
    end
 end
 
+function test_aa_acceptance_rejects_non_independent_or_foreign_runs(testCase)
+   % The gate certifies two independent runs from one environment. The
+   % same file, a reused run_id, another host, or a session-isolated
+   % artifact must all be rejected before any ratio is computed. The
+   % no-argument mode runs two full timed suites, so these tests cover
+   % the artifact-comparison branches only.
+
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   case_summary = aaCaseSummary(100.0, true);
+
+   meta = aaArtifactMeta("run-a");
+   file_a = fullfile(fixture.Folder, 'perf_results_a.mat');
+   save(file_a, 'meta', 'case_summary');
+
+   % The same file for A and B reproduces trivially: rejected.
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_a), ...
+      'icemodel:test:aaAcceptance:reusedFile');
+
+   % A copy of the same run under another file name carries the same
+   % run_name: rejected.
+   file_b = fullfile(fixture.Folder, 'perf_results_b.mat');
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:reusedRun');
+
+   % A blank run name cannot identify an independent timed run.
+   meta = aaArtifactMeta("   ");
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:unknownRunName');
+
+   % The two sides must contain the same number of model artifacts.
+   testCase.verifyError(@() run_aa_acceptance( ...
+      [string(file_a), string(file_b)], file_b), ...
+      'icemodel:test:aaAcceptance:artifactCountMismatch');
+
+   % A side cannot repeat one artifact in place of another model artifact.
+   testCase.verifyError(@() run_aa_acceptance( ...
+      [string(file_a), string(file_a)], ...
+      [string(file_b), string(file_b)]), ...
+      'icemodel:test:aaAcceptance:duplicateArtifact');
+
+   % An artifact without measured cases cannot certify the timing protocol.
+   empty_summary = case_summary([], :);
+   meta = aaArtifactMeta("empty-a");
+   empty_a = fullfile(fixture.Folder, 'perf_results_empty_a.mat');
+   case_summary = empty_summary;
+   save(empty_a, 'meta', 'case_summary');
+   meta = aaArtifactMeta("empty-b");
+   empty_b = fullfile(fixture.Folder, 'perf_results_empty_b.mat');
+   save(empty_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(empty_a, empty_b), ...
+      'icemodel:test:aaAcceptance:emptyCaseSummary');
+   case_summary = aaCaseSummary(100.0, true);
+
+   % Another machine is not comparable: rejected.
+   meta = aaArtifactMeta("run-b");
+   meta.hostname = "other-host";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:environmentMismatch');
+
+   % A session-isolated artifact certifies a different protocol: rejected.
+   meta = aaArtifactMeta("run-b");
+   meta.isolation = "session";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:notProcessIsolated');
+
+   % An artifact without a recorded hostname certifies an unverified
+   % machine: rejected.
+   meta = aaArtifactMeta("run-b");
+   meta.hostname = "   ";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:unknownHost');
+
+   % A blank MATLAB version cannot identify one measurement environment.
+   meta = aaArtifactMeta("run-b");
+   meta.matlab_version = "   ";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:unknownMatlabVersion');
+
+   % Two runs of different code certify an A/B change: rejected.
+   meta = aaArtifactMeta("run-b");
+   meta.git_revision = "other-rev";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:revisionMismatch');
+
+   % A blank revision cannot certify that both runs used the same source.
+   meta = aaArtifactMeta("run-b");
+   meta.git_revision = "   ";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:unknownRevision');
+
+   % Two measurement procedures are not comparable: rejected.
+   meta = aaArtifactMeta("run-b");
+   meta.n_runs = 30;
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:procedureMismatch');
+
+   % Two input data trees are not comparable: rejected.
+   meta = aaArtifactMeta("run-b");
+   meta.data_root = "other-data";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:inputMismatch');
+
+   % A blank data root cannot identify the measured input tree.
+   meta = aaArtifactMeta("run-b");
+   meta.data_root = "   ";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:unknownDataRoot');
+
+   % A reused case ID can name a different forcing product: rejected.
+   meta = aaArtifactMeta("run-b");
+   case_summary.forcings = "legacy_forcing";
+   save(file_b, 'meta', 'case_summary');
+   testCase.verifyError(@() run_aa_acceptance(file_a, file_b), ...
+      'icemodel:test:aaAcceptance:caseIdentityMismatch');
+   case_summary.forcings = "promice_filled";
+
+   % A side that mixes two runs could pair artifacts whose differences
+   % cancel in the ratios: rejected.
+   meta = aaArtifactMeta("run-c");
+   file_a2 = fullfile(fixture.Folder, 'perf_results_a2.mat');
+   save(file_a2, 'meta', 'case_summary');
+   meta = aaArtifactMeta("run-b");
+   save(file_b, 'meta', 'case_summary');
+   file_b2 = fullfile(fixture.Folder, 'perf_results_b2.mat');
+   save(file_b2, 'meta', 'case_summary');
+   testCase.verifyError( ...
+      @() run_aa_acceptance([string(file_a), string(file_a2)], ...
+      [string(file_b), string(file_b2)]), ...
+      'icemodel:test:aaAcceptance:mixedSide');
+end
+
+function test_aa_acceptance_no_argument_mode_compares_two_runs(testCase)
+   % The no-argument form runs the formal suite twice and compares the
+   % two runs' artifacts. A stub run_perf_suite shadows the real one and
+   % writes one band-centered artifact per call, so the branch runs
+   % without timing anything.
+
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   stub_dir = fullfile(fixture.Folder, 'stub');
+   icemodel.helpers.ensureDirExists(stub_dir);
+   writeAaSuiteStub(fullfile(stub_dir, 'run_perf_suite.m'));
+   testCase.applyFixture(matlab.unittest.fixtures.PathFixture(stub_dir));
+
+   [~] = evalc('report = run_aa_acceptance();');
+   testCase.verifyTrue(report.passed);
+   testCase.verifyEqual(height(report.cases), 1);
+   testCase.verifyEqual(report.cases.ratio_b_over_a, 1.0, 'AbsTol', 0);
+end
+
+function test_aa_acceptance_pairs_artifacts_by_filename(testCase)
+   % Pair model artifacts by filename when their parent directories differ.
+
+   [status, scratch_root] = system('mktemp -d');
+   testCase.assertEqual(status, 0);
+   scratch_root = string(strtrim(scratch_root));
+   cleanup = onCleanup(@() rmdir(scratch_root, 's'));
+   testCase.addTeardown(@() delete(cleanup));
+
+   dirs = fullfile(scratch_root, ["a_ice", "z_skin", "a_skin", "z_ice"]);
+   arrayfun(@mkdir, dirs);
+
+   meta = aaArtifactMeta("run-a");
+   case_summary = aaCaseSummary(100.0, true);
+   ice_a = fullfile(dirs(1), "perf_icemodel.mat");
+   save(ice_a, 'meta', 'case_summary');
+   case_summary.case_id = "skinmodel_kanm_2016_solver1";
+   skin_a = fullfile(dirs(2), "perf_skinmodel.mat");
+   save(skin_a, 'meta', 'case_summary');
+
+   meta = aaArtifactMeta("run-b");
+   skin_b = fullfile(dirs(3), "perf_skinmodel.mat");
+   save(skin_b, 'meta', 'case_summary');
+   case_summary.case_id = "icemodel_kanm_2016_solver1";
+   ice_b = fullfile(dirs(4), "perf_icemodel.mat");
+   save(ice_b, 'meta', 'case_summary');
+
+   [~] = evalc(['report = run_aa_acceptance(' ...
+      '[skin_a, ice_a], [ice_b, skin_b]);']);
+   testCase.verifyTrue(report.passed);
+   testCase.verifyEqual(height(report.cases), 2);
+end
+
+function test_aa_acceptance_fails_invalid_or_unstable_measurements(testCase)
+   % An invalid measurement or an ambient-unstable run must fail the
+   % verdict even when every ratio is inside the band.
+
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   case_summary = aaCaseSummary(100.0, true);
+
+   meta = aaArtifactMeta("run-a");
+   file_a = fullfile(fixture.Folder, 'perf_results_a.mat');
+   save(file_a, 'meta', 'case_summary');
+
+   % Run B's measurement failed its validity gate: the verdict fails.
+   meta = aaArtifactMeta("run-b");
+   case_summary.valid = false;
+   file_b = fullfile(fixture.Folder, 'perf_results_b.mat');
+   save(file_b, 'meta', 'case_summary');
+   [~] = evalc('report = run_aa_acceptance(file_a, file_b);');
+   testCase.verifyFalse(report.passed);
+   testCase.verifyFalse(all(report.cases.measurement_valid));
+
+   % Run B is ambient-unstable: the verdict fails.
+   meta.ambient_stable = false;
+   case_summary.valid = true;
+   save(file_b, 'meta', 'case_summary');
+   [~] = evalc('report = run_aa_acceptance(file_a, file_b);');
+   testCase.verifyFalse(report.passed);
+   testCase.verifyFalse(report.ambient_stable);
+end
+
+function test_perf_builder_refuses_benchmarks_in_session_mode(testCase)
+   % The component benchmark suite runs before the model cases, so an
+   % in-session build with benchmarks would measure model medians in a
+   % session the benchmarks already warmed. The builder must refuse.
+
+   testCase.verifyError(@() build_perf_baseline( ...
+      isolation="session", include_benchmarks=true), ...
+      'icemodel:test:perf:benchmarksWarmSession');
+end
+
+function test_aa_acceptance_accepts_the_band_edge(testCase)
+   % The A/A band is a closed interval: a ratio exactly at the band edge
+   % certifies the measurement protocol, and one just outside fails it.
+
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   band = 1 + icemodel.test.helpers.perfMeasurementPolicy().tol_perf;
+
+   % Two one-case artifacts whose medians sit exactly at the band edge.
+   meta = aaArtifactMeta("run-a");
+   case_summary = aaCaseSummary(100.0, true);
+   file_a = fullfile(fixture.Folder, 'perf_results_a.mat');
+   save(file_a, 'meta', 'case_summary');
+   meta = aaArtifactMeta("run-b");
+   case_summary.median_wall_s = 100.0 * band;
+   file_b = fullfile(fixture.Folder, 'perf_results_b.mat');
+   save(file_b, 'meta', 'case_summary');
+
+   % Discard the printed verdict so the suite log stays quiet.
+   [~] = evalc('report = run_aa_acceptance(file_a, file_b);');
+   testCase.verifyTrue(report.passed);
+   testCase.verifyEqual(report.cases.ratio_b_over_a, band, 'AbsTol', 0);
+
+   % A ratio just outside the closed interval fails.
+   case_summary.median_wall_s = 100.0 * band * (1 + 1e-6);
+   save(file_b, 'meta', 'case_summary');
+   [~] = evalc('report = run_aa_acceptance(file_a, file_b);');
+   testCase.verifyFalse(report.passed);
+end
+
 function test_resolveBaselineSelector_handles_rolling_and_release(testCase)
-   % Cover the public selector contract for rolling and release baselines.
+   % Test the public selector with rolling and release baselines.
 
    [baseline_type, baseline_tag] = ...
       icemodel.test.helpers.resolveBaselineSelector("rolling");
@@ -83,8 +350,8 @@ function test_loadBaseline_regression_normalizes_legacy_schema(testCase)
 end
 
 function test_frozen_v11_baselines_normalize_without_mutation(testCase)
-   % All four immutable release files must acquire the canonical solver alias
-   % in memory and pass their registered forcing/case identity checks.
+   % The four immutable release files must add solver from solver_mode in
+   % memory. Each file must pass its forcing and case checks.
    for kind = ["regression", "perf"]
       for model = ["icemodel", "skinmodel"]
          baseline = icemodel.test.helpers.loadBaseline(kind, ...
@@ -101,8 +368,8 @@ function test_frozen_v11_baselines_normalize_without_mutation(testCase)
 end
 
 function test_loadBaseline_rejects_solver_and_selector_conflicts(testCase)
-   % Existing persisted identity must never be replaced by requested selector
-   % metadata or a canonical alias derived from another column.
+   % The loader must not replace baseline-file values with selector metadata
+   % or an alias copied from another column.
    filepath = [tempname '.mat'];
    cleanup = onCleanup(@() deleteIfExists(filepath));
    RegressionBaseline = table( ...
@@ -173,8 +440,8 @@ function test_getRegressionCaseMatrix_uses_official_forcing(testCase)
 end
 
 function test_getPerfCaseMatrix_keeps_skinmodel_under_filter(testCase)
-   % The same solver-filter contract should hold for the managed perf
-   % matrix so build/run/bootstrap paths stay consistent.
+   % The performance matrix must keep skinmodel at solver 1 when its solver
+   % input is 2. This keeps build, run, and bootstrap paths consistent.
 
    cases = icemodel.test.helpers.getPerfCaseMatrix( ...
       tier="full", smbmodel="all", solver=2);
@@ -203,15 +470,66 @@ function test_formal_baseline_policy_owns_default_data_case(testCase)
    % The same registration selects forcing identity and its default data tree.
 
    rolling = icemodel.test.helpers.formalBaselinePolicy("rolling");
-   release = icemodel.test.helpers.formalBaselinePolicy("v1.1");
+   release_v11 = icemodel.test.helpers.formalBaselinePolicy("v1.1");
+   release_v12 = icemodel.test.helpers.formalBaselinePolicy("v1.2");
+   release_v12_alias = icemodel.test.helpers.formalBaselinePolicy("V1_2");
 
    testCase.verifyEqual(rolling.config_case, "verification");
    testCase.verifyEqual(rolling.forcing, "promice_filled");
    testCase.verifyEmpty(rolling.required_fixture_capabilities);
-   testCase.verifyEqual(release.config_case, "test");
-   testCase.verifyEqual(release.site_forcings, ["kanm"; "kanl"]);
-   testCase.verifyEqual(release.required_fixture_capabilities, "formal-core");
-   testCase.verifyFalse(release.snapshot_from_rolling);
+   testCase.verifyFalse(rolling.use_fixture_root_for_model);
+   testCase.verifyTrue(rolling.require_source_revision);
+   testCase.verifyEqual(rolling.promice_filled_policy_sha256, ...
+      icemodel.forcing.reconstruct.policySha256());
+   testCase.verifyEqual(release_v11.config_case, "test");
+   testCase.verifyEqual(release_v11.site_forcings, ["kanm"; "kanl"]);
+   testCase.verifyEqual( ...
+      release_v11.required_fixture_capabilities, "formal-core");
+   testCase.verifyFalse(release_v11.use_fixture_root_for_model);
+   testCase.verifyFalse(release_v11.snapshot_from_rolling);
+   testCase.verifyFalse(release_v11.require_source_revision);
+   testCase.verifyEqual(release_v12.config_case, "verification");
+   testCase.verifyEqual(release_v12.forcing_mode, "fixed");
+   testCase.verifyEqual(release_v12.forcing, "promice_filled");
+   testCase.verifyEmpty(release_v12.sites);
+   testCase.verifyEmpty(release_v12.site_forcings);
+   testCase.verifyEqual( ...
+      release_v12.required_fixture_capabilities, "formal-core");
+   testCase.verifyTrue(release_v12.use_fixture_root_for_model);
+   testCase.verifyTrue(release_v12.snapshot_from_rolling);
+   testCase.verifyTrue(release_v12.require_source_revision);
+   testCase.verifyEqual(release_v12.promice_filled_policy_sha256, ...
+      "bd336da0880474f1987facc2311c4f45a6c281877ae8b944a3fbdc7cfb68d513");
+   testCase.verifyEqual(release_v12_alias.baseline_tag, "v1.2");
+end
+
+function test_release_v12_case_matrices_use_rolling_forcing(testCase)
+   % v1.2 snapshots use the accepted forcing from the rolling baselines.
+
+   regression_cases = icemodel.test.helpers.getRegressionCaseMatrix( ...
+      tier="full", baseline="v1.2");
+   perf_cases = icemodel.test.helpers.getPerfCaseMatrix( ...
+      tier="full", baseline="v1_2");
+
+   testCase.verifyEqual(unique(regression_cases.forcings), ...
+      "promice_filled");
+   testCase.verifyEqual(unique(perf_cases.forcings), "promice_filled");
+
+   % These rows check the plumbing that carries the registered digest into
+   % each matrix and into opts, so read the digest from its registration
+   % rather than declaring it a second time. The pin itself is checked in
+   % test_formal_baseline_policy_owns_default_data_case.
+   expected_sha256 = icemodel.test.helpers.formalBaselinePolicy( ...
+      "v1.2").promice_filled_policy_sha256;
+   testCase.verifyEqual( ...
+      unique(regression_cases.promice_filled_expected_policy_sha256), ...
+      expected_sha256);
+   testCase.verifyEqual( ...
+      unique(perf_cases.promice_filled_expected_policy_sha256), ...
+      expected_sha256);
+   opts = icemodel.test.helpers.setModelOptsForCase(regression_cases(1, :));
+   testCase.verifyEqual( ...
+      string(opts.promice_filled_expected_policy_sha256), expected_sha256);
 end
 
 function test_release_v11_case_matrices_retain_historical_forcing(testCase)
@@ -404,10 +722,14 @@ function test_performance_verdict_fails_closed_when_compatible(testCase)
       true, 10, baseline, 1, true, 0.2, "");
    testCase.verifyFalse(passed);
    testCase.verifySubstring(reason, "finite and positive");
+end
+
+function test_incompatible_performance_verdict_is_not_acceptance(testCase)
+   % Valid samples do not pass when baseline timings are not comparable.
    [passed, ~, ~, ~, reason] = ...
       icemodel.test.helpers.formalPerformanceVerdict( ...
       true, 10, table(), [], false, 0.2, "metadata incompatible");
-   testCase.verifyTrue(passed);
+   testCase.verifyFalse(passed);
    testCase.verifyEqual(reason, "metadata incompatible");
 end
 
@@ -504,6 +826,249 @@ function test_existing_release_target_is_immutable(testCase)
    clear cleanup
 end
 
+function test_bootstrap_release_rejects_partial_model_snapshots(testCase)
+   % A partial aggregate release keeps the existing file and creates nothing.
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   models = ["icemodel"; "skinmodel"];
+   existing_file = fullfile(fixture.Folder, "icemodel.mat");
+   missing_file = fullfile(fixture.Folder, "skinmodel.mat");
+   writeTextFixture(existing_file, "frozen baseline bytes");
+   original_bytes = fileread(existing_file);
+   snapshot_calls = string.empty(0, 1);
+   removed_models = string.empty(0, 1);
+   fail_model = "";
+   fail_load = false;
+   empty_reload = false;
+   force_empty = false;
+   remove_fail_model = "";
+   source_revisions = ["revision-a"; "revision-a"];
+
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.resolveBootstrapRelease( ...
+      "perf", "v1.2", "all", 2016, ...
+      policy_resolver=@(~) struct('snapshot_from_rolling', true), ...
+      loader=@loadStub, perf_snapshotter=@snapshotStub), ...
+      'icemodel:test:partialReleaseBaseline');
+
+   testCase.verifyEmpty(snapshot_calls);
+   testCase.verifyEqual(fileread(existing_file), original_bytes);
+   testCase.verifyFalse(isfile(missing_file));
+
+   % An existing file that filters to no rows must not be deleted on failure.
+   writeTextFixture(missing_file, "second frozen baseline");
+   second_bytes = fileread(missing_file);
+   force_empty = true;
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.resolveBootstrapRelease( ...
+      "perf", "v1.2", "all", 2016, ...
+      policy_resolver=@(~) struct('snapshot_from_rolling', true), ...
+      loader=@loadStub, perf_snapshotter=@snapshotStub, ...
+      snapshot_remover=@removeStub), ...
+      'test:immutableSnapshot');
+   testCase.verifyEmpty(removed_models);
+   testCase.verifyEqual(fileread(existing_file), original_bytes);
+   testCase.verifyEqual(fileread(missing_file), second_bytes);
+
+   % A failure while creating a fresh set removes completed snapshots.
+   delete(existing_file);
+   delete(missing_file);
+   snapshot_calls = string.empty(0, 1);
+   force_empty = false;
+   fail_model = "skinmodel";
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.resolveBootstrapRelease( ...
+      "perf", "v1.2", "all", 2016, ...
+      policy_resolver=@(~) struct('snapshot_from_rolling', true), ...
+      loader=@loadStub, perf_snapshotter=@snapshotStub, ...
+      snapshot_remover=@removeStub), ...
+      'test:snapshotFailure');
+   testCase.verifyEqual(snapshot_calls, models);
+   testCase.verifyEqual(removed_models, "icemodel");
+   testCase.verifyFalse(isfile(existing_file));
+   testCase.verifyFalse(isfile(missing_file));
+
+   % Reload failures roll back both files even when one remover fails.
+   snapshot_calls = string.empty(0, 1);
+   removed_models = string.empty(0, 1);
+   fail_model = "";
+   fail_load = true;
+   remove_fail_model = "icemodel";
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.resolveBootstrapRelease( ...
+      "perf", "v1.2", "all", 2016, ...
+      policy_resolver=@(~) struct('snapshot_from_rolling', true), ...
+      loader=@loadStub, perf_snapshotter=@snapshotStub, ...
+      snapshot_remover=@removeStub), ...
+      'test:snapshotLoadFailure');
+   testCase.verifyEqual(snapshot_calls, models);
+   testCase.verifyEqual(removed_models, models);
+   testCase.verifyFalse(isfile(existing_file));
+   testCase.verifyFalse(isfile(missing_file));
+
+   % An empty persisted reload is incomplete and rolls back the whole set.
+   snapshot_calls = string.empty(0, 1);
+   removed_models = string.empty(0, 1);
+   fail_load = false;
+   empty_reload = true;
+   remove_fail_model = "";
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.resolveBootstrapRelease( ...
+      "perf", "v1.2", "all", 2016, ...
+      policy_resolver=@(~) struct('snapshot_from_rolling', true), ...
+      loader=@loadStub, perf_snapshotter=@snapshotStub, ...
+      snapshot_remover=@removeStub), ...
+      'icemodel:test:emptyReleaseSnapshot');
+   testCase.verifyEqual(snapshot_calls, models);
+   testCase.verifyEqual(removed_models, models);
+   testCase.verifyFalse(isfile(existing_file));
+   testCase.verifyFalse(isfile(missing_file));
+
+   % A fresh aggregate request creates both scalar model snapshots.
+   snapshot_calls = string.empty(0, 1);
+   removed_models = string.empty(0, 1);
+   fail_load = false;
+   empty_reload = false;
+   remove_fail_model = "";
+   baseline = icemodel.test.helpers.resolveBootstrapRelease( ...
+      "perf", "v1.2", "all", 2016, ...
+      policy_resolver=@(~) struct('snapshot_from_rolling', true), ...
+      loader=@loadStub, perf_snapshotter=@snapshotStub);
+   testCase.verifyEqual(snapshot_calls, models);
+   testCase.verifyEqual(sort(baseline.smbmodel), sort(models));
+
+   % Existing aggregate snapshots load without calling a snapshotter.
+   snapshot_calls = string.empty(0, 1);
+   baseline = icemodel.test.helpers.resolveBootstrapRelease( ...
+      "perf", "v1.2", "all", 2016, ...
+      policy_resolver=@(~) struct('snapshot_from_rolling', true), ...
+      loader=@loadStub, perf_snapshotter=@snapshotStub);
+   testCase.verifyEmpty(snapshot_calls);
+   testCase.verifyEqual(sort(baseline.smbmodel), sort(models));
+
+   % An existing aggregate cannot combine different source generations.
+   source_revisions(2) = "revision-b";
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.resolveBootstrapRelease( ...
+      "perf", "v1.2", "all", 2016, ...
+      policy_resolver=@(~) struct('snapshot_from_rolling', true), ...
+      loader=@loadStub, perf_snapshotter=@snapshotStub), ...
+      'icemodel:test:mixedReleaseBaselineProvenance');
+   source_revisions(2) = "revision-a";
+
+   % A current release rejects missing provenance even for one model.
+   source_revisions(1) = "";
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.resolveBootstrapRelease( ...
+      "perf", "v1.2", "icemodel", 2016, ...
+      policy_resolver=@(~) struct( ...
+      'snapshot_from_rolling', true, 'require_source_revision', true), ...
+      loader=@loadStub, perf_snapshotter=@snapshotStub), ...
+      'icemodel:test:mixedReleaseBaselineProvenance');
+   source_revisions(1) = "revision-a";
+
+   % A row-vector regression request uses the regression snapshotter.
+   delete(existing_file);
+   delete(missing_file);
+   baseline = icemodel.test.helpers.resolveBootstrapRelease( ...
+      "regression", "v1.2", models.', 2016, ...
+      policy_resolver=@(~) struct('snapshot_from_rolling', true), ...
+      loader=@loadStub, regression_snapshotter=@snapshotStub);
+   testCase.verifyEqual(snapshot_calls, models);
+   testCase.verifyEqual(sort(baseline.smbmodel), sort(models));
+
+   % A preserved release reports a missing immutable model snapshot.
+   delete(existing_file);
+   delete(missing_file);
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.resolveBootstrapRelease( ...
+      "regression", "v1.1", "all", 2016, ...
+      policy_resolver=@(~) struct('snapshot_from_rolling', false), ...
+      loader=@loadStub, regression_snapshotter=@snapshotStub), ...
+      'icemodel:test:preservedReleaseMissing');
+
+   % Historical v1.1 files remain usable without source-revision metadata.
+   writeTextFixture(existing_file, "historical icemodel baseline");
+   writeTextFixture(missing_file, "historical skinmodel baseline");
+   source_revisions(:) = "";
+   baseline = icemodel.test.helpers.resolveBootstrapRelease( ...
+      "regression", "v1.1", "all", 2016, ...
+      policy_resolver=@(~) struct( ...
+      'snapshot_from_rolling', false, 'require_source_revision', false), ...
+      loader=@loadStub, regression_snapshotter=@snapshotStub);
+   testCase.verifyEqual(sort(baseline.smbmodel), sort(models));
+
+   function [baseline, meta] = loadStub(kind, varargin)
+      %LOADSTUB Load temporary model markers as a baseline table.
+      kwargs = struct(varargin{:});
+      model_index = find(models == kwargs.smbmodel, 1);
+      meta = struct('git_revision', source_revisions(model_index));
+      assert(ismember(kind, ["perf", "regression"]) ...
+         && ismember(kwargs.baseline_tag, ["rolling", "v1.1", "v1.2"]) ...
+         && kwargs.simyear == 2016)
+      if kwargs.baseline_tag == "rolling"
+         baseline = table(kwargs.smbmodel, ...
+            'VariableNames', {'smbmodel'});
+         return
+      end
+      if force_empty
+         baseline = table(strings(0, 1), ...
+            'VariableNames', {'smbmodel'});
+         return
+      end
+      all_present = all(arrayfun(@(model) isfile( ...
+         fullfile(fixture.Folder, model + ".mat")), models));
+      if fail_load && all_present
+         error('test:snapshotLoadFailure', ...
+            'synthetic snapshot reload failure')
+      end
+      if empty_reload && all_present
+         baseline = table(strings(0, 1), ...
+            'VariableNames', {'smbmodel'});
+         return
+      end
+      present = arrayfun(@(model) isfile( ...
+         fullfile(fixture.Folder, model + ".mat")), models);
+      selected = models(present);
+      if kwargs.smbmodel ~= "all"
+         selected = selected(selected == kwargs.smbmodel);
+      end
+      baseline = table(selected, 'VariableNames', {'smbmodel'});
+   end
+
+   function snapshotStub(varargin)
+      %SNAPSHOTSTUB Record and create one temporary model snapshot.
+      kwargs = struct(varargin{:});
+      assert(kwargs.baseline_tag == "v1.2")
+      if isfield(kwargs, 'simyear')
+         assert(kwargs.simyear == 2016)
+      end
+      snapshot_calls(end + 1, 1) = kwargs.smbmodel;
+      pathname = fullfile(fixture.Folder, kwargs.smbmodel + ".mat");
+      if isfile(pathname)
+         error('test:immutableSnapshot', ...
+            'synthetic immutable target rejection')
+      end
+      if kwargs.smbmodel == fail_model
+         error('test:snapshotFailure', 'synthetic snapshot failure')
+      end
+      writeTextFixture(fullfile(fixture.Folder, ...
+         kwargs.smbmodel + ".mat"), "new baseline bytes");
+   end
+
+   function removeStub(~, ~, model, ~)
+      %REMOVESTUB Record and remove one attempted temporary snapshot.
+      removed_models(end + 1, 1) = model;
+      pathname = fullfile(fixture.Folder, model + ".mat");
+      if isfile(pathname)
+         delete(pathname)
+      end
+      if model == remove_fail_model
+         error('test:removeFailure', 'synthetic snapshot removal failure')
+      end
+   end
+end
+
 function test_new_snapshot_path_requires_release_registration(testCase)
    % A nonexistent target is not rejected as immutable, but a new release tag
    % must register its forcing identity before any snapshot can be written.
@@ -514,6 +1079,53 @@ function test_new_snapshot_path_requires_release_registration(testCase)
       "regression", "vNext", "icemodel", false, output_file, 2016), ...
       'icemodel:test:unregisteredReleaseForcing');
    testCase.verifyFalse(isfile(output_file));
+end
+
+function test_common_baseline_revision_requires_complete_provenance(testCase)
+   % Release evidence must name one source revision for every selected model.
+   models = ["icemodel"; "skinmodel"];
+   revisions = ["revision-a"; "revision-a"];
+
+   revision = icemodel.test.helpers.assertCommonBaselineRevision( ...
+      "regression", "v1.2", models, 2016, loader=@loadStub);
+   testCase.verifyEqual(revision, "revision-a");
+
+   revisions(2) = "revision-b";
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.assertCommonBaselineRevision( ...
+      "regression", "v1.2", models, 2016, loader=@loadStub), ...
+      'icemodel:test:mixedReleaseBaselineProvenance');
+
+   revisions(1) = "";
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.assertCommonBaselineRevision( ...
+      "perf", "v1.2", "icemodel", 2016, loader=@loadStub), ...
+      'icemodel:test:mixedReleaseBaselineProvenance');
+
+   % A whole set of blank revisions shares one value, so the unique count
+   % alone would accept it. The blank test must run on every entry.
+   revisions(:) = "";
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.assertCommonBaselineRevision( ...
+      "regression", "v1.2", models, 2016, loader=@loadStub), ...
+      'icemodel:test:mixedReleaseBaselineProvenance');
+
+   % A single missing revision is unique and has NaN length, so neither the
+   % strlength test nor the unique count rejects it on its own.
+   revisions(1) = missing;
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.assertCommonBaselineRevision( ...
+      "perf", "v1.2", "icemodel", 2016, loader=@loadStub), ...
+      'icemodel:test:mixedReleaseBaselineProvenance');
+
+   function [baseline, meta] = loadStub(~, varargin)
+      %LOADSTUB Return one revision for the requested model.
+      kwargs = struct(varargin{:});
+      model_index = find(models == kwargs.smbmodel, 1);
+      baseline = table(kwargs.smbmodel, ...
+         'VariableNames', {'smbmodel'});
+      meta = struct('git_revision', revisions(model_index));
+   end
 end
 
 function test_prepareBaselineBuild_forwards_release_identity(testCase)
@@ -568,7 +1180,10 @@ function test_baseline_builders_forward_data_root_without_writing(testCase)
    fixture_root = string(tempname);
    fixture_source = fullfile(fixture_root, "source");
    helper_dir = fullfile(fixture_source, "+icemodel", "+test", "+helpers");
+   setup_dir = fullfile(fixture_source, ...
+      "+icemodel", "+verification", "+setup");
    mkdir(helper_dir);
+   mkdir(setup_dir);
    output_file = fullfile(fixture_root, "must-not-exist.mat");
 
    env_names = ["ICEMODEL_EXPECTED_BUILDER_ARGUMENT_ROOT"; ...
@@ -587,9 +1202,11 @@ function test_baseline_builders_forward_data_root_without_writing(testCase)
       "bootstrapTestEnvironment.m"));
    writeBuilderResolverStub(fullfile(helper_dir, ...
       "resolveRequestedSmbmodels.m"));
+   writeBuilderFetchStub(fullfile(setup_dir, "fetchFixtures.m"));
    addpath(fixture_source, '-begin');
    clear('icemodel.test.helpers.bootstrapTestEnvironment', ...
-      'icemodel.test.helpers.resolveRequestedSmbmodels')
+      'icemodel.test.helpers.resolveRequestedSmbmodels', ...
+      'icemodel.verification.setup.fetchFixtures')
 
    selected_root = fullfile(fixture_root, "selected-data");
    setenv('ICEMODEL_EXPECTED_BUILDER_ARGUMENT_ROOT', selected_root);
@@ -637,9 +1254,22 @@ function test_baseline_builders_forward_data_root_without_writing(testCase)
       baseline_tag="v1.1", data_root="", output_file=output_file), ...
       'icemodel:test:baselineDataRootObserved');
 
+   % Frozen v1.2 verifies and runs from the registered fixture root.
+   setenv('ICEMODEL_EXPECTED_BUILDER_ARGUMENT_ROOT', historical_root);
+   setenv('ICEMODEL_EXPECTED_BUILDER_CASENAME', 'verification');
+   setenv('ICEMODEL_EXPECTED_BUILDER_KIND', 'regression');
+   testCase.verifyError(@() build_regression_baseline( ...
+      baseline_tag="v1.2", data_root="", output_file=output_file), ...
+      'icemodel:test:baselineDataRootObserved');
+   setenv('ICEMODEL_EXPECTED_BUILDER_KIND', 'perf');
+   testCase.verifyError(@() build_perf_baseline( ...
+      baseline_tag="v1.2", data_root="", output_file=output_file), ...
+      'icemodel:test:baselineDataRootObserved');
+
    % An explicit root still takes precedence, even for a release registration.
    setenv('ICEMODEL_EXPECTED_BUILDER_ARGUMENT_ROOT', selected_root);
    setenv('ICEMODEL_EXPECTED_BUILDER_RESOLVED_ROOT', selected_root);
+   setenv('ICEMODEL_EXPECTED_BUILDER_CASENAME', 'test');
    setenv('ICEMODEL_EXPECTED_BUILDER_KIND', 'regression');
    testCase.verifyError(@() build_regression_baseline( ...
       baseline_tag="v1.1", data_root=selected_root, ...
@@ -661,11 +1291,16 @@ function test_baseline_runners_select_registered_data_case_without_running(testC
 
    env_names = ["ICEMODEL_EXPECTED_RUNNER_ROOT"; ...
       "ICEMODEL_EXPECTED_RUNNER_CASENAME"; ...
-      "ICEMODEL_REGRESSION_BASELINE"; "ICEMODEL_TEST_DATA_ROOT"];
+      "ICEMODEL_REGRESSION_BASELINE"; "ICEMODEL_TEST_DATA_ROOT"; ...
+      "ICEMODEL_TEST_SESSION_ACTIVITY"];
    env_values = arrayfun(@(name) string(getenv(name)), env_names);
    original_path = path;
    cleanup = onCleanup(@() restoreRunnerFixture( ...
       original_path, fixture_root, env_names, env_values));
+
+   % This probe aborts the runners at bootstrap and times nothing, so the
+   % contaminated-session refusal does not apply; present a clean session.
+   setenv('ICEMODEL_TEST_SESSION_ACTIVITY', '');
 
    writeRunnerBootstrapStub(fullfile(helper_dir, ...
       "bootstrapTestEnvironment.m"));
@@ -704,15 +1339,56 @@ function test_release_runners_verify_registered_fixture_capability(testCase)
    mkdir(data_root)
    cleanup = onCleanup(@() rmdir(data_root, 's'));
 
+   % This probe stops at the capability check and times nothing, so the
+   % contaminated-session refusal does not apply; present a clean session.
+   prior_activity = getenv('ICEMODEL_TEST_SESSION_ACTIVITY');
+   activity_cleanup = onCleanup(@() ...
+      setenv('ICEMODEL_TEST_SESSION_ACTIVITY', prior_activity));
+   setenv('ICEMODEL_TEST_SESSION_ACTIVITY', '');
+
    verifyFixtureCapabilityError(testCase, @() run_regression_suite( ...
       tier="smoke", smbmodel="icemodel", baseline="v1.1", ...
-      data_root=data_root, build_report=false), data_root);
+      data_root=data_root, build_report=false), ...
+      data_root);
    verifyFixtureCapabilityError(testCase, @() run_perf_suite( ...
       tier="smoke", smbmodel="icemodel", baseline="v1.1", ...
-      data_root=data_root, include_benchmarks=false, build_report=false), ...
+      data_root=data_root, ...
+      include_benchmarks=false, build_report=false), ...
       data_root);
 
    clear cleanup
+end
+
+function test_release_data_roots_preserve_v1_1_and_unify_v1_2(testCase)
+   % v1.1 keeps its explicit root; v1.2 verifies the root it executes.
+   v1_1 = icemodel.test.helpers.formalBaselinePolicy("v1.1");
+   [data_root, fixture_root] = ...
+      icemodel.test.helpers.resolveReleaseDataRoots( ...
+      v1_1, "/tmp/v1.1", "");
+   testCase.verifyEqual([data_root; fixture_root], ...
+      ["/tmp/v1.1"; "/tmp/v1.1"]);
+
+   v1_2 = icemodel.test.helpers.formalBaselinePolicy("v1.2");
+   canonical = icemodel.verification.setup.fixtureDataRoot("v1.2");
+   [data_root, fixture_root] = ...
+      icemodel.test.helpers.resolveReleaseDataRoots(v1_2, "", "");
+   testCase.verifyEqual([data_root; fixture_root], ...
+      [canonical; canonical]);
+
+   [data_root, fixture_root] = ...
+      icemodel.test.helpers.resolveReleaseDataRoots( ...
+      v1_2, "", "/tmp/v1.2");
+   testCase.verifyEqual([data_root; fixture_root], ...
+      ["/tmp/v1.2"; "/tmp/v1.2"]);
+   testCase.verifyError(@() ...
+      icemodel.test.helpers.resolveReleaseDataRoots( ...
+      v1_2, "/tmp/model", "/tmp/fixtures"), ...
+      'icemodel:test:releaseDataRootMismatch');
+   [data_root, fixture_root] = ...
+      icemodel.test.helpers.resolveReleaseDataRoots( ...
+      v1_2, "/tmp/v1.2/../v1.2", "/tmp/v1.2/");
+   testCase.verifyEqual(data_root, "/tmp/v1.2/../v1.2");
+   testCase.verifyEqual(fixture_root, "/tmp/v1.2/");
 end
 
 function test_testSmbmodel_group_stays_limited_to_formal_models(testCase)
@@ -734,8 +1410,7 @@ function test_testsmbmodel_completion_group_matches_formal_models(testCase)
 end
 
 function test_resolveRequestedSmbmodels_expands_virtual_all_selector(testCase)
-   % Formal-suite entrypoints should expand the virtual aggregate selector
-   % once, then iterate through the canonical single-model workflow.
+   % Formal-suite entrypoints expand "all" once, then run one model at a time.
 
    models = icemodel.test.helpers.resolveRequestedSmbmodels("all");
 
@@ -788,8 +1463,8 @@ function test_summarizeIce1Metrics_prefers_full_surface_residual(testCase)
 end
 
 function test_bootstrapTestEnvironment_restores_caller_config(testCase)
-   % The suite bootstrap should install the canonical demo config for the
-   % run, then restore the caller's previous config on cleanup.
+   % The suite bootstrap must install the test demo configuration. Cleanup
+   % must restore the caller's configuration.
 
    previous_output = getenv('ICEMODEL_OUTPUT_PATH');
    restore_output = onCleanup(@() setenv('ICEMODEL_OUTPUT_PATH', previous_output));
@@ -868,12 +1543,65 @@ function test_baselineFilePath_returns_rolling_regression(testCase)
       "regression_baseline_rolling_icemodel.mat"));
 end
 
+function test_managedBaselineSiblings_returns_every_formal_model(testCase)
+   % A build with no explicit output owns one file for each formal model, so
+   % worktreeRevision must leave all of them out of the source identity.
+
+   models = icemodel.test.helpers.resolveRequestedSmbmodels("all");
+   returned = icemodel.test.helpers.managedBaselineSiblings( ...
+      "regression", "rolling", string.empty());
+   expected = arrayfun(@(model) string( ...
+      icemodel.test.helpers.baselineFilePath("regression", ...
+      smbmodel=model)), models);
+   testCase.verifyEqual(sort(returned(:)), sort(expected(:)));
+end
+
+function test_managedBaselineSiblings_keys_perf_files_by_year(testCase)
+   % Perf baseline paths carry the benchmark year; regression paths do not.
+
+   models = icemodel.test.helpers.resolveRequestedSmbmodels("all");
+   returned = icemodel.test.helpers.managedBaselineSiblings( ...
+      "perf", "v1.2", string.empty(), simyear=2016);
+   testCase.verifyNumElements(returned, numel(models));
+   testCase.verifyTrue(all(contains(returned, "perf_baseline_2016_v1_2_")));
+   testCase.verifyTrue(isstring(returned));
+end
+
+function test_managedBaselineSiblings_honors_an_explicit_output(testCase)
+   % An explicit output file names the only managed file the build writes.
+
+   returned = icemodel.test.helpers.managedBaselineSiblings( ...
+      "perf", "rolling", "/tmp/one-off-baseline.mat");
+   testCase.verifyEqual(returned, "/tmp/one-off-baseline.mat");
+end
+
 function test_baselineFilePath_resolves_latest_release(testCase)
    % baseline_type="release" without a tag should resolve the latest version.
 
    pathname = icemodel.test.helpers.baselineFilePath("perf", ...
       baseline_type="release");
-   testCase.verifyTrue(contains(pathname, "v1_1"));
+   testCase.verifyTrue(contains(pathname, "v1_2"));
+end
+
+function test_scalar_snapshot_commands_reload_custom_outputs(testCase)
+   % Scalar public snapshot commands validate their saved custom outputs.
+   regression_file = string(tempname) + ".mat";
+   perf_file = string(tempname) + ".mat";
+   cleanup = onCleanup(@() removeSnapshotOutputs( ...
+      [regression_file; perf_file]));
+
+   regression = snapshot_regression_baseline( ...
+      baseline_tag="v1.2", smbmodel="icemodel", ...
+      output_file=regression_file);
+   perf = snapshot_perf_baseline( ...
+      baseline_tag="v1.2", smbmodel="icemodel", simyear=2016, ...
+      output_file=perf_file);
+
+   testCase.verifyTrue(isfile(regression_file));
+   testCase.verifyTrue(isfile(perf_file));
+   testCase.verifyFalse(isempty(regression));
+   testCase.verifyFalse(isempty(perf));
+   clear cleanup
 end
 
 function test_loadBaseline_perf_returns_nonempty_table(testCase)
@@ -979,6 +1707,15 @@ function writeBuilderResolverStub(filename)
    writeTextFixture(filename, join(lines, newline));
 end
 
+function writeBuilderFetchStub(filename)
+   %WRITEBUILDERFETCHSTUB Keep ignored release data outside the unit seam.
+   lines = [ ...
+      "function result = fetchFixtures(varargin)"
+      "result = struct();"
+      "end"];
+   writeTextFixture(filename, join(lines, newline));
+end
+
 function writeRunnerBootstrapStub(filename)
    %WRITERUNNERBOOTSTRAPSTUB Stop public runners after setup.
 
@@ -1017,8 +1754,15 @@ function verifyFixtureCapabilityError(testCase, operation, data_root)
    %VERIFYFIXTURECAPABILITYERROR Check the repair path works without network
    % access.
 
+   % Mirror captureExpectedWarning's guard; this also anchors the
+   % analyzer's view of the argument the evalc string consumes.
+   assert(isa(operation, 'function_handle'))
    try
-      operation();
+      % The empty data_root makes config resolution warn about
+      % ICEMODEL_INPUT_PATH before the capability check errors. Run the
+      % operation under evalc so that expected warning text stays out of
+      % the suite log; evalc still propagates the error to the catch.
+      evalc('operation();');
       testCase.verifyFail('expected incomplete frozen fixture capability');
    catch err
       testCase.verifyEqual(string(err.identifier), ...
@@ -1043,7 +1787,8 @@ function restoreBuilderFixture(original_path, fixture_root, names, values)
 
    path(original_path);
    clear('icemodel.test.helpers.bootstrapTestEnvironment', ...
-      'icemodel.test.helpers.resolveRequestedSmbmodels')
+      'icemodel.test.helpers.resolveRequestedSmbmodels', ...
+      'icemodel.verification.setup.fetchFixtures')
    for n = 1:numel(names)
       setenv(names(n), values(n));
    end
@@ -1062,5 +1807,64 @@ function restoreRunnerFixture(original_path, fixture_root, names, values)
    end
    if isfolder(fixture_root)
       rmdir(fixture_root, 's');
+   end
+end
+
+function meta = aaArtifactMeta(run_name)
+   %AAARTIFACTMETA Build the metadata run_aa_acceptance requires.
+   meta = struct('ambient_stable', true, 'isolation', "process", ...
+      'run_name', string(run_name), 'hostname', "test-host", ...
+      'matlab_version', string(version), 'git_revision', "test-rev", ...
+      'tier', "smoke", 'simyear', 2016, 'n_runs', 3, 'n_warmups', 1, ...
+      'tol_perf', 0.2, 'data_root', "test-data");
+end
+
+function case_summary = aaCaseSummary(median_wall_s, valid)
+   %AACASESUMMARY Build one complete A/A workload row.
+   case_summary = table("icemodel_kanm_2016_solver1", ...
+      "promice_filled", median_wall_s, valid, ...
+      'VariableNames', {'case_id', 'forcings', 'median_wall_s', 'valid'});
+end
+
+function writeAaSuiteStub(stub_file)
+   %WRITEAASUITESTUB Write a run_perf_suite stub for the A/A branch test.
+   %
+   % Each call writes one valid process-isolated artifact beside the stub
+   % and returns its path, with a fresh run_name per call.
+   stub = [ ...
+      "function results = run_perf_suite(varargin)" ...
+      "   persistent n" ...
+      "   if isempty(n); n = 0; end" ...
+      "   n = n + 1;" ...
+      "   meta = struct('ambient_stable', true, 'isolation', ""process"", ..." ...
+      "      'run_name', ""20260101-00000"" + n, 'hostname', ""test-host"", ..." ...
+      "      'matlab_version', string(version), 'git_revision', ""test-rev"", ..." ...
+      "      'tier', ""smoke"", 'simyear', 2016, 'n_runs', 3, ..." ...
+      "      'n_warmups', 1, 'tol_perf', 0.2, 'data_root', ""test-data"");" ...
+      "   case_summary = table(""icemodel_kanm_2016_solver1"", ..." ...
+      "      ""promice_filled"", 100.0, true, ..." ...
+      "      'VariableNames', {'case_id', 'forcings', ..." ...
+      "      'median_wall_s', 'valid'});" ...
+      "   file = fullfile(fileparts(mfilename('fullpath')), ..." ...
+      "      sprintf('perf_results_stub_%d.mat', n));" ...
+      "   save(file, 'meta', 'case_summary');" ...
+      "   results = struct('artifact_file', file);" ...
+      "end"];
+   fid = fopen(stub_file, 'w');
+   assert(fid >= 0, 'cannot write the run_perf_suite stub')
+   cleanup = onCleanup(@() fclose(fid));
+   fprintf(fid, '%s\n', stub{:});
+end
+
+function removeSnapshotOutputs(files)
+   %REMOVESNAPSHOTOUTPUTS Remove temporary snapshot files and profiler copies.
+   for pathname = files.'
+      if isfile(pathname)
+         delete(pathname)
+      end
+      profile_dir = icemodel.test.helpers.baselineProfilerDir(pathname);
+      if isfolder(profile_dir)
+         rmdir(profile_dir, 's')
+      end
    end
 end

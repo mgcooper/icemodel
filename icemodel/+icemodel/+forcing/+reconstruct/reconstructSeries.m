@@ -31,9 +31,9 @@ function result = reconstructSeries(series, channel_methods, kwargs)
    %
    % Inputs
    %  series : target timetable (native, gaps preserved).
-   %  channel_methods : struct array, one element per channel to fill —
-   %     channel : canonical channel name present in the series.
-   %     methods : ordered struct array of admitted estimates —
+   %  channel_methods : struct array, one element per channel to fill:
+   %     channel : channel name present in the series.
+   %     methods : ordered struct array of admitted estimates:
    %        name : method label for audit/registry (e.g. "donor:aws10").
    %        code : uint8 provenance code from provenanceCodes.
    %        estimate : Nx1 estimate on the series axis (NaN = declines).
@@ -75,7 +75,7 @@ function result = reconstructSeries(series, channel_methods, kwargs)
    %        channel, on the same time axis.
    %     audit : segment-audit table (channel, start_time, end_time,
    %        duration_hours, method, detail, context_id). A production
-   %        context_id joins to the persisted station plan's exact fitted
+   %        context_id joins to the persisted station plan's fitted
    %        parameters and held-out metrics.
    %     registry : provenanceCodes() struct recorded with the product.
    %
