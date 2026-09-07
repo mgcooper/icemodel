@@ -40,6 +40,21 @@ function test_loadmet_concatenates_years_and_computes_exchange(testCase)
    testCase.verifyEqual(opts_2015.simyears, 2015);
 end
 
+function test_promice_filled_readiness_refuses_an_empty_file_list(testCase)
+   % Every later readiness step indexes the selected file list, so an empty
+   % selection must raise the documented not-ready identifier instead of an
+   % index error.
+   opts = struct();
+   opts.forcings = 'promice_filled';
+   opts.sitename = 'kanm';
+   opts.metfname = {};
+   opts.dt = 900;
+
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts), ...
+      'icemodel:loadmet:promiceFilledNotReady');
+end
+
 function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
    % The canonical filled product cannot enter a run unless the producer
    % manifest pins every runtime artifact and the filled files' samples
@@ -135,6 +150,45 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
    writePromiceRuntimeManifest(opts);
    S = load(opts.metfname{1}, 'met');
    canonical_met = S.met;
+   % A frozen release pins its own policy digest, so its artifact loads
+   % under that override.
+   historical_met = canonical_met;
+   historical_met.Properties.UserData.gapfill_engine_version = "0.9";
+   historical_met.Properties.UserData.gapfill_policy_sha256 = ...
+      string(repmat('b', 1, 64));
+   historical_opts = opts;
+   historical_opts.promice_filled_expected_policy_sha256 = ...
+      string(repmat('b', 1, 64));
+   testCase.verifyWarningFree(@() ...
+      icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
+      opts.metfname{1}, historical_met, opts.sitename, historical_opts));
+
+   % An artifact stamped by an older engine loads under the current policy
+   % with no override, because the check records the engine version instead
+   % of comparing it with icemodel.internal.version().
+   older_engine_met = canonical_met;
+   older_engine_met.Properties.UserData.gapfill_engine_version = "0.9";
+   testCase.verifyWarningFree(@() ...
+      icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
+      opts.metfname{1}, older_engine_met, opts.sitename, opts));
+
+   % A pinned digest still rejects an artifact stamped with a different one.
+   pinned_opts = opts;
+   pinned_opts.promice_filled_expected_policy_sha256 = ...
+      string(repmat('c', 1, 64));
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
+      opts.metfname{1}, canonical_met, opts.sitename, pinned_opts), ...
+      'icemodel:loadmet:promiceFilledIdentityMismatch');
+
+   % A blank engine version still fails, because the field must name the
+   % producer for later forensics.
+   blank_engine_met = canonical_met;
+   blank_engine_met.Properties.UserData.gapfill_engine_version = "";
+   testCase.verifyError(@() ...
+      icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
+      opts.metfname{1}, blank_engine_met, opts.sitename, opts), ...
+      'icemodel:loadmet:promiceFilledIdentityMismatch');
    met = canonical_met;
    met.Properties.UserData.gapfill_policy_sha256 = ...
       string(repmat('a', 1, 64));

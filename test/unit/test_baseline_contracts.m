@@ -470,15 +470,66 @@ function test_formal_baseline_policy_owns_default_data_case(testCase)
    % The same registration selects forcing identity and its default data tree.
 
    rolling = icemodel.test.helpers.formalBaselinePolicy("rolling");
-   release = icemodel.test.helpers.formalBaselinePolicy("v1.1");
+   release_v11 = icemodel.test.helpers.formalBaselinePolicy("v1.1");
+   release_v12 = icemodel.test.helpers.formalBaselinePolicy("v1.2");
+   release_v12_alias = icemodel.test.helpers.formalBaselinePolicy("V1_2");
 
    testCase.verifyEqual(rolling.config_case, "verification");
    testCase.verifyEqual(rolling.forcing, "promice_filled");
    testCase.verifyEmpty(rolling.required_fixture_capabilities);
-   testCase.verifyEqual(release.config_case, "test");
-   testCase.verifyEqual(release.site_forcings, ["kanm"; "kanl"]);
-   testCase.verifyEqual(release.required_fixture_capabilities, "formal-core");
-   testCase.verifyFalse(release.snapshot_from_rolling);
+   testCase.verifyFalse(rolling.use_fixture_root_for_model);
+   testCase.verifyTrue(rolling.require_source_revision);
+   testCase.verifyEqual(rolling.promice_filled_policy_sha256, ...
+      icemodel.forcing.reconstruct.policySha256());
+   testCase.verifyEqual(release_v11.config_case, "test");
+   testCase.verifyEqual(release_v11.site_forcings, ["kanm"; "kanl"]);
+   testCase.verifyEqual( ...
+      release_v11.required_fixture_capabilities, "formal-core");
+   testCase.verifyFalse(release_v11.use_fixture_root_for_model);
+   testCase.verifyFalse(release_v11.snapshot_from_rolling);
+   testCase.verifyFalse(release_v11.require_source_revision);
+   testCase.verifyEqual(release_v12.config_case, "verification");
+   testCase.verifyEqual(release_v12.forcing_mode, "fixed");
+   testCase.verifyEqual(release_v12.forcing, "promice_filled");
+   testCase.verifyEmpty(release_v12.sites);
+   testCase.verifyEmpty(release_v12.site_forcings);
+   testCase.verifyEqual( ...
+      release_v12.required_fixture_capabilities, "formal-core");
+   testCase.verifyTrue(release_v12.use_fixture_root_for_model);
+   testCase.verifyTrue(release_v12.snapshot_from_rolling);
+   testCase.verifyTrue(release_v12.require_source_revision);
+   testCase.verifyEqual(release_v12.promice_filled_policy_sha256, ...
+      "bd336da0880474f1987facc2311c4f45a6c281877ae8b944a3fbdc7cfb68d513");
+   testCase.verifyEqual(release_v12_alias.baseline_tag, "v1.2");
+end
+
+function test_release_v12_case_matrices_use_rolling_forcing(testCase)
+   % v1.2 snapshots use the accepted forcing from the rolling baselines.
+
+   regression_cases = icemodel.test.helpers.getRegressionCaseMatrix( ...
+      tier="full", baseline="v1.2");
+   perf_cases = icemodel.test.helpers.getPerfCaseMatrix( ...
+      tier="full", baseline="v1_2");
+
+   testCase.verifyEqual(unique(regression_cases.forcings), ...
+      "promice_filled");
+   testCase.verifyEqual(unique(perf_cases.forcings), "promice_filled");
+
+   % These rows check the plumbing that carries the registered digest into
+   % each matrix and into opts, so read the digest from its registration
+   % rather than declaring it a second time. The pin itself is checked in
+   % test_formal_baseline_policy_owns_default_data_case.
+   expected_sha256 = icemodel.test.helpers.formalBaselinePolicy( ...
+      "v1.2").promice_filled_policy_sha256;
+   testCase.verifyEqual( ...
+      unique(regression_cases.promice_filled_expected_policy_sha256), ...
+      expected_sha256);
+   testCase.verifyEqual( ...
+      unique(perf_cases.promice_filled_expected_policy_sha256), ...
+      expected_sha256);
+   opts = icemodel.test.helpers.setModelOptsForCase(regression_cases(1, :));
+   testCase.verifyEqual( ...
+      string(opts.promice_filled_expected_policy_sha256), expected_sha256);
 end
 
 function test_release_v11_case_matrices_retain_historical_forcing(testCase)

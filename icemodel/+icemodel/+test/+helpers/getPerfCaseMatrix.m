@@ -21,7 +21,7 @@ function cases = getPerfCaseMatrix(kwargs)
    % Output:
    %  cases - table with columns:
    %    case_id, tier, family, smbmodel, sitename, forcings, userdata, ...
-   %    uservars, simyear, solver
+   %    uservars, simyear, solver, promice_filled_expected_policy_sha256
    %
    %  `case_id` identifies the underlying model run, not the suite tier. This
    %  lets smoke and full compare against the same perf baseline row when they
@@ -79,6 +79,7 @@ end
 function cases = makeCases(tier_name, sites, simyear, baseline)
    %MAKECASES Expand one tier/site selection into the formal perf case rows.
    models = icemodel.namelists.smbmodel("test");
+   policy = icemodel.test.helpers.formalBaselinePolicy(baseline);
    rows = struct([]);
    k = 0;
 
@@ -104,6 +105,8 @@ function cases = makeCases(tier_name, sites, simyear, baseline)
             rows(k).uservars = "";
             rows(k).simyear = simyear;
             rows(k).solver = solver_id;
+            rows(k).promice_filled_expected_policy_sha256 = ...
+               policy.promice_filled_policy_sha256;
          end
       end
    end

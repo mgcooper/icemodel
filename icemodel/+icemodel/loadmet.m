@@ -225,7 +225,7 @@ function met = loadOneMetFile(opts, fileiter)
       end
       if forcing == "promice_filled"
          icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
-            filename, met, opts.sitename)
+            filename, met, opts.sitename, opts)
       end
    end
 

@@ -2,17 +2,16 @@ function opts = verifyPromiceFilledReadiness(opts, fileiter)
    %VERIFYPROMICEFILLEDREADINESS Gate derived PROMICE forcing by coverage.
    %
    %  opts = icemodel.forcing.reconstruct.verifyPromiceFilledReadiness(opts)
-   %  verifies the producer-manifest identity of the configured
-   %  promice_filled artifacts. For every configured file it also proves
-   %  complete required-channel coverage, and exact current provenance for
-   %  policy, version, registry, and channels. Coverage covers each requested
-   %  timestep between opts.startdate and opts.enddate, or the opts.simyears
-   %  span when no dates are set. It is checked against the samples in the
-   %  filled met files (POLICY A4; water years and arbitrary windows are
-   %  first-class). The product and runtime timestep are both fixed
-   %  at 15 minutes. Calendar-year ledger verdicts are producer bookkeeping,
-   %  and are never the runtime gate. The returned options are marked for
-   %  code-generation-safe loading.
+   %  verifies the producer-manifest identity of each configured promice_filled
+   %  file. It verifies complete required-channel coverage, the expected
+   %  policy digest, the registry, and per-channel provenance. It requires a
+   %  nonblank engine version but does not compare it with the model version.
+   %  The window uses opts.startdate and opts.enddate, or opts.simyears when
+   %  dates are unset.
+   %  Water-year and arbitrary windows are supported. The product and runtime
+   %  timestep are both 15 minutes. File contents determine runtime readiness
+   %  (POLICY A4). Calendar-year ledger verdicts are producer records. On
+   %  success, the returned options permit code-generation-safe loading.
    %
    % See also: icemodel.loadmet, icemodel.setopts
 
@@ -25,6 +24,12 @@ function opts = verifyPromiceFilledReadiness(opts, fileiter)
       fileiter = 1:numel(opts.metfname);
    end
    met_files = string(opts.metfname(fileiter));
+   % Every later step indexes met_files, so an empty selection must fail with
+   % the documented not-ready identifier rather than an index error.
+   if isempty(met_files)
+      error('icemodel:loadmet:promiceFilledNotReady', ...
+         'no promice_filled file is configured for %s', site);
+   end
    if numel(fileiter) < numel(opts.metfname)
       opts = narrowRequestToSelectedFiles(opts, met_files);
    end
@@ -33,15 +38,18 @@ function opts = verifyPromiceFilledReadiness(opts, fileiter)
          'promice_filled is published only at the 900-second cadence');
    end
 
-   % Resolve the producer ledger without placing table I/O in loadmet's
-   % code-generation surface. The ledger does not gate the run (A4) but
-   % remains a required, manifest-pinned bookkeeping artifact.
+   % Resolve the producer ledger here so table I/O stays outside loadmet's
+   % code-generation surface. The manifest pins the required ledger identity,
+   % but the ledger verdict does not determine runtime readiness (A4).
    readiness_file = "";
    if isfield(opts, 'readiness_file')
       readiness_file = string(opts.readiness_file);
    end
    if readiness_file == ""
-      readiness_file = fullfile(icemodel.internal.fullpath, 'data', ...
+      [data_root, ~] = ...
+         icemodel.forcing.reconstruct.selectedDataRoot( ...
+         string(fileparts(met_files(1))));
+      readiness_file = fullfile(data_root, ...
          'preview', 'qa', 'gapfill', 'ledger', ...
          site + "-readiness.csv");
    end
@@ -50,8 +58,8 @@ function opts = verifyPromiceFilledReadiness(opts, fileiter)
          'PROMICE readiness ledger is unavailable: %s', readiness_file);
    end
 
-   % The producer manifest binds both the verdict and every configured filled
-   % met file to the bytes published by the reconstruction transaction.
+   % The producer manifest binds the readiness ledger and configured met files
+   % to the bytes written by the reconstruction transaction.
    report_inputs_file = "";
    if isfield(opts, 'report_inputs_file')
       report_inputs_file = string(opts.report_inputs_file);
@@ -64,14 +72,13 @@ function opts = verifyPromiceFilledReadiness(opts, fileiter)
    verifyProducerManifest(report_inputs_file, site, readiness_file, ...
       met_files(:));
 
-   % A4 runtime gate: the filled samples themselves must cover every
-   % requested timestep with the required channels. Ledger verdict strings
-   % are never consulted here.
+   % Check every required channel at every requested timestep. The filled file
+   % contents, not ledger verdict strings, determine readiness (A4).
    verifyRequestedWindowCoverage(opts, site, met_files);
 
-   % These flags are the code-generation trust seam. Set them only after the
-   % manifest, the requested-window coverage, and the exact artifact
-   % provenance all pass on the MATLAB side.
+   % These flags tell generated loadmet calls that MATLAB completed checks
+   % which generated code cannot run. Set them only after the manifest,
+   % requested-window coverage, and exact artifact provenance pass in MATLAB.
    opts.promice_filled_readiness_verified = true;
    opts.promice_filled_manifest_verified = true;
    opts.promice_filled_provenance_verified = true;
@@ -272,12 +279,13 @@ function verifyRequestedWindowCoverage(opts, site, met_files)
    end
    if all(covered(:))
       % Generated loading cannot inspect timetable UserData. After the
-      % coverage gate passes, validate the exact current policy and version,
-      % the registry, the site and product identity, and the channel
-      % provenance, before setting the flags.
+      % coverage gate passes, validate the expected policy digest, the
+      % registry, the site and product identity, and the channel
+      % provenance, before setting the flags. The engine version must be
+      % present but is not compared with the model version.
       for k = 1:n_files
          icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
-            met_files(k), met_by_file{k}, site)
+            met_files(k), met_by_file{k}, site, opts)
       end
       return
    end

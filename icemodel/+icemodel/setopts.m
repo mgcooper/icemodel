@@ -544,6 +544,7 @@ function opts = initopts(smbmodel, sitename, simyears, forcings, ...
    opts.userdatafname = {};
    opts.readiness_file = "";
    opts.report_inputs_file = "";
+   opts.promice_filled_expected_policy_sha256 = "";
    opts.promice_filled_readiness_verified = false;
    opts.promice_filled_manifest_verified = false;
    opts.promice_filled_provenance_verified = false;

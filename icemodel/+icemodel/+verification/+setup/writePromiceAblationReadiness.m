@@ -242,7 +242,9 @@ function forcing = forcingPayload(c, input_data_root, policy)
    try
       loaded = load(filled_file, 'met');
       % Apply the same runtime product/provenance gate the model uses, so a
-      % stale policy, engine, registry, or channel ledger is rejected here too.
+      % stale registry or channel ledger is rejected here too. This call
+      % passes no opts, so it compares the artifact against the live policy
+      % digest. The engine version must be present but is not compared.
       icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
          filled_file, loaded.met, case_id)
       % Whole-artifact readiness is not the cohort gate: a requested year is

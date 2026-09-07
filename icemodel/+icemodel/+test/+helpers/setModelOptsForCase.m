@@ -98,6 +98,14 @@ function opts = optsFromFormalCase(c, kwargs)
    if isfield(c, 'solver') && ~isempty(c.solver)
       opts = icemodel.resetopts(opts, 'solver', c.solver);
    end
+   % A frozen release pins the reconstruction policy digest its accepted rows
+   % were built with. A blank value, or an older case matrix without the
+   % column, compares against the live policySha256() instead.
+   if isfield(c, 'promice_filled_expected_policy_sha256')
+      opts = icemodel.resetopts(opts, ...
+         'promice_filled_expected_policy_sha256', ...
+         c.promice_filled_expected_policy_sha256);
+   end
 end
 
 function opts = optsFromVerificationManifest(case_manifest, kwargs)
