@@ -1,0 +1,8 @@
+# mproject.toml - project dependency manifest, resolved by matfunclib
+# manager's workon via resolveprojectdeps. Entries are registry names.
+
+[project]
+name = "icemodel"
+
+[dependencies]
+projects = ["exactremap", "activelayer", "matfunclib"]
