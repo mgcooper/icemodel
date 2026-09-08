@@ -1,15 +1,27 @@
-function out = tocellstr(in)
-   %TOCELLSTR Convert char and string arrays to cellstr, or return cellstr input
+function out = tocellstr(in, varargin)
+   %TOCELLSTR Convert char, string arrays, or cell arrays to cellstr.
    %
-   %  OUT = TOCELLSTR(IN) Converts string, cell, or char array IN to cellstr
-   %  array OUT
+   %  OUT = TOCELLSTR(IN)
+   %  OUT = TOCELLSTR(IN, DATEFMT)
    %
-   % See also: tocolumn, torow, rowvec
+   % Description
+   %  OUT = TOCELLSTR(IN) tries to convert IN to a cellstr array. If it fails,
+   %  it returns IN unchanged.
+   %
+   %  OUT = TOCELLSTR(IN, DATEFMT) additionally supplies DATEFMT to cellstr to
+   %  convert datetime or duration IN to date formatted text. See `cellstr`
+   %  documentation for details.
+   %
+   % See also: cellstr tocolumn torow rowvec
    %
    %#codegen
 
-   %#ok<*ISCLSTR>
-   validateattributes(in, {'string', 'cell', 'char'}, {'vector'}, ...
-      mfilename, 'IN', 1)
-   out = ifelse(iscellstr(in), in, cellstr(in));
+   try
+      out = cellstr(in, varargin{:});
+   catch e
+      wid = ['custom:' mfilename ':conversionToCellstrFailed'];
+      msg = 'Conversion to cellstr failed. Returning input unchanged.';
+      warning(wid, msg)
+      out = in;
+   end
 end

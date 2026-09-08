@@ -7,7 +7,7 @@ function tf = ischarlike(x, varargin)
    %  but the predicate is really about text-like containers rather than only
    %  char-like values. New code should prefer ISTEXTLIKE.
    %
-   % See also ISTEXTLIKE
+   % See also ISTEXTLIKE CONTAINSONLYTEXT MUSTCONTAINONLYTEXT
 
    %#codegen
 
