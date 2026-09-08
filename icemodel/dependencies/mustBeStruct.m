@@ -26,11 +26,11 @@ function mustBeStruct(obj, caller_name, variable_name, argument_position)
 
    if nargin == 1 || nargin == 2
       if nargin == 1
-         % Read the caller off the stack rather than through mcallername,
-         % which icemodel does not vendor: it needs isoneof and
-         % isnumericscalar, three files for one error-message name. Every
-         % icemodel call site is an arguments-block validator and passes
-         % one input, so this is the live branch.
+         % Read the caller from dbstack. matfunclib calls mcallername
+         % here, which icemodel does not vendor (it needs isoneof and
+         % isnumericscalar too). Every icemodel call site is an
+         % arguments-block validator, so nargin == 1 is the branch that
+         % runs in production.
          stack = dbstack(1, '-completenames');
          if isempty(stack)
             caller_name = mfilename();

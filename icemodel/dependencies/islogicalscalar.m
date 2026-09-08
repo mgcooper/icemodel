@@ -15,7 +15,7 @@ function tf = islogicalscalar(x)
    %
    %#codegen
 
-   % parseoptarg calls this to tell a logical DEFAULTOPT from a text one,
-   % so both conditions must hold: logical type and exactly one element.
+   % parseoptarg calls this to tell a logical DEFAULTOPT from a text one.
+   % Both must hold: logical type and exactly one element.
    tf = islogical(x) && isscalar(x);
 end
