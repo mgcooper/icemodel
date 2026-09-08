@@ -26,13 +26,11 @@ function mustBeStruct(obj, caller_name, variable_name, argument_position)
 
    if nargin == 1 || nargin == 2
       if nargin == 1
-         % Vendored deviation from matfunclib, which calls mcallername()
-         % here. mcallername pulls isoneof and isnumericscalar into
-         % icemodel's vendored set for one error-message name, so read the
-         % caller off the stack directly and keep the closure bounded.
-         % Every icemodel call site is an arguments-block validator, which
-         % calls this function with one input, so this branch is the live
-         % one.
+         % Read the caller off the stack rather than through mcallername,
+         % which icemodel does not vendor: it needs isoneof and
+         % isnumericscalar, three files for one error-message name. Every
+         % icemodel call site is an arguments-block validator and passes
+         % one input, so this is the live branch.
          stack = dbstack(1, '-completenames');
          if isempty(stack)
             caller_name = mfilename();
