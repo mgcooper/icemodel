@@ -111,8 +111,8 @@ function [ice1, ice2, opts] = icemodel(opts)
          budget = icemodel.column.initialize_budget_state( ...
             T_ice, f_ice, f_liq, dz);
 
-         % Scalarize time-varying met observation heights and corresponding
-         % bulk-Richardson coefficients before each forcing step.
+         % Get the forcing observation heights and corresponding
+         % bulk-Richardson coefficients for this forcing step.
          step_opts = icemodel.surface.step_observation_heights(opts, metstep);
          br_coefs_step = br_coefs(min(metstep, size(br_coefs, 1)), :);
 

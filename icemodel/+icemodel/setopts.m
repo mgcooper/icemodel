@@ -26,20 +26,17 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %
    %  FORCINGS - a string scalar indicating the forcing data. Standard values
    %  include the climate-model forcings "mar", "merra", and "racmo", plus
-   %  supported met station runs such as "kanm" and "kanl". "promice_filled"
-   %  is the canonical runnable PROMICE forcing: the provenance-stamped
-   %  gap-filled product from icemodel.forcing.reconstruct, complete for
-   %  every ledger-ready station-year. "promice" is the native PROMICE AWS
-   %  station-met source (a met_<site>_promice file staged by the
-   %  verification builders). It exists for provenance and QC. Its record
-   %  is incomplete for most station-years, so it cannot force the model
-   %  there. In both cases SITENAME names the site;
-   %  "gcnet" is the Vandecrux GC-Net gap-filled surface/SEB source for RetMIP
-   %  Dye-2-long and Summit (2 m T/RH, 10 m wind); "imau", "retmip", and
-   %  "esm_snowmip" are native verification-staged sources with source-specific
-   %  height policy;
-   %  the legacy per-station convention (forcings == sitename, met_<site>_<site>)
-   %  is still accepted. Users who wish to add new forcing files can update the
+   %  supported met stations such as PROMICE "kanm" and "kanl". "promice_filled"
+   %  is the recommended PROMICE forcing: the gap-filled product from
+   %  icemodel.forcing.reconstruct. "promice" is the native PROMICE AWS data (a
+   %  met_<site>_promice file staged by the +verification namespace builders).
+   %  It exists for provenance and QC. Its record is incomplete for most
+   %  station-years, so it cannot force the model in those cases. In both cases
+   %  SITENAME names the site; "gcnet" is the Vandecrux GC-Net gap-filled
+   %  surface/SEB source for RetMIP Dye-2-long and Summit (2 m T/RH, 10 m wind);
+   %  "imau", "retmip", and "esm_snowmip" are native +verification sources. The
+   %  legacy per-station convention (forcings == sitename, met_<site>_<site>) is
+   %  still accepted. Users who wish to add new forcing files can update the
    %  icemodel.namelists definitions used throughout the repository.
    %
    %  USERDATA - (optional) a string scalar indicating the alternative forcing
@@ -81,7 +78,7 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %                  energy ledger. Full-column icemodel accumulates the raw
    %                  budget terms for every profile.
    %
-   %  The channel lists live in icemodel.namelists.surfaceoutputs and
+   %  The output channel lists are in icemodel.namelists.surfaceoutputs and
    %  icemodel.namelists.budgetoutputs; icemodel.configureRun assembles the
    %  run's vars1 and vars2 from them. The diagnostic list extends the
    %  standard one, so a standard channel is always present in a diagnostic
@@ -105,18 +102,22 @@ function opts = setopts(smbmodel, sitename, simyears, forcings, ...
    %  Setting a non-empty value (via name/value override or resetopts) bypasses
    %  the lookup and uses the supplied value instead. This is the intended
    %  mechanism for sensitivity analyses and site-specific calibration.
+   %
    %  USERDATAFNAME is an optional cell/string list of exact staged Data files.
    %  When nonempty it is authoritative for external met-channel swapping; the
    %  default empty list keeps legacy site/source/year filename discovery.
+   %
    %  READINESS_FILE optionally names the exact station readiness CSV pinned
-   %  by the promice_filled producer manifest; the default is the canonical
+   %  by the promice_filled producer manifest; the default is the current
    %  gapfill ledger. The ledger is bookkeeping; the runtime gate is
-   %  requested-window coverage of the filled met files (POLICY A4).
+   %  requested-window coverage of the filled met files.
+   %
    %  REPORT_INPUTS_FILE optionally names the producer manifest that hashes
    %  that ledger and every configured promice_filled met artifact.
+   %
    %  PRECIP_PHASE_SOURCE selects the runtime rain/snow split exposed by the
    %  forcing initializer: 'source' (default; the product's own components)
-   %  or 'threshold' (repartition total ppt by air temperature, POLICY A10).
+   %  or 'threshold' (repartition total ppt by air temperature).
    %
    % Outputs
    %

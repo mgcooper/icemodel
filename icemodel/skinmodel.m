@@ -6,15 +6,20 @@ function [ice1, ice2, opts] = skinmodel(opts)
    %
    % This function returns OPTS so callers can inspect the finalized runtime
    % configuration after icemodel.configureRun() resolves the derived fields.
+   %
    % See also: icemodel, icemodel.setopts
    %
    %#codegen
 
    %% INITIALIZE THE MODEL
 
-   assertF off
+   % Runtime configuration
+   assertF on
    opts = icemodel.configureRun(opts);
    opts = icemodel.prepareRunOutput(opts);
+
+   % Option to log thf/seb diagnostics.
+   use_thf_diag = strcmp(opts.output_profile, 'diagnostic');
 
    % INITIALIZE SOLVER SETTINGS
    % 'settings' holds the primary solver settings, 'settings0' holds the
@@ -44,7 +49,7 @@ function [ice1, ice2, opts] = skinmodel(opts)
    [metstep, substep, numsteps, dt, numyears, numspinup] ...
       = icemodel.timestepping.initialize_timesteps(opts, time);
 
-   if ~opts.saveflag && numyears - numspinup > 1
+   if ~opts.saveflag && (numyears - numspinup) > 1
       ice1_all = [];
       ice2_all = [];
    end
@@ -64,8 +69,8 @@ function [ice1, ice2, opts] = skinmodel(opts)
          [dt_sum, ~, ~, ~, ~, ~, ~, diag] ...
             = icemodel.timestepping.newtimestep(f_liq);
 
-         % Scalarize time-varying met observation heights and the matching
-         % bulk-Richardson coefficients before each forcing step.
+         % Get the forcing observation heights and corresponding
+         % bulk-Richardson coefficients for this forcing step.
          step_opts = icemodel.surface.step_observation_heights(opts, metstep);
          br_coefs_step = br_coefs(min(metstep, size(br_coefs, 1)), :);
 
@@ -122,7 +127,7 @@ function [ice1, ice2, opts] = skinmodel(opts)
                dt_sum, dt, TINY, settings, settings0, diag);
          end
 
-         % Error if dt accumulation exceeds full step
+         % Error if dt accumulation exceeds a full step.
          assertF(@() dt_sum < settings.dt_full_step + 2 * TINY)
 
          % DIAGNOSE SURFACE ENERGY BALANCE
@@ -130,18 +135,19 @@ function [ice1, ice2, opts] = skinmodel(opts)
             = icemodel.surface.diagnose_surface_energy_balance(T_sfc, ...
             tair(metstep), swd(metstep), lwd(metstep), albedo(metstep), ...
             wspd(metstep), ppt(metstep), tppt(metstep), psfc(metstep), ...
-            ea_atm(metstep), ro_atm(metstep), cv_atm(metstep), nu_air(metstep), ...
-            H_h(metstep), H_e, hv_atm, br_coefs_step, liqflag, chi, T_ice, ...
-            k_eff, dz, ro_sfc, snow_depth, step_opts);
+            ea_atm(metstep), ro_atm(metstep), cv_atm(metstep), ...
+            nu_air(metstep), H_h(metstep), H_e, hv_atm, br_coefs_step, ...
+            liqflag, chi, T_ice, k_eff, dz, ro_sfc, snow_depth, step_opts);
 
-         if strcmp(opts.output_profile, 'diagnostic')
+         % Build the thf diagnostic struct if requested.
+         if use_thf_diag
             [~, ~, thf_diag] ...
                = icemodel.surface.diagnose_turbulent_heat_fluxes( ...
                icemodel.surface.physical_surface_temperature(T_sfc), ...
-               tair(metstep), wspd(metstep), psfc(metstep), ea_atm(metstep), ...
-               ro_atm(metstep), cv_atm(metstep), nu_air(metstep), H_h(metstep), ...
-               H_e, hv_atm, br_coefs_step, liqflag, ro_sfc, snow_depth, ...
-               step_opts);
+               tair(metstep), wspd(metstep), psfc(metstep), ...
+               ea_atm(metstep), ro_atm(metstep), cv_atm(metstep), ...
+               nu_air(metstep), H_h(metstep), H_e, hv_atm, br_coefs_step, ...
+               liqflag, ro_sfc, snow_depth, step_opts);
          else
             thf_diag = struct([]);
          end
@@ -180,9 +186,11 @@ function [ice1, ice2, opts] = skinmodel(opts)
                'f_ice', f_ice, ...
                'f_liq', f_liq);
 
+            % Assemble the outputs.
             [data1, data2] = icemodel.buildOutputPayload(opts, ...
                surface_state, subsurface_state, thf_diag);
 
+            % Update the requested ice1 and ice2 outputs for this timestep.
             [ice1, ice2] = icemodel.updateoutput(timestep, ice1, ice2, ...
                opts.vars1, opts.vars2, data1, data2);
          end
@@ -203,8 +211,7 @@ function [ice1, ice2, opts] = skinmodel(opts)
          continue
       end
 
-      % Concatenate yearly raw output when running multi-year simulations
-      % without writing each year to disk.
+      % Concatenate yearly output when a run spans multiple years.
       if ~opts.saveflag && numyears - numspinup > 1
          [ice1_all, ice2_all] = icemodel.concatoutput(ice1_all, ice2_all, ...
             ice1, ice2);
@@ -212,7 +219,6 @@ function [ice1, ice2, opts] = skinmodel(opts)
 
       % WRITE TO DISK
       yridx = (thisyear-1)*numsteps+1:thisyear*numsteps;
-
       icemodel.writeoutput(ice1, ice2, opts, thisyear, ...
          time(yridx), swd(yridx), lwd(yridx), albedo(yridx))
    end
