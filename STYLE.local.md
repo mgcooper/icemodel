@@ -1,12 +1,6 @@
 # Project-specific code style — icemodel
 
-Conventions specific to icemodel, extending the canonical `STYLE.md` (general +
-MATLAB). This file is project-owned — `--update` never overwrites it.
-
-## Project-local skill routing
-
-For numerical-regression or performance-baseline work, read and follow
-`.agents/skills/icemodel-baselines/SKILL.md` before acting.
+Conventions specific to icemodel, extending `STYLE.md` (general + MATLAB).
 
 ## Figure export
 
