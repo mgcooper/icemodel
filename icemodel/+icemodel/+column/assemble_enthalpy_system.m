@@ -157,7 +157,13 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
       aP(N) = aP(N) - Fp * a1 / (a1 - Fp);
    end
 
-   % Apply the melt zone (enthalpy) transformation (Eq. 128/29)
+   % Apply the melt zone (enthalpy) transformation (Eq. 128/29). The gk term
+   % takes aP, not (aN + aS + aP0), because the transform substitutes
+   % T_P = gv_P * P_P + gk_P into the assembled row, so the coefficient that
+   % multiplies T_P also multiplies gk_P. That includes the Robin change to
+   % aP(N) above. The commented form applies only where that change is not.
+   % Keep the one product: forming -aP0 .* gk - aS .* gk - aN .* gk term by
+   % term accumulates roundoff.
    % b = b + aN .* gkN - (aN + aS + aP0) .* gk + aS .* gkS ;
    b = b + aN .* gkN - aP .* gk + aS .* gkS ;
    aN = aN .* gvN;
