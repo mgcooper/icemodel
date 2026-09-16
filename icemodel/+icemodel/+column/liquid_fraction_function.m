@@ -1,9 +1,9 @@
-function [T, f_ice, f_liq, f_wat, dFdT] = liquid_fraction_function(T, ...
-      f_ice, f_liq, f_wat)
+function [T_ice, f_ice, f_liq, f_wat, dFdT] = liquid_fraction_function( ...
+      T_ice, f_ice, f_liq, f_wat)
    %LIQUID_FRACTION_FUNCTION Project state onto the liquid-fraction function.
    %
    % Inputs:
-   %  T - control volume temperature [K]
+   %  T_ice - control volume temperature [K]
    %  f_ice - fraction of frozen water (-) (volumetric ice fraction)
    %  f_liq - fraction of unfrozen water (-) (volumetric liquid water fraction)
    % Mass fraction of liquid water:
@@ -26,7 +26,7 @@ function [T, f_ice, f_liq, f_wat, dFdT] = liquid_fraction_function(T, ...
    end
 
    % Compute volumetric fraction of liquid water eq 67, Jordan
-   T_dep = Tf - min(T, Tf);
+   T_dep = Tf - min(T_ice, Tf);
 
    % Ensure f_wat does not exceed maximum capacity by more than eps
    if nargin < 4 || isempty(f_wat)
@@ -38,17 +38,17 @@ function [T, f_ice, f_liq, f_wat, dFdT] = liquid_fraction_function(T, ...
 
    if nargout > 3
       % Compute temperature by inverting the fraction of liquid water function
-      T = Tf - sqrt(f_wat ./ f_liq - 1.0) / fcp;
+      T_ice = Tf - sqrt(f_wat ./ f_liq - 1.0) / fcp;
    end
 
    if nargout > 4
       % Differentiate the liquid-fraction function w.r.t temperature.
-      dFdT = icemodel.column.liquid_fraction_derivative(T, [], [], f_wat);
+      dFdT = icemodel.column.liquid_fraction_derivative(T_ice, [], [], f_wat);
    end
 end
 
 % In terms of f_ell = g_liq / g_wat = 1 / (1 + (fcp * T_dep) ^ 2 ):
 %
 % df_ell_dT = 2 * T_dep * fcp ^ 2 ./ (1 + (fcp * T_dep) .^ 2) .^ 2;
-% T = Tf - ((1.0 ./ f_ell - 1.0) ./ fcp ^ 2.0) .^ 0.50;
-% T = Tf - sqrt((1 ./ fliq - 1)) ./ fcp
+% T_ice = Tf - ((1.0 ./ f_ell - 1.0) ./ fcp ^ 2.0) .^ 0.50;
+% T_ice = Tf - sqrt((1 ./ fliq - 1)) ./ fcp

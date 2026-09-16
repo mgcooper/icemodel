@@ -100,7 +100,7 @@ function test_windcoef_and_stablefn_cover_neutral_stable_and_unstable(testCase)
 end
 
 function test_stablefn_derivative_matches_finite_difference(testCase)
-   % stability_factor should return a Ts derivative consistent with finite
+   % stability_factor should return a T_sfc derivative consistent with finite
    % differences in stable, unstable, and near-neutral regimes.
 
    tair = 268.15;
@@ -124,7 +124,7 @@ function test_stablefn_derivative_matches_finite_difference(testCase)
 
       T_sfc = T_sfc_cases(n);
 
-      [~, dSdTs] = ...
+      [~, dSdT_sfc] = ...
          icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
          T_sfc, tair, wspd, br_coefs);
 
@@ -134,9 +134,9 @@ function test_stablefn_derivative_matches_finite_difference(testCase)
       S_minus = icemodel.surface.turbulence.bulk_richardson.stability_factor( ...
          T_sfc - h, tair, wspd, br_coefs);
 
-      dSdTs_fd = (S_plus - S_minus) / (2 * h);
+      dSdT_sfc_fd = (S_plus - S_minus) / (2 * h);
 
-      testCase.verifyEqual(dSdTs, dSdTs_fd, 'RelTol', 1e-5, ...
+      testCase.verifyEqual(dSdT_sfc, dSdT_sfc_fd, 'RelTol', 1e-5, ...
          sprintf('Derivative mismatch at T_sfc = %.3f K', T_sfc));
    end
 end
@@ -306,13 +306,13 @@ function test_bulk_thermalk_stays_positive_and_responds_to_liquid(testCase)
    % Effective conductivity should stay positive and increase as the same
    % state gains more liquid water.
 
-   T = 268.15 * ones(3, 1);
+   T_ice = 268.15 * ones(3, 1);
    f_ice = [0.7; 0.7; 0.7];
    f_liq_dry = [0.00; 0.01; 0.02];
    f_liq_wet = [0.05; 0.08; 0.10];
 
-   k_dry = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq_dry);
-   k_wet = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq_wet);
+   k_dry = icemodel.column.bulk_thermal_conductivity(T_ice, f_ice, f_liq_dry);
+   k_wet = icemodel.column.bulk_thermal_conductivity(T_ice, f_ice, f_liq_wet);
 
    testCase.verifyGreaterThan(min(k_dry), 0);
    testCase.verifyGreaterThan(min(k_wet), 0);
@@ -325,28 +325,28 @@ function test_updateState_matches_component_kernels(testCase)
 
    [cv_ice, cv_liq] = icemodel.physicalConstant('cv_ice', 'cv_liq');
 
-   T = [266; 267; 268];
+   T_ice = [266; 267; 268];
    f_ice = [0.90; 0.88; 0.85];
    f_liq = [0.01; 0.02; 0.03];
    f_wat = icemodel.column.water_fraction(f_ice, f_liq);
 
    [H, k_eff, dHdT, dFdT, drovdT, ro_vap] = icemodel.column.updatestate( ...
-      T, f_ice, f_liq, f_wat);
+      T_ice, f_ice, f_liq, f_wat);
 
    [ro_vap_ref, drovdT_ref] = icemodel.vapor.saturation_vapor_density( ...
-      T, f_liq);
+      T_ice, f_liq);
 
    k_vap_ref = icemodel.vapor.vapor_thermal_conductivity( ...
-      T, f_liq, drovdT_ref);
+      T_ice, f_liq, drovdT_ref);
 
    k_eff_ref = icemodel.column.bulk_thermal_conductivity( ...
-      T, f_ice, f_liq, k_vap_ref);
+      T_ice, f_ice, f_liq, k_vap_ref);
 
    H_ref = icemodel.column.bulk_enthalpy( ...
-      T, f_ice, f_liq, f_wat, ro_vap_ref);
+      T_ice, f_ice, f_liq, f_wat, ro_vap_ref);
 
    dFdT_ref = icemodel.column.liquid_fraction_derivative( ...
-      T, f_ice, f_liq);
+      T_ice, f_ice, f_liq);
 
    testCase.verifyEqual(ro_vap, ro_vap_ref, 'RelTol', 1e-12);
    testCase.verifyEqual(drovdT, drovdT_ref, 'RelTol', 1e-12);
@@ -439,10 +439,10 @@ function test_firn_thermalk_positive_and_density_dependent(testCase)
    % icemodel.column.firn_thermal_conductivity should produce positive
    % conductivity that increases with ice fraction (density).
 
-   T = [255; 265; 270];
+   T_ice = [255; 265; 270];
    f_ice = [0.95; 0.80; 0.60];
 
-   k_firn = icemodel.column.firn_thermal_conductivity(T, f_ice);
+   k_firn = icemodel.column.firn_thermal_conductivity(T_ice, f_ice);
 
    testCase.verifyGreaterThan(min(k_firn), 0);
    testCase.verifyGreaterThan(k_firn(1), k_firn(3), ...

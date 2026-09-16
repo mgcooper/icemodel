@@ -58,7 +58,7 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    iM = TL <= T_ice & T_ice <= TH;
 
    % For a soil model, would need indices above the melt zone
-   % iH = T > TH;
+   % iH = T_ice > TH;
 
    % Phase-aware latent heat: Ls for dry/cold cells, Lv for wet cells.
    Lv = icemodel.vapor.latent_enthalpy_switch(f_liq, S);
@@ -124,10 +124,10 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    % Account for the upper boundary condition
    switch bc
       case {0, 1}
-         % Dirichlet: Ts = known
+         % Dirichlet: T_sfc = known
          bc_N = a1 * T_sfc;
       case {2, 3}
-         % Robin: qB = f(Ts)
+         % Robin: qB = f(T_sfc)
          bc_N = a1 * Fc / (a1 - Fp);
          aN(N) = 0.0;
       case 4

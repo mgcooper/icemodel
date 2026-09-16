@@ -1,7 +1,7 @@
 function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, ...
       albedo, wspd, ppt, tppt, ea_atm, H_h, H_e, br_coefs, liqflag, ...
       chi, T_ice, k_eff, dz)
-   %SOLVE_SURFACE_TEMPERATURE Solve the explicit bulk-Richardson SEB for Ts.
+   %SOLVE_SURFACE_TEMPERATURE Solve the explicit bulk-Richardson SEB for T_sfc.
    %
    %  [T_sfc, ok] = icemodel.surface.solve_surface_temperature(T_sfc, tair, ...)
    %
@@ -88,7 +88,7 @@ function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, ...
          old, tair, H_h, stability, dstability);
 
       % Net longwave radiation and its temperature derivative.
-      [Qln, dQln_dTsfc] = icemodel.surface.net_longwave_radiation(old, Qli);
+      [Qln, dQln_dT_sfc] = icemodel.surface.net_longwave_radiation(old, Qli);
 
       % Conductive heat flux.
       Qc = icemodel.surface.conductive_heat_flux(k_eff, T_ice, dz, old);
@@ -97,7 +97,7 @@ function [T_sfc, ok] = solve_surface_temperature(T_sfc, tair, Qsi, Qli, ...
       f = icemodel.surface.evaluate_surface_energy_balance( ...
          Qsn, Qln, Qh, Qe, Qc, Qa, 0.0);
 
-      dfdT = dQln_dTsfc + dQh_dT_sfc + dQe_dT_sfc + dQc_dT_sfc;
+      dfdT = dQln_dT_sfc + dQh_dT_sfc + dQe_dT_sfc + dQc_dT_sfc;
 
       % Updated T_sfc iterate.
       T_sfc = old - f / dfdT;

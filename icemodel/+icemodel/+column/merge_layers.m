@@ -1,5 +1,5 @@
-function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
-      T, f_ice, f_liq, Sc, Sp, j1, j2, d_lyr, dz)
+function [T_ice_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
+      T_ice, f_ice, f_liq, Sc, Sp, j1, j2, d_lyr, dz)
    %MERGE_LAYERS Combine two control volumes conserving state and sources.
    %
    % Combine two control volumes by equating the enthalpy of the two control
@@ -7,7 +7,7 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
    % combined temperature.
    %
    % Inputs
-   %  T - control volume temperature.
+   %  T_ice - control volume temperature.
    %  j1 - the layer that is removed
    %  j2 - the combined layer (with conserved values from j1 and j2)
    %  f_liq - liquid fraction, volume of liquid water per cv volume
@@ -26,11 +26,11 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
    %
    % The control volume temperature is a function of the liquid fraction:
    %
-   % T = Tf - sqrt((f_wat / f_liq - 1)) / fcp;
+   % T_ice = Tf - sqrt((f_wat / f_liq - 1)) / fcp;
    %
    % where the depression temperature, Td, is:
    %
-   % Td = Tf - T.
+   % Td = Tf - T_ice.
    %
    % and the water fraction, f_wat, is the volume of melted ice + liquid water
    % per cv volume:
@@ -38,7 +38,7 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
    % f_wat = icemodel.column.water_fraction(f_ice, f_liq)
    %
    % fcp is the "freezing curve parameter" that controls the slope of the
-   % f_liq = f(T) relationship in the mushy zone.
+   % f_liq = f(T_ice) relationship in the mushy zone.
    %
    % Rearrange for depression temperature as a function of f_liq:
    %
@@ -69,8 +69,8 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
    Sp_C = Sp(j1) + Sp(j2);
 
    % Depression temperature of each cv
-   Td_1 = Tf - T(j1);
-   Td_2 = Tf - T(j2);
+   Td_1 = Tf - T_ice(j1);
+   Td_2 = Tf - T_ice(j2);
 
    % Compute water mass (ice + liquid water)
    m_wat_1 = (ro_ice * f_ice(j1) + ro_liq * f_liq(j1)) * dz;
@@ -80,11 +80,11 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
 
    % Compute combined temperature assuming T1 != T2 but neither CV is melting.
    % This temperature also applies to the case where T1 == T2, melting or not.
-   T_C = (T(j1) * m_wat_1 + T(j2) * m_wat_2) / m_wat_C;
-   Td_C = Tf - T_C;
+   T_ice_C = (T_ice(j1) * m_wat_1 + T_ice(j2) * m_wat_2) / m_wat_C;
+   Td_C = Tf - T_ice_C;
 
    % If either CV is melting, compute combined temperature of dry and wet ice.
-   if T(j1) ~= T(j2) && (T(j1) > TL || T(j2) > TL)
+   if T_ice(j1) ~= T_ice(j2) && (T_ice(j1) > TL || T_ice(j2) > TL)
 
       % Equate the sum of the enthalpies of the separate cv's to that of the
       % combined cv. Use m_liq_C to express the equation as a third-order
@@ -110,7 +110,7 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
 
       % Check if the function successfully found a zero
       if ok == 1
-         T_C = Tf - Td_C;
+         T_ice_C = Tf - Td_C;
 
       elseif ok <= 0
          % fall back to the mass-weighted average temperature
@@ -121,8 +121,8 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
 
       % Fully-melted node
       if Td_C < 0
-         T_C  = (T(j1) * m_wat_1 + T(j2) * m_wat_2) / m_wat_C;
-         Td_C = Tf - T_C;
+         T_ice_C = (T_ice(j1) * m_wat_1 + T_ice(j2) * m_wat_2) / m_wat_C;
+         Td_C = Tf - T_ice_C;
       end
    end
 
@@ -138,9 +138,9 @@ function [T_C, f_ice_C, f_liq_C, Sc_C, Sp_C, d_lyr] = merge_layers( ...
    % surviving cell keeps half of it, because f_wat_C spreads m_wat_C over two
    % cell volumes. The merge removes the other half, which is never negative.
    % The halving is exact only for a scalar dz. Every call site passes a scalar
-   % dz, and the whole function assumes one. For a vector dz, m_wat_1, m_wat_2,
-   % T_C, and f_wat_C are all wrong. A graded grid needs a full revision of
-   % merge_layers.
+   % dz, and the whole function assumes one. For a vector dz, m_wat_1,
+   % m_wat_2, T_ice_C, and f_wat_C are all wrong. A graded grid needs a full
+   % revision of merge_layers.
    %
    % f_wat_12 is solid plus liquid. The liquid-only export is a separate
    % quantity; a top removal records it as top_export_liquid_mwe.

@@ -1,10 +1,10 @@
 function [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces, ...
-      L_vap_faces] = vapor_transport_terms(T, f_ice, f_liq, k_eff, ...
+      L_vap_faces] = vapor_transport_terms(T_ice, f_ice, f_liq, k_eff, ...
       ro_vap, dro_vapdT, De, delz, fn, f_res_por)
    %VAPOR_TRANSPORT_TERMS Build the coupled vapor face transport terms.
    %
    %  [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces, ...
-   %     L_vap_faces] = icemodel.column.vapor_transport_terms(T, f_ice, ...
+   %     L_vap_faces] = icemodel.column.vapor_transport_terms(T_ice, f_ice, ...
    %     f_liq, k_eff, ro_vap, dro_vapdT, De, delz, fn, f_res_por)
    %
    % Returns the vapor-coupled face terms for the enthalpy solve: the combined
@@ -35,7 +35,7 @@ function [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces, ...
    % using the surface energy and mass balance instead.
    %
    % Inputs
-   %   T         - Node temperature [K] (JJ x 1).
+   %   T_ice     - Node temperature [K] (JJ x 1).
    %   f_ice     - Node ice fraction [-] (JJ x 1).
    %   f_liq     - Node liquid fraction [-] (JJ x 1).
    %   k_eff     - Vapor-free conductivity at nodes [W m-1 K-1] (JJ x 1).
@@ -65,11 +65,11 @@ function [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces, ...
       [Ls, Lv] = icemodel.physicalConstant('Ls', 'Lv');
    end
 
-   JJ = numel(T);
+   JJ = numel(T_ice);
 
    % Pad both sides so every face follows the north/south convention used by
    % assemble_enthalpy_system. Repeating the endpoint closes its gradient.
-   T_nodes = [T(1); T; T(JJ)];
+   T_ice_nodes = [T_ice(1); T_ice; T_ice(JJ)];
    ro_vap_nodes = [ro_vap(1); ro_vap; ro_vap(JJ)];
    dro_vapdT_nodes = [dro_vapdT(1); dro_vapdT; dro_vapdT(JJ)];
    f_ice_nodes = [f_ice(1); f_ice; f_ice(JJ)];
@@ -84,7 +84,7 @@ function [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces, ...
 
    % Compute vapor mass flux at the cell faces [kg m-2 s-1].
    d_ro_vap = ro_vap_nodes(2:JJ+2) - ro_vap_nodes(1:JJ+1);
-   d_T = T_nodes(2:JJ+2) - T_nodes(1:JJ+1);
+   d_T = T_ice_nodes(2:JJ+2) - T_ice_nodes(1:JJ+1);
    U_vap_faces = -De_faces .* d_ro_vap ./ delz;
 
    % Select the latent heat from the node that supplies each face flux.

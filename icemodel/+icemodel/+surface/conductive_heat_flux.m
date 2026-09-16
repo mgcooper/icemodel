@@ -1,14 +1,14 @@
-function [Qc, dQc_dT_sfc] = conductive_heat_flux(k_eff, T, dz, T_sfc)
+function [Qc, dQc_dT_sfc] = conductive_heat_flux(k_eff, T_ice, dz, T_sfc)
    %CONDUCTIVE_HEAT_FLUX Conductive heat flux into the surface and derivative.
    %
-   %  Qc = icemodel.surface.conductive_heat_flux(k_eff, T, dz, T_sfc)
+   %  Qc = icemodel.surface.conductive_heat_flux(k_eff, T_ice, dz, T_sfc)
    %  [Qc, dQc_dT_sfc] = icemodel.surface.conductive_heat_flux( ...
-   %     k_eff, T, dz, T_sfc)
+   %     k_eff, T_ice, dz, T_sfc)
    %
    % Computes the conductive heat flux from ice layer 1 into the surface
    % across the top half-control-volume boundary:
    %
-   %   Qc = k_eff(1) * (T(1) - T_sfc) / (dz(1) / 2)   [W m^-2]
+   %   Qc = k_eff(1) * (T_ice(1) - T_sfc) / (dz(1) / 2)   [W m^-2]
    %
    % The partial derivative with respect to T_sfc is constant and negative:
    %
@@ -28,7 +28,7 @@ function [Qc, dQc_dT_sfc] = conductive_heat_flux(k_eff, T, dz, T_sfc)
    % icemodel.column.assemble_enthalpy_system). Both use vapor-free k_eff(1)
    % because face 1 is closed for vapor. Keep the SEB and column solve
    % consistent by passing the solver's vapor-free k_eff to this function.
-   Qc = k_eff(1) * (T(1) - T_sfc) / (dz(1) / 2);
+   Qc = k_eff(1) * (T_ice(1) - T_sfc) / (dz(1) / 2);
 
    if nargout > 1
       dQc_dT_sfc = -k_eff(1) / (dz(1) / 2);

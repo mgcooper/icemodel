@@ -7,10 +7,11 @@ function [d_pevp, pevp, Qe, T_sfc_phys] = ...
    %  [d_pevp, pevp, Qe, T_sfc_phys] = ...
    %     icemodel.surface.potential_surface_vapor_demand(...)
    %
-   % When icemodel solvers return surface temperature above Tf, the T>Tf excess
-   % represents the melt energy forcing. Here, the turbulent latent heat flux is
-   % diagnosed at the physical surface temperature T_SFC_PHYS = min(T_SFC, Tf);
-   % it's then converted to liquid-water-equivalent demand D_PEVP.
+   % When icemodel solvers return surface temperature above Tf, the T_sfc>Tf
+   % excess represents the melt energy forcing. Here, the turbulent latent heat
+   % flux is diagnosed at the physical surface temperature
+   % T_SFC_PHYS = min(T_SFC, Tf); it's then converted to liquid-water-equivalent
+   % demand D_PEVP.
    %
    % See also: icemodel.kernels.potential_surface_vapor_demand,
    %  icemodel.surface.potential_surface_vapor_exchange

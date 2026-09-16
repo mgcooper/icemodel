@@ -59,8 +59,8 @@ function test_skinmodel_forced_advance_restores_checkpoint(testCase)
    state = icemodel.test.fixtures.makeSyntheticColumnState( ...
       workspace, 'skinmodel', solver=1, testname='skin_forced_advance');
    f_liq_checkpoint = 0.01 * ones(size(state.f_liq));
-   restart = struct('T', state.T, 'f_ice', state.f_ice, ...
-      'f_liq', f_liq_checkpoint, 'Ts', state.Ts, 'r_eff', state.r_eff);
+   restart = struct('T_ice', state.T_ice, 'f_ice', state.f_ice, ...
+      'f_liq', f_liq_checkpoint, 'T_sfc', state.T_sfc, 'r_eff', state.r_eff);
    restart_file = fullfile(workspace.rootdir, ...
       'skin-forced-advance-restart.mat');
    save(restart_file, 'restart');
@@ -82,17 +82,17 @@ function test_skinmodel_forced_advance_restores_checkpoint(testCase)
    testCase.verifyEqual(ice1.dt_sum, 1, 'AbsTol', 0);
    testCase.verifyEqual(ice1.n_failed_substeps, 1, 'AbsTol', 0);
    testCase.verifyEqual(ice1.Tice_converged, 0, 'AbsTol', 0);
-   testCase.verifyEqual(ice1.Tsfc, state.Ts, 'AbsTol', 0);
-   testCase.verifyEqual(ice2.Tice, state.T, 'AbsTol', 0);
+   testCase.verifyEqual(ice1.Tsfc, state.T_sfc, 'AbsTol', 0);
+   testCase.verifyEqual(ice2.Tice, state.T_ice, 'AbsTol', 0);
    testCase.verifyEqual(ice2.f_ice, state.f_ice, 'AbsTol', 0);
    testCase.verifyEqual(ice2.f_liq, f_liq_checkpoint, 'AbsTol', 0);
 
    % Qc observes both restored temperature and restored conductivity, so it
    % catches a stale rejected-solve k_eff even when the saved state is correct.
    k_eff_checkpoint = icemodel.column.bulk_thermal_conductivity( ...
-      state.T, state.f_ice, f_liq_checkpoint, 0);
+      state.T_ice, state.f_ice, f_liq_checkpoint, 0);
    Qc_checkpoint = icemodel.surface.conductive_heat_flux( ...
-      k_eff_checkpoint, state.T, state.dz, state.Ts);
+      k_eff_checkpoint, state.T_ice, state.dz, state.T_sfc);
    testCase.verifyEqual(ice1.Qc, Qc_checkpoint, 'AbsTol', 1e-12);
 
    clear cleanup

@@ -1,16 +1,19 @@
-function saveRestartState(opts, simyear, T, f_ice, f_liq, Ts, r_eff)
+function saveRestartState(opts, simyear, T_ice, f_ice, f_liq, T_sfc, r_eff)
    %SAVERESTARTSTATE Save the year-boundary state needed for a restart.
    %
-   %  icemodel.saveRestartState(opts, simyear, T, f_ice, f_liq, Ts, r_eff)
+   %  icemodel.saveRestartState(opts, simyear, T_ice, f_ice, f_liq, T_sfc, ...
+   %     r_eff)
    %
    %  The restart file preserves variables that evolve through the governing
    %  equations. Rebuilding them requires a rerun of the prior simulation:
    %
-   %    T      - ice column temperature [K]
+   %    T_ice  - ice column temperature [K]
    %    f_ice  - volumetric ice fraction [-]
    %    f_liq  - volumetric liquid fraction [-]
-   %    Ts     - surface temperature [K] (SEB boundary condition / prior)
+   %    T_sfc  - surface temperature [K] (SEB boundary condition / prior)
    %    r_eff  - effective grain radius [m] (vapor mass transfer)
+   %
+   %  Each field takes the name of its model variable.
    %
    %  checksubstep selects retry settings for each substep. acceptsubstep
    %  restores the primary settings. The restart file does not store solver
@@ -33,10 +36,10 @@ function saveRestartState(opts, simyear, T, f_ice, f_liq, Ts, r_eff)
    restart.simyear = simyear;
 
    % Prognostic state
-   restart.T = T;
+   restart.T_ice = T_ice;
    restart.f_ice = f_ice;
    restart.f_liq = f_liq;
-   restart.Ts = Ts;
+   restart.T_sfc = T_sfc;
    restart.r_eff = r_eff;
 
    % Metadata

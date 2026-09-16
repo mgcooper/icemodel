@@ -1,8 +1,8 @@
-function [Qle, dQle_dTsfc] = outgoing_longwave_radiation(T_sfc, Qli)
+function [Qle, dQle_dT_sfc] = outgoing_longwave_radiation(T_sfc, Qli)
    %OUTGOING_LONGWAVE_RADIATION Outgoing longwave radiation and T_sfc derivative.
    %
    %  Qle = icemodel.surface.outgoing_longwave_radiation(T_sfc)
-   %  [Qle, dQle_dTsfc] = icemodel.surface.outgoing_longwave_radiation(T_sfc)
+   %  [Qle, dQle_dT_sfc] = icemodel.surface.outgoing_longwave_radiation(T_sfc)
    %
    % Computes outgoing longwave radiation using the Stefan-Boltzmann equation.
    %
@@ -33,6 +33,6 @@ function [Qle, dQle_dTsfc] = outgoing_longwave_radiation(T_sfc, Qli)
    end
 
    if nargout > 1
-      dQle_dTsfc = -4.0 * emiss * SB * T_sfc .^ 3;
+      dQle_dT_sfc = -4.0 * emiss * SB * T_sfc .^ 3;
    end
 end

@@ -81,13 +81,14 @@ function test_conduct_matches_level_formulas(testCase)
    % T_sfc derivative matching the analytic finite-volume expressions.
 
    k_eff = [2; 4];
-   T = [270; 268];
+   T_ice = [270; 268];
    dz = [0.04; 0.04];
-   Ts = 269;
+   T_sfc = 269;
 
-   [Qc, dQc_dT_sfc] = icemodel.surface.conductive_heat_flux(k_eff, T, dz, Ts);
+   [Qc, dQc_dT_sfc] = icemodel.surface.conductive_heat_flux(k_eff, T_ice, ...
+      dz, T_sfc);
 
-   % Top-boundary flux: k_eff(1) * (T(1) - Ts) / (dz(1)/2)
+   % Top-boundary flux: k_eff(1) * (T_ice(1) - T_sfc) / (dz(1)/2)
    testCase.verifyEqual(Qc, 2 * (270 - 269) / 0.02, 'AbsTol', 1e-12);
 
    % T_sfc derivative: -k_eff(1) / (dz(1)/2)
@@ -102,7 +103,8 @@ function test_inittimesteps_and_newtimestep_follow_solver_contract(testCase)
       'simyears', [2015 2016]);
    Time = transpose(datetime(2015, 1, 1) + minutes(15) * (0:7));
 
-   [metstep, substep, numsteps, dt_new, numyears, numspinup] = ...
+   [metstep, substep, numsteps, dt_new, numyears, numspinup, ...
+      force_advance_streak_dt] = ...
       icemodel.timestepping.initialize_timesteps( ...
       opts, Time);
 
@@ -111,6 +113,7 @@ function test_inittimesteps_and_newtimestep_follow_solver_contract(testCase)
 
    testCase.verifyEqual([metstep substep numsteps], [1 1 4]);
    testCase.verifyEqual([dt_new numyears numspinup], [900 2 1]);
+   testCase.verifyEqual(force_advance_streak_dt, 0, 'AbsTol', 0);
    testCase.verifyEqual(dt_sum, 0);
    testCase.verifyEqual(diag.n_failed_substeps, 0);
 
@@ -118,6 +121,12 @@ function test_inittimesteps_and_newtimestep_follow_solver_contract(testCase)
    % treats the initial NaN values as equal.
    testCase.verifyTrue( ...
       isequaln(diag, icemodel.couplers.initialize_solver_diag()));
+
+   % The couplers start each solve attempt from the raw attempt record, so
+   % the second output must equal the substep field of the first.
+   [returned_diag, returned_step_diag] = ...
+      icemodel.couplers.initialize_solver_diag();
+   testCase.verifyTrue(isequaln(returned_step_diag, returned_diag.substep));
    testCase.verifyEqual(d_liq, zeros(3, 1), 'AbsTol', 0);
    testCase.verifyEqual(d_evp, zeros(3, 1), 'AbsTol', 0);
    testCase.verifyEqual(d_lyr, zeros(3, 1), 'AbsTol', 0);
@@ -157,7 +166,7 @@ function test_resetsubstep_and_acceptsubstep_restore_and_advance(testCase)
    substep_opts = struct( ...
       'f_res_pore_snow', 0.07, 'f_res_pore_ice', 0.01);
 
-   [Ts, T, f_ice, f_liq, k_eff, n_subfail, substep, dt_new] = ...
+   [T_sfc, T_ice, f_ice, f_liq, k_eff, n_subfail, substep, dt_new] = ...
       icemodel.timestepping.resetsubstep( ...
       270, [269; 268], [0.9; 0.9], [0.01; 0.01], [2.1; 2.2], ...
       900, 2, 9, 0, 450);
@@ -169,11 +178,11 @@ function test_resetsubstep_and_acceptsubstep_restore_and_advance(testCase)
    diag = fixedDiag(true, true, true);
    diag.substep.n_iters = 4;
 
-   [Ts_up, T_up, f_ice_up, f_liq_up, k_eff_up, dt_sum, dt_next, ...
-      settings_up, diag_up] = icemodel.timestepping.acceptsubstep(Ts, ...
-      T, f_ice, f_liq, k_eff, 450, 300, 1e-12, settings, settings0, diag);
+   [T_sfc_up, T_ice_up, f_ice_up, f_liq_up, k_eff_up, dt_sum, dt_next, ...
+      settings_up, diag_up] = icemodel.timestepping.acceptsubstep(T_sfc, ...
+      T_ice, f_ice, f_liq, k_eff, 450, 300, 1e-12, settings, settings0, diag);
 
-   testCase.verifyEqual([Ts_up; T_up], [270; 269; 268], 'AbsTol', 0);
+   testCase.verifyEqual([T_sfc_up; T_ice_up], [270; 269; 268], 'AbsTol', 0);
    testCase.verifyEqual([f_ice_up; f_liq_up], [0.9; 0.9; 0.01; 0.01], ...
       'AbsTol', 0);
    testCase.verifyEqual(k_eff_up, [2.1; 2.2], 'AbsTol', 0);
@@ -211,15 +220,15 @@ function test_checksubstep_forces_advance_at_maxsubstep(testCase)
    diag = fixedDiag(false, false, false);
    diag.n_failed_substeps = 1;
 
-   [Ts, T, f_ice, f_liq, k_eff, substep, dt_new, ok, forced_advance, ~, ...
-      ~, diag] = icemodel.timestepping.checksubstep(270, [269; 268], ...
+   [T_sfc, T_ice, f_ice, f_liq, k_eff, substep, dt_new, ok, forced_advance, ...
+      ~, ~, diag] = icemodel.timestepping.checksubstep(270, [269; 268], ...
       [0.9; 0.9], [0.01; 0.01], [3; 4], 271, [270; 269], [0.8; 0.8], ...
       [0.02; 0.02], [1; 2], 150, 450, 1, 10, 1, 0.0, 'icemodel', ...
       settings, settings, diag);
 
    testCase.verifyTrue(ok);
-   testCase.verifyEqual(Ts, 271);
-   testCase.verifyEqual(T, [270; 269]);
+   testCase.verifyEqual(T_sfc, 271);
+   testCase.verifyEqual(T_ice, [270; 269]);
    testCase.verifyEqual(f_ice, [0.8; 0.8]);
    testCase.verifyEqual(f_liq, [0.02; 0.02]);
    testCase.verifyEqual(k_eff, [1; 2], 'AbsTol', 0);
@@ -238,15 +247,15 @@ function test_checksubstep_retries_failed_solve_from_checkpoint(testCase)
    diag = fixedDiag(false, false, false);
    diag.n_failed_substeps = 0;
 
-   [Ts, T, f_ice, f_liq, k_eff, substep, dt_new, ok, forced_advance, ~, ...
-      ~, diag] = icemodel.timestepping.checksubstep(270, [269; 268], ...
+   [T_sfc, T_ice, f_ice, f_liq, k_eff, substep, dt_new, ok, forced_advance, ...
+      ~, ~, diag] = icemodel.timestepping.checksubstep(270, [269; 268], ...
       [0.9; 0.9], [0.01; 0.01], [3; 4], 271, [270; 269], [0.8; 0.8], ...
       [0.02; 0.02], [1; 2], 0, 900, 1, 10, 1, 0.0, 'icemodel', ...
       settings, settings, diag);
 
    testCase.verifyFalse(ok);
-   testCase.verifyEqual(Ts, 271);
-   testCase.verifyEqual(T, [270; 269]);
+   testCase.verifyEqual(T_sfc, 271);
+   testCase.verifyEqual(T_ice, [270; 269]);
    testCase.verifyEqual(f_ice, [0.8; 0.8]);
    testCase.verifyEqual(f_liq, [0.02; 0.02]);
    testCase.verifyEqual(k_eff, [1; 2], 'AbsTol', 0);
@@ -310,15 +319,15 @@ function test_checksubstep_clamps_overshot_failure_count(testCase)
    diag = fixedDiag(false, false, false);
    diag.n_failed_substeps = 10;
 
-   [Ts, T, f_ice, f_liq, k_eff, substep, dt_new, ok, forced_advance, ~, ...
-      ~, diag] = icemodel.timestepping.checksubstep(270, [269; 268], ...
+   [T_sfc, T_ice, f_ice, f_liq, k_eff, substep, dt_new, ok, forced_advance, ...
+      ~, ~, diag] = icemodel.timestepping.checksubstep(270, [269; 268], ...
       [0.9; 0.9], [0.01; 0.01], [3; 4], 271, [270; 269], [0.8; 0.8], ...
       [0.02; 0.02], [1; 2], 150, 450, 1, 10, 10, 0.0, 'icemodel', ...
       settings, settings, diag);
 
    testCase.verifyTrue(ok);
-   testCase.verifyEqual(Ts, 271);
-   testCase.verifyEqual(T, [270; 269]);
+   testCase.verifyEqual(T_sfc, 271);
+   testCase.verifyEqual(T_ice, [270; 269]);
    testCase.verifyEqual(f_ice, [0.8; 0.8]);
    testCase.verifyEqual(f_liq, [0.02; 0.02]);
    testCase.verifyEqual(k_eff, [1; 2], 'AbsTol', 0);
@@ -351,10 +360,9 @@ function test_checksubstep_debug_dump_records_force_advance_context(testCase)
    debug_state = loaded.debug_state;
 
    testCase.verifyTrue(debug_state.forced_advance);
-   testCase.verifyEqual(debug_state.force_advance_streak_dt, 900, ...
+   testCase.verifyEqual(debug_state.projected_force_advance_dt, 900, ...
       'AbsTol', 1e-12);
-   testCase.verifyEqual(debug_state.force_advance_limit_dt, 900, ...
-      'AbsTol', 1e-12);
+   testCase.verifyEqual(debug_state.dt_full_step, 900, 'AbsTol', 1e-12);
    testCase.verifyEqual(debug_state.failed.k_eff, [3; 4], 'AbsTol', 0);
    testCase.verifyEqual(debug_state.checkpoint.k_eff, [1; 2], 'AbsTol', 0);
 end
@@ -451,7 +459,7 @@ function test_bottom_layer_merge_removes_it_and_conserves_mass(testCase)
    [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
    dz = 0.04;
    f_ice_min = 0.1;
-   T = [Tf - 1; Tf - 2; Tf - 3];
+   T_ice = [Tf - 1; Tf - 2; Tf - 3];
    f_ice = [0.9; 0.8; 0.02];
    f_liq = [0.01; 0.01; 0.0];
    zeros_col = zeros(3, 1);
@@ -459,9 +467,9 @@ function test_bottom_layer_merge_removes_it_and_conserves_mass(testCase)
    water_equivalent = @(fi, fl) sum(ro_ice / ro_liq * fi + fl) * dz;
    expected = water_equivalent(f_ice, f_liq);
 
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, returned_f_ice, returned_f_liq] = icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, zeros_col, zeros_col, dz, 0.0, zeros_col, ...
+      T_ice, f_ice, f_liq, zeros_col, zeros_col, dz, 0.0, zeros_col, ...
       f_ice_min, budget);
 
    testCase.verifyFalse(any(returned_f_ice < f_ice_min))

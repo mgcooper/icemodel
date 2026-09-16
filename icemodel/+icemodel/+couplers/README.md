@@ -26,7 +26,8 @@ Functions used by all couplers:
     settings include `dt_full_step`, `maxsubstep`, and `debug`.
 - `initialize_solver_diag`
   - Returns the forcing-step diagnostics record. `diag.substep` is the default
-    record for one solve attempt.
+    record for one solve attempt. The second output is a copy of that record;
+    each coupler starts its solve attempt from it.
 - `update_solver_diag`
   - Copies an accepted `diag.substep` into the forcing-step record and counts
     substeps accepted with recovery settings.

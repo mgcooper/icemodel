@@ -1,5 +1,5 @@
 function [H, k_eff, dHdT, dFdT, drovdT, ro_vap, ro_sno, cp_sno] = ...
-      updatestate(T, f_ice, f_liq, f_wat)
+      updatestate(T_ice, f_ice, f_liq, f_wat)
    %UPDATESTATE Update column thermodynamic state variables.
    %
    % Note: if this is called within solver iterations, ensure f_wat = f_wat_old
@@ -8,19 +8,19 @@ function [H, k_eff, dHdT, dFdT, drovdT, ro_vap, ro_sno, cp_sno] = ...
 
    % Saturation vapor density and temperature derivative [kg m-3, kg m-3 K-1]
    [ro_vap, drovdT] = icemodel.vapor.saturation_vapor_density( ...
-      T, f_liq);
+      T_ice, f_liq);
 
    % Vapor thermal conductivity [W m-1 K-1]
    k_vap = icemodel.vapor.vapor_thermal_conductivity( ...
-      T, f_liq, drovdT);
+      T_ice, f_liq, drovdT);
 
    % Effective thermal conductivity [W m-1 K-1]
    k_eff = icemodel.column.bulk_thermal_conductivity( ...
-      T, f_ice, f_liq, k_vap);
+      T_ice, f_ice, f_liq, k_vap);
 
    % Total enthalpy and temperature derivative [J m-3] and [J m-3 K-1]
    [H, dHdT, dFdT] = icemodel.column.bulk_enthalpy( ...
-      T, f_ice, f_liq, f_wat, ro_vap);
+      T_ice, f_ice, f_liq, f_wat, ro_vap);
 
    % Optional bulk density (pt) (eq 3) [kg m-3]
    if nargout > 6

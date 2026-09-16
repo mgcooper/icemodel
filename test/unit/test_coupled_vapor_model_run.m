@@ -124,7 +124,7 @@ function test_couple_vapor_step_records_nonzero_transport_net(testCase)
    % Two-node column. Node 1 is a generous liquid donor. Node 2 is fully
    % solid ice with no liquid pore space (f_ice = 1, f_liq = 0), so its
    % storage-limit clamp accepts none of an incoming liquid transfer.
-   T = [260; 260];
+   T_ice = [260; 260];
    f_ice = [0.3; 1.0];
    f_liq = [0.3; 0.0];
    dz = [0.05; 0.05];
@@ -144,7 +144,7 @@ function test_couple_vapor_step_records_nonzero_transport_net(testCase)
    d_vap_liq = zeros(JJ, 1);
    d_vap_ice = zeros(JJ, 1);
 
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
 
    [returned_f_ice, returned_f_liq, ~, ~, returned_budget] = ...
       icemodel.column.couple_vapor_step(f_ice, f_liq, U_vap, L_vap, ...
@@ -193,7 +193,7 @@ function test_robin_recovery_converges_via_checksubstep_retry(testCase)
    primary_settings = state.settings;
    primary_settings.cpl_alpha = 2.0;
    primary_settings.cpl_aitken = false;
-   [Ts1, T1, f_ice1, f_liq1, k_eff1, ~, ~, diag1] = ...
+   [T_sfc1, T_ice1, f_ice1, f_liq1, k_eff1, ~, ~, diag1] = ...
       runRobinProbe(state, primary_settings);
    testCase.verifyTrue(diag1.ok_seb);
    testCase.verifyTrue(diag1.ok_ieb);
@@ -207,11 +207,11 @@ function test_robin_recovery_converges_via_checksubstep_retry(testCase)
    primary_settings.debug = false;
    step_diag1 = icemodel.couplers.initialize_solver_diag();
    step_diag1.substep = diag1;
-   [Ts_r, T_r, f_ice_r, f_liq_r, k_eff_r, ~, dt_out, ok, ...
+   [T_sfc_r, T_ice_r, f_ice_r, f_liq_r, k_eff_r, ~, dt_out, ok, ...
       forced_advance, ~, retry_settings, diag_out] = ...
-      icemodel.timestepping.checksubstep(Ts1, T1, f_ice1, f_liq1, ...
-      k_eff1, state.Ts, state.T, state.f_ice, state.f_liq, state.k_eff, ...
-      0.0, dt, 1, 2, 1, 0.0, 'test', primary_settings, ...
+      icemodel.timestepping.checksubstep(T_sfc1, T_ice1, f_ice1, f_liq1, ...
+      k_eff1, state.T_sfc, state.T_ice, state.f_ice, state.f_liq, ...
+      state.k_eff, 0.0, dt, 1, 2, 1, 0.0, 'test', primary_settings, ...
       primary_settings, step_diag1);
 
    % checksubstep restores the checkpoint and offers the recovery-mode
@@ -224,8 +224,8 @@ function test_robin_recovery_converges_via_checksubstep_retry(testCase)
    testCase.verifyEqual(retry_settings.cpl_alpha, ...
       primary_settings.cpl_recovery_alpha, 'AbsTol', 0);
    testCase.verifyFalse(retry_settings.cpl_aitken);
-   testCase.verifyEqual(Ts_r, state.Ts, 'AbsTol', 0);
-   testCase.verifyEqual(T_r, state.T, 'AbsTol', 0);
+   testCase.verifyEqual(T_sfc_r, state.T_sfc, 'AbsTol', 0);
+   testCase.verifyEqual(T_ice_r, state.T_ice, 'AbsTol', 0);
    testCase.verifyEqual(f_ice_r, state.f_ice, 'AbsTol', 0);
    testCase.verifyEqual(f_liq_r, state.f_liq, 'AbsTol', 0);
    testCase.verifyEqual(k_eff_r, state.k_eff, 'AbsTol', 0);
@@ -295,7 +295,7 @@ function test_failed_robin_recovery_falls_through_substep_control(testCase)
    primary_settings.cpl_alpha = 2.0;
    primary_settings.cpl_aitken = false;
 
-   [Ts1, T1, f_ice1, f_liq1, k_eff1, ~, ~, diag1] = ...
+   [T_sfc1, T_ice1, f_ice1, f_liq1, k_eff1, ~, ~, diag1] = ...
       runRobinProbe(probe, primary_settings);
    testCase.verifyTrue(diag1.ok_seb && diag1.ok_ieb && ~diag1.ok_cpl);
 
@@ -310,8 +310,8 @@ function test_failed_robin_recovery_falls_through_substep_control(testCase)
    step_diag1.substep = diag1;
    [~, ~, ~, ~, ~, ~, dt_out1, ok1, forced1, ~, retry_settings, ...
       diag_out1] = icemodel.timestepping.checksubstep( ...
-      Ts1, T1, f_ice1, f_liq1, k_eff1, probe.Ts, probe.T, probe.f_ice, ...
-      probe.f_liq, probe.k_eff, 0.0, dt, 1, 1, 1, 0.0, 'test', ...
+      T_sfc1, T_ice1, f_ice1, f_liq1, k_eff1, probe.T_sfc, probe.T_ice, ...
+      probe.f_ice, probe.f_liq, probe.k_eff, 0.0, dt, 1, 1, 1, 0.0, 'test', ...
       primary_settings, primary_settings, step_diag1);
    testCase.verifyFalse(ok1);
    testCase.verifyFalse(forced1);
@@ -321,7 +321,7 @@ function test_failed_robin_recovery_falls_through_substep_control(testCase)
 
    % The recovery-mode retry also fails on this deliberately oscillating
    % fixture.
-   [Ts3, T3, f_ice3, f_liq3, k_eff3, ~, ~, diag2] = ...
+   [T_sfc3, T_ice3, f_ice3, f_liq3, k_eff3, ~, ~, diag2] = ...
       runRobinProbe(probe, retry_settings);
    testCase.verifyTrue(diag2.ok_seb && diag2.ok_ieb && ~diag2.ok_cpl);
 
@@ -331,8 +331,8 @@ function test_failed_robin_recovery_falls_through_substep_control(testCase)
    step_diag2.substep = diag2;
    [~, ~, ~, ~, ~, ~, dt_out2, ok2, forced2, ~, settings_out, ...
       diag_out2] = icemodel.timestepping.checksubstep( ...
-      Ts3, T3, f_ice3, f_liq3, k_eff3, probe.Ts, probe.T, probe.f_ice, ...
-      probe.f_liq, probe.k_eff, 0.0, dt, 1, 1, 1, 0.0, 'test', ...
+      T_sfc3, T_ice3, f_ice3, f_liq3, k_eff3, probe.T_sfc, probe.T_ice, ...
+      probe.f_ice, probe.f_liq, probe.k_eff, 0.0, dt, 1, 1, 1, 0.0, 'test', ...
       retry_settings, primary_settings, step_diag2);
    testCase.verifyFalse(ok2);
    testCase.verifyFalse(forced2);
@@ -362,8 +362,8 @@ function test_failed_robin_recovery_falls_through_substep_control(testCase)
    testCase.verifyEqual(ice1.cpl_recovery_count, 0);
    testCase.verifyEqual(ice1.n_failed_substeps, 2);
    testCase.verifyEqual(ice1.dt_sum, 2);
-   testCase.verifyEqual(ice1.Tsfc, state.Ts, 'AbsTol', 0);
-   testCase.verifyEqual(ice2.Tice, state.T, 'AbsTol', 0);
+   testCase.verifyEqual(ice1.Tsfc, state.T_sfc, 'AbsTol', 0);
+   testCase.verifyEqual(ice2.Tice, state.T_ice, 'AbsTol', 0);
    testCase.verifyEqual(ice2.f_ice, state.f_ice, 'AbsTol', 0);
    testCase.verifyEqual(ice2.f_liq, state.f_liq, 'AbsTol', 0);
    testCase.verifyEqual(ice2.df_liq, zeros(size(state.f_liq)), 'AbsTol', 0);
@@ -400,8 +400,8 @@ function test_forced_advance_is_time_only(testCase)
    state = icemodel.test.fixtures.makeSyntheticColumnState( ...
       workspace, 'icemodel', solver=1, testname='forced_advance');
    f_liq_checkpoint = 0.01 * ones(size(state.f_liq));
-   restart = struct('T', state.T, 'f_ice', state.f_ice, ...
-      'f_liq', f_liq_checkpoint, 'Ts', state.Ts, 'r_eff', state.r_eff);
+   restart = struct('T_ice', state.T_ice, 'f_ice', state.f_ice, ...
+      'f_liq', f_liq_checkpoint, 'T_sfc', state.T_sfc, 'r_eff', state.r_eff);
    restart_file = fullfile(workspace.rootdir, 'forced-advance-restart.mat');
    save(restart_file, 'restart');
 
@@ -435,7 +435,7 @@ function test_forced_advance_is_time_only(testCase)
    testCase.verifyTrue(isnan(ice1.cpl_res));
    testCase.verifyTrue(isnan(ice1.seb_res));
    testCase.verifyEqual(ice1.cpl_recovery_count, 0, 'AbsTol', 0);
-   testCase.verifyEqual(ice2.Tice, state.T, 'AbsTol', 0);
+   testCase.verifyEqual(ice2.Tice, state.T_ice, 'AbsTol', 0);
    testCase.verifyEqual(ice2.f_ice, state.f_ice, 'AbsTol', 0);
    testCase.verifyEqual(ice2.f_liq, f_liq_checkpoint, 'AbsTol', 0);
    testCase.verifyEqual(ice2.df_liq, zeros(size(state.f_liq)), 'AbsTol', 0);
@@ -446,9 +446,9 @@ function test_forced_advance_is_time_only(testCase)
    % Final diagnostics must use the restored checkpoint's vapor-free solver
    % conductivity, not conductivity returned by the rejected solve.
    k_eff_checkpoint = icemodel.column.bulk_thermal_conductivity( ...
-      state.T, state.f_ice, f_liq_checkpoint, 0);
+      state.T_ice, state.f_ice, f_liq_checkpoint, 0);
    Qc_checkpoint = icemodel.surface.conductive_heat_flux( ...
-      k_eff_checkpoint, state.T, state.dz, state.Ts);
+      k_eff_checkpoint, state.T_ice, state.dz, state.T_sfc);
    testCase.verifyEqual(ice1.Qc, Qc_checkpoint, 'AbsTol', 1e-12);
 
    % Every process ledger stays zero; only the unchanged storage endpoints are
@@ -478,13 +478,13 @@ function base_opts = syntheticRunOpts(testCase)
    assert(~isfield(base_opts, 'use_coupled_vapor'));
 end
 
-function [Ts, T, f_ice, f_liq, k_eff, U_vap, L_vap, diag] = ...
+function [T_sfc, T_ice, f_ice, f_liq, k_eff, U_vap, L_vap, diag] = ...
       runRobinProbe(s, settings)
    %RUNROBINPROBE Exercise the Robin coupler once under one settings policy.
 
-   [Ts, T, f_ice, f_liq, k_eff, U_vap, L_vap, diag] = ...
+   [T_sfc, T_ice, f_ice, f_liq, k_eff, U_vap, L_vap, diag] = ...
       icemodel.couplers.solve_surface_column_robin( ...
-      s.Ts, s.T, s.f_ice, s.f_liq, s.Sc, s.Sp, s.dz, s.delz, s.fn, ...
+      s.T_sfc, s.T_ice, s.f_ice, s.f_liq, s.Sc, s.Sp, s.dz, s.delz, s.fn, ...
       s.opts.dt, s.tair, s.swd, s.lwd, s.albedo, s.wspd, s.ppt, ...
       s.tppt, s.psfc, s.ea_atm, s.ro_atm, s.cv_atm, s.nu_air, s.H_h, ...
       s.H_e, s.hv_atm, s.br_coefs, s.liqflag, s.chi, s.ro_sfc, ...

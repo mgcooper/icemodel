@@ -1,7 +1,7 @@
-function diag = initialize_solver_diag()
+function [diag, step_diag] = initialize_solver_diag()
    %INITIALIZE_SOLVER_DIAG Initialize forcing-step solver diagnostics.
    %
-   %  diag = icemodel.couplers.initialize_solver_diag()
+   %  [diag, step_diag] = icemodel.couplers.initialize_solver_diag()
    %
    % Accepted-solve fields start at these values:
    %  - ok_seb, ok_ieb, ok_cpl: logical flags, false
@@ -19,6 +19,9 @@ function diag = initialize_solver_diag()
    % 16-by-1 signed residual ring for failure dumps. Without an accepted
    % attempt, the accepted-solve fields keep their initial values. Counters can
    % still change.
+   %
+   % STEP_DIAG equals DIAG.SUBSTEP. The couplers start each solve attempt
+   % from it.
    %
    % See also: icemodel.couplers.update_solver_diag,
    %  icemodel.timestepping.newtimestep
@@ -47,4 +50,7 @@ function diag = initialize_solver_diag()
       'n_failed_substeps', 0.0, ...
       'n_forced_advances', 0.0, ...
       'substep', substep_diag);
+
+   % Return the attempt record separately for the couplers.
+   step_diag = substep_diag;
 end

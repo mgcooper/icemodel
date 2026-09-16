@@ -13,14 +13,14 @@ function [ice1, ice2, opts] = icemodel(opts)
    % Inputs:
    % opts - A structure containing model options and parameters. Defined by the
    %        icemodel.setopts function. The fields include:
-   %        * sitename         - Site name for the model simulation
-   %        * smbmodel         - Simulation model identifier
-   %        * simyears         - Years for which the simulation is done
-   %        * forcings         - Type of forcing data used
-   %        * userdata         - User-defined data type
-   %        * uservars         - User-defined variables
-   %        * saveflag         - Flag indicating if data should be saved
-   %        * testname         - Name of the test (default: 'none')
+   %        * sitename - Site name for the model simulation
+   %        * smbmodel - Simulation model identifier
+   %        * simyears - Years for which the simulation is done
+   %        * forcings - Type of forcing data used
+   %        * userdata - User-defined data type
+   %        * uservars - User-defined variables
+   %        * saveflag - Flag indicating if data should be saved
+   %        * testname - Name of the test (default: 'none')
    %        * ... (other parameters related to the model configuration)
    %
    % Outputs:
@@ -84,7 +84,8 @@ function [ice1, ice2, opts] = icemodel(opts)
       = icemodel.surface.initialize_surface_state(opts, tair, wspd, rh, psfc);
 
    % INITIALIZE TIMESTEPPING
-   [metstep, substep, numsteps, dt, numyears, numspinup] ...
+   [metstep, substep, numsteps, dt, ...
+      numyears, numspinup, force_advance_streak_dt] ...
       = icemodel.timestepping.initialize_timesteps(opts, time);
 
    if ~opts.saveflag && (numyears - numspinup) > 1
@@ -95,7 +96,6 @@ function [ice1, ice2, opts] = icemodel(opts)
    % INITIALIZE PAST VALUES
    [xT_sfc, xT_ice, xf_ice, xf_liq, xk_eff] ...
       = icemodel.timestepping.resetsubstep(T_sfc, T_ice, f_ice, f_liq, k_eff);
-   force_advance_streak_dt = 0.0;
 
    %% START TIMESTEPS OVER YEARS
    for thisyear = 1:numyears

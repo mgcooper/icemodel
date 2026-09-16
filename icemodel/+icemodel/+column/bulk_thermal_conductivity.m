@@ -1,8 +1,9 @@
-function [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, varargin)
+function [k_eff, k_vap] = bulk_thermal_conductivity( ...
+      T_ice, f_ice, f_liq, varargin)
    %BULK_THERMAL_CONDUCTIVITY Compute bulk effective thermal conductivity.
    %
-   %  [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq)
-   %  [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, k_vap)
+   %  [k_eff, k_vap] = bulk_thermal_conductivity(T_ice, f_ice, f_liq)
+   %  [k_eff, k_vap] = bulk_thermal_conductivity(T_ice, f_ice, f_liq, k_vap)
    %
    %  Combines three transport mechanisms into a volume-weighted effective
    %  thermal conductivity (denoted gamma or ke in Patankar Eq. 4.9):
@@ -18,7 +19,7 @@ function [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, varargin)
    %
    %  The vapor component k_vap supports two calling conventions:
    %     nargin=3: k_vap computed internally via
-   %           icemodel.vapor.vapor_thermal_conductivity(T, f_liq)
+   %           icemodel.vapor.vapor_thermal_conductivity(T_ice, f_liq)
    %     nargin=4: k_vap provided externally (including explicit k_vap=0)
    %
    %  The three-input form returns vapor-inclusive k_eff and separate k_vap. The
@@ -42,11 +43,11 @@ function [k_eff, k_vap] = bulk_thermal_conductivity(T, f_ice, f_liq, varargin)
    end
 
    % Compute dry snow/firn/ice thermal conductivity (Calonne 2019 Eq. 5)
-   k_ice = icemodel.column.firn_thermal_conductivity(T, f_ice);
+   k_ice = icemodel.column.firn_thermal_conductivity(T_ice, f_ice);
 
    % Compute vapor thermal conductivity
    if nargin < 4
-      k_vap = icemodel.vapor.vapor_thermal_conductivity(T, f_liq);
+      k_vap = icemodel.vapor.vapor_thermal_conductivity(T_ice, f_liq);
    else
       % k_vap provided by an external model.
       k_vap = varargin{1};

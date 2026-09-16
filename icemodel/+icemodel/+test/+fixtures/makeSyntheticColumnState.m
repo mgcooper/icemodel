@@ -46,8 +46,8 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    end
 
    % Initialize the column state exactly as the model kernel would.
-   [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, delz, ...
-      z_nodes, f_res_por] = icemodel.column.initialize_column_state( ...
+   [ice1, ice2, T_sfc, T_ice, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
+      delz, z_nodes, f_res_por] = icemodel.column.initialize_column_state( ...
       opts, met.tair, r_eff);
 
    % Initialize the forcing-derived surface arrays.
@@ -113,7 +113,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    state.ice2 = ice2;
    state.metstep = metstep;
 
-   state.T = T;
+   state.T_ice = T_ice;
    state.f_ice = f_ice;
    state.f_liq = f_liq;
    state.r_eff = r_eff;
@@ -123,7 +123,7 @@ function state = makeSyntheticColumnState(workspace, smbmodel, kwargs)
    state.dz = dz;
    state.delz = delz;
    state.z_nodes = z_nodes;
-   state.Ts = Ts;
+   state.T_sfc = T_sfc;
    state.ro_sfc = icemodel.surface.surface_bulk_density(f_ice(1), f_liq(1));
    state.snow_depth = icemodel.surface.resolve_forcing_snow_depth( ...
       forcing_snow_depth, 1, opts.use_forcing_snow_depth_for_thf);

@@ -10,14 +10,14 @@ function test_zero_input_zero_output(testCase)
    Tf = icemodel.physicalConstant('Tf');
    f_ice = 0.30 * ones(N, 1);
    f_liq = 0.05 * ones(N, 1);  % above residual but below sat
-   T = Tf * ones(N, 1);
+   T_ice = Tf * ones(N, 1);
    q_top = 0;
-   [f_liq2, f_ice2, T2, diag] = icemodel.column.infiltration( ...
-      f_liq, f_ice, T, dz, dt, q_top);
+   [f_liq2, f_ice2, T_ice2, diag] = icemodel.column.infiltration( ...
+      f_liq, f_ice, T_ice, dz, dt, q_top);
    verifyEqual(testCase, diag.inflow_total, 0, 'AbsTol', 0);
    % Ripe column: liquid will drain by gravity even with q_top=0.
    verifyTrue(testCase, all(f_ice2 == f_ice), 'ice unchanged at Tf');
-   verifyTrue(testCase, all(T2 <= Tf + eps), 'no superheating');
+   verifyTrue(testCase, all(T_ice2 <= Tf + eps), 'no superheating');
    % Mass balance: inflow + d_storage = outflow (no refreezing at Tf).
    d_liq = sum(f_liq2 - f_liq) * dz;
    verifyEqual(testCase, -d_liq, diag.outflow_total, 'AbsTol', 1e-12);
@@ -31,10 +31,10 @@ function test_mass_balance_ripe_column(testCase)
    Tf = icemodel.physicalConstant('Tf');
    f_ice = 0.30 * ones(N, 1);
    f_liq = 0.05 * ones(N, 1);
-   T = Tf * ones(N, 1);
+   T_ice = Tf * ones(N, 1);
    q_top = 1e-6;
-   [f_liq2, f_ice2, T2, diag] = icemodel.column.infiltration( ...
-      f_liq, f_ice, T, dz, dt, q_top); %#ok<ASGLU>
+   [f_liq2, f_ice2, T_ice2, diag] = icemodel.column.infiltration( ...
+      f_liq, f_ice, T_ice, dz, dt, q_top); %#ok<ASGLU>
    d_liq = sum(f_liq2 - f_liq) * dz;
    residual = (diag.inflow_total - diag.outflow_total) - d_liq;
    verifyEqual(testCase, residual, 0, 'AbsTol', 1e-9);
@@ -43,7 +43,7 @@ function test_mass_balance_ripe_column(testCase)
 end
 
 function test_cold_content_refreezing(testCase)
-   % Inflow into a sub-freezing column refreezes -> f_liq drops, T rises,
+   % Inflow into a sub-freezing column refreezes -> f_liq drops, T_ice rises,
    % f_ice grows; total water-equivalent mass conserved.
    N = 20;
    dz = 0.05;
@@ -51,12 +51,12 @@ function test_cold_content_refreezing(testCase)
    [Tf, ro_ice, ro_liq] = icemodel.physicalConstant('Tf', 'ro_ice', 'ro_liq');
    f_ice = 0.30 * ones(N, 1);
    f_liq = zeros(N, 1);
-   T = (Tf - 5) * ones(N, 1);
+   T_ice = (Tf - 5) * ones(N, 1);
    q_top = 1e-6;
-   [f_liq2, f_ice2, T2, diag] = icemodel.column.infiltration( ...
-      f_liq, f_ice, T, dz, dt, q_top);
+   [f_liq2, f_ice2, T_ice2, diag] = icemodel.column.infiltration( ...
+      f_liq, f_ice, T_ice, dz, dt, q_top);
    verifyTrue(testCase, sum(f_ice2) > sum(f_ice), 'ice should grow');
-   verifyTrue(testCase, mean(T2) > mean(T), 'column should warm');
+   verifyTrue(testCase, mean(T_ice2) > mean(T_ice), 'column should warm');
 
    % Total water-equivalent mass balance.
    ro_iwe = ro_ice / ro_liq;
@@ -78,7 +78,7 @@ function test_overfilled_layer_clamps_to_the_water_equivalent_bound(testCase)
    [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
 
    f_ice = 0.30 * ones(N, 1);
-   T = Tf * ones(N, 1);
+   T_ice = Tf * ones(N, 1);
 
    % Start cell 3 above the bound, so the clamp must pull it back.
    bound = ro_ice / ro_liq * (1 - f_ice);
@@ -90,7 +90,7 @@ function test_overfilled_layer_clamps_to_the_water_equivalent_bound(testCase)
    % clamp reaches it. Over a long step the layer drains instead, and the
    % final value comes from the flux, not the clamp.
    [f_liq_short, ~, ~, ~] = icemodel.column.infiltration( ...
-      f_liq, f_ice, T, dz, 1e-3, 0);
+      f_liq, f_ice, T_ice, dz, 1e-3, 0);
 
    % The clamped layer lands on the bound exactly, not below it.
    testCase.verifyEqual(f_liq_short(3), bound(3), 'AbsTol', 1e-15);
@@ -98,7 +98,7 @@ function test_overfilled_layer_clamps_to_the_water_equivalent_bound(testCase)
    % Over a realistic step the invariant still holds: no layer sits above
    % the bound, whether the clamp or the drainage got it there.
    [f_liq2, ~, ~, ~] = icemodel.column.infiltration( ...
-      f_liq, f_ice, T, dz, dt, 0);
+      f_liq, f_ice, T_ice, dz, dt, 0);
    testCase.verifyLessThanOrEqual(f_liq2, bound + 1e-15);
 
    % The bound is the pore volume scaled to water equivalent. It sits below
@@ -116,10 +116,10 @@ function test_n_sub_increases_with_q_top(testCase)
    Tf = icemodel.physicalConstant('Tf');
    f_ice = 0.30 * ones(N, 1);
    f_liq = 0.05 * ones(N, 1);
-   T = Tf * ones(N, 1);
+   T_ice = Tf * ones(N, 1);
    [~, ~, ~, d_small] = icemodel.column.infiltration( ...
-      f_liq, f_ice, T, dz, dt, 1e-7);
+      f_liq, f_ice, T_ice, dz, dt, 1e-7);
    [~, ~, ~, d_large] = icemodel.column.infiltration( ...
-      f_liq, f_ice, T, dz, dt, 1e-5);
+      f_liq, f_ice, T_ice, dz, dt, 1e-5);
    verifyGreaterThanOrEqual(testCase, d_large.n_sub, d_small.n_sub);
 end

@@ -1,9 +1,9 @@
-function [H, dHdT, dFdT, dLdT, dVdT] = bulk_enthalpy(T, f_ice, f_liq, f_wat, ...
-      ro_vap, dro_vapdT)
+function [H, dHdT, dFdT, dLdT, dVdT] = bulk_enthalpy(T_ice, f_ice, f_liq, ...
+      f_wat, ro_vap, dro_vapdT)
    %BULK_ENTHALPY Compute the solver-state bulk enthalpy [J m-3].
    %
-   %  H = icemodel.column.bulk_enthalpy(T, f_ice, f_liq, f_wat)
-   %  H = icemodel.column.bulk_enthalpy(T, f_ice, f_liq, f_wat, ro_vap)
+   %  H = icemodel.column.bulk_enthalpy(T_ice, f_ice, f_liq, f_wat)
+   %  H = icemodel.column.bulk_enthalpy(T_ice, f_ice, f_liq, f_wat, ro_vap)
    %  [H, dHdT, dFdT] = icemodel.column.bulk_enthalpy(...)
    %  [H, dHdT, dFdT, dLdT, dVdT] = icemodel.column.bulk_enthalpy(...)
    %
@@ -65,14 +65,15 @@ function [H, dHdT, dFdT, dLdT, dVdT] = bulk_enthalpy(T, f_ice, f_liq, f_wat, ...
 
    % Total (bulk) enthalpy [J m-3].
    H = ( ...
-      dHdT .* (T - Tf) ...         % sensible heat relative to Tf
+      dHdT .* (T_ice - Tf) ...     % sensible heat relative to Tf
       + roLf .* f_liq ...          % latent heat wrt the dry reference state
       + roLv .* f_air ...          % vapor heat at saturation
       );
 
    % Optional liquid-fraction derivative [K-1].
    if nargout > 2
-      dFdT = icemodel.column.liquid_fraction_derivative(T, f_ice, f_liq, f_wat);
+      dFdT = icemodel.column.liquid_fraction_derivative( ...
+         T_ice, f_ice, f_liq, f_wat);
    else
       dFdT = [];
    end

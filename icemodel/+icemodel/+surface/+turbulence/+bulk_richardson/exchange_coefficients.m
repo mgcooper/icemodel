@@ -25,10 +25,10 @@ function [De_h, S123, W1] = exchange_coefficients(wspd, z0_bulk, z_tair, z_wind)
    % If Ri > 0 (stable):
    %     S = 1 / (1 + eta/2 * Ri) ^ 2
    %
-   % Eliminate Ri so S can be computed in terms of Ts, Ta:
+   % Eliminate Ri so S can be computed in terms of T_sfc, T_air:
    %
    % Define:
-   %  T_star = (Ts - Ta) / Ta
+   %  T_star = (T_sfc - T_air) / T_air
    %
    % With some algebra:
    %  if Ri < 0 (unstable):
@@ -92,23 +92,23 @@ function [De_h, S123, W1] = exchange_coefficients(wspd, z0_bulk, z_tair, z_wind)
 
    % This follows Glen, and can be compared with stability_factor
    %
-   % B1 = 9.4 * gravity * zobs / (Ta * wspd ^ 2) = S123(2) / (Ta * wspd ^ 2)
-   % B2 = 5.3 * 9.4 * W1 * sqrt(zobs / z0) * sqrt(gravity * zobs / (Ta * wspd ^ 2));
+   % B1 = 9.4 * gravity * zobs / (T_air * wspd^2) = S123(2) / (T_air * wspd^2)
+   % B2 = 5.3 * 9.4 * W1 * sqrt(zobs/z0) * sqrt(gravity*zobs / (T_air * wspd^2));
    %
-   % a1 = 5.3 * 9.4;                                    % [-]
-   % z1 = z_obs / z0_bulk;                              % [-]
-   % C1 = a1 * (kappa / log(z1)) ^ 2 * sqrt(z1);        % [-]
-   % C2 = gravity * z_obs / (Ta * wspd ^ 2);            % [K-1]
-   % B1 = 9.4 * C2;                                     % [K-1]
-   % B2 = C1 * sqrt(C2);                                % [K-1]
+   % a1 = 5.3 * 9.4;                                     % [-]
+   % z1 = z_obs / z0_bulk;                               % [-]
+   % C1 = a1 * (kappa / log(z1)) ^ 2 * sqrt(z1);         % [-]
+   % C2 = gravity * z_obs / (T_air * wspd ^ 2);          % [K-1]
+   % B1 = 9.4 * C2;                                      % [K-1]
+   % B2 = C1 * sqrt(C2);                                 % [K-1]
    %
-   % if (Ts > Ta)                                       % Unstable case.
-   %    B3 = 1.0 + B2 * sqrt(Ts - Ta);                  % [-]
-   %    S = 1.0 + B1 * (Ts - Ta) / B3;                  % [-]
-   % elseif (Ts < Ta)                                   % Stable case.
-   %    B8 = B1 / 2.0;                                  % [-]
-   %    S = 1.0 / (1.0 + B8 * (Ta - Ts)) ^ 2;           % [-]
-   % else                                               % Neutrally stable case.
-   %    S = 1.0;                                        % [-]
+   % if (T_sfc > T_air)                                  % Unstable case.
+   %    B3 = 1.0 + B2 * sqrt(T_sfc - T_air);             % [-]
+   %    S = 1.0 + B1 * (T_sfc - T_air) / B3;             % [-]
+   % elseif (T_sfc < T_air)                              % Stable case.
+   %    B8 = B1 / 2.0;                                   % [-]
+   %    S = 1.0 / (1.0 + B8 * (T_air - T_sfc)) ^ 2;      % [-]
+   % else                                                % Neutral stability
+   %    S = 1.0;                                         % [-]
    % end
 end

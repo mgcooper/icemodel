@@ -1,9 +1,9 @@
-function budget = accumulate_phase_budget(budget, xT, xf_ice, xf_liq, ...
-      T, f_ice, f_liq, dz)
+function budget = accumulate_phase_budget(budget, xT_ice, xf_ice, xf_liq, ...
+      T_ice, f_ice, f_liq, dz)
    %ACCUMULATE_PHASE_BUDGET Add one substep's phase-change storage increments.
    %
    %  budget = icemodel.column.accumulate_phase_budget( ...
-   %     budget, xT, xf_ice, xf_liq, T, f_ice, f_liq, dz)
+   %     budget, xT_ice, xf_ice, xf_liq, T_ice, f_ice, f_liq, dz)
    %
    % Integrates the prior checkpoint and updated column state to compute total
    % melt/freeze phase change over one substep. Call this once per accepted
@@ -13,14 +13,15 @@ function budget = accumulate_phase_budget(budget, xT, xf_ice, xf_liq, ...
    % to separate budget fields.
    %
    % Inputs
-   %   budget              - Forcing-step budget (see
-   %                         icemodel.column.initialize_budget_state).
-   %   xT, xf_ice, xf_liq  - Checkpointed column state entering the substep.
-   %   T, f_ice, f_liq     - Column state after the accepted phase-change solve.
-   %   dz                  - Control-volume thickness [m].
+   %   budget                  - Forcing-step budget (see
+   %                             icemodel.column.initialize_budget_state).
+   %   xT_ice, xf_ice, xf_liq  - Checkpointed column state entering the substep.
+   %   T_ice, f_ice, f_liq     - Column state after the accepted phase-change
+   %                             solve.
+   %   dz                      - Control-volume thickness [m].
    %
    % Outputs
-   %   budget              - Budget with the phase change increments added.
+   %   budget                  - Budget with the phase change increments added.
    %
    % See also: icemodel.column.initialize_budget_state,
    %  icemodel.column.integrate_column_budget,
@@ -30,9 +31,9 @@ function budget = accumulate_phase_budget(budget, xT, xf_ice, xf_liq, ...
 
    % Integrate the prior checkpoint state and the updated accepted state.
    [solid_0, liquid_0] = icemodel.column.integrate_column_budget( ...
-      xT, xf_ice, xf_liq, dz);
+      xT_ice, xf_ice, xf_liq, dz);
    [solid_p, liquid_p] = icemodel.column.integrate_column_budget( ...
-      T, f_ice, f_liq, dz);
+      T_ice, f_ice, f_liq, dz);
 
    % Difference them to get the column-integrated phase change increments for
    % this substep and accumulate the increments across substeps.

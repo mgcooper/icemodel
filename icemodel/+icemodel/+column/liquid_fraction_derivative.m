@@ -1,7 +1,7 @@
-function [dFdT, f_wat] = liquid_fraction_derivative(T, f_ice, f_liq, f_wat)
+function [dFdT, f_wat] = liquid_fraction_derivative(T_ice, f_ice, f_liq, f_wat)
    %LIQUID_FRACTION_DERIVATIVE Liquid fraction derivative wrt temperature.
    %
-   %  [DFDT, F_WAT] = liquid_fraction_derivative(T, F_ICE, F_LIQ)
+   %  [DFDT, F_WAT] = liquid_fraction_derivative(T_ICE, F_ICE, F_LIQ)
    %  [DFDT, F_WAT] = liquid_fraction_derivative(..., F_WAT)
    %
    % If you supply F_WAT, the function evaluates the derivative against that
@@ -18,7 +18,7 @@ function [dFdT, f_wat] = liquid_fraction_derivative(T, f_ice, f_liq, f_wat)
       fcp = icemodel.parameterLookup('fcp');
    end
 
-   T_dep = Tf - min(T, Tf);
+   T_dep = Tf - min(T_ice, Tf);
 
    if nargin < 4 || isempty(f_wat)
       % In terms of volumetric liquid fraction:

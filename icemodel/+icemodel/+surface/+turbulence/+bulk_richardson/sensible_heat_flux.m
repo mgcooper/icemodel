@@ -6,7 +6,7 @@ function [Qh, dQh_dT_sfc] = sensible_heat_flux(T_sfc, tair, H_h, stability, ...
    %  [Qh, dQh_dT_sfc] = ...
    %     icemodel.surface.turbulence.bulk_richardson.sensible_heat_flux(...)
    %
-   % Qh = H_h * stability * (Ta - Ts);
+   % Qh = H_h * stability * (T_air - T_sfc);
    % [W m-2] = [W m-2 K-1] * [-] * [K]
    %
    % where H_h = cv_atm * De = ro_atm * cp_air * De is the sensible heat

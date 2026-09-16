@@ -1,7 +1,7 @@
-function budget = finalize_budget_state(budget, T, f_ice, f_liq, dz)
+function budget = finalize_budget_state(budget, T_ice, f_ice, f_liq, dz)
    %FINALIZE_BUDGET_STATE Record the storage end endpoints for one forcing step.
    %
-   %  budget = icemodel.column.finalize_budget_state(budget, T, f_ice, ...
+   %  budget = icemodel.column.finalize_budget_state(budget, T_ice, f_ice, ...
    %     f_liq, dz)
    %
    % The driver calls this once per forcing step, after the substep loop.
@@ -16,7 +16,7 @@ function budget = finalize_budget_state(budget, T, f_ice, f_liq, dz)
 
    % Integrate solid and liquid phase storage [mwe] at the end of the step.
    [solid_end, liquid_end] = ...
-      icemodel.column.integrate_column_budget(T, f_ice, f_liq, dz);
+      icemodel.column.integrate_column_budget(T_ice, f_ice, f_liq, dz);
    budget.mass_budget_solid_end_mwe = solid_end;
    budget.mass_budget_liquid_end_mwe = liquid_end;
 end
