@@ -21,6 +21,7 @@
   - [References](#references)
   - [System Requirements](#system-requirements)
   - [Installation Guide](#installation-guide)
+    - [Optional external dependencies](#optional-external-dependencies)
   - [Contribute](#contribute)
   - [How do I cite this?](#how-do-i-cite-this)
 
@@ -48,13 +49,12 @@ Thanks for your interest. To get started, here's what we recommend:
 - If you do not have a MATLAB license, you can run this software using a free MATLAB Online account: [![Open in MATLAB Online](https://www.mathworks.com/images/responsive/global/open-in-matlab-online.svg)](https://matlab.mathworks.com/open/github/v1?repo=mgcooper/icemodel&file=demo/demo.m)
 - The main program is `icemodel/icemodel.m`. Open the function to get a sense for the model structure.
 - Open and run Example 1 in `demo/demo.m`. This runs the KAN_M weather-station
-  case on the Greenland ice sheet for 2016 using the retained 15-minute
-  forcing asset and a 15-minute model timestep.
+  case on the Greenland ice sheet for 2016 using a 15-minute timestep.
 - Inspect the demo plot created by the call to `icemodel.plot.enbal`. The simulated energy fluxes should closely track the weather station values.
 - Set `saveflag=true` and re-run Example 1. Notice how the `demo/data/output` directory is created, and the model output is saved there.
 - Set `backupflag=true` and re-run Example 1. Notice how the files are backed-up. By default, saveflag and backupflag are both false.
 
-The examples in `demo.m` run IceModel in its "SkinModel" surface energy balance configuration. Run-time will depend on your computer, but should take less than one minute. An IceModel configuration (which includes a full subsurface energy balance) should take between one and a few minutes to run. Initial run times may be longer due to JIT compilation.
+The examples in `demo.m` run IceModel in its "SkinModel" surface energy balance configuration. Run-time will depend on your computer, but should take less than one minute. An IceModel configuration (which includes a full subsurface energy balance) should also take less than one minute to run. Initial run times may be longer due to JIT compilation.
 
 ## Advanced Use
 
@@ -67,9 +67,7 @@ To specify custom input and output directories, use the configuration function `
 - Type `edit icemodel.config` and press enter.
 - Read the detailed documentation to understand the model input and output directory structure, and how to set them programmatically.
 
-`demo.m` selects `icemodel.config(casename="demo")`, which scopes the run to
-the small tracked `demo/data` tree. The `test` and `verification` cases select
-their independently owned data roots.
+`demo.m` selects `icemodel.config(casename="demo")`, which scopes the run to the small tracked `demo/data` tree. The `test` and `verification` cases select their data roots.
 
 ### Runtime configuration: Specify model options
 
@@ -81,24 +79,15 @@ To set run-specific model options and parameters, open and edit the function `ic
 
 ## Input Data
 
-The minimal example inputs are in `demo/data/input`: the KAN-M 2016
-15-minute forcing and MERRA-2 temperature-swap file under `input/met`, plus
-the two-stream tables under `input/spectral`. The MODIS example uses the
-column embedded in the primary forcing.
+The minimal example inputs are in `demo/data/input`: the KAN-M 2016 15-minute forcing and MERRA-2 [userdata](#user-data) file under `input/met`, plus the two-stream tables under `input/spectral`. The MODIS example uses the MODIS data column included in the demo forcing file to run the model with MODIS albedo rather than the KAN-M weather station albedo.
 
 The `spectral` directory contains values for the absorption coefficient of pure ice from Warren et al. 2008, in-situ absorption coefficients for glacier ice from Cooper et al. 2021, a downwelling solar spectrum for the Arctic atmosphere generated with `ATRAN` (Lord, 1991), and a library of mie-scattering coefficients as described in Cooper et al. 2021.
 
 ## User Data
 
-Custom workspaces may provide an `input/userdata` directory containing
-alternative model forcings that can be swapped into the standard forcing to
-test hypotheses about processes and model sensitivity. Unlike files in
-`input/met`, userdata files do not need to contain every model forcing.
+The model supports an `input/userdata` directory containing alternative model forcings that can be swapped into the standard forcing to test hypotheses about processes and model sensitivity. Unlike files in `input/met`, userdata files do not need to contain every model forcing.
 
-To swap a variable, set the `userdata` and `uservars` configuration
-parameters (see `demo/demo.m`). A source may be embedded in the primary
-forcing, as the demo MODIS column is, or supplied by a matching file in
-`input/met/<source>` or `input/userdata/<source>`.
+To swap a variable, set the `userdata` and `uservars` configuration parameters (see `demo/demo.m`). A "swappable" alternative forcing variable source can be included in the primary forcing file as an additional column, as the demo MODIS column is, or supplied by a matching file in `input/met/<source>` or `input/userdata/<source>`.
 
 ## Summary
 
@@ -126,70 +115,38 @@ forcing, as the demo MODIS column is, or supplied by a matching file in
 
 The met (forcing data) file naming convention has two forms:
 
-- per-year: `met_SITENAME_FORCINGS_YYYY_TIMESTEP`
-- window-stamped: `met_SITENAME_FORCINGS_YYYYMMDD_YYYYMMDD_TIMESTEP` (one file
-  spanning a full window; preferred when a run sets `opts.startdate` /
-  `opts.enddate`, e.g. for the verification suite)
+- per year: `met_SITENAME_FORCINGS_YYYY_TIMESTEP`
+- per time-window: `met_SITENAME_FORCINGS_YYYYMMDD_YYYYMMDD_TIMESTEP`
+  (preferred when a run sets `opts.startdate` / `opts.enddate`)
 
-Here `FORCINGS` is the forcing-source label (a versioned climate product such
-as `mar3.11` / `merra2` / `racmo2.3p3`, a station such as `kanm`, the generic
-AWS source `promice`, or the ESM-SnowMIP family `esm_snowmip`). Met files
-therefore follow `met_<site>_<source>` across all families. The legacy
-per-station convention sets `FORCINGS == SITENAME`
-(e.g. `met_kanm_kanm_...`); the `kanl` / `kanm` station forcings are kept under
-this legacy naming and are not relabeled.
+Here `FORCINGS` is the forcing-source label (a versioned climate product such as `mar3.11` / `merra2` / `racmo2.3p3`, a station such as `kanm`, the generic AWS source `promice`, or the ESM-SnowMIP family `esm_snowmip`). Met file names therefore follow `met_<site>_<source>` across all forcing product families. A legacy per-station convention is also supported, which sets `FORCINGS == SITENAME` (e.g. `met_kanm_kanm_...`) whereas the recommended convention is `met_kanm_promice_...`. Here, the `kanm` weather station is part of the `promice` forcing product.
 
 Examples:
 
 - `met_kanm_kanm_2016_15m.mat` specifies a met (forcing) data file for site KAN-M with KAN-M forcings for year 2016 at a 15-minute timestep.
-- `met_kanm_merra2_20160101_20161231_15m.mat` specifies a window-stamped met
-  file for site KAN-M with MERRA-2 forcings throughout 2016 at a 15-minute
-  timestep.
-- `met_cdp_esm_snowmip_19940801_20140731_1hr.mat` specifies an ESM-SnowMIP
-  window-stamped met file for site `cdp` spanning 1994-2014 at a 1-hour timestep.
+- `met_kanm_merra2_20160101_20161231_15m.mat` specifies a time-window stamped met file for site KAN-M with MERRA-2 forcings throughout 2016 at a 15-minute timestep.
+- `met_cdp_esm_snowmip_19940801_20140731_1hr.mat` specifies an ESM-SnowMIP time-window stamped met file for site `cdp` spanning 1994-2014 at a 1-hour timestep.
 
-Met files live under `input/met/`. Staging writes them into a per-source
-subfolder `input/met/<FORCINGS>/`, so the flat `met/` directory does not fill
-with files as forcing sources accumulate. The runtime resolves `input/met/<FORCINGS>/`
-**first** and falls back to a flat `input/met/` path, so both layouts work and
-committed flat fixtures still load. (`icemodel.forcing.helpers.writemet` writes
-the subfolder; `icemodel.forcing.helpers.sourceSearchDirs` defines the
-subfolder-first search order shared by the runtime resolvers.)
+Met files live under `input/met/`, staged into per-source subfolders `input/met/<FORCINGS>/` (recommended), or staged directly in `input/met/` (legacy convention). At runtime, the model resolves `input/met/<FORCINGS>/` **first** and falls back to a flat `input/met/` path, so both layouts work.
 
-Repository writers default model met to a 15-minute timestep. Public met
-builders/importers expose `dt_out="15m"`; pass `dt_out=""` explicitly to retain
-the source's native model-met cadence. A repeated write leaves an existing
-target unchanged unless you pass `overwrite=true`. A broader
-window-stamped artifact also satisfies a narrower ordinary request.
-
-Each met file must contain a timetable object named `met` with one column for each forcing variable. See the example met file.
+The recommended model timestep is 15-minute. Each met file must contain a timetable object named `met` with one column for each forcing variable. See the example met file.
 
 ### 3. User data files
 
 The "userdata" file naming convention has two forms:
 
-- per-year: `SITENAME_SOURCE_YYYY`
-- window-stamped: `SITENAME_SOURCE_YYYYMMDD_YYYYMMDD` (one file spanning a full
-  window; preferred and resolved when its encoded period brackets the run year)
-
-Repository userdata writers default to hourly artifacts. Source-native hourly
-data, including PROMICE, is unchanged; finer data is averaged into clock-hour
-bins, coarser data is linearly interpolated to hourly support, and wind
-direction uses circular aggregation/interpolation. Pass `dt_out=""` explicitly
-to retain native cadence. Unlike met filenames, userdata has no `TIMESTEP` file
-part; saved metadata records the source and output cadence policy.
+- per year: `SITENAME_SOURCE_YYYY`
+- per time-window: `SITENAME_SOURCE_YYYYMMDD_YYYYMMDD`
+  (preferred when a run sets `opts.startdate` / `opts.enddate`)
 
 Examples:
 
 - `kanm_merra2_2016.mat` specifies a user data file with MERRA-2 climate model forcings for the KAN-M weather station location for year 2016 on a 1-hr timestep.
 - `kanm_modis_2016.mat` specifies a user data file with MODIS satellite albedo values for the KAN-M weather station location for year 2016 on a 1-hr timestep.
 
-As with met files, staging writes userdata into a per-source subfolder
-`input/userdata/<SOURCE>/` and the runtime resolves that subfolder first, with a
-flat `input/userdata/` fallback. (`icemodel.forcing.helpers.writeuserdata`
-writes the subfolder; the same `sourceSearchDirs` ordering applies.)
+As with met files, userdata files are staged into per-source subfolders `input/userdata/<SOURCE>/` and the model resolves that subfolder first at runtime, with a flat `input/userdata/` fallback.
 
-Each userdata file must contain a timetable named `Data` with column names matching the met file column-naming conventions. See the example met file in `demo/data/input/`.
+Each userdata file must contain a timetable named `Data` with column names matching the met file column-naming conventions. Userdata files are staged at a 1-hr timestep; variables are linearly interpolated to the configured model timestep (e.g., 15-min) at runtime. See the example met file in `demo/data/input/`.
 
 ### 4. Output files
 
@@ -204,7 +161,7 @@ ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/restart/restart_FORCINGS_forcings_USERDAT
 
 Here, `ICEMODEL_OUTPUT_PATH` is an environment variable set by the `icemodel.config` function, the lowercase "forcings" is a string literal used to join the `FORCINGS` and `USERDATA` string variables, and `SITENAME`, `SMBMODEL`, `FORCINGS`, `USERDATA`, and `USERVARS` are parameters passed to the `icemodel.setopts` function (either directly or indirectly via the helper function `icemodel.run.point`). One `YYYY` folder is created for each year in the `SIMYEARS` parameter passed to `icemodel.setopts`.
 
-The `ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY` subfolders are created automatically when the model run starts if they do not exist. If `opts.saverestart` is enabled, a sibling `restart/` folder is also created under the same run output directory and stores one year-boundary restart file per saved year.
+The `ICEMODEL_OUTPUT_PATH/SITENAME/SMBMODEL/YYYY` subfolders are created automatically when the model run starts if they do not exist. If `opts.saverestart` is enabled, a sibling `restart/` folder is also created under the same run output directory and stores one restart file per saved year.
 
 Example: An IceModel simulation for the KAN-M weather station location for years 2015:2016 using MERRA forcings, with `userdata='modis'` and `uservars='albedo'` will produce the following output files:
 
@@ -352,10 +309,7 @@ Installation should only take a few seconds. If you encounter any issues, please
 
 ### Optional external dependencies
 
-Running the model and the snow-verification workflow needs nothing beyond this
-repo. A few auxiliary workflows (building gridded-climate forcings, and the
-permafrost-zone site classification used by `icemodel.verification`) call out to
-external dev-repo toolboxes that are kept *out* of this repo:
+Running the model and the snow-verification workflow needs nothing beyond this repo. A few auxiliary workflows (building gridded-climate forcings, and the permafrost-zone site classification used by `icemodel.verification`) call out to external dev-repo toolboxes that are kept *out* of this repo:
 
 | Repo | Used by | Path added |
 | --- | --- | --- |
@@ -363,10 +317,7 @@ external dev-repo toolboxes that are kept *out* of this repo:
 | [`activelayer`](https://github.com/mgcooper/activelayer) | Obu (UiO PEX) permafrost-zone reader `activelayer.readobuzones` used by site classification | `activelayer/toolbox` |
 | [`matfunclib`](https://github.com/mgcooper/matfunclib) | shared helpers `activelayer` depends on (`parseFileName`, `dealout`, ...) | `matfunclib` |
 
-These are wired by the single central function `icemodel.dependencies`, which
-the test bootstrap calls automatically. It resolves each repo root in this
-order, and it changes nothing when a dependency is already on the path or
-absent:
+These are wired by the single central function `icemodel.dependencies`, which the test suite bootstrap calls automatically. It resolves each repo root in this order, and it changes nothing when a dependency is already on the path or absent:
 
 1. A dependency-specific environment variable:
    `ICEMODEL_EXACTREMAP`, `ICEMODEL_ACTIVELAYER`, `ICEMODEL_MATFUNCLIB`.
@@ -374,17 +325,16 @@ absent:
    repo name (e.g. `$ICEMODEL_PROJECTS_ROOT/exactremap`).
 3. The sibling `projects/` layout (the parent folder of this repo).
 
-To use a non-default location, clone the repos and either set the env vars or
-clone them next to this repo. To add them to the path yourself:
+To use a non-default location, clone the repos and either set the env vars or clone them next to this repo. To add them to the path yourself:
 
 ```matlab
-icemodel.dependencies()           % no-op for anything already on the path
+icemodel.dependencies()              % no-op for anything already on the path
 icemodel.dependencies(require=true)  % error if any dependency is missing
 ```
 
 `matfunclib` must be on the path for `activelayer` to load.
 
-### Gridded raw-data source directories
+<!-- ### Gridded raw-data source directories
 
 The gridded-climate forcing builders read large raw source archives that, like
 the dependency repos above, are kept *out* of this repo. Each builder resolves
@@ -399,7 +349,7 @@ Only the env var is portable; set it to point each builder at the local archive.
 | `icemodel.forcing.buildRacmoData` (RACMO FGRN11) | `ICEMODEL_RACMO_DIR` |
 
 These are only needed to *rebuild* gridded forcing from the raw archives; the
-committed demo fixtures and the staged research forcing do not require them.
+committed demo fixtures and the staged research forcing do not require them. -->
 
 ## Contribute
 
