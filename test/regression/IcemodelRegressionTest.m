@@ -97,30 +97,23 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
             % Load the accepted baseline values for this case.
             bid = icemodel.test.helpers.findCaseRow(baseline, string(c.case_id));
-            case_passed = ~isempty(bid);
-            testCase.verifyNotEmpty(bid, ...
-               sprintf('baseline missing case=%s', c.case_id));
 
             % Populate the fields
             if ~isempty(bid)
                for f = all_baseline_fields'
                   base.(f) = testCase.getBaselineValue(baseline, bid, f);
                end
-               metric_names = string(fieldnames(S));
-               for imetric = 1:numel(metric_names)
-                  metric = metric_names(imetric);
-                  actual = S.(metric);
-                  [compare_metric, evidence_passed, evidence_reason] = ...
-                     icemodel.test.helpers.formalRegressionMetricEvidence( ...
-                     actual, baseline, bid, metric, baseline_tag);
-                  testCase.verifyTrue(evidence_passed, evidence_reason);
-                  case_passed = case_passed && evidence_passed;
-                  if compare_metric && evidence_passed
-                     metric_passed = testCase.checkAgainstBaseline( ...
-                        actual, baseline, bid, metric);
-                     case_passed = case_passed && metric_passed;
-                  end
-               end
+            end
+
+            % Evaluate every gate once, then verify each outcome so the runner
+            % output keeps every diagnostic and the report row names the
+            % failed gates.
+            [case_passed, failed_gates, checks] = ...
+               icemodel.test.helpers.regressionCaseGates(c.case_id, S, ...
+               baseline, bid, baseline_tag, testCase.gateTolerance());
+            for icheck = 1:numel(checks)
+               testCase.verifyTrue(checks(icheck).passed, ...
+                  checks(icheck).diagnostic);
             end
 
             % Build the report row with case identity, current metrics,
@@ -136,6 +129,7 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
             row.solver = c.solver;
             row = icemodel.helpers.copyFields(row, S);
             row.passed = case_passed;
+            row.failed_gates = failed_gates;
 
             for f = all_baseline_fields'
                row.("baseline_" + f) = base.(f);
@@ -171,14 +165,13 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
 
    methods (Access = private)
 
-      function passed = checkAgainstBaseline( ...
-            testCase, actual, baseline, row, varname)
-         % Compare one scalar regression metric against the selected baseline.
-         expected = baseline.(varname)(row);
-         tol = testCase.metricTolerance(char(varname), expected);
-         passed = abs(actual - expected) <= tol;
-         testCase.verifyTrue(passed, ...
-            sprintf('baseline mismatch var=%s', varname));
+      function tolerance = gateTolerance(testCase)
+         % Pack the scalar and runoff tolerances for regressionCaseGates.
+         tolerance = struct( ...
+            'rel_scalar', testCase.rel_tol_scalar, ...
+            'abs_scalar', testCase.abs_tol_scalar, ...
+            'rel_runoff_m3', testCase.rel_tol_runoff_m3, ...
+            'abs_runoff_m3', testCase.abs_tol_runoff_m3);
       end
 
       function x = getBaselineValue(~, baseline, row, varname)
@@ -188,39 +181,6 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          else
             x = nan;
          end
-      end
-
-      function tol = metricTolerance(testCase, varname, expected)
-         % Return one metric-specific scalar tolerance.
-
-         if endsWith(string(varname), "_m3")
-            tol = max(testCase.abs_tol_runoff_m3, ...
-               testCase.rel_tol_runoff_m3 * abs(expected));
-            return
-         end
-
-         if any(startsWith(string(varname), ["runoff_", "melt_"]))
-            tol = max(1e-4, 1e-4 * abs(expected));
-            return
-         end
-
-         if contains(varname, "numiter")
-            tol = 0.5;
-            return
-         end
-
-         if contains(varname, "not_converged")
-            tol = 1.0;
-            return
-         end
-
-         if startsWith(varname, "closure_") || startsWith(varname, "gof_")
-            tol = 5e-3;
-            return
-         end
-
-         tol = max(testCase.abs_tol_scalar, ...
-            testCase.rel_tol_scalar * abs(expected));
       end
 
       function saveArtifacts(~, report, case_opts, meta)
