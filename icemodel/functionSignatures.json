@@ -422,6 +422,14 @@
                "double",
                "scalar"
             ]
+         },
+         {
+            "name": "overrides",
+            "kind": "namevalue",
+            "type": [
+               "struct",
+               "scalar"
+            ]
          }
       ],
       "outputs": [

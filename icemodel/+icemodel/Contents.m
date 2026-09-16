@@ -415,7 +415,7 @@
 %   icemodel.radiation.update_extinction_coefficients                       - Update spectral extinction coefficients for
 %
 %   +ICEMODEL/+RUN
-%   icemodel.run.point
+%   icemodel.run.point                                                      - Run one point-scale simulation and post-process its output
 %   README.md
 %
 %   +ICEMODEL/+SURFACE
@@ -849,4 +849,4 @@
 %   icemodel.verification.validators.mustBeRcmSourceSelection               - Validate verification forcing-source selectors
 %   icemodel.verification.validators.mustBeSnowmipSite                      - Validate sitename against the canonical ESM-SnowMIP
 %
-%   updatecontents.m generated this file on 14 Sep 2026 at 20:13:53.
+%   updatecontents.m generated this file on 15 Sep 2026 at 19:07:09.
