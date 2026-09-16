@@ -44,7 +44,7 @@ function opts = setModelOptsForCase(c, kwargs)
    % loadmet with the selected staged input paths.
    %
    % See also: icemodel.setopts, icemodel.createMetFileNames,
-   %  icemodel.verification.runIcemodelSnowCandidate
+   %  icemodel.verification.runIcemodelCandidate
 
    arguments
       c

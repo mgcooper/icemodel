@@ -926,7 +926,7 @@ function test_retmip_candidate_adapter_returns_protocol_bundle(testCase)
    time = (datetime(2016, 1, 1, 0, 0, 0, 'TimeZone', 'UTC') ...
       + hours(0:1))';
    ice1 = struct('Time', time, 'melt', [0; 1], 'Tsfc', [260; 261]);
-   ice2 = struct('T', [260 261; 262 263], 'ro_sno', [350 351; 400 401]);
+   ice2 = struct('Tice', [260 261; 262 263], 'ro_sno', [350 351; 400 401]);
    opts = struct('dz_thermal', 0.1, 'smbmodel', "icemodel", ...
       'sitename', "retmip_test", 'simyears', 2016);
    manifest = struct( ...
@@ -945,6 +945,16 @@ function test_retmip_candidate_adapter_returns_protocol_bundle(testCase)
    testCase.verifyTrue(isfield(candidate.data.profiles, ...
       'subsurface_temperature'));
    testCase.verifyEqual(candidate.data.surface.tsfc, ice1.Tsfc);
+
+   % RetMIP stages profile temperatures in degrees C, so the top-column
+   % values 260 and 262 K become -13.16 and -11.16 C (Tf = 273.16 K).
+   returned = candidate.data.profiles.subsurface_temperature ...
+      .subsurface_temperature;
+   testCase.verifyEqual(returned, [-13.16; -11.16], 'AbsTol', 1e-12);
+
+   % Profile depths are the node centers of the 0.1 m mesh.
+   returned = candidate.data.profiles.subsurface_temperature.depth;
+   testCase.verifyEqual(returned, [0.05; 0.15], 'AbsTol', 1e-12);
 end
 
 function test_import_sumup_dry_run_does_not_write_staging_tree(testCase)

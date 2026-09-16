@@ -62,7 +62,7 @@ function report_path = writeRunReport(run_dir, case_results, cases, kwargs)
    fprintf(fid, "Run directory: `%s`\n\n", run_dir);
    if kwargs.run_icemodel
       fprintf(fid, "**Candidate source:** synthetic-snow hook ");
-      fprintf(fid, "(`icemodel.verification.runIcemodelSnowCandidate`).\n");
+      fprintf(fid, "(`icemodel.verification.runIcemodelCandidate`).\n");
       fprintf(fid, "Metrics include the deliberate perturbations:\n");
       fprintf(fid, "snow_depth +0.02 m, swe x 1.05, surface_temp +0.25 K, ");
       fprintf(fid, "liquid_water x 1.05. ");

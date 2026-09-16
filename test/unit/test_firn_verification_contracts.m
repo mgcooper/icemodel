@@ -258,8 +258,9 @@ end
 function test_candidate_adapter_resolves_declared_firn_variables(testCase)
    % The firn candidate adapter must map the firn comparison variables the
    % staged manifests declare (ablation, snow_depth, tsfc, tice1..tice8) from
-   % synthetic icemodel-shaped output, including the thermistor profile
-   % T(z,t) sampled from ice2.T at staged thermistor depths.
+   % synthetic icemodel-shaped output. It samples the thermistor profile
+   % T(z,t) from ice2.Tice at manifest thermistor depths. No stage writes
+   % thermistor_depths_m (Bead icemodel-xuai), so the test supplies it.
 
    manifest = icemodel.verification.loadmanifest("kanm", ...
       icemodel_config_casename="verification");
@@ -278,9 +279,11 @@ function test_candidate_adapter_resolves_declared_firn_variables(testCase)
       "Tsfc", 263.15 + (1:n)' * 0.1);
 
    % A column T(z,t): rows are depth nodes (dz_thermal spacing), cols are time.
-   nz = 40;
-   T_column = 263.15 + repmat((0:nz - 1)' * 0.05, 1, n);
-   ice2 = struct("T", T_column);
+   % The 500 nodes at 0.04 m span 20 m, the default z0_thermal, so the column
+   % contains every thermistor depth and the tice10m depth.
+   nz = 500;
+   T_column = 263.15 + repmat((0:nz - 1)' * 0.01, 1, n);
+   ice2 = struct("Tice", T_column);
    dz = 0.04;
 
    % Provide the thermistor depths the firn adapter samples T(z,t) at.
@@ -303,15 +306,15 @@ function test_candidate_adapter_resolves_declared_firn_variables(testCase)
    testCase.verifyEqual(string(candidate.format), "timeseries");
    resolved = string(candidate.data.Properties.VariableNames);
 
-   Tf = icemodel.physicalConstant('Tf');
-
-   % Surface / ablation / snow-depth axes map and convert correctly.
+   % Surface / ablation / snow-depth axes map correctly. PROMICE stages tsfc
+   % in Kelvin, so the model Kelvin series passes through.
    testCase.verifyTrue(ismember("ablation", resolved));
    testCase.verifyEqual(candidate.data.ablation, ice1.ablation);
    testCase.verifyTrue(ismember("snow_depth", resolved));
    testCase.verifyEqual(candidate.data.snow_depth, ice1.snow_depth_m);
    testCase.verifyTrue(ismember("tsfc", resolved));
-   testCase.verifyEqual(candidate.data.tsfc, ice1.Tsfc - Tf);
+   testCase.verifyEqual(candidate.data.tsfc, 263.15 + (1:n)' * 0.1, ...
+      'AbsTol', 1e-12);
 
    % The thermistor profile T(z,t) resolves for every staged tice axis.
    tice_vars = vars(startsWith(vars, "tice"));
@@ -320,9 +323,19 @@ function test_candidate_adapter_resolves_declared_firn_variables(testCase)
       testCase.verifyTrue(ismember(tv, resolved), ...
          sprintf('thermistor axis %s not resolved by firn adapter', tv));
    end
+
+   % The first thermistor sits at 0.5 m. Node 13 of the 0.04 m mesh spans
+   % 0.48 to 0.52 m, so tice1 is 263.15 + 12 * 0.01 = 263.27 K at every time.
+   % PROMICE stages tice1..tice8 in Kelvin, so no conversion applies.
+   testCase.assertTrue(ismember("tice1", resolved));
+   testCase.verifyEqual(candidate.data.tice1, repmat(263.27, n, 1), ...
+      'AbsTol', 1e-12);
+
+   % 10 m is the face between nodes 250 and 251. A face belongs to the node
+   % below it, so tice10m is 263.15 + 250 * 0.01 = 265.65 K.
    if ismember("tice10m", resolved)
-      zidx = min(size(ice2.T, 1), round(10 / dz) + 1);
-      testCase.verifyEqual(candidate.data.tice10m, ice2.T(zidx, :)');
+      testCase.verifyEqual(candidate.data.tice10m, repmat(265.65, n, 1), ...
+         'AbsTol', 1e-12);
    end
 end
 
@@ -537,7 +550,7 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
    time = (datetime(2014, 9, 15, 'TimeZone', 'UTC') + days(0:n - 1))';
    ice1 = struct("Time", time, "smb", linspace(0, 0.2, n)');
    ice2 = struct( ...
-      "T", 263.15 + repmat((0:nz - 1)' * 0.05, 1, n), ...
+      "Tice", 263.15 + repmat((0:nz - 1)' * 0.05, 1, n), ...
       "ro_sno", 350 + (0:nz - 1)' * 5);
    opts = struct("smbmodel", "icemodel", "sitename", "kanu", ...
       "simyears", 2013, "dz_thermal", 0.04);
@@ -568,7 +581,7 @@ function test_sumup_candidate_adapter_maps_profile_variables(testCase)
    testCase.verifyTrue(istable(candidate.data.subsurface_temperature));
    testCase.verifyEqual( ...
       candidate.data.subsurface_temperature.subsurface_temperature, ...
-      ice2.T(:) - Tf);
+      ice2.Tice(:) - Tf);
    testCase.verifyEqual( ...
       numel(unique(candidate.data.subsurface_temperature.datetime)), n);
 

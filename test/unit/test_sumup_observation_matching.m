@@ -214,7 +214,7 @@ function test_candidate_adapter_preserves_all_dated_profile_columns(testCase)
    ice1 = struct('Time', Time, 'smb', [0.1; 0.2]);
    ice2 = struct( ...
       'ro_sno', [300, 310; 400, 410; 500, 510], ...
-      'T', [260, 261; 262, 263; 264, 265]);
+      'Tice', [260, 261; 262, 263; 264, 265]);
    opts = struct('smbmodel', 'icemodel', 'sitename', 'fixture', ...
       'simyears', 2014:2015, 'dz_thermal', 0.5);
    manifest = struct('case_type', 'firn_observational', ...
@@ -234,7 +234,7 @@ function test_candidate_adapter_preserves_all_dated_profile_columns(testCase)
    testCase.verifyEqual(density.Properties.VariableUnits, ...
       {'', '', 'm', 'kg m-3'})
    testCase.verifyEqual(temperature.subsurface_temperature, ...
-      ice2.T(:) - Tf)
+      ice2.Tice(:) - Tf)
    testCase.verifyEqual(temperature.Properties.VariableUnits, ...
       {'', '', 'm', 'degC'})
    testCase.verifyEqual(density.datetime.TimeZone, 'UTC')
@@ -243,7 +243,7 @@ function test_candidate_adapter_preserves_all_dated_profile_columns(testCase)
    % over the complete model time vector.
    one_column = ice2;
    one_column.ro_sno = one_column.ro_sno(:, 1);
-   one_column.T = one_column.T(:, 1);
+   one_column.Tice = one_column.Tice(:, 1);
    one = icemodel.verification.candidateFromIcemodelOutput( ...
       ice1, one_column, opts, manifest);
    testCase.verifyEqual(height(one.data.density), 3)

@@ -8,7 +8,7 @@ function [observations, metadata] = buildEsmSnowmipObservations(sitename, kwargs
    %  Reads one ESM-SnowMIP obs_insitu_<sitename>_*.nc file and returns
    %  the observed snow / surface variables as a verification-target
    %  timetable. Variable mapping uses the verification-target schema consumed
-   %  by comparecase, plotcase, and the runIcemodelSnowCandidate adapter without
+   %  by comparecase, plotcase, and the runIcemodelCandidate adapter without
    %  a per-site branch.
    %
    %  Observation contract: this builder stages every snow and surface

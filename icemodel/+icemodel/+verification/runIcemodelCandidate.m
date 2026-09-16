@@ -1,8 +1,8 @@
-function candidate = runIcemodelSnowCandidate(case_manifest, kwargs)
-   %RUNICEMODELSNOWCANDIDATE Run icemodel and return a verification candidate.
+function candidate = runIcemodelCandidate(case_manifest, kwargs)
+   %RUNICEMODELCANDIDATE Run icemodel and return a verification candidate.
    %
-   %  candidate = icemodel.verification.runIcemodelSnowCandidate(case_manifest)
-   %  candidate = icemodel.verification.runIcemodelSnowCandidate(case_manifest, ...
+   %  candidate = icemodel.verification.runIcemodelCandidate(case_manifest)
+   %  candidate = icemodel.verification.runIcemodelCandidate(case_manifest, ...
    %     startdate=..., enddate=...)
    %
    % This bridge calls the normal icemodel entry point, receives ICE1/ICE2,
