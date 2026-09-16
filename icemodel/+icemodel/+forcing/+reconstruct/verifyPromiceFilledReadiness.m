@@ -427,11 +427,11 @@ function verifyProducerManifest(filename, site, readiness_file, met_files)
             'PROMICE producer manifest path escapes its selected root: %s', ...
             relative_paths(k));
       end
-      paths(k) = canonicalPath(candidate);
+      paths(k) = icemodel.helpers.canonicalPath(candidate);
    end
    expected_paths = [string(readiness_file); met_files];
    for k = 1:numel(expected_paths)
-      expected_paths(k) = canonicalPath(expected_paths(k));
+      expected_paths(k) = icemodel.helpers.canonicalPath(expected_paths(k));
    end
    expected_roles = ["readiness"; repmat("filled", numel(met_files), 1)];
    for k = 1:numel(expected_paths)
@@ -449,11 +449,6 @@ function verifyProducerManifest(filename, site, readiness_file, met_files)
             'runtime artifact differs from producer manifest: %s', ...
             expected_paths(k));
       end
-   end
-
-   function pathname = canonicalPath(pathname)
-      %CANONICALPATH Resolve one artifact path for identity comparison.
-      pathname = string(java.io.File(char(pathname)).getCanonicalPath());
    end
 
 end

@@ -13,8 +13,10 @@ function link = fixtureCallerSymlink(pathname)
    end
 
    % Normalize dot components and relative paths without resolving links.
+   % Anchor a relative path at pwd first; Java user.dir can be stale.
    empty_names = javaArray('java.lang.String', 0);
-   path_object = java.nio.file.Paths.get(char(pathname), empty_names);
+   path_object = java.nio.file.Paths.get( ...
+      char(icemodel.helpers.absolutePath(pathname)), empty_names);
    path_object = path_object.toAbsolutePath().normalize();
    cursor = path_object.getRoot();
    link = "";
@@ -43,7 +45,7 @@ function tf = isMacSystemAlias(path_object)
    leaf = string(path_object.getFileName().toString());
    expected = fullfile(string(path_object.getRoot().toString()), ...
       "private", leaf);
-   canonical = string(java.io.File( ...
-      char(path_object.toString())).getCanonicalPath());
+   canonical = icemodel.helpers.canonicalPath( ...
+      string(path_object.toString()));
    tf = canonical == expected;
 end

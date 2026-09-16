@@ -91,16 +91,15 @@ end
 function pathspec = gitPathspec(repo_root, ignored_paths)
    %GITPATHSPEC Exclude exact builder-owned outputs from source identity.
    pathspec = "";
-   repo_root = icemodel.verification.setup.fixtureCanonicalRoot(repo_root);
+   repo_root = icemodel.helpers.canonicalPath(repo_root);
    ignored_paths = reshape(string(ignored_paths), [], 1);
    for n = 1:numel(ignored_paths)
       % java.io.File classifies absolute paths on every supported platform.
-      % fixtureCanonicalRoot uses the same call, so the two agree.
+      % icemodel.helpers.absolutePath uses the same call, so the two agree.
       if ~java.io.File(char(ignored_paths(n))).isAbsolute()
          ignored_paths(n) = fullfile(repo_root, ignored_paths(n));
       end
-      ignored_paths(n) = ...
-         icemodel.verification.setup.fixtureCanonicalRoot(ignored_paths(n));
+      ignored_paths(n) = icemodel.helpers.canonicalPath(ignored_paths(n));
    end
    ignored_paths = ignored_paths(arrayfun(@(pathname) ...
       icemodel.isPathInside(pathname, repo_root), ignored_paths));

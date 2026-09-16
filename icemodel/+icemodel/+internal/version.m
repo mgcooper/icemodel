@@ -14,7 +14,12 @@ function str = version(new)
    % Cache the persisted version so ordinary runtime calls do not reread the
    % citation file. The override and reset branches below update the cache.
    persistent current
-   if isempty(current) || nargin == 1 && strcmp('reset', new)
+   is_reset = nargin == 1 && strcmp('reset', new);
+   if nargin == 1 && ~is_reset && isrow(new) && ischar(new)
+      % Apply an override before any cache check, so an override is not lost
+      % on the first call after the cache is cleared.
+      current = new;
+   elseif isempty(current) || is_reset
       % Discard an override before reading so a failed reset cannot leave
       % stale process state in place of a missing or malformed version source.
       current = [];
@@ -26,8 +31,6 @@ function str = version(new)
       project_dir = fileparts(toolbox_dir);
       current = icemodel.internal.readCffVersion( ...
          fullfile(project_dir, 'CITATION.cff'));
-   elseif nargin == 1 && isrow(new) && ischar(new)
-      current = new;
    end
    str = current;
 end

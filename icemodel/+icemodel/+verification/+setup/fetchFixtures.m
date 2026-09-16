@@ -614,7 +614,7 @@ function assertNoDestinationSymlinks(root, selections)
          'Fixture destination traverses a symbolic link: %s', ancestor_link)
    end
    assertNotDestinationSymlink(lexical_root, ".");
-   root = icemodel.verification.setup.fixtureCanonicalRoot(lexical_root);
+   root = icemodel.helpers.canonicalPath(lexical_root);
 
    % Check every existing or prospective manifest component inside the root.
    for n = 1:numel(selections)
@@ -633,7 +633,9 @@ end
 
 function assertNotDestinationSymlink(pathname, relpath)
    %ASSERTNOTDESTINATIONSYMLINK Prevent writes through existing symbolic links.
-   path_object = java.nio.file.Paths.get(char(pathname), ...
+   % Anchor a relative path at pwd first; Java user.dir can be stale.
+   path_object = java.nio.file.Paths.get( ...
+      char(icemodel.helpers.absolutePath(pathname)), ...
       javaArray('java.lang.String', 0));
    if java.nio.file.Files.isSymbolicLink(path_object)
       error('icemodel:verification:fetchFixtures:symlinkDestination', ...
@@ -724,8 +726,8 @@ end
 
 function relpath = relativePosix(root, pathname)
    %RELATIVEPOSIX Strip a known root prefix and normalize path separators.
-   root = icemodel.verification.setup.fixtureCanonicalRoot(string(root));
-   pathname = icemodel.verification.setup.fixtureCanonicalRoot(string(pathname));
+   root = icemodel.helpers.canonicalPath(root);
+   pathname = icemodel.helpers.canonicalPath(pathname);
    relpath = icemodel.verification.setup.fixtureRelativePosix( ...
       root, pathname);
 end

@@ -499,17 +499,13 @@ end
 function resetVersionIfCanonical(cff_file)
    %RESETVERSIONIFCANONICAL Refresh the process cache after a live CFF edit.
 
+   % Compare resolved absolute paths, so a relative or aliased spelling of
+   % the live CFF still resets the cache. A relative path resolves against pwd.
    canonical = string(icemodel.internal.fullpath("CITATION.cff"));
-   if canonicalPath(cff_file) == canonicalPath(canonical)
+   if icemodel.helpers.canonicalPath(cff_file) ...
+         == icemodel.helpers.canonicalPath(canonical)
       icemodel.internal.version('reset');
    end
-end
-
-function path = canonicalPath(filename)
-   %CANONICALPATH Resolve relative components and symbolic links.
-
-   file = javaObject('java.io.File', char(string(filename)));
-   path = string(file.getCanonicalPath());
 end
 
 function ok = checkReleasePreconditions(project_dir, version)
