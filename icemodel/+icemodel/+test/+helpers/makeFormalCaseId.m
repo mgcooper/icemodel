@@ -11,7 +11,7 @@ function case_id = makeFormalCaseId(smbmodel, sitename, simyear, solver)
       smbmodel (1, 1) string
       sitename (1, 1) string
       simyear (1, 1) double {mustBeInteger, mustBePositive}
-      solver (1, 1) double {mustBeInteger, mustBePositive}
+      solver (1, 1) double {icemodel.validators.mustBeSolverFilter(solver)}
    end
 
    % Keep the identifier compact and stable so baseline rows and reports

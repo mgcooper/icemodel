@@ -29,7 +29,8 @@ function RegressionBaseline = build_regression_baseline(kwargs)
    % concrete formal model. Multi-model requests write the managed per-model
    % baseline files under test/baselines/.
    %
-   % The optional solver filter accepts any subset of [1 2 3].
+   % The optional solver filter accepts any subset of
+   % icemodel.namelists.solver().
    % The formal comparison year and the smoke/full site selections are
    % explicit here, not inside the regression case-matrix helper.
 

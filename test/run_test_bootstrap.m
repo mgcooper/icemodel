@@ -48,7 +48,8 @@ function results = run_test_bootstrap(kwargs)
    %    files for each formal model and runs the union of those cases.
    %  - SMOKE_SITES and FULL_SITES are advanced overrides for the site lists
    %    used by each formal tier.
-   %  - The optional solver filter accepts any subset of [1 2 3].
+   %  - The optional solver filter accepts any subset of
+   %    icemodel.namelists.solver().
    %  - Compare runs are read-only with respect to baselines. Baseline updates
    %    happen through the explicit build/snapshot actions above.
 

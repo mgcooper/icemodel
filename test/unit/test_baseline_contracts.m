@@ -459,6 +459,84 @@ function test_getPerfCaseMatrix_uses_official_forcing(testCase)
    testCase.verifyEqual(unique(cases.forcings), "promice_filled");
 end
 
+function test_solver_namelist_includes_solver_zero(testCase)
+   % Solver 0, the Dirichlet single sweep, is a supported solver id. The
+   % shared solver filter accepts it and rejects an unsupported id.
+
+   returned = icemodel.namelists.solver();
+   expected = [0 1 2 3];
+   testCase.verifyEqual(returned, expected);
+   testCase.verifyWarningFree( ...
+      @() icemodel.validators.mustBeSolverFilter([0 3]));
+   testCase.verifyError( ...
+      @() icemodel.validators.mustBeSolverFilter(4), ...
+      'icemodel:validators:mustBeSolverFilter');
+end
+
+function test_formal_case_matrices_register_solvers_per_baseline(testCase)
+   % Rolling matrices run icemodel solvers 0 to 3. The frozen v1.1 and v1.2
+   % matrices run solvers 1 to 3, the ids of their accepted rows.
+
+   selectors = ["rolling", "v1.1", "v1.2"];
+   expected = {[0; 1; 2; 3], [1; 2; 3], [1; 2; 3]};
+   for k = 1:numel(selectors)
+      regression_cases = icemodel.test.helpers.getRegressionCaseMatrix( ...
+         tier="smoke", baseline=selectors(k));
+      perf_cases = icemodel.test.helpers.getPerfCaseMatrix( ...
+         tier="smoke", baseline=selectors(k));
+      verifyMatrixSolvers(testCase, regression_cases, expected{k});
+      verifyMatrixSolvers(testCase, perf_cases, expected{k});
+
+      % The policy registers the same ids that the matrices run.
+      returned = icemodel.test.helpers.formalBaselinePolicy( ...
+         selectors(k)).icemodel_solvers;
+      testCase.verifyEqual(returned, expected{k}');
+   end
+end
+
+function test_formal_case_ids_and_loader_accept_solver_zero(testCase)
+   % A solver 0 case id and a saved solver 0 row are valid. A saved id outside
+   % the supported solvers, or a fractional id, is a schema error.
+
+   returned = icemodel.test.helpers.makeFormalCaseId( ...
+      "icemodel", "kanm", 2016, 0);
+   testCase.verifyEqual(returned, "icemodel_kanm_2016_solver0");
+   testCase.verifyError(@() icemodel.test.helpers.makeFormalCaseId( ...
+      "icemodel", "kanm", 2016, 4), ...
+      'icemodel:validators:mustBeSolverFilter');
+
+   filepath = [tempname '.mat'];
+   cleanup = onCleanup(@() deleteIfExists(filepath));
+   RegressionBaseline = table("icemodel_kanm_2016_solver0", 0, 1.5, ...
+      'VariableNames', {'case_id', 'solver', 'runoff_final'});
+   save(filepath, 'RegressionBaseline');
+   loaded = icemodel.test.helpers.loadBaseline("regression", ...
+      smbmodel="icemodel", filename=filepath);
+   testCase.verifyEqual(loaded.solver, 0);
+
+   % Solver 4 is not a supported id, and 1.5 is not an integer id.
+   for solver_id = [4, 1.5]
+      RegressionBaseline.solver = solver_id;
+      save(filepath, 'RegressionBaseline');
+      testCase.verifyError(@() icemodel.test.helpers.loadBaseline( ...
+         "regression", filename=filepath), ...
+         'icemodel:test:baselineSolverSchemaMismatch');
+   end
+   clear cleanup
+end
+
+function test_spectral_tools_share_the_solver_validator(testCase)
+   % The spectral study tools validate their solver input with the shared
+   % solver filter, so an unsupported id fails before any model run.
+
+   tools = {@plot_spectral_variant_profiles, @run_spectral_study_bootstrap, ...
+      @summarize_spectral_density_floor, @summarize_spectral_perf};
+   for k = 1:numel(tools)
+      testCase.verifyError(@() tools{k}('solver', 4), ...
+         'icemodel:validators:mustBeSolverFilter', func2str(tools{k}));
+   end
+end
+
 function test_getFormalForcing_returns_official_product(testCase)
    % Keep the shared formal forcing identity explicit and independently tested.
 
@@ -1656,6 +1734,18 @@ function verifyCaseForcingMatches(testCase, cases, baseline)
       testCase.verifyEqual( ...
          string(baseline.forcings(idx)), cases.forcings(i));
    end
+end
+
+function verifyMatrixSolvers(testCase, cases, expected_icemodel)
+   %VERIFYMATRIXSOLVERS Compare the solver ids of each model in a case matrix.
+   %
+   % icemodel rows carry the expected ids in order. skinmodel rows carry
+   % solver 1.
+
+   returned = cases.solver(cases.smbmodel == "icemodel");
+   testCase.verifyEqual(returned, expected_icemodel);
+   returned = unique(cases.solver(cases.smbmodel == "skinmodel"));
+   testCase.verifyEqual(returned, 1);
 end
 
 function deleteIfExists(filepath)

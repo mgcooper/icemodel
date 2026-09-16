@@ -30,7 +30,8 @@ function results = run_perf_suite(kwargs)
    % spinup year plus one retained output year when the case matrix
    % carries only SIMYEAR.
    %
-   % The optional solver filter accepts any subset of [1 2 3].
+   % The optional solver filter accepts any subset of
+   % icemodel.namelists.solver().
    % DATA_ROOT overrides the default test case for isolated fixture comparisons.
    %
    % ISOLATION selects the measurement protocol. "process" (default) runs

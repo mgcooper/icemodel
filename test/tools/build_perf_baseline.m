@@ -37,7 +37,8 @@ function PerfBaseline = build_perf_baseline(kwargs)
    % concrete formal model. Multi-model requests write the managed per-model
    % baseline files under test/baselines/.
    %
-   % The optional solver filter accepts any subset of [1 2 3].
+   % The optional solver filter accepts any subset of
+   % icemodel.namelists.solver().
    % The formal benchmark year and smoke/full site selections are explicit
    % here rather than hidden in the case-matrix helper.
 
