@@ -72,11 +72,22 @@ To specify custom input and output directories, use the configuration function `
 
 ### Runtime configuration: Specify model options
 
-To set run-specific model options and parameters, open and edit the function `icemodel/+icemodel/setopts.m`. In your matlab terminal:
+Run-specific model options and parameters are set by `icemodel/+icemodel/setopts.m`, which returns the `opts` struct the model runs on. In your matlab terminal:
 
 - Type `edit icemodel.setopts` and press enter.
-- Edit the options and resave the function.
-- Run the model with the new options (see `demo.m` for an example of how to call `icemodel.run.point` to run the model).
+- Read the documentation to see the available options and their default values.
+
+To change an option for one run, pass it to `icemodel.run.point` in the `overrides` struct rather than editing `setopts`:
+
+```matlab
+[ice1, ice2, met, opts] = icemodel.run.point( ...
+   "sitename", "kanm", ...
+   "simyears", 2016, ...
+   "smbmodel", "icemodel", ...
+   "overrides", struct('dt', 900, 'solver', 3));
+```
+
+`icemodel.resetopts` applies each override by field name and clears the derived options that depend on it, then `icemodel.configureRun` rebuilds them inside the model. An option name that `setopts` does not define is an error. The model returns the resolved `opts` as its fourth output, so you can see exactly which options the run used. Edit `setopts` to change a default for every run.
 
 ## Input Data
 
@@ -99,7 +110,7 @@ To swap a variable, set the `userdata` and `uservars` configuration parameters (
 | Function Name | Description | How to Run |
 | --- | --- | --- |
 | `icemodel.config` | Set global configuration (model input and output paths). | Type `edit icemodel.config` then press enter. Set the environment variables programmatically as needed. |
-| `icemodel.setopts` | Set run-specific model configuration. | Type `edit icemodel.setopts` then press enter. Edit the model options and save the function. |
+| `icemodel.setopts` | Set run-specific model configuration. | Type `edit icemodel.setopts` then press enter. Edit the model options and save the function, or override them per run (see [runtime configuration](#runtime-configuration-specify-model-options)). |
 | `icemodel.run.point` | Run the model at a point. | See the example in `demo.m`, and the function arguments in `icemodel.run.point` for additional configuration. |
 | `demo.m` | Script to run and evaluate the model output. | Place this repo on your matlab path, edit and run the script. |
 
