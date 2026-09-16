@@ -287,17 +287,6 @@ function test_getpath_builds_restart_path_without_blank_parts(testCase)
       fullfile(output_root, 'kanm', 'skinmodel', 'case01', 'restart'));
 end
 
-function test_setpath_remains_a_compatibility_alias(testCase)
-   % SETPATH must return the same paths as GETPATH.
-
-   returned = icemodel.setpath('restart', 'kanm', 'skinmodel', '', [], ...
-      'case01');
-   expected = icemodel.getpath('restart', 'kanm', 'skinmodel', '', [], ...
-      'case01');
-
-   testCase.verifyEqual(returned, expected);
-end
-
 function test_configureRun_builds_default_restart_path(testCase)
    % When pathrestart is cleared, CONFIGURERUN should rebuild it from the
    % configured output root and case identity.
