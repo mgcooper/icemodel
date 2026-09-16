@@ -302,6 +302,35 @@ function test_vapork_matches_vapordensity_times_diffusivity(testCase)
    testCase.verifyEqual(k_vap_wet, k_vap_wet_manual, 'RelTol', 1e-10);
 end
 
+function test_vapork_derivative_matches_a_finite_difference(testCase)
+   % The third output of icemodel.vapor.vapor_thermal_conductivity should
+   % match a central difference of k_vap, for dry and for wet cells.
+
+   T = [255; 262; 270; 273];
+   dT = 1e-4;
+
+   for f_liq_value = [0, 0.05]
+      f_liq = f_liq_value * ones(size(T));
+      [~, ~, returned] = icemodel.vapor.vapor_thermal_conductivity(T, f_liq);
+
+      k_plus = icemodel.vapor.vapor_thermal_conductivity(T + dT, f_liq);
+      k_minus = icemodel.vapor.vapor_thermal_conductivity(T - dT, f_liq);
+      expected = (k_plus - k_minus) / (2 * dT);
+
+      testCase.verifyEqual(returned, expected, 'RelTol', 1e-6);
+   end
+
+   % A supplied dro_vapdT does not reach the derivative, which needs the
+   % second derivative of the same vapor-density relation.
+   f_liq = zeros(size(T));
+   [~, dro_vapdT] = icemodel.vapor.saturation_vapor_density(T, f_liq);
+   [~, ~, returned] = icemodel.vapor.vapor_thermal_conductivity( ...
+      T, f_liq, 2 * dro_vapdT);
+   [~, ~, expected] = icemodel.vapor.vapor_thermal_conductivity(T, f_liq);
+
+   testCase.verifyEqual(returned, expected);
+end
+
 function test_bulk_thermalk_stays_positive_and_responds_to_liquid(testCase)
    % Effective conductivity should stay positive and increase as the same
    % state gains more liquid water.
