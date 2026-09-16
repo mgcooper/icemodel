@@ -21,6 +21,7 @@
   - [References](#references)
   - [System Requirements](#system-requirements)
   - [Installation Guide](#installation-guide)
+    - [Release data](#release-data)
     - [Optional external dependencies](#optional-external-dependencies)
   - [Contribute](#contribute)
   - [How do I cite this?](#how-do-i-cite-this)
@@ -119,7 +120,7 @@ The met (forcing data) file naming convention has two forms:
 - per time-window: `met_SITENAME_FORCINGS_YYYYMMDD_YYYYMMDD_TIMESTEP`
   (preferred when a run sets `opts.startdate` / `opts.enddate`)
 
-Here `FORCINGS` is the forcing-source label (a versioned climate product such as `mar3.11` / `merra2` / `racmo2.3p3`, a station such as `kanm`, the generic AWS source `promice`, or the ESM-SnowMIP family `esm_snowmip`). Met file names therefore follow `met_<site>_<source>` across all forcing product families. A legacy per-station convention is also supported, which sets `FORCINGS == SITENAME` (e.g. `met_kanm_kanm_...`) whereas the recommended convention is `met_kanm_promice_...`. Here, the `kanm` weather station is part of the `promice` forcing product.
+Here `FORCINGS` is the forcing-source label (a versioned climate product such as `mar3.11` / `merra2` / `racmo2.3p3`, a station such as `kanm`, the generic AWS source `promice`, or the ESM-SnowMIP family `esm_snowmip`). Met file names therefore follow `met_<site>_<source>` across all forcing product families. A legacy per-station convention is also supported, which sets `FORCINGS == SITENAME` (e.g. `met_kanm_kanm_...`) whereas the recommended convention is `met_kanm_promice_...`. Here, the `kanm` weather station is part of the `promice` forcing product. The label names the product rather than its readiness: `promice` is the native station record, which has gaps in most station-years, so a runnable PROMICE forcing is usually the gap-filled product `promice_filled` (see `icemodel.setopts`).
 
 Examples:
 
@@ -146,7 +147,7 @@ Examples:
 
 As with met files, userdata files are staged into per-source subfolders `input/userdata/<SOURCE>/` and the model resolves that subfolder first at runtime, with a flat `input/userdata/` fallback.
 
-Each userdata file must contain a timetable named `Data` with column names matching the met file column-naming conventions. Userdata files are staged at a 1-hr timestep; variables are linearly interpolated to the configured model timestep (e.g., 15-min) at runtime. See the example met file in `demo/data/input/`.
+Each userdata file must contain a timetable named `Data` with column names matching the met file column-naming conventions. Userdata files are staged at a 1-hr timestep by default, but a staging function can keep the native cadence of its source, as the MODIS albedo stager does; at runtime, variables are linearly interpolated to the configured model timestep (e.g., 15-min). See the example met file in `demo/data/input/`.
 
 ### 4. Output files
 
@@ -306,6 +307,16 @@ setup()
 ```
 
 Installation should only take a few seconds. If you encounter any issues, please [open an issue](https://github.com/mgcooper/icemodel/issues).
+
+### Release data
+
+The examples in `demo/demo.m` only need the tracked inputs in `demo/data`. The test suite and the verification workflows read larger data trees that are not tracked in this repo. Those trees are published as data archives attached to each release, and the provisioning function installs them:
+
+```matlab
+icemodel.verification.setup.fetchFixtures()
+```
+
+Called without arguments, it installs the two mandatory capabilities for the version in `CITATION.cff`: `formal-core`, which installs to `test/data`, and `verification-showcase`. Pass `download=false` to verify an installation without network access. See `icemodel/+icemodel/+verification/README_FIXTURES.md` for the capability table and the offline and pre-publication options.
 
 ### Optional external dependencies
 
