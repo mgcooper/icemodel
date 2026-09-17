@@ -72,10 +72,10 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    gk = zeros(S, 1);    % Eq 123
    LfMZ = zeros(S, 1);  % Eq 123, melt-zone latent heat switch
 
-   aP01 = aP0(N);
-
    % % If using g_liq instead of f_liq in the definition of dLdT as in SNTHERM:
    % aP0 = (dHdT + Lf * ro_sno .* dLdT + Ls * f_air .* drovdT)
+
+   aP01 = aP0(N);
 
    % Cofficients for wet nodes inside the melt zone [W m-2 K-1]
    if sum(iM) > 0
