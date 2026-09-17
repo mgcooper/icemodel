@@ -65,8 +65,8 @@ accepted model output.
 
 Default software-level regression coverage:
 
-1. `icemodel`, `kanm`, `2016`, `solver = 1, 2, 3`
-2. `icemodel`, `kanl`, `2016`, `solver = 1, 2, 3`
+1. `icemodel`, `kanm`, `2016`, `solver = 0, 1, 2, 3`
+2. `icemodel`, `kanl`, `2016`, `solver = 0, 1, 2, 3`
 3. `skinmodel`, `kanm`, `2016`, `solver = 1`
 4. `skinmodel`, `kanl`, `2016`, `solver = 1`
 5. rolling/default comparisons use the official gap-filled PROMICE forcing
@@ -75,6 +75,9 @@ Default software-level regression coverage:
 6. explicit `baseline = "v1.1"` comparisons retain the frozen release's
    historical station forcing (`kanm` or `kanl`) under the existing case ids;
    any other release tag must register its forcing identity before use
+7. frozen `v1.1` and `v1.2` comparisons run icemodel solvers 1, 2, and 3, the
+   solver ids of their accepted rows (`icemodel_solvers` in
+   `formalBaselinePolicy`)
 
 Formal runtime contract for the default regression/perf matrices:
 

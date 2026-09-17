@@ -149,9 +149,11 @@ function solver = normalizeSolverColumn(value)
    else
       solver = str2double(string(value));
    end
-   if any(~isfinite(solver) | solver < 1 | fix(solver) ~= solver)
+   % A saved id must name a supported solver. NaN and fractional ids are not
+   % members, so the one membership check also rejects them.
+   if any(~ismember(solver, icemodel.namelists.solver()))
       error('icemodel:test:baselineSolverSchemaMismatch', ...
-         'Formal baseline solver identity must contain positive integers.')
+         'Formal baseline solver identity must contain supported solver ids.')
    end
 end
 

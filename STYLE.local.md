@@ -1,12 +1,6 @@
 # Project-specific code style — icemodel
 
-Conventions specific to icemodel, extending the canonical `STYLE.md` (general +
-MATLAB). This file is project-owned — `--update` never overwrites it.
-
-## Project-local skill routing
-
-For numerical-regression or performance-baseline work, read and follow
-`.agents/skills/icemodel-baselines/SKILL.md` before acting.
+Conventions specific to icemodel, extending `STYLE.md` (general + MATLAB).
 
 ## Figure export
 
@@ -87,7 +81,7 @@ issue and stop at the namespace-only deliverable.
 - Use reusable validators under `+validators` instead of hard-coded member lists when the choices are part of a stable repo contract.
 - Helper layers such as namespaced loaders, postprocessing, config functions, and setup functions may still use old-style parsing when that better matches surrounding code.
 - Maintain codegen compatibility in kernel functions to the degree the `%#codegen` directives enforce it. Nothing compiles to mex today.
-- Preserve established input/output ordering and naming. For example, use `T`, `f_ice`, `f_liq`, then related state/diagnostics.
+- Preserve established input/output ordering and naming. For example, use `T_ice`, `f_ice`, `f_liq`, then related state/diagnostics.
 - Surface namespace functions follow a preferred ordering schema:
   1. state variables (`T_sfc`, `T_ice`, `f_ice`, `f_liq`)
   2. source terms and grid (`Sc`, `Sp`, `dz`, `delz`, `fn`)

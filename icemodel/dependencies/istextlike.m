@@ -9,11 +9,12 @@ function tf = istextlike(x, varargin)
    %  TF = ISTEXTLIKE(X, MODE) controls how cell contents are reduced. MODE may
    %  be 'all', 'any', or 'each'. The default is 'all'.
    %
-   %  TF = ISTEXTLIKE(..., 'nontrivial') requires nonzero-length text values.
+   %  TF = ISTEXTLIKE(..., 'nontrivial') requires nonzero-length text values
+   %  rather than accepting blank text values.
    %
-   %  This is the container-level text predicate in matfunclib-style helper
-   %  code. Use ISSCALARTEXT for legacy scalar-text parsing semantics and
-   %  ISBLANKTEXT for blank-text detection.
+   %  This is the container-level text predicate in matfunclib. Use
+   %  ISSCALARTEXT for legacy scalar-text parsing semantics and ISBLANKTEXT for
+   %  blank-text detection.
    %
    % Examples
    %  istextlike({"test", "value"})
@@ -22,7 +23,8 @@ function tf = istextlike(x, varargin)
    %  istextlike({"test", 1}, 'any')
    %  istextlike({'', ""}, 'nontrivial')
    %
-   % See also ischarlike isscalartext isblanktext
+   % See also ischarlike containsOnlyText mustContainOnlyText isscalartext
+   % isblanktext
    %
    %#codegen
 

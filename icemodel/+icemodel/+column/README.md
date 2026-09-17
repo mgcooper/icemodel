@@ -26,7 +26,7 @@ Contents:
 - `icemodel.column.firn_thermal_conductivity`
 - `icemodel.column.integrate_column_budget`
   - Integrates column solid and liquid mass on a MWE basis and optional
-    enthalpy in J m-2 from `T`, `f_ice`, `f_liq`, and `dz`.
+    enthalpy in J m-2 from `T_ice`, `f_ice`, `f_liq`, and `dz`.
 - `icemodel.column.initialize_budget_state`
   - Returns the initialized 21-channel budget for one forcing step and records
     the storage start endpoints from the entry state. On each substep, applier
@@ -55,9 +55,10 @@ Contents:
 - `icemodel.column.apply_vapor_transfer`
   - Applies signed liquid- and ice-phase vapor increments for surface exchange
     and interior transport. Control-volume water capacity limits liquid
-    addition. `f_res` limits liquid removal. Control-volume water capacity limits ice
-    deposition, and `f_ice_min` limits sublimation. The function returns each
-    rejected phase change increment on a liquid-water-equivalent basis.
+    addition. `f_res` limits liquid removal. Control-volume water capacity
+    limits ice deposition, and `f_ice_min` limits sublimation. The function
+    returns each rejected phase change increment on a liquid-water-equivalent
+    basis.
 - `icemodel.column.vapor_exchange_is_wet`
   - The residual-mobility wet/dry decision for vapor exchange.
     `potential_surface_vapor_exchange` uses it to partition the surface
@@ -75,8 +76,8 @@ Contents:
 - `icemodel.column.couple_vapor_step`
   - Computes interior vapor transfer once per accepted substep after the
     surface budgets close. It converts the `U_vap` face flux to node increments
-    using the `L_vap` value returned with that flux. It calls `apply_vapor_transfer`
-    and records the applied transport increments.
+    using the `L_vap` value returned with that flux. It calls
+    `apply_vapor_transfer` and records the applied transport increments.
 - `icemodel.column.max_liquid_fraction_change`
   - Returns the largest `f_liq` increase a control volume accepts:
     `ro_ice/ro_liq * (1 - f_ice) - f_liq`, which is `f_wat_max - f_wat` on the

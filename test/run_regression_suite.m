@@ -20,8 +20,15 @@ function results = run_regression_suite(kwargs)
    % This function does not update baselines. It runs the formal cases,
    % compares core scalar outputs to the requested baseline, and writes one
    % artifact and one Quarto HTML report under test/artifacts/<run_name>/.
+   % RESULTS.failed_cases lists the failed case IDs. RESULTS.failed_gates is a
+   % table of each failed case and its failed gates. The saved report stores
+   % the per-case gates in its failed_gates column. A unittest failure after
+   % the report is saved appears only in RESULTS.failed_gates, as the gate
+   % test_framework. A failure before the save raises
+   % icemodel:test:regressionArtifactMissing.
    %
-   % The optional solver filter accepts any subset of [1 2 3].
+   % The optional solver filter accepts any subset of
+   % icemodel.namelists.solver().
    % DATA_ROOT overrides the default test case for isolated fixture comparisons.
    % FIXTURE_ROOT selects where a release's required fixture capabilities are
    % verified. A release that runs the model from its own provisioned data
@@ -181,7 +188,10 @@ function results = runSingleModelRegression(runner, suite, tier, smbmodel, ...
       tier, smbmodel, solver, simyear, smoke_sites, full_sites, ...
       baseline, run_name, data_root); %#ok<NASGU>
 
-   % Run the formal regression class for this concrete smbmodel.
+   % Run the formal regression class for this concrete smbmodel. Clear the
+   % artifact path first, so a class that fails before saving cannot return
+   % the artifact of an earlier model run in this session.
+   setenv('ICEMODEL_REGRESSION_ARTIFACT_FILE', '');
    test_result = runner.run(suite);
 
    % Load the artifact saved by IcemodelRegressionTest to build the
@@ -201,14 +211,10 @@ function results = runSingleModelRegression(runner, suite, tier, smbmodel, ...
    results.artifact_file = artifact_file;
    results.test_result = test_result;
    results.passed = all([test_result.Passed]);
-   if results.passed
-      results.failed_cases = strings(0, 1);
-   elseif any(~S.report.passed)
-      results.failed_cases = S.report.case_id(~S.report.passed);
-   else
-      % A setup or teardown failure cannot be localized to one saved row.
-      results.failed_cases = S.report.case_id;
-   end
+
+   % Name every failed case and its failed gates from the saved report rows.
+   [results.failed_cases, results.failed_gates] = ...
+      icemodel.test.helpers.regressionFailures(S.report, results.passed);
 end
 
 function results = combineRegressionResults(per_model)
@@ -228,6 +234,8 @@ function results = combineRegressionResults(per_model)
    test_result = cellfun(@(s) s.test_result, per_model, 'UniformOutput', false);
    failed_cases = cellfun(@(s) string(s.failed_cases(:)), per_model, ...
       'UniformOutput', false);
+   failed_gates = cellfun(@(s) s.failed_gates, per_model, ...
+      'UniformOutput', false);
    pass_flags = cellfun(@(s) s.passed, per_model);
 
    results = struct();
@@ -237,6 +245,7 @@ function results = combineRegressionResults(per_model)
    results.artifact_file = vertcat(artifact_file{:});
    results.test_result = horzcat(test_result{:});
    results.failed_cases = vertcat(failed_cases{:});
+   results.failed_gates = vertcat(failed_gates{:});
    results.passed = all(pass_flags);
 end
 

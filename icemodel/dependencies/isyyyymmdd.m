@@ -1,16 +1,16 @@
 function [tf, yyyy, mm, dd] = isyyyymmdd(t, varargin)
    %ISYYYYMMDD Check if the input is a date in the yyyyMMdd format.
    %
-   %   [TF, YYYY, MM, DD] = ISYYYYMMDD(T)
+   % Syntax:
+   %   [tf, yyyy, mm, dd] = isyyyymmdd(t)
    %
-   % Description
-   %   [TF, YYYY, MM, DD] = ISYYYYMMDD(T) Determines whether the provided input
-   %   represents a valid date in the format yyyyMMdd. The function checks for
-   %   both numeric and string inputs, converting strings to numbers where
-   %   necessary.
+   % Description:
+   %   Determines whether the provided input represents a valid date in
+   %   the format yyyyMMdd. The function checks for both numeric and
+   %   string inputs, converting strings to numbers where necessary.
    %
-   % Inputs
-   %   T - The input date to check, provided either as a numeric scalar
+   % Inputs:
+   %   t - The input date to check, provided either as a numeric scalar
    %       or a string. The format should be either yyyyMMdd (e.g., 20230101)
    %       or yyyymm (e.g., 202301).
    %
@@ -37,10 +37,10 @@ function [tf, yyyy, mm, dd] = isyyyymmdd(t, varargin)
    %   - To require valid dates, set the optional input 'validateDate', true.
    %
    % See also: str2double, datenum
-   %
-   %#codegen
 
    % Allow numeric or string input
+   %
+   %#codegen
    if ischar(t) || isStringScalar(t)
       t = str2double(t);
    end
@@ -102,3 +102,81 @@ function [tf, yyyy, mm, dd] = isyyyymmdd(t, varargin)
       [yyyy, mm, dd] = deal(nan);
    end
 end
+
+
+% Instead, return tf = false
+% assert(numdigits == 6 || numdigits == 8, ...
+%    ['Expected input 1, T, to be a 6-digit or 8-digit numeric scalar ' ...
+%    'or string in YYYYMMDD format'])
+
+
+% function tf = isyyyymmdd(t)
+%
+%    if ischar(t) || isStringScalar(t)
+%       t = str2double(t);
+%    end
+%    assert(isnumeric(t), 'Expected input 1, T, to be a numeric scalar')
+%
+%    numdigits = floor(log10(abs(t))) + 1 ;
+%
+%    if 5 < numdigits && numdigits < 9
+%
+%       assert(numdigits == 6 || numdigits == 8, ...
+%          ['Expected input 1, T, to be a 6-digit or 8-digit numeric scalar ' ...
+%          'or string in YYYYMMDD format'])
+%
+%       xStr = num2str(t);
+%       yyyy = str2double(xStr(1:4));
+%       switch numdigits
+%          case 6
+%             mm = str2double(xStr(5));
+%             dd = str2double(xStr(6));
+%
+%          case 8
+%             mm = str2double(xStr(5:6));
+%             dd = str2double(xStr(7:8));
+%          otherwise
+%             tf = false;
+%             return;
+%       end
+%
+%       % Check if month and day are compatible with 1:12 and 1:31
+%       if mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31
+%
+%          % Optionally, check the year as well
+%          if yyyy >= 0
+%             tf = true;
+%             return;
+%          end
+%       end
+%    end
+%
+%    tf = false;
+% end
+%
+%
+% function tf = isyyyymmdd(x)
+%
+%
+%
+%    if 5 < numdigits && numdigits < 9
+%       switch numdigits
+%          case 6
+%             yyyy = x(1:4);
+%             mm = x(5);
+%             dd = x(6);
+%          case 7
+%             % ... add logic
+%          case 8
+%             % ...
+%          otherwise
+%             % ...
+%       end
+%
+%       % now check if mm and dd are compatible with 1:12 and 1:31, and if
+%       % possible check yyyy too
+%    else
+%       tf = false;
+%    end
+%
+% end

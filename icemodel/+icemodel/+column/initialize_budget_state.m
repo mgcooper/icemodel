@@ -1,7 +1,7 @@
-function budget = initialize_budget_state(T, f_ice, f_liq, dz)
+function budget = initialize_budget_state(T_ice, f_ice, f_liq, dz)
    %INITIALIZE_BUDGET_STATE Return the zeroed budget for one forcing step.
    %
-   %  budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz)
+   %  budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz)
    %
    % Initialize BUDGET at the start of one forcing step. The phase, surface
    % vapor, interior vapor, and remesh functions add each accepted substep to
@@ -27,7 +27,7 @@ function budget = initialize_budget_state(T, f_ice, f_liq, dz)
 
    % Integrate solid and liquid phase storage over the column [mwe].
    [solid_start, liquid_start] = ...
-      icemodel.column.integrate_column_budget(T, f_ice, f_liq, dz);
+      icemodel.column.integrate_column_budget(T_ice, f_ice, f_liq, dz);
 
    % Declare every field so MATLAB Coder doesn't have to construct
    % or extend the budget from runtime field names.

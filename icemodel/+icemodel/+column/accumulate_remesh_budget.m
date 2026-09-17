@@ -4,8 +4,9 @@ function budget = accumulate_remesh_budget(budget, remesh)
    %  budget = icemodel.column.accumulate_remesh_budget(budget, remesh)
    %
    % Records the column storage changes caused by merging layers and cloning the
-   % bottom layer. icemodel.column.merge_thin_layers calls this once per accepted
-   % substep. These numerical mass changes close the column storage budget.
+   % bottom layer. icemodel.column.merge_thin_layers calls this once per
+   % accepted substep. These numerical mass changes close the column storage
+   % budget.
    %
    % Inputs
    %   budget - Forcing-step budget carrying the phase and vapor budgets.

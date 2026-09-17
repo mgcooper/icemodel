@@ -364,7 +364,7 @@ function assertNoSourceSymlinks(root, relpath)
       error('icemodel:verification:packFixtures:symlinkSource', ...
          'Manifest source root traverses a symbolic link: %s', ancestor_link)
    end
-   cursor = icemodel.verification.setup.fixtureCanonicalRoot(string(root));
+   cursor = icemodel.helpers.canonicalPath(root);
 
    % Inspect every manifest component inside the canonicalized selected source
    % root.
@@ -377,7 +377,9 @@ end
 
 function assertNotSymbolicLink(pathname, relpath)
    %ASSERTNOTSYMBOLICLINK Keep packing inside the selected source tree.
-   path_object = java.nio.file.Paths.get(char(pathname), ...
+   % Anchor a relative path at pwd first; Java user.dir can be stale.
+   path_object = java.nio.file.Paths.get( ...
+      char(icemodel.helpers.absolutePath(pathname)), ...
       javaArray('java.lang.String', 0));
    if java.nio.file.Files.isSymbolicLink(path_object)
       error('icemodel:verification:packFixtures:symlinkSource', ...

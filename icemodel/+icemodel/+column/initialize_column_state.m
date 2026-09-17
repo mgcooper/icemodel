@@ -1,9 +1,8 @@
-function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
-      delz, z_nodes, f_liq_res] ...
-      = initialize_column_state(opts, tair, r_eff)
+function [ice1, ice2, T_sfc, T_ice, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, ...
+      dz, delz, z_nodes, f_liq_res] = initialize_column_state(opts, tair, r_eff)
    %INITIALIZE_COLUMN_STATE Initialize the 1-d ice column state.
    %
-   %  [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, ...
+   %  [ice1, ice2, T_sfc, T_ice, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, ...
    %   dz, delz, z_nodes, f_liq_res] = ...
    %     icemodel.column.initialize_column_state(opts, tair, r_eff)
    %
@@ -44,46 +43,47 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
       ro_liq = ro_glc;
    end
 
-   % Lower melt-zone temperature bound (needed for initial T profile only)
+   % Lower melt-zone temperature bound (needed for initial T_ice profile only)
    TL = icemodel.parameterLookup('TL');
 
    % INITIALIZE CORE STATE VARIABLES
    if opts.use_restart
       restart = icemodel.loadRestartState(opts);
       validateRestartOpts(opts, restart);
-      T = restart.T;
+      T_ice = restart.T_ice;
       f_ice = restart.f_ice;
       f_liq = restart.f_liq;
-      Ts = restart.Ts;
+      T_sfc = restart.T_sfc;
       r_eff = restart.r_eff;
-      validateRestartState(T, f_ice, f_liq, Ts, r_eff, JJ);
+      validateRestartState(T_ice, f_ice, f_liq, T_sfc, r_eff, JJ);
    else
       % Initialize with a physically scaled exponential profile anchored to the
-      % top node so T(1) = T_ref exactly. Use a slight cold offset from air to
-      % avoid a zero-gradient startup.
-      T_deep = min(TL - 1, Tf + opts.T_ice_init);
+      % top node so T_ice(1) = T_ref exactly. Use a slight cold offset from air
+      % to avoid a zero-gradient startup.
+      T_bot = min(TL - 1, Tf + opts.T_ice_init);
       T_ref = min(TL - 1, min(tair(1), Tf) - 1.0);
       omega_yr = 2.0 * pi / (365.0 * 86400.0);
       kappa_ice = k_ice / (ro_ice * cp_ice);
       z_scale = sqrt(2.0 * kappa_ice / omega_yr);
-      T = T_deep + (T_ref - T_deep) .* exp(-(z_nodes - z_nodes(1)) ./ z_scale);
+      T_ice = T_bot + (T_ref - T_bot) ...
+         .* exp(-(z_nodes - z_nodes(1)) ./ z_scale);
 
       % INITIALIZE LIQUID/ICE WATER FRACTION (f) AND BULK DENSITIES (g)
-      T_dep = Tf - T;                           % [K]
-      f_ell = 1 ./ (1 + (fcp * T_dep) .^ 2);    % [-], f_ell = liquid mass fraction
-      g_ice = opts.ro_ice_init;
-      g_liq = g_ice .* (f_ell ./ (1 - f_ell));
-      f_liq = g_liq ./ ro_liq;
-      f_ice = g_ice ./ ro_ice .* ones(JJ, 1);
-      Ts = (min(tair(1), Tf) + T(1)) / 2;
-      r_eff = r_eff / 1000 * ones(JJ, 1); % convert mm to m for grain growth
+      T_dep = Tf - T_ice;                          % [K]
+      f_ell = 1 ./ (1 + (fcp * T_dep) .^ 2);       % [-], liquid mass fraction
+      g_ice = opts.ro_ice_init;                    % [kg m-3]
+      g_liq = g_ice .* (f_ell ./ (1 - f_ell));     % [kg m-3]
+      f_liq = g_liq ./ ro_liq;                     % [1]
+      f_ice = g_ice ./ ro_ice .* ones(JJ, 1);      % [1]
+      T_sfc = (min(tair(1), Tf) + T_ice(1)) / 2;   % [K]
+      r_eff = r_eff / 1000 * ones(JJ, 1);          % [m] mm->m for grain growth
    end
 
    % INITIAL SOLVER CONDUCTIVITY
    % The column solvers add vapor transport on faces. Initialize the
    % checkpoint with the same vapor-free node conductivity that subsequent
    % accepted solves return.
-   k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, 0);
+   k_eff = icemodel.column.bulk_thermal_conductivity(T_ice, f_ice, f_liq, 0);
 
    % SOURCE TERM LINEARIZATION VECTORS
    Sc = zeros(JJ, 1);
@@ -105,22 +105,22 @@ function [ice1, ice2, Ts, T, f_ice, f_liq, Sc, Sp, r_eff, k_eff, fn, dz, ...
       end
    end
 
-   function plot_T_init(T, Z, Ta, Ts)
+   function plot_T_init(T_ice, Z, Ta, T_sfc)
       figure; hold on
-      plot(T, Z)
-      scatter(Ts, 0, 'filled')
+      plot(T_ice, Z)
+      scatter(T_sfc, 0, 'filled')
       scatter(Ta, 0, 'filled')
       set(gca, 'YDir', 'reverse')
-      legend('T', 'Ts', 'Ta')
+      legend('T_ice', 'T_sfc', 'Ta')
    end
    if debug == true
-      plot_T_init(T, z_nodes, tair(1), Ts);
+      plot_T_init(T_ice, z_nodes, tair(1), T_sfc);
    end
 end
 
-function validateRestartState(T, f_ice, f_liq, Ts, r_eff, JJ)
+function validateRestartState(T_ice, f_ice, f_liq, T_sfc, r_eff, JJ)
 
-   state_vars = {T, f_ice, f_liq, r_eff};
+   state_vars = {T_ice, f_ice, f_liq, r_eff};
    for n = 1:numel(state_vars)
       x = state_vars{n};
       if ~isvector(x) || numel(x) ~= JJ
@@ -128,8 +128,8 @@ function validateRestartState(T, f_ice, f_liq, Ts, r_eff, JJ)
       end
    end
 
-   if ~isscalar(Ts) || ~isfinite(Ts)
-      error('restart state must provide a finite scalar Ts')
+   if ~isscalar(T_sfc) || ~isfinite(T_sfc)
+      error('restart state must provide a finite scalar T_sfc')
    end
 end
 

@@ -65,17 +65,18 @@ function candidate = firnCandidateFromIce1(ice1, ice2, opts, case_manifest)
    end
 
    data = timetable('RowTimes', ice1.Time);
-   Tf = icemodel.physicalConstant('Tf');
 
+   % PROMICE stages tsfc, tice1..tice8, and tice10m in Kelvin
+   % (icemodel.forcing.buildPromiceData), the units of ICE1.Tsfc and ICE2.Tice,
+   % so every temperature below passes through without conversion.
    for name = variable_names(:)'
       tice_tok = regexp(char(name), '^tice(\d+)$', 'tokens', 'once');
       if isfield(ice1, name)
          % Direct passthrough when the model already emits the named series.
          data.(name) = ice1.(name);
       elseif name == "tsfc" && isfield(ice1, "Tsfc")
-         % Surface temperature: icemodel stores Kelvin Tsfc; firn obs is
-         % degrees C (PROMICE tsfc). Convert once here.
-         data.tsfc = ice1.Tsfc - Tf;
+         % Surface temperature [K].
+         data.tsfc = ice1.Tsfc;
       elseif name == "snow_depth" && isfield(ice1, "snow_depth_m")
          data.snow_depth = ice1.snow_depth_m;
       elseif name == "tice10m"
@@ -86,8 +87,8 @@ function candidate = firnCandidateFromIce1(ice1, ice2, opts, case_manifest)
             data.tice10m = values;
          end
       elseif ~isempty(tice_tok)
-         % Subsurface thermistor: sample the column T(z,t) at the k-th
-         % staged thermistor depth and convert to degrees C.
+         % Subsurface thermistor: sample the column T(z,t) [K] at the k-th
+         % manifest thermistor depth.
          values = ticeFromIce2(ice2, opts, case_manifest, ...
             str2double(tice_tok{1}));
          if ~isempty(values)
@@ -107,13 +108,13 @@ function candidate = firnProfileCandidateFromIce2(ice1, ice2, opts, case_manifes
    %
    % SUMup firn cases compare against firn observation profiles: a density
    % profile rho(z) and a subsurface temperature profile T(z,t). icemodel
-   % carries these as column state in ice2 (T = column temperature [K], f_liq /
-   % density depending on the run). This function maps only the axes that the
-   % staged case declares. It omits an axis whose source column is absent, so
-   % the report marks that axis as a missing candidate (soft gate). The
-   % function never invents a value for it. The candidate
-   % format is "subsurface_profile_bundle", matching the observation target so
-   % the soft firn comparison can align them by depth.
+   % carries these as column state in ice2 (Tice = column temperature [K],
+   % f_liq / density depending on the run). This function maps only the axes
+   % that the staged case declares. It omits an axis whose source column is
+   % absent, so the report marks that axis as a missing candidate (soft gate).
+   % The function never invents a value for it. The candidate format is
+   % "subsurface_profile_bundle", matching the observation target so the soft
+   % firn comparison can align them by depth.
 
    variable_names = string(case_manifest.comparison_variables);
    Tf = icemodel.physicalConstant('Tf');
@@ -136,10 +137,10 @@ function candidate = firnProfileCandidateFromIce2(ice1, ice2, opts, case_manifes
    end
 
    if ismember("subsurface_temperature", variable_names)
-      if isfield(ice2, 'T') && ~isempty(ice2.T)
+      if isfield(ice2, 'Tice') && ~isempty(ice2.Tice)
          % Column temperature T(z,t) in degrees C, depth-indexed.
          bundle.subsurface_temperature = datedProfileTable( ...
-            ice2.T - Tf, dz, ice1.Time, ...
+            ice2.Tice - Tf, dz, ice1.Time, ...
             "subsurface_temperature", "degC");
       end
    end
@@ -186,10 +187,12 @@ function candidate = retmipProtocolCandidateFromOutput( ...
       end
    end
    if ismember("subsurface_temperature", variable_names) ...
-         && isfield(ice2, "T") && ~isempty(ice2.T)
+         && isfield(ice2, "Tice") && ~isempty(ice2.Tice)
+      % RetMIP stages profile temperatures in degrees C (temperature_degC),
+      % while the surface tsfc above stays in Kelvin like its target.
       data.profiles.subsurface_temperature = table( ...
-         depthAxis(size(ice2.T, 1), profileDz(opts)), ...
-         ice2.T(:, 1), ...
+         depthAxis(size(ice2.Tice, 1), profileDz(opts)), ...
+         ice2.Tice(:, 1) - icemodel.physicalConstant('Tf'), ...
          'VariableNames', {'depth', 'subsurface_temperature'});
    end
    candidate = struct( ...
@@ -253,25 +256,31 @@ end
 
 function z = depthAxis(nz, dz)
    %DEPTHAXIS Node-center depth axis for an nz-node column at spacing dz.
+   %
+   % icemodel.column.control_volume_mesh builds a uniform mesh with node k at
+   % the control volume center (k - 0.5) * dz. Without a spacing, the axis is
+   % the node index minus one.
    if isnan(dz)
       z = (0:nz - 1)';
    else
-      z = (0:nz - 1)' * dz;
+      z = ((0:nz - 1)' + 0.5) * dz;
    end
 end
 
 function values = ticeFromIce2(ice2, opts, case_manifest, k)
-   %TICEFROMICE2 Sample column T at the k-th manifested thermistor depth.
+   %TICEFROMICE2 Sample ice2.Tice at the k-th manifested thermistor depth.
    %
-   % Returns Celsius column-T at depth manifest.observation_variables
+   % Returns Kelvin column temperature at depth manifest.observation_variables
    % .thermistor_depths_m(k), or [] when the depth/grid is unavailable.
    % Mirrors soilTempFromIce2 (esm_site soil temps) for the firn thermistor
    % string. When the manifest records no explicit depths, the function
-   % returns [], so the report marks the variable as missing. The function
-   % never invents a value.
+   % returns [], so the report marks the variable as missing. A depth outside
+   % the column gives an empty result. The function never invents a value.
+   % Note: no stage writes thermistor_depths_m. PROMICE stages the
+   % time-dependent depths dtice1..dtice8 instead (Bead icemodel-xuai).
 
    values = [];
-   if ~isfield(ice2, 'T') || isempty(ice2.T)
+   if ~isfield(ice2, 'Tice') || isempty(ice2.Tice)
       return
    end
    obsvars = case_manifest.observation_variables;
@@ -282,22 +291,39 @@ function values = ticeFromIce2(ice2, opts, case_manifest, k)
    if k < 1 || k > numel(depths)
       return
    end
-   dz = opts.dz_thermal;
-   zidx = max(1, min(size(ice2.T, 1), round(depths(k) / dz) + 1));
-   Tf = icemodel.physicalConstant('Tf');
-   values = ice2.T(zidx, :)' - Tf;
+   zidx = nodeAtDepth(depths(k), opts.dz_thermal, size(ice2.Tice, 1));
+   values = ice2.Tice(zidx, :)';
 end
 
 function values = ticeFromIce2AtDepth(ice2, opts, depth_m)
-   %TICEFROMICE2ATDEPTH Sample Kelvin column T at a depth below the surface.
+   %TICEFROMICE2ATDEPTH Sample Kelvin ice2.Tice at a depth below the surface.
+   %
+   % Returns [] when ice2.Tice or opts.dz_thermal is missing, and an empty
+   % result when the depth is outside the column.
 
    values = [];
-   if ~isfield(ice2, 'T') || isempty(ice2.T) ...
+   if ~isfield(ice2, 'Tice') || isempty(ice2.Tice) ...
          || ~isfield(opts, 'dz_thermal') || isempty(opts.dz_thermal)
       return
    end
-   zidx = max(1, min(size(ice2.T, 1), round(depth_m / opts.dz_thermal) + 1));
-   values = ice2.T(zidx, :)';
+   zidx = nodeAtDepth(depth_m, opts.dz_thermal, size(ice2.Tice, 1));
+   values = ice2.Tice(zidx, :)';
+end
+
+function zidx = nodeAtDepth(depth_m, dz, nz)
+   %NODEATDEPTH Return the index of the control volume that contains a depth.
+   %
+   % Node k of the uniform icemodel mesh spans depths (k - 1) * dz to k * dz.
+   % A depth on a face belongs to the control volume below it. A depth outside
+   % the nz model nodes returns [], so the sampled values are empty and the
+   % caller omits the variable. alignObservationSeries also drops profile
+   % depths outside the candidate depth range.
+   zidx = floor(depth_m / dz) + 1;
+   if ~(zidx >= 1 && zidx <= nz)
+      % The column holds no value above its surface, below its base, or at a
+      % NaN depth.
+      zidx = [];
+   end
 end
 
 function candidate = timeseriesCandidateFromIce1(ice1, ice2, opts, case_manifest)
@@ -359,15 +385,16 @@ function candidate = experimentBundleCandidateFromIce1(ice1, opts)
 end
 
 function values = soilTempFromIce2(ice2, opts, case_manifest, k)
-   %SOILTEMPFROMICE2 Sample column T at the k-th manifested soil depth.
+   %SOILTEMPFROMICE2 Sample ice2.Tice at the k-th manifested soil depth.
    %
-   % Returns Celsius column-T at depth manifest.observation_variables
-   % .soil_depths_m(k), or [] if the depth/grid is unavailable. icemodel
-   % does not model a separate soil layer; the column temperature is
-   % sampled at the requested depth using opts.dz_thermal spacing.
+   % Returns Celsius column temperature at depth manifest.observation_variables
+   % .soil_depths_m(k), or [] if the depth/grid is unavailable. A depth
+   % outside the column gives an empty result. icemodel does not model a
+   % separate soil layer; the column temperature comes from the control volume
+   % that contains the requested depth on the opts.dz_thermal mesh.
 
    values = [];
-   if ~isfield(ice2, 'T') || isempty(ice2.T)
+   if ~isfield(ice2, 'Tice') || isempty(ice2.Tice)
       return
    end
    obsvars = case_manifest.observation_variables;
@@ -378,10 +405,9 @@ function values = soilTempFromIce2(ice2, opts, case_manifest, k)
    if k < 1 || k > numel(depths)
       return
    end
-   dz = opts.dz_thermal;
-   zidx = max(1, min(size(ice2.T, 1), round(depths(k) / dz) + 1));
+   zidx = nodeAtDepth(depths(k), opts.dz_thermal, size(ice2.Tice, 1));
    Tf = icemodel.physicalConstant('Tf');
-   values = ice2.T(zidx, :)' - Tf;
+   values = ice2.Tice(zidx, :)' - Tf;
 end
 
 function info = metadata(opts, source)

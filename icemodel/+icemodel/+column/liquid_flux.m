@@ -138,8 +138,8 @@ function [q, dq_df_liq] = liquid_flux(f_liq, f_ice, kwargs)
    %   shimizu1970 - grain-size + f_wat fit (varies in time as f_wat moves)
    %   darcy       - constant k_sat from caller-supplied permeability
    %
-   % If updating dynamic viscosity as a function of T:
-   %   n = icemodel.dynamicViscosityWater(T);
+   % If updating dynamic viscosity as a function of T_ice:
+   %   n = icemodel.dynamicViscosityWater(T_ice);
    %   k_sat = (6.1313e-10 ./ n) .* exp(15.9 * f_por);
    k_sat = icemodel.column.saturated_hydraulic_conductivity( ...
       f_ice, f_liq, ...

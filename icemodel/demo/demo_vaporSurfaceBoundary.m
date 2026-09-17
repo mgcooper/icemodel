@@ -20,7 +20,7 @@ fn = fn(1:JJ+1);
 
 % A cold, dry column with a temperature gradient that drives upward vapor
 % motion (warm below, cold above), typical of winter firn.
-T = (Tf - 12) + linspace(0, 6, JJ)';
+T_ice = (Tf - 12) + linspace(0, 6, JJ)';
 f_ice = 0.55 * ones(JJ, 1);
 f_liq = zeros(JJ, 1);
 f_res_por = 0.02;
@@ -40,12 +40,12 @@ f_res_por = 0.02;
 %
 % A needle-probe comparison uses the nodal conductivity
 % k_eff + (1 - f_ice - f_liq) .* k_vap.
-[ro_vap, dro_vapdT] = icemodel.vapor.saturation_vapor_density(T, f_liq);
-[~, De] = icemodel.vapor.vapor_thermal_conductivity(T, f_liq, dro_vapdT);
-k_eff = icemodel.column.bulk_thermal_conductivity(T, f_ice, f_liq, 0);
+[ro_vap, dro_vapdT] = icemodel.vapor.saturation_vapor_density(T_ice, f_liq);
+[~, De] = icemodel.vapor.vapor_thermal_conductivity(T_ice, f_liq, dro_vapdT);
+k_eff = icemodel.column.bulk_thermal_conductivity(T_ice, f_ice, f_liq, 0);
 
 [k_eff_faces, k_vap_faces, q_vap_deferred_faces, U_vap_faces, ...
-   L_vap_faces] = icemodel.column.vapor_transport_terms(T, f_ice, ...
+   L_vap_faces] = icemodel.column.vapor_transport_terms(T_ice, f_ice, ...
    f_liq, k_eff, ro_vap, dro_vapdT, De, delz, fn, f_res_por);
 
 face_table = table((1:JJ+1)', k_eff_faces, k_vap_faces, U_vap_faces, ...
@@ -71,8 +71,8 @@ a1 = k_eff_faces(1) / delz(1);
 % conductive_heat_flux is the same half-cell link, written as a flux. The
 % two agree exactly because both use the vapor-free k_eff(1).
 T_sfc = Tf - 15;
-Qc = icemodel.surface.conductive_heat_flux(k_eff, T, dz, T_sfc);
-assert(abs(Qc - a1 * (T(1) - T_sfc)) < 1e-10)
+Qc = icemodel.surface.conductive_heat_flux(k_eff, T_ice, dz, T_sfc);
+assert(abs(Qc - a1 * (T_ice(1) - T_sfc)) < 1e-10)
 fprintf('a1 = %.3f W m-2 K-1, Qc = %.2f W m-2\n', a1, Qc)
 %%
 %[text] ## 3. Why no diffusive vapor conductance at face 1
@@ -110,7 +110,7 @@ fprintf(['At 5 m s-1 wind, turbulent exchange is %.0f times the ', ...
 %[text] The reason is mass. Conduction carries energy without mass, so the massless skin can receive `Qc` from below and hand `Qh` to the air; nothing else is implied. Vapor carries energy WITH mass. The model's skin has no mass store, so a node-1-to-skin vapor flux has no reservoir to land in: every kilogram the surface exchanges must come from cell 1 either way. The coupled scheme therefore routes the whole surface vapor exchange through cell 1 directly ($d\_{\\mathrm{pevp}}$), and the conjugacy rule (every face that moves vapor energy moves L times that mass, see section 6) then forces the energy to take the same route. A $k\_{\\mathrm{vap}}$ inside $a\_1$ would move latent energy across a face that can move no mass, recreating the energy-without-mass inconsistency the coupled design exists to remove.
 %[text] Nothing is lost by this routing. Vapor that sublimates near node 1 and deposits at the skin is redistribution INSIDE the top half cell, below grid resolution; the cell-1 enthalpy accounts the phase change wherever the mass budget puts it. The one thing the choice does affect is the $T\_{\\mathrm{sfc}}$ diagnosis, because $a\_1$ sets how tightly the skin tracks node 1. That effect is percent-level:
 [k_vap_node, ~] = icemodel.vapor.vapor_thermal_conductivity( ...
-   T, f_liq, dro_vapdT);
+   T_ice, f_liq, dro_vapdT);
 f_air = 1 - f_ice - f_liq;
 fprintf('vapor contribution at node 1 / k_eff(1) = %.1f%%\n', ...
    100 * f_air(1) * k_vap_node(1) / k_eff(1))
@@ -141,8 +141,8 @@ assert(abs(sum(d_interior .* dz)) < 1e-18)
 %[text] The solve discretizes one enthalpy conservation law,
 %[text] $\\frac{\\partial H}{\\partial t} = -\\frac{\\partial}{\\partial z}\\left(q\_{cond} + q\_{vap}\\right)$
 %[text] with $q\_{vap} = -L\\,D\_e\\,\\frac{\\partial \\rho\_v}{\\partial z}$ on interior faces and the SEB as the top boundary flux. The interior face terms are conjugate: the matrix term plus deferred correction reconstructs the face latent heat times the requested mass flux. When no storage limit binds, the split step applies that requested mass.
-T_pad = [T(1); T; T(JJ)];
-d_T = T_pad(1:JJ+1) - T_pad(2:JJ+2);
+T_ice_pad = [T_ice(1); T_ice; T_ice(JJ)];
+d_T = T_ice_pad(1:JJ+1) - T_ice_pad(2:JJ+2);
 Q_vap_reconstructed = k_vap_faces .* d_T ./ delz + q_vap_deferred_faces;
 Q_vap_conjugate = L_vap_faces .* U_vap_faces;
 assert(max(abs(Q_vap_reconstructed - Q_vap_conjugate)) < 1e-12)

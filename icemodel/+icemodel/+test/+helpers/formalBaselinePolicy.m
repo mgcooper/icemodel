@@ -13,6 +13,10 @@ function policy = formalBaselinePolicy(baseline_selector)
    %     the same provisioned data root it verifies.
    %  require_source_revision  True when the baseline files must record the
    %     source revision that produced them.
+   %  icemodel_solvers  The icemodel solver ids that the formal regression and
+   %     perf case matrices run. Rolling baselines run every id in
+   %     icemodel.namelists.solver(). A frozen release keeps the ids of its
+   %     accepted rows.
 
    arguments
       baseline_selector (1, :) string = "rolling"
@@ -29,7 +33,7 @@ function policy = formalBaselinePolicy(baseline_selector)
    policy.promice_filled_policy_sha256 = "";
 
    % Rolling suites use the verification data tree and one forcing product
-   % for every formal station.
+   % for every formal station, and they run every supported icemodel solver.
    if baseline_type == "rolling"
       policy.config_case = "verification";
       policy.forcing_mode = "fixed";
@@ -42,11 +46,13 @@ function policy = formalBaselinePolicy(baseline_selector)
       policy.require_source_revision = true;
       policy.promice_filled_policy_sha256 = ...
          icemodel.forcing.reconstruct.policySha256();
+      policy.icemodel_solvers = icemodel.namelists.solver();
       return
    end
 
-   % Preserve the data tree and forcing identity that produced each release's
-   % frozen accepted rows.
+   % Preserve the data tree, forcing identity, and solver ids that produced
+   % each release's frozen accepted rows. The v1.1 and v1.2 accepted rows hold
+   % no solver 0 row.
    release_tag = lower(icemodel.test.helpers.sanitizeTag(baseline_tag));
    switch release_tag
       case "v1_1"
@@ -60,6 +66,7 @@ function policy = formalBaselinePolicy(baseline_selector)
          policy.use_fixture_root_for_model = false;
          policy.snapshot_from_rolling = false;
          policy.require_source_revision = false;
+         policy.icemodel_solvers = [1 2 3];
 
       case "v1_2"
          policy.baseline_tag = "v1.2";
@@ -77,6 +84,7 @@ function policy = formalBaselinePolicy(baseline_selector)
          policy.require_source_revision = true;
          policy.promice_filled_policy_sha256 = ...
             "bd336da0880474f1987facc2311c4f45a6c281877ae8b944a3fbdc7cfb68d513";
+         policy.icemodel_solvers = [1 2 3];
 
       otherwise
          error('icemodel:test:unregisteredReleaseForcing', ...

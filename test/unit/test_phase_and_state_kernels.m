@@ -11,17 +11,17 @@ function test_liquid_fraction_function_and_deriv_are_self_consistent(testCase)
    [ro_ice, ro_liq, Tf] = icemodel.physicalConstant( ...
       'ro_ice', 'ro_liq', 'Tf');
    fcp = icemodel.parameterLookup('fcp');
-   T_in = [Tf - 1.5; Tf - 0.8; Tf - 0.2];
+   T_ice_in = [Tf - 1.5; Tf - 0.8; Tf - 0.2];
    f_wat = [0.85; 0.85; 0.85];
-   f_liq = f_wat ./ (1 + (fcp * (Tf - T_in)) .^ 2);
+   f_liq = f_wat ./ (1 + (fcp * (Tf - T_ice_in)) .^ 2);
    f_ice = (f_wat - f_liq) * ro_liq / ro_ice;
 
-   [T_out, f_ice_out, f_liq_out, f_wat_out, dLdT] = ...
-      icemodel.column.liquid_fraction_function(T_in, f_ice, f_liq);
+   [T_ice_out, f_ice_out, f_liq_out, f_wat_out, dLdT] = ...
+      icemodel.column.liquid_fraction_function(T_ice_in, f_ice, f_liq);
    [dLdT_ref, f_wat_ref] = icemodel.column.liquid_fraction_derivative( ...
-      T_out, f_ice_out, f_liq_out);
+      T_ice_out, f_ice_out, f_liq_out);
 
-   testCase.verifyEqual(T_out, T_in, 'AbsTol', 1e-10);
+   testCase.verifyEqual(T_ice_out, T_ice_in, 'AbsTol', 1e-10);
    testCase.verifyEqual(f_wat_out, f_wat_ref, 'AbsTol', 1e-12);
    testCase.verifyEqual(dLdT, dLdT_ref, 'RelTol', 1e-12);
 end
@@ -87,14 +87,14 @@ function test_mztransform_updates_melt_zone_consistently(testCase)
    [ro_ice, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
    fcp = icemodel.parameterLookup('fcp');
 
-   T_old = Tf - 0.5;
+   T_ice_old = Tf - 0.5;
    f_wat = 0.85;
-   f_liq = f_wat / (1 + (fcp * (Tf - T_old)) ^ 2);
+   f_liq = f_wat / (1 + (fcp * (Tf - T_ice_old)) ^ 2);
    [f_liq_min, f_liq_max] = icemodel.column.meltzone_bounds(f_wat);
-   dLdT = icemodel.column.liquid_fraction_derivative(T_old, [], [], f_wat);
+   dLdT = icemodel.column.liquid_fraction_derivative(T_ice_old, [], [], f_wat);
 
-   [T_new, f_ice_new, f_liq_new, ok] = ...
-      icemodel.column.meltzone_transform(ro_liq * 0.002, T_old, f_liq, ...
+   [T_ice_new, f_ice_new, f_liq_new, ok] = ...
+      icemodel.column.meltzone_transform(ro_liq * 0.002, T_ice_old, f_liq, ...
       f_wat, dLdT, f_liq_min, f_liq_max, true, false);
 
    testCase.verifyTrue(ok);
@@ -102,7 +102,7 @@ function test_mztransform_updates_melt_zone_consistently(testCase)
    testCase.verifyLessThanOrEqual(f_liq_new, f_wat);
    testCase.verifyLessThanOrEqual(f_ice_new + f_liq_new * ro_liq / ro_ice, ...
       1 + 1e-9);
-   testCase.verifyLessThanOrEqual(T_new, Tf);
+   testCase.verifyLessThanOrEqual(T_ice_new, Tf);
 end
 
 function test_mztransform_allows_melt_zone_exit_to_frozen_branch(testCase)
@@ -114,19 +114,19 @@ function test_mztransform_allows_melt_zone_exit_to_frozen_branch(testCase)
    [TL, ~] = icemodel.parameterLookup('TL', 'TH');
    fcp = icemodel.parameterLookup('fcp');
 
-   T_old = TL + 0.01;
+   T_ice_old = TL + 0.01;
    f_wat = 0.85;
-   f_liq = f_wat / (1 + (fcp * (Tf - T_old)) ^ 2);
+   f_liq = f_wat / (1 + (fcp * (Tf - T_ice_old)) ^ 2);
    [f_liq_min, f_liq_max] = icemodel.column.meltzone_bounds(f_wat);
    d_fliq = 0.97 * f_liq_min - f_liq;
-   dLdT = icemodel.column.liquid_fraction_derivative(T_old, [], [], f_wat);
+   dLdT = icemodel.column.liquid_fraction_derivative(T_ice_old, [], [], f_wat);
 
-   [T_new, f_ice_new, f_liq_new, ok] = ...
-      icemodel.column.meltzone_transform(ro_liq * d_fliq, T_old, f_liq, ...
+   [T_ice_new, f_ice_new, f_liq_new, ok] = ...
+      icemodel.column.meltzone_transform(ro_liq * d_fliq, T_ice_old, f_liq, ...
       f_wat, dLdT, f_liq_min, f_liq_max, true, false);
 
    testCase.verifyTrue(ok);
-   testCase.verifyLessThan(T_new, TL);
+   testCase.verifyLessThan(T_ice_new, TL);
    testCase.verifyLessThan(f_liq_new, f_liq_min);
    testCase.verifyGreaterThan(f_liq_new, 0);
    testCase.verifyLessThanOrEqual(f_ice_new + f_liq_new * ro_liq / ro_ice, ...
@@ -136,25 +136,38 @@ end
 function test_mztransform_rejects_large_freeze_out_overshoot(testCase)
    % A large overshoot of the lower melt-zone boundary should be rejected so
    % the timestep can be shortened before trusting the transformed predictor.
+   % With debug on, the rejection dump stores the melt-zone mask under iM,
+   % the name of the variable.
+
+   fixture = testCase.applyFixture( ...
+      matlab.unittest.fixtures.TemporaryFolderFixture);
+   debug_file = fullfile(fixture.Folder, 'debug_mztransform.mat');
+   testCase.applyFixture(matlab.unittest.fixtures.EnvironmentVariableFixture( ...
+      'ICEMODEL_DEBUG_MZTRANSFORM_FILE', debug_file));
 
    [~, ro_liq, Tf] = icemodel.physicalConstant('ro_ice', 'ro_liq', 'Tf');
    [TL, ~] = icemodel.parameterLookup('TL', 'TH');
    fcp = icemodel.parameterLookup('fcp');
 
-   T_old = TL + 0.01;
+   T_ice_old = TL + 0.01;
    f_wat = 0.85;
-   f_liq = f_wat / (1 + (fcp * (Tf - T_old)) ^ 2);
+   f_liq = f_wat / (1 + (fcp * (Tf - T_ice_old)) ^ 2);
    [f_liq_min, f_liq_max] = icemodel.column.meltzone_bounds(f_wat);
    d_fliq = -1.5 * f_liq;
-   dLdT = icemodel.column.liquid_fraction_derivative(T_old, [], [], f_wat);
+   dLdT = icemodel.column.liquid_fraction_derivative(T_ice_old, [], [], f_wat);
 
-   [T_new, ~, f_liq_new, ok] = icemodel.column.meltzone_transform( ...
-      ro_liq * d_fliq, T_old, f_liq, f_wat, dLdT, f_liq_min, ...
-      f_liq_max, true, false);
+   [T_ice_new, ~, f_liq_new, ok] = icemodel.column.meltzone_transform( ...
+      ro_liq * d_fliq, T_ice_old, f_liq, f_wat, dLdT, f_liq_min, ...
+      f_liq_max, true, true);
 
    testCase.verifyFalse(ok);
-   testCase.verifyLessThan(T_new, 0);
+   testCase.verifyLessThan(T_ice_new, 0);
    testCase.verifyLessThan(f_liq_new, f_liq_min);
+   loaded = load(debug_file, 'debug_state');
+   testCase.verifyEqual(loaded.debug_state.reason, ...
+      "pmelt_overshot_melt_zone_bounds");
+   testCase.verifyTrue(loaded.debug_state.iM);
+   testCase.verifyFalse(isfield(loaded.debug_state, 'i_M'));
 end
 
 function test_mztransform_rejects_phase_skip(testCase)
@@ -181,7 +194,7 @@ function test_gecoefs_applies_robin_top_boundary_adjustment(testCase)
    % diagonal and source terms when the Robin boundary path is requested.
 
    JJ = 3;
-   T = [268; 267; 266];
+   T_ice = [268; 267; 266];
    f_ice = 0.9 * ones(JJ, 1);
    f_liq = 0.01 * ones(JJ, 1);
    dHdT = 1.8e6 * ones(JJ, 1);
@@ -194,18 +207,18 @@ function test_gecoefs_applies_robin_top_boundary_adjustment(testCase)
    fn = [1; 0.5; 0.5; 0];
    dz = 0.04 * ones(JJ, 1);
    dt = 900;
-   Ts = 269;
+   T_sfc = 269;
    Fc = 10;
    Fp = -5;
    k_eff_faces = 1.0 ./ ((1.0 - fn) ./ [k_eff(1); k_eff] ...
       + fn ./ [k_eff; k_eff(end)]);
    q_deferred_faces = zeros(JJ + 1, 1);
    [~, aP_dir, ~, b_dir, ~, a1] = icemodel.column.assemble_enthalpy_system( ...
-      T, f_ice, f_liq, dHdT, dLdT, drovdT, dH, Sc, zeros(JJ, 1), ...
-      k_eff_faces, delz, dz, dt, Ts, Fc, Fp, 1, q_deferred_faces);
+      T_ice, f_ice, f_liq, dHdT, dLdT, drovdT, dH, Sc, zeros(JJ, 1), ...
+      k_eff_faces, delz, dz, dt, T_sfc, Fc, Fp, 1, q_deferred_faces);
    [~, aP_rob, ~, b_rob] = icemodel.column.assemble_enthalpy_system( ...
-      T, f_ice, f_liq, dHdT, dLdT, drovdT, dH, Sc, zeros(JJ, 1), ...
-      k_eff_faces, delz, dz, dt, Ts, Fc, Fp, 2, q_deferred_faces);
+      T_ice, f_ice, f_liq, dHdT, dLdT, drovdT, dH, Sc, zeros(JJ, 1), ...
+      k_eff_faces, delz, dz, dt, T_sfc, Fc, Fp, 2, q_deferred_faces);
 
    testCase.verifyEqual(aP_rob(1) - aP_dir(1), ...
       -a1 - Fp * a1 / (a1 - Fp), ...
@@ -217,7 +230,7 @@ function test_assemble_enthalpy_system_adds_deferred_flux_convergence(testCase)
    % The deferred face flux must enter each cell as in minus out.
 
    JJ = 3;
-   T = [268; 267; 266];
+   T_ice = [268; 267; 266];
    f_ice = 0.8 * ones(JJ, 1);
    f_liq = zeros(JJ, 1);
    dHdT = 1.8e6 * ones(JJ, 1);
@@ -233,10 +246,10 @@ function test_assemble_enthalpy_system_adds_deferred_flux_convergence(testCase)
    q_deferred_faces = [0; 3; -2; 0];
 
    [~, ~, ~, b_zero] = icemodel.column.assemble_enthalpy_system( ...
-      T, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, Sp, ...
+      T_ice, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, Sp, ...
       k_eff_faces, delz, dz, 900, 269, 0, 0, 1, q_zero);
    [~, ~, ~, b_flux] = icemodel.column.assemble_enthalpy_system( ...
-      T, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, Sp, ...
+      T_ice, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, Sp, ...
       k_eff_faces, delz, dz, 900, 269, 0, 0, 1, q_deferred_faces);
 
    expected = q_deferred_faces(1:JJ) - q_deferred_faces(2:JJ+1);
@@ -248,8 +261,8 @@ function test_subsurface_error_matches_zero_flux_and_adds_top_convergence(testCa
    % Nonzero flux adds the assembler's top-face convergence.
 
    [Lf, ro_liq] = icemodel.physicalConstant('Lf', 'ro_liq');
-   T = [268.2; 267.8; 267.0];
-   T_old = [268.0; 267.7; 267.0];
+   T_ice = [268.2; 267.8; 267.0];
+   T_ice_old = [268.0; 267.7; 267.0];
    f_ice = 0.8 * ones(3, 1);
    f_liq = zeros(3, 1);
    f_liq_old = zeros(3, 1);
@@ -265,7 +278,7 @@ function test_subsurface_error_matches_zero_flux_and_adds_top_convergence(testCa
    q_zero = zeros(4, 1);
 
    returned_zero = icemodel.column.subsurface_linearization_error( ...
-      T, T_old, f_ice, f_liq, f_liq_old, drovdT, dHdT, Sc, q_zero, ...
+      T_ice, T_ice_old, f_ice, f_liq, f_liq_old, drovdT, dHdT, Sc, q_zero, ...
       dz, dt, a2, Fc, Fp, a1);
 
    % Assemble the zero-deferred-flux reference independently.
@@ -273,20 +286,20 @@ function test_subsurface_error_matches_zero_flux_and_adds_top_convergence(testCa
    denominator = dHdT(1) ...
       + L_top * drovdT(1) * (1.0 - f_ice(1) - f_liq(1));
    zero_flux_reference = (dt / dz(1) ...
-      * (a2 * (T(2) - T(1)) ...
-      + Fc + Fp * (Fc + a1 * T(1)) / (a1 - Fp) ...
+      * (a2 * (T_ice(2) - T_ice(1)) ...
+      + Fc + Fp * (Fc + a1 * T_ice(1)) / (a1 - Fp) ...
       + Sc(1) * dz(1)) ...
       - ro_liq * Lf * (f_liq(1) - f_liq_old(1))) / denominator ...
-      - (T(1) - T_old(1));
+      - (T_ice(1) - T_ice_old(1));
    testCase.verifyEqual( ...
       returned_zero, zero_flux_reference, 'RelTol', 1e-14);
 
    % Build the nonzero case through the production assembler. The state is
-   % below the melt zone, so the assembled unknown is T and the top-row
+   % below the melt zone, so the assembled unknown is T_ice and the top-row
    % residual can be evaluated directly from aN, aP, aS, and b.
    q_deferred_faces = [4; -3; 0; 0];
    dFdT = zeros(3, 1);
-   dH = denominator * (T - T_old) ...
+   dH = denominator * (T_ice - T_ice_old) ...
       + ro_liq * Lf * (f_liq - f_liq_old);
    k_eff_faces = [0.9; 0.8; 0.7; 0.6];
    delz = [0.02; 0.04; 0.04; 0.02];
@@ -294,14 +307,14 @@ function test_subsurface_error_matches_zero_flux_and_adds_top_convergence(testCa
    bc = 2;
    [aN, aP, aS, b, ~, a1_assembled, a2_assembled] = ...
       icemodel.column.assemble_enthalpy_system( ...
-      T, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, zeros(3, 1), ...
+      T_ice, f_ice, f_liq, dHdT, dFdT, drovdT, dH, Sc, zeros(3, 1), ...
       k_eff_faces, delz, dz, dt, T_sfc, Fc, Fp, bc, ...
       q_deferred_faces);
    returned_flux = icemodel.column.subsurface_linearization_error( ...
-      T, T_old, f_ice, f_liq, f_liq_old, drovdT, dHdT, Sc, ...
+      T_ice, T_ice_old, f_ice, f_liq, f_liq_old, drovdT, dHdT, Sc, ...
       q_deferred_faces, dz, dt, a2_assembled, Fc, Fp, a1_assembled);
-   top_row_residual = b(1) + aN(1) * T_sfc + aS(1) * T(2) ...
-      - aP(1) * T(1);
+   top_row_residual = b(1) + aN(1) * T_sfc + aS(1) * T_ice(2) ...
+      - aP(1) * T_ice(1);
    assembled_reference = top_row_residual * dt / dz(1) / denominator;
    testCase.verifyEqual(returned_flux, assembled_reference, ...
       'RelTol', 1e-13);
@@ -312,8 +325,8 @@ function test_subsurface_error_supports_one_closed_cell(testCase)
    % deferred terms must still enter as in-minus-out convergence.
 
    [Lf, ro_liq] = icemodel.physicalConstant('Lf', 'ro_liq');
-   T = 268.2;
-   T_old = 268.0;
+   T_ice = 268.2;
+   T_ice_old = 268.0;
    f_ice = 0.8;
    f_liq = 0.0;
    f_liq_old = 0.0;
@@ -331,18 +344,18 @@ function test_subsurface_error_supports_one_closed_cell(testCase)
    denominator = dHdT ...
       + L_top * drovdT * (1.0 - f_ice - f_liq);
    reference = (dt / dz ...
-      * (Fc + Fp * (Fc + a1 * T) / (a1 - Fp) + Sc * dz) ...
+      * (Fc + Fp * (Fc + a1 * T_ice) / (a1 - Fp) + Sc * dz) ...
       - ro_liq * Lf * (f_liq - f_liq_old)) / denominator ...
-      - (T - T_old);
+      - (T_ice - T_ice_old);
 
    returned_zero = icemodel.column.subsurface_linearization_error( ...
-      T, T_old, f_ice, f_liq, f_liq_old, drovdT, dHdT, Sc, zeros(2, 1), ...
-      dz, dt, a2, Fc, Fp, a1);
+      T_ice, T_ice_old, f_ice, f_liq, f_liq_old, drovdT, dHdT, Sc, ...
+      zeros(2, 1), dz, dt, a2, Fc, Fp, a1);
    testCase.verifyEqual(returned_zero, reference, 'RelTol', 1e-14);
 
    q_deferred_faces = [4; -3];
    returned_flux = icemodel.column.subsurface_linearization_error( ...
-      T, T_old, f_ice, f_liq, f_liq_old, drovdT, dHdT, Sc, ...
+      T_ice, T_ice_old, f_ice, f_liq, f_liq_old, drovdT, dHdT, Sc, ...
       q_deferred_faces, dz, dt, a2, Fc, Fp, a1);
    expected_flux = reference + dt / dz ...
       * (q_deferred_faces(1) - q_deferred_faces(2)) / denominator;
@@ -388,7 +401,7 @@ function test_budget_surface_mass_balance_and_merge_thin_layers(testCase)
 
    Tf = icemodel.physicalConstant('Tf');
 
-   T = [Tf - 2; Tf - 2.5; Tf - 3.0];
+   T_ice = [Tf - 2; Tf - 2.5; Tf - 3.0];
    f_ice = [0.05; 0.60; 0.65];
    f_liq = [0.01; 0.01; 0.01];
    xf_liq = f_liq;
@@ -399,20 +412,20 @@ function test_budget_surface_mass_balance_and_merge_thin_layers(testCase)
    d_lyr = zeros(3, 1);
    dz = 0.04;
 
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
-   [T_new, f_ice_new, f_liq_new, ~, ~, ~, ~, ~, ~, budget] = ...
-      icemodel.column.budget_surface_mass_balance(T, f_ice, f_liq, ...
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
+   [T_ice_new, f_ice_new, f_liq_new, ~, ~, ~, ~, ~, ~, budget] = ...
+      icemodel.column.budget_surface_mass_balance(T_ice, f_ice, f_liq, ...
       xf_liq, 0.0, d_liq, d_evp, 0.0, zeros(3, 1), zeros(3, 1), 0.02, ...
       0.1, budget, dz);
-   [T_new, f_ice_new, f_liq_new, ~, ~, d_lyr_new, budget] = ...
-      icemodel.column.merge_thin_layers(T_new, f_ice_new, f_liq_new, Sc, ...
+   [T_ice_new, f_ice_new, f_liq_new, ~, ~, d_lyr_new, budget] = ...
+      icemodel.column.merge_thin_layers(T_ice_new, f_ice_new, f_liq_new, Sc, ...
       Sp, dz, 0.0, d_lyr, 0.1, budget);
 
    % f_ice(1) = 0.05 starts below f_ice_min = 0.1, so the top cell is the one
    % merged; the observable is the budget's top-removal count, because
    % merge_thin_layers returns no per-cell eligibility mask.
    testCase.verifyGreaterThan(budget.mass_budget_top_deletion_count, 0);
-   testCase.verifyEqual(numel(T_new), 3);
+   testCase.verifyEqual(numel(T_ice_new), 3);
    testCase.verifyEqual(numel(f_ice_new), 3);
    testCase.verifyEqual(numel(f_liq_new), 3);
    testCase.verifyGreaterThan(sum(d_lyr_new), 0);

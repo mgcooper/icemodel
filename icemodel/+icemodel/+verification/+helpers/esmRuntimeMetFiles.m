@@ -12,7 +12,7 @@ function paths = esmRuntimeMetFiles(case_manifest, input_root)
    % them.
 
    % Carry the caller-selected input root into the same helper used by
-   % runIcemodelSnowCandidate. configureRun then delegates filename and path
+   % runIcemodelCandidate. configureRun then delegates filename and path
    % selection to createMetFileNames and sourceSearchDirs.
    case_manifest.input_data_root = char(input_root);
    opts = icemodel.test.helpers.setModelOptsForCase(case_manifest);

@@ -12,7 +12,7 @@ function cases = getPerfCaseMatrix(kwargs)
    % Inputs:
    %  tier        - smoke | full | all formal perf subset
    %  smbmodel    - all | icemodel | skinmodel
-   %  solver      - optional subset of [1 2 3]
+   %  solver      - optional subset of icemodel.namelists.solver()
    %  simyear     - single benchmark year used by the perf suite
    %  baseline    - rolling or registered release-baseline selector
    %  smoke_sites - advanced override for the smoke-tier site list
@@ -90,7 +90,7 @@ function cases = makeCases(tier_name, sites, simyear, baseline)
          sitename=sitename, baseline=baseline);
       for imodel = 1:numel(models)
          smbmodel = models(imodel);
-         solver_cases = formalSolversForModel(smbmodel);
+         solver_cases = formalSolversForModel(smbmodel, policy);
          for isolver = 1:numel(solver_cases)
             solver_id = solver_cases(isolver);
             k = k + 1;
@@ -114,10 +114,13 @@ function cases = makeCases(tier_name, sites, simyear, baseline)
    cases = struct2table(rows);
 end
 
-function solver_cases = formalSolversForModel(smbmodel)
+function solver_cases = formalSolversForModel(smbmodel, policy)
    %FORMALSOLVERSFORMODEL Return the solver ids covered by the perf suite.
+   %
+   % icemodel runs the solver ids that the baseline policy registers. Other
+   % models have one solver.
    if smbmodel == "icemodel"
-      solver_cases = 1:3;
+      solver_cases = policy.icemodel_solvers;
    else
       solver_cases = 1;
    end

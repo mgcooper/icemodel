@@ -81,7 +81,7 @@ function solution = analyticalSolution(experiment_name, def)
    rain_window = def.time.rain_window_s;
    f_ice_0 = experiment.f_ice;
    f_liq_0 = experiment.f_liq;
-   T_0 = experiment.T_K;
+   T_ice_0 = experiment.T_K;
 
    % Use the case-specific intrinsic permeability (matches the SUMMA Colbeck
    % parameter trial value), so analytical and numerical IceModel candidates and
@@ -106,14 +106,15 @@ function solution = analyticalSolution(experiment_name, def)
       % t_arrival vs rain_window.
       [storage, q_bot, params] = cold_solution( ...
          time_seconds, q_top, rain_window, total_depth, f_ice_0, f_liq_0, ...
-         T_0, f_res_pore, m_exp, Tf, Lf, ro_ice, ro_liq, cp_ice, permeability);
+         T_ice_0, f_res_pore, m_exp, Tf, Lf, ro_ice, ro_liq, cp_ice, ...
+         permeability);
 
       if isfield(params, 'kind') && params.kind == "cold" ...
             && params.t_arrival_s > rain_window
 
          % Partial-duration: use fine-grid kinematic-wave reference.
          [storage, q_bot] = cold_partial_duration_pde( ...
-            time_seconds, q_top, rain_window, total_depth, f_ice_0, T_0, ...
+            time_seconds, q_top, rain_window, total_depth, f_ice_0, T_ice_0, ...
             f_res_pore, m_exp, Tf, Lf, ro_ice, ro_liq, cp_ice, permeability);
          params.kind = "cold_partial_pde";
       end
@@ -252,14 +253,14 @@ end
 %% Cold snow: Clark 2017 wetting-front advance with phase-change uptake.
 function [storage, q_bot, params] = cold_solution( ...
       time_seconds, q_top, rain_window, total_depth, ...
-      f_ice_0, f_liq_0, T_0, f_res_pore, m_exp, ...
+      f_ice_0, f_liq_0, T_ice_0, f_res_pore, m_exp, ...
       Tf, Lf, ro_ice, ro_liq, cp_ice, permeability)
 
    % Thermal water requirement (Clark 2017 Eq. 10):
    %   f_frz = (ro_ice * cp_ice / (ro_liq * Lf)) * f_ice * (Tf - T)
    % This is the volumetric liquid that must freeze to bring the dry layer to
    % Tf. After freezing, the layer is at Tf and behaves as ripe snow.
-   f_frz = (ro_ice * cp_ice / (ro_liq * Lf)) * f_ice_0 * (Tf - T_0);
+   f_frz = (ro_ice * cp_ice / (ro_liq * Lf)) * f_ice_0 * (Tf - T_ice_0);
 
    % After thermal saturation the wetted region carries the steady- state
    % saturation that balances q_top through the post-refreeze ice fraction.
@@ -296,9 +297,8 @@ function [storage, q_bot, params] = cold_solution( ...
    q_bot = zeros(n, 1);
    for k = 1:n
       [storage(k), q_bot(k)] = sample_cold(time_seconds(k), q_top, ...
-         rain_window, t_arrival, t_drain_start, f_liq_0, f_liq_w, ...
-         total_depth, c_w, c_steady, k_sat_w, f_res_w, availCap_w, m_exp, ...
-         f_frz, inflow_total_at_rain_end);
+         rain_window, t_arrival, f_liq_0, f_liq_w, total_depth, c_w, ...
+         c_steady, k_sat_w, availCap_w, m_exp, f_frz, inflow_total_at_rain_end);
    end
 
    params = struct( ...
@@ -317,9 +317,8 @@ function [storage, q_bot, params] = cold_solution( ...
 end
 
 function [storage, q_bot] = sample_cold(t, q_top, rain_window, ...
-      t_arrival, t_drain_start, f_liq_0, f_liq_w, total_depth, ...
-      c_w, c_steady, k_sat_w, f_res, availCap, m_exp, f_frz, ...
-      inflow_total_at_rain_end)
+      t_arrival, f_liq_0, f_liq_w, total_depth, c_w, c_steady, k_sat_w, ...
+      availCap, m_exp, f_frz, inflow_total_at_rain_end)
 
    if t <= 0
       storage = f_liq_0 * total_depth;
@@ -469,7 +468,7 @@ end
 % so changes to icemodel.column.infiltration cannot mask issues caught here.
 
 function [storage, q_bot] = cold_partial_duration_pde( ...
-      time_seconds, q_top, rain_window, total_depth, f_ice_0, T_0, ...
+      time_seconds, q_top, rain_window, total_depth, f_ice_0, T_ice_0, ...
       f_res_pore, m_exp, Tf, Lf, ro_ice, ro_liq, cp_ice, permeability)
 
    % Refined grid and timestep. 1000 layers x 1-second substep gives 10x grid
@@ -480,7 +479,7 @@ function [storage, q_bot] = cold_partial_duration_pde( ...
    dt_ref = 1.0;
 
    % Initial column state (uniform; cold-snow case starts dry).
-   T     = T_0     * ones(N_ref, 1);
+   T_ice = T_ice_0 * ones(N_ref, 1);
    f_ice = f_ice_0 * ones(N_ref, 1);
    f_liq = zeros(N_ref, 1);
 
@@ -552,14 +551,14 @@ function [storage, q_bot] = cold_partial_duration_pde( ...
          bot_flux_accum = bot_flux_accum + q_bot_sub * dt_ref;
 
          % --- Cold-content refreezing per layer ----------------------
-         % Per layer with T < Tf and f_liq > 0, freeze up to the available cold
-         % content, releasing latent heat to warm the layer toward Tf. Same
+         % Per layer with T_ice < Tf and f_liq > 0, freeze up to the available
+         % cold content, releasing latent heat to warm the layer toward Tf. Same
          % physics as icemodel.column.infiltration's refreezing block.
          for k = 1:N_ref
-            if T(k) >= Tf - eps || f_liq(k) <= 0 || f_ice(k) <= 0
+            if T_ice(k) >= Tf - eps || f_liq(k) <= 0 || f_ice(k) <= 0
                continue
             end
-            cc = ro_ice * f_ice(k) * cp_ice * (Tf - T(k));
+            cc = ro_ice * f_ice(k) * cp_ice * (Tf - T_ice(k));
             df_frz = min(f_liq(k), cc / (ro_liq * Lf));
             if df_frz <= 0
                continue
@@ -567,7 +566,7 @@ function [storage, q_bot] = cold_partial_duration_pde( ...
             f_liq(k) = f_liq(k) - df_frz;
             f_ice(k) = f_ice(k) + df_frz / ro_iwe;
             dT = (ro_liq * df_frz * Lf) / (ro_ice * f_ice(k) * cp_ice);
-            T(k) = min(Tf, T(k) + dT);
+            T_ice(k) = min(Tf, T_ice(k) + dT);
          end
       end
 

@@ -9,20 +9,20 @@ function test_budget_state_uses_documented_references(testCase)
 
    [Tf, ro_ice, ro_liq] = ...
       icemodel.physicalConstant('Tf', 'ro_ice', 'ro_liq');
-   T = [Tf - 2; Tf - 1];
+   T_ice = [Tf - 2; Tf - 1];
    f_ice = [0.8; 0.7];
    f_liq = [0.01; 0.02];
    dz = [0.04; 0.06];
 
    [solid_mwe, liquid_mwe, enthalpy_j_m2] = ...
-      icemodel.column.integrate_column_budget(T, f_ice, f_liq, dz);
+      icemodel.column.integrate_column_budget(T_ice, f_ice, f_liq, dz);
 
    % Compare against the explicit accepted storage definitions.
    testCase.verifyEqual(solid_mwe, ...
       ro_ice / ro_liq * sum(f_ice .* dz), 'AbsTol', 1e-15);
    testCase.verifyEqual(liquid_mwe, sum(f_liq .* dz), 'AbsTol', 1e-15);
    f_wat = icemodel.column.water_fraction(f_ice, f_liq);
-   H = icemodel.column.bulk_enthalpy(T, f_ice, f_liq, f_wat);
+   H = icemodel.column.bulk_enthalpy(T_ice, f_ice, f_liq, f_wat);
    testCase.verifyEqual(enthalpy_j_m2, sum(H .* dz), 'AbsTol', 1e-9);
 end
 
@@ -51,14 +51,14 @@ function test_budget_ledger_is_fixed_codegen_schema(testCase)
    % remains synchronized with icemodel.namelists.budgetoutputs.
 
    Tf = icemodel.physicalConstant('Tf');
-   T = Tf - 2;
+   T_ice = Tf - 2;
    f_ice = 0.8;
    f_liq = 0.01;
    dz = 0.04;
    [solid_start, liquid_start] = ...
-      icemodel.column.integrate_column_budget(T, f_ice, f_liq, dz);
+      icemodel.column.integrate_column_budget(T_ice, f_ice, f_liq, dz);
 
-   ledger = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   ledger = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    budget_fields = icemodel.namelists.budgetoutputs('all');
    ledger_fields = transpose(fieldnames(ledger));
 
@@ -181,15 +181,15 @@ function test_no_merge_returns_zero_event_and_exchange_ledger(testCase)
    % An eligibility-free call must leave state, d_lyr, and the remesh budget
    % channels unchanged.
 
-   [T, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture([0.5; 0.6; 0.7]);
+   [T_ice, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture([0.5; 0.6; 0.7]);
    dz = 0.04;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
-   [T_new, f_ice_new, f_liq_new, Sc_new, Sp_new, d_lyr_new, budget] = ...
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
+   [T_ice_new, f_ice_new, f_liq_new, Sc_new, Sp_new, d_lyr_new, budget] = ...
       icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
+      T_ice, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
 
    % No inferred event or storage exchange is allowed on the early return.
-   testCase.verifyEqual(T_new, T);
+   testCase.verifyEqual(T_ice_new, T_ice);
    testCase.verifyEqual(f_ice_new, f_ice);
    testCase.verifyEqual(f_liq_new, f_liq);
    testCase.verifyEqual(Sc_new, Sc);
@@ -219,12 +219,12 @@ function test_top_export_is_the_mass_a_surface_removal_removes(testCase)
 
    [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
    f_ice = [0.05; 0.6; 0.7];
-   [T, ~, f_liq, Sc, Sp, d_lyr] = mergeFixture(f_ice);
+   [T_ice, ~, f_liq, Sc, Sp, d_lyr] = mergeFixture(f_ice);
    dz = 0.04;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, f_ice_new, f_liq_new, ~, ~, ~, budget] = ...
       icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
+      T_ice, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
 
    % Hand-compute the removed mass from the pair and the surviving merged cell.
    pair_solid = ro_ice / ro_liq * (f_ice(1) + f_ice(2)) * dz;
@@ -318,12 +318,12 @@ function test_d_lyr_carries_total_merge_export_not_liquid_only(testCase)
 
    [ro_ice, ro_liq] = icemodel.physicalConstant('ro_ice', 'ro_liq');
    f_ice = [0.05; 0.6; 0.7];
-   [T, ~, f_liq, Sc, Sp, d_lyr] = mergeFixture(f_ice);
+   [T_ice, ~, f_liq, Sc, Sp, d_lyr] = mergeFixture(f_ice);
    dz = 0.04;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, f_ice_new, f_liq_new, ~, ~, d_lyr_new, budget] = ...
       icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
+      T_ice, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
 
    % Hand-compute the removed solid and liquid mass from the pair and the
    % surviving merged cell, independent of the budget channels, so the
@@ -357,12 +357,12 @@ function test_interior_merge_exports_no_surface_mass(testCase)
    % Interior remeshing moves mass without lowering the surface, so it must
    % leave the surface-loss comparator untouched.
 
-   [T, f_ice, f_liq, Sc, Sp, d_lyr] = ...
+   [T_ice, f_ice, f_liq, Sc, Sp, d_lyr] = ...
       mergeFixture([0.6; 0.05; 0.7; 0.8]);
    dz = 0.04;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, ~, ~, ~, ~, ~, budget] = icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
+      T_ice, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
 
    testCase.verifyEqual(budget.mass_budget_interior_merge_count, 1);
    testCase.verifyEqual(budget.mass_budget_top_deletion_count, 0);
@@ -378,11 +378,11 @@ end
 function test_top_merge_counts_actual_grid_translation(testCase)
    % Removing the actual top cell contributes exactly one uniform-grid dz.
 
-   [T, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture([0.05; 0.6; 0.7]);
+   [T_ice, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture([0.05; 0.6; 0.7]);
    dz = 0.04;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, ~, ~, ~, ~, d_lyr_new, budget] = icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
+      T_ice, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
 
    % Geometry and the legacy non-geometric diagnostic remain distinct.
    testCase.verifyEqual(budget.mass_budget_top_deletion_count, 1);
@@ -396,12 +396,12 @@ end
 function test_interior_merge_does_not_translate_top_grid(testCase)
    % Removing an interior cell is numerical remeshing, not surface lowering.
 
-   [T, f_ice, f_liq, Sc, Sp, d_lyr] = ...
+   [T_ice, f_ice, f_liq, Sc, Sp, d_lyr] = ...
       mergeFixture([0.6; 0.05; 0.7; 0.8]);
    dz = 0.04;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, ~, ~, ~, ~, ~, budget] = icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
+      T_ice, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
 
    % The actual-event ledger must not infer height from the eligibility mask.
    testCase.verifyEqual(budget.mass_budget_top_deletion_count, 0);
@@ -413,12 +413,12 @@ end
 function test_multiple_top_merges_follow_index_drift_once_per_original_flag(testCase)
    % Adjacent flagged top cells shift to index one as each prior cell is removed.
 
-   [T, f_ice, f_liq, Sc, Sp, d_lyr] = ...
+   [T_ice, f_ice, f_liq, Sc, Sp, d_lyr] = ...
       mergeFixture([0.05; 0.04; 0.6; 0.7]);
    dz = 0.04;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, ~, ~, ~, ~, ~, budget] = icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
+      T_ice, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
 
    % Appended bottom clones are not reprocessed as new eligible cells.
    testCase.verifyEqual(budget.mass_budget_top_deletion_count, 2);
@@ -469,12 +469,12 @@ function test_depleted_bottom_removal_matches_minimal_transition(testCase)
    % Requesting the budget must never change the state transition, including
    % when the deepest cell is itself the merge-eligible layer.
 
-   [T, f_ice, f_liq, Sc, Sp, d_lyr] = ...
+   [T_ice, f_ice, f_liq, Sc, Sp, d_lyr] = ...
       mergeFixture([0.6; 0.7; 0.05]);
    dz = 0.04;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, f_ice_new, ~, ~, ~, ~, budget] = icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
+      T_ice, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
 
    % The deepest cell is removed, then the surviving bottom state is cloned.
    % The removed cell must not come back: cloning before the deletion copied
@@ -496,16 +496,16 @@ function test_bottom_adjacent_merge_matches_minimal_transition(testCase)
    % A bottom-adjacent merge clones an already-depleted reservoir, and the
    % ledger must still close its domain-exchange identity.
 
-   [T, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture([0.6; 0.0; 0.15]);
+   [T_ice, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture([0.6; 0.0; 0.15]);
    f_liq(:) = 0.0;
    [j1, j2] = icemodel.column.merge_layer_indices(2, f_ice);
    testCase.verifyEqual([j1, j2], [2, 3]);
    testCase.verifyGreaterThan(f_ice(end), 0.1);
 
    dz = 0.04;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, f_ice_new, ~, ~, ~, ~, budget] = icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
+      T_ice, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
 
    testCase.verifyLessThanOrEqual(f_ice_new(end), 0.1);
    testCase.verifyEqual(budget.mass_budget_top_deletion_count, 0);
@@ -523,16 +523,16 @@ function test_merge_prediction_uses_physical_vapor_basis(testCase)
    potential_ice_change = d_pevp * (Lv * ro_liq) / (Ls * ro_ice);
    f_ice_min = 0.1;
    f_top = f_ice_min - potential_ice_change / 2;
-   [T, f_ice, f_liq, Sc, Sp, d_lyr] = ...
+   [T_ice, f_ice, f_liq, Sc, Sp, d_lyr] = ...
       mergeFixture([f_top; 0.6; 0.7]);
 
    % The current top is retained, but the physical vapor prediction crosses the
    % floor and therefore marks only that top cell for merging.
    testCase.verifyGreaterThan(f_ice(1), f_ice_min);
    dz = 0.04;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, ~, ~, ~, ~, ~, budget] = icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, d_pevp, d_lyr, f_ice_min, budget);
+      T_ice, f_ice, f_liq, Sc, Sp, dz, d_pevp, d_lyr, f_ice_min, budget);
    testCase.verifyEqual(budget.mass_budget_top_deletion_count, 1);
    testCase.verifyEqual(budget.mass_budget_interior_merge_count, 0);
 end
@@ -580,22 +580,22 @@ function test_merge_prediction_reaches_the_top_layer_only(testCase)
    % the predicted ice loss. Every layer therefore crosses the floor under the
    % broadcast rule, and only the top layer crosses under the top-only rule.
    f_near = f_ice_min - potential_ice_change / 2;
-   [T, f_ice, f_liq, Sc, Sp, d_lyr] = ...
+   [T_ice, f_ice, f_liq, Sc, Sp, d_lyr] = ...
       mergeFixture([f_near; f_near; f_near]);
    testCase.verifyGreaterThan(min(f_ice), f_ice_min);
 
    dz = 0.04;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, ~, ~, ~, ~, ~, budget] = icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, d_pevp, d_lyr, f_ice_min, budget);
+      T_ice, f_ice, f_liq, Sc, Sp, dz, d_pevp, d_lyr, f_ice_min, budget);
    testCase.verifyEqual(budget.mass_budget_top_deletion_count, 1);
    testCase.verifyEqual(budget.mass_budget_interior_merge_count, 0);
 
    % A zero tendency must leave every layer unflagged, which shows the counts
    % above came from the prediction and not from the floor test.
-   budget_no_vapor = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget_no_vapor = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, ~, ~, ~, ~, ~, budget_no_vapor] = icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, f_ice_min, budget_no_vapor);
+      T_ice, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, f_ice_min, budget_no_vapor);
    testCase.verifyEqual(budget_no_vapor.mass_budget_top_deletion_count, 0);
    testCase.verifyEqual(budget_no_vapor.mass_budget_interior_merge_count, 0);
 end
@@ -605,20 +605,20 @@ function test_pending_flags_match_legacy_multi_event_result(testCase)
    % state and d_lyr evolution stay exactly unchanged. Requesting the budget
    % must never alter the transition it observes.
 
-   [T, f_ice, f_liq, Sc, Sp, d_lyr] = ...
+   [T_ice, f_ice, f_liq, Sc, Sp, d_lyr] = ...
       mergeFixture([0.6; 0.05; 0.04]);
    dz = 0.04;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
-   [T_new, f_ice_new, f_liq_new, Sc_new, Sp_new, d_lyr_new, budget] = ...
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
+   [T_ice_new, f_ice_new, f_liq_new, Sc_new, Sp_new, d_lyr_new, budget] = ...
       icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
-   [T_legacy, f_ice_legacy, f_liq_legacy, Sc_legacy, Sp_legacy, ...
+      T_ice, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1, budget);
+   [T_ice_legacy, f_ice_legacy, f_liq_legacy, Sc_legacy, Sp_legacy, ...
       d_lyr_legacy, legacy_mask] = legacyMergeThinLayers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1);
+      T_ice, f_ice, f_liq, Sc, Sp, dz, 0.0, d_lyr, 0.1);
 
    % Compare state against the legacy transition oracle, including its mask.
    testCase.verifyEqual(legacy_mask, [false; true; true]);
-   testCase.verifyEqual(T_new, T_legacy);
+   testCase.verifyEqual(T_ice_new, T_ice_legacy);
    testCase.verifyEqual(f_ice_new, f_ice_legacy);
    testCase.verifyEqual(f_liq_new, f_liq_legacy);
    testCase.verifyEqual(Sc_new, Sc_legacy);
@@ -647,20 +647,20 @@ function test_legacy_parity_holds_with_a_nonzero_vapor_tendency(testCase)
    % second layer is already below the floor. The transition therefore does a
    % real multi-event merge, not a comparison of two empty results.
    f_top = f_ice_min - potential_ice_change / 2;
-   [T, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture([f_top; 0.05; 0.7]);
+   [T_ice, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture([f_top; 0.05; 0.7]);
    dz = 0.04;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
-   [T_new, f_ice_new, f_liq_new, Sc_new, Sp_new, d_lyr_new, ~] = ...
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
+   [T_ice_new, f_ice_new, f_liq_new, Sc_new, Sp_new, d_lyr_new, ~] = ...
       icemodel.column.merge_thin_layers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, d_pevp, d_lyr, f_ice_min, budget);
-   [T_legacy, f_ice_legacy, f_liq_legacy, Sc_legacy, Sp_legacy, ...
+      T_ice, f_ice, f_liq, Sc, Sp, dz, d_pevp, d_lyr, f_ice_min, budget);
+   [T_ice_legacy, f_ice_legacy, f_liq_legacy, Sc_legacy, Sp_legacy, ...
       d_lyr_legacy, legacy_mask] = legacyMergeThinLayers( ...
-      T, f_ice, f_liq, Sc, Sp, dz, d_pevp, d_lyr, f_ice_min);
+      T_ice, f_ice, f_liq, Sc, Sp, dz, d_pevp, d_lyr, f_ice_min);
 
    % The vapor term must be what flags the top layer, or the case would not
    % reach the branch it exists to cover.
    testCase.verifyEqual(legacy_mask, [true; true; false]);
-   testCase.verifyEqual(T_new, T_legacy);
+   testCase.verifyEqual(T_ice_new, T_ice_legacy);
    testCase.verifyEqual(f_ice_new, f_ice_legacy);
    testCase.verifyEqual(f_liq_new, f_liq_legacy);
    testCase.verifyEqual(Sc_new, Sc_legacy);
@@ -694,17 +694,17 @@ function test_vapor_identity_cascades_to_the_next_cell(testCase)
    f_ice_min = 0.1;
    f_res_por = 0.02;
    dz = 0.04 * ones(2, 1);
-   T = (Tf - 2) * ones(2, 1);
+   T_ice = (Tf - 2) * ones(2, 1);
    f_ice = [f_ice_min + 1e-4; 0.8];
    f_liq = zeros(2, 1);
 
    % Demand far larger than what cell 1 can give above the retained floor.
    d_pevp = -0.05;
 
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, f_ice_new, ~, ~, ~, d_rof, ~, ~, ~, budget] = ...
       icemodel.column.budget_surface_mass_balance( ...
-      T, f_ice, f_liq, f_liq, d_pevp, zeros(2, 1), zeros(2, 1), 0, ...
+      T_ice, f_ice, f_liq, f_liq, d_pevp, zeros(2, 1), zeros(2, 1), 0, ...
       zeros(2, 1), zeros(2, 1), f_res_por, f_ice_min, budget, dz);
 
    % Cell 1 stops at the floor; cell 2 supplies the rest of the demand.
@@ -869,12 +869,12 @@ function [ledger, n_top] = runGridResolutionFixture(dz_thermal, target_height)
    n_cells = numel(mesh_dz);
    Tf = icemodel.physicalConstant('Tf');
    restart = struct();
-   restart.T = (Tf - 5) * ones(n_cells, 1);
+   restart.T_ice = (Tf - 5) * ones(n_cells, 1);
    restart.f_ice = 0.7 * ones(n_cells, 1);
    restart.f_ice(1:n_top) = 0.05;
    restart.f_ice(n_top + 2) = 0.05;
    restart.f_liq = zeros(n_cells, 1);
-   restart.Ts = Tf - 5;
+   restart.T_sfc = Tf - 5;
    restart.r_eff = 1e-3 * ones(n_cells, 1);
    restart_file = fullfile(workspace.rootdir, 'grid-resolution-restart.mat');
    save(restart_file, 'restart')
@@ -890,11 +890,11 @@ function [ledger, n_top] = runGridResolutionFixture(dz_thermal, target_height)
    clear cleanup
 end
 
-function [T, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture(f_ice)
+function [T_ice, f_ice, f_liq, Sc, Sp, d_lyr] = mergeFixture(f_ice)
    %MERGEFIXTURE Return a compact cold-column remesh fixture.
 
    Tf = icemodel.physicalConstant('Tf');
-   T = (Tf - 2) * ones(size(f_ice));
+   T_ice = (Tf - 2) * ones(size(f_ice));
    f_liq = 0.01 * ones(size(f_ice));
    Sc = zeros(size(f_ice));
    Sp = zeros(size(f_ice));
@@ -924,12 +924,12 @@ function d_rof = verifyVaporIdentity( ...
 
    [Tf, Ls, Lv, ro_liq] = icemodel.physicalConstant('Tf', 'Ls', 'Lv', 'ro_liq');
    dz = 0.04;
-   T = Tf - 2;
+   T_ice = Tf - 2;
 
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, ~, ~, ~, ~, d_rof, ~, ~, ~, budget] = ...
       icemodel.column.budget_surface_mass_balance( ...
-      T, f_ice, f_liq, f_liq, d_pevp, 0, 0, 0, 0, 0, ...
+      T_ice, f_ice, f_liq, f_liq, d_pevp, 0, 0, 0, 0, 0, ...
       f_res_por, f_ice_min, budget, dz);
 
    % Potential = realized solid + realized liquid + overflow, all expressed
@@ -942,9 +942,9 @@ function d_rof = verifyVaporIdentity( ...
    testCase.verifyEqual(potential, accepted, 'AbsTol', 1e-7);
 end
 
-function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask] = ...
+function [T_ice, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask] = ...
       legacyMergeThinLayers( ...
-      T, f_ice, f_liq, Sc, Sp, dz_therm, d_pevp, d_lyr, f_ice_min)
+      T_ice, f_ice, f_liq, Sc, Sp, dz_therm, d_pevp, d_lyr, f_ice_min)
    %LEGACYMERGETHINLAYERS Reproduce the pre-ledger seven-output transition.
    %
    % This oracle isolates the ledger from the state transition, so its
@@ -966,10 +966,10 @@ function [T, f_ice, f_liq, Sc, Sp, d_lyr, merge_mask] = ...
          continue
       end
       [j1, j2] = icemodel.column.merge_layer_indices(ji, f_ice);
-      [T(j2), f_ice(j2), f_liq(j2), Sc(j2), Sp(j2), d_lyr] = ...
+      [T_ice(j2), f_ice(j2), f_liq(j2), Sc(j2), Sp(j2), d_lyr] = ...
          icemodel.column.merge_layers( ...
-         T, f_ice, f_liq, Sc, Sp, j1, j2, d_lyr, dz_therm);
-      T = dropCellCloneBottom(T, j1);
+         T_ice, f_ice, f_liq, Sc, Sp, j1, j2, d_lyr, dz_therm);
+      T_ice = dropCellCloneBottom(T_ice, j1);
       Sc = dropCellCloneBottom(Sc, j1);
       Sp = dropCellCloneBottom(Sp, j1);
       f_ice = dropCellCloneBottom(f_ice, j1);

@@ -19,7 +19,7 @@ function f_res_por = residual_water_pore_fraction(f_ice, f_liq)
    % icemodel.column.residual_water_fraction for that form.
    %
    % The residual floor keeps evaporation from reducing f_liq below the
-   % minimum physically consistent value for a melting node (T > TL).
+   % minimum physically consistent value for a melting node (T_ice > TL).
    %
    % Inputs
    %   f_ice  - Volumetric ice fraction [-], scalar or column vector.

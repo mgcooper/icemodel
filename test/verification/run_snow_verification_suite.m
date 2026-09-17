@@ -116,7 +116,7 @@ function results = run_snow_verification_suite(kwargs)
 
       if kwargs.run_icemodel
          % Produce a real (or synthetic-stub) IceModel candidate.
-         candidate = icemodel.verification.runIcemodelSnowCandidate(cases(n), ...
+         candidate = icemodel.verification.runIcemodelCandidate(cases(n), ...
             startdate=kwargs.startdate, enddate=kwargs.enddate);
 
          % Compare the IceModel candidate against the staged reference for this

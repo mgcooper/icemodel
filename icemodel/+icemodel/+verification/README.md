@@ -4,6 +4,28 @@
 staged validation data and compare future model outputs against those targets.
 It is separate from the formal regression and performance suites.
 
+## Reading guide
+
+This file has three parts.
+
+1. Runtime use. A model-developer needs only these sections:
+   - Getting started
+   - PROMICE ablation evaluation
+   - Normal Workflow
+   - Candidate Contract
+   - Plotting Contract
+   - Time-window policy
+   - ESM-SnowMIP sites
+   - Data Contract
+   - Variable Mapping Contract
+   - Metrics Contract
+2. Staging internals:
+   - Family Adapter Architecture
+   - Source Catalogs and Staged Schemas
+   - Support Namespaces
+3. Setup Workflow. Read it only to fetch, stage, or refresh the verification
+   data.
+
 ## Getting started
 
 Run MATLAB from the repository root and put the package on the path:
@@ -232,7 +254,7 @@ committed targets without changing the staged data.
 
 Use `run_snow_verification_suite(run_icemodel=true)` when the candidate should
 come from `icemodel(opts)`. Until production snow physics exists, that route
-uses `icemodel.verification.runIcemodelSnowCandidate`, which activates an
+uses `icemodel.verification.runIcemodelCandidate`, which activates an
 explicit verification-only synthetic snow hook inside `icemodel`. Developers
 should keep the runner and comparison functions unchanged unless development
 is required, replace the synthetic stand-in with real snow-model outputs, and
@@ -321,9 +343,292 @@ subsets the staged target at read time via `opts.startdate` /
 Sites differ in available observation channels: boreal forest sites
 (`oas`, `obs`, `ojp`) report `snd_gap_auto` rather than `snd_auto`;
 some sites lack `tsl` (no soil-temp obs) or `albs` (no observed
-albedo). The builders auto-detect these and the importer derives a
-per-site `comparison_variables` list so `comparecase` does not
-emit `not_applicable` rows for variables the site never observed.
+albedo). The builders auto-detect these channels. The importer derives a
+per-site `comparison_variables` list, so `comparecase` does not emit
+`missing_target_variable` rows for variables that the site never observed.
+
+## Data Contract
+
+Each dataset family has one `manifest.json` under:
+
+`data/eval/<dataset_family>/manifest.json`
+
+The per-case folder layout is split by `case_type`:
+
+- **Analytical families** (`laugh_tests`; `synthetic_process`) bundle a computed
+  reference: each case folder stores `evaluation.mat` (the staged targets) and
+  `reference.mat` (the analytical / frozen-SUMMA solution the case is gated
+  against). This is the reference, not a smoke copy, so it is KEPT.
+- **Observational families** (`esm_snowmip`/`esm_site`, `promice`/`sumup`/
+  `firn_observational`) are FORCING-AGNOSTIC: the case folder stores one
+  data-only `observations.mat` bundle (the eval target). The manifest is
+  forcing-agnostic - it records which forcing/eval sources are available (by id,
+  informational only), but the forcing is NOT bundled and NOT stipulated. You
+  can therefore use any forcing that runs at runtime without rewriting
+  `observations.mat`. No bundled `reference.mat` smoke copy is written. With no
+  model output supplied, the default candidate falls through to the soft
+  diagnostic path. Forcing always
+  lives separately under per-source subfolders `data/input/met/<source>/` and
+  `data/input/userdata/<source>/` (standard icemodel naming via
+  `writemet`/`writeuserdata`), never in the eval folder. (Older PROMICE demo
+  fixtures carry no
+  `observations.mat`; the workflow functions fall back to reconstituting the
+  PROMICE-obs target from the per-year userdata files those manifests declare.)
+
+Manifests keep case paths relative to the dataset-family folder. Normal workflow
+functions resolve those paths to absolute paths at read time. For esm_snowmip and
+freshly staged promice the `observations.mat` bundle is referenced from
+`evaluation_file` (and `observation_variables.obs_file` for esm_snowmip); SUMup
+references it via `colocation.sumup.obs_file`. `reference_file` is empty for all
+observational families.
+
+### Target schema variants
+
+Two staged-target shapes are supported (`evaluation.mat` for the analytical
+families, `observations.mat` for the observational families):
+
+1. **Single-bundle** (default for ESM-SnowMIP cdp / wfj):
+
+   ```text
+   targets.format       = "timeseries" | "experiment_bundle"
+   targets.data         (timeseries case)
+   targets.experiments  (experiment_bundle case)
+   ```
+
+2. **Multi-source** (Colbeck 1976 case): the same evaluation.mat carries
+   two reference bundles keyed by source:
+
+   ```matlab
+   targets.numerical_summa.experiments.exp{1,2,3}     (frozen SUMMA)
+   targets.analytical_clark2017.experiments.exp{1,2,3} (Clark 2017)
+   ```
+
+   Generic `comparecase` and `plotcase` callers auto-pick `numerical_summa`
+   when the loaded targets struct has no top-level `format` field. The
+   case-specific 4-way driver is `icemodel.verification.colbeck.compareSolutions`.
+
+## Variable Mapping Contract
+
+`icemodel.verification.candidateFromIcemodelOutput(ice1, ice2, opts, manifest)`
+converts model output into the candidate bundle that `comparecase` reads. The
+case type selects the mapping.
+
+For an `esm_site` case, the adapter builds a timetable from the `ice1` and
+`ice2` fields in the table below. It adds a column only for a variable in the
+case's `comparison_variables`. A model field that already has the verification
+name passes through unchanged. The adapter expects the Kelvin fields that
+`icemodel` returns, before `icemodel.postprocess` converts `Tsfc` and `Tice`
+to Celsius.
+
+| Model field                                          | Candidate column       | Rule                                                                                                                                                                 |
+|------------------------------------------------------|------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `ice1.Time`                                          | row times              | Required. The adapter raises an error without it.                                                                                                                    |
+| `ice1.snow_depth_m` or `ice1.snow_depth` [m]         | `snow_depth_m` [m]     | Copy. `snow_depth` is used only when `snow_depth_m` is absent.                                                                                                       |
+| `ice1.snow_density_kg_m3` [kg m-3] and a depth field | `swe_kg_m2` [kg m-2]   | Depth times density.                                                                                                                                                 |
+| `ice1.Tsfc` [K]                                      | `surface_temp_C` [°C]  | `Tsfc - Tf`, with `Tf = 273.16` K from `icemodel.physicalConstant`.                                                                                                  |
+| `ice2.Tice` [K], depth by time                       | `soil_temp_<k>_C` [°C] | Row `floor(d / opts.dz_thermal) + 1` minus `Tf`. `d` is the k-th value of `observation_variables.soil_depths_m`, and the row is the control volume that contains it. |
+
+The adapter omits a `soil_temp_<k>_C` column when `ice2.Tice` is empty, the
+manifest has no k-th soil depth, or the depth lies outside the column.
+`comparecase` then reports that variable with status
+`missing_candidate_variable`.
+`test/unit/test_candidate_from_icemodel_output.m` checks these rules with
+model-like `ice1` and `ice2` structs and no synthetic-snow hook.
+
+The other case types map different fields:
+
+- For a `synthetic_process` case, the adapter returns
+  `ice1.verification_experiments` as the experiment bundle. Variables such as
+  `snow_liquid_water_storage_m` and `bottom_outflow_mps` come from those
+  experiment timetables.
+- For a `firn_observational` case, the adapter maps the PROMICE station
+  series (`tsfc`, `snow_depth`, and the `tice` thermistor series) or the SUMup
+  and RetMIP profile bundles. The temperatures keep the units of the staged
+  targets:
+  - Kelvin: the PROMICE `tsfc`, `tice1` to `tice8`, and `tice10m` series;
+  - Kelvin: the RetMIP `tsfc` series;
+  - degrees C: the SUMup and RetMIP profile temperatures.
+
+  A thermistor value comes from the control volume that contains the sensor
+  depth, and a depth outside the column gives no value. `tice10m` uses the
+  depth 10 m. `tice1` to `tice8` use
+  `observation_variables.thermistor_depths_m`, which no stage writes: PROMICE
+  stages the time-dependent depths `dtice1` to `dtice8` instead. `comparecase`
+  therefore marks a staged `tice1` to `tice8` target as
+  `missing_candidate_variable` (Bead `icemodel-xuai`). Profile depths are node
+  centers, `(k - 0.5) * opts.dz_thermal`. The SUMup section below describes the
+  profile bundle.
+
+The forcing side of the verification adapter runs in the opposite
+direction: `buildEsmSnowmipForcing(site, ...)` converts ESM-SnowMIP
+NetCDF channels (Tair, SWdown, LWdown, Wind, Psurf, Qair, Rainf,
+Snowf, plus obs sdepth/albs) into icemodel's native forcing
+timetable (tair, swd, lwd, albedo, wspd, rh, psfc, ppt,
+snow_depth). The conversion uses
+`icemodel.vapor.relative_humidity_from_specific_humidity` for
+humidity and `icemodel.physicalConstant('ro_liq')` for the
+mass-flux to volumetric-flux conversion of Rainf+Snowf, so all
+quantity conversions go through canonical icemodel kernels.
+
+Future snow-model developers who need additional verification variables (cold
+content, density profile, f_ice/f_liq snapshots) should extend the adapter and
+update this table; do not bury new mappings inside individual cases.
+
+Until production snow physics exists, the suite uses
+`verification_synthetic_snow=true` which routes to
+`icemodel.verification.syntheticSnowModelRun` and applies hard-coded
+perturbations (snow_depth +0.02 m, swe x 1.05, surface_temp +0.25 K,
+liquid_water x 1.05) to the staged targets to prove the end-to-end
+adapter and comparison path. **The synthetic candidate is NOT a real
+model output**; the +5 % storage bias visible in `run_icemodel=true`
+metrics is the synthetic perturbation, not a model error. Retirement
+of this hook is tracked under `icemodel-tk6.7`.
+
+## Metrics Contract
+
+`comparecase` produces one row per case x experiment x variable pair and
+computes the following metrics on aligned finite pairs (`isfinite(target) &
+isfinite(candidate)`):
+
+| Metric                      | Variable types        | Description                              |
+|-----------------------------|-----------------------|------------------------------------------|
+| `bias`                      | continuous, sparse    | `mean(candidate - target)`               |
+| `rmse`                      | continuous, sparse    | `sqrt(mean((candidate - target).^2))`    |
+| `correlation`               | continuous            | Pearson correlation; `NaN` when std=0    |
+| `peak_target`               | continuous            | `max(target)` over the comparison window |
+| `peak_candidate`            | continuous            | `max(candidate)` over the same window    |
+| `peak_error`                | continuous            | `peak_candidate - peak_target`           |
+| `peak_time_error_hours`     | continuous            | offset between candidate and target peak times |
+| `melt_out_time_error_hours` | snow_depth / swe      | offset between candidate and target return-to-near-zero times |
+
+For `timeseries`, `experiment_bundle`, and `retmip_protocol_bundle` cases,
+`status` takes one of these values:
+
+- `"ok"`: at least one finite pair exists;
+- `"missing_target_variable"` or `"missing_candidate_variable"`: the target or
+  the candidate lacks the variable;
+- `"no_overlap"`: the two series share no finite pair in the window, for
+  example when all observations are missing.
+
+For a `subsurface_profile_bundle` case, `comparecase` takes each row from
+`matchObservations`. That function can also return `"missing_candidate_date"`
+and `"ambiguous_candidate_profile"`. Filter on `status` before computing
+summaries.
+
+For the Colbeck multi-source case, `compareSolutions` produces a long-format
+table with these same metrics plus `axis_role` (`"formal"` or `"diagnostic"`)
+and `target_source` / `candidate_source` columns identifying which pair the
+row evaluates. Per-variable RMSE tolerances drive the formal PASS/FAIL summary
+(default storage 5 mm, outflow 5e-7 m/s).
+
+`comparecase` also reports two snow-season timing diagnostics on
+`snow_depth_m` and `swe_kg_m2` series: `snow_onset_time_error_hours`
+(first-rise above the variable's threshold) and
+`melt_out_time_error_hours` (post-peak first-return below the same
+threshold). Peak SWE timing and magnitude are already captured by the
+`peak_*` columns above.
+
+## Family Adapter Architecture
+
+Family entry points are thin source adapters around shared control flow, not
+independent staging implementations. Importers validate an optional paired
+window, resolve their family catalog and staging roots, reuse or stage requested
+cases, record provenance once, return through `runDatasetFamilyDryRun`, or
+persist through `runDatasetFamilyImport`. `stageDatasetFamilyCases` owns the
+common skip/error loop and `stageDatasetRcmForcing` owns delegated RCM work.
+Research-site dry runs return before root/source resolution so a
+metadata-only preview works on a clean machine; fixed Laugh-Test cases have no
+caller-selected window. Those are source-contract differences, not alternate
+manifest pipelines.
+
+Fetch adapters retain family-specific file discovery and provenance, while the
+shared registry helpers own selector extraction, validation, ordered status
+construction, and retrieval banners where the upstream package model matches.
+GC-Net remains station-aware and therefore does not use the simpler IMAU/RetMIP
+product-registry adapter. Data-backed met builders all convert through
+`icemodel.forcing.helpers.data2metCollection`; source readers/builders remain
+separate because their variables, grids, and validation evidence differ.
+
+`fillwithmissing` is a direct builder validation option. Verification importers
+always request `fillwithmissing=true` so a staged native met artifact has the
+canonical channel schema with unavailable channels represented explicitly as
+NaN. Direct builder callers can pass `fillwithmissing=false` to require the
+source itself to satisfy the complete met contract. It is not an
+importer option, because changing it would make the persisted schema depend on
+which family wrapper was called.
+
+## Source Catalogs and Staged Schemas
+
+Family source catalogs are inventories, not competing artifact schemas. Their
+names make that distinction explicit:
+
+- `promiceSiteCatalog` and `esmSnowmipSiteCatalog` describe source sites and
+  source-specific coverage/classification fields;
+- `imauSiteCatalog` and `researchSiteCatalog` describe the source anchors those
+  importers can stage;
+- `retmipCaseCatalog` remains a case catalog because RetMIP protocol aliases,
+  windows, and source associations describe protocol cases rather than only
+  physical sites.
+
+The catalogs retain source-specific fields instead of padding a
+union struct with fields that do not apply. Importers normalize staged snow
+cases through `makeCaseManifestEntry` and staged firn observational cases
+through `makeFirnCaseManifestEntry`; those factories and their field-name
+helpers are the canonical persisted schemas. Catalog selectors only choose
+source rows and must not define a new on-disk contract.
+
+## Support Namespaces
+
+- `helpers` contains normal workflow helpers for path discovery (`evaluationDataRoot`,
+  `inputDataRoot`, `esmRuntimeMetFiles`), manifest reads, artifact loading, candidate
+  resolution, metric schema definition, the per-run markdown report writer
+  (`writeRunReport`), and the per-site default window
+  (`esmSnowmipWaterYear`). The standard-contract
+  opts builder used by `runIcemodelCandidate` is
+  `icemodel.test.helpers.setModelOptsForCase`, which accepts both formal-case
+  rows and verification manifests via input dispatch.
+- `helpers` also owns the small pieces more than one consumer needs:
+  `residualMetrics` (bias, MAE, RMSE, max error, and NSE
+  with one set of guards), `sampleQuantile`, `evaluationSeason` (the season
+  bounds readiness admits against and the runner evaluates against),
+  `ablationLedgerIncrements` (the per-interval solid-balance, surface-loss,
+  and solid-vapor-loss terms the comparator scores and the runner plots),
+  `classifySnowDepth`, `physicsFingerprint` (the digest of the resolved
+  default option values plus the `CITATION.cff` version that the ablation
+  runner stamps and the ablation report compares against),
+  `isPhysicsFingerprint` (the shape test a saved stamp must pass before the
+  report compares it), and `validateAblationModelSchema` (the compatibility
+  test between a saved cohort's channel schema, the current namelists, and
+  the channels the ablation report reads).
+- `report` owns the pieces both report builders share: `markdownTable`,
+  `formatValue`, `markdownCode`, `escapeMarkdownText`, `sanitizeText`,
+  `safeLabel`, `formatReportAxes`, `configureCategoryAxis`, and
+  `exportAndClose`. Figures come from `icemodel.plot.newFigure` and spans from
+  `icemodel.plot.markTimeSpan`, so every report shares one export frame and
+  one span style.
+- `setup.writeJson` writes every readiness ledger, preview evidence, and QA
+  JSON, so they agree on UTF-8 and a trailing newline.
+- `setup.bytesSha256` is the one SHA-256 implementation. `setup.fileSha256`
+  hashes a file through it, and `setup.textSha256` hashes a UTF-8 encoded
+  string through it. A stored artifact digest and an in-memory digest of the
+  same bytes therefore agree.
+- `setup` contains the consistently named family source catalogs listed above,
+  their shared strict site-id selector (`selectSiteCatalogEntries`), and the
+  canonical staged-case factories. RetMIP keeps alias-aware case selection in
+  `retmipCaseCatalog`; PROMICE retains its documented first-pass fallback and
+  ESM-SnowMIP retains its scalar site lookup because those behaviors differ.
+- `namelists` contains canonical selector lists for dataset families, case ids,
+  case types, surface zones (`surfacezone`, the per-case physical-regime
+  vocabulary stamped onto case manifests), the ESM-SnowMIP site-name namelist
+  (`snowmipsite`), the Laugh-Tests case-id namelist (`laughtests`), and the
+  model diagnostic channels the ablation report reads
+  (`ablationReportChannels`, grouped by the report table that reads them).
+  `caseid` dispatches uniformly
+  across families using these per-family namelists. The richer per-site
+  ESM-SnowMIP catalog query helper lives at
+  `icemodel.verification.setup.esmSnowmipSiteCatalog`.
+- `validators` contains argument-block validators that consume the namelists,
+  including `mustBeSnowmipSite` for per-site builders.
 
 ## Setup Workflow
 
@@ -1421,239 +1726,3 @@ duplicate-plus-omitted or shifted posting. Partial boundary days remain missing.
 Ordinary sparse amounts/means and explicit interval observations retain their
 native timestamps and values, while a sparse rate with no defensible duration is
 not converted into an invented daily total.
-
-## Family Adapter Architecture
-
-Family entry points are thin source adapters around shared control flow, not
-independent staging implementations. Importers validate an optional paired
-window, resolve their family catalog and staging roots, reuse or stage requested
-cases, record provenance once, return through `runDatasetFamilyDryRun`, or
-persist through `runDatasetFamilyImport`. `stageDatasetFamilyCases` owns the
-common skip/error loop and `stageDatasetRcmForcing` owns delegated RCM work.
-Research-site dry runs return before root/source resolution so a
-metadata-only preview works on a clean machine; fixed Laugh-Test cases have no
-caller-selected window. Those are source-contract differences, not alternate
-manifest pipelines.
-
-Fetch adapters retain family-specific file discovery and provenance, while the
-shared registry helpers own selector extraction, validation, ordered status
-construction, and retrieval banners where the upstream package model matches.
-GC-Net remains station-aware and therefore does not use the simpler IMAU/RetMIP
-product-registry adapter. Data-backed met builders all convert through
-`icemodel.forcing.helpers.data2metCollection`; source readers/builders remain
-separate because their variables, grids, and validation evidence differ.
-
-`fillwithmissing` is a direct builder validation option. Verification importers
-always request `fillwithmissing=true` so a staged native met artifact has the
-canonical channel schema with unavailable channels represented explicitly as
-NaN. Direct builder callers can pass `fillwithmissing=false` to require the
-source itself to satisfy the complete met contract. It is not an
-importer option, because changing it would make the persisted schema depend on
-which family wrapper was called.
-
-## Source Catalogs and Staged Schemas
-
-Family source catalogs are inventories, not competing artifact schemas. Their
-names make that distinction explicit:
-
-- `promiceSiteCatalog` and `esmSnowmipSiteCatalog` describe source sites and
-  source-specific coverage/classification fields;
-- `imauSiteCatalog` and `researchSiteCatalog` describe the source anchors those
-  importers can stage;
-- `retmipCaseCatalog` remains a case catalog because RetMIP protocol aliases,
-  windows, and source associations describe protocol cases rather than only
-  physical sites.
-
-The catalogs retain source-specific fields instead of padding a
-union struct with fields that do not apply. Importers normalize staged snow
-cases through `makeCaseManifestEntry` and staged firn observational cases
-through `makeFirnCaseManifestEntry`; those factories and their field-name
-helpers are the canonical persisted schemas. Catalog selectors only choose
-source rows and must not define a new on-disk contract.
-
-## Support Namespaces
-
-- `helpers` contains normal workflow helpers for path discovery (`evaluationDataRoot`,
-  `inputDataRoot`, `esmRuntimeMetFiles`), manifest reads, artifact loading, candidate
-  resolution, metric schema definition, the per-run markdown report writer
-  (`writeRunReport`), and the per-site default window
-  (`esmSnowmipWaterYear`). The standard-contract
-  opts builder used by `runIcemodelSnowCandidate` is
-  `icemodel.test.helpers.setModelOptsForCase`, which accepts both formal-case
-  rows and verification manifests via input dispatch.
-- `helpers` also owns the small pieces more than one consumer needs:
-  `residualMetrics` (bias, MAE, RMSE, max error, and NSE
-  with one set of guards), `sampleQuantile`, `evaluationSeason` (the season
-  bounds readiness admits against and the runner evaluates against),
-  `ablationLedgerIncrements` (the per-interval solid-balance, surface-loss,
-  and solid-vapor-loss terms the comparator scores and the runner plots),
-  `classifySnowDepth`, `physicsFingerprint` (the digest of the resolved
-  default option values plus the `CITATION.cff` version that the ablation
-  runner stamps and the ablation report compares against),
-  `isPhysicsFingerprint` (the shape test a saved stamp must pass before the
-  report compares it), and `validateAblationModelSchema` (the compatibility
-  test between a saved cohort's channel schema, the current namelists, and
-  the channels the ablation report reads).
-- `report` owns the pieces both report builders share: `markdownTable`,
-  `formatValue`, `markdownCode`, `escapeMarkdownText`, `sanitizeText`,
-  `safeLabel`, `formatReportAxes`, `configureCategoryAxis`, and
-  `exportAndClose`. Figures come from `icemodel.plot.newFigure` and spans from
-  `icemodel.plot.markTimeSpan`, so every report shares one export frame and
-  one span style.
-- `setup.writeJson` writes every readiness ledger, preview evidence, and QA
-  JSON, so they agree on UTF-8 and a trailing newline.
-- `setup.bytesSha256` is the one SHA-256 implementation. `setup.fileSha256`
-  hashes a file through it, and `setup.textSha256` hashes a UTF-8 encoded
-  string through it. A stored artifact digest and an in-memory digest of the
-  same bytes therefore agree.
-- `setup` contains the consistently named family source catalogs listed above,
-  their shared strict site-id selector (`selectSiteCatalogEntries`), and the
-  canonical staged-case factories. RetMIP keeps alias-aware case selection in
-  `retmipCaseCatalog`; PROMICE retains its documented first-pass fallback and
-  ESM-SnowMIP retains its scalar site lookup because those behaviors differ.
-- `namelists` contains canonical selector lists for dataset families, case ids,
-  case types, surface zones (`surfacezone`, the per-case physical-regime
-  vocabulary stamped onto case manifests), the ESM-SnowMIP site-name namelist
-  (`snowmipsite`), the Laugh-Tests case-id namelist (`laughtests`), and the
-  model diagnostic channels the ablation report reads
-  (`ablationReportChannels`, grouped by the report table that reads them).
-  `caseid` dispatches uniformly
-  across families using these per-family namelists. The richer per-site
-  ESM-SnowMIP catalog query helper lives at
-  `icemodel.verification.setup.esmSnowmipSiteCatalog`.
-- `validators` contains argument-block validators that consume the namelists,
-  including `mustBeSnowmipSite` for per-site builders.
-
-## Data Contract
-
-Each dataset family has one `manifest.json` under:
-
-`data/eval/<dataset_family>/manifest.json`
-
-The per-case folder layout is split by `case_type`:
-
-- **Analytical families** (`laugh_tests`; `synthetic_process`) bundle a computed
-  reference: each case folder stores `evaluation.mat` (the staged targets) and
-  `reference.mat` (the analytical / frozen-SUMMA solution the case is gated
-  against). This is the reference, not a smoke copy, so it is KEPT.
-- **Observational families** (`esm_snowmip`/`esm_site`, `promice`/`sumup`/
-  `firn_observational`) are FORCING-AGNOSTIC: the case folder stores one
-  data-only `observations.mat` bundle (the eval target). The manifest is
-  forcing-agnostic - it records which forcing/eval sources are available (by id,
-  informational only), but the forcing is NOT bundled and NOT stipulated. You
-  can therefore use any forcing that runs at runtime without rewriting
-  `observations.mat`. No bundled `reference.mat` smoke copy is written. With no
-  model output supplied, the default candidate falls through to the soft
-  diagnostic path. Forcing always
-  lives separately under per-source subfolders `data/input/met/<source>/` and
-  `data/input/userdata/<source>/` (standard icemodel naming via
-  `writemet`/`writeuserdata`), never in the eval folder. (Older PROMICE demo
-  fixtures carry no
-  `observations.mat`; the workflow functions fall back to reconstituting the
-  PROMICE-obs target from the per-year userdata files those manifests declare.)
-
-Manifests keep case paths relative to the dataset-family folder. Normal workflow
-functions resolve those paths to absolute paths at read time. For esm_snowmip and
-freshly staged promice the `observations.mat` bundle is referenced from
-`evaluation_file` (and `observation_variables.obs_file` for esm_snowmip); SUMup
-references it via `colocation.sumup.obs_file`. `reference_file` is empty for all
-observational families.
-
-### Target schema variants
-
-Two staged-target shapes are supported (`evaluation.mat` for the analytical
-families, `observations.mat` for the observational families):
-
-1. **Single-bundle** (default for ESM-SnowMIP cdp / wfj):
-
-   ```text
-   targets.format       = "timeseries" | "experiment_bundle"
-   targets.data         (timeseries case)
-   targets.experiments  (experiment_bundle case)
-   ```
-
-2. **Multi-source** (Colbeck 1976 case): the same evaluation.mat carries
-   two reference bundles keyed by source:
-
-   ```matlab
-   targets.numerical_summa.experiments.exp{1,2,3}     (frozen SUMMA)
-   targets.analytical_clark2017.experiments.exp{1,2,3} (Clark 2017)
-   ```
-
-   Generic `comparecase` and `plotcase` callers auto-pick `numerical_summa`
-   when the loaded targets struct has no top-level `format` field. The
-   case-specific 4-way driver is `icemodel.verification.colbeck.compareSolutions`.
-
-## Variable Mapping Contract
-
-`candidateFromIcemodelOutput(ice1, ice2, opts, manifest)` adapts the icemodel
-output (ICE1 / ICE2 timetables / structs) into the candidate bundle consumed by
-`comparecase`. Currently supported mappings:
-
-| Verification variable         | Source field      | Derivation                              |
-|-------------------------------|-------------------|-----------------------------------------|
-| `snow_depth_m`                | `ice1.snow_depth` | direct                                  |
-| `swe_kg_m2`                   | derived           | `snow_depth_m * snow_density_kg_m3`     |
-| `surface_temp_C`              | derived           | `Tsfc - Tf` (Tf from physicalConstant)  |
-| `bottom_outflow_mps`          | derived           | runoff/outflow proxy from ice2          |
-| `snow_liquid_water_storage_m` | derived           | column-integrated f_liq*dz over snow    |
-
-The forcing side of the verification adapter runs in the opposite
-direction: `buildEsmSnowmipForcing(site, ...)` converts ESM-SnowMIP
-NetCDF channels (Tair, SWdown, LWdown, Wind, Psurf, Qair, Rainf,
-Snowf, plus obs sdepth/albs) into icemodel's native forcing
-timetable (tair, swd, lwd, albedo, wspd, rh, psfc, ppt,
-snow_depth). The conversion uses
-`icemodel.vapor.relative_humidity_from_specific_humidity` for
-humidity and `icemodel.physicalConstant('ro_liq')` for the
-mass-flux to volumetric-flux conversion of Rainf+Snowf, so all
-quantity conversions go through canonical icemodel kernels.
-
-Future snow-model developers who need additional verification variables (cold
-content, density profile, f_ice/f_liq snapshots) should extend the adapter and
-update this table; do not bury new mappings inside individual cases.
-
-Until production snow physics exists, the suite uses
-`verification_synthetic_snow=true` which routes to
-`icemodel.verification.syntheticSnowModelRun` and applies hard-coded
-perturbations (snow_depth +0.02 m, swe x 1.05, surface_temp +0.25 K,
-liquid_water x 1.05) to the staged targets to prove the end-to-end
-adapter and comparison path. **The synthetic candidate is NOT a real
-model output**; the +5 % storage bias visible in `run_icemodel=true`
-metrics is the synthetic perturbation, not a model error. Retirement
-of this hook is tracked under `icemodel-tk6.7`.
-
-## Metrics Contract
-
-`comparecase` produces one row per case x experiment x variable pair and
-computes the following metrics on aligned finite pairs (`isfinite(target) &
-isfinite(candidate)`):
-
-| Metric                      | Variable types        | Description                              |
-|-----------------------------|-----------------------|------------------------------------------|
-| `bias`                      | continuous, sparse    | `mean(candidate - target)`               |
-| `rmse`                      | continuous, sparse    | `sqrt(mean((candidate - target).^2))`    |
-| `correlation`               | continuous            | Pearson correlation; `NaN` when std=0    |
-| `peak_target`               | continuous            | `max(target)` over the comparison window |
-| `peak_candidate`            | continuous            | `max(candidate)` over the same window    |
-| `peak_error`                | continuous            | `peak_candidate - peak_target`           |
-| `peak_time_error_hours`     | continuous            | offset between candidate and target peak times |
-| `melt_out_time_error_hours` | snow_depth / swe      | offset between candidate and target return-to-near-zero times |
-
-`status` is `"ok"` when at least one finite pair exists, `"not_applicable"` when
-no finite pairs are available (e.g. the candidate omits a variable, or all
-observations are missing for the window). `status` is the right column for
-filtering before computing summaries.
-
-For the Colbeck multi-source case, `compareSolutions` produces a long-format
-table with these same metrics plus `axis_role` (`"formal"` or `"diagnostic"`)
-and `target_source` / `candidate_source` columns identifying which pair the
-row evaluates. Per-variable RMSE tolerances drive the formal PASS/FAIL summary
-(default storage 5 mm, outflow 5e-7 m/s).
-
-`comparecase` also reports two snow-season timing diagnostics on
-`snow_depth_m` and `swe_kg_m2` series: `snow_onset_time_error_hours`
-(first-rise above the variable's threshold) and
-`melt_out_time_error_hours` (post-peak first-return below the same
-threshold). Peak SWE timing and magnitude are already captured by the
-`peak_*` columns above.

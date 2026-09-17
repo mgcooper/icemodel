@@ -185,7 +185,7 @@ function test_forcing_includes_rainf_snowf_passthrough(testCase)
    % rain/snow-aware downstream consumers can use them directly.
 
    % Resolve the staged met file via the standard chain (createMetFileNames)
-   % using the same opts a runIcemodelSnowCandidate run would build.
+   % using the same opts a runIcemodelCandidate run would build.
    manifest = icemodel.verification.loadmanifest("cdp");
    opts = icemodel.test.helpers.setModelOptsForCase(manifest);
    met_files = opts.metfname;
@@ -265,7 +265,7 @@ function test_icemodel_candidate_provider_runs_model_entry_point(testCase)
    % The verification lane must accept candidates produced by icemodel(opts).
 
    manifest = icemodel.verification.loadmanifest("cdp");
-   candidate = icemodel.verification.runIcemodelSnowCandidate(manifest);
+   candidate = icemodel.verification.runIcemodelCandidate(manifest);
    result = icemodel.verification.comparecase("cdp", ...
       "artifact_dir", testCase.TestData.tmpdir, ...
       "candidate", candidate, ...
@@ -284,7 +284,7 @@ function test_icemodel_candidate_preserves_missing_targets(testCase)
    manifest = icemodel.verification.loadmanifest("wfj");
    targets = icemodel.verification.helpers.loadArtifact( ...
       manifest.evaluation_path, "targets");
-   candidate = icemodel.verification.runIcemodelSnowCandidate(manifest);
+   candidate = icemodel.verification.runIcemodelCandidate(manifest);
    result = icemodel.verification.comparecase("wfj", ...
       "artifact_dir", testCase.TestData.tmpdir, ...
       "candidate", candidate, ...
@@ -299,67 +299,6 @@ function test_icemodel_candidate_preserves_missing_targets(testCase)
    testCase.verifyTrue(all(~isfinite(candidate.data.snow_depth_m(missing_target))));
    testCase.verifyEqual(double(row.n), nnz(paired));
    testCase.verifyLessThan(double(row.n), height(targets.data));
-end
-
-function test_candidate_adapter_derives_swe_from_depth_and_density(testCase)
-   % Snow-model outputs can use core-adjacent names and derive SWE in adapter.
-
-   % These named fixture values make the adapter contract explicit: depth and
-   % density are native model-like outputs, while SWE and Celsius surface
-   % temperature are derived verification variables.
-   fixture_start_time = datetime(2000, 1, 1, 0, 0, 0);
-   fixture_sample_hours = 0:2;
-   snow_depth_m = [0.1; 0.2; 0.3];
-   snow_density_kg_m3 = [250; 300; 350];
-   surface_temp_K = [263.15; 264.15; 265.15];
-
-   time = fixture_start_time + hours(fixture_sample_hours);
-   ice1 = struct( ...
-      "Time", time(:), ...
-      "snow_depth", snow_depth_m, ...
-      "snow_density_kg_m3", snow_density_kg_m3, ...
-      "Tsfc", surface_temp_K);
-   ice2 = struct();
-   opts = struct("smbmodel", "icemodel", "sitename", "verification", ...
-      "simyears", year(fixture_start_time));
-   manifest = struct( ...
-      "case_type", "esm_site", ...
-      "comparison_variables", ...
-      expectedCoreSiteVariables());
-
-   candidate = icemodel.verification.candidateFromIcemodelOutput( ...
-      ice1, ice2, opts, manifest);
-
-   Tf = icemodel.physicalConstant('Tf');
-   testCase.verifyEqual(candidate.data.snow_depth_m, snow_depth_m);
-   testCase.verifyEqual(candidate.data.swe_kg_m2, ...
-      snow_depth_m .* snow_density_kg_m3);
-   testCase.verifyEqual(candidate.data.surface_temp_C, surface_temp_K - Tf);
-end
-
-function test_candidate_adapter_samples_soil_temp_from_ice2(testCase)
-   % soil_temp_<k>_C must be sampled from ice2.T at the manifested depth.
-
-   time = datetime(2000, 1, 1, 0, 0, 0) + hours(0:2);
-   T_column = [273.15 273.05 273.25; ...
-      272.15 272.10 272.20; ...
-      271.15 271.20 271.30];
-   ice1 = struct("Time", time(:), "Tsfc", T_column(1, :)');
-   ice2 = struct("T", T_column);
-   opts = struct("smbmodel", "icemodel", "sitename", "wfj", ...
-      "simyears", 2000, "dz_thermal", 0.04);
-   manifest = struct( ...
-      "case_type", "esm_site", ...
-      "comparison_variables", "soil_temp_1_C", ...
-      "observation_variables", struct("soil_depths_m", 0.01));
-
-   candidate = icemodel.verification.candidateFromIcemodelOutput( ...
-      ice1, ice2, opts, manifest);
-
-   Tf = icemodel.physicalConstant('Tf');
-   testCase.verifyTrue(ismember("soil_temp_1_C", ...
-      candidate.data.Properties.VariableNames));
-   testCase.verifyEqual(candidate.data.soil_temp_1_C, T_column(1, :)' - Tf);
 end
 
 function test_plotcase_writes_figure_without_candidate(testCase)
@@ -408,7 +347,7 @@ function test_comparecase_writes_separate_scatter_for_site_cases(testCase)
    % ESM site comparisons should keep time-series and scatter figures separate.
 
    manifest = icemodel.verification.loadmanifest("wfj");
-   candidate = icemodel.verification.runIcemodelSnowCandidate(manifest);
+   candidate = icemodel.verification.runIcemodelCandidate(manifest);
    result = icemodel.verification.comparecase("wfj", ...
       "artifact_dir", testCase.TestData.tmpdir, ...
       "candidate", candidate, ...
@@ -514,12 +453,6 @@ function ids = expectedColbeckExperimentIds()
    %EXPECTEDCOLBECKEXPERIMENTIDS Colbeck experiments staged from Laugh-Tests.
 
    ids = ["exp1", "exp2", "exp3"];
-end
-
-function names = expectedCoreSiteVariables()
-   %EXPECTEDCORESITEVARIABLES Minimal site variables derived from model output.
-
-   names = ["snow_depth_m"; "swe_kg_m2"; "surface_temp_C"];
 end
 
 function stageSelectedSnowInventory(data_root, case_id)

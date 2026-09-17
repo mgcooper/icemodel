@@ -24,9 +24,9 @@ function test_isothermal_column_redistributes_nothing(testCase)
    % No interior vapor gradient means no interior flux. The surface exchange
    % is not part of this step, so an isothermal column moves nothing at all.
 
-   [dz, delz, fn, T, f_liq, f_ice, f_res_por] = coupledFixture(8);
+   [dz, delz, fn, T_ice, f_liq, f_ice, f_res_por] = coupledFixture(8);
    [d_vap, dm_vap] = acceptedTransport( ...
-      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
+      T_ice, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
 
    testCase.verifyEqual(d_vap, zeros(8, 1), 'AbsTol', 1e-30);
    testCase.verifyEqual(dm_vap, zeros(8, 1), 'AbsTol', 1e-30);
@@ -37,9 +37,9 @@ function test_redistribution_conserves_column_mass(testCase)
    % and creates none. The column total must come back to zero.
 
    [dz, delz, fn, ~, f_liq, f_ice, f_res_por] = coupledFixture(8);
-   T = gradientColumn(8);
+   T_ice = gradientColumn(8);
    [d_vap, dm_vap] = acceptedTransport( ...
-      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
+      T_ice, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
 
    % The cells must actually exchange, or the sums below are trivially zero.
    % Compare the net against the size of the exchange: the net is a
@@ -57,9 +57,9 @@ function test_applied_mass_equals_redistributed_mass_when_dry(testCase)
    % equal the mass the faces moved.
 
    [dz, delz, fn, ~, f_liq, f_ice, f_res_por] = coupledFixture(8);
-   T = gradientColumn(8);
+   T_ice = gradientColumn(8);
    d_vap = acceptedTransport( ...
-      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
+      T_ice, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
    [f_ice_new, f_liq_new, d_sbl_err] = ...
       applyTransport(f_ice, f_liq, d_vap, 0.1, f_res_por);
 
@@ -74,10 +74,10 @@ function test_applied_mass_equals_redistributed_mass_when_mixed(testCase)
    % ice. The total mass must still match what the faces moved.
 
    [dz, delz, fn, ~, ~, f_ice, f_res_por] = coupledFixture(8);
-   T = gradientColumn(8);
+   T_ice = gradientColumn(8);
    f_liq = [0; 0; 0.05; 0.05; 0; 0; 0.05; 0];
    d_vap = acceptedTransport( ...
-      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
+      T_ice, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
    [f_ice_new, f_liq_new, d_sbl_err] = ...
       applyTransport(f_ice, f_liq, d_vap, 0.1, f_res_por);
 
@@ -102,8 +102,8 @@ function test_a_thin_liquid_film_records_what_it_cannot_give(testCase)
    % loses mass to both neighbours. A monotonic profile would move vapor
    % through that cell instead of out of it, and the film would never drain.
    Tf = icemodel.physicalConstant('Tf');
-   T = (Tf - 8) * ones(5, 1);
-   T(2) = Tf - 2;
+   T_ice = (Tf - 8) * ones(5, 1);
+   T_ice(2) = Tf - 2;
 
    % Put that cell barely above its residual floor, so the loss exhausts the
    % film at once.
@@ -115,7 +115,7 @@ function test_a_thin_liquid_film_records_what_it_cannot_give(testCase)
       f_ice(2), f_liq(2), f_res_por));
 
    d_vap = acceptedTransport( ...
-      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
+      T_ice, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
    testCase.assertLessThan(d_vap(2), 0);
 
    [f_ice_new, f_liq_new, d_sbl_err] = ...
@@ -185,8 +185,8 @@ function test_a_bound_interior_clamp_keeps_its_own_accounting(testCase)
    Tf = icemodel.physicalConstant('Tf');
 
    % A thin film at cell 2 makes the evaporation clamp bind.
-   T = (Tf - 8) * ones(5, 1);
-   T(2) = Tf - 2;
+   T_ice = (Tf - 8) * ones(5, 1);
+   T_ice(2) = Tf - 2;
    f_res = icemodel.column.residual_water_fraction( ...
       f_ice, zeros(5, 1), f_res_por);
    f_liq = zeros(5, 1);
@@ -195,12 +195,12 @@ function test_a_bound_interior_clamp_keeps_its_own_accounting(testCase)
    % The shortfall the applier records, reproduced from the primitives so
    % the orchestrated budget has an independent expectation to meet.
    [~, ~, U_vap_faces, L_vap_faces] = acceptedTransport( ...
-      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
+      T_ice, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
    [f_ice_new, f_liq_new, d_sbl_err] = applyDonorTransport( ...
       f_ice, f_liq, U_vap_faces, L_vap_faces, 900, dz, 0.1, f_res_por);
    testCase.assertLessThan(d_sbl_err(2), 0);
 
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
    [~, ~, ~, ~, budget_new] = icemodel.column.couple_vapor_step( ...
       f_ice, f_liq, U_vap_faces, L_vap_faces, zeros(5, 1), zeros(5, 1), ...
       dz, 900, 0.1, f_res_por, budget);
@@ -208,7 +208,7 @@ function test_a_bound_interior_clamp_keeps_its_own_accounting(testCase)
    % The transport channels are the realized per-phase storage moves, to
    % roundoff.
    [solid_1, liquid_1] = icemodel.column.integrate_column_budget( ...
-      T, f_ice_new, f_liq_new, dz);
+      T_ice, f_ice_new, f_liq_new, dz);
    testCase.verifyEqual( ...
       budget_new.mass_budget_vapor_transport_solid_mwe, ...
       solid_1 - budget.mass_budget_solid_start_mwe, 'RelTol', 1e-12);
@@ -234,15 +234,15 @@ function test_the_orchestrator_matches_its_parts(testCase)
    % in the same order.
 
    [dz, delz, fn, ~, ~, f_ice, f_res_por] = coupledFixture(6);
-   T = gradientColumn(6);
+   T_ice = gradientColumn(6);
    f_liq = [0; 0; 0.05; 0.05; 0; 0];
    dt = 900;
    f_ice_min = 0.1;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
 
    % Run the combined function.
    [~, ~, U_vap_faces, L_vap_faces] = acceptedTransport( ...
-      T, f_ice, f_liq, dz, delz, fn, f_res_por, dt);
+      T_ice, f_ice, f_liq, dz, delz, fn, f_res_por, dt);
    [f_ice_a, f_liq_a, ~, ~, budget_a] = icemodel.column.couple_vapor_step( ...
       f_ice, f_liq, U_vap_faces, L_vap_faces, zeros(6, 1), zeros(6, 1), ...
       dz, dt, f_ice_min, f_res_por, budget);
@@ -271,12 +271,12 @@ function test_the_budget_accumulates_across_repeated_transport_calls(testCase)
    % budget. Two calls must retain the sum of both transport increments.
 
    [dz, delz, fn, ~, ~, f_ice, f_res_por] = coupledFixture(6);
-   T = gradientColumn(6);
+   T_ice = gradientColumn(6);
    f_liq = [0; 0; 0.05; 0.05; 0; 0];
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
 
    [~, ~, U_vap_1, L_vap_1] = acceptedTransport( ...
-      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
+      T_ice, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
    [f_ice_1, f_liq_1, d_vap_liq_1, d_vap_ice_1, budget_1] = ...
       icemodel.column.couple_vapor_step( ...
       f_ice, f_liq, U_vap_1, L_vap_1, zeros(6, 1), zeros(6, 1), dz, ...
@@ -289,7 +289,7 @@ function test_the_budget_accumulates_across_repeated_transport_calls(testCase)
    % substep left behind, chaining the accumulator outputs forward the way
    % the driver chains substeps.
    [~, ~, U_vap_2, L_vap_2] = acceptedTransport( ...
-      T, f_ice_1, f_liq_1, dz, delz, fn, f_res_por, 900);
+      T_ice, f_ice_1, f_liq_1, dz, delz, fn, f_res_por, 900);
    [~, ~, ~, ~, budget_2] = icemodel.column.couple_vapor_step( ...
       f_ice_1, f_liq_1, U_vap_2, L_vap_2, d_vap_liq_1, d_vap_ice_1, dz, ...
       900, 0.1, f_res_por, budget_1);
@@ -298,7 +298,7 @@ function test_the_budget_accumulates_across_repeated_transport_calls(testCase)
    % contribution, so the chained total can be checked against the sum of
    % two independent calls.
    budget_solo_2 = icemodel.column.initialize_budget_state( ...
-      T, f_ice_1, f_liq_1, dz);
+      T_ice, f_ice_1, f_liq_1, dz);
    [~, ~, ~, ~, budget_solo_2] = icemodel.column.couple_vapor_step( ...
       f_ice_1, f_liq_1, U_vap_2, L_vap_2, zeros(6, 1), zeros(6, 1), dz, ...
       900, 0.1, f_res_por, budget_solo_2);
@@ -324,18 +324,18 @@ function test_transport_stays_out_of_the_surface_vapor_channels(testCase)
 
    [dz, delz, fn, ~, ~, f_ice, f_res_por] = coupledFixture(6);
    Tf = icemodel.physicalConstant('Tf');
-   T = (Tf - 8) + linspace(0, 6, 6)';
+   T_ice = (Tf - 8) + linspace(0, 6, 6)';
    f_liq = [0; 0; 0.05; 0.05; 0; 0];
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
 
    % Run the accepted-substep order: surface budget first, then transport.
    % D_PEVP is zero, so the surface call returns zero vapor increments.
-   [T2, f_ice2, f_liq2, d_liq, ~, ~, d_vap_liq, d_vap_ice, ~, budget] = ...
+   [T_ice2, f_ice2, f_liq2, d_liq, ~, ~, d_vap_liq, d_vap_ice, ~, budget] = ...
       icemodel.column.budget_surface_mass_balance( ...
-      T, f_ice, f_liq, f_liq, 0.0, zeros(6, 1), zeros(6, 1), 0.0, ...
+      T_ice, f_ice, f_liq, f_liq, 0.0, zeros(6, 1), zeros(6, 1), 0.0, ...
       zeros(6, 1), zeros(6, 1), f_res_por, 0.1, budget, dz);
    [~, ~, U_vap_faces, L_vap_faces] = acceptedTransport( ...
-      T2, f_ice2, f_liq2, dz, delz, fn, f_res_por, 900);
+      T_ice2, f_ice2, f_liq2, dz, delz, fn, f_res_por, 900);
    [f_ice3, ~, ~, ~, budget] = icemodel.column.couple_vapor_step( ...
       f_ice2, f_liq2, U_vap_faces, L_vap_faces, d_vap_liq, d_vap_ice, ...
       dz, 900, 0.1, f_res_por, budget);
@@ -365,16 +365,16 @@ function test_the_realized_surface_exchange_excludes_rejected_demand(testCase)
    % column holds. The cascade draws every cell down to the floor in turn
    % and still cannot satisfy the demand.
    JJ = 3;
-   T = (icemodel.physicalConstant('Tf') - 5) * ones(JJ, 1);
+   T_ice = (icemodel.physicalConstant('Tf') - 5) * ones(JJ, 1);
    f_ice = (f_ice_min + 1e-6) * ones(JJ, 1);
    f_liq = zeros(JJ, 1);
    d_pevp = -1e-3;
    dz = 0.04 * ones(JJ, 1);
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
 
    [~, f_ice_new, ~, ~, ~, ~, ~, ~, d_applied, ~] = ...
       icemodel.column.budget_surface_mass_balance( ...
-      T, f_ice, f_liq, f_liq, d_pevp, zeros(JJ, 1), zeros(JJ, 1), 0.0, ...
+      T_ice, f_ice, f_liq, f_liq, d_pevp, zeros(JJ, 1), zeros(JJ, 1), 0.0, ...
       zeros(JJ, 1), zeros(JJ, 1), f_res_por, f_ice_min, budget, dz);
 
    % Every cell stops at the floor. The realized exchange shows how much mass
@@ -429,15 +429,15 @@ function test_routing_reads_the_solve_state_not_the_current_state(testCase)
    % state therefore keeps this transfer liquid even when the current cell is
    % dry. Recomputing the phase from the current fractions would remove ice.
    [dz, delz, fn, ~, ~, f_ice_col, f_res_por_c] = coupledFixture(6);
-   T = gradientColumn(6);
+   T_ice = gradientColumn(6);
    f_liq_cur = zeros(6, 1);
    f_liq_solve = 0.05 * ones(6, 1);
    budget = icemodel.column.initialize_budget_state( ...
-      T, f_ice_col, f_liq_cur, dz);
+      T_ice, f_ice_col, f_liq_cur, dz);
    [~, ~, U_vap_wet, L_vap_wet] = acceptedTransport( ...
-      T, f_ice_col, f_liq_solve, dz, delz, fn, f_res_por_c, 900);
+      T_ice, f_ice_col, f_liq_solve, dz, delz, fn, f_res_por_c, 900);
    [~, ~, U_vap_dry, L_vap_dry] = acceptedTransport( ...
-      T, f_ice_col, f_liq_cur, dz, delz, fn, f_res_por_c, 900);
+      T_ice, f_ice_col, f_liq_cur, dz, delz, fn, f_res_por_c, 900);
 
    [f_ice_wet, f_liq_wet] = icemodel.column.couple_vapor_step( ...
       f_ice_col, f_liq_cur, U_vap_wet, L_vap_wet, zeros(6, 1), ...
@@ -459,13 +459,13 @@ function test_cross_phase_faces_preserve_the_donor_phase(testCase)
 
    [~, ~, ~, ~, ~, f_ice, f_res_por] = coupledFixture(2);
    dz = [0.03; 0.05];
-   T = gradientColumn(2);
+   T_ice = gradientColumn(2);
    f_liq = [0; 0.05];
    U_vap_faces = [0; 1e-5; 0];
    Ls = icemodel.physicalConstant('Ls');
    L_vap_faces = Ls * ones(3, 1);
    dt = 100;
-   budget = icemodel.column.initialize_budget_state(T, f_ice, f_liq, dz);
+   budget = icemodel.column.initialize_budget_state(T_ice, f_ice, f_liq, dz);
 
    [f_ice_new, f_liq_new] = icemodel.column.couple_vapor_step( ...
       f_ice, f_liq, U_vap_faces, L_vap_faces, zeros(2, 1), zeros(2, 1), ...
@@ -559,19 +559,19 @@ function test_mass_conserves_in_the_phase_decision_band(testCase)
    % mass. Both sides ask one function.
 
    [dz, delz, fn] = coupledFixture(3);
-   T = gradientColumn(3);
+   T_ice = gradientColumn(3);
    f_res_por = 0.07;
 
    % Dense ice: the residual floor sits below the fixed threshold.
    verifyBandConserves(testCase, 0.90 * ones(3, 1), [0; 0.0135; 0], ...
-      f_res_por, T, dz, delz, fn, true);
+      f_res_por, T_ice, dz, delz, fn, true);
 
    % Low-density snow: the floor sits above it, so the disagreement flips.
    verifyBandConserves(testCase, 0.30 * ones(3, 1), [0; 0.03; 0], ...
-      f_res_por, T, dz, delz, fn, false);
+      f_res_por, T_ice, dz, delz, fn, false);
 end
 
-function verifyBandConserves(testCase, f_ice, f_liq, f_res_por, T, dz, ...
+function verifyBandConserves(testCase, f_ice, f_liq, f_res_por, T_ice, dz, ...
       delz, fn, expect_wet)
    %VERIFYBANDCONSERVES Check one column's applied mass against its transport.
 
@@ -579,7 +579,7 @@ function verifyBandConserves(testCase, f_ice, f_liq, f_res_por, T, dz, ...
       f_ice(2), f_liq(2), f_res_por), expect_wet);
 
    d_vap = acceptedTransport( ...
-      T, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
+      T_ice, f_ice, f_liq, dz, delz, fn, f_res_por, 900);
    [f_ice_new, f_liq_new, d_sbl_err] = ...
       applyTransport(f_ice, f_liq, d_vap, 0.1, f_res_por);
 
@@ -776,19 +776,19 @@ function [f_ice, f_liq, d_sbl_err] = applyTransport( ...
 end
 
 function [d_vap_nodes, dm_vap_nodes, U_vap_faces, L_vap_faces] = ...
-      acceptedTransport(T, f_ice, f_liq, dz, delz, fn, f_res_por, dt)
+      acceptedTransport(T_ice, f_ice, f_liq, dz, delz, fn, f_res_por, dt)
    %ACCEPTEDTRANSPORT Compute the accepted face flux used by transport fixtures.
 
    ro_liq = icemodel.physicalConstant('ro_liq');
    [ro_vap, dro_vapdT] = ...
-      icemodel.vapor.saturation_vapor_density(T, f_liq);
+      icemodel.vapor.saturation_vapor_density(T_ice, f_liq);
    [~, De] = icemodel.vapor.vapor_thermal_conductivity( ...
-      T, f_liq, dro_vapdT);
+      T_ice, f_liq, dro_vapdT);
    k_eff = icemodel.column.bulk_thermal_conductivity( ...
-      T, f_ice, f_liq, zeros(size(T)));
+      T_ice, f_ice, f_liq, zeros(size(T_ice)));
    [~, ~, ~, U_vap_faces, L_vap_faces] = ...
       icemodel.column.vapor_transport_terms( ...
-      T, f_ice, f_liq, k_eff, ro_vap, dro_vapdT, De, delz, fn, ...
+      T_ice, f_ice, f_liq, k_eff, ro_vap, dro_vapdT, De, delz, fn, ...
       f_res_por);
 
    dm_vap_nodes = ...
@@ -796,11 +796,11 @@ function [d_vap_nodes, dm_vap_nodes, U_vap_faces, L_vap_faces] = ...
    d_vap_nodes = dm_vap_nodes * dt / ro_liq;
 end
 
-function T = gradientColumn(JJ)
+function T_ice = gradientColumn(JJ)
    %GRADIENTCOLUMN Return a temperature profile that drives interior vapor.
 
    Tf = icemodel.physicalConstant('Tf');
-   T = (Tf - 8) + linspace(0, 6, JJ)';
+   T_ice = (Tf - 8) + linspace(0, 6, JJ)';
 end
 
 function [f_ice, f_liq, d_sbl_err, d_liq_applied, d_ice_applied] = ...
@@ -845,7 +845,7 @@ function [f_ice, f_liq, d_sbl_err, d_liq_applied, d_ice_applied] = ...
    d_ice_applied = (d_ice - d_ice_unapplied) * ro_liq / ro_ice;
 end
 
-function [dz, delz, fn, T, f_liq, f_ice, f_res_por] = coupledFixture(JJ)
+function [dz, delz, fn, T_ice, f_liq, f_ice, f_res_por] = coupledFixture(JJ)
    %COUPLEDFIXTURE Return one dry, isothermal control-volume column.
 
    Tf = icemodel.physicalConstant('Tf');
@@ -854,7 +854,7 @@ function [dz, delz, fn, T, f_liq, f_ice, f_res_por] = coupledFixture(JJ)
    dz = dz(1:JJ);
    delz = delz(1:JJ + 1);
    fn = fn(1:JJ + 1);
-   T = (Tf - 5) * ones(JJ, 1);
+   T_ice = (Tf - 5) * ones(JJ, 1);
    f_liq = zeros(JJ, 1);
    f_ice = 0.85 * ones(JJ, 1);
    f_res_por = 0.02;

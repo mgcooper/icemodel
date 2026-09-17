@@ -51,6 +51,44 @@ function test_ispathinside_containment_contract(testCase)
    end
 end
 
+function test_path_helpers_follow_matlab_folder_changes(testCase)
+   %TEST_PATH_HELPERS_FOLLOW_MATLAB_FOLDER_CHANGES Anchor relative paths at pwd.
+   % Java user.dir does not follow MATLAB cd. A relative path must resolve
+   % against the current MATLAB folder after every folder change.
+   first = string(tempname);
+   second = string(tempname);
+   mkdir(first);
+   mkdir(second);
+   cleaner = onCleanup(@() cellfun(@(d) rmdir(d, 's'), ...
+      {char(first), char(second)}));
+   original_folder = pwd;
+   folder_cleanup = onCleanup(@() cd(original_folder));
+
+   % Resolve the same relative spellings from each folder in turn. The
+   % expected value canonicalizes an absolute path, which Java resolves
+   % without user.dir.
+   for folder = [first, second]
+      cd(folder)
+      expected = string(java.io.File( ...
+         char(fullfile(folder, "x.txt"))).getCanonicalPath());
+      returned = icemodel.helpers.canonicalPath(fullfile(".", "x.txt"));
+      testCase.verifyEqual(returned, expected);
+      returned = string(java.io.File(char( ...
+         icemodel.helpers.absolutePath("x.txt"))).getCanonicalPath());
+      testCase.verifyEqual(returned, expected);
+   end
+
+   % An absolute path is returned unchanged, and a ".." segment resolves to
+   % the sibling folder.
+   testCase.verifyEqual(icemodel.helpers.absolutePath(first), first);
+   [~, first_name] = fileparts(first);
+   returned = icemodel.helpers.canonicalPath( ...
+      fullfile(second, "..", first_name));
+   expected = string(java.io.File(char(first)).getCanonicalPath());
+   testCase.verifyEqual(returned, expected);
+   clear folder_cleanup cleaner
+end
+
 function test_basepath(testCase)
    %TEST_BASEPATH Verify internal.basepath path composition.
    modelpath = fullfile(icemodel.internal.fullpath(), 'icemodel');
@@ -163,6 +201,19 @@ function test_version(testCase)
 
    % Reset must discard the override and reread the citation source.
    testCase.verifyEqual(icemodel.internal.version('reset'), expected);
+end
+
+function test_version_overrideBeforeFirstRead(testCase)
+   %TEST_VERSION_OVERRIDEBEFOREFIRSTREAD Apply an override on an empty cache.
+   cleanup = onCleanup(@() icemodel.internal.version('reset'));
+
+   % Clearing the function empties its cache, so the override is the first
+   % call. It must still take effect instead of the CFF value.
+   clear('icemodel.internal.version')
+   testCase.verifyEqual(icemodel.internal.version('9.8.7-test'), ...
+      '9.8.7-test');
+   testCase.verifyEqual(icemodel.internal.version(), '9.8.7-test');
+   clear cleanup
 end
 
 function test_version_failedResetClearsOverride(testCase)

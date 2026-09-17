@@ -1,15 +1,15 @@
-function [f_liq, f_ice, T, diag] = infiltration( ...
-      f_liq, f_ice, T, dz, dt, q_top, kwargs)
+function [f_liq, f_ice, T_ice, diag] = infiltration( ...
+      f_liq, f_ice, T_ice, dz, dt, q_top, kwargs)
    %INFILTRATION Snow column liquid mass + cold-content + conduction update.
    %
-   %  [f_liq, f_ice, T, diag] = icemodel.column.infiltration( ...
-   %     f_liq, f_ice, T, dz, dt, q_top)
+   %  [f_liq, f_ice, T_ice, diag] = icemodel.column.infiltration( ...
+   %     f_liq, f_ice, T_ice, dz, dt, q_top)
    %
    %  Computes liquid infiltration in the snow/firn column. There are three
    %  parts: an explicit upwind liquid mass redistribution with CFL substepping,
-   %  cold-content refreezing in cold layers (latent heat released, T capped at
-   %  Tf), and a one-step explicit conduction update over the main timestep dt.
-   %  Returns the updated f_liq, f_ice and T, plus a diagnostic struct.
+   %  cold-content refreezing in cold layers (latent heat released, T_ice capped
+   %  at Tf), and a one-step explicit conduction update over the main timestep
+   %  dt. Returns the updated f_liq, f_ice and T_ice, plus a diagnostic struct.
    %
    %  The snow verification driver calls this kernel for the Colbeck 1976 and
    %  Clark 2017 cases.
@@ -20,7 +20,7 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
    %      Volumetric liquid water fraction in each layer [1].
    %  f_ice : (N x 1) vector
    %      Volumetric ice fraction in each layer [1].
-   %  T : (N x 1) vector
+   %  T_ice : (N x 1) vector
    %      Layer temperature [K].
    %  dz : scalar
    %      Layer thickness [m] (uniform grid).
@@ -44,7 +44,7 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
    %
    %  Returns:
    %  --------
-   %  f_liq, f_ice, T : (N x 1) vectors
+   %  f_liq, f_ice, T_ice : (N x 1) vectors
    %      Updated column state.
    %  diag : struct
    %      Substepping and mass-balance diagnostics:
@@ -77,12 +77,12 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
    %#codegen
 
    arguments
-      f_liq           (:, 1) double
-      f_ice           (:, 1) double
-      T               (:, 1) double
-      dz              (1, 1) double
-      dt              (1, 1) double
-      q_top           (1, 1) double
+      f_liq (:, 1) double
+      f_ice (:, 1) double
+      T_ice (:, 1) double
+      dz    (1, 1) double
+      dt    (1, 1) double
+      q_top (1, 1) double
       kwargs.k_sat_method (1, 1) string {mustBeMember( ...
          kwargs.k_sat_method, ["colbeck1972", "shimizu1970", "darcy"])} ...
          = "colbeck1972"
@@ -193,7 +193,7 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
       % ----- q(N+1) = flux across the bottom interface = free-drainage
       bc_N  = q_top;
       bc_S  = q(end);
-      q_int = [bc_N; q];        % length N+1
+      q_int = [bc_N; q]; % length N+1
       q_bot = bc_S;
 
       % Compute net liquid water flux for each layer
@@ -242,21 +242,21 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
    end
 
    % --- Cold-content refreezing -------------------------------------------
-   % Per layer with T < Tf and f_liq > 0, freeze up to the available cold
+   % Per layer with T_ice < Tf and f_liq > 0, freeze up to the available cold
    % content, releasing latent heat to warm the layer toward Tf.
    %
    % Cold content per unit layer volume [J m-3]:
-   %   cold_content = ro_ice * f_ice * cp_ice * (Tf - T)
+   %   cold_content = ro_ice * f_ice * cp_ice * (Tf - T_ice)
    % Latent heat released by freezing volumetric fraction df_frz of
    % liquid water (per unit layer volume) [J m-3]:
    %   dE = ro_liq * df_frz * Lf
    % Equating gives the maximum df_frz the cold content can absorb.
-   for k = 1:numel(T)
-      if T(k) >= Tf - eps || f_liq(k) <= 0 || f_ice(k) <= 0
+   for k = 1:numel(T_ice)
+      if T_ice(k) >= Tf - eps || f_liq(k) <= 0 || f_ice(k) <= 0
          continue
       end
-      cold_content = ro_ice * f_ice(k) * cp_ice * (Tf - T(k));
-      df_frz       = min(f_liq(k), cold_content / (ro_liq * Lf));
+      cold_content = ro_ice * f_ice(k) * cp_ice * (Tf - T_ice(k));
+      df_frz = min(f_liq(k), cold_content / (ro_liq * Lf));
       if df_frz <= 0
          continue
       end
@@ -264,8 +264,8 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
       % Update phase fractions and temperature in place.
       f_liq(k) = f_liq(k) - df_frz;
       f_ice(k) = f_ice(k) + df_frz / ro_iwe;
-      dT       = (ro_liq * df_frz * Lf) / (ro_ice * f_ice(k) * cp_ice);
-      T(k)     = min(Tf, T(k) + dT);
+      dT_ice = (ro_liq * df_frz * Lf) / (ro_ice * f_ice(k) * cp_ice);
+      T_ice(k) = min(Tf, T_ice(k) + dT_ice);
    end
 
    % --- Explicit conduction (one main step) -------------------------------
@@ -276,19 +276,23 @@ function [f_liq, f_ice, T, diag] = infiltration( ...
    % the verification target, so the conduction step has almost no effect on
    % the verification metrics (storage, outflow). The step stays here because
    % production callers need the energy update.
-   N = numel(T);
+   N = numel(T_ice);
    if N >= 2
-      k_thermal_layers = icemodel.column.firn_thermal_conductivity(T, f_ice);
+      k_thermal_layers = icemodel.column.firn_thermal_conductivity( ...
+         T_ice, f_ice);
       cv = ro_ice * f_ice * cp_ice;
       alpha = k_thermal_layers ./ max(cv, eps);  % m^2 s-1
-      T_new = T;
+      T_ice_new = T_ice;
       for k = 2:N-1
-         T_new(k) = T(k) + (alpha(k) * dt / dz^2) * (T(k+1) - 2 * T(k) + T(k-1));
+         T_ice_new(k) = T_ice(k) + ...
+            (alpha(k) * dt / dz^2) * (T_ice(k+1) - 2 * T_ice(k) + T_ice(k-1));
       end
       % Adiabatic top/bottom boundaries (zero-gradient).
-      T_new(1) = T(1) + (alpha(1) * dt / dz^2) * (T(2)   - T(1));
-      T_new(N) = T(N) + (alpha(N) * dt / dz^2) * (T(N-1) - T(N));
-      T = min(T_new, Tf);
+      T_ice_new(1) = T_ice(1) + ...
+         (alpha(1) * dt / dz^2) * (T_ice(2)   - T_ice(1));
+      T_ice_new(N) = T_ice(N) + ...
+         (alpha(N) * dt / dz^2) * (T_ice(N-1) - T_ice(N));
+      T_ice = min(T_ice_new, Tf);
    end
 
    % Diagnostics struct, returned for verification mass-balance checks
@@ -318,6 +322,6 @@ end
 % dq > 0 && dq + f_liq + f_ice > 1 means more drains than can be stored
 %
 % Check whether the infiltrating water satisfies the cold content:
-%   f_cc = (ro_ice * cp_ice / (ro_liq * Lf)) * f_ice * (Tf - T)
+%   f_cc = (ro_ice * cp_ice / (ro_liq * Lf)) * f_ice * (Tf - T_ice)
 % (this is the f_frz / Clark 2017 Eq. 10 thermal water requirement used by the
 % analyticalSolution wetting-front advance).

@@ -75,7 +75,7 @@ function cases = makeCases(tier_name, sites, simyear, baseline)
          sitename=sitename, baseline=baseline);
       for imodel = 1:numel(models)
          smbmodel = models(imodel);
-         solver_cases = formalSolversForModel(smbmodel);
+         solver_cases = formalSolversForModel(smbmodel, policy);
          for isolver = 1:numel(solver_cases)
             solver_id = solver_cases(isolver);
             k = k + 1;
@@ -100,10 +100,13 @@ function cases = makeCases(tier_name, sites, simyear, baseline)
    cases = struct2table(rows);
 end
 
-function solver_cases = formalSolversForModel(smbmodel)
+function solver_cases = formalSolversForModel(smbmodel, policy)
    %FORMALSOLVERSFORMODEL Return the solver ids covered by the regression suite.
+   %
+   % icemodel runs the solver ids that the baseline policy registers. Other
+   % models have one solver.
    if smbmodel == "icemodel"
-      solver_cases = 1:3;
+      solver_cases = policy.icemodel_solvers;
    else
       solver_cases = 1;
    end

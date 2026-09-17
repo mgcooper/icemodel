@@ -58,6 +58,29 @@ function test_regression_report_writes_plots_table_and_qmd(testCase)
    verifyFalse(testCase, contains(source, "Closure comparison unavailable"))
 end
 
+function test_regression_report_keeps_failed_gates(testCase)
+   % A failed case must carry its failed gate names into the saved CSV
+   % summary and the report table.
+
+   folder = temporaryFolder(testCase);
+   results = regressionResults();
+   results.passed = false;
+   results.report.passed = [true; false];
+   results.report.failed_gates = ["", "runoff_final:evidence,melt_final"]';
+   icemodel.verification.report.buildTestSuiteReport( ...
+      "regression", results, render=false, output_dir=folder);
+
+   summary = readtable(fullfile(folder, "regression-suite-summary.csv"), ...
+      'TextType', 'string', 'Delimiter', ',');
+   expected = "runoff_final:evidence,melt_final";
+   verifyEqual(testCase, summary.failed_gates(2), expected)
+   % The Markdown table escapes underscores and punctuation.
+   source = fileread(fullfile(folder, "regression-suite-report.qmd"));
+   verifySubstring(testCase, source, "| failed gates |")
+   verifySubstring(testCase, source, ...
+      "| false | runoff\_final\:evidence\,melt\_final |")
+end
+
 function test_regression_report_escapes_saved_metadata(testCase)
    % Saved paths and tags must remain literal text in generated Quarto source.
 
@@ -245,6 +268,31 @@ function test_build_perf_baseline_writes_machine_metadata(testCase)
    saved = load(output_file, 'meta');
    verifyEqual(testCase, saved.meta.hostname, ...
       icemodel.test.helpers.machineHostname())
+end
+
+function test_regression_runner_rejects_a_stale_artifact(testCase)
+   % A class run that fails before it saves must raise the missing-artifact
+   % error. It must not load the artifact path that an earlier run left in
+   % the session environment.
+
+   folder = temporaryFolder(testCase);
+   stale_file = fullfile(folder, "stale-regression-artifact.mat");
+   report = table("stale_case", true, "", ...
+      'VariableNames', {'case_id', 'passed', 'failed_gates'});
+   save(stale_file, 'report')
+   prior = getenv('ICEMODEL_REGRESSION_ARTIFACT_FILE');
+   restore = onCleanup(@() setenv('ICEMODEL_REGRESSION_ARTIFACT_FILE', ...
+      prior));
+   setenv('ICEMODEL_REGRESSION_ARTIFACT_FILE', char(stale_file));
+
+   % An empty data root has no met files, so the first case stops before the
+   % class saves its artifact.
+   empty_root = fullfile(folder, "empty-data-root");
+   mkdir(empty_root)
+   verifyError(testCase, @() run_regression_suite(tier="smoke", ...
+      smbmodel="skinmodel", data_root=empty_root, build_report=false), ...
+      'icemodel:test:regressionArtifactMissing')
+   clear restore
 end
 
 function test_regression_entrypoint_resolves_one_batch_run_name(testCase)

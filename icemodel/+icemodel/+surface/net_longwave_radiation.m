@@ -1,8 +1,8 @@
-function [Qln, dQln_dTsfc] = net_longwave_radiation(T_sfc, Qli)
+function [Qln, dQln_dT_sfc] = net_longwave_radiation(T_sfc, Qli)
    %NET_LONGWAVE_RADIATION Net surface longwave radiation and T_sfc derivative.
    %
    %  Qln = icemodel.surface.net_longwave_radiation(T_sfc, Qli)
-   %  [Qln, dQln_dTsfc] = icemodel.surface.net_longwave_radiation(T_sfc, Qli)
+   %  [Qln, dQln_dT_sfc] = icemodel.surface.net_longwave_radiation(T_sfc, Qli)
    %
    % In accordance with Kirchoff's Law, the upwelling longwave flux contains an
    % emitted component following the Stefan-Boltzmann equation, and a reflected
@@ -27,6 +27,6 @@ function [Qln, dQln_dTsfc] = net_longwave_radiation(T_sfc, Qli)
    Qln = Qli + icemodel.surface.outgoing_longwave_radiation(T_sfc, Qli);
 
    if nargout > 1
-      dQln_dTsfc = -4.0 * emiss * SB * T_sfc .^ 3;
+      dQln_dT_sfc = -4.0 * emiss * SB * T_sfc .^ 3;
    end
 end

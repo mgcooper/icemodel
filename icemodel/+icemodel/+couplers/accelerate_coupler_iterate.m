@@ -1,5 +1,5 @@
-function [Ts_next, hist] = accelerate_coupler_iterate( ...
-      hist, Ts_old, Ts_new, cpl_alpha, cpl_jumpmax, cpl_aitken)
+function [T_sfc_next, hist] = accelerate_coupler_iterate( ...
+      hist, T_sfc_old, T_sfc_new, cpl_alpha, cpl_jumpmax, cpl_aitken)
    %ACCELERATE_COUPLER_ITERATE Accelerate one surface-temperature Picard step.
    %
    % Accelerates the Picard loop on T_sfc that every coupler runs.
@@ -11,35 +11,37 @@ function [Ts_next, hist] = accelerate_coupler_iterate( ...
    % iterations behave exactly as Aitken alone.
    %
    % Inputs
-   %  hist       - iterate history struct from initialize_coupler_history
-   %  Ts_old     - surface temperature entering this iteration
-   %  Ts_new     - Picard iterate produced by this iteration
-   %  cpl_alpha  - relaxation weight on the Picard update
-   %  cpl_jumpmax - largest accepted jump from Ts_old
-   %  cpl_aitken - enable both acceleration stages, Aitken and secant. False
-   %               falls back to relaxation only.
+   %  hist        - iterate history struct from initialize_coupler_history
+   %  T_sfc_old   - surface temperature entering this iteration
+   %  T_sfc_new   - Picard iterate produced by this iteration
+   %  cpl_alpha   - relaxation weight on the Picard update
+   %  cpl_jumpmax - largest accepted jump from T_sfc_old
+   %  cpl_aitken  - enable both acceleration stages, Aitken and secant. False
+   %                falls back to relaxation only.
    %
    % Outputs
-   %  Ts_next - accelerated surface temperature for the next iteration
-   %  hist    - history advanced by one iteration
+   %  T_sfc_next  - accelerated surface temperature for the next iteration
+   %  hist        - history advanced by one iteration
    %
    % See also: icemodel.numerics.aitkenscalar, icemodel.numerics.secantscalar
    %
    %#codegen
 
-   cpl_res = Ts_new - Ts_old;
+   cpl_res = T_sfc_new - T_sfc_old;
 
-   % Relaxation is the innermost fallback: Ts_old + alpha * residual.
-   Ts_fallback = icemodel.numerics.aitkenscalar(hist.Ts_2, hist.Ts_1, ...
-      Ts_new, Ts_old + cpl_alpha * cpl_res, cpl_jumpmax, cpl_aitken);
+   % Relaxation is the innermost fallback: T_sfc_old + alpha * residual.
+   T_sfc_fallback = icemodel.numerics.aitkenscalar(hist.T_sfc_2, ...
+      hist.T_sfc_1, T_sfc_new, T_sfc_old + cpl_alpha * cpl_res, cpl_jumpmax, ...
+      cpl_aitken);
 
-   Ts_next = icemodel.numerics.secantscalar(hist.Ts_prev, hist.res_prev, ...
-      Ts_old, cpl_res, Ts_fallback, cpl_jumpmax, cpl_aitken);
+   T_sfc_next = icemodel.numerics.secantscalar(hist.T_sfc_prev, ...
+      hist.res_prev, T_sfc_old, cpl_res, T_sfc_fallback, cpl_jumpmax, ...
+      cpl_aitken);
 
    % Advance both histories: Aitken needs the last two iterates, the secant
    % needs the last (iterate, residual) pair.
-   hist.Ts_2 = hist.Ts_1;
-   hist.Ts_1 = Ts_new;
-   hist.Ts_prev = Ts_old;
+   hist.T_sfc_2 = hist.T_sfc_1;
+   hist.T_sfc_1 = T_sfc_new;
+   hist.T_sfc_prev = T_sfc_old;
    hist.res_prev = cpl_res;
 end

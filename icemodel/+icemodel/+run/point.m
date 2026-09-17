@@ -1,4 +1,21 @@
 function [ice1, ice2, met, opts] = point(kwargs)
+   %POINT Run one point-scale simulation and post-process its output.
+   %
+   %  [ice1, ice2, met, opts] = icemodel.run.point()
+   %  [ice1, ice2, met, opts] = icemodel.run.point("sitename", "kanm", ...
+   %     "simyears", 2016, "smbmodel", "icemodel")
+   %  [ice1, ice2, met, opts] = icemodel.run.point(_, ...
+   %     "overrides", struct('dt', 900, 'solver', 3))
+   %
+   %  The arguments below select the case. OVERRIDES holds any other option
+   %  by field name, and icemodel.resetopts applies it to the options this
+   %  function builds, so a caller sets a non-standard value without editing
+   %  icemodel.setopts. An override wins over the case arguments.
+   %
+   %  ice1 and ice2 are the post-processed model output, met is the forcing
+   %  timetable, and opts is the resolved options struct of the run.
+   %
+   % See also: icemodel.setopts icemodel.resetopts icemodel.configureRun
 
    arguments (Input)
       kwargs.saveflag (1, 1) logical = false
@@ -17,12 +34,14 @@ function [ice1, ice2, met, opts] = point(kwargs)
       kwargs.testname (1, :) string = []
       kwargs.backupflag (1, 1) logical = false
       kwargs.n_spinup_years (1, 1) double {mustBeNonnegative, mustBeInteger} = 0
+      kwargs.overrides (1, 1) struct = struct()
    end
    [saveflag, sitename, forcings, userdata, uservars, ...
-      smbmodel, simyears, gridcell, testname, backupflag, n_spinup_years] ...
-      = deal(kwargs.saveflag, kwargs.sitename, kwargs.forcings, ...
+      smbmodel, simyears, gridcell, testname, backupflag, n_spinup_years, ...
+      overrides] = deal(kwargs.saveflag, kwargs.sitename, kwargs.forcings, ...
       kwargs.userdata, kwargs.uservars, kwargs.smbmodel, kwargs.simyears, ...
-      kwargs.gridcell, kwargs.testname, kwargs.backupflag, kwargs.n_spinup_years);
+      kwargs.gridcell, kwargs.testname, kwargs.backupflag, ...
+      kwargs.n_spinup_years, kwargs.overrides);
 
    if isempty(userdata)
       userdata = forcings;
@@ -40,6 +59,15 @@ function [ice1, ice2, met, opts] = point(kwargs)
       opts = icemodel.resetopts(opts, 'metfname', ...
          {fullfile(opts.pathinput, 'met', 'sector', ...
          ['met_' int2str(gridcell) '.mat'])});
+   end
+
+   % Apply the caller overrides last, so an override wins over a case
+   % argument and over the gridcell metfname. resetopts clears the derived
+   % fields that depend on each override, and configureRun rebuilds them
+   % inside the model entry point.
+   if ~isempty(fieldnames(overrides))
+      override_args = namedargs2cell(overrides);
+      opts = icemodel.resetopts(opts, override_args{:});
    end
 
    % run the model

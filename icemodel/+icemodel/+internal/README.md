@@ -23,3 +23,11 @@ Release maintenance:
   checks.
 - `releaseMetadata("finalize", ...)` verifies Zenodo DOI lineage before
   updating and validating the CFF identifiers.
+
+Namespace listings:
+
+- `makecontents` writes a generated `Contents.m` in every namespace folder
+  under `icemodel/`, so `help icemodel.column` prints the functions of that
+  namespace with their H1 lines. Run `icemodel.internal.makecontents()` after
+  you add, rename, or remove a file in a namespace folder, and after you edit
+  an H1 line. Do not edit a `Contents.m` by hand.

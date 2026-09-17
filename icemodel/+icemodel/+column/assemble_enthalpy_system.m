@@ -58,7 +58,7 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    iM = TL <= T_ice & T_ice <= TH;
 
    % For a soil model, would need indices above the melt zone
-   % iH = T > TH;
+   % iH = T_ice > TH;
 
    % Phase-aware latent heat: Ls for dry/cold cells, Lv for wet cells.
    Lv = icemodel.vapor.latent_enthalpy_switch(f_liq, S);
@@ -72,10 +72,10 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    gk = zeros(S, 1);    % Eq 123
    LfMZ = zeros(S, 1);  % Eq 123, melt-zone latent heat switch
 
-   aP01 = aP0(N);
-
    % % If using g_liq instead of f_liq in the definition of dLdT as in SNTHERM:
    % aP0 = (dHdT + Lf * ro_sno .* dLdT + Ls * f_air .* drovdT)
+
+   aP01 = aP0(N);
 
    % Cofficients for wet nodes inside the melt zone [W m-2 K-1]
    if sum(iM) > 0
@@ -124,10 +124,10 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
    % Account for the upper boundary condition
    switch bc
       case {0, 1}
-         % Dirichlet: Ts = known
+         % Dirichlet: T_sfc = known
          bc_N = a1 * T_sfc;
       case {2, 3}
-         % Robin: qB = f(Ts)
+         % Robin: qB = f(T_sfc)
          bc_N = a1 * Fc / (a1 - Fp);
          aN(N) = 0.0;
       case 4
@@ -157,7 +157,13 @@ function [aN, aP, aS, b, iM, a1, a2, aP01] = assemble_enthalpy_system( ...
       aP(N) = aP(N) - Fp * a1 / (a1 - Fp);
    end
 
-   % Apply the melt zone (enthalpy) transformation (Eq. 128/29)
+   % Apply the melt zone (enthalpy) transformation (Eq. 128/29). The gk term
+   % takes aP, not (aN + aS + aP0), because the transform substitutes
+   % T_P = gv_P * P_P + gk_P into the assembled row, so the coefficient that
+   % multiplies T_P also multiplies gk_P. That includes the Robin change to
+   % aP(N) above. The commented form applies only where that change is not.
+   % Keep the one product: forming -aP0 .* gk - aS .* gk - aN .* gk term by
+   % term accumulates roundoff.
    % b = b + aN .* gkN - (aN + aS + aP0) .* gk + aS .* gkS ;
    b = b + aN .* gkN - aP .* gk + aS .* gkS ;
    aN = aN .* gvN;

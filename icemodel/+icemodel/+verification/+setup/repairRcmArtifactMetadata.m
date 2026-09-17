@@ -249,7 +249,9 @@ function locations = addArtifactField(locations, input_root, leg, field, kind, l
    entry = manifestLocationEntry(loc, method, source_id);
    values = string(leg.(field));
    for value = reshape(values, 1, [])
-      filename = absolutePath(fullfile(input_root, kind, value));
+      % Key path maps by resolved absolute path so aliases share one entry.
+      filename = icemodel.helpers.canonicalPath( ...
+         fullfile(input_root, kind, value));
       key = char(filename);
       if ~isKey(locations.by_file, key)
          locations.by_file(key) = entry;
@@ -318,7 +320,8 @@ function files = rcmArtifactFiles(input_root, locations, source_ids)
       % alias fallback is deliberately disabled outside those references.
       keep = false(size(files));
       for k = 1:numel(files)
-         keep(k) = isKey(locations.by_file, char(absolutePath(files(k))));
+         keep(k) = isKey(locations.by_file, ...
+            char(icemodel.helpers.canonicalPath(files(k))));
       end
       files = files(keep);
    end
@@ -817,7 +820,7 @@ function [found, location, sample_method, ambiguous] = artifactLocation( ...
    ambiguous = false;
    location = struct();
    sample_method = "nearest";
-   file_key = char(absolutePath(filename));
+   file_key = char(icemodel.helpers.canonicalPath(filename));
    if isKey(locations.by_file, file_key)
       ambiguous = locations.ambiguous_file(file_key);
       if ambiguous
@@ -904,20 +907,6 @@ function record = parseArtifactFilename(filename)
    record.window_start = string(tokens{3});
    record.window_end = string(tokens{4});
 end
-
-function pathname = absolutePath(pathname)
-   %ABSOLUTEPATH Return one canonical absolute key for path-map lookups.
-   pathname = string(pathname);
-   if ~startsWith(pathname, filesep)
-      pathname = string(fullfile(pwd, pathname));
-   end
-
-   % Java canonical paths resolve existing symlink components and lexically
-   % normalize dot segments in missing suffixes without creating the target.
-   path_object = java.io.File(char(pathname));
-   pathname = string(char(path_object.getCanonicalPath()));
-end
-
 
 function record = emptyRecord()
    %EMPTYRECORD Define deterministic per-file repair evidence.

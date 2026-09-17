@@ -164,92 +164,6 @@
          }
       ]
    },
-   "icemodel.setpath": {
-      "inputs": [
-         {
-            "name": "pathtype",
-            "kind": "required",
-            "type": [
-               "choices=icemodel.completions('getpath')"
-            ]
-         },
-         {
-            "name": "sitename",
-            "kind": "required",
-            "type": [
-               [
-                  "char"
-               ],
-               [
-                  "string",
-                  "scalar"
-               ]
-            ]
-         },
-         {
-            "name": "smbmodel",
-            "kind": "required",
-            "type": [
-               [
-                  "char"
-               ],
-               [
-                  "string",
-                  "scalar"
-               ]
-            ]
-         },
-         {
-            "name": "userdata",
-            "kind": "required",
-            "type": [
-               [
-                  "char"
-               ],
-               [
-                  "string",
-                  "scalar"
-               ]
-            ]
-         },
-         {
-            "name": "simyears",
-            "kind": "required",
-            "type": [
-               "numeric"
-            ]
-         },
-         {
-            "name": "varargin",
-            "kind": "required",
-            "repeating": true,
-            "type": [
-               [
-                  "char"
-               ],
-               [
-                  "string",
-                  "scalar"
-               ],
-               "numeric"
-            ]
-         }
-      ],
-      "outputs": [
-         {
-            "name": "pathlist",
-            "type": [
-               [
-                  "char"
-               ],
-               [
-                  "string",
-                  "scalar"
-               ]
-            ]
-         }
-      ]
-   },
    "icemodel.cvconvert": {
       "inputs": [
          {
@@ -506,6 +420,14 @@
             "kind": "namevalue",
             "type": [
                "double",
+               "scalar"
+            ]
+         },
+         {
+            "name": "overrides",
+            "kind": "namevalue",
+            "type": [
+               "struct",
                "scalar"
             ]
          }

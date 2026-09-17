@@ -1,5 +1,6 @@
 function [h_resid, h_avail, h_drain, h_ice, h_liq, h_air] = available_liquid_water( ...
-      h_ice, h_liq, h_air, T_old, Tf, theta_resid, h_drain, liqflag, h_total)
+      h_ice, h_liq, h_air, T_ice_old, Tf, theta_resid, h_drain, liqflag, ...
+      h_total)
    %AVAILABLE_LIQUID_WATER Compute available liquid water in one control volume.
    %
    % Note: The model does not use this function. Call it with scalar values,
@@ -8,7 +9,7 @@ function [h_resid, h_avail, h_drain, h_ice, h_liq, h_air] = available_liquid_wat
    %#codegen
 
    % Update theta_resid
-   if T_old < Tf; theta_resid = 0.0; end
+   if T_ice_old < Tf; theta_resid = 0.0; end
 
    % Compute liqresid and liqavail in units of liquid water. liqavail is
    % liquid water available to drain or freeze. liqresid is unavailable.

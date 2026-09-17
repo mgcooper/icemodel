@@ -73,6 +73,42 @@ function test_resetopts_updates_output_years_and_coupler_defaults(testCase)
    testCase.verifyTrue(opts.cpl_aitken);
 end
 
+function test_run_point_applies_caller_overrides(testCase)
+   % An OVERRIDES field reaches the run through icemodel.resetopts, so the
+   % fields it couples update too. The synthetic workspace holds one hourly
+   % met file, and icemodel.setopts defaults dt to 900 s, so the run finds a
+   % met file only when the override reaches icemodel.configureRun.
+
+   workspace = testCase.TestData.workspace;
+
+   % Routine timing output is captured so the unit result stays concise.
+   command = "[ice1, ice2, met, returned] = icemodel.run.point(" + ...
+      "sitename=workspace.sitename, forcings=workspace.forcings, " + ...
+      "smbmodel='skinmodel', simyears=2016, saveflag=false, " + ...
+      "overrides=struct('dt', workspace.dt_seconds));";
+   routine_output = evalc(command);
+
+   testCase.verifyClass(routine_output, 'char');
+   testCase.verifyEqual(returned.dt, workspace.dt_seconds);
+   testCase.verifyEqual(returned.tlag, 6 * 3600 / workspace.dt_seconds);
+   testCase.verifyEqual(returned.metfname, {fullfile(workspace.metdir, ...
+      'met_kanm_kanm_2016_1hr.mat')});
+   testCase.verifyEqual(height(ice1), workspace.nsteps);
+   testCase.verifyFalse(isempty(ice2));
+   testCase.verifyEqual(height(met), workspace.nsteps);
+
+   % An unrecognized override name stops the run inside icemodel.resetopts,
+   % which errors without an identifier, so compare the message.
+   message = '';
+   try
+      icemodel.run.point(sitename=workspace.sitename, simyears=2016, ...
+         overrides=struct('not_an_option', 1));
+   catch err
+      message = err.message;
+   end
+   testCase.verifyEqual(message, 'unrecognized opts field: not_an_option');
+end
+
 function test_userdatafname_is_explicit_and_dependency_safe(testCase)
    % Exact userdata paths normalize to a cell list and are cleared only when a
    % dependent source/path changes without an explicit replacement in that call.
@@ -285,17 +321,6 @@ function test_getpath_builds_restart_path_without_blank_parts(testCase)
       fullfile(output_root, 'kanm', 'skinmodel', 'restart'));
    testCase.verifyEqual(path_test, ...
       fullfile(output_root, 'kanm', 'skinmodel', 'case01', 'restart'));
-end
-
-function test_setpath_remains_a_compatibility_alias(testCase)
-   % SETPATH must return the same paths as GETPATH.
-
-   returned = icemodel.setpath('restart', 'kanm', 'skinmodel', '', [], ...
-      'case01');
-   expected = icemodel.getpath('restart', 'kanm', 'skinmodel', '', [], ...
-      'case01');
-
-   testCase.verifyEqual(returned, expected);
 end
 
 function test_configureRun_builds_default_restart_path(testCase)

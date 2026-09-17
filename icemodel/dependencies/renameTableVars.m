@@ -2,9 +2,9 @@ function tbl = renameTableVars(tbl, oldvars, newvars)
    %RENAMETABLEVARS Rename variables in a table.
    %
    %   TBL = renameTableVars(TBL, OLDVARS, NEWVARS) renames the variables in the
-   %   table TBL. OLDVARS is a cell array or string array of the current variable
-   %   names, and NEWVARS is a cell array or string array of the new variable
-   %   names. OLDVARS and NEWVARS must have the same length.
+   %   table TBL. OLDVARS is a cell array or string array of the current
+   %   variable names, and NEWVARS is a cell array or string array of the new
+   %   variable names. OLDVARS and NEWVARS must have the same length.
    %
    %   Note that this function is deliberately designed for pre-R2020a
    %   compatibility. For MATLAB versions >=R2020a, use renamevars.
@@ -23,7 +23,7 @@ function tbl = renameTableVars(tbl, oldvars, newvars)
    %
    %   See also: renamevars
 
-   % Ensure oldvars and newvars are cell arrays of strings
+   % Ensure oldvars and newvars are cellstr arrays
    if ischar(oldvars)
       oldvars = {oldvars};
    end
@@ -42,8 +42,9 @@ function tbl = renameTableVars(tbl, oldvars, newvars)
    newvars = string(newvars);
 
    % Ensure oldvars and newvars have the same length
-   assert(numel(oldvars) == numel(newvars), ...
-      'OLDVARS and NEWVARS must have the same length.');
+   eid = ['custom:' mfilename ':equalNumberVarsRequired'];
+   msg = 'OLDVARS and NEWVARS must have the same length.';
+   assert(numel(oldvars) == numel(newvars), eid, msg);
 
    % Get the current variable names of the table
    varnames = string(tbl.Properties.VariableNames);
@@ -53,7 +54,9 @@ function tbl = renameTableVars(tbl, oldvars, newvars)
       if any(strcmp(oldvars(n), varnames))
          tbl.Properties.VariableNames{char(oldvars(n))} = char(newvars(n));
       else
-         warning('Variable name %s not found in the table.', oldvars(n));
+         wid = ['custom:' mfilename ':variableNamesMissing'];
+         msg = 'Variable name %s not found in the table.';
+         warning(wid, msg, oldvars(n));
       end
    end
 end

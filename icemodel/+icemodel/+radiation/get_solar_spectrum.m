@@ -11,7 +11,7 @@ function [I0, solar, solar_dwavel] = get_solar_spectrum( ...
    % The spectral model works with one fixed prototype solar spectrum. I0 is the
    % corresponding integrated incoming shortwave over that prototype spectrum.
    %
-   % The model ships optical properties (mie.dat) on a defined 118-band
+   % The model ships optical properties (mie.mat) on a defined 118-band
    % wavelength grid. The solar spectrum is interpolated to these bands here.
    %
    %#codegen

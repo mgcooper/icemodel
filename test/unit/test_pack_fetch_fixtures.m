@@ -876,6 +876,30 @@ function test_symlinked_destination_ancestor_is_rejected(testCase)
    testCase.verifyFalse(isfolder(fullfile(real_parent, "new-root")));
 end
 
+function test_relative_path_finds_link_from_current_folder(testCase)
+   % A relative path must resolve against the current MATLAB folder. Java
+   % user.dir does not follow a second cd, so the check changes folders twice.
+   real_parent = canonicalTempname();
+   alias_parent = canonicalTempname();
+   linked_parent = fullfile(alias_parent, "destination-parent");
+   mkdir(real_parent)
+   mkdir(alias_parent)
+   makeSymbolicLink(real_parent, linked_parent);
+   cleaner = onCleanup(@() cleanupLinkedParent( ...
+      linked_parent, [alias_parent; real_parent]));
+   original_folder = pwd;
+   folder_cleanup = onCleanup(@() cd(original_folder));
+
+   % Enter an unrelated folder first, then the folder that holds the link.
+   cd(real_parent)
+   cd(alias_parent)
+   returned = icemodel.verification.setup.fixtureCallerSymlink( ...
+      fullfile("destination-parent", "new-root"));
+   expected = linked_parent;
+   testCase.verifyEqual(returned, expected);
+   clear folder_cleanup cleaner
+end
+
 function test_known_tmp_alias_allows_safe_pack_and_fetch(testCase)
    % The system /tmp alias is safe when no caller-created descendant is linked.
    source = aliasTempname();

@@ -25,9 +25,9 @@ function [T_sfc, ok] = solve_surface_energy_balance(T_sfc, tair, Qsi, ...
    %  iterate (old = T_sfc on each call), and evaluates the seb and its full
    %  derivative wrt T_sfc at each inner step.
    %
-   %  - For a "skinmodel", Tsfc never exceeds Tf when passed into functions, but
-   %  within the iterations of solve_surface_temperature and when it comes out
-   %  of solve_surface_temperature it can exceed Tf.
+   %  - For a "skinmodel", T_sfc never exceeds Tf when passed into functions,
+   %  but within the iterations of solve_surface_temperature and when it comes
+   %  out of solve_surface_temperature it can exceed Tf.
    %
    %#codegen
 
@@ -128,7 +128,7 @@ function [T_sfc, ok] = solve_surface_energy_balance(T_sfc, tair, Qsi, ...
    end
 end
 
-function dumpSebSolveFailure(solver, iter, T_sfc_old, T_sfc, tair, ...
+function dumpSebSolveFailure(seb_solver, iter, T_sfc_old, T_sfc, tair, ...
       Qsi, Qli, albedo, wspd, ppt, tppt, psfc, ea_atm, ro_atm, ...
       cv_atm, nu_air, H_h, H_e, hv_atm, br_coefs, liqflag, chi, ...
       T_ice, k_eff, dz, ro_sfc, snow_depth, ok_cpl, opts)
@@ -141,10 +141,10 @@ function dumpSebSolveFailure(solver, iter, T_sfc_old, T_sfc, tair, ...
 
    debug_state = struct();
    debug_state.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
-   debug_state.solver = solver;
+   debug_state.seb_solver = seb_solver;
    debug_state.iter = iter;
-   debug_state.Ts_old = T_sfc_old;
-   debug_state.Ts = T_sfc;
+   debug_state.T_sfc_old = T_sfc_old;
+   debug_state.T_sfc = T_sfc;
    debug_state.tair = tair;
    debug_state.Qsi = Qsi;
    debug_state.Qli = Qli;

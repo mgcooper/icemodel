@@ -1,0 +1,107 @@
+# icemodel.test
+
+Purpose: Shared code for the test suites under `test/`. The test runners,
+the baseline builders, and the test files call these functions.
+`test/README.md` describes the suites and the baseline workflow.
+
+Contents:
+
+- `+fixtures` builds synthetic inputs for tests:
+  - `cleanupSyntheticWorkspace`
+  - `makeReconstructSeries`
+  - `makeSyntheticColumnState`
+  - `makeSyntheticMetFile`
+  - `makeSyntheticWorkspace`
+  - `writeSyntheticMetFile`
+  - `writeSyntheticUserdataFile`
+- `+verify` holds reusable assertions:
+  - `verifyEqualNested`
+  - `verifyProcessedOutputBounds`
+- `+helpers` holds the runner and baseline code, grouped by task:
+  - Case matrices and model runs:
+    - `getRegressionCaseMatrix`
+    - `getPerfCaseMatrix`
+    - `getFormalTestSuiteCases`
+    - `makeFormalCaseId`
+    - `normalizeFormalCaseId`
+    - `setModelOptsForCase`
+    - `buildSyntheticOpts`
+    - `runModelCase`
+    - `runSmbModel`
+    - `resolveRequestedSmbmodels`
+    - `smbmodelTag`
+    - `getRunoffSite`
+  - Environment and data roots:
+    - `bootstrapTestEnvironment`
+    - `resolveReleaseDataRoots`
+    - `formalBaselinePolicy`
+    - `getFormalForcing`
+    - `markTestSessionDirty`
+    - `testSessionActivity`
+    - `assertCleanPerfSession`
+  - Baselines, references, and artifacts:
+    - `loadBaseline`
+    - `loadReference`
+    - `loadArtifact`
+    - `loadSavedTable`
+    - `baselineFilePath`
+    - `referenceFilePath`
+    - `artifactFilePath`
+    - `findCaseRow`
+    - `findRunoffReferenceRow`
+    - `resolveBaselineSelector`
+    - `resolveBaselineBuild`
+    - `prepareBaselineBuild`
+    - `archiveManagedBaseline`
+    - `managedBaselineSiblings`
+    - `assertFormalBaselineCandidate`
+    - `assertFormalBaselineForcing`
+    - `assertCommonBaselineRevision`
+    - `assertNewReleaseBaselineTarget`
+    - `snapshotBaseline`
+    - `transactionalSnapshotSet`
+    - `publishBaselineBundleSet`
+    - `removeReleaseSnapshotArtifacts`
+    - `resolveBootstrapRelease`
+    - `sourceRevisionGuard`
+    - `worktreeRevision`
+    - `machineHostname`
+  - Regression metrics and gates:
+    - `summarizeIce1Metrics`
+    - `formalRegressionMetricEvidence`
+    - `regressionCaseGates`
+    - `regressionFailures`
+    - `loadProcessedMetForOutputYears`
+    - `displayRegressionResults`
+    - `displayRegressionSummary`
+  - Performance timing:
+    - `measurePerfCase`
+    - `runPerfCase`
+    - `runPerfCaseSubprocess`
+    - `retryInvalidMeasurement`
+    - `perfMeasurementPolicy`
+    - `perfSampleValidity`
+    - `perfBaselineCompatibility`
+    - `performanceGate`
+    - `formalPerformanceVerdict`
+    - `ambientAnchorVerdict`
+    - `assertAmbientBaselineAcceptance`
+    - `displayPerfResults`
+    - `displayPerfSummary`
+  - Benchmarks and profiler files:
+    - `runBenchmarkDiagnostics`
+    - `benchmarkSuiteSignature`
+    - `assertFormalBenchmarkCandidate`
+    - `captureBaselineProfile`
+    - `baselineProfilerDir`
+    - `publishBaselineProfile`
+    - `commitBaselineProfilePublication`
+    - `rollbackBaselineProfilePublication`
+    - `removeBaselineProfileStage`
+  - Other test support:
+    - `resolveRunStamp`
+    - `sanitizeTag`
+    - `printFilePath`
+    - `captureExpectedWarning`
+    - `buildThfValidationCases`
+    - `runThfValidationCase`
