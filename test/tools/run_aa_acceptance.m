@@ -21,7 +21,8 @@ function report = run_aa_acceptance(artifacts_a, artifacts_b)
    %  - each side has the same artifact count and no duplicate paths
    %  - the two sides share no paths
    %  - each side has one meta.run_name, and the two names differ
-   %  - every artifact has the same nonempty meta.hostname
+   %  - every artifact has the same nonempty meta.hostname, compared
+   %    through icemodel.test.helpers.normalizeMachineIdentity
    %  - every artifact has the same MATLAB version and input data root
    %  - every artifact has the same nonempty meta.git_revision
    %  - tier, simyear, n_runs, n_warmups, and tol_perf match
@@ -106,7 +107,15 @@ function report = run_aa_acceptance(artifacts_a, artifacts_b)
    assert(all(~ismissing(versions)) && all(strlength(strip(versions)) > 0), ...
       'icemodel:test:aaAcceptance:unknownMatlabVersion', ...
       'run_aa_acceptance needs a recorded MATLAB version in every artifact')
-   assert(isscalar(unique(hosts)) && isscalar(unique(versions)), ...
+   % Normalize before the uniqueness check: an artifact that saved a
+   % hostname value (for example "MacBook-Air-2.local") and one saved after
+   % a simulated network change (for example "macbook-air-2") name the
+   % same machine. This matches
+   % the normalization icemodel.test.helpers.perfBaselineCompatibility
+   % applies.
+   normalized_hosts = arrayfun( ...
+      @icemodel.test.helpers.normalizeMachineIdentity, hosts);
+   assert(isscalar(unique(normalized_hosts)) && isscalar(unique(versions)), ...
       'icemodel:test:aaAcceptance:environmentMismatch', ...
       'run_aa_acceptance needs one machine and MATLAB version for both runs')
 

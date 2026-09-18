@@ -359,7 +359,8 @@ Notes:
   - artifact lists have equal lengths and no duplicate paths
   - the two sides share no paths
   - each side has one run name, and the two names differ
-  - every artifact has the same nonempty hostname
+  - every artifact has the same nonempty machine identity, compared after
+    `normalizeMachineIdentity`
   - every artifact has the same MATLAB version and data root
   - every artifact has the same nonempty source revision
   - tier, simulation year, sample count, warmup count, and tolerance match

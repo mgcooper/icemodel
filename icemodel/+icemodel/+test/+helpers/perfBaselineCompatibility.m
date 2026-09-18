@@ -1,18 +1,40 @@
 function [compatible, reason] = perfBaselineCompatibility( ...
-      baseline_meta, isolation)
+      baseline_meta, isolation, current_identity)
    %PERFBASELINECOMPATIBILITY Decide whether wall-time comparison is fair.
    %
    %  [compatible, reason] = ...
    %     icemodel.test.helpers.perfBaselineCompatibility(baseline_meta, ...
    %     isolation)
+   %  [compatible, reason] = ...
+   %     icemodel.test.helpers.perfBaselineCompatibility(baseline_meta, ...
+   %     isolation, current_identity)
    %
    % A timing gate is fair only when the baseline and the current run
    % measured under the same environment and the same isolation protocol.
    % When COMPATIBLE is false, the caller reports validity-only results
    % and REASON states the mismatch.
    %
+   % CURRENT_IDENTITY is an optional machine identity that replaces the
+   % live probe; it defaults to icemodel.test.helpers.machineHostname().
+   % A test passes it to compare a baseline against a chosen identity
+   % without depending on the host machine's own hostname. Both
+   % CURRENT_IDENTITY and BASELINE_META.hostname are normalized through
+   % icemodel.test.helpers.normalizeMachineIdentity before comparison, so
+   % a baseline that saved a hostname value (for example
+   % "MacBook-Air-2.local") stays compatible with the LocalHostName-derived
+   % identity (for example "macbook-air-2"); without the normalization a
+   % simulated network change would appear to break that compatibility.
+   %
    % See also: icemodel.test.helpers.formalPerformanceVerdict,
-   %  run_perf_suite, build_perf_baseline
+   %  icemodel.test.helpers.normalizeMachineIdentity, run_perf_suite,
+   %  build_perf_baseline
+
+   % Resolve the live probe below, once and only after the metadata checks
+   % pass, so an invalid or incomplete BASELINE_META returns early without
+   % probing the machine.
+   if nargin < 3
+      current_identity = [];
+   end
 
    compatible = false;
    reason = "";
@@ -50,12 +72,24 @@ function [compatible, reason] = perfBaselineCompatibility( ...
       return
    end
 
+   % Probe the machine only after the checks above pass. machineHostname()
+   % returns a normalized identity, so normalizing it again is a no-op;
+   % the call is here so a test can pass a raw, un-normalized
+   % CURRENT_IDENTITY.
+   if isempty(current_identity)
+      current_identity = icemodel.test.helpers.machineHostname();
+   end
    current_version = string(version);
    current_host = string(computer);
-   current_hostname = icemodel.test.helpers.machineHostname();
+   current_hostname = icemodel.test.helpers.normalizeMachineIdentity( ...
+      string(current_identity));
    baseline_version = string(baseline_meta.matlab_version);
    baseline_host = string(baseline_meta.host);
-   baseline_hostname = string(baseline_meta.hostname);
+   % Normalize the baseline side the same way, so a record that saved a
+   % hostname value (for example "MacBook-Air-2.local") compares equal to
+   % the LocalHostName-derived identity machineHostname() returns.
+   baseline_hostname = icemodel.test.helpers.normalizeMachineIdentity( ...
+      string(baseline_meta.hostname));
    compatible = current_version == baseline_version && ...
       current_host == baseline_host && current_hostname == baseline_hostname;
 

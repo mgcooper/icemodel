@@ -620,22 +620,25 @@ end
 
 function test_machine_hostname_trims_command_output(testCase)
    % The saved identity excludes whitespace from the hostname command.
+   % The probe takes the command string as an argument; is_mac=false
+   % selects the non-macOS branch, which calls the probe once, for
+   % "hostname" only. test_machine_identity.m covers the macOS branches.
    returned = icemodel.test.helpers.machineHostname( ...
-      @() deal(0, sprintf('  test-machine  \n')));
+      @(command) deal(0, sprintf('  test-machine  \n')), false);
    testCase.verifyEqual(returned, "test-machine");
 end
 
 function test_machine_hostname_rejects_blank_output(testCase)
    % A successful command with no machine name cannot identify the host.
    testCase.verifyError(@() icemodel.test.helpers.machineHostname( ...
-      @() deal(0, "   ")), ...
+      @(command) deal(0, "   ")), ...
       'icemodel:test:perf:machineIdentityUnavailable');
 end
 
 function test_machine_hostname_rejects_command_failure(testCase)
    % Command failure cannot produce a trusted machine identity.
    testCase.verifyError(@() icemodel.test.helpers.machineHostname( ...
-      @() deal(1, "test-machine")), ...
+      @(command) deal(1, "test-machine")), ...
       'icemodel:test:perf:machineIdentityUnavailable');
 end
 
