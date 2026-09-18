@@ -228,10 +228,11 @@ Important note:
   invalid, the run records `meta.ambient_stable = false` once and
   `results.quality.passed = false`; every case keeps its own verdict.
   `measure_anchor=false` skips the anchor for a quick diagnostic comparison
-- every run records `meta.attestation`: foreign MATLAB process count,
-  minimum, median, and maximum one-minute load average, and AC power,
-  sampled at run start, after each case, and at run end; each case row
-  also records the load average and foreign count sampled right after it
+- every run records `meta.attestation`: foreign MATLAB process count, the
+  one-minute load average at run start and its minimum, median, and
+  maximum over the run, and AC power, sampled at run start, after each
+  case, and at run end; each case row also records the load average and
+  foreign count sampled right after it
 - `results.passed` is the comparison verdict and `results.quality` the
   measurement quality verdict of `perfMeasurementQuality`; a release gate
   blocks on quality and reads the comparison as information

@@ -194,6 +194,7 @@ function test_summary_reduces_samples_to_the_attestation(testCase)
    returned = icemodel.test.helpers.summarizeMachineState(samples);
    testCase.verifyEqual(returned.sample_count, 3);
    testCase.verifyEqual(returned.foreign_matlab_processes, 1);
+   testCase.verifyEqual(returned.load_average_at_start, 1.0);
    testCase.verifyEqual(returned.load_average_min, 1.0);
    testCase.verifyEqual(returned.load_average_median, 2.0);
    testCase.verifyEqual(returned.load_average_max, 3.5);
@@ -253,6 +254,13 @@ function test_quality_passes_only_on_all_five_conditions(testCase)
 
    no_attestation = rmfield(meta, 'attestation');
    returned = icemodel.test.helpers.perfMeasurementQuality(rows, no_attestation);
+   testCase.verifyFalse(returned.conditions.attestation);
+
+   % An attestation without the run-start load, the shape a file written
+   % before that field existed would carry, does not satisfy the condition.
+   old_shape = meta;
+   old_shape.attestation = rmfield(meta.attestation, 'load_average_at_start');
+   returned = icemodel.test.helpers.perfMeasurementQuality(rows, old_shape);
    testCase.verifyFalse(returned.conditions.attestation);
 
    % A run that skipped the anchor names that cause, not a drift.
@@ -317,11 +325,17 @@ function test_release_source_check_refuses_each_condition(testCase)
    testCase.verifyError(@() check(rows, busy), ...
       'icemodel:test:releasePerfSourceForeignMatlab');
 
+   % The run-start load is gated; the run's own subprocesses raise the
+   % later samples, which are recorded but not gated.
    loaded = meta;
    loaded.attestation = icemodel.test.helpers.summarizeMachineState( ...
-      fakeSamples([1.0 4.5], [0 0], [true true]));
+      fakeSamples([4.5 1.0], [0 0], [true true]));
    testCase.verifyError(@() check(rows, loaded), ...
       'icemodel:test:releasePerfSourceLoadAverage');
+   busy_later = meta;
+   busy_later.attestation = icemodel.test.helpers.summarizeMachineState( ...
+      fakeSamples([1.5 6.4 5.8], [0 0 0], [true true true]));
+   testCase.verifyWarningFree(@() check(rows, busy_later));
 
    battery = meta;
    battery.attestation = icemodel.test.helpers.summarizeMachineState( ...
@@ -343,7 +357,7 @@ function test_release_load_threshold_lives_in_the_policy(testCase)
    testCase.verifyEqual(policy.load_average_max, 4.0);
    [rows, meta] = compliantSource();
    meta.attestation = icemodel.test.helpers.summarizeMachineState( ...
-      fakeSamples([1.0 4.0], [0 0], [true true]));
+      fakeSamples([4.0 1.0], [0 0], [true true]));
    testCase.verifyWarningFree(@() ...
       icemodel.test.helpers.assertReleasePerfBaselineSource(rows, meta, ...
       current_identity="macbook-air-2"));

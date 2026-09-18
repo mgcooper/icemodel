@@ -22,10 +22,13 @@ function policy = perfMeasurementPolicy()
    %                   default their tol_perf argument from it, and the
    %                   A/A diagnostic (run_aa_acceptance) accepts B/A
    %                   ratios inside [1/(1 + tol_perf), 1 + tol_perf].
-   %  load_average_max - largest one-minute load average that a release
+   %  load_average_max - largest one-minute load average, sampled at run
+   %                   start before the first measurement, that a release
    %                   snapshot accepts in the rolling source's
    %                   attestation. 4.0 is the gate the pre-snow sweep
-   %                   applied by hand before each timing run.
+   %                   applied by hand before each timing run. Later
+   %                   samples include the run's own subprocesses and are
+   %                   recorded, not gated.
    %
    % See also: icemodel.test.helpers.perfSampleValidity,
    %  icemodel.test.helpers.perfMeasurementQuality,

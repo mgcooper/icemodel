@@ -8,10 +8,12 @@ function assertReleasePerfBaselineSource(PerfBaseline, meta, kwargs)
    % metadata instead. A release source must pass the five quality
    % conditions of perfMeasurementQuality, must have been measured on the
    % machine that runs the snapshot, and must carry an attestation with zero
-   % foreign MATLAB processes, a maximum one-minute load average at or below
-   % perfMeasurementPolicy().load_average_max, and AC power. A rolling
-   % baseline that misses any of these may exist; it cannot become a release
-   % baseline.
+   % foreign MATLAB processes in every sample, a one-minute load average at
+   % run start at or below perfMeasurementPolicy().load_average_max, and AC
+   % power in every sample. The run-start load is the gated value because
+   % the run's own subprocesses raise the load average of the later samples.
+   % A rolling baseline that misses any of these may exist; it cannot become
+   % a release baseline.
    %
    % Name-value
    %  current_identity  Identity of the machine running the snapshot.
@@ -55,11 +57,12 @@ function assertReleasePerfBaselineSource(PerfBaseline, meta, kwargs)
          'during measurement; a release source needs zero.'], ...
          attestation.foreign_matlab_processes)
    end
-   if ~(attestation.load_average_max <= kwargs.policy.load_average_max)
+   if ~(attestation.load_average_at_start <= kwargs.policy.load_average_max)
       error('icemodel:test:releasePerfSourceLoadAverage', ...
-         ['The rolling perf baseline saw a one-minute load average of ', ...
-         '%.2f; a release source needs at most %.2f.'], ...
-         attestation.load_average_max, kwargs.policy.load_average_max)
+         ['The rolling perf baseline started on a one-minute load average ', ...
+         'of %.2f; a release source needs at most %.2f before the first ', ...
+         'measurement.'], attestation.load_average_at_start, ...
+         kwargs.policy.load_average_max)
    end
    if ~attestation.ac_power
       error('icemodel:test:releasePerfSourceBatteryPower', ...

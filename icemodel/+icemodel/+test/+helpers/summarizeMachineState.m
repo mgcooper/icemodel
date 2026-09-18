@@ -12,8 +12,14 @@ function attestation = summarizeMachineState(samples)
    %  sample_count              Number of samples.
    %  foreign_matlab_processes  Largest foreign MATLAB count seen. NaN when
    %                            any sample could not read the process list.
+   %  load_average_at_start     The one-minute load average of the first
+   %                            sample, taken before the first measurement.
+   %                            The run's own subprocesses raise the later
+   %                            samples, so this is the value the release
+   %                            gate reads.
    %  load_average_min, load_average_median, load_average_max
-   %                            Statistics of the one-minute load average.
+   %                            Statistics of the one-minute load average
+   %                            over every sample, recorded for the reader.
    %  ac_power                  True only when every sample drew AC power.
    %  load_average_samples, foreign_matlab_samples, ac_power_samples,
    %  sampled_utc               The per-sample values, in order.
@@ -37,6 +43,7 @@ function attestation = summarizeMachineState(samples)
    attestation = struct( ...
       'sample_count', numel(samples), ...
       'foreign_matlab_processes', max(foreign, [], 'includenan'), ...
+      'load_average_at_start', loads(1), ...
       'load_average_min', min(loads, [], 'includenan'), ...
       'load_average_median', median(loads), ...
       'load_average_max', max(loads, [], 'includenan'), ...

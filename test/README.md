@@ -198,9 +198,9 @@ Programmatic regression helpers:
         quality conditions (`results.quality.passed = false`).
      5. Every run records a machine-state attestation
         (`meta.attestation`): the largest count of foreign MATLAB
-        processes seen, the minimum, median, and maximum one-minute load
-        average, and the AC power state, sampled at run start, after each
-        case, and at run end. `run_perf_suite(measure_anchor=false)` skips
+        processes seen, the one-minute load average at run start and its
+        minimum, median, and maximum over the run, and the AC power state,
+        sampled at run start, after each case, and at run end. `run_perf_suite(measure_anchor=false)` skips
         the anchor for a quick diagnostic comparison.
    - A/A diagnostic for the protocol: two consecutive
      `isolation="process"` runs of the same commit pass only when every row is
@@ -218,10 +218,12 @@ Programmatic regression helpers:
      writes a rolling file after a finite, valid drifted anchor and records
      `ambient_drift_accepted = true`; `snapshot_perf_baseline` refuses that
      file as a release source. A release snapshot also requires the rolling
-     source's attestation to show zero foreign MATLAB processes, a maximum
-     one-minute load average at or below `perfMeasurementPolicy().load_average_max`,
-     and AC power, and the recorded machine identity must equal the machine
-     running the snapshot. For a release, rebuild the rolling performance
+     source's attestation to show zero foreign MATLAB processes in every
+     sample, a one-minute load average at run start at or below
+     `perfMeasurementPolicy().load_average_max` (the run's own subprocesses
+     raise the later samples, which are recorded but not gated), and AC
+     power in every sample, and the recorded machine identity must equal the
+     machine running the snapshot. For a release, rebuild the rolling performance
      baseline on a quiet machine after the comparison even when the
      comparison passes.
    - Isolation joins the baseline-compatibility check: timings compare
