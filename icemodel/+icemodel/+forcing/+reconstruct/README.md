@@ -276,8 +276,10 @@ Methods admit only through this validation harness:
     plan/audit, readiness, and proxy-window artifacts consumed by the report.
     Paths are relative to the selected data root, so moving the complete staged
     tree does not invalidate provenance.
-  - **Runtime binding.** The filled artifact records the engine version, policy
-    SHA-256, donor list, and exact planned channel set. Runtime loading verifies
+  - **Runtime binding.** `stampGapfillIdentity` writes the filled artifact's
+    identity: the engine version, policy SHA-256, donor list, exact planned
+    channel set, registry, seed, and the ISO 8601 UTC generation time
+    (`gapfill_generated_utc`, metadata only). Runtime loading verifies
     the readiness ledger and every configured filled met file against that
     transaction's producer manifest before trusting the site/product identity,
     canonical provenance registry, or typed provenance arrays.

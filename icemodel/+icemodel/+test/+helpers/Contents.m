@@ -8,11 +8,13 @@
 %   icemodel.test.helpers.artifactFilePath                   - Return the canonical artifact file path
 %   icemodel.test.helpers.assertAmbientBaselineAcceptance    - Validate the final baseline anchor
 %   icemodel.test.helpers.assertCleanPerfSession             - Refuse an in-session formal run in a dirty session
-%   icemodel.test.helpers.assertCommonBaselineRevision       - Require one source revision for a model set
+%   icemodel.test.helpers.assertCleanSnapshotWorktree        - Require a clean worktree for a release snapshot
 %   icemodel.test.helpers.assertFormalBaselineCandidate      - Reject incomplete state before publication
 %   icemodel.test.helpers.assertFormalBaselineForcing        - Verify a baseline's registered forcing identity
 %   icemodel.test.helpers.assertFormalBenchmarkCandidate     - Reject invalid component timing evidence
 %   icemodel.test.helpers.assertNewReleaseBaselineTarget     - Reject an existing immutable release file
+%   icemodel.test.helpers.assertPerfBuildQuality             - Require measurement quality before a managed build
+%   icemodel.test.helpers.assertReleasePerfBaselineSource    - Verify a rolling perf source for release
 %   icemodel.test.helpers.baselineFilePath                   - Return the canonical baseline file path
 %   icemodel.test.helpers.baselineProfilerDir                - Return the profiler-artifact folder for a baseline file
 %   icemodel.test.helpers.benchmarkSuiteSignature            - Hash the managed core benchmark suite
@@ -41,14 +43,16 @@
 %   icemodel.test.helpers.loadProcessedMetForOutputYears     - Load processed met limited to output years
 %   icemodel.test.helpers.loadReference                      - Load a test reference table
 %   icemodel.test.helpers.loadSavedTable                     - Load a saved table-like object from a MAT file
-%   icemodel.test.helpers.machineHostname                    - Return the current machine's trimmed hostname
+%   icemodel.test.helpers.machineHostname                    - Return a normalized, network-independent machine identity
 %   icemodel.test.helpers.makeFormalCaseId                   - Return canonical formal-suite identifier for one model run
 %   icemodel.test.helpers.managedBaselineSiblings            - Return the baseline files one build writes
 %   icemodel.test.helpers.markTestSessionDirty               - Record that this MATLAB session ran a test suite
 %   icemodel.test.helpers.measurePerfCase                    - Measure one case under the selected isolation protocol
 %   icemodel.test.helpers.normalizeFormalCaseId              - Normalize legacy formal-suite identifiers
+%   icemodel.test.helpers.normalizeMachineIdentity           - Fold a machine name to a stable identity
 %   icemodel.test.helpers.perfBaselineCompatibility          - Decide whether wall-time comparison is fair
 %   icemodel.test.helpers.perfMeasurementPolicy              - Formal timing gate thresholds
+%   icemodel.test.helpers.perfMeasurementQuality             - Judge a perf run on its measurement quality
 %   icemodel.test.helpers.performanceGate                    - Compare one runtime to a two-sided accepted band
 %   icemodel.test.helpers.perfSampleValidity                 - Decide whether one case's timing samples are usable
 %   icemodel.test.helpers.prepareBaselineBuild               - Resolve shared setup for perf/regression baseline builds
@@ -74,14 +78,15 @@
 %   icemodel.test.helpers.runPerfCaseSubprocess              - Run one formal perf case in this fresh session
 %   icemodel.test.helpers.runSmbModel                        - Dispatch to the requested core SMB model kernel
 %   icemodel.test.helpers.runThfValidationCase               - Run one real-case THF validation scenario
+%   icemodel.test.helpers.sampleMachineState                 - Sample the machine conditions that disturb a timing
 %   icemodel.test.helpers.sanitizeTag                        - Replace punctuation and whitespace for filename-safe tags
 %   icemodel.test.helpers.setModelOptsForCase                - Build resolved model OPTS for one case
 %   icemodel.test.helpers.smbmodelTag                        - Return canonical smbmodel tag for filenames and identifiers
 %   icemodel.test.helpers.snapshotBaseline                   - Save a release snapshot from the rolling test baseline
-%   icemodel.test.helpers.sourceRevisionGuard                - Capture or verify the current source revision
 %   icemodel.test.helpers.summarizeIce1Metrics               - Extract formal regression metrics from output and refs
+%   icemodel.test.helpers.summarizeMachineState              - Reduce machine-state samples to one attestation
 %   icemodel.test.helpers.testSessionActivity                - Return the suites this MATLAB session has run
 %   icemodel.test.helpers.transactionalSnapshotSet           - Create and validate an aggregate release set
-%   icemodel.test.helpers.worktreeRevision                   - Return a content-sensitive Git source identity
+%   icemodel.test.helpers.worktreeRevision                   - Return the Git description of the source tree
 %
-%   updatecontents.m generated this file on 14 Sep 2026 at 20:14:00.
+%   updatecontents.m generated this file on 18 Sep 2026 at 01:12:19.

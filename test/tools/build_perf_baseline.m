@@ -29,9 +29,19 @@ function PerfBaseline = build_perf_baseline(kwargs)
    %
    % The saved MAT file also carries the managed core benchmark timings.
    % Profiler artifacts are an opt-in, single-model diagnostic.
-   % ACCEPT_AMBIENT_DRIFT accepts complete release measurements after a
-   % finite, valid final anchor falls outside its tolerance. The saved
-   % metadata records the failed anchor and use of the override.
+   % ACCEPT_AMBIENT_DRIFT writes a rolling baseline after a finite, valid
+   % final anchor falls outside its tolerance. The saved metadata records
+   % the failed anchor and ambient_drift_accepted=true, and
+   % snapshot_perf_baseline refuses such a file as a release source. A
+   % noisy rolling baseline may exist; it cannot become a release baseline.
+   %
+   % The build accepts a managed candidate on measurement quality alone:
+   % valid samples, process isolation, one machine, a stable anchor (or the
+   % override above), and the machine-state attestation that every build
+   % records. A managed build refuses a session measurement before it
+   % starts and refuses any other failed condition before it publishes. A
+   % custom OUTPUT_FILE is a diagnostic copy that records the verdict only.
+   % The build never compares the new rows with the prior rolling file.
    %
    % A custom OUTPUT_FILE is supported only when SMBMODEL resolves to one
    % concrete formal model. Multi-model requests write the managed per-model
@@ -107,6 +117,21 @@ function PerfBaseline = build_perf_baseline(kwargs)
 
       kwargs.accept_ambient_drift (1, 1) logical ...
          = false
+   end
+
+   % A managed rolling file is accepted on measurement quality, and process
+   % isolation is one of its five conditions, so refuse a session build of
+   % the managed file before any bootstrap or measurement. A custom output
+   % file outside the managed tree is a diagnostic copy and may use session
+   % mode; one that names the managed path is a managed build.
+   if kwargs.isolation == "session" && isManagedPerfOutput( ...
+         kwargs.output_file, kwargs.baseline_tag, kwargs.baseline, ...
+         kwargs.smbmodel, kwargs.simyear)
+      error('icemodel:test:perf:managedBuildRequiresProcessIsolation', ...
+         ['isolation="session" cannot write the managed rolling baseline, ', ...
+         'because a session-measured file fails the measurement quality ', ...
+         'conditions. Use isolation="process" (the default), or pass ', ...
+         'output_file for a diagnostic copy.'])
    end
 
    % Resolve the baseline-owned default tree before installing scoped config.
@@ -202,15 +227,10 @@ function PerfBaseline = build_perf_baseline(kwargs)
          'it when smbmodel expands to more than one formal model.'])
    end
 
-   % Ignore every managed sibling that can be rebuilt separately.
-   managed_files = icemodel.test.helpers.managedBaselineSiblings( ...
-      "perf", baseline_selector, output_file, simyear=simyear);
-   revision_reader = @() icemodel.test.helpers.worktreeRevision( ...
-      ignored_paths=managed_files);
-
-   % Measure every saved result from one source tree.
-   build_revision = icemodel.test.helpers.sourceRevisionGuard( ...
-      string.empty(), revision_reader);
+   % Record the source identity once, before the first measurement. A
+   % tracked edit made before the build labels every row -dirty, and
+   % snapshotBaseline refuses such a source for a release file.
+   build_revision = icemodel.test.helpers.worktreeRevision();
 
    % Measure the managed component benchmarks once for the whole build.
    % They are model-independent, so measuring them inside the per-model
@@ -241,10 +261,6 @@ function PerfBaseline = build_perf_baseline(kwargs)
       profile_cleanups{model_index} = onCleanup(@() ...
          icemodel.test.helpers.removeBaselineProfileStage(profile_stage_dir));
    end
-
-   % Reject source edits before archiving or saving any measured candidate.
-   icemodel.test.helpers.sourceRevisionGuard( ...
-      build_revision, revision_reader);
 
    % Publish all model files and profiler sidecars as one transaction.
    bundles = icemodel.test.helpers.publishBaselineBundleSet("perf", bundles);
@@ -310,6 +326,12 @@ function bundle = buildSingleModelPerfBaseline(baseline, ...
    case_order = randperm(height(cases));
    rng(rng_prior);
 
+   % Sample the machine state at run start, after each case, and after the
+   % anchor, so the saved metadata can say whether the machine was quiet.
+   state_samples = repmat( ...
+      icemodel.test.helpers.sampleMachineState(), height(cases) + 2, 1);
+   n_sampled = 1;
+
    % Measure each formal case and save the accepted timing summary.
    for iorder = 1:height(cases)
       c = cases(case_order(iorder), :);
@@ -344,6 +366,13 @@ function bundle = buildSingleModelPerfBaseline(baseline, ...
       rows(k).gate_wall_s = nan;
       rows(k).valid = valid_gate;
       rows(k).passed_perf = valid_gate;
+      % The machine state right after this case, so a reader can tell
+      % which case ran under load.
+      n_sampled = n_sampled + 1;
+      state_samples(n_sampled) = icemodel.test.helpers.sampleMachineState();
+      rows(k).load_average_1min = state_samples(n_sampled).load_average_1min;
+      rows(k).foreign_matlab_processes = ...
+         state_samples(n_sampled).foreign_matlab_processes;
       rows(k).last_updated_utc = datetime('now', 'TimeZone', 'UTC');
 
       case_opts(k).case_id = string(c.case_id);
@@ -371,6 +400,10 @@ function bundle = buildSingleModelPerfBaseline(baseline, ...
    icemodel.test.helpers.assertAmbientBaselineAcceptance( ...
       ambient_stable, anchor_valid, anchor_ratio, ...
       accept_ambient_drift);
+   n_sampled = n_sampled + 1;
+   state_samples(n_sampled) = icemodel.test.helpers.sampleMachineState();
+   attestation = icemodel.test.helpers.summarizeMachineState( ...
+      state_samples(1:n_sampled));
 
    % Convert the accepted case rows into the saved baseline table.
    PerfBaseline = struct2table(rows);
@@ -404,6 +437,7 @@ function bundle = buildSingleModelPerfBaseline(baseline, ...
    meta.ambient_stable = ambient_stable;
    meta.ambient_drift_accepted = ...
       ~ambient_stable && accept_ambient_drift;
+   meta.attestation = attestation;
    meta.timing_scope = "IcemodelPerfTest.testCoreRuntime (runSmbModel only)";
    meta.timing_notes = sprintf([ ...
       'median_wall_s is the median of %d timed samples (wall-clock seconds). ' ...
@@ -424,6 +458,17 @@ function bundle = buildSingleModelPerfBaseline(baseline, ...
    meta.hostname = icemodel.test.helpers.machineHostname();
    meta.git_revision = source_revision;
    meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
+   % A managed rolling file must meet the five quality conditions; the
+   % accepted drift override is the one exception and is recorded as
+   % ambient_drift_accepted so the release snapshot can refuse the file. A
+   % custom output file is a diagnostic copy and records the verdict only.
+   meta.quality = icemodel.test.helpers.perfMeasurementQuality( ...
+      PerfBaseline, meta);
+   if isManagedPerfOutput(output_file, baseline_tag, baseline, ...
+         smbmodel, simyear)
+      icemodel.test.helpers.assertPerfBuildQuality( ...
+         meta.quality, meta.ambient_drift_accepted);
+   end
 
    % Attach the managed component benchmark baseline (measured once at
    % the entrypoint) to the same file so the accepted end-to-end timings
@@ -504,4 +549,35 @@ function [BenchmarkBaseline, meta] = buildBenchmarkBaseline(kwargs)
    meta.timestamp_utc = datetime('now', 'TimeZone', 'UTC');
    meta.matlab_version = string(version);
    meta.host = string(computer);
+end
+
+function tf = isManagedPerfOutput(output_file, baseline_tag, baseline, ...
+      smbmodel, simyear)
+   %ISMANAGEDPERFOUTPUT Decide whether a build writes a managed baseline file.
+   %
+   % A blank OUTPUT_FILE writes the managed file of every requested model.
+   % A nonblank OUTPUT_FILE is managed when it names the managed file of the
+   % one model it may apply to; any other path is a diagnostic copy.
+   if isblanktext(output_file)
+      tf = true;
+      return
+   end
+   models = icemodel.test.helpers.resolveRequestedSmbmodels(smbmodel);
+   if ~isscalar(models)
+      % A custom output file with several models is rejected later at the
+      % entry point; until then it cannot name one managed file.
+      tf = false;
+      return
+   end
+   selector = baseline_tag;
+   if isblanktext(selector)
+      selector = baseline;
+   end
+   [baseline_type, resolved_tag] = ...
+      icemodel.test.helpers.resolveBaselineSelector(selector);
+   managed_file = string(icemodel.test.helpers.baselineFilePath("perf", ...
+      smbmodel=models, baseline_type=baseline_type, ...
+      baseline_tag=resolved_tag, simyear=simyear));
+   tf = icemodel.helpers.canonicalPath(string(output_file)) ...
+      == icemodel.helpers.canonicalPath(managed_file);
 end

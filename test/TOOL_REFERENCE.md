@@ -225,7 +225,16 @@ Important note:
   fails the case as "measurement invalid"
 - an ambient anchor re-measures the first executed case at the end of the
   run; if the anchor drifts more than 15 percent or its re-measurement is
-  invalid, every verdict in the run is marked ambient-invalid
+  invalid, the run records `meta.ambient_stable = false` once and
+  `results.quality.passed = false`; every case keeps its own verdict.
+  `measure_anchor=false` skips the anchor for a quick diagnostic comparison
+- every run records `meta.attestation`: foreign MATLAB process count,
+  minimum, median, and maximum one-minute load average, and AC power,
+  sampled at run start, after each case, and at run end; each case row
+  also records the load average and foreign count sampled right after it
+- `results.passed` is the comparison verdict and `results.quality` the
+  measurement quality verdict of `perfMeasurementQuality`; a release gate
+  blocks on quality and reads the comparison as information
 - whole-model perf gating is skipped when the accepted perf baseline was built
   with a different hostname, MATLAB version, platform, or `isolation`
   protocol; the hostname identifies the machine that supplied the timings
@@ -309,10 +318,17 @@ Notes:
 - the build selector and case matrix use the same explicit forcing-identity
   contract as the regression builder
 - direct versioned builds never overwrite an existing release file
-- `accept_ambient_drift` accepts a build whose final ambient anchor drifted
-  but stayed finite and valid; the saved metadata then records the failed
-  anchor, its ratio, and use of the override. An invalid anchor
-  re-measurement is always rejected.
+- `accept_ambient_drift` writes a rolling build whose final ambient anchor
+  drifted but stayed finite and valid; the saved metadata then records the
+  failed anchor, its ratio, and `ambient_drift_accepted = true`, and
+  `snapshot_perf_baseline` refuses that file as a release source. An invalid
+  anchor re-measurement is always rejected.
+- a managed build accepts on measurement quality alone: it refuses
+  `isolation="session"` before measuring and refuses any other failed
+  condition of `perfMeasurementQuality` before publishing, with the accepted
+  drift override as the one exception; a custom `output_file` records the
+  verdict only. The build never compares the new rows with the prior rolling
+  file; the saved metadata records `meta.attestation` and `meta.quality`
 - by default the rebuilt baselines use the formal 2-year contract:
   retained year plus one leading spinup year
 
@@ -320,11 +336,14 @@ Notes:
 
 Purpose:
 
-- check whether two process-isolated timing runs reproduce each other
+- calibrate `tol_perf`: measure the protocol's reproducibility on this
+  machine in the same units the comparison gate uses
 - diagnose measurement stability when a timing comparison needs investigation
 
-This diagnostic is optional. It does not replace `run_perf_suite` or
-`build_perf_baseline`, and it does not block a release.
+This diagnostic is optional and outside every release path and every routine
+run. With no arguments it costs two full suite runs of the chosen tier. It
+does not replace `run_perf_suite` or `build_perf_baseline`, and it does not
+block a release.
 
 Default use:
 

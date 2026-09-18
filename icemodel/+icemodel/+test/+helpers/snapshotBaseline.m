@@ -1,4 +1,5 @@
-function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, output_file, simyear)
+function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, ...
+      overwrite, output_file, simyear, source_file)
    %SNAPSHOTBASELINE Save a release snapshot from the rolling test baseline.
    %
    %  baseline = icemodel.test.helpers.snapshotBaseline( ...
@@ -8,7 +9,14 @@ function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, ou
    %
    % Existing release files are immutable. New snapshots also require the
    % rolling source rows to match the forcing identity registered for the
-   % requested release tag.
+   % requested release tag, and a rolling source whose recorded revision
+   % carries the -dirty suffix is refused. A managed release file, whether
+   % OUTPUT_FILE is blank or names the managed path, also requires a clean
+   % worktree and, for perf, the release-only measurement conditions of
+   % assertReleasePerfBaselineSource. A custom OUTPUT_FILE outside the
+   % managed tree is a diagnostic copy and skips those two checks.
+   % SOURCE_FILE is a test seam that replaces the managed rolling file;
+   % production callers omit it.
 
    arguments
       kind (1, :) string {mustBeMember(kind, ["perf", "regression"])}
@@ -18,18 +26,26 @@ function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, ou
       overwrite (1, 1) logical = false
       output_file string = string.empty()
       simyear double = NaN
+      source_file string = string.empty()
    end
 
-   % Use the default release baseline path for this target.
+   % Use the default release baseline path for this target. A caller that
+   % names the managed release path explicitly gets the managed checks too,
+   % so the release gates cannot be skipped by spelling the path out.
+   managed_file = string(icemodel.test.helpers.baselineFilePath(kind, ...
+      smbmodel=smbmodel, baseline_type="release", ...
+      baseline_tag=baseline_tag, simyear=simyear));
    if isblanktext(output_file)
-      output_file = icemodel.test.helpers.baselineFilePath(kind, ...
-         smbmodel=smbmodel, baseline_type="release", ...
-         baseline_tag=baseline_tag, simyear=simyear);
+      output_file = managed_file;
    end
+   managed_output = icemodel.helpers.canonicalPath(string(output_file)) ...
+      == icemodel.helpers.canonicalPath(managed_file);
 
    % Copy the current rolling baseline bundle without rerunning the model.
-   source_file = icemodel.test.helpers.baselineFilePath(kind, ...
-      smbmodel=smbmodel, simyear=simyear);
+   if isblanktext(source_file)
+      source_file = icemodel.test.helpers.baselineFilePath(kind, ...
+         smbmodel=smbmodel, simyear=simyear);
+   end
    if ~isfile(char(source_file))
       error('rolling %s baseline is missing: %s', kind, char(source_file))
    end
@@ -57,9 +73,31 @@ function baseline = snapshotBaseline(kind, baseline_tag, smbmodel, overwrite, ou
       error('icemodel:test:releaseBaselineProvenanceMissing', ...
          'The rolling %s baseline has no source revision.', kind)
    end
+   % A rolling file built on a dirty tree records a revision no commit
+   % names, so a release file frozen from it could not be reproduced.
+   if endsWith(string(S.meta.git_revision), "-dirty")
+      error('icemodel:test:releaseBaselineSourceDirty', ...
+         ['The rolling %s baseline was built on a dirty worktree ', ...
+         '(%s). Rebuild it on a clean tree before the snapshot.'], ...
+         kind, char(string(S.meta.git_revision)))
+   end
 
    icemodel.test.helpers.assertFormalBaselineForcing(baseline, "rolling");
    icemodel.test.helpers.assertFormalBaselineForcing(baseline, baseline_tag);
+   % A managed perf release file freezes a measurement, so the rolling
+   % source must pass the release-only measurement conditions read from its
+   % metadata. A custom output file is a diagnostic copy outside the managed
+   % tree and skips the release conditions, as it skips the clean-tree check.
+   if kind == "perf" && managed_output
+      icemodel.test.helpers.assertReleasePerfBaselineSource(baseline, S.meta);
+   end
+   % A managed release file must record a revision one commit names, so the
+   % worktree must be clean apart from the release files this snapshot
+   % sequence writes. The check lives here so every caller of this helper,
+   % not only the snapshot tools, meets it.
+   if managed_output
+      icemodel.test.helpers.assertCleanSnapshotWorktree(baseline_tag);
+   end
    icemodel.test.helpers.assertNewReleaseBaselineTarget( ...
       output_file, overwrite);
 

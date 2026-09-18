@@ -6,8 +6,13 @@ function report = run_aa_acceptance(artifacts_a, artifacts_b)
    %
    % The A/A test runs the same code twice under the formal process-isolated
    % protocol and requires the two runs to reproduce each other. It validates
-   % the measurement system, not the code. Run it before trusting an A/B
-   % comparison.
+   % the measurement system, not the code: it measures the protocol's
+   % reproducibility on this machine in the same units the comparison gate
+   % uses, so it is the tool that answers whether
+   % perfMeasurementPolicy().tol_perf is defensible here. It is a calibration
+   % diagnostic outside every release path and every routine run. With no
+   % arguments it costs two full suite runs of the chosen tier, so run it only
+   % when that question is asked, on a quiet machine.
    %
    % With no arguments, run both measurement passes back to back and compare
    % them. With arguments, compare already-saved artifacts and run nothing

@@ -196,6 +196,12 @@ function test_performance_report_writes_current_ratio_and_history_plots(testCase
    verifySubstring(testCase, source, "accepted rolling baselines")
    verifySubstring(testCase, source, "runtime ratio")
    verifySubstring(testCase, source, "Accepted baseline: `rolling`")
+   % The comparison outcome and the measurement quality verdict are stated
+   % separately, so a passing comparison cannot hide a poor measurement.
+   verifySubstring(testCase, source, "**PASSED**")
+   verifySubstring(testCase, source, ...
+      "Measurement quality: **FAILED** " + char(8212) ...
+      + " the ambient anchor was not measured.")
 end
 
 function test_report_requires_artifact_path_without_output_override(testCase)
@@ -372,8 +378,13 @@ function results = performanceResults()
       median_wall_s, ref_wall_s, floor_wall_s, gate_wall_s, ...
       baseline_compatible, passed_perf, compare_reason);
    meta = struct('baseline_type', "rolling", 'baseline_tag', "");
+   % The comparison passed but the measurement quality did not, so the
+   % report must state both verdicts.
+   quality = struct('passed', false, ...
+      'reasons', "the ambient anchor was not measured", ...
+      'smbmodels', "all");
    results = struct('case_summary', case_summary, 'passed', true, ...
-      'artifact_file', "fixture.mat", 'meta', meta);
+      'artifact_file', "fixture.mat", 'meta', meta, 'quality', quality);
 end
 
 function writePerfHistory(baseline_root)

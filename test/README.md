@@ -127,12 +127,14 @@ Programmatic regression helpers:
 4. `run_regression_suite(...)` and `run_perf_suite(...)`
    - Compare against existing rolling or release baselines
    - Does not mutate baselines
-   - Use `run_aa_acceptance(...)` (in `test/tools`) when you need to check
-     whether two timing runs reproduce each other. It is a diagnostic, not a
-     release gate, and it does not replace `run_perf_suite` or
-     `build_perf_baseline`.
+   - Use `run_aa_acceptance(...)` (in `test/tools`) to calibrate `tol_perf`:
+     it measures the protocol's reproducibility on this machine in the same
+     units the comparison gate uses. It is a diagnostic outside every
+     release path and every routine run, and it does not replace
+     `run_perf_suite` or `build_perf_baseline`.
      With no arguments, it runs two process-isolated passes back to back and
-     compares them. With two artifact lists it compares already-saved runs.
+     compares them, so it costs two full suite runs of the chosen tier. With
+     two artifact lists it compares already-saved runs and runs nothing.
      Every per-case median ratio B/A must lie inside the closed band
      `[1/(1 + tol_perf), 1 + tol_perf]` from the artifacts' common saved
      `meta.tol_perf` value. Both runs must be process-isolated
@@ -190,20 +192,37 @@ Programmatic regression helpers:
      4. An ambient anchor re-measures the first executed case at the end
         of the run. The dispersion gate cannot see load or scheduling
         shifts that are steady within each case but different across
-        cases; an anchor drift above 15 percent marks every verdict in
-        the run ambient-invalid (`meta.ambient_stable = false`).
+        cases; an anchor drift above 15 percent records
+        `meta.ambient_stable = false` once for the run. Every case keeps
+        its own comparison verdict, and the run fails the measurement
+        quality conditions (`results.quality.passed = false`).
+     5. Every run records a machine-state attestation
+        (`meta.attestation`): the largest count of foreign MATLAB
+        processes seen, the minimum, median, and maximum one-minute load
+        average, and the AC power state, sampled at run start, after each
+        case, and at run end. `run_perf_suite(measure_anchor=false)` skips
+        the anchor for a quick diagnostic comparison.
    - A/A diagnostic for the protocol: two consecutive
      `isolation="process"` runs of the same commit pass only when every row is
      inside the tolerance band. Record a failed A/A result as measurement-system
      evidence; it does not block a release baseline refresh.
-   - If an accepted model change causes a comparison failure, document the
-     performance change before rebuilding. Every other comparison failure
-     blocks acceptance. Missing cases, invalid case samples, incomplete
-     matrices, or missing provenance are unusable and must not become a
-     baseline. If only the builder's final ambient anchor fails during a
-     release, `accept_ambient_drift=true` accepts the complete measurements and
-     records the failed anchor in the baseline metadata. For a release, rebuild
-     the rolling performance baseline after the comparison even when the
+   - A perf baseline is accepted on measurement quality, never on agreement
+     with the baseline it replaces: every case sample set valid, process
+     isolation, one machine identity, a stable anchor with no drift override
+     accepted, and the attestation present
+     (`icemodel.test.helpers.perfMeasurementQuality`). A comparison whose
+     median falls outside the band still writes its artifact and does not
+     block a rolling rebuild; document the performance change. Missing
+     cases, invalid case samples, incomplete matrices, or missing provenance
+     must not become a baseline. `build_perf_baseline(accept_ambient_drift=true)`
+     writes a rolling file after a finite, valid drifted anchor and records
+     `ambient_drift_accepted = true`; `snapshot_perf_baseline` refuses that
+     file as a release source. A release snapshot also requires the rolling
+     source's attestation to show zero foreign MATLAB processes, a maximum
+     one-minute load average at or below `perfMeasurementPolicy().load_average_max`,
+     and AC power, and the recorded machine identity must equal the machine
+     running the snapshot. For a release, rebuild the rolling performance
+     baseline on a quiet machine after the comparison even when the
      comparison passes.
    - Isolation joins the baseline-compatibility check: timings compare
      against a baseline only when both used the same isolation protocol

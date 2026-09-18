@@ -27,6 +27,5 @@ Contents:
     - `icemodel.verification.setup.fixtureCallerSymlink`
     - `icemodel.verification.setup.repairRcmArtifactMetadata`
     - `icemodel.test.helpers.resolveReleaseDataRoots`
-    - `icemodel.test.helpers.worktreeRevision`
 - `rmttleapinds`
   - Removes leap-day rows from a timetable.

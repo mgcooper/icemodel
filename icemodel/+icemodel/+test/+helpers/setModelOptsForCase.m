@@ -100,11 +100,13 @@ function opts = optsFromFormalCase(c, kwargs)
    end
    % A frozen release pins the reconstruction policy digest its accepted rows
    % were built with. A blank value, or an older case matrix without the
-   % column, compares against the live policySha256() instead.
+   % column, compares against the live policySha256() instead. The field is
+   % not an initopts default, so it is assigned directly: resetopts accepts
+   % only initopts fields, and assertPromiceFilledArtifact reads the pin
+   % through isfield.
    if isfield(c, 'promice_filled_expected_policy_sha256')
-      opts = icemodel.resetopts(opts, ...
-         'promice_filled_expected_policy_sha256', ...
-         c.promice_filled_expected_policy_sha256);
+      opts.promice_filled_expected_policy_sha256 = ...
+         c.promice_filled_expected_policy_sha256;
    end
 end
 

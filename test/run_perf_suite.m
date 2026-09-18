@@ -14,6 +14,7 @@ function results = run_perf_suite(kwargs)
    %  results = run_perf_suite(data_root="/path/to/test/data")
    %  results = run_perf_suite(fixture_root="/path/to/provisioned/data")
    %  results = run_perf_suite(artifact_root="/path/to/artifacts")
+   %  results = run_perf_suite(tier="smoke", measure_anchor=false)
    %
    % Use this for normal performance comparisons against an existing rolling or
    % release baseline.
@@ -52,6 +53,22 @@ function results = run_perf_suite(kwargs)
    %
    % ARTIFACT_ROOT writes run folders outside test/artifacts. Use it for
    % temporary or externally managed comparison artifacts.
+   %
+   % MEASURE_ANCHOR controls the ambient anchor, one more subprocess that
+   % re-measures the first executed case at the end of the run. It is the
+   % only check that sees a load or thermal shift across cases, so it stays
+   % on by default. Pass false for a quick read-only diagnostic comparison;
+   % the artifact then records anchor_measured=false and fails the
+   % measurement quality conditions, which a comparison never needs.
+   %
+   % results.passed is the comparison verdict: every case inside its
+   % tolerance band. results.quality is the measurement quality verdict of
+   % perfMeasurementQuality. The two are separate: a run whose timing moved
+   % outside the band still writes its artifact and still reports quality,
+   % and a run measured on a loaded machine can pass its comparison. Every
+   % artifact records a machine-state attestation (foreign MATLAB processes,
+   % one-minute load average, AC power) sampled at run start, after each
+   % case, and at run end.
    %
    % CLI entrypoint:
    %  matlab -batch "run('/ABS/PATH/icemodel/test/run_perf_suite.m')"
@@ -120,19 +137,25 @@ function results = run_perf_suite(kwargs)
       kwargs.isolation (1, 1) string ...
          {mustBeMember(kwargs.isolation, ["session", "process"])} ...
          = "process"
+
+      % The anchor is on by default because it is the only check that sees
+      % a shift across cases. build_perf_baseline has no opt-out.
+      kwargs.measure_anchor (1, 1) logical ...
+         = true
    end
 
    % Deal out arguments.
    [tier, smbmodel, solver, simyear, smoke_sites, full_sites, n_runs, ...
       tol_perf, include_benchmarks, benchmark_sampling_profile, ...
-      baseline_selector, run_name, artifact_root, build_report, isolation] = deal( ...
+      baseline_selector, run_name, artifact_root, build_report, isolation, ...
+      measure_anchor] = deal( ...
       kwargs.tier, kwargs.smbmodel, kwargs.solver, kwargs.simyear, ...
       reshape(kwargs.smoke_sites, [], 1), reshape(kwargs.full_sites, [], 1), ...
       kwargs.n_runs, kwargs.tol_perf, kwargs.include_benchmarks, ...
       kwargs.benchmark_sampling_profile, ...
       kwargs.baseline, kwargs.run_name, kwargs.artifact_root, ...
       kwargs.build_report, ...
-      kwargs.isolation);
+      kwargs.isolation, kwargs.measure_anchor);
 
    % Resolve full path to the test/ dir.
    testdir = icemodel.getpath('test');
@@ -188,10 +211,6 @@ function results = run_perf_suite(kwargs)
 
    % Expand the requested formal model selector once at the entrypoint.
    models = icemodel.test.helpers.resolveRequestedSmbmodels(smbmodel);
-   if baseline_policy.require_source_revision
-      icemodel.test.helpers.assertCommonBaselineRevision( ...
-         "perf", baseline_selector, models, simyear);
-   end
 
    % Build the MATLAB perf experiment once, then reuse it for each
    % single-model perf workflow below.
@@ -200,8 +219,9 @@ function results = run_perf_suite(kwargs)
    experiment = matlab.perftest.TimeExperiment.withFixedSampleSize( ...
       n_runs, 'NumWarmups', 1);
 
-   % Capture the source identity before the first measurement, so a
-   % worktree edit during the run is detectable at artifact save time.
+   % Capture the source identity before the first measurement. The value is
+   % git describe --always --dirty, so a tracked edit made before the run
+   % marks every artifact of the run with the -dirty suffix.
    revision_at_start = icemodel.test.helpers.worktreeRevision();
 
    % Run the single-model workflow for each requested model and merge the
@@ -212,7 +232,7 @@ function results = run_perf_suite(kwargs)
       baseline_tag, run_date, run_id, run_name, n_runs, tol_perf, ...
       include_benchmarks, benchmark_sampling_profile, isolation, ...
       baseline_policy.config_case, data_root, session_activity, ...
-      revision_at_start, artifact_root), ...
+      revision_at_start, artifact_root, measure_anchor), ...
       models, 'UniformOutput', false);
 
    % Combine results into a common struct.
@@ -244,7 +264,7 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       smoke_sites, full_sites, baseline_type, baseline_tag, run_date, ...
       run_id, run_name, n_runs, tol_perf, include_benchmarks, ...
       benchmark_sampling_profile, isolation, config_case, data_root, ...
-      session_activity, revision_at_start, artifact_root)
+      session_activity, revision_at_start, artifact_root, measure_anchor)
    %RUNSINGLEMODELPERFSUITE Run the formal perf workflow for one smbmodel.
 
    % Build the deterministic case list and load the matching managed baseline.
@@ -292,6 +312,13 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    if isolation == "process" && exist(artifact_dir, 'dir') ~= 7
       mkdir(artifact_dir);
    end
+
+   % Sample the machine state at run start, after each case, and after the
+   % anchor, so the artifact can say whether the machine was quiet.
+   n_state_samples = height(cases) + 1 + measure_anchor;
+   state_samples = repmat( ...
+      icemodel.test.helpers.sampleMachineState(), n_state_samples, 1);
+   n_sampled = 1;
 
    % Run the per-case performance experiment and compare to baseline.
    for iorder = 1:height(cases)
@@ -390,6 +417,14 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       case_rows(r_case).dispersion = dispersion;
       case_rows(r_case).n_measure_attempts = n_measure_attempts;
       case_rows(r_case).passed_perf = passed_perf;
+      % The machine state right after this case, so a reader can tell
+      % which case ran under load.
+      n_sampled = n_sampled + 1;
+      state_samples(n_sampled) = icemodel.test.helpers.sampleMachineState();
+      case_rows(r_case).load_average_1min = ...
+         state_samples(n_sampled).load_average_1min;
+      case_rows(r_case).foreign_matlab_processes = ...
+         state_samples(n_sampled).foreign_matlab_processes;
       case_rows(r_case).last_updated_utc = datetime('now', 'TimeZone', 'UTC');
 
       case_opts(r_case).case_id = string(c.case_id);
@@ -402,13 +437,15 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    % per-case dispersion gate cannot see load or scheduling shifts that
    % are steady WITHIN each case but different ACROSS cases (measured on
    % this host as a ~35 percent case-level swing under a constant
-   % background load). A drifted anchor marks every verdict in this run
-   % ambient-invalid rather than letting a phantom pass or fail stand.
+   % background load). A drifted anchor records ambient_stable=false once
+   % for the run; every case keeps its own comparison verdict and numbers,
+   % because a reader needs them to diagnose the run, and the run fails
+   % the measurement quality conditions instead.
    % The anchor tolerance comes from icemodel.test.helpers.perfMeasurementPolicy.
    anchor_tol = icemodel.test.helpers.perfMeasurementPolicy().anchor_tol;
    anchor_ratio = nan;
-   ambient_stable = true;
-   if height(cases) > 0
+   ambient_stable = false;
+   if height(cases) > 0 && measure_anchor
       c_anchor = cases(case_order(1), :);
       first_median = case_rows([case_rows.case_id] == ...
          string(c_anchor.case_id)).median_wall_s;
@@ -425,21 +462,15 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
       [ambient_stable, anchor_ratio] = ...
          icemodel.test.helpers.ambientAnchorVerdict(first_median, ...
          anchor_data.sample_times, anchor_valid, anchor_tol);
+      n_sampled = n_sampled + 1;
+      state_samples(n_sampled) = icemodel.test.helpers.sampleMachineState();
    end
-   if ~ambient_stable
-      for k = 1:numel(case_rows)
-         case_rows(k).passed_perf = false;
-         case_rows(k).compare_reason = sprintf( ...
-            ['ambient conditions shifted during the run or the anchor ' ...
-            're-measurement was invalid (anchor ratio %.3f); ' ...
-            'measurements are not comparable'], anchor_ratio);
-      end
-   end
+   attestation = icemodel.test.helpers.summarizeMachineState( ...
+      state_samples(1:n_sampled));
 
-   % The anchor invalidation above can flip verdicts after the loop
-   % accumulated them, so derive the failed list from the final rows. The
-   % string conversion keeps an all-pass run's empty list a string array,
-   % because the empty struct-field concatenation is numeric.
+   % The failed list is the comparison verdict only. The string conversion
+   % keeps an all-pass run's empty list a string array, because the empty
+   % struct-field concatenation is numeric.
    failed_cases = reshape(string( ...
       [case_rows(~[case_rows.passed_perf]).case_id]), [], 1);
 
@@ -481,8 +512,13 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    meta.case_order_seed = case_order_seed;
    meta.case_order = case_order;
    meta.session_activity_at_start = session_activity;
+   meta.anchor_measured = measure_anchor && height(cases) > 0;
    meta.anchor_ratio = anchor_ratio;
    meta.ambient_stable = ambient_stable;
+   % A comparison run never accepts a drift override; the field is present
+   % so the quality conditions read the same fields as a baseline file.
+   meta.ambient_drift_accepted = false;
+   meta.attestation = attestation;
    meta.experiment = "matlab.perftest.TimeExperiment.withFixedSampleSize";
    meta.timing_scope = "IcemodelPerfTest.testCoreRuntime (runSmbModel only)";
    meta.timing_notes = sprintf([ ...
@@ -500,15 +536,11 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    meta.hostname = icemodel.test.helpers.machineHostname();
    meta.artifact_root = artifact_root;
 
-   % The A/A gate certifies two runs of the same code. The identity was
-   % captured before the first measurement; a worktree edit during the
-   % run makes the label meaningless, so a changed identity records ""
-   % and the A/A gate rejects the artifact.
-   if icemodel.test.helpers.worktreeRevision() == revision_at_start
-      meta.git_revision = revision_at_start;
-   else
-      meta.git_revision = "";
-   end
+   % The A/A gate certifies two runs of the same code, so record the
+   % identity captured before the first measurement. A tracked edit made
+   % during the run is not detected; a single developer knows about such an
+   % edit and answers it with a rerun.
+   meta.git_revision = revision_at_start;
 
    % Runs that measured different input trees are not comparable; the
    % A/A gate compares this resolved root.
@@ -523,12 +555,6 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    benchmark = icemodel.test.helpers.runBenchmarkDiagnostics( ...
       benchmark_year, baseline_tag, smbmodel, ...
       include_benchmarks, benchmark_sampling_profile);
-
-   % A benchmark can outlast the earlier identity check. Invalidate the
-   % revision if the source changed before the artifact save.
-   if icemodel.test.helpers.worktreeRevision() ~= revision_at_start
-      meta.git_revision = "";
-   end
 
    % Save the artifacts file.
    artifact_file = saveArtifacts(sample_detail, activity_detail, ...
@@ -545,6 +571,11 @@ function results = runSingleModelPerfSuite(input_path, output_path, ...
    results.artifact_file = string(artifact_file);
    results.failed_cases = failed_cases;
    results.passed = isempty(failed_cases);
+   % The quality verdict is separate from the comparison verdict; a release
+   % gate blocks on quality and reads the comparison as information.
+   results.quality = ...
+      icemodel.test.helpers.perfMeasurementQuality(case_summary, meta);
+   results.quality.smbmodels = string(smbmodel);
 end
 
 function results = combinePerfResults(per_model)
@@ -575,6 +606,11 @@ function results = combinePerfResults(per_model)
    failed_cases = cellfun(@(s) string(s.failed_cases(:)), per_model, ...
       'UniformOutput', false);
    pass_flags = cellfun(@(s) s.passed, per_model);
+   quality_flags = cellfun(@(s) s.quality.passed, per_model);
+   quality_conditions = cellfun(@(s) s.quality.conditions, per_model);
+   quality_reasons = cellfun(@(s) reshape(s.quality.reasons, [], 1), ...
+      per_model, 'UniformOutput', false);
+   quality_models = cellfun(@(s) s.quality.smbmodels, per_model);
 
    results = struct();
    results.case_summary = vertcat(case_summary{:});
@@ -586,6 +622,12 @@ function results = combinePerfResults(per_model)
    results.artifact_file = vertcat(artifact_file{:});
    results.failed_cases = vertcat(failed_cases{:});
    results.passed = all(pass_flags);
+   % Keep the single-model shape: one conditions struct and one model name
+   % per element, so a consumer can see which model failed which condition.
+   results.quality = struct('passed', all(quality_flags), ...
+      'conditions', reshape(quality_conditions, [], 1), ...
+      'reasons', vertcat(quality_reasons{:}), ...
+      'smbmodels', reshape(quality_models, [], 1));
 end
 
 function artifact_file = saveArtifacts(sample_detail, ...

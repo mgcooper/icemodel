@@ -50,7 +50,6 @@ function baseline = resolveBootstrapRelease( ...
    models = icemodel.test.helpers.resolveRequestedSmbmodels(smbmodel);
    tables = loadModelSet(kwargs.loader, kind, baseline_tag, models, simyear);
    missing = cellfun(@isempty, tables);
-   require_source_revision = requiresSourceRevision(policy);
 
    % Reject a partial set because its files can come from different rolling
    % generations.
@@ -62,8 +61,6 @@ function baseline = resolveBootstrapRelease( ...
 
    % Create all missing snapshots as one rollback-protected set.
    if any(missing) && policy.snapshot_from_rolling
-      icemodel.test.helpers.assertCommonBaselineRevision( ...
-         kind, "rolling", models, simyear, loader=kwargs.loader);
       if kind == "regression"
          snapshotter = @(~, tag, model, ~) ...
             kwargs.regression_snapshotter( ...
@@ -82,19 +79,13 @@ function baseline = resolveBootstrapRelease( ...
       end
       baseline = icemodel.test.helpers.transactionalSnapshotSet( ...
          kind, baseline_tag, models(missing), simyear, snapshotter, ...
-         'loader', loader, remover_args{:}, ...
-         'revision_loader', kwargs.loader, ...
-         'require_common_revision', require_source_revision);
+         'loader', loader, remover_args{:});
       return
    elseif any(missing)
       error('icemodel:test:preservedReleaseMissing', ...
          'Registered immutable %s release %s is missing.', kind, baseline_tag)
    end
 
-   if require_source_revision
-      icemodel.test.helpers.assertCommonBaselineRevision( ...
-         kind, baseline_tag, models, simyear, loader=kwargs.loader);
-   end
    baseline = vertcat(tables{:});
 end
 
@@ -104,14 +95,5 @@ function tables = loadModelSet(loader, kind, baseline_tag, models, simyear)
    for k = 1:numel(models)
       tables{k} = loader(kind, smbmodel=models(k), ...
          baseline_tag=baseline_tag, simyear=simyear);
-   end
-end
-
-function tf = requiresSourceRevision(policy)
-   %REQUIRESSOURCEREVISION Read the release provenance policy.
-   if isfield(policy, 'require_source_revision')
-      tf = policy.require_source_revision;
-   else
-      tf = policy.snapshot_from_rolling;
    end
 end

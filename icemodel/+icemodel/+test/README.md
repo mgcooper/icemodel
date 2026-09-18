@@ -56,16 +56,18 @@ Contents:
     - `managedBaselineSiblings`
     - `assertFormalBaselineCandidate`
     - `assertFormalBaselineForcing`
-    - `assertCommonBaselineRevision`
     - `assertNewReleaseBaselineTarget`
+    - `assertCleanSnapshotWorktree`
+    - `assertReleasePerfBaselineSource`
+    - `assertPerfBuildQuality`
     - `snapshotBaseline`
     - `transactionalSnapshotSet`
     - `publishBaselineBundleSet`
     - `removeReleaseSnapshotArtifacts`
     - `resolveBootstrapRelease`
-    - `sourceRevisionGuard`
     - `worktreeRevision`
     - `machineHostname`
+    - `normalizeMachineIdentity`
   - Regression metrics and gates:
     - `summarizeIce1Metrics`
     - `formalRegressionMetricEvidence`
@@ -86,6 +88,9 @@ Contents:
     - `formalPerformanceVerdict`
     - `ambientAnchorVerdict`
     - `assertAmbientBaselineAcceptance`
+    - `sampleMachineState`
+    - `summarizeMachineState`
+    - `perfMeasurementQuality`
     - `displayPerfResults`
     - `displayPerfSummary`
   - Benchmarks and profiler files:

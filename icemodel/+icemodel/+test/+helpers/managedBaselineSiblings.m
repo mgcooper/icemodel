@@ -7,16 +7,16 @@ function managed_files = managedBaselineSiblings(kind, baseline_selector, ...
    %  managed_files = icemodel.test.helpers.managedBaselineSiblings( ...
    %     "perf", baseline_selector, output_file, simyear=2016)
    %
-   % A builder writes one file for each formal model, so worktreeRevision must
-   % leave those files out of the source identity it records. Return every
-   % managed sibling of the requested build, or the explicit override when the
-   % caller named one.
+   % A builder or snapshot writes one file for each formal model, so the
+   % clean-tree check of assertCleanSnapshotWorktree must leave those files
+   % out of the status it inspects. Return every managed sibling of the
+   % requested build, or the explicit override when the caller named one.
    %
    % Name-value
    %  simyear  Benchmark year for perf baseline paths. Blank leaves the
    %           default to baselineFilePath. Regression paths ignore it.
    %
-   % See also: icemodel.test.helpers.worktreeRevision,
+   % See also: icemodel.test.helpers.assertCleanSnapshotWorktree,
    %  icemodel.test.helpers.baselineFilePath
 
    arguments

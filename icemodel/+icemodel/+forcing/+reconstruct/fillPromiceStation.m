@@ -2576,19 +2576,11 @@ function met_file = writeArtifacts(site, filled, provenance, audit, ...
          met.(name + "_provenance") = provenance.(name);
       end
    end
-   ud = met.Properties.UserData;
    % Runtime identity uses the compact token, not the separator-bearing display
-   % name inherited from native metadata.
-   ud.site = site;
-   ud.gapfill_registry = codes;
-   ud.gapfill_seed = plan.split.seed;
-   ud.gapfill_product = char(family + "_filled");
-   ud.gapfill_channels = string({plan.channels.channel});
-   ud.gapfill_engine_version = string(icemodel.internal.version());
-   ud.gapfill_policy_sha256 = ...
-      icemodel.forcing.reconstruct.policySha256();
-   ud.gapfill_donors = donor_sites(:).';
-   met.Properties.UserData = ud;
+   % name inherited from native metadata. The shared helper stamps every
+   % gapfill_* identity field, including the generation time.
+   met = icemodel.forcing.reconstruct.stampGapfillIdentity( ...
+      met, site, codes, plan, family, donor_sites);
 
    % Stage through the shared writer so metadata and window naming match every
    % other met artifact without exposing a partial final product.
