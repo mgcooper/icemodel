@@ -38,9 +38,12 @@ function PerfBaseline = build_perf_baseline(kwargs)
    % The build accepts a managed candidate on measurement quality alone:
    % valid samples, process isolation, one machine, a stable anchor (or the
    % override above), and the machine-state attestation that every build
-   % records. A managed build refuses a session measurement before it
-   % starts and refuses any other failed condition before it publishes. A
-   % custom OUTPUT_FILE is a diagnostic copy that records the verdict only.
+   % records. The attestation's run-start sample is taken at the entry
+   % point, before the component benchmarks and before any model runs, and
+   % every model built by one call shares it. A managed build refuses a
+   % session measurement before it starts and refuses any other failed
+   % condition before it publishes. A custom OUTPUT_FILE is a diagnostic
+   % copy that records the verdict only.
    % The build never compares the new rows with the prior rolling file.
    %
    % A custom OUTPUT_FILE is supported only when SMBMODEL resolves to one
@@ -232,6 +235,12 @@ function PerfBaseline = build_perf_baseline(kwargs)
    % snapshotBaseline refuses such a source for a release file.
    build_revision = icemodel.test.helpers.worktreeRevision();
 
+   % Sample the machine state before the benchmark and model measurements.
+   % The component benchmarks below raise the load average, so the run-start
+   % sample that the release gate reads must come from the entry point, not
+   % from the per-model builder.
+   entry_sample = icemodel.test.helpers.sampleMachineState();
+
    % Measure the managed component benchmarks once for the whole build.
    % They are model-independent, so measuring them inside the per-model
    % builder would repeat the same suite for every model.
@@ -256,7 +265,7 @@ function PerfBaseline = build_perf_baseline(kwargs)
          BenchmarkBaseline, benchmark_meta, include_profile_artifacts, ...
          profile_history_size, output_file, kwargs.isolation, ...
          baseline_policy.config_case, data_root, ...
-         kwargs.accept_ambient_drift, build_revision);
+         kwargs.accept_ambient_drift, build_revision, entry_sample);
       profile_stage_dir = bundles{model_index}.profile_stage_dir;
       profile_cleanups{model_index} = onCleanup(@() ...
          icemodel.test.helpers.removeBaselineProfileStage(profile_stage_dir));
@@ -281,8 +290,12 @@ function bundle = buildSingleModelPerfBaseline(baseline, ...
       benchmark_sampling_profile, BenchmarkBaseline, benchmark_meta, ...
       include_profile_artifacts, profile_history_size, output_file, ...
       isolation, config_case, data_root, accept_ambient_drift, ...
-      source_revision)
+      source_revision, entry_sample)
    %BUILDSINGLEMODELPERFBASELINE Build one perf baseline file.
+   %
+   % ENTRY_SAMPLE is the machine-state sample the entry point took before
+   % the benchmarks and before any model ran; it is the run-start sample of
+   % every model this call builds.
 
    % Resolve the baseline target, configure paths, and load formal cases.
    [baseline_type, baseline_tag, output_file, input_path, output_path, ...
@@ -326,10 +339,10 @@ function bundle = buildSingleModelPerfBaseline(baseline, ...
    case_order = randperm(height(cases));
    rng(rng_prior);
 
-   % Sample the machine state at run start, after each case, and after the
-   % anchor, so the saved metadata can say whether the machine was quiet.
-   state_samples = repmat( ...
-      icemodel.test.helpers.sampleMachineState(), height(cases) + 2, 1);
+   % Keep the entry-point sample as run start, then sample after each case
+   % and after the anchor, so the saved metadata can say whether the machine
+   % was quiet before and during the build.
+   state_samples = repmat(entry_sample, height(cases) + 2, 1);
    n_sampled = 1;
 
    % Measure each formal case and save the accepted timing summary.

@@ -274,6 +274,14 @@ function test_build_perf_baseline_writes_machine_metadata(testCase)
    saved = load(output_file, 'meta');
    verifyEqual(testCase, saved.meta.hostname, ...
       icemodel.test.helpers.machineHostname())
+   % The attestation holds the entry-point sample first, then one sample
+   % per case and one after the anchor, and its run-start load is the
+   % first sample's load.
+   attestation = saved.meta.attestation;
+   verifyEqual(testCase, attestation.sample_count, 1 + 1 + 1)
+   verifyEqual(testCase, attestation.load_average_at_start, ...
+      attestation.load_average_samples(1))
+   verifyTrue(testCase, isfinite(attestation.load_average_at_start))
 end
 
 function test_regression_runner_rejects_a_stale_artifact(testCase)

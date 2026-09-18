@@ -328,8 +328,12 @@ Notes:
   `isolation="session"` before measuring and refuses any other failed
   condition of `perfMeasurementQuality` before publishing, with the accepted
   drift override as the one exception; a custom `output_file` records the
-  verdict only. The build never compares the new rows with the prior rolling
-  file; the saved metadata records `meta.attestation` and `meta.quality`
+  verdict only. The attestation's run-start load is sampled once at the
+  entry point, before the benchmarks and before any model runs. Every model
+  built by one call shares that sample. The release snapshot gates that
+  value, so start a release build only after the load average has settled.
+  The build never compares the new rows with the prior rolling file; the
+  saved metadata records `meta.attestation` and `meta.quality`
 - by default the rebuilt baselines use the formal 2-year contract:
   retained year plus one leading spinup year
 
