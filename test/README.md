@@ -77,7 +77,7 @@ Default software-level regression coverage:
    any other release tag must register its forcing identity before use
 7. frozen `v1.1` and `v1.2` comparisons run icemodel solvers 1, 2, and 3, the
    solver ids of their accepted rows (`icemodel_solvers` in
-   `formalBaselinePolicy`)
+   `formalBaselinePolicy`); frozen `v1.3` comparisons run solvers 0 to 3
 
 Formal runtime contract for the default regression/perf matrices:
 

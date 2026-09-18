@@ -73,6 +73,8 @@ function test_tracked_manifest_declares_current_release(testCase)
          expected_required = 11;
       case "v1.2"
          expected_required = 13;
+      case "v1.3"
+         expected_required = 13;
       otherwise
          testCase.assertFail( ...
             "Add the required fixture count for " + version + ".");

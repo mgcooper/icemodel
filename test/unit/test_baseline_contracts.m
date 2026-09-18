@@ -475,10 +475,12 @@ end
 
 function test_formal_case_matrices_register_solvers_per_baseline(testCase)
    % Rolling matrices run icemodel solvers 0 to 3. The frozen v1.1 and v1.2
-   % matrices run solvers 1 to 3, the ids of their accepted rows.
+   % matrices run solvers 1 to 3, the ids of their accepted rows. The frozen
+   % v1.3 matrices run solvers 0 to 3, because the rolling rows it froze
+   % carried solver 0.
 
-   selectors = ["rolling", "v1.1", "v1.2"];
-   expected = {[0; 1; 2; 3], [1; 2; 3], [1; 2; 3]};
+   selectors = ["rolling", "v1.1", "v1.2", "v1.3"];
+   expected = {[0; 1; 2; 3], [1; 2; 3], [1; 2; 3], [0; 1; 2; 3]};
    for k = 1:numel(selectors)
       regression_cases = icemodel.test.helpers.getRegressionCaseMatrix( ...
          tier="smoke", baseline=selectors(k));
@@ -551,6 +553,7 @@ function test_formal_baseline_policy_owns_default_data_case(testCase)
    release_v11 = icemodel.test.helpers.formalBaselinePolicy("v1.1");
    release_v12 = icemodel.test.helpers.formalBaselinePolicy("v1.2");
    release_v12_alias = icemodel.test.helpers.formalBaselinePolicy("V1_2");
+   release_v13 = icemodel.test.helpers.formalBaselinePolicy("v1.3");
 
    testCase.verifyEqual(rolling.config_case, "verification");
    testCase.verifyEqual(rolling.forcing, "promice_filled");
@@ -579,6 +582,19 @@ function test_formal_baseline_policy_owns_default_data_case(testCase)
    testCase.verifyEqual(release_v12.promice_filled_policy_sha256, ...
       "bd336da0880474f1987facc2311c4f45a6c281877ae8b944a3fbdc7cfb68d513");
    testCase.verifyEqual(release_v12_alias.baseline_tag, "v1.2");
+   testCase.verifyEqual(release_v13.baseline_tag, "v1.3");
+   testCase.verifyEqual(release_v13.config_case, "verification");
+   testCase.verifyEqual(release_v13.forcing, "promice_filled");
+   testCase.verifyEqual( ...
+      release_v13.required_fixture_capabilities, "formal-core");
+   testCase.verifyTrue(release_v13.use_fixture_root_for_model);
+   testCase.verifyTrue(release_v13.snapshot_from_rolling);
+   testCase.verifyEqual(release_v13.icemodel_solvers, [0 1 2 3]);
+   % The v1.3 pin is the policy digest at registration, so it must equal
+   % the live value until POLICY.md changes after the release.
+   testCase.verifyEqual(release_v13.promice_filled_policy_sha256, ...
+      icemodel.forcing.reconstruct.policySha256());
+   testCase.verifyFalse(isfield(release_v13, 'require_source_revision'));
 end
 
 function test_release_v12_case_matrices_use_rolling_forcing(testCase)

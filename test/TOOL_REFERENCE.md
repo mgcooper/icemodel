@@ -141,7 +141,8 @@ Key options:
   - explicit test-data tree override and always authoritative
   - blank uses the baseline registration's tree: verification data for
     rolling, historical `test/data` for frozen v1.1, and the provisioned
-    `fixtureDataRoot("v1.2")` for v1.2
+    `fixtureDataRoot("v1.2")` for v1.2 and `fixtureDataRoot("v1.3")`
+    for v1.3
 - `fixture_root`
   - tree where the release's required fixture capabilities are verified
   - blank uses `data_root` when set, else the release's provisioned root
