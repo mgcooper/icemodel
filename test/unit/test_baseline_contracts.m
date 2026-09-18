@@ -1740,7 +1740,7 @@ function test_baselineFilePath_resolves_latest_release(testCase)
 
    pathname = icemodel.test.helpers.baselineFilePath("perf", ...
       baseline_type="release");
-   testCase.verifyTrue(contains(pathname, "v1_2"));
+   testCase.verifyTrue(contains(pathname, "v1_3"));
 end
 
 function test_scalar_snapshot_commands_reload_custom_outputs(testCase)
