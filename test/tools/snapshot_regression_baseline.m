@@ -8,7 +8,9 @@ function RegressionBaseline = snapshot_regression_baseline(kwargs)
    % rolling baseline into a versioned release file. You can pass a custom
    % OUTPUT_FILE only when SMBMODEL resolves to one concrete formal model.
    % Existing release files stay immutable even when the OVERWRITE option is
-   % true.
+   % true. snapshotBaseline requires a clean worktree, apart from the
+   % release files this sequence writes, for a managed release file, and
+   % refuses a rolling source that carries the -dirty suffix.
 
    arguments (Input)
 
@@ -41,21 +43,16 @@ function RegressionBaseline = snapshot_regression_baseline(kwargs)
       output_file = "";
    end
 
-   % Every model snapshot must come from the same rolling source revision.
-   icemodel.test.helpers.assertCommonBaselineRevision( ...
-      "regression", "rolling", models, NaN);
-
    snapshotter = @(kind, tag, model, simyear) ...
       icemodel.test.helpers.snapshotBaseline( ...
       kind, tag, model, overwrite, output_file, simyear);
    if isblanktext(output_file)
       RegressionBaseline = ...
          icemodel.test.helpers.transactionalSnapshotSet( ...
-         "regression", baseline_tag, models, NaN, snapshotter, ...
-         require_common_revision=true);
+         "regression", baseline_tag, models, NaN, snapshotter);
    else
-      % A custom output file skips the common-revision check, because the
-      % revision loader resolves the managed baseline path, not this file.
+      % A custom output file needs its own loader and remover, because the
+      % defaults resolve the managed baseline path, not this file.
       RegressionBaseline = ...
          icemodel.test.helpers.transactionalSnapshotSet( ...
          "regression", baseline_tag, models, NaN, snapshotter, ...

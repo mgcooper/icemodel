@@ -9,7 +9,10 @@ function PerfBaseline = snapshot_perf_baseline(kwargs)
    % rolling baseline into a versioned release file. A custom
    % OUTPUT_FILE is supported only when SMBMODEL resolves to one concrete
    % formal model. Existing release files remain immutable even when the
-   % OVERWRITE option is true.
+   % OVERWRITE option is true. snapshotBaseline requires a clean worktree,
+   % apart from the release files this sequence writes, for a managed
+   % release file, refuses a rolling source that carries the -dirty suffix,
+   % and applies the release-only measurement conditions.
 
    arguments (Input)
 
@@ -47,20 +50,15 @@ function PerfBaseline = snapshot_perf_baseline(kwargs)
       output_file = "";
    end
 
-   % Every model snapshot must come from the same rolling source revision.
-   icemodel.test.helpers.assertCommonBaselineRevision( ...
-      "perf", "rolling", models, simyear);
-
    snapshotter = @(kind, tag, model, year) ...
       icemodel.test.helpers.snapshotBaseline( ...
       kind, tag, model, overwrite, output_file, year);
    if isblanktext(output_file)
       PerfBaseline = icemodel.test.helpers.transactionalSnapshotSet( ...
-         "perf", baseline_tag, models, simyear, snapshotter, ...
-         require_common_revision=true);
+         "perf", baseline_tag, models, simyear, snapshotter);
    else
-      % A custom output file skips the common-revision check, because the
-      % revision loader resolves the managed baseline path, not this file.
+      % A custom output file needs its own loader and remover, because the
+      % defaults resolve the managed baseline path, not this file.
       PerfBaseline = icemodel.test.helpers.transactionalSnapshotSet( ...
          "perf", baseline_tag, models, simyear, snapshotter, ...
          loader=@(kind, tag, model, year) ...

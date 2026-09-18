@@ -18,12 +18,9 @@ function baseline = transactionalSnapshotSet( ...
    %
    % Name-value
    %  loader          Reloads one saved snapshot for validation.
-   %  revision_loader Loads baselines for the common-revision check.
    %  remover         Removes one snapshot this call created. This default is
    %                  the only definition; resolveBootstrapRelease forwards a
    %                  remover only when its caller supplies one.
-   %  require_common_revision  Require every model's snapshot to name one
-   %                  source revision.
    %
    % See also: icemodel.test.helpers.resolveBootstrapRelease,
    %  icemodel.test.helpers.removeReleaseSnapshotArtifacts
@@ -35,10 +32,7 @@ function baseline = transactionalSnapshotSet( ...
       simyear (1, 1) double
       snapshotter (1, 1) function_handle
       kwargs.loader (1, 1) function_handle = @loadReleaseSnapshot
-      kwargs.revision_loader (1, 1) function_handle = ...
-         @icemodel.test.helpers.loadBaseline
       kwargs.remover (1, 1) function_handle = @removeReleaseSnapshot
-      kwargs.require_common_revision (1, 1) logical = false
    end
 
    % Track what this call created, separately from what it was asked to
@@ -53,12 +47,6 @@ function baseline = transactionalSnapshotSet( ...
          created_models(n_created) = model;
       end
 
-      % Snapshots compared as one set must come from one source revision.
-      if kwargs.require_common_revision
-         icemodel.test.helpers.assertCommonBaselineRevision( ...
-            kind, baseline_tag, models, simyear, ...
-            loader=kwargs.revision_loader);
-      end
       % Reload every saved file. A snapshot that writes but reloads without
       % rows would otherwise become an accepted empty release baseline.
       tables = arrayfun(@(model) kwargs.loader( ...

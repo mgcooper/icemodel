@@ -123,13 +123,10 @@ function RegressionBaseline = build_regression_baseline(kwargs)
          'it when smbmodel expands to more than one formal model.'])
    end
 
-   % Ignore every managed sibling that can be rebuilt separately.
-   managed_files = icemodel.test.helpers.managedBaselineSiblings( ...
-      "regression", baseline_selector, output_file);
-   revision_reader = @() icemodel.test.helpers.worktreeRevision( ...
-      ignored_paths=managed_files);
-   build_revision = icemodel.test.helpers.sourceRevisionGuard( ...
-      string.empty(), revision_reader);
+   % Record the source identity once, before the first model run. A
+   % tracked edit made before the build labels every row -dirty, and
+   % snapshotBaseline refuses such a source for a release file.
+   build_revision = icemodel.test.helpers.worktreeRevision();
 
    % Build every candidate before changing a managed baseline file.
    bundles = cell(numel(models), 1);
@@ -144,9 +141,7 @@ function RegressionBaseline = build_regression_baseline(kwargs)
          icemodel.test.helpers.removeBaselineProfileStage(profile_stage_dir));
    end
 
-   % Publish only candidates built from the same unchanged source tree.
-   icemodel.test.helpers.sourceRevisionGuard( ...
-      build_revision, revision_reader);
+   % Publish all model files and profiler sidecars as one transaction.
    bundles = icemodel.test.helpers.publishBaselineBundleSet( ...
       "regression", bundles);
 

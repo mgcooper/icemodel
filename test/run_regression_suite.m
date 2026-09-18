@@ -129,10 +129,6 @@ function results = run_regression_suite(kwargs)
 
    % Expand the requested formal model selector once at the entrypoint.
    models = icemodel.test.helpers.resolveRequestedSmbmodels(smbmodel);
-   if baseline_policy.require_source_revision
-      icemodel.test.helpers.assertCommonBaselineRevision( ...
-         "regression", baseline, models, simyear);
-   end
 
    % Resolve one run directory before dispatching models so aggregate artifacts
    % and their report always share the same review surface.

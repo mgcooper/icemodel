@@ -18,11 +18,11 @@ and is not a release capability. `demo/data` remains tracked with only the two
 
 The tracked `test/assets/icemodel-<version>-data-manifest.json` governs release
 data. It declares each archive and file's capability, required status, relative
-install path, byte size, and SHA-256. The three v1.2 archive names are:
+install path, byte size, and SHA-256. The three v1.3 archive names are:
 
-- `icemodel-v1.2-formal-core.tar.gz`
-- `icemodel-v1.2-verification-showcase.tar.gz`
-- `icemodel-v1.2-forcing-integration.tar.gz`
+- `icemodel-v1.3-formal-core.tar.gz`
+- `icemodel-v1.3-verification-showcase.tar.gz`
+- `icemodel-v1.3-forcing-integration.tar.gz`
 
 The manifest contains final local archive metadata and 141 optional
 forcing-integration file rows. Publishing those artifacts remains a separate,

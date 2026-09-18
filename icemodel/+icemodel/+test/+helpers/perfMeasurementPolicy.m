@@ -12,18 +12,31 @@ function policy = perfMeasurementPolicy()
    %                   outlier above this gate marks interference.
    %  anchor_tol     - largest accepted |anchor ratio - 1|. The ambient
    %                   anchor re-measures the first executed case at the
-   %                   end of the run; a larger drift marks every verdict
-   %                   in the run ambient-invalid.
+   %                   end of the run; a larger drift records
+   %                   meta.ambient_stable = false once for the run. Every
+   %                   case keeps its own comparison verdict, and the
+   %                   run fails the measurement quality conditions of
+   %                   perfMeasurementQuality.
    %  tol_perf       - two-sided fractional noise budget for a case
    %                   verdict. run_perf_suite and build_perf_baseline
    %                   default their tol_perf argument from it, and the
-   %                   A/A gate (run_aa_acceptance) accepts B/A ratios
-   %                   inside [1/(1 + tol_perf), 1 + tol_perf].
+   %                   A/A diagnostic (run_aa_acceptance) accepts B/A
+   %                   ratios inside [1/(1 + tol_perf), 1 + tol_perf].
+   %  load_average_max - largest one-minute load average, sampled at run
+   %                   start before the first measurement, that a release
+   %                   snapshot accepts in the rolling source's
+   %                   attestation. 4.0 is the gate the pre-snow sweep
+   %                   applied by hand before each timing run. Later
+   %                   samples include the run's own subprocesses and are
+   %                   recorded, not gated.
    %
-   % See also: icemodel.test.helpers.perfSampleValidity, run_perf_suite
+   % See also: icemodel.test.helpers.perfSampleValidity,
+   %  icemodel.test.helpers.perfMeasurementQuality,
+   %  icemodel.test.helpers.assertReleasePerfBaselineSource, run_perf_suite
 
    policy = struct( ...
       'max_dispersion', 1.5, ...
       'anchor_tol', 0.15, ...
-      'tol_perf', 0.20);
+      'tol_perf', 0.20, ...
+      'load_average_max', 4.0);
 end

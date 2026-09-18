@@ -22,6 +22,8 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          baseline_selector = string(getenv('ICEMODEL_REGRESSION_BASELINE'));
          baseline_policy = ...
             icemodel.test.helpers.formalBaselinePolicy(baseline_selector);
+         IcemodelRegressionTest.assertReleaseRootProvided( ...
+            baseline_policy, data_root);
          [~, ~, ~, ~, testCase.env_cleanup] = ...
             icemodel.test.helpers.bootstrapTestEnvironment( ...
             icemodel_config_casename=baseline_policy.config_case, ...
@@ -204,6 +206,30 @@ classdef IcemodelRegressionTest < matlab.unittest.TestCase
          % Export the artifact path so the runner can load it after the
          % unittest framework returns control.
          setenv('ICEMODEL_REGRESSION_ARTIFACT_FILE', artifact_file);
+      end
+   end
+
+   methods (Static)
+      function assertReleaseRootProvided(baseline_policy, data_root)
+         %ASSERTRELEASEROOTPROVIDED Refuse a release selector without a root.
+         %
+         %  IcemodelRegressionTest.assertReleaseRootProvided( ...
+         %     baseline_policy, data_root)
+         %
+         % A release whose policy sets use_fixture_root_for_model compares
+         % frozen rows against the provisioned test/data tree, and
+         % run_regression_suite forces data_root to that tree through
+         % resolveReleaseDataRoots. A direct class run bypasses the runner,
+         % so without an explicit ICEMODEL_TEST_DATA_ROOT it would bootstrap
+         % the policy's config case and read a tree no manifest hash covers.
+         % Refuse instead, naming the runner that owns root resolution.
+         if baseline_policy.use_fixture_root_for_model && isblanktext(data_root)
+            error('icemodel:test:regression:releaseRootRequired', ...
+               ['ICEMODEL_REGRESSION_BASELINE=%s needs an explicit ', ...
+               'ICEMODEL_TEST_DATA_ROOT. Run run_regression_suite, which ', ...
+               'resolves the release data root, instead of the class.'], ...
+               char(baseline_policy.baseline_tag))
+         end
       end
    end
 

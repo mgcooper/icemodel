@@ -328,28 +328,6 @@ function test_release_override_rejects_nonfinite_anchor_ratio(testCase)
       false, true, NaN, true), 'icemodel:test:perf:ambientDrift');
 end
 
-function test_source_revision_guard_captures_and_verifies_revision(testCase)
-   % The provenance guard returns a nonblank revision and accepts a match.
-   revision = icemodel.test.helpers.sourceRevisionGuard( ...
-      string.empty(), @() "test-revision");
-   testCase.verifyEqual(revision, "test-revision");
-   testCase.verifyWarningFree(@() ...
-      icemodel.test.helpers.sourceRevisionGuard( ...
-      "test-revision", @() "test-revision"));
-end
-
-function test_source_revision_guard_rejects_missing_or_changed_revision(testCase)
-   % Missing and changed source identities cannot become baseline provenance.
-   testCase.verifyError(@() ...
-      icemodel.test.helpers.sourceRevisionGuard( ...
-      string.empty(), @() ""), ...
-      'icemodel:test:baseline:sourceRevisionMissing');
-   testCase.verifyError(@() ...
-      icemodel.test.helpers.sourceRevisionGuard( ...
-      "first-revision", @() "second-revision"), ...
-      'icemodel:test:baseline:sourceRevisionChanged');
-end
-
 function test_profile_capture_uses_explicit_staging_directory(testCase)
    % An explicit profile directory leaves the managed sidecar untouched.
    fixture = testCase.applyFixture( ...
@@ -620,22 +598,25 @@ end
 
 function test_machine_hostname_trims_command_output(testCase)
    % The saved identity excludes whitespace from the hostname command.
+   % The probe takes the command string as an argument; is_mac=false
+   % selects the non-macOS branch, which calls the probe once, for
+   % "hostname" only. test_machine_identity.m covers the macOS branches.
    returned = icemodel.test.helpers.machineHostname( ...
-      @() deal(0, sprintf('  test-machine  \n')));
+      @(command) deal(0, sprintf('  test-machine  \n')), false);
    testCase.verifyEqual(returned, "test-machine");
 end
 
 function test_machine_hostname_rejects_blank_output(testCase)
    % A successful command with no machine name cannot identify the host.
    testCase.verifyError(@() icemodel.test.helpers.machineHostname( ...
-      @() deal(0, "   ")), ...
+      @(command) deal(0, "   ")), ...
       'icemodel:test:perf:machineIdentityUnavailable');
 end
 
 function test_machine_hostname_rejects_command_failure(testCase)
    % Command failure cannot produce a trusted machine identity.
    testCase.verifyError(@() icemodel.test.helpers.machineHostname( ...
-      @() deal(1, "test-machine")), ...
+      @(command) deal(1, "test-machine")), ...
       'icemodel:test:perf:machineIdentityUnavailable');
 end
 
@@ -647,55 +628,39 @@ function test_missing_environment_metadata_is_incompatible(testCase)
    testCase.verifySubstring(reason, "metadata");
 end
 
-function test_worktree_revision_tracks_git_content(testCase)
-   % The performance identity must change for tracked text, tracked binary,
-   % and untracked bytes, then return to its clean value after each removal.
+function test_worktree_revision_is_git_describe_dirty(testCase)
+   % The identity is git describe --always --dirty: a tracked change adds
+   % the -dirty suffix, an untracked file does not, and the value returns
+   % to its clean form after the change is reverted.
 
    [project_dir, cleanup] = createWorktreeRevisionFixture();
    testCase.addTeardown(@() delete(cleanup));
    clean_revision = icemodel.test.helpers.worktreeRevision(project_dir);
    testCase.verifyNotEmpty(clean_revision);
-   testCase.verifyFalse(contains(clean_revision, "-dirty-"));
+   testCase.verifyFalse(endsWith(clean_revision, "-dirty"));
 
    writeTestText(fullfile(project_dir, "tracked.txt"), "changed");
-   text_revision = icemodel.test.helpers.worktreeRevision(project_dir);
-   testCase.verifyMatches(text_revision, "-dirty-[0-9a-f]{12}$");
+   returned = icemodel.test.helpers.worktreeRevision(project_dir);
+   expected = clean_revision + "-dirty";
+   testCase.verifyEqual(returned, expected);
    runPerfTestGit(project_dir, "checkout -- tracked.txt");
    testCase.verifyEqual( ...
       icemodel.test.helpers.worktreeRevision(project_dir), clean_revision);
 
-   writeTestBytes(fullfile(project_dir, "tracked.bin"), uint8([0, 1, 255]));
-   binary_revision = icemodel.test.helpers.worktreeRevision(project_dir);
-   testCase.verifyMatches(binary_revision, "-dirty-[0-9a-f]{12}$");
-   testCase.verifyNotEqual(binary_revision, text_revision);
-   runPerfTestGit(project_dir, "checkout -- tracked.bin");
-
+   % Untracked bytes do not change the identity; the clean-tree check of
+   % the snapshot tools is what refuses them.
    writeTestBytes(fullfile(project_dir, "untracked.bin"), uint8([3, 2, 1]));
-   untracked_revision = icemodel.test.helpers.worktreeRevision(project_dir);
-   testCase.verifyMatches(untracked_revision, "-dirty-[0-9a-f]{12}$");
-   testCase.verifyNotEqual(untracked_revision, binary_revision);
-   testCase.verifyEqual(icemodel.test.helpers.worktreeRevision( ...
-      project_dir, ignored_paths=[ ...
-      fullfile(project_dir, "untracked.bin")]), clean_revision);
-   delete(fullfile(project_dir, "untracked.bin"));
-
-   writeTestText(fullfile(project_dir, "relative.mat"), "relative");
-   testCase.verifyEqual(icemodel.test.helpers.worktreeRevision( ...
-      project_dir, ignored_paths="relative.mat"), clean_revision);
-   delete(fullfile(project_dir, "relative.mat"));
-
-   writeTestText(fullfile(project_dir, "candidate1.mat"), "one");
-   pattern_revision = icemodel.test.helpers.worktreeRevision( ...
-      project_dir, ignored_paths=fullfile(project_dir, "candidate[12].mat"));
-   testCase.verifyNotEqual(pattern_revision, clean_revision);
-   delete(fullfile(project_dir, "candidate1.mat"));
-   writeTestText(fullfile(project_dir, "candidate[12].mat"), "literal");
-   testCase.verifyEqual(icemodel.test.helpers.worktreeRevision( ...
-      project_dir, ignored_paths=fullfile(project_dir, ...
-      "candidate[12].mat")), clean_revision);
-   delete(fullfile(project_dir, "candidate[12].mat"));
    testCase.verifyEqual( ...
       icemodel.test.helpers.worktreeRevision(project_dir), clean_revision);
+   delete(fullfile(project_dir, "untracked.bin"));
+end
+
+function test_worktree_revision_returns_blank_on_git_failure(testCase)
+   % A failed describe command returns "" so a caller that requires a
+   % nonblank identity rejects the run.
+   returned = icemodel.test.helpers.worktreeRevision( ...
+      "unused", @(~) deal(128, "fatal: not a git repository"));
+   testCase.verifyEqual(returned, "");
 end
 
 function test_worktree_revision_rejects_a_non_git_directory(testCase)
@@ -707,31 +672,6 @@ function test_worktree_revision_rejects_a_non_git_directory(testCase)
    testCase.addTeardown(@() delete(cleanup));
    testCase.verifyEqual( ...
       icemodel.test.helpers.worktreeRevision(project_dir), "");
-end
-
-function test_worktree_revision_rejects_an_untracked_read_failure(testCase)
-   % An unreadable untracked file makes the performance identity invalid.
-
-   [project_dir, cleanup] = createWorktreeRevisionFixture();
-   testCase.addTeardown(@() delete(cleanup));
-   writeTestText(fullfile(project_dir, "untracked.txt"), "unreadable");
-
-   revision = icemodel.test.helpers.worktreeRevision( ...
-      project_dir, @rejectTestFileHash);
-   testCase.verifyEqual(revision, "");
-end
-
-function test_worktree_revision_rejects_dirty_git_command_failures(testCase)
-   % A failed tracked-diff or untracked-list command invalidates the identity.
-
-   file_hasher = @icemodel.verification.setup.fileSha256;
-   revision = icemodel.test.helpers.worktreeRevision( ...
-      "unused", file_hasher, @failTrackedDiffCommand);
-   testCase.verifyEqual(revision, "");
-
-   revision = icemodel.test.helpers.worktreeRevision( ...
-      "unused", file_hasher, @failUntrackedListCommand);
-   testCase.verifyEqual(revision, "");
 end
 
 function [project_dir, cleanup] = createWorktreeRevisionFixture()
@@ -793,32 +733,6 @@ function writeTestBytes(filename, bytes)
    assert(fid >= 0, 'Could not create test fixture: %s', filename)
    cleanup = onCleanup(@() fclose(fid));
    fwrite(fid, bytes, 'uint8');
-end
-
-function digest = rejectTestFileHash(~)
-   %REJECTTESTFILEHASH Simulate an untracked-file read failure.
-
-   digest = "Simulated untracked-file read failure";
-   error('icemodel:test:worktreeRevision:simulatedReadFailure', ...
-      '%s', digest)
-end
-
-function [status, output] = failTrackedDiffCommand(command)
-   %FAILTRACKEDDIFFCOMMAND Simulate failure after Git reports a dirty tree.
-
-   [status, output] = worktreeRevisionCommandResult(command);
-   if contains(command, " diff --binary HEAD")
-      status = 1;
-   end
-end
-
-function [status, output] = failUntrackedListCommand(command)
-   %FAILUNTRACKEDLISTCOMMAND Simulate failure while listing untracked files.
-
-   [status, output] = worktreeRevisionCommandResult(command);
-   if contains(command, " ls-files --others")
-      status = 1;
-   end
 end
 
 function [status, output] = worktreeRevisionCommandResult(command)

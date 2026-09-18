@@ -4,6 +4,7 @@ function policy = formalBaselinePolicy(baseline_selector)
    %  policy = icemodel.test.helpers.formalBaselinePolicy("rolling")
    %  policy = icemodel.test.helpers.formalBaselinePolicy("v1.1")
    %  policy = icemodel.test.helpers.formalBaselinePolicy("v1.2")
+   %  policy = icemodel.test.helpers.formalBaselinePolicy("v1.3")
    %
    % Fields beyond the forcing selection:
    %  promice_filled_policy_sha256  The reconstruction policy digest a frozen
@@ -11,8 +12,6 @@ function policy = formalBaselinePolicy(baseline_selector)
    %     icemodel.forcing.reconstruct.policySha256() instead.
    %  use_fixture_root_for_model  True when the release runs the model from
    %     the same provisioned data root it verifies.
-   %  require_source_revision  True when the baseline files must record the
-   %     source revision that produced them.
    %  icemodel_solvers  The icemodel solver ids that the formal regression and
    %     perf case matrices run. Rolling baselines run every id in
    %     icemodel.namelists.solver(). A frozen release keeps the ids of its
@@ -43,7 +42,6 @@ function policy = formalBaselinePolicy(baseline_selector)
       policy.required_fixture_capabilities = strings(0, 1);
       policy.use_fixture_root_for_model = false;
       policy.snapshot_from_rolling = false;
-      policy.require_source_revision = true;
       policy.promice_filled_policy_sha256 = ...
          icemodel.forcing.reconstruct.policySha256();
       policy.icemodel_solvers = icemodel.namelists.solver();
@@ -65,7 +63,6 @@ function policy = formalBaselinePolicy(baseline_selector)
          policy.required_fixture_capabilities = "formal-core";
          policy.use_fixture_root_for_model = false;
          policy.snapshot_from_rolling = false;
-         policy.require_source_revision = false;
          policy.icemodel_solvers = [1 2 3];
 
       case "v1_2"
@@ -81,10 +78,29 @@ function policy = formalBaselinePolicy(baseline_selector)
          policy.required_fixture_capabilities = "formal-core";
          policy.use_fixture_root_for_model = true;
          policy.snapshot_from_rolling = true;
-         policy.require_source_revision = true;
          policy.promice_filled_policy_sha256 = ...
             "bd336da0880474f1987facc2311c4f45a6c281877ae8b944a3fbdc7cfb68d513";
          policy.icemodel_solvers = [1 2 3];
+
+      case "v1_3"
+         policy.baseline_tag = "v1.3";
+         % Same arrangement as v1.2: the release runs the model from the
+         % provisioned test/data tree that its manifest hashes.
+         policy.config_case = "verification";
+         policy.forcing_mode = "fixed";
+         policy.forcing = "promice_filled";
+         policy.sites = strings(0, 1);
+         policy.site_forcings = strings(0, 1);
+         policy.required_fixture_capabilities = "formal-core";
+         policy.use_fixture_root_for_model = true;
+         policy.snapshot_from_rolling = true;
+         % The v1.3 pin equals the v1.2 pin because POLICY.md did not change
+         % between the releases; the digest is verified against the live
+         % policySha256() at registration.
+         policy.promice_filled_policy_sha256 = ...
+            "bd336da0880474f1987facc2311c4f45a6c281877ae8b944a3fbdc7cfb68d513";
+         % The rolling matrices carried solver 0 rows at the v1.3 rebuild.
+         policy.icemodel_solvers = [0 1 2 3];
 
       otherwise
          error('icemodel:test:unregisteredReleaseForcing', ...

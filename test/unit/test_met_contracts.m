@@ -181,6 +181,21 @@ function test_loadmet_gates_promice_filled_by_window_coverage(testCase)
       opts.metfname{1}, canonical_met, opts.sitename, pinned_opts), ...
       'icemodel:loadmet:promiceFilledIdentityMismatch');
 
+   % gapfill_generated_utc is metadata, not identity: an artifact staged
+   % before the producer stamped it still loads, and one that carries it
+   % loads the same way.
+   testCase.verifyFalse(isfield( ...
+      canonical_met.Properties.UserData, 'gapfill_generated_utc'));
+   testCase.verifyWarningFree(@() ...
+      icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
+      opts.metfname{1}, canonical_met, opts.sitename, opts));
+   stamped_met = canonical_met;
+   stamped_met.Properties.UserData.gapfill_generated_utc = ...
+      "2026-09-17T00:00:00Z";
+   testCase.verifyWarningFree(@() ...
+      icemodel.forcing.reconstruct.assertPromiceFilledArtifact( ...
+      opts.metfname{1}, stamped_met, opts.sitename, opts));
+
    % A blank engine version still fails, because the field must name the
    % producer for later forensics.
    blank_engine_met = canonical_met;
@@ -2025,4 +2040,34 @@ function writePromiceRuntimeManifest(opts)
    cleaner = onCleanup(@() fclose(fid));
    fprintf(fid, '%s', jsonencode(manifest));
    clear cleaner
+end
+
+function test_stamp_gapfill_identity_writes_every_field(testCase)
+   % The producer stamps the five identity fields, the registry, the seed,
+   % and an ISO 8601 UTC generation time on the filled timetable.
+   met = timetable(datetime(2015, 1, 1, 'TimeZone', 'UTC') ...
+      + hours(0:2)', [1; 2; 3], 'VariableNames', {'tair'});
+   codes = icemodel.forcing.reconstruct.provenanceCodes();
+   plan = struct('split', struct('seed', 7), ...
+      'channels', struct('channel', {'tair', 'rh'}));
+   before = datetime('now', 'TimeZone', 'UTC') - seconds(1);
+   returned = icemodel.forcing.reconstruct.stampGapfillIdentity( ...
+      met, "kanm", codes, plan, "promice", ["kanl"; "kanu"]);
+   metadata = returned.Properties.UserData;
+
+   testCase.verifyEqual(metadata.site, "kanm");
+   testCase.verifyEqual(metadata.gapfill_registry, codes);
+   testCase.verifyEqual(metadata.gapfill_seed, 7);
+   testCase.verifyEqual(metadata.gapfill_product, 'promice_filled');
+   testCase.verifyEqual(metadata.gapfill_channels, ["tair", "rh"]);
+   testCase.verifyEqual(metadata.gapfill_engine_version, ...
+      string(icemodel.internal.version()));
+   testCase.verifyEqual(metadata.gapfill_policy_sha256, ...
+      icemodel.forcing.reconstruct.policySha256());
+   testCase.verifyEqual(metadata.gapfill_donors, ["kanl", "kanu"]);
+   generated = datetime(metadata.gapfill_generated_utc, ...
+      'InputFormat', "uuuu-MM-dd'T'HH:mm:ss'Z'", 'TimeZone', 'UTC');
+   testCase.verifyGreaterThanOrEqual(generated, before);
+   testCase.verifyLessThanOrEqual(generated, ...
+      datetime('now', 'TimeZone', 'UTC') + seconds(1));
 end

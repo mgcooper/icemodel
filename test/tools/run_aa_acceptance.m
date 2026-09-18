@@ -6,8 +6,13 @@ function report = run_aa_acceptance(artifacts_a, artifacts_b)
    %
    % The A/A test runs the same code twice under the formal process-isolated
    % protocol and requires the two runs to reproduce each other. It validates
-   % the measurement system, not the code. Run it before trusting an A/B
-   % comparison.
+   % the measurement system, not the code: it measures the protocol's
+   % reproducibility on this machine in the same units the comparison gate
+   % uses, so it is the tool that answers whether
+   % perfMeasurementPolicy().tol_perf is defensible here. It is a calibration
+   % diagnostic outside every release path and every routine run. With no
+   % arguments it costs two full suite runs of the chosen tier, so run it only
+   % when that question is asked, on a quiet machine.
    %
    % With no arguments, run both measurement passes back to back and compare
    % them. With arguments, compare already-saved artifacts and run nothing
@@ -21,7 +26,8 @@ function report = run_aa_acceptance(artifacts_a, artifacts_b)
    %  - each side has the same artifact count and no duplicate paths
    %  - the two sides share no paths
    %  - each side has one meta.run_name, and the two names differ
-   %  - every artifact has the same nonempty meta.hostname
+   %  - every artifact has the same nonempty meta.hostname, compared
+   %    through icemodel.test.helpers.normalizeMachineIdentity
    %  - every artifact has the same MATLAB version and input data root
    %  - every artifact has the same nonempty meta.git_revision
    %  - tier, simyear, n_runs, n_warmups, and tol_perf match
@@ -106,7 +112,15 @@ function report = run_aa_acceptance(artifacts_a, artifacts_b)
    assert(all(~ismissing(versions)) && all(strlength(strip(versions)) > 0), ...
       'icemodel:test:aaAcceptance:unknownMatlabVersion', ...
       'run_aa_acceptance needs a recorded MATLAB version in every artifact')
-   assert(isscalar(unique(hosts)) && isscalar(unique(versions)), ...
+   % Normalize before the uniqueness check: an artifact that saved a
+   % hostname value (for example "MacBook-Air-2.local") and one saved after
+   % a simulated network change (for example "macbook-air-2") name the
+   % same machine. This matches
+   % the normalization icemodel.test.helpers.perfBaselineCompatibility
+   % applies.
+   normalized_hosts = arrayfun( ...
+      @icemodel.test.helpers.normalizeMachineIdentity, hosts);
+   assert(isscalar(unique(normalized_hosts)) && isscalar(unique(versions)), ...
       'icemodel:test:aaAcceptance:environmentMismatch', ...
       'run_aa_acceptance needs one machine and MATLAB version for both runs')
 

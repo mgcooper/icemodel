@@ -410,6 +410,7 @@ function lines = reportMarkdown(title_text, suite_kind, results, summary, ...
       ""
       "**" + outcome + "** — " + string(height(summary)) + ...
       " formal case(s)."
+      qualityLine(results)
       ""
       reportMetadata(summary, suite_kind, results)];
 
@@ -459,6 +460,29 @@ function lines = reportMarkdown(title_text, suite_kind, results, summary, ...
          + "Changes can reflect code, MATLAB, host, or suite-contract revisions."];
    end
    lines(end + 1) = "";
+end
+
+function line = qualityLine(results)
+   %QUALITYLINE State the measurement quality verdict beside the outcome.
+   %
+   % A performance comparison can pass on a loaded machine and fail on a
+   % quiet one, so the report names the quality verdict of
+   % perfMeasurementQuality next to the comparison outcome. A result without
+   % that field, such as a regression result, adds no line.
+   line = strings(0, 1);
+   if ~isfield(results, "quality") || ~isstruct(results.quality)
+      return
+   end
+   quality = results.quality;
+   verdict = "FAILED";
+   if isfield(quality, "passed") && logical(quality.passed)
+      verdict = "PASSED";
+   end
+   line = "Measurement quality: **" + verdict + "**";
+   if isfield(quality, "reasons") && ~isempty(quality.reasons)
+      line = line + " — " + join(string(quality.reasons(:)), "; ");
+   end
+   line = line + ".";
 end
 
 function lines = reportMetadata(summary, suite_kind, results)

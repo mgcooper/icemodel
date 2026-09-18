@@ -50,6 +50,7 @@
 %   icemodel.forcing.reconstruct.setopts                          - Central options for the reconstruction pipeline
 %   icemodel.forcing.reconstruct.smoothShortwaveSeams             - Repair empirical outlier boundaries in filled SWD
 %   icemodel.forcing.reconstruct.solarElevationBands              - Solar-elevation thresholds for the swd science path
+%   icemodel.forcing.reconstruct.stampGapfillIdentity             - Stamp the gapfill_* identity fields on a filled met
 %   icemodel.forcing.reconstruct.stationMethodPlan                - Select and fit admitted fill methods for one station
 %   icemodel.forcing.reconstruct.stepScale                        - Per-season median absolute step of one observed channel
 %   icemodel.forcing.reconstruct.syntheticMissingness             - Draw blocked synthetic gaps into observed segments
@@ -58,4 +59,4 @@
 %   icemodel.forcing.reconstruct.validationSplit                  - Partition station years into selection and evaluation sets
 %   icemodel.forcing.reconstruct.verifyPromiceFilledReadiness     - Gate derived PROMICE forcing by coverage
 %
-%   updatecontents.m generated this file on 14 Sep 2026 at 20:13:58.
+%   updatecontents.m generated this file on 18 Sep 2026 at 01:12:19.

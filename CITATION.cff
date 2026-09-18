@@ -18,9 +18,6 @@ identifiers:
   - description: "The concept DOI representing all versions of IceModel"
     type: doi
     value: 10.5281/zenodo.11539329
-  - description: "The version DOI for IceModel v1.2"
-    type: doi
-    value: 10.5281/zenodo.22581761
 repository-code: 'https://github.com/mgcooper/icemodel'
 abstract: >-
   A 1-d radiative-thermodynamic heat transfer model of
@@ -36,5 +33,5 @@ keywords:
   - meltwater
   - albedo
 license: BSD-3-Clause
-version: 1.2
-date-released: '2026-09-06'
+version: 1.3
+date-released: '2026-09-18'
